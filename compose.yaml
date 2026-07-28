@@ -1,0 +1,156 @@
+# FantApperò local stack — EP01-02
+# Essential services: postgres, redis, api, worker
+# Optional tools: docker compose --profile tools up -d
+#
+# Usage from repo root:
+#   docker compose --env-file infra/local/.env.example up -d --build
+#   make up
+
+name: fantappero
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: fantappero-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-fantappero}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-fantappero_local_dev_only}
+      POSTGRES_DB: ${POSTGRES_DB:-fantappero}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - fantappero_pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${POSTGRES_USER:-fantappero} -d ${POSTGRES_DB:-fantappero}",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  redis:
+    image: redis:7-alpine
+    container_name: fantappero-redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - fantappero_redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+
+  api:
+    build:
+      context: .
+      dockerfile: infra/local/Dockerfile
+    image: fantappero-backend:local
+    container_name: fantappero-api
+    restart: unless-stopped
+    env_file:
+      - path: infra/local/.env.example
+        required: true
+      - path: infra/local/.env
+        required: false
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-postgresql://fantappero:fantappero_local_dev_only@postgres:5432/fantappero}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+      CELERY_BROKER_URL: ${CELERY_BROKER_URL:-redis://redis:6379/0}
+      CELERY_RESULT_BACKEND: ${CELERY_RESULT_BACKEND:-redis://redis:6379/1}
+    ports:
+      - "${API_PORT:-8000}:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "curl -fsS http://127.0.0.1:8000/health | grep -q '\"status\":\"ok\"'",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  worker:
+    image: fantappero-backend:local
+    container_name: fantappero-worker
+    restart: unless-stopped
+    command:
+      [
+        "celery",
+        "-A",
+        "app.worker.celery_app",
+        "worker",
+        "--loglevel=INFO",
+        "--concurrency=1",
+      ]
+    env_file:
+      - path: infra/local/.env.example
+        required: true
+      - path: infra/local/.env
+        required: false
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-postgresql://fantappero:fantappero_local_dev_only@postgres:5432/fantappero}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+      CELERY_BROKER_URL: ${CELERY_BROKER_URL:-redis://redis:6379/0}
+      CELERY_RESULT_BACKEND: ${CELERY_RESULT_BACKEND:-redis://redis:6379/1}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      api:
+        condition: service_started
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "celery -A app.worker.celery_app inspect ping -d celery@$$HOSTNAME | grep -q pong",
+        ]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 40s
+
+  # --- Optional tools (profile: tools) ---
+  adminer:
+    profiles: ["tools"]
+    image: adminer:4.8.1
+    container_name: fantappero-adminer
+    restart: unless-stopped
+    ports:
+      - "${ADMINER_PORT:-8081}:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  redis-commander:
+    profiles: ["tools"]
+    image: rediscommander/redis-commander:latest
+    container_name: fantappero-redis-commander
+    restart: unless-stopped
+    environment:
+      REDIS_HOSTS: local:redis:6379
+    ports:
+      - "${REDIS_COMMANDER_PORT:-8082}:8081"
+    depends_on:
+      redis:
+        condition: service_healthy
+
+volumes:
+  fantappero_pg_data:
+    name: fantappero_pg_data
+  fantappero_redis_data:
+    name: fantappero_redis_data
