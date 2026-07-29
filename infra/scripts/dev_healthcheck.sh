@@ -9,7 +9,7 @@ if [[ -f infra/local/.env ]]; then
   ENV_FILE="infra/local/.env"
 fi
 
-ESSENTIAL=(postgres redis api worker)
+ESSENTIAL=(postgres redis api worker web)
 TIMEOUT_SEC="${HEALTH_TIMEOUT_SEC:-180}"
 SLEEP_SEC=3
 deadline=$((SECONDS + TIMEOUT_SEC))
@@ -67,6 +67,11 @@ while (( SECONDS < deadline )); do
       body="$(curl -fsS "http://127.0.0.1:${api_port}/health" || true)"
       echo "API /health => ${body}"
       echo "$body" | grep -q '"status":"ok"' || fail "API /health did not return status ok"
+      web_port="$(compose port web 5173 2>/dev/null | awk -F: '{print $NF}' || true)"
+      web_port="${web_port:-5173}"
+      curl -fsS "http://127.0.0.1:${web_port}/" >/dev/null \
+        || fail "Web dev server not reachable on port ${web_port}"
+      echo "Web => http://127.0.0.1:${web_port}/"
     fi
     compose ps
     exit 0

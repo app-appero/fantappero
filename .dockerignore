@@ -9,6 +9,15 @@ venv
 node_modules
 apps
 packages
+# Dockerfile.web — workspace manifests for pnpm install
+!apps/web/
+!apps/web/package.json
+!apps/mobile/
+!apps/mobile/package.json
+!packages/contracts/
+!packages/contracts/package.json
+!packages/ui/
+!packages/ui/package.json
 tools
 experiments
 docs

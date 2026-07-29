@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from datetime import UTC, datetime
 from typing import Any
 
@@ -64,12 +65,20 @@ class SoftDeleteMixin:
 class TableNameMixin:
     """Plural ``snake_case`` table names derived from class name."""
 
+    @staticmethod
+    def _camel_to_snake(name: str) -> str:
+        snake = re.sub(r"([a-z0-9])([A-Z])", r"\1_\2", name)
+        return re.sub(r"([A-Z]+)([A-Z][a-z])", r"\1_\2", snake).lower()
+
+    @staticmethod
+    def _pluralize(snake: str) -> str:
+        if snake.endswith("y"):
+            return f"{snake[:-1]}ies"
+        if snake.endswith("s"):
+            return f"{snake}es"
+        return f"{snake}s"
+
     @declared_attr.directive
     @classmethod
     def __tablename__(cls) -> str:
-        name = cls.__name__
-        if name.endswith("y"):
-            return f"{name[:-1]}ies".lower()
-        if name.endswith("s"):
-            return f"{name.lower()}es"
-        return f"{name.lower()}s"
+        return cls._pluralize(cls._camel_to_snake(cls.__name__))

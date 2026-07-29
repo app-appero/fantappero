@@ -12,7 +12,8 @@ Python 3.12+, FastAPI, PostgreSQL, Redis/Celery (come da Architettura MVP).
 
 ```text
 backend/
-  src/app/           # FastAPI scaffold (health) — EP01-01
+  src/app/           # FastAPI (health + auth EP02-01)
+  src/auth/          # Email/password, sessions, rate limits — EP02-01
   src/database/      # SQLAlchemy base, session, baseline models — EP01-06
   src/sports_data/   # SPD anti-corruption (normalizzazione eventi EP00-03)
   alembic/           # Migrazioni Alembic (EP01-06)
@@ -82,6 +83,18 @@ python -m api_quota_estimator --csv docs/operations/api_quota_scenarios.csv
 Precedenza eventi fantavoto: [`docs/data/event_precedence_rules.md`](../docs/data/event_precedence_rules.md), ADR-0002.
 
 Polling e dimensionamento piano API: [`docs/operations/api_football_polling_plan.md`](../docs/operations/api_football_polling_plan.md).
+
+### Auth (EP02-01)
+
+Email/password, sessioni bearer revocabili, verifica email, reset password, rate limit.
+
+```bash
+make migrate
+python -m pytest tests/unit/auth -q
+# Integration (Postgres): DATABASE_URL=... python -m pytest tests/integration/auth -q
+```
+
+Documentazione: [`docs/development/auth.md`](../docs/development/auth.md).
 
 Rating Beta sperimentale (EP00-05, offline, no DB):
 

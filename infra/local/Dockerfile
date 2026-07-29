@@ -15,10 +15,15 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 COPY backend/pyproject.toml backend/README.md ./
+COPY backend/alembic.ini ./
+COPY backend/alembic ./alembic
 COPY backend/src ./src
+COPY infra/scripts/dev_api_entrypoint.sh /usr/local/bin/dev_api_entrypoint.sh
 
-RUN pip install .
+RUN pip install . \
+    && sed -i 's/\r$//' /usr/local/bin/dev_api_entrypoint.sh \
+    && chmod +x /usr/local/bin/dev_api_entrypoint.sh
 
 EXPOSE 8000
 
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["/usr/local/bin/dev_api_entrypoint.sh"]

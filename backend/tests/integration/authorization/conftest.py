@@ -1,0 +1,3 @@
+"""Fixtures for authorization integration tests."""
+
+from tests.integration.auth.conftest import *  # noqa: F403

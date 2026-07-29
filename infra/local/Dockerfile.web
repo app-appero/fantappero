@@ -1,0 +1,31 @@
+# syntax=docker/dockerfile:1
+# Vite web dev server for local Compose (EP02-01).
+
+FROM node:20-bookworm-slim
+
+ENV PNPM_HOME="/pnpm" \
+    PATH="/pnpm:$PATH"
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends curl \
+    && rm -rf /var/lib/apt/lists/* \
+    && corepack enable \
+    && corepack prepare pnpm@9.15.0 --activate
+
+WORKDIR /app
+
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY apps/web/package.json apps/web/
+COPY apps/mobile/package.json apps/mobile/
+COPY packages/contracts/package.json packages/contracts/
+COPY packages/ui/package.json packages/ui/
+
+RUN pnpm install --frozen-lockfile
+
+COPY infra/scripts/dev_web_entrypoint.sh /usr/local/bin/dev_web_entrypoint.sh
+RUN sed -i 's/\r$//' /usr/local/bin/dev_web_entrypoint.sh \
+    && chmod +x /usr/local/bin/dev_web_entrypoint.sh
+
+EXPOSE 5173
+
+ENTRYPOINT ["/usr/local/bin/dev_web_entrypoint.sh"]

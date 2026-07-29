@@ -13,7 +13,7 @@ BASH ?= bash
 	dev-api dev-web dev-mobile \
 	up up-tools down logs health reset-local smoke-local \
 	test test-api test-js lint format typecheck build \
-	check-migrations migrate migrate-down migrate-check quality smoke help
+	check-migrations migrate migrate-docker migrate-down migrate-check quality smoke help
 
 help:
 	@echo "Targets: setup | up | down | logs | health | reset-local | smoke-local |"
@@ -28,7 +28,7 @@ setup-js:
 setup-py:
 	python -m pip install -e "./backend[dev]"
 
-# --- Local Compose stack (EP01-02) ---
+# --- Local Compose stack (EP01-02 + EP02-01 web) ---
 
 up:
 	docker compose --env-file $(ENV_FILE) up -d --build
@@ -93,6 +93,10 @@ check-migrations:
 
 migrate:
 	cd backend && python -m alembic upgrade head
+
+# Prefer on Windows when host DATABASE_URL hits the wrong Postgres on :5432
+migrate-docker:
+	$(BASH) infra/scripts/migrate_docker.sh
 
 migrate-down:
 	cd backend && python -m alembic downgrade base

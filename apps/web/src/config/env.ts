@@ -33,3 +33,7 @@ export function loadWebEnv(
   }
   return { viteApiBaseUrl: parseUrl("VITE_API_BASE_URL", text) };
 }
+
+export function getApiBaseUrl(): string {
+  return loadWebEnv().viteApiBaseUrl;
+}

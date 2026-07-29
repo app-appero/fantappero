@@ -34,3 +34,7 @@ export function loadMobileEnv(
   }
   return { expoPublicApiBaseUrl: parseUrl("EXPO_PUBLIC_API_BASE_URL", text) };
 }
+
+export function getMobileApiBaseUrl(): string {
+  return loadMobileEnv().expoPublicApiBaseUrl;
+}

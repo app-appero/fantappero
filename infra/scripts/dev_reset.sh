@@ -13,6 +13,10 @@ Refusing destructive reset.
 This removes containers AND named volumes:
   - fantappero_pg_data
   - fantappero_redis_data
+  - fantappero_web_node_modules
+  - fantappero_web_app_node_modules
+  - fantappero_web_contracts_node_modules
+  - fantappero_web_ui_node_modules
 
 Re-run explicitly:
   CONFIRM=yes ./infra/scripts/dev_reset.sh

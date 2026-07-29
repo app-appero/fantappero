@@ -1,0 +1,35 @@
+---
+description: Lingua italiana e comandi senza Make (Windows)
+alwaysApply: true
+---
+
+# FantApperò — preferenze agent
+
+## Lingua
+
+- Rispondi sempre in **italiano** (spiegazioni, messaggi all'utente, PR/commit se richiesti).
+- Il codice (nomi, API, errori di dominio, docstring tecniche) resta in **inglese**, coerente con il codebase.
+
+## Comandi — non usare `make`
+
+Su Windows `make` è opzionale e spesso assente. Usa alternative esplicite:
+
+| Evitare | Usare invece |
+| --- | --- |
+| `make migrate` | `.\infra\scripts\migrate.ps1` (Compose) oppure `cd backend; python -m alembic upgrade head` |
+| `make migrate-check` | `python infra/scripts/check_migrations.py` |
+| `make quality` | Comandi singoli sotto (ruff, pytest, pnpm) |
+| `make up` | `docker compose --env-file infra/local/.env.example up -d --build` |
+| `make down` | `docker compose stop` o `.\infra\scripts\dev_down.sh` |
+| `make test` / `make test-api` | `cd backend; python -m pytest` |
+| `make test-js` | `pnpm test` |
+| `make lint` | `cd backend; python -m ruff check src tests` e `pnpm lint` |
+| `make format` | `cd backend; python -m ruff format --check src tests` |
+| `make typecheck` | `pnpm typecheck` |
+| `make build` | `pnpm run build:packages; pnpm run build:web` |
+| `make dev-api` | `cd backend; python -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8000` |
+| `make dev-web` | `pnpm dev:web` |
+
+- In **PowerShell** usa `;` come separatore, non `&&`.
+- Per migrazioni con Docker su Windows: preferire `.\infra\scripts\migrate.ps1` (vedi `docs/development/local_environment.md`).
+- Cita o esegui `make` solo se l'utente lo chiede esplicitamente.

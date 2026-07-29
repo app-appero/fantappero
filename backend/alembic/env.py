@@ -15,8 +15,18 @@ if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
 from database.base import Base  # noqa: E402
-from database.models import SystemFlag  # noqa: E402, F401
+from database.models import (  # noqa: E402, F401
+    AuthSession,
+    AuthToken,
+    League,
+    LeagueMembership,
+    SystemFlag,
+    User,
+)
+from config.settings.dotenv import load_repo_dotenv  # noqa: E402
 from database.session import get_database_url, normalize_database_url  # noqa: E402
+
+load_repo_dotenv(BACKEND_ROOT.parent)
 
 config = context.config
 
