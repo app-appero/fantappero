@@ -1,13 +1,20 @@
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
+import { MemoryRouter } from "./router/simpleRouter";
 import { describe, expect, it } from "vitest";
-import { App } from "./App";
+import { AuthProvider } from "./auth/AuthContext";
+import { AppRoutes } from "./routes";
 
-describe("App health page", () => {
-  it("renders ok health status", () => {
-    const html = renderToStaticMarkup(createElement(App));
-    expect(html).toContain('data-testid="health-status"');
-    expect(html).toContain(">ok<");
-    expect(html).toContain("fantappero-web");
+describe("App routing entry", () => {
+  it("redirects root to leagues", () => {
+    const html = renderToStaticMarkup(
+      createElement(MemoryRouter, {
+        initialEntries: ["/"],
+        children: createElement(AuthProvider, {
+          children: createElement(AppRoutes),
+        }),
+      }),
+    );
+    expect(html).toContain("Le tue leghe");
   });
 });

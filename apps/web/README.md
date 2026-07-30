@@ -22,4 +22,6 @@ pnpm --filter @fantappero/web build
 
 ## Status
 
-EP01-01 scaffold — minimal health page only.
+EPUI-01 — identità visiva documentata in `docs/design/`, token in `@fantappero/ui`, anteprima stati in `apps/web`.
+
+EPUI-05 — shell responsive con route placeholder, `ThemeProvider`, `AppErrorBoundary`, skip link e verifica 360px–desktop. Vedi [`docs/design/shell.md`](../../docs/design/shell.md).

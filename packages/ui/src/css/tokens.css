@@ -1,0 +1,140 @@
+/**
+ * Design tokens as CSS custom properties.
+ * Import via `@fantappero/ui/theme.css` in web/admin surfaces.
+ */
+:root,
+[data-theme="fantappero"] {
+  /* Palette */
+  --fa-pitch-950: #060910;
+  --fa-pitch-900: #0a0e14;
+  --fa-pitch-800: #0f1419;
+  --fa-pitch-700: #1c2736;
+  --fa-pitch-600: #2a3544;
+  --fa-pitch-500: #3d4a5c;
+
+  --fa-ivory-50: #faf8f4;
+  --fa-ivory-100: #f4f1ea;
+  --fa-ivory-200: #e8e4db;
+
+  --fa-slate-300: #a3abbe;
+  --fa-slate-400: #8b93a7;
+  --fa-slate-500: #6b7389;
+
+  --fa-electric-600: #1f57c9;
+  --fa-electric-500: #2f6fed;
+  --fa-electric-400: #5a8df2;
+  --fa-electric-300: #8fb0f7;
+
+  --fa-success-600: #247a35;
+  --fa-success-500: #2f9e44;
+  --fa-success-400: #4cb564;
+
+  --fa-warning-600: #b8860b;
+  --fa-warning-500: #e6a700;
+  --fa-warning-400: #f0c040;
+
+  --fa-danger-600: #c92a2a;
+  --fa-danger-500: #e03131;
+  --fa-danger-400: #f06565;
+
+  /* Semantic */
+  --fa-color-background: var(--fa-pitch-800);
+  --fa-color-background-subtle: var(--fa-pitch-900);
+  --fa-color-background-elevated: var(--fa-pitch-700);
+  --fa-color-background-gradient-stop: var(--fa-pitch-700);
+
+  --fa-color-foreground: var(--fa-ivory-100);
+  --fa-color-foreground-muted: var(--fa-slate-300);
+  --fa-color-foreground-subtle: var(--fa-slate-400);
+
+  --fa-color-accent: var(--fa-electric-500);
+  --fa-color-accent-hover: var(--fa-electric-400);
+  --fa-color-accent-muted: var(--fa-electric-300);
+
+  --fa-color-border: var(--fa-pitch-600);
+  --fa-color-border-strong: var(--fa-pitch-500);
+
+  --fa-color-success: var(--fa-success-500);
+  --fa-color-warning: var(--fa-warning-500);
+  --fa-color-danger: var(--fa-danger-500);
+  --fa-color-focus-ring: var(--fa-electric-300);
+
+  /* Typography */
+  --fa-font-sans: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --fa-font-mono: "IBM Plex Mono", "Consolas", monospace;
+
+  --fa-text-xs: 0.75rem;
+  --fa-text-sm: 0.875rem;
+  --fa-text-md: 1rem;
+  --fa-text-lg: 1.25rem;
+  --fa-text-xl: 1.75rem;
+  --fa-text-2xl: 2.5rem;
+
+  --fa-leading-tight: 1.2;
+  --fa-leading-snug: 1.35;
+  --fa-leading-normal: 1.5;
+
+  /* Spacing */
+  --fa-space-xs: 4px;
+  --fa-space-sm: 8px;
+  --fa-space-md: 16px;
+  --fa-space-lg: 24px;
+  --fa-space-xl: 40px;
+  --fa-space-2xl: 56px;
+
+  /* Radius */
+  --fa-radius-sm: 4px;
+  --fa-radius-md: 8px;
+  --fa-radius-lg: 12px;
+  --fa-radius-xl: 16px;
+  --fa-radius-pill: 9999px;
+
+  /* Shadows */
+  --fa-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.35);
+  --fa-shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4);
+  --fa-shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.45);
+  --fa-shadow-focus: 0 0 0 3px rgba(143, 176, 247, 0.45);
+
+  /* Motion */
+  --fa-duration-fast: 150ms;
+  --fa-duration-normal: 250ms;
+  --fa-easing-standard: cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* Breakpoints (for reference in custom media / JS) */
+  --fa-bp-sm: 640px;
+  --fa-bp-md: 768px;
+  --fa-bp-lg: 1024px;
+  --fa-bp-xl: 1280px;
+  --fa-bp-2xl: 1536px;
+
+  /* Z-index layers */
+  --fa-z-base: 0;
+  --fa-z-raised: 10;
+  --fa-z-dropdown: 100;
+  --fa-z-sticky: 200;
+  --fa-z-overlay: 300;
+  --fa-z-modal: 400;
+  --fa-z-toast: 500;
+  --fa-z-tooltip: 600;
+
+  /* Component semantic aliases */
+  --fa-color-input-bg: var(--fa-pitch-900);
+  --fa-color-input-border: var(--fa-color-border);
+  --fa-color-input-border-hover: var(--fa-color-border-strong);
+  --fa-color-input-border-focus: var(--fa-electric-400);
+  --fa-color-input-border-error: var(--fa-danger-500);
+  --fa-color-input-placeholder: var(--fa-slate-500);
+  --fa-color-disabled-bg: var(--fa-pitch-700);
+  --fa-color-disabled-fg: var(--fa-slate-500);
+}
+
+/** Admin panel shares the same tokens; density is applied via utility class. */
+[data-surface="admin"] {
+  --fa-density-gap: var(--fa-space-sm);
+  --fa-density-padding: var(--fa-space-md);
+}
+
+[data-surface="app"] {
+  --fa-density-gap: var(--fa-space-md);
+  --fa-density-padding: var(--fa-space-md);
+}

@@ -10,7 +10,12 @@
       "types": "./src/index.ts",
       "import": "./src/index.ts",
       "default": "./src/index.ts"
-    }
+    },
+    "./theme.css": "./src/css/theme.css",
+    "./tokens.css": "./src/css/tokens.css"
+  },
+  "peerDependencies": {
+    "react": ">=18"
   },
   "files": [
     "src",
@@ -20,10 +25,14 @@
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "lint": "tsc -p tsconfig.json --noEmit",
-    "test": "node --test --experimental-strip-types src/tokens.test.ts",
+    "test": "vitest run",
     "clean": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\""
   },
   "devDependencies": {
-    "typescript": "5.8.3"
+    "@types/react": "19.1.8",
+    "react": "19.1.0",
+    "react-dom": "19.1.0",
+    "typescript": "5.8.3",
+    "vitest": "3.2.4"
   }
 }

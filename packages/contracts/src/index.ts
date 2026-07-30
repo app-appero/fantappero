@@ -1,21 +1,25 @@
 /** Shared API contract types (scaffold — OpenAPI generation comes later). */
 
-export type HealthStatus = "ok" | "degraded" | "error";
+export {
+  hasAnyPermission,
+  hasPermissions,
+  resolvePermissions,
+} from "./auth.js";
+export type {
+  GlobalRole,
+  LeagueRole,
+  LeagueSummary,
+  Permission,
+  PermissionContext,
+  SessionUser,
+} from "./auth.js";
 
-export interface HealthResponse {
-  status: HealthStatus;
-}
+export type { BreadcrumbItem, NavItemDefinition, NavSurface } from "./navigation.js";
 
-export interface ServiceInfo {
-  service: string;
-  status: HealthStatus;
-}
-
-/** Stable service identifiers used by clients. */
-export const SERVICES = {
-  api: "fantappero-api",
-  web: "fantappero-web",
-  mobile: "fantappero-mobile",
-} as const;
-
-export type ServiceId = (typeof SERVICES)[keyof typeof SERVICES];
+export {
+  SERVICES,
+  type HealthResponse,
+  type HealthStatus,
+  type ServiceId,
+  type ServiceInfo,
+} from "./health.js";

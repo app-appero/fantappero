@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { SERVICES, type HealthResponse } from "./index.ts";
+import { SERVICES, type HealthResponse } from "./health.ts";
 
 test("SERVICES exposes stable ids", () => {
   assert.equal(SERVICES.api, "fantappero-api");

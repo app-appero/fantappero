@@ -1,10 +1,179 @@
-* {
-  box-sizing: border-box;
+@import "@fantappero/ui/theme.css";
+
+.fa-user-chip {
+  font-size: var(--fa-text-sm);
+  color: var(--fa-color-foreground-muted);
+  padding: var(--fa-space-xs) var(--fa-space-sm);
+  border-radius: var(--fa-radius-md);
+  border: 1px solid var(--fa-color-border);
+  background-color: var(--fa-color-background);
 }
 
-html,
-body,
-#root {
+.fa-user-chip--admin {
+  border-color: color-mix(in srgb, var(--fa-color-warning) 40%, var(--fa-color-border));
+}
+
+.fa-admin-brand {
+  color: var(--fa-color-warning);
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.fa-link-muted {
+  font-size: var(--fa-text-sm);
+  color: var(--fa-color-foreground-muted);
+  text-decoration: none;
+}
+
+.fa-link-muted:hover {
+  color: var(--fa-color-accent);
+}
+
+.fa-league-list {
+  list-style: none;
   margin: 0;
-  min-height: 100%;
+  padding: 0;
+  display: grid;
+  gap: var(--fa-space-sm);
+}
+
+.fa-league-list__item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--fa-space-sm) var(--fa-space-md);
+  border: 1px solid var(--fa-color-border);
+  border-radius: var(--fa-radius-md);
+  background-color: var(--fa-color-background-elevated);
+}
+
+.fa-league-list__role {
+  font-size: var(--fa-text-sm);
+  color: var(--fa-color-foreground-muted);
+}
+
+.fa-app-header__brand a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.fa-app-header__brand a:hover {
+  color: var(--fa-color-accent);
+}
+
+.fa-app-header__brand a:focus-visible {
+  outline: none;
+  box-shadow: var(--fa-shadow-focus);
+  border-radius: var(--fa-radius-sm);
+}
+
+.fa-wireframe-meta {
+  margin-top: var(--fa-space-xl);
+  padding: var(--fa-space-md);
+  border: 1px solid var(--fa-color-border);
+  border-radius: var(--fa-radius-md);
+  background-color: var(--fa-color-background);
+}
+
+.fa-wireframe-meta__title {
+  margin: 0 0 var(--fa-space-md);
+  font-size: var(--fa-text-md);
+  font-weight: 600;
+}
+
+.fa-wireframe-meta__list {
+  margin: 0;
+  display: grid;
+  gap: var(--fa-space-sm);
+}
+
+.fa-wireframe-meta__list dt {
+  font-size: var(--fa-text-xs);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--fa-color-foreground-subtle);
+}
+
+.fa-wireframe-meta__list dd {
+  margin: 0 0 var(--fa-space-sm);
+  color: var(--fa-color-foreground-muted);
+  font-size: var(--fa-text-sm);
+}
+
+.fa-wireframe-meta__list ul,
+.fa-wireframe-meta__list ol {
+  margin: 0;
+  padding-left: var(--fa-space-lg);
+}
+
+.fa-wireframe-meta__tbd {
+  margin-top: var(--fa-space-md);
+  padding-top: var(--fa-space-md);
+  border-top: 1px solid var(--fa-color-border);
+}
+
+.fa-wireframe-meta__tbd-label {
+  margin: 0 0 var(--fa-space-sm);
+  font-size: var(--fa-text-sm);
+  font-weight: 600;
+  color: var(--fa-color-warning);
+}
+
+.fa-wireframe-meta__tbd ul {
+  margin: 0;
+  padding-left: var(--fa-space-lg);
+  font-size: var(--fa-text-sm);
+}
+
+.fa-wireframe-note {
+  margin-top: var(--fa-space-md);
+  font-size: var(--fa-text-sm);
+  color: var(--fa-color-foreground-subtle);
+  text-align: center;
+}
+
+.fa-wireframe-hub__intro {
+  color: var(--fa-color-foreground-muted);
+  font-size: var(--fa-text-sm);
+}
+
+.fa-wireframe-hub__list {
+  list-style: none;
+  margin: var(--fa-space-lg) 0 0;
+  padding: 0;
+  display: grid;
+  gap: var(--fa-space-lg);
+}
+
+.fa-wireframe-hub__item {
+  padding: var(--fa-space-md);
+  border: 1px solid var(--fa-color-border);
+  border-radius: var(--fa-radius-md);
+  background-color: var(--fa-color-background-elevated);
+}
+
+.fa-wireframe-hub__item h2 {
+  margin: 0 0 var(--fa-space-sm);
+  font-size: var(--fa-text-lg);
+}
+
+.fa-wireframe-hub__states {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--fa-space-xs);
+  margin-top: var(--fa-space-sm);
+}
+
+.fa-wireframe-hub__state-link {
+  padding: var(--fa-space-xs) var(--fa-space-sm);
+  border: 1px solid var(--fa-color-border);
+  border-radius: var(--fa-radius-sm);
+  font-size: var(--fa-text-xs);
+  text-decoration: none;
+  color: var(--fa-color-accent);
+}
+
+.fa-wireframe-hub__state-link:hover {
+  border-color: var(--fa-color-accent);
 }
