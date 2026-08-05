@@ -14,7 +14,28 @@ export type AppRouteDefinition = {
 export const APP_ROUTE_DEFINITIONS: readonly AppRouteDefinition[] = [
   { id: "auth-login", path: "/accedi", layout: "none" },
   { id: "auth-register", path: "/accedi/registrati", layout: "none" },
+  { id: "auth-forgot", path: "/accedi/recupera", layout: "none" },
+  { id: "auth-reset", path: "/accedi/reimposta-password", layout: "none" },
+  { id: "auth-verify", path: "/accedi/verifica", layout: "none" },
   { id: "leagues", path: "/leghe", layout: "app", requiredPermissions: ["league:view"] },
+  {
+    id: "league-invite",
+    path: "/leghe/invito",
+    layout: "app",
+    requiredPermissions: ["league:view"],
+  },
+  {
+    id: "manager-directory",
+    path: "/fantallenatori",
+    layout: "app",
+    requiredPermissions: ["league:admin"],
+  },
+  {
+    id: "received-invites",
+    path: "/inviti",
+    layout: "app",
+    requiredPermissions: ["league:view"],
+  },
   { id: "matchday", path: "/turni", layout: "app", requiredPermissions: ["matchday:view"] },
   { id: "standings", path: "/classifica", layout: "app", requiredPermissions: ["matchday:view"] },
   { id: "roster", path: "/rosa", layout: "app", requiredPermissions: ["roster:view"] },

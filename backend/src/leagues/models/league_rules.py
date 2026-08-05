@@ -1,0 +1,76 @@
+"""League rules ORM model (EP03-02)."""
+
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+from uuid import UUID
+
+from sqlalchemy import (
+    Boolean,
+    CheckConstraint,
+    ForeignKey,
+    Index,
+    Integer,
+    String,
+    UniqueConstraint,
+    text,
+)
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+
+from database.base import Base, TimestampMixin, UUIDPrimaryKeyMixin
+
+if TYPE_CHECKING:
+    from leagues.models.league import League
+
+
+class LeagueRules(Base, UUIDPrimaryKeyMixin, TimestampMixin):
+    """Configurable league rules constrained by the Standard preset."""
+
+    __tablename__ = "league_rules"
+    __table_args__ = (
+        UniqueConstraint("league_id", name="uq_league_rules_league_id"),
+        Index("ix_league_rules_league_id", "league_id", unique=True),
+        CheckConstraint(
+            "participant_count BETWEEN 4 AND 10",
+            name="ck_league_rules_participant_range",
+        ),
+        CheckConstraint("roster_size = 35", name="ck_league_rules_roster_size"),
+        CheckConstraint("goalkeepers = 3", name="ck_league_rules_goalkeepers"),
+        CheckConstraint("defenders = 11", name="ck_league_rules_defenders"),
+        CheckConstraint("midfielders = 11", name="ck_league_rules_midfielders"),
+        CheckConstraint("forwards = 10", name="ck_league_rules_forwards"),
+        CheckConstraint(
+            "goalkeepers + defenders + midfielders + forwards = roster_size",
+            name="ck_league_rules_roster_sum",
+        ),
+        CheckConstraint("total_credits > 0", name="ck_league_rules_total_credits"),
+    )
+
+    league_id: Mapped[UUID] = mapped_column(
+        ForeignKey("leagues.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    preset_name: Mapped[str] = mapped_column(
+        String(32),
+        nullable=False,
+        server_default=text("'standard'"),
+    )
+    participant_count: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        server_default=text("8"),
+    )
+    roster_size: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("35"))
+    goalkeepers: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("3"))
+    defenders: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("11"))
+    midfielders: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("11"))
+    forwards: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("10"))
+    total_credits: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("1000"))
+    allow_trades: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("true"))
+    allow_manual_invites: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        server_default=text("true"),
+    )
+
+    league: Mapped[League] = relationship(back_populates="rules")

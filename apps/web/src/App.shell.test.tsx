@@ -21,7 +21,7 @@ function renderShellAt(path: string, search = "") {
 
 describe("App responsive shell (EPUI-05)", () => {
   it("exposes skip link and main landmark on member routes", () => {
-    const html = renderShellAt("/turni");
+    const html = renderShellAt("/turni", "?persona=admin&stato=success");
     expect(html).toContain('href="#main-content"');
     expect(html).toContain("Salta al contenuto principale");
     expect(html).toContain('id="main-content"');
@@ -39,21 +39,20 @@ describe("App responsive shell (EPUI-05)", () => {
     expect(html).not.toContain("Salta al contenuto principale");
   });
 
-  it("renders wireframe empty state with catalog copy", () => {
-    const html = renderShellAt("/leghe", "?stato=empty");
-    expect(html).toContain('data-testid="wireframe-league-dashboard-empty"');
-    expect(html).toContain("Nessuna lega");
+  it("renders empty leagues state with create action", () => {
+    const html = renderShellAt("/leghe", "?persona=admin&stato=empty");
+    expect(html).toContain('data-testid="leagues-empty"');
     expect(html).toContain("Crea lega");
   });
 
   it("renders wireframe error state with retry affordance", () => {
-    const html = renderShellAt("/mercato", "?stato=error");
+    const html = renderShellAt("/mercato", "?persona=admin&stato=error");
     expect(html).toContain('data-testid="wireframe-market-error"');
     expect(html).toContain("Ricarica");
   });
 
   it("renders forbidden state on protected route for member persona", () => {
-    const html = renderShellAt("/lega/amministrazione");
+    const html = renderShellAt("/lega/amministrazione", "?persona=member&stato=success");
     expect(html).toContain('data-testid="route-forbidden"');
   });
 
@@ -64,7 +63,7 @@ describe("App responsive shell (EPUI-05)", () => {
   });
 
   it("includes responsive shell structure for mobile and desktop nav", () => {
-    const html = renderShellAt("/rosa");
+    const html = renderShellAt("/rosa", "?persona=admin&stato=success");
     expect(html).toContain('data-testid="sidebar-nav"');
     expect(html).toContain('data-testid="bottom-nav"');
   });

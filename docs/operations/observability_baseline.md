@@ -55,8 +55,27 @@ Stable names in `observability.metrics`:
 | `jobs_failed_total` | counter | `task` |
 | `job_duration_seconds` | histogram | `task` |
 | `queue_depth` | gauge | `queue` |
+| `provider_requests_total` | counter | `provider`, `endpoint`, `status` |
+| `provider_request_errors_total` | counter | `provider`, `endpoint`, `error_type` |
+| `provider_request_duration_seconds` | histogram | `provider`, `endpoint` |
+| `provider_retries_total` | counter | `provider`, `endpoint` |
+| `provider_rate_limit_remaining` | gauge | `provider` |
+| `provider_snapshots_stored_total` | counter | `provider`, `endpoint`, `result` |
+| `provider_snapshots_deduped_total` | counter | `provider`, `endpoint` |
+| `catalog_sync_runs_total` | counter | `provider`, `status` |
+| `catalog_sync_entities_total` | counter | `provider`, `entity`, `result` |
+| `catalog_sync_duration_seconds` | histogram | `provider` |
+| `sports_scheduler_runs_total` | counter | `provider`, `window`, `status` |
+| `sports_scheduler_duration_seconds` | histogram | `provider`, `window` |
+| `sports_scheduler_quota_mode` | gauge | `provider` |
+| `sports_scheduler_lock_skipped_total` | counter | `provider`, `lock` |
 
 Export to Prometheus/OTel can wrap `MetricsRegistry.snapshot()` later without changing call sites.
+
+Adapter SPD (EP04-01): [`api_football_adapter.md`](./api_football_adapter.md).  
+Catalogo competizioni/stagioni/club (EP04-02): [`sports_catalog_sync.md`](./sports_catalog_sync.md).  
+Scheduler pre/live/post (EP04-06): [`sports_scheduler.md`](./sports_scheduler.md).  
+Pannello qualità dati (EP04-07): [`sports_data_quality.md`](./sports_data_quality.md).
 
 ## Error tracking feature flag
 

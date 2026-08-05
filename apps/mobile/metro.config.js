@@ -13,4 +13,28 @@ config.resolver.nodeModulesPaths = [
 ];
 config.resolver.disableHierarchicalLookup = true;
 
+/** Workspace packages use TS ESM imports with a `.js` extension; Metro needs `.ts`/`.tsx`. */
+const TS_SOURCE_EXTENSIONS = [".ts", ".tsx"];
+const defaultResolveRequest = config.resolver.resolveRequest;
+
+config.resolver.resolveRequest = (context, moduleName, platform) => {
+  const resolveModule = (name) =>
+    defaultResolveRequest
+      ? defaultResolveRequest(context, name, platform)
+      : context.resolveRequest(context, name, platform);
+
+  if (moduleName.startsWith(".") && moduleName.endsWith(".js")) {
+    const baseName = moduleName.slice(0, -3);
+    for (const extension of TS_SOURCE_EXTENSIONS) {
+      try {
+        return resolveModule(`${baseName}${extension}`);
+      } catch {
+        // try next extension
+      }
+    }
+  }
+
+  return resolveModule(moduleName);
+};
+
 module.exports = config;

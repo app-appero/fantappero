@@ -9,7 +9,7 @@ describe("App routing entry", () => {
   it("redirects root to leagues", () => {
     const html = renderToStaticMarkup(
       createElement(MemoryRouter, {
-        initialEntries: ["/"],
+        initialEntries: ["/?persona=admin&stato=success"],
         children: createElement(AuthProvider, {
           children: createElement(AppRoutes),
         }),

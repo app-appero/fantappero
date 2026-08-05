@@ -1,3 +1,4 @@
+import { RequireAuth } from "./auth/RequireAuth";
 import { RequireGlobalOperator, RequirePermissions } from "./auth/RequirePermissions";
 import { AdminLayout, AppLayout } from "./layout/AppLayout";
 import {
@@ -5,15 +6,22 @@ import {
   AdminLeaguesPage,
   AdminUsersPage,
   AuctionPage,
+  AuthForgotPasswordPage,
+  AuthLoginPage,
   AuthRegisterPage,
-  AuthPage,
+  AuthResetPasswordPage,
+  AuthVerifyEmailPage,
+  CreateLeaguePage,
   FormationPage,
   LeagueAdminPage,
+  JoinLeaguePage,
   LeaguesPage,
   MarketPage,
   MatchdayPage,
+  ManagerDirectoryPage,
   NotFoundPage,
   ProfilePage,
+  ReceivedInvitesPage,
   RosterPage,
   StandingsPage,
 } from "./pages/AppPages";
@@ -22,14 +30,20 @@ import { WireframesHubPage } from "./pages/WireframesHubPage";
 import { useLocation } from "./router/simpleRouter";
 
 function AppSection({ children }: { children: React.ReactNode }) {
-  return <AppLayout>{children}</AppLayout>;
+  return (
+    <RequireAuth>
+      <AppLayout>{children}</AppLayout>
+    </RequireAuth>
+  );
 }
 
 function AdminSection({ children }: { children: React.ReactNode }) {
   return (
-    <RequireGlobalOperator>
-      <AdminLayout>{children}</AdminLayout>
-    </RequireGlobalOperator>
+    <RequireAuth>
+      <RequireGlobalOperator>
+        <AdminLayout>{children}</AdminLayout>
+      </RequireGlobalOperator>
+    </RequireAuth>
   );
 }
 
@@ -37,11 +51,23 @@ export function AppRoutes() {
   const { pathname } = useLocation();
 
   if (pathname === "/accedi") {
-    return <AuthPage />;
+    return <AuthLoginPage />;
   }
 
   if (pathname === "/accedi/registrati") {
     return <AuthRegisterPage />;
+  }
+
+  if (pathname === "/accedi/recupera") {
+    return <AuthForgotPasswordPage />;
+  }
+
+  if (pathname === "/accedi/reimposta-password") {
+    return <AuthResetPasswordPage />;
+  }
+
+  if (pathname === "/accedi/verifica") {
+    return <AuthVerifyEmailPage />;
   }
 
   if (pathname === "/" || pathname === "/leghe") {
@@ -49,6 +75,46 @@ export function AppRoutes() {
       <AppSection>
         <RequirePermissions required={["league:view"]}>
           <LeaguesPage />
+        </RequirePermissions>
+      </AppSection>
+    );
+  }
+
+  if (pathname === "/leghe/crea") {
+    return (
+      <AppSection>
+        <RequirePermissions required={["league:view"]}>
+          <CreateLeaguePage />
+        </RequirePermissions>
+      </AppSection>
+    );
+  }
+
+  if (pathname === "/leghe/invito") {
+    return (
+      <AppSection>
+        <RequirePermissions required={["league:view"]}>
+          <JoinLeaguePage />
+        </RequirePermissions>
+      </AppSection>
+    );
+  }
+
+  if (pathname === "/fantallenatori") {
+    return (
+      <AppSection>
+        <RequirePermissions required={["league:admin"]}>
+          <ManagerDirectoryPage />
+        </RequirePermissions>
+      </AppSection>
+    );
+  }
+
+  if (pathname === "/inviti") {
+    return (
+      <AppSection>
+        <RequirePermissions required={["league:view"]}>
+          <ReceivedInvitesPage />
         </RequirePermissions>
       </AppSection>
     );

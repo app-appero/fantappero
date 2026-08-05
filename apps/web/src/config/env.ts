@@ -23,6 +23,8 @@ function parseUrl(name: string, value: string): string {
   }
 }
 
+let cachedEnv: WebEnv | null = null;
+
 export function loadWebEnv(
   source: Record<string, string | boolean | undefined> = import.meta.env,
 ): WebEnv {
@@ -32,4 +34,15 @@ export function loadWebEnv(
     throw new WebEnvError("Missing required environment variable: VITE_API_BASE_URL");
   }
   return { viteApiBaseUrl: parseUrl("VITE_API_BASE_URL", text) };
+}
+
+export function getWebEnv(): WebEnv {
+  if (cachedEnv === null) {
+    cachedEnv = loadWebEnv();
+  }
+  return cachedEnv;
+}
+
+export function resetWebEnvCache(): void {
+  cachedEnv = null;
 }

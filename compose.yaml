@@ -1,5 +1,5 @@
 # FantApperò local stack — EP01-02
-# Essential services: postgres, redis, api, worker
+# Essential services: postgres, redis, api, worker, beat, web
 # Optional tools: docker compose --profile tools up -d
 #
 # Usage from repo root:
@@ -26,6 +26,27 @@ services:
         [
           "CMD-SHELL",
           "pg_isready -U ${POSTGRES_USER:-fantappero} -d ${POSTGRES_DB:-fantappero}",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  postgres-test:
+    profiles: ["test"]
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-fantappero}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-fantappero_local_dev_only}
+      POSTGRES_DB: fantappero_test
+    volumes:
+      - fantappero_pg_test_data:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${POSTGRES_USER:-fantappero} -d fantappero_test",
         ]
       interval: 5s
       timeout: 5s
@@ -61,17 +82,30 @@ services:
       - path: infra/local/.env
         required: false
     environment:
-      DATABASE_URL: ${DATABASE_URL:-postgresql://fantappero:fantappero_local_dev_only@postgres:5432/fantappero}
-      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
-      CELERY_BROKER_URL: ${CELERY_BROKER_URL:-redis://redis:6379/0}
-      CELERY_RESULT_BACKEND: ${CELERY_RESULT_BACKEND:-redis://redis:6379/1}
+      # Always use in-compose hostnames — ignore host .env DATABASE_URL (127.0.0.1).
+      DATABASE_URL: postgresql://${POSTGRES_USER:-fantappero}:${POSTGRES_PASSWORD:-fantappero_local_dev_only}@postgres:5432/${POSTGRES_DB:-fantappero}
+      TEST_DATABASE_URL: postgresql://${POSTGRES_USER:-fantappero}:${POSTGRES_PASSWORD:-fantappero_local_dev_only}@postgres-test:5432/fantappero_test
+      REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/1
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-fantappero_local_jwt_dev_only_change_in_production}
+      SMTP_HOST: ${SMTP_HOST:-mailpit}
+      SMTP_PORT: ${SMTP_PORT:-1025}
+      MAIL_FROM: ${MAIL_FROM:-noreply@fantappero.local}
+      WEB_APP_BASE_URL: ${WEB_APP_BASE_URL:-http://localhost:5173}
+      AVATAR_STORAGE_PATH: /data/avatars
+      PROFILE_POLICY_VERSION: ${PROFILE_POLICY_VERSION:-2026-01}
     ports:
       - "${API_PORT:-8000}:8000"
+    volumes:
+      - fantappero_avatar_data:/data/avatars
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
+      mailpit:
+        condition: service_started
     healthcheck:
       test:
         [
@@ -102,15 +136,23 @@ services:
       - path: infra/local/.env
         required: false
     environment:
-      DATABASE_URL: ${DATABASE_URL:-postgresql://fantappero:fantappero_local_dev_only@postgres:5432/fantappero}
-      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
-      CELERY_BROKER_URL: ${CELERY_BROKER_URL:-redis://redis:6379/0}
-      CELERY_RESULT_BACKEND: ${CELERY_RESULT_BACKEND:-redis://redis:6379/1}
+      # Always use in-compose hostnames — ignore host .env DATABASE_URL (127.0.0.1).
+      DATABASE_URL: postgresql://${POSTGRES_USER:-fantappero}:${POSTGRES_PASSWORD:-fantappero_local_dev_only}@postgres:5432/${POSTGRES_DB:-fantappero}
+      REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/1
+      SMTP_HOST: ${SMTP_HOST:-mailpit}
+      SMTP_PORT: ${SMTP_PORT:-1025}
+      MAIL_FROM: ${MAIL_FROM:-noreply@fantappero.local}
+      WEB_APP_BASE_URL: ${WEB_APP_BASE_URL:-http://localhost:5173}
+      SPORTS_SCHEDULER_ENABLED: ${SPORTS_SCHEDULER_ENABLED:-false}
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
+      mailpit:
+        condition: service_started
       api:
         condition: service_started
     healthcheck:
@@ -123,6 +165,75 @@ services:
       timeout: 10s
       retries: 10
       start_period: 40s
+
+  beat:
+    image: fantappero-backend:local
+    container_name: fantappero-beat
+    restart: unless-stopped
+    command:
+      [
+        "celery",
+        "-A",
+        "app.worker.celery_app",
+        "beat",
+        "--loglevel=INFO",
+      ]
+    env_file:
+      - path: infra/local/.env.example
+        required: true
+      - path: infra/local/.env
+        required: false
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-fantappero}:${POSTGRES_PASSWORD:-fantappero_local_dev_only}@postgres:5432/${POSTGRES_DB:-fantappero}
+      REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/1
+      SPORTS_SCHEDULER_ENABLED: ${SPORTS_SCHEDULER_ENABLED:-false}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      worker:
+        condition: service_started
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "celery -A app.worker.celery_app inspect ping >/dev/null 2>&1 || exit 0",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 20s
+
+  web:
+    build:
+      context: .
+      dockerfile: infra/local/Dockerfile.web
+    image: fantappero-web:local
+    container_name: fantappero-web
+    restart: unless-stopped
+    environment:
+      VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://127.0.0.1:8000}
+    ports:
+      - "${WEB_PORT:-5173}:5173"
+    volumes:
+      - ./apps/web:/app/apps/web
+      - ./apps/mobile:/app/apps/mobile
+      - ./packages:/app/packages
+      - fantappero_web_node_modules:/app/node_modules
+      - fantappero_web_app_node_modules:/app/apps/web/node_modules
+      - fantappero_mobile_app_node_modules:/app/apps/mobile/node_modules
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:5173/ >/dev/null"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 45s
 
   # --- Optional tools (profile: tools) ---
   adminer:
@@ -149,8 +260,26 @@ services:
       redis:
         condition: service_healthy
 
+  mailpit:
+    image: axllent/mailpit:v1.22
+    container_name: fantappero-mailpit
+    restart: unless-stopped
+    ports:
+      - "${MAILPIT_SMTP_PORT:-1025}:1025"
+      - "${MAILPIT_UI_PORT:-8025}:8025"
+
 volumes:
   fantappero_pg_data:
     name: fantappero_pg_data
+  fantappero_pg_test_data:
+    name: fantappero_pg_test_data
   fantappero_redis_data:
     name: fantappero_redis_data
+  fantappero_avatar_data:
+    name: fantappero_avatar_data
+  fantappero_web_node_modules:
+    name: fantappero_web_node_modules
+  fantappero_web_app_node_modules:
+    name: fantappero_web_app_node_modules
+  fantappero_mobile_app_node_modules:
+    name: fantappero_mobile_app_node_modules

@@ -14,7 +14,7 @@ Python 3.12+, FastAPI, PostgreSQL, Redis/Celery (come da Architettura MVP).
 backend/
   src/app/           # FastAPI scaffold (health) — EP01-01
   src/database/      # SQLAlchemy base, session, baseline models — EP01-06
-  src/sports_data/   # SPD anti-corruption (normalizzazione eventi EP00-03)
+  src/sports_data/   # SPD anti-corruption (normalizzazione EP00-03; adapter EP04-01; catalogo EP04-02; roster EP04-03; listone EP04-04; qualità EP04-07)
   alembic/           # Migrazioni Alembic (EP01-06)
   alembic.ini
   scripts/           # tool offline sport data (EP00)
@@ -78,6 +78,30 @@ python -m api_quota_estimator --csv docs/operations/api_quota_scenarios.csv
 ```
 
 `API_FOOTBALL_KEY` vive nel `.env` di root (o env di processo), mai nei client.
+
+Adapter HTTP (auth, paginazione, errori, snapshot, metriche): [`docs/operations/api_football_adapter.md`](../docs/operations/api_football_adapter.md) (EP04-01).
+
+Catalogo MVP competizioni / stagioni / club (sync idempotente): [`docs/operations/sports_catalog_sync.md`](../docs/operations/sports_catalog_sync.md) (EP04-02).
+
+Calciatori, rose reali e trasferimenti: [`docs/operations/sports_roster_sync.md`](../docs/operations/sports_roster_sync.md) (EP04-03).
+
+Fixture, eventi, lineup e statistiche: [`docs/operations/sports_fixtures_sync.md`](../docs/operations/sports_fixtures_sync.md) (EP04-05).
+
+Scheduler pre/live/post (lock, quote, beat): [`docs/operations/sports_scheduler.md`](../docs/operations/sports_scheduler.md) (EP04-06).
+
+Pannello qualità dati (issue + retry sync operatore): [`docs/operations/sports_data_quality.md`](../docs/operations/sports_data_quality.md) (EP04-07).
+
+```bash
+# sync offline da fixture corpus
+docker compose --env-file infra/local/.env.example run --rm api \
+  python scripts/sync_sports_catalog.py --from-fixtures
+
+docker compose --env-file infra/local/.env.example run --rm api \
+  python scripts/sync_sports_roster.py --from-fixtures
+
+docker compose --env-file infra/local/.env.example run --rm api \
+  python scripts/sync_sports_fixtures.py --from-fixtures
+```
 
 Precedenza eventi fantavoto: [`docs/data/event_precedence_rules.md`](../docs/data/event_precedence_rules.md), ADR-0002.
 

@@ -1,20 +1,18 @@
-import type { UiState } from "@fantappero/ui";
+import { parseWireframeState, WIREFRAME_STATES } from "./catalog";
 import { useMemo } from "react";
 import { useLocation } from "../router/simpleRouter";
-import { WIREFRAME_STATES } from "./catalog";
+import type { UiState } from "@fantappero/ui";
 
-export function parseWireframeState(search: string): UiState {
+export function parseWireframeStateFromSearch(search: string): UiState {
   const params = new URLSearchParams(search.startsWith("?") ? search.slice(1) : search);
-  const stato = params.get("stato");
-  if (stato && (WIREFRAME_STATES as readonly string[]).includes(stato)) {
-    return stato as UiState;
-  }
-  return "success";
+  return parseWireframeState(params.get("stato")) as UiState;
 }
+
+export { WIREFRAME_STATES };
 
 export function useWireframeState(): UiState {
   const { search } = useLocation();
-  return useMemo(() => parseWireframeState(search), [search]);
+  return useMemo(() => parseWireframeStateFromSearch(search), [search]);
 }
 
 export function shouldShowWireframeMeta(search: string): boolean {

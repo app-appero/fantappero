@@ -6,6 +6,7 @@ import os
 import subprocess
 import sys
 from pathlib import Path
+from urllib.parse import urlsplit
 
 import pytest
 from sqlalchemy import create_engine, inspect
@@ -24,6 +25,12 @@ def require_database_url() -> str:
     url = database_url()
     if not url:
         pytest.skip("DATABASE_URL not set — skipping database integration tests")
+    database_name = urlsplit(url).path.lstrip("/").split("/", maxsplit=1)[0]
+    if not database_name.endswith("_test"):
+        pytest.fail(
+            "I test di integrazione richiedono un database dedicato con suffisso '_test'; "
+            "il database di sviluppo non verrà modificato."
+        )
     return url
 
 

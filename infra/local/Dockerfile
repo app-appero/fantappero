@@ -16,8 +16,12 @@ RUN apt-get update \
 
 COPY backend/pyproject.toml backend/README.md ./
 COPY backend/src ./src
+COPY backend/tests ./tests
+COPY backend/scripts ./scripts
+COPY backend/alembic.ini ./
+COPY backend/alembic ./alembic
 
-RUN pip install .
+RUN pip install ".[dev]"
 
 EXPOSE 8000
 

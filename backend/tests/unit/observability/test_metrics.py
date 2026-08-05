@@ -90,9 +90,7 @@ def test_metrics_on_failed_job() -> None:
     _on_task_postrun(sender=task, task_id="fail-1", task=task, state="FAILURE")
 
     metrics = get_metrics()
-    assert (
-        metrics.get_counter(JOBS_FAILED_TOTAL, labels={"task": "app.worker.fail"}) == 1.0
-    )
+    assert metrics.get_counter(JOBS_FAILED_TOTAL, labels={"task": "app.worker.fail"}) == 1.0
     assert (
         metrics.get_counter(
             JOBS_TOTAL,

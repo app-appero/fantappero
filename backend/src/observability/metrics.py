@@ -136,6 +136,14 @@ JOBS_TOTAL = "jobs_total"
 JOBS_FAILED_TOTAL = "jobs_failed_total"
 JOB_DURATION_SECONDS = "job_duration_seconds"
 QUEUE_DEPTH = "queue_depth"
+# Provider / SPD adapter (EP04-01) — also defined on sports_data.provider.client
+PROVIDER_REQUESTS_TOTAL = "provider_requests_total"
+PROVIDER_REQUEST_ERRORS_TOTAL = "provider_request_errors_total"
+PROVIDER_REQUEST_DURATION_SECONDS = "provider_request_duration_seconds"
+PROVIDER_RETRIES_TOTAL = "provider_retries_total"
+PROVIDER_RATE_LIMIT_REMAINING = "provider_rate_limit_remaining"
+PROVIDER_SNAPSHOTS_STORED_TOTAL = "provider_snapshots_stored_total"
+PROVIDER_SNAPSHOTS_DEDUPED_TOTAL = "provider_snapshots_deduped_total"
 
 
 _metrics = MetricsRegistry()

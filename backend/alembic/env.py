@@ -15,7 +15,24 @@ if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
 from database.base import Base  # noqa: E402
-from database.models import SystemFlag  # noqa: E402, F401
+from database.models import (  # noqa: E402, F401
+    AuthSession,
+    AuthToken,
+    Competition,
+    League,
+    LeagueAuditEvent,
+    LeagueCalendar,
+    LeagueCalendarSlot,
+    LeagueCompetition,
+    LeagueInvite,
+    LeagueMembership,
+    LeagueRules,
+    NamedLeagueInvite,
+    PrivacyAuditEvent,
+    SystemFlag,
+    User,
+    UserProfile,
+)
 from database.session import get_database_url, normalize_database_url  # noqa: E402
 
 config = context.config
@@ -24,6 +41,18 @@ if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
 target_metadata = Base.metadata
+
+
+def _include_managed_object(
+    object_: object,
+    name: str | None,
+    type_: str,
+    reflected: bool,
+    compare_to: object | None,
+) -> bool:
+    """Ignore local smoke-test tables that are not application schema."""
+    del object_, compare_to
+    return not (reflected and type_ == "table" and name == "_ep01_smoke")
 
 
 def _configure_url() -> None:
@@ -44,6 +73,7 @@ def run_migrations_offline() -> None:
         dialect_opts={"paramstyle": "named"},
         compare_type=True,
         compare_server_default=True,
+        include_object=_include_managed_object,
     )
 
     with context.begin_transaction():
@@ -66,6 +96,7 @@ def run_migrations_online() -> None:
             target_metadata=target_metadata,
             compare_type=True,
             compare_server_default=True,
+            include_object=_include_managed_object,
         )
 
         with context.begin_transaction():

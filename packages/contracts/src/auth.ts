@@ -28,11 +28,61 @@ export interface SessionUser {
   globalRole: GlobalRole;
 }
 
+/** Successful login/refresh response from the auth API. */
+export interface AuthTokensResponse {
+  accessToken: string;
+  refreshToken: string;
+  expiresIn: number;
+  user: SessionUser;
+}
+
+export interface RegisterRequest {
+  email: string;
+  password: string;
+  displayName: string;
+}
+
+export interface LoginRequest {
+  email: string;
+  password: string;
+}
+
+export interface RefreshRequest {
+  refreshToken: string;
+}
+
+export interface ForgotPasswordRequest {
+  email: string;
+}
+
+export interface ResetPasswordRequest {
+  token: string;
+  newPassword: string;
+}
+
+export interface VerifyEmailRequest {
+  token: string;
+}
+
+export interface ResendVerificationRequest {
+  email: string;
+}
+
+export interface AuthMessageResponse {
+  message: string;
+}
+
+export interface AuthErrorResponse {
+  message: string;
+  code: string;
+}
+
 /** League the user belongs to, with role for permission resolution. */
 export interface LeagueSummary {
   id: string;
   name: string;
   role: LeagueRole;
+  state?: import("./leagues.js").LeagueState;
 }
 
 /** Resolved permission set for the active session + optional league context. */

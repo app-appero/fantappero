@@ -95,6 +95,10 @@ export function useLocation() {
   return useMemo(() => ({ pathname, search }), [pathname, search]);
 }
 
+export function useNavigate() {
+  return useRouter().navigate;
+}
+
 export function useSearchParams(): [URLSearchParams, (next: URLSearchParams) => void] {
   const { search, navigate, pathname } = useRouter();
   const params = useMemo(() => new URLSearchParams(search), [search]);

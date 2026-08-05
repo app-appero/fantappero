@@ -233,7 +233,7 @@ Fonte primaria per **minuti**, **Rating Beta (input statistici)** e parte dei co
 
 | Esigenza critica | FR | Fonte primaria | Gap esplicito? |
 | --- | --- | --- | --- |
-| Listone 5 campionati, ID stabile, un ruolo P–D–C–A | FR-ROS-01 | `/players`, `/players/squads`, `/teams`, `/leagues` | **Sì:** mapping posizione provider → P/D/C/A e policy listone ufficiale non sono chiuse come tabella definitiva (OQ-01). |
+| Listone 5 campionati, ID stabile, un ruolo P–D–C–A | FR-ROS-01 | `/players`, `/players/squads`, `/teams`, `/leagues` | **Chiuso in EP04-04 (MVP):** mapping `v1.0.0` + `role_assignments` + override lega (OQ-01). |
 | Generazione turno europeo senza duplicare fixture | FR-TUR-01 | `/fixtures` (`id`, kickoff, league, status) | No gap fonte; regola turno è interna. |
 | Kickoff lock per calciatore | FR-TUR-02 | `/fixtures.fixture.date|timestamp` + status | No. |
 | Formazione fantasy / moduli / mosse | FR-FOR-*, FR-SUB-01 | Dati utente + minuti/voto da `/fixtures/players` (+ eventi) | Lineup ufficiale **non** è fonte della formazione fantasy. |
@@ -258,7 +258,7 @@ Fonte primaria per **minuti**, **Rating Beta (input statistici)** e parte dei co
 | G-05 | Chiave anti-duplicazione eventi | FR-DAT-01 / FR-SCO-02 | Schema `provider_event_key` collaudato su live+correzioni |
 | G-06 | Minuti e “senza voto” | Soglia e sostituzioni | `games.minutes` affidabile per titolari/sub/recupero |
 | G-07 | Coverage stats players sui 5 campionati | Senza stats niente Rating Beta | `coverage.fixtures.statistics_players=true` stagione attiva |
-| G-08 | Mapping ruolo listone | Rosa 3P–11D–11C–10A | Tabella posizione→P/D/C/A + override admin versionato |
+| G-08 | Mapping ruolo listone | Rosa 3P–11D–11C–10A | **Chiuso EP04-04:** tabella posizione→P/D/C/A `v1.0.0` + override admin lega versionato |
 
 ### 5.2 Rischi accettabili (MVP con mitigation)
 

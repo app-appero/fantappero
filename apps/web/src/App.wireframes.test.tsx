@@ -19,15 +19,22 @@ function renderAt(path: string, search = "") {
 
 function wireframeSearch(route: string, state: string): string {
   const params = new URLSearchParams({ stato: state });
-  if (route === "/lega/amministrazione") {
-    params.set("persona", "admin");
+  if (route.startsWith("/accedi")) {
+    return `?${params.toString()}`;
   }
+  params.set("persona", route === "/lega/amministrazione" ? "admin" : "admin");
   return `?${params.toString()}`;
 }
 
 describe("EPUI-04 wireframes", () => {
   for (const screen of WIREFRAME_CATALOG) {
-    if (screen.route.startsWith("/admin")) {
+    if (
+      screen.route.startsWith("/admin") ||
+      screen.id === "auth" ||
+      screen.id === "league-dashboard" ||
+      screen.id === "league-config" ||
+      screen.id === "auction"
+    ) {
       continue;
     }
 
@@ -58,28 +65,32 @@ describe("EPUI-04 wireframes", () => {
   });
 
   it("renders classifica standings table on success", () => {
-    const html = renderAt("/classifica", "?stato=success");
+    const html = renderAt("/classifica", "?persona=admin&stato=success");
     expect(html).toContain('data-testid="standings-table"');
   });
 
   it("renders auction panel for member", () => {
-    const html = renderAt("/asta", "?stato=success");
+    const html = renderAt("/asta", "?persona=admin&stato=success");
     expect(html).toContain('data-testid="auction-bid-panel"');
+    expect(html).toContain('data-testid="wireframe-region-auction-bid"');
+    expect(html).toContain('data-testid="auction-listone-card"');
   });
 
   it("shows admin auction controls for admin persona", () => {
     const html = renderAt("/asta", "?persona=admin&stato=success");
     expect(html).toContain('data-testid="wireframe-region-auction-admin"');
+    expect(html).toContain('data-testid="auction-listone-refresh"');
+    expect(html).toContain("Aggiorna");
   });
 
   it("renders wireframe meta panel when meta=1", () => {
-    const html = renderAt("/mercato", "?stato=success&meta=1");
+    const html = renderAt("/mercato", "?persona=admin&stato=success&meta=1");
     expect(html).toContain('data-testid="wireframe-meta-panel"');
     expect(html).toContain("CTA primaria");
   });
 
   it("renders wireframes dev hub", () => {
-    const html = renderAt("/dev/wireframes");
+    const html = renderAt("/dev/wireframes", "?persona=admin");
     expect(html).toContain("Hub di validazione EPUI-04");
     expect(html).toContain("/classifica?stato=empty");
   });

@@ -15,6 +15,18 @@ export const APP_NAV_ITEMS: readonly NavItemDefinition[] = [
     surface: "app",
   },
   {
+    id: "manager-directory",
+    path: "/fantallenatori",
+    requiredPermissions: ["league:admin"],
+    surface: "app",
+  },
+  {
+    id: "received-invites",
+    path: "/inviti",
+    requiredPermissions: ["league:view"],
+    surface: "app",
+  },
+  {
     id: "standings",
     path: "/classifica",
     requiredPermissions: ["matchday:view"],
@@ -81,6 +93,8 @@ export const ADMIN_NAV_ITEMS: readonly NavItemDefinition[] = [
 
 export const NAV_LABELS: Record<string, string> = {
   leagues: "Leghe",
+  "manager-directory": "Fantallenatori",
+  "received-invites": "Inviti",
   matchday: "Turni",
   standings: "Classifica",
   roster: "Rosa",

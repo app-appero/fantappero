@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Start essential local stack (postgres, redis, api, worker).
+# Start essential local stack (postgres, redis, api, worker, web).
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$ROOT"

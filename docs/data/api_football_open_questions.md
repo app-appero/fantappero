@@ -32,6 +32,7 @@ Questo registro elenca **solo** ciò che la documentazione pubblica e i requisit
 | Impatto | FR-ROS-01, vincoli rosa 3P–11D–11C–10A |
 | Evidenza richiesta EP00-02 | Inventario valori `position` su campione squadre; proposta tabella mapping; casi da override admin |
 | Criterio chiusura | Tabella versionata + policy “un solo ruolo attivo per listone” |
+| Esito EP04-04 | **Chiuso (MVP)** — mapping `v1.0.0` in `sports_data.listone.mapping`; listone ufficiale `role_assignments`; override lega versionato con efficacia post-avvio dal turno successivo. Vedi [`../operations/sports_listone.md`](../operations/sports_listone.md). |
 
 ### OQ-02 — Autogol univoco
 

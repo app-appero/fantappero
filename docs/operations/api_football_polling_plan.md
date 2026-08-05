@@ -114,3 +114,4 @@ Piani di riferimento pubblici API-Football (Free 100 / Pro 7 500 / Ultra 75 
 
 - Matrice requisiti: [`../data/api_football_requirement_matrix.md`](../data/api_football_requirement_matrix.md)
 - Confine provider: [`../adr/ADR-0001-sports-data-provider-boundary.md`](../adr/ADR-0001-sports-data-provider-boundary.md)
+- Implementazione scheduler (EP04-06): [`sports_scheduler.md`](./sports_scheduler.md)

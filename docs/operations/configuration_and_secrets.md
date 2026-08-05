@@ -51,8 +51,25 @@ All `.env` files are gitignored. Only `*.env.example` files are committed.
 | `REDIS_URL` | Yes | Sometimes | Redis connection string |
 | `CELERY_BROKER_URL` | Yes (worker) | Sometimes | Celery broker; defaults from `REDIS_URL` in dev |
 | `CELERY_RESULT_BACKEND` | Yes (worker) | Sometimes | Celery result backend |
-| `API_FOOTBALL_KEY` | No (scripts only) | **Yes** | API-Football provider key |
+| `API_FOOTBALL_KEY` | No (adapter/scripts) | **Yes** | API-Football provider key (SPD only) |
 | `APISPORTS_KEY` | No | **Yes** | Alias for `API_FOOTBALL_KEY` |
+| `API_FOOTBALL_BASE_URL` | No | No | Default `https://v3.football.api-sports.io` |
+| `API_FOOTBALL_TIMEOUT_SECONDS` | No | No | HTTP timeout (default 30) |
+| `API_FOOTBALL_MAX_RETRIES` | No | No | Retry on 429/5xx (default 3) |
+| `API_FOOTBALL_RETRY_BACKOFF_SECONDS` | No | No | Base backoff seconds (default 1) |
+| `API_FOOTBALL_REQUESTS_PER_MINUTE` | No | No | Client throttle /min (default 300 = Pro) |
+| `API_FOOTBALL_RATE_LIMIT_PAUSE_SECONDS` | No | No | Pause on 429/body rateLimit (default 60) |
+| `SPORTS_SCHEDULER_ENABLED` | No (default `false`) | No | Abilita Celery beat schedule pre/live/post/late (EP04-06) |
+| `SPORTS_POLL_*_INTERVAL_SECONDS` | No | No | Intervalli beat (live/pre/post/late); vedi [`sports_scheduler.md`](./sports_scheduler.md) |
+| `JWT_SECRET_KEY` | Yes (auth enabled) | **Yes** | HS256 signing key for access tokens |
+| `JWT_ACCESS_TOKEN_EXPIRE_MINUTES` | No (default `15`) | No | Access token TTL |
+| `JWT_REFRESH_TOKEN_EXPIRE_DAYS` | No (default `30`) | No | Refresh session TTL |
+| `AUTH_EMAIL_VERIFICATION_EXPIRE_HOURS` | No (default `24`) | No | Email verification link TTL |
+| `AUTH_PASSWORD_RESET_EXPIRE_HOURS` | No (default `1`) | No | Password reset link TTL |
+| `SMTP_HOST` / `SMTP_PORT` | Yes (when sending mail) | No | Outbound SMTP |
+| `SMTP_USER` / `SMTP_PASSWORD` | No | **Yes** | SMTP credentials if required |
+| `MAIL_FROM` / `MAIL_FROM_NAME` | No | No | Sender identity |
+| `WEB_APP_BASE_URL` | Yes (auth email links) | No | Public web origin for verification/reset URLs |
 
 ## Variable reference (clients)
 

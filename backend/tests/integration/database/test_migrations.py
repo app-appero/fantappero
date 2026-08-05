@@ -31,10 +31,78 @@ def test_upgrade_from_empty_database(clean_db: str) -> None:
     engine = create_engine_for_url(clean_db)
     try:
         assert table_exists(engine, "system_flags")
+        assert table_exists(engine, "league_rules")
+        assert table_exists(engine, "league_invites")
+        assert table_exists(engine, "named_league_invites")
+        assert table_exists(engine, "league_calendars")
+        assert table_exists(engine, "league_calendar_slots")
+        assert table_exists(engine, "provider_snapshots")
+        assert table_exists(engine, "clubs")
+        assert table_exists(engine, "sport_seasons")
+        assert table_exists(engine, "competition_season_clubs")
+        assert table_exists(engine, "athletes")
+        assert table_exists(engine, "squad_memberships")
+        assert table_exists(engine, "transfers")
+        assert table_exists(engine, "role_assignments")
+        assert table_exists(engine, "league_role_overrides")
+        assert table_exists(engine, "fixtures")
+        assert table_exists(engine, "match_events")
+        assert table_exists(engine, "official_lineups")
+        assert table_exists(engine, "official_lineup_entries")
+        assert table_exists(engine, "player_match_stats")
+        assert table_exists(engine, "sports_poll_runs")
         assert table_exists(engine, "alembic_version")
         with engine.connect() as conn:
             version = conn.execute(text("SELECT version_num FROM alembic_version")).scalar_one()
-        assert version == "7f3a1c9e2b04"
+            named_statuses = (
+                conn.execute(
+                    text(
+                        """
+                    SELECT enumlabel
+                    FROM pg_enum
+                    JOIN pg_type ON pg_type.oid = pg_enum.enumtypid
+                    WHERE pg_type.typname = 'named_invite_status'
+                    ORDER BY enumsortorder
+                    """
+                    )
+                )
+                .scalars()
+                .all()
+            )
+            calendar_statuses = (
+                conn.execute(
+                    text(
+                        """
+                    SELECT enumlabel
+                    FROM pg_enum
+                    JOIN pg_type ON pg_type.oid = pg_enum.enumtypid
+                    WHERE pg_type.typname = 'league_calendar_status'
+                    ORDER BY enumsortorder
+                    """
+                    )
+                )
+                .scalars()
+                .all()
+            )
+            fantasy_roles = (
+                conn.execute(
+                    text(
+                        """
+                    SELECT enumlabel
+                    FROM pg_enum
+                    JOIN pg_type ON pg_type.oid = pg_enum.enumtypid
+                    WHERE pg_type.typname = 'fantasy_role'
+                    ORDER BY enumsortorder
+                    """
+                    )
+                )
+                .scalars()
+                .all()
+            )
+        assert version == "e2f8a1b0c016"
+        assert named_statuses == ["pending", "accepted", "declined", "revoked", "expired"]
+        assert calendar_statuses == ["draft", "confirmed"]
+        assert fantasy_roles == ["P", "D", "C", "A"]
     finally:
         engine.dispose()
 

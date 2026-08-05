@@ -5,10 +5,10 @@ import { describe, expect, it } from "vitest";
 import { AuthProvider } from "./auth/AuthContext";
 import { AppRoutes } from "./routes";
 
-function renderAt(path: string, search = "") {
+function renderAt(path: string, search = "?persona=admin&stato=success") {
   return renderToStaticMarkup(
     createElement(MemoryRouter, {
-      initialEntries: [`${path}${search}`],
+      initialEntries: [`${path}${search.startsWith("?") ? search : `?${search}`}`],
       children: createElement(AuthProvider, {
         children: createElement(AppRoutes),
       }),
@@ -26,29 +26,29 @@ describe("App navigation shell (EPUI-03)", () => {
   });
 
   it("hides league admin link for default member persona", () => {
-    const html = renderAt("/leghe");
+    const html = renderAt("/leghe", "?persona=member&stato=success");
     expect(html).not.toContain("Admin lega");
   });
 
   it("shows league admin link when persona=admin", () => {
-    const html = renderAt("/leghe", "?persona=admin");
+    const html = renderAt("/leghe", "?persona=admin&stato=success");
     expect(html).toContain("Admin lega");
   });
 
   it("blocks league admin route for members with forbidden state", () => {
-    const html = renderAt("/lega/amministrazione");
+    const html = renderAt("/lega/amministrazione", "?persona=member&stato=success");
     expect(html).toContain('data-testid="route-forbidden"');
     expect(html).toContain("Permessi insufficienti");
   });
 
   it("allows league admin route for admin persona", () => {
     const html = renderAt("/lega/amministrazione", "?persona=admin&stato=success");
-    expect(html).toContain('data-testid="wireframe-league-config-success"');
+    expect(html).toContain('data-testid="league-admin-form"');
     expect(html).not.toContain('data-testid="route-forbidden"');
   });
 
   it("blocks global admin route for members with forbidden state", () => {
-    const html = renderAt("/admin");
+    const html = renderAt("/admin", "?persona=member&stato=success");
     expect(html).toContain('data-testid="route-forbidden"');
     expect(html).not.toContain('data-testid="admin-dashboard-success"');
   });
@@ -61,19 +61,19 @@ describe("App navigation shell (EPUI-03)", () => {
   });
 
   it("renders domain components on roster page", () => {
-    const html = renderAt("/rosa", "?stato=success");
+    const html = renderAt("/rosa");
     expect(html).toContain('data-testid="player-card"');
     expect(html).toContain('data-testid="wireframe-roster-success"');
   });
 
   it("renders formation view on formazione page", () => {
-    const html = renderAt("/formazione", "?stato=success");
+    const html = renderAt("/formazione");
     expect(html).toContain('data-testid="formation-view"');
   });
 
-  it("renders empty leagues state components when list would be empty", () => {
-    const html = renderAt("/leghe", "?stato=success");
-    expect(html).toContain('data-testid="wireframe-league-dashboard-success"');
+  it("renders leagues list or empty state on /leghe", () => {
+    const html = renderAt("/leghe");
+    expect(html).toContain('data-testid="leagues-create-link"');
   });
 
   it("uses keyboard-focusable nav links", () => {
@@ -99,7 +99,7 @@ describe("App navigation shell (EPUI-03)", () => {
   });
 
   it("renders standings wireframe on /classifica", () => {
-    const html = renderAt("/classifica", "?stato=success");
+    const html = renderAt("/classifica");
     expect(html).toContain('data-testid="wireframe-standings-success"');
   });
 });

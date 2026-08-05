@@ -1,6 +1,6 @@
 # Ambiente locale (EP01-02)
 
-Stack riproducibile con Docker Compose: **PostgreSQL**, **Redis**, **API** e **worker** Celery.
+Stack riproducibile con Docker Compose: **PostgreSQL**, **Redis**, **API**, **worker** Celery e **web** (Vite).
 
 ## Prerequisiti
 
@@ -30,7 +30,10 @@ cp infra/local/.env.example infra/local/.env
 # oppure: make health
 ```
 
-Atteso: `postgres`, `redis`, `api`, `worker` in stato **healthy**.
+Atteso: `postgres`, `redis`, `api`, `worker`, `web` in stato **healthy**.  
+Servizio opzionale per lo schedule sportivo: `beat` (Celery beat, EP04-06 — abilitare con `SPORTS_SCHEDULER_ENABLED=true`).
+
+App web: `http://localhost:5173` (API su `http://localhost:8000`).
 
 Smoke automatico (persistenza volumi + errore se manca Postgres):
 
@@ -43,7 +46,8 @@ Smoke automatico (persistenza volumi + errore se manca Postgres):
 
 | Profilo | Servizi | Comando |
 | --- | --- | --- |
-| Default (essenziali) | `postgres`, `redis`, `api`, `worker` | `make up` |
+| Default (essenziali) | `postgres`, `redis`, `api`, `worker`, `web`, `mailpit` | `docker compose --env-file infra/local/.env.example up -d --build` |
+| `test` | PostgreSQL isolato `fantappero_test` | `docker compose --profile test up -d postgres-test` |
 | `tools` (opzionale) | `adminer`, `redis-commander` | `make up-tools` |
 
 Gli strumenti opzionali **non** sono richiesti per lo sviluppo API/worker.
@@ -53,12 +57,15 @@ Gli strumenti opzionali **non** sono richiesti per lo sviluppo API/worker.
 | Servizio | Host | Container | Note |
 | --- | --- | --- | --- |
 | API | `8000` | `8000` | `GET /live`, `GET /ready` (alias `GET /health`) |
+| Web (Vite) | `5173` | `5173` | hot reload con mount sorgenti |
 | PostgreSQL | `5432` | `5432` | user/db `fantappero` |
 | Redis | `6379` | `6379` | AOF abilitato |
+| Mailpit UI | `8025` | `8025` | Web UI email di test |
+| Mailpit SMTP | `1025` | `1025` | Invio email auth locale |
 | Adminer | `8081` | `8080` | solo profile `tools` |
 | Redis Commander | `8082` | `8081` | solo profile `tools` |
 
-Override porte via `infra/local/.env` (`API_PORT`, `POSTGRES_PORT`, …).
+Override porte via `infra/local/.env` (`API_PORT`, `WEB_PORT`, `POSTGRES_PORT`, …).
 
 ## Credenziali locali (non di produzione)
 
@@ -69,6 +76,13 @@ Valori di default in `infra/local/.env.example`:
 - `REDIS_URL` / `CELERY_*` → host Compose `redis`
 
 Non inserire chiavi provider reali (`API_FOOTBALL_KEY`, ecc.) nei file commitati. Per host-run dell’API contro i container, copia root `.env.example` → `.env` e usa gli URL `127.0.0.1` documentati lì.
+
+### Verifica email in locale (EP02-01)
+
+1. Avvia lo stack con Mailpit incluso.
+2. Registrati da `http://localhost:5173/accedi/registrati`.
+3. Apri `http://localhost:8025` e segui il link di verifica nell’email catturata.
+4. Accedi da `/accedi`.
 
 ## Comandi
 
@@ -96,7 +110,9 @@ CONFIRM=yes ./infra/scripts/dev_reset.sh
 | Volume | Contenuto |
 | --- | --- |
 | `fantappero_pg_data` | Dati PostgreSQL |
+| `fantappero_pg_test_data` | Database isolato e distruttibile per i test d'integrazione |
 | `fantappero_redis_data` | Persistenza Redis (AOF) |
+| `fantappero_web_node_modules` | `node_modules` del container web (pnpm) |
 
 `make down` / `docker compose stop` **non** li elimina. Solo `dev_reset.sh` / `down -v`.
 
@@ -105,6 +121,7 @@ CONFIRM=yes ./infra/scripts/dev_reset.sh
 ```text
 compose.yaml                 # stack locale
 infra/local/Dockerfile       # immagine condivisa API + worker
+infra/local/Dockerfile.web   # dev server Vite
 infra/local/.env.example     # default senza segreti reali
 infra/scripts/dev_*.sh             # start / stop / logs / reset / health
 infra/scripts/smoke_local_stack.sh # smoke + persistenza + missing-dep
@@ -126,11 +143,18 @@ make dev-api
 Dopo `make up`, applicare lo schema baseline:
 
 ```bash
-# dalla root (DATABASE_URL in .env o infra/local/.env con host 127.0.0.1)
-make migrate
-make migrate-check
-cd backend && python -m pytest tests/integration/database -ra
+# Schema del database di sviluppo
+docker compose --env-file infra/local/.env.example run --rm api alembic upgrade head
+docker compose --env-file infra/local/.env.example run --rm api alembic check
+
+# Test distruttivi esclusivamente sul database dedicato
+docker compose --env-file infra/local/.env.example --profile test up -d postgres-test redis mailpit
+docker compose --env-file infra/local/.env.example --profile test run --rm api sh -lc 'DATABASE_URL="$TEST_DATABASE_URL" python -m pytest tests/integration/database -ra'
 ```
+
+Le fixture d'integrazione rifiutano qualsiasi database il cui nome non termini con
+`_test`. Questa protezione impedisce downgrade o cancellazioni accidentali sul database
+di sviluppo `fantappero`.
 
 Convenzioni e rollback: [`docs/adr/ADR-0004-database-conventions.md`](../adr/ADR-0004-database-conventions.md).
 
@@ -139,7 +163,7 @@ Convenzioni e rollback: [`docs/adr/ADR-0004-database-conventions.md`](../adr/ADR
 | Sintomo | Cosa controllare |
 | --- | --- |
 | `docker daemon not reachable` | Avviare Docker Desktop / il servizio Docker |
-| Porta già in uso (`5432` / `6379` / `8000`) | Fermare il processo host o cambiare `*_PORT` in `infra/local/.env` |
+| Porta già in uso (`5432` / `6379` / `8000` / `5173`) | Fermare il processo host o cambiare `*_PORT` in `infra/local/.env` |
 | `api` unhealthy / `/health` 503 | `docker compose logs api`; verificare che `postgres` e `redis` siano healthy |
 | `worker` unhealthy | Log Celery: `./infra/scripts/dev_logs.sh worker`; Redis deve accettare connessioni |
 | Build lenta o cache stantia | `docker compose build --no-cache api` |

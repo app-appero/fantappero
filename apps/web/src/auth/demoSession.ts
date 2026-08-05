@@ -22,6 +22,13 @@ export const DEMO_OPERATOR: SessionUser = {
   globalRole: "global_operator",
 };
 
+function asSearchParams(search: string | URLSearchParams): URLSearchParams {
+  if (search instanceof URLSearchParams) {
+    return search;
+  }
+  return new URLSearchParams(search);
+}
+
 export function buildPermissionContext(
   user: SessionUser,
   activeLeagueId: string | null,
@@ -35,8 +42,8 @@ export function buildPermissionContext(
  * Query param `?persona=operator|admin` switches mock session for local QA.
  * Production session comes from EP02-03 auth API.
  */
-export function resolveDemoUser(search: string): SessionUser {
-  const params = new URLSearchParams(search);
+export function resolveDemoUser(search: string | URLSearchParams): SessionUser {
+  const params = asSearchParams(search);
   const persona = params.get("persona");
   if (persona === "operator") {
     return DEMO_OPERATOR;
@@ -44,21 +51,21 @@ export function resolveDemoUser(search: string): SessionUser {
   return DEMO_MEMBER;
 }
 
-export function resolveDemoLeagues(search: string): readonly LeagueSummary[] {
-  const params = new URLSearchParams(search);
+export function resolveDemoLeagues(search: string | URLSearchParams): readonly LeagueSummary[] {
+  const params = asSearchParams(search);
   if (params.get("persona") === "admin") {
     return DEMO_LEAGUES.map((league) =>
       league.id === "lega-admin" ? { ...league, role: "league_admin" as const } : league,
     );
   }
-  return DEMO_LEAGUES;
+  return DEMO_LEAGUES.map((league) => ({ ...league, role: "member" as const }));
 }
 
 export function resolveInitialLeagueId(
-  search: string,
+  search: string | URLSearchParams,
   leagues: readonly LeagueSummary[],
 ): string | null {
-  const params = new URLSearchParams(search);
+  const params = asSearchParams(search);
   if (params.get("persona") === "admin") {
     return leagues.find((league) => league.role === "league_admin")?.id ?? leagues[0]?.id ?? null;
   }

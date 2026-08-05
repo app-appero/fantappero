@@ -50,7 +50,7 @@ Tipi e regole in `@fantappero/contracts` (`auth.ts`):
 
 Filtraggio voci menu: `hasPermissions` + catalogo in `apps/web/src/navigation/navConfig.ts`.
 
-**EP02-03 (futuro):** sessione reale da API; protezione route lato server. Fino ad allora la web app usa sessione demo (`?persona=admin|operator`).
+**EP02-03:** policy applicate lato server (`backend/src/authorization/`). I client continuano a usare `@fantappero/contracts` per il filtraggio UX; la web app può collegare `GET /leagues/mine` al posto delle leghe demo quando non in modalità persona.
 
 ## Route web (MVP layout + wireframe EPUI-04)
 
@@ -73,7 +73,7 @@ Stati wireframe: `?stato=loading|empty|error|success|forbidden` — vedi [`wiref
 
 ## Mobile
 
-Tab bar in `apps/mobile/App.tsx` con catalogo `MOBILE_NAV_ITEMS` e stesso modello permessi.
+Tab bar in `apps/mobile/src/navigation/AppTabNavigator.tsx` con catalogo `MOBILE_NAV_ITEMS`, stack admin separato e stesso modello permessi della web. Vedi [`shell-mobile.md`](./shell-mobile.md).
 
 ## Verifica locale
 

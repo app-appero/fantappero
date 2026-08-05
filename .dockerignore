@@ -7,8 +7,12 @@ venv
 **/.ruff_cache
 **/*.egg-info
 node_modules
-apps
-packages
+**/node_modules
+**/.pnpm-store
+**/.vite
+**/.vite-temp
+apps/web/dist
+apps/web/.env
 tools
 experiments
 docs

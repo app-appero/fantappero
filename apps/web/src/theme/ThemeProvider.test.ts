@@ -15,6 +15,9 @@ describe("resolveSurface (EPUI-05)", () => {
   it("maps auth routes to auth surface", () => {
     expect(resolveSurface("/accedi")).toBe("auth");
     expect(resolveSurface("/accedi/registrati")).toBe("auth");
+    expect(resolveSurface("/accedi/recupera")).toBe("auth");
+    expect(resolveSurface("/accedi/reimposta-password")).toBe("auth");
+    expect(resolveSurface("/accedi/verifica")).toBe("auth");
   });
 });
 

@@ -9,6 +9,7 @@ import {
 import { type ReactNode } from "react";
 import { Link, useLocation } from "../router/simpleRouter";
 import { useAuth } from "../auth/AuthContext";
+import { LogoutButton } from "../auth/LogoutButton";
 import { ADMIN_NAV_ITEMS, APP_NAV_ITEMS, filterNavItems } from "../navigation/navConfig";
 import {
   IconCart,
@@ -23,6 +24,8 @@ import { SkipLink } from "./SkipLink";
 
 const APP_ICONS: Record<string, ReactNode> = {
   leagues: <IconTrophy />,
+  "manager-directory": <IconUsers />,
+  "received-invites": <IconUsers />,
   matchday: <IconLayout />,
   standings: <IconTrophy />,
   roster: <IconUsers />,
@@ -84,8 +87,9 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                 </Link>
               ) : null}
               <span className="fa-user-chip" data-testid="user-display">
-                {user.displayName}
+                {user?.displayName ?? "Utente"}
               </span>
+              <LogoutButton />
             </>
           }
         />
@@ -139,8 +143,9 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
                 Torna all&apos;app
               </Link>
               <span className="fa-user-chip fa-user-chip--admin" data-testid="admin-user-display">
-                {user.displayName}
+                {user?.displayName ?? "Operatore"}
               </span>
+              <LogoutButton />
             </>
           }
         />

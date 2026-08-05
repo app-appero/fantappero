@@ -5,7 +5,8 @@
     "noUncheckedIndexedAccess": true,
     "paths": {
       "@fantappero/contracts": ["../../packages/contracts/src/index.ts"],
-      "@fantappero/ui": ["../../packages/ui/src/index.ts"]
+      "@fantappero/ui": ["../../packages/ui/src/index.ts"],
+      "@fantappero/ui/theme": ["../../packages/ui/src/theme.ts"]
     }
   },
   "include": ["App.tsx", "index.js", "src/**/*.ts", "src/**/*.tsx"],
