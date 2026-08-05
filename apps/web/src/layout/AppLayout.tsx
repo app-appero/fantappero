@@ -24,6 +24,7 @@ import { SkipLink } from "./SkipLink";
 
 const APP_ICONS: Record<string, ReactNode> = {
   leagues: <IconTrophy />,
+  "league-home": <IconLayout />,
   "manager-directory": <IconUsers />,
   "received-invites": <IconUsers />,
   matchday: <IconLayout />,
@@ -51,7 +52,8 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     icon: <NavIcon id={item.id} />,
   }));
 
-  const showLeagueSelector = leagues.length > 0 && location.pathname !== "/leghe";
+  const showLeagueSelector =
+    leagues.length > 0 && location.pathname !== "/leghe" && location.pathname !== "/leghe/crea";
 
   return (
     <AppShell

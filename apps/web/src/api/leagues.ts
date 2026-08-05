@@ -28,6 +28,24 @@ export function fetchMyLeagues(accessToken: string): Promise<LeagueSummary[]> {
   return apiRequest<LeagueSummary[]>("/leagues/mine", { accessToken });
 }
 
+export function fetchLeague(accessToken: string, leagueId: string): Promise<LeagueDetail> {
+  return apiRequest<LeagueDetail>(`/leagues/${leagueId}`, { accessToken });
+}
+
+export function fetchLeagueMembersPublic(
+  accessToken: string,
+  leagueId: string,
+): Promise<LeagueMember[]> {
+  return apiRequest<LeagueMember[]>(`/leagues/${leagueId}/partecipanti`, { accessToken });
+}
+
+export function fetchLeagueCalendar(
+  accessToken: string,
+  leagueId: string,
+): Promise<LeagueCalendar | null> {
+  return apiRequest<LeagueCalendar | null>(`/leagues/${leagueId}/calendario`, { accessToken });
+}
+
 export function createLeague(
   accessToken: string,
   payload: CreateLeagueRequest,
@@ -36,6 +54,13 @@ export function createLeague(
     method: "POST",
     accessToken,
     body: payload,
+  });
+}
+
+export function deleteLeague(accessToken: string, leagueId: string): Promise<void> {
+  return apiRequest<void>(`/leagues/${leagueId}`, {
+    method: "DELETE",
+    accessToken,
   });
 }
 

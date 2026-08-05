@@ -46,6 +46,9 @@ describe("EP03-03 join league page", () => {
     const html = renderRoute("/leghe/invito?persona=member");
     expect(html).toContain('data-testid="join-league-form"');
     expect(html).toContain("Codice invito");
+    expect(html).toContain("link");
+    expect(html).toContain("codice");
+    expect(html).toContain("ricerca pubblica");
   });
 
   it("renders token positive flow", () => {
@@ -60,9 +63,11 @@ describe("EP03-03 join league page", () => {
     expect(html).toContain("Ingresso non riuscito");
   });
 
-  it("renders success flow", () => {
+  it("renders success flow with home CTA", () => {
     const html = renderRoute("/leghe/invito?persona=member&stato=success");
     expect(html).toContain('data-testid="join-league-success"');
     expect(html).toContain("Ingresso completato");
+    expect(html).toContain('data-testid="join-league-open-home"');
+    expect(html).toContain("Apri home lega");
   });
 });

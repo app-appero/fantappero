@@ -91,6 +91,34 @@ button.fa-link-muted,
   background: var(--fa-color-background-elevated);
 }
 
+.fa-invite-secrets {
+  margin: var(--fa-space-md) 0;
+  display: grid;
+  gap: var(--fa-space-sm);
+}
+
+.fa-invite-secrets dt {
+  font-size: var(--fa-font-size-sm);
+  color: var(--fa-color-text-muted);
+}
+
+.fa-invite-secrets dd {
+  margin: 0;
+  word-break: break-all;
+  font-family: var(--fa-font-mono, ui-monospace, monospace);
+}
+
+.fa-league-delete {
+  margin-top: var(--fa-space-xl);
+  padding-top: var(--fa-space-lg);
+  border-top: 1px solid var(--fa-color-border);
+}
+
+.fa-league-delete--inline {
+  margin-top: var(--fa-space-md);
+  padding-top: var(--fa-space-md);
+}
+
 .fa-members {
   margin-top: var(--fa-space-xl);
   padding-top: var(--fa-space-lg);

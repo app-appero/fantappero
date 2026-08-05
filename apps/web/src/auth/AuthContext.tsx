@@ -46,6 +46,7 @@ export type AuthContextValue = {
   setActiveLeagueId: (leagueId: string) => void;
   can: (required: readonly Permission[]) => boolean;
   registerLeague: (league: LeagueSummary) => void;
+  unregisterLeague: (leagueId: string) => void;
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   applySession: (tokens: AuthTokensResponse) => void;
@@ -283,6 +284,31 @@ export function AuthProvider({ children }: AuthProviderProps) {
     [isDemoMode],
   );
 
+  const unregisterLeague = useCallback(
+    (leagueId: string) => {
+      if (isDemoMode) {
+        return;
+      }
+      setLeaguesState((current) => {
+        const next = current.filter((row) => row.id !== leagueId);
+        setActiveLeagueIdState((active) => {
+          if (active !== leagueId) {
+            return active;
+          }
+          const fallback = next[0]?.id ?? null;
+          if (fallback) {
+            saveStoredActiveLeagueId(fallback);
+          } else {
+            clearStoredActiveLeagueId();
+          }
+          return fallback;
+        });
+        return next;
+      });
+    },
+    [isDemoMode],
+  );
+
   const permissionContext = useMemo(() => {
     if (!user) {
       return null;
@@ -315,6 +341,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       setActiveLeagueId,
       can,
       registerLeague,
+      unregisterLeague,
       login,
       logout,
       applySession,
@@ -331,6 +358,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       setActiveLeagueId,
       can,
       registerLeague,
+      unregisterLeague,
       login,
       logout,
       applySession,

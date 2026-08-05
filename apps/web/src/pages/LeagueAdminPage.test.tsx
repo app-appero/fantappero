@@ -34,6 +34,10 @@ vi.mock("../api/leagues", () => ({
   fetchLeagueCalendarAdmin: vi.fn(),
   generateLeagueCalendar: vi.fn(),
   confirmLeagueCalendar: vi.fn(),
+  fetchLeague: vi.fn(),
+  fetchLeagueMembersPublic: vi.fn(),
+  fetchLeagueCalendar: vi.fn(),
+  deleteLeague: vi.fn(),
 }));
 
 function renderRoute(path: string) {
@@ -158,6 +162,20 @@ describe("EP03-02 league admin page", () => {
     const html = renderRoute("/lega/amministrazione?persona=admin&calendario=forbidden");
     expect(html).toContain('data-testid="league-calendar-forbidden"');
     expect(html).toContain("Permessi insufficienti");
+  });
+
+  it("renders invite code and link copy CTAs", () => {
+    const html = renderRoute("/lega/amministrazione?persona=admin");
+    expect(html).toContain('data-testid="league-invite-copy-code"');
+    expect(html).toContain('data-testid="league-invite-copy-url"');
+    expect(html).toContain("Copia codice");
+    expect(html).toContain("Copia link");
+  });
+
+  it("renders delete panel for draft leagues", () => {
+    const html = renderRoute("/lega/amministrazione?persona=admin");
+    expect(html).toContain('data-testid="league-delete-panel"');
+    expect(html).toContain("Elimina lega");
   });
 });
 

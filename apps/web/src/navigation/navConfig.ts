@@ -9,6 +9,12 @@ export const APP_NAV_ITEMS: readonly NavItemDefinition[] = [
     surface: "app",
   },
   {
+    id: "league-home",
+    path: "/lega/home",
+    requiredPermissions: ["league:view"],
+    surface: "app",
+  },
+  {
     id: "matchday",
     path: "/turni",
     requiredPermissions: ["matchday:view"],
@@ -93,6 +99,7 @@ export const ADMIN_NAV_ITEMS: readonly NavItemDefinition[] = [
 
 export const NAV_LABELS: Record<string, string> = {
   leagues: "Leghe",
+  "league-home": "Home lega",
   "manager-directory": "Fantallenatori",
   "received-invites": "Inviti",
   matchday: "Turni",

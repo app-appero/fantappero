@@ -9,6 +9,7 @@ export { AuctionPage } from "./AuctionPage";
 export { FormationWireframe as FormationPage } from "../wireframes/screens/formation";
 export { CreateLeaguePage } from "./CreateLeaguePage";
 export { LeagueAdminPage } from "./LeagueAdminPage";
+export { LeagueHomePage } from "./LeagueHomePage";
 export { JoinLeaguePage } from "./JoinLeaguePage";
 export { LeaguesPage } from "./LeaguesPage";
 export { ManagerDirectoryPage } from "./ManagerDirectoryPage";

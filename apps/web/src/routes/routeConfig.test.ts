@@ -5,6 +5,8 @@ describe("routeConfig (EPUI-05)", () => {
   it("registers all member and admin placeholder routes", () => {
     const paths = APP_ROUTE_DEFINITIONS.map((route) => route.path);
     expect(paths).toContain("/leghe");
+    expect(paths).toContain("/leghe/invito");
+    expect(paths).toContain("/lega/home");
     expect(paths).toContain("/turni");
     expect(paths).toContain("/classifica");
     expect(paths).toContain("/admin");

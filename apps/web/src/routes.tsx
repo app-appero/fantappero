@@ -14,6 +14,7 @@ import {
   CreateLeaguePage,
   FormationPage,
   LeagueAdminPage,
+  LeagueHomePage,
   JoinLeaguePage,
   LeaguesPage,
   MarketPage,
@@ -175,6 +176,16 @@ export function AppRoutes() {
       <AppSection>
         <RequirePermissions required={["market:view"]}>
           <MarketPage />
+        </RequirePermissions>
+      </AppSection>
+    );
+  }
+
+  if (pathname === "/lega/home") {
+    return (
+      <AppSection>
+        <RequirePermissions required={["league:view"]}>
+          <LeagueHomePage />
         </RequirePermissions>
       </AppSection>
     );

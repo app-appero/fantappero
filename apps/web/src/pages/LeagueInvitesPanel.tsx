@@ -142,14 +142,31 @@ export function LeagueInvitesPanel({
     }
   }
 
-  async function copy(value: string) {
-    await navigator.clipboard?.writeText(value);
+  const [copyFeedback, setCopyFeedback] = useState<string | null>(null);
+  const [copyError, setCopyError] = useState<string | null>(null);
+
+  async function copy(value: string, label: string) {
+    setCopyFeedback(null);
+    setCopyError(null);
+    try {
+      if (!navigator.clipboard?.writeText) {
+        throw new Error("clipboard unavailable");
+      }
+      await navigator.clipboard.writeText(value);
+      setCopyFeedback(`${label} copiato negli appunti.`);
+    } catch {
+      setCopyError(`Impossibile copiare ${label.toLowerCase()}. Copia manualmente.`);
+    }
   }
 
   return (
     <section className="fa-invites" aria-labelledby="league-invites-title">
       <h2 id="league-invites-title">Inviti</h2>
-      <p>Genera un link e un codice validi fino alla scadenza o alla revoca.</p>
+      <p>
+        Le leghe sono private: non esiste una ricerca pubblica. Condividi il{" "}
+        <strong>link</strong> oppure il <strong>codice</strong> — entrambi consentono
+        l&apos;ingresso da &quot;Unisciti con codice&quot;.
+      </p>
       <div className="fa-ds-showcase__row">
         <Select
           label="Durata invito"
@@ -174,21 +191,57 @@ export function LeagueInvitesPanel({
       </div>
 
       {created ? (
-        <div>
+        <div data-testid="league-invite-secrets">
           <UiStatePanel
             state="success"
             title="Invito generato"
-            message={`Codice ${created.code}. Copia ora link o codice: per sicurezza non saranno mostrati di nuovo.`}
+            message="Copia ora link e codice: per sicurezza non saranno mostrati di nuovo."
             testId="league-invite-created"
           />
+          <dl className="fa-invite-secrets">
+            <div>
+              <dt>Codice</dt>
+              <dd data-testid="league-invite-code">{created.code}</dd>
+            </div>
+            <div>
+              <dt>Link</dt>
+              <dd data-testid="league-invite-url">{created.inviteUrl}</dd>
+            </div>
+          </dl>
           <div className="fa-ds-showcase__row">
-            <Button type="button" variant="secondary" onClick={() => void copy(created.inviteUrl)}>
+            <Button
+              type="button"
+              variant="secondary"
+              data-testid="league-invite-copy-url"
+              onClick={() => void copy(created.inviteUrl, "Link")}
+            >
               Copia link
             </Button>
-            <Button type="button" variant="ghost" onClick={() => void copy(created.code)}>
+            <Button
+              type="button"
+              variant="ghost"
+              data-testid="league-invite-copy-code"
+              onClick={() => void copy(created.code, "Codice")}
+            >
               Copia codice
             </Button>
           </div>
+          {copyFeedback ? (
+            <UiStatePanel
+              state="success"
+              title="Copiato"
+              message={copyFeedback}
+              testId="league-invite-copy-success"
+            />
+          ) : null}
+          {copyError ? (
+            <UiStatePanel
+              state="error"
+              title="Copia non riuscita"
+              message={copyError}
+              testId="league-invite-copy-error"
+            />
+          ) : null}
         </div>
       ) : null}
 

@@ -21,6 +21,7 @@ vi.mock("../api/leagues", () => ({
   fetchCompetitions: vi.fn(),
   fetchMyLeagues: vi.fn(),
   createLeague: vi.fn(),
+  deleteLeague: vi.fn(),
 }));
 
 function renderCreateLeague(path = "/leghe/crea?persona=admin") {
@@ -68,9 +69,12 @@ function renderLeagues(path = "/leghe?persona=admin") {
 }
 
 describe("EP03-01 leagues page", () => {
-  it("renders create league action in demo mode", () => {
+  it("renders create and join league actions in demo mode", () => {
     const html = renderLeagues();
     expect(html).toContain('data-testid="leagues-create-link"');
     expect(html).toContain("Crea lega");
+    expect(html).toContain('data-testid="leagues-join-link"');
+    expect(html).toContain("Unisciti con codice");
+    expect(html).toContain("Entra in lega");
   });
 });

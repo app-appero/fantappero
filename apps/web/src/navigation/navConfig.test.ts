@@ -28,6 +28,7 @@ describe("filterNavItems", () => {
     const ids = items.map((item) => item.id);
     expect(ids).not.toContain("league-admin");
     expect(ids).toContain("matchday");
+    expect(ids).toContain("league-home");
   });
 
   it("shows league admin nav for league administrators", () => {

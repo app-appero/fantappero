@@ -34,6 +34,9 @@ LEAGUE_TRANSITIONS: dict[LeagueState, tuple[LeagueState, ...]] = {
     LeagueState.ARCHIVED: (),
 }
 CONFIGURABLE_LEAGUE_STATES = frozenset((LeagueState.DRAFT, LeagueState.CONFIGURING))
+# Hard-delete allowed only before auction/season start (EP03-05-EXT).
+# configuring is included: no irreversible gameplay yet; archive remains post-season path.
+DELETABLE_LEAGUE_STATES = frozenset((LeagueState.DRAFT, LeagueState.CONFIGURING))
 
 
 @dataclass(frozen=True)
@@ -175,6 +178,15 @@ def validate_configurable_league_state(state: LeagueState, *, subject: str) -> N
             f"Puoi gestire {subject} solo durante la bozza o la configurazione.",
             # Keep the existing public code for backward-compatible clients.
             code="league_not_draft",
+        )
+
+
+def validate_league_deletable(state: LeagueState) -> None:
+    if state not in DELETABLE_LEAGUE_STATES:
+        raise ValidationAuthError(
+            "La lega non può essere eliminata in questo stato. "
+            "Usa l'archiviazione a fine stagione.",
+            code="league_not_deletable",
         )
 
 

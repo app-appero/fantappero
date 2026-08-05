@@ -19,6 +19,7 @@ import { loadStoredSession } from "../auth/sessionStorage";
 import { useLocation } from "../router/simpleRouter";
 import { parseWireframeStateFromSearch } from "../wireframes/useWireframeState";
 import { LeagueCalendarPanel } from "./LeagueCalendarPanel";
+import { LeagueDeletePanel } from "./LeagueDeletePanel";
 import { LeagueInvitesPanel } from "./LeagueInvitesPanel";
 import { LeagueMembersPanel } from "./LeagueMembersPanel";
 import { LeagueSeasonPanel } from "./LeagueSeasonPanel";
@@ -68,7 +69,7 @@ function buildPayloadFromRules(rules: LeagueRules): UpdateLeagueRulesRequest {
 
 /** Configurazione regolamento lega prima dell'avvio stagione (EP03-02). */
 export function LeagueAdminPage() {
-  const { isDemoMode, activeLeagueId } = useAuth();
+  const { isDemoMode, activeLeagueId, activeLeague } = useAuth();
   const { search } = useLocation();
   const demoState = isDemoMode ? parseWireframeStateFromSearch(search) : null;
 
@@ -390,6 +391,14 @@ export function LeagueAdminPage() {
             isDemoMode={isDemoMode}
             search={search}
             onChange={setLifecycle}
+          />
+        ) : null}
+        {lifecycle ? (
+          <LeagueDeletePanel
+            leagueId={activeLeagueId}
+            state={lifecycle.state}
+            leagueName={activeLeague?.name ?? "questa lega"}
+            isDemoMode={isDemoMode}
           />
         ) : null}
         </>

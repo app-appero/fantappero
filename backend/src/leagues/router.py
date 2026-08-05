@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, Query, Response, status
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
@@ -199,6 +199,35 @@ def get_league(
     service: LeagueService = Depends(get_league_service),
 ) -> LeagueDetailResponse:
     return service.get_league_detail(league_access)
+
+
+@router.delete(
+    "/{league_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    response_class=Response,
+)
+def delete_league(
+    league_access: LeagueAccess = Depends(require_league_permissions(Permission.LEAGUE_ADMIN)),
+    service: LeagueService = Depends(get_league_service),
+) -> Response:
+    """Hard-delete a league still in draft/configuring; archive otherwise."""
+    try:
+        service.delete_league(league_access)
+    except AuthError as exc:
+        return _error_response(exc)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.get(
+    "/{league_id}/partecipanti",
+    response_model=list[LeagueMemberResponse],
+)
+def list_league_members_public(
+    league_access: LeagueAccess = Depends(require_league_permissions(Permission.LEAGUE_VIEW)),
+    service: LeagueMembershipService = Depends(get_league_membership_service),
+) -> list[LeagueMemberResponse]:
+    """Read-only participant roster for any league member (EP03-UX-02)."""
+    return service.list(league_access)
 
 
 @router.get(

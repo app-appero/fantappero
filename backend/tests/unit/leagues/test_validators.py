@@ -17,6 +17,7 @@ from leagues.validators import (
     validate_configurable_league_state,
     validate_invite_credential,
     validate_invite_expiry_days,
+    validate_league_deletable,
     validate_league_name,
     validate_league_transition,
     validate_member_removal,
@@ -179,6 +180,21 @@ def test_configuration_changes_keep_legacy_error_code_after_auction() -> None:
     with pytest.raises(ValidationAuthError) as error:
         validate_configurable_league_state(LeagueState.AUCTION, subject="il regolamento")
     assert error.value.code == "league_not_draft"
+
+
+@pytest.mark.parametrize("state", [LeagueState.DRAFT, LeagueState.CONFIGURING])
+def test_draft_and_configuring_leagues_are_deletable(state: LeagueState) -> None:
+    validate_league_deletable(state)
+
+
+@pytest.mark.parametrize(
+    "state",
+    [LeagueState.AUCTION, LeagueState.ACTIVE, LeagueState.CONCLUDED, LeagueState.ARCHIVED],
+)
+def test_started_leagues_are_not_hard_deletable(state: LeagueState) -> None:
+    with pytest.raises(ValidationAuthError) as error:
+        validate_league_deletable(state)
+    assert error.value.code == "league_not_deletable"
 
 
 def test_configuration_blockers_report_all_missing_requirements() -> None:

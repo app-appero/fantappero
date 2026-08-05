@@ -22,9 +22,9 @@ class LeagueAuditEvent(Base, UUIDPrimaryKeyMixin, TimestampMixin):
 
     __tablename__ = "league_audit_events"
 
-    league_id: Mapped[UUID] = mapped_column(
-        ForeignKey("leagues.id", ondelete="CASCADE"),
-        nullable=False,
+    league_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("leagues.id", ondelete="SET NULL"),
+        nullable=True,
         index=True,
     )
     actor_id: Mapped[UUID] = mapped_column(

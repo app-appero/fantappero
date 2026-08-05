@@ -53,6 +53,7 @@ from leagues.validators import (
     configuration_blockers,
     validate_competition_ids,
     validate_configurable_league_state,
+    validate_league_deletable,
     validate_league_name,
     validate_league_transition,
     validate_participant_count,
@@ -262,6 +263,36 @@ class LeagueService:
         self._session.commit()
         get_metrics().incr("league_rules_updated_total", labels={"result": "success"})
         return self._to_rules_response(rules)
+
+    def delete_league(self, league_access: LeagueAccess) -> None:
+        """Hard-delete a draft/configuring league; audit row survives via ON DELETE SET NULL."""
+        league = self._lock_league_for_lifecycle(league_access.league.id)
+        try:
+            validate_league_deletable(league.state)
+        except ValidationAuthError:
+            get_metrics().incr("league_deleted_total", labels={"result": "not_deletable"})
+            raise
+
+        details = {
+            "leagueId": str(league.id),
+            "name": league.name,
+            "state": league.state.value,
+            "seasonYear": league.season_year,
+        }
+        self._session.add(
+            LeagueAuditEvent(
+                league_id=league.id,
+                actor_id=league_access.user.id,
+                action=LeagueAuditAction.LEAGUE_DELETED,
+                correlation_id=get_correlation_id(),
+                details=details,
+            ),
+        )
+        self._session.flush()
+        self._session.delete(league)
+        self._session.commit()
+        get_metrics().incr("league_deleted_total", labels={"result": "success"})
+        logger.info("league_deleted", extra={"result": "success", **details})
 
     def _load_league_with_competitions(self, league_id: UUID) -> League:
         league = self._session.scalars(

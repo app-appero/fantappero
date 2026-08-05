@@ -104,6 +104,7 @@ class LeagueAuditAction(str, enum.Enum):
     LEAGUE_ROLE_OVERRIDE_SET = "league_role_override_set"
     LEAGUE_ROLE_OVERRIDE_CLEARED = "league_role_override_cleared"
     LEAGUE_LISTONE_REFRESHED = "league_listone_refreshed"
+    LEAGUE_DELETED = "league_deleted"
 
 
 class LeagueCalendarStatus(str, enum.Enum):

@@ -12,8 +12,21 @@ const DEMO_RESULT: AcceptedLeagueInvite = {
   alreadyMember: false,
 };
 
+function goToLeagueHome(
+  navigate: ReturnType<typeof useNavigate>,
+  registerLeague: ReturnType<typeof useAuth>["registerLeague"],
+  result: AcceptedLeagueInvite,
+) {
+  registerLeague({
+    id: result.leagueId,
+    name: result.leagueName,
+    role: "member",
+  });
+  navigate(`/lega/home?leagueId=${result.leagueId}`);
+}
+
 export function JoinLeaguePage() {
-  const { isDemoMode } = useAuth();
+  const { isDemoMode, registerLeague } = useAuth();
   const { search } = useLocation();
   const navigate = useNavigate();
   const params = new URLSearchParams(search);
@@ -37,6 +50,7 @@ export function JoinLeaguePage() {
     }
     if (isDemoMode) {
       setResult(DEMO_RESULT);
+      goToLeagueHome(navigate, registerLeague, DEMO_RESULT);
       return;
     }
     const session = loadStoredSession();
@@ -46,12 +60,12 @@ export function JoinLeaguePage() {
     }
     setLoading(true);
     try {
-      setResult(
-        await acceptLeagueInvite(
-          session.accessToken,
-          token ? { token } : { code: code.trim() },
-        ),
+      const accepted = await acceptLeagueInvite(
+        session.accessToken,
+        token ? { token } : { code: code.trim() },
       );
+      setResult(accepted);
+      goToLeagueHome(navigate, registerLeague, accepted);
     } catch (acceptError) {
       setError(getApiErrorMessage(acceptError, "Impossibile entrare nella lega."));
     } finally {
@@ -88,13 +102,21 @@ export function JoinLeaguePage() {
             message={`Ora fai parte di ${result.leagueName}.`}
             testId="join-league-success"
           />
-          <Button type="button" onClick={() => navigate("/leghe")}>
-            Vai alle tue leghe
+          <Button
+            type="button"
+            data-testid="join-league-open-home"
+            onClick={() => goToLeagueHome(navigate, registerLeague, result)}
+          >
+            Apri home lega
           </Button>
         </div>
       ) : null}
       {!loading && !result ? (
         <form onSubmit={(event) => void onSubmit(event)} data-testid="join-league-form">
+          <p>
+            Ingresso solo su invito: usa il <strong>link</strong> ricevuto oppure inserisci il{" "}
+            <strong>codice</strong>. Non esiste una ricerca pubblica delle leghe.
+          </p>
           {token ? (
             <p>Il link invito è pronto per essere verificato.</p>
           ) : (

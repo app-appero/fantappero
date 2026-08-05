@@ -19,8 +19,20 @@ export const APP_ROUTE_DEFINITIONS: readonly AppRouteDefinition[] = [
   { id: "auth-verify", path: "/accedi/verifica", layout: "none" },
   { id: "leagues", path: "/leghe", layout: "app", requiredPermissions: ["league:view"] },
   {
+    id: "league-create",
+    path: "/leghe/crea",
+    layout: "app",
+    requiredPermissions: ["league:view"],
+  },
+  {
     id: "league-invite",
     path: "/leghe/invito",
+    layout: "app",
+    requiredPermissions: ["league:view"],
+  },
+  {
+    id: "league-home",
+    path: "/lega/home",
     layout: "app",
     requiredPermissions: ["league:view"],
   },
