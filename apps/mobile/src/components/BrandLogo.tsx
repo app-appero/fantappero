@@ -36,9 +36,17 @@ export function BrandLogo({ variant = "full", size = "md", style, testID, ...res
       testID={testID ?? "brand-logo"}
       {...rest}
     >
-      <Feather name="shield" size={markSize} color={colors.accent} />
+      <View style={styles.markWrap}>
+        <Feather name="shield" size={markSize} color={colors.accent} />
+      </View>
       {variant === "full" ? (
-        <Text style={[styles.wordmark, { fontSize: WORDMARK_SIZES[size] }]}>FantApperò</Text>
+        <Text
+          style={[styles.wordmark, { fontSize: WORDMARK_SIZES[size] }]}
+          numberOfLines={1}
+          ellipsizeMode="tail"
+        >
+          FantApperò
+        </Text>
       ) : null}
     </View>
   );
@@ -49,9 +57,15 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: spacing.sm,
+    flexShrink: 1,
+    minWidth: 0,
+  },
+  markWrap: {
+    flexShrink: 0,
   },
   wordmark: {
     color: colors.foreground,
     fontWeight: typography.fontWeight.semibold,
+    flexShrink: 1,
   },
 });

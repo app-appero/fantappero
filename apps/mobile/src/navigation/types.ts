@@ -7,9 +7,15 @@ export type WireframeParams = {
 
 export type JoinLeagueParams = WireframeParams & {
   code?: string;
+  token?: string;
+};
+
+export type LeagueHomeParams = {
+  leagueId?: string;
 };
 
 export type LeagueAdminParams = WireframeParams & {
+  leagueId?: string;
   stagione?: WireframeUiState;
   calendario?: WireframeUiState;
   directory?: DirectoryDemoState;
@@ -23,17 +29,6 @@ export type ReceivedInvitesParams = {
   stato?: DirectoryDemoState;
 };
 
-export type RootStackParamList = {
-  MainTabs: undefined;
-  Auth: WireframeParams | undefined;
-  CreateLeague: CreateLeagueParams | undefined;
-  LeagueAdmin: LeagueAdminParams | undefined;
-  JoinLeague: JoinLeagueParams | undefined;
-  ReceivedInvites: ReceivedInvitesParams | undefined;
-  AdminPanel: undefined;
-  DevSettings: undefined;
-};
-
 export type AppTabParamList = {
   Leagues: WireframeParams | undefined;
   Matchday: WireframeParams | undefined;
@@ -43,6 +38,21 @@ export type AppTabParamList = {
   Auction: WireframeParams | undefined;
   Market: WireframeParams | undefined;
   Profile: undefined;
+};
+
+export type RootStackParamList = {
+  MainTabs: undefined | { screen?: keyof AppTabParamList };
+  Auth: WireframeParams | undefined;
+  AuthRegister: undefined;
+  AuthForgotPassword: undefined;
+  AuthResetPassword: { token?: string } | undefined;
+  CreateLeague: CreateLeagueParams | undefined;
+  LeagueHome: LeagueHomeParams | undefined;
+  LeagueAdmin: LeagueAdminParams | undefined;
+  JoinLeague: JoinLeagueParams | undefined;
+  ReceivedInvites: ReceivedInvitesParams | undefined;
+  ManagerDirectory: undefined;
+  AdminPanel: undefined;
 };
 
 export type AdminStackParamList = {

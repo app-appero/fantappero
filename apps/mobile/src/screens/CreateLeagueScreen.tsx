@@ -1,40 +1,62 @@
+import type { CompetitionSummary, LeagueDetail } from "@fantappero/contracts";
 import { theme } from "@fantappero/ui/theme";
-import { useRoute, type RouteProp } from "@react-navigation/core";
-import { useMemo, useState } from "react";
+import { useNavigation } from "@react-navigation/core";
+import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import { useCallback, useMemo, useState } from "react";
 import { Pressable, StyleSheet, Switch, Text, TextInput, View } from "react-native";
+import { createLeague, fetchCompetitions } from "../api/leagues";
 import { CoachDirectoryPanel } from "../components/CoachDirectoryPanel";
-import { PageContainer } from "../layout/PageContainer";
 import { UiStatePanel } from "../components/UiStatePanel";
+import { useScreenData } from "../hooks/useScreenData";
+import { PageContainer } from "../layout/PageContainer";
 import type { RootStackParamList } from "../navigation/types";
-import { useDemoSession } from "../session/DemoSessionContext";
-import { resolveDirectoryState } from "./directoryDemo";
+import { getApiErrorMessage, useAuthSession } from "../session/DemoSessionContext";
 
 const { colors, spacing, typography, radius } = theme;
 
-const DEMO_COMPETITIONS = [
-  { id: "demo-39", name: "Premier League", country: "England" },
-  { id: "demo-140", name: "La Liga", country: "Spain" },
-  { id: "demo-135", name: "Serie A", country: "Italy" },
-  { id: "demo-78", name: "Bundesliga", country: "Germany" },
-  { id: "demo-61", name: "Ligue 1", country: "France" },
-];
-
-/** Creazione lega privata in bozza — flusso demo con validazioni (EP03-01). */
+/** Creazione lega privata in bozza (EP03-01). */
 export function CreateLeagueScreen() {
-  const { can } = useDemoSession();
-  const route = useRoute<RouteProp<RootStackParamList, "CreateLeague">>();
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const { can, accessToken, registerLeague, refreshMemberships } = useAuthSession();
   const seasonOptions = useMemo(() => {
     const currentYear = new Date().getFullYear();
     return [currentYear - 1, currentYear, currentYear + 1];
   }, []);
 
+  const [competitions, setCompetitions] = useState<CompetitionSummary[]>([]);
+  const [loadingCatalog, setLoadingCatalog] = useState(true);
+  const [catalogError, setCatalogError] = useState<string | null>(null);
   const [name, setName] = useState("");
   const [seasonYear, setSeasonYear] = useState(String(new Date().getFullYear()));
   const [selected, setSelected] = useState<Record<string, boolean>>({});
   const [formError, setFormError] = useState<string | null>(null);
-  const [successMessage, setSuccessMessage] = useState<string | null>(null);
-  const [phase, setPhase] = useState<1 | 2>(1);
+  const [submitting, setSubmitting] = useState(false);
+  const [createdLeague, setCreatedLeague] = useState<LeagueDetail | null>(null);
   const [directoryCompleted, setDirectoryCompleted] = useState(false);
+
+  const loadCatalog = useCallback(
+    async (options?: { silent?: boolean }) => {
+      if (!accessToken) {
+        setCatalogError("Sessione non disponibile. Accedi di nuovo.");
+        setLoadingCatalog(false);
+        return;
+      }
+      if (!options?.silent) {
+        setLoadingCatalog(true);
+      }
+      setCatalogError(null);
+      try {
+        setCompetitions(await fetchCompetitions(accessToken));
+      } catch (error) {
+        setCatalogError(getApiErrorMessage(error, "Impossibile caricare i campionati."));
+      } finally {
+        setLoadingCatalog(false);
+      }
+    },
+    [accessToken],
+  );
+
+  const { refreshing, onRefresh } = useScreenData(loadCatalog);
 
   if (!can(["league:view"])) {
     return (
@@ -53,36 +75,59 @@ export function CreateLeagueScreen() {
     setSelected((current) => ({ ...current, [id]: !current[id] }));
   }
 
-  function handleSubmit() {
+  async function handleSubmit() {
     setFormError(null);
-    setSuccessMessage(null);
-
     if (!name.trim()) {
       setFormError("Inserisci un nome per la lega.");
       return;
     }
-
-    const selectedCount = DEMO_COMPETITIONS.filter((row) => selected[row.id]).length;
-    if (selectedCount < 3) {
+    const selectedIds = competitions.filter((row) => selected[row.id]).map((row) => row.id);
+    if (selectedIds.length < 3) {
       setFormError("Seleziona almeno 3 campionati.");
       return;
     }
 
-    setSuccessMessage(`"${name.trim()}" salvata in bozza (demo). Sei amministratore.`);
-    setPhase(2);
+    if (!accessToken) {
+      setFormError("Sessione non disponibile. Accedi di nuovo.");
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      const created = await createLeague(accessToken, {
+        name: name.trim(),
+        seasonYear: Number(seasonYear),
+        competitionIds: selectedIds,
+      });
+      registerLeague({
+        id: created.id,
+        name: created.name,
+        role: created.viewerRole === "league_admin" ? "league_admin" : "member",
+        state: created.state,
+      });
+      try {
+        await refreshMemberships();
+      } catch {
+        // Creazione già riuscita; registerLeague ha aggiornato lo stato locale.
+      }
+      setCreatedLeague(created);
+    } catch (error) {
+      setFormError(getApiErrorMessage(error, "Impossibile creare la lega."));
+    } finally {
+      setSubmitting(false);
+    }
   }
 
-  if (phase === 2) {
-    const directoryState = resolveDirectoryState(true, route.params?.directory);
+  if (createdLeague) {
     return (
       <PageContainer title="Crea lega · Fase 2" testID="screen-create-league-directory">
         <UiStatePanel
           state="success"
-          title={directoryCompleted ? "Configurazione demo completata" : "Lega creata"}
+          title={directoryCompleted ? "Configurazione completata" : "Lega creata"}
           message={
             directoryCompleted
-              ? "La fase directory è stata chiusa. Gli inviti restano solo nella sessione locale."
-              : `${successMessage} Ora puoi invitare facoltativamente dalla directory.`
+              ? "Puoi continuare dall'elenco leghe o dall'amministrazione."
+              : `"${createdLeague.name}" salvata in bozza. Sei amministratore.`
           }
           testID={
             directoryCompleted ? "create-league-directory-complete" : "create-league-phase-2"
@@ -91,9 +136,9 @@ export function CreateLeagueScreen() {
         {!directoryCompleted ? (
           <>
             <CoachDirectoryPanel
-              state={directoryState}
+              leagueId={createdLeague.id}
               memberCount={1}
-              capacity={8}
+              capacity={createdLeague.rules?.participantCount ?? 8}
               testIDPrefix="create-league-directory"
             />
             <Pressable
@@ -105,79 +150,117 @@ export function CreateLeagueScreen() {
               <Text style={styles.secondaryButtonLabel}>Salta e termina</Text>
             </Pressable>
           </>
-        ) : null}
+        ) : (
+          <View style={styles.footerActions}>
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => navigation.navigate("LeagueAdmin", { leagueId: createdLeague.id })}
+              style={styles.primaryButton}
+              testID="create-league-open-admin"
+            >
+              <Text style={styles.primaryButtonLabel}>Apri amministrazione</Text>
+            </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => navigation.navigate("MainTabs", { screen: "Leagues" } as never)}
+              style={styles.secondaryButton}
+              testID="create-league-back-list"
+            >
+              <Text style={styles.secondaryButtonLabel}>Torna alle leghe</Text>
+            </Pressable>
+          </View>
+        )}
       </PageContainer>
     );
   }
 
   return (
-    <PageContainer title="Crea lega" testID="screen-create-league">
-      {successMessage ? (
+    <PageContainer
+      title="Crea lega"
+      testID="screen-create-league"
+      refreshing={refreshing}
+      onRefresh={onRefresh}
+    >
+      {loadingCatalog ? (
         <UiStatePanel
-          state="success"
-          title="Lega creata"
-          message={successMessage}
-          testID="create-league-success"
+          state="loading"
+          title="Caricamento campionati"
+          message="Recupero del catalogo in corso…"
+          testID="create-league-catalog-loading"
         />
       ) : null}
-
+      {catalogError ? (
+        <UiStatePanel
+          state="error"
+          title="Catalogo non disponibile"
+          message={catalogError}
+          testID="create-league-catalog-error"
+        />
+      ) : null}
       {formError ? (
         <UiStatePanel state="error" title="Errore" message={formError} testID="create-league-error" />
       ) : null}
 
-      <View style={styles.section} testID="create-league-form">
-        <Text style={styles.label}>Nome lega</Text>
-        <TextInput
-          value={name}
-          onChangeText={setName}
-          style={styles.input}
-          placeholder="Es. Lega degli amici"
-          testID="create-league-name"
-        />
+      {!loadingCatalog && !catalogError ? (
+        <View style={styles.section} testID="create-league-form">
+          <Text style={styles.label}>Nome lega</Text>
+          <TextInput
+            value={name}
+            onChangeText={setName}
+            style={styles.input}
+            placeholder="Es. Lega degli amici"
+            placeholderTextColor={colors.foregroundMuted}
+            accessibilityLabel="Nome lega"
+            testID="create-league-name"
+          />
 
-        <Text style={styles.label}>Stagione</Text>
-        <View style={styles.seasonRow}>
-          {seasonOptions.map((year) => {
-            const selectedSeason = seasonYear === String(year);
-            return (
-              <Pressable
-                key={year}
-                accessibilityRole="button"
-                onPress={() => setSeasonYear(String(year))}
-                style={[styles.seasonChip, selectedSeason && styles.seasonChipSelected]}
-                testID={`create-league-season-${year}`}
-              >
-                <Text style={[styles.seasonLabel, selectedSeason && styles.seasonLabelSelected]}>
-                  {year}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </View>
-
-        <Text style={styles.label}>Campionati (minimo 3)</Text>
-        {DEMO_COMPETITIONS.map((competition) => (
-          <View key={competition.id} style={styles.competitionRow}>
-            <Switch
-              value={Boolean(selected[competition.id])}
-              onValueChange={() => toggleCompetition(competition.id)}
-              testID={`create-league-competition-${competition.id}`}
-            />
-            <Text style={styles.competitionLabel}>
-              {competition.name} ({competition.country})
-            </Text>
+          <Text style={styles.label}>Stagione</Text>
+          <View style={styles.seasonRow}>
+            {seasonOptions.map((year) => {
+              const selectedSeason = seasonYear === String(year);
+              return (
+                <Pressable
+                  key={year}
+                  accessibilityRole="button"
+                  onPress={() => setSeasonYear(String(year))}
+                  style={[styles.seasonChip, selectedSeason && styles.seasonChipSelected]}
+                  testID={`create-league-season-${year}`}
+                >
+                  <Text style={[styles.seasonLabel, selectedSeason && styles.seasonLabelSelected]}>
+                    {year}
+                  </Text>
+                </Pressable>
+              );
+            })}
           </View>
-        ))}
 
-        <Pressable
-          accessibilityRole="button"
-          onPress={handleSubmit}
-          style={styles.primaryButton}
-          testID="create-league-submit"
-        >
-          <Text style={styles.primaryButtonLabel}>Crea lega privata</Text>
-        </Pressable>
-      </View>
+          <Text style={styles.label}>Campionati (minimo 3)</Text>
+          {competitions.map((competition) => (
+            <View key={competition.id} style={styles.competitionRow}>
+              <Switch
+                value={Boolean(selected[competition.id])}
+                onValueChange={() => toggleCompetition(competition.id)}
+                testID={`create-league-competition-${competition.id}`}
+              />
+              <Text style={styles.competitionLabel}>
+                {competition.name} ({competition.country})
+              </Text>
+            </View>
+          ))}
+
+          <Pressable
+            accessibilityRole="button"
+            disabled={submitting}
+            onPress={() => void handleSubmit()}
+            style={[styles.primaryButton, submitting && styles.disabled]}
+            testID="create-league-submit"
+          >
+            <Text style={styles.primaryButtonLabel}>
+              {submitting ? "Creazione…" : "Crea lega privata"}
+            </Text>
+          </Pressable>
+        </View>
+      ) : null}
     </PageContainer>
   );
 }
@@ -193,6 +276,7 @@ const styles = StyleSheet.create({
     marginTop: spacing.sm,
   },
   input: {
+    minHeight: 44,
     borderWidth: 1,
     borderColor: colors.border,
     borderRadius: radius.md,
@@ -207,11 +291,13 @@ const styles = StyleSheet.create({
     gap: spacing.xs,
   },
   seasonChip: {
+    minHeight: 44,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
     borderRadius: radius.md,
     borderWidth: 1,
     borderColor: colors.border,
+    justifyContent: "center",
   },
   seasonChipSelected: {
     borderColor: colors.accent,
@@ -238,25 +324,36 @@ const styles = StyleSheet.create({
   },
   primaryButton: {
     marginTop: spacing.md,
+    minHeight: 44,
     backgroundColor: colors.accent,
     borderRadius: radius.md,
     paddingVertical: spacing.md,
     alignItems: "center",
+    justifyContent: "center",
   },
   primaryButtonLabel: {
-    color: colors.background,
+    color: colors.accentContrast,
     fontWeight: typography.fontWeight.semibold,
     fontSize: typography.fontSize.md,
   },
   secondaryButton: {
+    minHeight: 44,
     borderWidth: 1,
     borderColor: colors.accent,
     borderRadius: radius.md,
     paddingVertical: spacing.md,
     alignItems: "center",
+    justifyContent: "center",
   },
   secondaryButtonLabel: {
     color: colors.accent,
     fontWeight: typography.fontWeight.semibold,
+  },
+  footerActions: {
+    gap: spacing.sm,
+    marginTop: spacing.md,
+  },
+  disabled: {
+    opacity: 0.6,
   },
 });

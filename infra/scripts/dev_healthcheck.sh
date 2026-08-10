@@ -61,8 +61,8 @@ while (( SECONDS < deadline )); do
   if (( all_ok == 1 )); then
     echo "All essential services healthy."
     # Extra smoke: API JSON
-    api_port="$(compose port api 8000 2>/dev/null | awk -F: '{print $NF}' || true)"
-    api_port="${api_port:-8000}"
+    api_port="$(compose port api 8001 2>/dev/null | awk -F: '{print $NF}' || true)"
+    api_port="${api_port:-8001}"
     if command -v curl >/dev/null 2>&1; then
       body="$(curl -fsS "http://127.0.0.1:${api_port}/health" || true)"
       echo "API /health => ${body}"

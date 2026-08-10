@@ -14,6 +14,8 @@ export const colors = {
   accent: palette.electric500,
   accentHover: palette.electric400,
   accentMuted: palette.electric300,
+  /** Testo su sfondo accent (CTA filled). */
+  accentContrast: palette.ivory100,
 
   border: palette.pitch600,
   borderStrong: palette.pitch500,

@@ -1,7 +1,8 @@
-import { Pressable, StyleSheet, Text, View } from "react-native";
 import { theme } from "@fantappero/ui/theme";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 import { BrandLogo } from "../components/BrandLogo";
 import { LeagueSelector } from "../components/LeagueSelector";
+import { NavIcon } from "../navigation/NavIcons";
 
 const { colors, spacing, typography, radius } = theme;
 
@@ -13,13 +14,12 @@ export type AppHeaderProps = {
   activeLeagueId?: string | null;
   onLeagueChange?: (leagueId: string) => void;
   onBrandPress?: () => void;
-  onAdminPress?: () => void;
   onBackToAppPress?: () => void;
-  onLeagueAdminPress?: () => void;
-  showAdminLink?: boolean;
-  showLeagueAdminLink?: boolean;
-  showDevSettings?: boolean;
-  onDevSettingsPress?: () => void;
+  /** Apre il drawer laterale (solo surface app). */
+  onMenuPress?: () => void;
+  showMenuButton?: boolean;
+  onLogoutPress?: () => void;
+  showLogout?: boolean;
 };
 
 export function AppHeader({
@@ -30,13 +30,11 @@ export function AppHeader({
   activeLeagueId,
   onLeagueChange,
   onBrandPress,
-  onAdminPress,
   onBackToAppPress,
-  onLeagueAdminPress,
-  showAdminLink = false,
-  showLeagueAdminLink = false,
-  showDevSettings = false,
-  onDevSettingsPress,
+  onMenuPress,
+  showMenuButton = false,
+  onLogoutPress,
+  showLogout = false,
 }: AppHeaderProps) {
   const isAdmin = surface === "admin";
 
@@ -47,44 +45,36 @@ export function AppHeader({
       testID={isAdmin ? "admin-header" : "app-header"}
     >
       <View style={styles.topRow}>
+        {showMenuButton && onMenuPress ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Apri menu"
+            onPress={onMenuPress}
+            style={styles.menuButton}
+            testID="app-menu-button"
+          >
+            <NavIcon id="more" color={colors.foreground} size={24} />
+          </Pressable>
+        ) : null}
+
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={isAdmin ? "FantApperò operazioni" : "FantApperò, home"}
           onPress={onBrandPress}
           style={styles.brandButton}
+          testID="app-brand-button"
         >
           {isAdmin ? (
             <View style={styles.adminBrand}>
-              <BrandLogo variant="mark" size="sm" />
+              <BrandLogo variant="mark" size="md" />
               <Text style={styles.brandAdmin}>Operazioni</Text>
             </View>
           ) : (
-            <BrandLogo variant="full" size="sm" />
+            <BrandLogo variant="full" size="md" />
           )}
         </Pressable>
+
         <View style={styles.actions}>
-          {showDevSettings ? (
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Impostazioni demo"
-              onPress={onDevSettingsPress}
-              style={styles.linkButton}
-              testID="dev-settings-button"
-            >
-              <Text style={styles.linkText}>Demo</Text>
-            </Pressable>
-          ) : null}
-          {showAdminLink ? (
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Pannello globale"
-              onPress={onAdminPress}
-              style={styles.linkButton}
-              testID="admin-panel-link"
-            >
-              <Text style={styles.linkText}>Pannello</Text>
-            </Pressable>
-          ) : null}
           {isAdmin && onBackToAppPress ? (
             <Pressable
               accessibilityRole="button"
@@ -95,25 +85,27 @@ export function AppHeader({
               <Text style={styles.linkText}>App</Text>
             </Pressable>
           ) : null}
-          {showLeagueAdminLink ? (
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Admin lega"
-              onPress={onLeagueAdminPress}
-              style={styles.linkButton}
-              testID="league-admin-link"
-            >
-              <Text style={styles.linkText}>Admin lega</Text>
-            </Pressable>
-          ) : null}
           <View
             style={[styles.userChip, isAdmin && styles.userChipAdmin]}
             accessibilityRole="text"
             accessibilityLabel={`Utente ${userDisplayName}`}
             testID={isAdmin ? "admin-user-display" : "user-display"}
           >
-            <Text style={styles.userChipText}>{userDisplayName}</Text>
+            <Text style={styles.userChipText} numberOfLines={1}>
+              {userDisplayName}
+            </Text>
           </View>
+          {showLogout && onLogoutPress ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Esci"
+              onPress={onLogoutPress}
+              style={styles.linkButton}
+              testID="logout-button"
+            >
+              <Text style={styles.linkText}>Esci</Text>
+            </Pressable>
+          ) : null}
         </View>
       </View>
       {showLeagueSelector && activeLeagueId && onLeagueChange ? (
@@ -130,7 +122,7 @@ export function AppHeader({
 
 const styles = StyleSheet.create({
   header: {
-    paddingHorizontal: spacing.lg,
+    paddingHorizontal: spacing.md,
     paddingVertical: spacing.md,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
@@ -144,11 +136,20 @@ const styles = StyleSheet.create({
   topRow: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
     gap: spacing.sm,
   },
+  menuButton: {
+    minWidth: 44,
+    minHeight: 44,
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0,
+  },
   brandButton: {
+    flexGrow: 1,
     flexShrink: 1,
+    minWidth: 0,
+    justifyContent: "center",
   },
   adminBrand: {
     flexDirection: "row",
@@ -163,19 +164,22 @@ const styles = StyleSheet.create({
   actions: {
     flexDirection: "row",
     alignItems: "center",
-    flexWrap: "wrap",
-    justifyContent: "flex-end",
+    flexShrink: 0,
     gap: spacing.xs,
+    maxWidth: "42%",
   },
   linkButton: {
+    minHeight: 44,
+    justifyContent: "center",
     paddingHorizontal: spacing.xs,
-    paddingVertical: spacing.xs,
   },
   linkText: {
     color: colors.accent,
-    fontSize: typography.fontSize.xs,
+    fontSize: typography.fontSize.sm,
+    fontWeight: typography.fontWeight.semibold,
   },
   userChip: {
+    maxWidth: 96,
     paddingHorizontal: spacing.sm,
     paddingVertical: spacing.xs,
     borderRadius: radius.md,

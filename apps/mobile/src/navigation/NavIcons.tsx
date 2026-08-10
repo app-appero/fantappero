@@ -10,6 +10,9 @@ type FeatherName = ComponentProps<typeof Feather>["name"];
 
 export const NAV_ICON_MAP: Record<string, FeatherName> = {
   leagues: "award",
+  "league-home": "home",
+  "manager-directory": "users",
+  "received-invites": "mail",
   matchday: "calendar",
   standings: "bar-chart-2",
   roster: "users",
@@ -17,6 +20,7 @@ export const NAV_ICON_MAP: Record<string, FeatherName> = {
   auction: "shopping-cart",
   market: "repeat",
   profile: "user",
+  more: "menu",
   "league-admin": "shield",
   "admin-home": "shield",
   "admin-leagues": "layers",

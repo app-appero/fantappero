@@ -26,8 +26,8 @@ backend/
 
 ```bash
 python -m pip install -e "./backend[dev]"
-cd backend && python -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
-# GET http://127.0.0.1:8000/health → {"status":"ok"} (deps skipped if URL unset)
+cd backend && python -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8001
+# GET http://127.0.0.1:8001/health → {"status":"ok"} (deps skipped if URL unset)
 python -m pytest tests/unit/test_health.py
 ```
 

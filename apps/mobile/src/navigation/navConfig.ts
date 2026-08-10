@@ -1,7 +1,11 @@
-import type { NavItemDefinition, Permission } from "@fantappero/contracts";
+import type { Permission } from "@fantappero/contracts";
+import type { NavItemDefinition } from "@fantappero/contracts";
 
-/** Mobile tab bar catalog — member app routes (labels in NAV_LABELS). */
-export const MOBILE_NAV_ITEMS: readonly NavItemDefinition[] = [
+/**
+ * Catalogo drawer mobile — allineato a `apps/web` APP_NAV_ITEMS
+ * (stesso ordine ed etichette; permessi identici).
+ */
+export const MOBILE_DRAWER_NAV_ITEMS: readonly NavItemDefinition[] = [
   {
     id: "leagues",
     path: "/leghe",
@@ -9,9 +13,27 @@ export const MOBILE_NAV_ITEMS: readonly NavItemDefinition[] = [
     surface: "app",
   },
   {
+    id: "league-home",
+    path: "/lega/home",
+    requiredPermissions: ["league:view"],
+    surface: "app",
+  },
+  {
     id: "matchday",
     path: "/turni",
     requiredPermissions: ["matchday:view"],
+    surface: "app",
+  },
+  {
+    id: "manager-directory",
+    path: "/fantallenatori",
+    requiredPermissions: ["league:admin"],
+    surface: "app",
+  },
+  {
+    id: "received-invites",
+    path: "/inviti",
+    requiredPermissions: ["league:view"],
     surface: "app",
   },
   {
@@ -45,6 +67,12 @@ export const MOBILE_NAV_ITEMS: readonly NavItemDefinition[] = [
     surface: "app",
   },
   {
+    id: "league-admin",
+    path: "/lega/amministrazione",
+    requiredPermissions: ["league:admin"],
+    surface: "app",
+  },
+  {
     id: "profile",
     path: "/profilo",
     requiredPermissions: ["profile:view"],
@@ -52,15 +80,10 @@ export const MOBILE_NAV_ITEMS: readonly NavItemDefinition[] = [
   },
 ];
 
-/** League admin — outside tab bar, reachable from header link. */
-export const MOBILE_LEAGUE_ADMIN_ITEM: NavItemDefinition = {
-  id: "league-admin",
-  path: "/lega/amministrazione",
-  requiredPermissions: ["league:admin"],
-  surface: "app",
-};
+/** @deprecated Usare MOBILE_DRAWER_NAV_ITEMS — alias per test/import legacy. */
+export const MOBILE_NAV_ITEMS = MOBILE_DRAWER_NAV_ITEMS;
 
-/** Global operator panel — separate admin stack, not in member tab bar. */
+/** Global operator panel — separate admin stack. */
 export const MOBILE_ADMIN_NAV_ITEMS: readonly NavItemDefinition[] = [
   {
     id: "admin-home",
@@ -84,6 +107,9 @@ export const MOBILE_ADMIN_NAV_ITEMS: readonly NavItemDefinition[] = [
 
 export const NAV_LABELS: Record<string, string> = {
   leagues: "Leghe",
+  "league-home": "Home lega",
+  "manager-directory": "Fantallenatori",
+  "received-invites": "Inviti",
   matchday: "Turni",
   standings: "Classifica",
   roster: "Rosa",

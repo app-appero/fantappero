@@ -92,11 +92,11 @@ services:
       SMTP_HOST: ${SMTP_HOST:-mailpit}
       SMTP_PORT: ${SMTP_PORT:-1025}
       MAIL_FROM: ${MAIL_FROM:-noreply@fantappero.local}
-      WEB_APP_BASE_URL: ${WEB_APP_BASE_URL:-http://localhost:5173}
+      WEB_APP_BASE_URL: ${WEB_APP_BASE_URL:-http://localhost:5174}
       AVATAR_STORAGE_PATH: /data/avatars
       PROFILE_POLICY_VERSION: ${PROFILE_POLICY_VERSION:-2026-01}
     ports:
-      - "${API_PORT:-8000}:8000"
+      - "${API_PORT:-8001}:8001"
     volumes:
       - fantappero_avatar_data:/data/avatars
     depends_on:
@@ -110,7 +110,7 @@ services:
       test:
         [
           "CMD-SHELL",
-          "curl -fsS http://127.0.0.1:8000/health | grep -q '\"status\":\"ok\"'",
+          "curl -fsS http://127.0.0.1:8001/health | grep -q '\"status\":\"ok\"'",
         ]
       interval: 10s
       timeout: 5s
@@ -144,7 +144,7 @@ services:
       SMTP_HOST: ${SMTP_HOST:-mailpit}
       SMTP_PORT: ${SMTP_PORT:-1025}
       MAIL_FROM: ${MAIL_FROM:-noreply@fantappero.local}
-      WEB_APP_BASE_URL: ${WEB_APP_BASE_URL:-http://localhost:5173}
+      WEB_APP_BASE_URL: ${WEB_APP_BASE_URL:-http://localhost:5174}
       SPORTS_SCHEDULER_ENABLED: ${SPORTS_SCHEDULER_ENABLED:-false}
     depends_on:
       postgres:
@@ -215,9 +215,9 @@ services:
     container_name: fantappero-web
     restart: unless-stopped
     environment:
-      VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://127.0.0.1:8000}
+      VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://127.0.0.1:8001}
     ports:
-      - "${WEB_PORT:-5173}:5173"
+      - "${WEB_PORT:-5174}:5174"
     volumes:
       - ./apps/web:/app/apps/web
       - ./apps/mobile:/app/apps/mobile
@@ -229,7 +229,7 @@ services:
       api:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:5173/ >/dev/null"]
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:5174/ >/dev/null"]
       interval: 10s
       timeout: 5s
       retries: 10

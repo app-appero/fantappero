@@ -1,24 +1,42 @@
-import type { RouteProp } from "@react-navigation/core";
-import { useRoute } from "@react-navigation/core";
+import type { AcceptedLeagueInvite } from "@fantappero/contracts";
 import { theme } from "@fantappero/ui/theme";
+import { useNavigation, useRoute, type RouteProp } from "@react-navigation/core";
+import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useState } from "react";
-import { Pressable, StyleSheet, Text, TextInput } from "react-native";
+import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { acceptLeagueInvite } from "../api/leagues";
 import { UiStatePanel } from "../components/UiStatePanel";
 import { PageContainer } from "../layout/PageContainer";
 import type { RootStackParamList } from "../navigation/types";
-import { useDemoSession } from "../session/DemoSessionContext";
-import { resolveJoinInviteState } from "./inviteDemo";
+import { getApiErrorMessage, useAuthSession } from "../session/DemoSessionContext";
 
 const { colors, spacing, typography, radius } = theme;
 
 export function JoinLeagueScreen() {
-  const { can } = useDemoSession();
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const route = useRoute<RouteProp<RootStackParamList, "JoinLeague">>();
-  const state = resolveJoinInviteState(can(["league:view"]), route.params?.stato);
+  const { can, accessToken, registerLeague, refreshMemberships } = useAuthSession();
+  const token = route.params?.token?.trim() ?? "";
   const [code, setCode] = useState(route.params?.code ?? "");
-  const [message, setMessage] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [result, setResult] = useState<AcceptedLeagueInvite | null>(null);
 
-  if (state === "forbidden") {
+  async function goHome(accepted: AcceptedLeagueInvite) {
+    registerLeague({
+      id: accepted.leagueId,
+      name: accepted.leagueName,
+      role: "member",
+    });
+    try {
+      await refreshMemberships();
+    } catch {
+      // L'ingresso è già riuscito; la lista si aggiornerà al prossimo focus.
+    }
+    navigation.replace("LeagueHome", { leagueId: accepted.leagueId });
+  }
+
+  if (!can(["league:view"])) {
     return (
       <PageContainer title="Entra in una lega" testID="screen-join-league">
         <UiStatePanel
@@ -30,7 +48,33 @@ export function JoinLeagueScreen() {
       </PageContainer>
     );
   }
-  if (state === "loading") {
+
+  async function onSubmit() {
+    setError(null);
+    if (!token && !code.trim()) {
+      setError("Inserisci un codice invito.");
+      return;
+    }
+    if (!accessToken) {
+      setError("Sessione non disponibile. Accedi di nuovo.");
+      return;
+    }
+    setLoading(true);
+    try {
+      const accepted = await acceptLeagueInvite(
+        accessToken,
+        token ? { token } : { code: code.trim() },
+      );
+      setResult(accepted);
+      await goHome(accepted);
+    } catch (acceptError) {
+      setError(getApiErrorMessage(acceptError, "Impossibile entrare nella lega."));
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  if (loading) {
     return (
       <PageContainer title="Entra in una lega" testID="screen-join-league">
         <UiStatePanel
@@ -42,60 +86,69 @@ export function JoinLeagueScreen() {
       </PageContainer>
     );
   }
-  if (state === "error") {
-    return (
-      <PageContainer title="Entra in una lega" testID="screen-join-league">
-        <UiStatePanel
-          state="error"
-          title="Ingresso non riuscito"
-          message="L'invito non è valido, è scaduto o la lega è piena (demo)."
-          testID="join-league-error"
-        />
-      </PageContainer>
-    );
-  }
-  if (state === "success" || message) {
+
+  if (result) {
     return (
       <PageContainer title="Entra in una lega" testID="screen-join-league">
         <UiStatePanel
           state="success"
-          title="Ingresso completato"
-          message={message ?? "Ora fai parte di Lega del Quartiere (demo)."}
+          title={result.alreadyMember ? "Sei già nella lega" : "Ingresso completato"}
+          message={`Ora fai parte di ${result.leagueName}.`}
           testID="join-league-success"
         />
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => void goHome(result)}
+          style={styles.primaryButton}
+          testID="join-league-open-home"
+        >
+          <Text style={styles.primaryLabel}>Apri home lega</Text>
+        </Pressable>
       </PageContainer>
     );
   }
 
-  function accept() {
-    if (!code.trim()) {
-      setMessage(null);
-      return;
-    }
-    setMessage("Ora fai parte di Lega del Quartiere (demo).");
-  }
-
   return (
     <PageContainer title="Entra in una lega" testID="screen-join-league">
-      <UiStatePanel
-        state="empty"
-        title="Inserisci il codice"
-        message="Usa il codice ricevuto dall'amministratore della lega."
-        testID="join-league-empty"
-      />
-      <Text style={styles.label}>Codice invito</Text>
-      <TextInput
-        value={code}
-        onChangeText={setCode}
-        autoCapitalize="characters"
-        autoCorrect={false}
-        placeholder="ABCDE-FGHIJ"
-        style={styles.input}
-        testID="join-league-code"
-      />
+      <Text style={styles.hint}>
+        Ingresso solo su invito: usa il link ricevuto oppure inserisci il codice. Non esiste una
+        ricerca pubblica delle leghe.
+      </Text>
+      {error ? (
+        <UiStatePanel
+          state="error"
+          title="Ingresso non riuscito"
+          message={error}
+          testID="join-league-error"
+        />
+      ) : null}
+      {token ? (
+        <UiStatePanel
+          state="success"
+          title="Link invito pronto"
+          message="Il token dal link è pronto per essere verificato."
+          testID="join-league-token-ready"
+        />
+      ) : (
+        <View>
+          <Text style={styles.label}>Codice invito</Text>
+          <TextInput
+            value={code}
+            onChangeText={setCode}
+            autoCapitalize="characters"
+            autoCorrect={false}
+            placeholder="ABCDE-FGHIJ"
+            placeholderTextColor={colors.foregroundMuted}
+            style={styles.input}
+            accessibilityLabel="Codice invito"
+            testID="join-league-code"
+          />
+        </View>
+      )}
       <Pressable
         accessibilityRole="button"
-        onPress={accept}
+        accessibilityLabel="Entra nella lega"
+        onPress={() => void onSubmit()}
         style={styles.primaryButton}
         testID="join-league-submit"
       >
@@ -106,6 +159,11 @@ export function JoinLeagueScreen() {
 }
 
 const styles = StyleSheet.create({
+  hint: {
+    color: colors.foregroundMuted,
+    fontSize: typography.fontSize.sm,
+    marginBottom: spacing.md,
+  },
   label: {
     marginTop: spacing.md,
     color: colors.foregroundMuted,
@@ -114,6 +172,7 @@ const styles = StyleSheet.create({
   },
   input: {
     marginTop: spacing.xs,
+    minHeight: 44,
     borderWidth: 1,
     borderColor: colors.border,
     borderRadius: radius.md,
@@ -124,13 +183,15 @@ const styles = StyleSheet.create({
   },
   primaryButton: {
     marginTop: spacing.md,
+    minHeight: 44,
     padding: spacing.md,
     borderRadius: radius.md,
     backgroundColor: colors.accent,
     alignItems: "center",
+    justifyContent: "center",
   },
   primaryLabel: {
-    color: colors.background,
+    color: colors.accentContrast,
     fontSize: typography.fontSize.md,
     fontWeight: typography.fontWeight.semibold,
   },

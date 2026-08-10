@@ -11,7 +11,7 @@
     "web": "expo start --web",
     "typecheck": "tsc --noEmit --pretty false",
     "lint": "tsc --noEmit --pretty false",
-    "test": "node --test --experimental-strip-types src/health.test.ts src/config/env.test.ts src/navigation/navConfig.test.ts src/wireframes/useWireframeState.test.ts src/wireframes/screenMap.test.ts src/screens/ProfileScreen.test.ts src/screens/inviteDemo.test.ts src/screens/directoryDemo.test.ts",
+    "test": "node --test --experimental-strip-types src/health.test.ts src/config/env.test.ts src/navigation/navConfig.test.ts src/wireframes/useWireframeState.test.ts src/wireframes/screenMap.test.ts src/screens/ProfileScreen.test.ts src/screens/inviteDemo.test.ts src/screens/directoryDemo.test.ts src/leagues/leagueDeleteHelpers.test.ts",
     "build": "tsc --noEmit --pretty false"
   },
   "dependencies": {

@@ -3,7 +3,7 @@ import { StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { theme } from "@fantappero/ui/theme";
 import { AppHeader } from "../layout/AppHeader";
-import { useDemoSession } from "../session/DemoSessionContext";
+import { useAuthSession } from "../session/DemoSessionContext";
 import { WireframePlaceholderScreen } from "../wireframes/WireframePlaceholderScreen";
 import { MOBILE_ADMIN_NAV_ITEMS, NAV_LABELS } from "./navConfig";
 import type { AdminStackParamList } from "./types";
@@ -18,17 +18,17 @@ const { colors } = theme;
 function AdminShell({ children }: { children: React.ReactNode }) {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
-  const { user } = useDemoSession();
+  const { user, logout } = useAuthSession();
 
   return (
     <View style={[styles.shell, { paddingTop: insets.top }]}>
       <AppHeader
         surface="admin"
-        userDisplayName={user.displayName}
+        userDisplayName={user?.displayName ?? "Operatore"}
         onBrandPress={() => navigation.navigate("AdminPanel")}
         onBackToAppPress={() => navigation.navigate("MainTabs")}
-        showDevSettings={__DEV__}
-        onDevSettingsPress={() => navigation.navigate("DevSettings")}
+        showLogout
+        onLogoutPress={() => void logout()}
       />
       <View style={styles.content}>{children}</View>
     </View>

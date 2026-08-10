@@ -90,7 +90,7 @@ Queste voci sono **segnalate nei wireframe** con badge TBD e **non** implementat
 
 ## Verifica locale
 
-Hub dev: [`/dev/wireframes`](http://localhost:5173/dev/wireframes)
+Hub dev: [`/dev/wireframes`](http://localhost:5174/dev/wireframes)
 
 | Scenario | URL demo |
 | --- | --- |

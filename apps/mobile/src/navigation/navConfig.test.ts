@@ -3,8 +3,7 @@ import { describe, it } from "node:test";
 import { hasPermissions, type PermissionContext } from "../../../../packages/contracts/src/auth.ts";
 import {
   MOBILE_ADMIN_NAV_ITEMS,
-  MOBILE_LEAGUE_ADMIN_ITEM,
-  MOBILE_NAV_ITEMS,
+  MOBILE_DRAWER_NAV_ITEMS,
   filterMobileNavItems,
 } from "./navConfig.ts";
 
@@ -24,24 +23,29 @@ const operatorContext: PermissionContext = {
 };
 
 describe("mobile navigation", () => {
-  it("shows all member tabs aligned with web for demo member", () => {
+  it("aligns drawer catalog with web member routes", () => {
     const visible = filterMobileNavItems(
-      MOBILE_NAV_ITEMS,
+      MOBILE_DRAWER_NAV_ITEMS,
       (required) => hasPermissions(memberContext, required),
     );
-    assert.equal(visible.length, 8);
     assert.ok(visible.some((item) => item.id === "leagues"));
+    assert.ok(visible.some((item) => item.id === "league-home"));
+    assert.ok(visible.some((item) => item.id === "received-invites"));
     assert.ok(visible.some((item) => item.id === "standings"));
     assert.ok(visible.some((item) => item.id === "formation"));
     assert.ok(visible.some((item) => item.id === "auction"));
+    assert.ok(visible.some((item) => item.id === "profile"));
     assert.ok(!visible.some((item) => item.id === "league-admin"));
+    assert.ok(!visible.some((item) => item.id === "manager-directory"));
   });
 
-  it("keeps league admin outside tab bar", () => {
-    assert.ok(!MOBILE_NAV_ITEMS.some((item) => item.id === "league-admin"));
-    assert.equal(MOBILE_LEAGUE_ADMIN_ITEM.id, "league-admin");
-    assert.ok(hasPermissions(adminContext, MOBILE_LEAGUE_ADMIN_ITEM.requiredPermissions));
-    assert.ok(!hasPermissions(memberContext, MOBILE_LEAGUE_ADMIN_ITEM.requiredPermissions));
+  it("shows league admin and directory only to league admins", () => {
+    const visible = filterMobileNavItems(
+      MOBILE_DRAWER_NAV_ITEMS,
+      (required) => hasPermissions(adminContext, required),
+    );
+    assert.ok(visible.some((item) => item.id === "league-admin"));
+    assert.ok(visible.some((item) => item.id === "manager-directory"));
   });
 
   it("exposes admin routes only to global operator", () => {

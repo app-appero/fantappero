@@ -93,7 +93,7 @@ Da macchina pulita con Docker:
 | Smoke stack | `make smoke-local` |
 | Tools opzionali (Adminer, Redis Commander) | `make up-tools` |
 
-Porte default: API `8000`, Web `5173`, PostgreSQL `5432`, Redis `6379`.  
+Porte default: API `8001`, Web `5174`, PostgreSQL `5432`, Redis `6379`.  
 Dettagli, troubleshooting e volumi: [`docs/development/local_environment.md`](docs/development/local_environment.md).
 
 I default in `infra/local/.env.example` sono placeholder locali, non segreti di produzione.
@@ -102,9 +102,9 @@ I default in `infra/local/.env.example` sono placeholder locali, non segreti di 
 
 | Target | Comando |
 | --- | --- |
-| Stack Docker (API+worker+Postgres+Redis+Web) | `make up` poi `http://127.0.0.1:5173` e `http://127.0.0.1:8000/health` |
-| API host-only | `make dev-api` oppure `cd backend && python -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8000` |
-| Web host-only (`http://127.0.0.1:5173`) | `make dev-web` oppure `pnpm dev:web` |
+| Stack Docker (API+worker+Postgres+Redis+Web) | `make up` poi `http://127.0.0.1:5174` e `http://127.0.0.1:8001/health` |
+| API host-only | `make dev-api` oppure `cd backend && python -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8001` |
+| Web host-only (`http://127.0.0.1:5174`) | `make dev-web` oppure `pnpm dev:web` |
 | Mobile (Expo) | `make dev-mobile` oppure `pnpm dev:mobile` |
 
 ## Test / lint / build (quality gates EP01-03)

@@ -106,7 +106,7 @@ class WebPublicSettings(BaseAppSettings):
     """Documented public env vars for the web client (validated in apps/web)."""
 
     vite_api_base_url: HttpUrl | str = Field(
-        default="http://127.0.0.1:8000",
+        default="http://127.0.0.1:8001",
         validation_alias="VITE_API_BASE_URL",
     )
 
@@ -115,6 +115,6 @@ class MobilePublicSettings(BaseAppSettings):
     """Documented public env vars for the mobile client (validated in apps/mobile)."""
 
     expo_public_api_base_url: HttpUrl | str = Field(
-        default="http://127.0.0.1:8000",
+        default="http://127.0.0.1:8001",
         validation_alias="EXPO_PUBLIC_API_BASE_URL",
     )

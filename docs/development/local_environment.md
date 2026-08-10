@@ -33,7 +33,7 @@ cp infra/local/.env.example infra/local/.env
 Atteso: `postgres`, `redis`, `api`, `worker`, `web` in stato **healthy**.  
 Servizio opzionale per lo schedule sportivo: `beat` (Celery beat, EP04-06 — abilitare con `SPORTS_SCHEDULER_ENABLED=true`).
 
-App web: `http://localhost:5173` (API su `http://localhost:8000`).
+App web: `http://localhost:5174` (API su `http://localhost:8001`).
 
 Smoke automatico (persistenza volumi + errore se manca Postgres):
 
@@ -56,8 +56,8 @@ Gli strumenti opzionali **non** sono richiesti per lo sviluppo API/worker.
 
 | Servizio | Host | Container | Note |
 | --- | --- | --- | --- |
-| API | `8000` | `8000` | `GET /live`, `GET /ready` (alias `GET /health`) |
-| Web (Vite) | `5173` | `5173` | hot reload con mount sorgenti |
+| API | `8001` | `8001` | `GET /live`, `GET /ready` (alias `GET /health`) |
+| Web (Vite) | `5174` | `5174` | hot reload con mount sorgenti |
 | PostgreSQL | `5432` | `5432` | user/db `fantappero` |
 | Redis | `6379` | `6379` | AOF abilitato |
 | Mailpit UI | `8025` | `8025` | Web UI email di test |
@@ -80,7 +80,7 @@ Non inserire chiavi provider reali (`API_FOOTBALL_KEY`, ecc.) nei file commitati
 ### Verifica email in locale (EP02-01)
 
 1. Avvia lo stack con Mailpit incluso.
-2. Registrati da `http://localhost:5173/accedi/registrati`.
+2. Registrati da `http://localhost:5174/accedi/registrati`.
 3. Apri `http://localhost:8025` e segui il link di verifica nell’email catturata.
 4. Accedi da `/accedi`.
 
@@ -163,7 +163,7 @@ Convenzioni e rollback: [`docs/adr/ADR-0004-database-conventions.md`](../adr/ADR
 | Sintomo | Cosa controllare |
 | --- | --- |
 | `docker daemon not reachable` | Avviare Docker Desktop / il servizio Docker |
-| Porta già in uso (`5432` / `6379` / `8000` / `5173`) | Fermare il processo host o cambiare `*_PORT` in `infra/local/.env` |
+| Porta già in uso (`5432` / `6379` / `8001` / `5174`) | Fermare il processo host o cambiare `*_PORT` in `infra/local/.env` |
 | `api` unhealthy / `/health` 503 | `docker compose logs api`; verificare che `postgres` e `redis` siano healthy |
 | `worker` unhealthy | Log Celery: `./infra/scripts/dev_logs.sh worker`; Redis deve accettare connessioni |
 | Build lenta o cache stantia | `docker compose build --no-cache api` |

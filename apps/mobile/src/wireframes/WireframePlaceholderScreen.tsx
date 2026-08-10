@@ -146,7 +146,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.accent,
   },
   ctaLabel: {
-    color: colors.background,
+    color: colors.accentContrast,
     fontWeight: typography.fontWeight.semibold,
     fontSize: typography.fontSize.sm,
   },

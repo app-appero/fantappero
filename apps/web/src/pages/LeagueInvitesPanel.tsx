@@ -18,7 +18,7 @@ const DEMO_INVITE: CreatedLeagueInvite = {
   createdAt: "2026-08-03T10:00:00Z",
   token: "demo-token",
   code: "FANTA-2026X",
-  inviteUrl: "http://localhost:5173/leghe/invito?token=demo-token",
+  inviteUrl: "http://localhost:5174/leghe/invito?token=demo-token",
 };
 
 type LeagueInvitesPanelProps = {

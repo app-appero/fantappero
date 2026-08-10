@@ -1,147 +1,222 @@
+import type { FantasyCoachDirectoryItem } from "@fantappero/contracts";
 import { theme } from "@fantappero/ui/theme";
-import { useState } from "react";
+import { useFocusEffect } from "@react-navigation/native";
+import { useCallback, useEffect, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
-import {
-  DEMO_COACHES,
-  resolveNominalInviteOutcome,
-  type DirectoryDemoState,
-} from "../screens/directoryDemo";
+import { ApiError } from "../api/client";
+import { createNamedLeagueInvite, fetchManagerDirectory } from "../api/managerInvites";
+import { getApiErrorMessage, useAuthSession } from "../session/DemoSessionContext";
 import { UiStatePanel } from "./UiStatePanel";
 
 const { colors, spacing, typography, radius } = theme;
 
-const STATE_COPY: Record<
-  Exclude<DirectoryDemoState, "success">,
-  { state: "loading" | "empty" | "error" | "forbidden"; title: string; message: string }
-> = {
-  loading: {
-    state: "loading",
-    title: "Caricamento directory",
-    message: "Preparazione dei profili demo disponibili…",
-  },
-  empty: {
-    state: "empty",
-    title: "Directory vuota",
-    message: "Nessun fantallenatore ha attivato la disponibilità.",
-  },
-  error: {
-    state: "error",
-    title: "Directory non disponibile",
-    message: "Impossibile leggere i dati demo della directory.",
-  },
-  forbidden: {
-    state: "forbidden",
-    title: "Permessi insufficienti",
-    message: "Solo l’amministratore della lega può consultare la directory.",
-  },
-  unavailable: {
-    state: "empty",
-    title: "Fantallenatore indisponibile",
-    message: "Il profilo selezionato non accetta inviti nominativi.",
-  },
-  "already-invited": {
-    state: "error",
-    title: "Già invitato",
-    message: "Esiste già un invito nominativo attivo per questo profilo.",
-  },
-  capacity: {
-    state: "error",
-    title: "Capienza raggiunta",
-    message: "Non puoi inviare altri inviti: tutti i posti della lega sono occupati.",
-  },
-};
-
 export type CoachDirectoryPanelProps = {
-  state: DirectoryDemoState;
+  leagueId: string;
   memberCount: number;
   capacity: number;
   testIDPrefix: string;
+  /** Incrementato dal parent per forzare un reload (pull-to-refresh). */
+  reloadToken?: number;
+  /** Chiamato quando un reload richiesto via reloadToken è terminato. */
+  onReloadSettled?: () => void;
 };
 
-/** Directory locale riusabile: nessuna ricerca remota e azioni solo in memoria. */
+/** Directory fantallenatori via API (come web ManagerDirectory). */
 export function CoachDirectoryPanel({
-  state,
+  leagueId,
   memberCount,
   capacity,
   testIDPrefix,
+  reloadToken,
+  onReloadSettled,
 }: CoachDirectoryPanelProps) {
-  const [feedback, setFeedback] = useState<DirectoryDemoState | null>(null);
-  const [invitedIds, setInvitedIds] = useState<readonly string[]>([]);
+  const { accessToken, can } = useAuthSession();
+  const [items, setItems] = useState<FantasyCoachDirectoryItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
+  const [workingId, setWorkingId] = useState<string | null>(null);
 
-  if (state !== "success") {
-    const copy = STATE_COPY[state];
+  const load = useCallback(
+    async (options?: { silent?: boolean }) => {
+      setSuccess(null);
+      if (!can(["league:admin"])) {
+        setError("Solo l’amministratore della lega può consultare la directory.");
+        setItems([]);
+        setLoading(false);
+        return;
+      }
+      if (!accessToken) {
+        setError("Sessione non disponibile. Accedi di nuovo.");
+        setItems([]);
+        setLoading(false);
+        return;
+      }
+      if (!options?.silent) {
+        setLoading(true);
+      }
+      setError(null);
+      try {
+        const page = await fetchManagerDirectory(accessToken, leagueId, { pageSize: 20 });
+        setItems(page.items);
+      } catch (loadError) {
+        if (loadError instanceof ApiError && loadError.status === 403) {
+          setError("Non hai i permessi per consultare la directory.");
+        } else {
+          setError(getApiErrorMessage(loadError, "Impossibile caricare la directory."));
+        }
+        setItems([]);
+      } finally {
+        setLoading(false);
+      }
+    },
+    [accessToken, can, leagueId],
+  );
+
+  useFocusEffect(
+    useCallback(() => {
+      void load({ silent: true });
+    }, [load]),
+  );
+
+  useEffect(() => {
+    if (reloadToken === undefined || reloadToken === 0) {
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      await load({ silent: true });
+      if (!cancelled) {
+        onReloadSettled?.();
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [load, onReloadSettled, reloadToken]);
+
+  async function onInvite(manager: FantasyCoachDirectoryItem) {
+    setError(null);
+    setSuccess(null);
+    if (!manager.availableForInvites) {
+      setError("Questo fantallenatore non accetta inviti.");
+      return;
+    }
+    if (manager.namedInviteStatus === "pending") {
+      setError("Hai già invitato questo fantallenatore.");
+      return;
+    }
+    if (memberCount >= capacity) {
+      setError("La lega ha raggiunto la capienza massima.");
+      return;
+    }
+    if (!accessToken) {
+      setError("Sessione non disponibile. Accedi di nuovo.");
+      return;
+    }
+    setWorkingId(manager.userId);
+    try {
+      await createNamedLeagueInvite(accessToken, leagueId, manager.userId);
+      setSuccess(`Invito inviato a ${manager.displayName}.`);
+      await load({ silent: true });
+    } catch (inviteError) {
+      setError(getApiErrorMessage(inviteError, "Impossibile inviare l'invito."));
+    } finally {
+      setWorkingId(null);
+    }
+  }
+
+  if (loading) {
     return (
       <UiStatePanel
-        state={copy.state}
-        title={copy.title}
-        message={copy.message}
-        testID={`${testIDPrefix}-${state}`}
+        state="loading"
+        title="Caricamento directory"
+        message="Recupero dei fantallenatori disponibili…"
+        testID={`${testIDPrefix}-loading`}
       />
     );
   }
 
-  const feedbackCopy = feedback && feedback !== "success" ? STATE_COPY[feedback] : null;
+  if (error && items.length === 0) {
+    return (
+      <View style={styles.section}>
+        <UiStatePanel
+          state="error"
+          title="Directory non disponibile"
+          message={error}
+          testID={`${testIDPrefix}-error`}
+        />
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => void load()}
+          style={styles.retry}
+          testID={`${testIDPrefix}-retry`}
+        >
+          <Text style={styles.retryLabel}>Ricarica</Text>
+        </Pressable>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.section} testID={`${testIDPrefix}-success`}>
       <Text style={styles.hint}>
-        Profili demo con disponibilità manuale. Inviti {memberCount}/{capacity}; nessun dato viene
-        inviato in rete.
+        Fantallenatori disponibili agli inviti. Posti {memberCount}/{capacity}.
       </Text>
-      {feedback === "success" ? (
+      {success ? (
         <UiStatePanel
           state="success"
-          title="Invito nominativo simulato"
-          message="L’invito è stato aggiunto localmente alla demo."
+          title="Invito nominativo inviato"
+          message={success}
           testID={`${testIDPrefix}-invite-success`}
         />
-      ) : feedbackCopy ? (
+      ) : null}
+      {error ? (
         <UiStatePanel
-          state={feedbackCopy.state}
-          title={feedbackCopy.title}
-          message={feedbackCopy.message}
-          testID={`${testIDPrefix}-invite-${feedback}`}
+          state="error"
+          title="Invito non riuscito"
+          message={error}
+          testID={`${testIDPrefix}-invite-error`}
         />
       ) : null}
-      {DEMO_COACHES.map((coach) => {
-        const locallyInvited = invitedIds.includes(coach.id) || Boolean(coach.alreadyInvited);
-        const unavailable = !coach.available;
-        return (
-          <View key={coach.id} style={styles.card}>
-            <View style={styles.identity}>
-              <Text style={styles.name}>{coach.displayName}</Text>
-              <Text style={styles.status}>
-                {coach.userType === "ai" ? "IA" : "Manuale"} ·{" "}
-                {coach.available ? "Disponibile" : "Non disponibile"}
-              </Text>
+      {items.length === 0 ? (
+        <UiStatePanel
+          state="empty"
+          title="Directory vuota"
+          message="Nessun fantallenatore ha attivato la disponibilità."
+          testID={`${testIDPrefix}-empty`}
+        />
+      ) : (
+        items.map((coach) => {
+          const pending = coach.namedInviteStatus === "pending";
+          const unavailable = !coach.availableForInvites;
+          return (
+            <View key={coach.userId} style={styles.card}>
+              <View style={styles.identity}>
+                <Text style={styles.name}>{coach.displayName}</Text>
+                <Text style={styles.status}>
+                  {coach.userType === "ai" ? "IA" : "Manuale"} ·{" "}
+                  {coach.availableForInvites ? "Disponibile" : "Non disponibile"}
+                </Text>
+              </View>
+              <Pressable
+                accessibilityRole="button"
+                disabled={pending || unavailable || workingId === coach.userId}
+                onPress={() => void onInvite(coach)}
+                style={[
+                  styles.button,
+                  (pending || unavailable || workingId === coach.userId) && styles.buttonDisabled,
+                ]}
+                testID={`${testIDPrefix}-invite-${coach.userId}`}
+              >
+                <Text style={styles.buttonLabel}>
+                  {unavailable ? "Indisponibile" : pending ? "Già invitato" : "Invita"}
+                </Text>
+              </Pressable>
             </View>
-            <Pressable
-              accessibilityRole="button"
-              disabled={locallyInvited || unavailable}
-              onPress={() => {
-                const outcome = resolveNominalInviteOutcome(coach, memberCount, capacity);
-                setFeedback(outcome);
-                if (outcome === "success") {
-                  setInvitedIds((current) => [...current, coach.id]);
-                }
-              }}
-              style={[
-                styles.button,
-                (locallyInvited || unavailable) && styles.buttonDisabled,
-              ]}
-              testID={`${testIDPrefix}-invite-${coach.id}`}
-            >
-              <Text style={styles.buttonLabel}>
-                {unavailable
-                  ? "Indisponibile"
-                  : locallyInvited
-                    ? "Già invitato"
-                    : "Invita"}
-              </Text>
-            </Pressable>
-          </View>
-        );
-      })}
+          );
+        })
+      )}
     </View>
   );
 }
@@ -187,7 +262,16 @@ const styles = StyleSheet.create({
     opacity: 0.55,
   },
   buttonLabel: {
-    color: colors.background,
+    color: colors.accentContrast,
+    fontWeight: typography.fontWeight.semibold,
+  },
+  retry: {
+    minHeight: 44,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  retryLabel: {
+    color: colors.accent,
     fontWeight: typography.fontWeight.semibold,
   },
 });

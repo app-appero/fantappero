@@ -4,8 +4,8 @@ import test from "node:test";
 import { loadMobileEnv, MobileEnvError } from "./env.ts";
 
 test("loadMobileEnv accepts minimal valid configuration", () => {
-  const env = loadMobileEnv({ EXPO_PUBLIC_API_BASE_URL: "http://127.0.0.1:8000" });
-  assert.equal(env.expoPublicApiBaseUrl, "http://127.0.0.1:8000");
+  const env = loadMobileEnv({ EXPO_PUBLIC_API_BASE_URL: "http://127.0.0.1:8001" });
+  assert.equal(env.expoPublicApiBaseUrl, "http://127.0.0.1:8001");
 });
 
 test("loadMobileEnv fails when EXPO_PUBLIC_API_BASE_URL is missing", () => {

@@ -4,77 +4,250 @@ import {
   PROFILE_TIMEZONE_OPTIONS,
   type UserProfile,
 } from "@fantappero/contracts";
-import { useNavigation } from "@react-navigation/core";
-import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { theme } from "@fantappero/ui/theme";
-import { useMemo, useState } from "react";
-import { Pressable, StyleSheet, Switch, Text, TextInput, View } from "react-native";
-import { PageContainer } from "../layout/PageContainer";
-import type { RootStackParamList } from "../navigation/types";
+import { useCallback, useState } from "react";
+import { Pressable, Share, StyleSheet, Switch, Text, TextInput, View } from "react-native";
+import { deleteAccount, exportAccountData } from "../api/privacy";
+import {
+  fetchProfile,
+  recordPolicyConsent,
+  updateInviteAvailability,
+  updateProfile,
+} from "../api/profile";
 import { UiStatePanel } from "../components/UiStatePanel";
-import { useDemoSession } from "../session/DemoSessionContext";
+import { useScreenData } from "../hooks/useScreenData";
+import { PageContainer } from "../layout/PageContainer";
+import { getApiErrorMessage, useAuthSession } from "../session/DemoSessionContext";
 
 const { colors, spacing, typography, radius } = theme;
 
-const DEMO_PROFILE: UserProfile = {
-  email: "demo@fantappero.local",
-  displayName: "Marco Rossi",
-  avatarUrl: null,
-  language: "it",
-  timezone: "Europe/Rome",
-  notificationsEmail: true,
-  notificationsPush: true,
-  policyConsentAt: null,
-  policyVersion: null,
-  currentPolicyVersion: "2026-01",
-  userType: "human",
-  availableForInvites: false,
-};
-
-/** Profilo utente — preferenze in modalità demo (EP02-02). */
+/** Profilo utente — preferenze e privacy via API (EP02-02). */
 export function ProfileScreen() {
-  const { user, logout, directoryAvailable, setDirectoryAvailable } = useDemoSession();
-  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
-  const initialProfile = useMemo(
-    () => ({ ...DEMO_PROFILE, displayName: user.displayName }),
-    [user.displayName],
-  );
-
-  const [displayName, setDisplayName] = useState(initialProfile.displayName);
-  const [timezone, setTimezone] = useState(initialProfile.timezone);
-  const [notificationsEmail, setNotificationsEmail] = useState(initialProfile.notificationsEmail);
-  const [notificationsPush, setNotificationsPush] = useState(initialProfile.notificationsPush);
+  const { accessToken, logout, updateDisplayName } = useAuthSession();
+  const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [displayName, setDisplayName] = useState("");
+  const [timezone, setTimezone] = useState("Europe/Rome");
+  const [notificationsEmail, setNotificationsEmail] = useState(true);
+  const [notificationsPush, setNotificationsPush] = useState(true);
+  const [availableForInvites, setAvailableForInvites] = useState(false);
   const [policyAccepted, setPolicyAccepted] = useState(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [deletePhrase, setDeletePhrase] = useState("");
+  const [deletePassword, setDeletePassword] = useState("");
 
-  function handleSave() {
+  const applyProfile = useCallback((next: UserProfile) => {
+    setProfile(next);
+    setDisplayName(next.displayName);
+    setTimezone(next.timezone);
+    setNotificationsEmail(next.notificationsEmail);
+    setNotificationsPush(next.notificationsPush);
+    setAvailableForInvites(next.availableForInvites);
+    setPolicyAccepted(next.policyVersion === next.currentPolicyVersion);
+  }, []);
+
+  const loadProfile = useCallback(
+    async (options?: { silent?: boolean }) => {
+      if (!accessToken) {
+        setLoadError("Sessione non disponibile. Accedi di nuovo.");
+        setLoading(false);
+        return;
+      }
+      if (!options?.silent) {
+        setLoading(true);
+      }
+      setLoadError(null);
+      try {
+        applyProfile(await fetchProfile(accessToken));
+      } catch (error) {
+        setLoadError(getApiErrorMessage(error, "Impossibile caricare il profilo."));
+      } finally {
+        setLoading(false);
+      }
+    },
+    [accessToken, applyProfile],
+  );
+
+  const { refreshing, onRefresh } = useScreenData(loadProfile);
+
+  async function handleSave() {
     setFormError(null);
+    setSuccessMessage(null);
     if (!displayName.trim()) {
       setFormError("Inserisci un nome visualizzato.");
       return;
     }
-    setSuccessMessage("Preferenze salvate (demo).");
+    if (!accessToken || !profile) {
+      setFormError("Sessione non disponibile. Accedi di nuovo.");
+      return;
+    }
+    setSaving(true);
+    try {
+      const updated = await updateProfile(accessToken, {
+        displayName: displayName.trim(),
+        language: profile.language,
+        timezone,
+        notificationsEmail,
+        notificationsPush,
+      });
+      applyProfile(updated);
+      updateDisplayName(updated.displayName);
+      setSuccessMessage("Preferenze salvate con successo.");
+    } catch (error) {
+      setFormError(getApiErrorMessage(error, "Salvataggio non riuscito."));
+    } finally {
+      setSaving(false);
+    }
   }
 
-  function handlePolicyConsent() {
+  async function handlePolicyConsent() {
+    setFormError(null);
+    setSuccessMessage(null);
     if (!policyAccepted) {
       setFormError("Accetta la policy per continuare.");
       return;
     }
-    setFormError(null);
-    setSuccessMessage("Consenso registrato (demo).");
+    if (!accessToken || !profile) {
+      setFormError("Sessione non disponibile. Accedi di nuovo.");
+      return;
+    }
+    setSaving(true);
+    try {
+      const updated = await recordPolicyConsent(accessToken, {
+        policyVersion: profile.currentPolicyVersion,
+        accepted: true,
+      });
+      applyProfile(updated);
+      setSuccessMessage("Consenso alla policy registrato.");
+    } catch (error) {
+      setFormError(getApiErrorMessage(error, "Registrazione consenso non riuscita."));
+    } finally {
+      setSaving(false);
+    }
   }
 
-  function handleLogout() {
-    logout();
+  async function handleInviteAvailabilityChange(next: boolean) {
     setFormError(null);
     setSuccessMessage(null);
-    navigation.navigate("Auth");
+    if (profile?.userType === "ai") {
+      setFormError("Gli account IA sono sempre disponibili e non possono modificare questa preferenza.");
+      return;
+    }
+    if (!accessToken) {
+      setFormError("Sessione non disponibile. Accedi di nuovo.");
+      return;
+    }
+    setSaving(true);
+    try {
+      const updated = await updateInviteAvailability(accessToken, next);
+      applyProfile(updated);
+      setSuccessMessage("Disponibilità agli inviti aggiornata.");
+    } catch (error) {
+      setFormError(getApiErrorMessage(error, "Aggiornamento disponibilità non riuscito."));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleExportData() {
+    setFormError(null);
+    setSuccessMessage(null);
+    if (!accessToken) {
+      setFormError("Sessione non disponibile. Accedi di nuovo.");
+      return;
+    }
+    setSaving(true);
+    try {
+      const payload = await exportAccountData(accessToken);
+      await Share.share({
+        message: JSON.stringify(payload, null, 2),
+        title: `fantappero-export-${payload.exportedAt.slice(0, 10)}.json`,
+      });
+      setSuccessMessage("Esportazione completata. Condividi o salva il JSON.");
+    } catch (error) {
+      setFormError(getApiErrorMessage(error, "Esportazione non riuscita."));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleDeleteAccount() {
+    setFormError(null);
+    setSuccessMessage(null);
+    if (deletePhrase !== DELETE_ACCOUNT_CONFIRMATION_PHRASE) {
+      setFormError(`Digita ${DELETE_ACCOUNT_CONFIRMATION_PHRASE} per confermare.`);
+      return;
+    }
+    if (!deletePassword.trim()) {
+      setFormError("Inserisci la password per eliminare l'account.");
+      return;
+    }
+    if (!accessToken) {
+      setFormError("Sessione non disponibile. Accedi di nuovo.");
+      return;
+    }
+    setSaving(true);
+    try {
+      await deleteAccount(accessToken, {
+        confirmPhrase: deletePhrase,
+        password: deletePassword,
+      });
+      await logout();
+    } catch (error) {
+      setFormError(getApiErrorMessage(error, "Eliminazione non riuscita."));
+      setSaving(false);
+    }
+  }
+
+  if (loading) {
+    return (
+      <PageContainer
+        title="Profilo"
+        testID="screen-profile"
+        refreshing={refreshing}
+        onRefresh={onRefresh}
+      >
+        <UiStatePanel
+          state="loading"
+          title="Caricamento profilo"
+          message="Recupero preferenze…"
+          testID="profile-loading"
+        />
+      </PageContainer>
+    );
+  }
+
+  if (loadError || !profile) {
+    return (
+      <PageContainer
+        title="Profilo"
+        testID="screen-profile"
+        refreshing={refreshing}
+        onRefresh={onRefresh}
+      >
+        <UiStatePanel
+          state="error"
+          title="Profilo non disponibile"
+          message={loadError ?? "Profilo non trovato."}
+          testID="profile-load-error"
+        />
+        <Pressable accessibilityRole="button" onPress={() => void loadProfile()} style={styles.secondaryButton}>
+          <Text style={styles.secondaryButtonLabel}>Ricarica</Text>
+        </Pressable>
+      </PageContainer>
+    );
   }
 
   return (
-    <PageContainer title="Profilo" testID="screen-profile">
+    <PageContainer
+      title="Profilo"
+      testID="screen-profile"
+      refreshing={refreshing}
+      onRefresh={onRefresh}
+    >
       {successMessage ? (
         <UiStatePanel
           state="success"
@@ -98,7 +271,7 @@ export function ProfileScreen() {
         />
 
         <Text style={styles.label}>Email</Text>
-        <TextInput value={initialProfile.email} editable={false} style={[styles.input, styles.readonly]} />
+        <TextInput value={profile.email} editable={false} style={[styles.input, styles.readonly]} />
 
         <Text style={styles.label}>Lingua</Text>
         <Text style={styles.value}>{PROFILE_LANGUAGE_OPTIONS[0]?.label ?? "Italiano"}</Text>
@@ -138,34 +311,30 @@ export function ProfileScreen() {
 
         <Pressable
           accessibilityRole="button"
-          onPress={handleSave}
-          style={styles.primaryButton}
+          disabled={saving}
+          onPress={() => void handleSave()}
+          style={[styles.primaryButton, saving && styles.disabled]}
           testID="profile-save"
         >
-          <Text style={styles.primaryButtonLabel}>Salva preferenze</Text>
+          <Text style={styles.primaryButtonLabel}>
+            {saving ? "Salvataggio…" : "Salva preferenze"}
+          </Text>
         </Pressable>
       </View>
 
       <View style={styles.section} testID="profile-directory-availability-section">
         <Text style={styles.sectionTitle}>Directory fantallenatori</Text>
         <Text style={styles.hint}>
-          Scegli manualmente se comparire nella directory demo. Il valore resta solo nella sessione
-          locale e non viene pubblicato.
+          Se attivo, gli amministratori di lega possono invitarti dalla directory.
         </Text>
         <View style={styles.switchRow}>
           <Text style={styles.label}>
-            {directoryAvailable ? "Disponibile per inviti" : "Non disponibile"}
+            {availableForInvites ? "Disponibile per inviti" : "Non disponibile"}
           </Text>
           <Switch
-            value={directoryAvailable}
-            onValueChange={(available) => {
-              setDirectoryAvailable(available);
-              setSuccessMessage(
-                available
-                  ? "Disponibilità directory attivata (demo)."
-                  : "Disponibilità directory disattivata (demo).",
-              );
-            }}
+            value={availableForInvites}
+            disabled={saving || profile.userType === "ai"}
+            onValueChange={(available) => void handleInviteAvailabilityChange(available)}
             testID="profile-directory-availability"
           />
         </View>
@@ -174,15 +343,20 @@ export function ProfileScreen() {
       <View style={styles.section} testID="profile-policy-pending">
         <Text style={styles.sectionTitle}>Privacy</Text>
         <Text style={styles.hint}>
-          Policy versione {initialProfile.currentPolicyVersion}. Accetta per continuare.
+          Policy versione {profile.currentPolicyVersion}. Accetta per continuare.
         </Text>
         <View style={styles.switchRow}>
           <Text style={styles.label}>Accetto la policy</Text>
-          <Switch value={policyAccepted} onValueChange={setPolicyAccepted} testID="profile-policy-checkbox" />
+          <Switch
+            value={policyAccepted}
+            onValueChange={setPolicyAccepted}
+            testID="profile-policy-checkbox"
+          />
         </View>
         <Pressable
           accessibilityRole="button"
-          onPress={handlePolicyConsent}
+          disabled={saving}
+          onPress={() => void handlePolicyConsent()}
           style={styles.secondaryButton}
           testID="profile-policy-submit"
         >
@@ -192,12 +366,11 @@ export function ProfileScreen() {
 
       <View style={styles.section} testID="profile-privacy-actions">
         <Text style={styles.sectionTitle}>I tuoi dati</Text>
-        <Text style={styles.hint}>
-          Esporta o elimina l&apos;account. In modalità demo le azioni sono simulate.
-        </Text>
+        <Text style={styles.hint}>Esporta o elimina l&apos;account.</Text>
         <Pressable
           accessibilityRole="button"
-          onPress={() => setSuccessMessage("Esportazione simulata (demo).")}
+          disabled={saving}
+          onPress={() => void handleExportData()}
           style={styles.secondaryButton}
           testID="profile-export-data"
         >
@@ -205,11 +378,30 @@ export function ProfileScreen() {
         </Pressable>
         <Text style={styles.hint}>
           Per eliminare l&apos;account digita {DELETE_ACCOUNT_CONFIRMATION_PHRASE} e conferma con la
-          password (demo).
+          password.
         </Text>
+        <TextInput
+          value={deletePhrase}
+          onChangeText={setDeletePhrase}
+          style={styles.input}
+          autoCapitalize="characters"
+          placeholder={DELETE_ACCOUNT_CONFIRMATION_PHRASE}
+          placeholderTextColor={colors.foregroundMuted}
+          testID="profile-delete-phrase"
+        />
+        <TextInput
+          value={deletePassword}
+          onChangeText={setDeletePassword}
+          style={styles.input}
+          secureTextEntry
+          placeholder="Password"
+          placeholderTextColor={colors.foregroundMuted}
+          testID="profile-delete-password"
+        />
         <Pressable
           accessibilityRole="button"
-          onPress={() => setSuccessMessage("Eliminazione simulata (demo).")}
+          disabled={saving}
+          onPress={() => void handleDeleteAccount()}
           style={styles.dangerButton}
           testID="profile-delete-submit"
         >
@@ -219,10 +411,10 @@ export function ProfileScreen() {
 
       <View style={styles.section} testID="profile-session-actions">
         <Text style={styles.sectionTitle}>Sessione</Text>
-        <Text style={styles.hint}>Termina la sessione demo corrente e torna alla schermata di accesso.</Text>
+        <Text style={styles.hint}>Termina la sessione corrente e torna alla schermata di accesso.</Text>
         <Pressable
           accessibilityRole="button"
-          onPress={handleLogout}
+          onPress={() => void logout()}
           style={styles.logoutButton}
           testID="profile-logout"
         >
@@ -299,7 +491,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   primaryButtonLabel: {
-    color: colors.background,
+    color: colors.accentContrast,
     fontWeight: typography.fontWeight.semibold,
   },
   secondaryButton: {
@@ -338,5 +530,8 @@ const styles = StyleSheet.create({
   logoutButtonLabel: {
     color: colors.foreground,
     fontWeight: typography.fontWeight.semibold,
+  },
+  disabled: {
+    opacity: 0.6,
   },
 });

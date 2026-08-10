@@ -16,7 +16,7 @@ class MailSettingsMixin:
     mail_from: str = Field(default="noreply@fantappero.local", validation_alias="MAIL_FROM")
     mail_from_name: str = Field(default="FantApperò", validation_alias="MAIL_FROM_NAME")
     web_app_base_url: str = Field(
-        default="http://localhost:5173",
+        default="http://localhost:5174",
         validation_alias="WEB_APP_BASE_URL",
     )
 

@@ -106,7 +106,7 @@ sleep 3
 api_bad=0
 for _ in $(seq 1 30); do
   code="$(compose exec -T api curl -s -o /tmp/health.json -w '%{http_code}' \
-    http://127.0.0.1:8000/health 2>/dev/null | tr -d '\r' || true)"
+    http://127.0.0.1:8001/health 2>/dev/null | tr -d '\r' || true)"
   code="${code:-000}"
   # curl -w appends after body when -o is used; keep last 3 digits if noisy
   code="${code: -3}"
