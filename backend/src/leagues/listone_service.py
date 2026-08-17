@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from datetime import UTC, datetime
 from uuid import UUID
 
@@ -12,11 +13,19 @@ from auth.exceptions import ValidationAuthError
 from authorization.context import LeagueAccess
 from config.settings.loader import get_api_settings
 from database.enums import FantasyRole, LeagueAuditAction
+from leagues.listone_refresh_progress import (
+    ListoneRefreshProgress,
+    load_progress,
+    new_job_id,
+    save_progress,
+)
 from leagues.models.league_audit_event import LeagueAuditEvent
 from leagues.schemas import (
     LeagueListoneEntryResponse,
     LeagueListoneOverrideResponse,
     LeagueListoneRefreshCounters,
+    LeagueListoneRefreshJobResponse,
+    LeagueListoneRefreshProgressResponse,
     LeagueListoneRefreshResponse,
 )
 from observability.logging import get_logger
@@ -130,13 +139,17 @@ class LeagueListoneService:
         league_access: LeagueAccess,
         *,
         client: ApiFootballClient | None = None,
+        on_progress: Callable[[int, str, str], None] | None = None,
     ) -> LeagueListoneRefreshResponse:
-        """Sync catalog/roster from API-Football then regenerate official listone."""
+        """Sync full MVP catalog + rosters from API-Football, then regenerate listone."""
         league = league_access.league
         metrics = get_metrics()
         status = "ok"
         owns_client = client is None
-        catalog_synced = False
+
+        def report(percent: int, stage: str, message: str) -> None:
+            if on_progress is not None:
+                on_progress(max(0, min(100, percent)), stage, message)
 
         with Timer(
             metrics,
@@ -154,17 +167,33 @@ class LeagueListoneService:
                             code="provider_key_missing",
                         ) from exc
 
+                report(5, "catalog", "Sincronizzazione catalogo campionati e club…")
+                sync_mvp_catalog_with_client(self._session, client)
                 if self._count_clubs_for_season(league.season_year) == 0:
-                    sync_mvp_catalog_with_client(self._session, client)
-                    catalog_synced = True
-                    if self._count_clubs_for_season(league.season_year) == 0:
-                        raise ValidationAuthError(
-                            "Catalogo club non disponibile dopo il sync. "
-                            "Verifica la stagione e la copertura provider.",
-                            code="catalog_not_ready",
-                        )
+                    raise ValidationAuthError(
+                        "Catalogo club non disponibile dopo il sync. "
+                        "Verifica la stagione e la copertura provider.",
+                        code="catalog_not_ready",
+                    )
+                report(12, "catalog", "Catalogo aggiornato. Avvio sync rose…")
 
-                roster_result = sync_mvp_roster_with_client(self._session, client)
+                def roster_progress(done: int, total: int, label: str) -> None:
+                    # Map roster work to 12% → 90%
+                    ratio = done / total if total else 1.0
+                    percent = 12 + int(ratio * 78)
+                    report(
+                        percent,
+                        "roster",
+                        f"Rosa {done}/{total}: {label}",
+                    )
+
+                roster_result = sync_mvp_roster_with_client(
+                    self._session,
+                    client,
+                    season_year=league.season_year,
+                    on_progress=roster_progress,
+                )
+                report(92, "listone", "Generazione listone ufficiale…")
                 listone_result = generate_official_listone(
                     self._session,
                     season_year=league.season_year,
@@ -180,7 +209,7 @@ class LeagueListoneService:
                     listoneUpdated=listone_result.counters.updated,
                     listoneUnchanged=listone_result.counters.unchanged,
                     listoneSkippedUnmapped=listone_result.counters.skipped_unmapped,
-                    catalogSynced=catalog_synced,
+                    catalogSynced=True,
                 )
                 self._session.add(
                     LeagueAuditEvent(
@@ -190,7 +219,7 @@ class LeagueListoneService:
                         details={
                             "seasonYear": league.season_year,
                             "mappingVersion": MAPPING_VERSION,
-                            "catalogSynced": catalog_synced,
+                            "catalogSynced": True,
                             "listoneCreated": counters.listone_created,
                             "listoneUpdated": counters.listone_updated,
                             "skippedUnmapped": counters.listone_skipped_unmapped,
@@ -203,11 +232,12 @@ class LeagueListoneService:
                     extra={
                         "league_id": str(league.id),
                         "season_year": league.season_year,
-                        "catalog_synced": catalog_synced,
+                        "catalog_synced": True,
                         "listone_created": counters.listone_created,
                         "listone_updated": counters.listone_updated,
                     },
                 )
+                report(100, "completed", "Listone aggiornato dal provider sportivo.")
                 return LeagueListoneRefreshResponse(
                     seasonYear=league.season_year,
                     mappingVersion=MAPPING_VERSION,
@@ -259,6 +289,57 @@ class LeagueListoneService:
                 if owns_client and client is not None:
                     client.close()
 
+    def start_refresh_job(self, league_access: LeagueAccess) -> LeagueListoneRefreshJobResponse:
+        """Enqueue async listone refresh and return a pollable job id."""
+        from leagues.listone_tasks import refresh_league_listone_task
+
+        job_id = new_job_id()
+        league_id = str(league_access.league.id)
+        save_progress(
+            ListoneRefreshProgress(
+                job_id=job_id,
+                league_id=league_id,
+                status="queued",
+                percent=0,
+                stage="queued",
+                message="Aggiornamento in coda…",
+            )
+        )
+        refresh_league_listone_task.delay(
+            job_id=job_id,
+            league_id=league_id,
+            actor_id=str(league_access.user.id),
+        )
+        return LeagueListoneRefreshJobResponse(
+            jobId=job_id,
+            status="queued",
+            message="Aggiornamento listone avviato.",
+        )
+
+    def get_refresh_progress(
+        self,
+        league_access: LeagueAccess,
+        job_id: str,
+    ) -> LeagueListoneRefreshProgressResponse:
+        progress = load_progress(job_id)
+        if progress is None or progress.league_id != str(league_access.league.id):
+            raise ValidationAuthError(
+                "Job di aggiornamento non trovato.",
+                code="listone_refresh_job_not_found",
+            )
+        result = None
+        if progress.result is not None:
+            result = LeagueListoneRefreshResponse.model_validate(progress.result)
+        return LeagueListoneRefreshProgressResponse(
+            jobId=progress.job_id,
+            leagueId=progress.league_id,
+            status=progress.status,
+            percent=progress.percent,
+            stage=progress.stage,
+            message=progress.message,
+            errorCode=progress.error_code,
+            result=result,
+        )
     def set_override(
         self,
         league_access: LeagueAccess,

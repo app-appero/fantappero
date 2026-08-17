@@ -105,6 +105,103 @@ class LeagueAuditAction(str, enum.Enum):
     LEAGUE_ROLE_OVERRIDE_CLEARED = "league_role_override_cleared"
     LEAGUE_LISTONE_REFRESHED = "league_listone_refreshed"
     LEAGUE_DELETED = "league_deleted"
+    FANTASY_TEAM_CREATED = "fantasy_team_created"
+    FANTASY_ROSTER_SLOT_ASSIGNED = "fantasy_roster_slot_assigned"
+    FANTASY_ROSTER_SLOT_RELEASED = "fantasy_roster_slot_released"
+    FANTASY_ROSTER_CSV_IMPORTED = "fantasy_roster_csv_imported"
+    FANTASY_ROSTER_COMPOSITION_VALIDATED = "fantasy_roster_composition_validated"
+    FANTASY_ROSTER_OWNERSHIP_CLOSED = "fantasy_roster_ownership_closed"
+    FANTASY_ROSTER_TURN_SNAPSHOT_CREATED = "fantasy_roster_turn_snapshot_created"
+    FANTASY_TURN_GENERATED = "fantasy_turn_generated"
+    FANTASY_TURN_OPENED = "fantasy_turn_opened"
+    FANTASY_TURN_FIXTURE_EXCLUDED = "fantasy_turn_fixture_excluded"
+    FANTASY_TURN_CUTOFF_RECALCULATED = "fantasy_turn_cutoff_recalculated"
+    FANTASY_LINEUP_SAVED = "fantasy_lineup_saved"
+    FANTASY_LINEUP_COPIED = "fantasy_lineup_copied"
+    FANTASY_LINEUP_DRAFT_SAVED = "fantasy_lineup_draft_saved"
+    FANTASY_TACTICAL_MOVE_APPLIED = "fantasy_tactical_move_applied"
+    CREDIT_ACCOUNT_INITIALIZED = "credit_account_initialized"
+    CREDIT_LEDGER_ENTRY_POSTED = "credit_ledger_entry_posted"
+
+
+class FantasyTurnStatus(str, enum.Enum):
+    """European fantasy turn lifecycle (EP06-01 / FR-TUR-01/02 subset)."""
+
+    SCHEDULED = "scheduled"
+    OPEN = "open"
+    LOCKED = "locked"
+    SKIPPED = "skipped"
+
+
+class FantasyTurnKind(str, enum.Enum):
+    """Temporal window kind for european turn generation."""
+
+    WEEKEND = "weekend"
+    MIDWEEK = "midweek"
+
+
+class FantasyRoundFixtureReason(str, enum.Enum):
+    """Why a fixture was linked to a fantasy turn."""
+
+    WINDOW = "window"
+    ADMIN_INCLUDE = "admin_include"
+
+
+class FantasyModule(str, enum.Enum):
+    """Approved FantApperò modules (EP06-02 / FR-FOR-01)."""
+
+    M343 = "3-4-3"
+    M352 = "3-5-2"
+    M433 = "4-3-3"
+    M442 = "4-4-2"
+    M451 = "4-5-1"
+    M532 = "5-3-2"
+    M541 = "5-4-1"
+
+
+class LineupSlotKind(str, enum.Enum):
+    """Whether a lineup player is a starter or on the bench."""
+
+    STARTER = "starter"
+    BENCH = "bench"
+
+
+class TacticalMoveStatus(str, enum.Enum):
+    """Lifecycle of a recorded tactical move (EP06-05 / FR-FOR-02)."""
+
+    APPLIED = "applied"
+
+
+class RosterImportStatus(str, enum.Enum):
+    """Lifecycle of a CSV roster import session (EP05-04)."""
+
+    DRAFT = "draft"
+    CONFIRMED = "confirmed"
+
+
+class RosterCompositionStatus(str, enum.Enum):
+    """Roster composition validity (EP05-05 / FR-ROS-02)."""
+
+    INCOMPLETE = "incomplete"
+    INVALID = "invalid"
+    VALIDATED = "validated"
+
+
+class RosterOwnershipSource(str, enum.Enum):
+    """How a roster ownership interval was opened (EP05-06)."""
+
+    MANUAL = "manual"
+    CSV_IMPORT = "csv_import"
+    ADMIN = "admin"
+
+
+class CreditLedgerReason(str, enum.Enum):
+    """Immutable credit ledger causals (EP05-02 / EP05-03)."""
+
+    INITIAL_ALLOCATION = "initial_allocation"
+    ADMIN_ADJUSTMENT = "admin_adjustment"
+    ROSTER_PURCHASE = "roster_purchase"
+    ROSTER_RELEASE_REFUND = "roster_release_refund"
 
 
 class LeagueCalendarStatus(str, enum.Enum):

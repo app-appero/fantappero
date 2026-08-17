@@ -1,5 +1,6 @@
 import { type HTMLAttributes } from "react";
 import { Card, CardBody, CardHeader } from "../Card.js";
+import { Badge, roleBadgeVariant } from "../Badge.js";
 import { classNames } from "../../utils/classNames.js";
 
 export type FormationSlot = {
@@ -17,6 +18,8 @@ export type FormationViewProps = HTMLAttributes<HTMLElement> & {
   benchTitle?: string;
   pitchAriaLabel?: string;
   benchAriaLabel?: string;
+  /** How many ordered bench players can actually enter (EP06-04). */
+  maxSubstitutions?: number;
 };
 
 export function FormationView({
@@ -26,6 +29,7 @@ export function FormationView({
   benchTitle,
   pitchAriaLabel,
   benchAriaLabel,
+  maxSubstitutions = 5,
   className,
   ...rest
 }: FormationViewProps) {
@@ -40,7 +44,7 @@ export function FormationView({
         >
           {slots.map((slot) => (
             <div key={slot.id} className="fa-formation-view__slot" role="listitem">
-              <span className="fa-formation-view__role">{slot.role}</span>
+              <Badge variant={roleBadgeVariant(slot.role)}>{slot.role}</Badge>
               <span className="fa-formation-view__player">
                 {slot.playerName ?? slot.label}
               </span>
@@ -54,14 +58,30 @@ export function FormationView({
             aria-label={benchAriaLabel}
           >
             {benchTitle ? <p className="fa-formation-view__bench-title">{benchTitle}</p> : null}
-            <ul className="fa-formation-view__bench-list">
-              {bench.map((slot) => (
-                <li key={slot.id}>
-                  <span className="fa-formation-view__role">{slot.role}</span>{" "}
-                  {slot.playerName ?? slot.label}
+            <ol className="fa-formation-view__bench-list">
+              {bench.map((slot, index) => (
+                <li
+                  key={slot.id}
+                  className={classNames(
+                    "fa-formation-view__bench-item",
+                    index < maxSubstitutions
+                      ? "fa-formation-view__bench-item--can-enter"
+                      : "fa-formation-view__bench-item--overflow",
+                  )}
+                >
+                  <span className="fa-formation-view__bench-index">{index + 1}.</span>
+                  <Badge variant={roleBadgeVariant(slot.role)}>{slot.role}</Badge>
+                  <span>{slot.playerName ?? slot.label}</span>
+                  {index < maxSubstitutions ? (
+                    <span className="fa-formation-view__bench-hint">può subentrare</span>
+                  ) : (
+                    <span className="fa-formation-view__bench-hint">
+                      oltre i {maxSubstitutions} cambi
+                    </span>
+                  )}
                 </li>
               ))}
-            </ul>
+            </ol>
           </div>
         ) : null}
       </CardBody>

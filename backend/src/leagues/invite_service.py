@@ -22,6 +22,7 @@ from database.enums import (
     LeagueState,
     NamedInviteStatus,
 )
+from fantasy_teams.factory import ensure_team_for_membership
 from leagues.models.league import League
 from leagues.models.league_audit_event import LeagueAuditEvent
 from leagues.models.league_invite import LeagueInvite
@@ -241,13 +242,26 @@ class LeagueInviteService:
                 result="full",
             )
 
-        self._session.add(
-            LeagueMembership(
-                league_id=league.id,
-                user_id=user.id,
-                role=LeagueMemberRole.MEMBER,
-            )
+        membership = LeagueMembership(
+            league_id=league.id,
+            user_id=user.id,
+            role=LeagueMemberRole.MEMBER,
         )
+        self._session.add(membership)
+        self._session.flush()
+        team, created = ensure_team_for_membership(
+            self._session,
+            membership,
+            name=user.display_name,
+            actor_id=user.id,
+        )
+        if created:
+            self._add_audit(
+                league.id,
+                user.id,
+                LeagueAuditAction.FANTASY_TEAM_CREATED,
+                details={"fantasyTeamId": str(team.id), "membershipId": str(membership.id)},
+            )
         if own_named_invite is not None:
             own_named_invite.status = NamedInviteStatus.ACCEPTED
             own_named_invite.responded_at = now
@@ -281,6 +295,8 @@ class LeagueInviteService:
         league_id: UUID,
         actor_id: UUID,
         action: LeagueAuditAction,
+        *,
+        details: dict[str, object] | None = None,
     ) -> None:
         self._session.add(
             LeagueAuditEvent(
@@ -288,6 +304,7 @@ class LeagueInviteService:
                 actor_id=actor_id,
                 action=action,
                 correlation_id=get_correlation_id(),
+                details=details,
             )
         )
 

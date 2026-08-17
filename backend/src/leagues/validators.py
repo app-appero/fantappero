@@ -8,6 +8,11 @@ from uuid import UUID
 
 from auth.exceptions import ValidationAuthError
 from database.enums import LeagueMemberRole, LeagueState
+from fantasy_ratings.eligibility import (
+    MAX_MINUTES_THRESHOLD,
+    MIN_MINUTES_THRESHOLD,
+    coerce_minutes_threshold,
+)
 
 _LEAGUE_NAME_MAX_LENGTH = 120
 MIN_COMPETITIONS = 3
@@ -107,6 +112,19 @@ def validate_total_credits(total_credits: int) -> int:
             code="invalid_total_credits",
         )
     return total_credits
+
+
+def validate_minutes_threshold(value: int) -> int:
+    try:
+        return coerce_minutes_threshold(value)
+    except ValueError as exc:
+        raise ValidationAuthError(
+            (
+                "La soglia minuti deve essere tra "
+                f"{MIN_MINUTES_THRESHOLD} e {MAX_MINUTES_THRESHOLD}."
+            ),
+            code="invalid_minutes_threshold",
+        ) from exc
 
 
 def validate_invite_expiry_days(expires_in_days: int) -> int:
@@ -230,8 +248,16 @@ def configuration_blockers(
     return blockers
 
 
-def auction_activation_blockers(*, calendar_configured: bool = False) -> list[LifecycleBlocker]:
-    """Blockers for auction → active. Calendar is owned by EP03-06; rose/credits remain later."""
+def auction_activation_blockers(
+    *,
+    calendar_configured: bool = False,
+    roster_blockers: list[LifecycleBlocker] | None = None,
+) -> list[LifecycleBlocker]:
+    """Blockers for auction → active.
+
+    Calendar is owned by EP03-06. Roster/credit checks are supplied by EP05-05
+    (``roster_blockers``); when omitted, keep legacy placeholders for unit tests.
+    """
     blockers: list[LifecycleBlocker] = []
     if not calendar_configured:
         blockers.append(
@@ -240,18 +266,21 @@ def auction_activation_blockers(*, calendar_configured: bool = False) -> list[Li
                 message="Genera il calendario prima di avviare la stagione.",
             )
         )
-    blockers.extend(
-        [
-            LifecycleBlocker(
-                code="fantasy_teams_not_configured",
-                message="Completa squadre e rose prima di avviare la stagione.",
-            ),
-            LifecycleBlocker(
-                code="credits_not_configured",
-                message="Verifica i crediti di tutte le squadre prima di avviare la stagione.",
-            ),
-        ]
-    )
+    if roster_blockers is not None:
+        blockers.extend(roster_blockers)
+    else:
+        blockers.extend(
+            [
+                LifecycleBlocker(
+                    code="fantasy_teams_not_configured",
+                    message="Completa squadre e rose prima di avviare la stagione.",
+                ),
+                LifecycleBlocker(
+                    code="credits_not_configured",
+                    message="Verifica i crediti di tutte le squadre prima di avviare la stagione.",
+                ),
+            ]
+        )
     return blockers
 
 

@@ -200,7 +200,6 @@ def test_generate_confirm_calendar_is_audited_and_clears_blocker(
     }
     assert {row["code"] for row in auction.json()["blockers"]} == {
         "fantasy_teams_not_configured",
-        "credits_not_configured",
     }
 
     db_session.expire_all()

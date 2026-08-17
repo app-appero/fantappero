@@ -80,6 +80,7 @@ Response include il regolamento corrente:
       "forwards": 10
     },
     "totalCredits": 1000,
+    "minFixturesPerRound": 25,
     "options": {
       "allowTrades": true,
       "allowManualInvites": true
@@ -104,6 +105,7 @@ Response include il regolamento corrente:
     "forwards": 10
   },
   "totalCredits": 1200,
+  "minFixturesPerRound": 25,
   "options": {
     "allowTrades": true,
     "allowManualInvites": true
@@ -119,6 +121,7 @@ Response include il regolamento corrente:
 | `participantCount` | Intero 4–10 |
 | `roster` | Sempre 35 con distribuzione 3P–11D–11C–10A |
 | `totalCredits` | Intero > 0 |
+| `minFixturesPerRound` | Intero 10–40 (default 25); soglia turni europei EP06-01 |
 
 ### Effetti atomici
 
@@ -134,6 +137,7 @@ Response include il regolamento corrente:
 | 400 | `invalid_participant_count` | Partecipanti fuori range 4–10 |
 | 400 | `invalid_roster_size` / `invalid_roster_distribution` | Rosa non conforme a 35 / 3P–11D–11C–10A |
 | 400 | `invalid_total_credits` | Crediti <= 0 |
+| 400 | `invalid_min_fixtures_per_round` | Soglia partite fuori range 10–40 |
 | 400 | `league_not_draft` | Lega non in bozza |
 | 403 | `forbidden` | Utente non admin nella lega |
 | 404 | `league_not_found` | Lega non esistente |
@@ -247,8 +251,8 @@ un secondo evento audit. Salti e regressioni non previsti restituiscono
 Il passaggio ad asta richiede regolamento valido, almeno tre campionati, un
 amministratore e il numero esatto di partecipanti configurato. Il passaggio ad `active`
 è il vero avvio stagione e resta bloccato finché non risultano validi calendario,
-squadre, rose e crediti. EP03-06 implementa il calendario H2H; rose e crediti restano
-dominio delle card successive e continuano a bloccare `auction → active`.
+squadre con rose **convalidate** (composizione 3P–11D–11C–10A da regolamento,
+≥3 campionati rappresentati — EP05-05) e conti crediti. EP03-06 implementa il calendario H2H.
 
 La transizione acquisisce un lock sulla lega e salva stato ed evento
 `league_state_changed` nella stessa transazione. L'audit conserva stato precedente e
@@ -285,8 +289,8 @@ Decisione prodotto documentata (aperta in FR-LEG-04): in questa card si adotta s
 l'andata; andata/ritorno e mapping a turni europei eccedenti restano decisioni future.
 
 Eventi audit: `league_calendar_generated`, `league_calendar_confirmed`.
-Tabelle: `league_calendars`, `league_calendar_slots` (FK ai membership, non alle
-future `fantasy_team`).
+Tabelle: `league_calendars`, `league_calendar_slots` (FK ai membership; le `fantasy_team`
+esistono da EP05-01 ma il calendario resta ancorato ai membership).
 
 ## Audit
 
@@ -314,7 +318,14 @@ Restituisce le voci del listone ufficiale della stagione della lega, con ruolo u
 
 `POST /leagues/{league_id}/amministrazione/listone/aggiorna` — richiede `league:admin`.
 
-Sincronizza catalogo (se necessario) e roster da **API-Football** lato server, poi rigenera `role_assignments`. Non espone la chiave al client. Richiede `API_FOOTBALL_KEY` nell’ambiente backend.
+Avvia in **async** (Celery) la sync completa: **sempre** catalogo MVP + rose di tutti i club
+dei campionati censiti per la stagione della lega + generazione `role_assignments`.
+Risposta immediata: `{ jobId, status, message }`.
+
+`GET /leagues/{league_id}/amministrazione/listone/aggiorna/{jobId}` — progresso
+`{ percent, stage, message, status, result? }`. Pollare fino a `completed` / `failed`.
+
+Non espone la chiave al client. Richiede `API_FOOTBALL_KEY` e worker Celery attivi.
 
 | HTTP | `code` | Caso |
 | --- | --- | --- |
@@ -324,7 +335,7 @@ Sincronizza catalogo (se necessario) e roster da **API-Football** lato server, p
 | 400 | `catalog_not_ready` | Nessun club dopo sync catalogo |
 | 400 | `provider_sync_failed` / `listone_refresh_failed` | Errore sync/generazione |
 
-UI: schermata **Asta** (`/asta`) — tabella con tab Tutti/P/D/C/A e pulsante «Aggiorna».
+UI: schermata **Asta** (`/asta`) — tabella con tab Tutti/P/D/C/A (sola lettura del listone ufficiale).
 
 `PUT /leagues/{league_id}/amministrazione/listone/{athlete_id}/ruolo` — richiede `league:admin`.
 
@@ -345,6 +356,10 @@ UI: schermata **Asta** (`/asta`) — tabella con tab Tutti/P/D/C/A e pulsante «
 `DELETE /leagues/{league_id}/amministrazione/listone/{athlete_id}/ruolo` — ripristina il ruolo ufficiale (supersede override attivo).
 
 Dettagli operativi: [`../operations/sports_listone.md`](../operations/sports_listone.md).
+
+## Squadre fantasy e rosa (EP05-01 / EP05-02 / EP05-03 / EP05-04)
+
+Vedi [`fantasy_teams.md`](./fantasy_teams.md) (rosa, ledger crediti, inserimento manuale admin, import CSV).
 
 ## Test
 

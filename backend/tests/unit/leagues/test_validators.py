@@ -21,6 +21,7 @@ from leagues.validators import (
     validate_league_name,
     validate_league_transition,
     validate_member_removal,
+    validate_minutes_threshold,
     validate_participant_count,
     validate_preset_name,
     validate_season_year,
@@ -89,6 +90,18 @@ def test_validate_participant_count_rejects_outside_range() -> None:
 def test_validate_total_credits_requires_positive() -> None:
     with pytest.raises(ValidationAuthError, match="maggiori di zero"):
         validate_total_credits(0)
+
+
+@pytest.mark.parametrize("value", [1, 15, 30])
+def test_validate_minutes_threshold_accepts_range(value: int) -> None:
+    assert validate_minutes_threshold(value) == value
+
+
+@pytest.mark.parametrize("value", [0, 31])
+def test_validate_minutes_threshold_rejects_range(value: int) -> None:
+    with pytest.raises(ValidationAuthError) as error:
+        validate_minutes_threshold(value)
+    assert error.value.code == "invalid_minutes_threshold"
 
 
 def test_validate_standard_roster_rejects_wrong_distribution() -> None:
@@ -223,3 +236,8 @@ def test_auction_activation_blockers_include_calendar_until_configured() -> None
         "fantasy_teams_not_configured",
         "credits_not_configured",
     }
+    assert auction_activation_blockers(
+        calendar_configured=True,
+        roster_blockers=[],
+    ) == []
+

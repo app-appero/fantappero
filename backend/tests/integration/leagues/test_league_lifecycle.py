@@ -155,7 +155,6 @@ def test_draft_to_auction_is_audited_idempotent_and_active_stays_blocked(
     assert {row["code"] for row in auction.json()["blockers"]} == {
         "calendar_not_configured",
         "fantasy_teams_not_configured",
-        "credits_not_configured",
     }
 
     noop = _transition(client, owner_token, league_id, "auction")

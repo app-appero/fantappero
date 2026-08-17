@@ -4,7 +4,6 @@ import {
   Button,
   Input,
   PageContainer,
-  Select,
   UiStatePanel,
 } from "@fantappero/ui";
 import { type FormEvent, useCallback, useEffect, useMemo, useState } from "react";
@@ -23,12 +22,13 @@ const DEMO_COMPETITIONS: CompetitionSummary[] = [
   { id: "demo-61", providerId: 61, name: "Ligue 1", country: "France" },
 ];
 
-function buildSeasonOptions(): Array<{ value: string; label: string }> {
-  const currentYear = new Date().getFullYear();
-  return [currentYear - 1, currentYear, currentYear + 1].map((year) => ({
-    value: String(year),
-    label: String(year),
-  }));
+/** Anno di avvio stagione corrente (API: singolo intero; UI: YYYY-YYYY+1). */
+export function currentSeasonYear(now = new Date()): number {
+  return now.getFullYear();
+}
+
+export function formatSeasonLabel(seasonYear: number): string {
+  return `${seasonYear}-${seasonYear + 1}`;
 }
 
 /** Configurazione iniziale di una lega privata in bozza (EP03-01). */
@@ -37,8 +37,8 @@ export function CreateLeaguePage() {
   const { isDemoMode, registerLeague } = useAuth();
   const { search } = useLocation();
   const demoState = isDemoMode ? parseWireframeStateFromSearch(search) : null;
-  const seasonOptions = useMemo(() => buildSeasonOptions(), []);
-  const defaultSeason = String(new Date().getFullYear());
+  const seasonYear = useMemo(() => currentSeasonYear(), []);
+  const seasonLabel = useMemo(() => formatSeasonLabel(seasonYear), [seasonYear]);
 
   const [competitions, setCompetitions] = useState<CompetitionSummary[]>(() =>
     isDemoMode && demoState !== "empty" ? DEMO_COMPETITIONS : [],
@@ -51,11 +51,11 @@ export function CreateLeaguePage() {
   );
 
   const [name, setName] = useState("");
-  const [seasonYear, setSeasonYear] = useState(defaultSeason);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [formError, setFormError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [createdLeague, setCreatedLeague] = useState<LeagueDetail | null>(null);
+  const allSelected = competitions.length > 0 && selectedIds.size === competitions.length;
 
   const loadCatalog = useCallback(async () => {
     if (isDemoMode) {
@@ -117,6 +117,15 @@ export function CreateLeaguePage() {
     });
   }
 
+  function toggleSelectAll() {
+    setSelectedIds((current) => {
+      if (competitions.length > 0 && current.size === competitions.length) {
+        return new Set();
+      }
+      return new Set(competitions.map((row) => row.id));
+    });
+  }
+
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setFormError(null);
@@ -134,7 +143,7 @@ export function CreateLeaguePage() {
       setCreatedLeague({
         id: "demo-created-league",
         name: name.trim(),
-        seasonYear: Number(seasonYear),
+        seasonYear,
         state: "draft",
         viewerRole: "league_admin",
         competitions: DEMO_COMPETITIONS.filter((row) => selectedIds.has(row.id)),
@@ -151,6 +160,8 @@ export function CreateLeaguePage() {
             forwards: 10,
           },
           totalCredits: 1000,
+          minFixturesPerRound: 25,
+          minutesThreshold: 15,
           options: {
             allowTrades: true,
             allowManualInvites: true,
@@ -170,7 +181,7 @@ export function CreateLeaguePage() {
     try {
       const created = await createLeague(stored.accessToken, {
         name: name.trim(),
-        seasonYear: Number(seasonYear),
+        seasonYear,
         competitionIds: [...selectedIds],
       });
       registerLeague({
@@ -272,31 +283,58 @@ export function CreateLeaguePage() {
             onChange={(event) => setName(event.target.value)}
             required
           />
-          <Select
+          <Input
             label="Stagione"
             name="season-year"
-            value={seasonYear}
-            onChange={(event) => setSeasonYear(event.target.value)}
-            options={seasonOptions}
+            value={seasonLabel}
+            readOnly
+            hint="La lega viene creata per la stagione sportiva corrente."
+            data-testid="create-league-season"
           />
 
-          <fieldset data-testid="create-league-competitions">
-            <legend>Campionati (minimo 3)</legend>
-            <ul className="fa-wireframe-list">
-              {competitions.map((competition) => (
-                <li key={competition.id}>
-                  <label>
-                    <input
-                      type="checkbox"
-                      name="competition"
-                      value={competition.id}
-                      checked={selectedIds.has(competition.id)}
-                      onChange={() => toggleCompetition(competition.id)}
-                    />{" "}
-                    {competition.name} ({competition.country})
-                  </label>
-                </li>
-              ))}
+          <fieldset className="fa-competition-picker" data-testid="create-league-competitions">
+            <legend className="fa-competition-picker__legend">Campionati (minimo 3)</legend>
+            <div className="fa-competition-picker__toolbar">
+              <p className="fa-competition-picker__count" aria-live="polite">
+                {selectedIds.size} di {competitions.length} selezionati
+              </p>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={toggleSelectAll}
+                data-testid="create-league-select-all"
+              >
+                {allSelected ? "Deseleziona tutto" : "Seleziona tutto"}
+              </Button>
+            </div>
+            <ul className="fa-competition-picker__list">
+              {competitions.map((competition) => {
+                const checked = selectedIds.has(competition.id);
+                return (
+                  <li key={competition.id}>
+                    <label
+                      className={
+                        checked
+                          ? "fa-competition-picker__option fa-competition-picker__option--checked"
+                          : "fa-competition-picker__option"
+                      }
+                    >
+                      <input
+                        type="checkbox"
+                        name="competition"
+                        value={competition.id}
+                        checked={checked}
+                        onChange={() => toggleCompetition(competition.id)}
+                      />
+                      <span className="fa-competition-picker__label">
+                        <span className="fa-competition-picker__name">{competition.name}</span>
+                        <span className="fa-competition-picker__country">{competition.country}</span>
+                      </span>
+                    </label>
+                  </li>
+                );
+              })}
             </ul>
           </fieldset>
 

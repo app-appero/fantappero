@@ -47,6 +47,8 @@ function buildPayloadFromRules(rules: LeagueRules): UpdateLeagueRulesRequest {
     participantCount: rules.participantCount,
     roster: { ...rules.roster },
     totalCredits: rules.totalCredits,
+    minFixturesPerRound: rules.minFixturesPerRound,
+    minutesThreshold: rules.minutesThreshold,
     options: { ...rules.options },
   };
 }
@@ -96,6 +98,7 @@ export function LeagueAdminScreen() {
   const [deleteConfirmed, setDeleteConfirmed] = useState(false);
   const [deleteSuccess, setDeleteSuccess] = useState<string | null>(null);
   const [participantCountText, setParticipantCountText] = useState("8");
+  const [minutesThresholdText, setMinutesThresholdText] = useState("15");
 
   const loadAll = useCallback(
     async (options?: { silent?: boolean }) => {
@@ -122,6 +125,7 @@ export function LeagueAdminScreen() {
         setRules(panel.rules);
         setLifecycle(panel.lifecycle);
         setParticipantCountText(String(panel.rules.participantCount));
+        setMinutesThresholdText(String(panel.rules.minutesThreshold));
         setMembers(memberRows);
         setInvites(inviteRows);
         setCalendar(cal);
@@ -160,6 +164,7 @@ export function LeagueAdminScreen() {
     const nextRules: LeagueRules = {
       ...rules,
       participantCount: Number(participantCountText) || rules.participantCount,
+      minutesThreshold: Number(minutesThresholdText) || rules.minutesThreshold,
     };
     if (!leagueId || !accessToken) {
       setActionError("Seleziona una lega e accedi di nuovo.");
@@ -405,6 +410,16 @@ export function LeagueAdminScreen() {
             style={styles.input}
             accessibilityLabel="Partecipanti previsti"
             testID="league-admin-participant-count"
+          />
+          <Text style={styles.label}>Soglia minuti per il voto</Text>
+          <TextInput
+            value={minutesThresholdText}
+            onChangeText={setMinutesThresholdText}
+            keyboardType="number-pad"
+            editable={canConfigure}
+            style={styles.input}
+            accessibilityLabel="Soglia minuti per il voto"
+            testID="league-admin-minutes-threshold"
           />
           <View style={styles.switchRow}>
             <Text style={styles.body}>Scambi consentiti</Text>

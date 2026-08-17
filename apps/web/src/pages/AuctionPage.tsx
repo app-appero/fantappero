@@ -22,7 +22,7 @@ import {
   WireframeSection,
 } from "@fantappero/ui";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { fetchLeagueListone, refreshLeagueListone } from "../api/leagues";
+import { fetchLeagueListone } from "../api/leagues";
 import { getApiErrorMessage, useAuth } from "../auth/AuthContext";
 import { loadStoredSession } from "../auth/sessionStorage";
 import { useLocation } from "../router/simpleRouter";
@@ -37,6 +37,19 @@ const ROLE_TABS: Array<{ value: RoleTab; label: string }> = [
   { value: "C", label: "Centrocampisti" },
   { value: "A", label: "Attaccanti" },
 ];
+
+function roleBadgeVariant(role: FantasyRole): "success" | "warning" | "accent" | "danger" {
+  if (role === "P") {
+    return "success";
+  }
+  if (role === "D") {
+    return "warning";
+  }
+  if (role === "C") {
+    return "accent";
+  }
+  return "danger";
+}
 
 const ROLE_LABEL: Record<FantasyRole, string> = {
   P: "Portiere",
@@ -132,7 +145,6 @@ export function AuctionPage() {
   const { search } = useLocation();
   const demoState = isDemoMode ? parseWireframeStateFromSearch(search) : null;
   const canManageSession = can(["market:manage"]);
-  const isListoneAdmin = can(["league:admin"]);
 
   const [entries, setEntries] = useState<LeagueListoneEntry[]>(() =>
     initialDemoEntries(isDemoMode, demoState),
@@ -146,14 +158,8 @@ export function AuctionPage() {
       ? "Impossibile caricare il listone (demo)."
       : null,
   );
-  const [refreshing, setRefreshing] = useState(false);
-  const [refreshMessage, setRefreshMessage] = useState<string | null>(null);
-  const [refreshError, setRefreshError] = useState<string | null>(null);
 
   const loadListone = useCallback(async () => {
-    setRefreshMessage(null);
-    setRefreshError(null);
-
     if (isDemoMode) {
       if (demoState === "loading") {
         setLoading(true);
@@ -221,51 +227,6 @@ export function AuctionPage() {
     () => filterByTab(entries, activeTab),
     [activeTab, entries],
   );
-
-  const onRefresh = async () => {
-    setRefreshMessage(null);
-    setRefreshError(null);
-
-    if (isDemoMode) {
-      setRefreshing(true);
-      window.setTimeout(() => {
-        setEntries(DEMO_LISTONE);
-        setRefreshMessage("Listone aggiornato (demo).");
-        setRefreshing(false);
-      }, 400);
-      return;
-    }
-
-    if (!activeLeagueId) {
-      setRefreshError("Seleziona una lega per aggiornare il listone.");
-      return;
-    }
-    const stored = loadStoredSession();
-    if (!stored?.accessToken) {
-      setRefreshError("Sessione non disponibile. Accedi di nuovo.");
-      return;
-    }
-
-    setRefreshing(true);
-    try {
-      const result = await refreshLeagueListone(stored.accessToken, activeLeagueId);
-      setRefreshMessage(
-        `${result.message} Creati ${result.counters.listoneCreated}, aggiornati ${result.counters.listoneUpdated}, invariati ${result.counters.listoneUnchanged}.`,
-      );
-      const rows = await fetchLeagueListone(stored.accessToken, activeLeagueId);
-      setEntries(rows);
-      setLoadError(null);
-    } catch (error) {
-      setRefreshError(
-        getApiErrorMessage(
-          error,
-          "Aggiornamento listone non riuscito. Verifica la chiave API-Football sul server.",
-        ),
-      );
-    } finally {
-      setRefreshing(false);
-    }
-  };
 
   if (isDemoMode && demoState === "forbidden") {
     return (
@@ -335,36 +296,9 @@ export function AuctionPage() {
                     : "Seleziona una lega dal selettore in alto."}
                 </p>
               </div>
-              {isListoneAdmin ? (
-                <Button
-                  variant="primary"
-                  onClick={() => void onRefresh()}
-                  disabled={refreshing || loading || (!isDemoMode && !activeLeagueId)}
-                  data-testid="auction-listone-refresh"
-                >
-                  {refreshing ? "Aggiornamento…" : "Aggiorna"}
-                </Button>
-              ) : null}
             </div>
           </CardHeader>
           <CardBody>
-            {refreshMessage ? (
-              <UiStatePanel
-                state="success"
-                title="Listone aggiornato"
-                message={refreshMessage}
-                testId="auction-listone-refresh-success"
-              />
-            ) : null}
-            {refreshError ? (
-              <UiStatePanel
-                state="error"
-                title="Aggiornamento non riuscito"
-                message={refreshError}
-                testId="auction-listone-refresh-error"
-              />
-            ) : null}
-
             {loading ? (
               <UiStatePanel
                 state="loading"
@@ -418,7 +352,7 @@ export function AuctionPage() {
                         title="Nessun calciatore"
                         message={
                           tab.value === "all"
-                            ? "Il listone è vuoto. L'amministratore può aggiornarlo dal provider."
+                            ? "Il listone è vuoto. Verrà popolato dagli operatori della piattaforma."
                             : `Nessun ${ROLE_LABEL[tab.value as FantasyRole].toLowerCase()} nel listone.`
                         }
                         testId={`auction-listone-empty-${tab.value}`}
@@ -439,7 +373,9 @@ export function AuctionPage() {
                             <TableRow key={entry.athleteId}>
                               <TableCell>{entry.canonicalName}</TableCell>
                               <TableCell>
-                                <Badge variant="accent">{entry.effectiveRole}</Badge>{" "}
+                                <Badge variant={roleBadgeVariant(entry.effectiveRole)}>
+                                  {entry.effectiveRole}
+                                </Badge>{" "}
                                 {ROLE_LABEL[entry.effectiveRole]}
                               </TableCell>
                               <TableCell>{entry.clubName ?? "—"}</TableCell>

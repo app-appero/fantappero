@@ -44,6 +44,14 @@ class LeagueRules(Base, UUIDPrimaryKeyMixin, TimestampMixin):
             name="ck_league_rules_roster_sum",
         ),
         CheckConstraint("total_credits > 0", name="ck_league_rules_total_credits"),
+        CheckConstraint(
+            "min_fixtures_per_round BETWEEN 10 AND 40",
+            name="ck_league_rules_min_fixtures_per_round",
+        ),
+        CheckConstraint(
+            "minutes_threshold BETWEEN 1 AND 30",
+            name="ck_league_rules_minutes_threshold",
+        ),
     )
 
     league_id: Mapped[UUID] = mapped_column(
@@ -66,6 +74,16 @@ class LeagueRules(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     midfielders: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("11"))
     forwards: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("10"))
     total_credits: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("1000"))
+    min_fixtures_per_round: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        server_default=text("25"),
+    )
+    minutes_threshold: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        server_default=text("15"),
+    )
     allow_trades: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("true"))
     allow_manual_invites: Mapped[bool] = mapped_column(
         Boolean,

@@ -218,27 +218,27 @@ export function LeagueHomeScreen() {
           <Text style={styles.body}>Funzioni di gioco disponibili dalla prossima fase.</Text>
           <Pressable
             accessibilityRole="button"
-            disabled
-            style={[styles.ghostButton, styles.disabled]}
-            testID="league-home-roster-soon"
+            style={styles.ghostButton}
+            testID="league-home-roster-link"
+            onPress={() => navigation.navigate("MainTabs", { screen: "Roster" })}
           >
-            <Text style={styles.ghostLabel}>Rosa — disponibile dalla prossima fase</Text>
+            <Text style={styles.ghostLabel}>Vai alla rosa</Text>
           </Pressable>
           <Pressable
             accessibilityRole="button"
-            disabled
-            style={[styles.ghostButton, styles.disabled]}
-            testID="league-home-formation-soon"
+            style={styles.ghostButton}
+            testID="league-home-formation-link"
+            onPress={() => navigation.navigate("MainTabs", { screen: "Formation" })}
           >
-            <Text style={styles.ghostLabel}>Formazione — disponibile dalla prossima fase</Text>
+            <Text style={styles.ghostLabel}>Vai alla formazione</Text>
           </Pressable>
           <Pressable
             accessibilityRole="button"
-            disabled
-            style={[styles.ghostButton, styles.disabled]}
-            testID="league-home-matchday-soon"
+            style={styles.ghostButton}
+            testID="league-home-matchday-link"
+            onPress={() => navigation.navigate("MainTabs", { screen: "Matchday" })}
           >
-            <Text style={styles.ghostLabel}>Turni — disponibile dalla prossima fase</Text>
+            <Text style={styles.ghostLabel}>Vai ai turni</Text>
           </Pressable>
         </View>
       ) : null}

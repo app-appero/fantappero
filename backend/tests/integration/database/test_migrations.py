@@ -50,7 +50,10 @@ def test_upgrade_from_empty_database(clean_db: str) -> None:
         assert table_exists(engine, "official_lineups")
         assert table_exists(engine, "official_lineup_entries")
         assert table_exists(engine, "player_match_stats")
+        assert table_exists(engine, "player_match_ratings")
         assert table_exists(engine, "sports_poll_runs")
+        assert table_exists(engine, "lineup_submissions")
+        assert table_exists(engine, "lineup_drafts")
         assert table_exists(engine, "alembic_version")
         with engine.connect() as conn:
             version = conn.execute(text("SELECT version_num FROM alembic_version")).scalar_one()
@@ -99,7 +102,7 @@ def test_upgrade_from_empty_database(clean_db: str) -> None:
                 .scalars()
                 .all()
             )
-        assert version == "e2f8a1b0c016"
+            assert version == "a2b4c6d8e088"
         assert named_statuses == ["pending", "accepted", "declined", "revoked", "expired"]
         assert calendar_statuses == ["draft", "confirmed"]
         assert fantasy_roles == ["P", "D", "C", "A"]

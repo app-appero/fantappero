@@ -18,7 +18,7 @@ export type { SelectOption, SelectProps } from "./components/Select.js";
 export { Card, CardBody, CardFooter, CardHeader } from "./components/Card.js";
 export type { CardBodyProps, CardFooterProps, CardHeaderProps, CardProps } from "./components/Card.js";
 
-export { Badge } from "./components/Badge.js";
+export { Badge, roleBadgeVariant } from "./components/Badge.js";
 export type { BadgeProps, BadgeVariant } from "./components/Badge.js";
 
 export { Tab, TabList, TabPanel, Tabs } from "./components/Tabs.js";

@@ -2,7 +2,7 @@ import type { FantasyRole, LeagueListoneEntry } from "@fantappero/contracts";
 import { theme } from "@fantappero/ui/theme";
 import { useCallback, useMemo, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
-import { fetchLeagueListone, refreshLeagueListone } from "../api/leagues";
+import { fetchLeagueListone } from "../api/leagues";
 import { UiStatePanel } from "../components/UiStatePanel";
 import { useScreenData } from "../hooks/useScreenData";
 import { PageContainer } from "../layout/PageContainer";
@@ -27,6 +27,19 @@ const ROLE_LABEL: Record<FantasyRole, string> = {
   A: "Attaccante",
 };
 
+function roleBadgeColors(role: FantasyRole): { backgroundColor: string; color: string } {
+  if (role === "P") {
+    return { backgroundColor: colors.success, color: colors.accentContrast };
+  }
+  if (role === "D") {
+    return { backgroundColor: colors.warning, color: colors.background };
+  }
+  if (role === "C") {
+    return { backgroundColor: colors.accent, color: colors.accentContrast };
+  }
+  return { backgroundColor: colors.danger, color: colors.accentContrast };
+}
+
 function filterByTab(entries: LeagueListoneEntry[], tab: RoleTab): LeagueListoneEntry[] {
   if (tab === "all") {
     return entries;
@@ -38,21 +51,14 @@ function filterByTab(entries: LeagueListoneEntry[], tab: RoleTab): LeagueListone
 export function AuctionScreen() {
   const { can, accessToken, activeLeagueId, activeLeague } = useAuthSession();
   const canManageSession = can(["market:manage"]);
-  const isListoneAdmin = can(["league:admin"]);
 
   const [entries, setEntries] = useState<LeagueListoneEntry[]>([]);
   const [tab, setTab] = useState<RoleTab>("all");
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [providerRefreshing, setProviderRefreshing] = useState(false);
-  const [refreshMessage, setRefreshMessage] = useState<string | null>(null);
-  const [refreshError, setRefreshError] = useState<string | null>(null);
 
   const loadListone = useCallback(
-    async (options?: { silent?: boolean }) => {
-      setRefreshMessage(null);
-      setRefreshError(null);
-
+    async () => {
       if (!activeLeagueId) {
         setLoading(false);
         setEntries([]);
@@ -66,9 +72,7 @@ export function AuctionScreen() {
         return;
       }
 
-      if (!options?.silent) {
-        setLoading(true);
-      }
+      setLoading(true);
       setLoadError(null);
       try {
         setEntries(await fetchLeagueListone(accessToken, activeLeagueId));
@@ -85,37 +89,6 @@ export function AuctionScreen() {
   const { refreshing, onRefresh } = useScreenData(loadListone);
 
   const visibleEntries = useMemo(() => filterByTab(entries, tab), [entries, tab]);
-
-  async function onProviderRefresh() {
-    setRefreshMessage(null);
-    setRefreshError(null);
-    if (!activeLeagueId) {
-      setRefreshError("Seleziona una lega per aggiornare il listone.");
-      return;
-    }
-    if (!accessToken) {
-      setRefreshError("Sessione non disponibile. Accedi di nuovo.");
-      return;
-    }
-    setProviderRefreshing(true);
-    try {
-      const result = await refreshLeagueListone(accessToken, activeLeagueId);
-      setRefreshMessage(
-        `${result.message} Creati ${result.counters.listoneCreated}, aggiornati ${result.counters.listoneUpdated}, invariati ${result.counters.listoneUnchanged}.`,
-      );
-      setEntries(await fetchLeagueListone(accessToken, activeLeagueId));
-      setLoadError(null);
-    } catch (error) {
-      setRefreshError(
-        getApiErrorMessage(
-          error,
-          "Aggiornamento listone non riuscito. Verifica la chiave API-Football sul server.",
-        ),
-      );
-    } finally {
-      setProviderRefreshing(false);
-    }
-  }
 
   return (
     <PageContainer
@@ -155,41 +128,7 @@ export function AuctionScreen() {
                 : "Seleziona una lega dal selettore in alto."}
             </Text>
           </View>
-          {isListoneAdmin ? (
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Aggiorna listone"
-              disabled={providerRefreshing || loading || !activeLeagueId}
-              onPress={() => void onProviderRefresh()}
-              style={[
-                styles.refreshBtn,
-                (providerRefreshing || loading || !activeLeagueId) && styles.disabled,
-              ]}
-              testID="auction-listone-refresh"
-            >
-              <Text style={styles.refreshLabel}>
-                {providerRefreshing ? "Aggiornamento…" : "Aggiorna"}
-              </Text>
-            </Pressable>
-          ) : null}
         </View>
-
-        {refreshMessage ? (
-          <UiStatePanel
-            state="success"
-            title="Listone aggiornato"
-            message={refreshMessage}
-            testID="auction-listone-refresh-success"
-          />
-        ) : null}
-        {refreshError ? (
-          <UiStatePanel
-            state="error"
-            title="Aggiornamento non riuscito"
-            message={refreshError}
-            testID="auction-listone-refresh-error"
-          />
-        ) : null}
 
         {loading ? (
           <UiStatePanel
@@ -251,19 +190,27 @@ export function AuctionScreen() {
                 title="Nessun calciatore"
                 message={
                   tab === "all"
-                    ? "Il listone è vuoto. L'amministratore può aggiornarlo dal provider."
+                    ? "Il listone è vuoto. Verrà popolato dagli operatori della piattaforma."
                     : `Nessun ${ROLE_LABEL[tab].toLowerCase()} nel listone.`
                 }
                 testID={`auction-listone-empty-${tab}`}
               />
             ) : (
               <View testID={`auction-listone-table-${tab}`}>
-                {visibleEntries.map((entry) => (
+                {visibleEntries.map((entry) => {
+                  const roleColors = roleBadgeColors(entry.effectiveRole);
+                  return (
                   <View key={entry.athleteId} style={styles.row}>
-                    <Text style={styles.name}>{entry.canonicalName}</Text>
+                    <View style={styles.nameRow}>
+                      <View style={[styles.roleBadge, roleColors]}>
+                        <Text style={[styles.roleBadgeText, { color: roleColors.color }]}>
+                          {entry.effectiveRole}
+                        </Text>
+                      </View>
+                      <Text style={styles.name}>{entry.canonicalName}</Text>
+                    </View>
                     <Text style={styles.meta}>
-                      {entry.effectiveRole} · {ROLE_LABEL[entry.effectiveRole]} ·{" "}
-                      {entry.clubName ?? "—"}
+                      {ROLE_LABEL[entry.effectiveRole]} · {entry.clubName ?? "—"}
                     </Text>
                     {entry.providerPositionRaw ? (
                       <Text style={styles.meta}>Provider: {entry.providerPositionRaw}</Text>
@@ -276,7 +223,8 @@ export function AuctionScreen() {
                       </Text>
                     ) : null}
                   </View>
-                ))}
+                  );
+                })}
               </View>
             )}
           </>
@@ -336,18 +284,6 @@ const styles = StyleSheet.create({
     fontWeight: typography.fontWeight.semibold,
     color: colors.foreground,
   },
-  refreshBtn: {
-    minHeight: 44,
-    backgroundColor: colors.accent,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    borderRadius: radius.md,
-    justifyContent: "center",
-  },
-  refreshLabel: {
-    color: colors.accentContrast,
-    fontWeight: typography.fontWeight.semibold,
-  },
   secondaryBtn: {
     minHeight: 44,
     borderWidth: 1,
@@ -391,9 +327,27 @@ const styles = StyleSheet.create({
     marginBottom: spacing.sm,
     gap: 2,
   },
+  nameRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+  },
+  roleBadge: {
+    minWidth: 28,
+    height: 28,
+    borderRadius: radius.sm,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: spacing.xs,
+  },
+  roleBadgeText: {
+    fontSize: typography.fontSize.sm,
+    fontWeight: typography.fontWeight.semibold,
+  },
   name: {
     color: colors.foreground,
     fontWeight: typography.fontWeight.semibold,
+    flexShrink: 1,
   },
   meta: {
     color: colors.foregroundMuted,

@@ -33,7 +33,10 @@ describe("EPUI-04 wireframes", () => {
       screen.id === "auth" ||
       screen.id === "league-dashboard" ||
       screen.id === "league-config" ||
-      screen.id === "auction"
+      screen.id === "auction" ||
+      screen.id === "roster" ||
+      screen.id === "formation" ||
+      screen.id === "matchday"
     ) {
       continue;
     }
@@ -79,8 +82,7 @@ describe("EPUI-04 wireframes", () => {
   it("shows admin auction controls for admin persona", () => {
     const html = renderAt("/asta", "?persona=admin&stato=success");
     expect(html).toContain('data-testid="wireframe-region-auction-admin"');
-    expect(html).toContain('data-testid="auction-listone-refresh"');
-    expect(html).toContain("Aggiorna");
+    expect(html).not.toContain('data-testid="auction-listone-refresh"');
   });
 
   it("renders wireframe meta panel when meta=1", () => {

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, date, datetime
 from typing import Any
@@ -641,8 +641,14 @@ def sync_mvp_roster_with_client(
     league_ids: Sequence[int] = MVP_LEAGUE_IDS,
     store_snapshots: bool = True,
     max_clubs_per_league: int | None = None,
+    season_year: int | None = None,
+    on_progress: Callable[[int, int, str], None] | None = None,
 ) -> RosterSyncResult:
-    """Fetch squads and transfers for MVP clubs already present in catalog."""
+    """Fetch squads and transfers for MVP clubs already present in catalog.
+
+    When ``season_year`` is set, syncs clubs for that sport season year (preferred for
+    listone refresh). Otherwise uses seasons marked ``is_current``.
+    """
     from sports_data.catalog.models import CompetitionSeasonClub
 
     allowed = frozenset(league_ids)
@@ -650,12 +656,18 @@ def sync_mvp_roster_with_client(
     players_batches: list[PlayersBatch] = []
     transfer_envelopes: list[ProviderEnvelope] = []
 
+    season_filter = (
+        SportSeason.year == season_year
+        if season_year is not None
+        else SportSeason.is_current.is_(True)
+    )
     season_rows = session.scalars(
         select(SportSeason)
         .join(Competition)
-        .where(Competition.provider_id.in_(allowed), SportSeason.is_current.is_(True)),
+        .where(Competition.provider_id.in_(allowed), season_filter),
     ).all()
 
+    work_items: list[tuple[SportSeason, Competition, Club]] = []
     for sport_season in season_rows:
         competition = session.get(Competition, sport_season.competition_id)
         if competition is None:
@@ -673,29 +685,38 @@ def sync_mvp_roster_with_client(
             club_query = club_query.limit(max_clubs_per_league)
         clubs = session.scalars(club_query).all()
         for club in clubs:
-            squads = client.get("/players/squads", {"team": club.provider_id})
-            squad_batches.append(
-                SquadBatch(
-                    envelope=squads,
-                    club_provider_id=club.provider_id,
-                    competition_provider_id=competition.provider_id,
-                    season_year=sport_season.year,
-                ),
-            )
-            players = client.get(
-                "/players",
-                {"team": club.provider_id, "season": sport_season.year},
-            )
-            players_batches.append(
-                PlayersBatch(
-                    envelope=players,
-                    club_provider_id=club.provider_id,
-                    season_year=sport_season.year,
-                ),
-            )
-            transfers = client.get("/transfers", {"team": club.provider_id})
-            if transfers.results > 0:
-                transfer_envelopes.append(transfers)
+            work_items.append((sport_season, competition, club))
+
+    total = len(work_items)
+    if on_progress is not None:
+        on_progress(0, max(total, 1), "Avvio sync rose")
+
+    for index, (sport_season, competition, club) in enumerate(work_items, start=1):
+        squads = client.get("/players/squads", {"team": club.provider_id})
+        squad_batches.append(
+            SquadBatch(
+                envelope=squads,
+                club_provider_id=club.provider_id,
+                competition_provider_id=competition.provider_id,
+                season_year=sport_season.year,
+            ),
+        )
+        players = client.get(
+            "/players",
+            {"team": club.provider_id, "season": sport_season.year},
+        )
+        players_batches.append(
+            PlayersBatch(
+                envelope=players,
+                club_provider_id=club.provider_id,
+                season_year=sport_season.year,
+            ),
+        )
+        transfers = client.get("/transfers", {"team": club.provider_id})
+        if transfers.results > 0:
+            transfer_envelopes.append(transfers)
+        if on_progress is not None:
+            on_progress(index, max(total, 1), club.name)
 
     return sync_roster(
         session,

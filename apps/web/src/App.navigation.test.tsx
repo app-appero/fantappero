@@ -62,8 +62,8 @@ describe("App navigation shell (EPUI-03)", () => {
 
   it("renders domain components on roster page", () => {
     const html = renderAt("/rosa");
-    expect(html).toContain('data-testid="player-card"');
     expect(html).toContain('data-testid="wireframe-roster-success"');
+    expect(html).toContain('data-testid="roster-summary"');
   });
 
   it("renders formation view on formazione page", () => {

@@ -51,6 +51,10 @@ export interface LeagueRules {
   participantMax: number;
   roster: LeagueRosterConfig;
   totalCredits: number;
+  /** Minimum real fixtures required to publish a european turn (10–40, default 25). */
+  minFixturesPerRound: number;
+  /** Minutes required for a statistical vote (1–30, default 15). */
+  minutesThreshold: number;
   options: LeagueRulesOptions;
 }
 
@@ -76,6 +80,8 @@ export interface UpdateLeagueRulesRequest {
   participantCount: number;
   roster: LeagueRosterConfig;
   totalCredits: number;
+  minFixturesPerRound?: number;
+  minutesThreshold?: number;
   options: LeagueRulesOptions;
 }
 
@@ -245,4 +251,282 @@ export interface LeagueListoneRefreshResult {
   refreshedAt: string;
   message: string;
   counters: LeagueListoneRefreshCounters;
+}
+
+export interface LeagueListoneRefreshJob {
+  jobId: string;
+  status: string;
+  message: string;
+}
+
+export interface LeagueListoneRefreshProgress {
+  jobId: string;
+  leagueId: string;
+  status: "queued" | "running" | "completed" | "failed" | string;
+  percent: number;
+  stage: string;
+  message: string;
+  errorCode?: string | null;
+  result?: LeagueListoneRefreshResult | null;
+}
+
+/** Fantasy team and roster slots (EP05-01 / EP05-03 / EP05-05). */
+export type RosterCompositionStatus = "incomplete" | "invalid" | "validated";
+
+export interface RosterCompositionLimits {
+  rosterSize: number;
+  goalkeepers: number;
+  defenders: number;
+  midfielders: number;
+  forwards: number;
+}
+
+export interface RosterCompositionCounts {
+  P: number;
+  D: number;
+  C: number;
+  A: number;
+}
+
+export interface RosterCompositionIssue {
+  code: string;
+  message: string;
+}
+
+export interface RosterComposition {
+  status: RosterCompositionStatus | string;
+  filledSlots: number;
+  competitionCount: number;
+  requireComplete: boolean;
+  validatedAt: string | null;
+  limits: RosterCompositionLimits;
+  counts: RosterCompositionCounts;
+  issues: RosterCompositionIssue[];
+}
+
+export interface FantasyRosterSlot {
+  id: string;
+  slotIndex: number;
+  athleteId: string | null;
+  athleteName: string | null;
+  clubName: string | null;
+  role: string | null;
+  purchaseCredits: number | null;
+}
+
+export interface FantasyTeam {
+  id: string;
+  leagueId: string;
+  membershipId: string;
+  userId: string;
+  name: string;
+  rosterSize: number;
+  filledSlots: number;
+  compositionStatus: RosterCompositionStatus | string;
+  composition?: RosterComposition | null;
+  slots: FantasyRosterSlot[];
+}
+
+export interface FantasyTeamSummary {
+  id: string;
+  leagueId: string;
+  membershipId: string;
+  userId: string;
+  name: string;
+  rosterSize: number;
+  filledSlots: number;
+  compositionStatus: RosterCompositionStatus | string;
+}
+
+export interface EnsureFantasyTeamsResult {
+  created: number;
+  existing: number;
+  teams: FantasyTeamSummary[];
+}
+
+export interface AssignRosterSlotRequest {
+  athleteId: string;
+  purchaseCredits: number;
+}
+
+export interface RosterOccupancyEntry {
+  athleteId: string;
+  fantasyTeamId: string;
+  teamName: string;
+  slotIndex: number;
+  purchaseCredits: number | null;
+}
+
+/** Credit ledger (EP05-02 / EP05-03). */
+export type CreditLedgerReason =
+  | "initial_allocation"
+  | "admin_adjustment"
+  | "roster_purchase"
+  | "roster_release_refund";
+
+export interface CreditAccount {
+  fantasyTeamId: string;
+  balance: number;
+  version: number;
+  reconstructedBalance: number;
+}
+
+export interface CreditLedgerEntry {
+  id: string;
+  amount: number;
+  reason: CreditLedgerReason | string;
+  transactionId: string;
+  balanceAfter: number;
+  note: string | null;
+  actorId: string | null;
+  createdAt: string;
+}
+
+export interface CreditLedgerList {
+  fantasyTeamId: string;
+  balance: number;
+  version: number;
+  entries: CreditLedgerEntry[];
+}
+
+export interface AdminCreditMovementRequest {
+  fantasyTeamId: string;
+  amount: number;
+  transactionId: string;
+  note?: string | null;
+}
+
+/** CSV roster import with preview (EP05-04 / FR-ROS-03). */
+export type RosterImportStatus = "draft" | "confirmed";
+
+export type RosterImportRowStatus = "ok" | "error" | "ambiguous";
+
+export interface RosterImportIssue {
+  code: string;
+  message: string;
+  severity: "error" | "warning" | string;
+}
+
+export interface RosterImportAthleteCandidate {
+  athleteId: string;
+  providerId: number;
+  canonicalName: string;
+}
+
+export interface RosterImportRow {
+  rowNumber: number;
+  squadra: string;
+  providerId: number | null;
+  nome: string;
+  crediti: number | null;
+  status: RosterImportRowStatus | string;
+  fantasyTeamId: string | null;
+  fantasyTeamName: string | null;
+  athleteId: string | null;
+  athleteName: string | null;
+  slotIndex: number | null;
+  issues: RosterImportIssue[];
+  candidates: RosterImportAthleteCandidate[];
+}
+
+export interface RosterImportPreview {
+  importId: string;
+  status: RosterImportStatus | string;
+  fileSha256: string;
+  originalFilename: string | null;
+  canConfirm: boolean;
+  rowCount: number;
+  errorCount: number;
+  warningCount: number;
+  rows: RosterImportRow[];
+  confirmedAt: string | null;
+}
+
+export interface RosterImportResolution {
+  rowNumber: number;
+  athleteId: string;
+}
+
+export interface RosterImportConfirmRequest {
+  resolutions?: RosterImportResolution[];
+}
+
+export interface RosterImportConfirmResult {
+  importId: string;
+  status: RosterImportStatus | string;
+  assignedCount: number;
+  teamsTouched: number;
+  confirmedAt: string;
+  preview: RosterImportPreview;
+}
+
+/** Roster ownership history and turn snapshots (EP05-06). */
+export type RosterOwnershipSource = "manual" | "csv_import" | "admin";
+
+export interface RosterOwnershipInterval {
+  id: string;
+  fantasyTeamId: string;
+  athleteId: string;
+  athleteName: string | null;
+  slotIndex: number;
+  purchaseCredits: number;
+  acquiredAt: string;
+  releasedAt: string | null;
+  source: RosterOwnershipSource | string;
+  active: boolean;
+}
+
+export interface RosterOwnershipHistory {
+  fantasyTeamId: string;
+  intervals: RosterOwnershipInterval[];
+}
+
+export interface RosterAsOfSlot {
+  slotIndex: number;
+  athleteId: string;
+  athleteName: string | null;
+  purchaseCredits: number;
+  acquiredAt: string;
+  role: string | null;
+}
+
+export interface RosterAsOf {
+  fantasyTeamId: string;
+  asOf: string;
+  filledSlots: number;
+  slots: RosterAsOfSlot[];
+}
+
+export interface CreateRosterTurnSnapshotRequest {
+  roundNumber: number;
+}
+
+export interface RosterTurnSnapshotSummary {
+  id: string;
+  leagueId: string;
+  roundNumber: number;
+  capturedAt: string;
+  entryCount: number;
+  actorId: string | null;
+}
+
+export interface RosterTurnSnapshotEntry {
+  fantasyTeamId: string;
+  teamName: string;
+  slotIndex: number;
+  athleteId: string;
+  athleteName: string | null;
+  purchaseCredits: number;
+  role: string | null;
+}
+
+export interface RosterTurnSnapshotDetail {
+  id: string;
+  leagueId: string;
+  roundNumber: number;
+  capturedAt: string;
+  entryCount: number;
+  actorId: string | null;
+  created: boolean;
+  entries: RosterTurnSnapshotEntry[];
 }

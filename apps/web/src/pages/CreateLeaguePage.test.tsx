@@ -42,6 +42,11 @@ describe("EP03-01 create league page", () => {
     expect(html).toContain("Nome lega");
     expect(html).toContain("Campionati (minimo 3)");
     expect(html).toContain("Premier League");
+    expect(html).toContain('data-testid="create-league-select-all"');
+    expect(html).toContain("Seleziona tutto");
+    const year = new Date().getFullYear();
+    expect(html).toContain(`${year}-${year + 1}`);
+    expect(html).toContain('data-testid="create-league-season"');
   });
 
   it("redirects unauthenticated users away from create route", () => {

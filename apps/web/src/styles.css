@@ -450,6 +450,35 @@ button.fa-link-muted,
   font-size: 0.9rem;
 }
 
+.fa-roster-role-tables {
+  display: grid;
+  gap: var(--fa-space-lg);
+  margin-top: var(--fa-space-md);
+}
+
+.fa-roster-role-section__title {
+  display: flex;
+  align-items: center;
+  gap: var(--fa-space-xs);
+  margin: 0 0 var(--fa-space-sm);
+  font-size: 1.05rem;
+  font-weight: 600;
+}
+
+.fa-roster-role-section__count {
+  margin-left: auto;
+  color: var(--fa-color-text-muted);
+  font-size: 0.9rem;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+.fa-roster-role-section__empty {
+  margin: 0;
+  color: var(--fa-color-text-muted);
+  font-size: 0.9rem;
+}
+
 @media (max-width: 44rem) {
   .fa-manager-directory__filters {
     grid-template-columns: 1fr;
@@ -460,4 +489,188 @@ button.fa-link-muted,
     align-items: flex-start;
     flex-wrap: wrap;
   }
+}
+
+/* Create league — competition multi-select */
+.fa-competition-picker {
+  margin: 0 0 var(--fa-space-lg);
+  padding: var(--fa-space-md);
+  border: 1px solid var(--fa-color-border);
+  border-radius: var(--fa-radius-md);
+  background-color: var(--fa-color-background-subtle);
+  display: grid;
+  gap: var(--fa-space-sm);
+}
+
+.fa-competition-picker__legend {
+  padding: 0;
+  color: var(--fa-color-foreground);
+  font-size: var(--fa-text-sm);
+  font-weight: 600;
+}
+
+.fa-competition-picker__toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--fa-space-sm);
+  flex-wrap: wrap;
+}
+
+.fa-competition-picker__count {
+  margin: 0;
+  color: var(--fa-color-foreground-muted);
+  font-size: var(--fa-text-xs);
+}
+
+.fa-competition-picker__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: var(--fa-space-xs);
+}
+
+.fa-competition-picker__option {
+  display: flex;
+  align-items: center;
+  gap: var(--fa-space-md);
+  min-height: 2.75rem;
+  padding: var(--fa-space-sm) var(--fa-space-md);
+  border: 1px solid var(--fa-color-border);
+  border-radius: var(--fa-radius-md);
+  background-color: var(--fa-color-input-bg);
+  cursor: pointer;
+  transition:
+    border-color var(--fa-duration-fast) var(--fa-easing-standard),
+    background-color var(--fa-duration-fast) var(--fa-easing-standard);
+}
+
+.fa-competition-picker__option:hover {
+  border-color: var(--fa-color-border-strong);
+  background-color: var(--fa-color-background-elevated);
+}
+
+.fa-competition-picker__option--checked {
+  border-color: var(--fa-color-accent);
+  background-color: color-mix(in srgb, var(--fa-color-accent) 12%, var(--fa-color-input-bg));
+}
+
+.fa-competition-picker__option input[type="checkbox"] {
+  width: 1.15rem;
+  height: 1.15rem;
+  margin: 0;
+  flex-shrink: 0;
+  accent-color: var(--fa-color-accent);
+  cursor: pointer;
+}
+
+.fa-competition-picker__label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  min-width: 0;
+}
+
+.fa-competition-picker__name {
+  color: var(--fa-color-foreground);
+  font-size: var(--fa-text-sm);
+  font-weight: 600;
+}
+
+.fa-competition-picker__country {
+  color: var(--fa-color-foreground-muted);
+  font-size: var(--fa-text-xs);
+}
+
+.fa-starter-slot__trigger {
+  display: flex;
+  align-items: center;
+  text-align: left;
+  cursor: pointer;
+}
+
+.fa-starter-slot__list {
+  list-style: none;
+  margin: var(--fa-space-xs) 0 0;
+  padding: var(--fa-space-xs);
+  display: grid;
+  gap: 2px;
+  border: 1px solid var(--fa-color-input-border);
+  border-radius: var(--fa-radius-md);
+  background-color: var(--fa-color-input-bg);
+}
+
+.fa-starter-slot__option {
+  width: 100%;
+  margin: 0;
+  padding: var(--fa-space-sm) var(--fa-space-md);
+  border: 0;
+  border-radius: var(--fa-radius-sm);
+  background: transparent;
+  color: var(--fa-color-foreground);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.fa-starter-slot__option:hover,
+.fa-starter-slot__option[aria-selected="true"] {
+  background-color: color-mix(in srgb, var(--fa-color-accent) 12%, var(--fa-color-input-bg));
+}
+
+.fa-starter-slot__label {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--fa-space-xs);
+}
+
+.fa-bench-order {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: var(--fa-space-xs);
+}
+
+.fa-bench-order__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-start;
+  gap: var(--fa-space-sm);
+  padding: var(--fa-space-xs) 0;
+  border-bottom: 1px solid var(--fa-color-border);
+}
+
+.fa-bench-order__row--overflow {
+  opacity: 0.65;
+}
+
+.fa-bench-order__player {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--fa-space-xs);
+}
+
+.fa-bench-order__position {
+  flex: 0 0 auto;
+}
+
+.fa-bench-order__position .fa-field {
+  margin: 0;
+}
+
+.fa-bench-order__select {
+  width: auto;
+  min-width: 4.75rem;
+  min-height: 2.25rem;
+  padding-top: var(--fa-space-xs);
+  padding-bottom: var(--fa-space-xs);
+}
+
+.fa-bench-order__hint {
+  font-size: var(--fa-text-xs);
+  color: var(--fa-color-foreground-muted);
 }

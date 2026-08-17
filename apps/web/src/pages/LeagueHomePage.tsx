@@ -57,6 +57,8 @@ const DEMO_LEAGUE: LeagueDetail = {
       forwards: 10,
     },
     totalCredits: 1000,
+    minFixturesPerRound: 25,
+    minutesThreshold: 15,
     options: { allowTrades: true, allowManualInvites: true },
   },
 };
@@ -342,20 +344,15 @@ export function LeagueHomePage() {
             <h2 id="league-home-next-title">Prossime fasi</h2>
             <p>Funzioni di gioco disponibili dalla prossima fase.</p>
             <div className="fa-ds-showcase__row">
-              <Button type="button" variant="ghost" disabled data-testid="league-home-roster-soon">
-                Rosa — disponibile dalla prossima fase
-              </Button>
-              <Button
-                type="button"
-                variant="ghost"
-                disabled
-                data-testid="league-home-formation-soon"
-              >
-                Formazione — disponibile dalla prossima fase
-              </Button>
-              <Button type="button" variant="ghost" disabled data-testid="league-home-matchday-soon">
-                Turni — disponibile dalla prossima fase
-              </Button>
+              <Link to="/rosa" data-testid="league-home-roster-link">
+                Vai alla rosa
+              </Link>
+              <Link to="/formazione" data-testid="league-home-formation-link">
+                Vai alla formazione
+              </Link>
+              <Link to="/turni" data-testid="league-home-matchday-link">
+                Vai ai turni
+              </Link>
             </div>
           </section>
         </div>

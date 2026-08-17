@@ -46,6 +46,8 @@ class LeagueRulesResponse(ApiModel):
     participant_max: int = Field(alias="participantMax")
     roster: LeagueRosterConfig
     total_credits: int = Field(alias="totalCredits")
+    min_fixtures_per_round: int = Field(alias="minFixturesPerRound")
+    minutes_threshold: int = Field(alias="minutesThreshold")
     options: LeagueRulesOptions
 
 
@@ -70,6 +72,8 @@ class UpdateLeagueRulesRequest(ApiModel):
     participant_count: int = Field(alias="participantCount")
     roster: LeagueRosterConfig
     total_credits: int = Field(alias="totalCredits")
+    min_fixtures_per_round: int | None = Field(default=None, alias="minFixturesPerRound")
+    minutes_threshold: int | None = Field(default=None, alias="minutesThreshold")
     options: LeagueRulesOptions
 
 
@@ -253,3 +257,20 @@ class LeagueListoneRefreshResponse(ApiModel):
     refreshed_at: datetime = Field(alias="refreshedAt")
     message: str
     counters: LeagueListoneRefreshCounters
+
+
+class LeagueListoneRefreshJobResponse(ApiModel):
+    job_id: str = Field(alias="jobId")
+    status: str
+    message: str
+
+
+class LeagueListoneRefreshProgressResponse(ApiModel):
+    job_id: str = Field(alias="jobId")
+    league_id: str = Field(alias="leagueId")
+    status: str
+    percent: int
+    stage: str
+    message: str
+    error_code: str | None = Field(default=None, alias="errorCode")
+    result: LeagueListoneRefreshResponse | None = None

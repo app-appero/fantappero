@@ -277,6 +277,67 @@ def test_update_league_rules_persists_and_audits(
     assert audit[-1].actor_id == user_id
 
 
+def test_update_league_rules_persists_minutes_threshold(
+    client: TestClient,
+    db_session: Session,
+    competition_ids: list[str],
+) -> None:
+    token, _ = _register_and_login(client, "rules.minutes@example.com")
+    created = client.post(
+        "/leagues",
+        headers={"Authorization": f"Bearer {token}"},
+        json={
+            "name": "Lega Soglia Minuti",
+            "seasonYear": 2026,
+            "competitionIds": competition_ids,
+        },
+    )
+    league_id = created.json()["id"]
+    payload = _standard_rules_payload()
+    payload["minutesThreshold"] = 20
+
+    updated = client.put(
+        f"/leagues/{league_id}/amministrazione/regolamento",
+        headers={"Authorization": f"Bearer {token}"},
+        json=payload,
+    )
+    assert updated.status_code == 200
+    assert updated.json()["minutesThreshold"] == 20
+
+    persisted = db_session.scalars(
+        select(LeagueRules).where(LeagueRules.league_id == UUID(league_id)),
+    ).first()
+    assert persisted is not None
+    assert persisted.minutes_threshold == 20
+
+
+def test_update_league_rules_rejects_invalid_minutes_threshold(
+    client: TestClient,
+    competition_ids: list[str],
+) -> None:
+    token, _ = _register_and_login(client, "rules.minutes.invalid@example.com")
+    created = client.post(
+        "/leagues",
+        headers={"Authorization": f"Bearer {token}"},
+        json={
+            "name": "Lega Soglia Invalida",
+            "seasonYear": 2026,
+            "competitionIds": competition_ids,
+        },
+    )
+    league_id = created.json()["id"]
+    payload = _standard_rules_payload()
+    payload["minutesThreshold"] = 0
+
+    updated = client.put(
+        f"/leagues/{league_id}/amministrazione/regolamento",
+        headers={"Authorization": f"Bearer {token}"},
+        json=payload,
+    )
+    assert updated.status_code == 400
+    assert updated.json()["code"] == "invalid_minutes_threshold"
+
+
 def test_update_league_rules_rejects_invalid_participants(
     client: TestClient,
     competition_ids: list[str],

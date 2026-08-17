@@ -124,3 +124,62 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
   }
   return payload as T;
 }
+
+type UploadOptions = {
+  accessToken: string;
+  file: { uri: string; name: string; type?: string };
+  fieldName?: string;
+};
+
+export async function apiUpload<T>(path: string, options: UploadOptions): Promise<T> {
+  const baseUrl = resolveApiBaseUrl();
+  const url = `${baseUrl}${path}`;
+  const formData = new FormData();
+  formData.append(options.fieldName ?? "file", {
+    uri: options.file.uri,
+    name: options.file.name,
+    type: options.file.type ?? "text/csv",
+  } as unknown as Blob);
+
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      method: "POST",
+      headers: {
+        Accept: "application/json",
+        Authorization: `Bearer ${options.accessToken}`,
+      },
+      body: formData,
+    });
+  } catch (error) {
+    if (error instanceof ApiError) {
+      throw error;
+    }
+    throw new ApiError(
+      `Connessione non disponibile verso ${baseUrl}. Verifica rete e EXPO_PUBLIC_API_BASE_URL.`,
+      0,
+      "network_error",
+    );
+  }
+
+  let payload: FastApiErrorBody | T;
+  try {
+    payload = (await response.json()) as FastApiErrorBody | T;
+  } catch {
+    throw new ApiError(
+      `Risposta non valida dall'API (HTTP ${response.status}).`,
+      response.status,
+      "invalid_response",
+    );
+  }
+
+  if (!response.ok) {
+    const errorPayload = payload as FastApiErrorBody;
+    throw new ApiError(
+      extractErrorMessage(errorPayload, response.status),
+      response.status,
+      errorPayload.code ?? "unknown_error",
+    );
+  }
+  return payload as T;
+}

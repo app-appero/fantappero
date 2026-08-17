@@ -37,6 +37,8 @@ const DEMO_RULES: LeagueRules = {
     forwards: 10,
   },
   totalCredits: 1000,
+  minFixturesPerRound: 25,
+  minutesThreshold: 15,
   options: {
     allowTrades: true,
     allowManualInvites: true,
@@ -63,6 +65,8 @@ function buildPayloadFromRules(rules: LeagueRules): UpdateLeagueRulesRequest {
     participantCount: rules.participantCount,
     roster: { ...rules.roster },
     totalCredits: rules.totalCredits,
+    minFixturesPerRound: rules.minFixturesPerRound,
+    minutesThreshold: rules.minutesThreshold,
     options: { ...rules.options },
   };
 }
@@ -284,6 +288,19 @@ export function LeagueAdminPage() {
             value={String(rules.totalCredits)}
             onChange={(event) =>
               updateLocalRules({ totalCredits: Number(event.target.value) || 0 })
+            }
+          />
+
+          <Input
+            label="Soglia minuti per il voto"
+            name="minutesThreshold"
+            type="number"
+            min={1}
+            max={30}
+            disabled={!canConfigure}
+            value={String(rules.minutesThreshold)}
+            onChange={(event) =>
+              updateLocalRules({ minutesThreshold: Number(event.target.value) || 0 })
             }
           />
 

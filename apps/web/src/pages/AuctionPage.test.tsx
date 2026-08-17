@@ -37,7 +37,7 @@ function renderRoute(path: string) {
 }
 
 describe("AuctionPage layout + listone", () => {
-  it("admin: sessione + offerta + listone con Aggiorna", () => {
+  it("admin: sessione + offerta + listone senza Aggiorna", () => {
     const html = renderRoute("/asta?persona=admin");
     expect(html).toContain('data-testid="wireframe-region-auction-admin"');
     expect(html).toContain("Apri asta");
@@ -50,8 +50,7 @@ describe("AuctionPage layout + listone", () => {
     expect(html).toContain("Difensori");
     expect(html).toContain("Centrocampisti");
     expect(html).toContain("Attaccanti");
-    expect(html).toContain('data-testid="auction-listone-refresh"');
-    expect(html).toContain("Aggiorna");
+    expect(html).not.toContain('data-testid="auction-listone-refresh"');
   });
 
   it("member: offerta + listone senza admin e senza Aggiorna", () => {

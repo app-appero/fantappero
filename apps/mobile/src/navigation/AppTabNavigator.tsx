@@ -8,8 +8,11 @@ import { theme } from "@fantappero/ui/theme";
 import { AppDrawer } from "../components/AppDrawer";
 import { AppHeader } from "../layout/AppHeader";
 import { AuctionScreen } from "../screens/AuctionScreen";
+import { FormationScreen } from "../screens/FormationScreen";
 import { LeaguesScreen } from "../screens/LeaguesScreen";
+import { MatchdayScreen } from "../screens/MatchdayScreen";
 import { ProfileScreen } from "../screens/ProfileScreen";
+import { RosterScreen } from "../screens/RosterScreen";
 import { useAuthSession } from "../session/DemoSessionContext";
 import { WireframePlaceholderScreen } from "../wireframes/WireframePlaceholderScreen";
 import {
@@ -23,17 +26,8 @@ import { sceneBackgroundStyle } from "../theme/navigationTheme";
 const Tab = createBottomTabNavigator<AppTabParamList>();
 const { colors } = theme;
 
-function MatchdayScreen() {
-  return <WireframePlaceholderScreen screenId="matchday" />;
-}
 function StandingsScreen() {
   return <WireframePlaceholderScreen screenId="standings" />;
-}
-function RosterScreen() {
-  return <WireframePlaceholderScreen screenId="roster" />;
-}
-function FormationScreen() {
-  return <WireframePlaceholderScreen screenId="formation" />;
 }
 function MarketScreen() {
   return <WireframePlaceholderScreen screenId="market" />;

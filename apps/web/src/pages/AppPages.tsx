@@ -6,7 +6,7 @@ export {
   AuthVerifyEmailPage,
 } from "./auth/AuthPages";
 export { AuctionPage } from "./AuctionPage";
-export { FormationWireframe as FormationPage } from "../wireframes/screens/formation";
+export { FormationPage } from "./FormationPage";
 export { CreateLeaguePage } from "./CreateLeaguePage";
 export { LeagueAdminPage } from "./LeagueAdminPage";
 export { LeagueHomePage } from "./LeagueHomePage";
@@ -15,13 +15,13 @@ export { LeaguesPage } from "./LeaguesPage";
 export { ManagerDirectoryPage } from "./ManagerDirectoryPage";
 export { ReceivedInvitesPage } from "./ReceivedInvitesPage";
 export { MarketWireframe as MarketPage } from "../wireframes/screens/market";
-export { MatchdayWireframe as MatchdayPage } from "../wireframes/screens/matchday";
+export { MatchdayPage } from "./MatchdayPage";
 export {
   OperatorDashboardWireframe as AdminDashboardPage,
   OperatorLeaguesWireframe as AdminLeaguesPage,
   OperatorUsersWireframe as AdminUsersPage,
 } from "../wireframes/screens/operatorPanel";
-export { RosterWireframe as RosterPage } from "../wireframes/screens/roster";
+export { RosterPage } from "./RosterPage";
 export { StandingsWireframe as StandingsPage } from "../wireframes/screens/standings";
 
 export { NotFoundPage, ProfilePage } from "./ProfilePage";

@@ -34,7 +34,7 @@ def sync_mvp_fixtures_task(
     finally:
         engine.dispose()
     c = result.counters
-    return {
+    payload = {
         "fixtures_created": c.fixtures_created,
         "fixtures_updated": c.fixtures_updated,
         "events_created": c.events_created,
@@ -44,3 +44,14 @@ def sync_mvp_fixtures_task(
         "stats_created": c.stats_created,
         "stats_corrected": c.stats_corrected,
     }
+    if settings.fantasy_turns_auto_generate_enabled and (
+        c.fixtures_created > 0 or c.fixtures_updated > 0
+    ):
+        try:
+            from fantasy_turns.tasks import ensure_upcoming_fantasy_turns_task
+
+            ensure_upcoming_fantasy_turns_task.delay()
+        except Exception:
+            # Never fail fixture sync because turn ensure enqueue failed.
+            pass
+    return payload

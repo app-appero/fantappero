@@ -146,6 +146,9 @@ services:
       MAIL_FROM: ${MAIL_FROM:-noreply@fantappero.local}
       WEB_APP_BASE_URL: ${WEB_APP_BASE_URL:-http://localhost:5174}
       SPORTS_SCHEDULER_ENABLED: ${SPORTS_SCHEDULER_ENABLED:-false}
+      FANTASY_TURNS_AUTO_GENERATE_ENABLED: ${FANTASY_TURNS_AUTO_GENERATE_ENABLED:-true}
+      FANTASY_TURNS_AUTO_GENERATE_INTERVAL_SECONDS: ${FANTASY_TURNS_AUTO_GENERATE_INTERVAL_SECONDS:-3600}
+      FANTASY_TURNS_HORIZON_DAYS: ${FANTASY_TURNS_HORIZON_DAYS:-14}
     depends_on:
       postgres:
         condition: service_healthy
@@ -189,6 +192,9 @@ services:
       CELERY_BROKER_URL: redis://redis:6379/0
       CELERY_RESULT_BACKEND: redis://redis:6379/1
       SPORTS_SCHEDULER_ENABLED: ${SPORTS_SCHEDULER_ENABLED:-false}
+      FANTASY_TURNS_AUTO_GENERATE_ENABLED: ${FANTASY_TURNS_AUTO_GENERATE_ENABLED:-true}
+      FANTASY_TURNS_AUTO_GENERATE_INTERVAL_SECONDS: ${FANTASY_TURNS_AUTO_GENERATE_INTERVAL_SECONDS:-3600}
+      FANTASY_TURNS_HORIZON_DAYS: ${FANTASY_TURNS_HORIZON_DAYS:-14}
     depends_on:
       postgres:
         condition: service_healthy
@@ -216,6 +222,8 @@ services:
     restart: unless-stopped
     environment:
       VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://127.0.0.1:8001}
+      CHOKIDAR_USEPOLLING: "true"
+      WATCHPACK_POLLING: "true"
     ports:
       - "${WEB_PORT:-5174}:5174"
     volumes:

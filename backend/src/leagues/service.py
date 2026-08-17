@@ -17,6 +17,12 @@ from database.enums import (
     LeagueState,
     league_member_role_to_league_role,
 )
+from fantasy_teams.composition_service import activation_roster_and_credit_blockers
+from fantasy_teams.factory import ensure_team_for_membership
+from fantasy_teams.ledger import find_account_for_team
+from fantasy_ratings.eligibility import STANDARD_MINUTES_THRESHOLD
+from fantasy_turns.rules import STANDARD_MIN_FIXTURES
+from fantasy_turns.validators import validate_min_fixtures_per_round
 from leagues.calendar_service import league_has_confirmed_calendar
 from leagues.models.competition import Competition
 from leagues.models.league import League
@@ -56,6 +62,7 @@ from leagues.validators import (
     validate_league_deletable,
     validate_league_name,
     validate_league_transition,
+    validate_minutes_threshold,
     validate_participant_count,
     validate_preset_name,
     validate_season_year,
@@ -102,13 +109,12 @@ class LeagueService:
         self._session.add(league)
         self._session.flush()
 
-        self._session.add(
-            LeagueMembership(
-                league_id=league.id,
-                user_id=user.id,
-                role=LeagueMemberRole.OWNER,
-            ),
+        membership = LeagueMembership(
+            league_id=league.id,
+            user_id=user.id,
+            role=LeagueMemberRole.OWNER,
         )
+        self._session.add(membership)
         self._session.add(
             LeagueRules(
                 league_id=league.id,
@@ -120,11 +126,46 @@ class LeagueService:
                 midfielders=STANDARD_MIDFIELDERS,
                 forwards=STANDARD_FORWARDS,
                 total_credits=STANDARD_TOTAL_CREDITS,
+                min_fixtures_per_round=STANDARD_MIN_FIXTURES,
+                minutes_threshold=STANDARD_MINUTES_THRESHOLD,
                 allow_trades=True,
                 allow_manual_invites=True,
             ),
         )
         league.competitions = list(competitions)
+        self._session.flush()
+
+        team, created = ensure_team_for_membership(
+            self._session,
+            membership,
+            name=user.display_name,
+            roster_size=STANDARD_ROSTER_SIZE,
+            actor_id=user.id,
+        )
+        if created:
+            self._session.add(
+                LeagueAuditEvent(
+                    league_id=league.id,
+                    actor_id=user.id,
+                    action=LeagueAuditAction.FANTASY_TEAM_CREATED,
+                    correlation_id=get_correlation_id(),
+                    details={"fantasyTeamId": str(team.id), "membershipId": str(membership.id)},
+                ),
+            )
+            account = find_account_for_team(self._session, team.id)
+            if account is not None:
+                self._session.add(
+                    LeagueAuditEvent(
+                        league_id=league.id,
+                        actor_id=user.id,
+                        action=LeagueAuditAction.CREDIT_ACCOUNT_INITIALIZED,
+                        correlation_id=get_correlation_id(),
+                        details={
+                            "fantasyTeamId": str(team.id),
+                            "balance": account.balance,
+                        },
+                    ),
+                )
 
         self._session.add(
             LeagueAuditEvent(
@@ -231,10 +272,22 @@ class LeagueService:
         )
 
         rules = self._resolve_rules_for_league(league)
+        min_fixtures = (
+            validate_min_fixtures_per_round(payload.min_fixtures_per_round)
+            if payload.min_fixtures_per_round is not None
+            else rules.min_fixtures_per_round
+        )
+        minutes_threshold = (
+            validate_minutes_threshold(payload.minutes_threshold)
+            if payload.minutes_threshold is not None
+            else rules.minutes_threshold
+        )
         changed = (
             rules.preset_name != preset_name
             or rules.participant_count != participant_count
             or rules.total_credits != total_credits
+            or rules.min_fixtures_per_round != min_fixtures
+            or rules.minutes_threshold != minutes_threshold
             or rules.allow_trades != payload.options.allow_trades
             or rules.allow_manual_invites != payload.options.allow_manual_invites
         )
@@ -250,6 +303,8 @@ class LeagueService:
         rules.midfielders = payload.roster.midfielders
         rules.forwards = payload.roster.forwards
         rules.total_credits = total_credits
+        rules.min_fixtures_per_round = min_fixtures
+        rules.minutes_threshold = minutes_threshold
         rules.allow_trades = payload.options.allow_trades
         rules.allow_manual_invites = payload.options.allow_manual_invites
         self._session.add(
@@ -356,6 +411,7 @@ class LeagueService:
         if league.state == LeagueState.AUCTION:
             return auction_activation_blockers(
                 calendar_configured=league_has_confirmed_calendar(self._session, league.id),
+                roster_blockers=activation_roster_and_credit_blockers(self._session, league),
             )
         return []
 
@@ -428,6 +484,8 @@ class LeagueService:
                 forwards=rules.forwards,
             ),
             totalCredits=rules.total_credits,
+            minFixturesPerRound=rules.min_fixtures_per_round,
+            minutesThreshold=rules.minutes_threshold,
             options=LeagueRulesOptions(
                 allowTrades=rules.allow_trades,
                 allowManualInvites=rules.allow_manual_invites,

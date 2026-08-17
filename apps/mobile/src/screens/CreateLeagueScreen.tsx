@@ -14,25 +14,34 @@ import { getApiErrorMessage, useAuthSession } from "../session/DemoSessionContex
 
 const { colors, spacing, typography, radius } = theme;
 
+/** Anno di avvio stagione corrente (API: singolo intero; UI: YYYY-YYYY+1). */
+export function currentSeasonYear(now = new Date()): number {
+  return now.getFullYear();
+}
+
+export function formatSeasonLabel(seasonYear: number): string {
+  return `${seasonYear}-${seasonYear + 1}`;
+}
+
 /** Creazione lega privata in bozza (EP03-01). */
 export function CreateLeagueScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { can, accessToken, registerLeague, refreshMemberships } = useAuthSession();
-  const seasonOptions = useMemo(() => {
-    const currentYear = new Date().getFullYear();
-    return [currentYear - 1, currentYear, currentYear + 1];
-  }, []);
+  const seasonYear = useMemo(() => currentSeasonYear(), []);
+  const seasonLabel = useMemo(() => formatSeasonLabel(seasonYear), [seasonYear]);
 
   const [competitions, setCompetitions] = useState<CompetitionSummary[]>([]);
   const [loadingCatalog, setLoadingCatalog] = useState(true);
   const [catalogError, setCatalogError] = useState<string | null>(null);
   const [name, setName] = useState("");
-  const [seasonYear, setSeasonYear] = useState(String(new Date().getFullYear()));
   const [selected, setSelected] = useState<Record<string, boolean>>({});
   const [formError, setFormError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [createdLeague, setCreatedLeague] = useState<LeagueDetail | null>(null);
   const [directoryCompleted, setDirectoryCompleted] = useState(false);
+
+  const selectedCount = competitions.filter((row) => selected[row.id]).length;
+  const allSelected = competitions.length > 0 && selectedCount === competitions.length;
 
   const loadCatalog = useCallback(
     async (options?: { silent?: boolean }) => {
@@ -75,6 +84,18 @@ export function CreateLeagueScreen() {
     setSelected((current) => ({ ...current, [id]: !current[id] }));
   }
 
+  function toggleSelectAll() {
+    if (allSelected) {
+      setSelected({});
+      return;
+    }
+    const next: Record<string, boolean> = {};
+    for (const row of competitions) {
+      next[row.id] = true;
+    }
+    setSelected(next);
+  }
+
   async function handleSubmit() {
     setFormError(null);
     if (!name.trim()) {
@@ -96,7 +117,7 @@ export function CreateLeagueScreen() {
     try {
       const created = await createLeague(accessToken, {
         name: name.trim(),
-        seasonYear: Number(seasonYear),
+        seasonYear,
         competitionIds: selectedIds,
       });
       registerLeague({
@@ -215,38 +236,51 @@ export function CreateLeagueScreen() {
           />
 
           <Text style={styles.label}>Stagione</Text>
-          <View style={styles.seasonRow}>
-            {seasonOptions.map((year) => {
-              const selectedSeason = seasonYear === String(year);
-              return (
-                <Pressable
-                  key={year}
-                  accessibilityRole="button"
-                  onPress={() => setSeasonYear(String(year))}
-                  style={[styles.seasonChip, selectedSeason && styles.seasonChipSelected]}
-                  testID={`create-league-season-${year}`}
-                >
-                  <Text style={[styles.seasonLabel, selectedSeason && styles.seasonLabelSelected]}>
-                    {year}
-                  </Text>
-                </Pressable>
-              );
-            })}
+          <View style={styles.seasonReadonly} testID="create-league-season">
+            <Text style={styles.seasonReadonlyLabel}>{seasonLabel}</Text>
+            <Text style={styles.seasonHint}>Stagione sportiva corrente</Text>
           </View>
 
-          <Text style={styles.label}>Campionati (minimo 3)</Text>
-          {competitions.map((competition) => (
-            <View key={competition.id} style={styles.competitionRow}>
-              <Switch
-                value={Boolean(selected[competition.id])}
-                onValueChange={() => toggleCompetition(competition.id)}
-                testID={`create-league-competition-${competition.id}`}
-              />
-              <Text style={styles.competitionLabel}>
-                {competition.name} ({competition.country})
+          <View style={styles.competitionHeader}>
+            <Text style={styles.label}>Campionati (minimo 3)</Text>
+            <Pressable
+              accessibilityRole="button"
+              onPress={toggleSelectAll}
+              testID="create-league-select-all"
+              hitSlop={8}
+            >
+              <Text style={styles.selectAllLabel}>
+                {allSelected ? "Deseleziona tutto" : "Seleziona tutto"}
               </Text>
-            </View>
-          ))}
+            </Pressable>
+          </View>
+          <Text style={styles.competitionCount}>
+            {selectedCount} di {competitions.length} selezionati
+          </Text>
+          {competitions.map((competition) => {
+            const isSelected = Boolean(selected[competition.id]);
+            return (
+              <Pressable
+                key={competition.id}
+                accessibilityRole="checkbox"
+                accessibilityState={{ checked: isSelected }}
+                onPress={() => toggleCompetition(competition.id)}
+                style={[styles.competitionRow, isSelected && styles.competitionRowSelected]}
+                testID={`create-league-competition-${competition.id}`}
+              >
+                <Switch
+                  value={isSelected}
+                  onValueChange={() => toggleCompetition(competition.id)}
+                  trackColor={{ false: colors.border, true: colors.accent }}
+                  pointerEvents="none"
+                />
+                <View style={styles.competitionText}>
+                  <Text style={styles.competitionLabel}>{competition.name}</Text>
+                  <Text style={styles.competitionCountry}>{competition.country}</Text>
+                </View>
+              </Pressable>
+            );
+          })}
 
           <Pressable
             accessibilityRole="button"
@@ -285,42 +319,70 @@ const styles = StyleSheet.create({
     color: colors.foreground,
     backgroundColor: colors.backgroundElevated,
   },
-  seasonRow: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: spacing.xs,
-  },
-  seasonChip: {
+  seasonReadonly: {
     minHeight: 44,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    borderRadius: radius.md,
     borderWidth: 1,
     borderColor: colors.border,
-    justifyContent: "center",
-  },
-  seasonChipSelected: {
-    borderColor: colors.accent,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
     backgroundColor: colors.backgroundElevated,
+    gap: 2,
   },
-  seasonLabel: {
-    color: colors.foregroundMuted,
-    fontSize: typography.fontSize.sm,
-  },
-  seasonLabelSelected: {
-    color: colors.accent,
+  seasonReadonlyLabel: {
+    color: colors.foreground,
+    fontSize: typography.fontSize.md,
     fontWeight: typography.fontWeight.semibold,
+  },
+  seasonHint: {
+    color: colors.foregroundMuted,
+    fontSize: typography.fontSize.xs,
+  },
+  competitionHeader: {
+    marginTop: spacing.sm,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: spacing.sm,
+  },
+  selectAllLabel: {
+    color: colors.accent,
+    fontSize: typography.fontSize.sm,
+    fontWeight: typography.fontWeight.semibold,
+  },
+  competitionCount: {
+    color: colors.foregroundMuted,
+    fontSize: typography.fontSize.xs,
+    marginBottom: spacing.xs,
   },
   competitionRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: spacing.sm,
     marginBottom: spacing.xs,
+    minHeight: 48,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    backgroundColor: colors.backgroundElevated,
+  },
+  competitionRowSelected: {
+    borderColor: colors.accent,
+  },
+  competitionText: {
+    flexShrink: 1,
+    gap: 2,
   },
   competitionLabel: {
     color: colors.foreground,
     fontSize: typography.fontSize.sm,
-    flexShrink: 1,
+    fontWeight: typography.fontWeight.semibold,
+  },
+  competitionCountry: {
+    color: colors.foregroundMuted,
+    fontSize: typography.fontSize.xs,
   },
   primaryButton: {
     marginTop: spacing.md,

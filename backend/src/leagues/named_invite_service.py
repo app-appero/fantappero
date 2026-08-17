@@ -21,6 +21,7 @@ from database.enums import (
     NamedInviteStatus,
     UserType,
 )
+from fantasy_teams.factory import ensure_team_for_membership
 from leagues.models.league import League
 from leagues.models.league_audit_event import LeagueAuditEvent
 from leagues.models.league_membership import LeagueMembership
@@ -331,13 +332,32 @@ class NamedLeagueInviteService:
             existing = self._membership(league.id, user.id)
             if existing is None:
                 self._require_capacity(league, include_pending=False)
-                self._session.add(
-                    LeagueMembership(
-                        league_id=league.id,
-                        user_id=user.id,
-                        role=LeagueMemberRole.MEMBER,
-                    )
+                membership = LeagueMembership(
+                    league_id=league.id,
+                    user_id=user.id,
+                    role=LeagueMemberRole.MEMBER,
                 )
+                self._session.add(membership)
+                self._session.flush()
+                team, created = ensure_team_for_membership(
+                    self._session,
+                    membership,
+                    name=user.display_name,
+                    actor_id=user.id,
+                )
+                if created:
+                    self._session.add(
+                        LeagueAuditEvent(
+                            league_id=league.id,
+                            actor_id=user.id,
+                            action=LeagueAuditAction.FANTASY_TEAM_CREATED,
+                            correlation_id=get_correlation_id(),
+                            details={
+                                "fantasyTeamId": str(team.id),
+                                "membershipId": str(membership.id),
+                            },
+                        )
+                    )
             audit_action = LeagueAuditAction.NAMED_INVITE_ACCEPTED
         else:
             audit_action = LeagueAuditAction.NAMED_INVITE_DECLINED

@@ -5,6 +5,7 @@ from __future__ import annotations
 from celery import Celery
 
 from config.settings.loader import validate_worker_settings
+from fantasy_turns.schedule import fantasy_turns_beat_schedule
 from observability.celery_signals import register_celery_observability
 from observability.error_tracking import configure_error_tracking
 from observability.logging import configure_logging
@@ -17,19 +18,30 @@ configure_error_tracking(
     dsn=_worker_settings.error_tracking_dsn,
 )
 
+_beat_schedule: dict = {}
+_beat_schedule.update(
+    beat_schedule_entries(
+        enabled=_worker_settings.sports_scheduler_enabled,
+        live_interval=_worker_settings.sports_poll_live_interval_seconds,
+        pre_interval=_worker_settings.sports_poll_pre_interval_seconds,
+        post_interval=_worker_settings.sports_poll_post_interval_seconds,
+        late_interval=_worker_settings.sports_poll_late_interval_seconds,
+    )
+)
+_beat_schedule.update(
+    fantasy_turns_beat_schedule(
+        enabled=_worker_settings.fantasy_turns_auto_generate_enabled,
+        interval_seconds=_worker_settings.fantasy_turns_auto_generate_interval_seconds,
+    )
+)
+
 celery_app = Celery("fantappero")
 celery_app.conf.update(
     broker_url=_worker_settings.resolved_broker_url(),
     result_backend=_worker_settings.resolved_result_backend(),
     task_always_eager=_worker_settings.fantappero_env.value == "test",
     broker_connection_retry_on_startup=True,
-    beat_schedule=beat_schedule_entries(
-        enabled=_worker_settings.sports_scheduler_enabled,
-        live_interval=_worker_settings.sports_poll_live_interval_seconds,
-        pre_interval=_worker_settings.sports_poll_pre_interval_seconds,
-        post_interval=_worker_settings.sports_poll_post_interval_seconds,
-        late_interval=_worker_settings.sports_poll_late_interval_seconds,
-    ),
+    beat_schedule=_beat_schedule,
 )
 register_celery_observability(celery_app)
 
@@ -47,6 +59,9 @@ def fail() -> None:
 
 
 # Register task modules for the worker process (import side effects).
+import fantasy_ratings.tasks  # noqa: E402, F401
+import fantasy_turns.tasks  # noqa: E402, F401
+import leagues.listone_tasks  # noqa: E402, F401
 import mail.tasks  # noqa: E402, F401
 import sports_data.catalog.tasks  # noqa: E402, F401
 import sports_data.fixtures.tasks  # noqa: E402, F401

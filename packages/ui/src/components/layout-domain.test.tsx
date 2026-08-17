@@ -129,6 +129,7 @@ describe("EPUI-03 domain components", () => {
     expect(html).toContain('data-testid="player-card"');
     expect(html).toContain('data-testid="match-card"');
     expect(html).toContain('data-testid="formation-view"');
+    expect(html).toContain("fa-badge--success");
     expect(html).toContain('data-testid="result-card"');
     expect(html).toContain('data-testid="anomaly-indicator"');
   });

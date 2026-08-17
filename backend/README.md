@@ -116,3 +116,10 @@ python -m pytest
 ```
 
 Config: [`experiments/rating_beta/config/beta-v0.1.yaml`](../experiments/rating_beta/config/beta-v0.1.yaml) · Report: [`experiments/rating_beta/reports/rating_beta_v0.1.md`](../experiments/rating_beta/reports/rating_beta_v0.1.md).
+
+Voto statistico persistito (EP07-01): [`docs/api/fantasy_ratings.md`](../docs/api/fantasy_ratings.md)
+
+```bash
+docker compose --env-file infra/local/.env.example run --rm api sh -lc \
+  'DATABASE_URL="$TEST_DATABASE_URL" python -m pytest tests/unit/fantasy_ratings tests/integration/fantasy_ratings -ra'
+```

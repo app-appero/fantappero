@@ -42,6 +42,8 @@ from leagues.schemas import (
     LeagueInviteResponse,
     LeagueLifecycleResponse,
     LeagueListoneEntryResponse,
+    LeagueListoneRefreshJobResponse,
+    LeagueListoneRefreshProgressResponse,
     LeagueListoneRefreshResponse,
     LeagueMemberResponse,
     LeagueRulesResponse,
@@ -387,15 +389,31 @@ def list_league_listone(
 
 @router.post(
     "/{league_id}/amministrazione/listone/aggiorna",
-    response_model=LeagueListoneRefreshResponse,
+    response_model=LeagueListoneRefreshJobResponse,
 )
 def refresh_league_listone(
     league_access: LeagueAccess = Depends(require_league_permissions(Permission.LEAGUE_ADMIN)),
     service: LeagueListoneService = Depends(get_league_listone_service),
-) -> LeagueListoneRefreshResponse | JSONResponse:
-    """Sincronizza roster da API-Football e rigenera il listone ufficiale."""
+) -> LeagueListoneRefreshJobResponse | JSONResponse:
+    """Avvia sync async catalogo+rose MVP e generazione listone (poll progresso)."""
     try:
-        return service.refresh_from_provider(league_access)
+        return service.start_refresh_job(league_access)
+    except AuthError as exc:
+        return _error_response(exc)
+
+
+@router.get(
+    "/{league_id}/amministrazione/listone/aggiorna/{job_id}",
+    response_model=LeagueListoneRefreshProgressResponse,
+)
+def get_league_listone_refresh_progress(
+    job_id: UUID,
+    league_access: LeagueAccess = Depends(require_league_permissions(Permission.LEAGUE_ADMIN)),
+    service: LeagueListoneService = Depends(get_league_listone_service),
+) -> LeagueListoneRefreshProgressResponse | JSONResponse:
+    """Stato percentuale di un job di aggiornamento listone."""
+    try:
+        return service.get_refresh_progress(league_access, str(job_id))
     except AuthError as exc:
         return _error_response(exc)
 

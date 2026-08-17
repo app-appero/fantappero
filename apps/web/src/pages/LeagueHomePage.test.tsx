@@ -93,7 +93,9 @@ describe("EP03-UX-02 league home", () => {
     expect(html).toContain('data-testid="league-home-content"');
     expect(html).toContain("Regolamento");
     expect(html).toContain('data-testid="league-home-members-list"');
-    expect(html).toContain("disponibile dalla prossima fase");
+    expect(html).toContain('data-testid="league-home-roster-link"');
+    expect(html).toContain('data-testid="league-home-formation-link"');
+    expect(html).toContain("Vai alla formazione");
   });
 
   it("shows admin link for admin persona", () => {

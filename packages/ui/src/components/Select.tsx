@@ -47,10 +47,10 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(function Select
         ref={ref}
         id={id}
         className={classNames("fa-select", className)}
-        disabled={disabled}
         aria-invalid={error ? true : undefined}
         aria-describedby={describedBy}
         {...rest}
+        disabled={disabled}
       >
         {placeholder ? (
           <option value="" disabled>

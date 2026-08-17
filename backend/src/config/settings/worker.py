@@ -5,11 +5,17 @@ from __future__ import annotations
 from pydantic import Field, field_validator, model_validator
 
 from config.settings.base import BaseAppSettings, require_non_empty
+from config.settings.fantasy_turns_settings import FantasyTurnsSettingsMixin
 from config.settings.mail import MailSettingsMixin
 from config.settings.scheduler_settings import SportsSchedulerSettingsMixin
 
 
-class WorkerSettings(BaseAppSettings, MailSettingsMixin, SportsSchedulerSettingsMixin):
+class WorkerSettings(
+    BaseAppSettings,
+    MailSettingsMixin,
+    SportsSchedulerSettingsMixin,
+    FantasyTurnsSettingsMixin,
+):
     """Configuration consumed by the Celery worker / beat."""
 
     database_url: str | None = Field(default=None, validation_alias="DATABASE_URL")

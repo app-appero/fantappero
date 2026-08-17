@@ -46,7 +46,12 @@ Posizioni ambigue non mappate (es. Wing Back) restano fuori listone (`skipped_un
 | `PUT` | `/leagues/{id}/amministrazione/listone/{athleteId}/ruolo` | `league:admin` |
 | `DELETE` | `/leagues/{id}/amministrazione/listone/{athleteId}/ruolo` | `league:admin` |
 
-`POST …/aggiorna` (sincrono): sync catalogo se assente → `sync_mvp_roster_with_client` (API-Football) → `generate_official_listone`. Richiede `API_FOOTBALL_KEY` sul backend. UI Asta web `/asta`: in alto gestionale sessione + offerta busta (placeholder), sotto listone + «Aggiorna». Mobile: stesso ordine (placeholder + listone demo); sync live solo via API/web.
+`POST …/aggiorna` (async): **sempre** sync catalogo MVP → `sync_mvp_roster_with_client(season_year)`
+(API-Football, tutte le rose dei club censiti) → `generate_official_listone`.
+Progresso pollabile su `GET …/aggiorna/{jobId}` (`percent` 0–100).
+Richiede `API_FOOTBALL_KEY` sul backend e worker Celery.
+Il sync non è esposto in UI Asta/Rosa (ruolo operatore / pannello qualità dati — EP04-07 / EP11-04);
+in locale si usano gli script sotto.
 
 Audit: `league_role_override_set` / `league_role_override_cleared` / `league_listone_refreshed`.
 

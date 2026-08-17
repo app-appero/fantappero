@@ -6,6 +6,19 @@ from auth.models.privacy_audit_event import PrivacyAuditEvent
 from auth.models.user import User
 from auth.models.user_profile import UserProfile
 from database.models.infrastructure import SystemFlag
+from fantasy_lineups.models import LineupDraft, LineupPlayer, LineupSubmission, TacticalMove
+from fantasy_ratings.models import PlayerMatchRating
+from fantasy_teams.models import (
+    CreditAccount,
+    CreditLedgerEntry,
+    FantasyRosterSlot,
+    FantasyTeam,
+    RosterImportSession,
+    RosterOwnershipInterval,
+    RosterTurnSnapshot,
+    RosterTurnSnapshotEntry,
+)
+from fantasy_turns.models import FantasyRound, FantasyRoundFixture
 from leagues.models.competition import Competition
 from leagues.models.league import League
 from leagues.models.league_audit_event import LeagueAuditEvent
@@ -36,6 +49,12 @@ __all__ = [
     "Club",
     "Competition",
     "CompetitionSeasonClub",
+    "CreditAccount",
+    "CreditLedgerEntry",
+    "FantasyRosterSlot",
+    "FantasyRound",
+    "FantasyRoundFixture",
+    "FantasyTeam",
     "Fixture",
     "League",
     "LeagueAuditEvent",
@@ -46,14 +65,23 @@ __all__ = [
     "LeagueMembership",
     "LeagueRoleOverride",
     "LeagueRules",
+    "LineupDraft",
+    "LineupPlayer",
+    "LineupSubmission",
+    "TacticalMove",
     "MatchEvent",
     "NamedLeagueInvite",
     "OfficialLineup",
     "OfficialLineupEntry",
+    "PlayerMatchRating",
     "PlayerMatchStat",
     "PrivacyAuditEvent",
     "ProviderSnapshot",
     "RoleAssignment",
+    "RosterImportSession",
+    "RosterOwnershipInterval",
+    "RosterTurnSnapshot",
+    "RosterTurnSnapshotEntry",
     "SportsDataQualityIssue",
     "SportsDataSyncRetry",
     "SquadMembership",

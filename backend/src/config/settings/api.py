@@ -7,6 +7,7 @@ from pydantic_settings import SettingsConfigDict
 
 from config.settings.auth_settings import AuthSettingsMixin
 from config.settings.base import BaseAppSettings, require_non_empty
+from config.settings.fantasy_turns_settings import FantasyTurnsSettingsMixin
 from config.settings.mail import MailSettingsMixin
 from config.settings.profile_settings import ProfileSettingsMixin
 from config.settings.scheduler_settings import SportsSchedulerSettingsMixin
@@ -18,6 +19,7 @@ class ApiSettings(
     MailSettingsMixin,
     ProfileSettingsMixin,
     SportsSchedulerSettingsMixin,
+    FantasyTurnsSettingsMixin,
 ):
     """Configuration consumed by the API service."""
 

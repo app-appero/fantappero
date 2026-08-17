@@ -542,8 +542,34 @@
 
 .fa-formation-view__bench-list {
   margin: 0;
-  padding-left: var(--fa-space-lg);
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: var(--fa-space-xs);
   font-size: var(--fa-text-sm);
+  color: var(--fa-color-foreground);
+}
+
+.fa-formation-view__bench-item {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--fa-space-xs);
+}
+
+.fa-formation-view__bench-item--overflow {
+  opacity: 0.65;
+}
+
+.fa-formation-view__bench-index {
+  font-variant-numeric: tabular-nums;
+  min-width: 1.5rem;
+  color: var(--fa-color-foreground-muted);
+}
+
+.fa-formation-view__bench-hint {
+  margin-left: auto;
+  font-size: var(--fa-text-xs);
   color: var(--fa-color-foreground-muted);
 }
 
