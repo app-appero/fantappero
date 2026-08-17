@@ -241,6 +241,29 @@ class RoundMatchResultResponse(ApiModel):
     computed_at: datetime | None = Field(default=None, alias="computedAt")
 
 
+class ComputeStandingsResponse(ApiModel):
+    league_id: str = Field(alias="leagueId")
+    teams: int
+    matches_considered: int = Field(alias="matchesConsidered")
+    created: int
+    updated: int
+    unchanged: int
+    removed: int
+
+
+class LeagueStandingResponse(ApiModel):
+    fantasy_team_id: str = Field(alias="fantasyTeamId")
+    position: int
+    played: int
+    won: int
+    drawn: int
+    lost: int
+    fantasy_goals_for: int = Field(alias="fantasyGoalsFor")
+    fantasy_goals_against: int = Field(alias="fantasyGoalsAgainst")
+    points: int
+    computed_at: datetime = Field(alias="computedAt")
+
+
 class LeagueListoneOverrideResponse(ApiModel):
     role: Literal["P", "D", "C", "A"]
     effective_from_round: int | None = Field(alias="effectiveFromRound")

@@ -1,4 +1,4 @@
-"""Integration tests for round-level H2H scoring (EP07-05 / FR-SCO-03)."""
+"""Integration tests for round-level H2H scoring and standings (EP07-05 / EP07-06)."""
 
 from __future__ import annotations
 
@@ -31,8 +31,10 @@ from leagues.models.league import League
 from leagues.models.league_calendar import LeagueCalendar, LeagueCalendarSlot
 from leagues.models.league_membership import LeagueMembership
 from leagues.models.league_rules import LeagueRules
+from leagues.models.league_standing import LeagueStanding
 from leagues.scoring import fantasy_goals_for_points
 from leagues.scoring_service import compute_round_results
+from leagues.standings_service import compute_league_standings
 from sports_data.catalog.sync import TeamsBatch, sync_catalog
 from sports_data.fixtures.models import Fixture
 from sports_data.fixtures.sync import FixtureDetailBatch, sync_fixtures
@@ -362,3 +364,73 @@ def test_compute_round_results_skips_team_without_effective_lineup(db_session: S
     assert result.matchups == 1
     assert result.counters.skipped == 1
     assert result.counters.created == 0
+
+
+def test_compute_league_standings_after_round_results(db_session: Session) -> None:
+    """EP07-06: la classifica riflette il risultato finale dello scontro diretto."""
+    _seed_catalog(db_session)
+    db_session.commit()
+    fixture = _sync_match(db_session)
+    db_session.commit()
+    compute_fixture_ratings(db_session, fixture_id=fixture.id)
+    db_session.commit()
+
+    fantasy_round, teams = _build_two_team_round(db_session, fixture)
+    compute_round_effective_lineups(db_session, round_id=fantasy_round.id)
+    db_session.commit()
+    compute_round_results(db_session, round_id=fantasy_round.id)
+    db_session.commit()
+
+    result = compute_league_standings(db_session, league_id=fantasy_round.league_id)
+    db_session.commit()
+
+    assert result.teams == 2
+    assert result.matches_considered == 1
+    assert result.counters.created == 2
+
+    calendar = db_session.scalars(
+        select(LeagueCalendar).where(LeagueCalendar.league_id == fantasy_round.league_id)
+    ).one()
+    slot = db_session.scalars(
+        select(LeagueCalendarSlot).where(LeagueCalendarSlot.calendar_id == calendar.id)
+    ).one()
+
+    standings = {
+        row.fantasy_team_id: row
+        for row in db_session.scalars(
+            select(LeagueStanding).where(LeagueStanding.league_id == fantasy_round.league_id)
+        ).all()
+    }
+    west_ham_standing = standings[teams["west_ham"].id]
+    chelsea_standing = standings[teams["chelsea"].id]
+
+    assert west_ham_standing.played == 1
+    assert chelsea_standing.played == 1
+    assert west_ham_standing.fantasy_goals_for == slot.home_fantasy_goals
+    assert west_ham_standing.fantasy_goals_against == slot.away_fantasy_goals
+    assert chelsea_standing.fantasy_goals_for == slot.away_fantasy_goals
+    assert chelsea_standing.fantasy_goals_against == slot.home_fantasy_goals
+    # Le due posizioni sono 1 e 2 in ordine coerente con l'esito.
+    assert {west_ham_standing.position, chelsea_standing.position} == {1, 2}
+    if slot.outcome == "home":
+        assert west_ham_standing.points == 3 and chelsea_standing.points == 0
+        assert west_ham_standing.position == 1
+    elif slot.outcome == "away":
+        assert chelsea_standing.points == 3 and west_ham_standing.points == 0
+        assert chelsea_standing.position == 1
+    else:
+        assert west_ham_standing.points == 1 and chelsea_standing.points == 1
+
+    # Ricalcolo: nessun accumulo, i valori restano identici.
+    again = compute_league_standings(db_session, league_id=fantasy_round.league_id)
+    db_session.commit()
+    assert again.counters.created == 0
+    assert again.counters.updated == 0
+    assert again.counters.unchanged == 2
+    refreshed = db_session.scalars(
+        select(LeagueStanding).where(
+            LeagueStanding.league_id == fantasy_round.league_id,
+            LeagueStanding.fantasy_team_id == teams["west_ham"].id,
+        )
+    ).one()
+    assert refreshed.played == 1

@@ -27,6 +27,7 @@ from leagues.models.league_competition import LeagueCompetition
 from leagues.models.league_invite import LeagueInvite
 from leagues.models.league_membership import LeagueMembership
 from leagues.models.league_rules import LeagueRules
+from leagues.models.league_standing import LeagueStanding
 from leagues.models.named_league_invite import NamedLeagueInvite
 from sports_data.catalog.models import Club, CompetitionSeasonClub, SportSeason
 from sports_data.fixtures.models import (
@@ -65,6 +66,7 @@ __all__ = [
     "LeagueMembership",
     "LeagueRoleOverride",
     "LeagueRules",
+    "LeagueStanding",
     "LineupDraft",
     "LineupPlayer",
     "LineupSubmission",

@@ -47,6 +47,7 @@ from leagues.schemas import (
     LeagueListoneRefreshResponse,
     LeagueMemberResponse,
     LeagueRulesResponse,
+    LeagueStandingResponse,
     LeagueSummaryResponse,
     NamedLeagueInviteResponse,
     RespondNamedLeagueInviteResponse,
@@ -55,6 +56,7 @@ from leagues.schemas import (
     UpdateLeagueRulesRequest,
 )
 from leagues.service import LeagueService
+from leagues.standings_service import list_league_standings
 
 router = APIRouter(prefix="/leagues", tags=["leagues"])
 
@@ -548,3 +550,30 @@ def revoke_league_invite(
         return service.revoke(league_access, invite_id)
     except AuthError as exc:
         return _error_response(exc)
+
+
+@router.get(
+    "/{league_id}/classifica",
+    response_model=list[LeagueStandingResponse],
+)
+def get_league_standings(
+    league_access: LeagueAccess = Depends(require_league_permissions(Permission.LEAGUE_VIEW)),
+    session: Session = Depends(get_db_session),
+) -> list[LeagueStandingResponse]:
+    """Classifica persistita (EP07-06), ordinata per posizione."""
+    rows = list_league_standings(session, league_id=league_access.league.id)
+    return [
+        LeagueStandingResponse(
+            fantasyTeamId=str(row.fantasy_team_id),
+            position=row.position,
+            played=row.played,
+            won=row.won,
+            drawn=row.drawn,
+            lost=row.lost,
+            fantasyGoalsFor=row.fantasy_goals_for,
+            fantasyGoalsAgainst=row.fantasy_goals_against,
+            points=row.points,
+            computedAt=row.computed_at,
+        )
+        for row in rows
+    ]
