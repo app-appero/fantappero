@@ -29,6 +29,7 @@ from fantasy_lineups.rules import (
 from fantasy_lineups.validators import validate_max_automatic_substitutions_override
 from fantasy_ratings.config import default_formula_config
 from fantasy_ratings.models import PlayerMatchRating
+from fantasy_turns.homologation import assert_round_not_homologated
 from fantasy_turns.models import FantasyRound, FantasyRoundFixture
 from leagues.models.league_rules import LeagueRules
 
@@ -64,6 +65,7 @@ def compute_round_effective_lineups(
     fantasy_round = session.get(FantasyRound, round_id)
     if fantasy_round is None:
         raise ValidationAuthError("Turno non trovato.", code="turn_not_found")
+    assert_round_not_homologated(fantasy_round)
 
     rules = session.execute(
         select(LeagueRules).where(LeagueRules.league_id == fantasy_round.league_id)

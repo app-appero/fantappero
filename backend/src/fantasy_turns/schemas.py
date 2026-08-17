@@ -78,3 +78,14 @@ class EnsureFantasyTurnsResponse(ApiModel):
     duplicates: int
     waiting: int
     horizon_days: int = Field(alias="horizonDays")
+
+
+class ApplyRoundCorrectionRequest(ApiModel):
+    reason: str = Field(min_length=1)
+
+
+class RoundHomologationResponse(ApiModel):
+    round_id: str = Field(alias="roundId")
+    homologation_status: Literal["provisional", "homologated"] = Field(alias="homologationStatus")
+    homologated_at: datetime | None = Field(default=None, alias="homologatedAt")
+    formula_version: str | None = Field(default=None, alias="formulaVersion")

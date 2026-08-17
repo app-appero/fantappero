@@ -1,0 +1,182 @@
+"""Homologate and correct fantasy turns (EP07-07 / FR-OMO-01).
+
+FR-OMO-01: pubblica il risultato provvisorio, acquisisce eventuali
+correzioni, ricalcola e notifica le variazioni, quindi omologa. Un turno
+omologato non cambia più per nuove versioni della formula; solo una
+correzione esplicita — con permesso, motivo e traccia in audit — può
+riaprirlo per un nuovo ricalcolo.
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+from datetime import UTC, datetime
+from uuid import UUID
+
+from sqlalchemy import select, update
+from sqlalchemy.orm import Session
+
+from auth.exceptions import ValidationAuthError
+from database.enums import FantasyRoundHomologationStatus, LeagueAuditAction
+from fantasy_ratings.config import default_formula_config
+from fantasy_turns.models import FantasyRound, FantasyRoundFixture
+from leagues.models.league_audit_event import LeagueAuditEvent
+from observability.context import get_correlation_id
+from sports_data.fixtures.models import Fixture
+
+# API-Football terminal "finished" statuses (same set used by EP07-05 scoring).
+FINISHED_FIXTURE_STATUSES = frozenset({"FT", "AET", "PEN"})
+
+
+@dataclass(frozen=True)
+class HomologationResult:
+    round_id: UUID
+    homologation_status: str
+    homologated_at: datetime | None
+    formula_version: str | None
+
+
+def homologate_round(session: Session, *, round_id: UUID, actor_id: UUID) -> HomologationResult:
+    """Omologa un turno: richiede tutte le partite terminate (dato reale finale).
+
+    La transizione è una UPDATE condizionale sullo stato corrente: sotto
+    concorrenza, un solo chiamante la vede applicata (``rowcount == 1``); gli
+    altri ricevono ``round_already_homologated`` invece di sovrascriversi a
+    vicenda o duplicare l'evento di audit.
+    """
+    fantasy_round = session.get(FantasyRound, round_id)
+    if fantasy_round is None:
+        raise ValidationAuthError("Turno non trovato.", code="turn_not_found")
+
+    statuses = list(
+        session.scalars(
+            select(Fixture.status_short)
+            .join(FantasyRoundFixture, FantasyRoundFixture.fixture_id == Fixture.id)
+            .where(
+                FantasyRoundFixture.round_id == round_id,
+                FantasyRoundFixture.excluded_at.is_(None),
+            )
+        ).all()
+    )
+    if not statuses or not all(
+        (status or "").upper() in FINISHED_FIXTURE_STATUSES for status in statuses
+    ):
+        raise ValidationAuthError(
+            "Non tutte le partite del turno sono terminate: il risultato resta provvisorio.",
+            code="round_not_final",
+        )
+
+    now = datetime.now(UTC)
+    formula_version = default_formula_config().version
+    outcome = session.execute(
+        update(FantasyRound)
+        .where(
+            FantasyRound.id == round_id,
+            FantasyRound.homologation_status == FantasyRoundHomologationStatus.PROVISIONAL,
+        )
+        .values(
+            homologation_status=FantasyRoundHomologationStatus.HOMOLOGATED,
+            homologated_at=now,
+            homologated_by_user_id=actor_id,
+            homologation_formula_version=formula_version,
+        )
+    )
+    if outcome.rowcount == 0:
+        raise ValidationAuthError("Il turno è già omologato.", code="round_already_homologated")
+
+    # L'UPDATE condizionale sopra e' un'espressione Core: non aggiorna in modo
+    # affidabile gli attributi dell'oggetto ORM gia' caricato in sessione.
+    # Lo si scade cosi' che ogni accesso successivo rilegga lo stato reale.
+    session.expire(fantasy_round)
+
+    session.add(
+        LeagueAuditEvent(
+            league_id=fantasy_round.league_id,
+            actor_id=actor_id,
+            action=LeagueAuditAction.FANTASY_ROUND_HOMOLOGATED,
+            correlation_id=get_correlation_id(),
+            details={"roundId": str(round_id), "formulaVersion": formula_version},
+        )
+    )
+    session.flush()
+    return HomologationResult(
+        round_id=round_id,
+        homologation_status=FantasyRoundHomologationStatus.HOMOLOGATED.value,
+        homologated_at=now,
+        formula_version=formula_version,
+    )
+
+
+def apply_round_correction(
+    session: Session,
+    *,
+    round_id: UUID,
+    actor_id: UUID,
+    reason: str,
+) -> HomologationResult:
+    """Riapre un turno omologato per un ricalcolo controllato (FR-OMO-01 §Eccezioni).
+
+    Non ricalcola nulla da sola: riporta il turno a "provvisorio" in modo
+    atomico e auditato, cosi' le chiamate successive a compute_fixture_ratings
+    / compute_round_effective_lineups / compute_round_results tornano ad
+    essere ammesse. Il turno resta "provvisorio" finche' un nuovo
+    ``homologate_round`` non lo richiude esplicitamente.
+    """
+    cleaned_reason = reason.strip()
+    if not cleaned_reason:
+        raise ValidationAuthError(
+            "Indica il motivo della correzione.",
+            code="correction_reason_required",
+        )
+
+    fantasy_round = session.get(FantasyRound, round_id)
+    if fantasy_round is None:
+        raise ValidationAuthError("Turno non trovato.", code="turn_not_found")
+
+    previous_homologated_at = fantasy_round.homologated_at
+    previous_formula_version = fantasy_round.homologation_formula_version
+
+    outcome = session.execute(
+        update(FantasyRound)
+        .where(
+            FantasyRound.id == round_id,
+            FantasyRound.homologation_status == FantasyRoundHomologationStatus.HOMOLOGATED,
+        )
+        .values(
+            homologation_status=FantasyRoundHomologationStatus.PROVISIONAL,
+            homologated_at=None,
+            homologated_by_user_id=None,
+            homologation_formula_version=None,
+        )
+    )
+    if outcome.rowcount == 0:
+        raise ValidationAuthError(
+            "Il turno non è omologato: non serve una correzione per ricalcolarlo.",
+            code="round_not_homologated",
+        )
+
+    session.expire(fantasy_round)
+
+    session.add(
+        LeagueAuditEvent(
+            league_id=fantasy_round.league_id,
+            actor_id=actor_id,
+            action=LeagueAuditAction.FANTASY_ROUND_CORRECTION_APPLIED,
+            correlation_id=get_correlation_id(),
+            details={
+                "roundId": str(round_id),
+                "reason": cleaned_reason,
+                "previousHomologatedAt": (
+                    previous_homologated_at.isoformat() if previous_homologated_at else None
+                ),
+                "previousFormulaVersion": previous_formula_version,
+            },
+        )
+    )
+    session.flush()
+    return HomologationResult(
+        round_id=round_id,
+        homologation_status=FantasyRoundHomologationStatus.PROVISIONAL.value,
+        homologated_at=None,
+        formula_version=None,
+    )

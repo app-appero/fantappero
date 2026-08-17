@@ -91,3 +91,4 @@ persistiti, ricalcolo stabile.
 
 - Formazione effettiva: [`fantasy_lineups_effective.md`](./fantasy_lineups_effective.md)
 - Voto statistico e fantavoto: [`fantasy_ratings.md`](./fantasy_ratings.md)
+- Omologazione e correzioni: [`fantasy_turns_homologation.md`](./fantasy_turns_homologation.md)

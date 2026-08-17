@@ -19,7 +19,12 @@ from sqlalchemy import (
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from database.base import Base, TimestampMixin, UUIDPrimaryKeyMixin
-from database.enums import FantasyRoundFixtureReason, FantasyTurnKind, FantasyTurnStatus
+from database.enums import (
+    FantasyRoundFixtureReason,
+    FantasyRoundHomologationStatus,
+    FantasyTurnKind,
+    FantasyTurnStatus,
+)
 from database.types import UTCDateTime
 
 if TYPE_CHECKING:
@@ -82,8 +87,26 @@ class FantasyRound(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     )
     skip_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
     generated_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False)
+    homologation_status: Mapped[FantasyRoundHomologationStatus] = mapped_column(
+        Enum(
+            FantasyRoundHomologationStatus,
+            name="fantasy_round_homologation_status",
+            native_enum=True,
+            create_constraint=True,
+            values_callable=lambda enum_cls: [member.value for member in enum_cls],
+        ),
+        nullable=False,
+        server_default=text("'provisional'"),
+    )
+    homologated_at: Mapped[datetime | None] = mapped_column(UTCDateTime(), nullable=True)
+    homologated_by_user_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    homologation_formula_version: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     league: Mapped[League] = relationship()
+    homologated_by: Mapped[User | None] = relationship()
     fixtures: Mapped[list[FantasyRoundFixture]] = relationship(
         back_populates="round",
         cascade="all, delete-orphan",

@@ -148,3 +148,6 @@ espulsione) sulla stessa fixture.
 - Spike offline: [`experiments/rating_beta/README.md`](../../experiments/rating_beta/README.md)
 - Fixture sync: [`../operations/sports_fixtures_sync.md`](../operations/sports_fixtures_sync.md)
 - Turni europei: [`fantasy_turns.md`](./fantasy_turns.md)
+- Omologazione: se la fixture appartiene a un turno già omologato in
+  qualunque lega, il ricalcolo è bloccato — vedi
+  [`fantasy_turns_homologation.md`](./fantasy_turns_homologation.md)

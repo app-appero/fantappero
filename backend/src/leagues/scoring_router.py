@@ -11,9 +11,12 @@ from sqlalchemy.orm import Session
 
 from auth.dependencies import get_db_session
 from auth.exceptions import AuthError
+from auth.models.user import User
 from authorization.dependencies import require_permissions
 from database.enums import Permission
+from fantasy_turns.homologation_service import apply_round_correction, homologate_round
 from fantasy_turns.models import FantasyRound
+from fantasy_turns.schemas import ApplyRoundCorrectionRequest, RoundHomologationResponse
 from leagues.models.league_calendar import LeagueCalendar, LeagueCalendarSlot
 from leagues.schemas import (
     ComputeRoundResultsRequest,
@@ -132,4 +135,56 @@ def compute_standings_endpoint(
         updated=result.counters.updated,
         unchanged=result.counters.unchanged,
         removed=result.counters.removed,
+    )
+
+
+@router.post(
+    "/rounds/{round_id}/omologa",
+    response_model=RoundHomologationResponse,
+)
+def homologate_round_endpoint(
+    round_id: UUID,
+    operator: User = Depends(require_permissions(Permission.GLOBAL_OPERATE)),
+    session: Session = Depends(get_db_session),
+) -> RoundHomologationResponse | JSONResponse:
+    """Omologa il turno: richiede tutte le partite terminate (FR-OMO-01)."""
+    try:
+        result = homologate_round(session, round_id=round_id, actor_id=operator.id)
+    except AuthError as exc:
+        return _error_response(exc)
+    session.commit()
+    return RoundHomologationResponse(
+        roundId=str(result.round_id),
+        homologationStatus=result.homologation_status,
+        homologatedAt=result.homologated_at,
+        formulaVersion=result.formula_version,
+    )
+
+
+@router.post(
+    "/rounds/{round_id}/correzione",
+    response_model=RoundHomologationResponse,
+)
+def apply_round_correction_endpoint(
+    round_id: UUID,
+    body: ApplyRoundCorrectionRequest,
+    operator: User = Depends(require_permissions(Permission.GLOBAL_OPERATE)),
+    session: Session = Depends(get_db_session),
+) -> RoundHomologationResponse | JSONResponse:
+    """Riapre un turno omologato per un ricalcolo controllato, con motivo obbligatorio."""
+    try:
+        result = apply_round_correction(
+            session,
+            round_id=round_id,
+            actor_id=operator.id,
+            reason=body.reason,
+        )
+    except AuthError as exc:
+        return _error_response(exc)
+    session.commit()
+    return RoundHomologationResponse(
+        roundId=str(result.round_id),
+        homologationStatus=result.homologation_status,
+        homologatedAt=result.homologated_at,
+        formulaVersion=result.formula_version,
     )

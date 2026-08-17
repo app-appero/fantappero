@@ -122,6 +122,8 @@ class LeagueAuditAction(str, enum.Enum):
     FANTASY_TACTICAL_MOVE_APPLIED = "fantasy_tactical_move_applied"
     CREDIT_ACCOUNT_INITIALIZED = "credit_account_initialized"
     CREDIT_LEDGER_ENTRY_POSTED = "credit_ledger_entry_posted"
+    FANTASY_ROUND_HOMOLOGATED = "fantasy_round_homologated"
+    FANTASY_ROUND_CORRECTION_APPLIED = "fantasy_round_correction_applied"
 
 
 class FantasyTurnStatus(str, enum.Enum):
@@ -131,6 +133,13 @@ class FantasyTurnStatus(str, enum.Enum):
     OPEN = "open"
     LOCKED = "locked"
     SKIPPED = "skipped"
+
+
+class FantasyRoundHomologationStatus(str, enum.Enum):
+    """Provisional vs homologated results for a turn (EP07-07 / FR-OMO-01)."""
+
+    PROVISIONAL = "provisional"
+    HOMOLOGATED = "homologated"
 
 
 class FantasyTurnKind(str, enum.Enum):

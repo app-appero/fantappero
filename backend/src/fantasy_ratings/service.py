@@ -40,6 +40,7 @@ from fantasy_ratings.validators import (
     validate_minutes_threshold,
     validate_threshold_target,
 )
+from fantasy_turns.homologation import assert_fixture_not_homologated
 from observability.logging import get_logger
 from observability.metrics import Timer, get_metrics
 from sports_data.fixtures.models import Fixture, MatchEvent, PlayerMatchStat
@@ -182,6 +183,7 @@ def compute_fixture_ratings(
         fixture_id=fixture_id,
         fixture_provider_id=fixture_provider_id,
     )
+    assert_fixture_not_homologated(session, fixture_id=fixture.id)
     counters = RatingComputeCounters()
     metrics = get_metrics()
     status = "ok"

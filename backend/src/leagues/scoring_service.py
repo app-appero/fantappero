@@ -21,6 +21,7 @@ from fantasy_lineups.models import EffectiveLineup
 from fantasy_ratings.config import default_formula_config
 from fantasy_ratings.models import PlayerMatchRating
 from fantasy_teams.models import FantasyTeam
+from fantasy_turns.homologation import assert_round_not_homologated
 from fantasy_turns.models import FantasyRound, FantasyRoundFixture
 from leagues.models.league_calendar import LeagueCalendar, LeagueCalendarSlot
 from leagues.scoring import MatchOutcome
@@ -63,6 +64,7 @@ def compute_round_results(
     fantasy_round = session.get(FantasyRound, round_id)
     if fantasy_round is None:
         raise ValidationAuthError("Turno non trovato.", code="turn_not_found")
+    assert_round_not_homologated(fantasy_round)
 
     calendar = session.execute(
         select(LeagueCalendar).where(LeagueCalendar.league_id == fantasy_round.league_id)

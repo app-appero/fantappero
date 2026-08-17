@@ -126,3 +126,5 @@ restano spiegati in `skipped`.
 
 - Voto statistico e bonus/malus: [`fantasy_ratings.md`](./fantasy_ratings.md)
 - Formazione, moduli, panchina, mosse tattiche: [`fantasy_lineups.md`](./fantasy_lineups.md)
+- Omologazione: un turno omologato blocca il ricalcolo — vedi
+  [`fantasy_turns_homologation.md`](./fantasy_turns_homologation.md)

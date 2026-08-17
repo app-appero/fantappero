@@ -1,21 +1,26 @@
-"""Integration tests for round-level H2H scoring and standings (EP07-05 / EP07-06)."""
+"""Integration tests for H2H scoring, standings and homologation (EP07-05/06/07)."""
 
 from __future__ import annotations
 
 import json
+import threading
+import time
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from uuid import uuid4
 
 import pytest
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 from tests.integration.database.helpers import create_engine_for_url
 
+from auth.exceptions import ValidationAuthError
 from auth.models.user import User
 from database.enums import (
+    FantasyRoundHomologationStatus,
     FantasyTurnKind,
     FantasyTurnStatus,
+    LeagueAuditAction,
     LeagueMemberRole,
     LeagueState,
     LineupSlotKind,
@@ -26,8 +31,10 @@ from fantasy_lineups.models import LineupPlayer, LineupSubmission
 from fantasy_lineups.substitution_service import compute_round_effective_lineups
 from fantasy_ratings.service import compute_fixture_ratings
 from fantasy_teams.models import FantasyTeam
+from fantasy_turns.homologation_service import apply_round_correction, homologate_round
 from fantasy_turns.models import FantasyRound, FantasyRoundFixture
 from leagues.models.league import League
+from leagues.models.league_audit_event import LeagueAuditEvent
 from leagues.models.league_calendar import LeagueCalendar, LeagueCalendarSlot
 from leagues.models.league_membership import LeagueMembership
 from leagues.models.league_rules import LeagueRules
@@ -434,3 +441,195 @@ def test_compute_league_standings_after_round_results(db_session: Session) -> No
         )
     ).one()
     assert refreshed.played == 1
+
+
+def _full_pipeline(db_session: Session) -> tuple[Fixture, FantasyRound, dict]:
+    _seed_catalog(db_session)
+    db_session.commit()
+    fixture = _sync_match(db_session)
+    db_session.commit()
+    compute_fixture_ratings(db_session, fixture_id=fixture.id)
+    db_session.commit()
+    fantasy_round, teams = _build_two_team_round(db_session, fixture)
+    compute_round_effective_lineups(db_session, round_id=fantasy_round.id)
+    db_session.commit()
+    compute_round_results(db_session, round_id=fantasy_round.id)
+    db_session.commit()
+    return fixture, fantasy_round, teams
+
+
+def test_homologate_round_requires_finished_fixtures(db_session: Session) -> None:
+    operator = _make_user(db_session)
+    db_session.commit()
+    _, fantasy_round, _teams = _full_pipeline(db_session)
+
+    # Sposta artificialmente la fixture fuori dallo stato "terminato".
+    fixture = db_session.scalars(select(Fixture).where(Fixture.provider_id == 1035055)).one()
+    fixture.status_short = "1H"
+    db_session.commit()
+
+    with pytest.raises(ValidationAuthError) as excinfo:
+        homologate_round(db_session, round_id=fantasy_round.id, actor_id=operator.id)
+    assert excinfo.value.code == "round_not_final"
+
+
+def test_homologate_round_locks_data_and_correction_reopens_it(db_session: Session) -> None:
+    """EP07-07 / FR-OMO-01: un turno omologato non cambia più; solo una
+    correzione motivata e auditata lo riapre per un nuovo ricalcolo."""
+    operator = _make_user(db_session)
+    db_session.commit()
+    fixture, fantasy_round, teams = _full_pipeline(db_session)
+
+    result = homologate_round(db_session, round_id=fantasy_round.id, actor_id=operator.id)
+    db_session.commit()
+    assert result.homologation_status == "homologated"
+    assert result.formula_version is not None
+
+    stored = db_session.get(FantasyRound, fantasy_round.id)
+    assert stored.homologation_status == FantasyRoundHomologationStatus.HOMOLOGATED
+    assert stored.homologated_at is not None
+    assert stored.homologated_by_user_id == operator.id
+    assert stored.homologation_formula_version == result.formula_version
+
+    # Un ricalcolo ordinario è bloccato su ognuno dei tre livelli della pipeline.
+    with pytest.raises(ValidationAuthError) as excinfo:
+        compute_fixture_ratings(db_session, fixture_id=fixture.id)
+    assert excinfo.value.code == "round_homologated"
+
+    with pytest.raises(ValidationAuthError) as excinfo:
+        compute_round_effective_lineups(db_session, round_id=fantasy_round.id)
+    assert excinfo.value.code == "round_homologated"
+
+    with pytest.raises(ValidationAuthError) as excinfo:
+        compute_round_results(db_session, round_id=fantasy_round.id)
+    assert excinfo.value.code == "round_homologated"
+
+    # Omologare due volte è rifiutato in modo esplicito (non silenzioso).
+    with pytest.raises(ValidationAuthError) as excinfo:
+        homologate_round(db_session, round_id=fantasy_round.id, actor_id=operator.id)
+    assert excinfo.value.code == "round_already_homologated"
+
+    # La correzione richiede un motivo.
+    with pytest.raises(ValidationAuthError) as excinfo:
+        apply_round_correction(
+            db_session, round_id=fantasy_round.id, actor_id=operator.id, reason="   "
+        )
+    assert excinfo.value.code == "correction_reason_required"
+
+    correction = apply_round_correction(
+        db_session,
+        round_id=fantasy_round.id,
+        actor_id=operator.id,
+        reason="Rettifica statistiche ufficiali del provider",
+    )
+    db_session.commit()
+    assert correction.homologation_status == "provisional"
+
+    stored = db_session.get(FantasyRound, fantasy_round.id)
+    assert stored.homologation_status == FantasyRoundHomologationStatus.PROVISIONAL
+    assert stored.homologated_at is None
+    assert stored.homologated_by_user_id is None
+
+    # Dopo la correzione, il ricalcolo torna ammesso su tutta la pipeline.
+    compute_fixture_ratings(db_session, fixture_id=fixture.id)
+    compute_round_effective_lineups(db_session, round_id=fantasy_round.id)
+    compute_round_results(db_session, round_id=fantasy_round.id)
+    db_session.commit()
+
+    again = homologate_round(db_session, round_id=fantasy_round.id, actor_id=operator.id)
+    db_session.commit()
+    assert again.homologation_status == "homologated"
+
+    audit_actions = [
+        row[0]
+        for row in db_session.execute(
+            select(LeagueAuditEvent.action).where(
+                LeagueAuditEvent.league_id == fantasy_round.league_id
+            )
+        ).all()
+    ]
+    assert audit_actions.count(LeagueAuditAction.FANTASY_ROUND_HOMOLOGATED) == 2
+    assert audit_actions.count(LeagueAuditAction.FANTASY_ROUND_CORRECTION_APPLIED) == 1
+
+    # Riporta il turno a provvisorio: il modulo riusa lo stesso match reale
+    # del corpus (fixture 39/1035055, upsert per provider_id) in piu' test,
+    # e il guard blocca il ricalcolo su QUALSIASI turno legato a una fixture
+    # omologata, quindi lasciarlo omologato bloccherebbe i test successivi.
+    apply_round_correction(
+        db_session,
+        round_id=fantasy_round.id,
+        actor_id=operator.id,
+        reason="Ripristino stato provvisorio per isolamento test",
+    )
+    db_session.commit()
+
+
+def test_homologate_round_concurrent_requests_only_one_succeeds(
+    db_session: Session, db_url: str
+) -> None:
+    """Test di concorrenza (EP07-07): due thread con connessioni separate
+    provano a omologare lo stesso turno nella stessa finestra. La UPDATE
+    condizionale (``WHERE homologation_status = 'provisional'``) e' atomica
+    a livello di riga in Postgres: il secondo thread resta bloccato sul lock
+    del primo finche' non committa, poi trova 0 righe e fallisce in modo
+    esplicito — nessuna doppia assegnazione, nessun audit duplicato.
+    """
+    operator = _make_user(db_session)
+    db_session.commit()
+    _fixture, fantasy_round, _teams = _full_pipeline(db_session)
+
+    engine = create_engine_for_url(db_url)
+    session_a = create_session_factory(engine)()
+    session_b = create_session_factory(engine)()
+
+    results: dict[str, tuple[str, str | None]] = {}
+    a_updated = threading.Event()
+    b_about_to_attempt = threading.Event()
+
+    def run_a() -> None:
+        try:
+            outcome = homologate_round(session_a, round_id=fantasy_round.id, actor_id=operator.id)
+            a_updated.set()
+            # Da' tempo a session_b di raggiungere la UPDATE e bloccarsi sul
+            # lock di riga prima che session_a rilasci il lock con il commit.
+            b_about_to_attempt.wait(timeout=5)
+            time.sleep(0.2)
+            session_a.commit()
+            results["a"] = ("ok", outcome.homologation_status)
+        except Exception as exc:  # pragma: no cover - fallimento inatteso nel thread
+            session_a.rollback()
+            results["a"] = ("error", str(exc))
+
+    def run_b() -> None:
+        a_updated.wait(timeout=5)
+        b_about_to_attempt.set()
+        try:
+            homologate_round(session_b, round_id=fantasy_round.id, actor_id=operator.id)
+            session_b.commit()
+            results["b"] = ("ok", None)
+        except ValidationAuthError as exc:
+            session_b.rollback()
+            results["b"] = ("error", exc.code)
+
+    thread_a = threading.Thread(target=run_a)
+    thread_b = threading.Thread(target=run_b)
+    thread_a.start()
+    thread_b.start()
+    thread_a.join(timeout=10)
+    thread_b.join(timeout=10)
+    session_a.close()
+    session_b.close()
+    engine.dispose()
+
+    assert results.get("a") == ("ok", "homologated")
+    assert results.get("b") == ("error", "round_already_homologated")
+
+    audit_count = db_session.scalar(
+        select(func.count())
+        .select_from(LeagueAuditEvent)
+        .where(
+            LeagueAuditEvent.league_id == fantasy_round.league_id,
+            LeagueAuditEvent.action == LeagueAuditAction.FANTASY_ROUND_HOMOLOGATED,
+        )
+    )
+    assert audit_count == 1
