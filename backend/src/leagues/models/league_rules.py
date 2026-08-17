@@ -52,6 +52,10 @@ class LeagueRules(Base, UUIDPrimaryKeyMixin, TimestampMixin):
             "minutes_threshold BETWEEN 1 AND 30",
             name="ck_league_rules_minutes_threshold",
         ),
+        CheckConstraint(
+            "max_automatic_substitutions BETWEEN 0 AND 5",
+            name="ck_league_rules_max_automatic_substitutions",
+        ),
     )
 
     league_id: Mapped[UUID] = mapped_column(
@@ -83,6 +87,11 @@ class LeagueRules(Base, UUIDPrimaryKeyMixin, TimestampMixin):
         Integer,
         nullable=False,
         server_default=text("15"),
+    )
+    max_automatic_substitutions: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        server_default=text("5"),
     )
     allow_trades: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("true"))
     allow_manual_invites: Mapped[bool] = mapped_column(

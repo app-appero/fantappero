@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 from uuid import UUID
 
 from sqlalchemy import (
+    Boolean,
     CheckConstraint,
     Enum,
     ForeignKey,
@@ -244,3 +245,67 @@ class TacticalMove(Base, UUIDPrimaryKeyMixin, TimestampMixin):
 
     submission: Mapped[LineupSubmission] = relationship(back_populates="tactical_moves")
     used_by: Mapped[User] = relationship()
+
+
+class EffectiveLineup(Base, UUIDPrimaryKeyMixin, TimestampMixin):
+    """Formazione effettiva dopo le sostituzioni automatiche (EP07-04 / FR-SUB-01).
+
+    Ricalcolabile in modo deterministico: un nuovo calcolo sovrascrive la riga
+    esistente per ``(round_id, fantasy_team_id)`` invece di accumularla.
+    """
+
+    __tablename__ = "effective_lineups"
+    __table_args__ = (
+        UniqueConstraint(
+            "round_id",
+            "fantasy_team_id",
+            name="uq_effective_lineups_round_id_fantasy_team_id",
+        ),
+        Index("ix_effective_lineups_league_id", "league_id"),
+    )
+
+    league_id: Mapped[UUID] = mapped_column(
+        ForeignKey("leagues.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    round_id: Mapped[UUID] = mapped_column(
+        ForeignKey("fantasy_rounds.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    fantasy_team_id: Mapped[UUID] = mapped_column(
+        ForeignKey("fantasy_teams.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    submission_id: Mapped[UUID] = mapped_column(
+        ForeignKey("lineup_submissions.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    module: Mapped[FantasyModule] = mapped_column(
+        Enum(
+            FantasyModule,
+            name="fantasy_module",
+            native_enum=True,
+            create_constraint=True,
+            values_callable=lambda enum_cls: [member.value for member in enum_cls],
+        ),
+        nullable=False,
+    )
+    module_valid: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    max_automatic_substitutions: Mapped[int] = mapped_column(Integer, nullable=False)
+    effective_starter_ids: Mapped[list[object]] = mapped_column(JSONB, nullable=False)
+    substitutions_json: Mapped[list[object]] = mapped_column(
+        JSONB,
+        nullable=False,
+        server_default=text("'[]'::jsonb"),
+    )
+    skipped_json: Mapped[list[object]] = mapped_column(
+        JSONB,
+        nullable=False,
+        server_default=text("'[]'::jsonb"),
+    )
+    computed_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False)
+
+    league: Mapped[League] = relationship()
+    round: Mapped[FantasyRound] = relationship()
+    fantasy_team: Mapped[FantasyTeam] = relationship()
+    submission: Mapped[LineupSubmission] = relationship()

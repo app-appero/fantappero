@@ -125,3 +125,43 @@ class SaveLineupDraftRequest(ApiModel):
     module: FantasyModuleLiteral
     starter_athlete_ids: list[str] = Field(alias="starterAthleteIds")
     bench_athlete_ids: list[str] = Field(alias="benchAthleteIds")
+
+
+class ComputeEffectiveLineupsRequest(ApiModel):
+    max_automatic_substitutions: int | None = Field(default=None, alias="maxAutomaticSubstitutions")
+
+
+class ComputeEffectiveLineupsResponse(ApiModel):
+    round_id: str = Field(alias="roundId")
+    max_automatic_substitutions: int = Field(alias="maxAutomaticSubstitutions")
+    teams: int
+    created: int
+    updated: int
+    unchanged: int
+
+
+class SubstitutionResponse(ApiModel):
+    out_athlete_id: str = Field(alias="outAthleteId")
+    in_athlete_id: str = Field(alias="inAthleteId")
+    role: str
+    order: int
+
+
+class SkippedBenchCandidateResponse(ApiModel):
+    athlete_id: str = Field(alias="athleteId")
+    role: str | None = None
+    reason: str
+
+
+class EffectiveLineupResponse(ApiModel):
+    id: str
+    round_id: str = Field(alias="roundId")
+    fantasy_team_id: str = Field(alias="fantasyTeamId")
+    submission_id: str = Field(alias="submissionId")
+    module: str
+    module_valid: bool = Field(alias="moduleValid")
+    max_automatic_substitutions: int = Field(alias="maxAutomaticSubstitutions")
+    effective_starter_ids: list[str] = Field(alias="effectiveStarterIds")
+    substitutions: list[SubstitutionResponse] = Field(default_factory=list)
+    skipped: list[SkippedBenchCandidateResponse] = Field(default_factory=list)
+    computed_at: datetime = Field(alias="computedAt")

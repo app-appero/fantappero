@@ -17,10 +17,11 @@ from database.enums import (
     LeagueState,
     league_member_role_to_league_role,
 )
+from fantasy_lineups.rules import STANDARD_AUTOMATIC_SUBSTITUTIONS
+from fantasy_ratings.eligibility import STANDARD_MINUTES_THRESHOLD
 from fantasy_teams.composition_service import activation_roster_and_credit_blockers
 from fantasy_teams.factory import ensure_team_for_membership
 from fantasy_teams.ledger import find_account_for_team
-from fantasy_ratings.eligibility import STANDARD_MINUTES_THRESHOLD
 from fantasy_turns.rules import STANDARD_MIN_FIXTURES
 from fantasy_turns.validators import validate_min_fixtures_per_round
 from leagues.calendar_service import league_has_confirmed_calendar
@@ -62,6 +63,7 @@ from leagues.validators import (
     validate_league_deletable,
     validate_league_name,
     validate_league_transition,
+    validate_max_automatic_substitutions,
     validate_minutes_threshold,
     validate_participant_count,
     validate_preset_name,
@@ -128,6 +130,7 @@ class LeagueService:
                 total_credits=STANDARD_TOTAL_CREDITS,
                 min_fixtures_per_round=STANDARD_MIN_FIXTURES,
                 minutes_threshold=STANDARD_MINUTES_THRESHOLD,
+                max_automatic_substitutions=STANDARD_AUTOMATIC_SUBSTITUTIONS,
                 allow_trades=True,
                 allow_manual_invites=True,
             ),
@@ -282,12 +285,18 @@ class LeagueService:
             if payload.minutes_threshold is not None
             else rules.minutes_threshold
         )
+        max_automatic_substitutions = (
+            validate_max_automatic_substitutions(payload.max_automatic_substitutions)
+            if payload.max_automatic_substitutions is not None
+            else rules.max_automatic_substitutions
+        )
         changed = (
             rules.preset_name != preset_name
             or rules.participant_count != participant_count
             or rules.total_credits != total_credits
             or rules.min_fixtures_per_round != min_fixtures
             or rules.minutes_threshold != minutes_threshold
+            or rules.max_automatic_substitutions != max_automatic_substitutions
             or rules.allow_trades != payload.options.allow_trades
             or rules.allow_manual_invites != payload.options.allow_manual_invites
         )
@@ -305,6 +314,7 @@ class LeagueService:
         rules.total_credits = total_credits
         rules.min_fixtures_per_round = min_fixtures
         rules.minutes_threshold = minutes_threshold
+        rules.max_automatic_substitutions = max_automatic_substitutions
         rules.allow_trades = payload.options.allow_trades
         rules.allow_manual_invites = payload.options.allow_manual_invites
         self._session.add(
@@ -486,6 +496,7 @@ class LeagueService:
             totalCredits=rules.total_credits,
             minFixturesPerRound=rules.min_fixtures_per_round,
             minutesThreshold=rules.minutes_threshold,
+            maxAutomaticSubstitutions=rules.max_automatic_substitutions,
             options=LeagueRulesOptions(
                 allowTrades=rules.allow_trades,
                 allowManualInvites=rules.allow_manual_invites,

@@ -64,6 +64,7 @@ from fantasy_turns.rules import derive_effective_status
 from fantasy_turns.service import FantasyTurnService
 from leagues.models.league_audit_event import LeagueAuditEvent
 from leagues.models.league_membership import LeagueMembership
+from leagues.models.league_rules import LeagueRules
 from observability.context import get_correlation_id
 from observability.logging import get_logger
 from observability.metrics import get_metrics
@@ -718,6 +719,7 @@ class FantasyLineupService:
                 LineupIssueResponse(code=item.code, message=item.message)
                 for item in evaluation.issues
             ]
+        max_automatic_substitutions = self._max_automatic_substitutions_for_league(league_id)
         moves = list(submission.tactical_moves) if submission is not None else []
         moves.sort(key=lambda row: row.sequence)
         used = len(moves)
@@ -760,7 +762,7 @@ class FantasyLineupService:
             effectiveStatus=effective.value,
             modificationAllowed=turn_editable and any_unlocked,
             serverNow=now,
-            maxAutomaticSubstitutions=MAX_AUTOMATIC_SUBSTITUTIONS,
+            maxAutomaticSubstitutions=max_automatic_substitutions,
             maxTacticalMoves=MAX_TACTICAL_MOVES,
             tacticalMovesUsed=used,
             tacticalMovesRemaining=remaining_tactical_moves(used=used),
@@ -894,6 +896,14 @@ class FantasyLineupService:
             status_short=ref.status_short,
             lock_latched=ref.lock_latched,
         )
+
+    def _max_automatic_substitutions_for_league(self, league_id: UUID) -> int:
+        rules = self._session.execute(
+            select(LeagueRules.max_automatic_substitutions).where(
+                LeagueRules.league_id == league_id
+            )
+        ).scalar_one_or_none()
+        return rules if rules is not None else MAX_AUTOMATIC_SUBSTITUTIONS
 
     def _sync_round_kickoffs(
         self,

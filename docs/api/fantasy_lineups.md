@@ -18,10 +18,12 @@ modificabili. Il timestamp **server UTC** è autorevole; il client può validare
 anticipo ma il server resta decisivo.
 
 **EP06-04** rende la **panchina ordinata** (priorità di ingresso) e definisce il motore
-di **fino a 5 sostituzioni automatiche**: un panchinaro con voto subentra al primo
-titolare **dello stesso ruolo** senza voto, camminando l'ordine di panchina. Il modulo
-resta valido perché il cambio è sempre a parità di ruolo. I minuti/voti reali restano
-un input del motore: la risoluzione dopo i dati finali è **EP07-04**.
+puro di **fino a 5 sostituzioni automatiche** (limite configurabile 0–5 per lega,
+`league_rules.max_automatic_substitutions`, EP07-04): un panchinaro con voto subentra
+al primo titolare **dello stesso ruolo** senza voto, camminando l'ordine di panchina.
+Il modulo resta valido perché il cambio è sempre a parità di ruolo. La risoluzione
+contro i voti reali (EP07-02) ed il salvataggio della formazione effettiva per turno
+sono **EP07-04**: vedi [`fantasy_lineups_effective.md`](./fantasy_lineups_effective.md).
 
 **EP06-05** registra le **tre mosse tattiche** del turno. Dopo la formazione iniziale,
 ogni salvataggio confermato che modifica slot o ordine di panchina **nella finestra
@@ -46,8 +48,6 @@ Un rinvio **dopo** il kickoff già trascorso non sblocca il calciatore e non
 rimborsa mosse tattiche. Un rinvio **prima** del fischio lascia il calciatore
 modificabile e può slittare il cutoff. Kickoff simultanei, anche espressi in fusi
 diversi, si confrontano in UTC.
-
-Fuori scope: formazione effettiva persistita dopo i voti (EP07-04).
 
 La formazione è agganciata al **turno europeo** `(round_id, fantasy_team_id)`, non allo
 scontro H2H: i matchup di calendario restano un dominio distinto.
@@ -94,18 +94,26 @@ turno in cui quel club è casa o trasferta.
 
 ## Panchina e sostituzioni automatiche
 
-Costante condivisa: `MAX_AUTOMATIC_SUBSTITUTIONS = 5`.
+Costante condivisa: `MAX_AUTOMATIC_SUBSTITUTIONS = 5` (limite massimo assoluto e
+default). Configurabile per lega 0–5 (`league_rules.max_automatic_substitutions`,
+EP07-04).
 
 Algoritmo puro `resolveAutomaticSubstitutions` / `resolve_automatic_substitutions`:
 
 1. Si percorre la panchina **nell'ordine salvato**.
-2. Un panchinaro presente in `playedAthleteIds` (ha il voto) cerca il primo titolare
-   dello **stesso ruolo** assente da quel set e non ancora sostituito.
-3. Si applicano al massimo 5 cambi. Il sesto e successivi restano in panchina.
+2. Un panchinaro presente in `playedAthleteIds` (ha un voto eleggibile, EP07-02)
+   cerca il primo titolare dello **stesso ruolo** assente da quel set e non
+   ancora sostituito.
+3. Si applicano al massimo `maxSubstitutions` cambi (standard 5). Oltre il
+   limite i restanti panchinari sono saltati.
 4. Un portiere entra solo al posto di un portiere; stesso vincolo per D/C/A.
 5. Il modulo dell'XI effettivo resta quello schierato (cambio same-role).
+6. Ogni panchinaro non utilizzato è restituito in `skipped` con un motivo
+   (`not_eligible`, `role_unresolved`, `no_compatible_starter`, `limit_reached`).
 
-Nessun fallback cross-ruolo in questa card.
+Nessun fallback cross-ruolo in questa card. La risoluzione contro i voti reali
+e la persistenza per turno sono in
+[`fantasy_lineups_effective.md`](./fantasy_lineups_effective.md) (EP07-04).
 
 ## Tre mosse tattiche
 

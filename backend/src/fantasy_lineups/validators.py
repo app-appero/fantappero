@@ -5,7 +5,25 @@ from __future__ import annotations
 from uuid import UUID
 
 from auth.exceptions import ValidationAuthError
-from fantasy_lineups.rules import parse_module
+from fantasy_lineups.rules import (
+    MAX_AUTOMATIC_SUBSTITUTIONS,
+    MIN_AUTOMATIC_SUBSTITUTIONS,
+    coerce_max_automatic_substitutions,
+    parse_module,
+)
+
+
+def validate_max_automatic_substitutions_override(value: int) -> int:
+    try:
+        return coerce_max_automatic_substitutions(value)
+    except ValueError as exc:
+        raise ValidationAuthError(
+            (
+                "Il limite di sostituzioni automatiche deve essere tra "
+                f"{MIN_AUTOMATIC_SUBSTITUTIONS} e {MAX_AUTOMATIC_SUBSTITUTIONS}."
+            ),
+            code="invalid_max_automatic_substitutions",
+        ) from exc
 
 
 def validate_athlete_id_list(values: list[UUID]) -> list[UUID]:

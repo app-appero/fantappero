@@ -16,6 +16,7 @@ from auth.profile_router import router as profile_router
 from auth.router import router as auth_router
 from authorization.exceptions import AuthorizationError
 from config.settings.loader import get_api_settings, validate_api_settings
+from fantasy_lineups.router import effective_lineup_router
 from fantasy_lineups.router import router as fantasy_lineups_router
 from fantasy_ratings.exceptions import FantasyRatingError
 from fantasy_ratings.router import rating_error_handler
@@ -65,6 +66,7 @@ app.include_router(leagues_router)
 app.include_router(fantasy_teams_router)
 app.include_router(fantasy_turns_router)
 app.include_router(fantasy_lineups_router)
+app.include_router(effective_lineup_router)
 app.include_router(fantasy_ratings_router)
 app.include_router(quality_router)
 app.add_exception_handler(QualityRetryError, quality_error_handler)

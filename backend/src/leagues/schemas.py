@@ -48,6 +48,7 @@ class LeagueRulesResponse(ApiModel):
     total_credits: int = Field(alias="totalCredits")
     min_fixtures_per_round: int = Field(alias="minFixturesPerRound")
     minutes_threshold: int = Field(alias="minutesThreshold")
+    max_automatic_substitutions: int = Field(alias="maxAutomaticSubstitutions")
     options: LeagueRulesOptions
 
 
@@ -74,6 +75,7 @@ class UpdateLeagueRulesRequest(ApiModel):
     total_credits: int = Field(alias="totalCredits")
     min_fixtures_per_round: int | None = Field(default=None, alias="minFixturesPerRound")
     minutes_threshold: int | None = Field(default=None, alias="minutesThreshold")
+    max_automatic_substitutions: int | None = Field(default=None, alias="maxAutomaticSubstitutions")
     options: LeagueRulesOptions
 
 

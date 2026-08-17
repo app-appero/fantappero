@@ -338,6 +338,68 @@ def test_update_league_rules_rejects_invalid_minutes_threshold(
     assert updated.json()["code"] == "invalid_minutes_threshold"
 
 
+def test_update_league_rules_persists_max_automatic_substitutions(
+    client: TestClient,
+    db_session: Session,
+    competition_ids: list[str],
+) -> None:
+    token, _ = _register_and_login(client, "rules.subs@example.com")
+    created = client.post(
+        "/leagues",
+        headers={"Authorization": f"Bearer {token}"},
+        json={
+            "name": "Lega Sostituzioni",
+            "seasonYear": 2026,
+            "competitionIds": competition_ids,
+        },
+    )
+    league_id = created.json()["id"]
+
+    payload = _standard_rules_payload()
+    payload["maxAutomaticSubstitutions"] = 3
+
+    updated = client.put(
+        f"/leagues/{league_id}/amministrazione/regolamento",
+        headers={"Authorization": f"Bearer {token}"},
+        json=payload,
+    )
+    assert updated.status_code == 200
+    assert updated.json()["maxAutomaticSubstitutions"] == 3
+
+    persisted = db_session.scalars(
+        select(LeagueRules).where(LeagueRules.league_id == UUID(league_id)),
+    ).first()
+    assert persisted is not None
+    assert persisted.max_automatic_substitutions == 3
+
+
+def test_update_league_rules_rejects_invalid_max_automatic_substitutions(
+    client: TestClient,
+    competition_ids: list[str],
+) -> None:
+    token, _ = _register_and_login(client, "rules.subs.invalid@example.com")
+    created = client.post(
+        "/leagues",
+        headers={"Authorization": f"Bearer {token}"},
+        json={
+            "name": "Lega Sostituzioni Invalide",
+            "seasonYear": 2026,
+            "competitionIds": competition_ids,
+        },
+    )
+    league_id = created.json()["id"]
+    payload = _standard_rules_payload()
+    payload["maxAutomaticSubstitutions"] = 6
+
+    updated = client.put(
+        f"/leagues/{league_id}/amministrazione/regolamento",
+        headers={"Authorization": f"Bearer {token}"},
+        json=payload,
+    )
+    assert updated.status_code == 400
+    assert updated.json()["code"] == "invalid_max_automatic_substitutions"
+
+
 def test_update_league_rules_rejects_invalid_participants(
     client: TestClient,
     competition_ids: list[str],

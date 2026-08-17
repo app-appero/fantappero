@@ -11,12 +11,26 @@ from sqlalchemy.orm import Session
 from auth.dependencies import get_db_session
 from auth.exceptions import AuthError
 from authorization.context import LeagueAccess
-from authorization.dependencies import require_league_permissions
+from authorization.dependencies import require_league_permissions, require_permissions
 from database.enums import Permission
-from fantasy_lineups.schemas import LineupContextResponse, SaveLineupDraftRequest, SaveLineupRequest
+from fantasy_lineups.schemas import (
+    ComputeEffectiveLineupsRequest,
+    ComputeEffectiveLineupsResponse,
+    EffectiveLineupResponse,
+    LineupContextResponse,
+    SaveLineupDraftRequest,
+    SaveLineupRequest,
+    SkippedBenchCandidateResponse,
+    SubstitutionResponse,
+)
 from fantasy_lineups.service import FantasyLineupService
+from fantasy_lineups.substitution_service import (
+    compute_round_effective_lineups,
+    get_effective_lineup,
+)
 
 router = APIRouter(prefix="/leagues", tags=["fantasy-lineups"])
+effective_lineup_router = APIRouter(prefix="/fantasy-lineups", tags=["fantasy-lineups"])
 
 
 def _error_response(exc: AuthError) -> JSONResponse:
@@ -96,3 +110,84 @@ def save_my_lineup_draft(
         return service.save_my_draft(league_access, round_id, body)
     except AuthError as exc:
         return _error_response(exc)
+
+
+def _to_effective_lineup_response(row: object) -> EffectiveLineupResponse:
+    return EffectiveLineupResponse(
+        id=str(row.id),
+        roundId=str(row.round_id),
+        fantasyTeamId=str(row.fantasy_team_id),
+        submissionId=str(row.submission_id),
+        module=row.module.value,
+        moduleValid=row.module_valid,
+        maxAutomaticSubstitutions=row.max_automatic_substitutions,
+        effectiveStarterIds=list(row.effective_starter_ids),
+        substitutions=[
+            SubstitutionResponse(
+                outAthleteId=item["outAthleteId"],
+                inAthleteId=item["inAthleteId"],
+                role=item["role"],
+                order=item["order"],
+            )
+            for item in row.substitutions_json
+        ],
+        skipped=[
+            SkippedBenchCandidateResponse(
+                athleteId=item["athleteId"],
+                role=item["role"],
+                reason=item["reason"],
+            )
+            for item in row.skipped_json
+        ],
+        computedAt=row.computed_at,
+    )
+
+
+@effective_lineup_router.post(
+    "/rounds/{round_id}/formazione-effettiva",
+    response_model=ComputeEffectiveLineupsResponse,
+)
+def compute_effective_lineups(
+    round_id: UUID,
+    body: ComputeEffectiveLineupsRequest,
+    _operator: object = Depends(require_permissions(Permission.GLOBAL_OPERATE)),
+    session: Session = Depends(get_db_session),
+) -> ComputeEffectiveLineupsResponse | JSONResponse:
+    """Risolve e persiste le sostituzioni automatiche per tutte le squadre del turno."""
+    try:
+        result = compute_round_effective_lineups(
+            session,
+            round_id=round_id,
+            max_automatic_substitutions=body.max_automatic_substitutions,
+        )
+    except AuthError as exc:
+        return _error_response(exc)
+    session.commit()
+    return ComputeEffectiveLineupsResponse(
+        roundId=str(result.round_id),
+        maxAutomaticSubstitutions=result.max_automatic_substitutions,
+        teams=result.teams,
+        created=result.counters.created,
+        updated=result.counters.updated,
+        unchanged=result.counters.unchanged,
+    )
+
+
+@effective_lineup_router.get(
+    "/rounds/{round_id}/formazione-effettiva/{fantasy_team_id}",
+    response_model=EffectiveLineupResponse,
+)
+def get_round_effective_lineup(
+    round_id: UUID,
+    fantasy_team_id: UUID,
+    _operator: object = Depends(require_permissions(Permission.GLOBAL_OPERATE)),
+    session: Session = Depends(get_db_session),
+) -> EffectiveLineupResponse | JSONResponse:
+    """Formazione effettiva persistita per una squadra fantasy nel turno."""
+    row = get_effective_lineup(session, round_id=round_id, fantasy_team_id=fantasy_team_id)
+    if row is None:
+        return JSONResponse(
+            status_code=status.HTTP_404_NOT_FOUND,
+            content={"message": "Formazione effettiva non trovata.", "code": "not_found"},
+        )
+    return _to_effective_lineup_response(row)

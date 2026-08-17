@@ -8,6 +8,11 @@ from uuid import UUID
 
 from auth.exceptions import ValidationAuthError
 from database.enums import LeagueMemberRole, LeagueState
+from fantasy_lineups.rules import (
+    MAX_AUTOMATIC_SUBSTITUTIONS,
+    MIN_AUTOMATIC_SUBSTITUTIONS,
+    coerce_max_automatic_substitutions,
+)
 from fantasy_ratings.eligibility import (
     MAX_MINUTES_THRESHOLD,
     MIN_MINUTES_THRESHOLD,
@@ -124,6 +129,19 @@ def validate_minutes_threshold(value: int) -> int:
                 f"{MIN_MINUTES_THRESHOLD} e {MAX_MINUTES_THRESHOLD}."
             ),
             code="invalid_minutes_threshold",
+        ) from exc
+
+
+def validate_max_automatic_substitutions(value: int) -> int:
+    try:
+        return coerce_max_automatic_substitutions(value)
+    except ValueError as exc:
+        raise ValidationAuthError(
+            (
+                "Il limite di sostituzioni automatiche deve essere tra "
+                f"{MIN_AUTOMATIC_SUBSTITUTIONS} e {MAX_AUTOMATIC_SUBSTITUTIONS}."
+            ),
+            code="invalid_max_automatic_substitutions",
         ) from exc
 
 

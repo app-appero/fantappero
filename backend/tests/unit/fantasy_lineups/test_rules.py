@@ -13,12 +13,14 @@ from fantasy_lineups.rules import (
     APPROVED_MODULES,
     MAX_AUTOMATIC_SUBSTITUTIONS,
     MAX_TACTICAL_MOVES,
+    MIN_AUTOMATIC_SUBSTITUTIONS,
     LineupPlayerRef,
     assert_bench_order_lock,
     assert_copy_previous_lineup,
     assert_lineup_modification_allowed,
     assert_progressive_lock,
     assert_tactical_move,
+    coerce_max_automatic_substitutions,
     copy_previous_lineup,
     evaluate_bench_order_lock,
     evaluate_lineup,
@@ -377,6 +379,70 @@ def test_automatic_substitutions_respect_role_module_order_and_cap() -> None:
     assert len(capped.substitutions) == MAX_AUTOMATIC_SUBSTITUTIONS
     assert capped.substitutions[0].order == 1
     assert capped.module_valid
+
+
+def test_coerce_max_automatic_substitutions_range() -> None:
+    assert coerce_max_automatic_substitutions(MIN_AUTOMATIC_SUBSTITUTIONS) == 0
+    assert coerce_max_automatic_substitutions(MAX_AUTOMATIC_SUBSTITUTIONS) == 5
+    with pytest.raises(ValueError):
+        coerce_max_automatic_substitutions(-1)
+    with pytest.raises(ValueError):
+        coerce_max_automatic_substitutions(6)
+    with pytest.raises(ValueError):
+        coerce_max_automatic_substitutions(True)  # bool is not an int here
+
+
+def test_automatic_substitutions_explain_skipped_bench_candidates() -> None:
+    """FR-SUB-01: il risultato mostra chi è entrato e perché gli altri sono stati saltati."""
+    roster, starters, bench = _valid_433()
+    first_defender = next(player.athlete_id for player in starters if player.role == FantasyRole.D)
+    bench_defenders = [player.athlete_id for player in bench if player.role == FantasyRole.D]
+    replacement_defender, other_defender = bench_defenders[0], bench_defenders[1]
+    played = set(roster) - {first_defender, other_defender}
+
+    resolved = resolve_automatic_substitutions(
+        module="4-3-3",
+        starters=starters,
+        bench=bench,
+        played_athlete_ids=list(played),
+    )
+    assert len(resolved.substitutions) == 1
+    assert resolved.substitutions[0].in_athlete_id == replacement_defender
+    assert resolved.substitutions[0].out_athlete_id == first_defender
+
+    reasons = {item.athlete_id: item.reason for item in resolved.skipped}
+    # other_defender non ha voto: non può entrare.
+    assert reasons[other_defender] == "not_eligible"
+    # I panchinari di ruolo diverso non hanno un titolare senza voto compatibile.
+    other_role_bench = [item for item in bench if item.role != FantasyRole.D]
+    assert all(reasons[item.athlete_id] == "no_compatible_starter" for item in other_role_bench)
+    assert len(resolved.skipped) == len(bench) - 1
+
+
+def test_automatic_substitutions_respect_league_configurable_limit() -> None:
+    roster, starters, bench = _valid_433()
+    six_played = set(roster)
+    for starter in starters[:6]:
+        six_played.discard(starter.athlete_id)
+
+    zero_limit = resolve_automatic_substitutions(
+        module="4-3-3",
+        starters=starters,
+        bench=bench,
+        played_athlete_ids=list(six_played),
+        max_substitutions=0,
+    )
+    assert zero_limit.substitutions == ()
+    assert all(item.reason == "limit_reached" for item in zero_limit.skipped)
+
+    two_limit = resolve_automatic_substitutions(
+        module="4-3-3",
+        starters=starters,
+        bench=bench,
+        played_athlete_ids=list(six_played),
+        max_substitutions=2,
+    )
+    assert len(two_limit.substitutions) == 2
 
 
 def test_tactical_moves_cap_and_window() -> None:

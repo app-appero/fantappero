@@ -28,7 +28,9 @@ MODULE_OUTFIELD: dict[FantasyModule, tuple[int, int, int]] = {
 
 STARTER_COUNT = 11
 GOALKEEPER_STARTERS = 1
+MIN_AUTOMATIC_SUBSTITUTIONS = 0
 MAX_AUTOMATIC_SUBSTITUTIONS = 5
+STANDARD_AUTOMATIC_SUBSTITUTIONS = 5
 MAX_TACTICAL_MOVES = 3
 BENCH_ORDER_LOCKED_MESSAGE = (
     "Non puoi cambiare l'ordine di panchina di un calciatore la cui partita è già iniziata."
@@ -91,10 +93,20 @@ class AutomaticSubstitution:
 
 
 @dataclass(frozen=True)
+class SkippedBenchCandidate:
+    """Panchinaro non utilizzato e motivo (FR-SUB-01: spiegazione dell'esito)."""
+
+    athlete_id: object
+    role: FantasyRole | None
+    reason: str
+
+
+@dataclass(frozen=True)
 class SubstitutionResolution:
     substitutions: tuple[AutomaticSubstitution, ...]
     effective_starter_ids: tuple[object, ...]
     module_valid: bool
+    skipped: tuple[SkippedBenchCandidate, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -114,6 +126,17 @@ class CopyLineupResult:
     issues: tuple[LineupIssue, ...]
     blocked: bool
     can_confirm: bool
+
+
+def coerce_max_automatic_substitutions(value: int) -> int:
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise ValueError("max_automatic_substitutions must be an integer")
+    if value < MIN_AUTOMATIC_SUBSTITUTIONS or value > MAX_AUTOMATIC_SUBSTITUTIONS:
+        raise ValueError(
+            "max_automatic_substitutions must be between "
+            f"{MIN_AUTOMATIC_SUBSTITUTIONS} and {MAX_AUTOMATIC_SUBSTITUTIONS}"
+        )
+    return value
 
 
 def parse_module(value: str) -> FantasyModule | None:
@@ -531,10 +554,20 @@ def resolve_automatic_substitutions(
     starters: Sequence[LineupPlayerRef],
     bench: Sequence[LineupPlayerRef],
     played_athlete_ids: Sequence[object],
+    max_substitutions: int = MAX_AUTOMATIC_SUBSTITUTIONS,
 ) -> SubstitutionResolution:
-    """Apply up to 5 same-role substitutions walking the ordered bench."""
+    """Apply up to ``max_substitutions`` same-role substitutions (FR-SUB-01).
+
+    ``played_athlete_ids`` identifies starters/bench players with a valid
+    statistical vote (EP07-02 eligibility): a titolare "senza voto" is
+    replaced by the first compatible bench player with a vote, walking the
+    bench in its saved order. Every bench candidate not used is reported in
+    ``skipped`` with the reason, so the result explains "chi è entrato, per
+    chi e perché gli altri sono stati saltati".
+    """
     played = {item for item in played_athlete_ids if item not in {None, ""}}
     substitutions: list[AutomaticSubstitution] = []
+    skipped: list[SkippedBenchCandidate] = []
     replaced: set[object] = set()
     effective = [player.athlete_id for player in starters]
     role_by_id: dict[object, FantasyRole | None] = {}
@@ -543,11 +576,34 @@ def resolve_automatic_substitutions(
             role_by_id[player.athlete_id] = player.role
 
     for bench_player in bench:
-        if len(substitutions) >= MAX_AUTOMATIC_SUBSTITUTIONS:
-            break
-        if bench_player.athlete_id in {None, ""} or bench_player.athlete_id not in played:
+        if bench_player.athlete_id in {None, ""}:
+            continue
+        if len(substitutions) >= max_substitutions:
+            skipped.append(
+                SkippedBenchCandidate(
+                    athlete_id=bench_player.athlete_id,
+                    role=bench_player.role,
+                    reason="limit_reached",
+                )
+            )
+            continue
+        if bench_player.athlete_id not in played:
+            skipped.append(
+                SkippedBenchCandidate(
+                    athlete_id=bench_player.athlete_id,
+                    role=bench_player.role,
+                    reason="not_eligible",
+                )
+            )
             continue
         if bench_player.role is None:
+            skipped.append(
+                SkippedBenchCandidate(
+                    athlete_id=bench_player.athlete_id,
+                    role=None,
+                    reason="role_unresolved",
+                )
+            )
             continue
         starter_index = next(
             (
@@ -561,6 +617,13 @@ def resolve_automatic_substitutions(
             None,
         )
         if starter_index is None:
+            skipped.append(
+                SkippedBenchCandidate(
+                    athlete_id=bench_player.athlete_id,
+                    role=bench_player.role,
+                    reason="no_compatible_starter",
+                )
+            )
             continue
         outgoing = starters[starter_index]
         replaced.add(outgoing.athlete_id)
@@ -595,6 +658,7 @@ def resolve_automatic_substitutions(
         substitutions=tuple(substitutions),
         effective_starter_ids=tuple(effective),
         module_valid=module_valid,
+        skipped=tuple(skipped),
     )
 
 
