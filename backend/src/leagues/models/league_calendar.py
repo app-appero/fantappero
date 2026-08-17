@@ -11,6 +11,7 @@ from sqlalchemy import (
     CheckConstraint,
     DateTime,
     Enum,
+    Float,
     ForeignKey,
     Index,
     Integer,
@@ -110,6 +111,10 @@ class LeagueCalendarSlot(Base, UUIDPrimaryKeyMixin, TimestampMixin):
             ")",
             name="ck_league_calendar_slots_shape",
         ),
+        CheckConstraint(
+            "outcome IS NULL OR outcome IN ('home', 'away', 'draw')",
+            name="ck_league_calendar_slots_outcome",
+        ),
     )
 
     calendar_id: Mapped[UUID] = mapped_column(
@@ -126,6 +131,17 @@ class LeagueCalendarSlot(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     away_membership_id: Mapped[UUID | None] = mapped_column(
         ForeignKey("league_memberships.id", ondelete="CASCADE"),
         nullable=True,
+    )
+    home_score: Mapped[float | None] = mapped_column(Float, nullable=True)
+    away_score: Mapped[float | None] = mapped_column(Float, nullable=True)
+    home_fantasy_goals: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    away_fantasy_goals: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    outcome: Mapped[str | None] = mapped_column(String(8), nullable=True)
+    result_final: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default=text("false")
+    )
+    result_computed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
     )
 
     calendar: Mapped[LeagueCalendar] = relationship(back_populates="slots")

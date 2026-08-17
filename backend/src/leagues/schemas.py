@@ -214,6 +214,33 @@ class LeagueCalendarResponse(ApiModel):
     summary: LeagueCalendarSummaryResponse
 
 
+class ComputeRoundResultsRequest(ApiModel):
+    formula_version: str | None = Field(default=None, alias="formulaVersion")
+
+
+class ComputeRoundResultsResponse(ApiModel):
+    round_id: str = Field(alias="roundId")
+    result_final: bool = Field(alias="resultFinal")
+    matchups: int
+    created: int
+    updated: int
+    unchanged: int
+    skipped: int
+
+
+class RoundMatchResultResponse(ApiModel):
+    slot_index: int = Field(alias="slotIndex")
+    home_membership_id: str = Field(alias="homeMembershipId")
+    away_membership_id: str | None = Field(default=None, alias="awayMembershipId")
+    home_score: float | None = Field(default=None, alias="homeScore")
+    away_score: float | None = Field(default=None, alias="awayScore")
+    home_fantasy_goals: int | None = Field(default=None, alias="homeFantasyGoals")
+    away_fantasy_goals: int | None = Field(default=None, alias="awayFantasyGoals")
+    outcome: str | None = None
+    result_final: bool = Field(alias="resultFinal")
+    computed_at: datetime | None = Field(default=None, alias="computedAt")
+
+
 class LeagueListoneOverrideResponse(ApiModel):
     role: Literal["P", "D", "C", "A"]
     effective_from_round: int | None = Field(alias="effectiveFromRound")

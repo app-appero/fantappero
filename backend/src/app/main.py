@@ -24,6 +24,7 @@ from fantasy_ratings.router import router as fantasy_ratings_router
 from fantasy_teams.router import router as fantasy_teams_router
 from fantasy_turns.router import router as fantasy_turns_router
 from leagues.router import router as leagues_router
+from leagues.scoring_router import router as scoring_router
 from observability.error_tracking import configure_error_tracking
 from observability.health import as_readiness, liveness
 from observability.logging import configure_logging
@@ -63,6 +64,7 @@ app.add_middleware(
 app.include_router(auth_router)
 app.include_router(profile_router)
 app.include_router(leagues_router)
+app.include_router(scoring_router)
 app.include_router(fantasy_teams_router)
 app.include_router(fantasy_turns_router)
 app.include_router(fantasy_lineups_router)
