@@ -56,3 +56,7 @@ class PlayerMatchRatingResponse(ApiModel):
     formula: dict[str, Any]
     input: dict[str, Any]
     components: list[dict[str, Any]]
+    bonus_config_version: str | None = Field(default=None, alias="bonusConfigVersion")
+    bonus_malus: list[dict[str, Any]] = Field(default_factory=list, alias="bonusMalus")
+    bonus_malus_total: float = Field(default=0.0, alias="bonusMalusTotal")
+    fantasy_score: float | None = Field(default=None, alias="fantasyScore")

@@ -1,4 +1,4 @@
-"""Golden tests on the EP00-02 offline corpus (EP07-01)."""
+"""Golden tests on the EP00-02 offline corpus (EP07-01 / EP07-03)."""
 
 from __future__ import annotations
 
@@ -7,6 +7,8 @@ from pathlib import Path
 
 import pytest
 
+from fantasy_ratings.bonus import BonusMalusInput, compute_bonus_malus
+from fantasy_ratings.bonus_config import default_bonus_config
 from fantasy_ratings.config import default_formula_config
 from fantasy_ratings.formula import compute_rating
 from fantasy_ratings.input import (
@@ -193,3 +195,105 @@ def test_stoppage_entry_payload_without_event_is_senza_voto(config) -> None:
     assert result.eligible is False
     assert result.display is None
     assert result.eligibility_reason == "stoppage_entry_no_relevant_event"
+
+
+# EP07-03 / FR-SCO-02: fixture 39/1035055 (West Ham 3-1 Chelsea, home club_id=48,
+# away club_id=49). Ogni caso e' ricavato direttamente dalle statistiche reali
+# del corpus offline (fixtures_players.json / fixtures_events.json).
+BONUS_GOLDEN = [
+    {
+        # Areola (P, West Ham): 1 rigore parato, 1 gol subito, no clean sheet.
+        "player_id": 253,
+        "team_goals_conceded": 1,
+        "components": {"penalty_saved": 3.0, "goalkeeper_goal_conceded": -1.0},
+        "total": 2.0,
+    },
+    {
+        # Emerson (D, West Ham): un solo cartellino giallo, nessun autogol.
+        "player_id": 2284,
+        "team_goals_conceded": 0,
+        "components": {"yellow_card": -0.5},
+        "total": -0.5,
+    },
+    {
+        # Ward-Prowse (C, West Ham): 2 assist, nessun'altra penalita'.
+        "player_id": 2938,
+        "team_goals_conceded": 0,
+        "components": {"assist": 2.0},
+        "total": 2.0,
+    },
+    {
+        # Antonio (A, West Ham): 1 gol.
+        "player_id": 18819,
+        "team_goals_conceded": 0,
+        "components": {"goal": 3.0},
+        "total": 3.0,
+    },
+    {
+        # Aguerd (D, West Ham): 1 gol + doppia ammonizione/espulsione nello
+        # stesso episodio al 67' -> solo il malus espulsione viene applicato.
+        "player_id": 21694,
+        "team_goals_conceded": 0,
+        "components": {"goal": 3.0, "red_card": -1.0},
+        "total": 2.0,
+    },
+    {
+        # Paqueta (C, West Ham): rigore segnato (gia' incluso in goals.total,
+        # nessun bonus aggiuntivo per "rigore segnato") + 1 cartellino giallo.
+        "player_id": 1646,
+        "team_goals_conceded": 0,
+        "components": {"goal": 3.0, "yellow_card": -0.5},
+        "total": 2.5,
+    },
+    {
+        # Enzo Fernandez (C, Chelsea): 1 rigore sbagliato.
+        "player_id": 5996,
+        "team_goals_conceded": 3,
+        "components": {"penalty_missed": -3.0},
+        "total": -3.0,
+    },
+]
+
+
+@pytest.fixture(scope="module")
+def bonus_config():
+    return default_bonus_config()
+
+
+def _bonus_input_from_player(
+    player, *, team_goals_conceded: int, role: str | None
+) -> BonusMalusInput:
+    stats = player.statistics
+    cards = stats.get("cards") or {}
+    penalty = stats.get("penalty") or {}
+    return BonusMalusInput(
+        goals=player.goals_total,
+        assists=player.assists_total,
+        yellow_card=int(cards.get("yellow") or 0) > 0,
+        red_card=int(cards.get("red") or 0) > 0,
+        penalty_missed=int(penalty.get("missed") or 0),
+        penalty_saved=int(penalty.get("saved") or 0),
+        role=role,
+        team_goals_conceded=team_goals_conceded,
+    )
+
+
+@pytest.mark.parametrize("case", BONUS_GOLDEN, ids=lambda c: str(c["player_id"]))
+def test_bonus_malus_golden_subset(config, bonus_config, case):
+    player = _load_player(39, 1035055, case["player_id"])
+    rating = compute_rating(player, config)
+    assert rating.eligible is True
+
+    bonus_input = _bonus_input_from_player(
+        player,
+        team_goals_conceded=case["team_goals_conceded"],
+        role=rating.role,
+    )
+    result = compute_bonus_malus(bonus_input, bonus_config, eligible=rating.eligible)
+
+    actual = {item.id: item.contribution for item in result.components}
+    assert actual == case["components"]
+    assert result.total == pytest.approx(case["total"])
+
+    fantasy_score = round(rating.display + result.total, 10)
+    assert fantasy_score == pytest.approx(rating.display + case["total"])

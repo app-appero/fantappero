@@ -11,6 +11,12 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from database.enums import FantasyRole
+from fantasy_ratings.bonus import (
+    BonusMalusResult,
+    compute_bonus_malus,
+    reconstruct_total_from_stored,
+)
+from fantasy_ratings.bonus_config import BonusMalusConfig, default_bonus_config
 from fantasy_ratings.config import FormulaConfig, default_formula_config
 from fantasy_ratings.eligibility import evaluate_eligibility
 from fantasy_ratings.exceptions import FantasyRatingError
@@ -21,7 +27,11 @@ from fantasy_ratings.formula import (
     round_to_step,
 )
 from fantasy_ratings.input import RelevantEvents
-from fantasy_ratings.mapping import inputs_from_fixture_stats
+from fantasy_ratings.mapping import (
+    bonus_input_from_stat,
+    inputs_from_fixture_stats,
+    own_goal_counts_by_provider_id,
+)
 from fantasy_ratings.models import PlayerMatchRating
 from fantasy_ratings.schemas import ComputeRatingsResponse, PlayerMatchRatingResponse
 from fantasy_ratings.validators import (
@@ -78,9 +88,16 @@ def _payload_equal(left: Any, right: Any) -> bool:
 
 
 class FantasyRatingService:
-    def __init__(self, session: Session, *, config: FormulaConfig | None = None) -> None:
+    def __init__(
+        self,
+        session: Session,
+        *,
+        config: FormulaConfig | None = None,
+        bonus_config: BonusMalusConfig | None = None,
+    ) -> None:
         self._session = session
         self._config = config or default_formula_config()
+        self._bonus_config = bonus_config or default_bonus_config()
 
     def compute_for_fixture(
         self,
@@ -99,6 +116,7 @@ class FantasyRatingService:
             fixture_id=fixture_id,
             fixture_provider_id=fixture_provider_id,
             config=self._config,
+            bonus_config=self._bonus_config,
             league_id=league_id,
             minutes_threshold=minutes_threshold,
         )
@@ -146,10 +164,12 @@ def compute_fixture_ratings(
     fixture_id: UUID | None = None,
     fixture_provider_id: int | None = None,
     config: FormulaConfig | None = None,
+    bonus_config: BonusMalusConfig | None = None,
     league_id: UUID | None = None,
     minutes_threshold: int | None = None,
 ) -> RatingComputeResult:
     formula = config or default_formula_config()
+    bonus_cfg = bonus_config or default_bonus_config()
     resolved = _resolve_minutes_threshold(
         session,
         league_id=league_id,
@@ -180,15 +200,24 @@ def compute_fixture_ratings(
                 stats=stats,
                 events=events,
             )
+            own_goal_counts = own_goal_counts_by_provider_id(events)
             kept_ids: set[int] = set()
             formula_snapshot = formula.as_dict()
             for player, stat in zip(inputs, stats, strict=True):
                 rating = compute_rating(player, formula)
+                bonus_input = bonus_input_from_stat(
+                    fixture=fixture,
+                    stat=stat,
+                    role=rating.role,
+                    own_goal_counts=own_goal_counts,
+                )
+                bonus = compute_bonus_malus(bonus_input, bonus_cfg, eligible=rating.eligible)
                 _upsert_rating(
                     session,
                     fixture=fixture,
                     stat=stat,
                     rating=rating,
+                    bonus=bonus,
                     formula_snapshot=formula_snapshot,
                     input_snapshot=player.as_input_snapshot(),
                     counters=counters,
@@ -310,6 +339,7 @@ def _upsert_rating(
     fixture: Fixture,
     stat: PlayerMatchStat,
     rating: RatingResult,
+    bonus: BonusMalusResult,
     formula_snapshot: dict[str, Any],
     input_snapshot: dict[str, Any],
     counters: RatingComputeCounters,
@@ -322,6 +352,19 @@ def _upsert_rating(
             "rating_not_reconstructable",
             "Il voto calcolato non è ricostruibile da formula e componenti.",
         )
+
+    bonus_components = bonus.as_dict()
+    bonus_total = reconstruct_total_from_stored(bonus_components)
+    if abs(bonus_total - bonus.total) > 1e-9:
+        raise FantasyRatingError(
+            "bonus_malus_not_reconstructable",
+            "Il bonus/malus calcolato non è ricostruibile dai componenti.",
+        )
+    fantasy_score = (
+        round(rating.display + bonus_total, 10)
+        if rating.eligible and rating.display is not None
+        else None
+    )
 
     row = session.execute(
         select(PlayerMatchRating).where(
@@ -351,6 +394,10 @@ def _upsert_rating(
             formula_json=formula_snapshot,
             input_json=input_snapshot,
             components_json=components,
+            bonus_config_version=bonus.config_version,
+            bonus_malus_json=bonus_components,
+            bonus_malus_total=bonus_total,
+            fantasy_score=fantasy_score,
         )
         session.add(row)
         counters.incr("created")
@@ -365,6 +412,10 @@ def _upsert_rating(
         and _payload_equal(row.formula_json, formula_snapshot)
         and _payload_equal(row.input_json, input_snapshot)
         and _payload_equal(row.components_json, components)
+        and row.bonus_config_version == bonus.config_version
+        and _payload_equal(row.bonus_malus_json, bonus_components)
+        and row.bonus_malus_total == bonus_total
+        and row.fantasy_score == fantasy_score
     )
     if unchanged:
         counters.incr("unchanged")
@@ -383,6 +434,10 @@ def _upsert_rating(
     row.formula_json = formula_snapshot
     row.input_json = input_snapshot
     row.components_json = components
+    row.bonus_config_version = bonus.config_version
+    row.bonus_malus_json = bonus_components
+    row.bonus_malus_total = bonus_total
+    row.fantasy_score = fantasy_score
     _touch_updated_at(row)
     counters.incr("updated")
     return row
@@ -406,6 +461,14 @@ def _to_response(
             config=formula,
         )
         formula_payload = {**formula_payload, "minutes_threshold": overlay_threshold}
+    fantasy_score = row.fantasy_score
+    if overlay_threshold is not None and eligible != row.eligible:
+        # La soglia overlay cambia l'eleggibilità: senza voto niente fantavoto;
+        # con voto usiamo il bonus/malus persistito (il ricalcolo reale avviene
+        # solo tramite POST /fantasy-ratings/compute).
+        fantasy_score = (
+            round(display + row.bonus_malus_total, 10) if eligible and display is not None else None
+        )
     return PlayerMatchRatingResponse(
         id=str(row.id),
         fixture_id=str(row.fixture_id),
@@ -424,4 +487,8 @@ def _to_response(
         formula=formula_payload,
         input=dict(row.input_json),
         components=list(row.components_json),
+        bonus_config_version=row.bonus_config_version,
+        bonus_malus=list(row.bonus_malus_json),
+        bonus_malus_total=row.bonus_malus_total,
+        fantasy_score=fantasy_score,
     )

@@ -93,6 +93,18 @@ class PlayerMatchRating(Base, UUIDPrimaryKeyMixin, TimestampMixin):
         nullable=False,
         server_default=text("'[]'::jsonb"),
     )
+    bonus_config_version: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    bonus_malus_json: Mapped[list[Any]] = mapped_column(
+        JSONB,
+        nullable=False,
+        server_default=text("'[]'::jsonb"),
+    )
+    bonus_malus_total: Mapped[float] = mapped_column(
+        Float,
+        nullable=False,
+        server_default=text("0"),
+    )
+    fantasy_score: Mapped[float | None] = mapped_column(Float, nullable=True)
 
     fixture: Mapped[Fixture] = relationship()
     athlete: Mapped[Athlete | None] = relationship()

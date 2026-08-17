@@ -1,32 +1,40 @@
-# Voto statistico versionato — EP07-01
+# Voto statistico e fantavoto versionati — EP07-01 / EP07-02 / EP07-03
 
 | Metadato | Valore |
 | --- | --- |
-| Card | EP07-01 |
+| Card | EP07-01, EP07-02, EP07-03 |
 | Modulo | `backend/src/fantasy_ratings/` |
-| Dipendenze | EP00-05 (spike Rating Beta), EP04-05 (fixture/stats), EP06 (turni — contesto matchday) |
+| Dipendenze | EP00-05 (spike Rating Beta), EP04-05 (fixture/stats/eventi), EP06 (turni — contesto matchday) |
 | Spike di riferimento | `experiments/rating_beta/` (`beta-v0.1`) |
+| Requisiti | FR-SCO-01 (voto statistico), FR-SCO-02 (bonus/malus e fantavoto) |
 
 ## Ruolo
 
 Persiste il **voto statistico FantApperò** per calciatore-partita con formula
-**versionata**, **input** e **componenti** spiegabili. Il motore è puro
-(`fantasy_ratings/formula.py`): base **6**, clamp **3–10**, pesi per ruolo P/D/C/A,
-gol/assist **esclusi** dal voto statistico (bonus/malus in EP07-03).
+**versionata**, **input** e **componenti** spiegabili (`fantasy_ratings/formula.py`):
+base **6**, clamp **3–10**, pesi per ruolo P/D/C/A, gol/assist **esclusi** dal voto
+statistico (contano solo nel bonus/malus, EP07-03).
 
-Fuori scope: bonus/malus (EP07-03), soglia minuti configurabile per lega
-(EP07-02), sostituzioni e formazione effettiva (EP07-04), punteggio H2H
-(EP07-05).
+La **soglia minuti** (EP07-02, `fantasy_ratings/eligibility.py`) è configurabile
+per lega 1–30 (default 15, `league_rules.minutes_threshold`): sotto soglia il
+calciatore resta senza voto salvo evento rilevante (gol, assist, rigore
+sbagliato, autogol, espulsione) o portiere titolare.
 
-## Formula `beta-v0.1`
+Il **bonus/malus** (EP07-03, `fantasy_ratings/bonus.py`) applica gli eventi
+ufficiali (FR-SCO-02) al voto statistico producendo il **fantavoto**.
+
+Fuori scope: sostituzioni e formazione effettiva (EP07-04), punteggio squadra
+e scontro diretto (EP07-05).
+
+## Formula voto statistico `beta-v0.1`
 
 | Parametro | Valore |
 | --- | --- |
 | `base` | 6.0 |
 | `clamp` | 3.0 – 10.0 |
 | `display_step` | 0.5 (solo se eleggibile) |
-| Soglia minuti (transitoria) | 15 (allineata allo spike EP00-05; EP07-02 la renderà configurabile) |
-| Gol/assist in stats | mai componenti |
+| Soglia minuti standard | 15, configurabile 1–30 per lega (`league_rules.minutes_threshold`) |
+| Gol/assist in stats | mai componenti del voto statistico |
 
 Ogni voto persistito contiene:
 
@@ -36,11 +44,45 @@ Ogni voto persistito contiene:
 
 Il voto è ricostruibile come `clamp(base + Σ contributioni)`.
 
+## Bonus e malus `bonus-beta-v0.1` (FR-SCO-02)
+
+| Evento | Valore | Ruolo |
+| --- | --- | --- |
+| Gol | +3 | tutti |
+| Assist | +1 | tutti |
+| Ammonizione | −0,5 | tutti |
+| Espulsione | −1 | tutti |
+| Autogol | −2 | tutti |
+| Rigore sbagliato | −3 | tutti |
+| Rigore parato | +3 | solo P |
+| Gol subito | −1 per gol | solo P |
+| Porta inviolata | +1 | solo P (0 gol subiti) |
+
+Regole:
+
+- ogni componente legge un campo statistico aggregato già deduplicato dal
+  provider (o un conteggio di `match_event` attivi con `provider_event_key`
+  univoco per l'autogol): nessun evento è contato due volte;
+- un rigore segnato è già incluso in `goals.total` (bonus gol), non riceve un
+  bonus "rigore segnato" separato, per non duplicare l'evento;
+- **decisione aperta** (FR-SCO-02, da chiudere nel regolamento esecutivo):
+  doppia ammonizione/espulsione nello stesso episodio. Default Beta
+  `red_supersedes_yellow` — si applica solo il malus espulsione;
+- il bonus/malus si applica solo se il voto statistico è eleggibile (EP07-02);
+  un calciatore senza voto non riceve bonus/malus.
+
+Ogni voto persistito contiene inoltre:
+
+- `bonus_malus_json` — componenti bonus/malus (`id`, `count`, `unit_value`, `contribution`);
+- `bonus_malus_total` — somma dei componenti;
+- `fantasy_score` — `display + bonus_malus_total` (fantavoto), `null` se non eleggibile;
+- `bonus_config_version` — versione della configurazione bonus/malus usata.
+
 ## Entità
 
 | Tabella | Vincoli | Note |
 | --- | --- | --- |
-| `player_match_ratings` | unique `(fixture_id, athlete_provider_id, formula_version)` | Upsert idempotente per hash stats |
+| `player_match_ratings` | unique `(fixture_id, athlete_provider_id, formula_version)` | Upsert idempotente per hash stats; colonne bonus/malus aggiunte in EP07-03 |
 
 ## API (permesso `global:operate`)
 
@@ -97,7 +139,9 @@ docker compose --env-file infra/local/.env.example run --rm api sh -lc \
 ```
 
 Golden test: stesso sottoinsieme del corpus EP00-02 (`1035055`) dello spike
-`experiments/rating_beta/tests/test_golden.py`.
+`experiments/rating_beta/tests/test_golden.py`, esteso in EP07-03 con casi
+bonus/malus reali (rigore parato/sbagliato, autogol, doppia ammonizione ed
+espulsione) sulla stessa fixture.
 
 ## Relazioni
 
