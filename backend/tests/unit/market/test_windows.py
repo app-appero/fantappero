@@ -5,8 +5,13 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 
-from database.enums import MarketSessionStatus
-from market.windows import effective_status, is_open_for_bids
+from database.enums import MarketSessionStatus, TradeStatus
+from market.windows import (
+    effective_status,
+    effective_trade_status,
+    is_open_for_bids,
+    is_trade_actionable,
+)
 
 
 @dataclass
@@ -74,3 +79,34 @@ def test_effective_status_terminal_states_are_sticky() -> None:
         closes_delta=timedelta(hours=1),
     )
     assert effective_status(closed_session, now=datetime.now(UTC)) == MarketSessionStatus.CLOSED
+
+
+@dataclass
+class _FakeTradeProposal:
+    """Duck-typed stand-in for ``TradeProposal``."""
+
+    status: TradeStatus
+    expires_at: datetime
+
+
+def test_effective_trade_status_is_proposed_before_deadline() -> None:
+    now = datetime.now(UTC)
+    proposal = _FakeTradeProposal(status=TradeStatus.PROPOSED, expires_at=now + timedelta(hours=1))
+    assert effective_trade_status(proposal, now=now) == TradeStatus.PROPOSED
+    assert is_trade_actionable(proposal, now=now)
+
+
+def test_effective_trade_status_expires_after_deadline_without_a_write() -> None:
+    now = datetime.now(UTC)
+    proposal = _FakeTradeProposal(status=TradeStatus.PROPOSED, expires_at=now - timedelta(hours=1))
+    assert effective_trade_status(proposal, now=now) == TradeStatus.EXPIRED
+    assert not is_trade_actionable(proposal, now=now)
+
+
+def test_effective_trade_status_terminal_state_wins_even_before_deadline() -> None:
+    now = datetime.now(UTC)
+    proposal = _FakeTradeProposal(
+        status=TradeStatus.CANCELLED, expires_at=now + timedelta(hours=1)
+    )
+    assert effective_trade_status(proposal, now=now) == TradeStatus.CANCELLED
+    assert not is_trade_actionable(proposal, now=now)

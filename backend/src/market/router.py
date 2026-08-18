@@ -25,6 +25,12 @@ from market.schemas import (
     SubmitMarketBidRequest,
 )
 from market.service import MarketService
+from market.trade_schemas import (
+    CreateTradeProposalRequest,
+    TradeProposalListResponse,
+    TradeProposalResponse,
+)
+from market.trade_service import TradeService
 
 router = APIRouter(prefix="/leagues", tags=["market"])
 
@@ -38,6 +44,10 @@ def _error_response(exc: AuthError) -> JSONResponse:
 
 def get_market_service(session: Session = Depends(get_db_session)) -> MarketService:
     return MarketService(session)
+
+
+def get_trade_service(session: Session = Depends(get_db_session)) -> TradeService:
+    return TradeService(session)
 
 
 @router.post(
@@ -336,5 +346,71 @@ def apply_voluntary_release(
     """Release the caller's own player and apply the percentage-based credit refund."""
     try:
         return service.apply_release(league_access, slot_index, body.reason)
+    except AuthError as exc:
+        return _error_response(exc)
+
+
+# -- Scambi tra partecipanti: proposta (EP08-05 / FR-MKT-03) --------------------
+
+
+@router.post(
+    "/{league_id}/mercato/scambi/proposte",
+    response_model=TradeProposalResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_trade_proposal(
+    body: CreateTradeProposalRequest,
+    league_access: LeagueAccess = Depends(require_league_permissions(Permission.MARKET_VIEW)),
+    service: TradeService = Depends(get_trade_service),
+) -> TradeProposalResponse | JSONResponse:
+    """Propose a trade to another team in the league (own team as proposer)."""
+    try:
+        return service.create_proposal(league_access, body)
+    except AuthError as exc:
+        return _error_response(exc)
+
+
+@router.get(
+    "/{league_id}/mercato/scambi/proposte",
+    response_model=TradeProposalListResponse,
+)
+def list_trade_proposals(
+    league_access: LeagueAccess = Depends(require_league_permissions(Permission.MARKET_VIEW)),
+    service: TradeService = Depends(get_trade_service),
+) -> TradeProposalListResponse | JSONResponse:
+    """List trade proposals sent or received by the caller's team."""
+    try:
+        return service.list_proposals(league_access)
+    except AuthError as exc:
+        return _error_response(exc)
+
+
+@router.get(
+    "/{league_id}/mercato/scambi/proposte/{proposal_id}",
+    response_model=TradeProposalResponse,
+)
+def get_trade_proposal(
+    proposal_id: UUID,
+    league_access: LeagueAccess = Depends(require_league_permissions(Permission.MARKET_VIEW)),
+    service: TradeService = Depends(get_trade_service),
+) -> TradeProposalResponse | JSONResponse:
+    try:
+        return service.get_proposal(league_access, proposal_id)
+    except AuthError as exc:
+        return _error_response(exc)
+
+
+@router.post(
+    "/{league_id}/mercato/scambi/proposte/{proposal_id}/annulla",
+    response_model=TradeProposalResponse,
+)
+def cancel_trade_proposal(
+    proposal_id: UUID,
+    league_access: LeagueAccess = Depends(require_league_permissions(Permission.MARKET_VIEW)),
+    service: TradeService = Depends(get_trade_service),
+) -> TradeProposalResponse | JSONResponse:
+    """Withdraw the caller's own pending proposal before the recipient acts on it."""
+    try:
+        return service.cancel_proposal(league_access, proposal_id)
     except AuthError as exc:
         return _error_response(exc)

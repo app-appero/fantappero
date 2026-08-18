@@ -19,7 +19,7 @@ from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from database.base import Base, TimestampMixin, UUIDPrimaryKeyMixin
-from database.enums import MarketBidStatus, MarketSessionKind, MarketSessionStatus
+from database.enums import MarketBidStatus, MarketSessionKind, MarketSessionStatus, TradeStatus
 from database.types import UTCDateTime
 
 if TYPE_CHECKING:
@@ -154,3 +154,63 @@ class MarketBid(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     fantasy_team: Mapped[FantasyTeam] = relationship()
     athlete: Mapped[Athlete] = relationship(foreign_keys=[athlete_id])
     release_athlete: Mapped[Athlete | None] = relationship(foreign_keys=[release_athlete_id])
+
+
+class TradeProposal(Base, UUIDPrimaryKeyMixin, TimestampMixin):
+    """One-to-one trade proposal between two fantasy teams (EP08-05 / FR-MKT-03)."""
+
+    __tablename__ = "trade_proposals"
+    __table_args__ = (
+        Index("ix_trade_proposals_league_id", "league_id"),
+        Index("ix_trade_proposals_proposer_team_id", "proposer_team_id"),
+        Index("ix_trade_proposals_recipient_team_id", "recipient_team_id"),
+        Index("ix_trade_proposals_status", "status"),
+        CheckConstraint("offered_credits >= 0", name="ck_trade_proposals_offered_credits"),
+        CheckConstraint("requested_credits >= 0", name="ck_trade_proposals_requested_credits"),
+        CheckConstraint(
+            "proposer_team_id != recipient_team_id",
+            name="ck_trade_proposals_distinct_teams",
+        ),
+    )
+
+    league_id: Mapped[UUID] = mapped_column(
+        ForeignKey("leagues.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    proposer_team_id: Mapped[UUID] = mapped_column(
+        ForeignKey("fantasy_teams.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    recipient_team_id: Mapped[UUID] = mapped_column(
+        ForeignKey("fantasy_teams.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    # Athlete UUIDs stored as JSONB string arrays: a trade side can carry several
+    # players, and the set is only meaningful together with the paired credits.
+    offered_athlete_ids: Mapped[list[str]] = mapped_column(JSONB, nullable=False)
+    requested_athlete_ids: Mapped[list[str]] = mapped_column(JSONB, nullable=False)
+    offered_credits: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("0"))
+    requested_credits: Mapped[int] = mapped_column(
+        Integer, nullable=False, server_default=text("0")
+    )
+    status: Mapped[TradeStatus] = mapped_column(
+        Enum(
+            TradeStatus,
+            name="trade_status",
+            native_enum=True,
+            create_constraint=True,
+            values_callable=lambda enum_cls: [member.value for member in enum_cls],
+        ),
+        nullable=False,
+        server_default=text("'proposed'"),
+    )
+    expires_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False)
+    created_by: Mapped[UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+
+    league: Mapped[League] = relationship()
+    proposer_team: Mapped[FantasyTeam] = relationship(foreign_keys=[proposer_team_id])
+    recipient_team: Mapped[FantasyTeam] = relationship(foreign_keys=[recipient_team_id])
+    creator: Mapped[User | None] = relationship()

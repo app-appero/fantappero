@@ -130,6 +130,8 @@ class LeagueAuditAction(str, enum.Enum):
     MARKET_BID_WITHDRAWN = "market_bid_withdrawn"
     MARKET_SESSION_RESOLVED = "market_session_resolved"
     MARKET_TIEBREAK_OPENED = "market_tiebreak_opened"
+    MARKET_TRADE_PROPOSED = "market_trade_proposed"
+    MARKET_TRADE_CANCELLED = "market_trade_cancelled"
 
 
 class FantasyTurnStatus(str, enum.Enum):
@@ -267,6 +269,19 @@ class MarketSessionStatus(str, enum.Enum):
     OPEN = "open"
     CLOSED = "closed"
     RESOLVED = "resolved"
+
+
+class TradeStatus(str, enum.Enum):
+    """Trade proposal lifecycle (EP08-05/06/07, Doc §17 'Scambio').
+
+    Only the states written by EP08-05 are defined here; ACCEPTED, REJECTED and
+    COUNTERED are added by EP08-06's migration, PENDING_APPROVAL/EXECUTED/
+    REJECTED_BY_ADMIN by EP08-07's, each as an ``ALTER TYPE ... ADD VALUE``.
+    """
+
+    PROPOSED = "proposed"
+    CANCELLED = "cancelled"
+    EXPIRED = "expired"
 
 
 class MarketBidStatus(str, enum.Enum):
