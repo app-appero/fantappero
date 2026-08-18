@@ -1,0 +1,43 @@
+"""HTTP schemas for the sealed-bid market session (EP08-01)."""
+
+from __future__ import annotations
+
+from pydantic import Field
+
+from auth.schemas import ApiModel
+
+
+class CreateMarketSessionRequest(ApiModel):
+    opens_at: str = Field(alias="opensAt", min_length=1)
+    closes_at: str = Field(alias="closesAt", min_length=1)
+
+
+class MarketSessionResponse(ApiModel):
+    id: str
+    league_id: str = Field(alias="leagueId")
+    kind: str
+    status: str
+    opens_at: str = Field(alias="opensAt")
+    closes_at: str = Field(alias="closesAt")
+    bid_count: int | None = Field(default=None, alias="bidCount")
+
+
+class SubmitMarketBidRequest(ApiModel):
+    amount_credits: int = Field(alias="amountCredits", ge=1)
+
+
+class MarketBidResponse(ApiModel):
+    id: str
+    session_id: str = Field(alias="sessionId")
+    fantasy_team_id: str = Field(alias="fantasyTeamId")
+    athlete_id: str = Field(alias="athleteId")
+    athlete_name: str = Field(alias="athleteName")
+    amount_credits: int = Field(alias="amountCredits")
+    status: str
+    submitted_at: str = Field(alias="submittedAt")
+
+
+class MarketBidListResponse(ApiModel):
+    session_id: str = Field(alias="sessionId")
+    fantasy_team_id: str = Field(alias="fantasyTeamId")
+    bids: list[MarketBidResponse] = Field(default_factory=list)

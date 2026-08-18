@@ -1,0 +1,130 @@
+"""ORM models for the sealed-bid market session and its bids (EP08-01)."""
+
+from __future__ import annotations
+
+from datetime import datetime
+from typing import TYPE_CHECKING
+from uuid import UUID
+
+from sqlalchemy import (
+    CheckConstraint,
+    Enum,
+    ForeignKey,
+    Index,
+    Integer,
+    UniqueConstraint,
+    text,
+)
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+
+from database.base import Base, TimestampMixin, UUIDPrimaryKeyMixin
+from database.enums import MarketBidStatus, MarketSessionKind, MarketSessionStatus
+from database.types import UTCDateTime
+
+if TYPE_CHECKING:
+    from auth.models.user import User
+    from fantasy_teams.models import FantasyTeam
+    from leagues.models.league import League
+    from sports_data.roster.models import Athlete
+
+
+class MarketSession(Base, UUIDPrimaryKeyMixin, TimestampMixin):
+    """Sealed-bid market window (initial auction; waiver reuses this in EP08-03)."""
+
+    __tablename__ = "market_sessions"
+    __table_args__ = (
+        Index("ix_market_sessions_league_id", "league_id"),
+        Index("ix_market_sessions_status", "status"),
+        CheckConstraint("closes_at > opens_at", name="ck_market_sessions_window_order"),
+    )
+
+    league_id: Mapped[UUID] = mapped_column(
+        ForeignKey("leagues.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    kind: Mapped[MarketSessionKind] = mapped_column(
+        Enum(
+            MarketSessionKind,
+            name="market_session_kind",
+            native_enum=True,
+            create_constraint=True,
+            values_callable=lambda enum_cls: [member.value for member in enum_cls],
+        ),
+        nullable=False,
+    )
+    status: Mapped[MarketSessionStatus] = mapped_column(
+        Enum(
+            MarketSessionStatus,
+            name="market_session_status",
+            native_enum=True,
+            create_constraint=True,
+            values_callable=lambda enum_cls: [member.value for member in enum_cls],
+        ),
+        nullable=False,
+        server_default=text("'scheduled'"),
+    )
+    opens_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False)
+    closes_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False)
+    created_by: Mapped[UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+
+    league: Mapped[League] = relationship()
+    creator: Mapped[User | None] = relationship()
+    bids: Mapped[list[MarketBid]] = relationship(
+        back_populates="session",
+        cascade="all, delete-orphan",
+    )
+
+
+class MarketBid(Base, UUIDPrimaryKeyMixin, TimestampMixin):
+    """Sealed offer for one athlete inside a market session (EP08-01)."""
+
+    __tablename__ = "market_bids"
+    __table_args__ = (
+        UniqueConstraint(
+            "session_id",
+            "fantasy_team_id",
+            "athlete_id",
+            name="uq_market_bids_session_team_athlete",
+        ),
+        Index("ix_market_bids_session_id", "session_id"),
+        Index("ix_market_bids_athlete_id", "athlete_id"),
+        Index("ix_market_bids_fantasy_team_id", "fantasy_team_id"),
+        CheckConstraint("amount_credits >= 1", name="ck_market_bids_amount_credits"),
+    )
+
+    session_id: Mapped[UUID] = mapped_column(
+        ForeignKey("market_sessions.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    fantasy_team_id: Mapped[UUID] = mapped_column(
+        ForeignKey("fantasy_teams.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    athlete_id: Mapped[UUID] = mapped_column(
+        ForeignKey("athletes.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    amount_credits: Mapped[int] = mapped_column(Integer, nullable=False)
+    status: Mapped[MarketBidStatus] = mapped_column(
+        Enum(
+            MarketBidStatus,
+            name="market_bid_status",
+            native_enum=True,
+            create_constraint=True,
+            values_callable=lambda enum_cls: [member.value for member in enum_cls],
+        ),
+        nullable=False,
+        server_default=text("'submitted'"),
+    )
+    submitted_at: Mapped[datetime] = mapped_column(
+        UTCDateTime(),
+        nullable=False,
+        server_default=text("timezone('utc', now())"),
+    )
+
+    session: Mapped[MarketSession] = relationship(back_populates="bids")
+    fantasy_team: Mapped[FantasyTeam] = relationship()
+    athlete: Mapped[Athlete] = relationship()

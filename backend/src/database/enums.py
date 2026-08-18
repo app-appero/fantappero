@@ -124,6 +124,10 @@ class LeagueAuditAction(str, enum.Enum):
     CREDIT_LEDGER_ENTRY_POSTED = "credit_ledger_entry_posted"
     FANTASY_ROUND_HOMOLOGATED = "fantasy_round_homologated"
     FANTASY_ROUND_CORRECTION_APPLIED = "fantasy_round_correction_applied"
+    MARKET_SESSION_CREATED = "market_session_created"
+    MARKET_SESSION_CLOSED = "market_session_closed"
+    MARKET_BID_SUBMITTED = "market_bid_submitted"
+    MARKET_BID_WITHDRAWN = "market_bid_withdrawn"
 
 
 class FantasyTurnStatus(str, enum.Enum):
@@ -241,6 +245,31 @@ class PrivacyAuditAction(str, enum.Enum):
 
     DATA_EXPORT = "data_export"
     ACCOUNT_DELETE = "account_delete"
+
+
+class MarketSessionKind(str, enum.Enum):
+    """Kind of sealed-bid market window (EP08-01 / FR-AST-01, FR-MKT-01)."""
+
+    INITIAL_AUCTION = "initial_auction"
+
+
+class MarketSessionStatus(str, enum.Enum):
+    """Lifecycle of a sealed-bid market session window (EP08-01)."""
+
+    SCHEDULED = "scheduled"
+    OPEN = "open"
+    CLOSED = "closed"
+    RESOLVED = "resolved"
+
+
+class MarketBidStatus(str, enum.Enum):
+    """Sealed offer lifecycle, shared by auction and waiver bids (Doc §17 'Offerta mercato')."""
+
+    SUBMITTED = "submitted"
+    EXPIRED = "expired"
+    WON = "won"
+    LOST = "lost"
+    CANCELLED = "cancelled"
 
 
 class Permission(str, enum.Enum):
