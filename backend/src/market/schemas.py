@@ -26,6 +26,9 @@ class MarketSessionResponse(ApiModel):
 
 class SubmitMarketBidRequest(ApiModel):
     amount_credits: int = Field(alias="amountCredits", ge=1)
+    # Required for waiver bids (FR-MKT-01): the roster player to release if won.
+    # Must be omitted for initial-auction bids.
+    release_athlete_id: str | None = Field(default=None, alias="releaseAthleteId")
 
 
 class MarketBidResponse(ApiModel):
@@ -37,6 +40,8 @@ class MarketBidResponse(ApiModel):
     amount_credits: int = Field(alias="amountCredits")
     status: str
     submitted_at: str = Field(alias="submittedAt")
+    release_athlete_id: str | None = Field(default=None, alias="releaseAthleteId")
+    release_athlete_name: str | None = Field(default=None, alias="releaseAthleteName")
 
 
 class MarketBidListResponse(ApiModel):

@@ -69,3 +69,30 @@ def validate_team_eligible_for_session(
             "La tua squadra non partecipa a questo spareggio.",
             code="market_team_not_eligible",
         )
+
+
+def validate_release_athlete_required(release_athlete_id: UUID | None) -> UUID:
+    """Every waiver bid must name the roster player to release (FR-MKT-01)."""
+    if release_athlete_id is None:
+        raise ValidationAuthError(
+            "Indica il calciatore da svincolare per completare l'offerta.",
+            code="release_athlete_required",
+        )
+    return release_athlete_id
+
+
+def validate_release_athlete_not_allowed(release_athlete_id: str | None) -> None:
+    """Auction bids never name a player to release — that is waiver-only."""
+    if release_athlete_id is not None:
+        raise ValidationAuthError(
+            "L'asta iniziale non prevede lo svincolo di un calciatore.",
+            code="release_athlete_not_allowed",
+        )
+
+
+def validate_release_athlete_owned_by_team(*, owner_team_id: UUID | None, team_id: UUID) -> None:
+    if owner_team_id != team_id:
+        raise ValidationAuthError(
+            "Il calciatore da svincolare non è nella tua rosa.",
+            code="release_athlete_not_owned",
+        )

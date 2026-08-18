@@ -219,6 +219,7 @@ class CreditLedgerReason(str, enum.Enum):
     ROSTER_PURCHASE = "roster_purchase"
     ROSTER_RELEASE_REFUND = "roster_release_refund"
     MARKET_AUCTION_WIN = "market_auction_win"
+    MARKET_WAIVER_ACQUISITION = "market_waiver_acquisition"
 
 
 class LeagueCalendarStatus(str, enum.Enum):
@@ -255,6 +256,7 @@ class MarketSessionKind(str, enum.Enum):
     """Kind of sealed-bid market window (EP08-01 / FR-AST-01, FR-MKT-01)."""
 
     INITIAL_AUCTION = "initial_auction"
+    WAIVER = "waiver"
 
 
 class MarketSessionStatus(str, enum.Enum):

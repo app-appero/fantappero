@@ -23,7 +23,7 @@ from fantasy_teams.models import FantasyRosterSlot, FantasyTeam
 from leagues.models.league import League
 from leagues.models.league_audit_event import LeagueAuditEvent
 from leagues.models.league_membership import LeagueMembership
-from market.assignment import assign_winning_bid
+from market.assignment import assign_winning_bid, assign_winning_waiver_bid
 from market.models import MarketBid, MarketSession
 from market.schemas import (
     CreateMarketSessionRequest,
@@ -39,6 +39,9 @@ from market.validators import (
     validate_athlete_is_free_agent,
     validate_bid_amount,
     validate_bid_targets_session_athlete,
+    validate_release_athlete_not_allowed,
+    validate_release_athlete_owned_by_team,
+    validate_release_athlete_required,
     validate_session_window,
     validate_team_eligible_for_session,
     validate_team_has_free_slot,
@@ -81,6 +84,24 @@ class MarketService:
         league_access: LeagueAccess,
         payload: CreateMarketSessionRequest,
     ) -> MarketSessionResponse:
+        return self._create_session(
+            league_access, payload, kind=MarketSessionKind.INITIAL_AUCTION
+        )
+
+    def create_waiver_session(
+        self,
+        league_access: LeagueAccess,
+        payload: CreateMarketSessionRequest,
+    ) -> MarketSessionResponse:
+        return self._create_session(league_access, payload, kind=MarketSessionKind.WAIVER)
+
+    def _create_session(
+        self,
+        league_access: LeagueAccess,
+        payload: CreateMarketSessionRequest,
+        *,
+        kind: MarketSessionKind,
+    ) -> MarketSessionResponse:
         league = self._lock_league(league_access.league.id)
         opens_at = _parse_required_datetime(payload.opens_at, field="opensAt")
         closes_at = _parse_required_datetime(payload.closes_at, field="closesAt")
@@ -89,7 +110,8 @@ class MarketService:
         existing = self._session.scalar(
             select(MarketSession).where(
                 MarketSession.league_id == league.id,
-                MarketSession.kind == MarketSessionKind.INITIAL_AUCTION,
+                MarketSession.kind == kind,
+                MarketSession.parent_session_id.is_(None),
                 MarketSession.status.in_(
                     (MarketSessionStatus.SCHEDULED, MarketSessionStatus.OPEN)
                 ),
@@ -100,13 +122,13 @@ class MarketService:
             MarketSessionStatus.OPEN,
         ):
             raise ValidationAuthError(
-                "Esiste già una sessione d'asta attiva per questa lega.",
+                "Esiste già una sessione di questo tipo attiva per questa lega.",
                 code="market_session_already_active",
             )
 
         market_session = MarketSession(
             league_id=league.id,
-            kind=MarketSessionKind.INITIAL_AUCTION,
+            kind=kind,
             status=MarketSessionStatus.SCHEDULED,
             opens_at=opens_at,
             closes_at=closes_at,
@@ -120,12 +142,13 @@ class MarketService:
             LeagueAuditAction.MARKET_SESSION_CREATED,
             details={
                 "sessionId": str(market_session.id),
+                "kind": kind.value,
                 "opensAt": opens_at.isoformat(),
                 "closesAt": closes_at.isoformat(),
             },
         )
         self._session.commit()
-        get_metrics().incr("market_session_created_total", labels={"kind": "initial_auction"})
+        get_metrics().incr("market_session_created_total", labels={"kind": kind.value})
         return self._to_session_response(market_session)
 
     def close_session(
@@ -152,12 +175,16 @@ class MarketService:
         get_metrics().incr("market_session_closed_total")
         return self._to_session_response(market_session)
 
-    def list_sessions(self, league_access: LeagueAccess) -> list[MarketSessionResponse]:
-        rows = self._session.scalars(
-            select(MarketSession)
-            .where(MarketSession.league_id == league_access.league.id)
-            .order_by(MarketSession.opens_at.desc())
-        ).all()
+    def list_sessions(
+        self,
+        league_access: LeagueAccess,
+        *,
+        kind: MarketSessionKind | None = None,
+    ) -> list[MarketSessionResponse]:
+        stmt = select(MarketSession).where(MarketSession.league_id == league_access.league.id)
+        if kind is not None:
+            stmt = stmt.where(MarketSession.kind == kind)
+        rows = self._session.scalars(stmt.order_by(MarketSession.opens_at.desc())).all()
         return [self._to_session_response(row) for row in rows]
 
     def get_session(
@@ -227,16 +254,32 @@ class MarketService:
         candidates.sort(key=lambda row: (-row.amount_credits, row.submitted_at))
 
         for bid in candidates:
-            transaction_id = f"auction:{market_session.id}:{bid.fantasy_team_id}:{bid.athlete_id}"
-            slot = assign_winning_bid(
-                self._session,
-                league=league,
-                team=bid.fantasy_team,
-                athlete_id=bid.athlete_id,
-                amount_credits=bid.amount_credits,
-                transaction_id=transaction_id,
-                actor_id=league_access.user.id,
-            )
+            transaction_id = f"market:{market_session.id}:{bid.fantasy_team_id}:{bid.athlete_id}"
+            if market_session.kind == MarketSessionKind.WAIVER:
+                slot = (
+                    assign_winning_waiver_bid(
+                        self._session,
+                        league=league,
+                        team=bid.fantasy_team,
+                        acquire_athlete_id=bid.athlete_id,
+                        release_athlete_id=bid.release_athlete_id,
+                        amount_credits=bid.amount_credits,
+                        transaction_id=transaction_id,
+                        actor_id=league_access.user.id,
+                    )
+                    if bid.release_athlete_id is not None
+                    else None
+                )
+            else:
+                slot = assign_winning_bid(
+                    self._session,
+                    league=league,
+                    team=bid.fantasy_team,
+                    athlete_id=bid.athlete_id,
+                    amount_credits=bid.amount_credits,
+                    transaction_id=transaction_id,
+                    actor_id=league_access.user.id,
+                )
             bid.status = MarketBidStatus.WON if slot is not None else MarketBidStatus.LOST
 
         tiebreak_count = 0
@@ -383,16 +426,41 @@ class MarketService:
         balance = account.balance if account is not None else 0
         validate_amount_within_balance(amount_credits=amount, balance=balance)
 
-        has_free_slot = (
-            self._session.scalar(
+        release_athlete_id: UUID | None
+        if market_session.kind == MarketSessionKind.WAIVER:
+            raw_release_id = payload.release_athlete_id
+            try:
+                release_athlete_id = validate_release_athlete_required(
+                    UUID(raw_release_id) if raw_release_id else None
+                )
+            except ValueError as exc:
+                raise ValidationAuthError(
+                    "Identificativo del calciatore da svincolare non valido.",
+                    code="invalid_release_athlete_id",
+                ) from exc
+            release_slot = self._session.scalar(
                 select(FantasyRosterSlot).where(
-                    FantasyRosterSlot.fantasy_team_id == team.id,
-                    FantasyRosterSlot.athlete_id.is_(None),
+                    FantasyRosterSlot.league_id == league_access.league.id,
+                    FantasyRosterSlot.athlete_id == release_athlete_id,
                 )
             )
-            is not None
-        )
-        validate_team_has_free_slot(has_free_slot=has_free_slot)
+            validate_release_athlete_owned_by_team(
+                owner_team_id=release_slot.fantasy_team_id if release_slot is not None else None,
+                team_id=team.id,
+            )
+        else:
+            validate_release_athlete_not_allowed(payload.release_athlete_id)
+            release_athlete_id = None
+            has_free_slot = (
+                self._session.scalar(
+                    select(FantasyRosterSlot).where(
+                        FantasyRosterSlot.fantasy_team_id == team.id,
+                        FantasyRosterSlot.athlete_id.is_(None),
+                    )
+                )
+                is not None
+            )
+            validate_team_has_free_slot(has_free_slot=has_free_slot)
 
         existing_bid = self._session.scalar(
             select(MarketBid)
@@ -405,6 +473,7 @@ class MarketService:
         )
         if existing_bid is not None:
             existing_bid.amount_credits = amount
+            existing_bid.release_athlete_id = release_athlete_id
             existing_bid.status = MarketBidStatus.SUBMITTED
             bid = existing_bid
             self._session.flush()
@@ -414,6 +483,7 @@ class MarketService:
                 fantasy_team_id=team.id,
                 athlete_id=athlete_id,
                 amount_credits=amount,
+                release_athlete_id=release_athlete_id,
             )
             try:
                 with self._session.begin_nested():
@@ -445,12 +515,16 @@ class MarketService:
                 "fantasyTeamId": str(team.id),
                 "athleteId": str(athlete_id),
                 "amountCredits": amount,
+                "releaseAthleteId": str(release_athlete_id) if release_athlete_id else None,
             },
         )
         self._session.commit()
-        get_metrics().incr("market_bid_submitted_total")
+        get_metrics().incr("market_bid_submitted_total", labels={"kind": market_session.kind.value})
         self._session.refresh(bid)
-        return self._to_bid_response(bid, athlete=athlete)
+        release_athlete = (
+            self._session.get(Athlete, release_athlete_id) if release_athlete_id else None
+        )
+        return self._to_bid_response(bid, athlete=athlete, release_athlete=release_athlete)
 
     def withdraw_bid(
         self,
@@ -501,7 +575,10 @@ class MarketService:
         team = self._my_team(league_access)
         rows = self._session.scalars(
             select(MarketBid)
-            .options(selectinload(MarketBid.athlete))
+            .options(
+                selectinload(MarketBid.athlete),
+                selectinload(MarketBid.release_athlete),
+            )
             .where(
                 MarketBid.session_id == market_session.id,
                 MarketBid.fantasy_team_id == team.id,
@@ -511,7 +588,10 @@ class MarketService:
         return MarketBidListResponse(
             sessionId=str(market_session.id),
             fantasyTeamId=str(team.id),
-            bids=[self._to_bid_response(row, athlete=row.athlete) for row in rows],
+            bids=[
+                self._to_bid_response(row, athlete=row.athlete, release_athlete=row.release_athlete)
+                for row in rows
+            ],
         )
 
     # -- helpers --------------------------------------------------------------
@@ -625,7 +705,13 @@ class MarketService:
             ),
         )
 
-    def _to_bid_response(self, bid: MarketBid, *, athlete: Athlete) -> MarketBidResponse:
+    def _to_bid_response(
+        self,
+        bid: MarketBid,
+        *,
+        athlete: Athlete,
+        release_athlete: Athlete | None = None,
+    ) -> MarketBidResponse:
         return MarketBidResponse(
             id=str(bid.id),
             sessionId=str(bid.session_id),
@@ -635,4 +721,6 @@ class MarketService:
             amountCredits=bid.amount_credits,
             status=bid.status.value,
             submittedAt=bid.submitted_at.isoformat(),
+            releaseAthleteId=str(bid.release_athlete_id) if bid.release_athlete_id else None,
+            releaseAthleteName=release_athlete.canonical_name if release_athlete else None,
         )

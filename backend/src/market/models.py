@@ -127,6 +127,12 @@ class MarketBid(Base, UUIDPrimaryKeyMixin, TimestampMixin):
         nullable=False,
     )
     amount_credits: Mapped[int] = mapped_column(Integer, nullable=False)
+    # Waiver bids only (EP08-03 / FR-MKT-01): the roster player the team commits to
+    # release if this bid wins. Never set on initial-auction bids.
+    release_athlete_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("athletes.id", ondelete="RESTRICT"),
+        nullable=True,
+    )
     status: Mapped[MarketBidStatus] = mapped_column(
         Enum(
             MarketBidStatus,
@@ -146,4 +152,5 @@ class MarketBid(Base, UUIDPrimaryKeyMixin, TimestampMixin):
 
     session: Mapped[MarketSession] = relationship(back_populates="bids")
     fantasy_team: Mapped[FantasyTeam] = relationship()
-    athlete: Mapped[Athlete] = relationship()
+    athlete: Mapped[Athlete] = relationship(foreign_keys=[athlete_id])
+    release_athlete: Mapped[Athlete | None] = relationship(foreign_keys=[release_athlete_id])
