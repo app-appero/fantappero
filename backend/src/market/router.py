@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import datetime
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query, status
@@ -13,6 +14,8 @@ from auth.exceptions import AuthError
 from authorization.context import LeagueAccess
 from authorization.dependencies import require_league_permissions
 from database.enums import MarketSessionKind, Permission
+from market.history_schemas import MarketHistoryListResponse
+from market.history_service import DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE, MarketHistoryService
 from market.schemas import (
     CreateMarketSessionRequest,
     MarketBidListResponse,
@@ -49,6 +52,12 @@ def get_market_service(session: Session = Depends(get_db_session)) -> MarketServ
 
 def get_trade_service(session: Session = Depends(get_db_session)) -> TradeService:
     return TradeService(session)
+
+
+def get_market_history_service(
+    session: Session = Depends(get_db_session),
+) -> MarketHistoryService:
+    return MarketHistoryService(session)
 
 
 @router.post(
@@ -500,5 +509,37 @@ def reject_trade_proposal_admin(
     """Reject a trade awaiting admin sign-off."""
     try:
         return service.reject_admin_proposal(league_access, proposal_id)
+    except AuthError as exc:
+        return _error_response(exc)
+
+
+# -- Storico mercato (EP08-08 / FR-MKT-04) --------------------------------------
+
+
+@router.get(
+    "/{league_id}/mercato/storico",
+    response_model=MarketHistoryListResponse,
+)
+def get_market_history(
+    category: str | None = Query(default=None),
+    fantasy_team_id: UUID | None = Query(default=None, alias="fantasyTeamId"),
+    date_from: datetime | None = Query(default=None, alias="dateFrom"),
+    date_to: datetime | None = Query(default=None, alias="dateTo"),
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=DEFAULT_PAGE_SIZE, ge=1, le=MAX_PAGE_SIZE, alias="pageSize"),
+    league_access: LeagueAccess = Depends(require_league_permissions(Permission.MARKET_VIEW)),
+    service: MarketHistoryService = Depends(get_market_history_service),
+) -> MarketHistoryListResponse | JSONResponse:
+    """Filterable, paginated market history: acquisti, svincoli, scambi e interventi manuali."""
+    try:
+        return service.list_history(
+            league_access,
+            category=category,
+            fantasy_team_id=fantasy_team_id,
+            date_from=date_from,
+            date_to=date_to,
+            page=page,
+            page_size=page_size,
+        )
     except AuthError as exc:
         return _error_response(exc)

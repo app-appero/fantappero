@@ -326,14 +326,24 @@ class MarketService:
         market_session.status = MarketSessionStatus.RESOLVED
         market_session.resolved_at = now
         self._session.flush()
+        winners = [
+            {
+                "fantasyTeamId": str(bid.fantasy_team_id),
+                "athleteId": str(bid.athlete_id),
+                "amountCredits": bid.amount_credits,
+            }
+            for bid in candidates
+            if bid.status == MarketBidStatus.WON
+        ]
         self._add_audit(
             league.id,
             league_access.user.id,
             LeagueAuditAction.MARKET_SESSION_RESOLVED,
             details={
                 "sessionId": str(market_session.id),
-                "assigned": sum(1 for bid in candidates if bid.status == MarketBidStatus.WON),
+                "assigned": len(winners),
                 "tiebreaksOpened": tiebreak_count,
+                "winners": winners,
             },
         )
         self._session.commit()
