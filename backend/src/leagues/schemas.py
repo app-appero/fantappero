@@ -49,6 +49,8 @@ class LeagueRulesResponse(ApiModel):
     min_fixtures_per_round: int = Field(alias="minFixturesPerRound")
     minutes_threshold: int = Field(alias="minutesThreshold")
     max_automatic_substitutions: int = Field(alias="maxAutomaticSubstitutions")
+    voluntary_release_refund_percent: int = Field(alias="voluntaryReleaseRefundPercent")
+    league_exit_refund_percent: int = Field(alias="leagueExitRefundPercent")
     options: LeagueRulesOptions
 
 
@@ -76,6 +78,10 @@ class UpdateLeagueRulesRequest(ApiModel):
     min_fixtures_per_round: int | None = Field(default=None, alias="minFixturesPerRound")
     minutes_threshold: int | None = Field(default=None, alias="minutesThreshold")
     max_automatic_substitutions: int | None = Field(default=None, alias="maxAutomaticSubstitutions")
+    voluntary_release_refund_percent: int | None = Field(
+        default=None, alias="voluntaryReleaseRefundPercent"
+    )
+    league_exit_refund_percent: int | None = Field(default=None, alias="leagueExitRefundPercent")
     options: LeagueRulesOptions
 
 

@@ -145,6 +145,16 @@ def validate_max_automatic_substitutions(value: int) -> int:
         ) from exc
 
 
+def validate_refund_percent(value: int, *, field: str) -> int:
+    """Bounds for the market release refund percentages (EP08-04 / FR-MKT-02)."""
+    if value < 0 or value > 100:
+        raise ValidationAuthError(
+            f"La percentuale {field} deve essere tra 0 e 100.",
+            code="invalid_refund_percent",
+        )
+    return value
+
+
 def validate_invite_expiry_days(expires_in_days: int) -> int:
     if expires_in_days < MIN_INVITE_EXPIRY_DAYS or expires_in_days > MAX_INVITE_EXPIRY_DAYS:
         raise ValidationAuthError(

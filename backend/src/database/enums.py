@@ -220,6 +220,7 @@ class CreditLedgerReason(str, enum.Enum):
     ROSTER_RELEASE_REFUND = "roster_release_refund"
     MARKET_AUCTION_WIN = "market_auction_win"
     MARKET_WAIVER_ACQUISITION = "market_waiver_acquisition"
+    MARKET_RELEASE_REFUND = "market_release_refund"
 
 
 class LeagueCalendarStatus(str, enum.Enum):
@@ -276,6 +277,13 @@ class MarketBidStatus(str, enum.Enum):
     WON = "won"
     LOST = "lost"
     CANCELLED = "cancelled"
+
+
+class MarketReleaseReason(str, enum.Enum):
+    """Cause of a voluntary roster release, driving the refund percentage (FR-MKT-02)."""
+
+    VOLUNTARY = "voluntary"
+    LEAGUE_EXIT = "league_exit"
 
 
 class Permission(str, enum.Enum):

@@ -8,10 +8,12 @@ import pytest
 
 from auth.exceptions import ValidationAuthError
 from market.validators import (
+    compute_release_refund,
     validate_amount_within_balance,
     validate_athlete_is_free_agent,
     validate_bid_amount,
     validate_session_window,
+    validate_slot_has_athlete,
     validate_team_has_free_slot,
 )
 
@@ -66,3 +68,18 @@ def test_validate_athlete_is_free_agent_rejects_owned() -> None:
 
 def test_validate_athlete_is_free_agent_accepts_unowned() -> None:
     validate_athlete_is_free_agent(owner_team_id=None)
+
+
+def test_validate_slot_has_athlete_rejects_empty_slot() -> None:
+    with pytest.raises(ValidationAuthError) as exc:
+        validate_slot_has_athlete(None)
+    assert exc.value.code == "release_slot_empty"
+
+
+def test_compute_release_refund_uses_floor_rounding() -> None:
+    # Documented rounding rule (FR-MKT-02): floor(purchase_credits * percent / 100).
+    assert compute_release_refund(purchase_credits=100, refund_percent=50) == 50
+    assert compute_release_refund(purchase_credits=99, refund_percent=50) == 49
+    assert compute_release_refund(purchase_credits=1, refund_percent=50) == 0
+    assert compute_release_refund(purchase_credits=100, refund_percent=100) == 100
+    assert compute_release_refund(purchase_credits=100, refund_percent=0) == 0

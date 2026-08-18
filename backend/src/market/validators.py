@@ -96,3 +96,22 @@ def validate_release_athlete_owned_by_team(*, owner_team_id: UUID | None, team_i
             "Il calciatore da svincolare non è nella tua rosa.",
             code="release_athlete_not_owned",
         )
+
+
+def validate_slot_has_athlete(athlete_id: UUID | None) -> UUID:
+    """A voluntary release needs an occupied slot (EP08-04 / FR-MKT-02)."""
+    if athlete_id is None:
+        raise ValidationAuthError(
+            "Lo slot è già libero.",
+            code="release_slot_empty",
+        )
+    return athlete_id
+
+
+def compute_release_refund(*, purchase_credits: int, refund_percent: int) -> int:
+    """Rounding rule for svincolo refunds: integer floor division (unique and public).
+
+    ``refund = floor(purchase_credits * refund_percent / 100)``. Documented once here
+    per FR-MKT-02 ("la regola di arrotondamento dei crediti deve essere unica e pubblica").
+    """
+    return (purchase_credits * refund_percent) // 100

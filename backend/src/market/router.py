@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Query, status
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
@@ -17,6 +17,9 @@ from market.schemas import (
     CreateMarketSessionRequest,
     MarketBidListResponse,
     MarketBidResponse,
+    MarketReleasePreviewResponse,
+    MarketReleaseRequest,
+    MarketReleaseResultResponse,
     MarketResolutionResponse,
     MarketSessionResponse,
     SubmitMarketBidRequest,
@@ -296,5 +299,42 @@ def list_my_waiver_bids(
     """List the caller's own sealed waiver bids for a session (own team only)."""
     try:
         return service.list_my_bids(league_access, session_id)
+    except AuthError as exc:
+        return _error_response(exc)
+
+
+# -- Svincolo volontario e recupero crediti (EP08-04 / FR-MKT-02) ---------------
+
+
+@router.get(
+    "/{league_id}/mercato/svincolo/{slot_index}/anteprima",
+    response_model=MarketReleasePreviewResponse,
+)
+def preview_voluntary_release(
+    slot_index: int,
+    reason: str = Query(alias="causa"),
+    league_access: LeagueAccess = Depends(require_league_permissions(Permission.MARKET_VIEW)),
+    service: MarketService = Depends(get_market_service),
+) -> MarketReleasePreviewResponse | JSONResponse:
+    """Preview the credit refund for releasing the caller's own player before confirming."""
+    try:
+        return service.preview_release(league_access, slot_index, reason)
+    except AuthError as exc:
+        return _error_response(exc)
+
+
+@router.post(
+    "/{league_id}/mercato/svincolo/{slot_index}",
+    response_model=MarketReleaseResultResponse,
+)
+def apply_voluntary_release(
+    slot_index: int,
+    body: MarketReleaseRequest,
+    league_access: LeagueAccess = Depends(require_league_permissions(Permission.MARKET_VIEW)),
+    service: MarketService = Depends(get_market_service),
+) -> MarketReleaseResultResponse | JSONResponse:
+    """Release the caller's own player and apply the percentage-based credit refund."""
+    try:
+        return service.apply_release(league_access, slot_index, body.reason)
     except AuthError as exc:
         return _error_response(exc)

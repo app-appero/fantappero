@@ -56,6 +56,14 @@ class LeagueRules(Base, UUIDPrimaryKeyMixin, TimestampMixin):
             "max_automatic_substitutions BETWEEN 0 AND 5",
             name="ck_league_rules_max_automatic_substitutions",
         ),
+        CheckConstraint(
+            "voluntary_release_refund_percent BETWEEN 0 AND 100",
+            name="ck_league_rules_voluntary_release_refund_percent",
+        ),
+        CheckConstraint(
+            "league_exit_refund_percent BETWEEN 0 AND 100",
+            name="ck_league_rules_league_exit_refund_percent",
+        ),
     )
 
     league_id: Mapped[UUID] = mapped_column(
@@ -94,6 +102,17 @@ class LeagueRules(Base, UUIDPrimaryKeyMixin, TimestampMixin):
         server_default=text("5"),
     )
     allow_trades: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("true"))
+    # Refund percentages for a released player, by cause (EP08-04 / FR-MKT-02).
+    voluntary_release_refund_percent: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        server_default=text("50"),
+    )
+    league_exit_refund_percent: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        server_default=text("100"),
+    )
     allow_manual_invites: Mapped[bool] = mapped_column(
         Boolean,
         nullable=False,

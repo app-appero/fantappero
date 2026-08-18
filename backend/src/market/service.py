@@ -12,29 +12,37 @@ from sqlalchemy.orm import Session, selectinload
 from auth.exceptions import ValidationAuthError
 from authorization.context import LeagueAccess
 from database.enums import (
+    CreditLedgerReason,
     LeagueAuditAction,
     MarketBidStatus,
+    MarketReleaseReason,
     MarketSessionKind,
     MarketSessionStatus,
 )
+from fantasy_teams.composition_service import sync_team_composition_status
 from fantasy_teams.factory import ensure_team_for_membership, find_team_for_membership
-from fantasy_teams.ledger import find_account_for_team
+from fantasy_teams.ledger import apply_ledger_movement, find_account_for_team
 from fantasy_teams.models import FantasyRosterSlot, FantasyTeam
+from fantasy_teams.ownership import sync_ownership_on_release
 from leagues.models.league import League
 from leagues.models.league_audit_event import LeagueAuditEvent
 from leagues.models.league_membership import LeagueMembership
+from leagues.models.league_rules import LeagueRules
 from market.assignment import assign_winning_bid, assign_winning_waiver_bid
 from market.models import MarketBid, MarketSession
 from market.schemas import (
     CreateMarketSessionRequest,
     MarketBidListResponse,
     MarketBidResponse,
+    MarketReleasePreviewResponse,
+    MarketReleaseResultResponse,
     MarketResolutionOutcomeResponse,
     MarketResolutionResponse,
     MarketSessionResponse,
     SubmitMarketBidRequest,
 )
 from market.validators import (
+    compute_release_refund,
     validate_amount_within_balance,
     validate_athlete_is_free_agent,
     validate_bid_amount,
@@ -43,6 +51,7 @@ from market.validators import (
     validate_release_athlete_owned_by_team,
     validate_release_athlete_required,
     validate_session_window,
+    validate_slot_has_athlete,
     validate_team_eligible_for_session,
     validate_team_has_free_slot,
 )
@@ -593,6 +602,134 @@ class MarketService:
                 for row in rows
             ],
         )
+
+    # -- voluntary release / refund (EP08-04 / FR-MKT-02) ----------------------
+
+    def preview_release(
+        self,
+        league_access: LeagueAccess,
+        slot_index: int,
+        reason_raw: str,
+    ) -> MarketReleasePreviewResponse:
+        team = self._my_team(league_access)
+        reason, percent = self._resolve_release_reason(league_access.league.id, reason_raw)
+        slot = self._session.scalar(
+            select(FantasyRosterSlot).where(
+                FantasyRosterSlot.fantasy_team_id == team.id,
+                FantasyRosterSlot.slot_index == slot_index,
+            )
+        )
+        if slot is None:
+            raise ValidationAuthError("Slot non trovato.", code="slot_not_found")
+        athlete_id = validate_slot_has_athlete(slot.athlete_id)
+        athlete = self._session.get(Athlete, athlete_id)
+        assert athlete is not None
+        purchase_credits = slot.purchase_credits or 0
+        refund = compute_release_refund(purchase_credits=purchase_credits, refund_percent=percent)
+        return MarketReleasePreviewResponse(
+            fantasyTeamId=str(team.id),
+            slotIndex=slot_index,
+            athleteId=str(athlete_id),
+            athleteName=athlete.canonical_name,
+            purchaseCredits=purchase_credits,
+            reason=reason.value,
+            refundPercent=percent,
+            refundCredits=refund,
+        )
+
+    def apply_release(
+        self,
+        league_access: LeagueAccess,
+        slot_index: int,
+        reason_raw: str,
+    ) -> MarketReleaseResultResponse:
+        league = self._lock_league(league_access.league.id)
+        team = self._my_team(league_access)
+        reason, percent = self._resolve_release_reason(league.id, reason_raw)
+
+        slot = self._session.scalar(
+            select(FantasyRosterSlot)
+            .where(
+                FantasyRosterSlot.fantasy_team_id == team.id,
+                FantasyRosterSlot.slot_index == slot_index,
+            )
+            .with_for_update()
+        )
+        if slot is None:
+            raise ValidationAuthError("Slot non trovato.", code="slot_not_found")
+        athlete_id = validate_slot_has_athlete(slot.athlete_id)
+        athlete = self._session.get(Athlete, athlete_id)
+        assert athlete is not None
+        purchase_credits = slot.purchase_credits or 0
+        refund = compute_release_refund(purchase_credits=purchase_credits, refund_percent=percent)
+
+        account = find_account_for_team(self._session, team.id, for_update=True)
+        if account is None:
+            raise ValidationAuthError("Conto crediti non trovato.", code="credit_account_not_found")
+
+        slot.athlete_id = None
+        slot.purchase_credits = None
+        sync_ownership_on_release(
+            self._session,
+            fantasy_team_id=team.id,
+            slot_index=slot_index,
+        )
+        if refund > 0:
+            apply_ledger_movement(
+                self._session,
+                account,
+                amount=refund,
+                reason=CreditLedgerReason.MARKET_RELEASE_REFUND,
+                transaction_id=f"release:{team.id}:{slot_index}:{athlete_id}",
+                actor_id=league_access.user.id,
+                note=f"Svincolo {athlete.canonical_name} ({reason.value}, {percent}%)",
+            )
+        sync_team_composition_status(self._session, team, league=league)
+        self._add_audit(
+            league.id,
+            league_access.user.id,
+            LeagueAuditAction.FANTASY_ROSTER_SLOT_RELEASED,
+            details={
+                "fantasyTeamId": str(team.id),
+                "slotIndex": slot_index,
+                "athleteId": str(athlete_id),
+                "reason": reason.value,
+                "refundPercent": percent,
+                "purchaseCredits": purchase_credits,
+                "refundCredits": refund,
+            },
+        )
+        self._session.commit()
+        get_metrics().incr("market_release_applied_total", labels={"reason": reason.value})
+        self._session.refresh(account)
+        return MarketReleaseResultResponse(
+            fantasyTeamId=str(team.id),
+            slotIndex=slot_index,
+            athleteId=str(athlete_id),
+            athleteName=athlete.canonical_name,
+            purchaseCredits=purchase_credits,
+            reason=reason.value,
+            refundPercent=percent,
+            refundCredits=refund,
+            balance=account.balance,
+        )
+
+    def _resolve_release_reason(
+        self, league_id: UUID, reason_raw: str
+    ) -> tuple[MarketReleaseReason, int]:
+        try:
+            reason = MarketReleaseReason(reason_raw)
+        except ValueError as exc:
+            raise ValidationAuthError(
+                "Causa dello svincolo non valida.",
+                code="invalid_release_reason",
+            ) from exc
+        rules = self._session.scalar(select(LeagueRules).where(LeagueRules.league_id == league_id))
+        if reason == MarketReleaseReason.LEAGUE_EXIT:
+            percent = rules.league_exit_refund_percent if rules else 100
+        else:
+            percent = rules.voluntary_release_refund_percent if rules else 50
+        return reason, percent
 
     # -- helpers --------------------------------------------------------------
 

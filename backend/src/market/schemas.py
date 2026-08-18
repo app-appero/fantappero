@@ -63,3 +63,22 @@ class MarketResolutionResponse(ApiModel):
     session_id: str = Field(alias="sessionId")
     status: str
     outcomes: list[MarketResolutionOutcomeResponse] = Field(default_factory=list)
+
+
+class MarketReleaseRequest(ApiModel):
+    reason: str = Field(min_length=1)  # "voluntary" | "league_exit"
+
+
+class MarketReleasePreviewResponse(ApiModel):
+    fantasy_team_id: str = Field(alias="fantasyTeamId")
+    slot_index: int = Field(alias="slotIndex")
+    athlete_id: str = Field(alias="athleteId")
+    athlete_name: str = Field(alias="athleteName")
+    purchase_credits: int = Field(alias="purchaseCredits")
+    reason: str
+    refund_percent: int = Field(alias="refundPercent")
+    refund_credits: int = Field(alias="refundCredits")
+
+
+class MarketReleaseResultResponse(MarketReleasePreviewResponse):
+    balance: int

@@ -67,6 +67,7 @@ from leagues.validators import (
     validate_minutes_threshold,
     validate_participant_count,
     validate_preset_name,
+    validate_refund_percent,
     validate_season_year,
     validate_standard_roster,
     validate_total_credits,
@@ -290,6 +291,20 @@ class LeagueService:
             if payload.max_automatic_substitutions is not None
             else rules.max_automatic_substitutions
         )
+        voluntary_release_refund_percent = (
+            validate_refund_percent(
+                payload.voluntary_release_refund_percent, field="svincolo volontario"
+            )
+            if payload.voluntary_release_refund_percent is not None
+            else rules.voluntary_release_refund_percent
+        )
+        league_exit_refund_percent = (
+            validate_refund_percent(
+                payload.league_exit_refund_percent, field="uscita dai 5 campionati"
+            )
+            if payload.league_exit_refund_percent is not None
+            else rules.league_exit_refund_percent
+        )
         changed = (
             rules.preset_name != preset_name
             or rules.participant_count != participant_count
@@ -297,6 +312,8 @@ class LeagueService:
             or rules.min_fixtures_per_round != min_fixtures
             or rules.minutes_threshold != minutes_threshold
             or rules.max_automatic_substitutions != max_automatic_substitutions
+            or rules.voluntary_release_refund_percent != voluntary_release_refund_percent
+            or rules.league_exit_refund_percent != league_exit_refund_percent
             or rules.allow_trades != payload.options.allow_trades
             or rules.allow_manual_invites != payload.options.allow_manual_invites
         )
@@ -315,6 +332,8 @@ class LeagueService:
         rules.min_fixtures_per_round = min_fixtures
         rules.minutes_threshold = minutes_threshold
         rules.max_automatic_substitutions = max_automatic_substitutions
+        rules.voluntary_release_refund_percent = voluntary_release_refund_percent
+        rules.league_exit_refund_percent = league_exit_refund_percent
         rules.allow_trades = payload.options.allow_trades
         rules.allow_manual_invites = payload.options.allow_manual_invites
         self._session.add(
@@ -497,6 +516,8 @@ class LeagueService:
             minFixturesPerRound=rules.min_fixtures_per_round,
             minutesThreshold=rules.minutes_threshold,
             maxAutomaticSubstitutions=rules.max_automatic_substitutions,
+            voluntaryReleaseRefundPercent=rules.voluntary_release_refund_percent,
+            leagueExitRefundPercent=rules.league_exit_refund_percent,
             options=LeagueRulesOptions(
                 allowTrades=rules.allow_trades,
                 allowManualInvites=rules.allow_manual_invites,
