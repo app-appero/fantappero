@@ -19,7 +19,12 @@ from leagues.models.league_membership import LeagueMembership
 from leagues.models.league_rules import LeagueRules
 from mail.capture import get_captured_emails
 
-ADMIN_PATHS = ["/admin/overview", "/admin/users", "/admin/leagues"]
+ADMIN_PATHS = [
+    "/admin/overview",
+    "/admin/users",
+    "/admin/leagues",
+    "/admin/listone?seasonYear=2026",
+]
 
 
 def _extract_token_from_email_body(body: str) -> str | None:
@@ -192,3 +197,53 @@ def test_admin_leagues_list_shows_owner(client: TestClient, db_session: Session)
     assert response.status_code == 200
     names = {row["name"] for row in response.json()["items"]}
     assert "Lega Globale" in names
+
+
+def test_admin_listone_refresh_denied_for_member(client: TestClient, db_session: Session) -> None:
+    token, _ = _register_and_login(client, "admin.listone.member@example.com")
+    response = client.post(
+        "/admin/listone/aggiorna?seasonYear=2026",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert response.status_code == 403
+    assert response.json()["code"] == "forbidden"
+
+
+def test_admin_listone_refresh_job_lifecycle_for_operator(
+    client: TestClient, db_session: Session
+) -> None:
+    """No API_FOOTBALL_KEY in this test env, so the eager job fails deterministically —
+    exercises the full start → poll round trip without depending on real provider access."""
+    token, user_id = _register_and_login(client, "admin.operator.five@example.com")
+    _promote(db_session, user_id)
+
+    start = client.post(
+        "/admin/listone/aggiorna?seasonYear=2026",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert start.status_code == 200
+    job_id = start.json()["jobId"]
+    assert start.json()["status"] == "queued"
+
+    progress = client.get(
+        f"/admin/listone/aggiorna/{job_id}",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert progress.status_code == 200
+    body = progress.json()
+    assert body["status"] == "failed"
+    assert body["errorCode"] == "provider_key_missing"
+
+
+def test_admin_listone_refresh_progress_unknown_job_not_found(
+    client: TestClient, db_session: Session
+) -> None:
+    token, user_id = _register_and_login(client, "admin.operator.six@example.com")
+    _promote(db_session, user_id)
+
+    response = client.get(
+        "/admin/listone/aggiorna/does-not-exist",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert response.status_code == 404
+    assert response.json()["code"] == "listone_refresh_job_not_found"

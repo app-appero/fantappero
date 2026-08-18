@@ -59,6 +59,7 @@ def fail() -> None:
 
 
 # Register task modules for the worker process (import side effects).
+import admin.listone_tasks  # noqa: E402, F401
 import fantasy_ratings.tasks  # noqa: E402, F401
 import fantasy_turns.tasks  # noqa: E402, F401
 import leagues.listone_tasks  # noqa: E402, F401

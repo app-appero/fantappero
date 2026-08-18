@@ -1,8 +1,9 @@
-"""Admin panel HTTP schemas — platform operator only (EP11-04a)."""
+"""Admin panel HTTP schemas — platform operator only (EP11-04a / EP11-04b)."""
 
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Literal
 
 from pydantic import Field
 
@@ -49,3 +50,51 @@ class PaginatedAdminLeaguesResponse(ApiModel):
     page_size: int = Field(alias="pageSize")
     total: int
     total_pages: int = Field(alias="totalPages")
+
+
+class AdminListoneEntryResponse(ApiModel):
+    athlete_id: str = Field(alias="athleteId")
+    canonical_name: str = Field(alias="canonicalName")
+    season_year: int = Field(alias="seasonYear")
+    official_role: Literal["P", "D", "C", "A"] = Field(alias="officialRole")
+    provider_position_raw: str | None = Field(default=None, alias="providerPositionRaw")
+    mapping_version: str = Field(alias="mappingVersion")
+    club_id: str | None = Field(default=None, alias="clubId")
+    club_name: str | None = Field(default=None, alias="clubName")
+
+
+class AdminListoneRefreshCounters(ApiModel):
+    athletes_created: int = Field(alias="athletesCreated")
+    athletes_updated: int = Field(alias="athletesUpdated")
+    memberships_created: int = Field(alias="membershipsCreated")
+    memberships_updated: int = Field(alias="membershipsUpdated")
+    transfers_created: int = Field(alias="transfersCreated")
+    listone_created: int = Field(alias="listoneCreated")
+    listone_updated: int = Field(alias="listoneUpdated")
+    listone_unchanged: int = Field(alias="listoneUnchanged")
+    listone_skipped_unmapped: int = Field(alias="listoneSkippedUnmapped")
+    catalog_synced: bool = Field(alias="catalogSynced")
+
+
+class AdminListoneRefreshResultResponse(ApiModel):
+    season_year: int = Field(alias="seasonYear")
+    mapping_version: str = Field(alias="mappingVersion")
+    refreshed_at: datetime = Field(alias="refreshedAt")
+    message: str
+    counters: AdminListoneRefreshCounters
+
+
+class AdminListoneRefreshJobResponse(ApiModel):
+    job_id: str = Field(alias="jobId")
+    status: str
+    message: str
+
+
+class AdminListoneRefreshProgressResponse(ApiModel):
+    job_id: str = Field(alias="jobId")
+    status: str
+    percent: int
+    stage: str
+    message: str
+    error_code: str | None = Field(default=None, alias="errorCode")
+    result: AdminListoneRefreshResultResponse | None = None

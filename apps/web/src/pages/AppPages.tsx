@@ -18,6 +18,7 @@ export { MarketWireframe as MarketPage } from "../wireframes/screens/market";
 export { MatchdayPage } from "./MatchdayPage";
 export { AdminDashboardPage } from "./AdminDashboardPage";
 export { AdminLeaguesPage } from "./AdminLeaguesPage";
+export { AdminListonePage } from "./AdminListonePage";
 export { AdminUsersPage } from "./AdminUsersPage";
 export { RosterPage } from "./RosterPage";
 export { StandingsWireframe as StandingsPage } from "../wireframes/screens/standings";

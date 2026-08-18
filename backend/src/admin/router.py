@@ -9,7 +9,11 @@ from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
 from admin.exceptions import AdminError
+from admin.listone_service import AdminListoneService
 from admin.schemas import (
+    AdminListoneEntryResponse,
+    AdminListoneRefreshJobResponse,
+    AdminListoneRefreshProgressResponse,
     AdminOverviewResponse,
     AdminUserResponse,
     PaginatedAdminLeaguesResponse,
@@ -17,6 +21,7 @@ from admin.schemas import (
 )
 from admin.service import AdminService
 from auth.dependencies import get_db_session
+from auth.exceptions import ValidationAuthError
 from auth.models.user import User
 from authorization.dependencies import require_permissions
 from config.settings.api import ApiSettings
@@ -33,8 +38,20 @@ def get_admin_service(
     return AdminService(session, settings)
 
 
+def get_admin_listone_service(
+    session: Session = Depends(get_db_session),
+    settings: ApiSettings = Depends(get_api_settings),
+) -> AdminListoneService:
+    return AdminListoneService(session, settings)
+
+
 def _error_response(exc: AdminError) -> JSONResponse:
     status_code = 404 if exc.code == "admin_user_not_found" else 409
+    return JSONResponse(status_code=status_code, content={"message": exc.message, "code": exc.code})
+
+
+def _listone_error_response(exc: ValidationAuthError) -> JSONResponse:
+    status_code = 404 if exc.code == "listone_refresh_job_not_found" else 400
     return JSONResponse(status_code=status_code, content={"message": exc.message, "code": exc.code})
 
 
@@ -88,3 +105,33 @@ def list_leagues(
     service: AdminService = Depends(get_admin_service),
 ) -> PaginatedAdminLeaguesResponse:
     return service.list_leagues(query=query, page=page)
+
+
+@router.get("/listone", response_model=list[AdminListoneEntryResponse])
+def list_listone(
+    season_year: int = Query(alias="seasonYear", ge=2000, le=2100),
+    _operator: User = Depends(require_permissions(Permission.GLOBAL_OPERATE)),
+    service: AdminListoneService = Depends(get_admin_listone_service),
+) -> list[AdminListoneEntryResponse]:
+    return service.list_entries(season_year=season_year)
+
+
+@router.post("/listone/aggiorna", response_model=AdminListoneRefreshJobResponse)
+def start_listone_refresh(
+    season_year: int = Query(alias="seasonYear", ge=2000, le=2100),
+    operator: User = Depends(require_permissions(Permission.GLOBAL_OPERATE)),
+    service: AdminListoneService = Depends(get_admin_listone_service),
+) -> AdminListoneRefreshJobResponse:
+    return service.start_refresh_job(season_year=season_year, actor=operator)
+
+
+@router.get("/listone/aggiorna/{job_id}", response_model=AdminListoneRefreshProgressResponse)
+def get_listone_refresh_progress(
+    job_id: str,
+    _operator: User = Depends(require_permissions(Permission.GLOBAL_OPERATE)),
+    service: AdminListoneService = Depends(get_admin_listone_service),
+) -> AdminListoneRefreshProgressResponse | JSONResponse:
+    try:
+        return service.get_refresh_progress(job_id=job_id)
+    except ValidationAuthError as exc:
+        return _listone_error_response(exc)

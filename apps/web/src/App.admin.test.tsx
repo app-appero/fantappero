@@ -8,6 +8,8 @@ const fetchMyLeaguesMock = vi.fn();
 const fetchAdminOverviewMock = vi.fn();
 const fetchAdminUsersMock = vi.fn();
 const fetchAdminLeaguesMock = vi.fn();
+const fetchAdminListoneMock = vi.fn();
+const refreshAdminListoneMock = vi.fn();
 
 vi.mock("./api/auth", () => ({
   fetchMe: (...args: unknown[]) => fetchMeMock(...args),
@@ -31,6 +33,8 @@ vi.mock("./api/admin", () => ({
   fetchAdminOverview: (...args: unknown[]) => fetchAdminOverviewMock(...args),
   fetchAdminUsers: (...args: unknown[]) => fetchAdminUsersMock(...args),
   fetchAdminLeagues: (...args: unknown[]) => fetchAdminLeaguesMock(...args),
+  fetchAdminListone: (...args: unknown[]) => fetchAdminListoneMock(...args),
+  refreshAdminListone: (...args: unknown[]) => refreshAdminListoneMock(...args),
   promoteOperator: vi.fn(),
   revokeOperator: vi.fn(),
 }));
@@ -100,6 +104,8 @@ describe("Admin panel identity gate (EP11-04a)", () => {
     fetchAdminOverviewMock.mockReset();
     fetchAdminUsersMock.mockReset();
     fetchAdminLeaguesMock.mockReset();
+    fetchAdminListoneMock.mockReset();
+    refreshAdminListoneMock.mockReset();
   });
 
   afterEach(() => {
@@ -126,7 +132,7 @@ describe("Admin panel identity gate (EP11-04a)", () => {
     unmount();
   });
 
-  it("blocks /admin/utenti and /admin/leghe for a member session", async () => {
+  it("blocks /admin/utenti, /admin/leghe and /admin/listone for a member session", async () => {
     const usersResult = await renderAppAt("/admin/utenti", MEMBER);
     expect(usersResult.html).toContain('data-testid="route-forbidden"');
     usersResult.unmount();
@@ -134,6 +140,10 @@ describe("Admin panel identity gate (EP11-04a)", () => {
     const leaguesResult = await renderAppAt("/admin/leghe", MEMBER);
     expect(leaguesResult.html).toContain('data-testid="route-forbidden"');
     leaguesResult.unmount();
+
+    const listoneResult = await renderAppAt("/admin/listone", MEMBER);
+    expect(listoneResult.html).toContain('data-testid="route-forbidden"');
+    listoneResult.unmount();
   });
 
   it("allows an operator session into /admin with real overview data", async () => {
@@ -196,6 +206,28 @@ describe("Admin panel identity gate (EP11-04a)", () => {
     const { html, unmount } = await renderAppAt("/admin/leghe", OPERATOR);
     expect(html).toContain('data-testid="admin-leagues-list"');
     expect(html).toContain("Lega Globale");
+    unmount();
+  });
+
+  it("smoke: operator reaches /admin/listone with real listone data", async () => {
+    fetchAdminListoneMock.mockResolvedValue([
+      {
+        athleteId: "athlete-1",
+        canonicalName: "Giocatore Esempio",
+        seasonYear: new Date().getFullYear(),
+        officialRole: "A",
+        providerPositionRaw: "Attacker",
+        mappingVersion: "v1.0.0",
+        clubId: "club-1",
+        clubName: "Club Esempio",
+      },
+    ]);
+
+    const { html, unmount } = await renderAppAt("/admin/listone", OPERATOR);
+    expect(html).toContain('data-surface="admin"');
+    expect(html).toContain('data-testid="admin-listone-refresh"');
+    expect(html).toContain("Giocatore Esempio");
+    expect(html).not.toContain('data-testid="route-forbidden"');
     unmount();
   });
 });

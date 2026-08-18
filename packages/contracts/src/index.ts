@@ -218,6 +218,11 @@ export {
 
 export type {
   AdminLeague,
+  AdminListoneEntry,
+  AdminListoneRefreshCounters,
+  AdminListoneRefreshJob,
+  AdminListoneRefreshProgress,
+  AdminListoneRefreshResult,
   AdminOverview,
   AdminUser,
   PaginatedAdminLeagues,

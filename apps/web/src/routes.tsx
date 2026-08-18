@@ -4,6 +4,7 @@ import { AdminLayout, AppLayout } from "./layout/AppLayout";
 import {
   AdminDashboardPage,
   AdminLeaguesPage,
+  AdminListonePage,
   AdminUsersPage,
   AuctionPage,
   AuthForgotPasswordPage,
@@ -258,6 +259,16 @@ export function AppRoutes() {
       <AdminSection>
         <RequirePermissions required={["global:operate"]}>
           <AdminUsersPage />
+        </RequirePermissions>
+      </AdminSection>
+    );
+  }
+
+  if (pathname === "/admin/listone") {
+    return (
+      <AdminSection>
+        <RequirePermissions required={["global:operate"]}>
+          <AdminListonePage />
         </RequirePermissions>
       </AdminSection>
     );

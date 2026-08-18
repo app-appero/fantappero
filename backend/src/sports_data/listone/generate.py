@@ -7,13 +7,13 @@ from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.orm import Session, selectinload
 
 import database.models  # noqa: F401 — register ORM mappers
 from observability.logging import get_logger
 from observability.metrics import Timer, get_metrics
-from sports_data.catalog.models import SportSeason
+from sports_data.catalog.models import CompetitionSeasonClub, SportSeason
 from sports_data.listone.mapping import MAPPING_VERSION, map_provider_position_to_role
 from sports_data.listone.models import RoleAssignment
 from sports_data.provider.constants import PROVIDER_NAME
@@ -215,18 +215,44 @@ def generate_official_listone(session: Session, *, season_year: int) -> ListoneG
     )
 
 
+def _competition_filter_clause(*, season_year: int, competition_ids: set[UUID]):
+    """Match role_assignments whose club plays in one of the given competitions.
+
+    Rows with ``club_id IS NULL`` are never excluded — in production
+    ``generate_official_listone`` always sets ``club_id``, but treating a
+    missing club as "out of competition" would silently hide data-quality
+    gaps rather than surface a real cross-competition mismatch.
+    """
+    club_ids_in_competitions = (
+        select(CompetitionSeasonClub.club_id)
+        .join(SportSeason, SportSeason.id == CompetitionSeasonClub.sport_season_id)
+        .where(
+            SportSeason.year == season_year,
+            SportSeason.competition_id.in_(competition_ids),
+        )
+    )
+    return or_(
+        RoleAssignment.club_id.is_(None),
+        RoleAssignment.club_id.in_(club_ids_in_competitions),
+    )
+
+
 def get_role_assignment(
     session: Session,
     *,
     athlete_id: UUID,
     season_year: int,
+    competition_ids: set[UUID] | None = None,
 ) -> RoleAssignment | None:
-    return session.execute(
-        select(RoleAssignment).where(
-            RoleAssignment.athlete_id == athlete_id,
-            RoleAssignment.season_year == season_year,
+    stmt = select(RoleAssignment).where(
+        RoleAssignment.athlete_id == athlete_id,
+        RoleAssignment.season_year == season_year,
+    )
+    if competition_ids is not None:
+        stmt = stmt.where(
+            _competition_filter_clause(season_year=season_year, competition_ids=competition_ids)
         )
-    ).scalar_one_or_none()
+    return session.execute(stmt).scalar_one_or_none()
 
 
 def list_role_assignments(
@@ -234,11 +260,16 @@ def list_role_assignments(
     *,
     season_year: int,
     athlete_ids: list[UUID] | None = None,
+    competition_ids: set[UUID] | None = None,
 ) -> list[RoleAssignment]:
     stmt = select(RoleAssignment).where(RoleAssignment.season_year == season_year)
     if athlete_ids is not None:
         if not athlete_ids:
             return []
         stmt = stmt.where(RoleAssignment.athlete_id.in_(athlete_ids))
+    if competition_ids is not None:
+        stmt = stmt.where(
+            _competition_filter_clause(season_year=season_year, competition_ids=competition_ids)
+        )
     stmt = stmt.join(Athlete).order_by(Athlete.canonical_name.asc())
     return list(session.execute(stmt).scalars().all())

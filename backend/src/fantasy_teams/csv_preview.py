@@ -29,6 +29,7 @@ def build_preview_rows(
     league_id: UUID,
     season_year: int,
     parsed_rows: list[ParsedCsvRow],
+    competition_ids: set[UUID] | None = None,
 ) -> list[PreviewRow]:
     teams = list(
         session.scalars(
@@ -109,6 +110,7 @@ def build_preview_rows(
             season_year=season_year,
             athletes_by_provider=athletes_by_provider,
             athletes_by_name=athletes_by_name,
+            competition_ids=competition_ids,
         )
 
         if team is not None:
@@ -276,6 +278,7 @@ def _resolve_athlete(
     season_year: int,
     athletes_by_provider: dict[int, Athlete],
     athletes_by_name: dict[str, list[Athlete]],
+    competition_ids: set[UUID] | None = None,
 ) -> Athlete | None:
     if row.provider_id is not None:
         athlete = athletes_by_provider.get(row.provider_id)
@@ -301,7 +304,13 @@ def _resolve_athlete(
                     severity="warning",
                 )
             )
-        _warn_if_not_on_listone(session, row, athlete_id=athlete.id, season_year=season_year)
+        _warn_if_not_on_listone(
+            session,
+            row,
+            athlete_id=athlete.id,
+            season_year=season_year,
+            competition_ids=competition_ids,
+        )
         return athlete
 
     if not row.nome:
@@ -337,7 +346,13 @@ def _resolve_athlete(
         return None
 
     athlete = matches[0]
-    _warn_if_not_on_listone(session, row, athlete_id=athlete.id, season_year=season_year)
+    _warn_if_not_on_listone(
+        session,
+        row,
+        athlete_id=athlete.id,
+        season_year=season_year,
+        competition_ids=competition_ids,
+    )
     return athlete
 
 
@@ -347,8 +362,14 @@ def _warn_if_not_on_listone(
     *,
     athlete_id: UUID,
     season_year: int,
+    competition_ids: set[UUID] | None = None,
 ) -> None:
-    assignment = get_role_assignment(session, athlete_id=athlete_id, season_year=season_year)
+    assignment = get_role_assignment(
+        session,
+        athlete_id=athlete_id,
+        season_year=season_year,
+        competition_ids=competition_ids,
+    )
     if assignment is None:
         row.issues.append(
             PreviewRowIssue(

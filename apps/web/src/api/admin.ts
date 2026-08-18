@@ -1,4 +1,8 @@
 import type {
+  AdminListoneEntry,
+  AdminListoneRefreshJob,
+  AdminListoneRefreshProgress,
+  AdminListoneRefreshResult,
   AdminOverview,
   AdminUser,
   PaginatedAdminLeagues,
@@ -52,4 +56,66 @@ export function fetchAdminLeagues(
   }
   const qs = params.toString();
   return apiRequest<PaginatedAdminLeagues>(`/admin/leagues${qs ? `?${qs}` : ""}`, { accessToken });
+}
+
+export function fetchAdminListone(
+  accessToken: string,
+  seasonYear: number,
+): Promise<AdminListoneEntry[]> {
+  const params = new URLSearchParams({ seasonYear: String(seasonYear) });
+  return apiRequest<AdminListoneEntry[]>(`/admin/listone?${params}`, { accessToken });
+}
+
+export function startAdminListoneRefresh(
+  accessToken: string,
+  seasonYear: number,
+): Promise<AdminListoneRefreshJob> {
+  const params = new URLSearchParams({ seasonYear: String(seasonYear) });
+  return apiRequest<AdminListoneRefreshJob>(`/admin/listone/aggiorna?${params}`, {
+    accessToken,
+    method: "POST",
+  });
+}
+
+export function fetchAdminListoneRefreshProgress(
+  accessToken: string,
+  jobId: string,
+): Promise<AdminListoneRefreshProgress> {
+  return apiRequest<AdminListoneRefreshProgress>(`/admin/listone/aggiorna/${jobId}`, {
+    accessToken,
+  });
+}
+
+export async function refreshAdminListone(
+  accessToken: string,
+  seasonYear: number,
+  options?: {
+    onProgress?: (progress: AdminListoneRefreshProgress) => void;
+    pollIntervalMs?: number;
+  },
+): Promise<AdminListoneRefreshResult> {
+  const started = await startAdminListoneRefresh(accessToken, seasonYear);
+  if (!started.jobId) {
+    throw new Error("Aggiornamento avviato ma senza jobId. Ricarica la pagina e riprova.");
+  }
+  const pollIntervalMs = options?.pollIntervalMs ?? 800;
+  for (;;) {
+    const progress = await fetchAdminListoneRefreshProgress(accessToken, started.jobId);
+    options?.onProgress?.(progress);
+    if (progress.status === "completed") {
+      if (!progress.result) {
+        throw new Error("Aggiornamento completato senza risultato.");
+      }
+      return progress.result;
+    }
+    if (progress.status === "failed") {
+      throw new Error(
+        progress.message ||
+          "Aggiornamento listone non riuscito (controlla quota API-Football / worker).",
+      );
+    }
+    await new Promise((resolve) => {
+      window.setTimeout(resolve, pollIntervalMs);
+    });
+  }
 }

@@ -60,6 +60,9 @@ Risposte di errore coerenti:
 | `POST /admin/users/{user_id}/promote` | `global:operate` (solo operatore) |
 | `POST /admin/users/{user_id}/revoke` | `global:operate` (solo operatore) |
 | `GET /admin/leagues` | `global:operate` (solo operatore) |
+| `GET /admin/listone` | `global:operate` (solo operatore) |
+| `POST /admin/listone/aggiorna` | `global:operate` (solo operatore) |
+| `GET /admin/listone/aggiorna/{job_id}` | `global:operate` (solo operatore) |
 
 `GET /auth/me` richiede solo autenticazione (JWT valido).
 

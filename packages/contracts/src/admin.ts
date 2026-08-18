@@ -1,4 +1,6 @@
-/** Admin panel contracts — platform operator only (EP11-04a). */
+/** Admin panel contracts — platform operator only (EP11-04a / EP11-04b). */
+
+import type { FantasyRole } from "./leagues.js";
 
 export type PlatformRole = "user" | "operator";
 
@@ -41,4 +43,52 @@ export interface PaginatedAdminLeagues {
   pageSize: number;
   total: number;
   totalPages: number;
+}
+
+export interface AdminListoneEntry {
+  athleteId: string;
+  canonicalName: string;
+  seasonYear: number;
+  officialRole: FantasyRole;
+  providerPositionRaw: string | null;
+  mappingVersion: string;
+  clubId: string | null;
+  clubName: string | null;
+}
+
+export interface AdminListoneRefreshCounters {
+  athletesCreated: number;
+  athletesUpdated: number;
+  membershipsCreated: number;
+  membershipsUpdated: number;
+  transfersCreated: number;
+  listoneCreated: number;
+  listoneUpdated: number;
+  listoneUnchanged: number;
+  listoneSkippedUnmapped: number;
+  catalogSynced: boolean;
+}
+
+export interface AdminListoneRefreshResult {
+  seasonYear: number;
+  mappingVersion: string;
+  refreshedAt: string;
+  message: string;
+  counters: AdminListoneRefreshCounters;
+}
+
+export interface AdminListoneRefreshJob {
+  jobId: string;
+  status: string;
+  message: string;
+}
+
+export interface AdminListoneRefreshProgress {
+  jobId: string;
+  status: "queued" | "running" | "completed" | "failed" | string;
+  percent: number;
+  stage: string;
+  message: string;
+  errorCode?: string | null;
+  result?: AdminListoneRefreshResult | null;
 }

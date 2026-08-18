@@ -50,10 +50,25 @@ Posizioni ambigue non mappate (es. Wing Back) restano fuori listone (`skipped_un
 (API-Football, tutte le rose dei club censiti) → `generate_official_listone`.
 Progresso pollabile su `GET …/aggiorna/{jobId}` (`percent` 0–100).
 Richiede `API_FOOTBALL_KEY` sul backend e worker Celery.
-Il sync non è esposto in UI Asta/Rosa (ruolo operatore / pannello qualità dati — EP04-07 / EP11-04);
-in locale si usano gli script sotto.
 
 Audit: `league_role_override_set` / `league_role_override_cleared` / `league_listone_refreshed`.
+
+## Pannello operatore (EP11-04b)
+
+Il sync è ora esposto nel pannello globale `/admin/listone` (permesso `global:operate`, non
+`league:admin`): l'operatore sceglie una `seasonYear` esplicita e avvia lo stesso refresh
+provider (catalogo → rose → listone) senza dover passare da una lega specifica. Endpoint
+backend equivalenti: `GET /admin/listone?seasonYear=`, `POST /admin/listone/aggiorna?seasonYear=`,
+`GET /admin/listone/aggiorna/{jobId}` — orchestrazione indipendente da
+`LeagueListoneService.refresh_from_provider` (stesse funzioni di sync/generate, nessun audit
+per-lega: log strutturato `listone_platform_refresh_ok`/`_failed`).
+
+**Filtro per campionato lega**: la vista listone di ciascuna lega (`GET /leagues/{id}/listone`,
+consumata da Rosa/Asta/CSV import) è filtrata sui soli campionati scelti in creazione lega
+(`league.competitions`). Un atleta il cui `RoleAssignment.club_id` è noto e non milita in
+nessuna di quelle competizioni non compare; un atleta con `club_id` non ancora risolto
+(dato incompleto) resta visibile per non nascondere silenziosamente gap di sincronizzazione.
+La vista `/admin/listone` resta invece non filtrata (l'operatore non ha "una" lega).
 
 ## Metriche e log
 

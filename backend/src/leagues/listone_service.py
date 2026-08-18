@@ -86,6 +86,7 @@ class LeagueListoneService:
         assignments = list_role_assignments(
             self._session,
             season_year=league.season_year,
+            competition_ids={competition.id for competition in league.competitions},
         )
         overrides = {
             row.athlete_id: row
@@ -363,6 +364,7 @@ class LeagueListoneService:
             self._session,
             athlete_id=athlete_id,
             season_year=league.season_year,
+            competition_ids={competition.id for competition in league.competitions},
         )
         if assignment is None:
             raise ValidationAuthError(
@@ -451,6 +453,7 @@ class LeagueListoneService:
             self._session,
             athlete_id=athlete_id,
             season_year=league.season_year,
+            competition_ids={competition.id for competition in league.competitions},
         )
         if assignment is None:
             raise ValidationAuthError(
@@ -517,6 +520,7 @@ class LeagueListoneService:
             self._session,
             athlete_id=athlete_id,
             season_year=league.season_year,
+            competition_ids={competition.id for competition in league.competitions},
         )
         if assignment is None:
             raise ValidationAuthError(

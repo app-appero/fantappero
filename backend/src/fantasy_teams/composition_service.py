@@ -58,8 +58,14 @@ def resolve_effective_athlete_role(
     athlete_id: UUID,
     season_year: int,
     current_round: int = 0,
+    competition_ids: set[UUID] | None = None,
 ) -> FantasyRole | None:
-    assignment = get_role_assignment(session, athlete_id=athlete_id, season_year=season_year)
+    assignment = get_role_assignment(
+        session,
+        athlete_id=athlete_id,
+        season_year=season_year,
+        competition_ids=competition_ids,
+    )
     if assignment is None:
         return None
     override = get_active_override(session, league_id=league_id, athlete_id=athlete_id)
@@ -209,6 +215,7 @@ def assert_assignment_respects_role_quota(
         league_id=league.id,
         athlete_id=athlete_id,
         season_year=league.season_year,
+        competition_ids={competition.id for competition in league.competitions},
     )
     if new_role is None:
         raise ValidationAuthError(

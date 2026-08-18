@@ -873,6 +873,7 @@ class FantasyTeamService:
             league_id=league.id,
             season_year=league.season_year,
             parsed_rows=parsed,
+            competition_ids={competition.id for competition in league.competitions},
         )
         error_count, warning_count = count_preview_issues(rows)
         payload = {
