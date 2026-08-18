@@ -20,6 +20,8 @@ class MarketSessionResponse(ApiModel):
     opens_at: str = Field(alias="opensAt")
     closes_at: str = Field(alias="closesAt")
     bid_count: int | None = Field(default=None, alias="bidCount")
+    parent_session_id: str | None = Field(default=None, alias="parentSessionId")
+    target_athlete_id: str | None = Field(default=None, alias="targetAthleteId")
 
 
 class SubmitMarketBidRequest(ApiModel):
@@ -41,3 +43,18 @@ class MarketBidListResponse(ApiModel):
     session_id: str = Field(alias="sessionId")
     fantasy_team_id: str = Field(alias="fantasyTeamId")
     bids: list[MarketBidResponse] = Field(default_factory=list)
+
+
+class MarketResolutionOutcomeResponse(ApiModel):
+    athlete_id: str = Field(alias="athleteId")
+    athlete_name: str = Field(alias="athleteName")
+    outcome: str  # "assigned" | "tiebreak" | "unassigned"
+    winning_team_id: str | None = Field(default=None, alias="winningTeamId")
+    amount_credits: int | None = Field(default=None, alias="amountCredits")
+    tiebreak_session_id: str | None = Field(default=None, alias="tiebreakSessionId")
+
+
+class MarketResolutionResponse(ApiModel):
+    session_id: str = Field(alias="sessionId")
+    status: str
+    outcomes: list[MarketResolutionOutcomeResponse] = Field(default_factory=list)

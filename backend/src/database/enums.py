@@ -128,6 +128,8 @@ class LeagueAuditAction(str, enum.Enum):
     MARKET_SESSION_CLOSED = "market_session_closed"
     MARKET_BID_SUBMITTED = "market_bid_submitted"
     MARKET_BID_WITHDRAWN = "market_bid_withdrawn"
+    MARKET_SESSION_RESOLVED = "market_session_resolved"
+    MARKET_TIEBREAK_OPENED = "market_tiebreak_opened"
 
 
 class FantasyTurnStatus(str, enum.Enum):
@@ -206,6 +208,7 @@ class RosterOwnershipSource(str, enum.Enum):
     MANUAL = "manual"
     CSV_IMPORT = "csv_import"
     ADMIN = "admin"
+    MARKET = "market"
 
 
 class CreditLedgerReason(str, enum.Enum):
@@ -215,6 +218,7 @@ class CreditLedgerReason(str, enum.Enum):
     ADMIN_ADJUSTMENT = "admin_adjustment"
     ROSTER_PURCHASE = "roster_purchase"
     ROSTER_RELEASE_REFUND = "roster_release_refund"
+    MARKET_AUCTION_WIN = "market_auction_win"
 
 
 class LeagueCalendarStatus(str, enum.Enum):

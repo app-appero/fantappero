@@ -17,6 +17,7 @@ from market.schemas import (
     CreateMarketSessionRequest,
     MarketBidListResponse,
     MarketBidResponse,
+    MarketResolutionResponse,
     MarketSessionResponse,
     SubmitMarketBidRequest,
 )
@@ -65,6 +66,22 @@ def close_auction_session(
     """Close a session before its scheduled deadline (admin)."""
     try:
         return service.close_session(league_access, session_id)
+    except AuthError as exc:
+        return _error_response(exc)
+
+
+@router.post(
+    "/{league_id}/mercato/asta/sessioni/{session_id}/risolvi",
+    response_model=MarketResolutionResponse,
+)
+def resolve_auction_session(
+    session_id: UUID,
+    league_access: LeagueAccess = Depends(require_league_permissions(Permission.MARKET_MANAGE)),
+    service: MarketService = Depends(get_market_service),
+) -> MarketResolutionResponse | JSONResponse:
+    """Resolve a closed session: highest bid wins, ties reopen a tiebreak (admin)."""
+    try:
+        return service.resolve_session(league_access, session_id)
     except AuthError as exc:
         return _error_response(exc)
 

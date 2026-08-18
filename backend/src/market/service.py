@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
 from sqlalchemy import func, select
@@ -23,11 +23,14 @@ from fantasy_teams.models import FantasyRosterSlot, FantasyTeam
 from leagues.models.league import League
 from leagues.models.league_audit_event import LeagueAuditEvent
 from leagues.models.league_membership import LeagueMembership
+from market.assignment import assign_winning_bid
 from market.models import MarketBid, MarketSession
 from market.schemas import (
     CreateMarketSessionRequest,
     MarketBidListResponse,
     MarketBidResponse,
+    MarketResolutionOutcomeResponse,
+    MarketResolutionResponse,
     MarketSessionResponse,
     SubmitMarketBidRequest,
 )
@@ -35,7 +38,9 @@ from market.validators import (
     validate_amount_within_balance,
     validate_athlete_is_free_agent,
     validate_bid_amount,
+    validate_bid_targets_session_athlete,
     validate_session_window,
+    validate_team_eligible_for_session,
     validate_team_has_free_slot,
 )
 from market.windows import effective_status, is_open_for_bids
@@ -44,6 +49,11 @@ from observability.metrics import get_metrics
 from sports_data.roster.models import Athlete
 
 logger = get_logger(__name__)
+
+# Parity rule for the initial auction is an open decision in the functional spec
+# (Doc §20 "Parità nell'asta iniziale e nello spareggio mercato"). Default: reopen a
+# 24h tiebreak session scoped to the tied teams and the contested athlete.
+TIEBREAK_WINDOW = timedelta(hours=24)
 
 
 def _parse_required_datetime(value: str, *, field: str) -> datetime:
@@ -158,6 +168,178 @@ class MarketService:
         market_session = self._find_session(league_access.league.id, session_id)
         return self._to_session_response(market_session)
 
+    # -- resolution -----------------------------------------------------------
+
+    def resolve_session(
+        self,
+        league_access: LeagueAccess,
+        session_id: UUID,
+    ) -> MarketResolutionResponse:
+        """Resolve a closed session: highest bid wins, ties reopen a tiebreak session.
+
+        Atomic and idempotent: replaying against an already-resolved session just
+        returns the persisted outcome without recomputing or re-charging anyone.
+        """
+        league = self._lock_league(league_access.league.id)
+        market_session = self._get_session_for_update(league.id, session_id)
+        now = datetime.now(UTC)
+
+        if market_session.status == MarketSessionStatus.RESOLVED:
+            return self._resolution_summary(market_session)
+
+        if effective_status(market_session, now=now) != MarketSessionStatus.CLOSED:
+            raise ValidationAuthError(
+                "La sessione deve essere chiusa prima di poter essere risolta.",
+                code="market_session_not_closed",
+            )
+        market_session.status = MarketSessionStatus.CLOSED
+
+        bids = self._session.scalars(
+            select(MarketBid)
+            .options(selectinload(MarketBid.athlete), selectinload(MarketBid.fantasy_team))
+            .where(
+                MarketBid.session_id == market_session.id,
+                MarketBid.status == MarketBidStatus.SUBMITTED,
+            )
+            .with_for_update()
+        ).all()
+
+        by_athlete: dict[UUID, list[MarketBid]] = {}
+        for bid in bids:
+            by_athlete.setdefault(bid.athlete_id, []).append(bid)
+
+        candidates: list[MarketBid] = []
+        tie_groups: dict[UUID, list[MarketBid]] = {}
+        for athlete_id, group in by_athlete.items():
+            group.sort(key=lambda row: (-row.amount_credits, row.submitted_at))
+            top_amount = group[0].amount_credits
+            top_bids = [row for row in group if row.amount_credits == top_amount]
+            for loser in group:
+                if loser not in top_bids:
+                    loser.status = MarketBidStatus.LOST
+            if len(top_bids) == 1:
+                candidates.append(top_bids[0])
+            else:
+                tie_groups[athlete_id] = top_bids
+
+        # Deterministic, reconstructable order: highest amount first league-wide, so a
+        # team that wins several athletes spends on its most valuable bids first.
+        candidates.sort(key=lambda row: (-row.amount_credits, row.submitted_at))
+
+        for bid in candidates:
+            transaction_id = f"auction:{market_session.id}:{bid.fantasy_team_id}:{bid.athlete_id}"
+            slot = assign_winning_bid(
+                self._session,
+                league=league,
+                team=bid.fantasy_team,
+                athlete_id=bid.athlete_id,
+                amount_credits=bid.amount_credits,
+                transaction_id=transaction_id,
+                actor_id=league_access.user.id,
+            )
+            bid.status = MarketBidStatus.WON if slot is not None else MarketBidStatus.LOST
+
+        tiebreak_count = 0
+        for athlete_id, tied_bids in tie_groups.items():
+            for bid in tied_bids:
+                bid.status = MarketBidStatus.EXPIRED
+            eligible_team_ids = [str(bid.fantasy_team_id) for bid in tied_bids]
+            child = MarketSession(
+                league_id=league.id,
+                kind=market_session.kind,
+                status=MarketSessionStatus.OPEN,
+                opens_at=now,
+                closes_at=now + TIEBREAK_WINDOW,
+                created_by=league_access.user.id,
+                parent_session_id=market_session.id,
+                target_athlete_id=athlete_id,
+                eligible_team_ids=eligible_team_ids,
+            )
+            self._session.add(child)
+            self._session.flush()
+            tiebreak_count += 1
+            self._add_audit(
+                league.id,
+                league_access.user.id,
+                LeagueAuditAction.MARKET_TIEBREAK_OPENED,
+                details={
+                    "parentSessionId": str(market_session.id),
+                    "tiebreakSessionId": str(child.id),
+                    "athleteId": str(athlete_id),
+                    "tiedAmountCredits": tied_bids[0].amount_credits,
+                    "teamIds": eligible_team_ids,
+                },
+            )
+
+        market_session.status = MarketSessionStatus.RESOLVED
+        market_session.resolved_at = now
+        self._session.flush()
+        self._add_audit(
+            league.id,
+            league_access.user.id,
+            LeagueAuditAction.MARKET_SESSION_RESOLVED,
+            details={
+                "sessionId": str(market_session.id),
+                "assigned": sum(1 for bid in candidates if bid.status == MarketBidStatus.WON),
+                "tiebreaksOpened": tiebreak_count,
+            },
+        )
+        self._session.commit()
+        get_metrics().incr("market_session_resolved_total")
+        return self._resolution_summary(market_session)
+
+    def _resolution_summary(self, market_session: MarketSession) -> MarketResolutionResponse:
+        bids = self._session.scalars(
+            select(MarketBid)
+            .options(selectinload(MarketBid.athlete))
+            .where(MarketBid.session_id == market_session.id)
+        ).all()
+        children = self._session.scalars(
+            select(MarketSession).where(MarketSession.parent_session_id == market_session.id)
+        ).all()
+        tiebreak_by_athlete = {child.target_athlete_id: child for child in children}
+
+        by_athlete: dict[UUID, list[MarketBid]] = {}
+        for bid in bids:
+            by_athlete.setdefault(bid.athlete_id, []).append(bid)
+
+        outcomes: list[MarketResolutionOutcomeResponse] = []
+        for athlete_id, group in by_athlete.items():
+            athlete = group[0].athlete
+            won = next((row for row in group if row.status == MarketBidStatus.WON), None)
+            if won is not None:
+                outcomes.append(
+                    MarketResolutionOutcomeResponse(
+                        athleteId=str(athlete_id),
+                        athleteName=athlete.canonical_name,
+                        outcome="assigned",
+                        winningTeamId=str(won.fantasy_team_id),
+                        amountCredits=won.amount_credits,
+                    )
+                )
+            elif athlete_id in tiebreak_by_athlete:
+                outcomes.append(
+                    MarketResolutionOutcomeResponse(
+                        athleteId=str(athlete_id),
+                        athleteName=athlete.canonical_name,
+                        outcome="tiebreak",
+                        tiebreakSessionId=str(tiebreak_by_athlete[athlete_id].id),
+                    )
+                )
+            else:
+                outcomes.append(
+                    MarketResolutionOutcomeResponse(
+                        athleteId=str(athlete_id),
+                        athleteName=athlete.canonical_name,
+                        outcome="unassigned",
+                    )
+                )
+        return MarketResolutionResponse(
+            sessionId=str(market_session.id),
+            status=market_session.status.value,
+            outcomes=outcomes,
+        )
+
     # -- bids ---------------------------------------------------------------
 
     def submit_bid(
@@ -175,8 +357,14 @@ class MarketService:
                 code="market_session_not_open",
             )
         amount = validate_bid_amount(payload.amount_credits)
+        validate_bid_targets_session_athlete(
+            target_athlete_id=market_session.target_athlete_id, athlete_id=athlete_id
+        )
 
         team = self._my_team(league_access)
+        validate_team_eligible_for_session(
+            eligible_team_ids=market_session.eligible_team_ids, fantasy_team_id=team.id
+        )
         athlete = self._session.get(Athlete, athlete_id)
         if athlete is None:
             raise ValidationAuthError("Calciatore non trovato.", code="athlete_not_found")
@@ -425,6 +613,16 @@ class MarketService:
             opensAt=market_session.opens_at.isoformat(),
             closesAt=market_session.closes_at.isoformat(),
             bidCount=bid_count,
+            parentSessionId=(
+                str(market_session.parent_session_id)
+                if market_session.parent_session_id
+                else None
+            ),
+            targetAthleteId=(
+                str(market_session.target_athlete_id)
+                if market_session.target_athlete_id
+                else None
+            ),
         )
 
     def _to_bid_response(self, bid: MarketBid, *, athlete: Athlete) -> MarketBidResponse:

@@ -15,6 +15,7 @@ from sqlalchemy import (
     UniqueConstraint,
     text,
 )
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from database.base import Base, TimestampMixin, UUIDPrimaryKeyMixin
@@ -69,9 +70,27 @@ class MarketSession(Base, UUIDPrimaryKeyMixin, TimestampMixin):
         ForeignKey("users.id", ondelete="SET NULL"),
         nullable=True,
     )
+    resolved_at: Mapped[datetime | None] = mapped_column(UTCDateTime(), nullable=True)
+    # Tiebreak child sessions only (EP08-02): the round they were reopened from.
+    parent_session_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("market_sessions.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    # Tiebreak child sessions only: restricts bidding to this single athlete.
+    target_athlete_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("athletes.id", ondelete="CASCADE"),
+        nullable=True,
+    )
+    # Tiebreak child sessions only: restricts bidding to these fantasy team ids.
+    eligible_team_ids: Mapped[list[str] | None] = mapped_column(JSONB, nullable=True)
 
     league: Mapped[League] = relationship()
     creator: Mapped[User | None] = relationship()
+    parent_session: Mapped[MarketSession | None] = relationship(
+        remote_side="MarketSession.id",
+        foreign_keys=[parent_session_id],
+    )
     bids: Mapped[list[MarketBid]] = relationship(
         back_populates="session",
         cascade="all, delete-orphan",
