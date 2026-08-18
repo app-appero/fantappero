@@ -242,7 +242,10 @@ def test_exclude_before_open_and_reject_after_open(
     token, _ = _register_and_login(client, "turn.exclude@example.com")
     league_id = _create_league(client, token, competition_ids, "Lega Escludi")
     _set_min_fixtures(db_session, league_id, 10)
-    kickoff = datetime(2026, 8, 15, 18, 0, tzinfo=UTC)
+    today = datetime.now(UTC).date()
+    days_until_saturday = (5 - today.weekday()) % 7
+    saturday = today + timedelta(days=days_until_saturday or 7)
+    kickoff = datetime(saturday.year, saturday.month, saturday.day, 18, 0, tzinfo=UTC)
     fixture_ids = _seed_weekend_fixtures(
         db_session, competition_ids, count=12, kickoff=kickoff, id_offset=930_000
     )
@@ -250,7 +253,7 @@ def test_exclude_before_open_and_reject_after_open(
     created = client.post(
         f"/leagues/{league_id}/turni",
         headers={"Authorization": f"Bearer {token}"},
-        json={"kind": "weekend", "anchorDate": "2026-08-15"},
+        json={"kind": "weekend", "anchorDate": saturday.isoformat()},
     )
     assert created.status_code == 201
     round_id = created.json()["id"]

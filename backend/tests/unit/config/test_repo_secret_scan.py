@@ -19,6 +19,11 @@ SECRET_PATTERNS: tuple[re.Pattern[str], ...] = (
 ALLOWLIST_SUFFIXES = (
     ".env.example",
     "configuration_and_secrets.md",
+    # Test fixture with representative (non-real) redaction inputs.
+    "backend/tests/unit/config/test_redaction.py",
+    # API docs using the literal `<access_token>` placeholder, not a token.
+    "docs/api/privacy.md",
+    "docs/api/profile.md",
 )
 
 ALLOWLIST_PATH_PREFIXES = (

@@ -17,7 +17,9 @@ def test_root_ok() -> None:
     assert body["service"] == "fantappero-api"
 
 
-def test_health_ok_without_deps() -> None:
+def test_health_ok_without_deps(monkeypatch) -> None:
+    monkeypatch.delenv("DATABASE_URL", raising=False)
+    monkeypatch.delenv("REDIS_URL", raising=False)
     response = client.get("/health")
     assert response.status_code == 200
     body = response.json()

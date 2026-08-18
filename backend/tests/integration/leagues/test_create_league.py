@@ -139,11 +139,16 @@ def test_create_league_persists_draft_with_admin_and_audit(
     assert membership is not None
     assert membership.role == LeagueMemberRole.OWNER
 
+    # La creazione lega provisiona anche squadra fantasy e conto crediti per
+    # l'owner (M3-1): filtra sull'azione di interesse invece di contare tutte
+    # le righe di audit della lega.
     audit = db_session.scalars(
-        select(LeagueAuditEvent).where(LeagueAuditEvent.league_id == league_id),
+        select(LeagueAuditEvent).where(
+            LeagueAuditEvent.league_id == league_id,
+            LeagueAuditEvent.action == LeagueAuditAction.LEAGUE_CREATED,
+        ),
     ).all()
     assert len(audit) == 1
-    assert audit[0].action == LeagueAuditAction.LEAGUE_CREATED
     assert audit[0].actor_id == user_id
 
     rules = db_session.scalars(
@@ -265,9 +270,16 @@ def test_update_league_rules_persists_and_audits(
     assert persisted.participant_count == 10
     assert persisted.total_credits == 1200
 
+    # La creazione lega provisiona anche squadra fantasy e conto crediti per
+    # l'owner (M3-1): filtra sulle due azioni di interesse per questo test.
     audit = db_session.scalars(
         select(LeagueAuditEvent)
-        .where(LeagueAuditEvent.league_id == UUID(league_id))
+        .where(
+            LeagueAuditEvent.league_id == UUID(league_id),
+            LeagueAuditEvent.action.in_(
+                [LeagueAuditAction.LEAGUE_CREATED, LeagueAuditAction.LEAGUE_RULES_UPDATED]
+            ),
+        )
         .order_by(LeagueAuditEvent.created_at.asc()),
     ).all()
     assert [event.action for event in audit] == [

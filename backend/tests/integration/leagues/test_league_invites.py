@@ -132,9 +132,21 @@ def test_create_list_accept_and_idempotency(
         )
     )
     assert membership_count == 1
+    # Creazione lega e accettazione invito provisionano anche squadra fantasy
+    # e conto crediti per owner/membro (M3-1): filtra sulle tre azioni di
+    # interesse per questo test.
     audits = db_session.scalars(
         select(LeagueAuditEvent)
-        .where(LeagueAuditEvent.league_id == UUID(league_id))
+        .where(
+            LeagueAuditEvent.league_id == UUID(league_id),
+            LeagueAuditEvent.action.in_(
+                [
+                    LeagueAuditAction.LEAGUE_CREATED,
+                    LeagueAuditAction.LEAGUE_INVITE_CREATED,
+                    LeagueAuditAction.LEAGUE_MEMBER_JOINED,
+                ]
+            ),
+        )
         .order_by(LeagueAuditEvent.created_at.asc())
     ).all()
     assert [audit.action for audit in audits] == [

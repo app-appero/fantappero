@@ -39,7 +39,9 @@ def test_health_aliases_readiness(monkeypatch) -> None:
     assert response.json()["probe"] == "ready"
 
 
-def test_ready_ok_without_deps() -> None:
+def test_ready_ok_without_deps(monkeypatch) -> None:
+    monkeypatch.delenv("DATABASE_URL", raising=False)
+    monkeypatch.delenv("REDIS_URL", raising=False)
     response = client.get("/ready")
     assert response.status_code == 200
     body = response.json()
