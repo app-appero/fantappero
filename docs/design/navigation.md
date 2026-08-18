@@ -66,8 +66,8 @@ Filtraggio voci menu: `hasPermissions` + catalogo in `apps/web/src/navigation/na
 | `/mercato` | `market:view` |
 | `/lega/amministrazione` | `league:admin` |
 | `/profilo` | `profile:view` |
-| `/dev/wireframes` | — (dev) |
-| `/admin` | `global:operate` + ruolo globale |
+| `/dev/wireframes` | — (solo `development`; 404 in produzione, EP11-04a) |
+| `/admin` | `global:operate` + ruolo globale (sessione reale, non `?persona=`) |
 
 Stati wireframe: `?stato=loading|empty|error|success|forbidden` — vedi [`wireframes.md`](./wireframes.md).
 
@@ -89,8 +89,9 @@ pnpm build:web
 Demo permessi web:
 
 - Membro: `/leghe`
-- Admin lega: `/leghe?persona=admin` → voce «Admin lega»
-- Operatore: `/admin?persona=operator`
+- Admin lega (solo `development`, wireframe lega): `/leghe?persona=admin` → voce «Admin lega»
+
+**Pannello operatore (`/admin`, EP11-04a):** `?persona=operator` è stato dismesso — non autentica più e non apre `/admin` in nessun ambiente. L'accesso richiede una sessione reale con `platform_role=operator`; vedi [`docs/operations/admin_operator_bootstrap.md`](../operations/admin_operator_bootstrap.md) per creare/promuovere un operatore. `?persona=admin` resta debito tecnico limitato ai wireframe lega in `development` e non deve mai dare accesso al pannello operatore.
 
 ## Riferimenti
 

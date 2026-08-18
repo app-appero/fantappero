@@ -15,7 +15,8 @@ Wireframe responsive navigabili nella web app per validare struttura e gerarchia
 | Classifica | `/classifica` | M3 | Partecipante |
 | Asta | `/asta` | M3 | Partecipante, Admin lega |
 | Mercato | `/mercato` | M3 | Partecipante, Admin lega |
-| Pannello operatore | `/admin`, `/admin/leghe`, `/admin/utenti` | M1, M4 | Operatore globale |
+
+**Pannello operatore (`/admin`, `/admin/leghe`, `/admin/utenti`) non è più un wireframe di questo inventario dalla EP11-04a**: sono pagine reali con dati dal backend, gated da sessione con `platform_role=operator`. Restano fuori scope per questa card: anomalie dati, job operatore, audit UI consultabile (EP11-04 resto / EP11-03).
 
 Turno e risultati condividono la route `/turni` con tab dedicate (decisione documentata sotto).
 
@@ -63,7 +64,7 @@ Annotazioni PO (CTA, passaggi critici): aggiungere `?meta=1` oppure aprire `/dev
 
 ### M4 — Operatore piattaforma
 
-Estensione del pannello `/admin/*` con anomalie dati, leghe globali e utenti — azioni sempre auditabili lato server (implementazione EP11-04).
+Il pannello `/admin/*` (identità operatore, elenco utenti con promuovi/revoca, elenco leghe read-only) è implementazione reale da EP11-04a. Estensione futura con anomalie dati, job operatore e azioni limitate su utenti/leghe resta EP11-04 resto — non implementata in questa card.
 
 ## Matrice ruoli
 
@@ -74,7 +75,7 @@ Estensione del pannello `/admin/*` con anomalie dati, leghe globali e utenti —
 | Gestisce sessione asta | No | Sì | No |
 | Pannello `/admin/*` | No | No | Sì |
 
-Demo permessi web: `?persona=admin` (admin lega), `?persona=operator` (operatore globale).
+Demo permessi web (solo `development`): `?persona=admin` (admin lega, wireframe lega). Operatore globale: nessuna demo via query string dalla EP11-04a — richiede sessione reale con `platform_role=operator` (vedi [`docs/operations/admin_operator_bootstrap.md`](../operations/admin_operator_bootstrap.md)).
 
 ## Decisioni non approvate (TBD)
 
@@ -99,7 +100,8 @@ Hub dev: [`/dev/wireframes`](http://localhost:5174/dev/wireframes)
 | Classifica loading | `/classifica?stato=loading` |
 | Asta admin | `/asta?persona=admin&stato=success` |
 | Mercato forbidden | `/mercato?stato=forbidden` |
-| Operatore | `/admin?persona=operator&stato=success` |
+
+`/admin` non è più raggiungibile via `?persona=operator` (EP11-04a): è una pagina reale, accessibile solo con sessione `platform_role=operator`.
 
 ```powershell
 pnpm typecheck

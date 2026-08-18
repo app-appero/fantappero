@@ -55,8 +55,17 @@ Risposte di errore coerenti:
 | `GET /leagues/{league_id}/amministrazione` | `league:admin` + membership |
 | `GET/POST/DELETE /leagues/{league_id}/amministrazione/partecipanti/*` | `league:admin` + membership |
 | `GET/POST /sports-data/quality/*` | `global:operate` (solo operatore) |
+| `GET /admin/overview` | `global:operate` (solo operatore) |
+| `GET /admin/users` | `global:operate` (solo operatore) |
+| `POST /admin/users/{user_id}/promote` | `global:operate` (solo operatore) |
+| `POST /admin/users/{user_id}/revoke` | `global:operate` (solo operatore) |
+| `GET /admin/leagues` | `global:operate` (solo operatore) |
 
 `GET /auth/me` richiede solo autenticazione (JWT valido).
+
+## Pannello operatore `/admin` (EP11-04a)
+
+L'accesso a `/admin/*` (frontend e backend) è determinato **solo dal ruolo**, mai da un query param o dall'ambiente: `users.platform_role=operator` in ogni ambiente (development/staging/production usano le stesse route, dati diversi per DB). Non esiste self-promotion né bootstrap via UI: il primo operator si crea con un comando one-shot documentato in [`docs/operations/admin_operator_bootstrap.md`](../operations/admin_operator_bootstrap.md); operatori successivi si promuovono/revocano da `/admin/utenti`, solo da un operator già autenticato, con conferma esplicita. Il gate frontend (`RequireGlobalOperator` + `can(["global:operate"])`) è solo UX — l'autorizzazione reale è `require_permissions(Permission.GLOBAL_OPERATE)` su ciascun endpoint sopra.
 
 ## Dipendenze FastAPI
 

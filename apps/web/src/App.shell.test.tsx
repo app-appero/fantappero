@@ -27,12 +27,6 @@ describe("App responsive shell (EPUI-05)", () => {
     expect(html).toContain('id="main-content"');
   });
 
-  it("exposes skip link on admin routes", () => {
-    const html = renderShellAt("/admin", "?persona=operator&stato=success");
-    expect(html).toContain('href="#main-content"');
-    expect(html).toContain('data-surface="admin"');
-  });
-
   it("omits app shell on auth routes", () => {
     const html = renderShellAt("/accedi", "?stato=success");
     expect(html).not.toContain('data-testid="app-shell"');

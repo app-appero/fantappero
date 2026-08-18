@@ -97,9 +97,4 @@ describe("EPUI-04 wireframes", () => {
     expect(html).toContain("/classifica?stato=empty");
   });
 
-  it("renders operator panel with admin surface", () => {
-    const html = renderAt("/admin", "?persona=operator&stato=success");
-    expect(html).toContain('data-surface="admin"');
-    expect(html).toContain('data-testid="wireframe-operator-panel-success"');
-  });
 });

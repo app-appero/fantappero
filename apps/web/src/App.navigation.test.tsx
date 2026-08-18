@@ -53,13 +53,6 @@ describe("App navigation shell (EPUI-03)", () => {
     expect(html).not.toContain('data-testid="admin-dashboard-success"');
   });
 
-  it("renders distinct global operator panel for operator persona", () => {
-    const html = renderAt("/admin", "?persona=operator&stato=success");
-    expect(html).toContain('data-surface="admin"');
-    expect(html).toContain('data-testid="wireframe-operator-panel-success"');
-    expect(html).toContain("Operazioni piattaforma");
-  });
-
   it("renders domain components on roster page", () => {
     const html = renderAt("/rosa");
     expect(html).toContain('data-testid="wireframe-roster-success"');

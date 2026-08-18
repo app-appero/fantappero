@@ -16,12 +16,6 @@ export const DEMO_MEMBER: SessionUser = {
   globalRole: "member",
 };
 
-export const DEMO_OPERATOR: SessionUser = {
-  id: "op-demo",
-  displayName: "Operatore Piattaforma",
-  globalRole: "global_operator",
-};
-
 function asSearchParams(search: string | URLSearchParams): URLSearchParams {
   if (search instanceof URLSearchParams) {
     return search;
@@ -39,15 +33,13 @@ export function buildPermissionContext(
 }
 
 /**
- * Query param `?persona=operator|admin` switches mock session for local QA.
- * Production session comes from EP02-03 auth API.
+ * Query param `?persona=admin` switches the mock league role for local QA of
+ * the league-admin wireframes. Real session (member or global operator) comes
+ * from the EP02-03 auth API — the demo session can never produce a global
+ * operator identity (EP11-04a: `/admin` is gated only by a real
+ * `platform_role=operator` session, never by `?persona=`).
  */
-export function resolveDemoUser(search: string | URLSearchParams): SessionUser {
-  const params = asSearchParams(search);
-  const persona = params.get("persona");
-  if (persona === "operator") {
-    return DEMO_OPERATOR;
-  }
+export function resolveDemoUser(_search: string | URLSearchParams): SessionUser {
   return DEMO_MEMBER;
 }
 

@@ -27,6 +27,8 @@ Dipendenze: [EPUI-02](./components.md), [EPUI-03](./navigation.md), [EPUI-04](./
 
 Vedi [`navigation.md`](./navigation.md) per permessi e path. Gli stati UI (`?stato=loading|empty|error|success|forbidden`) sono wireframe EPUI-04 — nessun dato di produzione simulato.
 
+**`/admin/*` non è più un placeholder wireframe (EP11-04a):** `AdminDashboardPage`, `AdminUsersPage`, `AdminLeaguesPage` sono pagine reali con dati dal backend, gated da sessione con `platform_role=operator`. `/dev/wireframes` e `/dev/design-system` restano wireframe placeholder, ma solo in `development` — 404 in produzione.
+
 ## Responsività
 
 - Breakpoint nav: **768px** — sidebar desktop, bottom nav mobile
@@ -51,13 +53,14 @@ pnpm typecheck
 pnpm build:web
 ```
 
-Demo:
+Demo (solo `development`):
 
 | Persona | URL |
 | --- | --- |
 | Membro | `/leghe` |
-| Admin lega | `/leghe?persona=admin` |
-| Operatore | `/admin?persona=operator` |
+| Admin lega (wireframe lega) | `/leghe?persona=admin` |
+
+Operatore (`/admin`): nessuna demo via query string — serve una sessione reale con `platform_role=operator` (bootstrap: [`docs/operations/admin_operator_bootstrap.md`](../operations/admin_operator_bootstrap.md)).
 
 ## Riferimenti
 

@@ -70,6 +70,7 @@ All `.env` files are gitignored. Only `*.env.example` files are committed.
 | `SMTP_USER` / `SMTP_PASSWORD` | No | **Yes** | SMTP credentials if required |
 | `MAIL_FROM` / `MAIL_FROM_NAME` | No | No | Sender identity |
 | `WEB_APP_BASE_URL` | Yes (auth email links) | No | Public web origin for verification/reset URLs |
+| `BOOTSTRAP_OPERATOR_EMAIL` | No | No (email, not a secret) | Fallback email for `devtools.bootstrap_operator`; no-op once an operator exists — see [`admin_operator_bootstrap.md`](admin_operator_bootstrap.md) |
 
 ## Variable reference (clients)
 
@@ -125,3 +126,4 @@ pnpm --filter @fantappero/mobile test
 - [Local environment](../development/local_environment.md) — Docker Compose and `.env` precedence
 - [ADR-0003](../adr/ADR-0003-monorepo.md) — monorepo boundaries and secret placement
 - [Quality gates](../development/quality_gates.md) — CI runs config tests automatically
+- [Admin operator bootstrap](admin_operator_bootstrap.md) — creating the first platform operator (EP11-04a)

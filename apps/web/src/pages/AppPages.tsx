@@ -16,11 +16,9 @@ export { ManagerDirectoryPage } from "./ManagerDirectoryPage";
 export { ReceivedInvitesPage } from "./ReceivedInvitesPage";
 export { MarketWireframe as MarketPage } from "../wireframes/screens/market";
 export { MatchdayPage } from "./MatchdayPage";
-export {
-  OperatorDashboardWireframe as AdminDashboardPage,
-  OperatorLeaguesWireframe as AdminLeaguesPage,
-  OperatorUsersWireframe as AdminUsersPage,
-} from "../wireframes/screens/operatorPanel";
+export { AdminDashboardPage } from "./AdminDashboardPage";
+export { AdminLeaguesPage } from "./AdminLeaguesPage";
+export { AdminUsersPage } from "./AdminUsersPage";
 export { RosterPage } from "./RosterPage";
 export { StandingsWireframe as StandingsPage } from "../wireframes/screens/standings";
 

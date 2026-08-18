@@ -212,6 +212,9 @@ export function AppRoutes() {
   }
 
   if (pathname === "/dev/design-system") {
+    if (!import.meta.env.DEV) {
+      return <NotFoundPage />;
+    }
     return (
       <AppSection>
         <DevShowcasePage />
@@ -220,6 +223,9 @@ export function AppRoutes() {
   }
 
   if (pathname === "/dev/wireframes") {
+    if (!import.meta.env.DEV) {
+      return <NotFoundPage />;
+    }
     return (
       <AppSection>
         <WireframesHubPage />

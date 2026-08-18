@@ -32,6 +32,15 @@ class ApiSettings(
     database_url: str | None = Field(default=None, validation_alias="DATABASE_URL")
     redis_url: str | None = Field(default=None, validation_alias="REDIS_URL")
 
+    bootstrap_operator_email: str | None = Field(
+        default=None,
+        validation_alias="BOOTSTRAP_OPERATOR_EMAIL",
+        description=(
+            "Email of an already-registered user to promote to operator on first bootstrap "
+            "(devtools.bootstrap_operator). No-op once an operator already exists."
+        ),
+    )
+
     api_football_key: SecretStr | None = Field(
         default=None,
         validation_alias="API_FOOTBALL_KEY",
@@ -80,7 +89,7 @@ class ApiSettings(
         description="Pause before resume when provider returns 429 / rateLimit body.",
     )
 
-    @field_validator("database_url", "redis_url", mode="before")
+    @field_validator("database_url", "redis_url", "bootstrap_operator_email", mode="before")
     @classmethod
     def _strip_or_none(cls, value: object) -> str | None:
         if value is None:

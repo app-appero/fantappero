@@ -10,6 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
+from admin.router import router as admin_router
 from app.deps_health import aggregate_health
 from auth.exceptions import AuthError
 from auth.profile_router import router as profile_router
@@ -63,6 +64,7 @@ app.add_middleware(
 )
 app.include_router(auth_router)
 app.include_router(profile_router)
+app.include_router(admin_router)
 app.include_router(leagues_router)
 app.include_router(scoring_router)
 app.include_router(fantasy_teams_router)

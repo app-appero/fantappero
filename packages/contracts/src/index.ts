@@ -215,3 +215,12 @@ export {
   type ServiceId,
   type ServiceInfo,
 } from "./health.js";
+
+export type {
+  AdminLeague,
+  AdminOverview,
+  AdminUser,
+  PaginatedAdminLeagues,
+  PaginatedAdminUsers,
+  PlatformRole as AdminPlatformRole,
+} from "./admin.js";
