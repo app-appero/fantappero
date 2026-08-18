@@ -63,6 +63,7 @@ from leagues.validators import (
     validate_league_deletable,
     validate_league_name,
     validate_league_transition,
+    validate_max_active_trade_proposals,
     validate_max_automatic_substitutions,
     validate_minutes_threshold,
     validate_participant_count,
@@ -305,6 +306,11 @@ class LeagueService:
             if payload.league_exit_refund_percent is not None
             else rules.league_exit_refund_percent
         )
+        max_active_trade_proposals_per_team = (
+            validate_max_active_trade_proposals(payload.max_active_trade_proposals_per_team)
+            if payload.max_active_trade_proposals_per_team is not None
+            else rules.max_active_trade_proposals_per_team
+        )
         changed = (
             rules.preset_name != preset_name
             or rules.participant_count != participant_count
@@ -314,8 +320,10 @@ class LeagueService:
             or rules.max_automatic_substitutions != max_automatic_substitutions
             or rules.voluntary_release_refund_percent != voluntary_release_refund_percent
             or rules.league_exit_refund_percent != league_exit_refund_percent
+            or rules.max_active_trade_proposals_per_team != max_active_trade_proposals_per_team
             or rules.allow_trades != payload.options.allow_trades
             or rules.allow_manual_invites != payload.options.allow_manual_invites
+            or rules.require_trade_approval != payload.options.require_trade_approval
         )
         if not changed:
             get_metrics().incr("league_rules_updated_total", labels={"result": "noop"})
@@ -334,8 +342,10 @@ class LeagueService:
         rules.max_automatic_substitutions = max_automatic_substitutions
         rules.voluntary_release_refund_percent = voluntary_release_refund_percent
         rules.league_exit_refund_percent = league_exit_refund_percent
+        rules.max_active_trade_proposals_per_team = max_active_trade_proposals_per_team
         rules.allow_trades = payload.options.allow_trades
         rules.allow_manual_invites = payload.options.allow_manual_invites
+        rules.require_trade_approval = payload.options.require_trade_approval
         self._session.add(
             LeagueAuditEvent(
                 league_id=league.id,
@@ -518,8 +528,10 @@ class LeagueService:
             maxAutomaticSubstitutions=rules.max_automatic_substitutions,
             voluntaryReleaseRefundPercent=rules.voluntary_release_refund_percent,
             leagueExitRefundPercent=rules.league_exit_refund_percent,
+            maxActiveTradeProposalsPerTeam=rules.max_active_trade_proposals_per_team,
             options=LeagueRulesOptions(
                 allowTrades=rules.allow_trades,
                 allowManualInvites=rules.allow_manual_invites,
+                requireTradeApproval=rules.require_trade_approval,
             ),
         )

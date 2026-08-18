@@ -145,6 +145,16 @@ def validate_max_automatic_substitutions(value: int) -> int:
         ) from exc
 
 
+def validate_max_active_trade_proposals(value: int) -> int:
+    """Bounds for the per-team active trade proposal limit (EP08-07 / FR-MKT-03)."""
+    if value < 1 or value > 50:
+        raise ValidationAuthError(
+            "Il limite di proposte di scambio attive deve essere tra 1 e 50.",
+            code="invalid_max_active_trade_proposals",
+        )
+    return value
+
+
 def validate_refund_percent(value: int, *, field: str) -> int:
     """Bounds for the market release refund percentages (EP08-04 / FR-MKT-02)."""
     if value < 0 or value > 100:

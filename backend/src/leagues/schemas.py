@@ -37,6 +37,7 @@ class LeagueRosterConfig(ApiModel):
 class LeagueRulesOptions(ApiModel):
     allow_trades: bool = Field(alias="allowTrades")
     allow_manual_invites: bool = Field(alias="allowManualInvites")
+    require_trade_approval: bool = Field(default=False, alias="requireTradeApproval")
 
 
 class LeagueRulesResponse(ApiModel):
@@ -51,6 +52,7 @@ class LeagueRulesResponse(ApiModel):
     max_automatic_substitutions: int = Field(alias="maxAutomaticSubstitutions")
     voluntary_release_refund_percent: int = Field(alias="voluntaryReleaseRefundPercent")
     league_exit_refund_percent: int = Field(alias="leagueExitRefundPercent")
+    max_active_trade_proposals_per_team: int = Field(alias="maxActiveTradeProposalsPerTeam")
     options: LeagueRulesOptions
 
 
@@ -82,6 +84,9 @@ class UpdateLeagueRulesRequest(ApiModel):
         default=None, alias="voluntaryReleaseRefundPercent"
     )
     league_exit_refund_percent: int | None = Field(default=None, alias="leagueExitRefundPercent")
+    max_active_trade_proposals_per_team: int | None = Field(
+        default=None, alias="maxActiveTradeProposalsPerTeam"
+    )
     options: LeagueRulesOptions
 
 

@@ -33,6 +33,7 @@ from market.trade_schemas import (
 )
 from market.trade_validators import (
     parse_athlete_ids,
+    validate_active_proposal_limit,
     validate_athletes_owned_by_team,
     validate_distinct_teams,
     validate_no_athlete_overlap,
@@ -157,6 +158,11 @@ class TradeService:
             team_label="della squadra destinataria",
         )
 
+        limit = rules.max_active_trade_proposals_per_team if rules else 10
+        validate_active_proposal_limit(
+            active_count=self._count_active_proposals(proposer.id), limit=limit
+        )
+
         account = find_account_for_team(self._session, proposer.id)
         balance = account.balance if account is not None else 0
         validate_offered_credits_within_balance(offered_credits=offered_credits, balance=balance)
@@ -244,6 +250,26 @@ class TradeService:
         recipient_team = self._session.get(FantasyTeam, proposal.recipient_team_id)
         assert proposer_team is not None and recipient_team is not None
 
+        rules = self._session.scalar(
+            select(LeagueRules).where(LeagueRules.league_id == league_access.league.id)
+        )
+        if rules is not None and rules.require_trade_approval:
+            # Deferred to admin approval (EP08-07): nothing is moved yet, so no
+            # re-validation is needed here — execute_trade re-validates everything
+            # fresh at approval time, when the assets actually get swapped.
+            proposal.status = TradeStatus.PENDING_APPROVAL
+            proposal.decided_at = datetime.now(UTC)
+            self._session.flush()
+            self._add_audit(
+                league_access.league.id,
+                league_access.user.id,
+                LeagueAuditAction.MARKET_TRADE_ACCEPTED,
+                details={"proposalId": str(proposal.id), "pendingApproval": True},
+            )
+            self._session.commit()
+            get_metrics().incr("trade_proposal_accepted_total", labels={"result": "pending"})
+            return self._to_response(proposal)
+
         execute_trade(
             self._session,
             league=league,
@@ -270,7 +296,58 @@ class TradeService:
             },
         )
         self._session.commit()
-        get_metrics().incr("trade_proposal_accepted_total")
+        get_metrics().incr("trade_proposal_accepted_total", labels={"result": "executed"})
+        return self._to_response(proposal)
+
+    def approve_proposal(
+        self,
+        league_access: LeagueAccess,
+        proposal_id: UUID,
+    ) -> TradeProposalResponse:
+        """Admin approval (EP08-07): re-validates and executes a pending trade."""
+        proposal = self._lock_pending_approval_proposal(proposal_id, league_access)
+        league = self._session.get(League, league_access.league.id)
+        assert league is not None
+        proposer_team = self._session.get(FantasyTeam, proposal.proposer_team_id)
+        recipient_team = self._session.get(FantasyTeam, proposal.recipient_team_id)
+        assert proposer_team is not None and recipient_team is not None
+
+        execute_trade(
+            self._session,
+            league=league,
+            proposal=proposal,
+            proposer_team=proposer_team,
+            recipient_team=recipient_team,
+            actor_id=league_access.user.id,
+        )
+        proposal.status = TradeStatus.EXECUTED
+        self._session.flush()
+        self._add_audit(
+            league_access.league.id,
+            league_access.user.id,
+            LeagueAuditAction.MARKET_TRADE_APPROVED,
+            details={"proposalId": str(proposal.id)},
+        )
+        self._session.commit()
+        get_metrics().incr("trade_proposal_approved_total")
+        return self._to_response(proposal)
+
+    def reject_admin_proposal(
+        self,
+        league_access: LeagueAccess,
+        proposal_id: UUID,
+    ) -> TradeProposalResponse:
+        proposal = self._lock_pending_approval_proposal(proposal_id, league_access)
+        proposal.status = TradeStatus.REJECTED_BY_ADMIN
+        self._session.flush()
+        self._add_audit(
+            league_access.league.id,
+            league_access.user.id,
+            LeagueAuditAction.MARKET_TRADE_REJECTED_BY_ADMIN,
+            details={"proposalId": str(proposal.id)},
+        )
+        self._session.commit()
+        get_metrics().incr("trade_proposal_rejected_by_admin_total")
         return self._to_response(proposal)
 
     def counter_proposal(
@@ -378,6 +455,24 @@ class TradeService:
             )
         return proposal
 
+    def _lock_pending_approval_proposal(
+        self,
+        proposal_id: UUID,
+        league_access: LeagueAccess,
+    ) -> TradeProposal:
+        """Row-lock a proposal awaiting admin approval (EP08-07)."""
+        proposal = self._session.scalars(
+            select(TradeProposal).where(TradeProposal.id == proposal_id).with_for_update()
+        ).first()
+        if proposal is None or proposal.league_id != league_access.league.id:
+            raise ValidationAuthError("Proposta non trovata.", code="trade_proposal_not_found")
+        if proposal.status != TradeStatus.PENDING_APPROVAL:
+            raise ValidationAuthError(
+                "La proposta non è in attesa di approvazione.",
+                code="trade_not_pending_approval",
+            )
+        return proposal
+
     def _my_team(self, league_access: LeagueAccess) -> FantasyTeam:
         membership = self._session.scalar(
             select(LeagueMembership).where(
@@ -408,6 +503,17 @@ class TradeService:
             )
         ).all()
         return {row for row in rows if row is not None}
+
+    def _count_active_proposals(self, proposer_team_id: UUID) -> int:
+        now = datetime.now(UTC)
+        rows = self._session.scalars(
+            select(TradeProposal).where(
+                TradeProposal.proposer_team_id == proposer_team_id,
+                TradeProposal.status == TradeStatus.PROPOSED,
+                TradeProposal.expires_at > now,
+            )
+        ).all()
+        return len(rows)
 
     def _add_audit(
         self,

@@ -10,6 +10,7 @@ import pytest
 from auth.exceptions import ValidationAuthError
 from market.trade_validators import (
     parse_athlete_ids,
+    validate_active_proposal_limit,
     validate_athletes_owned_by_team,
     validate_distinct_teams,
     validate_no_athlete_overlap,
@@ -113,3 +114,10 @@ def test_validate_offered_credits_within_balance_rejects_overdraw() -> None:
         validate_offered_credits_within_balance(offered_credits=101, balance=100)
     assert exc.value.code == "insufficient_credits"
     validate_offered_credits_within_balance(offered_credits=100, balance=100)
+
+
+def test_validate_active_proposal_limit_rejects_at_or_above_limit() -> None:
+    with pytest.raises(ValidationAuthError) as exc:
+        validate_active_proposal_limit(active_count=5, limit=5)
+    assert exc.value.code == "trade_active_limit_reached"
+    validate_active_proposal_limit(active_count=4, limit=5)

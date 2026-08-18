@@ -465,3 +465,40 @@ def counter_trade_proposal(
         return service.counter_proposal(league_access, proposal_id, body)
     except AuthError as exc:
         return _error_response(exc)
+
+
+# -- Approvazione amministratore (EP08-07 / FR-MKT-03) --------------------------
+# Only reachable when the league requires it (league_rules.require_trade_approval);
+# otherwise accept_proposal executes the trade immediately and these never apply.
+
+
+@router.post(
+    "/{league_id}/mercato/scambi/proposte/{proposal_id}/amministrazione/approva",
+    response_model=TradeProposalResponse,
+)
+def approve_trade_proposal(
+    proposal_id: UUID,
+    league_access: LeagueAccess = Depends(require_league_permissions(Permission.MARKET_MANAGE)),
+    service: TradeService = Depends(get_trade_service),
+) -> TradeProposalResponse | JSONResponse:
+    """Approve a trade awaiting admin sign-off: re-validated and executed atomically."""
+    try:
+        return service.approve_proposal(league_access, proposal_id)
+    except AuthError as exc:
+        return _error_response(exc)
+
+
+@router.post(
+    "/{league_id}/mercato/scambi/proposte/{proposal_id}/amministrazione/rifiuta",
+    response_model=TradeProposalResponse,
+)
+def reject_trade_proposal_admin(
+    proposal_id: UUID,
+    league_access: LeagueAccess = Depends(require_league_permissions(Permission.MARKET_MANAGE)),
+    service: TradeService = Depends(get_trade_service),
+) -> TradeProposalResponse | JSONResponse:
+    """Reject a trade awaiting admin sign-off."""
+    try:
+        return service.reject_admin_proposal(league_access, proposal_id)
+    except AuthError as exc:
+        return _error_response(exc)

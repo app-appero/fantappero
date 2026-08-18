@@ -89,6 +89,15 @@ def validate_athletes_owned_by_team(
         )
 
 
+def validate_active_proposal_limit(*, active_count: int, limit: int) -> None:
+    """Admin-configured cap on outstanding proposals per team (EP08-07 / FR-MKT-03)."""
+    if active_count >= limit:
+        raise ValidationAuthError(
+            f"Hai raggiunto il limite di {limit} proposte di scambio attive.",
+            code="trade_active_limit_reached",
+        )
+
+
 def validate_offered_credits_within_balance(*, offered_credits: int, balance: int) -> None:
     if offered_credits > balance:
         raise ValidationAuthError(

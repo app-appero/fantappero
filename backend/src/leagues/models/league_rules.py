@@ -64,6 +64,10 @@ class LeagueRules(Base, UUIDPrimaryKeyMixin, TimestampMixin):
             "league_exit_refund_percent BETWEEN 0 AND 100",
             name="ck_league_rules_league_exit_refund_percent",
         ),
+        CheckConstraint(
+            "max_active_trade_proposals_per_team >= 1",
+            name="ck_league_rules_max_active_trade_proposals_per_team",
+        ),
     )
 
     league_id: Mapped[UUID] = mapped_column(
@@ -112,6 +116,17 @@ class LeagueRules(Base, UUIDPrimaryKeyMixin, TimestampMixin):
         Integer,
         nullable=False,
         server_default=text("100"),
+    )
+    # Trade admin controls (EP08-07 / FR-MKT-03).
+    require_trade_approval: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        server_default=text("false"),
+    )
+    max_active_trade_proposals_per_team: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        server_default=text("10"),
     )
     allow_manual_invites: Mapped[bool] = mapped_column(
         Boolean,
