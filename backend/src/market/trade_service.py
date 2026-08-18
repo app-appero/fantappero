@@ -18,11 +18,14 @@ from fantasy_teams.factory import (
 )
 from fantasy_teams.ledger import find_account_for_team
 from fantasy_teams.models import FantasyRosterSlot, FantasyTeam
+from leagues.models.league import League
 from leagues.models.league_audit_event import LeagueAuditEvent
 from leagues.models.league_membership import LeagueMembership
 from leagues.models.league_rules import LeagueRules
 from market.models import TradeProposal
+from market.trade_execution import execute_trade
 from market.trade_schemas import (
+    CounterTradeProposalRequest,
     CreateTradeProposalRequest,
     TradeAthleteResponse,
     TradeProposalListResponse,
@@ -41,8 +44,6 @@ from market.trade_validators import (
 from market.windows import effective_trade_status
 from observability.metrics import get_metrics
 from sports_data.roster.models import Athlete
-
-_NEW_AUDIT_ACTION = LeagueAuditAction.MARKET_TRADE_PROPOSED
 
 
 def _parse_required_datetime(value: str, *, field: str) -> datetime:
@@ -69,9 +70,6 @@ class TradeService:
         payload: CreateTradeProposalRequest,
     ) -> TradeProposalResponse:
         league_id = league_access.league.id
-        rules = self._session.scalar(select(LeagueRules).where(LeagueRules.league_id == league_id))
-        validate_trades_enabled(allow_trades=rules.allow_trades if rules else True)
-
         proposer = self._my_team(league_access)
         try:
             recipient_team_id = UUID(payload.recipient_team_id)
@@ -86,21 +84,68 @@ class TradeService:
                 "Squadra destinataria non trovata in questa lega.",
                 code="recipient_team_not_found",
             )
+
+        proposal = self._build_validated_proposal(
+            league_id=league_id,
+            proposer=proposer,
+            recipient=recipient,
+            offered_athlete_ids_raw=payload.offered_athlete_ids,
+            requested_athlete_ids_raw=payload.requested_athlete_ids,
+            offered_credits=payload.offered_credits,
+            requested_credits=payload.requested_credits,
+            expires_at_raw=payload.expires_at,
+            created_by=league_access.user.id,
+        )
+        self._session.add(proposal)
+        self._session.flush()
+        self._add_audit(
+            league_id,
+            league_access.user.id,
+            LeagueAuditAction.MARKET_TRADE_PROPOSED,
+            details={
+                "proposalId": str(proposal.id),
+                "proposerTeamId": str(proposer.id),
+                "recipientTeamId": str(recipient.id),
+                "offeredAthleteIds": proposal.offered_athlete_ids,
+                "requestedAthleteIds": proposal.requested_athlete_ids,
+                "offeredCredits": proposal.offered_credits,
+                "requestedCredits": proposal.requested_credits,
+                "expiresAt": proposal.expires_at.isoformat(),
+            },
+        )
+        self._session.commit()
+        get_metrics().incr("trade_proposal_created_total")
+        return self._to_response(proposal)
+
+    def _build_validated_proposal(
+        self,
+        *,
+        league_id: UUID,
+        proposer: FantasyTeam,
+        recipient: FantasyTeam,
+        offered_athlete_ids_raw: list[str],
+        requested_athlete_ids_raw: list[str],
+        offered_credits: int,
+        requested_credits: int,
+        expires_at_raw: str,
+        created_by: UUID,
+    ) -> TradeProposal:
+        rules = self._session.scalar(select(LeagueRules).where(LeagueRules.league_id == league_id))
+        validate_trades_enabled(allow_trades=rules.allow_trades if rules else True)
         validate_distinct_teams(proposer_team_id=proposer.id, recipient_team_id=recipient.id)
 
-        offered_athlete_ids = parse_athlete_ids(payload.offered_athlete_ids, field="offerta")
-        requested_athlete_ids = parse_athlete_ids(payload.requested_athlete_ids, field="richiesta")
+        offered_athlete_ids = parse_athlete_ids(offered_athlete_ids_raw, field="offerta")
+        requested_athlete_ids = parse_athlete_ids(requested_athlete_ids_raw, field="richiesta")
         validate_no_athlete_overlap(
             offered_athlete_ids=offered_athlete_ids,
             requested_athlete_ids=requested_athlete_ids,
         )
         validate_trade_sides_not_empty(
             offered_athlete_ids=offered_athlete_ids,
-            offered_credits=payload.offered_credits,
+            offered_credits=offered_credits,
             requested_athlete_ids=requested_athlete_ids,
-            requested_credits=payload.requested_credits,
+            requested_credits=requested_credits,
         )
-
         validate_athletes_owned_by_team(
             athlete_ids=offered_athlete_ids,
             owned_athlete_ids=self._roster_athlete_ids(proposer.id),
@@ -114,45 +159,23 @@ class TradeService:
 
         account = find_account_for_team(self._session, proposer.id)
         balance = account.balance if account is not None else 0
-        validate_offered_credits_within_balance(
-            offered_credits=payload.offered_credits, balance=balance
-        )
+        validate_offered_credits_within_balance(offered_credits=offered_credits, balance=balance)
 
         now = datetime.now(UTC)
-        expires_at = _parse_required_datetime(payload.expires_at, field="expiresAt")
+        expires_at = _parse_required_datetime(expires_at_raw, field="expiresAt")
         validate_trade_expiry(expires_at, now=now)
 
-        proposal = TradeProposal(
+        return TradeProposal(
             league_id=league_id,
             proposer_team_id=proposer.id,
             recipient_team_id=recipient.id,
             offered_athlete_ids=[str(value) for value in offered_athlete_ids],
             requested_athlete_ids=[str(value) for value in requested_athlete_ids],
-            offered_credits=payload.offered_credits,
-            requested_credits=payload.requested_credits,
+            offered_credits=offered_credits,
+            requested_credits=requested_credits,
             expires_at=expires_at,
-            created_by=league_access.user.id,
+            created_by=created_by,
         )
-        self._session.add(proposal)
-        self._session.flush()
-        self._add_audit(
-            league_id,
-            league_access.user.id,
-            _NEW_AUDIT_ACTION,
-            details={
-                "proposalId": str(proposal.id),
-                "proposerTeamId": str(proposer.id),
-                "recipientTeamId": str(recipient.id),
-                "offeredAthleteIds": proposal.offered_athlete_ids,
-                "requestedAthleteIds": proposal.requested_athlete_ids,
-                "offeredCredits": proposal.offered_credits,
-                "requestedCredits": proposal.requested_credits,
-                "expiresAt": expires_at.isoformat(),
-            },
-        )
-        self._session.commit()
-        get_metrics().incr("trade_proposal_created_total")
-        return self._to_response(proposal)
 
     def cancel_proposal(
         self,
@@ -188,6 +211,110 @@ class TradeService:
         get_metrics().incr("trade_proposal_cancelled_total")
         return self._to_response(proposal)
 
+    def reject_proposal(
+        self,
+        league_access: LeagueAccess,
+        proposal_id: UUID,
+    ) -> TradeProposalResponse:
+        team = self._my_team(league_access)
+        proposal = self._lock_actionable_proposal_as_recipient(proposal_id, league_access, team)
+        proposal.status = TradeStatus.REJECTED
+        proposal.decided_at = datetime.now(UTC)
+        self._session.flush()
+        self._add_audit(
+            league_access.league.id,
+            league_access.user.id,
+            LeagueAuditAction.MARKET_TRADE_REJECTED,
+            details={"proposalId": str(proposal.id)},
+        )
+        self._session.commit()
+        get_metrics().incr("trade_proposal_rejected_total")
+        return self._to_response(proposal)
+
+    def accept_proposal(
+        self,
+        league_access: LeagueAccess,
+        proposal_id: UUID,
+    ) -> TradeProposalResponse:
+        team = self._my_team(league_access)
+        proposal = self._lock_actionable_proposal_as_recipient(proposal_id, league_access, team)
+        league = self._session.get(League, league_access.league.id)
+        assert league is not None
+        proposer_team = self._session.get(FantasyTeam, proposal.proposer_team_id)
+        recipient_team = self._session.get(FantasyTeam, proposal.recipient_team_id)
+        assert proposer_team is not None and recipient_team is not None
+
+        execute_trade(
+            self._session,
+            league=league,
+            proposal=proposal,
+            proposer_team=proposer_team,
+            recipient_team=recipient_team,
+            actor_id=league_access.user.id,
+        )
+        proposal.status = TradeStatus.ACCEPTED
+        proposal.decided_at = datetime.now(UTC)
+        self._session.flush()
+        self._add_audit(
+            league_access.league.id,
+            league_access.user.id,
+            LeagueAuditAction.MARKET_TRADE_ACCEPTED,
+            details={
+                "proposalId": str(proposal.id),
+                "proposerTeamId": str(proposer_team.id),
+                "recipientTeamId": str(recipient_team.id),
+                "offeredAthleteIds": proposal.offered_athlete_ids,
+                "requestedAthleteIds": proposal.requested_athlete_ids,
+                "offeredCredits": proposal.offered_credits,
+                "requestedCredits": proposal.requested_credits,
+            },
+        )
+        self._session.commit()
+        get_metrics().incr("trade_proposal_accepted_total")
+        return self._to_response(proposal)
+
+    def counter_proposal(
+        self,
+        league_access: LeagueAccess,
+        proposal_id: UUID,
+        payload: CounterTradeProposalRequest,
+    ) -> TradeProposalResponse:
+        team = self._my_team(league_access)
+        original = self._lock_actionable_proposal_as_recipient(proposal_id, league_access, team)
+        original_proposer = self._session.get(FantasyTeam, original.proposer_team_id)
+        assert original_proposer is not None
+
+        # The counter flips the roles: today's recipient proposes back to the
+        # original proposer.
+        counter = self._build_validated_proposal(
+            league_id=league_access.league.id,
+            proposer=team,
+            recipient=original_proposer,
+            offered_athlete_ids_raw=payload.offered_athlete_ids,
+            requested_athlete_ids_raw=payload.requested_athlete_ids,
+            offered_credits=payload.offered_credits,
+            requested_credits=payload.requested_credits,
+            expires_at_raw=payload.expires_at,
+            created_by=league_access.user.id,
+        )
+        counter.counter_of_id = original.id
+        self._session.add(counter)
+        original.status = TradeStatus.COUNTERED
+        original.decided_at = datetime.now(UTC)
+        self._session.flush()
+        self._add_audit(
+            league_access.league.id,
+            league_access.user.id,
+            LeagueAuditAction.MARKET_TRADE_COUNTERED,
+            details={
+                "originalProposalId": str(original.id),
+                "counterProposalId": str(counter.id),
+            },
+        )
+        self._session.commit()
+        get_metrics().incr("trade_proposal_countered_total")
+        return self._to_response(counter)
+
     def list_proposals(self, league_access: LeagueAccess) -> TradeProposalListResponse:
         team = self._my_team(league_access)
         rows = self._session.scalars(
@@ -220,6 +347,36 @@ class TradeService:
         return self._to_response(proposal)
 
     # -- helpers ----------------------------------------------------------------
+
+    def _lock_actionable_proposal_as_recipient(
+        self,
+        proposal_id: UUID,
+        league_access: LeagueAccess,
+        team: FantasyTeam,
+    ) -> TradeProposal:
+        """Row-lock the proposal and ensure only one valid transition can win.
+
+        Locking before checking status means a concurrent accept/reject/counter on
+        the same proposal blocks until the first commits, then sees the now-terminal
+        status and fails cleanly — "solo una transizione valida prevale".
+        """
+        proposal = self._session.scalars(
+            select(TradeProposal).where(TradeProposal.id == proposal_id).with_for_update()
+        ).first()
+        if proposal is None or proposal.league_id != league_access.league.id:
+            raise ValidationAuthError("Proposta non trovata.", code="trade_proposal_not_found")
+        if proposal.recipient_team_id != team.id:
+            raise ValidationAuthError(
+                "Solo il destinatario può decidere su questa proposta.",
+                code="trade_decision_forbidden",
+            )
+        now = datetime.now(UTC)
+        if effective_trade_status(proposal, now=now) != TradeStatus.PROPOSED:
+            raise ValidationAuthError(
+                "La proposta non è più decidibile (scaduta o già decisa).",
+                code="trade_not_actionable",
+            )
+        return proposal
 
     def _my_team(self, league_access: LeagueAccess) -> FantasyTeam:
         membership = self._session.scalar(
@@ -281,6 +438,7 @@ class TradeService:
             status=effective_trade_status(proposal, now=now).value,
             expiresAt=proposal.expires_at.isoformat(),
             createdAt=proposal.created_at.isoformat(),
+            counterOfId=str(proposal.counter_of_id) if proposal.counter_of_id else None,
         )
 
     def _athlete_labels(self, raw_ids: list[str]) -> list[TradeAthleteResponse]:

@@ -132,6 +132,9 @@ class LeagueAuditAction(str, enum.Enum):
     MARKET_TIEBREAK_OPENED = "market_tiebreak_opened"
     MARKET_TRADE_PROPOSED = "market_trade_proposed"
     MARKET_TRADE_CANCELLED = "market_trade_cancelled"
+    MARKET_TRADE_ACCEPTED = "market_trade_accepted"
+    MARKET_TRADE_REJECTED = "market_trade_rejected"
+    MARKET_TRADE_COUNTERED = "market_trade_countered"
 
 
 class FantasyTurnStatus(str, enum.Enum):
@@ -223,6 +226,8 @@ class CreditLedgerReason(str, enum.Enum):
     MARKET_AUCTION_WIN = "market_auction_win"
     MARKET_WAIVER_ACQUISITION = "market_waiver_acquisition"
     MARKET_RELEASE_REFUND = "market_release_refund"
+    MARKET_TRADE_CREDITS_SENT = "market_trade_credits_sent"
+    MARKET_TRADE_CREDITS_RECEIVED = "market_trade_credits_received"
 
 
 class LeagueCalendarStatus(str, enum.Enum):
@@ -282,6 +287,9 @@ class TradeStatus(str, enum.Enum):
     PROPOSED = "proposed"
     CANCELLED = "cancelled"
     EXPIRED = "expired"
+    ACCEPTED = "accepted"
+    REJECTED = "rejected"
+    COUNTERED = "countered"
 
 
 class MarketBidStatus(str, enum.Enum):

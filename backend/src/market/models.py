@@ -209,8 +209,20 @@ class TradeProposal(Base, UUIDPrimaryKeyMixin, TimestampMixin):
         ForeignKey("users.id", ondelete="SET NULL"),
         nullable=True,
     )
+    # Set on the new proposal when it replies to another (EP08-06); the countered
+    # original is marked COUNTERED and is no longer directly actionable.
+    counter_of_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("trade_proposals.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    decided_at: Mapped[datetime | None] = mapped_column(UTCDateTime(), nullable=True)
 
     league: Mapped[League] = relationship()
     proposer_team: Mapped[FantasyTeam] = relationship(foreign_keys=[proposer_team_id])
     recipient_team: Mapped[FantasyTeam] = relationship(foreign_keys=[recipient_team_id])
     creator: Mapped[User | None] = relationship()
+    counter_of: Mapped[TradeProposal | None] = relationship(
+        remote_side="TradeProposal.id",
+        foreign_keys=[counter_of_id],
+    )

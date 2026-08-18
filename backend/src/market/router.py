@@ -26,6 +26,7 @@ from market.schemas import (
 )
 from market.service import MarketService
 from market.trade_schemas import (
+    CounterTradeProposalRequest,
     CreateTradeProposalRequest,
     TradeProposalListResponse,
     TradeProposalResponse,
@@ -412,5 +413,55 @@ def cancel_trade_proposal(
     """Withdraw the caller's own pending proposal before the recipient acts on it."""
     try:
         return service.cancel_proposal(league_access, proposal_id)
+    except AuthError as exc:
+        return _error_response(exc)
+
+
+@router.post(
+    "/{league_id}/mercato/scambi/proposte/{proposal_id}/accetta",
+    response_model=TradeProposalResponse,
+)
+def accept_trade_proposal(
+    proposal_id: UUID,
+    league_access: LeagueAccess = Depends(require_league_permissions(Permission.MARKET_VIEW)),
+    service: TradeService = Depends(get_trade_service),
+) -> TradeProposalResponse | JSONResponse:
+    """Accept a pending proposal (recipient only): re-validated and executed atomically."""
+    try:
+        return service.accept_proposal(league_access, proposal_id)
+    except AuthError as exc:
+        return _error_response(exc)
+
+
+@router.post(
+    "/{league_id}/mercato/scambi/proposte/{proposal_id}/rifiuta",
+    response_model=TradeProposalResponse,
+)
+def reject_trade_proposal(
+    proposal_id: UUID,
+    league_access: LeagueAccess = Depends(require_league_permissions(Permission.MARKET_VIEW)),
+    service: TradeService = Depends(get_trade_service),
+) -> TradeProposalResponse | JSONResponse:
+    """Reject a pending proposal (recipient only)."""
+    try:
+        return service.reject_proposal(league_access, proposal_id)
+    except AuthError as exc:
+        return _error_response(exc)
+
+
+@router.post(
+    "/{league_id}/mercato/scambi/proposte/{proposal_id}/controproponi",
+    response_model=TradeProposalResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def counter_trade_proposal(
+    proposal_id: UUID,
+    body: CounterTradeProposalRequest,
+    league_access: LeagueAccess = Depends(require_league_permissions(Permission.MARKET_VIEW)),
+    service: TradeService = Depends(get_trade_service),
+) -> TradeProposalResponse | JSONResponse:
+    """Counter a pending proposal (recipient only): flips proposer/recipient roles."""
+    try:
+        return service.counter_proposal(league_access, proposal_id, body)
     except AuthError as exc:
         return _error_response(exc)

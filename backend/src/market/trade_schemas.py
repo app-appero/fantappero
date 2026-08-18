@@ -16,6 +16,16 @@ class CreateTradeProposalRequest(ApiModel):
     expires_at: str = Field(alias="expiresAt", min_length=1)
 
 
+class CounterTradeProposalRequest(ApiModel):
+    """Same shape as a fresh proposal; the recipient becomes the new proposer."""
+
+    offered_athlete_ids: list[str] = Field(default_factory=list, alias="offeredAthleteIds")
+    requested_athlete_ids: list[str] = Field(default_factory=list, alias="requestedAthleteIds")
+    offered_credits: int = Field(default=0, alias="offeredCredits", ge=0)
+    requested_credits: int = Field(default=0, alias="requestedCredits", ge=0)
+    expires_at: str = Field(alias="expiresAt", min_length=1)
+
+
 class TradeAthleteResponse(ApiModel):
     id: str
     name: str
@@ -37,6 +47,7 @@ class TradeProposalResponse(ApiModel):
     status: str
     expires_at: str = Field(alias="expiresAt")
     created_at: str = Field(alias="createdAt")
+    counter_of_id: str | None = Field(default=None, alias="counterOfId")
 
 
 class TradeProposalListResponse(ApiModel):
