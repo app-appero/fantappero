@@ -84,7 +84,8 @@ const DEMO_TEAM: FantasyTeam = {
 
 /** Schermata Mercato: svincolo volontario con recupero crediti (EP08-04 / FR-MKT-02). */
 export function MarketPage() {
-  const { isDemoMode, activeLeagueId } = useAuth();
+  const { isDemoMode, activeLeagueId, can } = useAuth();
+  const canManageMarket = can(["market:manage"]);
   const { search } = useLocation();
   const demoState = isDemoMode ? parseWireframeStateFromSearch(search) : null;
 
@@ -690,6 +691,27 @@ export function MarketPage() {
                             onClick={() => startCounter(proposal.id)}
                           >
                             Controproponi
+                          </Button>
+                        </div>
+                      ) : null}
+
+                      {proposal.status === "pending_approval" && canManageMarket ? (
+                        <div className="fa-ds-showcase__row" data-testid={`market-trade-admin-actions-${proposal.id}`}>
+                          <Button
+                            variant="primary"
+                            size="sm"
+                            disabled={pending}
+                            onClick={() => void trade.approveProposal(proposal.id)}
+                          >
+                            Approva
+                          </Button>
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            disabled={pending}
+                            onClick={() => void trade.rejectProposalAsAdmin(proposal.id)}
+                          >
+                            Rifiuta (admin)
                           </Button>
                         </div>
                       ) : null}

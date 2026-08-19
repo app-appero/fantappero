@@ -6,11 +6,13 @@ import type {
 import { useCallback, useEffect, useState } from "react";
 import {
   acceptTradeProposal,
+  approveTradeProposal,
   cancelTradeProposal,
   counterTradeProposal,
   createTradeProposal,
   fetchTradeProposals,
   rejectTradeProposal,
+  rejectTradeProposalAsAdmin,
 } from "../api/market";
 import { getApiErrorMessage } from "../auth/AuthContext";
 import { loadStoredSession } from "../auth/sessionStorage";
@@ -121,6 +123,14 @@ export function useTradeFlow({ leagueId, active }: UseTradeFlowOptions) {
   const cancelProposal = withProposalAction(cancelTradeProposal, "Impossibile annullare la proposta.");
   const acceptProposal = withProposalAction(acceptTradeProposal, "Impossibile accettare la proposta.");
   const rejectProposal = withProposalAction(rejectTradeProposal, "Impossibile rifiutare la proposta.");
+  const approveProposal = withProposalAction(
+    approveTradeProposal,
+    "Impossibile approvare la proposta.",
+  );
+  const rejectProposalAsAdmin = withProposalAction(
+    rejectTradeProposalAsAdmin,
+    "Impossibile rifiutare la proposta.",
+  );
 
   const counterProposal = useCallback(
     async (proposalId: string, body: CounterTradeProposalRequest) => {
@@ -158,6 +168,8 @@ export function useTradeFlow({ leagueId, active }: UseTradeFlowOptions) {
     acceptProposal,
     rejectProposal,
     counterProposal,
+    approveProposal,
+    rejectProposalAsAdmin,
     actionPendingId,
     actionError,
   };

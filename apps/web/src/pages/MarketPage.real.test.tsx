@@ -18,6 +18,8 @@ const createTradeProposalMock = vi.fn();
 const acceptTradeProposalMock = vi.fn();
 const rejectTradeProposalMock = vi.fn();
 const cancelTradeProposalMock = vi.fn();
+const approveTradeProposalMock = vi.fn();
+const rejectTradeProposalAsAdminMock = vi.fn();
 
 vi.mock("../api/auth", () => ({
   fetchMe: (...args: unknown[]) => fetchMeMock(...args),
@@ -69,8 +71,8 @@ vi.mock("../api/market", () => ({
   acceptTradeProposal: (...args: unknown[]) => acceptTradeProposalMock(...args),
   rejectTradeProposal: (...args: unknown[]) => rejectTradeProposalMock(...args),
   counterTradeProposal: vi.fn(),
-  approveTradeProposal: vi.fn(),
-  rejectTradeProposalAsAdmin: vi.fn(),
+  approveTradeProposal: (...args: unknown[]) => approveTradeProposalMock(...args),
+  rejectTradeProposalAsAdmin: (...args: unknown[]) => rejectTradeProposalAsAdminMock(...args),
   fetchMarketHistory: vi.fn(),
 }));
 
@@ -115,9 +117,12 @@ async function flushAsync(rounds = 6): Promise<void> {
   }
 }
 
-async function renderAppAt(path: string): Promise<{ html: string; unmount: () => void }> {
+async function renderAppAt(
+  path: string,
+  leagues: LeagueSummary[] = [LEAGUE],
+): Promise<{ html: string; unmount: () => void }> {
   fetchMeMock.mockResolvedValue(USER);
-  fetchMyLeaguesMock.mockResolvedValue([LEAGUE]);
+  fetchMyLeaguesMock.mockResolvedValue(leagues);
   saveStoredSession({ accessToken: "access-token", refreshToken: "refresh-token", user: USER });
 
   const container = document.createElement("div");
@@ -300,6 +305,57 @@ describe("Mercato — scambi collegati alle API reali (EP08-05/06)", () => {
     expect(html).toContain("Rifiuta");
     expect(html).toContain("Controproponi");
     expect(html).toContain("Annulla");
+    unmount();
+  });
+
+  it("admin: proposta in attesa di approvazione mostra Approva/Rifiuta (admin)", async () => {
+    fetchTradeProposalsMock.mockReset().mockResolvedValue({
+      proposals: [
+        {
+          id: "proposal-pending",
+          leagueId: "league-1",
+          proposerTeamId: "team-1",
+          recipientTeamId: "team-2",
+          offeredAthletes: [],
+          requestedAthletes: [{ id: "athlete-2", name: "Giocatore Avversario" }],
+          offeredCredits: 5,
+          requestedCredits: 0,
+          status: "pending_approval",
+          expiresAt: "2026-09-01T00:00:00Z",
+          createdAt: "2026-08-19T00:00:00Z",
+          counterOfId: null,
+        },
+      ],
+    });
+    const adminLeague: LeagueSummary = { id: "league-1", name: "Lega Test", role: "league_admin" };
+    const { html, unmount } = await renderAppAt("/mercato", [adminLeague]);
+    expect(html).toContain('data-testid="market-trade-admin-actions-proposal-pending"');
+    expect(html).toContain("Approva");
+    expect(html).toContain("Rifiuta (admin)");
+    unmount();
+  });
+
+  it("membro non vede le azioni admin su una proposta in attesa di approvazione", async () => {
+    fetchTradeProposalsMock.mockReset().mockResolvedValue({
+      proposals: [
+        {
+          id: "proposal-pending",
+          leagueId: "league-1",
+          proposerTeamId: "team-1",
+          recipientTeamId: "team-2",
+          offeredAthletes: [],
+          requestedAthletes: [{ id: "athlete-2", name: "Giocatore Avversario" }],
+          offeredCredits: 5,
+          requestedCredits: 0,
+          status: "pending_approval",
+          expiresAt: "2026-09-01T00:00:00Z",
+          createdAt: "2026-08-19T00:00:00Z",
+          counterOfId: null,
+        },
+      ],
+    });
+    const { html, unmount } = await renderAppAt("/mercato", [LEAGUE]);
+    expect(html).not.toContain('data-testid="market-trade-admin-actions-proposal-pending"');
     unmount();
   });
 });
