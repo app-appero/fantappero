@@ -346,6 +346,19 @@ class AiFeedbackRating(str, enum.Enum):
     DOWN = "down"
 
 
+class SubscriptionPlan(str, enum.Enum):
+    """Platform entitlement tier (EP11-01). Never affects credits/moves/scores."""
+
+    FREE = "free"
+    PRO = "pro"
+
+
+class SubscriptionPaymentStatus(str, enum.Enum):
+    """Lifecycle of a recorded subscription payment event (EP11-02)."""
+
+    COMPLETED = "completed"
+
+
 class Permission(str, enum.Enum):
     """Fine-grained permissions mirrored from client contracts (EP02-03)."""
 

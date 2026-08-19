@@ -6,6 +6,7 @@ from auth.models.auth_token import AuthToken
 from auth.models.privacy_audit_event import PrivacyAuditEvent
 from auth.models.user import User
 from auth.models.user_profile import UserProfile
+from billing.models import SubscriptionPayment, UserEntitlement
 from database.models.infrastructure import SystemFlag
 from fantasy_lineups.models import LineupDraft, LineupPlayer, LineupSubmission, TacticalMove
 from fantasy_ratings.models import PlayerMatchRating
@@ -97,9 +98,11 @@ __all__ = [
     "SquadMembership",
     "SportSeason",
     "SportsPollRun",
+    "SubscriptionPayment",
     "SystemFlag",
     "TradeProposal",
     "Transfer",
     "User",
+    "UserEntitlement",
     "UserProfile",
 ]

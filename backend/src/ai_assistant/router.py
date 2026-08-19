@@ -29,6 +29,7 @@ from auth.exceptions import AuthError
 from auth.models.user import User
 from authorization.context import LeagueAccess
 from authorization.dependencies import require_league_permissions, require_permissions
+from billing.entitlement_service import EntitlementService
 from database.enums import AiFeedbackRating, FantasyRole, Permission
 
 router = APIRouter(prefix="/leagues", tags=["ai-assistant"])
@@ -42,6 +43,11 @@ def _error_response(exc: AuthError) -> JSONResponse:
     elif exc.code == "ai_interaction_not_found":
         status_code = status.HTTP_404_NOT_FOUND
     return JSONResponse(status_code=status_code, content={"message": exc.message, "code": exc.code})
+
+
+def _check_quota(session: Session, user_id: UUID) -> None:
+    limit = EntitlementService(session).get_status(user_id).ai_daily_limit
+    check_daily_quota(session, user_id, limit=limit)
 
 
 def _row_response(row: AthleteComparisonRow) -> AthleteComparisonRowResponse:
@@ -67,7 +73,7 @@ def get_viceallenatore_advice(
     session: Session = Depends(get_db_session),
 ) -> ViceallenatoreAdviceResponse | JSONResponse:
     try:
-        check_daily_quota(session, league_access.user.id)
+        _check_quota(session, league_access.user.id)
         advice = ViceallenatoreService(session).suggest(league_access, round_id)
     except AuthError as exc:
         return _error_response(exc)
@@ -108,7 +114,7 @@ def compare_athletes(
             },
         )
     try:
-        check_daily_quota(session, league_access.user.id)
+        _check_quota(session, league_access.user.id)
         result = OsservatoreService(session).compare(league_access, athlete_ids)
     except AuthError as exc:
         return _error_response(exc)
@@ -130,7 +136,7 @@ def suggest_free_agent_targets(
     session: Session = Depends(get_db_session),
 ) -> OsservatoreResultResponse | JSONResponse:
     try:
-        check_daily_quota(session, league_access.user.id)
+        _check_quota(session, league_access.user.id)
         result = OsservatoreService(session).suggest_free_agent_targets(
             league_access, role=role, season_year=season_year, limit=limit
         )
@@ -152,7 +158,7 @@ def get_analista_explanation(
     session: Session = Depends(get_db_session),
 ) -> AnalistaExplanationResponse | JSONResponse:
     try:
-        check_daily_quota(session, league_access.user.id)
+        _check_quota(session, league_access.user.id)
         explanation = AnalistaService(session).explain(league_access, athlete_id)
     except AuthError as exc:
         return _error_response(exc)

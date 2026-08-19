@@ -260,6 +260,14 @@ export type {
 } from "./admin.js";
 
 export type {
+  AuditLogEntry,
+  AuditLogList,
+  EntitlementStatus,
+  LeagueProExport,
+  SubscriptionPlan,
+} from "./billing.js";
+
+export type {
   AiFeedbackRatingValue,
   AiFeedbackRequest,
   AiFeedbackResponse,
