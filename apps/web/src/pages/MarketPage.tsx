@@ -2,6 +2,7 @@ import type {
   FantasyTeam,
   FantasyTeamSummary,
   LeagueListoneEntry,
+  MarketHistoryCategory,
   MarketReleasePreview,
   MarketReleaseReason,
   RosterOccupancyEntry,
@@ -27,9 +28,17 @@ import {
 } from "../api/leagues";
 import { getApiErrorMessage, useAuth } from "../auth/AuthContext";
 import { loadStoredSession } from "../auth/sessionStorage";
+import { useMarketHistory } from "../market/useMarketHistory";
 import { useTradeFlow } from "../market/useTradeFlow";
 import { useLocation } from "../router/simpleRouter";
 import { parseWireframeStateFromSearch } from "../wireframes/useWireframeState";
+
+const HISTORY_CATEGORY_OPTIONS = [
+  { value: "acquisto", label: "Acquisto" },
+  { value: "svincolo", label: "Svincolo" },
+  { value: "scambio", label: "Scambio" },
+  { value: "intervento_manuale", label: "Intervento manuale" },
+];
 
 const TRADE_STATUS_LABEL: Record<string, string> = {
   proposed: "Proposta",
@@ -162,6 +171,7 @@ export function MarketPage() {
   const otherTeams = useMemo(() => teams.filter((row) => row.id !== team?.id), [teams, team]);
 
   const trade = useTradeFlow({ leagueId: activeLeagueId, active: !isDemoMode });
+  const history = useMarketHistory({ leagueId: activeLeagueId, active: !isDemoMode });
 
   const ownedSlots = useMemo(
     () => (team?.slots ?? []).filter((slot) => slot.athleteId !== null),
@@ -801,6 +811,90 @@ export function MarketPage() {
                   );
                 })}
               </ul>
+            ) : null}
+          </WireframeSection>
+        ) : null}
+
+        {!isDemoMode && activeLeagueId ? (
+          <WireframeSection label="Storico mercato" testId="wireframe-region-market-history">
+            <div className="fa-ds-showcase__row">
+              <Select
+                label="Categoria"
+                name="history-category"
+                options={HISTORY_CATEGORY_OPTIONS}
+                placeholder="Tutte le categorie"
+                value={history.category}
+                onChange={(event) =>
+                  history.setCategory(event.target.value as MarketHistoryCategory | "")
+                }
+              />
+              <Select
+                label="Squadra"
+                name="history-team"
+                options={teams.map((row) => ({ value: row.id, label: row.name }))}
+                placeholder="Tutte le squadre"
+                value={history.fantasyTeamId}
+                onChange={(event) => history.setFantasyTeamId(event.target.value)}
+              />
+            </div>
+
+            {history.loading ? (
+              <UiStatePanel
+                state="loading"
+                title="Caricamento storico"
+                message="Recupero gli eventi di mercato…"
+                testId="market-history-loading"
+              />
+            ) : null}
+
+            {!history.loading && history.loadError ? (
+              <UiStatePanel
+                state="error"
+                title="Storico non disponibile"
+                message={history.loadError}
+                testId="market-history-error"
+              />
+            ) : null}
+
+            {!history.loading && !history.loadError && history.items.length === 0 ? (
+              <UiStatePanel
+                state="empty"
+                title="Nessun evento"
+                message="Non ci sono eventi di mercato per i filtri selezionati."
+                testId="market-history-empty"
+              />
+            ) : null}
+
+            {!history.loading && !history.loadError && history.items.length > 0 ? (
+              <>
+                <ul data-testid="market-history-list">
+                  {history.items.map((entry) => (
+                    <li key={entry.id} data-testid={`market-history-entry-${entry.id}`}>
+                      <Badge variant="neutral">{entry.category}</Badge> {entry.action} —{" "}
+                      {new Date(entry.occurredAt).toLocaleString("it-IT")}
+                    </li>
+                  ))}
+                </ul>
+                <div className="fa-ds-showcase__row">
+                  <Button
+                    variant="secondary"
+                    disabled={history.page <= 1}
+                    onClick={() => history.goToPage(history.page - 1)}
+                  >
+                    Pagina precedente
+                  </Button>
+                  <span>
+                    Pagina {history.page} di {history.totalPages} ({history.total} eventi)
+                  </span>
+                  <Button
+                    variant="secondary"
+                    disabled={history.page >= history.totalPages}
+                    onClick={() => history.goToPage(history.page + 1)}
+                  >
+                    Pagina successiva
+                  </Button>
+                </div>
+              </>
             ) : null}
           </WireframeSection>
         ) : null}

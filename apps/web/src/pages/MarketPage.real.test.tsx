@@ -13,6 +13,7 @@ const fetchRosterOccupancyMock = vi.fn();
 const fetchLeagueListoneMock = vi.fn();
 const previewVoluntaryReleaseMock = vi.fn();
 const applyVoluntaryReleaseMock = vi.fn();
+const fetchMarketHistoryMock = vi.fn();
 const fetchTradeProposalsMock = vi.fn();
 const createTradeProposalMock = vi.fn();
 const acceptTradeProposalMock = vi.fn();
@@ -73,7 +74,7 @@ vi.mock("../api/market", () => ({
   counterTradeProposal: vi.fn(),
   approveTradeProposal: (...args: unknown[]) => approveTradeProposalMock(...args),
   rejectTradeProposalAsAdmin: (...args: unknown[]) => rejectTradeProposalAsAdminMock(...args),
-  fetchMarketHistory: vi.fn(),
+  fetchMarketHistory: (...args: unknown[]) => fetchMarketHistoryMock(...args),
 }));
 
 import { AuthProvider } from "../auth/AuthContext";
@@ -165,6 +166,9 @@ describe("Mercato — svincolo volontario collegato alle API reali (EP08-04)", (
     fetchRosterOccupancyMock.mockReset().mockResolvedValue([]);
     fetchLeagueListoneMock.mockReset().mockResolvedValue([]);
     fetchTradeProposalsMock.mockReset().mockResolvedValue({ proposals: [] });
+    fetchMarketHistoryMock
+      .mockReset()
+      .mockResolvedValue({ items: [], page: 1, pageSize: 20, total: 0, totalPages: 0 });
     createTradeProposalMock.mockReset();
     acceptTradeProposalMock.mockReset();
     rejectTradeProposalMock.mockReset();
@@ -237,6 +241,9 @@ describe("Mercato — scambi collegati alle API reali (EP08-05/06)", () => {
     previewVoluntaryReleaseMock.mockReset();
     applyVoluntaryReleaseMock.mockReset();
     fetchTradeProposalsMock.mockReset().mockResolvedValue({ proposals: [] });
+    fetchMarketHistoryMock
+      .mockReset()
+      .mockResolvedValue({ items: [], page: 1, pageSize: 20, total: 0, totalPages: 0 });
     createTradeProposalMock.mockReset();
     acceptTradeProposalMock.mockReset();
     rejectTradeProposalMock.mockReset();
@@ -356,6 +363,95 @@ describe("Mercato — scambi collegati alle API reali (EP08-05/06)", () => {
     });
     const { html, unmount } = await renderAppAt("/mercato", [LEAGUE]);
     expect(html).not.toContain('data-testid="market-trade-admin-actions-proposal-pending"');
+    unmount();
+  });
+});
+
+describe("Mercato — storico collegato alle API reali (EP08-08)", () => {
+  beforeEach(() => {
+    clearStoredSession();
+    fetchMyFantasyTeamMock.mockReset().mockResolvedValue(TEAM_WITH_PLAYER);
+    fetchMyCreditsMock.mockReset().mockResolvedValue({
+      fantasyTeamId: "team-1",
+      balance: 150,
+      version: 1,
+      reconstructedBalance: 150,
+    });
+    previewVoluntaryReleaseMock.mockReset();
+    applyVoluntaryReleaseMock.mockReset();
+    fetchFantasyTeamsMock.mockReset().mockResolvedValue([]);
+    fetchRosterOccupancyMock.mockReset().mockResolvedValue([]);
+    fetchLeagueListoneMock.mockReset().mockResolvedValue([]);
+    fetchTradeProposalsMock.mockReset().mockResolvedValue({ proposals: [] });
+    fetchMarketHistoryMock.mockReset();
+  });
+
+  afterEach(() => {
+    clearStoredSession();
+  });
+
+  it("nessun evento mostra lo stato vuoto", async () => {
+    fetchMarketHistoryMock.mockResolvedValue({
+      items: [],
+      page: 1,
+      pageSize: 20,
+      total: 0,
+      totalPages: 0,
+    });
+    const { html, unmount } = await renderAppAt("/mercato");
+    expect(html).toContain('data-testid="market-history-empty"');
+    unmount();
+  });
+
+  it("errore nel caricamento dello storico mostra lo stato di errore", async () => {
+    fetchMarketHistoryMock.mockRejectedValue(
+      new ApiError("Errore dal server.", 500, "internal_error"),
+    );
+    const { html, unmount } = await renderAppAt("/mercato");
+    expect(html).toContain('data-testid="market-history-error"');
+    expect(html).toContain("Errore dal server.");
+    unmount();
+  });
+
+  it("elenca gli eventi e mostra la paginazione", async () => {
+    fetchMarketHistoryMock.mockResolvedValue({
+      items: [
+        {
+          id: "event-1",
+          occurredAt: "2026-08-19T10:00:00Z",
+          category: "acquisto",
+          action: "market_session_resolved",
+          actorId: "user-1",
+          details: { sessionId: "session-1" },
+        },
+      ],
+      page: 1,
+      pageSize: 20,
+      total: 25,
+      totalPages: 2,
+    });
+    const { html, unmount } = await renderAppAt("/mercato");
+    expect(html).toContain('data-testid="market-history-entry-event-1"');
+    expect(html).toContain("market_session_resolved");
+    expect(html).toContain("Pagina 1 di 2");
+    expect(html).toContain("25 eventi");
+    unmount();
+  });
+
+  it("passa la categoria selezionata come filtro alla chiamata API", async () => {
+    fetchMarketHistoryMock.mockResolvedValue({
+      items: [],
+      page: 1,
+      pageSize: 20,
+      total: 0,
+      totalPages: 0,
+    });
+    const { unmount } = await renderAppAt("/mercato");
+    expect(fetchMarketHistoryMock).toHaveBeenCalledWith(
+      "access-token",
+      "league-1",
+      expect.objectContaining({ category: undefined, fantasyTeamId: undefined }),
+    );
     unmount();
   });
 });
