@@ -137,6 +137,8 @@ class LeagueAuditAction(str, enum.Enum):
     MARKET_TRADE_COUNTERED = "market_trade_countered"
     MARKET_TRADE_APPROVED = "market_trade_approved"
     MARKET_TRADE_REJECTED_BY_ADMIN = "market_trade_rejected_by_admin"
+    PLATFORM_OPERATOR_PROMOTED = "platform_operator_promoted"
+    PLATFORM_OPERATOR_REVOKED = "platform_operator_revoked"
 
 
 class FantasyTurnStatus(str, enum.Enum):

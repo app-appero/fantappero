@@ -19,8 +19,9 @@ from admin.schemas import (
 from auth.models.user import User
 from auth.models.user_profile import UserProfile
 from config.settings.api import ApiSettings
-from database.enums import LeagueMemberRole, PlatformRole
+from database.enums import LeagueAuditAction, LeagueMemberRole, PlatformRole
 from leagues.models.league import League
+from leagues.models.league_audit_event import LeagueAuditEvent
 from leagues.models.league_membership import LeagueMembership
 from observability.logging import get_logger
 
@@ -79,8 +80,10 @@ class AdminService:
     def list_users(
         self, *, query: str | None, page: int, page_size: int = PAGE_SIZE
     ) -> PaginatedAdminUsersResponse:
-        base = select(User).outerjoin(UserProfile, UserProfile.user_id == User.id).where(
-            User.deleted_at.is_(None)
+        base = (
+            select(User)
+            .outerjoin(UserProfile, UserProfile.user_id == User.id)
+            .where(User.deleted_at.is_(None))
         )
         if query:
             escaped = _escape_ilike(query)
@@ -112,6 +115,15 @@ class AdminService:
         if user.platform_role != PlatformRole.OPERATOR:
             user.platform_role = PlatformRole.OPERATOR
             self._session.flush()
+            self._session.add(
+                LeagueAuditEvent(
+                    league_id=None,
+                    actor_id=actor.id,
+                    action=LeagueAuditAction.PLATFORM_OPERATOR_PROMOTED,
+                    details={"targetUserId": str(user.id)},
+                )
+            )
+            self._session.flush()
             _logger.info(
                 "admin operator role changed",
                 extra={
@@ -134,6 +146,15 @@ class AdminService:
             if operators_count <= 1:
                 raise LastOperatorRevokeError()
             user.platform_role = PlatformRole.USER
+            self._session.flush()
+            self._session.add(
+                LeagueAuditEvent(
+                    league_id=None,
+                    actor_id=actor.id,
+                    action=LeagueAuditAction.PLATFORM_OPERATOR_REVOKED,
+                    details={"targetUserId": str(user.id)},
+                )
+            )
             self._session.flush()
             _logger.info(
                 "admin operator role changed",

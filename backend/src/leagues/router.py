@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import datetime
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query, Response, status
@@ -19,14 +20,19 @@ from authorization.dependencies import (
     require_permissions,
 )
 from authorization.service import AuthorizationService
+from billing.entitlement_service import EntitlementService
 from config.settings.api import ApiSettings
 from config.settings.loader import get_api_settings
-from database.enums import Permission, UserType
+from database.enums import LeagueAuditAction, Permission, SubscriptionPlan, UserType
+from leagues.audit_log_schemas import AuditLogListResponse
+from leagues.audit_log_service import DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE, AuditLogService
 from leagues.calendar_service import LeagueCalendarService
 from leagues.invite_service import LeagueInviteService
 from leagues.listone_service import LeagueListoneService
 from leagues.membership_service import LeagueMembershipService
 from leagues.named_invite_service import NamedLeagueInviteService
+from leagues.pro_export_schemas import LeagueProExportResponse
+from leagues.pro_export_service import build_league_export
 from leagues.schemas import (
     AcceptLeagueInviteRequest,
     AcceptLeagueInviteResponse,
@@ -44,7 +50,6 @@ from leagues.schemas import (
     LeagueListoneEntryResponse,
     LeagueListoneRefreshJobResponse,
     LeagueListoneRefreshProgressResponse,
-    LeagueListoneRefreshResponse,
     LeagueMemberResponse,
     LeagueRulesResponse,
     LeagueStandingResponse,
@@ -577,3 +582,56 @@ def get_league_standings(
         )
         for row in rows
     ]
+
+
+@router.get(
+    "/{league_id}/audit",
+    response_model=AuditLogListResponse,
+)
+def get_league_audit_log(
+    action: LeagueAuditAction | None = Query(default=None),
+    date_from: str | None = Query(default=None, alias="dateFrom"),
+    date_to: str | None = Query(default=None, alias="dateTo"),
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=DEFAULT_PAGE_SIZE, ge=1, le=MAX_PAGE_SIZE, alias="pageSize"),
+    league_access: LeagueAccess = Depends(require_league_permissions(Permission.LEAGUE_ADMIN)),
+    session: Session = Depends(get_db_session),
+) -> AuditLogListResponse | JSONResponse:
+    """Registro di audit della lega: chi/cosa/quando, secondo permessi (EP11-03)."""
+    try:
+        parsed_from = datetime.fromisoformat(date_from) if date_from else None
+        parsed_to = datetime.fromisoformat(date_to) if date_to else None
+    except ValueError:
+        return JSONResponse(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            content={"message": "Data non valida.", "code": "invalid_date"},
+        )
+    return AuditLogService(session).list_events(
+        league_id=league_access.league.id,
+        action=action,
+        date_from=parsed_from,
+        date_to=parsed_to,
+        page=page,
+        page_size=page_size,
+    )
+
+
+@router.get(
+    "/{league_id}/pro/export",
+    response_model=LeagueProExportResponse,
+)
+def export_league_pro_data(
+    league_access: LeagueAccess = Depends(require_league_permissions(Permission.LEAGUE_VIEW)),
+    session: Session = Depends(get_db_session),
+) -> LeagueProExportResponse | JSONResponse:
+    """Esportazione classifica e riepilogo lega, riservata agli abbonati Pro (EP11-05)."""
+    status_row = EntitlementService(session).get_status(league_access.user.id)
+    if status_row.plan != SubscriptionPlan.PRO:
+        return JSONResponse(
+            status_code=status.HTTP_403_FORBIDDEN,
+            content={
+                "message": "Funzionalità riservata agli abbonati Pro.",
+                "code": "pro_entitlement_required",
+            },
+        )
+    return build_league_export(session, league_id=league_access.league.id)
