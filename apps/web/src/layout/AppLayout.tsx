@@ -20,6 +20,7 @@ import {
   IconUsers,
 } from "../navigation/NavIcons";
 import { RouterBottomNavLink, RouterNavLinkAdapter } from "../navigation/RouterNavLink";
+import { NotificationCenter } from "../notifications/NotificationCenter";
 import { SkipLink } from "./SkipLink";
 
 const APP_ICONS: Record<string, ReactNode> = {
@@ -89,6 +90,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                   Pannello globale
                 </Link>
               ) : null}
+              <NotificationCenter />
               <span className="fa-user-chip" data-testid="user-display">
                 {user?.displayName ?? "Utente"}
               </span>

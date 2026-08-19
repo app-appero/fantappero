@@ -257,3 +257,14 @@ export type {
   PaginatedAdminUsers,
   PlatformRole as AdminPlatformRole,
 } from "./admin.js";
+
+export type {
+  ListNotificationsFilters,
+  MarkAllNotificationsReadResult,
+  NotificationCategory,
+  NotificationItem,
+  NotificationList,
+  NotificationPreference,
+  NotificationPreferenceList,
+  UpdateNotificationPreferenceRequest,
+} from "./notifications.js";

@@ -30,6 +30,7 @@ from leagues.models.league_rules import LeagueRules
 from leagues.models.league_standing import LeagueStanding
 from leagues.models.named_league_invite import NamedLeagueInvite
 from market.models import MarketBid, MarketSession, TradeProposal
+from notifications.models import Notification, NotificationPreference
 from sports_data.catalog.models import Club, CompetitionSeasonClub, SportSeason
 from sports_data.fixtures.models import (
     Fixture,
@@ -76,6 +77,8 @@ __all__ = [
     "MarketSession",
     "MatchEvent",
     "NamedLeagueInvite",
+    "Notification",
+    "NotificationPreference",
     "OfficialLineup",
     "OfficialLineupEntry",
     "PlayerMatchRating",

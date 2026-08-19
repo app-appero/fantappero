@@ -314,6 +314,23 @@ class MarketReleaseReason(str, enum.Enum):
     LEAGUE_EXIT = "league_exit"
 
 
+class NotificationCategory(str, enum.Enum):
+    """In-app notification category (EP09-01). Producers land in EP09-02/03/04."""
+
+    SISTEMA = "sistema"
+    FORMAZIONE = "formazione"
+    MERCATO = "mercato"
+    RISULTATI = "risultati"
+
+
+class NotificationStatus(str, enum.Enum):
+    """Outbox delivery lifecycle for a notification (EP09-01)."""
+
+    PENDING = "pending"
+    DELIVERED = "delivered"
+    FAILED = "failed"
+
+
 class Permission(str, enum.Enum):
     """Fine-grained permissions mirrored from client contracts (EP02-03)."""
 

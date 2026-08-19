@@ -674,3 +674,108 @@ button.fa-link-muted,
   font-size: var(--fa-text-xs);
   color: var(--fa-color-foreground-muted);
 }
+
+.fa-notification-center {
+  position: relative;
+  display: inline-flex;
+}
+
+.fa-notification-center__trigger {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: var(--fa-space-xs);
+  color: var(--fa-color-foreground-muted);
+  border-radius: var(--fa-radius-md);
+}
+
+.fa-notification-center__trigger:hover {
+  color: var(--fa-color-accent);
+}
+
+.fa-notification-center__badge {
+  position: absolute;
+  top: 0;
+  right: 0;
+  min-width: 1.1rem;
+  padding: 0 0.25rem;
+  border-radius: 999px;
+  background-color: var(--fa-color-danger);
+  color: var(--fa-color-background);
+  font-size: var(--fa-text-xs);
+  line-height: 1.1rem;
+  text-align: center;
+}
+
+.fa-notification-center__panel {
+  position: absolute;
+  top: calc(100% + var(--fa-space-xs));
+  right: 0;
+  z-index: 20;
+  width: 20rem;
+  max-height: 24rem;
+  overflow-y: auto;
+  background-color: var(--fa-color-background);
+  border: 1px solid var(--fa-color-border);
+  border-radius: var(--fa-radius-md);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+}
+
+.fa-notification-center__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--fa-space-sm);
+  padding: var(--fa-space-sm);
+  border-bottom: 1px solid var(--fa-color-border);
+  font-weight: 600;
+}
+
+.fa-notification-center__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.fa-notification-center__item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: none;
+  border-bottom: 1px solid var(--fa-color-border);
+  cursor: pointer;
+  padding: var(--fa-space-sm);
+  color: inherit;
+  font: inherit;
+}
+
+.fa-notification-center__item--unread {
+  background-color: color-mix(in srgb, var(--fa-color-accent) 8%, transparent);
+}
+
+.fa-notification-center__item-category {
+  font-size: var(--fa-text-xs);
+  text-transform: uppercase;
+  color: var(--fa-color-foreground-muted);
+}
+
+.fa-notification-center__item-title {
+  font-weight: 600;
+}
+
+.fa-notification-center__item-body {
+  font-size: var(--fa-text-sm);
+  color: var(--fa-color-foreground-muted);
+}
+
+.fa-notification-center__item-time {
+  font-size: var(--fa-text-xs);
+  color: var(--fa-color-foreground-muted);
+}

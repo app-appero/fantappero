@@ -77,6 +77,21 @@ vi.mock("../api/market", () => ({
   fetchMarketHistory: (...args: unknown[]) => fetchMarketHistoryMock(...args),
 }));
 
+vi.mock("../api/notifications", () => ({
+  fetchNotifications: vi.fn().mockResolvedValue({
+    items: [],
+    page: 1,
+    pageSize: 20,
+    total: 0,
+    totalPages: 0,
+    unreadCount: 0,
+  }),
+  markNotificationRead: vi.fn(),
+  markAllNotificationsRead: vi.fn(),
+  fetchNotificationPreferences: vi.fn(),
+  updateNotificationPreference: vi.fn(),
+}));
+
 import { AuthProvider } from "../auth/AuthContext";
 import { clearStoredSession, saveStoredSession } from "../auth/sessionStorage";
 import { MemoryRouter } from "../router/simpleRouter";

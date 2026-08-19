@@ -27,6 +27,7 @@ from fantasy_turns.router import router as fantasy_turns_router
 from leagues.router import router as leagues_router
 from leagues.scoring_router import router as scoring_router
 from market.router import router as market_router
+from notifications.router import router as notifications_router
 from observability.error_tracking import configure_error_tracking
 from observability.health import as_readiness, liveness
 from observability.logging import configure_logging
@@ -75,6 +76,7 @@ app.include_router(fantasy_lineups_router)
 app.include_router(effective_lineup_router)
 app.include_router(fantasy_ratings_router)
 app.include_router(quality_router)
+app.include_router(notifications_router)
 app.add_exception_handler(QualityRetryError, quality_error_handler)
 app.add_exception_handler(FantasyRatingError, rating_error_handler)
 
