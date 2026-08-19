@@ -37,6 +37,8 @@ const DEMO_PROFILE: UserProfile = {
   timezone: "Europe/Rome",
   notificationsEmail: true,
   notificationsPush: true,
+  quietHoursStartHour: null,
+  quietHoursEndHour: null,
   policyConsentAt: "2026-01-15T10:00:00.000Z",
   policyVersion: "2026-01",
   currentPolicyVersion: "2026-01",
@@ -93,6 +95,12 @@ export function ProfilePage() {
   const [notificationsPush, setNotificationsPush] = useState(
     demoProfile?.notificationsPush ?? true,
   );
+  const [quietHoursStartHour, setQuietHoursStartHour] = useState<string>(
+    demoProfile?.quietHoursStartHour?.toString() ?? "",
+  );
+  const [quietHoursEndHour, setQuietHoursEndHour] = useState<string>(
+    demoProfile?.quietHoursEndHour?.toString() ?? "",
+  );
   const [policyAccepted, setPolicyAccepted] = useState(
     demoProfile ? demoProfile.policyVersion === demoProfile.currentPolicyVersion : false,
   );
@@ -104,6 +112,8 @@ export function ProfilePage() {
     setTimezone(next.timezone);
     setNotificationsEmail(next.notificationsEmail);
     setNotificationsPush(next.notificationsPush);
+    setQuietHoursStartHour(next.quietHoursStartHour?.toString() ?? "");
+    setQuietHoursEndHour(next.quietHoursEndHour?.toString() ?? "");
     setAvailableForInvites(profileInviteAvailability(next));
     setPolicyAccepted(next.policyVersion === next.currentPolicyVersion);
   }, []);
@@ -164,6 +174,13 @@ export function ProfilePage() {
       return;
     }
 
+    if (
+      (quietHoursStartHour.trim() === "") !== (quietHoursEndHour.trim() === "")
+    ) {
+      setFormError("Imposta sia l'inizio sia la fine del silenzio, oppure lasciali entrambi vuoti.");
+      return;
+    }
+
     setSaving(true);
     try {
       const updated = await updateProfile(stored.accessToken, {
@@ -172,6 +189,8 @@ export function ProfilePage() {
         timezone,
         notificationsEmail,
         notificationsPush,
+        quietHoursStartHour: quietHoursStartHour.trim() === "" ? null : Number(quietHoursStartHour),
+        quietHoursEndHour: quietHoursEndHour.trim() === "" ? null : Number(quietHoursEndHour),
       });
       applyProfile(updated);
       updateDisplayName(updated.displayName);
@@ -525,6 +544,32 @@ export function ProfilePage() {
                   />
                   Push
                 </label>
+              </fieldset>
+
+              <fieldset className="fa-profile-notifications">
+                <legend className="fa-field__label">Silenzio notifiche (email/push)</legend>
+                <Input
+                  label="Dalle ore"
+                  name="quietHoursStartHour"
+                  type="number"
+                  min={0}
+                  max={23}
+                  value={quietHoursStartHour}
+                  onChange={(event) => setQuietHoursStartHour(event.target.value)}
+                  disabled={saving}
+                  data-testid="profile-quiet-hours-start"
+                />
+                <Input
+                  label="Alle ore"
+                  name="quietHoursEndHour"
+                  type="number"
+                  min={0}
+                  max={23}
+                  value={quietHoursEndHour}
+                  onChange={(event) => setQuietHoursEndHour(event.target.value)}
+                  disabled={saving}
+                  data-testid="profile-quiet-hours-end"
+                />
               </fieldset>
 
               <fieldset className="fa-profile-notifications">

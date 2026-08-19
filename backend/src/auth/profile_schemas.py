@@ -17,6 +17,8 @@ class ProfileResponse(ApiModel):
     timezone: str
     notificationsEmail: bool
     notificationsPush: bool
+    quietHoursStartHour: int | None = None
+    quietHoursEndHour: int | None = None
     policyConsentAt: str | None = None
     policyVersion: str | None = None
     currentPolicyVersion: str
@@ -30,6 +32,8 @@ class UpdateProfileRequest(ApiModel):
     timezone: str | None = None
     notifications_email: bool | None = Field(default=None, alias="notificationsEmail")
     notifications_push: bool | None = Field(default=None, alias="notificationsPush")
+    quiet_hours_start_hour: int | None = Field(default=None, alias="quietHoursStartHour")
+    quiet_hours_end_hour: int | None = Field(default=None, alias="quietHoursEndHour")
     available_for_invites: bool | None = Field(default=None, alias="availableForInvites")
 
 

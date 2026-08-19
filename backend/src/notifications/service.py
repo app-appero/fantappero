@@ -10,7 +10,10 @@ from sqlalchemy import func, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from auth.models.user import User
+from auth.models.user_profile import UserProfile
 from database.enums import NotificationCategory, NotificationStatus
+from notifications.email_dispatch import dispatch_notification_email
 from notifications.exceptions import NotificationNotFoundError
 from notifications.models import Notification, NotificationPreference
 from notifications.schemas import (
@@ -123,7 +126,15 @@ class NotificationService:
             "notification_created",
             extra={"category": category.value, "template_key": template_key},
         )
+        self._dispatch_email(notification)
         return notification, True
+
+    def _dispatch_email(self, notification: Notification) -> None:
+        user = self._session.get(User, notification.user_id)
+        if user is None:
+            return
+        profile = self._session.get(UserProfile, notification.user_id)
+        dispatch_notification_email(notification=notification, user=user, profile=profile)
 
     def list_notifications(
         self,

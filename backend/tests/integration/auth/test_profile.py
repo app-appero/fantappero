@@ -156,3 +156,35 @@ def test_profile_empty_update_rejected(client: TestClient) -> None:
     response = client.patch("/profile/me", headers=headers, json={})
     assert response.status_code == 400
     assert response.json()["code"] == "empty_update"
+
+
+def test_profile_quiet_hours_set_reject_invalid_and_clear(client: TestClient) -> None:
+    session = _register_and_login(client, "quiethours@example.com", "Quiet Hours User")
+    headers = {"Authorization": f"Bearer {session['access']}"}
+
+    set_hours = client.patch(
+        "/profile/me",
+        headers=headers,
+        json={"quietHoursStartHour": 22, "quietHoursEndHour": 8},
+    )
+    assert set_hours.status_code == 200
+    body = set_hours.json()
+    assert body["quietHoursStartHour"] == 22
+    assert body["quietHoursEndHour"] == 8
+
+    invalid = client.patch(
+        "/profile/me",
+        headers=headers,
+        json={"quietHoursStartHour": 24},
+    )
+    assert invalid.status_code == 400
+    assert invalid.json()["code"] == "invalid_quiet_hour"
+
+    cleared = client.patch(
+        "/profile/me",
+        headers=headers,
+        json={"quietHoursStartHour": None, "quietHoursEndHour": None},
+    )
+    assert cleared.status_code == 200
+    assert cleared.json()["quietHoursStartHour"] is None
+    assert cleared.json()["quietHoursEndHour"] is None

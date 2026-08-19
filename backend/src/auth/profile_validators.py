@@ -17,6 +17,15 @@ _WEBP_RIFF = b"RIFF"
 _WEBP_MARKER = b"WEBP"
 
 
+def validate_quiet_hour(hour: int) -> int:
+    if hour < 0 or hour > 23:
+        raise ValidationAuthError(
+            "L'ora di inizio/fine silenzio deve essere tra 0 e 23.",
+            code="invalid_quiet_hour",
+        )
+    return hour
+
+
 def validate_profile_display_name(display_name: str) -> str:
     cleaned = display_name.strip()
     if not cleaned:

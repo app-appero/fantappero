@@ -17,6 +17,7 @@ from auth.profile_validators import (
     validate_language,
     validate_policy_version,
     validate_profile_display_name,
+    validate_quiet_hour,
     validate_timezone,
 )
 from auth.security import utc_now
@@ -54,6 +55,20 @@ class ProfileService:
             changed = True
         if payload.notifications_push is not None:
             profile.notifications_push = payload.notifications_push
+            changed = True
+        if "quiet_hours_start_hour" in payload.model_fields_set:
+            profile.quiet_hours_start_hour = (
+                validate_quiet_hour(payload.quiet_hours_start_hour)
+                if payload.quiet_hours_start_hour is not None
+                else None
+            )
+            changed = True
+        if "quiet_hours_end_hour" in payload.model_fields_set:
+            profile.quiet_hours_end_hour = (
+                validate_quiet_hour(payload.quiet_hours_end_hour)
+                if payload.quiet_hours_end_hour is not None
+                else None
+            )
             changed = True
         if payload.available_for_invites is not None:
             self._set_invite_availability(user, profile, payload.available_for_invites)
@@ -174,6 +189,8 @@ class ProfileService:
             timezone=profile.timezone,
             notificationsEmail=profile.notifications_email,
             notificationsPush=profile.notifications_push,
+            quietHoursStartHour=profile.quiet_hours_start_hour,
+            quietHoursEndHour=profile.quiet_hours_end_hour,
             policyConsentAt=consent_at.isoformat() if consent_at is not None else None,
             policyVersion=profile.policy_version,
             currentPolicyVersion=self._settings.profile_policy_version,

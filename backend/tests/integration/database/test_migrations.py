@@ -104,7 +104,7 @@ def test_upgrade_from_empty_database(clean_db: str) -> None:
                 .scalars()
                 .all()
             )
-            assert version == "80d763c9e61d"
+            assert version == "1abdd05156d8"
         assert named_statuses == ["pending", "accepted", "declined", "revoked", "expired"]
         assert calendar_statuses == ["draft", "confirmed"]
         assert fantasy_roles == ["P", "D", "C", "A"]

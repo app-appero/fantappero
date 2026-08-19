@@ -5,7 +5,7 @@ from __future__ import annotations
 import uuid
 from typing import TYPE_CHECKING
 
-from sqlalchemy import Boolean, ForeignKey, String, Text, text
+from sqlalchemy import Boolean, CheckConstraint, ForeignKey, Integer, String, Text, text
 from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -20,6 +20,16 @@ class UserProfile(Base, TimestampMixin):
     """Extended profile data keyed by user account."""
 
     __tablename__ = "user_profiles"
+    __table_args__ = (
+        CheckConstraint(
+            "quiet_hours_start_hour IS NULL OR quiet_hours_start_hour BETWEEN 0 AND 23",
+            name="ck_user_profiles_quiet_hours_start_hour",
+        ),
+        CheckConstraint(
+            "quiet_hours_end_hour IS NULL OR quiet_hours_end_hour BETWEEN 0 AND 23",
+            name="ck_user_profiles_quiet_hours_end_hour",
+        ),
+    )
 
     user_id: Mapped[uuid.UUID] = mapped_column(
         PGUUID(as_uuid=True),
@@ -44,6 +54,11 @@ class UserProfile(Base, TimestampMixin):
         nullable=False,
         server_default=text("true"),
     )
+    # Local hour (0-23, in ``timezone`` above) during which external channel
+    # notifications (email/push) are deferred (EP09-05). Both null = no quiet
+    # hours configured. Never affects the in-app center, which is always live.
+    quiet_hours_start_hour: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    quiet_hours_end_hour: Mapped[int | None] = mapped_column(Integer, nullable=True)
     available_for_invites: Mapped[bool] = mapped_column(
         Boolean,
         nullable=False,

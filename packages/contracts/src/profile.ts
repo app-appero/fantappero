@@ -9,6 +9,9 @@ export interface UserProfile {
   timezone: string;
   notificationsEmail: boolean;
   notificationsPush: boolean;
+  /** Local hour (0-23) window during which email/push are deferred; null = disabled. */
+  quietHoursStartHour: number | null;
+  quietHoursEndHour: number | null;
   policyConsentAt: string | null;
   policyVersion: string | null;
   currentPolicyVersion: string;
@@ -24,6 +27,8 @@ export interface UpdateProfileRequest {
   timezone?: string;
   notificationsEmail?: boolean;
   notificationsPush?: boolean;
+  quietHoursStartHour?: number | null;
+  quietHoursEndHour?: number | null;
   availableForInvites?: boolean;
 }
 
