@@ -488,6 +488,13 @@
   font-size: var(--fa-text-sm);
 }
 
+.fa-match-card__score {
+  color: var(--fa-color-foreground);
+  font-size: var(--fa-text-md);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
 .fa-match-card__footer {
   display: flex;
   align-items: center;

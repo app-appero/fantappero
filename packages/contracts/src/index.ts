@@ -131,6 +131,7 @@ export type {
   ExcludeFantasyTurnFixtureRequest,
   FantasyFixtureMatchStatus,
   FantasyRoundFixtureReason,
+  FantasyRoundHomologationStatus,
   FantasyTurnDetail,
   FantasyTurnFixture,
   FantasyTurnKind,

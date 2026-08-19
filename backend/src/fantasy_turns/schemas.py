@@ -20,6 +20,9 @@ class FantasyTurnFixtureResponse(ApiModel):
     observed_kickoff_at: datetime | None = Field(default=None, alias="observedKickoffAt")
     lock_latched_at: datetime | None = Field(default=None, alias="lockLatchedAt")
     status_short: str = Field(alias="statusShort")
+    status_elapsed: int | None = Field(default=None, alias="statusElapsed")
+    home_goals: int | None = Field(default=None, alias="homeGoals")
+    away_goals: int | None = Field(default=None, alias="awayGoals")
     home_club_name: str = Field(alias="homeClubName")
     away_club_name: str = Field(alias="awayClubName")
     competition_name: str | None = Field(default=None, alias="competitionName")
@@ -45,6 +48,7 @@ class FantasyTurnSummaryResponse(ApiModel):
 
 
 class FantasyTurnDetailResponse(FantasyTurnSummaryResponse):
+    homologation_status: Literal["provisional", "homologated"] = Field(alias="homologationStatus")
     fixtures: list[FantasyTurnFixtureResponse] = Field(default_factory=list)
 
 

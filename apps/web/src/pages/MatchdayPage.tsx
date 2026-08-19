@@ -6,6 +6,7 @@ import type {
 } from "@fantappero/contracts";
 import { mapFixtureMatchStatus } from "@fantappero/contracts";
 import {
+  Badge,
   Breadcrumb,
   Button,
   Card,
@@ -32,6 +33,7 @@ import {
 } from "../api/leagues";
 import { getApiErrorMessage, useAuth } from "../auth/AuthContext";
 import { loadStoredSession } from "../auth/sessionStorage";
+import { useLiveTurnPolling } from "../matchday/useLiveTurnPolling";
 import { useLocation } from "../router/simpleRouter";
 import { parseWireframeStateFromSearch } from "../wireframes/useWireframeState";
 
@@ -65,6 +67,7 @@ const DEMO_TURN: FantasyTurnDetail = {
   fixtureCount: 2,
   generatedAt: "2026-08-12T08:00:00.000Z",
   modificationAllowed: true,
+  homologationStatus: "provisional",
   fixtures: [
     {
       id: "rf-1",
@@ -75,6 +78,9 @@ const DEMO_TURN: FantasyTurnDetail = {
       observedKickoffAt: "2026-08-15T14:00:00.000Z",
       lockLatchedAt: "2026-08-15T14:00:00.000Z",
       statusShort: "PST",
+      statusElapsed: null,
+      homeGoals: null,
+      awayGoals: null,
       homeClubName: "West Ham",
       awayClubName: "Chelsea",
       competitionName: "Premier League",
@@ -89,6 +95,9 @@ const DEMO_TURN: FantasyTurnDetail = {
       observedKickoffAt: "2026-08-15T18:30:00.000Z",
       lockLatchedAt: null,
       statusShort: "NS",
+      statusElapsed: null,
+      homeGoals: null,
+      awayGoals: null,
       homeClubName: "Inter",
       awayClubName: "Milan",
       competitionName: "Serie A",
@@ -232,6 +241,13 @@ export function MatchdayPage() {
   useEffect(() => {
     void loadTurns();
   }, [loadTurns]);
+
+  const { degraded: liveUpdateDegraded } = useLiveTurnPolling(
+    activeLeagueId,
+    selected,
+    setSelected,
+    !isDemoMode,
+  );
 
   async function selectTurn(turnId: string) {
     if (isDemoMode) {
@@ -548,6 +564,26 @@ export function MatchdayPage() {
                       ? ` (persistito: ${STATUS_LABEL[selected.status]})`
                       : null}
                   </p>
+                  <p>
+                    Punteggi:{" "}
+                    <Badge
+                      variant={selected.homologationStatus === "homologated" ? "success" : "warning"}
+                      data-testid="matchday-homologation-status"
+                    >
+                      {selected.homologationStatus === "homologated" ? "Finale" : "Provvisorio"}
+                    </Badge>
+                    {liveUpdateDegraded ? (
+                      <span
+                        data-testid="matchday-live-degraded"
+                        style={{
+                          marginLeft: "var(--fa-space-sm)",
+                          color: "var(--fa-color-foreground-muted)",
+                        }}
+                      >
+                        Aggiornamento live rallentato, nuovo tentativo in corso…
+                      </span>
+                    ) : null}
+                  </p>
                   <p>Finestra: {formatDateTime(selected.windowStartAt)} → {formatDateTime(selected.windowEndAt)}</p>
                   <p>Cutoff formazione: {formatDateTime(selected.cutoffAt)}</p>
                   {selected.fixtures.some((fixture) => fixture.lockLatchedAt) ? (
@@ -588,6 +624,11 @@ export function MatchdayPage() {
                             fixture.statusShort
                           }
                           contextLabel={fixture.competitionName ?? "Campionato"}
+                          score={
+                            fixture.homeGoals !== null && fixture.awayGoals !== null
+                              ? { home: fixture.homeGoals, away: fixture.awayGoals }
+                              : null
+                          }
                         />
                         {fixture.lockLatchedAt ? (
                           <p data-testid={`matchday-lock-latched-${fixture.fixtureId}`}>

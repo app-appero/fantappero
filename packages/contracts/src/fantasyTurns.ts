@@ -6,6 +6,8 @@ export type FantasyTurnKind = "weekend" | "midweek";
 
 export type FantasyRoundFixtureReason = "window" | "admin_include";
 
+export type FantasyRoundHomologationStatus = "provisional" | "homologated";
+
 export interface FantasyTurnFixture {
   id: string;
   fixtureId: string;
@@ -15,6 +17,9 @@ export interface FantasyTurnFixture {
   observedKickoffAt: string | null;
   lockLatchedAt: string | null;
   statusShort: string;
+  statusElapsed: number | null;
+  homeGoals: number | null;
+  awayGoals: number | null;
   homeClubName: string;
   awayClubName: string;
   competitionName: string | null;
@@ -40,6 +45,7 @@ export interface FantasyTurnSummary {
 }
 
 export interface FantasyTurnDetail extends FantasyTurnSummary {
+  homologationStatus: FantasyRoundHomologationStatus;
   fixtures: FantasyTurnFixture[];
 }
 

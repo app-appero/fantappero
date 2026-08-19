@@ -1005,6 +1005,7 @@ class FantasyTurnService:
             fixtureCount=summary.fixture_count,
             generatedAt=summary.generated_at,
             modificationAllowed=summary.modification_allowed,
+            homologationStatus=fantasy_round.homologation_status.value,
             fixtures=fixtures,
         )
 
@@ -1025,6 +1026,9 @@ class FantasyTurnService:
             observedKickoffAt=link.observed_kickoff_at,
             lockLatchedAt=link.lock_latched_at,
             statusShort=fixture.status_short if fixture else "NS",
+            statusElapsed=fixture.status_elapsed if fixture else None,
+            homeGoals=fixture.home_goals if fixture else None,
+            awayGoals=fixture.away_goals if fixture else None,
             homeClubName=home,
             awayClubName=away,
             competitionName=competition,

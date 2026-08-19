@@ -14,6 +14,8 @@ export type MatchCardProps = HTMLAttributes<HTMLElement> & {
   statusLabel: string;
   /** Optional competition or matchday label. */
   contextLabel?: string;
+  /** Live/final score, when known (omitted before kickoff). */
+  score?: { home: number; away: number } | null;
 };
 
 const STATUS_VARIANTS = {
@@ -30,6 +32,7 @@ export function MatchCard({
   status,
   statusLabel,
   contextLabel,
+  score,
   className,
   ...rest
 }: MatchCardProps) {
@@ -39,9 +42,15 @@ export function MatchCard({
         {contextLabel ? <p className="fa-match-card__context">{contextLabel}</p> : null}
         <div className="fa-match-card__teams">
           <span className="fa-match-card__team">{homeTeam}</span>
-          <span className="fa-match-card__vs" aria-hidden="true">
-            vs
-          </span>
+          {score ? (
+            <span className="fa-match-card__score" data-testid="match-card-score">
+              {score.home} - {score.away}
+            </span>
+          ) : (
+            <span className="fa-match-card__vs" aria-hidden="true">
+              vs
+            </span>
+          )}
           <span className="fa-match-card__team">{awayTeam}</span>
         </div>
         <div className="fa-match-card__footer">
