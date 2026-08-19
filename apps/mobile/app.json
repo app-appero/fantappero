@@ -1,0 +1,23 @@
+{
+  "expo": {
+    "name": "FantAppero",
+    "slug": "fantappero",
+    "version": "0.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "dark",
+    "newArchEnabled": true,
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.fantappero.mobile"
+    },
+    "android": {
+      "package": "com.fantappero.mobile",
+      "adaptiveIcon": {
+        "backgroundColor": "#0f1419"
+      }
+    },
+    "web": {
+      "bundler": "metro"
+    }
+  }
+}

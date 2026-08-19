@@ -1,0 +1,1646 @@
+﻿Name,Description,List,Labels,Members,Due Date,Position
+"EP02-01 — Registrazione, login e recupero accesso","CODICE: EP02-01
+
+USER STORY
+Come utente voglio creare e recuperare il mio account per partecipare alle leghe.
+
+OBIETTIVO E SCOPE
+- Implementare email/password e token/sessioni sicure.
+- Aggiungere verifica email, logout e reset password.
+- Proteggere endpoint e rate-limitare i tentativi.
+
+CRITERI DI ACCETTAZIONE
+- Flussi positivi e negativi coperti da test.
+- Token revocati non sono riutilizzabili.
+
+TEST MINIMI
+- Test unitari delle regole e delle validazioni introdotte.
+- Test del flusso UI positivo, vuoto, errore e permessi insufficienti.
+- Test di autorizzazione cross-user e cross-league, inclusi casi IDOR.
+
+DELIVERABLE
+- Codice applicativo e configurazioni nel modulo coerente con l’architettura approvata.
+- API/servizi di dominio, validazioni e documentazione tecnica aggiornata.
+- Interfaccia web/mobile con stati di caricamento, vuoto, errore e successo.
+- Test automatici e breve evidenza di verifica collegabile alla card.
+
+DIPENDENZE
+EP01
+
+STIMA INIZIALE
+1,5–3 giorni
+
+PROMPT CURSOR
+CONTESTO STANDARD — FANTAPPERÒ
+Stai lavorando su FantApperò, una piattaforma fantasy football web con backend Python/FastAPI, frontend React/TypeScript, PostgreSQL, Redis, worker asincroni e integrazione centralizzata con API-Football. L’architettura approvata è un monolite modulare API-first. Gli ambienti locali e i servizi applicativi devono essere gestiti con Docker e Docker Compose.
+
+REGOLE GENERALI OBBLIGATORIE
+- Usa l’italiano come lingua predefinita per interfaccia, messaggi utente, dati seed, documentazione funzionale e nuovi contenuti. Predisponi il codice per una futura internazionalizzazione, senza implementare ora lingue aggiuntive se la card non lo richiede.
+- Non modificare funzionalità, regole di gioco, API, schema dati, configurazioni o componenti non necessari alla card.
+- Non cancellare o rinominare codice, migrazioni, dati, test o funzioni esistenti senza una motivazione tecnica esplicita e verificata.
+- Prima di creare qualcosa, controlla cosa esiste già e riusa pattern, moduli e componenti compatibili.
+- Mantieni compatibilità con le funzionalità esistenti e non anticipare card o milestone successive.
+- Non inserire segreti nel codice, nei log, nei test, nei commit o nella documentazione.
+- Non usare Makefile, il comando `make` o wrapper equivalenti. Usa i normali comandi `docker compose` definiti dal progetto.
+- Non presupporre servizi installati localmente: esegui backend, worker, database, Redis, migrazioni e test attraverso Docker Compose, salvo attività puramente frontend già previste diversamente dal repository.
+- Se manca un servizio o un comando Compose necessario, aggiorna `compose.yaml` e la documentazione in modo minimale e coerente con lo scope.
+
+INCARICO
+- Card Trello: EP02-01 — Registrazione, login e recupero accesso
+- Dipendenze dichiarate: EP01
+
+Prima di modificare il codice:
+1. analizza la struttura del progetto aperto e individua tutti i file coinvolti nella card;
+2. leggi il README e la documentazione architetturale o tecnica effettivamente presenti e pertinenti;
+3. verifica cosa esiste già ed evita implementazioni duplicate;
+4. controlla che le dipendenze funzionali dichiarate siano già implementate; se manca una dipendenza bloccante, fermati e descrivi con precisione cosa manca;
+5. indicami brevemente il piano che seguirai prima di applicare le modifiche;
+6. riusa pattern, servizi e componenti già adottati quando sono compatibili;
+7. non introdurre segreti, credenziali, dipendenze non necessarie o modifiche fuori scope.
+
+USER STORY
+Come utente voglio creare e recuperare il mio account per partecipare alle leghe.
+
+ATTIVITÀ RICHIESTE
+- Implementare email/password e token/sessioni sicure.
+- Aggiungere verifica email, logout e reset password.
+- Proteggere endpoint e rate-limitare i tentativi.
+
+VINCOLI DI IMPLEMENTAZIONE
+- Rispetta il monolite modulare API-first, i confini di dominio e il modello dati approvati.
+- Le autorizzazioni e le validazioni decisive devono essere applicate lato server.
+- Le operazioni che cambiano crediti, rose, mercato, risultati o configurazioni devono essere atomiche e auditabili.
+- Mantieni retrocompatibilità con migrazioni e API esistenti; se non è possibile, documenta esplicitamente la decisione.
+- Non implementare funzionalità appartenenti a card successive.
+- Aggiungi log e metriche utili senza esporre dati personali o segreti.
+
+CRITERI DI ACCETTAZIONE
+- Flussi positivi e negativi coperti da test.
+- Token revocati non sono riutilizzabili.
+
+TEST MINIMI
+- Test unitari delle regole e delle validazioni introdotte.
+- Test del flusso UI positivo, vuoto, errore e permessi insufficienti.
+- Test di autorizzazione cross-user e cross-league, inclusi casi IDOR.
+
+DELIVERABLE ATTESI
+- Codice applicativo e configurazioni nel modulo coerente con l’architettura approvata.
+- API/servizi di dominio, validazioni e documentazione tecnica aggiornata.
+- Interfaccia web/mobile con stati di caricamento, vuoto, errore e successo.
+- Test automatici e breve evidenza di verifica collegabile alla card.
+
+CHIUSURA DEL LAVORO
+- Esegui lint, type-check, test pertinenti e build dei moduli toccati usando i comandi ordinari `docker compose`; non usare `make`.
+- Riporta file modificati, migrazioni, comandi eseguiti e relativi esiti.
+- Spiega le decisioni tecniche non ovvie e gli eventuali rischi residui.
+- Se qualcosa non è verificabile nell’ambiente disponibile, dichiaralo chiaramente senza simulare un esito positivo.
+- Non creare commit o push se non richiesto espressamente.
+",M1 — Ready,"M1, EP02, Must, Backend, Frontend",,,1
+EP02-02 — Profilo e preferenze,"CODICE: EP02-02
+
+USER STORY
+Come utente voglio gestire nome, avatar, lingua, fuso e notifiche.
+
+OBIETTIVO E SCOPE
+- Creare API e interfaccia profilo.
+- Validare upload avatar e preferenze.
+- Registrare consenso e versione policy.
+
+CRITERI DI ACCETTAZIONE
+- Modifiche persistono e si riflettono nei client.
+- I dati privati non sono esposti ad altri utenti.
+
+TEST MINIMI
+- Test unitari delle regole e delle validazioni introdotte.
+- Test del flusso UI positivo, vuoto, errore e permessi insufficienti.
+
+DELIVERABLE
+- Codice applicativo e configurazioni nel modulo coerente con l’architettura approvata.
+- API/servizi di dominio, validazioni e documentazione tecnica aggiornata.
+- Interfaccia web/mobile con stati di caricamento, vuoto, errore e successo.
+- Test automatici e breve evidenza di verifica collegabile alla card.
+
+DIPENDENZE
+EP02-01
+
+STIMA INIZIALE
+1,5–3 giorni
+
+PROMPT CURSOR
+CONTESTO STANDARD — FANTAPPERÒ
+Stai lavorando su FantApperò, una piattaforma fantasy football web con backend Python/FastAPI, frontend React/TypeScript, PostgreSQL, Redis, worker asincroni e integrazione centralizzata con API-Football. L’architettura approvata è un monolite modulare API-first. Gli ambienti locali e i servizi applicativi devono essere gestiti con Docker e Docker Compose.
+
+REGOLE GENERALI OBBLIGATORIE
+- Usa l’italiano come lingua predefinita per interfaccia, messaggi utente, dati seed, documentazione funzionale e nuovi contenuti. Predisponi il codice per una futura internazionalizzazione, senza implementare ora lingue aggiuntive se la card non lo richiede.
+- Non modificare funzionalità, regole di gioco, API, schema dati, configurazioni o componenti non necessari alla card.
+- Non cancellare o rinominare codice, migrazioni, dati, test o funzioni esistenti senza una motivazione tecnica esplicita e verificata.
+- Prima di creare qualcosa, controlla cosa esiste già e riusa pattern, moduli e componenti compatibili.
+- Mantieni compatibilità con le funzionalità esistenti e non anticipare card o milestone successive.
+- Non inserire segreti nel codice, nei log, nei test, nei commit o nella documentazione.
+- Non usare Makefile, il comando `make` o wrapper equivalenti. Usa i normali comandi `docker compose` definiti dal progetto.
+- Non presupporre servizi installati localmente: esegui backend, worker, database, Redis, migrazioni e test attraverso Docker Compose, salvo attività puramente frontend già previste diversamente dal repository.
+- Se manca un servizio o un comando Compose necessario, aggiorna `compose.yaml` e la documentazione in modo minimale e coerente con lo scope.
+
+INCARICO
+- Card Trello: EP02-02 — Profilo e preferenze
+- Dipendenze dichiarate: EP02-01
+
+Prima di modificare il codice:
+1. analizza la struttura del progetto aperto e individua tutti i file coinvolti nella card;
+2. leggi il README e la documentazione architetturale o tecnica effettivamente presenti e pertinenti;
+3. verifica cosa esiste già ed evita implementazioni duplicate;
+4. controlla che le dipendenze funzionali dichiarate siano già implementate; se manca una dipendenza bloccante, fermati e descrivi con precisione cosa manca;
+5. indicami brevemente il piano che seguirai prima di applicare le modifiche;
+6. riusa pattern, servizi e componenti già adottati quando sono compatibili;
+7. non introdurre segreti, credenziali, dipendenze non necessarie o modifiche fuori scope.
+
+USER STORY
+Come utente voglio gestire nome, avatar, lingua, fuso e notifiche.
+
+ATTIVITÀ RICHIESTE
+- Creare API e interfaccia profilo.
+- Validare upload avatar e preferenze.
+- Registrare consenso e versione policy.
+
+VINCOLI DI IMPLEMENTAZIONE
+- Rispetta il monolite modulare API-first, i confini di dominio e il modello dati approvati.
+- Le autorizzazioni e le validazioni decisive devono essere applicate lato server.
+- Le operazioni che cambiano crediti, rose, mercato, risultati o configurazioni devono essere atomiche e auditabili.
+- Mantieni retrocompatibilità con migrazioni e API esistenti; se non è possibile, documenta esplicitamente la decisione.
+- Non implementare funzionalità appartenenti a card successive.
+- Aggiungi log e metriche utili senza esporre dati personali o segreti.
+
+CRITERI DI ACCETTAZIONE
+- Modifiche persistono e si riflettono nei client.
+- I dati privati non sono esposti ad altri utenti.
+
+TEST MINIMI
+- Test unitari delle regole e delle validazioni introdotte.
+- Test del flusso UI positivo, vuoto, errore e permessi insufficienti.
+
+DELIVERABLE ATTESI
+- Codice applicativo e configurazioni nel modulo coerente con l’architettura approvata.
+- API/servizi di dominio, validazioni e documentazione tecnica aggiornata.
+- Interfaccia web/mobile con stati di caricamento, vuoto, errore e successo.
+- Test automatici e breve evidenza di verifica collegabile alla card.
+
+CHIUSURA DEL LAVORO
+- Esegui lint, type-check, test pertinenti e build dei moduli toccati usando i comandi ordinari `docker compose`; non usare `make`.
+- Riporta file modificati, migrazioni, comandi eseguiti e relativi esiti.
+- Spiega le decisioni tecniche non ovvie e gli eventuali rischi residui.
+- Se qualcosa non è verificabile nell’ambiente disponibile, dichiaralo chiaramente senza simulare un esito positivo.
+- Non creare commit o push se non richiesto espressamente.
+",M1 — Ready,"M1, EP02, Must, Backend, Frontend",,,2
+EP02-03 — Ruoli applicativi e autorizzazioni,"CODICE: EP02-03
+
+USER STORY
+Come sistema voglio distinguere utente, amministratore di lega e operatore piattaforma.
+
+OBIETTIVO E SCOPE
+- Implementare policy per risorsa e appartenenza lega.
+- Evitare IDOR e accesso tra tenant.
+- Aggiungere test di matrice autorizzativa.
+
+CRITERI DI ACCETTAZIONE
+- Ogni endpoint sensibile applica una policy.
+- Test cross-league falliscono con risposta coerente.
+
+TEST MINIMI
+- Test unitari delle regole e delle validazioni introdotte.
+- Test di integrazione e regressione sui casi limite indicati nei criteri di accettazione.
+- Test di autorizzazione cross-user e cross-league, inclusi casi IDOR.
+
+DELIVERABLE
+- Codice applicativo e configurazioni nel modulo coerente con l’architettura approvata.
+- API/servizi di dominio, validazioni e documentazione tecnica aggiornata.
+- Test automatici e breve evidenza di verifica collegabile alla card.
+
+DIPENDENZE
+EP02-01
+
+STIMA INIZIALE
+1,5–3 giorni
+
+PROMPT CURSOR
+CONTESTO STANDARD — FANTAPPERÒ
+Stai lavorando su FantApperò, una piattaforma fantasy football web con backend Python/FastAPI, frontend React/TypeScript, PostgreSQL, Redis, worker asincroni e integrazione centralizzata con API-Football. L’architettura approvata è un monolite modulare API-first. Gli ambienti locali e i servizi applicativi devono essere gestiti con Docker e Docker Compose.
+
+REGOLE GENERALI OBBLIGATORIE
+- Usa l’italiano come lingua predefinita per interfaccia, messaggi utente, dati seed, documentazione funzionale e nuovi contenuti. Predisponi il codice per una futura internazionalizzazione, senza implementare ora lingue aggiuntive se la card non lo richiede.
+- Non modificare funzionalità, regole di gioco, API, schema dati, configurazioni o componenti non necessari alla card.
+- Non cancellare o rinominare codice, migrazioni, dati, test o funzioni esistenti senza una motivazione tecnica esplicita e verificata.
+- Prima di creare qualcosa, controlla cosa esiste già e riusa pattern, moduli e componenti compatibili.
+- Mantieni compatibilità con le funzionalità esistenti e non anticipare card o milestone successive.
+- Non inserire segreti nel codice, nei log, nei test, nei commit o nella documentazione.
+- Non usare Makefile, il comando `make` o wrapper equivalenti. Usa i normali comandi `docker compose` definiti dal progetto.
+- Non presupporre servizi installati localmente: esegui backend, worker, database, Redis, migrazioni e test attraverso Docker Compose, salvo attività puramente frontend già previste diversamente dal repository.
+- Se manca un servizio o un comando Compose necessario, aggiorna `compose.yaml` e la documentazione in modo minimale e coerente con lo scope.
+
+INCARICO
+- Card Trello: EP02-03 — Ruoli applicativi e autorizzazioni
+- Dipendenze dichiarate: EP02-01
+
+Prima di modificare il codice:
+1. analizza la struttura del progetto aperto e individua tutti i file coinvolti nella card;
+2. leggi il README e la documentazione architetturale o tecnica effettivamente presenti e pertinenti;
+3. verifica cosa esiste già ed evita implementazioni duplicate;
+4. controlla che le dipendenze funzionali dichiarate siano già implementate; se manca una dipendenza bloccante, fermati e descrivi con precisione cosa manca;
+5. indicami brevemente il piano che seguirai prima di applicare le modifiche;
+6. riusa pattern, servizi e componenti già adottati quando sono compatibili;
+7. non introdurre segreti, credenziali, dipendenze non necessarie o modifiche fuori scope.
+
+USER STORY
+Come sistema voglio distinguere utente, amministratore di lega e operatore piattaforma.
+
+ATTIVITÀ RICHIESTE
+- Implementare policy per risorsa e appartenenza lega.
+- Evitare IDOR e accesso tra tenant.
+- Aggiungere test di matrice autorizzativa.
+
+VINCOLI DI IMPLEMENTAZIONE
+- Rispetta il monolite modulare API-first, i confini di dominio e il modello dati approvati.
+- Le autorizzazioni e le validazioni decisive devono essere applicate lato server.
+- Le operazioni che cambiano crediti, rose, mercato, risultati o configurazioni devono essere atomiche e auditabili.
+- Mantieni retrocompatibilità con migrazioni e API esistenti; se non è possibile, documenta esplicitamente la decisione.
+- Non implementare funzionalità appartenenti a card successive.
+- Aggiungi log e metriche utili senza esporre dati personali o segreti.
+
+CRITERI DI ACCETTAZIONE
+- Ogni endpoint sensibile applica una policy.
+- Test cross-league falliscono con risposta coerente.
+
+TEST MINIMI
+- Test unitari delle regole e delle validazioni introdotte.
+- Test di integrazione e regressione sui casi limite indicati nei criteri di accettazione.
+- Test di autorizzazione cross-user e cross-league, inclusi casi IDOR.
+
+DELIVERABLE ATTESI
+- Codice applicativo e configurazioni nel modulo coerente con l’architettura approvata.
+- API/servizi di dominio, validazioni e documentazione tecnica aggiornata.
+- Test automatici e breve evidenza di verifica collegabile alla card.
+
+CHIUSURA DEL LAVORO
+- Esegui lint, type-check, test pertinenti e build dei moduli toccati usando i comandi ordinari `docker compose`; non usare `make`.
+- Riporta file modificati, migrazioni, comandi eseguiti e relativi esiti.
+- Spiega le decisioni tecniche non ovvie e gli eventuali rischi residui.
+- Se qualcosa non è verificabile nell’ambiente disponibile, dichiaralo chiaramente senza simulare un esito positivo.
+- Non creare commit o push se non richiesto espressamente.
+",M1 — Ready,"M1, EP02, Must, Backend, QA",,,3
+EP02-04 — Eliminazione ed esportazione account,"CODICE: EP02-04
+
+USER STORY
+Come utente voglio esercitare i diritti sui miei dati senza corrompere gli storici di lega.
+
+OBIETTIVO E SCOPE
+- Definire anonimizzazione dei record competitivi.
+- Implementare export dati e richiesta cancellazione.
+- Auditare l’operazione.
+
+CRITERI DI ACCETTAZIONE
+- Export completo e leggibile.
+- Cancellazione preserva integrità sportiva e rimuove dati personali non necessari.
+
+TEST MINIMI
+- Test unitari delle regole e delle validazioni introdotte.
+- Test del flusso UI positivo, vuoto, errore e permessi insufficienti.
+- Test di autorizzazione cross-user e cross-league, inclusi casi IDOR.
+
+DELIVERABLE
+- Codice applicativo e configurazioni nel modulo coerente con l’architettura approvata.
+- API/servizi di dominio, validazioni e documentazione tecnica aggiornata.
+- Interfaccia web/mobile con stati di caricamento, vuoto, errore e successo.
+- Test automatici e breve evidenza di verifica collegabile alla card.
+
+DIPENDENZE
+EP02-02, EP11-03
+
+STIMA INIZIALE
+1,5–3 giorni
+
+PROMPT CURSOR
+CONTESTO STANDARD — FANTAPPERÒ
+Stai lavorando su FantApperò, una piattaforma fantasy football web con backend Python/FastAPI, frontend React/TypeScript, PostgreSQL, Redis, worker asincroni e integrazione centralizzata con API-Football. L’architettura approvata è un monolite modulare API-first. Gli ambienti locali e i servizi applicativi devono essere gestiti con Docker e Docker Compose.
+
+REGOLE GENERALI OBBLIGATORIE
+- Usa l’italiano come lingua predefinita per interfaccia, messaggi utente, dati seed, documentazione funzionale e nuovi contenuti. Predisponi il codice per una futura internazionalizzazione, senza implementare ora lingue aggiuntive se la card non lo richiede.
+- Non modificare funzionalità, regole di gioco, API, schema dati, configurazioni o componenti non necessari alla card.
+- Non cancellare o rinominare codice, migrazioni, dati, test o funzioni esistenti senza una motivazione tecnica esplicita e verificata.
+- Prima di creare qualcosa, controlla cosa esiste già e riusa pattern, moduli e componenti compatibili.
+- Mantieni compatibilità con le funzionalità esistenti e non anticipare card o milestone successive.
+- Non inserire segreti nel codice, nei log, nei test, nei commit o nella documentazione.
+- Non usare Makefile, il comando `make` o wrapper equivalenti. Usa i normali comandi `docker compose` definiti dal progetto.
+- Non presupporre servizi installati localmente: esegui backend, worker, database, Redis, migrazioni e test attraverso Docker Compose, salvo attività puramente frontend già previste diversamente dal repository.
+- Se manca un servizio o un comando Compose necessario, aggiorna `compose.yaml` e la documentazione in modo minimale e coerente con lo scope.
+
+INCARICO
+- Card Trello: EP02-04 — Eliminazione ed esportazione account
+- Dipendenze dichiarate: EP02-02, EP11-03
+
+Prima di modificare il codice:
+1. analizza la struttura del progetto aperto e individua tutti i file coinvolti nella card;
+2. leggi il README e la documentazione architetturale o tecnica effettivamente presenti e pertinenti;
+3. verifica cosa esiste già ed evita implementazioni duplicate;
+4. controlla che le dipendenze funzionali dichiarate siano già implementate; se manca una dipendenza bloccante, fermati e descrivi con precisione cosa manca;
+5. indicami brevemente il piano che seguirai prima di applicare le modifiche;
+6. riusa pattern, servizi e componenti già adottati quando sono compatibili;
+7. non introdurre segreti, credenziali, dipendenze non necessarie o modifiche fuori scope.
+
+USER STORY
+Come utente voglio esercitare i diritti sui miei dati senza corrompere gli storici di lega.
+
+ATTIVITÀ RICHIESTE
+- Definire anonimizzazione dei record competitivi.
+- Implementare export dati e richiesta cancellazione.
+- Auditare l’operazione.
+
+VINCOLI DI IMPLEMENTAZIONE
+- Rispetta il monolite modulare API-first, i confini di dominio e il modello dati approvati.
+- Le autorizzazioni e le validazioni decisive devono essere applicate lato server.
+- Le operazioni che cambiano crediti, rose, mercato, risultati o configurazioni devono essere atomiche e auditabili.
+- Mantieni retrocompatibilità con migrazioni e API esistenti; se non è possibile, documenta esplicitamente la decisione.
+- Non implementare funzionalità appartenenti a card successive.
+- Aggiungi log e metriche utili senza esporre dati personali o segreti.
+
+CRITERI DI ACCETTAZIONE
+- Export completo e leggibile.
+- Cancellazione preserva integrità sportiva e rimuove dati personali non necessari.
+
+TEST MINIMI
+- Test unitari delle regole e delle validazioni introdotte.
+- Test del flusso UI positivo, vuoto, errore e permessi insufficienti.
+- Test di autorizzazione cross-user e cross-league, inclusi casi IDOR.
+
+DELIVERABLE ATTESI
+- Codice applicativo e configurazioni nel modulo coerente con l’architettura approvata.
+- API/servizi di dominio, validazioni e documentazione tecnica aggiornata.
+- Interfaccia web/mobile con stati di caricamento, vuoto, errore e successo.
+- Test automatici e breve evidenza di verifica collegabile alla card.
+
+CHIUSURA DEL LAVORO
+- Esegui lint, type-check, test pertinenti e build dei moduli toccati usando i comandi ordinari `docker compose`; non usare `make`.
+- Riporta file modificati, migrazioni, comandi eseguiti e relativi esiti.
+- Spiega le decisioni tecniche non ovvie e gli eventuali rischi residui.
+- Se qualcosa non è verificabile nell’ambiente disponibile, dichiaralo chiaramente senza simulare un esito positivo.
+- Non creare commit o push se non richiesto espressamente.
+",M1 — Ready,"M1, EP02, Should, Backend, Frontend",,,4
+EP03-01 — Creazione lega,"CODICE: EP03-01
+
+USER STORY
+Come amministratore voglio configurare una lega coerente prima dell’avvio.
+
+OBIETTIVO E SCOPE
+- Creare lega privata, nome, stagione e campionati (minimo 3).
+- Implementare API, validazioni, interfaccia e audit dell’azione.
+
+CRITERI DI ACCETTAZIONE
+- Lega salvata in stato bozza con creatore amministratore.
+- Test di dominio e interfaccia superati.
+
+TEST MINIMI
+- Test unitari delle regole e delle validazioni introdotte.
+- Test del flusso UI positivo, vuoto, errore e permessi insufficienti.
+- Test di migrazione, vincoli, transazioni e idempotenza dove applicabile.
+
+DELIVERABLE
+- Codice applicativo e configurazioni nel modulo coerente con l’architettura approvata.
+- API/servizi di dominio, validazioni e documentazione tecnica aggiornata.
+- Interfaccia web/mobile con stati di caricamento, vuoto, errore e successo.
+- Migrazione database e aggiornamento del modello dati.
+- Test automatici e breve evidenza di verifica collegabile alla card.
+
+DIPENDENZE
+EP02-03, EP01-06
+
+STIMA INIZIALE
+2–4 giorni
+
+PROMPT CURSOR
+CONTESTO STANDARD — FANTAPPERÒ
+Stai lavorando su FantApperò, una piattaforma fantasy football web con backend Python/FastAPI, frontend React/TypeScript, PostgreSQL, Redis, worker asincroni e integrazione centralizzata con API-Football. L’architettura approvata è un monolite modulare API-first. Gli ambienti locali e i servizi applicativi devono essere gestiti con Docker e Docker Compose.
+
+REGOLE GENERALI OBBLIGATORIE
+- Usa l’italiano come lingua predefinita per interfaccia, messaggi utente, dati seed, documentazione funzionale e nuovi contenuti. Predisponi il codice per una futura internazionalizzazione, senza implementare ora lingue aggiuntive se la card non lo richiede.
+- Non modificare funzionalità, regole di gioco, API, schema dati, configurazioni o componenti non necessari alla card.
+- Non cancellare o rinominare codice, migrazioni, dati, test o funzioni esistenti senza una motivazione tecnica esplicita e verificata.
+- Prima di creare qualcosa, controlla cosa esiste già e riusa pattern, moduli e componenti compatibili.
+- Mantieni compatibilità con le funzionalità esistenti e non anticipare card o milestone successive.
+- Non inserire segreti nel codice, nei log, nei test, nei commit o nella documentazione.
+- Non usare Makefile, il comando `make` o wrapper equivalenti. Usa i normali comandi `docker compose` definiti dal progetto.
+- Non presupporre servizi installati localmente: esegui backend, worker, database, Redis, migrazioni e test attraverso Docker Compose, salvo attività puramente frontend già previste diversamente dal repository.
+- Se manca un servizio o un comando Compose necessario, aggiorna `compose.yaml` e la documentazione in modo minimale e coerente con lo scope.
+
+INCARICO
+- Card Trello: EP03-01 — Creazione lega
+- Dipendenze dichiarate: EP02-03, EP01-06
+
+Prima di modificare il codice:
+1. analizza la struttura del progetto aperto e individua tutti i file coinvolti nella card;
+2. leggi il README e la documentazione architetturale o tecnica effettivamente presenti e pertinenti;
+3. verifica cosa esiste già ed evita implementazioni duplicate;
+4. controlla che le dipendenze funzionali dichiarate siano già implementate; se manca una dipendenza bloccante, fermati e descrivi con precisione cosa manca;
+5. indicami brevemente il piano che seguirai prima di applicare le modifiche;
+6. riusa pattern, servizi e componenti già adottati quando sono compatibili;
+7. non introdurre segreti, credenziali, dipendenze non necessarie o modifiche fuori scope.
+
+USER STORY
+Come amministratore voglio configurare una lega coerente prima dell’avvio.
+
+ATTIVITÀ RICHIESTE
+- Creare lega privata, nome, stagione e campionati (minimo 3).
+- Implementare API, validazioni, interfaccia e audit dell’azione.
+
+VINCOLI DI IMPLEMENTAZIONE
+- Rispetta il monolite modulare API-first, i confini di dominio e il modello dati approvati.
+- Le autorizzazioni e le validazioni decisive devono essere applicate lato server.
+- Le operazioni che cambiano crediti, rose, mercato, risultati o configurazioni devono essere atomiche e auditabili.
+- Mantieni retrocompatibilità con migrazioni e API esistenti; se non è possibile, documenta esplicitamente la decisione.
+- Non implementare funzionalità appartenenti a card successive.
+- Aggiungi log e metriche utili senza esporre dati personali o segreti.
+
+CRITERI DI ACCETTAZIONE
+- Lega salvata in stato bozza con creatore amministratore.
+- Test di dominio e interfaccia superati.
+
+TEST MINIMI
+- Test unitari delle regole e delle validazioni introdotte.
+- Test del flusso UI positivo, vuoto, errore e permessi insufficienti.
+- Test di migrazione, vincoli, transazioni e idempotenza dove applicabile.
+
+DELIVERABLE ATTESI
+- Codice applicativo e configurazioni nel modulo coerente con l’architettura approvata.
+- API/servizi di dominio, validazioni e documentazione tecnica aggiornata.
+- Interfaccia web/mobile con stati di caricamento, vuoto, errore e successo.
+- Migrazione database e aggiornamento del modello dati.
+- Test automatici e breve evidenza di verifica collegabile alla card.
+
+CHIUSURA DEL LAVORO
+- Esegui lint, type-check, test pertinenti e build dei moduli toccati usando i comandi ordinari `docker compose`; non usare `make`.
+- Riporta file modificati, migrazioni, comandi eseguiti e relativi esiti.
+- Spiega le decisioni tecniche non ovvie e gli eventuali rischi residui.
+- Se qualcosa non è verificabile nell’ambiente disponibile, dichiaralo chiaramente senza simulare un esito positivo.
+- Non creare commit o push se non richiesto espressamente.
+",M1 — Ready,"M1, EP03, Must, Backend, Frontend, Database",,,5
+EP03-02 — Configurazione regolamento,"CODICE: EP03-02
+
+USER STORY
+Come amministratore voglio configurare una lega coerente prima dell’avvio.
+
+OBIETTIVO E SCOPE
+- Gestire partecipanti 4–10, rosa 35, 3P–11D–11C–10A, crediti e opzioni.
+- Implementare API, validazioni, interfaccia e audit dell’azione.
+
+CRITERI DI ACCETTAZIONE
+- Preset Standard applicato; configurazioni invalide bloccate.
+- Test di dominio e interfaccia superati.
+
+TEST MINIMI
+- Test unitari delle regole e delle validazioni introdotte.
+- Test del flusso UI positivo, vuoto, errore e permessi insufficienti.
+- Test di migrazione, vincoli, transazioni e idempotenza dove applicabile.
+
+DELIVERABLE
+- Codice applicativo e configurazioni nel modulo coerente con l’architettura approvata.
+- API/servizi di dominio, validazioni e documentazione tecnica aggiornata.
+- Interfaccia web/mobile con stati di caricamento, vuoto, errore e successo.
+- Migrazione database e aggiornamento del modello dati.
+- Test automatici e breve evidenza di verifica collegabile alla card.
+
+DIPENDENZE
+EP02-03, EP01-06
+
+STIMA INIZIALE
+2–4 giorni
+
+PROMPT CURSOR
+CONTESTO STANDARD — FANTAPPERÒ
+Stai lavorando su FantApperò, una piattaforma fantasy football web con backend Python/FastAPI, frontend React/TypeScript, PostgreSQL, Redis, worker asincroni e integrazione centralizzata con API-Football. L’architettura approvata è un monolite modulare API-first. Gli ambienti locali e i servizi applicativi devono essere gestiti con Docker e Docker Compose.
+
+REGOLE GENERALI OBBLIGATORIE
+- Usa l’italiano come lingua predefinita per interfaccia, messaggi utente, dati seed, documentazione funzionale e nuovi contenuti. Predisponi il codice per una futura internazionalizzazione, senza implementare ora lingue aggiuntive se la card non lo richiede.
+- Non modificare funzionalità, regole di gioco, API, schema dati, configurazioni o componenti non necessari alla card.
+- Non cancellare o rinominare codice, migrazioni, dati, test o funzioni esistenti senza una motivazione tecnica esplicita e verificata.
+- Prima di creare qualcosa, controlla cosa esiste già e riusa pattern, moduli e componenti compatibili.
+- Mantieni compatibilità con le funzionalità esistenti e non anticipare card o milestone successive.
+- Non inserire segreti nel codice, nei log, nei test, nei commit o nella documentazione.
+- Non usare Makefile, il comando `make` o wrapper equivalenti. Usa i normali comandi `docker compose` definiti dal progetto.
+- Non presupporre servizi installati localmente: esegui backend, worker, database, Redis, migrazioni e test attraverso Docker Compose, salvo attività puramente frontend già previste diversamente dal repository.
+- Se manca un servizio o un comando Compose necessario, aggiorna `compose.yaml` e la documentazione in modo minimale e coerente con lo scope.
+
+INCARICO
+- Card Trello: EP03-02 — Configurazione regolamento
+- Dipendenze dichiarate: EP02-03, EP01-06
+
+Prima di modificare il codice:
+1. analizza la struttura del progetto aperto e individua tutti i file coinvolti nella card;
+2. leggi il README e la documentazione architetturale o tecnica effettivamente presenti e pertinenti;
+3. verifica cosa esiste già ed evita implementazioni duplicate;
+4. controlla che le dipendenze funzionali dichiarate siano già implementate; se manca una dipendenza bloccante, fermati e descrivi con precisione cosa manca;
+5. indicami brevemente il piano che seguirai prima di applicare le modifiche;
+6. riusa pattern, servizi e componenti già adottati quando sono compatibili;
+7. non introdurre segreti, credenziali, dipendenze non necessarie o modifiche fuori scope.
+
+USER STORY
+Come amministratore voglio configurare una lega coerente prima dell’avvio.
+
+ATTIVITÀ RICHIESTE
+- Gestire partecipanti 4–10, rosa 35, 3P–11D–11C–10A, crediti e opzioni.
+- Implementare API, validazioni, interfaccia e audit dell’azione.
+
+VINCOLI DI IMPLEMENTAZIONE
+- Rispetta il monolite modulare API-first, i confini di dominio e il modello dati approvati.
+- Le autorizzazioni e le validazioni decisive devono essere applicate lato server.
+- Le operazioni che cambiano crediti, rose, mercato, risultati o configurazioni devono essere atomiche e auditabili.
+- Mantieni retrocompatibilità con migrazioni e API esistenti; se non è possibile, documenta esplicitamente la decisione.
+- Non implementare funzionalità appartenenti a card successive.
+- Aggiungi log e metriche utili senza esporre dati personali o segreti.
+
+CRITERI DI ACCETTAZIONE
+- Preset Standard applicato; configurazioni invalide bloccate.
+- Test di dominio e interfaccia superati.
+
+TEST MINIMI
+- Test unitari delle regole e delle validazioni introdotte.
+- Test del flusso UI positivo, vuoto, errore e permessi insufficienti.
+- Test di migrazione, vincoli, transazioni e idempotenza dove applicabile.
+
+DELIVERABLE ATTESI
+- Codice applicativo e configurazioni nel modulo coerente con l’architettura approvata.
+- API/servizi di dominio, validazioni e documentazione tecnica aggiornata.
+- Interfaccia web/mobile con stati di caricamento, vuoto, errore e successo.
+- Migrazione database e aggiornamento del modello dati.
+- Test automatici e breve evidenza di verifica collegabile alla card.
+
+CHIUSURA DEL LAVORO
+- Esegui lint, type-check, test pertinenti e build dei moduli toccati usando i comandi ordinari `docker compose`; non usare `make`.
+- Riporta file modificati, migrazioni, comandi eseguiti e relativi esiti.
+- Spiega le decisioni tecniche non ovvie e gli eventuali rischi residui.
+- Se qualcosa non è verificabile nell’ambiente disponibile, dichiaralo chiaramente senza simulare un esito positivo.
+- Non creare commit o push se non richiesto espressamente.
+",M1 — Ready,"M1, EP03, Must, Backend, Frontend, Database",,,6
+EP03-03 — Inviti e ingresso,"CODICE: EP03-03
+
+USER STORY
+Come amministratore voglio configurare una lega coerente prima dell’avvio.
+
+OBIETTIVO E SCOPE
+- Generare link/codice con scadenza, accettazione e revoca.
+- Implementare API, validazioni, interfaccia e audit dell’azione.
+
+CRITERI DI ACCETTAZIONE
+- Solo invitati validi entrano; capienza e duplicati gestiti.
+- Test di dominio e interfaccia superati.
+
+TEST MINIMI
+- Test unitari delle regole e delle validazioni introdotte.
+- Test del flusso UI positivo, vuoto, errore e permessi insufficienti.
+- Test di migrazione, vincoli, transazioni e idempotenza dove applicabile.
+
+DELIVERABLE
+- Codice applicativo e configurazioni nel modulo coerente con l’architettura approvata.
+- API/servizi di dominio, validazioni e documentazione tecnica aggiornata.
+- Interfaccia web/mobile con stati di caricamento, vuoto, errore e successo.
+- Migrazione database e aggiornamento del modello dati.
+- Test automatici e breve evidenza di verifica collegabile alla card.
+
+DIPENDENZE
+EP02-03, EP01-06
+
+STIMA INIZIALE
+2–4 giorni
+
+PROMPT CURSOR
+CONTESTO STANDARD — FANTAPPERÒ
+Stai lavorando su FantApperò, una piattaforma fantasy football web con backend Python/FastAPI, frontend React/TypeScript, PostgreSQL, Redis, worker asincroni e integrazione centralizzata con API-Football. L’architettura approvata è un monolite modulare API-first. Gli ambienti locali e i servizi applicativi devono essere gestiti con Docker e Docker Compose.
+
+REGOLE GENERALI OBBLIGATORIE
+- Usa l’italiano come lingua predefinita per interfaccia, messaggi utente, dati seed, documentazione funzionale e nuovi contenuti. Predisponi il codice per una futura internazionalizzazione, senza implementare ora lingue aggiuntive se la card non lo richiede.
+- Non modificare funzionalità, regole di gioco, API, schema dati, configurazioni o componenti non necessari alla card.
+- Non cancellare o rinominare codice, migrazioni, dati, test o funzioni esistenti senza una motivazione tecnica esplicita e verificata.
+- Prima di creare qualcosa, controlla cosa esiste già e riusa pattern, moduli e componenti compatibili.
+- Mantieni compatibilità con le funzionalità esistenti e non anticipare card o milestone successive.
+- Non inserire segreti nel codice, nei log, nei test, nei commit o nella documentazione.
+- Non usare Makefile, il comando `make` o wrapper equivalenti. Usa i normali comandi `docker compose` definiti dal progetto.
+- Non presupporre servizi installati localmente: esegui backend, worker, database, Redis, migrazioni e test attraverso Docker Compose, salvo attività puramente frontend già previste diversamente dal repository.
+- Se manca un servizio o un comando Compose necessario, aggiorna `compose.yaml` e la documentazione in modo minimale e coerente con lo scope.
+
+INCARICO
+- Card Trello: EP03-03 — Inviti e ingresso
+- Dipendenze dichiarate: EP02-03, EP01-06
+
+Prima di modificare il codice:
+1. analizza la struttura del progetto aperto e individua tutti i file coinvolti nella card;
+2. leggi il README e la documentazione architetturale o tecnica effettivamente presenti e pertinenti;
+3. verifica cosa esiste già ed evita implementazioni duplicate;
+4. controlla che le dipendenze funzionali dichiarate siano già implementate; se manca una dipendenza bloccante, fermati e descrivi con precisione cosa manca;
+5. indicami brevemente il piano che seguirai prima di applicare le modifiche;
+6. riusa pattern, servizi e componenti già adottati quando sono compatibili;
+7. non introdurre segreti, credenziali, dipendenze non necessarie o modifiche fuori scope.
+
+USER STORY
+Come amministratore voglio configurare una lega coerente prima dell’avvio.
+
+ATTIVITÀ RICHIESTE
+- Generare link/codice con scadenza, accettazione e revoca.
+- Implementare API, validazioni, interfaccia e audit dell’azione.
+
+VINCOLI DI IMPLEMENTAZIONE
+- Rispetta il monolite modulare API-first, i confini di dominio e il modello dati approvati.
+- Le autorizzazioni e le validazioni decisive devono essere applicate lato server.
+- Le operazioni che cambiano crediti, rose, mercato, risultati o configurazioni devono essere atomiche e auditabili.
+- Mantieni retrocompatibilità con migrazioni e API esistenti; se non è possibile, documenta esplicitamente la decisione.
+- Non implementare funzionalità appartenenti a card successive.
+- Aggiungi log e metriche utili senza esporre dati personali o segreti.
+
+CRITERI DI ACCETTAZIONE
+- Solo invitati validi entrano; capienza e duplicati gestiti.
+- Test di dominio e interfaccia superati.
+
+TEST MINIMI
+- Test unitari delle regole e delle validazioni introdotte.
+- Test del flusso UI positivo, vuoto, errore e permessi insufficienti.
+- Test di migrazione, vincoli, transazioni e idempotenza dove applicabile.
+
+DELIVERABLE ATTESI
+- Codice applicativo e configurazioni nel modulo coerente con l’architettura approvata.
+- API/servizi di dominio, validazioni e documentazione tecnica aggiornata.
+- Interfaccia web/mobile con stati di caricamento, vuoto, errore e successo.
+- Migrazione database e aggiornamento del modello dati.
+- Test automatici e breve evidenza di verifica collegabile alla card.
+
+CHIUSURA DEL LAVORO
+- Esegui lint, type-check, test pertinenti e build dei moduli toccati usando i comandi ordinari `docker compose`; non usare `make`.
+- Riporta file modificati, migrazioni, comandi eseguiti e relativi esiti.
+- Spiega le decisioni tecniche non ovvie e gli eventuali rischi residui.
+- Se qualcosa non è verificabile nell’ambiente disponibile, dichiaralo chiaramente senza simulare un esito positivo.
+- Non creare commit o push se non richiesto espressamente.
+",M1 — Ready,"M1, EP03, Must, Backend, Frontend, Database",,,7
+EP03-04 — Gestione partecipanti,"CODICE: EP03-04
+
+USER STORY
+Come amministratore voglio configurare una lega coerente prima dell’avvio.
+
+OBIETTIVO E SCOPE
+- Mostrare membri, trasferire ruolo admin e rimuovere prima dell’avvio.
+- Implementare API, validazioni, interfaccia e audit dell’azione.
+
+CRITERI DI ACCETTAZIONE
+- Non è possibile lasciare una lega senza amministratore.
+- Test di dominio e interfaccia superati.
+
+TEST MINIMI
+- Test unitari delle regole e delle validazioni introdotte.
+- Test del flusso UI positivo, vuoto, errore e permessi insufficienti.
+- Test di migrazione, vincoli, transazioni e idempotenza dove applicabile.
+
+DELIVERABLE
+- Codice applicativo e configurazioni nel modulo coerente con l’architettura approvata.
+- API/servizi di dominio, validazioni e documentazione tecnica aggiornata.
+- Interfaccia web/mobile con stati di caricamento, vuoto, errore e successo.
+- Migrazione database e aggiornamento del modello dati.
+- Test automatici e breve evidenza di verifica collegabile alla card.
+
+DIPENDENZE
+EP02-03, EP01-06
+
+STIMA INIZIALE
+2–4 giorni
+
+PROMPT CURSOR
+CONTESTO STANDARD — FANTAPPERÒ
+Stai lavorando su FantApperò, una piattaforma fantasy football web con backend Python/FastAPI, frontend React/TypeScript, PostgreSQL, Redis, worker asincroni e integrazione centralizzata con API-Football. L’architettura approvata è un monolite modulare API-first. Gli ambienti locali e i servizi applicativi devono essere gestiti con Docker e Docker Compose.
+
+REGOLE GENERALI OBBLIGATORIE
+- Usa l’italiano come lingua predefinita per interfaccia, messaggi utente, dati seed, documentazione funzionale e nuovi contenuti. Predisponi il codice per una futura internazionalizzazione, senza implementare ora lingue aggiuntive se la card non lo richiede.
+- Non modificare funzionalità, regole di gioco, API, schema dati, configurazioni o componenti non necessari alla card.
+- Non cancellare o rinominare codice, migrazioni, dati, test o funzioni esistenti senza una motivazione tecnica esplicita e verificata.
+- Prima di creare qualcosa, controlla cosa esiste già e riusa pattern, moduli e componenti compatibili.
+- Mantieni compatibilità con le funzionalità esistenti e non anticipare card o milestone successive.
+- Non inserire segreti nel codice, nei log, nei test, nei commit o nella documentazione.
+- Non usare Makefile, il comando `make` o wrapper equivalenti. Usa i normali comandi `docker compose` definiti dal progetto.
+- Non presupporre servizi installati localmente: esegui backend, worker, database, Redis, migrazioni e test attraverso Docker Compose, salvo attività puramente frontend già previste diversamente dal repository.
+- Se manca un servizio o un comando Compose necessario, aggiorna `compose.yaml` e la documentazione in modo minimale e coerente con lo scope.
+
+INCARICO
+- Card Trello: EP03-04 — Gestione partecipanti
+- Dipendenze dichiarate: EP02-03, EP01-06
+
+Prima di modificare il codice:
+1. analizza la struttura del progetto aperto e individua tutti i file coinvolti nella card;
+2. leggi il README e la documentazione architetturale o tecnica effettivamente presenti e pertinenti;
+3. verifica cosa esiste già ed evita implementazioni duplicate;
+4. controlla che le dipendenze funzionali dichiarate siano già implementate; se manca una dipendenza bloccante, fermati e descrivi con precisione cosa manca;
+5. indicami brevemente il piano che seguirai prima di applicare le modifiche;
+6. riusa pattern, servizi e componenti già adottati quando sono compatibili;
+7. non introdurre segreti, credenziali, dipendenze non necessarie o modifiche fuori scope.
+
+USER STORY
+Come amministratore voglio configurare una lega coerente prima dell’avvio.
+
+ATTIVITÀ RICHIESTE
+- Mostrare membri, trasferire ruolo admin e rimuovere prima dell’avvio.
+- Implementare API, validazioni, interfaccia e audit dell’azione.
+
+VINCOLI DI IMPLEMENTAZIONE
+- Rispetta il monolite modulare API-first, i confini di dominio e il modello dati approvati.
+- Le autorizzazioni e le validazioni decisive devono essere applicate lato server.
+- Le operazioni che cambiano crediti, rose, mercato, risultati o configurazioni devono essere atomiche e auditabili.
+- Mantieni retrocompatibilità con migrazioni e API esistenti; se non è possibile, documenta esplicitamente la decisione.
+- Non implementare funzionalità appartenenti a card successive.
+- Aggiungi log e metriche utili senza esporre dati personali o segreti.
+
+CRITERI DI ACCETTAZIONE
+- Non è possibile lasciare una lega senza amministratore.
+- Test di dominio e interfaccia superati.
+
+TEST MINIMI
+- Test unitari delle regole e delle validazioni introdotte.
+- Test del flusso UI positivo, vuoto, errore e permessi insufficienti.
+- Test di migrazione, vincoli, transazioni e idempotenza dove applicabile.
+
+DELIVERABLE ATTESI
+- Codice applicativo e configurazioni nel modulo coerente con l’architettura approvata.
+- API/servizi di dominio, validazioni e documentazione tecnica aggiornata.
+- Interfaccia web/mobile con stati di caricamento, vuoto, errore e successo.
+- Migrazione database e aggiornamento del modello dati.
+- Test automatici e breve evidenza di verifica collegabile alla card.
+
+CHIUSURA DEL LAVORO
+- Esegui lint, type-check, test pertinenti e build dei moduli toccati usando i comandi ordinari `docker compose`; non usare `make`.
+- Riporta file modificati, migrazioni, comandi eseguiti e relativi esiti.
+- Spiega le decisioni tecniche non ovvie e gli eventuali rischi residui.
+- Se qualcosa non è verificabile nell’ambiente disponibile, dichiaralo chiaramente senza simulare un esito positivo.
+- Non creare commit o push se non richiesto espressamente.
+",M1 — Ready,"M1, EP03, Must, Backend, Frontend, Database",,,8
+EP03-05 — Stati e avvio stagione,"CODICE: EP03-05
+
+USER STORY
+Come amministratore voglio configurare una lega coerente prima dell’avvio.
+
+OBIETTIVO E SCOPE
+- Gestire bozza, configurazione, asta, attiva, conclusa e archiviata.
+- Implementare API, validazioni, interfaccia e audit dell’azione.
+
+CRITERI DI ACCETTAZIONE
+- Transizioni validate; avvio bloccato se prerequisiti non soddisfatti.
+- Test di dominio e interfaccia superati.
+
+TEST MINIMI
+- Test unitari delle regole e delle validazioni introdotte.
+- Test del flusso UI positivo, vuoto, errore e permessi insufficienti.
+- Test di migrazione, vincoli, transazioni e idempotenza dove applicabile.
+
+DELIVERABLE
+- Codice applicativo e configurazioni nel modulo coerente con l’architettura approvata.
+- API/servizi di dominio, validazioni e documentazione tecnica aggiornata.
+- Interfaccia web/mobile con stati di caricamento, vuoto, errore e successo.
+- Migrazione database e aggiornamento del modello dati.
+- Test automatici e breve evidenza di verifica collegabile alla card.
+
+DIPENDENZE
+EP02-03, EP01-06
+
+STIMA INIZIALE
+2–4 giorni
+
+PROMPT CURSOR
+CONTESTO STANDARD — FANTAPPERÒ
+Stai lavorando su FantApperò, una piattaforma fantasy football web con backend Python/FastAPI, frontend React/TypeScript, PostgreSQL, Redis, worker asincroni e integrazione centralizzata con API-Football. L’architettura approvata è un monolite modulare API-first. Gli ambienti locali e i servizi applicativi devono essere gestiti con Docker e Docker Compose.
+
+REGOLE GENERALI OBBLIGATORIE
+- Usa l’italiano come lingua predefinita per interfaccia, messaggi utente, dati seed, documentazione funzionale e nuovi contenuti. Predisponi il codice per una futura internazionalizzazione, senza implementare ora lingue aggiuntive se la card non lo richiede.
+- Non modificare funzionalità, regole di gioco, API, schema dati, configurazioni o componenti non necessari alla card.
+- Non cancellare o rinominare codice, migrazioni, dati, test o funzioni esistenti senza una motivazione tecnica esplicita e verificata.
+- Prima di creare qualcosa, controlla cosa esiste già e riusa pattern, moduli e componenti compatibili.
+- Mantieni compatibilità con le funzionalità esistenti e non anticipare card o milestone successive.
+- Non inserire segreti nel codice, nei log, nei test, nei commit o nella documentazione.
+- Non usare Makefile, il comando `make` o wrapper equivalenti. Usa i normali comandi `docker compose` definiti dal progetto.
+- Non presupporre servizi installati localmente: esegui backend, worker, database, Redis, migrazioni e test attraverso Docker Compose, salvo attività puramente frontend già previste diversamente dal repository.
+- Se manca un servizio o un comando Compose necessario, aggiorna `compose.yaml` e la documentazione in modo minimale e coerente con lo scope.
+
+INCARICO
+- Card Trello: EP03-05 — Stati e avvio stagione
+- Dipendenze dichiarate: EP02-03, EP01-06
+
+Prima di modificare il codice:
+1. analizza la struttura del progetto aperto e individua tutti i file coinvolti nella card;
+2. leggi il README e la documentazione architetturale o tecnica effettivamente presenti e pertinenti;
+3. verifica cosa esiste già ed evita implementazioni duplicate;
+4. controlla che le dipendenze funzionali dichiarate siano già implementate; se manca una dipendenza bloccante, fermati e descrivi con precisione cosa manca;
+5. indicami brevemente il piano che seguirai prima di applicare le modifiche;
+6. riusa pattern, servizi e componenti già adottati quando sono compatibili;
+7. non introdurre segreti, credenziali, dipendenze non necessarie o modifiche fuori scope.
+
+USER STORY
+Come amministratore voglio configurare una lega coerente prima dell’avvio.
+
+ATTIVITÀ RICHIESTE
+- Gestire bozza, configurazione, asta, attiva, conclusa e archiviata.
+- Implementare API, validazioni, interfaccia e audit dell’azione.
+
+VINCOLI DI IMPLEMENTAZIONE
+- Rispetta il monolite modulare API-first, i confini di dominio e il modello dati approvati.
+- Le autorizzazioni e le validazioni decisive devono essere applicate lato server.
+- Le operazioni che cambiano crediti, rose, mercato, risultati o configurazioni devono essere atomiche e auditabili.
+- Mantieni retrocompatibilità con migrazioni e API esistenti; se non è possibile, documenta esplicitamente la decisione.
+- Non implementare funzionalità appartenenti a card successive.
+- Aggiungi log e metriche utili senza esporre dati personali o segreti.
+
+CRITERI DI ACCETTAZIONE
+- Transizioni validate; avvio bloccato se prerequisiti non soddisfatti.
+- Test di dominio e interfaccia superati.
+
+TEST MINIMI
+- Test unitari delle regole e delle validazioni introdotte.
+- Test del flusso UI positivo, vuoto, errore e permessi insufficienti.
+- Test di migrazione, vincoli, transazioni e idempotenza dove applicabile.
+
+DELIVERABLE ATTESI
+- Codice applicativo e configurazioni nel modulo coerente con l’architettura approvata.
+- API/servizi di dominio, validazioni e documentazione tecnica aggiornata.
+- Interfaccia web/mobile con stati di caricamento, vuoto, errore e successo.
+- Migrazione database e aggiornamento del modello dati.
+- Test automatici e breve evidenza di verifica collegabile alla card.
+
+CHIUSURA DEL LAVORO
+- Esegui lint, type-check, test pertinenti e build dei moduli toccati usando i comandi ordinari `docker compose`; non usare `make`.
+- Riporta file modificati, migrazioni, comandi eseguiti e relativi esiti.
+- Spiega le decisioni tecniche non ovvie e gli eventuali rischi residui.
+- Se qualcosa non è verificabile nell’ambiente disponibile, dichiaralo chiaramente senza simulare un esito positivo.
+- Non creare commit o push se non richiesto espressamente.
+",M1 — Ready,"M1, EP03, Must, Backend, Frontend, Database",,,9
+EP03-06 — Calendario scontri diretti,"CODICE: EP03-06
+
+USER STORY
+Come amministratore voglio configurare una lega coerente prima dell’avvio.
+
+OBIETTIVO E SCOPE
+- Generare calendario bilanciato in base a squadre e turni.
+- Implementare API, validazioni, interfaccia e audit dell’azione.
+
+CRITERI DI ACCETTAZIONE
+- Ogni partecipante incontra gli altri con distribuzione verificabile.
+- Test di dominio e interfaccia superati.
+
+TEST MINIMI
+- Test unitari delle regole e delle validazioni introdotte.
+- Test del flusso UI positivo, vuoto, errore e permessi insufficienti.
+- Test di migrazione, vincoli, transazioni e idempotenza dove applicabile.
+
+DELIVERABLE
+- Codice applicativo e configurazioni nel modulo coerente con l’architettura approvata.
+- API/servizi di dominio, validazioni e documentazione tecnica aggiornata.
+- Interfaccia web/mobile con stati di caricamento, vuoto, errore e successo.
+- Migrazione database e aggiornamento del modello dati.
+- Test automatici e breve evidenza di verifica collegabile alla card.
+
+DIPENDENZE
+EP02-03, EP01-06
+
+STIMA INIZIALE
+2–4 giorni
+
+PROMPT CURSOR
+CONTESTO STANDARD — FANTAPPERÒ
+Stai lavorando su FantApperò, una piattaforma fantasy football web con backend Python/FastAPI, frontend React/TypeScript, PostgreSQL, Redis, worker asincroni e integrazione centralizzata con API-Football. L’architettura approvata è un monolite modulare API-first. Gli ambienti locali e i servizi applicativi devono essere gestiti con Docker e Docker Compose.
+
+REGOLE GENERALI OBBLIGATORIE
+- Usa l’italiano come lingua predefinita per interfaccia, messaggi utente, dati seed, documentazione funzionale e nuovi contenuti. Predisponi il codice per una futura internazionalizzazione, senza implementare ora lingue aggiuntive se la card non lo richiede.
+- Non modificare funzionalità, regole di gioco, API, schema dati, configurazioni o componenti non necessari alla card.
+- Non cancellare o rinominare codice, migrazioni, dati, test o funzioni esistenti senza una motivazione tecnica esplicita e verificata.
+- Prima di creare qualcosa, controlla cosa esiste già e riusa pattern, moduli e componenti compatibili.
+- Mantieni compatibilità con le funzionalità esistenti e non anticipare card o milestone successive.
+- Non inserire segreti nel codice, nei log, nei test, nei commit o nella documentazione.
+- Non usare Makefile, il comando `make` o wrapper equivalenti. Usa i normali comandi `docker compose` definiti dal progetto.
+- Non presupporre servizi installati localmente: esegui backend, worker, database, Redis, migrazioni e test attraverso Docker Compose, salvo attività puramente frontend già previste diversamente dal repository.
+- Se manca un servizio o un comando Compose necessario, aggiorna `compose.yaml` e la documentazione in modo minimale e coerente con lo scope.
+
+INCARICO
+- Card Trello: EP03-06 — Calendario scontri diretti
+- Dipendenze dichiarate: EP02-03, EP01-06
+
+Prima di modificare il codice:
+1. analizza la struttura del progetto aperto e individua tutti i file coinvolti nella card;
+2. leggi il README e la documentazione architetturale o tecnica effettivamente presenti e pertinenti;
+3. verifica cosa esiste già ed evita implementazioni duplicate;
+4. controlla che le dipendenze funzionali dichiarate siano già implementate; se manca una dipendenza bloccante, fermati e descrivi con precisione cosa manca;
+5. indicami brevemente il piano che seguirai prima di applicare le modifiche;
+6. riusa pattern, servizi e componenti già adottati quando sono compatibili;
+7. non introdurre segreti, credenziali, dipendenze non necessarie o modifiche fuori scope.
+
+USER STORY
+Come amministratore voglio configurare una lega coerente prima dell’avvio.
+
+ATTIVITÀ RICHIESTE
+- Generare calendario bilanciato in base a squadre e turni.
+- Implementare API, validazioni, interfaccia e audit dell’azione.
+
+VINCOLI DI IMPLEMENTAZIONE
+- Rispetta il monolite modulare API-first, i confini di dominio e il modello dati approvati.
+- Le autorizzazioni e le validazioni decisive devono essere applicate lato server.
+- Le operazioni che cambiano crediti, rose, mercato, risultati o configurazioni devono essere atomiche e auditabili.
+- Mantieni retrocompatibilità con migrazioni e API esistenti; se non è possibile, documenta esplicitamente la decisione.
+- Non implementare funzionalità appartenenti a card successive.
+- Aggiungi log e metriche utili senza esporre dati personali o segreti.
+
+CRITERI DI ACCETTAZIONE
+- Ogni partecipante incontra gli altri con distribuzione verificabile.
+- Test di dominio e interfaccia superati.
+
+TEST MINIMI
+- Test unitari delle regole e delle validazioni introdotte.
+- Test del flusso UI positivo, vuoto, errore e permessi insufficienti.
+- Test di migrazione, vincoli, transazioni e idempotenza dove applicabile.
+
+DELIVERABLE ATTESI
+- Codice applicativo e configurazioni nel modulo coerente con l’architettura approvata.
+- API/servizi di dominio, validazioni e documentazione tecnica aggiornata.
+- Interfaccia web/mobile con stati di caricamento, vuoto, errore e successo.
+- Migrazione database e aggiornamento del modello dati.
+- Test automatici e breve evidenza di verifica collegabile alla card.
+
+CHIUSURA DEL LAVORO
+- Esegui lint, type-check, test pertinenti e build dei moduli toccati usando i comandi ordinari `docker compose`; non usare `make`.
+- Riporta file modificati, migrazioni, comandi eseguiti e relativi esiti.
+- Spiega le decisioni tecniche non ovvie e gli eventuali rischi residui.
+- Se qualcosa non è verificabile nell’ambiente disponibile, dichiaralo chiaramente senza simulare un esito positivo.
+- Non creare commit o push se non richiesto espressamente.
+",M1 — Ready,"M1, EP03, Must, Backend, Frontend, Database",,,10
+EP04-01 — Adapter API-Football,"CODICE: EP04-01
+
+USER STORY
+Come piattaforma vogliamo una fonte sportiva centrale, normalizzata e affidabile.
+
+OBIETTIVO E SCOPE
+- Isolare autenticazione, paginazione, errori e mapping del provider.
+- Aggiungere metriche, log e fixture di test dai payload campione.
+
+CRITERI DI ACCETTAZIONE
+- Nessun client accede direttamente al provider.
+- Test di idempotenza e mapping superati.
+
+TEST MINIMI
+- Test unitari delle regole e delle validazioni introdotte.
+- Test di migrazione, vincoli, transazioni e idempotenza dove applicabile.
+- Smoke test dell’ambiente e verifica di log, metriche, retry e configurazione.
+
+DELIVERABLE
+- Codice applicativo e configurazioni nel modulo coerente con l’architettura approvata.
+- API/servizi di dominio, validazioni e documentazione tecnica aggiornata.
+- Migrazione database e aggiornamento del modello dati.
+- Configurazione infrastrutturale, osservabilità e runbook pertinenti.
+- Test automatici e breve evidenza di verifica collegabile alla card.
+
+DIPENDENZE
+EP00, EP01
+
+STIMA INIZIALE
+2–4 giorni
+
+PROMPT CURSOR
+CONTESTO STANDARD — FANTAPPERÒ
+Stai lavorando su FantApperò, una piattaforma fantasy football web con backend Python/FastAPI, frontend React/TypeScript, PostgreSQL, Redis, worker asincroni e integrazione centralizzata con API-Football. L’architettura approvata è un monolite modulare API-first. Gli ambienti locali e i servizi applicativi devono essere gestiti con Docker e Docker Compose.
+
+REGOLE GENERALI OBBLIGATORIE
+- Usa l’italiano come lingua predefinita per interfaccia, messaggi utente, dati seed, documentazione funzionale e nuovi contenuti. Predisponi il codice per una futura internazionalizzazione, senza implementare ora lingue aggiuntive se la card non lo richiede.
+- Non modificare funzionalità, regole di gioco, API, schema dati, configurazioni o componenti non necessari alla card.
+- Non cancellare o rinominare codice, migrazioni, dati, test o funzioni esistenti senza una motivazione tecnica esplicita e verificata.
+- Prima di creare qualcosa, controlla cosa esiste già e riusa pattern, moduli e componenti compatibili.
+- Mantieni compatibilità con le funzionalità esistenti e non anticipare card o milestone successive.
+- Non inserire segreti nel codice, nei log, nei test, nei commit o nella documentazione.
+- Non usare Makefile, il comando `make` o wrapper equivalenti. Usa i normali comandi `docker compose` definiti dal progetto.
+- Non presupporre servizi installati localmente: esegui backend, worker, database, Redis, migrazioni e test attraverso Docker Compose, salvo attività puramente frontend già previste diversamente dal repository.
+- Se manca un servizio o un comando Compose necessario, aggiorna `compose.yaml` e la documentazione in modo minimale e coerente con lo scope.
+
+INCARICO
+- Card Trello: EP04-01 — Adapter API-Football
+- Dipendenze dichiarate: EP00, EP01
+
+Prima di modificare il codice:
+1. analizza la struttura del progetto aperto e individua tutti i file coinvolti nella card;
+2. leggi il README e la documentazione architetturale o tecnica effettivamente presenti e pertinenti;
+3. verifica cosa esiste già ed evita implementazioni duplicate;
+4. controlla che le dipendenze funzionali dichiarate siano già implementate; se manca una dipendenza bloccante, fermati e descrivi con precisione cosa manca;
+5. indicami brevemente il piano che seguirai prima di applicare le modifiche;
+6. riusa pattern, servizi e componenti già adottati quando sono compatibili;
+7. non introdurre segreti, credenziali, dipendenze non necessarie o modifiche fuori scope.
+
+USER STORY
+Come piattaforma vogliamo una fonte sportiva centrale, normalizzata e affidabile.
+
+ATTIVITÀ RICHIESTE
+- Isolare autenticazione, paginazione, errori e mapping del provider.
+- Aggiungere metriche, log e fixture di test dai payload campione.
+
+VINCOLI DI IMPLEMENTAZIONE
+- Rispetta il monolite modulare API-first, i confini di dominio e il modello dati approvati.
+- Le autorizzazioni e le validazioni decisive devono essere applicate lato server.
+- Le operazioni che cambiano crediti, rose, mercato, risultati o configurazioni devono essere atomiche e auditabili.
+- Mantieni retrocompatibilità con migrazioni e API esistenti; se non è possibile, documenta esplicitamente la decisione.
+- Non implementare funzionalità appartenenti a card successive.
+- Aggiungi log e metriche utili senza esporre dati personali o segreti.
+
+CRITERI DI ACCETTAZIONE
+- Nessun client accede direttamente al provider.
+- Test di idempotenza e mapping superati.
+
+TEST MINIMI
+- Test unitari delle regole e delle validazioni introdotte.
+- Test di migrazione, vincoli, transazioni e idempotenza dove applicabile.
+- Smoke test dell’ambiente e verifica di log, metriche, retry e configurazione.
+
+DELIVERABLE ATTESI
+- Codice applicativo e configurazioni nel modulo coerente con l’architettura approvata.
+- API/servizi di dominio, validazioni e documentazione tecnica aggiornata.
+- Migrazione database e aggiornamento del modello dati.
+- Configurazione infrastrutturale, osservabilità e runbook pertinenti.
+- Test automatici e breve evidenza di verifica collegabile alla card.
+
+CHIUSURA DEL LAVORO
+- Esegui lint, type-check, test pertinenti e build dei moduli toccati usando i comandi ordinari `docker compose`; non usare `make`.
+- Riporta file modificati, migrazioni, comandi eseguiti e relativi esiti.
+- Spiega le decisioni tecniche non ovvie e gli eventuali rischi residui.
+- Se qualcosa non è verificabile nell’ambiente disponibile, dichiaralo chiaramente senza simulare un esito positivo.
+- Non creare commit o push se non richiesto espressamente.
+",M1 — Ready,"M1, EP04, Must, Backend, Database, Infrastructure",,,11
+EP04-02 — Catalogo competizioni e stagioni,"CODICE: EP04-02
+
+USER STORY
+Come piattaforma vogliamo una fonte sportiva centrale, normalizzata e affidabile.
+
+OBIETTIVO E SCOPE
+- Sincronizzare cinque campionati, squadre e stagioni.
+- Aggiungere metriche, log e fixture di test dai payload campione.
+
+CRITERI DI ACCETTAZIONE
+- ID esterni mappati in modo stabile e idempotente.
+- Test di idempotenza e mapping superati.
+
+TEST MINIMI
+- Test unitari delle regole e delle validazioni introdotte.
+- Test di migrazione, vincoli, transazioni e idempotenza dove applicabile.
+- Smoke test dell’ambiente e verifica di log, metriche, retry e configurazione.
+
+DELIVERABLE
+- Codice applicativo e configurazioni nel modulo coerente con l’architettura approvata.
+- API/servizi di dominio, validazioni e documentazione tecnica aggiornata.
+- Migrazione database e aggiornamento del modello dati.
+- Configurazione infrastrutturale, osservabilità e runbook pertinenti.
+- Test automatici e breve evidenza di verifica collegabile alla card.
+
+DIPENDENZE
+EP00, EP01
+
+STIMA INIZIALE
+2–4 giorni
+
+PROMPT CURSOR
+CONTESTO STANDARD — FANTAPPERÒ
+Stai lavorando su FantApperò, una piattaforma fantasy football web con backend Python/FastAPI, frontend React/TypeScript, PostgreSQL, Redis, worker asincroni e integrazione centralizzata con API-Football. L’architettura approvata è un monolite modulare API-first. Gli ambienti locali e i servizi applicativi devono essere gestiti con Docker e Docker Compose.
+
+REGOLE GENERALI OBBLIGATORIE
+- Usa l’italiano come lingua predefinita per interfaccia, messaggi utente, dati seed, documentazione funzionale e nuovi contenuti. Predisponi il codice per una futura internazionalizzazione, senza implementare ora lingue aggiuntive se la card non lo richiede.
+- Non modificare funzionalità, regole di gioco, API, schema dati, configurazioni o componenti non necessari alla card.
+- Non cancellare o rinominare codice, migrazioni, dati, test o funzioni esistenti senza una motivazione tecnica esplicita e verificata.
+- Prima di creare qualcosa, controlla cosa esiste già e riusa pattern, moduli e componenti compatibili.
+- Mantieni compatibilità con le funzionalità esistenti e non anticipare card o milestone successive.
+- Non inserire segreti nel codice, nei log, nei test, nei commit o nella documentazione.
+- Non usare Makefile, il comando `make` o wrapper equivalenti. Usa i normali comandi `docker compose` definiti dal progetto.
+- Non presupporre servizi installati localmente: esegui backend, worker, database, Redis, migrazioni e test attraverso Docker Compose, salvo attività puramente frontend già previste diversamente dal repository.
+- Se manca un servizio o un comando Compose necessario, aggiorna `compose.yaml` e la documentazione in modo minimale e coerente con lo scope.
+
+INCARICO
+- Card Trello: EP04-02 — Catalogo competizioni e stagioni
+- Dipendenze dichiarate: EP00, EP01
+
+Prima di modificare il codice:
+1. analizza la struttura del progetto aperto e individua tutti i file coinvolti nella card;
+2. leggi il README e la documentazione architetturale o tecnica effettivamente presenti e pertinenti;
+3. verifica cosa esiste già ed evita implementazioni duplicate;
+4. controlla che le dipendenze funzionali dichiarate siano già implementate; se manca una dipendenza bloccante, fermati e descrivi con precisione cosa manca;
+5. indicami brevemente il piano che seguirai prima di applicare le modifiche;
+6. riusa pattern, servizi e componenti già adottati quando sono compatibili;
+7. non introdurre segreti, credenziali, dipendenze non necessarie o modifiche fuori scope.
+
+USER STORY
+Come piattaforma vogliamo una fonte sportiva centrale, normalizzata e affidabile.
+
+ATTIVITÀ RICHIESTE
+- Sincronizzare cinque campionati, squadre e stagioni.
+- Aggiungere metriche, log e fixture di test dai payload campione.
+
+VINCOLI DI IMPLEMENTAZIONE
+- Rispetta il monolite modulare API-first, i confini di dominio e il modello dati approvati.
+- Le autorizzazioni e le validazioni decisive devono essere applicate lato server.
+- Le operazioni che cambiano crediti, rose, mercato, risultati o configurazioni devono essere atomiche e auditabili.
+- Mantieni retrocompatibilità con migrazioni e API esistenti; se non è possibile, documenta esplicitamente la decisione.
+- Non implementare funzionalità appartenenti a card successive.
+- Aggiungi log e metriche utili senza esporre dati personali o segreti.
+
+CRITERI DI ACCETTAZIONE
+- ID esterni mappati in modo stabile e idempotente.
+- Test di idempotenza e mapping superati.
+
+TEST MINIMI
+- Test unitari delle regole e delle validazioni introdotte.
+- Test di migrazione, vincoli, transazioni e idempotenza dove applicabile.
+- Smoke test dell’ambiente e verifica di log, metriche, retry e configurazione.
+
+DELIVERABLE ATTESI
+- Codice applicativo e configurazioni nel modulo coerente con l’architettura approvata.
+- API/servizi di dominio, validazioni e documentazione tecnica aggiornata.
+- Migrazione database e aggiornamento del modello dati.
+- Configurazione infrastrutturale, osservabilità e runbook pertinenti.
+- Test automatici e breve evidenza di verifica collegabile alla card.
+
+CHIUSURA DEL LAVORO
+- Esegui lint, type-check, test pertinenti e build dei moduli toccati usando i comandi ordinari `docker compose`; non usare `make`.
+- Riporta file modificati, migrazioni, comandi eseguiti e relativi esiti.
+- Spiega le decisioni tecniche non ovvie e gli eventuali rischi residui.
+- Se qualcosa non è verificabile nell’ambiente disponibile, dichiaralo chiaramente senza simulare un esito positivo.
+- Non creare commit o push se non richiesto espressamente.
+",M1 — Ready,"M1, EP04, Must, Backend, Database, Infrastructure",,,12
+"EP04-03 — Calciatori, rose reali e trasferimenti","CODICE: EP04-03
+
+USER STORY
+Come piattaforma vogliamo una fonte sportiva centrale, normalizzata e affidabile.
+
+OBIETTIVO E SCOPE
+- Sincronizzare anagrafiche, squadre correnti e storico trasferimenti.
+- Aggiungere metriche, log e fixture di test dai payload campione.
+
+CRITERI DI ACCETTAZIONE
+- Duplicati e cambi squadra non rompono riferimenti storici.
+- Test di idempotenza e mapping superati.
+
+TEST MINIMI
+- Test unitari delle regole e delle validazioni introdotte.
+- Test di migrazione, vincoli, transazioni e idempotenza dove applicabile.
+- Smoke test dell’ambiente e verifica di log, metriche, retry e configurazione.
+
+DELIVERABLE
+- Codice applicativo e configurazioni nel modulo coerente con l’architettura approvata.
+- API/servizi di dominio, validazioni e documentazione tecnica aggiornata.
+- Migrazione database e aggiornamento del modello dati.
+- Configurazione infrastrutturale, osservabilità e runbook pertinenti.
+- Test automatici e breve evidenza di verifica collegabile alla card.
+
+DIPENDENZE
+EP00, EP01
+
+STIMA INIZIALE
+2–4 giorni
+
+PROMPT CURSOR
+CONTESTO STANDARD — FANTAPPERÒ
+Stai lavorando su FantApperò, una piattaforma fantasy football web con backend Python/FastAPI, frontend React/TypeScript, PostgreSQL, Redis, worker asincroni e integrazione centralizzata con API-Football. L’architettura approvata è un monolite modulare API-first. Gli ambienti locali e i servizi applicativi devono essere gestiti con Docker e Docker Compose.
+
+REGOLE GENERALI OBBLIGATORIE
+- Usa l’italiano come lingua predefinita per interfaccia, messaggi utente, dati seed, documentazione funzionale e nuovi contenuti. Predisponi il codice per una futura internazionalizzazione, senza implementare ora lingue aggiuntive se la card non lo richiede.
+- Non modificare funzionalità, regole di gioco, API, schema dati, configurazioni o componenti non necessari alla card.
+- Non cancellare o rinominare codice, migrazioni, dati, test o funzioni esistenti senza una motivazione tecnica esplicita e verificata.
+- Prima di creare qualcosa, controlla cosa esiste già e riusa pattern, moduli e componenti compatibili.
+- Mantieni compatibilità con le funzionalità esistenti e non anticipare card o milestone successive.
+- Non inserire segreti nel codice, nei log, nei test, nei commit o nella documentazione.
+- Non usare Makefile, il comando `make` o wrapper equivalenti. Usa i normali comandi `docker compose` definiti dal progetto.
+- Non presupporre servizi installati localmente: esegui backend, worker, database, Redis, migrazioni e test attraverso Docker Compose, salvo attività puramente frontend già previste diversamente dal repository.
+- Se manca un servizio o un comando Compose necessario, aggiorna `compose.yaml` e la documentazione in modo minimale e coerente con lo scope.
+
+INCARICO
+- Card Trello: EP04-03 — Calciatori, rose reali e trasferimenti
+- Dipendenze dichiarate: EP00, EP01
+
+Prima di modificare il codice:
+1. analizza la struttura del progetto aperto e individua tutti i file coinvolti nella card;
+2. leggi il README e la documentazione architetturale o tecnica effettivamente presenti e pertinenti;
+3. verifica cosa esiste già ed evita implementazioni duplicate;
+4. controlla che le dipendenze funzionali dichiarate siano già implementate; se manca una dipendenza bloccante, fermati e descrivi con precisione cosa manca;
+5. indicami brevemente il piano che seguirai prima di applicare le modifiche;
+6. riusa pattern, servizi e componenti già adottati quando sono compatibili;
+7. non introdurre segreti, credenziali, dipendenze non necessarie o modifiche fuori scope.
+
+USER STORY
+Come piattaforma vogliamo una fonte sportiva centrale, normalizzata e affidabile.
+
+ATTIVITÀ RICHIESTE
+- Sincronizzare anagrafiche, squadre correnti e storico trasferimenti.
+- Aggiungere metriche, log e fixture di test dai payload campione.
+
+VINCOLI DI IMPLEMENTAZIONE
+- Rispetta il monolite modulare API-first, i confini di dominio e il modello dati approvati.
+- Le autorizzazioni e le validazioni decisive devono essere applicate lato server.
+- Le operazioni che cambiano crediti, rose, mercato, risultati o configurazioni devono essere atomiche e auditabili.
+- Mantieni retrocompatibilità con migrazioni e API esistenti; se non è possibile, documenta esplicitamente la decisione.
+- Non implementare funzionalità appartenenti a card successive.
+- Aggiungi log e metriche utili senza esporre dati personali o segreti.
+
+CRITERI DI ACCETTAZIONE
+- Duplicati e cambi squadra non rompono riferimenti storici.
+- Test di idempotenza e mapping superati.
+
+TEST MINIMI
+- Test unitari delle regole e delle validazioni introdotte.
+- Test di migrazione, vincoli, transazioni e idempotenza dove applicabile.
+- Smoke test dell’ambiente e verifica di log, metriche, retry e configurazione.
+
+DELIVERABLE ATTESI
+- Codice applicativo e configurazioni nel modulo coerente con l’architettura approvata.
+- API/servizi di dominio, validazioni e documentazione tecnica aggiornata.
+- Migrazione database e aggiornamento del modello dati.
+- Configurazione infrastrutturale, osservabilità e runbook pertinenti.
+- Test automatici e breve evidenza di verifica collegabile alla card.
+
+CHIUSURA DEL LAVORO
+- Esegui lint, type-check, test pertinenti e build dei moduli toccati usando i comandi ordinari `docker compose`; non usare `make`.
+- Riporta file modificati, migrazioni, comandi eseguiti e relativi esiti.
+- Spiega le decisioni tecniche non ovvie e gli eventuali rischi residui.
+- Se qualcosa non è verificabile nell’ambiente disponibile, dichiaralo chiaramente senza simulare un esito positivo.
+- Non creare commit o push se non richiesto espressamente.
+",M1 — Ready,"M1, EP04, Must, Backend, Database, Infrastructure",,,13
+EP04-04 — Listone e ruoli P–D–C–A,"CODICE: EP04-04
+
+USER STORY
+Come piattaforma vogliamo una fonte sportiva centrale, normalizzata e affidabile.
+
+OBIETTIVO E SCOPE
+- Generare listone ufficiale e consentire override pre-asta per lega.
+- Aggiungere metriche, log e fixture di test dai payload campione.
+
+CRITERI DI ACCETTAZIONE
+- Ogni giocatore ha un ruolo valido e modifiche post-avvio decorrono dal turno seguente.
+- Test di idempotenza e mapping superati.
+
+TEST MINIMI
+- Test unitari delle regole e delle validazioni introdotte.
+- Test di migrazione, vincoli, transazioni e idempotenza dove applicabile.
+- Smoke test dell’ambiente e verifica di log, metriche, retry e configurazione.
+
+DELIVERABLE
+- Codice applicativo e configurazioni nel modulo coerente con l’architettura approvata.
+- API/servizi di dominio, validazioni e documentazione tecnica aggiornata.
+- Migrazione database e aggiornamento del modello dati.
+- Configurazione infrastrutturale, osservabilità e runbook pertinenti.
+- Test automatici e breve evidenza di verifica collegabile alla card.
+
+DIPENDENZE
+EP00, EP01
+
+STIMA INIZIALE
+2–4 giorni
+
+PROMPT CURSOR
+CONTESTO STANDARD — FANTAPPERÒ
+Stai lavorando su FantApperò, una piattaforma fantasy football web con backend Python/FastAPI, frontend React/TypeScript, PostgreSQL, Redis, worker asincroni e integrazione centralizzata con API-Football. L’architettura approvata è un monolite modulare API-first. Gli ambienti locali e i servizi applicativi devono essere gestiti con Docker e Docker Compose.
+
+REGOLE GENERALI OBBLIGATORIE
+- Usa l’italiano come lingua predefinita per interfaccia, messaggi utente, dati seed, documentazione funzionale e nuovi contenuti. Predisponi il codice per una futura internazionalizzazione, senza implementare ora lingue aggiuntive se la card non lo richiede.
+- Non modificare funzionalità, regole di gioco, API, schema dati, configurazioni o componenti non necessari alla card.
+- Non cancellare o rinominare codice, migrazioni, dati, test o funzioni esistenti senza una motivazione tecnica esplicita e verificata.
+- Prima di creare qualcosa, controlla cosa esiste già e riusa pattern, moduli e componenti compatibili.
+- Mantieni compatibilità con le funzionalità esistenti e non anticipare card o milestone successive.
+- Non inserire segreti nel codice, nei log, nei test, nei commit o nella documentazione.
+- Non usare Makefile, il comando `make` o wrapper equivalenti. Usa i normali comandi `docker compose` definiti dal progetto.
+- Non presupporre servizi installati localmente: esegui backend, worker, database, Redis, migrazioni e test attraverso Docker Compose, salvo attività puramente frontend già previste diversamente dal repository.
+- Se manca un servizio o un comando Compose necessario, aggiorna `compose.yaml` e la documentazione in modo minimale e coerente con lo scope.
+
+INCARICO
+- Card Trello: EP04-04 — Listone e ruoli P–D–C–A
+- Dipendenze dichiarate: EP00, EP01
+
+Prima di modificare il codice:
+1. analizza la struttura del progetto aperto e individua tutti i file coinvolti nella card;
+2. leggi il README e la documentazione architetturale o tecnica effettivamente presenti e pertinenti;
+3. verifica cosa esiste già ed evita implementazioni duplicate;
+4. controlla che le dipendenze funzionali dichiarate siano già implementate; se manca una dipendenza bloccante, fermati e descrivi con precisione cosa manca;
+5. indicami brevemente il piano che seguirai prima di applicare le modifiche;
+6. riusa pattern, servizi e componenti già adottati quando sono compatibili;
+7. non introdurre segreti, credenziali, dipendenze non necessarie o modifiche fuori scope.
+
+USER STORY
+Come piattaforma vogliamo una fonte sportiva centrale, normalizzata e affidabile.
+
+ATTIVITÀ RICHIESTE
+- Generare listone ufficiale e consentire override pre-asta per lega.
+- Aggiungere metriche, log e fixture di test dai payload campione.
+
+VINCOLI DI IMPLEMENTAZIONE
+- Rispetta il monolite modulare API-first, i confini di dominio e il modello dati approvati.
+- Le autorizzazioni e le validazioni decisive devono essere applicate lato server.
+- Le operazioni che cambiano crediti, rose, mercato, risultati o configurazioni devono essere atomiche e auditabili.
+- Mantieni retrocompatibilità con migrazioni e API esistenti; se non è possibile, documenta esplicitamente la decisione.
+- Non implementare funzionalità appartenenti a card successive.
+- Aggiungi log e metriche utili senza esporre dati personali o segreti.
+
+CRITERI DI ACCETTAZIONE
+- Ogni giocatore ha un ruolo valido e modifiche post-avvio decorrono dal turno seguente.
+- Test di idempotenza e mapping superati.
+
+TEST MINIMI
+- Test unitari delle regole e delle validazioni introdotte.
+- Test di migrazione, vincoli, transazioni e idempotenza dove applicabile.
+- Smoke test dell’ambiente e verifica di log, metriche, retry e configurazione.
+
+DELIVERABLE ATTESI
+- Codice applicativo e configurazioni nel modulo coerente con l’architettura approvata.
+- API/servizi di dominio, validazioni e documentazione tecnica aggiornata.
+- Migrazione database e aggiornamento del modello dati.
+- Configurazione infrastrutturale, osservabilità e runbook pertinenti.
+- Test automatici e breve evidenza di verifica collegabile alla card.
+
+CHIUSURA DEL LAVORO
+- Esegui lint, type-check, test pertinenti e build dei moduli toccati usando i comandi ordinari `docker compose`; non usare `make`.
+- Riporta file modificati, migrazioni, comandi eseguiti e relativi esiti.
+- Spiega le decisioni tecniche non ovvie e gli eventuali rischi residui.
+- Se qualcosa non è verificabile nell’ambiente disponibile, dichiaralo chiaramente senza simulare un esito positivo.
+- Non creare commit o push se non richiesto espressamente.
+",M1 — Ready,"M1, EP04, Must, Backend, Database, Infrastructure",,,14
+"EP04-05 — Fixture, eventi, lineup e statistiche","CODICE: EP04-05
+
+USER STORY
+Come piattaforma vogliamo una fonte sportiva centrale, normalizzata e affidabile.
+
+OBIETTIVO E SCOPE
+- Ingerire calendario e dettagli partita con raw payload e normalizzazione.
+- Aggiungere metriche, log e fixture di test dai payload campione.
+
+CRITERI DI ACCETTAZIONE
+- Sync ripetuta non duplica eventi; correzioni sono rilevate.
+- Test di idempotenza e mapping superati.
+
+TEST MINIMI
+- Test unitari delle regole e delle validazioni introdotte.
+- Test di migrazione, vincoli, transazioni e idempotenza dove applicabile.
+- Smoke test dell’ambiente e verifica di log, metriche, retry e configurazione.
+
+DELIVERABLE
+- Codice applicativo e configurazioni nel modulo coerente con l’architettura approvata.
+- API/servizi di dominio, validazioni e documentazione tecnica aggiornata.
+- Migrazione database e aggiornamento del modello dati.
+- Configurazione infrastrutturale, osservabilità e runbook pertinenti.
+- Test automatici e breve evidenza di verifica collegabile alla card.
+
+DIPENDENZE
+EP00, EP01
+
+STIMA INIZIALE
+2–4 giorni
+
+PROMPT CURSOR
+CONTESTO STANDARD — FANTAPPERÒ
+Stai lavorando su FantApperò, una piattaforma fantasy football web con backend Python/FastAPI, frontend React/TypeScript, PostgreSQL, Redis, worker asincroni e integrazione centralizzata con API-Football. L’architettura approvata è un monolite modulare API-first. Gli ambienti locali e i servizi applicativi devono essere gestiti con Docker e Docker Compose.
+
+REGOLE GENERALI OBBLIGATORIE
+- Usa l’italiano come lingua predefinita per interfaccia, messaggi utente, dati seed, documentazione funzionale e nuovi contenuti. Predisponi il codice per una futura internazionalizzazione, senza implementare ora lingue aggiuntive se la card non lo richiede.
+- Non modificare funzionalità, regole di gioco, API, schema dati, configurazioni o componenti non necessari alla card.
+- Non cancellare o rinominare codice, migrazioni, dati, test o funzioni esistenti senza una motivazione tecnica esplicita e verificata.
+- Prima di creare qualcosa, controlla cosa esiste già e riusa pattern, moduli e componenti compatibili.
+- Mantieni compatibilità con le funzionalità esistenti e non anticipare card o milestone successive.
+- Non inserire segreti nel codice, nei log, nei test, nei commit o nella documentazione.
+- Non usare Makefile, il comando `make` o wrapper equivalenti. Usa i normali comandi `docker compose` definiti dal progetto.
+- Non presupporre servizi installati localmente: esegui backend, worker, database, Redis, migrazioni e test attraverso Docker Compose, salvo attività puramente frontend già previste diversamente dal repository.
+- Se manca un servizio o un comando Compose necessario, aggiorna `compose.yaml` e la documentazione in modo minimale e coerente con lo scope.
+
+INCARICO
+- Card Trello: EP04-05 — Fixture, eventi, lineup e statistiche
+- Dipendenze dichiarate: EP00, EP01
+
+Prima di modificare il codice:
+1. analizza la struttura del progetto aperto e individua tutti i file coinvolti nella card;
+2. leggi il README e la documentazione architetturale o tecnica effettivamente presenti e pertinenti;
+3. verifica cosa esiste già ed evita implementazioni duplicate;
+4. controlla che le dipendenze funzionali dichiarate siano già implementate; se manca una dipendenza bloccante, fermati e descrivi con precisione cosa manca;
+5. indicami brevemente il piano che seguirai prima di applicare le modifiche;
+6. riusa pattern, servizi e componenti già adottati quando sono compatibili;
+7. non introdurre segreti, credenziali, dipendenze non necessarie o modifiche fuori scope.
+
+USER STORY
+Come piattaforma vogliamo una fonte sportiva centrale, normalizzata e affidabile.
+
+ATTIVITÀ RICHIESTE
+- Ingerire calendario e dettagli partita con raw payload e normalizzazione.
+- Aggiungere metriche, log e fixture di test dai payload campione.
+
+VINCOLI DI IMPLEMENTAZIONE
+- Rispetta il monolite modulare API-first, i confini di dominio e il modello dati approvati.
+- Le autorizzazioni e le validazioni decisive devono essere applicate lato server.
+- Le operazioni che cambiano crediti, rose, mercato, risultati o configurazioni devono essere atomiche e auditabili.
+- Mantieni retrocompatibilità con migrazioni e API esistenti; se non è possibile, documenta esplicitamente la decisione.
+- Non implementare funzionalità appartenenti a card successive.
+- Aggiungi log e metriche utili senza esporre dati personali o segreti.
+
+CRITERI DI ACCETTAZIONE
+- Sync ripetuta non duplica eventi; correzioni sono rilevate.
+- Test di idempotenza e mapping superati.
+
+TEST MINIMI
+- Test unitari delle regole e delle validazioni introdotte.
+- Test di migrazione, vincoli, transazioni e idempotenza dove applicabile.
+- Smoke test dell’ambiente e verifica di log, metriche, retry e configurazione.
+
+DELIVERABLE ATTESI
+- Codice applicativo e configurazioni nel modulo coerente con l’architettura approvata.
+- API/servizi di dominio, validazioni e documentazione tecnica aggiornata.
+- Migrazione database e aggiornamento del modello dati.
+- Configurazione infrastrutturale, osservabilità e runbook pertinenti.
+- Test automatici e breve evidenza di verifica collegabile alla card.
+
+CHIUSURA DEL LAVORO
+- Esegui lint, type-check, test pertinenti e build dei moduli toccati usando i comandi ordinari `docker compose`; non usare `make`.
+- Riporta file modificati, migrazioni, comandi eseguiti e relativi esiti.
+- Spiega le decisioni tecniche non ovvie e gli eventuali rischi residui.
+- Se qualcosa non è verificabile nell’ambiente disponibile, dichiaralo chiaramente senza simulare un esito positivo.
+- Non creare commit o push se non richiesto espressamente.
+",M1 — Ready,"M1, EP04, Must, Backend, Database, Infrastructure",,,15
+EP04-06 — Scheduler pre/live/post partita,"CODICE: EP04-06
+
+USER STORY
+Come piattaforma vogliamo una fonte sportiva centrale, normalizzata e affidabile.
+
+OBIETTIVO E SCOPE
+- Pianificare polling per stato con quote, lock e retry.
+- Aggiungere metriche, log e fixture di test dai payload campione.
+
+CRITERI DI ACCETTAZIONE
+- Nessun doppio job concorrente; modalità degradata osservabile.
+- Test di idempotenza e mapping superati.
+
+TEST MINIMI
+- Test unitari delle regole e delle validazioni introdotte.
+- Test di migrazione, vincoli, transazioni e idempotenza dove applicabile.
+- Smoke test dell’ambiente e verifica di log, metriche, retry e configurazione.
+
+DELIVERABLE
+- Codice applicativo e configurazioni nel modulo coerente con l’architettura approvata.
+- API/servizi di dominio, validazioni e documentazione tecnica aggiornata.
+- Migrazione database e aggiornamento del modello dati.
+- Configurazione infrastrutturale, osservabilità e runbook pertinenti.
+- Test automatici e breve evidenza di verifica collegabile alla card.
+
+DIPENDENZE
+EP00, EP01
+
+STIMA INIZIALE
+2–4 giorni
+
+PROMPT CURSOR
+CONTESTO STANDARD — FANTAPPERÒ
+Stai lavorando su FantApperò, una piattaforma fantasy football web con backend Python/FastAPI, frontend React/TypeScript, PostgreSQL, Redis, worker asincroni e integrazione centralizzata con API-Football. L’architettura approvata è un monolite modulare API-first. Gli ambienti locali e i servizi applicativi devono essere gestiti con Docker e Docker Compose.
+
+REGOLE GENERALI OBBLIGATORIE
+- Usa l’italiano come lingua predefinita per interfaccia, messaggi utente, dati seed, documentazione funzionale e nuovi contenuti. Predisponi il codice per una futura internazionalizzazione, senza implementare ora lingue aggiuntive se la card non lo richiede.
+- Non modificare funzionalità, regole di gioco, API, schema dati, configurazioni o componenti non necessari alla card.
+- Non cancellare o rinominare codice, migrazioni, dati, test o funzioni esistenti senza una motivazione tecnica esplicita e verificata.
+- Prima di creare qualcosa, controlla cosa esiste già e riusa pattern, moduli e componenti compatibili.
+- Mantieni compatibilità con le funzionalità esistenti e non anticipare card o milestone successive.
+- Non inserire segreti nel codice, nei log, nei test, nei commit o nella documentazione.
+- Non usare Makefile, il comando `make` o wrapper equivalenti. Usa i normali comandi `docker compose` definiti dal progetto.
+- Non presupporre servizi installati localmente: esegui backend, worker, database, Redis, migrazioni e test attraverso Docker Compose, salvo attività puramente frontend già previste diversamente dal repository.
+- Se manca un servizio o un comando Compose necessario, aggiorna `compose.yaml` e la documentazione in modo minimale e coerente con lo scope.
+
+INCARICO
+- Card Trello: EP04-06 — Scheduler pre/live/post partita
+- Dipendenze dichiarate: EP00, EP01
+
+Prima di modificare il codice:
+1. analizza la struttura del progetto aperto e individua tutti i file coinvolti nella card;
+2. leggi il README e la documentazione architetturale o tecnica effettivamente presenti e pertinenti;
+3. verifica cosa esiste già ed evita implementazioni duplicate;
+4. controlla che le dipendenze funzionali dichiarate siano già implementate; se manca una dipendenza bloccante, fermati e descrivi con precisione cosa manca;
+5. indicami brevemente il piano che seguirai prima di applicare le modifiche;
+6. riusa pattern, servizi e componenti già adottati quando sono compatibili;
+7. non introdurre segreti, credenziali, dipendenze non necessarie o modifiche fuori scope.
+
+USER STORY
+Come piattaforma vogliamo una fonte sportiva centrale, normalizzata e affidabile.
+
+ATTIVITÀ RICHIESTE
+- Pianificare polling per stato con quote, lock e retry.
+- Aggiungere metriche, log e fixture di test dai payload campione.
+
+VINCOLI DI IMPLEMENTAZIONE
+- Rispetta il monolite modulare API-first, i confini di dominio e il modello dati approvati.
+- Le autorizzazioni e le validazioni decisive devono essere applicate lato server.
+- Le operazioni che cambiano crediti, rose, mercato, risultati o configurazioni devono essere atomiche e auditabili.
+- Mantieni retrocompatibilità con migrazioni e API esistenti; se non è possibile, documenta esplicitamente la decisione.
+- Non implementare funzionalità appartenenti a card successive.
+- Aggiungi log e metriche utili senza esporre dati personali o segreti.
+
+CRITERI DI ACCETTAZIONE
+- Nessun doppio job concorrente; modalità degradata osservabile.
+- Test di idempotenza e mapping superati.
+
+TEST MINIMI
+- Test unitari delle regole e delle validazioni introdotte.
+- Test di migrazione, vincoli, transazioni e idempotenza dove applicabile.
+- Smoke test dell’ambiente e verifica di log, metriche, retry e configurazione.
+
+DELIVERABLE ATTESI
+- Codice applicativo e configurazioni nel modulo coerente con l’architettura approvata.
+- API/servizi di dominio, validazioni e documentazione tecnica aggiornata.
+- Migrazione database e aggiornamento del modello dati.
+- Configurazione infrastrutturale, osservabilità e runbook pertinenti.
+- Test automatici e breve evidenza di verifica collegabile alla card.
+
+CHIUSURA DEL LAVORO
+- Esegui lint, type-check, test pertinenti e build dei moduli toccati usando i comandi ordinari `docker compose`; non usare `make`.
+- Riporta file modificati, migrazioni, comandi eseguiti e relativi esiti.
+- Spiega le decisioni tecniche non ovvie e gli eventuali rischi residui.
+- Se qualcosa non è verificabile nell’ambiente disponibile, dichiaralo chiaramente senza simulare un esito positivo.
+- Non creare commit o push se non richiesto espressamente.
+",M1 — Ready,"M1, EP04, Must, Backend, Database, Infrastructure",,,16
+EP04-07 — Pannello qualità dati,"CODICE: EP04-07
+
+USER STORY
+Come piattaforma vogliamo una fonte sportiva centrale, normalizzata e affidabile.
+
+OBIETTIVO E SCOPE
+- Mostrare fixture mancanti, ritardi, conflitti e correzioni.
+- Aggiungere metriche, log e fixture di test dai payload campione.
+
+CRITERI DI ACCETTAZIONE
+- Operatore può individuare e rilanciare una sync senza modifiche manuali opache.
+- Test di idempotenza e mapping superati.
+
+TEST MINIMI
+- Test unitari delle regole e delle validazioni introdotte.
+- Test di migrazione, vincoli, transazioni e idempotenza dove applicabile.
+- Smoke test dell’ambiente e verifica di log, metriche, retry e configurazione.
+
+DELIVERABLE
+- Codice applicativo e configurazioni nel modulo coerente con l’architettura approvata.
+- API/servizi di dominio, validazioni e documentazione tecnica aggiornata.
+- Migrazione database e aggiornamento del modello dati.
+- Configurazione infrastrutturale, osservabilità e runbook pertinenti.
+- Test automatici e breve evidenza di verifica collegabile alla card.
+
+DIPENDENZE
+EP00, EP01
+
+STIMA INIZIALE
+2–4 giorni
+
+PROMPT CURSOR
+CONTESTO STANDARD — FANTAPPERÒ
+Stai lavorando su FantApperò, una piattaforma fantasy football web con backend Python/FastAPI, frontend React/TypeScript, PostgreSQL, Redis, worker asincroni e integrazione centralizzata con API-Football. L’architettura approvata è un monolite modulare API-first. Gli ambienti locali e i servizi applicativi devono essere gestiti con Docker e Docker Compose.
+
+REGOLE GENERALI OBBLIGATORIE
+- Usa l’italiano come lingua predefinita per interfaccia, messaggi utente, dati seed, documentazione funzionale e nuovi contenuti. Predisponi il codice per una futura internazionalizzazione, senza implementare ora lingue aggiuntive se la card non lo richiede.
+- Non modificare funzionalità, regole di gioco, API, schema dati, configurazioni o componenti non necessari alla card.
+- Non cancellare o rinominare codice, migrazioni, dati, test o funzioni esistenti senza una motivazione tecnica esplicita e verificata.
+- Prima di creare qualcosa, controlla cosa esiste già e riusa pattern, moduli e componenti compatibili.
+- Mantieni compatibilità con le funzionalità esistenti e non anticipare card o milestone successive.
+- Non inserire segreti nel codice, nei log, nei test, nei commit o nella documentazione.
+- Non usare Makefile, il comando `make` o wrapper equivalenti. Usa i normali comandi `docker compose` definiti dal progetto.
+- Non presupporre servizi installati localmente: esegui backend, worker, database, Redis, migrazioni e test attraverso Docker Compose, salvo attività puramente frontend già previste diversamente dal repository.
+- Se manca un servizio o un comando Compose necessario, aggiorna `compose.yaml` e la documentazione in modo minimale e coerente con lo scope.
+
+INCARICO
+- Card Trello: EP04-07 — Pannello qualità dati
+- Dipendenze dichiarate: EP00, EP01
+
+Prima di modificare il codice:
+1. analizza la struttura del progetto aperto e individua tutti i file coinvolti nella card;
+2. leggi il README e la documentazione architetturale o tecnica effettivamente presenti e pertinenti;
+3. verifica cosa esiste già ed evita implementazioni duplicate;
+4. controlla che le dipendenze funzionali dichiarate siano già implementate; se manca una dipendenza bloccante, fermati e descrivi con precisione cosa manca;
+5. indicami brevemente il piano che seguirai prima di applicare le modifiche;
+6. riusa pattern, servizi e componenti già adottati quando sono compatibili;
+7. non introdurre segreti, credenziali, dipendenze non necessarie o modifiche fuori scope.
+
+USER STORY
+Come piattaforma vogliamo una fonte sportiva centrale, normalizzata e affidabile.
+
+ATTIVITÀ RICHIESTE
+- Mostrare fixture mancanti, ritardi, conflitti e correzioni.
+- Aggiungere metriche, log e fixture di test dai payload campione.
+
+VINCOLI DI IMPLEMENTAZIONE
+- Rispetta il monolite modulare API-first, i confini di dominio e il modello dati approvati.
+- Le autorizzazioni e le validazioni decisive devono essere applicate lato server.
+- Le operazioni che cambiano crediti, rose, mercato, risultati o configurazioni devono essere atomiche e auditabili.
+- Mantieni retrocompatibilità con migrazioni e API esistenti; se non è possibile, documenta esplicitamente la decisione.
+- Non implementare funzionalità appartenenti a card successive.
+- Aggiungi log e metriche utili senza esporre dati personali o segreti.
+
+CRITERI DI ACCETTAZIONE
+- Operatore può individuare e rilanciare una sync senza modifiche manuali opache.
+- Test di idempotenza e mapping superati.
+
+TEST MINIMI
+- Test unitari delle regole e delle validazioni introdotte.
+- Test di migrazione, vincoli, transazioni e idempotenza dove applicabile.
+- Smoke test dell’ambiente e verifica di log, metriche, retry e configurazione.
+
+DELIVERABLE ATTESI
+- Codice applicativo e configurazioni nel modulo coerente con l’architettura approvata.
+- API/servizi di dominio, validazioni e documentazione tecnica aggiornata.
+- Migrazione database e aggiornamento del modello dati.
+- Configurazione infrastrutturale, osservabilità e runbook pertinenti.
+- Test automatici e breve evidenza di verifica collegabile alla card.
+
+CHIUSURA DEL LAVORO
+- Esegui lint, type-check, test pertinenti e build dei moduli toccati usando i comandi ordinari `docker compose`; non usare `make`.
+- Riporta file modificati, migrazioni, comandi eseguiti e relativi esiti.
+- Spiega le decisioni tecniche non ovvie e gli eventuali rischi residui.
+- Se qualcosa non è verificabile nell’ambiente disponibile, dichiaralo chiaramente senza simulare un esito positivo.
+- Non creare commit o push se non richiesto espressamente.
+",M1 — Ready,"M1, EP04, Must, Backend, Database, Infrastructure",,,17

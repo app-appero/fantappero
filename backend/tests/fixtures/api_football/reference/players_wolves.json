@@ -1,0 +1,48 @@
+{
+  "errors": [],
+  "get": "players",
+  "parameters": {"team": "39", "season": "2026"},
+  "paging": {"current": 1, "total": 1},
+  "results": 2,
+  "response": [
+    {
+      "player": {
+        "id": 2674,
+        "name": "Rui Patrício",
+        "firstname": "Rui",
+        "lastname": "Patrício",
+        "age": 36,
+        "birth": {"date": "1988-02-15", "place": "Batel", "country": "Portugal"},
+        "nationality": "Portugal",
+        "height": "190 cm",
+        "weight": "84 kg",
+        "injured": false
+      },
+      "statistics": [
+        {
+          "team": {"id": 39, "name": "Wolves"},
+          "league": {"id": 39, "name": "Premier League", "country": "England", "season": 2026},
+          "games": {"position": "Goalkeeper", "appearences": 10, "minutes": 900}
+        }
+      ]
+    },
+    {
+      "player": {
+        "id": 2887,
+        "name": "R. Jiménez",
+        "firstname": "Raúl",
+        "lastname": "Jiménez",
+        "age": 32,
+        "nationality": "Mexico",
+        "injured": false
+      },
+      "statistics": [
+        {
+          "team": {"id": 39, "name": "Wolves"},
+          "league": {"id": 39, "name": "Premier League", "country": "England", "season": 2026},
+          "games": {"position": "Attacker", "appearences": 8, "minutes": 620}
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,14 @@
+[project]
+name = "api-quota-estimator"
+version = "1.0.0"
+description = "EP00-04 API-Football quota estimator (central SPD sync)"
+requires-python = ">=3.12"
+dependencies = []
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0"]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
+addopts = "-q"
