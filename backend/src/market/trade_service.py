@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 
 from auth.exceptions import ValidationAuthError
 from authorization.context import LeagueAccess
-from database.enums import LeagueAuditAction, TradeStatus
+from database.enums import LeagueAuditAction, NotificationCategory, TradeStatus
 from fantasy_teams.factory import (
     ensure_team_for_membership,
     find_team_by_id,
@@ -43,6 +43,8 @@ from market.trade_validators import (
     validate_trades_enabled,
 )
 from market.windows import effective_trade_status
+from notifications.recipients import user_ids_for_teams
+from notifications.service import NotificationService
 from observability.metrics import get_metrics
 from sports_data.roster.models import Athlete
 
@@ -233,6 +235,11 @@ class TradeService:
             LeagueAuditAction.MARKET_TRADE_REJECTED,
             details={"proposalId": str(proposal.id)},
         )
+        self._notify_trade_status(
+            proposal_id=proposal.id,
+            status=TradeStatus.REJECTED,
+            team_ids=[proposal.proposer_team_id],
+        )
         self._session.commit()
         get_metrics().incr("trade_proposal_rejected_total")
         return self._to_response(proposal)
@@ -266,6 +273,11 @@ class TradeService:
                 LeagueAuditAction.MARKET_TRADE_ACCEPTED,
                 details={"proposalId": str(proposal.id), "pendingApproval": True},
             )
+            self._notify_trade_status(
+                proposal_id=proposal.id,
+                status=TradeStatus.PENDING_APPROVAL,
+                team_ids=[proposer_team.id],
+            )
             self._session.commit()
             get_metrics().incr("trade_proposal_accepted_total", labels={"result": "pending"})
             return self._to_response(proposal)
@@ -294,6 +306,11 @@ class TradeService:
                 "offeredCredits": proposal.offered_credits,
                 "requestedCredits": proposal.requested_credits,
             },
+        )
+        self._notify_trade_status(
+            proposal_id=proposal.id,
+            status=TradeStatus.ACCEPTED,
+            team_ids=[proposer_team.id],
         )
         self._session.commit()
         get_metrics().incr("trade_proposal_accepted_total", labels={"result": "executed"})
@@ -328,6 +345,11 @@ class TradeService:
             LeagueAuditAction.MARKET_TRADE_APPROVED,
             details={"proposalId": str(proposal.id)},
         )
+        self._notify_trade_status(
+            proposal_id=proposal.id,
+            status=TradeStatus.EXECUTED,
+            team_ids=[proposer_team.id, recipient_team.id],
+        )
         self._session.commit()
         get_metrics().incr("trade_proposal_approved_total")
         return self._to_response(proposal)
@@ -345,6 +367,11 @@ class TradeService:
             league_access.user.id,
             LeagueAuditAction.MARKET_TRADE_REJECTED_BY_ADMIN,
             details={"proposalId": str(proposal.id)},
+        )
+        self._notify_trade_status(
+            proposal_id=proposal.id,
+            status=TradeStatus.REJECTED_BY_ADMIN,
+            team_ids=[proposal.proposer_team_id, proposal.recipient_team_id],
         )
         self._session.commit()
         get_metrics().incr("trade_proposal_rejected_by_admin_total")
@@ -387,6 +414,11 @@ class TradeService:
                 "originalProposalId": str(original.id),
                 "counterProposalId": str(counter.id),
             },
+        )
+        self._notify_trade_status(
+            proposal_id=counter.id,
+            status=TradeStatus.COUNTERED,
+            team_ids=[original_proposer.id],
         )
         self._session.commit()
         get_metrics().incr("trade_proposal_countered_total")
@@ -527,6 +559,25 @@ class TradeService:
             LeagueAuditEvent(league_id=league_id, actor_id=actor_id, action=action, details=details)
         )
         self._session.flush()
+
+    def _notify_trade_status(
+        self,
+        *,
+        proposal_id: UUID,
+        status: TradeStatus,
+        team_ids: list[UUID],
+    ) -> None:
+        recipients = user_ids_for_teams(self._session, team_ids)
+        notifications = NotificationService(self._session)
+        for user_id in recipients.values():
+            notifications.create_notification(
+                user_id=user_id,
+                category=NotificationCategory.MERCATO,
+                template_key="mercato.scambio",
+                template_version=1,
+                params={"status": status.value},
+                dedup_key=f"trade_status:{proposal_id}:{status.value}:{user_id}",
+            )
 
     def _to_response(self, proposal: TradeProposal) -> TradeProposalResponse:
         now = datetime.now(UTC)

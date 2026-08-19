@@ -72,3 +72,66 @@ def _render_formazione_scadenza_turno(params: NotificationParams) -> Notificatio
         ),
         deep_link="/formazione",
     )
+
+
+@register_template("mercato.esito_busta", 1)
+def _render_mercato_esito_busta(params: NotificationParams) -> NotificationContent:
+    athlete_name = params.get("athlete_name", "un giocatore")
+    if params.get("outcome") == "assigned":
+        amount = params.get("amount_credits")
+        return NotificationContent(
+            title="Busta aggiudicata",
+            body=f"Hai aggiudicato {athlete_name} per {amount} crediti.",
+            deep_link="/mercato",
+        )
+    return NotificationContent(
+        title="Busta non aggiudicata",
+        body=f"Non hai aggiudicato {athlete_name}: offerta inferiore.",
+        deep_link="/mercato",
+    )
+
+
+_TRADE_STATUS_MESSAGES: dict[str, tuple[str, str]] = {
+    "accepted": ("Scambio accettato", "La tua proposta di scambio è stata accettata."),
+    "pending_approval": (
+        "Scambio in attesa di approvazione",
+        "Lo scambio accettato è in attesa di approvazione dell'amministratore.",
+    ),
+    "rejected": ("Scambio rifiutato", "La tua proposta di scambio è stata rifiutata."),
+    "countered": ("Controproposta ricevuta", "Hai ricevuto una controproposta di scambio."),
+    "executed": ("Scambio approvato", "Lo scambio è stato approvato ed eseguito."),
+    "rejected_by_admin": (
+        "Scambio rifiutato dall'amministratore",
+        "Lo scambio approvato dalle parti è stato rifiutato dall'amministratore.",
+    ),
+}
+
+
+@register_template("mercato.scambio", 1)
+def _render_mercato_scambio(params: NotificationParams) -> NotificationContent:
+    status = str(params.get("status"))
+    title, body = _TRADE_STATUS_MESSAGES.get(status, ("Aggiornamento scambio", "Stato aggiornato."))
+    return NotificationContent(title=title, body=body, deep_link="/mercato")
+
+
+@register_template("risultati.omologazione", 1)
+def _render_risultati_omologazione(params: NotificationParams) -> NotificationContent:
+    round_number = params.get("round_number")
+    return NotificationContent(
+        title="Turno omologato",
+        body=f"Il turno {round_number} è stato omologato: il risultato è definitivo.",
+        deep_link="/classifica",
+    )
+
+
+@register_template("risultati.correzione", 1)
+def _render_risultati_correzione(params: NotificationParams) -> NotificationContent:
+    round_number = params.get("round_number")
+    return NotificationContent(
+        title="Correzione al turno omologato",
+        body=(
+            f"Il turno {round_number} è stato riaperto per una correzione: "
+            "il punteggio sarà ricalcolato."
+        ),
+        deep_link="/classifica",
+    )

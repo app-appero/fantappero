@@ -17,10 +17,12 @@ from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
 from auth.exceptions import ValidationAuthError
-from database.enums import FantasyRoundHomologationStatus, LeagueAuditAction
+from database.enums import FantasyRoundHomologationStatus, LeagueAuditAction, NotificationCategory
 from fantasy_ratings.config import default_formula_config
 from fantasy_turns.models import FantasyRound, FantasyRoundFixture
 from leagues.models.league_audit_event import LeagueAuditEvent
+from notifications.recipients import user_ids_for_league
+from notifications.service import NotificationService
 from observability.context import get_correlation_id
 from sports_data.fixtures.models import Fixture
 
@@ -98,6 +100,16 @@ def homologate_round(session: Session, *, round_id: UUID, actor_id: UUID) -> Hom
             details={"roundId": str(round_id), "formulaVersion": formula_version},
         )
     )
+    notifications = NotificationService(session)
+    for _, user_id in user_ids_for_league(session, fantasy_round.league_id):
+        notifications.create_notification(
+            user_id=user_id,
+            category=NotificationCategory.RISULTATI,
+            template_key="risultati.omologazione",
+            template_version=1,
+            params={"round_number": fantasy_round.number},
+            dedup_key=f"round_homologated:{round_id}:{now.isoformat()}:{user_id}",
+        )
     session.flush()
     return HomologationResult(
         round_id=round_id,
@@ -173,6 +185,19 @@ def apply_round_correction(
             },
         )
     )
+    corrected_homologation = (
+        previous_homologated_at.isoformat() if previous_homologated_at else "na"
+    )
+    notifications = NotificationService(session)
+    for _, user_id in user_ids_for_league(session, fantasy_round.league_id):
+        notifications.create_notification(
+            user_id=user_id,
+            category=NotificationCategory.RISULTATI,
+            template_key="risultati.correzione",
+            template_version=1,
+            params={"round_number": fantasy_round.number},
+            dedup_key=f"round_correction:{round_id}:{corrected_homologation}:{user_id}",
+        )
     session.flush()
     return HomologationResult(
         round_id=round_id,

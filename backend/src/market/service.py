@@ -18,6 +18,7 @@ from database.enums import (
     MarketReleaseReason,
     MarketSessionKind,
     MarketSessionStatus,
+    NotificationCategory,
 )
 from fantasy_teams.composition_service import sync_team_composition_status
 from fantasy_teams.factory import ensure_team_for_membership, find_team_for_membership
@@ -56,6 +57,8 @@ from market.validators import (
     validate_team_has_free_slot,
 )
 from market.windows import effective_status, is_open_for_bids
+from notifications.recipients import user_ids_for_teams
+from notifications.service import NotificationService
 from observability.logging import get_logger
 from observability.metrics import get_metrics
 from sports_data.roster.models import Athlete
@@ -93,9 +96,7 @@ class MarketService:
         league_access: LeagueAccess,
         payload: CreateMarketSessionRequest,
     ) -> MarketSessionResponse:
-        return self._create_session(
-            league_access, payload, kind=MarketSessionKind.INITIAL_AUCTION
-        )
+        return self._create_session(league_access, payload, kind=MarketSessionKind.INITIAL_AUCTION)
 
     def create_waiver_session(
         self,
@@ -121,9 +122,7 @@ class MarketService:
                 MarketSession.league_id == league.id,
                 MarketSession.kind == kind,
                 MarketSession.parent_session_id.is_(None),
-                MarketSession.status.in_(
-                    (MarketSessionStatus.SCHEDULED, MarketSessionStatus.OPEN)
-                ),
+                MarketSession.status.in_((MarketSessionStatus.SCHEDULED, MarketSessionStatus.OPEN)),
             )
         )
         if existing is not None and effective_status(existing, now=datetime.now(UTC)) in (
@@ -321,6 +320,27 @@ class MarketService:
                     "tiedAmountCredits": tied_bids[0].amount_credits,
                     "teamIds": eligible_team_ids,
                 },
+            )
+
+        bidder_user_ids = user_ids_for_teams(self._session, (bid.fantasy_team_id for bid in bids))
+        notifications = NotificationService(self._session)
+        for bid in bids:
+            if bid.status not in (MarketBidStatus.WON, MarketBidStatus.LOST):
+                continue
+            recipient_id = bidder_user_ids.get(bid.fantasy_team_id)
+            if recipient_id is None:
+                continue
+            notifications.create_notification(
+                user_id=recipient_id,
+                category=NotificationCategory.MERCATO,
+                template_key="mercato.esito_busta",
+                template_version=1,
+                params={
+                    "outcome": "assigned" if bid.status == MarketBidStatus.WON else "lost",
+                    "athlete_name": bid.athlete.canonical_name,
+                    "amount_credits": bid.amount_credits,
+                },
+                dedup_key=f"market_bid_outcome:{bid.id}",
             )
 
         market_session.status = MarketSessionStatus.RESOLVED
@@ -841,14 +861,10 @@ class MarketService:
             closesAt=market_session.closes_at.isoformat(),
             bidCount=bid_count,
             parentSessionId=(
-                str(market_session.parent_session_id)
-                if market_session.parent_session_id
-                else None
+                str(market_session.parent_session_id) if market_session.parent_session_id else None
             ),
             targetAthleteId=(
-                str(market_session.target_athlete_id)
-                if market_session.target_athlete_id
-                else None
+                str(market_session.target_athlete_id) if market_session.target_athlete_id else None
             ),
         )
 
