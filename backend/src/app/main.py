@@ -11,6 +11,8 @@ from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from admin.router import router as admin_router
+from ai_assistant.router import feedback_router as ai_assistant_feedback_router
+from ai_assistant.router import router as ai_assistant_router
 from app.deps_health import aggregate_health
 from auth.exceptions import AuthError
 from auth.profile_router import router as profile_router
@@ -77,6 +79,8 @@ app.include_router(effective_lineup_router)
 app.include_router(fantasy_ratings_router)
 app.include_router(quality_router)
 app.include_router(notifications_router)
+app.include_router(ai_assistant_router)
+app.include_router(ai_assistant_feedback_router)
 app.add_exception_handler(QualityRetryError, quality_error_handler)
 app.add_exception_handler(FantasyRatingError, rating_error_handler)
 

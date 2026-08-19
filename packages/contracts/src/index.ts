@@ -260,6 +260,18 @@ export type {
 } from "./admin.js";
 
 export type {
+  AiFeedbackRatingValue,
+  AiFeedbackRequest,
+  AiFeedbackResponse,
+  AnalistaExplanation,
+  AthleteComparisonRow,
+  CompareAthletesRequest,
+  LineupSuggestion,
+  OsservatoreResult,
+  ViceallenatoreAdvice,
+} from "./aiAssistant.js";
+
+export type {
   ListNotificationsFilters,
   MarkAllNotificationsReadResult,
   NotificationCategory,
