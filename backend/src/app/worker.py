@@ -6,6 +6,7 @@ from celery import Celery
 
 from config.settings.loader import validate_worker_settings
 from fantasy_turns.schedule import fantasy_turns_beat_schedule
+from notifications.schedule import notifications_beat_schedule
 from observability.celery_signals import register_celery_observability
 from observability.error_tracking import configure_error_tracking
 from observability.logging import configure_logging
@@ -32,6 +33,12 @@ _beat_schedule.update(
     fantasy_turns_beat_schedule(
         enabled=_worker_settings.fantasy_turns_auto_generate_enabled,
         interval_seconds=_worker_settings.fantasy_turns_auto_generate_interval_seconds,
+    )
+)
+_beat_schedule.update(
+    notifications_beat_schedule(
+        enabled=_worker_settings.notifications_lineup_reminder_enabled,
+        interval_seconds=_worker_settings.notifications_lineup_reminder_interval_seconds,
     )
 )
 
@@ -64,6 +71,7 @@ import fantasy_ratings.tasks  # noqa: E402, F401
 import fantasy_turns.tasks  # noqa: E402, F401
 import leagues.listone_tasks  # noqa: E402, F401
 import mail.tasks  # noqa: E402, F401
+import notifications.tasks  # noqa: E402, F401
 import sports_data.catalog.tasks  # noqa: E402, F401
 import sports_data.fixtures.tasks  # noqa: E402, F401
 import sports_data.listone.tasks  # noqa: E402, F401

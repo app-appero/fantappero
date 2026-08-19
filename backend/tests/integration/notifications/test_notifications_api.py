@@ -44,7 +44,7 @@ def test_list_notifications_without_token_is_unauthorized(client: TestClient) ->
 def test_list_and_mark_read_positive_flow(client: TestClient, db_session: Session) -> None:
     token, user_id = _register_and_login(client, "notif-api-flow@example.com")
     service = NotificationService(db_session)
-    notification = service.create_notification(
+    notification, _ = service.create_notification(
         user_id=user_id,
         category=NotificationCategory.SISTEMA,
         template_key="sistema.generico",
@@ -81,7 +81,7 @@ def test_mark_read_on_other_users_notification_is_not_found(
     _, owner_id = _register_and_login(client, "notif-api-owner@example.com")
     intruder_token, _ = _register_and_login(client, "notif-api-intruder@example.com")
     service = NotificationService(db_session)
-    notification = service.create_notification(
+    notification, _ = service.create_notification(
         user_id=owner_id,
         category=NotificationCategory.SISTEMA,
         template_key="sistema.generico",

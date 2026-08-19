@@ -30,7 +30,7 @@ def test_create_notification_is_deduplicated(client: TestClient, db_session: Ses
     user_id = _register_and_login(client, "notif-dedup@example.com")
     service = NotificationService(db_session)
 
-    first = service.create_notification(
+    first, created_first = service.create_notification(
         user_id=user_id,
         category=NotificationCategory.SISTEMA,
         template_key="sistema.generico",
@@ -38,7 +38,7 @@ def test_create_notification_is_deduplicated(client: TestClient, db_session: Ses
         params={"title": "Ciao", "body": "Prova"},
         dedup_key="test:dedup:1",
     )
-    second = service.create_notification(
+    second, created_second = service.create_notification(
         user_id=user_id,
         category=NotificationCategory.SISTEMA,
         template_key="sistema.generico",
@@ -51,6 +51,8 @@ def test_create_notification_is_deduplicated(client: TestClient, db_session: Ses
     assert first is not None
     assert second is not None
     assert first.id == second.id
+    assert created_first is True
+    assert created_second is False
     assert service.list_notifications(user_id=user_id).total == 1
 
 
@@ -65,7 +67,7 @@ def test_create_notification_skips_when_preference_disabled(
     )
     db_session.commit()
 
-    created = service.create_notification(
+    created, was_created = service.create_notification(
         user_id=user_id,
         category=NotificationCategory.MERCATO,
         template_key="sistema.generico",
@@ -76,6 +78,7 @@ def test_create_notification_skips_when_preference_disabled(
     db_session.commit()
 
     assert created is None
+    assert was_created is False
     listing = service.list_notifications(user_id=user_id, category=NotificationCategory.MERCATO)
     assert listing.total == 0
 

@@ -58,3 +58,17 @@ def _render_sistema_generico(params: NotificationParams) -> NotificationContent:
         body=body,
         deep_link=str(deep_link) if deep_link is not None else None,
     )
+
+
+@register_template("formazione.scadenza_turno", 1)
+def _render_formazione_scadenza_turno(params: NotificationParams) -> NotificationContent:
+    round_number = params.get("round_number")
+    cutoff_local = params.get("cutoff_local")
+    return NotificationContent(
+        title="Scadenza formazione in arrivo",
+        body=(
+            f"Il turno {round_number} chiude alle {cutoff_local}. "
+            "Salva la formazione prima del fischio d'inizio."
+        ),
+        deep_link="/formazione",
+    )

@@ -65,11 +65,13 @@ class NotificationService:
         template_version: int,
         params: dict[str, object],
         dedup_key: str,
-    ) -> Notification | None:
+    ) -> tuple[Notification | None, bool]:
         """Create an in-app notification, or return the existing one for ``dedup_key``.
 
-        Returns ``None`` (no row created) when the user has disabled the
-        category in their preferences.
+        Returns ``(notification, created)``. ``notification`` is ``None`` (no
+        row involved) only when the user has disabled the category in their
+        preferences; ``created`` is ``False`` whenever an existing row for
+        ``dedup_key`` was returned instead of a new one (idempotent replay).
         """
         existing = self._session.scalar(
             select(Notification).where(
@@ -79,11 +81,11 @@ class NotificationService:
         )
         if existing is not None:
             get_metrics().incr("notifications_deduped_total", labels={"category": category.value})
-            return existing
+            return existing, False
 
         if not self._in_app_enabled(user_id, category):
             get_metrics().incr("notifications_skipped_total", labels={"category": category.value})
-            return None
+            return None, False
 
         content = render_notification(template_key, template_version, params)
         notification = Notification(
@@ -113,7 +115,7 @@ class NotificationService:
                 get_metrics().incr(
                     "notifications_deduped_total", labels={"category": category.value}
                 )
-                return replayed
+                return replayed, False
             raise
 
         get_metrics().incr("notifications_created_total", labels={"category": category.value})
@@ -121,7 +123,7 @@ class NotificationService:
             "notification_created",
             extra={"category": category.value, "template_key": template_key},
         )
-        return notification
+        return notification, True
 
     def list_notifications(
         self,

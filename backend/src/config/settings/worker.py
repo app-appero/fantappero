@@ -7,6 +7,7 @@ from pydantic import Field, field_validator, model_validator
 from config.settings.base import BaseAppSettings, require_non_empty
 from config.settings.fantasy_turns_settings import FantasyTurnsSettingsMixin
 from config.settings.mail import MailSettingsMixin
+from config.settings.notifications_settings import NotificationsSettingsMixin
 from config.settings.scheduler_settings import SportsSchedulerSettingsMixin
 
 
@@ -15,6 +16,7 @@ class WorkerSettings(
     MailSettingsMixin,
     SportsSchedulerSettingsMixin,
     FantasyTurnsSettingsMixin,
+    NotificationsSettingsMixin,
 ):
     """Configuration consumed by the Celery worker / beat."""
 
