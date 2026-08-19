@@ -23,6 +23,38 @@ vi.mock("../api/leagues", () => ({
   createLeague: vi.fn(),
   fetchLeagueListone: vi.fn(),
   refreshLeagueListone: vi.fn(),
+  fetchMyCredits: vi.fn(),
+}));
+
+vi.mock("../api/market", () => ({
+  createAuctionSession: vi.fn(),
+  closeAuctionSession: vi.fn(),
+  resolveAuctionSession: vi.fn(),
+  fetchAuctionSessions: vi.fn(),
+  fetchAuctionSession: vi.fn(),
+  submitAuctionBid: vi.fn(),
+  withdrawAuctionBid: vi.fn(),
+  fetchMyAuctionBids: vi.fn(),
+  createWaiverSession: vi.fn(),
+  closeWaiverSession: vi.fn(),
+  resolveWaiverSession: vi.fn(),
+  fetchWaiverSessions: vi.fn(),
+  fetchWaiverSession: vi.fn(),
+  submitWaiverBid: vi.fn(),
+  withdrawWaiverBid: vi.fn(),
+  fetchMyWaiverBids: vi.fn(),
+  previewVoluntaryRelease: vi.fn(),
+  applyVoluntaryRelease: vi.fn(),
+  createTradeProposal: vi.fn(),
+  fetchTradeProposals: vi.fn(),
+  fetchTradeProposal: vi.fn(),
+  cancelTradeProposal: vi.fn(),
+  acceptTradeProposal: vi.fn(),
+  rejectTradeProposal: vi.fn(),
+  counterTradeProposal: vi.fn(),
+  approveTradeProposal: vi.fn(),
+  rejectTradeProposalAsAdmin: vi.fn(),
+  fetchMarketHistory: vi.fn(),
 }));
 
 function renderRoute(path: string) {
