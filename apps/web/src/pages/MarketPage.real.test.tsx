@@ -8,8 +8,16 @@ const fetchMeMock = vi.fn();
 const fetchMyLeaguesMock = vi.fn();
 const fetchMyFantasyTeamMock = vi.fn();
 const fetchMyCreditsMock = vi.fn();
+const fetchFantasyTeamsMock = vi.fn();
+const fetchRosterOccupancyMock = vi.fn();
+const fetchLeagueListoneMock = vi.fn();
 const previewVoluntaryReleaseMock = vi.fn();
 const applyVoluntaryReleaseMock = vi.fn();
+const fetchTradeProposalsMock = vi.fn();
+const createTradeProposalMock = vi.fn();
+const acceptTradeProposalMock = vi.fn();
+const rejectTradeProposalMock = vi.fn();
+const cancelTradeProposalMock = vi.fn();
 
 vi.mock("../api/auth", () => ({
   fetchMe: (...args: unknown[]) => fetchMeMock(...args),
@@ -27,10 +35,12 @@ vi.mock("../api/leagues", () => ({
   fetchCompetitions: vi.fn(),
   fetchMyLeagues: (...args: unknown[]) => fetchMyLeaguesMock(...args),
   createLeague: vi.fn(),
-  fetchLeagueListone: vi.fn(),
+  fetchLeagueListone: (...args: unknown[]) => fetchLeagueListoneMock(...args),
   refreshLeagueListone: vi.fn(),
   fetchMyCredits: (...args: unknown[]) => fetchMyCreditsMock(...args),
   fetchMyFantasyTeam: (...args: unknown[]) => fetchMyFantasyTeamMock(...args),
+  fetchFantasyTeams: (...args: unknown[]) => fetchFantasyTeamsMock(...args),
+  fetchRosterOccupancy: (...args: unknown[]) => fetchRosterOccupancyMock(...args),
 }));
 
 vi.mock("../api/market", () => ({
@@ -52,12 +62,12 @@ vi.mock("../api/market", () => ({
   fetchMyWaiverBids: vi.fn(),
   previewVoluntaryRelease: (...args: unknown[]) => previewVoluntaryReleaseMock(...args),
   applyVoluntaryRelease: (...args: unknown[]) => applyVoluntaryReleaseMock(...args),
-  createTradeProposal: vi.fn(),
-  fetchTradeProposals: vi.fn(),
+  createTradeProposal: (...args: unknown[]) => createTradeProposalMock(...args),
+  fetchTradeProposals: (...args: unknown[]) => fetchTradeProposalsMock(...args),
   fetchTradeProposal: vi.fn(),
-  cancelTradeProposal: vi.fn(),
-  acceptTradeProposal: vi.fn(),
-  rejectTradeProposal: vi.fn(),
+  cancelTradeProposal: (...args: unknown[]) => cancelTradeProposalMock(...args),
+  acceptTradeProposal: (...args: unknown[]) => acceptTradeProposalMock(...args),
+  rejectTradeProposal: (...args: unknown[]) => rejectTradeProposalMock(...args),
   counterTradeProposal: vi.fn(),
   approveTradeProposal: vi.fn(),
   rejectTradeProposalAsAdmin: vi.fn(),
@@ -146,6 +156,14 @@ describe("Mercato — svincolo volontario collegato alle API reali (EP08-04)", (
     });
     previewVoluntaryReleaseMock.mockReset();
     applyVoluntaryReleaseMock.mockReset();
+    fetchFantasyTeamsMock.mockReset().mockResolvedValue([]);
+    fetchRosterOccupancyMock.mockReset().mockResolvedValue([]);
+    fetchLeagueListoneMock.mockReset().mockResolvedValue([]);
+    fetchTradeProposalsMock.mockReset().mockResolvedValue({ proposals: [] });
+    createTradeProposalMock.mockReset();
+    acceptTradeProposalMock.mockReset();
+    rejectTradeProposalMock.mockReset();
+    cancelTradeProposalMock.mockReset();
   });
 
   afterEach(() => {
@@ -176,6 +194,112 @@ describe("Mercato — svincolo volontario collegato alle API reali (EP08-04)", (
     const { html, unmount } = await renderAppAt("/mercato");
     expect(html).toContain('data-testid="wireframe-market-error"');
     expect(html).toContain("Errore dal server.");
+    unmount();
+  });
+});
+
+describe("Mercato — scambi collegati alle API reali (EP08-05/06)", () => {
+  beforeEach(() => {
+    clearStoredSession();
+    fetchMyFantasyTeamMock.mockReset().mockResolvedValue(TEAM_WITH_PLAYER);
+    fetchMyCreditsMock.mockReset().mockResolvedValue({
+      fantasyTeamId: "team-1",
+      balance: 150,
+      version: 1,
+      reconstructedBalance: 150,
+    });
+    fetchFantasyTeamsMock.mockReset().mockResolvedValue([
+      { id: "team-1", leagueId: "league-1", membershipId: "m-1", userId: "user-1", name: "La Mia Squadra", rosterSize: 25, filledSlots: 1, compositionStatus: "incomplete" },
+      { id: "team-2", leagueId: "league-1", membershipId: "m-2", userId: "user-2", name: "Squadra Avversaria", rosterSize: 25, filledSlots: 1, compositionStatus: "incomplete" },
+    ]);
+    fetchRosterOccupancyMock.mockReset().mockResolvedValue([
+      { athleteId: "athlete-2", fantasyTeamId: "team-2", teamName: "Squadra Avversaria", slotIndex: 0, purchaseCredits: 20 },
+    ]);
+    fetchLeagueListoneMock.mockReset().mockResolvedValue([
+      {
+        athleteId: "athlete-2",
+        canonicalName: "Giocatore Avversario",
+        seasonYear: 2026,
+        officialRole: "D",
+        effectiveRole: "D",
+        providerPositionRaw: "Defender",
+        mappingVersion: "v1.0.0",
+        clubId: "club-2",
+        clubName: "Napoli",
+        override: null,
+      },
+    ]);
+    previewVoluntaryReleaseMock.mockReset();
+    applyVoluntaryReleaseMock.mockReset();
+    fetchTradeProposalsMock.mockReset().mockResolvedValue({ proposals: [] });
+    createTradeProposalMock.mockReset();
+    acceptTradeProposalMock.mockReset();
+    rejectTradeProposalMock.mockReset();
+    cancelTradeProposalMock.mockReset();
+  });
+
+  afterEach(() => {
+    clearStoredSession();
+  });
+
+  it("nessuna proposta mostra lo stato vuoto e il form di creazione", async () => {
+    const { html, unmount } = await renderAppAt("/mercato");
+    expect(html).toContain('data-testid="market-trade-empty"');
+    expect(html).toContain('data-testid="market-trade-create-form"');
+    expect(html).toContain("Squadra Avversaria");
+    unmount();
+  });
+
+  it("errore nel caricamento delle proposte mostra lo stato di errore", async () => {
+    fetchTradeProposalsMock.mockReset().mockRejectedValue(
+      new ApiError("Errore dal server.", 500, "internal_error"),
+    );
+    const { html, unmount } = await renderAppAt("/mercato");
+    expect(html).toContain('data-testid="market-trade-load-error"');
+    expect(html).toContain("Errore dal server.");
+    unmount();
+  });
+
+  it("proposta ricevuta mostra Accetta/Rifiuta/Controproponi, proposta inviata mostra Annulla", async () => {
+    fetchTradeProposalsMock.mockReset().mockResolvedValue({
+      proposals: [
+        {
+          id: "proposal-received",
+          leagueId: "league-1",
+          proposerTeamId: "team-2",
+          recipientTeamId: "team-1",
+          offeredAthletes: [{ id: "athlete-2", name: "Giocatore Avversario" }],
+          requestedAthletes: [],
+          offeredCredits: 10,
+          requestedCredits: 0,
+          status: "proposed",
+          expiresAt: "2026-09-01T00:00:00Z",
+          createdAt: "2026-08-19T00:00:00Z",
+          counterOfId: null,
+        },
+        {
+          id: "proposal-sent",
+          leagueId: "league-1",
+          proposerTeamId: "team-1",
+          recipientTeamId: "team-2",
+          offeredAthletes: [],
+          requestedAthletes: [{ id: "athlete-2", name: "Giocatore Avversario" }],
+          offeredCredits: 5,
+          requestedCredits: 0,
+          status: "proposed",
+          expiresAt: "2026-09-01T00:00:00Z",
+          createdAt: "2026-08-19T00:00:00Z",
+          counterOfId: null,
+        },
+      ],
+    });
+    const { html, unmount } = await renderAppAt("/mercato");
+    expect(html).toContain('data-testid="market-trade-proposal-proposal-received"');
+    expect(html).toContain('data-testid="market-trade-proposal-proposal-sent"');
+    expect(html).toContain("Accetta");
+    expect(html).toContain("Rifiuta");
+    expect(html).toContain("Controproponi");
+    expect(html).toContain("Annulla");
     unmount();
   });
 });

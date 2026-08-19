@@ -1,19 +1,59 @@
-import type { FantasyTeam, MarketReleasePreview, MarketReleaseReason } from "@fantappero/contracts";
+import type {
+  FantasyTeam,
+  FantasyTeamSummary,
+  LeagueListoneEntry,
+  MarketReleasePreview,
+  MarketReleaseReason,
+  RosterOccupancyEntry,
+} from "@fantappero/contracts";
 import {
+  Badge,
   Breadcrumb,
   Button,
+  Input,
   PageContainer,
   Select,
   UiStatePanel,
   WireframeSection,
 } from "@fantappero/ui";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { type FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { applyVoluntaryRelease, previewVoluntaryRelease } from "../api/market";
-import { fetchMyCredits, fetchMyFantasyTeam } from "../api/leagues";
+import {
+  fetchFantasyTeams,
+  fetchLeagueListone,
+  fetchMyCredits,
+  fetchMyFantasyTeam,
+  fetchRosterOccupancy,
+} from "../api/leagues";
 import { getApiErrorMessage, useAuth } from "../auth/AuthContext";
 import { loadStoredSession } from "../auth/sessionStorage";
+import { useTradeFlow } from "../market/useTradeFlow";
 import { useLocation } from "../router/simpleRouter";
 import { parseWireframeStateFromSearch } from "../wireframes/useWireframeState";
+
+const TRADE_STATUS_LABEL: Record<string, string> = {
+  proposed: "Proposta",
+  cancelled: "Annullata",
+  expired: "Scaduta",
+  accepted: "Accettata",
+  rejected: "Rifiutata",
+  countered: "Controproposta ricevuta",
+  pending_approval: "In attesa di approvazione",
+  executed: "Eseguita",
+  rejected_by_admin: "Rifiutata dall'amministratore",
+};
+
+const TRADE_STATUS_VARIANT: Record<string, "success" | "warning" | "accent" | "danger" | "neutral"> = {
+  proposed: "accent",
+  cancelled: "neutral",
+  expired: "neutral",
+  accepted: "success",
+  rejected: "danger",
+  countered: "warning",
+  pending_approval: "warning",
+  executed: "success",
+  rejected_by_admin: "danger",
+};
 
 const REASON_OPTIONS: Array<{ value: MarketReleaseReason; label: string }> = [
   { value: "voluntary", label: "Svincolo volontario" },
@@ -50,6 +90,9 @@ export function MarketPage() {
 
   const [team, setTeam] = useState<FantasyTeam | null>(isDemoMode ? DEMO_TEAM : null);
   const [balance, setBalance] = useState<number | null>(isDemoMode ? 200 : null);
+  const [teams, setTeams] = useState<FantasyTeamSummary[]>([]);
+  const [occupancy, setOccupancy] = useState<RosterOccupancyEntry[]>([]);
+  const [listoneEntries, setListoneEntries] = useState<LeagueListoneEntry[]>([]);
   const [loading, setLoading] = useState(() => (isDemoMode ? demoState === "loading" : true));
   const [loadError, setLoadError] = useState<string | null>(() =>
     isDemoMode && demoState === "error" ? "Impossibile caricare la rosa (demo)." : null,
@@ -81,14 +124,20 @@ export function MarketPage() {
     setLoading(true);
     setLoadError(null);
     try {
-      const [myTeam, credits] = await Promise.all([
+      const [myTeam, credits, allTeams, allOccupancy, listone] = await Promise.all([
         fetchMyFantasyTeam(stored.accessToken, activeLeagueId),
         fetchMyCredits(stored.accessToken, activeLeagueId).catch(() => null),
+        fetchFantasyTeams(stored.accessToken, activeLeagueId).catch(() => []),
+        fetchRosterOccupancy(stored.accessToken, activeLeagueId).catch(() => []),
+        fetchLeagueListone(stored.accessToken, activeLeagueId).catch(() => []),
       ]);
       setTeam(myTeam);
       if (credits) {
         setBalance(credits.balance);
       }
+      setTeams(allTeams);
+      setOccupancy(allOccupancy);
+      setListoneEntries(listone);
     } catch (error) {
       setTeam(null);
       setLoadError(getApiErrorMessage(error, "Impossibile caricare la rosa."));
@@ -100,6 +149,18 @@ export function MarketPage() {
   useEffect(() => {
     void loadTeam();
   }, [loadTeam]);
+
+  const athleteNameById = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const entry of listoneEntries) {
+      map.set(entry.athleteId, entry.canonicalName);
+    }
+    return map;
+  }, [listoneEntries]);
+
+  const otherTeams = useMemo(() => teams.filter((row) => row.id !== team?.id), [teams, team]);
+
+  const trade = useTradeFlow({ leagueId: activeLeagueId, active: !isDemoMode });
 
   const ownedSlots = useMemo(
     () => (team?.slots ?? []).filter((slot) => slot.athleteId !== null),
@@ -182,6 +243,101 @@ export function MarketPage() {
     } finally {
       setApplying(false);
     }
+  }
+
+  // -- Scambi tra partecipanti (EP08-05/06) ------------------------------------
+
+  const [recipientTeamId, setRecipientTeamId] = useState("");
+  const [offeredAthleteIds, setOfferedAthleteIds] = useState<string[]>([]);
+  const [requestedAthleteIds, setRequestedAthleteIds] = useState<string[]>([]);
+  const [offeredCredits, setOfferedCredits] = useState("0");
+  const [requestedCredits, setRequestedCredits] = useState("0");
+  const [expiresAt, setExpiresAt] = useState("");
+
+  const recipientOptions = useMemo(
+    () => otherTeams.map((row) => ({ value: row.id, label: row.name })),
+    [otherTeams],
+  );
+
+  const recipientAthleteOptions = useMemo(() => {
+    if (!recipientTeamId) {
+      return [];
+    }
+    return occupancy
+      .filter((entry) => entry.fantasyTeamId === recipientTeamId)
+      .map((entry) => ({
+        id: entry.athleteId,
+        label: athleteNameById.get(entry.athleteId) ?? "Giocatore",
+      }));
+  }, [athleteNameById, occupancy, recipientTeamId]);
+
+  function toggleAthleteId(list: string[], id: string): string[] {
+    return list.includes(id) ? list.filter((row) => row !== id) : [...list, id];
+  }
+
+  function resetTradeForm() {
+    setRecipientTeamId("");
+    setOfferedAthleteIds([]);
+    setRequestedAthleteIds([]);
+    setOfferedCredits("0");
+    setRequestedCredits("0");
+    setExpiresAt("");
+  }
+
+  function handleCreateProposal(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!recipientTeamId || !expiresAt) {
+      return;
+    }
+    void trade
+      .createProposal({
+        recipientTeamId,
+        offeredAthleteIds,
+        requestedAthleteIds,
+        offeredCredits: Number(offeredCredits) || 0,
+        requestedCredits: Number(requestedCredits) || 0,
+        expiresAt: new Date(expiresAt).toISOString(),
+      })
+      .then(resetTradeForm);
+  }
+
+  const [counteringProposalId, setCounteringProposalId] = useState<string | null>(null);
+  const [counterOfferedAthleteIds, setCounterOfferedAthleteIds] = useState<string[]>([]);
+  const [counterRequestedAthleteIds, setCounterRequestedAthleteIds] = useState<string[]>([]);
+  const [counterOfferedCredits, setCounterOfferedCredits] = useState("0");
+  const [counterRequestedCredits, setCounterRequestedCredits] = useState("0");
+  const [counterExpiresAt, setCounterExpiresAt] = useState("");
+
+  function startCounter(proposalId: string) {
+    setCounteringProposalId(proposalId);
+    setCounterOfferedAthleteIds([]);
+    setCounterRequestedAthleteIds([]);
+    setCounterOfferedCredits("0");
+    setCounterRequestedCredits("0");
+    setCounterExpiresAt("");
+  }
+
+  function handleCounterSubmit(event: FormEvent<HTMLFormElement>, proposalId: string) {
+    event.preventDefault();
+    if (!counterExpiresAt) {
+      return;
+    }
+    void trade
+      .counterProposal(proposalId, {
+        offeredAthleteIds: counterOfferedAthleteIds,
+        requestedAthleteIds: counterRequestedAthleteIds,
+        offeredCredits: Number(counterOfferedCredits) || 0,
+        requestedCredits: Number(counterRequestedCredits) || 0,
+        expiresAt: new Date(counterExpiresAt).toISOString(),
+      })
+      .then(() => setCounteringProposalId(null));
+  }
+
+  function teamNameFor(teamId: string): string {
+    if (team?.id === teamId) {
+      return "La tua squadra";
+    }
+    return teams.find((row) => row.id === teamId)?.name ?? "Squadra";
   }
 
   if (isDemoMode && demoState === "forbidden") {
@@ -335,6 +491,295 @@ export function MarketPage() {
                 ) : null}
               </div>
             )}
+          </WireframeSection>
+        ) : null}
+
+        {!loading && !loadError && !isDemoMode && activeLeagueId ? (
+          <WireframeSection label="Nuova proposta di scambio" testId="market-trade-form-section">
+            <form data-testid="market-trade-create-form" onSubmit={handleCreateProposal}>
+              <Select
+                label="Squadra destinataria"
+                name="trade-recipient"
+                options={recipientOptions}
+                placeholder="Scegli una squadra…"
+                value={recipientTeamId}
+                onChange={(event) => {
+                  setRecipientTeamId(event.target.value);
+                  setRequestedAthleteIds([]);
+                }}
+                required
+              />
+
+              <fieldset data-testid="market-trade-offered-athletes">
+                <legend>Giocatori offerti (dalla tua rosa)</legend>
+                {ownedSlots.length === 0 ? (
+                  <p>Nessun giocatore in rosa da offrire.</p>
+                ) : (
+                  ownedSlots.map((slot) => (
+                    <label key={slot.id}>
+                      <input
+                        type="checkbox"
+                        checked={offeredAthleteIds.includes(slot.athleteId as string)}
+                        onChange={() =>
+                          setOfferedAthleteIds((prev) =>
+                            toggleAthleteId(prev, slot.athleteId as string),
+                          )
+                        }
+                      />{" "}
+                      {slot.athleteName}
+                    </label>
+                  ))
+                )}
+              </fieldset>
+
+              <fieldset data-testid="market-trade-requested-athletes">
+                <legend>Giocatori richiesti</legend>
+                {recipientAthleteOptions.length === 0 ? (
+                  <p>Scegli prima una squadra destinataria.</p>
+                ) : (
+                  recipientAthleteOptions.map((athlete) => (
+                    <label key={athlete.id}>
+                      <input
+                        type="checkbox"
+                        checked={requestedAthleteIds.includes(athlete.id)}
+                        onChange={() =>
+                          setRequestedAthleteIds((prev) => toggleAthleteId(prev, athlete.id))
+                        }
+                      />{" "}
+                      {athlete.label}
+                    </label>
+                  ))
+                )}
+              </fieldset>
+
+              <Input
+                label="Crediti offerti"
+                name="trade-offered-credits"
+                type="number"
+                min={0}
+                value={offeredCredits}
+                onChange={(event) => setOfferedCredits(event.target.value)}
+              />
+              <Input
+                label="Crediti richiesti"
+                name="trade-requested-credits"
+                type="number"
+                min={0}
+                value={requestedCredits}
+                onChange={(event) => setRequestedCredits(event.target.value)}
+              />
+              <Input
+                label="Scadenza"
+                name="trade-expires-at"
+                type="datetime-local"
+                value={expiresAt}
+                onChange={(event) => setExpiresAt(event.target.value)}
+                required
+              />
+
+              {trade.createError ? (
+                <UiStatePanel
+                  state="error"
+                  title="Proposta non inviata"
+                  message={trade.createError}
+                  testId="market-trade-create-error"
+                />
+              ) : null}
+
+              <Button type="submit" variant="primary" disabled={trade.creating}>
+                {trade.creating ? "Invio…" : "Proponi scambio"}
+              </Button>
+            </form>
+          </WireframeSection>
+        ) : null}
+
+        {!isDemoMode && activeLeagueId ? (
+          <WireframeSection label="Proposte di scambio" testId="wireframe-region-market-trade">
+            {trade.loading ? (
+              <UiStatePanel
+                state="loading"
+                title="Caricamento proposte"
+                message="Recupero le proposte di scambio…"
+                testId="market-trade-loading"
+              />
+            ) : null}
+
+            {!trade.loading && trade.loadError ? (
+              <UiStatePanel
+                state="error"
+                title="Proposte non disponibili"
+                message={trade.loadError}
+                testId="market-trade-load-error"
+              />
+            ) : null}
+
+            {!trade.loading && !trade.loadError && trade.proposals.length === 0 ? (
+              <UiStatePanel
+                state="empty"
+                title="Nessuna proposta"
+                message="Non ci sono proposte di scambio inviate o ricevute."
+                testId="market-trade-empty"
+              />
+            ) : null}
+
+            {trade.actionError ? (
+              <UiStatePanel
+                state="error"
+                title="Operazione non riuscita"
+                message={trade.actionError}
+                testId="market-trade-action-error"
+              />
+            ) : null}
+
+            {!trade.loading && !trade.loadError && trade.proposals.length > 0 ? (
+              <ul data-testid="market-trade-list">
+                {trade.proposals.map((proposal) => {
+                  const isProposer = proposal.proposerTeamId === team?.id;
+                  const isRecipient = proposal.recipientTeamId === team?.id;
+                  const pending = trade.actionPendingId === proposal.id;
+                  return (
+                    <li key={proposal.id} data-testid={`market-trade-proposal-${proposal.id}`}>
+                      <p>
+                        {teamNameFor(proposal.proposerTeamId)} → {teamNameFor(proposal.recipientTeamId)}{" "}
+                        <Badge variant={TRADE_STATUS_VARIANT[proposal.status] ?? "neutral"}>
+                          {TRADE_STATUS_LABEL[proposal.status] ?? proposal.status}
+                        </Badge>
+                      </p>
+                      <p>
+                        Offerti: {proposal.offeredAthletes.map((a) => a.name).join(", ") || "—"}
+                        {proposal.offeredCredits > 0 ? ` + ${proposal.offeredCredits} crediti` : ""}
+                      </p>
+                      <p>
+                        Richiesti: {proposal.requestedAthletes.map((a) => a.name).join(", ") || "—"}
+                        {proposal.requestedCredits > 0 ? ` + ${proposal.requestedCredits} crediti` : ""}
+                      </p>
+
+                      {proposal.status === "proposed" && isProposer ? (
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          disabled={pending}
+                          onClick={() => void trade.cancelProposal(proposal.id)}
+                        >
+                          Annulla
+                        </Button>
+                      ) : null}
+
+                      {proposal.status === "proposed" && isRecipient ? (
+                        <div className="fa-ds-showcase__row">
+                          <Button
+                            variant="primary"
+                            size="sm"
+                            disabled={pending}
+                            onClick={() => void trade.acceptProposal(proposal.id)}
+                          >
+                            Accetta
+                          </Button>
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            disabled={pending}
+                            onClick={() => void trade.rejectProposal(proposal.id)}
+                          >
+                            Rifiuta
+                          </Button>
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            disabled={pending}
+                            onClick={() => startCounter(proposal.id)}
+                          >
+                            Controproponi
+                          </Button>
+                        </div>
+                      ) : null}
+
+                      {counteringProposalId === proposal.id ? (
+                        <form
+                          data-testid={`market-trade-counter-form-${proposal.id}`}
+                          onSubmit={(event) => handleCounterSubmit(event, proposal.id)}
+                        >
+                          <fieldset>
+                            <legend>Giocatori offerti nella controproposta</legend>
+                            {ownedSlots.map((slot) => (
+                              <label key={slot.id}>
+                                <input
+                                  type="checkbox"
+                                  checked={counterOfferedAthleteIds.includes(
+                                    slot.athleteId as string,
+                                  )}
+                                  onChange={() =>
+                                    setCounterOfferedAthleteIds((prev) =>
+                                      toggleAthleteId(prev, slot.athleteId as string),
+                                    )
+                                  }
+                                />{" "}
+                                {slot.athleteName}
+                              </label>
+                            ))}
+                          </fieldset>
+                          <fieldset>
+                            <legend>Giocatori richiesti nella controproposta</legend>
+                            {occupancy
+                              .filter((entry) => entry.fantasyTeamId === proposal.proposerTeamId)
+                              .map((entry) => (
+                                <label key={entry.athleteId}>
+                                  <input
+                                    type="checkbox"
+                                    checked={counterRequestedAthleteIds.includes(entry.athleteId)}
+                                    onChange={() =>
+                                      setCounterRequestedAthleteIds((prev) =>
+                                        toggleAthleteId(prev, entry.athleteId),
+                                      )
+                                    }
+                                  />{" "}
+                                  {athleteNameById.get(entry.athleteId) ?? "Giocatore"}
+                                </label>
+                              ))}
+                          </fieldset>
+                          <Input
+                            label="Crediti offerti"
+                            name="counter-offered-credits"
+                            type="number"
+                            min={0}
+                            value={counterOfferedCredits}
+                            onChange={(event) => setCounterOfferedCredits(event.target.value)}
+                          />
+                          <Input
+                            label="Crediti richiesti"
+                            name="counter-requested-credits"
+                            type="number"
+                            min={0}
+                            value={counterRequestedCredits}
+                            onChange={(event) => setCounterRequestedCredits(event.target.value)}
+                          />
+                          <Input
+                            label="Scadenza"
+                            name="counter-expires-at"
+                            type="datetime-local"
+                            value={counterExpiresAt}
+                            onChange={(event) => setCounterExpiresAt(event.target.value)}
+                            required
+                          />
+                          <div className="fa-ds-showcase__row">
+                            <Button type="submit" variant="primary" disabled={pending}>
+                              Invia controproposta
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="secondary"
+                              onClick={() => setCounteringProposalId(null)}
+                            >
+                              Annulla
+                            </Button>
+                          </div>
+                        </form>
+                      ) : null}
+                    </li>
+                  );
+                })}
+              </ul>
+            ) : null}
           </WireframeSection>
         ) : null}
       </div>
