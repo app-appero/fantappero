@@ -53,6 +53,7 @@ export const APP_ROUTE_DEFINITIONS: readonly AppRouteDefinition[] = [
   { id: "roster", path: "/rosa", layout: "app", requiredPermissions: ["roster:view"] },
   { id: "formation", path: "/formazione", layout: "app", requiredPermissions: ["roster:view"] },
   { id: "auction", path: "/asta", layout: "app", requiredPermissions: ["market:view"] },
+  { id: "waiver", path: "/svincoli", layout: "app", requiredPermissions: ["market:view"] },
   { id: "market", path: "/mercato", layout: "app", requiredPermissions: ["market:view"] },
   {
     id: "league-admin",

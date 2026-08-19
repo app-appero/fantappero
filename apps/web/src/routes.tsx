@@ -19,6 +19,7 @@ import {
   JoinLeaguePage,
   LeaguesPage,
   MarketPage,
+  WaiverPage,
   MatchdayPage,
   ManagerDirectoryPage,
   NotFoundPage,
@@ -167,6 +168,16 @@ export function AppRoutes() {
       <AppSection>
         <RequirePermissions required={["market:view"]}>
           <AuctionPage />
+        </RequirePermissions>
+      </AppSection>
+    );
+  }
+
+  if (pathname === "/svincoli") {
+    return (
+      <AppSection>
+        <RequirePermissions required={["market:view"]}>
+          <WaiverPage />
         </RequirePermissions>
       </AppSection>
     );

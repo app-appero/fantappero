@@ -6,6 +6,7 @@ export {
   AuthVerifyEmailPage,
 } from "./auth/AuthPages";
 export { AuctionPage } from "./AuctionPage";
+export { WaiverPage } from "./WaiverPage";
 export { FormationPage } from "./FormationPage";
 export { CreateLeaguePage } from "./CreateLeaguePage";
 export { LeagueAdminPage } from "./LeagueAdminPage";
