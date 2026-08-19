@@ -56,6 +56,7 @@ def test_upgrade_from_empty_database(clean_db: str) -> None:
         assert table_exists(engine, "lineup_drafts")
         assert table_exists(engine, "notifications")
         assert table_exists(engine, "notification_preferences")
+        assert table_exists(engine, "ai_interactions")
         assert table_exists(engine, "alembic_version")
         with engine.connect() as conn:
             version = conn.execute(text("SELECT version_num FROM alembic_version")).scalar_one()
@@ -104,7 +105,7 @@ def test_upgrade_from_empty_database(clean_db: str) -> None:
                 .scalars()
                 .all()
             )
-            assert version == "1abdd05156d8"
+            assert version == "94321d5a16fa"
         assert named_statuses == ["pending", "accepted", "declined", "revoked", "expired"]
         assert calendar_statuses == ["draft", "confirmed"]
         assert fantasy_roles == ["P", "D", "C", "A"]

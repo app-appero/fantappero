@@ -331,6 +331,21 @@ class NotificationStatus(str, enum.Enum):
     FAILED = "failed"
 
 
+class AiAssistantFeature(str, enum.Enum):
+    """AI-assisted advisory surfaces (EP10) — advice only, never auto-applied."""
+
+    VICEALLENATORE = "viceallenatore"
+    OSSERVATORE = "osservatore"
+    ANALISTA = "analista"
+
+
+class AiFeedbackRating(str, enum.Enum):
+    """User feedback on an AI suggestion (EP10-05) — never changes game state."""
+
+    UP = "up"
+    DOWN = "down"
+
+
 class Permission(str, enum.Enum):
     """Fine-grained permissions mirrored from client contracts (EP02-03)."""
 

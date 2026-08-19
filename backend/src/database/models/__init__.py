@@ -1,5 +1,6 @@
 """ORM models — import all mapped classes for Alembic autogenerate."""
 
+from ai_assistant.models import AiInteraction
 from auth.models.auth_session import AuthSession
 from auth.models.auth_token import AuthToken
 from auth.models.privacy_audit_event import PrivacyAuditEvent
@@ -46,6 +47,7 @@ from sports_data.roster.models import Athlete, SquadMembership, Transfer
 from sports_data.scheduler.models import SportsPollRun
 
 __all__ = [
+    "AiInteraction",
     "Athlete",
     "AuthSession",
     "AuthToken",
