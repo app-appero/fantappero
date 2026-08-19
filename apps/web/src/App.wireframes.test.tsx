@@ -34,6 +34,7 @@ describe("EPUI-04 wireframes", () => {
       screen.id === "league-dashboard" ||
       screen.id === "league-config" ||
       screen.id === "auction" ||
+      screen.id === "market" ||
       screen.id === "roster" ||
       screen.id === "formation" ||
       screen.id === "matchday"
@@ -86,7 +87,7 @@ describe("EPUI-04 wireframes", () => {
   });
 
   it("renders wireframe meta panel when meta=1", () => {
-    const html = renderAt("/mercato", "?persona=admin&stato=success&meta=1");
+    const html = renderAt("/classifica", "?persona=admin&stato=success&meta=1");
     expect(html).toContain('data-testid="wireframe-meta-panel"');
     expect(html).toContain("CTA primaria");
   });

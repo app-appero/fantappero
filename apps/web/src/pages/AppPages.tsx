@@ -15,7 +15,7 @@ export { JoinLeaguePage } from "./JoinLeaguePage";
 export { LeaguesPage } from "./LeaguesPage";
 export { ManagerDirectoryPage } from "./ManagerDirectoryPage";
 export { ReceivedInvitesPage } from "./ReceivedInvitesPage";
-export { MarketWireframe as MarketPage } from "../wireframes/screens/market";
+export { MarketPage } from "./MarketPage";
 export { MatchdayPage } from "./MatchdayPage";
 export { AdminDashboardPage } from "./AdminDashboardPage";
 export { AdminLeaguesPage } from "./AdminLeaguesPage";

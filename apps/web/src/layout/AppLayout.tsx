@@ -32,6 +32,7 @@ const APP_ICONS: Record<string, ReactNode> = {
   roster: <IconUsers />,
   formation: <IconLayout />,
   auction: <IconCart />,
+  waiver: <IconCart />,
   market: <IconCart />,
   "league-admin": <IconShield />,
   profile: <IconUser />,
