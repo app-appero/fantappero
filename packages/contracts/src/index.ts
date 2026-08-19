@@ -191,6 +191,34 @@ export {
   starterTemplate,
 } from "./fantasyLineups.js";
 
+export type {
+  CounterTradeProposalRequest,
+  CreateMarketSessionRequest,
+  CreateTradeProposalRequest,
+  MarketBid,
+  MarketBidList,
+  MarketBidStatus,
+  MarketHistoryCategory,
+  MarketHistoryEntry,
+  MarketHistoryFilters,
+  MarketHistoryList,
+  MarketReleasePreview,
+  MarketReleaseReason,
+  MarketReleaseRequest,
+  MarketReleaseResult,
+  MarketResolution,
+  MarketResolutionOutcome,
+  MarketResolutionOutcomeKind,
+  MarketSession,
+  MarketSessionKind,
+  MarketSessionStatus,
+  SubmitMarketBidRequest,
+  TradeAthlete,
+  TradeProposal,
+  TradeProposalList,
+  TradeStatus,
+} from "./market.js";
+
 export type { BreadcrumbItem, NavItemDefinition, NavSurface } from "./navigation.js";
 
 export {

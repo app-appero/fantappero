@@ -39,9 +39,13 @@ const DEMO_RULES: LeagueRules = {
   totalCredits: 1000,
   minFixturesPerRound: 25,
   minutesThreshold: 15,
+  voluntaryReleaseRefundPercent: 50,
+  leagueExitRefundPercent: 100,
+  maxActiveTradeProposalsPerTeam: 10,
   options: {
     allowTrades: true,
     allowManualInvites: true,
+    requireTradeApproval: false,
   },
 };
 
@@ -67,6 +71,9 @@ function buildPayloadFromRules(rules: LeagueRules): UpdateLeagueRulesRequest {
     totalCredits: rules.totalCredits,
     minFixturesPerRound: rules.minFixturesPerRound,
     minutesThreshold: rules.minutesThreshold,
+    voluntaryReleaseRefundPercent: rules.voluntaryReleaseRefundPercent,
+    leagueExitRefundPercent: rules.leagueExitRefundPercent,
+    maxActiveTradeProposalsPerTeam: rules.maxActiveTradeProposalsPerTeam,
     options: { ...rules.options },
   };
 }
@@ -343,6 +350,70 @@ export function LeagueAdminPage() {
               />{" "}
               Abilita inviti manuali
             </label>
+            <label>
+              <input
+                type="checkbox"
+                disabled={!canConfigure}
+                checked={rules.options.requireTradeApproval}
+                onChange={(event) =>
+                  updateLocalRules({
+                    options: {
+                      ...rules.options,
+                      requireTradeApproval: event.target.checked,
+                    },
+                  })
+                }
+              />{" "}
+              Richiedi approvazione amministratore per gli scambi
+            </label>
+          </fieldset>
+
+          <fieldset data-testid="league-admin-market-rules" style={{ marginBottom: "1rem" }}>
+            <legend>Regole mercato</legend>
+
+            <Input
+              label="Rimborso svincolo volontario (%)"
+              name="voluntaryReleaseRefundPercent"
+              type="number"
+              min={0}
+              max={100}
+              disabled={!canConfigure}
+              value={String(rules.voluntaryReleaseRefundPercent)}
+              onChange={(event) =>
+                updateLocalRules({
+                  voluntaryReleaseRefundPercent: Number(event.target.value) || 0,
+                })
+              }
+            />
+
+            <Input
+              label="Rimborso svincolo per uscita dai cinque campionati (%)"
+              name="leagueExitRefundPercent"
+              type="number"
+              min={0}
+              max={100}
+              disabled={!canConfigure}
+              value={String(rules.leagueExitRefundPercent)}
+              onChange={(event) =>
+                updateLocalRules({
+                  leagueExitRefundPercent: Number(event.target.value) || 0,
+                })
+              }
+            />
+
+            <Input
+              label="Proposte di scambio attive per squadra (max)"
+              name="maxActiveTradeProposalsPerTeam"
+              type="number"
+              min={1}
+              disabled={!canConfigure}
+              value={String(rules.maxActiveTradeProposalsPerTeam)}
+              onChange={(event) =>
+                updateLocalRules({
+                  maxActiveTradeProposalsPerTeam: Number(event.target.value) || 1,
+                })
+              }
+            />
           </fieldset>
 
           {saveError ? (

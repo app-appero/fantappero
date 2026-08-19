@@ -162,9 +162,13 @@ export function CreateLeaguePage() {
           totalCredits: 1000,
           minFixturesPerRound: 25,
           minutesThreshold: 15,
+          voluntaryReleaseRefundPercent: 50,
+          leagueExitRefundPercent: 100,
+          maxActiveTradeProposalsPerTeam: 10,
           options: {
             allowTrades: true,
             allowManualInvites: true,
+            requireTradeApproval: false,
           },
         },
       });

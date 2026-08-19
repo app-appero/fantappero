@@ -59,7 +59,10 @@ const DEMO_LEAGUE: LeagueDetail = {
     totalCredits: 1000,
     minFixturesPerRound: 25,
     minutesThreshold: 15,
-    options: { allowTrades: true, allowManualInvites: true },
+    voluntaryReleaseRefundPercent: 50,
+    leagueExitRefundPercent: 100,
+    maxActiveTradeProposalsPerTeam: 10,
+    options: { allowTrades: true, allowManualInvites: true, requireTradeApproval: false },
   },
 };
 

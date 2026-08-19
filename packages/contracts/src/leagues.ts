@@ -42,6 +42,8 @@ export interface LeagueRosterConfig {
 export interface LeagueRulesOptions {
   allowTrades: boolean;
   allowManualInvites: boolean;
+  /** Defer trade execution to admin approval instead of executing on accept (EP08-07). */
+  requireTradeApproval: boolean;
 }
 
 export interface LeagueRules {
@@ -55,6 +57,12 @@ export interface LeagueRules {
   minFixturesPerRound: number;
   /** Minutes required for a statistical vote (1–30, default 15). */
   minutesThreshold: number;
+  /** Credit refund percent for a voluntary release (0–100, EP08-04). */
+  voluntaryReleaseRefundPercent: number;
+  /** Credit refund percent for a release on exit from all five leagues (0–100, EP08-04). */
+  leagueExitRefundPercent: number;
+  /** Cap on a team's simultaneously active trade proposals (EP08-07). */
+  maxActiveTradeProposalsPerTeam: number;
   options: LeagueRulesOptions;
 }
 
@@ -82,6 +90,9 @@ export interface UpdateLeagueRulesRequest {
   totalCredits: number;
   minFixturesPerRound?: number;
   minutesThreshold?: number;
+  voluntaryReleaseRefundPercent?: number;
+  leagueExitRefundPercent?: number;
+  maxActiveTradeProposalsPerTeam?: number;
   options: LeagueRulesOptions;
 }
 
