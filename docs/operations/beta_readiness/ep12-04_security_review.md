@@ -12,9 +12,11 @@
 **Eseguita interamente** (dependency audit, SAST, secret scan, review manuale OWASP,
 test dinamico di bypass autorizzazione, job CI). **Aggiornamento sessione successiva**:
 entrambi i finding Alti sono stati chiusi su decisione esplicita del responsabile della
-card (vedi #5 e #6 sotto) — **nessun finding Alto resta aperto**. Resta aperto un solo
-finding Medio (#7, header di sicurezza HTTP) che richiede una decisione di policy
-prodotto/infra non presa in questa sessione.
+card (vedi #5 e #6 sotto) — **nessun finding Alto resta aperto**. Il finding Medio
+residuo (#7, header di sicurezza HTTP) è stato **accettato come rischio per la Beta**
+su decisione esplicita del responsabile della card (stessa sessione di chiusura dei
+finding Alti) — vedi dettaglio sotto. **Card EP12-04 chiusa**: nessun finding Alto o
+Medio resta senza una decisione registrata.
 
 ### Riepilogo finding
 
@@ -26,7 +28,7 @@ prodotto/infra non presa in questa sessione.
 | 4 | vite 6.3.5 / vitest 3.2.4 vulnerabili (incl. 1 critical, dev-only) | Alta (nominale) | **Corretto** (→ 6.4.3 / 3.2.7) |
 | 5 | starlette 0.47.3 vulnerabile (DoS `Range` header su `FileResponse`/`StaticFiles`), bloccato dal pin `fastapi==0.116.1` | Alta (dipendenza) → **mitigata, vettore concreto chiuso** | **Mitigato** (guard applicativo, non bump fastapi) |
 | 6 | CORS `allow_origins=["*"]` + `allow_credentials=True` | Media | **Corretto** (`allow_credentials=False`) |
-| 7 | Nessun header di sicurezza HTTP (CSP/HSTS/X-Frame-Options/nosniff) | Media | **Aperto — decisione richiesta** |
+| 7 | Nessun header di sicurezza HTTP (CSP/HSTS/X-Frame-Options/nosniff) | Media | **Rischio accettato per la Beta** |
 | 8 | pip 25.0.1 vulnerabile nell'immagine backend (6 CVE, build-time only) | Bassa | Aperto, non corretto |
 | 9 | pytest 8.4.1 vulnerabile (dev-only, DoS locale) | Bassa | Aperto, non corretto |
 | 10 | Dipendenze transitive JS sotto `apps/mobile`/Expo (postcss, uuid, js-yaml, image-size, nanoid, brace-expansion) | Bassa (dev/build tool) | Aperto, non corretto |
@@ -369,9 +371,16 @@ vettore di attacco concreto per questa app. Il bump di fastapi resta un'azione v
 per il futuro (fuori scope qui per il rischio di regressione); se effettuato, il guard
 di questa sessione può restare come difesa in profondità aggiuntiva senza conflitti.
 
-### Finding aperti che richiedono ancora una decisione
+### Rischi accettati (nessuna decisione ulteriore pendente)
 
-**#7 — Nessun header di sicurezza HTTP (Media)**
+**#7 — Nessun header di sicurezza HTTP (Media) — RISCHIO ACCETTATO PER LA BETA**
+
+Decisione esplicita del responsabile della card: lasciare il gap documentato e non
+implementare in questa milestone, per non introdurre un middleware CSP/HSTS non
+validato senza le informazioni necessarie a farlo in sicurezza (vedi motivazione
+sotto — un CSP sbagliato rompe l'intera app web). Da riprendere prima di un rollout
+oltre la Beta pilota, quando saranno note le fonti reali script/style/font della SPA
+e la terminazione TLS di produzione.
 
 Verificato dal vivo (`curl -i http://localhost:8001/auth/me`): nessuna risposta include
 `Content-Security-Policy`, `X-Frame-Options`, `X-Content-Type-Options`,
