@@ -10,6 +10,7 @@ on:
   push:
     branches: [main, dev]
   pull_request:
+  workflow_dispatch:
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
@@ -316,6 +317,72 @@ jobs:
       - name: Database integration tests
         working-directory: backend
         run: python -m pytest tests/integration/database -ra --tb=short
+
+  # ---------------------------------------------------------------------------
+  # Informative — EP12-01 critical-flow E2E suite (Playwright + Docker Compose)
+  #
+  # Deliberately NOT in ci-success's `needs`: a full Docker Compose stack
+  # (build + 5 services + browser automation) is far slower than the rest of
+  # the required gates, and the risk section of
+  # docs/operations/beta_readiness/ep12-01_suite_e2e.md flags this explicitly.
+  # Gated to manual runs and to PRs/pushes on the `claude/M5` pre-release
+  # branch, so it never slows down ordinary main/dev pushes or PRs.
+  # ---------------------------------------------------------------------------
+  e2e-critical-flow:
+    name: E2E critical flow (EP12-01, informative)
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      github.ref == 'refs/heads/claude/M5' ||
+      github.head_ref == 'claude/M5'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    continue-on-error: true
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Build and start stack
+        run: docker compose up -d --build postgres redis api web mailpit
+
+      - name: Wait for services to be healthy
+        run: |
+          set -euo pipefail
+          for service in postgres redis api web mailpit; do
+            echo "waiting for fantappero-$service..."
+            timeout 180 bash -c "until [ \"\$(docker inspect -f '{{.State.Health.Status}}' fantappero-$service 2>/dev/null)\" = healthy ]; do sleep 3; done"
+          done
+
+      - name: Install Playwright
+        working-directory: apps/e2e
+        run: |
+          npm install
+          npx playwright install --with-deps chromium
+
+      - name: Run E2E suite
+        working-directory: apps/e2e
+        run: npm run test:e2e
+
+      - name: Docker compose logs (on failure)
+        if: failure()
+        run: docker compose logs --tail=200 api web mailpit
+
+      - name: Upload Playwright report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-${{ github.run_id }}
+          path: apps/e2e/playwright-report/
+          if-no-files-found: ignore
+          retention-days: 14
+
+      - name: Tear down stack
+        if: always()
+        run: docker compose down -v
 
   # ---------------------------------------------------------------------------
   # Informative — do not block merge (continue-on-error)
