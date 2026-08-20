@@ -7,6 +7,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query, Response, status
 from fastapi.responses import JSONResponse
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from auth.dependencies import get_db_session, get_rate_limiter
@@ -24,6 +25,7 @@ from billing.entitlement_service import EntitlementService
 from config.settings.api import ApiSettings
 from config.settings.loader import get_api_settings
 from database.enums import LeagueAuditAction, Permission, SubscriptionPlan, UserType
+from fantasy_teams.models import FantasyTeam
 from leagues.audit_log_schemas import AuditLogListResponse
 from leagues.audit_log_service import DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE, AuditLogService
 from leagues.calendar_service import LeagueCalendarService
@@ -566,10 +568,18 @@ def get_league_standings(
     session: Session = Depends(get_db_session),
 ) -> list[LeagueStandingResponse]:
     """Classifica persistita (EP07-06), ordinata per posizione."""
-    rows = list_league_standings(session, league_id=league_access.league.id)
+    league_id = league_access.league.id
+    rows = list_league_standings(session, league_id=league_id)
+    team_names = {
+        team.id: team.name
+        for team in session.scalars(
+            select(FantasyTeam).where(FantasyTeam.league_id == league_id)
+        ).all()
+    }
     return [
         LeagueStandingResponse(
             fantasyTeamId=str(row.fantasy_team_id),
+            teamName=team_names.get(row.fantasy_team_id, "Squadra"),
             position=row.position,
             played=row.played,
             won=row.won,

@@ -100,6 +100,7 @@ from fantasy_teams.schemas import (
     RosterTurnSnapshotDetailResponse,
     RosterTurnSnapshotEntryResponse,
     RosterTurnSnapshotSummaryResponse,
+    TeamRosterPlayerResponse,
 )
 from fantasy_teams.validators import (
     validate_athlete_not_owned_in_league,
@@ -408,7 +409,10 @@ class FantasyTeamService:
                 FantasyRosterSlot.league_id == league_access.league.id,
                 FantasyRosterSlot.athlete_id.is_not(None),
             )
-            .options(selectinload(FantasyRosterSlot.fantasy_team))
+            .options(
+                selectinload(FantasyRosterSlot.fantasy_team),
+                selectinload(FantasyRosterSlot.athlete),
+            )
             .order_by(FantasyRosterSlot.slot_index.asc())
         ).all()
         return [
@@ -416,12 +420,42 @@ class FantasyTeamService:
                 athleteId=str(slot.athlete_id),
                 fantasyTeamId=str(slot.fantasy_team_id),
                 teamName=slot.fantasy_team.name,
+                athleteName=slot.athlete.canonical_name if slot.athlete is not None else None,
                 slotIndex=slot.slot_index,
                 purchaseCredits=slot.purchase_credits,
             )
             for slot in slots
             if slot.athlete_id is not None
         ]
+
+    def list_team_players_for_trade(
+        self,
+        league_access: LeagueAccess,
+        team_id: UUID,
+    ) -> list[TeamRosterPlayerResponse]:
+        """Rosa corrente di una squadra della lega (sola lettura, per proposte di scambio)."""
+        team = find_team_by_id(
+            self._session,
+            league_id=league_access.league.id,
+            team_id=team_id,
+            with_slots=True,
+        )
+        if team is None:
+            raise ValidationAuthError("Squadra non trovata.", code="fantasy_team_not_found")
+        players: list[TeamRosterPlayerResponse] = []
+        for slot in sorted(team.slots, key=lambda row: row.slot_index):
+            if slot.athlete_id is None:
+                continue
+            athlete = slot.athlete
+            players.append(
+                TeamRosterPlayerResponse(
+                    athleteId=str(slot.athlete_id),
+                    athleteName=athlete.canonical_name if athlete is not None else "Giocatore",
+                    slotIndex=slot.slot_index,
+                    purchaseCredits=slot.purchase_credits,
+                )
+            )
+        return players
 
     def assign_slot(
         self,

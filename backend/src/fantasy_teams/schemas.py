@@ -87,6 +87,16 @@ class RosterOccupancyEntryResponse(ApiModel):
     athlete_id: str = Field(alias="athleteId")
     fantasy_team_id: str = Field(alias="fantasyTeamId")
     team_name: str = Field(alias="teamName")
+    athlete_name: str | None = Field(default=None, alias="athleteName")
+    slot_index: int = Field(alias="slotIndex")
+    purchase_credits: int | None = Field(default=None, alias="purchaseCredits")
+
+
+class TeamRosterPlayerResponse(ApiModel):
+    """Giocatore in rosa di una squadra, per UI scambi (EP08-05)."""
+
+    athlete_id: str = Field(alias="athleteId")
+    athlete_name: str = Field(alias="athleteName")
     slot_index: int = Field(alias="slotIndex")
     purchase_credits: int | None = Field(default=None, alias="purchaseCredits")
 

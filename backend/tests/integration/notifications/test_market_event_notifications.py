@@ -144,6 +144,56 @@ def test_market_resolution_notifies_winner_and_loser(
     assert "non aggiudicata" in loser_notification.title.lower()
 
 
+def test_trade_proposal_notifies_recipient(
+    client: TestClient, db_session: Session, competition_ids: list[str]
+) -> None:
+    token, proposer_id = _register_and_login(client, "trade-evt-new-proposer@example.com")
+    _, recipient_id = _register_and_login(client, "trade-evt-new-recipient@example.com")
+    league_id = UUID(_create_league(client, token, competition_ids, "Lega Nuova Proposta"))
+
+    league = db_session.get(League, league_id)
+    proposer_user = db_session.get(User, proposer_id)
+    proposer_team = db_session.scalars(
+        select(FantasyTeam).where(FantasyTeam.league_id == league_id)
+    ).one()
+    recipient_team = _second_team(db_session, league_id, recipient_id)
+
+    league_access = LeagueAccess(
+        league=league, user=proposer_user, membership_role=LeagueMemberRole.OWNER
+    )
+    from market.trade_schemas import CreateTradeProposalRequest
+
+    TradeService(db_session).create_proposal(
+        league_access,
+        CreateTradeProposalRequest(
+            recipientTeamId=str(recipient_team.id),
+            offeredAthleteIds=[],
+            requestedAthleteIds=[],
+            offeredCredits=5,
+            requestedCredits=0,
+            expiresAt=(datetime.now(UTC) + timedelta(days=1)).isoformat(),
+        ),
+    )
+
+    notification = db_session.scalar(
+        select(Notification).where(
+            Notification.user_id == recipient_id,
+            Notification.category == NotificationCategory.MERCATO,
+        )
+    )
+    assert notification is not None
+    assert notification.title == "Nuova proposta di scambio"
+
+    # Proposer must not get a self-notification on create.
+    proposer_notes = db_session.scalars(
+        select(Notification).where(
+            Notification.user_id == proposer_id,
+            Notification.category == NotificationCategory.MERCATO,
+        )
+    ).all()
+    assert proposer_notes == []
+
+
 def test_trade_rejection_notifies_proposer(
     client: TestClient, db_session: Session, competition_ids: list[str]
 ) -> None:

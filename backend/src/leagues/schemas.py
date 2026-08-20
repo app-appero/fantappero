@@ -264,6 +264,7 @@ class ComputeStandingsResponse(ApiModel):
 
 class LeagueStandingResponse(ApiModel):
     fantasy_team_id: str = Field(alias="fantasyTeamId")
+    team_name: str = Field(alias="teamName")
     position: int
     played: int
     won: int

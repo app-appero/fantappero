@@ -735,6 +735,19 @@ button.fa-link-muted,
   font-weight: 600;
 }
 
+.fa-notification-center__empty,
+.fa-notification-center__status {
+  margin: 0;
+  padding: var(--fa-space-sm) var(--fa-space-md);
+  font-size: var(--fa-text-sm);
+  color: var(--fa-color-foreground-muted);
+  text-align: center;
+}
+
+.fa-notification-center__status--error {
+  color: var(--fa-color-danger);
+}
+
 .fa-notification-center__list {
   list-style: none;
   margin: 0;

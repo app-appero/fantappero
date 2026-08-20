@@ -79,6 +79,7 @@ placeholder: verificano rose e conti reali.
 | `GET` | `/leagues/{id}/rosa` | `roster:view` — rosa del chiamante (creazione lazy) + composizione |
 | `GET` | `/leagues/{id}/squadre` | `roster:view` — elenco squadre (`compositionStatus`) |
 | `GET` | `/leagues/{id}/occupazione-rosa` | `roster:view` — mappa atleta→squadra per UI listone |
+| `GET` | `/leagues/{id}/squadre/{teamId}/giocatori` | `roster:view` — rosa corrente di una squadra (scambi) |
 | `GET` | `/leagues/{id}/crediti` | `roster:view` — saldo + `reconstructedBalance` |
 | `GET` | `/leagues/{id}/crediti/movimenti` | `roster:view` — ledger immutabile |
 | `GET` | `/leagues/{id}/rosa/storico` | `roster:view` — intervalli possesso (`activeOnly` opzionale) |

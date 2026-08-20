@@ -31,6 +31,7 @@ from fantasy_teams.schemas import (
     RosterOwnershipHistoryResponse,
     RosterTurnSnapshotDetailResponse,
     RosterTurnSnapshotSummaryResponse,
+    TeamRosterPlayerResponse,
 )
 from fantasy_teams.service import FantasyTeamService
 
@@ -81,6 +82,22 @@ def list_roster_occupancy(
 ) -> list[RosterOccupancyEntryResponse]:
     """Return league-wide athlete occupancy for manual roster editing."""
     return service.list_roster_occupancy(league_access)
+
+
+@router.get(
+    "/{league_id}/squadre/{team_id}/giocatori",
+    response_model=list[TeamRosterPlayerResponse],
+)
+def list_team_players_for_trade(
+    team_id: UUID,
+    league_access: LeagueAccess = Depends(require_league_permissions(Permission.ROSTER_VIEW)),
+    service: FantasyTeamService = Depends(get_fantasy_team_service),
+) -> list[TeamRosterPlayerResponse] | JSONResponse:
+    """Rosa corrente di una squadra della lega, per proposte di scambio (EP08-05)."""
+    try:
+        return service.list_team_players_for_trade(league_access, team_id)
+    except AuthError as exc:
+        return _error_response(exc)
 
 
 @router.get(

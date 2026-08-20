@@ -16,6 +16,7 @@ import type {
   RosterImportConfirmResult,
   RosterImportPreview,
   RosterOccupancyEntry,
+  TeamRosterPlayer,
   RosterOwnershipHistory,
   RosterAsOf,
   CreateRosterTurnSnapshotRequest,
@@ -40,6 +41,7 @@ import type {
   LeagueListoneRefreshResult,
   LeagueMember,
   LeagueRules,
+  LeagueStanding,
   LeagueSummary,
   TransitionLeagueStateRequest,
   UpdateLeagueRulesRequest,
@@ -71,6 +73,13 @@ export function fetchLeagueCalendar(
   leagueId: string,
 ): Promise<LeagueCalendar | null> {
   return apiRequest<LeagueCalendar | null>(`/leagues/${leagueId}/calendario`, { accessToken });
+}
+
+export function fetchLeagueStandings(
+  accessToken: string,
+  leagueId: string,
+): Promise<LeagueStanding[]> {
+  return apiRequest<LeagueStanding[]>(`/leagues/${leagueId}/classifica`, { accessToken });
 }
 
 export function createLeague(
@@ -323,6 +332,16 @@ export function fetchRosterOccupancy(
   leagueId: string,
 ): Promise<RosterOccupancyEntry[]> {
   return apiRequest<RosterOccupancyEntry[]>(`/leagues/${leagueId}/occupazione-rosa`, {
+    accessToken,
+  });
+}
+
+export function fetchTeamPlayersForTrade(
+  accessToken: string,
+  leagueId: string,
+  teamId: string,
+): Promise<TeamRosterPlayer[]> {
+  return apiRequest<TeamRosterPlayer[]>(`/leagues/${leagueId}/squadre/${teamId}/giocatori`, {
     accessToken,
   });
 }

@@ -110,6 +110,21 @@ export interface LeagueMember {
   joinedAt: string;
 }
 
+/** Classifica lega persistita (EP07-06 / FR-CLS-01). */
+export interface LeagueStanding {
+  fantasyTeamId: string;
+  teamName: string;
+  position: number;
+  played: number;
+  won: number;
+  drawn: number;
+  lost: number;
+  fantasyGoalsFor: number;
+  fantasyGoalsAgainst: number;
+  points: number;
+  computedAt: string;
+}
+
 export type LeagueInviteStatus = "active" | "expired" | "revoked";
 
 export interface CreateLeagueInviteRequest {
@@ -364,6 +379,15 @@ export interface RosterOccupancyEntry {
   athleteId: string;
   fantasyTeamId: string;
   teamName: string;
+  athleteName?: string | null;
+  slotIndex: number;
+  purchaseCredits: number | null;
+}
+
+/** Giocatori in rosa di una squadra, per proposte di scambio. */
+export interface TeamRosterPlayer {
+  athleteId: string;
+  athleteName: string;
   slotIndex: number;
   purchaseCredits: number | null;
 }

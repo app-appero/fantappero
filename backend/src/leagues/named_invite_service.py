@@ -229,10 +229,15 @@ class NamedLeagueInviteService:
         )
         if result.rowcount:
             self._session.commit()
+        # Solo inviti ancora actionable: accettati/rifiutati/scaduti/revocati
+        # non devono riapparire nella inbox dopo un refresh.
         invites = list(
             self._session.scalars(
                 select(NamedLeagueInvite)
-                .where(NamedLeagueInvite.recipient_id == user.id)
+                .where(
+                    NamedLeagueInvite.recipient_id == user.id,
+                    NamedLeagueInvite.status == NamedInviteStatus.PENDING,
+                )
                 .options(
                     selectinload(NamedLeagueInvite.league),
                     selectinload(NamedLeagueInvite.recipient).selectinload(User.profile),

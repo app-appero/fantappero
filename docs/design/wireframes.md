@@ -12,7 +12,7 @@ Wireframe responsive navigabili nella web app per validare struttura e gerarchia
 | Rosa | `/rosa` | M2 | Partecipante, Admin lega |
 | Formazione | `/formazione` | M2 | Partecipante |
 | Turno + Risultati | `/turni` (tab) | M2, M3 | Partecipante |
-| Classifica | `/classifica` | M3 | Partecipante |
+| Classifica | `/classifica` | M3 | Partecipante — pagina reale EP07-06 (wireframe solo in demo `?persona=`) |
 | Asta | `/asta` | M3 | Partecipante, Admin lega |
 | Mercato | `/mercato` | M3 | Partecipante, Admin lega |
 

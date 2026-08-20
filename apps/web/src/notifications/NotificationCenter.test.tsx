@@ -104,7 +104,8 @@ describe("NotificationCenter (EP09-01)", () => {
     await flushAsync();
 
     const panel = container.querySelector('[data-testid="notification-panel"]');
-    expect(panel?.querySelector('[data-ui-state="empty"]')).not.toBeNull();
+    expect(panel?.querySelector('[data-testid="notification-empty"]')).not.toBeNull();
+    expect(panel?.textContent).toContain("Nessuna notifica");
   });
 
   it("error state: shows the error panel when the list fails to load", async () => {
@@ -118,7 +119,7 @@ describe("NotificationCenter (EP09-01)", () => {
     await flushAsync();
 
     const panel = container.querySelector('[data-testid="notification-panel"]');
-    expect(panel?.querySelector('[data-ui-state="error"]')).not.toBeNull();
+    expect(panel?.querySelector('[data-testid="notification-error"]')).not.toBeNull();
   });
 
   it("clicking an unread item marks it read and closes the panel", async () => {
