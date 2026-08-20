@@ -14,6 +14,7 @@ from admin.router import router as admin_router
 from ai_assistant.router import feedback_router as ai_assistant_feedback_router
 from ai_assistant.router import router as ai_assistant_router
 from app.deps_health import aggregate_health
+from app.security_middleware import install_range_header_guard
 from auth.exceptions import AuthError
 from auth.profile_router import router as profile_router
 from auth.router import router as auth_router
@@ -60,10 +61,19 @@ app = FastAPI(
     lifespan=lifespan,
 )
 install_correlation_middleware(app)
+install_range_header_guard(app)
+# EP12-04 security review: auth is Bearer-token-only (no Set-Cookie anywhere in
+# backend/src, verified by grep), so the browser never needs to send/receive
+# ambient credentials for this API. allow_credentials=False makes the wildcard
+# origin safe again (the browser will simply refuse to expose a credentialed
+# response to a wildcard-origin API, but we never ask for credentialed
+# requests in the first place) instead of restricting to a per-environment
+# origin allowlist that would need new configuration to keep in sync with
+# apps/web + apps/mobile across dev/staging/prod.
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_credentials=True,
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )

@@ -227,6 +227,121 @@ jobs:
           retention-days: 14
 
   # ---------------------------------------------------------------------------
+  # Required — SAST (EP12-04 security review)
+  #
+  # bandit is pure static analysis of the current tree: deterministic, fast
+  # (~seconds), no external network calls whose result can drift between runs
+  # of the same commit. That determinism is why this is a blocking gate job
+  # (unlike e2e-critical-flow above, which is informative because of real
+  # browser/Docker Compose flakiness). `-ll` fails the build only on
+  # medium/high severity — today's 48 low-severity `assert`/`try-except-pass`
+  # findings are accepted code-style patterns (see
+  # docs/operations/beta_readiness/ep12-04_security_review.md), not
+  # vulnerabilities; a real medium/high finding still fails CI.
+  # ---------------------------------------------------------------------------
+  python-sast:
+    name: Python SAST (bandit)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/pyproject.toml
+
+      - name: Install bandit
+        run: python -m pip install "bandit==1.9.4"
+
+      - name: Bandit scan (backend/src, medium+ severity fails the build)
+        working-directory: backend
+        run: python -m bandit -r src -ll
+
+  # ---------------------------------------------------------------------------
+  # Required — secret scanning (EP12-04 security review)
+  #
+  # Deterministic pattern-match over tracked history, same reasoning as
+  # python-sast above: fast, no external drift, safe to block merges.
+  # ---------------------------------------------------------------------------
+  secret-scan:
+    name: Secret scan (gitleaks)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout (full history)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # ---------------------------------------------------------------------------
+  # Informative — dependency audit (EP12-04 security review)
+  #
+  # pip-audit / pnpm audit query external vulnerability databases (PyPA
+  # advisory DB, npm/GHSA advisories) that change independently of this
+  # repo's code — a newly disclosed CVE in an already-pinned, untouched
+  # dependency can flip this job from green to red between two runs of the
+  # *same* commit. Blocking ci-success on that would stop unrelated merges
+  # for a problem the PR didn't introduce and can't fix by itself. Kept
+  # informative (continue-on-error) and running on every push so findings are
+  # visible immediately; revisit once there's a documented waiver/triage
+  # process for accepting a dependency risk without unpinning it same-day.
+  # ---------------------------------------------------------------------------
+  dependency-audit:
+    name: Dependency audit (pip-audit + pnpm audit, informative)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    continue-on-error: true
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/pyproject.toml
+
+      - name: Install backend (dev) + pip-audit
+        run: |
+          python -m pip install -e "./backend[dev]"
+          python -m pip install pip-audit
+
+      - name: pip-audit (backend dependencies)
+        run: python -m pip_audit
+
+      - name: Set up pnpm
+        if: always()
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.0
+
+      - name: Set up Node
+        if: always()
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Install JS dependencies
+        if: always()
+        run: pnpm install --frozen-lockfile
+
+      - name: pnpm audit (JS/TS dependencies)
+        if: always()
+        run: pnpm audit
+
+  # ---------------------------------------------------------------------------
   # Aggregate required status (use this as the single branch-protection check)
   # ---------------------------------------------------------------------------
   ci-success:
@@ -240,6 +355,8 @@ jobs:
       - js-test
       - js-build
       - migrations
+      - python-sast
+      - secret-scan
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -254,6 +371,8 @@ jobs:
             [js-test]="${{ needs.js-test.result }}"
             [js-build]="${{ needs.js-build.result }}"
             [migrations]="${{ needs.migrations.result }}"
+            [python-sast]="${{ needs.python-sast.result }}"
+            [secret-scan]="${{ needs.secret-scan.result }}"
           )
           failed=0
           for job in "${!results[@]}"; do
