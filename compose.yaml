@@ -378,6 +378,188 @@ services:
       retries: 10
       start_period: 45s
 
+  # --- Isolated capacity environment (EP12-03, profile: performance) ---
+  # No service below connects to postgres/redis from the dev or pilot stack.
+  # Database and broker use container-local tmpfs and disappear with the
+  # dedicated containers; the seeder independently verifies host + DB name.
+  postgres-perf:
+    profiles: ["performance"]
+    image: postgres:16-alpine
+    container_name: fantappero-postgres-perf
+    environment:
+      POSTGRES_USER: fantappero_perf
+      POSTGRES_PASSWORD: fantappero_perf_local_only
+      POSTGRES_DB: fantappero_performance
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U fantappero_perf -d fantappero_performance"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+      start_period: 5s
+
+  redis-perf:
+    profiles: ["performance"]
+    image: redis:7-alpine
+    container_name: fantappero-redis-perf
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    tmpfs:
+      - /data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+      start_period: 3s
+
+  api-perf:
+    profiles: ["performance"]
+    build:
+      context: .
+      dockerfile: infra/local/Dockerfile
+    image: fantappero-backend:local
+    container_name: fantappero-api-perf
+    restart: "no"
+    command:
+      [
+        "uvicorn",
+        "app.main:app",
+        "--host",
+        "0.0.0.0",
+        "--port",
+        "8001",
+        "--workers",
+        "${PERF_API_WORKERS:-4}",
+      ]
+    environment:
+      FANTAPPERO_ENV: development
+      LOG_LEVEL: WARNING
+      DATABASE_URL: postgresql://fantappero_perf:fantappero_perf_local_only@postgres-perf:5432/fantappero_performance
+      REDIS_URL: redis://redis-perf:6379/0
+      CELERY_BROKER_URL: redis://redis-perf:6379/0
+      CELERY_RESULT_BACKEND: redis://redis-perf:6379/1
+      JWT_SECRET_KEY: fantappero_performance_jwt_local_only
+      WEB_APP_BASE_URL: http://performance.invalid
+      AVATAR_STORAGE_PATH: /tmp/performance-avatars
+      PROFILE_POLICY_VERSION: 2026-01
+      SPORTS_SCHEDULER_ENABLED: "false"
+      FANTASY_TURNS_AUTO_GENERATE_ENABLED: "false"
+      NOTIFICATIONS_LINEUP_REMINDER_ENABLED: "false"
+      PERFORMANCE_SEED_CONFIRM: isolated-performance-only
+      # k6 setup authenticates 20 synthetic accounts before each scenario.
+      # This override exists only on the disposable performance API; ordinary
+      # dev/pilot services retain the secure default of 5 attempts/minute.
+      AUTH_RATE_LIMIT_LOGIN_PER_MINUTE: ${PERF_AUTH_LOGIN_BURST:-50}
+    ports:
+      - "${PERF_API_PORT:-8004}:8001"
+    tmpfs:
+      - /tmp/performance-avatars
+    depends_on:
+      postgres-perf:
+        condition: service_healthy
+      redis-perf:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8001/ready >/dev/null"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+      start_period: 10s
+
+  worker-perf:
+    profiles: ["performance"]
+    image: fantappero-backend:local
+    container_name: fantappero-worker-perf
+    restart: "no"
+    command:
+      [
+        "celery",
+        "-A",
+        "app.worker.celery_app",
+        "worker",
+        "--loglevel=WARNING",
+        "--concurrency=${PERF_WORKER_CONCURRENCY:-2}",
+      ]
+    environment:
+      FANTAPPERO_ENV: development
+      LOG_LEVEL: WARNING
+      DATABASE_URL: postgresql://fantappero_perf:fantappero_perf_local_only@postgres-perf:5432/fantappero_performance
+      REDIS_URL: redis://redis-perf:6379/0
+      CELERY_BROKER_URL: redis://redis-perf:6379/0
+      CELERY_RESULT_BACKEND: redis://redis-perf:6379/1
+      SPORTS_SCHEDULER_ENABLED: "false"
+      FANTASY_TURNS_AUTO_GENERATE_ENABLED: "false"
+      NOTIFICATIONS_LINEUP_REMINDER_ENABLED: "false"
+      PERFORMANCE_SEED_CONFIRM: isolated-performance-only
+    depends_on:
+      postgres-perf:
+        condition: service_healthy
+      redis-perf:
+        condition: service_healthy
+      api-perf:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "celery -A app.worker.celery_app inspect ping -d celery@$$HOSTNAME | grep -q pong",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 15s
+
+  performance-seed:
+    profiles: ["performance"]
+    image: fantappero-backend:local
+    environment:
+      FANTAPPERO_ENV: development
+      LOG_LEVEL: WARNING
+      DATABASE_URL: postgresql://fantappero_perf:fantappero_perf_local_only@postgres-perf:5432/fantappero_performance
+      REDIS_URL: redis://redis-perf:6379/0
+      CELERY_BROKER_URL: redis://redis-perf:6379/0
+      CELERY_RESULT_BACKEND: redis://redis-perf:6379/1
+      JWT_SECRET_KEY: fantappero_performance_jwt_local_only
+      WEB_APP_BASE_URL: http://performance.invalid
+      AVATAR_STORAGE_PATH: /tmp/performance-avatars
+      PROFILE_POLICY_VERSION: 2026-01
+      SPORTS_SCHEDULER_ENABLED: "false"
+      FANTASY_TURNS_AUTO_GENERATE_ENABLED: "false"
+      NOTIFICATIONS_LINEUP_REMINDER_ENABLED: "false"
+      PERFORMANCE_SEED_CONFIRM: isolated-performance-only
+      PERF_TEST_PASSWORD: ${PERF_TEST_PASSWORD:-PerfBeta-Only-2026!}
+    volumes:
+      - type: bind
+        source: ./artifacts/performance
+        target: /artifacts
+    depends_on:
+      postgres-perf:
+        condition: service_healthy
+      redis-perf:
+        condition: service_healthy
+
+  k6:
+    profiles: ["performance"]
+    image: grafana/k6:0.54.0
+    environment:
+      PERF_BASE_URL: http://api-perf:8001
+      PERF_SEED_PATH: /artifacts/runtime/seed.json
+      PERF_OUTPUT_DIR: /artifacts/results
+    volumes:
+      - type: bind
+        source: ./tools/performance
+        target: /scripts
+        read_only: true
+      - type: bind
+        source: ./artifacts/performance
+        target: /artifacts
+    depends_on:
+      api-perf:
+        condition: service_healthy
+      worker-perf:
+        condition: service_healthy
+
   # --- Optional tools (profile: tools) ---
   adminer:
     profiles: ["tools"]

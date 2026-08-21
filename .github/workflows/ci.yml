@@ -504,6 +504,47 @@ jobs:
         run: docker compose down -v
 
   # ---------------------------------------------------------------------------
+  # Informative — EP12-03 isolated capacity smoke (k6 + Compose)
+  #
+  # The full steady/spike run is an operator gate because its numbers depend on
+  # runner capacity. CI only proves that the disposable stack, seed, Celery
+  # probes and k6 smoke remain executable; it is intentionally not in
+  # ci-success's `needs`.
+  # ---------------------------------------------------------------------------
+  performance-smoke:
+    name: Performance smoke (EP12-03, informative)
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      github.ref == 'refs/heads/claude/M5' ||
+      github.head_ref == 'claude/M5'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    continue-on-error: true
+    env:
+      PERF_USER_COUNT: "1"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run isolated capacity smoke
+        run: make performance-smoke
+
+      - name: Upload sanitized diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: performance-smoke-${{ github.run_id }}
+          path: artifacts/performance/results/
+          if-no-files-found: ignore
+          retention-days: 14
+
+      - name: Remove isolated performance services
+        if: always()
+        run: >-
+          docker compose --profile performance rm -sf
+          api-perf worker-perf postgres-perf redis-perf
+
+  # ---------------------------------------------------------------------------
   # Informative — do not block merge (continue-on-error)
   # ---------------------------------------------------------------------------
   ep00-extra-tests:

@@ -10,10 +10,11 @@ from zoneinfo import ZoneInfo
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import func, select
+from sqlalchemy import event, func, select
 from sqlalchemy.orm import Session
 from tests.integration.database.helpers import create_engine_for_url
 
+import auth.dependencies as auth_dependencies
 from database.enums import (
     FantasyRole,
     FantasyTurnKind,
@@ -228,6 +229,66 @@ def _lineup_payload(athletes: list[Athlete], module: str = "4-3-3") -> dict:
         "starterAthleteIds": starters,
         "benchAthleteIds": bench,
     }
+
+
+def _count_request_queries(call) -> tuple[object, int]:
+    engine = auth_dependencies._engine
+    assert engine is not None
+    count = 0
+
+    def _before_cursor_execute(*_args: object) -> None:
+        nonlocal count
+        count += 1
+
+    event.listen(engine, "before_cursor_execute", _before_cursor_execute)
+    try:
+        response = call()
+    finally:
+        event.remove(engine, "before_cursor_execute", _before_cursor_execute)
+    return response, count
+
+
+def test_full_roster_and_lineup_query_counts_are_bounded(
+    client: TestClient,
+    db_session: Session,
+    competition_ids: list[str],
+) -> None:
+    """Guard against reintroducing per-player listone/override queries."""
+    token, _ = _register_and_login(client, "lineup.query-budget@example.com")
+    league_id = _create_league(client, token, competition_ids, "Lega Query Budget")
+    grouped = _seed_roster_athletes(db_session, id_offset=2_390_000)
+    athletes = _fill_validated_roster(db_session, league_id, grouped)
+    fantasy_round, _clubs = _create_open_round(
+        db_session,
+        league_id,
+        cutoff=datetime.now(UTC) + timedelta(hours=4),
+        id_offset=2_395_000,
+        competition_ids=competition_ids,
+    )
+    headers = {"Authorization": f"Bearer {token}"}
+    saved = client.put(
+        f"/leagues/{league_id}/turni/{fantasy_round.id}/formazione",
+        headers=headers,
+        json=_lineup_payload(athletes),
+    )
+    assert saved.status_code == 200
+
+    roster, roster_queries = _count_request_queries(
+        lambda: client.get(f"/leagues/{league_id}/rosa", headers=headers)
+    )
+    lineup, lineup_queries = _count_request_queries(
+        lambda: client.get(
+            f"/leagues/{league_id}/turni/{fantasy_round.id}/formazione",
+            headers=headers,
+        )
+    )
+
+    assert roster.status_code == 200
+    assert roster.json()["filledSlots"] == 35
+    assert roster_queries <= 25
+    assert lineup.status_code == 200
+    assert len(lineup.json()["roster"]) == 35
+    assert lineup_queries <= 35
 
 
 def test_save_valid_module_and_reject_incompatible(

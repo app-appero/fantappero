@@ -98,3 +98,92 @@ def test_metrics_on_failed_job() -> None:
         )
         == 1.0
     )
+
+
+def test_prometheus_snapshot_escapes_labels_and_exports_histogram_parts() -> None:
+    metrics = get_metrics()
+    labels = {"route:name": '/leagues/{id}\n"quoted"'}
+    metrics.incr("requests-total", labels=labels, amount=2)
+    metrics.observe("duration.seconds", 0.25, labels=labels)
+    metrics.set_gauge("queue-depth", 3, labels={"queue": "celery"})
+
+    rendered = metrics.render_prometheus()
+
+    assert "# TYPE requests_total counter" in rendered
+    assert 'requests_total{route_name="/leagues/{id}\\n\\"quoted\\""} 2.0' in rendered
+    assert "duration_seconds_count" in rendered
+    assert "duration_seconds_sum" in rendered
+    assert "duration_seconds_max" in rendered
+    assert 'queue_depth{queue="celery"} 3' in rendered
+
+
+def test_prometheus_snapshot_declares_each_metric_family_once() -> None:
+    metrics = get_metrics()
+    metrics.incr("requests_total", labels={"status": "200"})
+    metrics.incr("requests_total", labels={"status": "404"})
+    metrics.observe("duration_seconds", 0.1, labels={"status": "200"})
+    metrics.observe("duration_seconds", 0.2, labels={"status": "404"})
+
+    rendered = metrics.render_prometheus()
+
+    assert rendered.count("# TYPE requests_total counter") == 1
+    assert rendered.count("# TYPE duration_seconds_count gauge") == 1
+    assert rendered.count("# TYPE duration_seconds_sum gauge") == 1
+    assert rendered.count("# TYPE duration_seconds_max gauge") == 1
+
+
+def test_metrics_use_route_template_instead_of_dynamic_identifier() -> None:
+    app = FastAPI()
+    install_correlation_middleware(app)
+
+    @app.get("/items/{item_id}")
+    def item(item_id: str) -> dict[str, str]:
+        return {"id": item_id}
+
+    response = TestClient(app).get("/items/abc-123")
+    assert response.status_code == 200
+    assert (
+        get_metrics().get_counter(
+            HTTP_REQUESTS_TOTAL,
+            labels={"method": "GET", "path": "/items/{item_id}", "status": "200"},
+        )
+        == 1.0
+    )
+
+
+def test_error_metrics_use_route_template_instead_of_dynamic_identifier() -> None:
+    app = FastAPI()
+    install_correlation_middleware(app)
+
+    @app.get("/items/{item_id}")
+    def broken_item(item_id: str) -> None:
+        raise RuntimeError(item_id)
+
+    response = TestClient(app, raise_server_exceptions=False).get("/items/abc-123")
+    assert response.status_code == 500
+    assert (
+        get_metrics().get_counter(
+            HTTP_REQUEST_ERRORS_TOTAL,
+            labels={
+                "method": "GET",
+                "path": "/items/{item_id}",
+                "error_type": "RuntimeError",
+            },
+        )
+        == 1.0
+    )
+
+
+def test_unmatched_paths_share_one_bounded_metric_label() -> None:
+    client = _app_with_routes()
+
+    assert client.get("/missing/first-id").status_code == 404
+    assert client.get("/missing/second-id").status_code == 404
+
+    assert (
+        get_metrics().get_counter(
+            HTTP_REQUESTS_TOTAL,
+            labels={"method": "GET", "path": "<unmatched>", "status": "404"},
+        )
+        == 2.0
+    )

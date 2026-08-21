@@ -29,6 +29,7 @@ from fantasy_teams.composition_service import (
     assert_assignment_respects_role_quota,
     evaluate_team_composition,
     resolve_effective_athlete_role,
+    resolve_effective_athlete_roles,
     resolve_league_rules_limits,
     sync_team_composition_status,
 )
@@ -119,9 +120,7 @@ from observability.context import get_correlation_id
 from observability.logging import get_logger
 from observability.metrics import get_metrics
 from sports_data.catalog.models import Club
-from sports_data.listone.generate import get_role_assignment
 from sports_data.listone.models import RoleAssignment
-from sports_data.listone.overrides import effective_role_for_athlete, get_active_override
 from sports_data.roster.models import Athlete
 
 logger = get_logger(__name__)
@@ -1716,8 +1715,35 @@ class FantasyTeamService:
         roster_size = resolve_roster_size(self._session, team.league_id)
         league = self._session.get(League, team.league_id)
         season_year = league.season_year if league is not None else 0
+        athlete_ids = [slot.athlete_id for slot in team.slots if slot.athlete_id is not None]
+        effective_roles = resolve_effective_athlete_roles(
+            self._session,
+            league_id=team.league_id,
+            athlete_ids=athlete_ids,
+            season_year=season_year,
+        )
+        club_ids = {item.club_id for item in effective_roles.values() if item.club_id is not None}
+        club_names = (
+            dict(
+                self._session.execute(select(Club.id, Club.name).where(Club.id.in_(club_ids))).all()
+            )
+            if club_ids
+            else {}
+        )
         slots = [
-            self._to_slot_response(slot, season_year=season_year)
+            self._to_slot_response(
+                slot,
+                role=(
+                    effective_roles[slot.athlete_id].role.value
+                    if slot.athlete_id in effective_roles
+                    else None
+                ),
+                club_name=(
+                    club_names.get(effective_roles[slot.athlete_id].club_id)
+                    if slot.athlete_id in effective_roles
+                    else None
+                ),
+            )
             for slot in sorted(team.slots, key=lambda row: row.slot_index)
         ]
         filled = sum(1 for slot in slots if slot.athlete_id is not None)
@@ -1728,6 +1754,7 @@ class FantasyTeamService:
                 team,
                 league=league,
                 require_complete=False,
+                effective_roles=effective_roles,
             )
         composition_payload = (
             self._composition_response(team, report) if report is not None else None
@@ -1752,30 +1779,9 @@ class FantasyTeamService:
         self,
         slot: FantasyRosterSlot,
         *,
-        season_year: int,
+        role: str | None,
+        club_name: str | None,
     ) -> FantasyRosterSlotResponse:
-        club_name: str | None = None
-        role: str | None = None
-        if slot.athlete_id is not None:
-            assignment = get_role_assignment(
-                self._session,
-                athlete_id=slot.athlete_id,
-                season_year=season_year,
-            )
-            if assignment is not None:
-                override = get_active_override(
-                    self._session,
-                    league_id=slot.league_id,
-                    athlete_id=slot.athlete_id,
-                )
-                role = effective_role_for_athlete(
-                    official_role=assignment.role,
-                    override=override,
-                    current_round=0,
-                ).value
-                if assignment.club_id is not None:
-                    club = self._session.get(Club, assignment.club_id)
-                    club_name = club.name if club is not None else None
         return FantasyRosterSlotResponse(
             id=str(slot.id),
             slotIndex=slot.slot_index,

@@ -13,12 +13,14 @@ BASH ?= bash
 	dev-api dev-web dev-mobile \
 	up up-tools down logs health reset-local smoke-local \
 	backup backup-service backup-logs dr-restore-test \
+	performance-smoke performance-test \
 	test test-api test-js lint format typecheck build \
 	check-migrations migrate migrate-down migrate-check quality smoke help
 
 help:
 	@echo "Targets: setup | up | down | logs | health | reset-local | smoke-local |"
 	@echo "         backup | backup-service | backup-logs | dr-restore-test |"
+	@echo "         performance-smoke | performance-test |"
 	@echo "         dev-api | dev-web | dev-mobile | test | lint | format | typecheck |"
 	@echo "         build | migrate | migrate-check | check-migrations | quality | smoke"
 
@@ -69,6 +71,14 @@ backup-logs:
 
 dr-restore-test:
 	ENV_FILE=$(ENV_FILE) $(BASH) infra/scripts/dr_restore_drill.sh
+
+# --- Performance / capacity (EP12-03, disposable isolated stack) ---
+
+performance-smoke:
+	$(BASH) infra/scripts/run_performance_test.sh smoke
+
+performance-test:
+	$(BASH) infra/scripts/run_performance_test.sh full
 
 dev-api:
 	cd backend && python -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8001

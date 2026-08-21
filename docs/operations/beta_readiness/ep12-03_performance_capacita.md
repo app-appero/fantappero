@@ -1,5 +1,19 @@
 # EP12-03 — Performance e capacità
 
+## Stato implementazione (branch `claude/M5`)
+
+**Implementazione e prove tecniche completate il 2026-08-21; pronta per review.** È stato
+integrato k6 0.54 in un profilo Docker Compose isolato, con seed derivato dallo scenario
+EP12-01, carico smoke/steady/spike/recovery, benchmark Celery, metriche Prometheus minime,
+campionamento risorse API/PostgreSQL/worker e guardrail che rifiutano database diversi da
+`postgres-perf/fantappero_performance`. Il full run finale ha prodotto 0% errori, steady
+p95 276,12 ms a 155,02 req/s e recovery p95 605,97 ms.
+
+I budget numerici nel [runbook di capacità](../performance_capacity.md) sono una
+**baseline Beta proposta e congelata prima del run finale**, non SLO già approvati. Serve
+ratifica esplicita del team prima del gate EP12-07. Evidenza sintetica, priva di segreti:
+[report 2026-08-21](../evidence/ep12-03_capacity_2026-08-21.md).
+
 | Metadato | Valore |
 | --- | --- |
 | Card | EP12-03 |
@@ -12,7 +26,9 @@
 Misurare API, DB, worker, aggiornamenti live e picchi di carico; definire SLO Beta e
 rispettarli sul carico concordato, con piano, dati di test, responsabile ed evidenze.
 
-## Stato attuale nel repo (gap)
+## Ricognizione iniziale (gap ora chiusi)
+
+Questi erano i gap rilevati prima dell'implementazione; restano qui per tracciabilità.
 
 - **Nessun tool di load testing** presente (né k6, né locust, né altro) in `tools/`,
   `backend/`, o alla radice.
@@ -84,14 +100,17 @@ rispettarli sul carico concordato, con piano, dati di test, responsabile ed evid
 - Test di integrazione e regressione sui casi limite (picco improvviso, worker saturo,
   degrado e recupero).
 
-## Rischi e domande aperte
+## Rischi e decisioni residue
 
-- **Gli SLO Beta non sono ancora definiti da nessuna parte**: prima di poter dire "SLO
-  rispettati" serve una decisione esplicita del team sui valori target (non deducibile
-  dal codice). Questo documento propone la struttura, non i numeri.
-- L'assenza di metriche esportabili è un gap reale: va deciso se per la Beta basta un
-  report puntuale del test di carico o se serve investire in un backend di metriche
-  osservabile in continuo (rimandabile a dopo la Beta se non bloccante).
-- `worker: --concurrency=1` in `compose.yaml` è un vincolo dell'ambiente locale; il test
-  di carico deve essere esplicito su quale concorrenza worker sta effettivamente
-  misurando, per non produrre numeri fuorvianti.
+- Ratificare con il team i budget Beta proposti; il report dimostra la baseline tecnica,
+  non sostituisce la decisione di prodotto/operations.
+- `/metrics` è process-local: con i quattro worker Uvicorn ogni scrape vede un singolo
+  processo, non un aggregato. I gate HTTP derivano esclusivamente da k6.
+- Il worker usa concorrenza 2 nel profilo performance. Il benchmark copre coda/broker e
+  invocazione di task reali, ma `ensure_upcoming` non ha trovato lavoro da creare e il
+  poll live è stato correttamente saltato perché il provider è disabilitato.
+- Non esiste oggi un canale SSE/WebSocket né un trigger HTTP rappresentativo per update
+  live: nessuna copertura live end-to-end viene dichiarata.
+- Il trust incondizionato di `X-Forwarded-For`, scoperto durante il diagnostico, è stato
+  corretto e coperto da test dinamico in EP12-04. Il benchmark non usa header sintetici;
+  solo `api-perf` alza esplicitamente il limite login per il setup.

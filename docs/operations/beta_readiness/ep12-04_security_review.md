@@ -10,13 +10,19 @@
 ## Stato implementazione (branch `claude/M5`)
 
 **Eseguita interamente** (dependency audit, SAST, secret scan, review manuale OWASP,
-test dinamico di bypass autorizzazione, job CI). **Aggiornamento sessione successiva**:
+test dinamico di bypass autorizzazione, job CI). **Aggiornamento EP12-03 (2026-08-21)**:
+il load test ha riaperto la review sul rate limit login: `get_client_ip()` accettava
+`X-Forwarded-For` da qualunque client e permetteva di cambiare arbitrariamente la chiave
+del contatore. Il nuovo finding Medio #19 è stato corretto ignorando gli header inoltrati
+nell'applicazione e affidandosi esclusivamente al peer già normalizzato dall'ASGI server
+per proxy esplicitamente fidati; un test dinamico verifica il 429 anche variando XFF.
+I risultati della chiusura precedente restano validi per gli altri finding.
+**Aggiornamento sessione successiva**:
 entrambi i finding Alti sono stati chiusi su decisione esplicita del responsabile della
 card (vedi #5 e #6 sotto) — **nessun finding Alto resta aperto**. Il finding Medio
 residuo (#7, header di sicurezza HTTP) è stato **accettato come rischio per la Beta**
 su decisione esplicita del responsabile della card (stessa sessione di chiusura dei
-finding Alti) — vedi dettaglio sotto. **Card EP12-04 chiusa**: nessun finding Alto o
-Medio resta senza una decisione registrata.
+finding Alti) — vedi dettaglio sotto. La breve riapertura sul finding #19 è ora chiusa.
 
 ### Riepilogo finding
 
@@ -40,6 +46,7 @@ Medio resta senza una decisione registrata.
 | 16 | Upload avatar (tipo/dimensione/path traversal) | — | Verificato, nessun finding |
 | 17 | Privacy/GDPR (`auth/privacy_service.py`) | — | Coperto da test esistenti, verificati verdi |
 | 18 | Redazione log PII/segreti | — | Verificato agganciato globalmente, nessun finding |
+| 19 | Trust incondizionato di `X-Forwarded-For` nel rate limit login | Media | **Corretto — peer ASGI trusted-only + test dinamico** |
 
 ### 1. Dependency audit — Python (`pip-audit`)
 
@@ -253,8 +260,17 @@ sync sportiva (`sports_data/quality/router.py`) richiede `Permission.GLOBAL_OPER
 (non pubblico → nessun bisogno di rate limit dedicato); gli endpoint AI assistente
 (viceallenatore/osservatore/analista, `ai_assistant/router.py`) applicano una **quota
 giornaliera per utente** (`_check_quota`/`billing.entitlement_service`) che funge da
-rate limit funzionale. **Nessun finding** — l'ipotesi di gap del piano non è confermata
-dalla verifica puntuale.
+rate limit funzionale. La copertura degli endpoint è confermata, ma l'assunzione sulla
+provenienza dell'IP non lo è: `auth.dependencies.get_client_ip()` usa il primo valore di
+`X-Forwarded-For` senza verificare che la richiesta provenga da un reverse proxy
+fidato. Durante EP12-03 è bastato cambiare tale header per aggirare il limite
+`5/min/IP`. **Finding #19 (Medio, corretto)**: `get_client_ip()` usa ora soltanto
+`request.client`, che Uvicorn può riscrivere esclusivamente per i proxy configurati in
+`FORWARDED_ALLOW_IPS`; l'app non interpreta più direttamente XFF. Il test dinamico
+`test_login_rate_limit_ignores_client_supplied_forwarded_for` invia sei tentativi con
+sei header diversi e verifica comunque il 429 finale. Il benchmark non sfrutta il bypass:
+solo `api-perf` usa un limite esplicitamente alzato per il burst di setup, mentre lo stack
+ordinario conserva il default 5/minuto.
 
 **Privacy/GDPR** (`backend/src/auth/privacy_service.py`, `privacy_validators.py`) —
 review leggera, appoggiata alla suite test esistente e dedicata

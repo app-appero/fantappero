@@ -48,3 +48,10 @@ def test_ready_ok_without_deps(monkeypatch) -> None:
     assert body["status"] == "ok"
     assert body["probe"] == "ready"
     assert body["checks"]["postgres"]["status"] == "skipped"
+
+
+def test_metrics_endpoint_is_prometheus_text() -> None:
+    response = client.get("/metrics")
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("text/plain")
+    assert "http_requests_total" in response.text

@@ -56,7 +56,7 @@ from fantasy_lineups.validators import (
     validate_athlete_id_list,
     validate_module_code,
 )
-from fantasy_teams.composition_service import resolve_effective_athlete_role
+from fantasy_teams.composition_service import resolve_effective_athlete_roles
 from fantasy_teams.factory import ensure_team_for_membership, find_team_for_membership
 from fantasy_teams.models import FantasyTeam
 from fantasy_turns.models import FantasyRound, FantasyRoundFixture
@@ -644,22 +644,27 @@ class FantasyLineupService:
         self._session.flush()
 
     def _roster_rows(self, season_year: int, team: FantasyTeam) -> list[_RosterRow]:
+        athlete_ids = [
+            slot.athlete_id
+            for slot in team.slots
+            if slot.athlete_id is not None and slot.athlete is not None
+        ]
+        effective_roles = resolve_effective_athlete_roles(
+            self._session,
+            league_id=team.league_id,
+            athlete_ids=athlete_ids,
+            season_year=season_year,
+        )
         rows: list[_RosterRow] = []
         for slot in sorted(team.slots, key=lambda item: item.slot_index):
             if slot.athlete_id is None or slot.athlete is None:
                 continue
-            role = resolve_effective_athlete_role(
-                self._session,
-                league_id=team.league_id,
-                athlete_id=slot.athlete_id,
-                season_year=season_year,
-                current_round=0,
-            )
+            resolved = effective_roles.get(slot.athlete_id)
             rows.append(
                 _RosterRow(
                     athlete_id=slot.athlete_id,
                     athlete_name=slot.athlete.canonical_name,
-                    role=role,
+                    role=resolved.role if resolved is not None else None,
                     slot_index=slot.slot_index,
                 )
             )

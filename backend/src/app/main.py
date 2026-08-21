@@ -7,7 +7,7 @@ from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 
 from admin.router import router as admin_router
@@ -35,6 +35,7 @@ from notifications.router import router as notifications_router
 from observability.error_tracking import configure_error_tracking
 from observability.health import as_readiness, liveness
 from observability.logging import configure_logging
+from observability.metrics import get_metrics
 from observability.middleware import install_correlation_middleware
 from sports_data.quality.retry import QualityRetryError
 from sports_data.quality.router import quality_error_handler
@@ -156,3 +157,12 @@ def health() -> JSONResponse:
     """
     status_code, body = as_readiness(*aggregate_health())
     return JSONResponse(status_code=status_code, content=body)
+
+
+@app.get("/metrics", include_in_schema=False)
+def metrics() -> PlainTextResponse:
+    """Dependency-free Prometheus snapshot for Beta operations/load tests."""
+    return PlainTextResponse(
+        get_metrics().render_prometheus(),
+        media_type="text/plain; version=0.0.4",
+    )
