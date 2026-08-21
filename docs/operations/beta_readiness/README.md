@@ -5,9 +5,9 @@ Questa cartella raccoglie la pianificazione dettagliata delle 7 card dell'Epic E
 milestone (M5) prevista dal pacchetto `docs/doc_fantapperò/FantAppero_Pacchetto_Completo_M0.5-M5_v0.3/`.
 
 **Stato aggiornato al 2026-08-21 sul branch `claude/M5`**: EP12-01…06 sono implementate,
-validate e accompagnate dalle rispettive evidenze. EP12-07 resta l'ultima card: l'agente può
-predisporre processo, KPI, checklist e template, ma onboarding, osservazione delle leghe
-reali e decisione go/no-go richiedono il team nel tempo.
+validate e accompagnate dalle rispettive evidenze. Per EP12-07 il pacchetto operativo e
+il dry-run interno sono predisposti; il pilot reale (onboarding e osservazione delle
+leghe), la misura dei KPI e la decisione go/no-go richiedono ancora il team nel tempo.
 
 ## Stato corrente
 
@@ -19,7 +19,7 @@ reali e decisione go/no-go richiedono il team nel tempo.
 | EP12-04 | completata | finding e prove nella [security review](./ep12-04_security_review.md) |
 | EP12-05 | completata | [`ep12-05_restore_drill_2026-08-21.md`](../evidence/ep12-05_restore_drill_2026-08-21.md) |
 | EP12-06 | completata | [`ep12-06_runbook_simulations_2026-08-21.md`](../evidence/ep12-06_runbook_simulations_2026-08-21.md) |
-| EP12-07 | da predisporre/eseguire | processo e gate ancora da implementare; pilot reale umano |
+| EP12-07 | pacchetto predisposto; pilot pendente | [processo e gate](../beta_pilot_gate.md), [dry-run](../evidence/ep12-07_internal_dry_run_2026-08-21.md); criteri reali/decisione non ancora misurati |
 
 ## Precondizione: Epic Must (M1–M4)
 
@@ -73,10 +73,9 @@ pianificazione EP12) ed è segnalato come rischio comune a tutte le card in cias
    concorrenza già noti).
 6. **EP12-06** (runbook) — completata tecnicamente dopo EP12-04/05; ruoli, canali e
    cutover deployment-specifico devono essere confermati prima del pilot.
-7. **EP12-07** (pilot e gate Beta) — prossimo e ultimo, è il gate complessivo. **Non interamente
-   implementabile da un agente**: richiede onboarding di leghe/utenti reali nel tempo. Il
-   relativo piano definisce processo, KPI, checklist e template di decisione, non
-   l'esecuzione del pilot stesso.
+7. **EP12-07** (pilot e gate Beta) — pacchetto tecnico/procedurale e tabletop completati.
+   **Non interamente implementabile da un agente**: richiede onboarding di leghe/utenti
+   reali nel tempo. Criteri misurati e decisione firmata restano pendenti.
 
 ## Criteri di gate complessivo "Beta chiusa" (da EP12-07)
 

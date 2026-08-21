@@ -1,5 +1,29 @@
 # EP12-07 — Pilot e gate Beta chiusa
 
+## Stato implementazione (branch `claude/M5`)
+
+**Pacchetto operativo predisposto e dry-run interno completato il 2026-08-21; pilot
+reale, KPI osservati e decisione finale ancora umani e pendenti.**
+
+- [Processo pilot e gate Beta](../beta_pilot_gate.md): criteri di ammissione, proposta
+  3–5 leghe con 6–12 partecipanti per lega, durata minima 28 giorni e 4 turni, onboarding,
+  aspettative/privacy, ruoli, KPI con sorgenti reali e soglie da ratificare.
+- [Registro manuale privacy-safe](../templates/ep12-07_pilot_register.csv) e
+  [template GO/NO-GO con remediation](../templates/ep12-07_gate_decision.md).
+- Checklist tracciabile EP12-01…06 e Must M1–M4; EP12-03 è distinto fra capacità
+  controllata e comportamento reale, EP12-05 fra restore tecnico isolato e RTO
+  end-to-end, EP12-06 fra proposte operative e ruoli/canali approvati.
+- `infra/scripts/verify_beta_pilot_gate.py` valida senza dipendenze schema, link,
+  placeholder obbligatori, alias/timestamp/sorgenti e calcola il solo caso sintetico.
+- [Evidenza del tabletop](../evidence/ep12-07_internal_dry_run_2026-08-21.md): un caso
+  senza misura produce NO-GO; dopo remediation il dataset interamente sintetico produce
+  GO simulato.
+
+La card **non soddisfa ancora** il criterio “criteri di uscita misurati e decisione
+registrata”: prima degli inviti il team deve assegnare persone/canali, ratificare
+protocollo e soglie, completare i gate deployment/privacy; poi deve eseguire il pilot
+reale nel tempo e firmare GO o NO-GO. Il tabletop non sostituisce questi passi.
+
 | Metadato | Valore |
 | --- | --- |
 | Card | EP12-07 |
@@ -21,22 +45,21 @@ decisione di business/prodotto. Il contributo possibile in una sessione di lavor
 tecnico è limitato a: **predisporre il processo, gli strumenti di misura e i template di
 decisione**, non a eseguire il pilot.
 
-## Stato attuale nel repo (gap)
+## Ricognizione iniziale (gap tecnici ora coperti)
 
-- Nessun processo di onboarding pilota documentato.
-- Nessuna definizione di KPI Beta in nessun documento esistente.
-- Nessun template/documento di decisione go/no-go.
-- Le altre 6 card EP12 (di cui questa è il gate) non sono ancora implementate: questa
-  card **non può essere completata** finché EP12-01…06 non producono le rispettive
-  evidenze.
+- Il processo di onboarding, i KPI Beta e il template decisionale mancavano: sono ora
+  disponibili negli artefatti collegati nello stato implementazione.
+- EP12-01…06 dispongono ora di implementazione/evidenze collegate. Restano da ratificare
+  per l'ambiente reale i valori proposti e i blocchi organizzativi/deployment esplicitati
+  da EP12-06 e dal processo pilot.
+- Onboarding reale, osservazione nel tempo, feedback umano e decisione di business non
+  sono simulabili né dichiarati conclusi dal repository.
 
 ## Piano d'azione
 
-1. **Definire i criteri di ammissione al pilot**: quante leghe, quanti utenti per lega,
-   durata minima di osservazione, requisiti tecnici minimi già soddisfatti (tipicamente:
-   EP12-01…06 con evidenze verdi) prima di invitare utenti reali.
-2. **Definire i KPI Beta da raccogliere durante il pilot** (proposta di categorie, valori
-   soglia da confermare col team):
+1. **Coperto — criteri di ammissione**: dimensione, durata e requisiti tecnici sono nel
+   processo pilot; valori e responsabili restano da ratificare prima degli inviti.
+2. **Coperto — KPI Beta** (categorie, formule, fonti e soglie proposte):
    - Affidabilità: tasso di errore percepito, incidenti aperti (da runbook EP12-06),
      rispetto SLO (da EP12-03).
    - Adozione/usabilità: completamento del flusso critico (stesso flusso testato in
@@ -45,52 +68,46 @@ decisione**, non a eseguire il pilot.
      EP12-04).
    - Recuperabilità: eventuali interventi di backup/restore richiesti durante il pilot e
      relativo tempo di risoluzione (collegato a EP12-05).
-3. **Predisporre uno strumento di raccolta KPI**: valutare se riusare le metriche
-   in-process già esistenti (`backend/src/observability/metrics.py`) più un log
-   strutturato di eventi di prodotto (nuova istrumentazione minima, da definire in fase
-   di implementazione), oppure una raccolta manuale/survey per la parte qualitativa
-   (feedback utenti) — decisione da prendere in fase di implementazione, non qui.
-4. **Definire il processo di selezione e comunicazione con le leghe pilota** (chi le
-   invita, materiale di onboarding, canale di supporto — riusa il processo di supporto
-   definito in EP12-06).
-5. **Creare il template di decisione go/no-go**: criteri di uscita misurabili (soglie sui
-   KPI del punto 2), formato del report finale, chi ha autorità di decisione, cosa succede
-   in caso di no-go (remediation e nuovo tentativo, o rollback).
-6. **Eseguire il pilot** (fuori scope di un'agente: richiede tempo reale e utenti reali) e
-   **registrare la decisione finale** usando il template del punto 5.
+3. **Coperto — raccolta KPI**: scelto un registro CSV manuale con fonti reali e survey
+   aggregata. Non è stata inventata un'integrazione analytics; le metriche in-process
+   restano soltanto diagnostiche e non sono usate come aggregato autorevole.
+4. **Coperto proceduralmente — selezione e comunicazione**: sequenza, contenuto minimo e
+   riuso del supporto EP12-06 sono documentati; persone, canali e testo privacy sono
+   ancora scelte umane bloccanti.
+5. **Coperto — template decisionale**: GO/NO-GO, evidenze, autorità, remediation e retest
+   sono predisposti e verificati con dati sintetici.
+6. **Pendente umano — eseguire il pilot e registrare la decisione finale**: richiede
+   tempo reale, utenti reali e firma del decision owner.
 
-## Tooling proposto
+## Tooling implementato
 
-Nessun nuovo tool obbligatorio lato codice; eventuale instrumentazione minima di eventi
-prodotto (punto 3) da valutare in fase di implementazione, riusando
-`backend/src/observability/` invece di introdurre un sistema di analytics esterno per la
-Beta.
+Nessuna nuova dipendenza o analytics esterna. Il registro è manuale e il validatore usa
+solo la standard library Python; le fonti di ogni KPI sono esplicite nel processo.
 
 ## Dati di test
 
-Non applicabile in senso stretto: il "dato" di questa card sono le leghe pilota reali. In
-fase di preparazione, può essere utile validare il processo di onboarding con un "pilot
-a tavolino" interno (team stesso come lega di prova) prima di invitare utenti esterni.
+Il dato di accettazione resta quello delle leghe reali. Per verificare la preparazione è
+stato creato un registro interamente sintetico con tre alias e due percorsi decisionali:
+evidenza mancante → NO-GO; dataset completo → GO simulato. Non è contato come pilot.
 
-## Criteri di accettazione (dalla card)
+## Criteri di accettazione (dalla card, ancora pendenti sul pilot reale)
 
 - Criteri di uscita misurati e decisione registrata.
 - Evidenze collegate alla card.
 
 ## Test minimi richiesti
 
-Non applicabili nel senso tecnico standard (unit/integration/E2E): la "verifica" di
-questa card è procedurale — il processo di onboarding e il template di decisione vanno
-validati con un dry-run interno prima del pilot reale.
+Non applicabili nel senso tecnico standard (unit/integration/E2E): la verifica della
+preparazione è procedurale. Processo, template e registro sono stati validati con il
+tabletop versionato e con `python infra/scripts/verify_beta_pilot_gate.py`. L'esecuzione
+del pilot e la firma del gate restano verifiche umane successive.
 
 ## Rischi e domande aperte
 
-- **Questa card non può iniziare realisticamente finché EP12-01…06 non sono completate**,
-  perché i KPI e i criteri di uscita dipendono direttamente dalle loro evidenze (SLO da
-  EP12-03, assenza di vulnerabilità da EP12-04, RPO/RTO da EP12-05, runbook da EP12-06).
+- EP12-01…06 sono implementate e collegate, ma l'ammissione reale richiede un run recente
+  sulla build candidata e la risoluzione delle decisioni organizzative/deployment.
 - La durata di un pilot reale (settimane/mesi, legata al calendario di un campionato) non
   è comprimibile in una sessione di lavoro tecnico: va pianificata come attività
   calendarizzata dal team, non come task eseguibile in una singola sessione.
-- I valori soglia dei KPI e l'autorità di decisione go/no-go sono scelte di prodotto/
-  business, non deducibili dal codice: questo documento propone la struttura del
-  processo, non i valori.
+- I valori soglia e il protocollo sono proposti nel pacchetto per rendere il dry-run
+  verificabile, ma autorità e team devono ratificarli e congelarli prima del primo invito.
