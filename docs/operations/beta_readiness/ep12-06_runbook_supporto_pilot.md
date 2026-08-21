@@ -1,5 +1,28 @@
 # EP12-06 — Runbook e supporto pilot
 
+## Stato implementazione (branch `claude/M5`)
+
+**Implementazione tecnica e simulazioni completate il 2026-08-21.**
+
+- Cinque procedure uniformi e aderenti agli strumenti reali sono disponibili in
+  [Runbook incidenti Beta pilot](../pilot_incident_runbooks.md): dati sportivi mancanti,
+  ricalcolo turno omologato, incidente sicurezza, perdita/corruzione dati ed errore di
+  mercato.
+- Canale, triage, severità, escalation, template e KPI del supporto sono definiti in
+  [Processo supporto Beta pilot](../pilot_support_process.md). Ruoli, canali e tempi sono
+  proposte esplicitamente da confermare, non SLA già approvati.
+- `infra/scripts/verify_pilot_runbooks.sh` ripete i cinque scenari senza modificare il DB
+  dev/pilot: 9 test di integrazione su `postgres-test`, più backup/restore reale da
+  `postgres-perf` tmpfs a `postgres-test/fantappero_restore_ep12` (target eliminato al
+  termine).
+- Evidenza versionabile: [simulazioni EP12-06 del 2026-08-21](../evidence/ep12-06_runbook_simulations_2026-08-21.md).
+
+Il perimetro tecnico della card è coperto, ma l'onboarding EP12-07 resta bloccato finché
+il team non assegna nominativi/canali, approva i tempi proposti e inserisce nella scheda
+dell'ambiente il comando reale di cutover DR. Il repo non offre una revoca immediata di
+una singola access session né l'undo di una transazione mercato già applicata: i runbook
+documentano il contenimento/tabletop senza aggirare questi limiti con SQL manuale.
+
 | Metadato | Valore |
 | --- | --- |
 | Card | EP12-06 |
@@ -13,11 +36,12 @@ Documentare incidenti, dati mancanti, ricalcoli e rollback in modo che **un oper
 possa gestire gli incidenti previsti senza intervento improvvisato**, con piano, dati di
 test, responsabile ed evidenze.
 
-## Stato attuale nel repo (gap)
+## Ricognizione iniziale (gap ora coperti)
 
-- `docs/operations/` ha 12 documenti, ma **nessuno è un runbook operativo generico per
-  incidenti**: sono tutti guide a singole funzionalità/sync (es. `sports_scheduler.md`,
-  `sports_data_quality.md`, `admin_operator_bootstrap.md`).
+- `docs/operations/` non aveva un runbook operativo trasversale per incidenti: conteneva
+  guide a singole funzionalità/sync (es. `sports_scheduler.md`,
+  `sports_data_quality.md`, `admin_operator_bootstrap.md`). Il gap è ora coperto dai due
+  documenti EP12-06 collegati sopra.
 - Esiste già materiale riusabile come base per i runbook, non da riscrivere:
   - `docs/operations/sports_data_quality.md` — pannello qualità dati (EP04-07), copre già
     "mancanti", "ritardi", "conflitti", "correzioni" con audit su
@@ -60,11 +84,11 @@ test, responsabile ed evidenze.
 5. **Collegare i runbook come evidenza** (i documenti stessi sono la evidenza richiesta
    dalla card, insieme a un eventuale run di prova simulato di un incidente).
 
-## Tooling proposto
+## Tooling implementato
 
-Nessun nuovo tool: la card è principalmente documentale, con riuso di
-osservabilità/audit/backup già pianificati/esistenti (`observability_baseline.md`,
-EP11-03 audit log, restore EP12-05).
+Nessuna nuova dipendenza: la card riusa osservabilità, audit e backup esistenti. Il solo
+tool aggiunto è uno script Bash di orchestrazione ripetibile,
+`infra/scripts/verify_pilot_runbooks.sh`, con target e servizi isolati allowlisted.
 
 ## Dati di test
 
@@ -84,10 +108,13 @@ EP11-03 audit log, restore EP12-05).
 - Verifica che ogni riferimento a log/metriche/audit nel runbook corrisponda a strumenti
   realmente disponibili (non ipotetici).
 
-## Rischi e domande aperte
+## Rischi e decisioni residue
 
-- Questa card dipende nei contenuti da EP12-04 (procedure di sicurezza) ed EP12-05
-  (procedura di restore): se quelle non sono ancora implementate, i runbook corrispondenti
-  possono essere scritti solo come bozza/placeholder in attesa.
-- Il processo di supporto pilot (canale, SLA) richiede una decisione organizzativa del
-  team, non solo tecnica.
+- EP12-04 ed EP12-05 sono implementate e citate: la dipendenza tecnica è risolta.
+- Canale, nominativi, copertura e obiettivi di risposta richiedono approvazione
+  organizzativa del team.
+- Il cutover DR dipende dal deployment reale e deve essere inserito nella scheda ambiente
+  prima di EP12-07; il repo automatizza intenzionalmente soltanto restore isolati.
+- Access token già emessi non hanno revoca puntuale e il mercato non ha undo per azioni
+  terminali. I runbook definiscono contenimento e confini; le eventuali nuove operazioni
+  di dominio sono follow-up, non edit manuali sul database.

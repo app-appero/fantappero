@@ -4,11 +4,22 @@ Questa cartella raccoglie la pianificazione dettagliata delle 7 card dell'Epic E
 ("Come team vogliamo rilasciare una Beta osservabile, sicura e recuperabile"), ultima
 milestone (M5) prevista dal pacchetto `docs/doc_fantapperò/FantAppero_Pacchetto_Completo_M0.5-M5_v0.3/`.
 
-**Stato di questi documenti**: solo pianificazione (obiettivo, gap, task, tooling proposto,
-criteri di accettazione). Nessuna delle 7 card è stata implementata in questa sessione:
-codice, test, CI, script e configurazioni restano quelli attuali. L'implementazione va
-fatta in sessioni successive, una card alla volta, usando questi documenti come punto di
-partenza.
+**Stato aggiornato al 2026-08-21 sul branch `claude/M5`**: EP12-01…06 sono implementate,
+validate e accompagnate dalle rispettive evidenze. EP12-07 resta l'ultima card: l'agente può
+predisporre processo, KPI, checklist e template, ma onboarding, osservazione delle leghe
+reali e decisione go/no-go richiedono il team nel tempo.
+
+## Stato corrente
+
+| Card | Stato | Evidenza principale |
+| --- | --- | --- |
+| EP12-01 | completata | suite Playwright critica e seed E2E |
+| EP12-02 | completata | property test ledger e concorrenza formazione |
+| EP12-03 | completata | [`ep12-03_capacity_2026-08-21.md`](../evidence/ep12-03_capacity_2026-08-21.md) |
+| EP12-04 | completata | finding e prove nella [security review](./ep12-04_security_review.md) |
+| EP12-05 | completata | [`ep12-05_restore_drill_2026-08-21.md`](../evidence/ep12-05_restore_drill_2026-08-21.md) |
+| EP12-06 | completata | [`ep12-06_runbook_simulations_2026-08-21.md`](../evidence/ep12-06_runbook_simulations_2026-08-21.md) |
+| EP12-07 | da predisporre/eseguire | processo e gate ancora da implementare; pilot reale umano |
 
 ## Precondizione: Epic Must (M1–M4)
 
@@ -60,9 +71,9 @@ pianificazione EP12) ed è segnalato come rischio comune a tutte le card in cias
 5. **EP12-03** (performance/capacità) — dopo EP12-01 (riusa lo scenario E2E come base di
    carico) ed EP12-02 (in modo che i test di carico non stressino codice con bug di
    concorrenza già noti).
-6. **EP12-06** (runbook) — dopo EP12-04/05, perché i runbook devono citare le procedure di
-   sicurezza e di backup/restore appena definite.
-7. **EP12-07** (pilot e gate Beta) — ultimo, è il gate complessivo. **Non interamente
+6. **EP12-06** (runbook) — completata tecnicamente dopo EP12-04/05; ruoli, canali e
+   cutover deployment-specifico devono essere confermati prima del pilot.
+7. **EP12-07** (pilot e gate Beta) — prossimo e ultimo, è il gate complessivo. **Non interamente
    implementabile da un agente**: richiede onboarding di leghe/utenti reali nel tempo. Il
    relativo piano definisce processo, KPI, checklist e template di decisione, non
    l'esecuzione del pilot stesso.
