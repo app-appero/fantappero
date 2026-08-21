@@ -12,11 +12,13 @@ BASH ?= bash
 .PHONY: setup setup-js setup-py \
 	dev-api dev-web dev-mobile \
 	up up-tools down logs health reset-local smoke-local \
+	backup backup-service backup-logs dr-restore-test \
 	test test-api test-js lint format typecheck build \
 	check-migrations migrate migrate-down migrate-check quality smoke help
 
 help:
 	@echo "Targets: setup | up | down | logs | health | reset-local | smoke-local |"
+	@echo "         backup | backup-service | backup-logs | dr-restore-test |"
 	@echo "         dev-api | dev-web | dev-mobile | test | lint | format | typecheck |"
 	@echo "         build | migrate | migrate-check | check-migrations | quality | smoke"
 
@@ -53,6 +55,20 @@ reset-local:
 
 smoke-local:
 	$(BASH) infra/scripts/smoke_local_stack.sh
+
+# --- Backup / disaster recovery (EP12-05) ---
+
+backup:
+	MSYS_NO_PATHCONV=1 docker compose --env-file $(ENV_FILE) --profile backup run --rm --entrypoint /bin/sh postgres-backup /scripts/backup_postgres.sh
+
+backup-service:
+	docker compose --env-file $(ENV_FILE) --profile backup up -d postgres-backup
+
+backup-logs:
+	docker compose --env-file $(ENV_FILE) --profile backup logs -f --tail=100 postgres-backup
+
+dr-restore-test:
+	ENV_FILE=$(ENV_FILE) $(BASH) infra/scripts/dr_restore_drill.sh
 
 dev-api:
 	cd backend && python -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8001

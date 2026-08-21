@@ -1,5 +1,32 @@
 # EP12-05 — Backup e disaster recovery
 
+## Stato implementazione
+
+**Implementata e validata su `claude/M5` il 2026-08-21.**
+
+- Servizio Compose opzionale `postgres-backup` con esecuzione immediata + intervallo
+  configurabile, dump custom-format atomico, tre tentativi, retention 14 giornalieri/8
+  settimanali, lock condiviso fra job schedulati/manuali, log strutturati, stato/metriche
+  textfile, healthcheck di freshness e webhook opzionale dopo il fallimento definitivo.
+- Backup coordinato del volume avatar; Redis è dichiarato ricostruibile e non viene
+  incluso nei backup Beta.
+- Restore PostgreSQL automatizzato solo su
+  `postgres-test/fantappero_restore_ep12`, con guardie non aggirabili dalla configurazione
+  Compose, checksum, manifest di schema, constraint e revisione Alembic. Restore avatar
+  solo su `tmpfs` vuoto.
+- Verifica ripetibile di tutte le tabelle (conteggi + digest), sequence e avvio reale
+  dell'API sul DB ripristinato tramite `infra/scripts/dr_restore_drill.sh`.
+- RPO Beta 24 h, RTO 2 h, responsabilità, alert, procedura incidente e limiti documentati
+  in `docs/operations/backup_disaster_recovery.md`.
+- Evidenza del drill reale: `docs/operations/evidence/ep12-05_restore_drill_2026-08-21.md`.
+  Esito PASS: backup 6 s, restore 4 s, 60 tabelle/62.455 righe e sequence identiche,
+  constraint invalidi 0, restore avatar e readiness API riusciti; verificati anche retry,
+  healthcheck, retention e rifiuto del target non allowlisted.
+
+Vincolo operativo residuo: il default locale salva sotto `artifacts/backups`; prima del
+pilot `POSTGRES_BACKUP_HOST_PATH` deve puntare a storage indipendente dal disco Postgres,
+cifrato e replicato offsite, e il monitor deve notificare il container unhealthy.
+
 | Metadato | Valore |
 | --- | --- |
 | Card | EP12-05 |

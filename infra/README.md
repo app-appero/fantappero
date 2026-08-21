@@ -10,10 +10,12 @@ Docker, ambienti, pipeline CI/CD e configurazione di deploy.
 | [`local/`](local/) | Dockerfile API/worker e env di esempio |
 | [`scripts/`](scripts/) | `dev_up` / `dev_down` / `dev_logs` / `dev_reset` / `dev_healthcheck` / `smoke_local_stack` |
 | [`../docs/development/local_environment.md`](../docs/development/local_environment.md) | Porte, comandi, troubleshooting |
+| [`../docs/operations/backup_disaster_recovery.md`](../docs/operations/backup_disaster_recovery.md) | Backup PostgreSQL/avatar, restore isolato, RPO/RTO e drill EP12-05 |
 
 ```bash
 make up && make health
 # reset distruttivo volumi: make reset-local CONFIRM=yes
+# backup manuale / drill restore isolato: make backup / make dr-restore-test
 ```
 
 ## Confini

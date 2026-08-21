@@ -33,7 +33,7 @@ services:
       start_period: 10s
 
   postgres-test:
-    profiles: ["test"]
+    profiles: ["test", "backup-test"]
     image: postgres:16-alpine
     restart: unless-stopped
     environment:
@@ -51,6 +51,141 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
+      start_period: 10s
+
+  # EP12-05: isolated scheduler/tooling for PostgreSQL + avatar backups.
+  # Kept behind a profile so local developers opt in explicitly; pilot must
+  # run this service continuously (see docs/operations/backup_disaster_recovery.md).
+  postgres-backup:
+    profiles: ["backup"]
+    image: postgres:16-alpine
+    container_name: fantappero-postgres-backup
+    restart: unless-stopped
+    entrypoint: ["/bin/sh", "/scripts/backup_loop.sh"]
+    environment:
+      PGHOST: postgres
+      PGPORT: 5432
+      PGUSER: ${POSTGRES_USER:-fantappero}
+      PGPASSWORD: ${POSTGRES_PASSWORD:-fantappero_local_dev_only}
+      PGDATABASE: ${POSTGRES_DB:-fantappero}
+      BACKUP_ROOT: /backups
+      AVATAR_SOURCE: /avatars
+      BACKUP_INTERVAL_SECONDS: ${BACKUP_INTERVAL_SECONDS:-86400}
+      BACKUP_MAX_AGE_SECONDS: ${BACKUP_MAX_AGE_SECONDS:-93600}
+      BACKUP_MAX_ATTEMPTS: ${BACKUP_MAX_ATTEMPTS:-3}
+      BACKUP_RETRY_DELAY_SECONDS: ${BACKUP_RETRY_DELAY_SECONDS:-30}
+      BACKUP_DAILY_RETENTION_COUNT: ${BACKUP_DAILY_RETENTION_COUNT:-14}
+      BACKUP_WEEKLY_RETENTION_COUNT: ${BACKUP_WEEKLY_RETENTION_COUNT:-8}
+      BACKUP_WEEKLY_DAY_UTC: ${BACKUP_WEEKLY_DAY_UTC:-7}
+      BACKUP_ALERT_WEBHOOK_URL: ${BACKUP_ALERT_WEBHOOK_URL:-}
+    volumes:
+      - type: bind
+        source: ${POSTGRES_BACKUP_HOST_PATH:-./artifacts/backups}
+        target: /backups
+      - type: bind
+        source: ./infra/scripts
+        target: /scripts
+        read_only: true
+      - type: volume
+        source: fantappero_avatar_data
+        target: /avatars
+        read_only: true
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "/bin/sh", "/scripts/backup_healthcheck.sh"]
+      interval: 5m
+      timeout: 10s
+      retries: 2
+      start_period: 5m
+
+  # One-shot restore tools. Their scripts hard-refuse hosts/databases outside
+  # the isolated allowlist even when an operator supplies unsafe overrides.
+  postgres-restore-test:
+    profiles: ["backup-test"]
+    image: postgres:16-alpine
+    entrypoint: ["/bin/sh", "/scripts/restore_postgres.sh"]
+    environment:
+      PGUSER: ${POSTGRES_USER:-fantappero}
+      PGPASSWORD: ${POSTGRES_PASSWORD:-fantappero_local_dev_only}
+      BACKUP_ROOT: /backups
+      RESTORE_BACKUP_FILE: ${RESTORE_BACKUP_FILE:-latest}
+      RESTORE_TARGET_HOST: postgres-test
+      RESTORE_TARGET_PORT: 5432
+      RESTORE_TARGET_DATABASE: fantappero_restore_ep12
+      CONFIRM_RESTORE: isolated-test-only
+    volumes:
+      - type: bind
+        source: ${POSTGRES_BACKUP_HOST_PATH:-./artifacts/backups}
+        target: /backups
+        read_only: true
+      - type: bind
+        source: ./infra/scripts
+        target: /scripts
+        read_only: true
+    depends_on:
+      postgres-test:
+        condition: service_healthy
+
+  avatar-restore-test:
+    profiles: ["backup-test"]
+    image: postgres:16-alpine
+    entrypoint: ["/bin/sh", "/scripts/restore_avatars.sh"]
+    environment:
+      BACKUP_ROOT: /backups
+      RESTORE_AVATAR_FILE: ${RESTORE_AVATAR_FILE:-latest}
+      RESTORE_AVATAR_TARGET: /restore/avatars
+      CONFIRM_AVATAR_RESTORE: isolated-target-only
+    volumes:
+      - type: bind
+        source: ${POSTGRES_BACKUP_HOST_PATH:-./artifacts/backups}
+        target: /backups
+        read_only: true
+      - type: bind
+        source: ./infra/scripts
+        target: /scripts
+        read_only: true
+    tmpfs:
+      - /restore
+
+  api-restore-test:
+    profiles: ["backup-test"]
+    image: fantappero-backend:local
+    container_name: fantappero-api-restore-test
+    restart: "no"
+    environment:
+      FANTAPPERO_ENV: development
+      SOURCE_DATABASE_URL: postgresql://${POSTGRES_USER:-fantappero}:${POSTGRES_PASSWORD:-fantappero_local_dev_only}@postgres:5432/${POSTGRES_DB:-fantappero}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-fantappero}:${POSTGRES_PASSWORD:-fantappero_local_dev_only}@postgres-test:5432/fantappero_restore_ep12
+      REDIS_URL: redis://redis:6379/0
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-fantappero_local_jwt_dev_only_change_in_production}
+      SMTP_HOST: ${SMTP_HOST:-mailpit}
+      SMTP_PORT: ${SMTP_PORT:-1025}
+      MAIL_FROM: ${MAIL_FROM:-noreply@fantappero.local}
+      WEB_APP_BASE_URL: ${WEB_APP_BASE_URL:-http://localhost:5174}
+      AVATAR_STORAGE_PATH: /tmp/restore-avatars
+      PROFILE_POLICY_VERSION: ${PROFILE_POLICY_VERSION:-2026-01}
+    ports:
+      - "${RESTORE_API_PORT:-8003}:8001"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      postgres-test:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      mailpit:
+        condition: service_started
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "curl -fsS http://127.0.0.1:8001/ready | grep -q '\"status\":\"ok\"'",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 12
       start_period: 10s
 
   redis:
