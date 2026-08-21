@@ -106,6 +106,7 @@ export interface LeagueAdminPanel {
 export interface LeagueMember {
   userId: string;
   displayName: string;
+  userType: import("./profile.js").UserType;
   role: "member" | "league_admin";
   joinedAt: string;
 }
@@ -238,6 +239,92 @@ export interface LeagueCalendar {
 
 export type FantasyRole = "P" | "D" | "C" | "A";
 
+/** Risultato H2H persistito sullo slot (EP07-05), lettura matchday. */
+export interface H2HMatchupScore {
+  homeScore: number | null;
+  awayScore: number | null;
+  homeFantasyGoals: number | null;
+  awayFantasyGoals: number | null;
+  outcome: "home" | "away" | "draw" | null;
+  resultFinal: boolean;
+  computedAt: string | null;
+}
+
+export interface H2HCalendarMatchup {
+  slotId: string;
+  slotIndex: number;
+  isBye: boolean;
+  homeUserId: string;
+  homeDisplayName: string;
+  homeTeamName: string | null;
+  awayUserId: string | null;
+  awayDisplayName: string | null;
+  awayTeamName: string | null;
+  result: H2HMatchupScore | null;
+}
+
+export interface H2HCalendarRound {
+  roundNumber: number;
+  /** Allineato a FantasyRound.number sulla stessa lega. */
+  fantasyRoundId: string | null;
+  homologationStatus: "provisional" | "homologated" | null;
+  europeanTurnStatus: "scheduled" | "open" | "locked" | "skipped" | null;
+  matchups: H2HCalendarMatchup[];
+}
+
+export interface H2HCalendar {
+  id: string;
+  leagueId: string;
+  status: "confirmed";
+  format: LeagueCalendarFormat;
+  algorithmVersion: string;
+  participantCount: number;
+  roundCount: number;
+  matchupCount: number;
+  byeCount: number;
+  generatedAt: string;
+  confirmedAt: string | null;
+  /** True se almeno un turno europeo collegato è open/locked e non omologato. */
+  live: boolean;
+  rounds: H2HCalendarRound[];
+  summary: { message: string };
+}
+
+export interface H2HPlayerScore {
+  athleteId: string;
+  name: string;
+  role: FantasyRole;
+  fantasyScore: number | null;
+  isEffectiveStarter: boolean;
+  isBench: boolean;
+}
+
+export interface H2HSideLineup {
+  fantasyTeamId: string | null;
+  teamName: string | null;
+  displayName: string;
+  module: string | null;
+  lineupSource: "effective" | "submitted" | "none";
+  totalScore: number | null;
+  fantasyGoals: number | null;
+  starters: H2HPlayerScore[];
+  bench: H2HPlayerScore[];
+}
+
+export interface H2HMatchupDetail {
+  slotId: string;
+  leagueId: string;
+  roundNumber: number;
+  fantasyRoundId: string | null;
+  homologationStatus: "provisional" | "homologated" | null;
+  europeanTurnStatus: "scheduled" | "open" | "locked" | "skipped" | null;
+  live: boolean;
+  isBye: boolean;
+  home: H2HSideLineup;
+  away: H2HSideLineup | null;
+  result: H2HMatchupScore | null;
+}
+
 export interface LeagueListoneOverride {
   role: FantasyRole;
   effectiveFromRound: number | null;
@@ -345,6 +432,7 @@ export interface FantasyTeam {
   leagueId: string;
   membershipId: string;
   userId: string;
+  userType: import("./profile.js").UserType;
   name: string;
   rosterSize: number;
   filledSlots: number;
@@ -358,6 +446,7 @@ export interface FantasyTeamSummary {
   leagueId: string;
   membershipId: string;
   userId: string;
+  userType: import("./profile.js").UserType;
   name: string;
   rosterSize: number;
   filledSlots: number;

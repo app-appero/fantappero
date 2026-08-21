@@ -281,6 +281,22 @@ def ensure_fantasy_teams(
         return _error_response(exc)
 
 
+@router.post(
+    "/{league_id}/amministrazione/squadre/{team_id}/rosa/random",
+    response_model=FantasyTeamResponse,
+)
+def assign_random_ai_roster(
+    team_id: UUID,
+    league_access: LeagueAccess = Depends(require_league_permissions(Permission.LEAGUE_ADMIN)),
+    service: FantasyTeamService = Depends(get_fantasy_team_service),
+) -> FantasyTeamResponse | JSONResponse:
+    """Fill an AI manager's empty roster slots with random free listone athletes."""
+    try:
+        return service.assign_random_ai_roster(league_access, team_id)
+    except AuthError as exc:
+        return _error_response(exc)
+
+
 @router.get("/{league_id}/amministrazione/import-csv/modello")
 def download_roster_csv_template(
     league_access: LeagueAccess = Depends(require_league_permissions(Permission.LEAGUE_ADMIN)),

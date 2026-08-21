@@ -107,6 +107,7 @@ const TEAM_WITH_PLAYER: FantasyTeam = {
   leagueId: "league-1",
   membershipId: "membership-1",
   userId: "user-1",
+  userType: "human",
   name: "Squadra Test",
   rosterSize: 25,
   filledSlots: 1,

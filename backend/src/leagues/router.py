@@ -29,6 +29,7 @@ from fantasy_teams.models import FantasyTeam
 from leagues.audit_log_schemas import AuditLogListResponse
 from leagues.audit_log_service import DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE, AuditLogService
 from leagues.calendar_service import LeagueCalendarService
+from leagues.h2h_matchday_service import get_h2h_calendar, get_h2h_matchup_detail
 from leagues.invite_service import LeagueInviteService
 from leagues.listone_service import LeagueListoneService
 from leagues.membership_service import LeagueMembershipService
@@ -44,6 +45,8 @@ from leagues.schemas import (
     CreateLeagueRequest,
     CreateNamedLeagueInviteRequest,
     FantasyCoachDirectoryResponse,
+    H2HCalendarResponse,
+    H2HMatchupDetailResponse,
     LeagueAdminPanelResponse,
     LeagueCalendarResponse,
     LeagueDetailResponse,
@@ -381,6 +384,43 @@ def get_league_calendar(
 ) -> LeagueCalendarResponse | None:
     """Return the confirmed calendar for all league members."""
     return service.get_public_calendar(league_access)
+
+
+@router.get(
+    "/{league_id}/calendario/h2h",
+    response_model=H2HCalendarResponse | None,
+)
+def get_league_h2h_calendar(
+    league_access: LeagueAccess = Depends(require_league_permissions(Permission.MATCHDAY_VIEW)),
+    session: Session = Depends(get_db_session),
+) -> H2HCalendarResponse | None:
+    """Calendario H2H confermato con risultati affiancati (tab Calendario fantallenatori)."""
+    return get_h2h_calendar(session, league_id=league_access.league.id)
+
+
+@router.get(
+    "/{league_id}/calendario/scontri/{slot_id}",
+    response_model=H2HMatchupDetailResponse,
+)
+def get_league_h2h_matchup(
+    slot_id: UUID,
+    league_access: LeagueAccess = Depends(require_league_permissions(Permission.MATCHDAY_VIEW)),
+    session: Session = Depends(get_db_session),
+) -> H2HMatchupDetailResponse | JSONResponse:
+    """Dettaglio scontro: formazioni a confronto, fantavoti e risultato H2H."""
+    try:
+        return get_h2h_matchup_detail(
+            session,
+            league_id=league_access.league.id,
+            slot_id=slot_id,
+        )
+    except AuthError as exc:
+        if exc.code == "matchup_not_found":
+            return JSONResponse(
+                status_code=status.HTTP_404_NOT_FOUND,
+                content={"message": exc.message, "code": exc.code},
+            )
+        return _error_response(exc)
 
 
 @router.get(

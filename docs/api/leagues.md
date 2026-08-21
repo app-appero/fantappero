@@ -273,6 +273,15 @@ Endpoint consultazione (`league:view`):
 
 - `GET /leagues/{league_id}/calendario` — solo calendari `confirmed`
 
+Endpoint consultazione matchday (`matchday:view`):
+
+- `GET /leagues/{league_id}/calendario/h2h` — calendario H2H confermato con risultati
+  affiancati (punti/gol fantasy/esito/provvisorio|finale) e collegamento al turno
+  europeo (`fantasyRoundId`, `homologationStatus`, `europeanTurnStatus`) tramite
+  `FantasyRound.number == LeagueCalendarSlot.round_number`.
+- `GET /leagues/{league_id}/calendario/scontri/{slot_id}` — dettaglio scontro:
+  formazioni (effettiva se presente, altrimenti schierata) + fantavoti + totale.
+
 Formato Standard MVP: **girone di andata** (`single_round_robin`). Ogni coppia di
 partecipanti si affronta una sola volta; con numero dispari ogni turno ha un riposo
 esplicito (nessun avversario fantasma). L'algoritmo `circle_rr_v1` è deterministico
@@ -282,11 +291,11 @@ partecipanti. La generazione richiede che gli iscritti coincidano col regolament
 
 Flusso: genera anteprima (`draft`) → conferma (`confirmed`, idempotente). Una
 rigenerazione sostituisce l'anteprima. Se i partecipanti cambiano dopo la generazione,
-il calendario risulta stale e va rigenerato. L'associazione ai turni europei
-(`fantasy_round`) è fuori scope e arriva con le card turni.
+il calendario risulta stale e va rigenerato.
 
 Decisione prodotto documentata (aperta in FR-LEG-04): in questa card si adotta solo
-l'andata; andata/ritorno e mapping a turni europei eccedenti restano decisioni future.
+l'andata; andata/ritorno resta decisione futura (nessuna regola di scoring nuova).
+Il mapping ai turni europei è `FantasyRound.number ↔ LeagueCalendarSlot.round_number`.
 
 Eventi audit: `league_calendar_generated`, `league_calendar_confirmed`.
 Tabelle: `league_calendars`, `league_calendar_slots` (FK ai membership; le `fantasy_team`

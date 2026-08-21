@@ -49,6 +49,12 @@ export const APP_ROUTE_DEFINITIONS: readonly AppRouteDefinition[] = [
     requiredPermissions: ["league:view"],
   },
   { id: "matchday", path: "/turni", layout: "app", requiredPermissions: ["matchday:view"] },
+  {
+    id: "matchday-matchup",
+    path: "/turni/scontro/:slotId",
+    layout: "app",
+    requiredPermissions: ["matchday:view"],
+  },
   { id: "standings", path: "/classifica", layout: "app", requiredPermissions: ["matchday:view"] },
   { id: "roster", path: "/rosa", layout: "app", requiredPermissions: ["roster:view"] },
   { id: "formation", path: "/formazione", layout: "app", requiredPermissions: ["roster:view"] },

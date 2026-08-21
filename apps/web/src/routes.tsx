@@ -21,6 +21,7 @@ import {
   MarketPage,
   WaiverPage,
   MatchdayPage,
+  MatchupDetailPage,
   ManagerDirectoryPage,
   NotFoundPage,
   ProfilePage,
@@ -128,6 +129,16 @@ export function AppRoutes() {
       <AppSection>
         <RequirePermissions required={["matchday:view"]}>
           <MatchdayPage />
+        </RequirePermissions>
+      </AppSection>
+    );
+  }
+
+  if (pathname.startsWith("/turni/scontro/")) {
+    return (
+      <AppSection>
+        <RequirePermissions required={["matchday:view"]}>
+          <MatchupDetailPage />
         </RequirePermissions>
       </AppSection>
     );

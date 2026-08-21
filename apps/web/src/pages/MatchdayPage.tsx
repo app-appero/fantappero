@@ -3,6 +3,7 @@ import type {
   FantasyTurnPreview,
   FantasyTurnSummary,
   FantasyTurnKind,
+  H2HCalendar,
 } from "@fantappero/contracts";
 import { mapFixtureMatchStatus } from "@fantappero/contracts";
 import {
@@ -14,6 +15,7 @@ import {
   CardHeader,
   MatchCard,
   PageContainer,
+  Select,
   Tab,
   TabList,
   TabPanel,
@@ -26,6 +28,7 @@ import {
   ensureFantasyTurns,
   fetchFantasyTurn,
   fetchFantasyTurns,
+  fetchH2HCalendar,
   generateFantasyTurn,
   openFantasyTurn,
   previewFantasyTurn,
@@ -33,9 +36,11 @@ import {
 } from "../api/leagues";
 import { getApiErrorMessage, useAuth } from "../auth/AuthContext";
 import { loadStoredSession } from "../auth/sessionStorage";
+import { useLiveH2HPolling } from "../matchday/useLiveH2HPolling";
 import { useLiveTurnPolling } from "../matchday/useLiveTurnPolling";
 import { useLocation } from "../router/simpleRouter";
 import { parseWireframeStateFromSearch } from "../wireframes/useWireframeState";
+import { MatchdayH2HPanel } from "./MatchdayH2HPanel";
 
 const STATUS_LABEL: Record<string, string> = {
   scheduled: "Programmato",
@@ -121,14 +126,192 @@ function formatDateTime(value: string | null): string {
   }
 }
 
-/** Turni europei — consultazione e sync automatico (EP06-01). */
+function resolveMatchdayTab(raw: string | null): "calendario" | "europei" {
+  if (raw === "europei" || raw === "turno") {
+    return "europei";
+  }
+  return "calendario";
+}
+
+function groupFixturesByCompetition(fixtures: FantasyTurnDetail["fixtures"]) {
+  const groups = new Map<string, FantasyTurnDetail["fixtures"]>();
+  for (const fixture of fixtures) {
+    const key = fixture.competitionName ?? "Altre competizioni";
+    const bucket = groups.get(key);
+    if (bucket) {
+      bucket.push(fixture);
+    } else {
+      groups.set(key, [fixture]);
+    }
+  }
+  return [...groups.entries()];
+}
+
+const DEMO_H2H: H2HCalendar = {
+  id: "demo-h2h",
+  leagueId: "lega-demo",
+  status: "confirmed",
+  format: "single_round_robin",
+  algorithmVersion: "circle_rr_v1",
+  participantCount: 4,
+  roundCount: 3,
+  matchupCount: 6,
+  byeCount: 0,
+  generatedAt: "2026-08-12T08:00:00.000Z",
+  confirmedAt: "2026-08-12T09:00:00.000Z",
+  live: true,
+  summary: { message: "Calendario demo." },
+  rounds: [
+    {
+      roundNumber: 1,
+      fantasyRoundId: "turn-demo-0",
+      homologationStatus: "homologated",
+      europeanTurnStatus: "locked",
+      matchups: [
+        {
+          slotId: "slot-demo-past",
+          slotIndex: 0,
+          isBye: false,
+          homeUserId: "a",
+          homeDisplayName: "Marco",
+          homeTeamName: "Marco FC",
+          awayUserId: "d",
+          awayDisplayName: "Sara",
+          awayTeamName: "Sara City",
+          result: {
+            homeScore: 70,
+            awayScore: 66,
+            homeFantasyGoals: 1,
+            awayFantasyGoals: 1,
+            outcome: "draw",
+            resultFinal: true,
+            computedAt: "2026-08-10T18:00:00.000Z",
+          },
+        },
+        {
+          slotId: "slot-demo-past-2",
+          slotIndex: 1,
+          isBye: false,
+          homeUserId: "b",
+          homeDisplayName: "Giulia",
+          homeTeamName: "Giulia United",
+          awayUserId: "c",
+          awayDisplayName: "Luca",
+          awayTeamName: "Luca XI",
+          result: {
+            homeScore: 74,
+            awayScore: 61,
+            homeFantasyGoals: 2,
+            awayFantasyGoals: 0,
+            outcome: "home",
+            resultFinal: true,
+            computedAt: "2026-08-10T18:00:00.000Z",
+          },
+        },
+      ],
+    },
+    {
+      roundNumber: 2,
+      fantasyRoundId: "turn-demo-1",
+      homologationStatus: "provisional",
+      europeanTurnStatus: "open",
+      matchups: [
+        {
+          slotId: "slot-demo-1",
+          slotIndex: 0,
+          isBye: false,
+          homeUserId: "a",
+          homeDisplayName: "Marco",
+          homeTeamName: "Marco FC",
+          awayUserId: "b",
+          awayDisplayName: "Giulia",
+          awayTeamName: "Giulia United",
+          result: {
+            homeScore: 72.5,
+            awayScore: 68,
+            homeFantasyGoals: 2,
+            awayFantasyGoals: 1,
+            outcome: "home",
+            resultFinal: false,
+            computedAt: "2026-08-17T18:00:00.000Z",
+          },
+        },
+        {
+          slotId: "slot-demo-2",
+          slotIndex: 1,
+          isBye: true,
+          homeUserId: "c",
+          homeDisplayName: "Luca",
+          homeTeamName: "Luca XI",
+          awayUserId: null,
+          awayDisplayName: null,
+          awayTeamName: null,
+          result: null,
+        },
+      ],
+    },
+    {
+      roundNumber: 3,
+      fantasyRoundId: null,
+      homologationStatus: null,
+      europeanTurnStatus: null,
+      matchups: [
+        {
+          slotId: "slot-demo-3",
+          slotIndex: 0,
+          isBye: false,
+          homeUserId: "a",
+          homeDisplayName: "Marco",
+          homeTeamName: "Marco FC",
+          awayUserId: "c",
+          awayDisplayName: "Luca",
+          awayTeamName: "Luca XI",
+          result: null,
+        },
+        {
+          slotId: "slot-demo-4",
+          slotIndex: 1,
+          isBye: false,
+          homeUserId: "b",
+          homeDisplayName: "Giulia",
+          homeTeamName: "Giulia United",
+          awayUserId: "d",
+          awayDisplayName: "Sara",
+          awayTeamName: "Sara City",
+          result: null,
+        },
+      ],
+    },
+  ],
+};
+
+/** Turni — calendario H2H fantallenatori e turni europei. */
 export function MatchdayPage() {
   const { isDemoMode, activeLeagueId, can } = useAuth();
   const { search } = useLocation();
   const demoState = isDemoMode ? parseWireframeStateFromSearch(search) : null;
   const params = new URLSearchParams(search.startsWith("?") ? search.slice(1) : search);
-  const initialTab = params.get("tab") === "risultati" ? "risultati" : "turno";
+  const initialTab = resolveMatchdayTab(params.get("tab"));
   const [tab, setTab] = useState(initialTab);
+
+  const [h2hCalendar, setH2hCalendar] = useState<H2HCalendar | null>(() => {
+    if (isDemoMode && demoState === "success") {
+      return DEMO_H2H;
+    }
+    return null;
+  });
+  const [h2hLoading, setH2hLoading] = useState(() => {
+    if (isDemoMode) {
+      return demoState === "loading";
+    }
+    return true;
+  });
+  const [h2hError, setH2hError] = useState<string | null>(() => {
+    if (isDemoMode && demoState === "error") {
+      return "Impossibile caricare il calendario H2H (demo).";
+    }
+    return null;
+  });
 
   const [turns, setTurns] = useState<FantasyTurnSummary[]>(() => {
     if (isDemoMode && demoState === "success") {
@@ -170,6 +353,57 @@ export function MatchdayPage() {
     }
     return !canView;
   }, [canView, demoState, isDemoMode]);
+
+  const loadH2H = useCallback(async () => {
+    if (isDemoMode) {
+      if (demoState === "loading") {
+        setH2hLoading(true);
+        return;
+      }
+      if (demoState === "error") {
+        setH2hLoading(false);
+        setH2hError("Impossibile caricare il calendario H2H (demo).");
+        setH2hCalendar(null);
+        return;
+      }
+      if (demoState === "empty") {
+        setH2hLoading(false);
+        setH2hError(null);
+        setH2hCalendar(null);
+        return;
+      }
+      setH2hLoading(false);
+      setH2hError(null);
+      setH2hCalendar(DEMO_H2H);
+      return;
+    }
+
+    if (!activeLeagueId) {
+      setH2hLoading(false);
+      setH2hCalendar(null);
+      setH2hError(null);
+      return;
+    }
+
+    const session = loadStoredSession();
+    if (!session?.accessToken) {
+      setH2hLoading(false);
+      setH2hError("Sessione non disponibile. Accedi di nuovo.");
+      return;
+    }
+
+    setH2hLoading(true);
+    setH2hError(null);
+    try {
+      const calendar = await fetchH2HCalendar(session.accessToken, activeLeagueId);
+      setH2hCalendar(calendar);
+    } catch (error) {
+      setH2hError(getApiErrorMessage(error, "Impossibile caricare il calendario H2H."));
+      setH2hCalendar(null);
+    } finally {
+      setH2hLoading(false);
+    }
+  }, [activeLeagueId, demoState, isDemoMode]);
 
   const loadTurns = useCallback(async () => {
     if (isDemoMode) {
@@ -239,6 +473,10 @@ export function MatchdayPage() {
   }, [activeLeagueId, demoState, isDemoMode]);
 
   useEffect(() => {
+    void loadH2H();
+  }, [loadH2H]);
+
+  useEffect(() => {
     void loadTurns();
   }, [loadTurns]);
 
@@ -246,7 +484,14 @@ export function MatchdayPage() {
     activeLeagueId,
     selected,
     setSelected,
-    !isDemoMode,
+    !isDemoMode && tab === "europei",
+  );
+
+  const { degraded: h2hLiveDegraded } = useLiveH2HPolling(
+    activeLeagueId,
+    h2hCalendar,
+    setH2hCalendar,
+    !isDemoMode && tab === "calendario",
   );
 
   async function selectTurn(turnId: string) {
@@ -484,176 +729,207 @@ export function MatchdayPage() {
         />
       ) : null}
 
-      {!showForbidden && loading ? (
-        <UiStatePanel
-          state="loading"
-          title="Caricamento turni"
-          message="Recupero del calendario europeo in corso…"
-          testId="matchday-loading"
-        />
-      ) : null}
-
-      {!showForbidden && !loading && loadError ? (
-        <div data-testid="matchday-error-wrap">
-          <UiStatePanel
-            state="error"
-            title="Turni non disponibili"
-            message={loadError}
-            testId="matchday-error"
-          />
-          <Button type="button" variant="secondary" onClick={() => void loadTurns()}>
-            Ricarica
-          </Button>
-        </div>
-      ) : null}
-
-      {!showForbidden && !loading && !loadError && !activeLeagueId && !isDemoMode ? (
+      {!showForbidden && !activeLeagueId && !isDemoMode ? (
         <UiStatePanel
           state="empty"
           title="Nessuna lega attiva"
-          message="Seleziona una lega per consultare i turni europei."
+          message="Seleziona una lega per consultare calendario e turni."
           testId="matchday-no-league"
         />
       ) : null}
 
-      {!showForbidden && !loading && !loadError && (activeLeagueId || isDemoMode) ? (
-        <Tabs value={tab} onValueChange={setTab}>
-          <TabList aria-label="Sezioni turno">
-            <Tab value="turno">Turno</Tab>
-            <Tab value="risultati">Risultati</Tab>
+      {!showForbidden && (activeLeagueId || isDemoMode) ? (
+        <Tabs value={tab} onValueChange={(value) => setTab(resolveMatchdayTab(value))}>
+          <TabList aria-label="Sezioni turni">
+            <Tab value="calendario">Calendario fantallenatori</Tab>
+            <Tab value="europei">Turni europei</Tab>
           </TabList>
-          <TabPanel value="turno">
-            {turns.length === 0 ? (
+          <TabPanel value="calendario">
+            <MatchdayH2HPanel
+              calendar={h2hCalendar}
+              loading={h2hLoading}
+              error={h2hError}
+              liveDegraded={h2hLiveDegraded}
+              canAdmin={isAdmin}
+              onRetry={() => void loadH2H()}
+            />
+          </TabPanel>
+          <TabPanel value="europei">
+            {loading ? (
+              <UiStatePanel
+                state="loading"
+                title="Caricamento turni"
+                message="Recupero del calendario europeo in corso…"
+                testId="matchday-loading"
+              />
+            ) : null}
+
+            {!loading && loadError ? (
+              <div data-testid="matchday-error-wrap">
+                <UiStatePanel
+                  state="error"
+                  title="Turni non disponibili"
+                  message={loadError}
+                  testId="matchday-error"
+                />
+                <Button type="button" variant="secondary" onClick={() => void loadTurns()}>
+                  Ricarica
+                </Button>
+              </div>
+            ) : null}
+
+            {!loading && !loadError && turns.length === 0 ? (
               <UiStatePanel
                 state="empty"
                 title="Nessun turno ancora"
                 message="I turni vengono calcolati automaticamente dal sistema in base ai campionati della lega. Se non ne vedi ancora, attendi il sync del calendario o usa «Aggiorna dal calendario»."
                 testId="matchday-empty"
               />
-            ) : (
-              <div className="fa-ds-showcase__stack" data-testid="matchday-turn-list">
-                <Card>
-                  <CardHeader title="Turni della lega" />
-                  <CardBody>
-                    <ul className="fa-ds-list">
-                      {turns.map((turn) => (
-                        <li key={turn.id}>
-                          <Button
-                            type="button"
-                            variant={selected?.id === turn.id ? "primary" : "ghost"}
-                            onClick={() => void selectTurn(turn.id)}
-                            data-testid={`matchday-turn-${turn.number}`}
-                          >
-                            Turno {turn.number} — {STATUS_LABEL[turn.effectiveStatus] ?? turn.effectiveStatus}
-                          </Button>
-                        </li>
-                      ))}
-                    </ul>
-                  </CardBody>
-                </Card>
-              </div>
-            )}
+            ) : null}
 
-            {selected ? (
-              <Card data-testid="matchday-turn-detail">
-                <CardHeader title={`Turno ${selected.number}`} />
-                <CardBody>
-                  <p>
-                    Stato: <strong>{STATUS_LABEL[selected.effectiveStatus] ?? selected.effectiveStatus}</strong>
-                    {selected.status !== selected.effectiveStatus
-                      ? ` (persistito: ${STATUS_LABEL[selected.status]})`
-                      : null}
-                  </p>
-                  <p>
-                    Punteggi:{" "}
+            {!loading && !loadError && turns.length > 0 ? (
+              <div className="fa-matchday-europei" data-testid="matchday-turn-list">
+                <div className="fa-matchday-toolbar">
+                  <Select
+                    label="Turno europeo"
+                    options={turns.map((turn) => ({
+                      value: turn.id,
+                      label: `Turno ${turn.number} — ${STATUS_LABEL[turn.effectiveStatus] ?? turn.effectiveStatus}`,
+                    }))}
+                    value={selected?.id ?? ""}
+                    onChange={(event) => void selectTurn(event.target.value)}
+                    data-testid="matchday-turn-select"
+                  />
+                </div>
+              </div>
+            ) : null}
+
+            {!loading && !loadError && selected ? (
+              <div className="fa-matchday-europei-detail" data-testid="matchday-turn-detail">
+                <header className="fa-matchday-round__header">
+                  <div>
+                    <h2>Turno {selected.number}</h2>
+                    <p className="fa-matchday-lede">
+                      Stato:{" "}
+                      <strong>
+                        {STATUS_LABEL[selected.effectiveStatus] ?? selected.effectiveStatus}
+                      </strong>
+                      {selected.status !== selected.effectiveStatus
+                        ? ` (persistito: ${STATUS_LABEL[selected.status]})`
+                        : null}
+                    </p>
+                    <p className="fa-matchday-hint">
+                      Finestra {formatDateTime(selected.windowStartAt)} →{" "}
+                      {formatDateTime(selected.windowEndAt)} · Cutoff{" "}
+                      {formatDateTime(selected.cutoffAt)}
+                    </p>
+                  </div>
+                  <div className="fa-matchday-toolbar__badges">
                     <Badge
-                      variant={selected.homologationStatus === "homologated" ? "success" : "warning"}
+                      variant={
+                        selected.homologationStatus === "homologated" ? "success" : "warning"
+                      }
                       data-testid="matchday-homologation-status"
                     >
                       {selected.homologationStatus === "homologated" ? "Finale" : "Provvisorio"}
                     </Badge>
                     {liveUpdateDegraded ? (
-                      <span
-                        data-testid="matchday-live-degraded"
-                        style={{
-                          marginLeft: "var(--fa-space-sm)",
-                          color: "var(--fa-color-foreground-muted)",
-                        }}
-                      >
-                        Aggiornamento live rallentato, nuovo tentativo in corso…
+                      <span data-testid="matchday-live-degraded" className="fa-matchday-degraded">
+                        Aggiornamento live rallentato…
                       </span>
                     ) : null}
+                  </div>
+                </header>
+
+                {selected.fixtures.some((fixture) => fixture.lockLatchedAt) ? (
+                  <p data-testid="matchday-cutoff-latch" className="fa-matchday-hint">
+                    Un rinvio o un cambio orario non sblocca le partite il cui kickoff originale è
+                    già trascorso. Le mosse tattiche già usate restano consumate.
                   </p>
-                  <p>Finestra: {formatDateTime(selected.windowStartAt)} → {formatDateTime(selected.windowEndAt)}</p>
-                  <p>Cutoff formazione: {formatDateTime(selected.cutoffAt)}</p>
-                  {selected.fixtures.some((fixture) => fixture.lockLatchedAt) ? (
-                    <p data-testid="matchday-cutoff-latch">
-                      Un rinvio o un cambio orario non sblocca le partite il cui kickoff originale è
-                      già trascorso. Le mosse tattiche già usate restano consumate.
-                    </p>
+                ) : null}
+                {selected.skipReason ? <p>{selected.skipReason}</p> : null}
+
+                <div className="fa-ds-showcase__row">
+                  {isAdmin && selected.status === "scheduled" ? (
+                    <Button
+                      type="button"
+                      disabled={busy}
+                      onClick={() => void runOpen()}
+                      data-testid="matchday-open"
+                    >
+                      Apri turno
+                    </Button>
                   ) : null}
-                  {selected.skipReason ? <p>{selected.skipReason}</p> : null}
-                  <div className="fa-ds-showcase__row">
-                    {isAdmin && selected.status === "scheduled" ? (
-                      <Button type="button" disabled={busy} onClick={() => void runOpen()} data-testid="matchday-open">
-                        Apri turno
-                      </Button>
-                    ) : null}
-                    {isAdmin && selected.status !== "skipped" ? (
-                      <Button
-                        type="button"
-                        variant="secondary"
-                        disabled={busy}
-                        onClick={() => void runRecalculate()}
-                        data-testid="matchday-recalc"
+                  {isAdmin && selected.status !== "skipped" ? (
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      disabled={busy}
+                      onClick={() => void runRecalculate()}
+                      data-testid="matchday-recalc"
+                    >
+                      Ricalcola cutoff
+                    </Button>
+                  ) : null}
+                </div>
+
+                <div className="fa-matchday-competitions" data-testid="matchday-fixtures">
+                  {groupFixturesByCompetition(selected.fixtures).map(
+                    ([competitionName, fixtures]) => (
+                      <section
+                        key={competitionName}
+                        className="fa-matchday-competition"
+                        data-testid={`matchday-competition-${competitionName}`}
                       >
-                        Ricalcola cutoff
-                      </Button>
-                    ) : null}
-                  </div>
-                  <div className="fa-ds-showcase__stack" data-testid="matchday-fixtures">
-                    {selected.fixtures.map((fixture) => (
-                      <div key={fixture.id} className="fa-ds-showcase__row">
-                        <MatchCard
-                          homeTeam={fixture.homeClubName}
-                          awayTeam={fixture.awayClubName}
-                          kickoffLabel={formatDateTime(fixture.kickoffAt)}
-                          status={mapFixtureMatchStatus(fixture.statusShort)}
-                          statusLabel={
-                            MATCH_STATUS_LABEL[mapFixtureMatchStatus(fixture.statusShort)] ??
-                            fixture.statusShort
-                          }
-                          contextLabel={fixture.competitionName ?? "Campionato"}
-                          score={
-                            fixture.homeGoals !== null && fixture.awayGoals !== null
-                              ? { home: fixture.homeGoals, away: fixture.awayGoals }
-                              : null
-                          }
-                        />
-                        {fixture.lockLatchedAt ? (
-                          <p data-testid={`matchday-lock-latched-${fixture.fixtureId}`}>
-                            Bloccata: l'orario originale è già trascorso.
-                          </p>
-                        ) : null}
-                        {isAdmin && selected.modificationAllowed ? (
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            disabled={busy}
-                            onClick={() => void runExclude(fixture.fixtureId)}
-                            data-testid={`matchday-exclude-${fixture.fixtureId}`}
-                          >
-                            Escludi
-                          </Button>
-                        ) : null}
-                      </div>
-                    ))}
-                  </div>
-                </CardBody>
-              </Card>
+                        <h3 className="fa-matchday-competition__title">{competitionName}</h3>
+                        <div className="fa-matchday-competition__fixtures">
+                          {fixtures.map((fixture) => (
+                            <div key={fixture.id} className="fa-matchday-fixture">
+                              <MatchCard
+                                homeTeam={fixture.homeClubName}
+                                awayTeam={fixture.awayClubName}
+                                kickoffLabel={formatDateTime(fixture.kickoffAt)}
+                                status={mapFixtureMatchStatus(fixture.statusShort)}
+                                statusLabel={
+                                  MATCH_STATUS_LABEL[mapFixtureMatchStatus(fixture.statusShort)] ??
+                                  fixture.statusShort
+                                }
+                                score={
+                                  fixture.homeGoals !== null && fixture.awayGoals !== null
+                                    ? { home: fixture.homeGoals, away: fixture.awayGoals }
+                                    : null
+                                }
+                              />
+                              {fixture.lockLatchedAt ? (
+                                <p
+                                  className="fa-matchday-hint"
+                                  data-testid={`matchday-lock-latched-${fixture.fixtureId}`}
+                                >
+                                  Bloccata: l'orario originale è già trascorso.
+                                </p>
+                              ) : null}
+                              {isAdmin && selected.modificationAllowed ? (
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  disabled={busy}
+                                  onClick={() => void runExclude(fixture.fixtureId)}
+                                  data-testid={`matchday-exclude-${fixture.fixtureId}`}
+                                >
+                                  Escludi
+                                </Button>
+                              ) : null}
+                            </div>
+                          ))}
+                        </div>
+                      </section>
+                    ),
+                  )}
+                </div>
+              </div>
             ) : null}
 
-            {isAdmin ? (
+            {!loading && !loadError && isAdmin ? (
               <Card data-testid="matchday-admin">
                 <CardHeader title="Calendario turni" />
                 <CardBody>
@@ -733,14 +1009,6 @@ export function MatchdayPage() {
                 testId="matchday-action-error"
               />
             ) : null}
-          </TabPanel>
-          <TabPanel value="risultati">
-            <UiStatePanel
-              state="empty"
-              title="Risultati non ancora disponibili"
-              message="Il tab risultati arriverà con le fasi di scoring successive."
-              testId="matchday-results-soon"
-            />
           </TabPanel>
         </Tabs>
       ) : null}

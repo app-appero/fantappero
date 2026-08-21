@@ -17,6 +17,7 @@ export { ManagerDirectoryPage } from "./ManagerDirectoryPage";
 export { ReceivedInvitesPage } from "./ReceivedInvitesPage";
 export { MarketPage } from "./MarketPage";
 export { MatchdayPage } from "./MatchdayPage";
+export { MatchupDetailPage } from "./MatchupDetailPage";
 export { AdminDashboardPage } from "./AdminDashboardPage";
 export { AdminLeaguesPage } from "./AdminLeaguesPage";
 export { AdminListonePage } from "./AdminListonePage";

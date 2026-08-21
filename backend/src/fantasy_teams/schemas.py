@@ -53,6 +53,7 @@ class FantasyTeamResponse(ApiModel):
     league_id: str = Field(alias="leagueId")
     membership_id: str = Field(alias="membershipId")
     user_id: str = Field(alias="userId")
+    user_type: str = Field(alias="userType")
     name: str
     roster_size: int = Field(alias="rosterSize")
     filled_slots: int = Field(alias="filledSlots")
@@ -66,6 +67,7 @@ class FantasyTeamSummaryResponse(ApiModel):
     league_id: str = Field(alias="leagueId")
     membership_id: str = Field(alias="membershipId")
     user_id: str = Field(alias="userId")
+    user_type: str = Field(alias="userType")
     name: str
     roster_size: int = Field(alias="rosterSize")
     filled_slots: int = Field(alias="filledSlots")

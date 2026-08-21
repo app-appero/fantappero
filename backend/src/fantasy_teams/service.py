@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import random
 from datetime import UTC, datetime
 from typing import NoReturn
 from uuid import UUID
@@ -15,16 +16,20 @@ from auth.models.user import User
 from authorization.context import LeagueAccess
 from database.enums import (
     CreditLedgerReason,
+    FantasyRole,
     LeagueAuditAction,
     LeagueMemberRole,
     RosterCompositionStatus,
     RosterImportStatus,
     RosterOwnershipSource,
+    UserType,
 )
 from fantasy_teams.composition import RosterCompositionReport
 from fantasy_teams.composition_service import (
     assert_assignment_respects_role_quota,
     evaluate_team_composition,
+    resolve_effective_athlete_role,
+    resolve_league_rules_limits,
     sync_team_composition_status,
 )
 from fantasy_teams.csv_import import (
@@ -115,6 +120,7 @@ from observability.logging import get_logger
 from observability.metrics import get_metrics
 from sports_data.catalog.models import Club
 from sports_data.listone.generate import get_role_assignment
+from sports_data.listone.models import RoleAssignment
 from sports_data.listone.overrides import effective_role_for_athlete, get_active_override
 from sports_data.roster.models import Athlete
 
@@ -164,7 +170,7 @@ class FantasyTeamService:
             .where(FantasyTeam.league_id == league_access.league.id)
             .options(
                 selectinload(FantasyTeam.slots),
-                selectinload(FantasyTeam.membership),
+                selectinload(FantasyTeam.membership).selectinload(LeagueMembership.user),
             )
             .order_by(FantasyTeam.created_at.asc())
         ).all()
@@ -274,6 +280,180 @@ class FantasyTeamService:
             extra={"created": created, "existing": existing},
         )
         return EnsureFantasyTeamsResponse(created=created, existing=existing, teams=summaries)
+
+    def assign_random_ai_roster(
+        self,
+        league_access: LeagueAccess,
+        team_id: UUID,
+        *,
+        purchase_credits: int = 0,
+    ) -> FantasyTeamResponse:
+        """Fill empty slots of an AI manager roster with random free listone athletes."""
+        if not self._is_league_admin(league_access):
+            raise ValidationAuthError(
+                "Solo l'amministratore di lega può assegnare una rosa random.",
+                code="admin_required",
+            )
+
+        league = self._lock_league(league_access.league.id)
+        team = self._get_team_for_update(league.id, team_id)
+        membership = self._session.scalar(
+            select(LeagueMembership)
+            .where(LeagueMembership.id == team.membership_id)
+            .options(selectinload(LeagueMembership.user))
+            .with_for_update()
+        )
+        if membership is None or membership.user is None:
+            raise ValidationAuthError("Squadra non trovata.", code="fantasy_team_not_found")
+        if membership.user.user_type != UserType.AI:
+            raise ValidationAuthError(
+                "La rosa random è disponibile solo per i fantallenatori IA.",
+                code="not_ai_manager",
+            )
+
+        slots = list(
+            self._session.scalars(
+                select(FantasyRosterSlot)
+                .where(FantasyRosterSlot.fantasy_team_id == team.id)
+                .order_by(FantasyRosterSlot.slot_index.asc())
+                .with_for_update()
+            ).all()
+        )
+        team.slots = slots
+
+        empty_slots = [slot for slot in slots if slot.athlete_id is None]
+        if not empty_slots:
+            get_metrics().incr("fantasy_roster_random_ai_total", labels={"result": "noop"})
+            refreshed = find_team_by_id(
+                self._session,
+                league_id=league.id,
+                team_id=team.id,
+                with_slots=True,
+            )
+            assert refreshed is not None
+            return self._to_team_response(refreshed)
+
+        limits = resolve_league_rules_limits(self._session, league.id)
+        purchase_credits = validate_purchase_credits(purchase_credits)
+
+        filled_by_role: dict[FantasyRole, int] = {
+            FantasyRole.P: 0,
+            FantasyRole.D: 0,
+            FantasyRole.C: 0,
+            FantasyRole.A: 0,
+        }
+        for slot in slots:
+            if slot.athlete_id is None:
+                continue
+            role = resolve_effective_athlete_role(
+                self._session,
+                league_id=league.id,
+                athlete_id=slot.athlete_id,
+                season_year=league.season_year,
+            )
+            if role is not None:
+                filled_by_role[role] += 1
+
+        needed_by_role: dict[FantasyRole, int] = {}
+        for role in FantasyRole:
+            needed = limits.for_role(role) - filled_by_role[role]
+            if needed > 0:
+                needed_by_role[role] = needed
+
+        if not needed_by_role:
+            get_metrics().incr("fantasy_roster_random_ai_total", labels={"result": "noop"})
+            refreshed = find_team_by_id(
+                self._session,
+                league_id=league.id,
+                team_id=team.id,
+                with_slots=True,
+            )
+            assert refreshed is not None
+            return self._to_team_response(refreshed)
+
+        owned_athlete_ids = select(FantasyRosterSlot.athlete_id).where(
+            FantasyRosterSlot.league_id == league.id,
+            FantasyRosterSlot.athlete_id.is_not(None),
+        )
+        free_rows = self._session.execute(
+            select(RoleAssignment.athlete_id, RoleAssignment.role).where(
+                RoleAssignment.season_year == league.season_year,
+                RoleAssignment.athlete_id.not_in(owned_athlete_ids),
+            )
+        ).all()
+
+        pool: dict[FantasyRole, list[UUID]] = {
+            FantasyRole.P: [],
+            FantasyRole.D: [],
+            FantasyRole.C: [],
+            FantasyRole.A: [],
+        }
+        for athlete_id, role in free_rows:
+            pool[role].append(athlete_id)
+
+        rng = random.Random()
+        picks: list[tuple[FantasyRole, UUID]] = []
+        for role, needed in needed_by_role.items():
+            candidates = list(pool[role])
+            if len(candidates) < needed:
+                raise ValidationAuthError(
+                    (
+                        f"Calciatori liberi insufficienti per ruolo {role.value}: "
+                        f"servono {needed}, disponibili {len(candidates)}."
+                    ),
+                    code="insufficient_free_athletes",
+                )
+            rng.shuffle(candidates)
+            for athlete_id in candidates[:needed]:
+                picks.append((role, athlete_id))
+
+        if len(picks) > len(empty_slots):
+            raise ValidationAuthError(
+                "Slot liberi insufficienti per completare la rosa.",
+                code="insufficient_empty_slots",
+            )
+
+        assigned = 0
+        for slot, (_role, athlete_id) in zip(empty_slots, picks, strict=False):
+            self._apply_assignment_without_commit(
+                league_access,
+                team=team,
+                slot_index=slot.slot_index,
+                athlete_id=athlete_id,
+                purchase_credits=purchase_credits,
+                skip_per_row_audit=True,
+                ownership_source=RosterOwnershipSource.ADMIN,
+                ledger_tx_prefix="random-ai",
+                audit_source="random_ai",
+            )
+            assigned += 1
+
+        self._add_audit(
+            league.id,
+            league_access.user.id,
+            LeagueAuditAction.FANTASY_ROSTER_SLOT_ASSIGNED,
+            details={
+                "fantasyTeamId": str(team.id),
+                "source": "random_ai",
+                "assignedCount": assigned,
+                "purchaseCredits": purchase_credits,
+            },
+        )
+        report = self._sync_composition(team, league, actor_id=league_access.user.id)
+        self._session.commit()
+        get_metrics().incr("fantasy_roster_random_ai_total", labels={"result": "success"})
+        logger.info(
+            "fantasy_roster_random_ai_assigned",
+            extra={"assigned": assigned, "team_id": str(team.id)},
+        )
+        refreshed = find_team_by_id(
+            self._session,
+            league_id=league.id,
+            team_id=team.id,
+            with_slots=True,
+        )
+        assert refreshed is not None
+        return self._to_team_response(refreshed, composition=report)
 
     def get_my_credits(self, league_access: LeagueAccess) -> CreditAccountResponse:
         membership = self._require_membership(league_access)
@@ -1093,8 +1273,11 @@ class FantasyTeamService:
         athlete_id: UUID,
         purchase_credits: int,
         skip_per_row_audit: bool = False,
+        ownership_source: RosterOwnershipSource = RosterOwnershipSource.CSV_IMPORT,
+        ledger_tx_prefix: str = "csv-purchase",
+        audit_source: str = "csv_import",
     ) -> None:
-        """Assign one athlete inside an open transaction (used by CSV confirm)."""
+        """Assign one athlete inside an open transaction (used by CSV confirm / random AI)."""
         roster_size = resolve_roster_size(self._session, team.league_id)
         validate_slot_index(slot_index=slot_index, roster_size=roster_size)
         purchase_credits = validate_purchase_credits(purchase_credits)
@@ -1167,9 +1350,9 @@ class FantasyTeamService:
                 account,
                 amount=-purchase_credits,
                 reason=CreditLedgerReason.ROSTER_PURCHASE,
-                transaction_id=f"csv-purchase:{team.id}:{slot_index}:{athlete_id}",
+                transaction_id=f"{ledger_tx_prefix}:{team.id}:{slot_index}:{athlete_id}",
                 actor_id=league_access.user.id,
-                note=f"Import CSV {athlete.canonical_name}",
+                note=f"Assegnazione {athlete.canonical_name}",
             )
 
         sync_ownership_on_assign(
@@ -1179,7 +1362,7 @@ class FantasyTeamService:
             slot_index=slot_index,
             athlete_id=athlete_id,
             purchase_credits=purchase_credits,
-            source=RosterOwnershipSource.CSV_IMPORT,
+            source=ownership_source,
             previous_athlete_id=None,
         )
         get_metrics().incr(
@@ -1197,7 +1380,7 @@ class FantasyTeamService:
                     "slotIndex": slot_index,
                     "athleteId": str(athlete_id),
                     "purchaseCredits": purchase_credits,
-                    "source": "csv_import",
+                    "source": audit_source,
                 },
             )
 
@@ -1511,11 +1694,13 @@ class FantasyTeamService:
         roster_size: int,
     ) -> FantasyTeamSummaryResponse:
         filled = sum(1 for slot in team.slots if slot.athlete_id is not None)
+        user = team.membership.user
         return FantasyTeamSummaryResponse(
             id=str(team.id),
             leagueId=str(team.league_id),
             membershipId=str(team.membership_id),
             userId=str(team.membership.user_id),
+            userType=user.user_type.value if user is not None else UserType.HUMAN.value,
             name=team.name,
             rosterSize=roster_size,
             filledSlots=filled,
@@ -1548,11 +1733,13 @@ class FantasyTeamService:
             self._composition_response(team, report) if report is not None else None
         )
         status_value = report.status.value if report is not None else team.composition_status.value
+        user = team.membership.user
         return FantasyTeamResponse(
             id=str(team.id),
             leagueId=str(team.league_id),
             membershipId=str(team.membership_id),
             userId=str(team.membership.user_id),
+            userType=user.user_type.value if user is not None else UserType.HUMAN.value,
             name=team.name,
             rosterSize=roster_size,
             filledSlots=filled,

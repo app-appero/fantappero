@@ -76,6 +76,7 @@ const DEMO_TEAM: FantasyTeam = {
   leagueId: "demo-league",
   membershipId: "demo-membership",
   userId: "demo-user",
+  userType: "human",
   name: "Squadra Demo",
   rosterSize: 25,
   filledSlots: 1,

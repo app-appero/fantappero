@@ -24,6 +24,8 @@ vi.mock("../api/leagues", () => ({
   fetchLeague: vi.fn(),
   fetchLeagueMembersPublic: vi.fn(),
   fetchLeagueCalendar: vi.fn(),
+  fetchH2HCalendar: vi.fn(),
+  fetchH2HMatchup: vi.fn(),
   deleteLeague: vi.fn(),
   fetchLeagueAdminPanel: vi.fn(),
   updateLeagueRules: vi.fn(),
@@ -45,6 +47,7 @@ vi.mock("../api/leagues", () => ({
   openFantasyTurn: vi.fn(),
   excludeFantasyTurnFixture: vi.fn(),
   recalculateFantasyTurnCutoff: vi.fn(),
+  ensureFantasyTurns: vi.fn(),
 }));
 
 function renderRoute(path: string) {
@@ -58,26 +61,39 @@ function renderRoute(path: string) {
   );
 }
 
-describe("EP06-01 / EP06-07 matchday page", () => {
-  it("renders success demo with turn detail and admin tools", () => {
+describe("Matchday page H2H + europei", () => {
+  it("renders H2H calendar with giornata selector defaulting to current round", () => {
     const html = renderRoute("/turni?persona=admin&stato=success");
+    expect(html).toContain("Calendario fantallenatori");
+    expect(html).toContain("Turni europei");
+    expect(html).toContain('data-testid="h2h-calendar"');
+    expect(html).toContain('data-testid="h2h-round-select"');
+    expect(html).toContain("Giornata 2");
+    expect(html).toContain("Marco FC");
+    expect(html).toContain("Riposo");
+    expect(html).toContain("storico");
+  });
+
+  it("renders european tab with competition columns and turn select", () => {
+    const html = renderRoute("/turni?persona=admin&stato=success&tab=europei");
     expect(html).toContain('data-testid="matchday-turn-detail"');
+    expect(html).toContain('data-testid="matchday-turn-select"');
     expect(html).toContain('data-testid="matchday-admin"');
     expect(html).toContain("Genera turno");
     expect(html).toContain("West Ham");
+    expect(html).toContain("Premier League");
+    expect(html).toContain("Serie A");
     expect(html).toContain("Rinviata");
-    expect(html).toContain('data-testid="matchday-lock-latched-fx-1"');
-    expect(html).toContain('data-testid="matchday-cutoff-latch"');
   });
 
-  it("shows empty state", () => {
+  it("shows H2H empty state", () => {
     const html = renderRoute("/turni?persona=admin&stato=empty");
-    expect(html).toContain('data-testid="matchday-empty"');
+    expect(html).toContain('data-testid="h2h-empty"');
   });
 
-  it("shows error state with retry", () => {
+  it("shows H2H error state with retry", () => {
     const html = renderRoute("/turni?persona=member&stato=error");
-    expect(html).toContain('data-testid="matchday-error"');
+    expect(html).toContain('data-testid="h2h-error"');
     expect(html).toContain("Ricarica");
   });
 
@@ -86,8 +102,23 @@ describe("EP06-01 / EP06-07 matchday page", () => {
     expect(html).toContain('data-testid="matchday-forbidden"');
   });
 
-  it("shows loading state", () => {
+  it("shows H2H loading state", () => {
     const html = renderRoute("/turni?persona=admin&stato=loading");
-    expect(html).toContain('data-testid="matchday-loading"');
+    expect(html).toContain('data-testid="h2h-loading"');
+  });
+
+  it("renders matchup detail demo", () => {
+    const html = renderRoute("/turni/scontro/slot-demo-1?persona=admin&stato=success");
+    expect(html).toContain('data-testid="matchup-detail"');
+    expect(html).toContain("Marco FC");
+    expect(html).toContain("Giulia United");
+    expect(html).toContain("Provvisorio");
+    expect(html).toContain("formazione effettiva");
+    expect(html).toContain('data-testid="formation-view"');
+  });
+
+  it("shows matchup forbidden state", () => {
+    const html = renderRoute("/turni/scontro/slot-demo-1?persona=member&stato=forbidden");
+    expect(html).toContain('data-testid="matchup-forbidden"');
   });
 });

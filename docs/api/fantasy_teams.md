@@ -90,6 +90,7 @@ placeholder: verificano rose e conti reali.
 | `GET` | `/leagues/{id}/amministrazione/squadre/{teamId}/rosa/storico` | `league:admin` |
 | `POST` | `/leagues/{id}/amministrazione/crediti/movimenti` | `league:admin` — aggiustamento idempotente (`transactionId`) |
 | `POST` | `/leagues/{id}/amministrazione/squadre` | `league:admin` — assicura squadra+slot+conto per ogni iscritto |
+| `POST` | `/leagues/{id}/amministrazione/squadre/{teamId}/rosa/random` | `league:admin` — riempie slot vuoti di un fantallenatore IA con calciatori liberi random |
 | `GET` | `/leagues/{id}/amministrazione/squadre/{teamId}` | `league:admin` — dettaglio rosa per inserimento multi-squadra |
 | `GET` | `/leagues/{id}/amministrazione/squadre/{teamId}/crediti` | `league:admin` — saldo + ledger di una squadra |
 | `PUT` | `/leagues/{id}/amministrazione/squadre/{teamId}/slot/{slotIndex}` | `roster:edit` — assegna calciatore (`athleteId`, `purchaseCredits`); solo propria squadra se non admin |

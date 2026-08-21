@@ -2,6 +2,8 @@ import type { LeagueMember } from "@fantappero/contracts";
 import { Button, UiStatePanel } from "@fantappero/ui";
 import { useCallback, useEffect, useState } from "react";
 import {
+  assignRandomAiRoster,
+  ensureFantasyTeams,
   fetchLeagueMembers,
   removeLeagueMember,
   transferLeagueAdmin,
@@ -13,18 +15,21 @@ const DEMO_MEMBERS: LeagueMember[] = [
   {
     userId: "demo-admin",
     displayName: "Marco",
+    userType: "human",
     role: "league_admin",
     joinedAt: "2026-08-01T10:00:00Z",
   },
   {
     userId: "demo-member-1",
     displayName: "Giulia",
+    userType: "human",
     role: "member",
     joinedAt: "2026-08-02T10:00:00Z",
   },
   {
     userId: "demo-member-2",
-    displayName: "Luca",
+    displayName: "Allenatore IA 01",
+    userType: "ai",
     role: "member",
     joinedAt: "2026-08-03T10:00:00Z",
   },
@@ -155,6 +160,43 @@ export function LeagueMembersPanel({
     }
   }
 
+  async function onAssignRandomRoster(target: LeagueMember) {
+    setError(null);
+    setSuccess(null);
+    if (target.userType !== "ai") {
+      setError("La rosa random è disponibile solo per i fantallenatori IA.");
+      return;
+    }
+    if (isDemoMode) {
+      setSuccess(`Rosa random assegnata a ${target.displayName} (demo).`);
+      return;
+    }
+    const session = loadStoredSession();
+    if (!leagueId || !session?.accessToken) {
+      setError("Sessione non disponibile. Accedi di nuovo.");
+      return;
+    }
+    setWorkingId(`random-${target.userId}`);
+    try {
+      const ensured = await ensureFantasyTeams(session.accessToken, leagueId);
+      const team = ensured.teams.find((row) => row.userId === target.userId);
+      if (!team) {
+        setError("Squadra del fantallenatore IA non trovata. Assicura prima le squadre.");
+        return;
+      }
+      const updated = await assignRandomAiRoster(session.accessToken, leagueId, team.id);
+      setSuccess(
+        `Rosa random assegnata a ${target.displayName}: ${updated.filledSlots}/${updated.rosterSize} giocatori.`,
+      );
+    } catch (assignError) {
+      setError(
+        getApiErrorMessage(assignError, "Impossibile assegnare la rosa random."),
+      );
+    } finally {
+      setWorkingId(null);
+    }
+  }
+
   return (
     <section className="fa-members" aria-labelledby="league-members-title">
       <h2 id="league-members-title">Partecipanti iscritti</h2>
@@ -196,9 +238,23 @@ export function LeagueMembersPanel({
               <span>
                 <strong>{member.displayName}</strong>
                 {` · ${member.role === "league_admin" ? "Amministratore" : "Partecipante"}`}
+                {member.userType === "ai" ? " · IA" : ""}
               </span>
               {member.role === "member" ? (
                 <span className="fa-ds-showcase__row">
+                  {member.userType === "ai" ? (
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="sm"
+                      data-testid={`league-members-random-ai-${member.userId}`}
+                      loading={workingId === `random-${member.userId}`}
+                      disabled={workingId !== null}
+                      onClick={() => void onAssignRandomRoster(member)}
+                    >
+                      Assegna rosa random
+                    </Button>
+                  ) : null}
                   <Button
                     type="button"
                     variant="secondary"
