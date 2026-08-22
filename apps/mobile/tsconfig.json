@@ -4,6 +4,7 @@
     "strict": true,
     "noUncheckedIndexedAccess": true,
     "paths": {
+      "@fantappero/api-client": ["../../packages/api-client/src/index.ts"],
       "@fantappero/contracts": ["../../packages/contracts/src/index.ts"],
       "@fantappero/ui": ["../../packages/ui/src/index.ts"],
       "@fantappero/ui/theme": ["../../packages/ui/src/theme.ts"]

@@ -12,6 +12,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@fantappero/api-client": "workspace:*",
     "@fantappero/contracts": "workspace:*",
     "@fantappero/ui": "workspace:*",
     "react": "19.1.0",

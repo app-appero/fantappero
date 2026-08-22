@@ -4,7 +4,7 @@
   "private": true,
   "main": "index.js",
   "scripts": {
-    "prestart": "pnpm --filter @fantappero/contracts build && pnpm --filter @fantappero/ui build",
+    "prestart": "pnpm --filter @fantappero/contracts build && pnpm --filter @fantappero/ui build && pnpm --filter @fantappero/api-client build",
     "start": "expo start --lan -c",
     "android": "expo start --android",
     "ios": "expo start --ios",
@@ -17,6 +17,7 @@
   "dependencies": {
     "@expo/metro-runtime": "~6.1.2",
     "@expo/vector-icons": "15.1.1",
+    "@fantappero/api-client": "workspace:*",
     "@fantappero/contracts": "workspace:*",
     "@fantappero/ui": "workspace:*",
     "@react-navigation/bottom-tabs": "^7.18.14",
