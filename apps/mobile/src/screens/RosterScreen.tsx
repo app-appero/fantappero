@@ -14,6 +14,7 @@ import type {
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Pressable, Text, View } from "react-native";
 import {
+  assignRandomAiRoster,
   assignRosterSlot,
   confirmRosterCsvImport,
   createRosterTurnSnapshot,
@@ -74,6 +75,9 @@ export function RosterScreen() {
   const [ensuring, setEnsuring] = useState(false);
   const [ensureMessage, setEnsureMessage] = useState<string | null>(null);
   const [ensureError, setEnsureError] = useState<string | null>(null);
+  const [randomAiBusy, setRandomAiBusy] = useState(false);
+  const [randomAiMessage, setRandomAiMessage] = useState<string | null>(null);
+  const [randomAiError, setRandomAiError] = useState<string | null>(null);
   const [adjustAmount, setAdjustAmount] = useState("-10");
   const [adjustNote, setAdjustNote] = useState("");
   const [adjusting, setAdjusting] = useState(false);
@@ -412,6 +416,52 @@ export function RosterScreen() {
       setEnsureError(getApiErrorMessage(error, "Impossibile creare le squadre."));
     } finally {
       setEnsuring(false);
+    }
+  };
+
+  const onAssignRandomAiRoster = async () => {
+    setRandomAiMessage(null);
+    setRandomAiError(null);
+    const targetId = adminTeamId || viewedTeam?.id;
+    const resolvedTarget =
+      (targetId ? teamDetails.find((row) => row.id === targetId) : null) ??
+      adminTeam ??
+      viewedTeam;
+    if (!resolvedTarget || resolvedTarget.userType !== "ai") {
+      setRandomAiError("Seleziona una squadra di un fantallenatore IA.");
+      return;
+    }
+    if (resolvedTarget.filledSlots >= resolvedTarget.rosterSize) {
+      setRandomAiMessage("La rosa del fantallenatore IA è già completa.");
+      return;
+    }
+    if (!activeLeagueId || !accessToken) {
+      setRandomAiError("Sessione o lega non disponibile.");
+      return;
+    }
+    setRandomAiBusy(true);
+    try {
+      const updated = await assignRandomAiRoster(accessToken, activeLeagueId, resolvedTarget.id);
+      setAdminTeam(updated);
+      setTeamDetails((current) => current.map((row) => (row.id === updated.id ? updated : row)));
+      setLeagueTeams((current) =>
+        current.map((row) =>
+          row.id === updated.id
+            ? {
+                ...row,
+                filledSlots: updated.filledSlots,
+                compositionStatus: updated.compositionStatus,
+                userType: updated.userType,
+              }
+            : row,
+        ),
+      );
+      setRandomAiMessage(`Rosa random assegnata: ${updated.filledSlots}/${updated.rosterSize} giocatori.`);
+      await loadEditContext(updated.id);
+    } catch (error) {
+      setRandomAiError(getApiErrorMessage(error, "Impossibile assegnare la rosa random."));
+    } finally {
+      setRandomAiBusy(false);
     }
   };
 
@@ -755,9 +805,15 @@ export function RosterScreen() {
 
           <RosterAdminToolsPanel
             ensuring={ensuring}
+            randomAiBusy={randomAiBusy}
             onEnsureTeams={onEnsureTeams}
+            leagueTeams={leagueTeams}
+            adminOrViewedTeam={adminTeam ?? viewedTeam}
+            onAssignRandomAiRoster={onAssignRandomAiRoster}
             ensureMessage={ensureMessage}
             ensureError={ensureError}
+            randomAiMessage={randomAiMessage}
+            randomAiError={randomAiError}
           />
         </>
       ) : null}
