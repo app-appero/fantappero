@@ -10,6 +10,7 @@ import { JoinLeagueScreen } from "../screens/JoinLeagueScreen";
 import { LeagueAdminScreen } from "../screens/LeagueAdminScreen";
 import { LeagueHomeScreen } from "../screens/LeagueHomeScreen";
 import { ManagerDirectoryScreen } from "../screens/ManagerDirectoryScreen";
+import { MatchupDetailScreen } from "../screens/MatchupDetailScreen";
 import { ReceivedInvitesScreen } from "../screens/ReceivedInvitesScreen";
 import { useAuthSession } from "../session/DemoSessionContext";
 import { sceneBackgroundStyle } from "../theme/navigationTheme";
@@ -107,6 +108,11 @@ export function RootNavigator() {
             name="ManagerDirectory"
             component={ManagerDirectoryScreen}
             options={{ title: "Fantallenatori" }}
+          />
+          <Stack.Screen
+            name="MatchupDetail"
+            component={MatchupDetailScreen}
+            options={{ title: "Scontro diretto" }}
           />
           <Stack.Screen
             name="AdminPanel"

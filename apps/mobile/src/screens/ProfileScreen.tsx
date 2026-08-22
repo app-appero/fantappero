@@ -5,14 +5,18 @@ import {
   type UserProfile,
 } from "@fantappero/contracts";
 import { theme } from "@fantappero/ui/theme";
+import * as ImagePicker from "expo-image-picker";
 import { useCallback, useState } from "react";
-import { Pressable, Share, StyleSheet, Switch, Text, TextInput, View } from "react-native";
+import { Image, Pressable, Share, StyleSheet, Switch, Text, TextInput, View } from "react-native";
+import { loadMobileEnv, MobileEnvError } from "../config/env";
 import { deleteAccount, exportAccountData } from "../api/privacy";
 import {
   fetchProfile,
   recordPolicyConsent,
+  removeAvatar,
   updateInviteAvailability,
   updateProfile,
+  uploadAvatar,
 } from "../api/profile";
 import { UiStatePanel } from "../components/UiStatePanel";
 import { useScreenData } from "../hooks/useScreenData";
@@ -20,6 +24,38 @@ import { PageContainer } from "../layout/PageContainer";
 import { getApiErrorMessage, useAuthSession } from "../session/DemoSessionContext";
 
 const { colors, spacing, typography, radius } = theme;
+
+function resolveAvatarUrl(avatarUrl: string | null): string | null {
+  if (!avatarUrl) {
+    return null;
+  }
+  if (avatarUrl.startsWith("http://") || avatarUrl.startsWith("https://")) {
+    return avatarUrl;
+  }
+  try {
+    return `${loadMobileEnv().expoPublicApiBaseUrl}${avatarUrl}`;
+  } catch (error) {
+    if (error instanceof MobileEnvError) {
+      return null;
+    }
+    throw error;
+  }
+}
+
+function parseQuietHour(value: string): number | null | undefined {
+  const trimmed = value.trim();
+  if (trimmed === "") {
+    return null;
+  }
+  if (!/^\d+$/.test(trimmed)) {
+    return undefined;
+  }
+  const parsed = Number(trimmed);
+  if (parsed < 0 || parsed > 23) {
+    return undefined;
+  }
+  return parsed;
+}
 
 /** Profilo utente — preferenze e privacy via API (EP02-02). */
 export function ProfileScreen() {
@@ -31,11 +67,14 @@ export function ProfileScreen() {
   const [timezone, setTimezone] = useState("Europe/Rome");
   const [notificationsEmail, setNotificationsEmail] = useState(true);
   const [notificationsPush, setNotificationsPush] = useState(true);
+  const [quietHoursStartHour, setQuietHoursStartHour] = useState("");
+  const [quietHoursEndHour, setQuietHoursEndHour] = useState("");
   const [availableForInvites, setAvailableForInvites] = useState(false);
   const [policyAccepted, setPolicyAccepted] = useState(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [avatarBusy, setAvatarBusy] = useState(false);
   const [deletePhrase, setDeletePhrase] = useState("");
   const [deletePassword, setDeletePassword] = useState("");
 
@@ -45,6 +84,8 @@ export function ProfileScreen() {
     setTimezone(next.timezone);
     setNotificationsEmail(next.notificationsEmail);
     setNotificationsPush(next.notificationsPush);
+    setQuietHoursStartHour(next.quietHoursStartHour?.toString() ?? "");
+    setQuietHoursEndHour(next.quietHoursEndHour?.toString() ?? "");
     setAvailableForInvites(next.availableForInvites);
     setPolicyAccepted(next.policyVersion === next.currentPolicyVersion);
   }, []);
@@ -84,6 +125,16 @@ export function ProfileScreen() {
       setFormError("Sessione non disponibile. Accedi di nuovo.");
       return;
     }
+    if ((quietHoursStartHour.trim() === "") !== (quietHoursEndHour.trim() === "")) {
+      setFormError("Imposta sia l'inizio sia la fine del silenzio, oppure lasciali entrambi vuoti.");
+      return;
+    }
+    const parsedStartHour = parseQuietHour(quietHoursStartHour);
+    const parsedEndHour = parseQuietHour(quietHoursEndHour);
+    if (parsedStartHour === undefined || parsedEndHour === undefined) {
+      setFormError("Le ore di silenzio devono essere comprese tra 0 e 23.");
+      return;
+    }
     setSaving(true);
     try {
       const updated = await updateProfile(accessToken, {
@@ -92,6 +143,8 @@ export function ProfileScreen() {
         timezone,
         notificationsEmail,
         notificationsPush,
+        quietHoursStartHour: parsedStartHour,
+        quietHoursEndHour: parsedEndHour,
       });
       applyProfile(updated);
       updateDisplayName(updated.displayName);
@@ -100,6 +153,58 @@ export function ProfileScreen() {
       setFormError(getApiErrorMessage(error, "Salvataggio non riuscito."));
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function handlePickAvatar() {
+    setFormError(null);
+    setSuccessMessage(null);
+    if (!accessToken) {
+      setFormError("Sessione non disponibile. Accedi di nuovo.");
+      return;
+    }
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) {
+      setFormError("Permesso di accesso alle foto negato.");
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ["images"],
+      quality: 0.8,
+    });
+    if (result.canceled || !result.assets?.[0]) {
+      return;
+    }
+    const asset = result.assets[0];
+    const name = asset.fileName ?? asset.uri.split("/").pop() ?? "avatar.jpg";
+    const type = asset.mimeType ?? "image/jpeg";
+    setAvatarBusy(true);
+    try {
+      const updated = await uploadAvatar(accessToken, { uri: asset.uri, name, type });
+      applyProfile(updated);
+      setSuccessMessage("Avatar aggiornato.");
+    } catch (error) {
+      setFormError(getApiErrorMessage(error, "Caricamento avatar non riuscito."));
+    } finally {
+      setAvatarBusy(false);
+    }
+  }
+
+  async function handleRemoveAvatar() {
+    setFormError(null);
+    setSuccessMessage(null);
+    if (!accessToken || !profile?.avatarUrl) {
+      return;
+    }
+    setAvatarBusy(true);
+    try {
+      const updated = await removeAvatar(accessToken);
+      applyProfile(updated);
+      setSuccessMessage("Avatar rimosso.");
+    } catch (error) {
+      setFormError(getApiErrorMessage(error, "Rimozione avatar non riuscita."));
+    } finally {
+      setAvatarBusy(false);
     }
   }
 
@@ -261,6 +366,47 @@ export function ProfileScreen() {
         <UiStatePanel state="error" title="Errore" message={formError} testID="profile-error" />
       ) : null}
 
+      <View style={styles.section} testID="profile-avatar-section">
+        <Text style={styles.sectionTitle}>Avatar</Text>
+        {resolveAvatarUrl(profile.avatarUrl) ? (
+          <Image
+            source={{ uri: resolveAvatarUrl(profile.avatarUrl) ?? undefined }}
+            style={styles.avatarImage}
+            testID="profile-avatar-image"
+            accessibilityLabel="Avatar profilo"
+          />
+        ) : (
+          <View style={styles.avatarPlaceholder} testID="profile-avatar-placeholder">
+            <Text style={styles.avatarPlaceholderLabel}>
+              {profile.displayName.charAt(0).toUpperCase()}
+            </Text>
+          </View>
+        )}
+        <Text style={styles.hint}>JPEG, PNG o WebP — massimo 2 MB.</Text>
+        <Pressable
+          accessibilityRole="button"
+          disabled={avatarBusy}
+          onPress={() => void handlePickAvatar()}
+          style={[styles.secondaryButton, avatarBusy && styles.disabled]}
+          testID="profile-avatar-pick"
+        >
+          <Text style={styles.secondaryButtonLabel}>
+            {avatarBusy ? "Caricamento…" : "Cambia foto"}
+          </Text>
+        </Pressable>
+        {profile.avatarUrl ? (
+          <Pressable
+            accessibilityRole="button"
+            disabled={avatarBusy}
+            onPress={() => void handleRemoveAvatar()}
+            style={[styles.secondaryButton, avatarBusy && styles.disabled]}
+            testID="profile-avatar-remove"
+          >
+            <Text style={styles.secondaryButtonLabel}>Rimuovi foto</Text>
+          </Pressable>
+        ) : null}
+      </View>
+
       <View style={styles.section} testID="profile-form">
         <Text style={styles.label}>Nome visualizzato</Text>
         <TextInput
@@ -307,6 +453,35 @@ export function ProfileScreen() {
             onValueChange={setNotificationsPush}
             testID="profile-notifications-push"
           />
+        </View>
+
+        <Text style={styles.sectionTitle}>Silenzio notifiche (email/push)</Text>
+        <Text style={styles.hint}>Ore 0-23. Lascia entrambi i campi vuoti per disattivare.</Text>
+        <View style={styles.quietHoursRow}>
+          <View style={styles.quietHoursField}>
+            <Text style={styles.label}>Dalle ore</Text>
+            <TextInput
+              value={quietHoursStartHour}
+              onChangeText={setQuietHoursStartHour}
+              style={styles.input}
+              keyboardType="number-pad"
+              maxLength={2}
+              accessibilityLabel="Silenzio notifiche dalle ore"
+              testID="profile-quiet-hours-start"
+            />
+          </View>
+          <View style={styles.quietHoursField}>
+            <Text style={styles.label}>Alle ore</Text>
+            <TextInput
+              value={quietHoursEndHour}
+              onChangeText={setQuietHoursEndHour}
+              style={styles.input}
+              keyboardType="number-pad"
+              maxLength={2}
+              accessibilityLabel="Silenzio notifiche alle ore"
+              testID="profile-quiet-hours-end"
+            />
+          </View>
         </View>
 
         <Pressable
@@ -459,6 +634,33 @@ const styles = StyleSheet.create({
   },
   readonly: {
     opacity: 0.7,
+  },
+  avatarImage: {
+    width: 88,
+    height: 88,
+    borderRadius: 44,
+    backgroundColor: colors.backgroundElevated,
+  },
+  avatarPlaceholder: {
+    width: 88,
+    height: 88,
+    borderRadius: 44,
+    backgroundColor: colors.backgroundElevated,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  avatarPlaceholderLabel: {
+    fontSize: typography.fontSize.lg,
+    fontWeight: typography.fontWeight.semibold,
+    color: colors.foreground,
+  },
+  quietHoursRow: {
+    flexDirection: "row",
+    gap: spacing.sm,
+  },
+  quietHoursField: {
+    flex: 1,
+    gap: spacing.xs,
   },
   timezoneList: {
     gap: spacing.xs,

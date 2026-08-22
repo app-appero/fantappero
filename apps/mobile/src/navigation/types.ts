@@ -29,6 +29,10 @@ export type ReceivedInvitesParams = {
   stato?: DirectoryDemoState;
 };
 
+export type MatchupDetailParams = {
+  slotId: string;
+};
+
 export type AppTabParamList = {
   Leagues: WireframeParams | undefined;
   Matchday: WireframeParams | undefined;
@@ -54,6 +58,7 @@ export type RootStackParamList = {
   ReceivedInvites: ReceivedInvitesParams | undefined;
   ManagerDirectory: undefined;
   AdminPanel: undefined;
+  MatchupDetail: MatchupDetailParams;
 };
 
 export type AdminStackParamList = {

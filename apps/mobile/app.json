@@ -8,7 +8,10 @@
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.fantappero.mobile"
+      "bundleIdentifier": "com.fantappero.mobile",
+      "infoPlist": {
+        "NSPhotoLibraryUsageDescription": "Consenti l'accesso alle foto per impostare l'avatar del profilo."
+      }
     },
     "android": {
       "package": "com.fantappero.mobile",
@@ -18,6 +21,14 @@
     },
     "web": {
       "bundler": "metro"
-    }
+    },
+    "plugins": [
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Consenti l'accesso alle foto per impostare l'avatar del profilo."
+        }
+      ]
+    ]
   }
 }

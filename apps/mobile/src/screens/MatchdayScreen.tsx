@@ -7,6 +7,7 @@ import type {
 } from "@fantappero/contracts";
 import { mapFixtureMatchStatus } from "@fantappero/contracts";
 import { theme } from "@fantappero/ui/theme";
+import { useNavigation, type NavigationProp } from "@react-navigation/core";
 import { useCallback, useEffect, useState } from "react";
 import {
   Pressable,
@@ -17,6 +18,7 @@ import {
 } from "react-native";
 import {
   ensureFantasyTurns,
+  excludeFantasyTurnFixture,
   fetchFantasyTurn,
   fetchFantasyTurns,
   fetchH2HCalendar,
@@ -27,6 +29,9 @@ import {
 } from "../api/leagues";
 import { UiStatePanel } from "../components/UiStatePanel";
 import { PageContainer } from "../layout/PageContainer";
+import { useLiveH2HPolling } from "../matchday/useLiveH2HPolling";
+import type { RootStackParamList } from "../navigation/types";
+import { MatchdayH2HPanel } from "./matchday/MatchdayH2HPanel";
 import { getApiErrorMessage, useAuthSession } from "../session/DemoSessionContext";
 
 const { colors, spacing, typography, radius } = theme;
@@ -60,14 +65,16 @@ function formatDateTime(value: string | null): string {
   }
 }
 
-/** Turni — calendario H2H + turni europei (parity essenziale; dettaglio scontro su web). */
+/** Turni — calendario H2H fantallenatori (con dettaglio scontro) + turni europei. */
 export function MatchdayScreen() {
   const { accessToken, activeLeagueId, can } = useAuthSession();
+  const navigation = useNavigation<NavigationProp<RootStackParamList>>();
   const isAdmin = can(["league:admin"]);
   const canView = can(["matchday:view"]);
 
   const [tab, setTab] = useState<"calendario" | "europei">("calendario");
   const [h2h, setH2h] = useState<H2HCalendar | null>(null);
+  const [h2hLoading, setH2hLoading] = useState(true);
   const [h2hError, setH2hError] = useState<string | null>(null);
   const [turns, setTurns] = useState<FantasyTurnSummary[]>([]);
   const [selected, setSelected] = useState<FantasyTurnDetail | null>(null);
@@ -82,18 +89,30 @@ export function MatchdayScreen() {
 
   const loadH2H = useCallback(async () => {
     if (!canView || !accessToken || !activeLeagueId) {
+      setH2hLoading(false);
       setH2h(null);
       setH2hError(null);
       return;
     }
+    setH2hLoading(true);
     try {
       setH2h(await fetchH2HCalendar(accessToken, activeLeagueId));
       setH2hError(null);
     } catch (error) {
       setH2h(null);
       setH2hError(getApiErrorMessage(error, "Calendario H2H non disponibile."));
+    } finally {
+      setH2hLoading(false);
     }
   }, [accessToken, activeLeagueId, canView]);
+
+  const { degraded: h2hLiveDegraded } = useLiveH2HPolling(
+    accessToken,
+    activeLeagueId,
+    h2h,
+    setH2h,
+    tab === "calendario",
+  );
 
   const loadTurns = useCallback(async () => {
     if (!canView) {
@@ -218,39 +237,18 @@ export function MatchdayScreen() {
 
         {tab === "calendario" ? (
           <View testID="matchday-h2h">
-            {h2hError ? (
-              <UiStatePanel
-                state="error"
-                title="Calendario non disponibile"
-                message={h2hError}
-                testID="h2h-error"
-              />
-            ) : null}
-            {!h2hError && !h2h ? (
-              <UiStatePanel
-                state="empty"
-                title="Calendario non ancora confermato"
-                message="L'amministratore deve generare e confermare il calendario H2H in Amministrazione lega. Il dettaglio scontro completo è disponibile sul web."
-                testID="h2h-empty"
-              />
-            ) : null}
-            {h2h
-              ? h2h.rounds.map((round) => (
-                  <View key={round.roundNumber} style={styles.section}>
-                    <Text style={styles.heading}>Giornata {round.roundNumber}</Text>
-                    {round.matchups.map((matchup) => (
-                      <Text key={matchup.slotId} style={styles.body}>
-                        {matchup.isBye
-                          ? `${matchup.homeTeamName ?? matchup.homeDisplayName} (riposo)`
-                          : `${matchup.homeTeamName ?? matchup.homeDisplayName} vs ${matchup.awayTeamName ?? matchup.awayDisplayName}`}
-                        {matchup.result
-                          ? ` — ${matchup.result.homeFantasyGoals}–${matchup.result.awayFantasyGoals} (${matchup.result.resultFinal ? "finale" : "provvisorio"})`
-                          : ""}
-                      </Text>
-                    ))}
-                  </View>
-                ))
-              : null}
+            <MatchdayH2HPanel
+              calendar={h2h}
+              loading={h2hLoading}
+              error={h2hError}
+              liveDegraded={h2hLiveDegraded}
+              canAdmin={isAdmin}
+              onRetry={() => void loadH2H()}
+              onOpenAdmin={() =>
+                navigation.navigate("LeagueAdmin", { leagueId: activeLeagueId ?? undefined })
+              }
+              onOpenMatchup={(slotId) => navigation.navigate("MatchupDetail", { slotId })}
+            />
           </View>
         ) : null}
 
@@ -305,11 +303,41 @@ export function MatchdayScreen() {
               </Text>
             ) : null}
             {selected.fixtures.map((fixture) => (
-              <Text key={fixture.id} style={styles.body}>
-                {fixture.homeClubName} – {fixture.awayClubName} ({formatDateTime(fixture.kickoffAt)}) —{" "}
-                {MATCH_STATUS_LABEL[mapFixtureMatchStatus(fixture.statusShort)] ?? fixture.statusShort}
-                {fixture.lockLatchedAt ? " — bloccata" : ""}
-              </Text>
+              <View key={fixture.id} style={styles.fixtureRow}>
+                <Text style={styles.body}>
+                  {fixture.homeClubName} – {fixture.awayClubName} ({formatDateTime(fixture.kickoffAt)}) —{" "}
+                  {MATCH_STATUS_LABEL[mapFixtureMatchStatus(fixture.statusShort)] ?? fixture.statusShort}
+                  {fixture.lockLatchedAt ? " — bloccata" : ""}
+                </Text>
+                {isAdmin && selected.modificationAllowed ? (
+                  <Pressable
+                    style={styles.ghostButton}
+                    disabled={busy}
+                    onPress={() => {
+                      if (!accessToken) {
+                        return;
+                      }
+                      setBusy(true);
+                      setActionError(null);
+                      void excludeFantasyTurnFixture(accessToken, activeLeagueId, selected.id, {
+                        fixtureId: fixture.fixtureId,
+                      })
+                        .then(async (detail) => {
+                          setSelected(detail);
+                          setActionMessage("Partita esclusa dal turno.");
+                          await loadTurns();
+                        })
+                        .catch((error) =>
+                          setActionError(getApiErrorMessage(error, "Esclusione non consentita.")),
+                        )
+                        .finally(() => setBusy(false));
+                    }}
+                    testID={`matchday-exclude-${fixture.fixtureId}`}
+                  >
+                    <Text style={styles.ghostLabel}>Escludi</Text>
+                  </Pressable>
+                ) : null}
+              </View>
             ))}
             {isAdmin && selected.status === "scheduled" ? (
               <Pressable
@@ -541,6 +569,21 @@ const styles = StyleSheet.create({
   },
   secondaryLabel: {
     color: colors.foreground,
+  },
+  fixtureRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: spacing.sm,
+  },
+  ghostButton: {
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 4,
+  },
+  ghostLabel: {
+    color: colors.danger,
+    fontWeight: "600",
   },
   input: {
     borderWidth: 1,

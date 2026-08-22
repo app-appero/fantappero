@@ -3,7 +3,7 @@ import type {
   UpdateProfileRequest,
   UserProfile,
 } from "@fantappero/contracts";
-import { apiRequest } from "./client";
+import { apiRequest, apiUpload } from "./client";
 
 export function fetchProfile(accessToken: string): Promise<UserProfile> {
   return apiRequest<UserProfile>("/profile/me", { accessToken });
@@ -27,6 +27,20 @@ export function updateInviteAvailability(
   return apiRequest<UserProfile>("/profile/disponibilita-inviti", {
     method: "PATCH",
     body: { availableForInvites },
+    accessToken,
+  });
+}
+
+export function uploadAvatar(
+  accessToken: string,
+  file: { uri: string; name: string; type?: string },
+): Promise<UserProfile> {
+  return apiUpload<UserProfile>("/profile/me/avatar", { accessToken, file });
+}
+
+export function removeAvatar(accessToken: string): Promise<UserProfile> {
+  return apiRequest<UserProfile>("/profile/me/avatar", {
+    method: "DELETE",
     accessToken,
   });
 }
