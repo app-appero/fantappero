@@ -8,7 +8,7 @@ FantApperò ships a vendor-neutral observability baseline so an API request and 
 | --- | --- |
 | **Correlation** | `X-Correlation-ID` / `X-Request-ID` created or propagated on every HTTP request; echoed on responses; passed to Celery as task headers (`correlation_id`, `request_id`) |
 | **Structured logs** | One JSON object per log line (UTC `timestamp`, `level`, `logger`, `message`, IDs) |
-| **Metrics** | In-process counters/histograms for HTTP requests, errors, latency, jobs, failures, queue depth |
+| **Metrics** | In-process counters/histograms for HTTP requests, errors, latency, jobs, failures, queue depth; Prometheus text snapshot at `/metrics` |
 | **Error tracking** | `ErrorTracker` Protocol + feature flag; null implementation when disabled |
 | **Probes** | `/live` = process up; `/ready` (and `/health`) = dependencies available |
 
@@ -39,6 +39,7 @@ Helpers:
 | `GET /live` | Liveness — process alive | None | Optional |
 | `GET /ready` | Readiness — can serve traffic | Postgres/Redis when configured | Preferred |
 | `GET /health` | Alias of readiness | Same as `/ready` | Current healthcheck |
+| `GET /metrics` | Prometheus text snapshot | None | Scrape/diagnostics |
 
 When `DATABASE_URL` / `REDIS_URL` are unset (unit tests), dependency checks are `skipped` and readiness returns 200. When set and unreachable, readiness returns **503**.
 
@@ -70,7 +71,11 @@ Stable names in `observability.metrics`:
 | `sports_scheduler_quota_mode` | gauge | `provider` |
 | `sports_scheduler_lock_skipped_total` | counter | `provider`, `lock` |
 
-Export to Prometheus/OTel can wrap `MetricsRegistry.snapshot()` later without changing call sites.
+`GET /metrics` renders the registry without an external client dependency. HTTP labels use
+matched route templates and collapse unmatched URLs into `<unmatched>`, avoiding cardinality
+per UUID or arbitrary 404 path. The registry remains process-local: with multiple Uvicorn
+workers a scrape observes one process, not an aggregate. Restrict the endpoint at the reverse
+proxy and add a multiprocess backend or external collector before using it for pilot alerting.
 
 Adapter SPD (EP04-01): [`api_football_adapter.md`](./api_football_adapter.md).  
 Catalogo competizioni/stagioni/club (EP04-02): [`sports_catalog_sync.md`](./sports_catalog_sync.md).  

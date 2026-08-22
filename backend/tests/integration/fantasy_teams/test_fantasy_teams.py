@@ -434,6 +434,14 @@ def test_member_can_edit_own_roster_not_others_and_purchase_is_tracked(
     assert occupancy.status_code == 200
     assert any(row["athleteId"] == str(athlete.id) for row in occupancy.json())
 
+    peer_roster = client.get(
+        f"/leagues/{league_id}/squadre/{member_team}/giocatori",
+        headers={"Authorization": f"Bearer {owner_token}"},
+    )
+    assert peer_roster.status_code == 200
+    assert any(row["athleteId"] == str(athlete.id) for row in peer_roster.json())
+    assert peer_roster.json()[0]["athleteName"]
+
     released = client.delete(
         f"/leagues/{league_id}/amministrazione/squadre/{member_team}/slot/0",
         headers={"Authorization": f"Bearer {member_token}"},

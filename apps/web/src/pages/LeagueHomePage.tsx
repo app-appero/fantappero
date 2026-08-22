@@ -70,12 +70,14 @@ const DEMO_MEMBERS: LeagueMember[] = [
   {
     userId: "user-1",
     displayName: "Marco Rossi",
+    userType: "human",
     role: "league_admin",
     joinedAt: "2026-07-01T10:00:00Z",
   },
   {
     userId: "user-2",
     displayName: "Giulia Bianchi",
+    userType: "human",
     role: "member",
     joinedAt: "2026-07-02T10:00:00Z",
   },

@@ -34,6 +34,7 @@ import {
 } from "@fantappero/ui";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  assignRandomAiRoster,
   assignRosterSlot,
   confirmRosterCsvImport,
   createRosterTurnSnapshot,
@@ -177,6 +178,7 @@ const DEMO_TEAM: FantasyTeam = {
   leagueId: "demo-league",
   membershipId: "demo-membership",
   userId: "demo-user",
+  userType: "human",
   name: "Rosa demo",
   rosterSize: 35,
   filledSlots: 2,
@@ -244,7 +246,8 @@ const DEMO_TEAM_B: FantasyTeam = {
   id: "demo-team-b",
   membershipId: "demo-membership-b",
   userId: "demo-user-b",
-  name: "Rosa avversaria",
+  userType: "ai",
+  name: "Allenatore IA 01",
   filledSlots: 0,
   compositionStatus: "incomplete",
   composition: {
@@ -273,6 +276,7 @@ const DEMO_TEAMS: FantasyTeamSummary[] = [
     leagueId: DEMO_TEAM.leagueId,
     membershipId: DEMO_TEAM.membershipId,
     userId: DEMO_TEAM.userId,
+    userType: DEMO_TEAM.userType,
     name: DEMO_TEAM.name,
     rosterSize: DEMO_TEAM.rosterSize,
     filledSlots: DEMO_TEAM.filledSlots,
@@ -283,6 +287,7 @@ const DEMO_TEAMS: FantasyTeamSummary[] = [
     leagueId: DEMO_TEAM_B.leagueId,
     membershipId: DEMO_TEAM_B.membershipId,
     userId: DEMO_TEAM_B.userId,
+    userType: DEMO_TEAM_B.userType,
     name: DEMO_TEAM_B.name,
     rosterSize: DEMO_TEAM_B.rosterSize,
     filledSlots: DEMO_TEAM_B.filledSlots,
@@ -527,6 +532,7 @@ function toSummary(team: FantasyTeam): FantasyTeamSummary {
     leagueId: team.leagueId,
     membershipId: team.membershipId,
     userId: team.userId,
+    userType: team.userType,
     name: team.name,
     rosterSize: team.rosterSize,
     filledSlots: team.filledSlots,
@@ -653,6 +659,9 @@ export function RosterPage() {
   const [ensureMessage, setEnsureMessage] = useState<string | null>(null);
   const [ensureError, setEnsureError] = useState<string | null>(null);
   const [ensuring, setEnsuring] = useState(false);
+  const [randomAiMessage, setRandomAiMessage] = useState<string | null>(null);
+  const [randomAiError, setRandomAiError] = useState<string | null>(null);
+  const [randomAiBusy, setRandomAiBusy] = useState(false);
   const [adjustAmount, setAdjustAmount] = useState("-10");
   const [adjustNote, setAdjustNote] = useState("");
   const [adjustMessage, setAdjustMessage] = useState<string | null>(null);
@@ -1225,6 +1234,104 @@ export function RosterPage() {
       setEnsureError(getApiErrorMessage(error, "Impossibile creare le squadre."));
     } finally {
       setEnsuring(false);
+    }
+  };
+
+  const onAssignRandomAiRoster = async () => {
+    setRandomAiMessage(null);
+    setRandomAiError(null);
+    const targetId = adminTeamId || viewedTeam?.id;
+    const targetTeam =
+      (targetId ? teamDetails.find((row) => row.id === targetId) : null) ??
+      adminTeam ??
+      viewedTeam;
+    if (!targetTeam || targetTeam.userType !== "ai") {
+      setRandomAiError("Seleziona una squadra di un fantallenatore IA.");
+      return;
+    }
+    if (targetTeam.filledSlots >= targetTeam.rosterSize) {
+      setRandomAiMessage("La rosa del fantallenatore IA è già completa.");
+      return;
+    }
+    if (isDemoMode) {
+      setRandomAiBusy(true);
+      window.setTimeout(() => {
+        const filled = {
+          ...DEMO_TEAM_B,
+          filledSlots: DEMO_TEAM_B.rosterSize,
+          compositionStatus: "incomplete" as const,
+          composition: {
+            ...DEMO_TEAM_B.composition!,
+            status: "incomplete" as const,
+            filledSlots: DEMO_TEAM_B.rosterSize,
+            counts: { P: 3, D: 11, C: 11, A: 10 },
+          },
+          slots: DEMO_TEAM_B.slots.map((slot, index) => ({
+            ...slot,
+            athleteId: `ai-demo-${index}`,
+            athleteName: `Calciatore IA ${index + 1}`,
+            role: (["P", "P", "P", "D", "D", "D", "D", "D", "D", "D", "D", "D", "D", "D", "C", "C", "C", "C", "C", "C", "C", "C", "C", "C", "C", "A", "A", "A", "A", "A", "A", "A", "A", "A", "A"] as const)[index] ?? "A",
+            purchaseCredits: 0,
+          })),
+        };
+        setAdminTeam(filled);
+        setTeamDetails((current) =>
+          current.map((row) => (row.id === filled.id ? filled : row)),
+        );
+        setLeagueTeams((current) =>
+          current.map((row) =>
+            row.id === filled.id
+              ? { ...row, filledSlots: filled.filledSlots, compositionStatus: filled.compositionStatus }
+              : row,
+          ),
+        );
+        setRandomAiMessage("Rosa random assegnata al fantallenatore IA (demo).");
+        setRandomAiBusy(false);
+      }, 300);
+      return;
+    }
+    if (!activeLeagueId) {
+      setRandomAiError("Seleziona una lega.");
+      return;
+    }
+    const stored = loadStoredSession();
+    if (!stored?.accessToken) {
+      setRandomAiError("Sessione non disponibile. Accedi di nuovo.");
+      return;
+    }
+    setRandomAiBusy(true);
+    try {
+      const updated = await assignRandomAiRoster(
+        stored.accessToken,
+        activeLeagueId,
+        targetTeam.id,
+      );
+      setAdminTeam(updated);
+      setTeamDetails((current) =>
+        current.map((row) => (row.id === updated.id ? updated : row)),
+      );
+      setLeagueTeams((current) =>
+        current.map((row) =>
+          row.id === updated.id
+            ? {
+                ...row,
+                filledSlots: updated.filledSlots,
+                compositionStatus: updated.compositionStatus,
+                userType: updated.userType,
+              }
+            : row,
+        ),
+      );
+      setRandomAiMessage(
+        `Rosa random assegnata: ${updated.filledSlots}/${updated.rosterSize} giocatori.`,
+      );
+      await loadEditContext(updated.id);
+    } catch (error) {
+      setRandomAiError(
+        getApiErrorMessage(error, "Impossibile assegnare la rosa random."),
+      );
+    } finally {
+      setRandomAiBusy(false);
     }
   };
 
@@ -1975,7 +2082,9 @@ export function RosterPage() {
               >
                 {leagueTeams.map((row) => (
                   <option key={row.id} value={row.id}>
-                    {row.name} ({row.filledSlots}/{row.rosterSize})
+                    {row.name}
+                    {row.userType === "ai" ? " (IA)" : ""} ({row.filledSlots}/
+                    {row.rosterSize})
                   </option>
                 ))}
               </select>
@@ -2214,16 +2323,50 @@ export function RosterPage() {
           ) : null}
 
           <div style={{ marginTop: "1rem" }} data-testid="roster-admin-tools">
-            <Button
-              type="button"
-              variant="secondary"
-              disabled={ensuring}
-              onClick={() => void onEnsureTeams()}
+            <div
+              style={{
+                display: "flex",
+                flexWrap: "wrap",
+                gap: "0.5rem",
+                alignItems: "center",
+              }}
             >
-              {ensuring ? "Verifica in corso…" : "Assicura squadre partecipanti"}
-            </Button>
+              <Button
+                type="button"
+                variant="secondary"
+                disabled={ensuring || randomAiBusy}
+                onClick={() => void onEnsureTeams()}
+              >
+                {ensuring ? "Verifica in corso…" : "Assicura squadre partecipanti"}
+              </Button>
+              {leagueTeams.some((row) => row.userType === "ai") ? (
+                <Button
+                  type="button"
+                  variant="secondary"
+                  data-testid="roster-admin-random-ai"
+                  disabled={
+                    ensuring ||
+                    randomAiBusy ||
+                    (adminTeam ?? viewedTeam)?.userType !== "ai" ||
+                    ((adminTeam ?? viewedTeam)?.filledSlots ?? 0) >=
+                      ((adminTeam ?? viewedTeam)?.rosterSize ?? 0)
+                  }
+                  onClick={() => void onAssignRandomAiRoster()}
+                >
+                  {randomAiBusy
+                    ? "Assegnazione in corso…"
+                    : "Assegna rosa random (IA)"}
+                </Button>
+              ) : null}
+            </div>
             {ensureMessage ? <p data-testid="roster-ensure-ok">{ensureMessage}</p> : null}
             {ensureError ? <p data-testid="roster-ensure-error">{ensureError}</p> : null}
+            {randomAiMessage ? (
+              <p data-testid="roster-random-ai-ok">{randomAiMessage}</p>
+            ) : null}
+            {randomAiError ? (
+              <p data-testid="roster-random-ai-error">{randomAiError}</p>
+            ) : null}
           </div>
         </>
       ) : null}

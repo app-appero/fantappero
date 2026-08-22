@@ -117,6 +117,8 @@ describe("EP05-01/02/03 roster, credits and manual assignment", () => {
     const html = renderRoute("/rosa?persona=admin&stato=success");
     expect(html).toContain('data-testid="roster-admin-tools"');
     expect(html).toContain("Assicura squadre partecipanti");
+    expect(html).toContain('data-testid="roster-admin-random-ai"');
+    expect(html).toContain("Assegna rosa random (IA)");
     expect(html).toContain('data-testid="roster-admin-manual"');
     expect(html).toContain("Inserimento manuale rose");
     expect(html).toContain('data-testid="roster-admin-team"');

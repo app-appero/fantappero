@@ -10,6 +10,7 @@ const fetchMyFantasyTeamMock = vi.fn();
 const fetchMyCreditsMock = vi.fn();
 const fetchFantasyTeamsMock = vi.fn();
 const fetchRosterOccupancyMock = vi.fn();
+const fetchTeamPlayersForTradeMock = vi.fn();
 const fetchLeagueListoneMock = vi.fn();
 const previewVoluntaryReleaseMock = vi.fn();
 const applyVoluntaryReleaseMock = vi.fn();
@@ -44,6 +45,7 @@ vi.mock("../api/leagues", () => ({
   fetchMyFantasyTeam: (...args: unknown[]) => fetchMyFantasyTeamMock(...args),
   fetchFantasyTeams: (...args: unknown[]) => fetchFantasyTeamsMock(...args),
   fetchRosterOccupancy: (...args: unknown[]) => fetchRosterOccupancyMock(...args),
+  fetchTeamPlayersForTrade: (...args: unknown[]) => fetchTeamPlayersForTradeMock(...args),
 }));
 
 vi.mock("../api/market", () => ({
@@ -105,6 +107,7 @@ const TEAM_WITH_PLAYER: FantasyTeam = {
   leagueId: "league-1",
   membershipId: "membership-1",
   userId: "user-1",
+  userType: "human",
   name: "Squadra Test",
   rosterSize: 25,
   filledSlots: 1,
@@ -136,7 +139,7 @@ async function flushAsync(rounds = 6): Promise<void> {
 async function renderAppAt(
   path: string,
   leagues: LeagueSummary[] = [LEAGUE],
-): Promise<{ html: string; unmount: () => void }> {
+): Promise<{ html: string; container: HTMLDivElement; unmount: () => void }> {
   fetchMeMock.mockResolvedValue(USER);
   fetchMyLeaguesMock.mockResolvedValue(leagues);
   saveStoredSession({ accessToken: "access-token", refreshToken: "refresh-token", user: USER });
@@ -157,6 +160,7 @@ async function renderAppAt(
 
   return {
     html: container.innerHTML,
+    container,
     unmount: () => {
       act(() => {
         root.unmount();
@@ -239,6 +243,14 @@ describe("Mercato — scambi collegati alle API reali (EP08-05/06)", () => {
     fetchRosterOccupancyMock.mockReset().mockResolvedValue([
       { athleteId: "athlete-2", fantasyTeamId: "team-2", teamName: "Squadra Avversaria", slotIndex: 0, purchaseCredits: 20 },
     ]);
+    fetchTeamPlayersForTradeMock.mockReset().mockResolvedValue([
+      {
+        athleteId: "athlete-2",
+        athleteName: "Giocatore Avversario",
+        slotIndex: 0,
+        purchaseCredits: 20,
+      },
+    ]);
     fetchLeagueListoneMock.mockReset().mockResolvedValue([
       {
         athleteId: "athlete-2",
@@ -274,6 +286,21 @@ describe("Mercato — scambi collegati alle API reali (EP08-05/06)", () => {
     expect(html).toContain('data-testid="market-trade-empty"');
     expect(html).toContain('data-testid="market-trade-create-form"');
     expect(html).toContain("Squadra Avversaria");
+    unmount();
+  });
+
+  it("selezionando la squadra destinataria carica i giocatori richiesti", async () => {
+    const { container, unmount } = await renderAppAt("/mercato");
+    const select = container.querySelector('select[name="trade-recipient"]') as HTMLSelectElement | null;
+    expect(select).not.toBeNull();
+    await act(async () => {
+      select!.value = "team-2";
+      select!.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+    await flushAsync();
+    expect(fetchTeamPlayersForTradeMock).toHaveBeenCalledWith("access-token", "league-1", "team-2");
+    expect(container.innerHTML).toContain("Giocatore Avversario");
+    expect(container.innerHTML).not.toContain("Scegli prima una squadra destinataria.");
     unmount();
   });
 

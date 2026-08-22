@@ -3,16 +3,18 @@
 from __future__ import annotations
 
 import re
+from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime, timedelta
 from uuid import UUID
 from zoneinfo import ZoneInfo
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import select
+from sqlalchemy import event, func, select
 from sqlalchemy.orm import Session
 from tests.integration.database.helpers import create_engine_for_url
 
+import auth.dependencies as auth_dependencies
 from database.enums import (
     FantasyRole,
     FantasyTurnKind,
@@ -21,6 +23,7 @@ from database.enums import (
     RosterCompositionStatus,
 )
 from database.session import create_session_factory
+from fantasy_lineups.models import LineupPlayer, LineupSubmission
 from fantasy_lineups.rules import remaining_roster_for_bench
 from fantasy_teams.models import FantasyRosterSlot, FantasyTeam
 from fantasy_turns.models import FantasyRound, FantasyRoundFixture
@@ -226,6 +229,66 @@ def _lineup_payload(athletes: list[Athlete], module: str = "4-3-3") -> dict:
         "starterAthleteIds": starters,
         "benchAthleteIds": bench,
     }
+
+
+def _count_request_queries(call) -> tuple[object, int]:
+    engine = auth_dependencies._engine
+    assert engine is not None
+    count = 0
+
+    def _before_cursor_execute(*_args: object) -> None:
+        nonlocal count
+        count += 1
+
+    event.listen(engine, "before_cursor_execute", _before_cursor_execute)
+    try:
+        response = call()
+    finally:
+        event.remove(engine, "before_cursor_execute", _before_cursor_execute)
+    return response, count
+
+
+def test_full_roster_and_lineup_query_counts_are_bounded(
+    client: TestClient,
+    db_session: Session,
+    competition_ids: list[str],
+) -> None:
+    """Guard against reintroducing per-player listone/override queries."""
+    token, _ = _register_and_login(client, "lineup.query-budget@example.com")
+    league_id = _create_league(client, token, competition_ids, "Lega Query Budget")
+    grouped = _seed_roster_athletes(db_session, id_offset=2_390_000)
+    athletes = _fill_validated_roster(db_session, league_id, grouped)
+    fantasy_round, _clubs = _create_open_round(
+        db_session,
+        league_id,
+        cutoff=datetime.now(UTC) + timedelta(hours=4),
+        id_offset=2_395_000,
+        competition_ids=competition_ids,
+    )
+    headers = {"Authorization": f"Bearer {token}"}
+    saved = client.put(
+        f"/leagues/{league_id}/turni/{fantasy_round.id}/formazione",
+        headers=headers,
+        json=_lineup_payload(athletes),
+    )
+    assert saved.status_code == 200
+
+    roster, roster_queries = _count_request_queries(
+        lambda: client.get(f"/leagues/{league_id}/rosa", headers=headers)
+    )
+    lineup, lineup_queries = _count_request_queries(
+        lambda: client.get(
+            f"/leagues/{league_id}/turni/{fantasy_round.id}/formazione",
+            headers=headers,
+        )
+    )
+
+    assert roster.status_code == 200
+    assert roster.json()["filledSlots"] == 35
+    assert roster_queries <= 25
+    assert lineup.status_code == 200
+    assert len(lineup.json()["roster"]) == 35
+    assert lineup_queries <= 35
 
 
 def test_save_valid_module_and_reject_incompatible(
@@ -1158,3 +1221,70 @@ def test_postponement_before_kickoff_keeps_player_editable(
     )
     assert allowed.status_code == 200
     assert allowed.json()["tacticalMovesUsed"] == 0
+
+
+def test_concurrent_identical_lineup_saves_produce_single_revision(
+    client: TestClient,
+    db_session: Session,
+    competition_ids: list[str],
+) -> None:
+    """EP12-02: N richieste concorrenti che salvano la STESSA formazione per la
+    stessa squadra/turno devono produrre un solo submission con revision=1 e un
+    solo evento di audit, senza righe LineupPlayer duplicate. Il lock a riga su
+    FantasyRound/FantasyTeam (``_load_round``/``_lock_team_for_membership``)
+    serializza le richieste; la seconda in poi trova già salvata la stessa
+    formazione (stessa signature) e ritorna senza incrementare la revision.
+    """
+    token, _ = _register_and_login(client, "lineup.conc@example.com")
+    league_id = _create_league(client, token, competition_ids, "Lega Concorrenza Formazione")
+    client.get(f"/leagues/{league_id}/rosa", headers={"Authorization": f"Bearer {token}"})
+    grouped = _seed_roster_athletes(db_session, id_offset=2_950_000)
+    athletes = _fill_validated_roster(db_session, league_id, grouped)
+    cutoff = datetime.now(UTC) + timedelta(hours=4)
+    fantasy_round, _clubs = _create_open_round(
+        db_session,
+        league_id,
+        cutoff=cutoff,
+        id_offset=2_960_000,
+        competition_ids=competition_ids,
+    )
+    payload = _lineup_payload(athletes, "4-3-3")
+
+    def _save(_index: int) -> int:
+        response = client.put(
+            f"/leagues/{league_id}/turni/{fantasy_round.id}/formazione",
+            headers={"Authorization": f"Bearer {token}"},
+            json=payload,
+        )
+        return response.status_code
+
+    with ThreadPoolExecutor(max_workers=6) as pool:
+        statuses = list(pool.map(_save, range(6)))
+
+    assert statuses.count(200) == 6
+
+    team = db_session.scalars(
+        select(FantasyTeam).where(FantasyTeam.league_id == UUID(league_id))
+    ).one()
+    submissions = db_session.scalars(
+        select(LineupSubmission).where(
+            LineupSubmission.round_id == fantasy_round.id,
+            LineupSubmission.fantasy_team_id == team.id,
+        )
+    ).all()
+    assert len(submissions) == 1
+    submission = submissions[0]
+    assert submission.revision == 1
+
+    player_athlete_ids = db_session.scalars(
+        select(LineupPlayer.athlete_id).where(LineupPlayer.submission_id == submission.id)
+    ).all()
+    assert len(player_athlete_ids) == len(set(player_athlete_ids)) == 35
+
+    saved_count = db_session.scalar(
+        select(func.count(LeagueAuditEvent.id)).where(
+            LeagueAuditEvent.league_id == UUID(league_id),
+            LeagueAuditEvent.action == LeagueAuditAction.FANTASY_LINEUP_SAVED,
+        )
+    )
+    assert saved_count == 1

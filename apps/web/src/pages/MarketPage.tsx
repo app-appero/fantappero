@@ -6,6 +6,7 @@ import type {
   MarketReleasePreview,
   MarketReleaseReason,
   RosterOccupancyEntry,
+  TeamRosterPlayer,
 } from "@fantappero/contracts";
 import {
   Badge,
@@ -25,6 +26,7 @@ import {
   fetchMyCredits,
   fetchMyFantasyTeam,
   fetchRosterOccupancy,
+  fetchTeamPlayersForTrade,
 } from "../api/leagues";
 import { getApiErrorMessage, useAuth } from "../auth/AuthContext";
 import { loadStoredSession } from "../auth/sessionStorage";
@@ -74,6 +76,7 @@ const DEMO_TEAM: FantasyTeam = {
   leagueId: "demo-league",
   membershipId: "demo-membership",
   userId: "demo-user",
+  userType: "human",
   name: "Squadra Demo",
   rosterSize: 25,
   filledSlots: 1,
@@ -259,6 +262,9 @@ export function MarketPage() {
   // -- Scambi tra partecipanti (EP08-05/06) ------------------------------------
 
   const [recipientTeamId, setRecipientTeamId] = useState("");
+  const [recipientPlayers, setRecipientPlayers] = useState<TeamRosterPlayer[]>([]);
+  const [recipientRosterLoading, setRecipientRosterLoading] = useState(false);
+  const [recipientRosterError, setRecipientRosterError] = useState<string | null>(null);
   const [offeredAthleteIds, setOfferedAthleteIds] = useState<string[]>([]);
   const [requestedAthleteIds, setRequestedAthleteIds] = useState<string[]>([]);
   const [offeredCredits, setOfferedCredits] = useState("0");
@@ -270,17 +276,40 @@ export function MarketPage() {
     [otherTeams],
   );
 
-  const recipientAthleteOptions = useMemo(() => {
-    if (!recipientTeamId) {
-      return [];
-    }
-    return occupancy
-      .filter((entry) => entry.fantasyTeamId === recipientTeamId)
-      .map((entry) => ({
-        id: entry.athleteId,
-        label: athleteNameById.get(entry.athleteId) ?? "Giocatore",
-      }));
-  }, [athleteNameById, occupancy, recipientTeamId]);
+  const loadRecipientRoster = useCallback(
+    async (teamId: string) => {
+      if (!teamId || !activeLeagueId || isDemoMode) {
+        setRecipientPlayers([]);
+        setRecipientRosterLoading(false);
+        setRecipientRosterError(null);
+        return;
+      }
+      const stored = loadStoredSession();
+      if (!stored?.accessToken) {
+        setRecipientPlayers([]);
+        setRecipientRosterError("Sessione non disponibile. Accedi di nuovo.");
+        return;
+      }
+      setRecipientRosterLoading(true);
+      setRecipientRosterError(null);
+      try {
+        const players = await fetchTeamPlayersForTrade(
+          stored.accessToken,
+          activeLeagueId,
+          teamId,
+        );
+        setRecipientPlayers(players);
+      } catch (error) {
+        setRecipientPlayers([]);
+        setRecipientRosterError(
+          getApiErrorMessage(error, "Impossibile caricare la rosa della squadra selezionata."),
+        );
+      } finally {
+        setRecipientRosterLoading(false);
+      }
+    },
+    [activeLeagueId, isDemoMode],
+  );
 
   function toggleAthleteId(list: string[], id: string): string[] {
     return list.includes(id) ? list.filter((row) => row !== id) : [...list, id];
@@ -288,6 +317,8 @@ export function MarketPage() {
 
   function resetTradeForm() {
     setRecipientTeamId("");
+    setRecipientPlayers([]);
+    setRecipientRosterError(null);
     setOfferedAthleteIds([]);
     setRequestedAthleteIds([]);
     setOfferedCredits("0");
@@ -515,8 +546,10 @@ export function MarketPage() {
                 placeholder="Scegli una squadra…"
                 value={recipientTeamId}
                 onChange={(event) => {
-                  setRecipientTeamId(event.target.value);
+                  const nextId = event.target.value;
+                  setRecipientTeamId(nextId);
                   setRequestedAthleteIds([]);
+                  void loadRecipientRoster(nextId);
                 }}
                 required
               />
@@ -545,22 +578,61 @@ export function MarketPage() {
 
               <fieldset data-testid="market-trade-requested-athletes">
                 <legend>Giocatori richiesti</legend>
-                {recipientAthleteOptions.length === 0 ? (
+                {!recipientTeamId ? (
                   <p>Scegli prima una squadra destinataria.</p>
-                ) : (
-                  recipientAthleteOptions.map((athlete) => (
-                    <label key={athlete.id}>
-                      <input
-                        type="checkbox"
-                        checked={requestedAthleteIds.includes(athlete.id)}
-                        onChange={() =>
-                          setRequestedAthleteIds((prev) => toggleAthleteId(prev, athlete.id))
-                        }
-                      />{" "}
-                      {athlete.label}
-                    </label>
-                  ))
-                )}
+                ) : null}
+                {recipientTeamId && recipientRosterLoading ? (
+                  <UiStatePanel
+                    state="loading"
+                    title="Caricamento rosa"
+                    message="Recupero i giocatori della squadra selezionata…"
+                    testId="market-trade-recipient-loading"
+                  />
+                ) : null}
+                {recipientTeamId && !recipientRosterLoading && recipientRosterError ? (
+                  <div>
+                    <UiStatePanel
+                      state="error"
+                      title="Rosa non disponibile"
+                      message={recipientRosterError}
+                      testId="market-trade-recipient-error"
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      onClick={() => void loadRecipientRoster(recipientTeamId)}
+                    >
+                      Riprova
+                    </Button>
+                  </div>
+                ) : null}
+                {recipientTeamId &&
+                !recipientRosterLoading &&
+                !recipientRosterError &&
+                recipientPlayers.length === 0 ? (
+                  <p data-testid="market-trade-recipient-empty">
+                    Questa squadra non ha ancora giocatori in rosa.
+                  </p>
+                ) : null}
+                {recipientTeamId &&
+                !recipientRosterLoading &&
+                !recipientRosterError &&
+                recipientPlayers.length > 0
+                  ? recipientPlayers.map((athlete) => (
+                      <label key={athlete.athleteId}>
+                        <input
+                          type="checkbox"
+                          checked={requestedAthleteIds.includes(athlete.athleteId)}
+                          onChange={() =>
+                            setRequestedAthleteIds((prev) =>
+                              toggleAthleteId(prev, athlete.athleteId),
+                            )
+                          }
+                        />{" "}
+                        {athlete.athleteName}
+                      </label>
+                    ))
+                  : null}
               </fieldset>
 
               <Input
@@ -765,7 +837,9 @@ export function MarketPage() {
                                       )
                                     }
                                   />{" "}
-                                  {athleteNameById.get(entry.athleteId) ?? "Giocatore"}
+                                  {entry.athleteName ??
+                                    athleteNameById.get(entry.athleteId) ??
+                                    "Giocatore"}
                                 </label>
                               ))}
                           </fieldset>

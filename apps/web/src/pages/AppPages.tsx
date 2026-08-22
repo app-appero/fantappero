@@ -17,12 +17,13 @@ export { ManagerDirectoryPage } from "./ManagerDirectoryPage";
 export { ReceivedInvitesPage } from "./ReceivedInvitesPage";
 export { MarketPage } from "./MarketPage";
 export { MatchdayPage } from "./MatchdayPage";
+export { MatchupDetailPage } from "./MatchupDetailPage";
 export { AdminDashboardPage } from "./AdminDashboardPage";
 export { AdminLeaguesPage } from "./AdminLeaguesPage";
 export { AdminListonePage } from "./AdminListonePage";
 export { AdminUsersPage } from "./AdminUsersPage";
 export { RosterPage } from "./RosterPage";
-export { StandingsWireframe as StandingsPage } from "../wireframes/screens/standings";
+export { StandingsPage } from "./StandingsPage";
 
 export { NotFoundPage, ProfilePage } from "./ProfilePage";
 

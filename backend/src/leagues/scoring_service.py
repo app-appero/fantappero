@@ -25,6 +25,7 @@ from fantasy_turns.homologation import assert_round_not_homologated
 from fantasy_turns.models import FantasyRound, FantasyRoundFixture
 from leagues.models.league_calendar import LeagueCalendar, LeagueCalendarSlot
 from leagues.scoring import MatchOutcome
+from leagues.standings_service import compute_league_standings
 from sports_data.fixtures.models import Fixture
 
 # API-Football terminal "finished" statuses. Live/not-started fixtures keep the
@@ -121,6 +122,10 @@ def compute_round_results(
             counters=counters,
         )
 
+    session.flush()
+    # Pipeline naturale EP07-05 → EP07-06: dopo i risultati H2H la classifica
+    # viene ricostruita dall'origine (solo slot con result_final).
+    compute_league_standings(session, league_id=fantasy_round.league_id)
     session.flush()
     return RoundScoringResult(
         round_id=round_id,

@@ -151,6 +151,7 @@ function toSummary(team: FantasyTeam): FantasyTeamSummary {
     leagueId: team.leagueId,
     membershipId: team.membershipId,
     userId: team.userId,
+    userType: team.userType,
     name: team.name,
     rosterSize: team.rosterSize,
     filledSlots: team.filledSlots,
