@@ -109,6 +109,12 @@ export const MOBILE_ADMIN_NAV_ITEMS: readonly NavItemDefinition[] = [
     requiredPermissions: ["global:operate"],
     surface: "admin",
   },
+  {
+    id: "admin-listone",
+    path: "/admin/listone",
+    requiredPermissions: ["global:operate"],
+    surface: "admin",
+  },
 ];
 
 export const NAV_LABELS: Record<string, string> = {
@@ -128,6 +134,7 @@ export const NAV_LABELS: Record<string, string> = {
   "admin-home": "Pannello",
   "admin-leagues": "Leghe globali",
   "admin-users": "Utenti",
+  "admin-listone": "Listone",
   auth: "Accedi",
 };
 

@@ -3,9 +3,12 @@ import { StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { theme } from "@fantappero/ui/theme";
 import { AppHeader } from "../layout/AppHeader";
+import { AdminDashboardScreen } from "../screens/admin/AdminDashboardScreen";
+import { AdminLeaguesScreen } from "../screens/admin/AdminLeaguesScreen";
+import { AdminListoneScreen } from "../screens/admin/AdminListoneScreen";
+import { AdminUsersScreen } from "../screens/admin/AdminUsersScreen";
 import { useAuthSession } from "../session/DemoSessionContext";
-import { WireframePlaceholderScreen } from "../wireframes/WireframePlaceholderScreen";
-import { MOBILE_ADMIN_NAV_ITEMS, NAV_LABELS } from "./navConfig";
+import { NAV_LABELS } from "./navConfig";
 import type { AdminStackParamList } from "./types";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import type { RootStackParamList } from "./types";
@@ -35,28 +38,27 @@ function AdminShell({ children }: { children: React.ReactNode }) {
   );
 }
 
+/**
+ * Global operator panel stack (EP11-04a/b/EP11-05 mobile parity).
+ * The dashboard links to the other three sections (mirrors the web `AdminLayout` sidebar,
+ * which has no mobile equivalent — the native stack header back button returns to it).
+ */
 export function AdminNavigator() {
   return (
     <AdminShell>
       <Stack.Navigator screenOptions={{ headerShown: false, contentStyle: sceneBackgroundStyle }}>
-        {MOBILE_ADMIN_NAV_ITEMS.map((item) => {
-          const screenName =
-            item.id === "admin-home"
-              ? "AdminHome"
-              : item.id === "admin-leagues"
-                ? "AdminLeagues"
-                : "AdminUsers";
-
-          return (
-            <Stack.Screen
-              key={item.id}
-              name={screenName}
-              options={{ title: NAV_LABELS[item.id] }}
-            >
-              {() => <WireframePlaceholderScreen screenId="operator-panel" />}
-            </Stack.Screen>
-          );
-        })}
+        <Stack.Screen name="AdminHome" options={{ title: NAV_LABELS["admin-home"] }}>
+          {() => <AdminDashboardScreen />}
+        </Stack.Screen>
+        <Stack.Screen name="AdminLeagues" options={{ title: NAV_LABELS["admin-leagues"] }}>
+          {() => <AdminLeaguesScreen />}
+        </Stack.Screen>
+        <Stack.Screen name="AdminUsers" options={{ title: NAV_LABELS["admin-users"] }}>
+          {() => <AdminUsersScreen />}
+        </Stack.Screen>
+        <Stack.Screen name="AdminListone" options={{ title: NAV_LABELS["admin-listone"] }}>
+          {() => <AdminListoneScreen />}
+        </Stack.Screen>
       </Stack.Navigator>
     </AdminShell>
   );

@@ -65,6 +65,7 @@ export type AdminStackParamList = {
   AdminHome: WireframeParams | undefined;
   AdminLeagues: WireframeParams | undefined;
   AdminUsers: WireframeParams | undefined;
+  AdminListone: WireframeParams | undefined;
 };
 
 declare global {
