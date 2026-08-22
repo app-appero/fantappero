@@ -175,7 +175,7 @@ Due passaggi:
    lettura diretta) — ha portato alla stessa scoperta di gitleaks in modo indipendente.
 
 **1 finding reale, corretto**: `infra/local/.env.example:4` conteneva
-`API_FOOTBALL_KEY=67d90279902aa6aa55cefd2263089ab9` — un valore nel formato esatto di
+`API_FOOTBALL_KEY=<redacted>` — un valore nel formato esatto di
 una chiave reale API-Football (32 caratteri esadecimali minuscoli), committato dal
 commit `b343888` ("M1 + M3-1", 2026-08-05), documentato come **Secret: Sì** nella stessa
 `docs/operations/configuration_and_secrets.md` del repo, in violazione diretta della

@@ -24,6 +24,8 @@ ALLOWLIST_SUFFIXES = (
     # API docs using the literal `<access_token>` placeholder, not a token.
     "docs/api/privacy.md",
     "docs/api/profile.md",
+    # Runbook curl examples using the shell placeholder `$ACCESS_TOKEN`, not a token.
+    "docs/operations/pilot_incident_runbooks.md",
 )
 
 ALLOWLIST_PATH_PREFIXES = (
