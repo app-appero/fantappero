@@ -5,6 +5,12 @@ import { UiStatePanel } from "../../components/UiStatePanel";
 import { marketUiStyles as styles } from "../../market/marketUiStyles";
 import { filterByTab, roleBadgeColors, ROLE_LABEL, ROLE_TABS, type RoleTab } from "./auctionListoneHelpers";
 
+// The "Tutti" tab returns the whole listone (several hundred players).
+// Rendering that as plain Views inside a ScrollView (no FlatList — see
+// RosterAdminManualCard.tsx for why) mounts too many native views at once
+// and gets the app killed for excessive memory use on a real device.
+const LISTONE_RENDER_LIMIT = 60;
+
 /** Official listone with role tabs — read-only reference table shown below the bid panel (EP08-01/02). */
 export function AuctionListone({
   entries,
@@ -100,7 +106,13 @@ export function AuctionListone({
             />
           ) : (
             <View testID={`auction-listone-table-${tab}`}>
-              {visibleEntries.map((entry) => {
+              {visibleEntries.length > LISTONE_RENDER_LIMIT ? (
+                <Text style={styles.meta} testID="auction-listone-truncated">
+                  Mostrati i primi {LISTONE_RENDER_LIMIT} di {visibleEntries.length} calciatori.
+                  Usa i filtri ruolo per restringere l'elenco.
+                </Text>
+              ) : null}
+              {visibleEntries.slice(0, LISTONE_RENDER_LIMIT).map((entry) => {
                 const roleColors = roleBadgeColors(entry.effectiveRole);
                 return (
                   <View key={entry.athleteId} style={styles.listRow}>
