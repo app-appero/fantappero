@@ -4,6 +4,14 @@ import { UiStatePanel } from "../../components/UiStatePanel";
 import { ROLE_LABEL, roleBadgeColors, type AthleteOwnership } from "./rosterHelpers";
 import { rosterStyles as styles } from "./rosterStyles";
 
+// The listone can hold several hundred players. This screen scrolls inside a
+// plain ScrollView (PageContainer), so a virtualized list isn't an option
+// here; rendering every row as a native View at once is what was crashing
+// the app on real devices (OOM) even though it looked fine in a browser
+// preview. Cap the rendered rows and push the user toward the search box
+// instead.
+const LISTONE_RENDER_LIMIT = 40;
+
 export function RosterAdminManualCard({
   isAdmin,
   leagueTeams,
@@ -96,6 +104,12 @@ export function RosterAdminManualCard({
                 autoCorrect={false}
                 testID="roster-admin-listone-search"
               />
+              {filteredListone.length > LISTONE_RENDER_LIMIT ? (
+                <Text style={styles.meta} testID="roster-admin-listone-truncated">
+                  Mostrati i primi {LISTONE_RENDER_LIMIT} di {filteredListone.length} risultati.
+                  Affina la ricerca per restringere l'elenco.
+                </Text>
+              ) : null}
               {filteredListone.length === 0 ? (
                 <UiStatePanel
                   state="empty"
@@ -104,7 +118,7 @@ export function RosterAdminManualCard({
                   testID="roster-admin-listone-search-empty"
                 />
               ) : (
-                filteredListone.map((entry) => {
+                filteredListone.slice(0, LISTONE_RENDER_LIMIT).map((entry) => {
                   const owner = ownership.get(entry.athleteId);
                   const canAssign = !owner && emptySlotsCount > 0;
                   const canRelease = owner ? canReleaseAthlete(owner.teamId) : false;
