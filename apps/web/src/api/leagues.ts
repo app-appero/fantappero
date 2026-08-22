@@ -16,7 +16,6 @@ import type {
   RosterImportConfirmResult,
   RosterImportPreview,
   RosterOccupancyEntry,
-  TeamRosterPlayer,
   RosterOwnershipHistory,
   RosterAsOf,
   CreateRosterTurnSnapshotRequest,
@@ -32,8 +31,6 @@ import type {
   SaveLineupRequest,
   LeagueAdminPanel,
   LeagueCalendar,
-  H2HCalendar,
-  H2HMatchupDetail,
   LeagueDetail,
   LeagueInvite,
   LeagueLifecycle,
@@ -43,7 +40,6 @@ import type {
   LeagueListoneRefreshResult,
   LeagueMember,
   LeagueRules,
-  LeagueStanding,
   LeagueSummary,
   TransitionLeagueStateRequest,
   UpdateLeagueRulesRequest,
@@ -75,30 +71,6 @@ export function fetchLeagueCalendar(
   leagueId: string,
 ): Promise<LeagueCalendar | null> {
   return apiRequest<LeagueCalendar | null>(`/leagues/${leagueId}/calendario`, { accessToken });
-}
-
-export function fetchH2HCalendar(
-  accessToken: string,
-  leagueId: string,
-): Promise<H2HCalendar | null> {
-  return apiRequest<H2HCalendar | null>(`/leagues/${leagueId}/calendario/h2h`, { accessToken });
-}
-
-export function fetchH2HMatchup(
-  accessToken: string,
-  leagueId: string,
-  slotId: string,
-): Promise<H2HMatchupDetail> {
-  return apiRequest<H2HMatchupDetail>(`/leagues/${leagueId}/calendario/scontri/${slotId}`, {
-    accessToken,
-  });
-}
-
-export function fetchLeagueStandings(
-  accessToken: string,
-  leagueId: string,
-): Promise<LeagueStanding[]> {
-  return apiRequest<LeagueStanding[]>(`/leagues/${leagueId}/classifica`, { accessToken });
 }
 
 export function createLeague(
@@ -355,16 +327,6 @@ export function fetchRosterOccupancy(
   });
 }
 
-export function fetchTeamPlayersForTrade(
-  accessToken: string,
-  leagueId: string,
-  teamId: string,
-): Promise<TeamRosterPlayer[]> {
-  return apiRequest<TeamRosterPlayer[]>(`/leagues/${leagueId}/squadre/${teamId}/giocatori`, {
-    accessToken,
-  });
-}
-
 export function ensureFantasyTeams(
   accessToken: string,
   leagueId: string,
@@ -383,20 +345,6 @@ export function fetchFantasyTeamForAdmin(
   return apiRequest<FantasyTeam>(`/leagues/${leagueId}/amministrazione/squadre/${teamId}`, {
     accessToken,
   });
-}
-
-export function assignRandomAiRoster(
-  accessToken: string,
-  leagueId: string,
-  teamId: string,
-): Promise<FantasyTeam> {
-  return apiRequest<FantasyTeam>(
-    `/leagues/${leagueId}/amministrazione/squadre/${teamId}/rosa/random`,
-    {
-      method: "POST",
-      accessToken,
-    },
-  );
 }
 
 export function assignRosterSlot(

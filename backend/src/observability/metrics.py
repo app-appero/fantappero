@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import re
 import threading
 import time
 from dataclasses import dataclass, field
@@ -127,78 +126,6 @@ class MetricsRegistry:
                 for (name, labels), value in self._gauges.items()
             }
         return {"counters": counters, "histograms": histograms, "gauges": gauges}
-
-    def render_prometheus(self) -> str:
-        """Render a dependency-free Prometheus text snapshot.
-
-        Histograms in this small registry do not retain buckets.  They are
-        therefore exported as ``_count``, ``_sum`` and ``_max`` gauges instead
-        of pretending to be Prometheus histograms.  This preserves the
-        existing in-process contract while making short Beta/load-test runs
-        externally observable.
-        """
-        with self._lock:
-            counters = [
-                (name, labels, counter.value) for (name, labels), counter in self._counters.items()
-            ]
-            histograms = [
-                (name, labels, hist.count, hist.sum_seconds, hist.max_seconds)
-                for (name, labels), hist in self._histograms.items()
-            ]
-            gauges = [(name, labels, value) for (name, labels), value in self._gauges.items()]
-
-        lines: list[str] = []
-        declared_types: set[str] = set()
-        for name, labels, value in sorted(counters):
-            metric_name = _prometheus_name(name)
-            if metric_name not in declared_types:
-                lines.append(f"# TYPE {metric_name} counter")
-                declared_types.add(metric_name)
-            lines.append(f"{metric_name}{_prometheus_labels(labels)} {value}")
-        for name, labels, count, total, maximum in sorted(histograms):
-            metric_name = _prometheus_name(name)
-            for suffix, value in (("count", count), ("sum", total), ("max", maximum)):
-                exported_name = f"{metric_name}_{suffix}"
-                if exported_name not in declared_types:
-                    lines.append(f"# TYPE {exported_name} gauge")
-                    declared_types.add(exported_name)
-                lines.append(f"{exported_name}{_prometheus_labels(labels)} {value}")
-        for name, labels, value in sorted(gauges):
-            metric_name = _prometheus_name(name)
-            if metric_name not in declared_types:
-                lines.append(f"# TYPE {metric_name} gauge")
-                declared_types.add(metric_name)
-            lines.append(f"{metric_name}{_prometheus_labels(labels)} {value}")
-        return "\n".join(lines) + ("\n" if lines else "")
-
-
-_INVALID_PROMETHEUS_NAME = re.compile(r"[^a-zA-Z0-9_:]")
-_INVALID_PROMETHEUS_LABEL_NAME = re.compile(r"[^a-zA-Z0-9_]")
-
-
-def _prometheus_name(value: str) -> str:
-    sanitized = _INVALID_PROMETHEUS_NAME.sub("_", value)
-    if not sanitized or sanitized[0].isdigit():
-        return f"metric_{sanitized}"
-    return sanitized
-
-
-def _prometheus_label_name(value: str) -> str:
-    sanitized = _INVALID_PROMETHEUS_LABEL_NAME.sub("_", value)
-    if not sanitized or sanitized[0].isdigit():
-        return f"label_{sanitized}"
-    return sanitized
-
-
-def _prometheus_labels(labels: tuple[tuple[str, str], ...]) -> str:
-    if not labels:
-        return ""
-    rendered = []
-    for raw_name, raw_value in labels:
-        name = _prometheus_label_name(raw_name)
-        value = raw_value.replace("\\", "\\\\").replace("\n", "\\n").replace('"', '\\"')
-        rendered.append(f'{name}="{value}"')
-    return "{" + ",".join(rendered) + "}"
 
 
 # Metric names (stable contract for tests and future exporters).

@@ -19,17 +19,10 @@ from leagues.models.league_audit_event import LeagueAuditEvent
 from leagues.pro_export_schemas import LeagueProExportResponse
 from leagues.schemas import LeagueStandingResponse
 from leagues.standings_service import list_league_standings
-from fantasy_teams.models import FantasyTeam
 
 
 def build_league_export(session: Session, *, league_id: UUID) -> LeagueProExportResponse:
     standings = list_league_standings(session, league_id=league_id)
-    team_names = {
-        team.id: team.name
-        for team in session.scalars(
-            select(FantasyTeam).where(FantasyTeam.league_id == league_id)
-        ).all()
-    }
     audit_count = (
         session.scalar(
             select(func.count())
@@ -44,7 +37,6 @@ def build_league_export(session: Session, *, league_id: UUID) -> LeagueProExport
         standings=[
             LeagueStandingResponse(
                 fantasyTeamId=str(row.fantasy_team_id),
-                teamName=team_names.get(row.fantasy_team_id, "Squadra"),
                 position=row.position,
                 played=row.played,
                 won=row.won,

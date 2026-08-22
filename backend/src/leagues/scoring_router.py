@@ -9,14 +9,10 @@ from fastapi.responses import JSONResponse
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from auth.dependencies import get_current_user, get_db_session
+from auth.dependencies import get_db_session
 from auth.exceptions import AuthError
 from auth.models.user import User
-from authorization.context import PermissionContext
-from authorization.dependencies import get_authorization_service, require_permissions
-from authorization.exceptions import ForbiddenError
-from authorization.permissions import has_permissions
-from authorization.service import AuthorizationService
+from authorization.dependencies import require_permissions
 from database.enums import Permission
 from fantasy_turns.homologation_service import apply_round_correction, homologate_round
 from fantasy_turns.models import FantasyRound
@@ -30,37 +26,12 @@ from leagues.schemas import (
 )
 from leagues.scoring_service import compute_round_results
 from leagues.standings_service import compute_league_standings
-from observability.metrics import get_metrics
 
 router = APIRouter(prefix="/fantasy-scoring", tags=["fantasy-scoring"])
 
 
 def _error_response(exc: AuthError) -> JSONResponse:
     return JSONResponse(status_code=400, content={"message": exc.message, "code": exc.code})
-
-
-def _require_results_read(
-    round_id: UUID,
-    current_user: User = Depends(get_current_user),
-    authz: AuthorizationService = Depends(get_authorization_service),
-    session: Session = Depends(get_db_session),
-) -> User:
-    """Compute resta global:operate; lettura risultati anche matchday:view in lega."""
-    context = PermissionContext.for_user(current_user)
-    if has_permissions(context, (Permission.GLOBAL_OPERATE,)):
-        return current_user
-    fantasy_round = session.get(FantasyRound, round_id)
-    if fantasy_round is None:
-        raise ForbiddenError()
-    league_access = authz.resolve_league_access(current_user, fantasy_round.league_id)
-    league_context = PermissionContext.for_user(current_user, league_access=league_access)
-    if not has_permissions(league_context, (Permission.MATCHDAY_VIEW,)):
-        get_metrics().incr(
-            "authorization_denied_total",
-            labels={"reason": "forbidden", "permission": Permission.MATCHDAY_VIEW.value},
-        )
-        raise ForbiddenError()
-    return current_user
 
 
 @router.post(
@@ -100,7 +71,7 @@ def compute_round_results_endpoint(
 )
 def list_round_results(
     round_id: UUID,
-    _reader: User = Depends(_require_results_read),
+    _operator: object = Depends(require_permissions(Permission.GLOBAL_OPERATE)),
     session: Session = Depends(get_db_session),
 ) -> list[RoundMatchResultResponse] | JSONResponse:
     """Risultati persistiti per un turno (una riga per scontro diretto, no bye)."""

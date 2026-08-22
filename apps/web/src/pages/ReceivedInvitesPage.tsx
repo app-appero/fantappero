@@ -81,8 +81,7 @@ export function ReceivedInvitesPage() {
     setLoading(true);
     setError(null);
     try {
-      const rows = await fetchReceivedNamedInvites(session.accessToken);
-      setInvites(rows.filter((row) => row.status === "pending"));
+      setInvites(await fetchReceivedNamedInvites(session.accessToken));
     } catch (loadError) {
       setError(getApiErrorMessage(loadError, "Impossibile caricare gli inviti ricevuti."));
     } finally {

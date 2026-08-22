@@ -367,13 +367,6 @@ def test_named_invite_directory_accept_and_idempotency(
         == 1
     )
 
-    received_after = client.get(
-        "/leagues/inviti-ricevuti",
-        headers={"Authorization": f"Bearer {recipient_token}"},
-    )
-    assert received_after.status_code == 200
-    assert received_after.json() == []
-
 
 def test_ai_named_invite_auto_accepts_and_ai_cannot_login(
     client: TestClient,

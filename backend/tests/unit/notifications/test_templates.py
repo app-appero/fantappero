@@ -49,8 +49,6 @@ def test_render_mercato_esito_busta_lost() -> None:
 def test_render_mercato_scambio_known_and_unknown_status() -> None:
     known = render_notification("mercato.scambio", 1, {"status": "rejected"})
     assert known.title == "Scambio rifiutato"
-    proposed = render_notification("mercato.scambio", 1, {"status": "proposed"})
-    assert proposed.title == "Nuova proposta di scambio"
     fallback = render_notification("mercato.scambio", 1, {"status": "boh"})
     assert fallback.title == "Aggiornamento scambio"
 

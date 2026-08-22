@@ -92,10 +92,6 @@ def _render_mercato_esito_busta(params: NotificationParams) -> NotificationConte
 
 
 _TRADE_STATUS_MESSAGES: dict[str, tuple[str, str]] = {
-    "proposed": (
-        "Nuova proposta di scambio",
-        "Hai ricevuto una proposta di scambio. Aprila dal mercato.",
-    ),
     "accepted": ("Scambio accettato", "La tua proposta di scambio è stata accettata."),
     "pending_approval": (
         "Scambio in attesa di approvazione",

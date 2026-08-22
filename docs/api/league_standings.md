@@ -58,13 +58,3 @@ risultato dello scontro diretto; ricalcolo stabile (nessun accumulo).
 
 - Punteggio e scontro diretto: [`league_scoring.md`](./league_scoring.md)
 - Formazione effettiva: [`fantasy_lineups_effective.md`](./fantasy_lineups_effective.md)
-
-## Aggiornamento
-
-`compute_round_results` (EP07-05) richiama automaticamente
-`compute_league_standings` dopo aver persistito gli esiti H2H: la classifica
-segue il flusso naturale dei risultati senza un secondo passo manuale.
-Il `POST /fantasy-scoring/leagues/{leagueId}/classifica` resta disponibile
-per ricalcoli espliciti (operatore).
-
-`GET /leagues/{leagueId}/classifica` include `teamName` per la UI.

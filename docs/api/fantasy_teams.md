@@ -79,7 +79,6 @@ placeholder: verificano rose e conti reali.
 | `GET` | `/leagues/{id}/rosa` | `roster:view` — rosa del chiamante (creazione lazy) + composizione |
 | `GET` | `/leagues/{id}/squadre` | `roster:view` — elenco squadre (`compositionStatus`) |
 | `GET` | `/leagues/{id}/occupazione-rosa` | `roster:view` — mappa atleta→squadra per UI listone |
-| `GET` | `/leagues/{id}/squadre/{teamId}/giocatori` | `roster:view` — rosa corrente di una squadra (scambi) |
 | `GET` | `/leagues/{id}/crediti` | `roster:view` — saldo + `reconstructedBalance` |
 | `GET` | `/leagues/{id}/crediti/movimenti` | `roster:view` — ledger immutabile |
 | `GET` | `/leagues/{id}/rosa/storico` | `roster:view` — intervalli possesso (`activeOnly` opzionale) |
@@ -90,7 +89,6 @@ placeholder: verificano rose e conti reali.
 | `GET` | `/leagues/{id}/amministrazione/squadre/{teamId}/rosa/storico` | `league:admin` |
 | `POST` | `/leagues/{id}/amministrazione/crediti/movimenti` | `league:admin` — aggiustamento idempotente (`transactionId`) |
 | `POST` | `/leagues/{id}/amministrazione/squadre` | `league:admin` — assicura squadra+slot+conto per ogni iscritto |
-| `POST` | `/leagues/{id}/amministrazione/squadre/{teamId}/rosa/random` | `league:admin` — riempie slot vuoti di un fantallenatore IA con calciatori liberi random |
 | `GET` | `/leagues/{id}/amministrazione/squadre/{teamId}` | `league:admin` — dettaglio rosa per inserimento multi-squadra |
 | `GET` | `/leagues/{id}/amministrazione/squadre/{teamId}/crediti` | `league:admin` — saldo + ledger di una squadra |
 | `PUT` | `/leagues/{id}/amministrazione/squadre/{teamId}/slot/{slotIndex}` | `roster:edit` — assegna calciatore (`athleteId`, `purchaseCredits`); solo propria squadra se non admin |

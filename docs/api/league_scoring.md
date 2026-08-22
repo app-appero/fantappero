@@ -51,14 +51,12 @@ calendario tramite `FantasyRound.number == LeagueCalendarSlot.round_number`
 sulla stessa lega; i lati home/away si risolvono da
 `LeagueMembership` → `FantasyTeam.membership_id`.
 
-## API
+## API (permesso `global:operate`)
 
-| Metodo | Path | Permesso | Descrizione |
-| --- | --- | --- | --- |
-| `POST` | `/fantasy-scoring/rounds/{roundId}/risultati` | `global:operate` | Calcola e persiste i risultati di tutti gli scontri diretti del turno |
-| `GET` | `/fantasy-scoring/rounds/{roundId}/risultati` | `global:operate` **oppure** `matchday:view` (membro della lega del turno) | Risultati persistiti (uno per scontro diretto, esclusi i bye) |
-| `GET` | `/leagues/{leagueId}/calendario/h2h` | `matchday:view` | Aggregato giornate H2H + score (UI `/turni`) |
-| `GET` | `/leagues/{leagueId}/calendario/scontri/{slotId}` | `matchday:view` | Dettaglio scontro con formazioni e fantavoti |
+| Metodo | Path | Descrizione |
+| --- | --- | --- |
+| `POST` | `/fantasy-scoring/rounds/{roundId}/risultati` | Calcola e persiste i risultati di tutti gli scontri diretti del turno |
+| `GET` | `/fantasy-scoring/rounds/{roundId}/risultati` | Risultati persistiti (uno per scontro diretto, esclusi i bye) |
 
 Risposta compute:
 

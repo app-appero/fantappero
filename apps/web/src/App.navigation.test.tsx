@@ -91,9 +91,8 @@ describe("App navigation shell (EPUI-03)", () => {
     expect(html).toContain('href="/asta"');
   });
 
-  it("renders standings page on /classifica", () => {
+  it("renders standings wireframe on /classifica", () => {
     const html = renderAt("/classifica");
     expect(html).toContain('data-testid="wireframe-standings-success"');
-    expect(html).toContain('data-testid="standings-table"');
   });
 });

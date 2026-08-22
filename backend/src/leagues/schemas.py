@@ -115,7 +115,6 @@ class LeagueAdminPanelResponse(ApiModel):
 class LeagueMemberResponse(ApiModel):
     user_id: str = Field(alias="userId")
     display_name: str = Field(alias="displayName")
-    user_type: Literal["human", "ai"] = Field(alias="userType")
     role: Literal["member", "league_admin"]
     joined_at: datetime = Field(alias="joinedAt")
 
@@ -226,101 +225,6 @@ class LeagueCalendarResponse(ApiModel):
     summary: LeagueCalendarSummaryResponse
 
 
-class H2HMatchupScoreResponse(ApiModel):
-    """Risultato H2H persistito sullo slot (EP07-05), esposto in lettura matchday."""
-
-    home_score: float | None = Field(default=None, alias="homeScore")
-    away_score: float | None = Field(default=None, alias="awayScore")
-    home_fantasy_goals: int | None = Field(default=None, alias="homeFantasyGoals")
-    away_fantasy_goals: int | None = Field(default=None, alias="awayFantasyGoals")
-    outcome: Literal["home", "away", "draw"] | None = None
-    result_final: bool = Field(alias="resultFinal")
-    computed_at: datetime | None = Field(default=None, alias="computedAt")
-
-
-class H2HCalendarMatchupResponse(ApiModel):
-    slot_id: str = Field(alias="slotId")
-    slot_index: int = Field(alias="slotIndex")
-    is_bye: bool = Field(alias="isBye")
-    home_user_id: str = Field(alias="homeUserId")
-    home_display_name: str = Field(alias="homeDisplayName")
-    home_team_name: str | None = Field(default=None, alias="homeTeamName")
-    away_user_id: str | None = Field(default=None, alias="awayUserId")
-    away_display_name: str | None = Field(default=None, alias="awayDisplayName")
-    away_team_name: str | None = Field(default=None, alias="awayTeamName")
-    result: H2HMatchupScoreResponse | None = None
-
-
-class H2HCalendarRoundResponse(ApiModel):
-    round_number: int = Field(alias="roundNumber")
-    fantasy_round_id: str | None = Field(default=None, alias="fantasyRoundId")
-    homologation_status: Literal["provisional", "homologated"] | None = Field(
-        default=None, alias="homologationStatus"
-    )
-    european_turn_status: Literal["scheduled", "open", "locked", "skipped"] | None = Field(
-        default=None, alias="europeanTurnStatus"
-    )
-    matchups: list[H2HCalendarMatchupResponse]
-
-
-class H2HCalendarResponse(ApiModel):
-    """Calendario H2H confermato con risultati affiancati (consultazione /turni)."""
-
-    id: str
-    league_id: str = Field(alias="leagueId")
-    status: Literal["confirmed"]
-    format: Literal["single_round_robin"]
-    algorithm_version: str = Field(alias="algorithmVersion")
-    participant_count: int = Field(alias="participantCount")
-    round_count: int = Field(alias="roundCount")
-    matchup_count: int = Field(alias="matchupCount")
-    bye_count: int = Field(alias="byeCount")
-    generated_at: datetime = Field(alias="generatedAt")
-    confirmed_at: datetime | None = Field(default=None, alias="confirmedAt")
-    live: bool
-    rounds: list[H2HCalendarRoundResponse]
-    summary: LeagueCalendarSummaryResponse
-
-
-class H2HPlayerScoreResponse(ApiModel):
-    athlete_id: str = Field(alias="athleteId")
-    name: str
-    role: Literal["P", "D", "C", "A"]
-    fantasy_score: float | None = Field(default=None, alias="fantasyScore")
-    is_effective_starter: bool = Field(alias="isEffectiveStarter")
-    is_bench: bool = Field(alias="isBench")
-
-
-class H2HSideLineupResponse(ApiModel):
-    fantasy_team_id: str | None = Field(default=None, alias="fantasyTeamId")
-    team_name: str | None = Field(default=None, alias="teamName")
-    display_name: str = Field(alias="displayName")
-    module: str | None = None
-    lineup_source: Literal["effective", "submitted", "none"] = Field(alias="lineupSource")
-    total_score: float | None = Field(default=None, alias="totalScore")
-    fantasy_goals: int | None = Field(default=None, alias="fantasyGoals")
-    starters: list[H2HPlayerScoreResponse]
-    bench: list[H2HPlayerScoreResponse]
-
-
-class H2HMatchupDetailResponse(ApiModel):
-    slot_id: str = Field(alias="slotId")
-    league_id: str = Field(alias="leagueId")
-    round_number: int = Field(alias="roundNumber")
-    fantasy_round_id: str | None = Field(default=None, alias="fantasyRoundId")
-    homologation_status: Literal["provisional", "homologated"] | None = Field(
-        default=None, alias="homologationStatus"
-    )
-    european_turn_status: Literal["scheduled", "open", "locked", "skipped"] | None = Field(
-        default=None, alias="europeanTurnStatus"
-    )
-    live: bool
-    is_bye: bool = Field(alias="isBye")
-    home: H2HSideLineupResponse
-    away: H2HSideLineupResponse | None = None
-    result: H2HMatchupScoreResponse | None = None
-
-
 class ComputeRoundResultsRequest(ApiModel):
     formula_version: str | None = Field(default=None, alias="formulaVersion")
 
@@ -360,7 +264,6 @@ class ComputeStandingsResponse(ApiModel):
 
 class LeagueStandingResponse(ApiModel):
     fantasy_team_id: str = Field(alias="fantasyTeamId")
-    team_name: str = Field(alias="teamName")
     position: int
     played: int
     won: int

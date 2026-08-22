@@ -1,4 +1,5 @@
 import type { NotificationItem } from "@fantappero/contracts";
+import { UiStatePanel } from "@fantappero/ui";
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "../router/simpleRouter";
 import { IconBell } from "../navigation/NavIcons";
@@ -99,17 +100,15 @@ export function NotificationCenter() {
             ) : null}
           </div>
           {loading ? (
-            <p className="fa-notification-center__status" data-testid="notification-loading">
-              Caricamento…
-            </p>
+            <UiStatePanel state="loading" title="Caricamento" message="Recupero le notifiche…" />
           ) : loadError ? (
-            <p className="fa-notification-center__status fa-notification-center__status--error" data-testid="notification-error">
-              {loadError}
-            </p>
+            <UiStatePanel state="error" title="Errore" message={loadError} />
           ) : items.length === 0 ? (
-            <p className="fa-notification-center__empty" data-testid="notification-empty">
-              Nessuna notifica
-            </p>
+            <UiStatePanel
+              state="empty"
+              title="Nessuna notifica"
+              message="Non hai ancora notifiche."
+            />
           ) : (
             <ul className="fa-notification-center__list">
               {items.map((item) => (

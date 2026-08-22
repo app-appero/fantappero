@@ -116,11 +116,6 @@ class TradeService:
                 "expiresAt": proposal.expires_at.isoformat(),
             },
         )
-        self._notify_trade_status(
-            proposal_id=proposal.id,
-            status=TradeStatus.PROPOSED,
-            team_ids=[recipient.id],
-        )
         self._session.commit()
         get_metrics().incr("trade_proposal_created_total")
         return self._to_response(proposal)

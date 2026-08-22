@@ -74,13 +74,8 @@ Body generazione/anteprima:
 
 ## UI
 
-- Web `/turni` — due tab: **Calendario fantallenatori** (H2H confermato + risultati) e
-  **Turni europei** (lista/dettaglio, raggruppamento per competizione, sync admin).
-- Dettaglio scontro: `/turni/scontro/{slotId}` — confronto formazioni + fantavoti + esito.
-- Live polling su tab europei (`useLiveTurnPolling`), tab H2H e dettaglio scontro
-  finché il turno collegato è open/locked e non omologato.
-- Mobile tab Turni — stessi flussi essenziali europei; calendario H2H in lettura
-  (dettaglio scontro: stub/link documentato verso web se non implementato).
+- Web `/turni` — lista/dettaglio, stato partita (rinviata/in corso), sync automatico admin, ricalcolo cutoff; tab Risultati placeholder.
+- Mobile tab Turni — stessi flussi essenziali, con avviso se un rinvio non sblocca un kickoff già trascorso.
 
 ## Verifica
 
@@ -113,9 +108,7 @@ Task: `fantasy_turns.ensure_upcoming` — solo leghe `active`; non persiste `ski
 
 ## Rischi residui
 
-- Numerazione turni: mapping ufficiale H2H↔europeo è
-  `FantasyRound.number == LeagueCalendarSlot.round_number` (stessa lega).
-  Formato calendario MVP = solo andata (`single_round_robin`); andata/ritorno differita.
+- Numerazione turni indipendente dal calendario H2H (allineamento futuro).
 - Timezone lega non ancora modellata: default `Europe/Rome`.
 - Leghe non ancora `active` non ricevono turni automatici (serve attivazione o sync manuale).
 - Il latch usa lo snapshot `observed_kickoff_at` (impostato in generazione). Un ricalcolo **prima** del fischio adotta il nuovo orario; uno **dopo** aggancia il lock e non riapre la finestra. Tra sync provider e job/`GET` il cutoff persistito può restare stantio per pochi minuti.

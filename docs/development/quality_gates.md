@@ -19,7 +19,6 @@ Workflow: [`.github/workflows/ci.yml`](../../.github/workflows/ci.yml)
 | `ci-success` | **Obbligatorio** — aggregato (branch protection) | `make quality` |
 | `migrations` | **Obbligatorio** — Alembic upgrade, drift check, integration DB tests | `make migrate && make migrate-check` (richiede `DATABASE_URL`) |
 | `ep00-extra-tests` | **Informativo** — suite tools/experiments | vedi sotto |
-| `performance-smoke` | **Informativo** — stack isolato + seed + Celery + k6 smoke EP12-03 | `PERF_USER_COUNT=1 make performance-smoke` |
 
 In branch protection su GitHub, richiedere il check **`CI success`** (job `ci-success`).
 I job informativi non devono essere required.
@@ -79,16 +78,6 @@ python -m pip install "pytest==8.4.1"
 (cd experiments/rating_beta && python -m pytest)
 ```
 
-### Smoke performance EP12-03 (non in `make quality`)
-
-```bash
-PERF_USER_COUNT=1 make performance-smoke
-```
-
-Il job gira solo su invocazione manuale o branch M5. È informativo perché la capacità
-del runner GitHub non rappresenta il pilot; il full gate resta `make performance-test`
-su un host controllato, secondo il runbook `docs/operations/performance_capacity.md`.
-
 ## Cache e concorrenza
 
 - **Concurrency**: un solo run attivo per `workflow + ref`; i run precedenti sulla
@@ -117,7 +106,6 @@ per i job obbligatori, 7 per EP00):
 | `js-test` | `js-test-diagnostics-*` (`js-test.log`) |
 | `js-build` | `js-build-diagnostics-*` (`js-build.log`) |
 | `ep00-extra-tests` | `ep00-test-diagnostics-*` |
-| `performance-smoke` | `performance-smoke-*` (summary sanitizzati e metriche dello stack isolato) |
 
 ## Controllo migrazioni (EP01-06)
 

@@ -26,13 +26,6 @@ def _headers_to_dict(raw: list[tuple[bytes, bytes]]) -> dict[str, str]:
     return {k.decode("latin-1"): v.decode("latin-1") for k, v in raw}
 
 
-def _metric_path(scope: Scope) -> str:
-    """Use a bounded route label, including for arbitrary unmatched paths."""
-    route = scope.get("route")
-    route_path = getattr(route, "path", None)
-    return str(route_path) if route_path else "<unmatched>"
-
-
 class CorrelationMiddleware:
     """Propagate correlation/request IDs and record per-request metrics."""
 
@@ -73,14 +66,9 @@ class CorrelationMiddleware:
         except Exception as exc:
             raised = exc
             metrics = get_metrics()
-            metric_path = _metric_path(scope)
             metrics.incr(
                 HTTP_REQUEST_ERRORS_TOTAL,
-                labels={
-                    "method": method,
-                    "path": metric_path,
-                    "error_type": type(exc).__name__,
-                },
+                labels={"method": method, "path": path, "error_type": type(exc).__name__},
             )
             get_error_tracker().capture_exception(
                 exc,
@@ -95,10 +83,9 @@ class CorrelationMiddleware:
         finally:
             elapsed = time.perf_counter() - start
             metrics = get_metrics()
-            metric_path = _metric_path(scope)
             labels = {
                 "method": method,
-                "path": metric_path,
+                "path": path,
                 "status": str(status_code),
             }
             metrics.incr(HTTP_REQUESTS_TOTAL, labels=labels)
@@ -106,11 +93,7 @@ class CorrelationMiddleware:
             if status_code >= 500 and raised is None:
                 metrics.incr(
                     HTTP_REQUEST_ERRORS_TOTAL,
-                    labels={
-                        "method": method,
-                        "path": metric_path,
-                        "error_type": "http_5xx",
-                    },
+                    labels={"method": method, "path": path, "error_type": "http_5xx"},
                 )
             logger.info(
                 "request_completed",

@@ -30,11 +30,7 @@ def find_team_for_membership(
     if with_slots:
         stmt = stmt.options(
             selectinload(FantasyTeam.slots).selectinload(FantasyRosterSlot.athlete),
-            selectinload(FantasyTeam.membership).selectinload(LeagueMembership.user),
-        )
-    else:
-        stmt = stmt.options(
-            selectinload(FantasyTeam.membership).selectinload(LeagueMembership.user),
+            selectinload(FantasyTeam.membership),
         )
     return session.scalar(stmt)
 
@@ -53,11 +49,7 @@ def find_team_by_id(
     if with_slots:
         stmt = stmt.options(
             selectinload(FantasyTeam.slots).selectinload(FantasyRosterSlot.athlete),
-            selectinload(FantasyTeam.membership).selectinload(LeagueMembership.user),
-        )
-    else:
-        stmt = stmt.options(
-            selectinload(FantasyTeam.membership).selectinload(LeagueMembership.user),
+            selectinload(FantasyTeam.membership),
         )
     return session.scalar(stmt)
 

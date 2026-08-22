@@ -31,7 +31,6 @@ import type {
   SaveLineupRequest,
   LeagueAdminPanel,
   LeagueCalendar,
-  H2HCalendar,
   LeagueDetail,
   LeagueInvite,
   LeagueLifecycle,
@@ -71,13 +70,6 @@ export function fetchLeagueCalendar(
   leagueId: string,
 ): Promise<LeagueCalendar | null> {
   return apiRequest<LeagueCalendar | null>(`/leagues/${leagueId}/calendario`, { accessToken });
-}
-
-export function fetchH2HCalendar(
-  accessToken: string,
-  leagueId: string,
-): Promise<H2HCalendar | null> {
-  return apiRequest<H2HCalendar | null>(`/leagues/${leagueId}/calendario/h2h`, { accessToken });
 }
 
 export function createLeague(
@@ -352,20 +344,6 @@ export function fetchFantasyTeamForAdmin(
   return apiRequest<FantasyTeam>(`/leagues/${leagueId}/amministrazione/squadre/${teamId}`, {
     accessToken,
   });
-}
-
-export function assignRandomAiRoster(
-  accessToken: string,
-  leagueId: string,
-  teamId: string,
-): Promise<FantasyTeam> {
-  return apiRequest<FantasyTeam>(
-    `/leagues/${leagueId}/amministrazione/squadre/${teamId}/rosa/random`,
-    {
-      method: "POST",
-      accessToken,
-    },
-  );
 }
 
 export function assignRosterSlot(

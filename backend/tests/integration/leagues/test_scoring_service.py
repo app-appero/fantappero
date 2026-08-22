@@ -373,32 +373,6 @@ def test_compute_round_results_skips_team_without_effective_lineup(db_session: S
     assert result.counters.created == 0
 
 
-def test_compute_round_results_updates_standings(db_session: Session) -> None:
-    """EP07-05→EP07-06: il calcolo risultati aggiorna la classifica automaticamente."""
-    _seed_catalog(db_session)
-    db_session.commit()
-    fixture = _sync_match(db_session)
-    db_session.commit()
-    compute_fixture_ratings(db_session, fixture_id=fixture.id)
-    db_session.commit()
-
-    fantasy_round, teams = _build_two_team_round(db_session, fixture)
-    compute_round_effective_lineups(db_session, round_id=fantasy_round.id)
-    db_session.commit()
-    compute_round_results(db_session, round_id=fantasy_round.id)
-    db_session.commit()
-
-    standings = {
-        row.fantasy_team_id: row
-        for row in db_session.scalars(
-            select(LeagueStanding).where(LeagueStanding.league_id == fantasy_round.league_id)
-        ).all()
-    }
-    assert len(standings) == 2
-    assert standings[teams["west_ham"].id].played == 1
-    assert standings[teams["chelsea"].id].played == 1
-
-
 def test_compute_league_standings_after_round_results(db_session: Session) -> None:
     """EP07-06: la classifica riflette il risultato finale dello scontro diretto."""
     _seed_catalog(db_session)
@@ -419,9 +393,7 @@ def test_compute_league_standings_after_round_results(db_session: Session) -> No
 
     assert result.teams == 2
     assert result.matches_considered == 1
-    # Già popolata da compute_round_results; il secondo passaggio è idempotente.
-    assert result.counters.created == 0
-    assert result.counters.unchanged == 2
+    assert result.counters.created == 2
 
     calendar = db_session.scalars(
         select(LeagueCalendar).where(LeagueCalendar.league_id == fantasy_round.league_id)

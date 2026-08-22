@@ -92,14 +92,9 @@ def get_privacy_service(
 
 
 def get_client_ip(request: Request) -> str:
-    """Return the peer address already normalized by the trusted ASGI layer.
-
-    Forwarding headers are intentionally not parsed here: accepting a client-
-    supplied ``X-Forwarded-For`` would let callers choose the rate-limit key.
-    Deployments behind a reverse proxy must configure Uvicorn's trusted
-    ``FORWARDED_ALLOW_IPS`` policy so it rewrites ``request.client`` only for
-    connections from that proxy.
-    """
+    forwarded = request.headers.get("X-Forwarded-For")
+    if forwarded:
+        return forwarded.split(",")[0].strip()
     if request.client is not None:
         return request.client.host
     return "unknown"

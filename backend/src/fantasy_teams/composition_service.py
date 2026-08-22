@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 from datetime import UTC, datetime
 from uuid import UUID
 
@@ -24,55 +23,8 @@ from leagues.models.league_membership import LeagueMembership
 from leagues.models.league_rules import LeagueRules
 from leagues.validators import LifecycleBlocker
 from sports_data.catalog.models import CompetitionSeasonClub, SportSeason
-from sports_data.listone.generate import get_role_assignment, list_role_assignments
-from sports_data.listone.models import LeagueRoleOverride
+from sports_data.listone.generate import get_role_assignment
 from sports_data.listone.overrides import effective_role_for_athlete, get_active_override
-
-
-@dataclass(frozen=True)
-class EffectiveAthleteRole:
-    role: FantasyRole
-    club_id: UUID | None
-
-
-def resolve_effective_athlete_roles(
-    session: Session,
-    *,
-    league_id: UUID,
-    athlete_ids: list[UUID],
-    season_year: int,
-    current_round: int = 0,
-    competition_ids: set[UUID] | None = None,
-) -> dict[UUID, EffectiveAthleteRole]:
-    """Resolve listone assignments and league overrides in two bulk queries."""
-    unique_ids = list(dict.fromkeys(athlete_ids))
-    if not unique_ids:
-        return {}
-    assignments = list_role_assignments(
-        session,
-        season_year=season_year,
-        athlete_ids=unique_ids,
-        competition_ids=competition_ids,
-    )
-    overrides = session.scalars(
-        select(LeagueRoleOverride).where(
-            LeagueRoleOverride.league_id == league_id,
-            LeagueRoleOverride.athlete_id.in_(unique_ids),
-            LeagueRoleOverride.superseded_at.is_(None),
-        )
-    ).all()
-    overrides_by_athlete = {row.athlete_id: row for row in overrides}
-    return {
-        assignment.athlete_id: EffectiveAthleteRole(
-            role=effective_role_for_athlete(
-                official_role=assignment.role,
-                override=overrides_by_athlete.get(assignment.athlete_id),
-                current_round=current_round,
-            ),
-            club_id=assignment.club_id,
-        )
-        for assignment in assignments
-    }
 
 
 def resolve_league_rules_limits(session: Session, league_id: UUID) -> RosterCompositionLimits:
@@ -155,7 +107,6 @@ def evaluate_team_composition(
     *,
     league: League,
     require_complete: bool | None = None,
-    effective_roles: dict[UUID, EffectiveAthleteRole] | None = None,
 ) -> RosterCompositionReport:
     limits = resolve_league_rules_limits(session, league.id)
     must_complete = (
@@ -176,22 +127,33 @@ def evaluate_team_composition(
         ).all()
     )
 
-    athlete_ids = [slot.athlete_id for slot in slots if slot.athlete_id is not None]
-    resolved = effective_roles
-    if resolved is None:
-        resolved = resolve_effective_athlete_roles(
+    roles: list[FantasyRole | None] = []
+    unresolved = 0
+    club_ids: set[UUID] = set()
+    for slot in slots:
+        if slot.athlete_id is None:
+            continue
+        assignment = get_role_assignment(
             session,
-            league_id=league.id,
-            athlete_ids=athlete_ids,
+            athlete_id=slot.athlete_id,
             season_year=league.season_year,
         )
-    roles = [resolved[athlete_id].role for athlete_id in athlete_ids if athlete_id in resolved]
-    unresolved = len(athlete_ids) - len(roles)
-    club_ids = {
-        item.club_id
-        for athlete_id, item in resolved.items()
-        if athlete_id in athlete_ids and item.club_id is not None
-    }
+        if assignment is None:
+            unresolved += 1
+            continue
+        override = get_active_override(
+            session,
+            league_id=league.id,
+            athlete_id=slot.athlete_id,
+        )
+        role = effective_role_for_athlete(
+            official_role=assignment.role,
+            override=override,
+            current_round=0,
+        )
+        roles.append(role)
+        if assignment.club_id is not None:
+            club_ids.add(assignment.club_id)
 
     club_competitions = resolve_club_competition_ids(
         session,
