@@ -10,11 +10,13 @@ import { AppHeader } from "../layout/AppHeader";
 import { AuctionScreen } from "../screens/AuctionScreen";
 import { FormationScreen } from "../screens/FormationScreen";
 import { LeaguesScreen } from "../screens/LeaguesScreen";
+import { MarketScreen } from "../screens/MarketScreen";
 import { MatchdayScreen } from "../screens/MatchdayScreen";
 import { ProfileScreen } from "../screens/ProfileScreen";
 import { RosterScreen } from "../screens/RosterScreen";
+import { WaiverScreen } from "../screens/WaiverScreen";
+import { StandingsScreen } from "../screens/StandingsScreen";
 import { useAuthSession } from "../session/DemoSessionContext";
-import { WireframePlaceholderScreen } from "../wireframes/WireframePlaceholderScreen";
 import {
   filterMobileNavItems,
   MOBILE_DRAWER_NAV_ITEMS,
@@ -26,13 +28,6 @@ import { sceneBackgroundStyle } from "../theme/navigationTheme";
 const Tab = createBottomTabNavigator<AppTabParamList>();
 const { colors } = theme;
 
-function StandingsScreen() {
-  return <WireframePlaceholderScreen screenId="standings" />;
-}
-function MarketScreen() {
-  return <WireframePlaceholderScreen screenId="market" />;
-}
-
 const TAB_ROUTE_MAP: Record<string, keyof AppTabParamList> = {
   leagues: "Leagues",
   matchday: "Matchday",
@@ -40,6 +35,7 @@ const TAB_ROUTE_MAP: Record<string, keyof AppTabParamList> = {
   roster: "Roster",
   formation: "Formation",
   auction: "Auction",
+  waiver: "Waiver",
   market: "Market",
   profile: "Profile",
 };
@@ -58,6 +54,7 @@ const SCREEN_COMPONENTS: Record<keyof AppTabParamList, React.ComponentType> = {
   Roster: RosterScreen,
   Formation: FormationScreen,
   Auction: AuctionScreen,
+  Waiver: WaiverScreen,
   Market: MarketScreen,
   Profile: ProfileScreen,
 };
@@ -69,6 +66,7 @@ const ALL_TAB_IDS = [
   "roster",
   "formation",
   "auction",
+  "waiver",
   "market",
   "profile",
 ] as const;

@@ -61,6 +61,12 @@ export const MOBILE_DRAWER_NAV_ITEMS: readonly NavItemDefinition[] = [
     surface: "app",
   },
   {
+    id: "waiver",
+    path: "/svincoli",
+    requiredPermissions: ["market:view"],
+    surface: "app",
+  },
+  {
     id: "market",
     path: "/mercato",
     requiredPermissions: ["market:view"],
@@ -115,6 +121,7 @@ export const NAV_LABELS: Record<string, string> = {
   roster: "Rosa",
   formation: "Formazione",
   auction: "Asta",
+  waiver: "Svincolati",
   market: "Mercato",
   "league-admin": "Admin lega",
   profile: "Profilo",

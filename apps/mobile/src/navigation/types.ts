@@ -36,6 +36,7 @@ export type AppTabParamList = {
   Roster: WireframeParams | undefined;
   Formation: WireframeParams | undefined;
   Auction: WireframeParams | undefined;
+  Waiver: WireframeParams | undefined;
   Market: WireframeParams | undefined;
   Profile: undefined;
 };

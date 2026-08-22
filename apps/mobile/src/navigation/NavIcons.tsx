@@ -18,6 +18,7 @@ export const NAV_ICON_MAP: Record<string, FeatherName> = {
   roster: "users",
   formation: "grid",
   auction: "shopping-cart",
+  waiver: "inbox",
   market: "repeat",
   profile: "user",
   more: "menu",

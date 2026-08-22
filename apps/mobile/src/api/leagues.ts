@@ -17,6 +17,7 @@ import type {
   RosterImportPreview,
   RosterOccupancyEntry,
   RosterOwnershipHistory,
+  TeamRosterPlayer,
   RosterAsOf,
   CreateRosterTurnSnapshotRequest,
   RosterTurnSnapshotSummary,
@@ -349,6 +350,16 @@ export function fetchRosterOccupancy(
   leagueId: string,
 ): Promise<RosterOccupancyEntry[]> {
   return apiRequest<RosterOccupancyEntry[]>(`/leagues/${leagueId}/occupazione-rosa`, {
+    accessToken,
+  });
+}
+
+export function fetchTeamPlayersForTrade(
+  accessToken: string,
+  leagueId: string,
+  teamId: string,
+): Promise<TeamRosterPlayer[]> {
+  return apiRequest<TeamRosterPlayer[]>(`/leagues/${leagueId}/squadre/${teamId}/giocatori`, {
     accessToken,
   });
 }
