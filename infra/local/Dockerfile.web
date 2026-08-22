@@ -24,6 +24,8 @@ COPY packages/contracts/package.json packages/contracts/tsconfig.json packages/c
 COPY packages/contracts/src packages/contracts/src
 COPY packages/ui/package.json packages/ui/tsconfig.json packages/ui/vitest.config.ts packages/ui/
 COPY packages/ui/src packages/ui/src
+COPY packages/api-client/package.json packages/api-client/tsconfig.json packages/api-client/
+COPY packages/api-client/src packages/api-client/src
 
 RUN pnpm install
 
