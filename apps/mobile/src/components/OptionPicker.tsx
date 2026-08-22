@@ -4,6 +4,14 @@ import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-
 
 const { colors, spacing, typography, radius } = theme;
 
+// Some callers pass hundreds of options (e.g. every athlete in the
+// listone). The menu's ScrollView clips overflow visually via maxHeight,
+// but React Native still mounts every child view in memory regardless of
+// what's scrolled into sight — rendering all of them at once can get the
+// app killed for excessive memory use on a real device. Cap what's
+// rendered and nudge the user toward the search box instead.
+const OPTIONS_RENDER_LIMIT = 60;
+
 export type OptionPickerOption = { value: string; label: string };
 
 export type OptionPickerProps = {
@@ -77,7 +85,14 @@ export function OptionPicker({
             ) : filtered.length === 0 ? (
               <Text style={styles.empty}>Nessun risultato per la ricerca.</Text>
             ) : (
-              filtered.map((option) => (
+              <>
+                {filtered.length > OPTIONS_RENDER_LIMIT ? (
+                  <Text style={styles.empty}>
+                    Mostrate le prime {OPTIONS_RENDER_LIMIT} di {filtered.length} opzioni. Affina
+                    la ricerca per restringere l'elenco.
+                  </Text>
+                ) : null}
+                {filtered.slice(0, OPTIONS_RENDER_LIMIT).map((option) => (
                 <Pressable
                   key={option.value}
                   style={[styles.option, option.value === value ? styles.optionActive : null]}
@@ -90,7 +105,8 @@ export function OptionPicker({
                 >
                   <Text style={styles.optionLabel}>{option.label}</Text>
                 </Pressable>
-              ))
+                ))}
+              </>
             )}
           </ScrollView>
         </View>

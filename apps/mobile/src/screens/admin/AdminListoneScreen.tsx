@@ -51,6 +51,14 @@ function filterByTab(entries: AdminListoneEntry[], tab: RoleTab): AdminListoneEn
 
 const CURRENT_YEAR = new Date().getFullYear();
 
+// The global listone can hold thousands of athletes across every
+// competition. Rendering it as plain Views with no virtualization (this
+// screen scrolls inside a plain ScrollView, so a FlatList wouldn't help
+// here — see apps/mobile/src/screens/roster/RosterAdminManualCard.tsx)
+// mounts too many native views at once and gets the app killed for
+// excessive memory use on a real device.
+const LISTONE_RENDER_LIMIT = 60;
+
 /** Listone ufficiale globale — mobile port of `apps/web/src/pages/AdminListonePage.tsx` (EP11-05). */
 export function AdminListoneScreen() {
   const { accessToken } = useAuthSession();
@@ -259,7 +267,13 @@ export function AdminListoneScreen() {
               />
             ) : (
               <View testID={`admin-listone-table-${activeTab}`}>
-                {visibleEntries.map((entry) => (
+                {visibleEntries.length > LISTONE_RENDER_LIMIT ? (
+                  <Text style={styles.meta} testID="admin-listone-truncated">
+                    Mostrati i primi {LISTONE_RENDER_LIMIT} di {visibleEntries.length} calciatori.
+                    Usa i filtri ruolo per restringere l'elenco.
+                  </Text>
+                ) : null}
+                {visibleEntries.slice(0, LISTONE_RENDER_LIMIT).map((entry) => (
                   <View key={entry.athleteId} style={styles.listRow}>
                     <View style={styles.identityRow}>
                       <Text style={styles.name}>{entry.canonicalName}</Text>
