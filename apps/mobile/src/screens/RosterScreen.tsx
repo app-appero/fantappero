@@ -11,9 +11,8 @@ import type {
   RosterTurnSnapshotDetail,
   RosterTurnSnapshotSummary,
 } from "@fantappero/contracts";
-import { theme } from "@fantappero/ui/theme";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { Pressable, Text, View } from "react-native";
 import {
   assignRosterSlot,
   confirmRosterCsvImport,
@@ -39,135 +38,22 @@ import { UiStatePanel } from "../components/UiStatePanel";
 import { useScreenData } from "../hooks/useScreenData";
 import { PageContainer } from "../layout/PageContainer";
 import { getApiErrorMessage, useAuthSession } from "../session/DemoSessionContext";
-
-const { colors, spacing, typography, radius } = theme;
-
-type AthleteOwnership = {
-  teamId: string;
-  teamName: string;
-  slotIndex: number;
-};
-
-const ROLE_LABEL: Record<FantasyRole, string> = {
-  P: "Portiere",
-  D: "Difensore",
-  C: "Centrocampista",
-  A: "Attaccante",
-};
-
-const ROLE_SECTION_ORDER: FantasyRole[] = ["P", "D", "C", "A"];
-
-const ROLE_SECTION_TITLE: Record<FantasyRole, string> = {
-  P: "Portieri",
-  D: "Difensori",
-  C: "Centrocampisti",
-  A: "Attaccanti",
-};
-
-function reasonLabel(reason: string): string {
-  if (reason === "initial_allocation") {
-    return "Allocazione iniziale";
-  }
-  if (reason === "admin_adjustment") {
-    return "Aggiustamento admin";
-  }
-  if (reason === "roster_purchase") {
-    return "Acquisto rosa";
-  }
-  if (reason === "roster_release_refund") {
-    return "Rimborso rosa";
-  }
-  return reason;
-}
-
-const LEDGER_PAGE_SIZE = 10;
-
-function formatLedgerDate(iso: string): string {
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) {
-    return iso;
-  }
-  return date.toLocaleString("it-IT", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
-
-function sortLedgerNewestFirst(entries: CreditLedgerList["entries"]) {
-  return [...entries].sort((left, right) => {
-    const leftTime = Date.parse(left.createdAt);
-    const rightTime = Date.parse(right.createdAt);
-    if (leftTime !== rightTime) {
-      return rightTime - leftTime;
-    }
-    return right.id.localeCompare(left.id);
-  });
-}
-
-function buildOwnership(entries: RosterOccupancyEntry[]): Map<string, AthleteOwnership> {
-  const map = new Map<string, AthleteOwnership>();
-  for (const entry of entries) {
-    map.set(entry.athleteId, {
-      teamId: entry.fantasyTeamId,
-      teamName: entry.teamName,
-      slotIndex: entry.slotIndex,
-    });
-  }
-  return map;
-}
-
-function roleLabel(role: string | null): string {
-  if (!role) {
-    return "—";
-  }
-  if (role in ROLE_LABEL) {
-    return ROLE_LABEL[role as FantasyRole];
-  }
-  return role;
-}
-
-function roleBadgeColors(role: string | null | undefined): { backgroundColor: string; color: string } {
-  if (role === "P") {
-    return { backgroundColor: colors.success, color: colors.accentContrast };
-  }
-  if (role === "D") {
-    return { backgroundColor: colors.warning, color: colors.background };
-  }
-  if (role === "C") {
-    return { backgroundColor: colors.accent, color: colors.accentContrast };
-  }
-  if (role === "A") {
-    return { backgroundColor: colors.danger, color: colors.accentContrast };
-  }
-  return { backgroundColor: colors.border, color: colors.foreground };
-}
-
-function toSummary(team: FantasyTeam): FantasyTeamSummary {
-  return {
-    id: team.id,
-    leagueId: team.leagueId,
-    membershipId: team.membershipId,
-    userId: team.userId,
-    userType: team.userType,
-    name: team.name,
-    rosterSize: team.rosterSize,
-    filledSlots: team.filledSlots,
-    compositionStatus: team.compositionStatus,
-  };
-}
-
-function compositionStatusLabel(status: string | undefined): string {
-  if (status === "validated") {
-    return "Convalidata";
-  }
-  if (status === "invalid") {
-    return "Non valida";
-  }
-  return "Incompleta";
-}
+import { RosterAdminManualCard } from "./roster/RosterAdminManualCard";
+import { RosterAdminToolsPanel } from "./roster/RosterAdminToolsPanel";
+import { RosterCreditsPanel } from "./roster/RosterCreditsPanel";
+import { RosterCsvImportCard } from "./roster/RosterCsvImportCard";
+import { RosterEmptyState } from "./roster/RosterEmptyState";
+import { RosterFilledSummary } from "./roster/RosterFilledSummary";
+import {
+  buildOwnership,
+  LEDGER_PAGE_SIZE,
+  sortLedgerNewestFirst,
+  toSummary,
+  type AthleteOwnership,
+} from "./roster/rosterHelpers";
+import { RosterHistorySection } from "./roster/RosterHistorySection";
+import { RosterSectionTabs } from "./roster/RosterSectionTabs";
+import { rosterStyles as styles } from "./roster/rosterStyles";
 
 /** Rosa fantasy, ledger crediti e inserimento manuale admin (EP05-01/02/03).
  * EP05-04 CSV import UI is implemented but temporarily hidden (`SHOW_ROSTER_CSV_IMPORT`).
@@ -762,129 +648,24 @@ export function RosterScreen() {
       </Text>
 
       {!loading && canView && !loadError ? (
-        <View style={styles.chipRow} testID="roster-section-tabs">
-          <Pressable
-            style={[styles.chip, pageSection === "rosa" && styles.chipSelected]}
-            onPress={() => setPageSection("rosa")}
-            testID="roster-section-rosa"
-          >
-            <Text style={[styles.chipLabel, pageSection === "rosa" && styles.chipLabelSelected]}>
-              Rosa
-            </Text>
-          </Pressable>
-          <Pressable
-            style={[styles.chip, pageSection === "storico" && styles.chipSelected]}
-            onPress={() => setPageSection("storico")}
-            testID="roster-section-storico"
-          >
-            <Text
-              style={[styles.chipLabel, pageSection === "storico" && styles.chipLabelSelected]}
-            >
-              Storico
-            </Text>
-          </Pressable>
-        </View>
+        <RosterSectionTabs pageSection={pageSection} onSelect={setPageSection} />
       ) : null}
 
       {!loading && canView && !loadError && pageSection === "storico" ? (
-        <View testID="roster-history">
-          {historyLoading ? (
-            <UiStatePanel
-              state="loading"
-              title="Caricamento storico"
-              message="Recupero intervalli e snapshot…"
-              testID="roster-history-loading"
-            />
-          ) : null}
-          {!historyLoading && historyError ? (
-            <UiStatePanel
-              state="error"
-              title="Storico non disponibile"
-              message={historyError}
-              testID="roster-history-error"
-            />
-          ) : null}
-          {!historyLoading && !historyError && history && history.intervals.length === 0 ? (
-            <UiStatePanel
-              state="empty"
-              title="Nessun possesso registrato"
-              message="Gli intervalli compaiono dopo assegnazioni o rilasci."
-              testID="roster-history-empty"
-            />
-          ) : null}
-          {!historyLoading && !historyError && history && history.intervals.length > 0 ? (
-            <View testID="roster-history-success">
-              <Text style={styles.summary}>Intervalli di possesso</Text>
-              {history.intervals.map((row) => (
-                <Text key={row.id} style={styles.meta}>
-                  {row.athleteName ?? row.athleteId} · slot {row.slotIndex + 1} ·{" "}
-                  {row.purchaseCredits} cr ·{" "}
-                  {row.releasedAt ? "chiuso" : "in rosa"} · {row.source}
-                </Text>
-              ))}
-            </View>
-          ) : null}
-          <View style={{ marginTop: spacing.md }} testID="roster-snapshots">
-            <Text style={styles.summary}>Snapshot per turno</Text>
-            <TextInput
-              style={styles.input}
-              value={snapshotRound}
-              onChangeText={setSnapshotRound}
-              keyboardType="numeric"
-              placeholder="Numero turno"
-              testID="roster-snapshot-round"
-            />
-            {isAdmin ? (
-              <Pressable
-                style={[styles.button, snapshotBusy && styles.disabled]}
-                disabled={snapshotBusy}
-                onPress={() => void onCreateSnapshot()}
-                testID="roster-snapshot-create"
-              >
-                <Text style={styles.buttonLabel}>
-                  {snapshotBusy ? "Salvataggio…" : "Crea snapshot turno"}
-                </Text>
-              </Pressable>
-            ) : null}
-            {snapshotMessage ? (
-              <Text style={styles.ok} testID="roster-snapshot-ok">
-                {snapshotMessage}
-              </Text>
-            ) : null}
-            {snapshotError ? (
-              <Text style={styles.error} testID="roster-snapshot-error">
-                {snapshotError}
-              </Text>
-            ) : null}
-            {!snapshotDetail ? (
-              <UiStatePanel
-                state="empty"
-                title="Nessuno snapshot"
-                message="Crea uno snapshot per congelare la rosa di un turno."
-                testID="roster-snapshot-empty"
-              />
-            ) : (
-              <View testID="roster-snapshot-detail">
-                <Text style={styles.meta}>
-                  Turno {snapshotDetail.roundNumber} · {snapshotDetail.entryCount} assegnazioni
-                </Text>
-                {snapshotDetail.entries.map((entry) => (
-                  <Text
-                    key={`${entry.fantasyTeamId}-${entry.slotIndex}-${entry.athleteId}`}
-                    style={styles.meta}
-                  >
-                    {entry.teamName}: {entry.athleteName ?? entry.athleteId} ({entry.role ?? "—"})
-                  </Text>
-                ))}
-                {snapshots.length > 0 ? (
-                  <Text style={styles.meta}>
-                    Snapshot disponibili: {snapshots.map((row) => row.roundNumber).join(", ")}
-                  </Text>
-                ) : null}
-              </View>
-            )}
-          </View>
-        </View>
+        <RosterHistorySection
+          historyLoading={historyLoading}
+          historyError={historyError}
+          history={history}
+          snapshots={snapshots}
+          snapshotDetail={snapshotDetail}
+          snapshotRound={snapshotRound}
+          onSnapshotRoundChange={setSnapshotRound}
+          snapshotBusy={snapshotBusy}
+          isAdmin={isAdmin}
+          onCreateSnapshot={onCreateSnapshot}
+          snapshotMessage={snapshotMessage}
+          snapshotError={snapshotError}
+        />
       ) : null}
 
       {pageSection === "rosa" && loading ? (
@@ -929,616 +710,93 @@ export function RosterScreen() {
       ) : null}
 
       {pageSection === "rosa" && !loading && canView && !loadError && (viewedTeam || team) ? (
-        <View style={styles.credits} testID="roster-credits">
-          {isAdmin && leagueTeams.length > 0 ? (
-            <>
-              <Text style={styles.summary}>Squadra target</Text>
-              <View style={styles.chipRow} testID="roster-admin-team">
-                {leagueTeams.map((row) => {
-                  const selected = row.id === adminTeamId;
-                  return (
-                    <Pressable
-                      key={row.id}
-                      style={[styles.chip, selected && styles.chipSelected]}
-                      disabled={adminBusy || adjusting}
-                      onPress={() => onSelectAdminTeam(row.id)}
-                    >
-                      <Text style={[styles.chipLabel, selected && styles.chipLabelSelected]}>
-                        {row.name} ({row.filledSlots}/{row.rosterSize})
-                      </Text>
-                    </Pressable>
-                  );
-                })}
-              </View>
-            </>
-          ) : null}
-          <Text style={styles.summary} testID="roster-credits-balance">
-            Crediti residui: {credits?.balance ?? "—"}
-            {credits ? ` (v${credits.version})` : ""}
-          </Text>
-          {isAdmin ? (
-            <View style={styles.inlineAdjust} testID="roster-admin-credits">
-              <TextInput
-                style={styles.input}
-                value={adjustAmount}
-                onChangeText={setAdjustAmount}
-                keyboardType="numeric"
-                placeholder="Importo"
-                testID="roster-adjust-amount"
-              />
-              <TextInput
-                style={styles.input}
-                value={adjustNote}
-                onChangeText={setAdjustNote}
-                placeholder="Nota"
-                testID="roster-adjust-note"
-              />
-              <Pressable
-                style={[styles.button, (adjusting || !(adminTeamId || team)) && styles.disabled]}
-                disabled={adjusting || !(adminTeamId || team)}
-                onPress={() => void onAdminAdjust()}
-              >
-                <Text style={styles.buttonLabel}>
-                  {adjusting ? "Registrazione…" : "Aggiusta crediti"}
-                </Text>
-              </Pressable>
-              {adjustMessage ? (
-                <Text style={styles.ok} testID="roster-adjust-ok">
-                  {adjustMessage}
-                </Text>
-              ) : null}
-              {adjustError ? (
-                <Text style={styles.error} testID="roster-adjust-error">
-                  {adjustError}
-                </Text>
-              ) : null}
-            </View>
-          ) : null}
-          {hasLedger ? (
-            <View testID="roster-credits-ledger">
-              {pagedLedgerEntries.map((entry) => {
-                const note = entry.note?.trim();
-                return (
-                  <Text key={entry.id} style={styles.meta}>
-                    {formatLedgerDate(entry.createdAt)} · {reasonLabel(entry.reason)}
-                    {note ? ` — ${note}` : ""}: {entry.amount > 0 ? "+" : ""}
-                    {entry.amount} → {entry.balanceAfter}
-                  </Text>
-                );
-              })}
-              {ledgerEntriesNewestFirst.length > LEDGER_PAGE_SIZE ? (
-                <View style={styles.chipRow}>
-                  <Pressable
-                    style={[styles.chip, safeLedgerPage <= 0 && styles.disabled]}
-                    disabled={safeLedgerPage <= 0}
-                    testID="roster-credits-ledger-prev"
-                    onPress={() => setLedgerPage((page) => Math.max(0, page - 1))}
-                  >
-                    <Text style={styles.chipLabel}>Precedenti</Text>
-                  </Pressable>
-                  <Text style={styles.meta} testID="roster-credits-ledger-page">
-                    {safeLedgerPage + 1}/{ledgerPageCount}
-                  </Text>
-                  <Pressable
-                    style={[
-                      styles.chip,
-                      safeLedgerPage >= ledgerPageCount - 1 && styles.disabled,
-                    ]}
-                    disabled={safeLedgerPage >= ledgerPageCount - 1}
-                    testID="roster-credits-ledger-next"
-                    onPress={() =>
-                      setLedgerPage((page) => Math.min(ledgerPageCount - 1, page + 1))
-                    }
-                  >
-                    <Text style={styles.chipLabel}>Successivi</Text>
-                  </Pressable>
-                </View>
-              ) : null}
-            </View>
-          ) : (
-            <UiStatePanel
-              state="empty"
-              title="Nessun movimento"
-              message="Il ledger crediti non contiene ancora movimenti."
-              testID="roster-credits-empty"
-            />
-          )}
-        </View>
+        <RosterCreditsPanel
+          isAdmin={isAdmin}
+          leagueTeams={leagueTeams}
+          adminTeamId={adminTeamId}
+          onSelectAdminTeam={onSelectAdminTeam}
+          adminBusy={adminBusy}
+          adjusting={adjusting}
+          hasAdjustTarget={Boolean(adminTeamId || team)}
+          credits={credits}
+          adjustAmount={adjustAmount}
+          onAdjustAmountChange={setAdjustAmount}
+          adjustNote={adjustNote}
+          onAdjustNoteChange={setAdjustNote}
+          onAdminAdjust={onAdminAdjust}
+          adjustMessage={adjustMessage}
+          adjustError={adjustError}
+          hasLedger={hasLedger}
+          pagedLedgerEntries={pagedLedgerEntries}
+          ledgerEntriesCount={ledgerEntriesNewestFirst.length}
+          safeLedgerPage={safeLedgerPage}
+          ledgerPageCount={ledgerPageCount}
+          onLedgerPagePrev={() => setLedgerPage((page) => Math.max(0, page - 1))}
+          onLedgerPageNext={() =>
+            setLedgerPage((page) => Math.min(ledgerPageCount - 1, page + 1))
+          }
+        />
       ) : null}
 
       {isAdmin && canView && !loading ? (
         <>
           {SHOW_ROSTER_CSV_IMPORT ? (
-          <View style={styles.card} testID="roster-csv-import">
-            <Text style={styles.cardTitle}>Import CSV rose</Text>
-            <Text style={styles.meta}>
-              Incolla il CSV (colonne squadra,provider_id,nome,crediti), genera anteprima e
-              conferma solo senza errori.
-            </Text>
-            <TextInput
-              style={[styles.input, styles.csvInput]}
-              multiline
-              value={csvText}
-              onChangeText={setCsvText}
-              editable={!csvBusy}
-              testID="roster-csv-text"
-              autoCapitalize="none"
-              autoCorrect={false}
+            <RosterCsvImportCard
+              csvText={csvText}
+              onCsvTextChange={setCsvText}
+              csvBusy={csvBusy}
+              onPreviewCsvText={onPreviewCsvText}
+              csvPreview={csvPreview}
+              onConfirmCsvImport={onConfirmCsvImport}
+              csvMessage={csvMessage}
+              csvError={csvError}
             />
-            <Pressable
-              style={[styles.button, csvBusy && styles.disabled]}
-              disabled={csvBusy}
-              onPress={() => void onPreviewCsvText()}
-              testID="roster-csv-preview-btn"
-            >
-              <Text style={styles.buttonLabel}>
-                {csvBusy ? "Elaborazione…" : "Anteprima CSV"}
-              </Text>
-            </Pressable>
-            <Pressable
-              style={[
-                styles.button,
-                (csvBusy || !csvPreview?.canConfirm) && styles.disabled,
-              ]}
-              disabled={csvBusy || !csvPreview?.canConfirm}
-              onPress={() => void onConfirmCsvImport()}
-              testID="roster-csv-confirm"
-            >
-              <Text style={styles.buttonLabel}>Conferma import</Text>
-            </Pressable>
-            {csvPreview ? (
-              <Text style={styles.meta} testID="roster-csv-preview">
-                Anteprima: {csvPreview.rowCount} righe · errori {csvPreview.errorCount} · avvisi{" "}
-                {csvPreview.warningCount}
-              </Text>
-            ) : null}
-            {csvMessage ? (
-              <Text style={styles.ok} testID="roster-csv-ok">
-                {csvMessage}
-              </Text>
-            ) : null}
-            {csvError ? (
-              <Text style={styles.error} testID="roster-csv-error">
-                {csvError}
-              </Text>
-            ) : null}
-          </View>
           ) : null}
 
-          <View style={styles.admin} testID="roster-admin-tools">
-            <Pressable
-              style={[styles.button, ensuring && styles.disabled]}
-              disabled={ensuring}
-              onPress={() => void onEnsureTeams()}
-            >
-              <Text style={styles.buttonLabel}>
-                {ensuring ? "Verifica in corso…" : "Assicura squadre partecipanti"}
-              </Text>
-            </Pressable>
-            {ensureMessage ? (
-              <Text style={styles.ok} testID="roster-ensure-ok">
-                {ensureMessage}
-              </Text>
-            ) : null}
-            {ensureError ? (
-              <Text style={styles.error} testID="roster-ensure-error">
-                {ensureError}
-              </Text>
-            ) : null}
-          </View>
+          <RosterAdminToolsPanel
+            ensuring={ensuring}
+            onEnsureTeams={onEnsureTeams}
+            ensureMessage={ensureMessage}
+            ensureError={ensureError}
+          />
         </>
       ) : null}
 
       {pageSection === "rosa" && !loading && canView && !loadError && viewedTeam && isEmpty ? (
-        <View testID="roster-empty">
-          <UiStatePanel
-            state="empty"
-            title="Rosa vuota"
-            message="Completa l'asta o importa i giocatori per popolare la rosa."
-          />
-          <Text style={styles.summary} testID="roster-empty-summary">
-            {viewedTeam.name}: 0/{viewedTeam.rosterSize} slot occupati
-          </Text>
-        </View>
+        <RosterEmptyState viewedTeam={viewedTeam} />
       ) : null}
 
       {pageSection === "rosa" && !loading && canView && !loadError && viewedTeam && !isEmpty ? (
-        <View testID="roster-success">
-          <Text style={styles.summary} testID="roster-summary">
-            {viewedTeam.name}: {viewedTeam.filledSlots}/{viewedTeam.rosterSize} giocatori
-          </Text>
-          {viewedTeam.composition ? (
-            <View testID="roster-composition" style={styles.compositionBox}>
-              <Text style={styles.meta}>
-                Composizione: {compositionStatusLabel(viewedTeam.composition.status)}
-              </Text>
-              <Text style={styles.meta} testID="roster-composition-counts">
-                {viewedTeam.composition.counts.P}/{viewedTeam.composition.limits.goalkeepers}P ·{" "}
-                {viewedTeam.composition.counts.D}/{viewedTeam.composition.limits.defenders}D ·{" "}
-                {viewedTeam.composition.counts.C}/{viewedTeam.composition.limits.midfielders}C ·{" "}
-                {viewedTeam.composition.counts.A}/{viewedTeam.composition.limits.forwards}A ·{" "}
-                {viewedTeam.composition.competitionCount} campionati
-              </Text>
-              {viewedTeam.composition.issues.map((issue) => (
-                <Text key={`${issue.code}-${issue.message}`} style={styles.errorText}>
-                  {issue.message}
-                </Text>
-              ))}
-            </View>
-          ) : null}
-          <View testID="roster-filled-table" style={styles.roleTables}>
-            {ROLE_SECTION_ORDER.map((role) => {
-              const slots = filledByRole[role];
-              const limit =
-                viewedTeam.composition?.limits == null
-                  ? null
-                  : role === "P"
-                    ? viewedTeam.composition.limits.goalkeepers
-                    : role === "D"
-                      ? viewedTeam.composition.limits.defenders
-                      : role === "C"
-                        ? viewedTeam.composition.limits.midfielders
-                        : viewedTeam.composition.limits.forwards;
-              const roleColors = roleBadgeColors(role);
-              return (
-                <View key={role} style={styles.roleSection} testID={`roster-filled-table-${role}`}>
-                  <View style={styles.roleSectionHeader}>
-                    <View style={[styles.roleBadge, roleColors]}>
-                      <Text style={[styles.roleBadgeText, { color: roleColors.color }]}>{role}</Text>
-                    </View>
-                    <Text style={styles.roleSectionTitle}>{ROLE_SECTION_TITLE[role]}</Text>
-                    <Text style={styles.roleSectionCount}>
-                      {slots.length}
-                      {limit != null ? `/${limit}` : ""}
-                    </Text>
-                  </View>
-                  {slots.length === 0 ? (
-                    <Text style={styles.meta}>Nessun giocatore in questo ruolo.</Text>
-                  ) : (
-                    slots.map((slot) => (
-                      <View key={slot.id} style={styles.card}>
-                        <Text style={styles.cardTitle}>{slot.athleteName ?? "Calciatore"}</Text>
-                        <Text style={styles.meta}>
-                          Club: {slot.clubName ?? "—"} · Crediti: {slot.purchaseCredits ?? "—"} ·
-                          Slot {slot.slotIndex + 1}
-                        </Text>
-                        {canEdit && slot.athleteId ? (
-                          <Pressable
-                            style={[styles.button, adminBusy && styles.disabled]}
-                            disabled={adminBusy}
-                            testID={`roster-admin-release-${slot.athleteId}`}
-                            onPress={() => void onReleaseAthlete(slot.athleteId!)}
-                          >
-                            <Text style={styles.buttonLabel}>Rimuovi</Text>
-                          </Pressable>
-                        ) : null}
-                      </View>
-                    ))
-                  )}
-                </View>
-              );
-            })}
-            {filledByRole.unknown.length > 0 ? (
-              <View style={styles.roleSection} testID="roster-filled-table-unknown">
-                <View style={styles.roleSectionHeader}>
-                  <Text style={styles.roleSectionTitle}>Senza ruolo</Text>
-                  <Text style={styles.roleSectionCount}>{filledByRole.unknown.length}</Text>
-                </View>
-                {filledByRole.unknown.map((slot) => (
-                  <View key={slot.id} style={styles.card}>
-                    <Text style={styles.cardTitle}>{slot.athleteName ?? "Calciatore"}</Text>
-                    <Text style={styles.meta}>
-                      Club: {slot.clubName ?? "—"} · Crediti: {slot.purchaseCredits ?? "—"} · Slot{" "}
-                      {slot.slotIndex + 1}
-                    </Text>
-                    {canEdit && slot.athleteId ? (
-                      <Pressable
-                        style={[styles.button, adminBusy && styles.disabled]}
-                        disabled={adminBusy}
-                        testID={`roster-admin-release-${slot.athleteId}`}
-                        onPress={() => void onReleaseAthlete(slot.athleteId!)}
-                      >
-                        <Text style={styles.buttonLabel}>Rimuovi</Text>
-                      </Pressable>
-                    ) : null}
-                  </View>
-                ))}
-              </View>
-            ) : null}
-          </View>
-        </View>
+        <RosterFilledSummary
+          viewedTeam={viewedTeam}
+          filledByRole={filledByRole}
+          canEdit={canEdit}
+          adminBusy={adminBusy}
+          onReleaseAthlete={onReleaseAthlete}
+        />
       ) : null}
 
       {pageSection === "rosa" && canEdit && canView ? (
-        <View style={styles.adjust} testID="roster-admin-manual">
-          <View style={styles.headerRow}>
-            <Text style={styles.summary}>Inserimento manuale rose</Text>
-          </View>
-          {isAdmin && leagueTeams.length === 0 ? (
-            <UiStatePanel
-              state="empty"
-              title="Nessuna squadra"
-              message="Assicura prima le squadre dei partecipanti."
-              testID="roster-admin-manual-empty"
-            />
-          ) : !isAdmin && !targetTeam ? (
-            <UiStatePanel
-              state="empty"
-              title="Nessuna squadra"
-              message="La tua rosa non è ancora disponibile."
-              testID="roster-admin-manual-empty"
-            />
-          ) : (
-            <>
-              {targetTeam ? (
-                <Text style={styles.meta} testID="roster-admin-team-summary">
-                  {targetTeam.name}: {targetTeam.filledSlots}/{targetTeam.rosterSize} ·{" "}
-                  {emptySlots.length} liberi
-                </Text>
-              ) : null}
-
-              <Text style={styles.meta}>Crediti acquisto</Text>
-              <TextInput
-                style={styles.input}
-                value={purchaseCredits}
-                onChangeText={setPurchaseCredits}
-                keyboardType="numeric"
-                testID="roster-purchase-credits"
-              />
-
-              {listone.length === 0 ? (
-                <UiStatePanel
-                  state="empty"
-                  title="Listone vuoto"
-                  message="Il listone ufficiale non è ancora disponibile. Verrà popolato dagli operatori della piattaforma."
-                  testID="roster-admin-listone-empty"
-                />
-              ) : (
-                <View testID="roster-admin-listone-table-all">
-                  <TextInput
-                    style={styles.input}
-                    value={listoneQuery}
-                    onChangeText={setListoneQuery}
-                    placeholder="Cerca per nome o club…"
-                    autoCapitalize="none"
-                    autoCorrect={false}
-                    testID="roster-admin-listone-search"
-                  />
-                  {filteredListone.length === 0 ? (
-                    <UiStatePanel
-                      state="empty"
-                      title="Nessun calciatore"
-                      message="Nessun risultato per la ricerca corrente."
-                      testID="roster-admin-listone-search-empty"
-                    />
-                  ) : (
-                    filteredListone.map((entry) => {
-                      const owner = ownership.get(entry.athleteId);
-                      const canAssign = !owner && emptySlots.length > 0;
-                      const canRelease = owner ? canReleaseAthlete(owner.teamId) : false;
-                      const roleColors = roleBadgeColors(entry.effectiveRole);
-                      return (
-                        <View key={entry.athleteId} style={styles.card}>
-                          <View style={styles.row}>
-                            <View style={[styles.roleBadge, roleColors]}>
-                              <Text style={[styles.roleBadgeText, { color: roleColors.color }]}>
-                                {entry.effectiveRole}
-                              </Text>
-                            </View>
-                            <Text style={styles.cardTitle}>{entry.canonicalName}</Text>
-                          </View>
-                          <Text style={styles.meta}>
-                            {ROLE_LABEL[entry.effectiveRole]}
-                            {entry.clubName ? ` · ${entry.clubName}` : ""}
-                            {owner ? ` · In rosa: ${owner.teamName}` : " · Libero"}
-                          </Text>
-                          {owner && canRelease ? (
-                            <Pressable
-                              style={[styles.button, adminBusy && styles.disabled]}
-                              disabled={adminBusy}
-                              testID={`roster-admin-release-${entry.athleteId}`}
-                              onPress={() => void onReleaseAthlete(entry.athleteId)}
-                            >
-                              <Text style={styles.buttonLabel}>Rimuovi</Text>
-                            </Pressable>
-                          ) : !owner ? (
-                            <Pressable
-                              style={[
-                                styles.button,
-                                (adminBusy || !canAssign) && styles.disabled,
-                              ]}
-                              disabled={adminBusy || !canAssign}
-                              testID={`roster-admin-assign-${entry.athleteId}`}
-                              onPress={() => void onAssignAthlete(entry.athleteId)}
-                            >
-                              <Text style={styles.buttonLabel}>Assegna</Text>
-                            </Pressable>
-                          ) : null}
-                        </View>
-                      );
-                    })
-                  )}
-                </View>
-              )}
-
-              {adminMessage ? (
-                <Text style={styles.ok} testID="roster-admin-ok">
-                  {adminMessage}
-                </Text>
-              ) : null}
-              {adminError ? (
-                <Text style={styles.error} testID="roster-admin-assign-error">
-                  {adminError}
-                </Text>
-              ) : null}
-            </>
-          )}
-        </View>
+        <RosterAdminManualCard
+          isAdmin={isAdmin}
+          leagueTeams={leagueTeams}
+          targetTeam={targetTeam}
+          emptySlotsCount={emptySlots.length}
+          purchaseCredits={purchaseCredits}
+          onPurchaseCreditsChange={setPurchaseCredits}
+          listone={listone}
+          listoneQuery={listoneQuery}
+          onListoneQueryChange={setListoneQuery}
+          filteredListone={filteredListone}
+          ownership={ownership}
+          canReleaseAthlete={canReleaseAthlete}
+          adminBusy={adminBusy}
+          onReleaseAthlete={onReleaseAthlete}
+          onAssignAthlete={onAssignAthlete}
+          adminMessage={adminMessage}
+          adminError={adminError}
+        />
       ) : null}
     </PageContainer>
   );
 }
-
-const styles = StyleSheet.create({
-  summary: {
-    fontSize: typography.fontSize.md,
-    color: colors.foreground,
-    marginBottom: spacing.sm,
-  },
-  meta: {
-    fontSize: typography.fontSize.sm,
-    color: colors.muted,
-    marginBottom: spacing.sm,
-  },
-  compositionBox: {
-    marginBottom: spacing.md,
-    gap: spacing.xs,
-  },
-  errorText: {
-    fontSize: typography.fontSize.sm,
-    color: colors.danger,
-  },
-  roleTables: {
-    gap: spacing.md,
-  },
-  roleSection: {
-    marginBottom: spacing.md,
-    gap: spacing.xs,
-  },
-  roleSectionHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.xs,
-    marginBottom: spacing.xs,
-  },
-  roleSectionTitle: {
-    fontSize: typography.fontSize.md,
-    fontWeight: typography.fontWeight.semibold,
-    color: colors.foreground,
-    flex: 1,
-  },
-  roleSectionCount: {
-    fontSize: typography.fontSize.sm,
-    color: colors.muted,
-  },
-  credits: {
-    marginBottom: spacing.md,
-  },
-  inlineAdjust: {
-    marginBottom: spacing.sm,
-    gap: spacing.xs,
-  },
-  headerRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: spacing.sm,
-    marginBottom: spacing.sm,
-  },
-  card: {
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.md,
-    padding: spacing.md,
-    marginBottom: spacing.sm,
-    backgroundColor: colors.background,
-  },
-  cardTitle: {
-    fontSize: typography.fontSize.md,
-    fontWeight: typography.fontWeight.semibold,
-    color: colors.foreground,
-    flexShrink: 1,
-  },
-  row: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.sm,
-    marginBottom: spacing.xs,
-  },
-  roleBadge: {
-    minWidth: 28,
-    height: 28,
-    borderRadius: radius.sm,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: spacing.xs,
-  },
-  roleBadgeText: {
-    fontSize: typography.fontSize.sm,
-    fontWeight: typography.fontWeight.semibold,
-  },
-  admin: {
-    marginTop: spacing.lg,
-  },
-  adjust: {
-    marginTop: spacing.md,
-  },
-  chipRow: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: spacing.xs,
-    marginBottom: spacing.sm,
-  },
-  chip: {
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.md,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs,
-    backgroundColor: colors.background,
-  },
-  chipSelected: {
-    borderColor: colors.accent,
-    backgroundColor: colors.accent,
-  },
-  chipLabel: {
-    fontSize: typography.fontSize.sm,
-    color: colors.foreground,
-  },
-  chipLabelSelected: {
-    color: colors.accentContrast,
-    fontWeight: typography.fontWeight.semibold,
-  },
-  input: {
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.md,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    marginBottom: spacing.sm,
-    color: colors.foreground,
-    backgroundColor: colors.background,
-    minHeight: 44,
-  },
-  csvInput: {
-    minHeight: 120,
-    textAlignVertical: "top",
-  },
-  button: {
-    marginTop: spacing.sm,
-    backgroundColor: colors.accent,
-    borderRadius: radius.md,
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.md,
-    alignItems: "center",
-    minHeight: 44,
-    justifyContent: "center",
-  },
-  disabled: {
-    opacity: 0.6,
-  },
-  buttonLabel: {
-    color: colors.accentContrast,
-    fontWeight: typography.fontWeight.semibold,
-  },
-  ok: {
-    fontSize: typography.fontSize.sm,
-    color: colors.foreground,
-    marginTop: spacing.sm,
-  },
-  error: {
-    fontSize: typography.fontSize.sm,
-    color: colors.danger,
-    marginTop: spacing.sm,
-  },
-});

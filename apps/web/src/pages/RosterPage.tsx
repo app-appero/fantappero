@@ -11,27 +11,7 @@ import type {
   RosterTurnSnapshotDetail,
   RosterTurnSnapshotSummary,
 } from "@fantappero/contracts";
-import {
-  Badge,
-  Breadcrumb,
-  Button,
-  Card,
-  CardBody,
-  CardHeader,
-  Input,
-  PageContainer,
-  Tab,
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeaderCell,
-  TableRow,
-  TabList,
-  TabPanel,
-  Tabs,
-  UiStatePanel,
-} from "@fantappero/ui";
+import { Breadcrumb, Button, PageContainer, UiStatePanel } from "@fantappero/ui";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   assignRandomAiRoster,
@@ -60,571 +40,39 @@ import { getApiErrorMessage, useAuth } from "../auth/AuthContext";
 import { loadStoredSession } from "../auth/sessionStorage";
 import { useLocation } from "../router/simpleRouter";
 import { parseWireframeStateFromSearch } from "../wireframes/useWireframeState";
-
-type RoleTab = "all" | FantasyRole;
-type RosterPageSection = "rosa" | "storico";
-
-const DEMO_HISTORY: RosterOwnershipHistory = {
-  fantasyTeamId: "demo-team",
-  intervals: [
-    {
-      id: "interval-1",
-      fantasyTeamId: "demo-team",
-      athleteId: "a1",
-      athleteName: "L. Martinez",
-      slotIndex: 0,
-      purchaseCredits: 120,
-      acquiredAt: "2026-08-01T10:00:00+00:00",
-      releasedAt: null,
-      source: "manual",
-      active: true,
-    },
-    {
-      id: "interval-2",
-      fantasyTeamId: "demo-team",
-      athleteId: "a9",
-      athleteName: "Ex Calciatore",
-      slotIndex: 1,
-      purchaseCredits: 40,
-      acquiredAt: "2026-07-01T10:00:00+00:00",
-      releasedAt: "2026-07-20T10:00:00+00:00",
-      source: "admin",
-      active: false,
-    },
-  ],
-};
-
-const DEMO_SNAPSHOTS: RosterTurnSnapshotSummary[] = [
-  {
-    id: "snap-1",
-    leagueId: "demo-league",
-    roundNumber: 1,
-    capturedAt: "2026-08-05T12:00:00+00:00",
-    entryCount: 2,
-    actorId: "demo-admin",
-  },
-];
-
-const DEMO_SNAPSHOT_DETAIL: RosterTurnSnapshotDetail = {
-  id: "snap-1",
-  leagueId: "demo-league",
-  roundNumber: 1,
-  capturedAt: "2026-08-05T12:00:00+00:00",
-  entryCount: 2,
-  actorId: "demo-admin",
-  created: false,
-  entries: [
-    {
-      fantasyTeamId: "demo-team",
-      teamName: "Rosa demo",
-      slotIndex: 0,
-      athleteId: "a1",
-      athleteName: "L. Martinez",
-      purchaseCredits: 120,
-      role: "A",
-    },
-    {
-      fantasyTeamId: "demo-team",
-      teamName: "Rosa demo",
-      slotIndex: 1,
-      athleteId: "a2",
-      athleteName: "N. Barella",
-      purchaseCredits: 80,
-      role: "C",
-    },
-  ],
-};
-
-type AthleteOwnership = {
-  teamId: string;
-  teamName: string;
-  slotIndex: number;
-};
-
-const ROLE_TABS: Array<{ value: RoleTab; label: string }> = [
-  { value: "all", label: "Tutti" },
-  { value: "P", label: "Portieri" },
-  { value: "D", label: "Difensori" },
-  { value: "C", label: "Centrocampisti" },
-  { value: "A", label: "Attaccanti" },
-];
-
-const ROLE_LABEL: Record<FantasyRole, string> = {
-  P: "Portiere",
-  D: "Difensore",
-  C: "Centrocampista",
-  A: "Attaccante",
-};
-
-const ROLE_SECTION_ORDER: FantasyRole[] = ["P", "D", "C", "A"];
-
-const ROLE_SECTION_TITLE: Record<FantasyRole, string> = {
-  P: "Portieri",
-  D: "Difensori",
-  C: "Centrocampisti",
-  A: "Attaccanti",
-};
-
-const DEMO_COMPOSITION_LIMITS = {
-  rosterSize: 35,
-  goalkeepers: 3,
-  defenders: 11,
-  midfielders: 11,
-  forwards: 10,
-} as const;
-
-const DEMO_TEAM: FantasyTeam = {
-  id: "demo-team",
-  leagueId: "demo-league",
-  membershipId: "demo-membership",
-  userId: "demo-user",
-  userType: "human",
-  name: "Rosa demo",
-  rosterSize: 35,
-  filledSlots: 2,
-  compositionStatus: "incomplete",
-  composition: {
-    status: "incomplete",
-    filledSlots: 2,
-    competitionCount: 1,
-    requireComplete: false,
-    validatedAt: null,
-    limits: { ...DEMO_COMPOSITION_LIMITS },
-    counts: { P: 0, D: 0, C: 1, A: 1 },
-    issues: [],
-  },
-  slots: [
-    {
-      id: "slot-0",
-      slotIndex: 0,
-      athleteId: "a1",
-      athleteName: "L. Martinez",
-      clubName: "Inter",
-      role: "A",
-      purchaseCredits: 50,
-    },
-    {
-      id: "slot-1",
-      slotIndex: 1,
-      athleteId: "a2",
-      athleteName: "N. Barella",
-      clubName: "Inter",
-      role: "C",
-      purchaseCredits: 35,
-    },
-    ...Array.from({ length: 33 }, (_, index) => ({
-      id: `slot-${index + 2}`,
-      slotIndex: index + 2,
-      athleteId: null,
-      athleteName: null,
-      clubName: null,
-      role: null,
-      purchaseCredits: null,
-    })),
-  ],
-};
-
-const DEMO_OCCUPANCY: RosterOccupancyEntry[] = [
-  {
-    athleteId: "a1",
-    fantasyTeamId: DEMO_TEAM.id,
-    teamName: DEMO_TEAM.name,
-    slotIndex: 0,
-    purchaseCredits: 50,
-  },
-  {
-    athleteId: "a2",
-    fantasyTeamId: DEMO_TEAM.id,
-    teamName: DEMO_TEAM.name,
-    slotIndex: 1,
-    purchaseCredits: 35,
-  },
-];
-
-const DEMO_TEAM_B: FantasyTeam = {
-  ...DEMO_TEAM,
-  id: "demo-team-b",
-  membershipId: "demo-membership-b",
-  userId: "demo-user-b",
-  userType: "ai",
-  name: "Allenatore IA 01",
-  filledSlots: 0,
-  compositionStatus: "incomplete",
-  composition: {
-    status: "incomplete",
-    filledSlots: 0,
-    competitionCount: 0,
-    requireComplete: false,
-    validatedAt: null,
-    limits: { ...DEMO_COMPOSITION_LIMITS },
-    counts: { P: 0, D: 0, C: 0, A: 0 },
-    issues: [],
-  },
-  slots: DEMO_TEAM.slots.map((slot) => ({
-    ...slot,
-    athleteId: null,
-    athleteName: null,
-    clubName: null,
-    role: null,
-    purchaseCredits: null,
-  })),
-};
-
-const DEMO_TEAMS: FantasyTeamSummary[] = [
-  {
-    id: DEMO_TEAM.id,
-    leagueId: DEMO_TEAM.leagueId,
-    membershipId: DEMO_TEAM.membershipId,
-    userId: DEMO_TEAM.userId,
-    userType: DEMO_TEAM.userType,
-    name: DEMO_TEAM.name,
-    rosterSize: DEMO_TEAM.rosterSize,
-    filledSlots: DEMO_TEAM.filledSlots,
-    compositionStatus: DEMO_TEAM.compositionStatus,
-  },
-  {
-    id: DEMO_TEAM_B.id,
-    leagueId: DEMO_TEAM_B.leagueId,
-    membershipId: DEMO_TEAM_B.membershipId,
-    userId: DEMO_TEAM_B.userId,
-    userType: DEMO_TEAM_B.userType,
-    name: DEMO_TEAM_B.name,
-    rosterSize: DEMO_TEAM_B.rosterSize,
-    filledSlots: DEMO_TEAM_B.filledSlots,
-    compositionStatus: DEMO_TEAM_B.compositionStatus,
-  },
-];
-
-const DEMO_LISTONE: LeagueListoneEntry[] = [
-  {
-    athleteId: "a1",
-    canonicalName: "L. Martinez",
-    seasonYear: 2026,
-    officialRole: "A",
-    effectiveRole: "A",
-    providerPositionRaw: "Attacker",
-    mappingVersion: "v1.0.0",
-    clubId: null,
-    clubName: "Inter",
-    override: null,
-  },
-  {
-    athleteId: "a2",
-    canonicalName: "N. Barella",
-    seasonYear: 2026,
-    officialRole: "C",
-    effectiveRole: "C",
-    providerPositionRaw: "Midfielder",
-    mappingVersion: "v1.0.0",
-    clubId: null,
-    clubName: "Inter",
-    override: null,
-  },
-  {
-    athleteId: "a3",
-    canonicalName: "R. Leao",
-    seasonYear: 2026,
-    officialRole: "A",
-    effectiveRole: "A",
-    providerPositionRaw: "Attacker",
-    mappingVersion: "v1.0.0",
-    clubId: null,
-    clubName: "Milan",
-    override: null,
-  },
-  {
-    athleteId: "a4",
-    canonicalName: "M. Thuram",
-    seasonYear: 2026,
-    officialRole: "A",
-    effectiveRole: "A",
-    providerPositionRaw: "Attacker",
-    mappingVersion: "v1.0.0",
-    clubId: null,
-    clubName: "Inter",
-    override: null,
-  },
-];
-
-const DEMO_CREDITS: CreditAccount = {
-  fantasyTeamId: "demo-team",
-  balance: 940,
-  version: 3,
-  reconstructedBalance: 940,
-};
-
-const DEMO_LEDGER: CreditLedgerList = {
-  fantasyTeamId: "demo-team",
-  balance: 940,
-  version: 3,
-  entries: [
-    {
-      id: "entry-1",
-      amount: 1000,
-      reason: "initial_allocation",
-      transactionId: "initial:demo-team",
-      balanceAfter: 1000,
-      note: "Allocazione iniziale crediti di lega",
-      actorId: null,
-      createdAt: "2026-08-01T10:00:00+00:00",
-    },
-    {
-      id: "entry-2",
-      amount: -50,
-      reason: "roster_purchase",
-      transactionId: "purchase:demo-team:0:a1",
-      balanceAfter: 950,
-      note: "Acquisto L. Martinez",
-      actorId: "demo-user",
-      createdAt: "2026-08-10T15:30:00+00:00",
-    },
-    {
-      id: "entry-3",
-      amount: -10,
-      reason: "admin_adjustment",
-      transactionId: "adj:demo-1",
-      balanceAfter: 940,
-      note: "Correzione manuale",
-      actorId: "demo-admin",
-      createdAt: "2026-08-11T09:00:00+00:00",
-    },
-  ],
-};
-
-const DEMO_CREDITS_B: CreditAccount = {
-  fantasyTeamId: "demo-team-b",
-  balance: 1000,
-  version: 1,
-  reconstructedBalance: 1000,
-};
-
-const DEMO_LEDGER_B: CreditLedgerList = {
-  fantasyTeamId: "demo-team-b",
-  balance: 1000,
-  version: 1,
-  entries: [
-    {
-      id: "entry-b1",
-      amount: 1000,
-      reason: "initial_allocation",
-      transactionId: "initial:demo-team-b",
-      balanceAfter: 1000,
-      note: "Allocazione iniziale crediti di lega",
-      actorId: null,
-      createdAt: "2026-08-01T10:00:00+00:00",
-    },
-  ],
-};
-
-function reasonLabel(reason: string): string {
-  if (reason === "initial_allocation") {
-    return "Allocazione iniziale";
-  }
-  if (reason === "admin_adjustment") {
-    return "Aggiustamento admin";
-  }
-  if (reason === "roster_purchase") {
-    return "Acquisto rosa";
-  }
-  if (reason === "roster_release_refund") {
-    return "Rimborso rosa";
-  }
-  return reason;
-}
-
-const LEDGER_PAGE_SIZE = 10;
-
-function formatLedgerDate(iso: string): string {
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) {
-    return iso;
-  }
-  return date.toLocaleString("it-IT", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
-
-function sortLedgerNewestFirst(entries: CreditLedgerList["entries"]) {
-  return [...entries].sort((left, right) => {
-    const leftTime = Date.parse(left.createdAt);
-    const rightTime = Date.parse(right.createdAt);
-    if (leftTime !== rightTime) {
-      return rightTime - leftTime;
-    }
-    return right.id.localeCompare(left.id);
-  });
-}
-
-function formatLedgerEntry(entry: CreditLedgerList["entries"][number]): string {
-  const sign = entry.amount > 0 ? "+" : "";
-  const note = entry.note?.trim();
-  const detail = note ? ` — ${note}` : "";
-  return `${formatLedgerDate(entry.createdAt)} · ${reasonLabel(entry.reason)}${detail}: ${sign}${entry.amount} → saldo ${entry.balanceAfter}`;
-}
-
-function filterByTab(entries: LeagueListoneEntry[], tab: RoleTab): LeagueListoneEntry[] {
-  if (tab === "all") {
-    return entries;
-  }
-  return entries.filter((entry) => entry.effectiveRole === tab);
-}
-
-function filterListone(
-  entries: LeagueListoneEntry[],
-  tab: RoleTab,
-  query: string,
-): LeagueListoneEntry[] {
-  const normalized = query.trim().toLocaleLowerCase("it-IT");
-  return filterByTab(entries, tab).filter((entry) => {
-    if (!normalized) {
-      return true;
-    }
-    const haystack = `${entry.canonicalName} ${entry.clubName ?? ""}`.toLocaleLowerCase("it-IT");
-    return haystack.includes(normalized);
-  });
-}
-
-function buildOwnership(entries: RosterOccupancyEntry[]): Map<string, AthleteOwnership> {
-  const map = new Map<string, AthleteOwnership>();
-  for (const entry of entries) {
-    map.set(entry.athleteId, {
-      teamId: entry.fantasyTeamId,
-      teamName: entry.teamName,
-      slotIndex: entry.slotIndex,
-    });
-  }
-  return map;
-}
-
-function roleLabel(role: string | null): string {
-  if (!role) {
-    return "—";
-  }
-  if (role in ROLE_LABEL) {
-    return ROLE_LABEL[role as FantasyRole];
-  }
-  return role;
-}
-
-function roleBadgeVariant(role: string | null | undefined): "success" | "warning" | "accent" | "danger" | "neutral" {
-  if (role === "P") {
-    return "success";
-  }
-  if (role === "D") {
-    return "warning";
-  }
-  if (role === "C") {
-    return "accent";
-  }
-  if (role === "A") {
-    return "danger";
-  }
-  return "neutral";
-}
-
-function toSummary(team: FantasyTeam): FantasyTeamSummary {
-  return {
-    id: team.id,
-    leagueId: team.leagueId,
-    membershipId: team.membershipId,
-    userId: team.userId,
-    userType: team.userType,
-    name: team.name,
-    rosterSize: team.rosterSize,
-    filledSlots: team.filledSlots,
-    compositionStatus: team.compositionStatus,
-  };
-}
-
-function compositionStatusLabel(status: string | undefined): string {
-  if (status === "validated") {
-    return "Convalidata";
-  }
-  if (status === "invalid") {
-    return "Non valida";
-  }
-  return "Incompleta";
-}
-
-function compositionStatusVariant(
-  status: string | undefined,
-): "success" | "warning" | "danger" | "neutral" {
-  if (status === "validated") {
-    return "success";
-  }
-  if (status === "invalid") {
-    return "danger";
-  }
-  return "warning";
-}
-
-function initialDemoTeam(
-  isDemoMode: boolean,
-  demoState: ReturnType<typeof parseWireframeStateFromSearch> | null,
-): FantasyTeam | null {
-  if (!isDemoMode) {
-    return null;
-  }
-  if (demoState === "error" || demoState === "loading" || demoState === "forbidden") {
-    return null;
-  }
-  if (demoState === "empty") {
-    return {
-      ...DEMO_TEAM,
-      filledSlots: 0,
-      compositionStatus: "incomplete",
-      composition: {
-        status: "incomplete",
-        filledSlots: 0,
-        competitionCount: 0,
-        requireComplete: false,
-        validatedAt: null,
-        limits: { ...DEMO_COMPOSITION_LIMITS },
-        counts: { P: 0, D: 0, C: 0, A: 0 },
-        issues: [],
-      },
-      slots: DEMO_TEAM.slots.map((slot) => ({
-        ...slot,
-        athleteId: null,
-        athleteName: null,
-        clubName: null,
-        role: null,
-        purchaseCredits: null,
-      })),
-    };
-  }
-  return DEMO_TEAM;
-}
-
-function initialDemoCredits(
-  isDemoMode: boolean,
-  demoState: ReturnType<typeof parseWireframeStateFromSearch> | null,
-): CreditAccount | null {
-  if (!isDemoMode) {
-    return null;
-  }
-  if (demoState === "error" || demoState === "loading" || demoState === "forbidden") {
-    return null;
-  }
-  return DEMO_CREDITS;
-}
-
-function initialDemoLedger(
-  isDemoMode: boolean,
-  demoState: ReturnType<typeof parseWireframeStateFromSearch> | null,
-): CreditLedgerList | null {
-  if (!isDemoMode) {
-    return null;
-  }
-  if (demoState === "error" || demoState === "loading" || demoState === "forbidden") {
-    return null;
-  }
-  return DEMO_LEDGER;
-}
+import { RosterAdminManualCard } from "./roster/RosterAdminManualCard";
+import { RosterAdminToolsPanel } from "./roster/RosterAdminToolsPanel";
+import {
+  DEMO_CREDITS,
+  DEMO_CREDITS_B,
+  DEMO_HISTORY,
+  DEMO_LEDGER,
+  DEMO_LEDGER_B,
+  DEMO_LISTONE,
+  DEMO_OCCUPANCY,
+  DEMO_SNAPSHOT_DETAIL,
+  DEMO_SNAPSHOTS,
+  DEMO_TEAM,
+  DEMO_TEAM_B,
+  DEMO_TEAMS,
+} from "./roster/rosterDemoData";
+import { RosterCreditsPanel } from "./roster/RosterCreditsPanel";
+import { RosterCsvImportCard } from "./roster/RosterCsvImportCard";
+import { RosterEmptyState } from "./roster/RosterEmptyState";
+import { RosterFilledSummary } from "./roster/RosterFilledSummary";
+import {
+  LEDGER_PAGE_SIZE,
+  buildOwnership,
+  initialDemoCredits,
+  initialDemoLedger,
+  initialDemoTeam,
+  sortLedgerNewestFirst,
+  toSummary,
+  type RoleTab,
+  type RosterPageSection,
+} from "./roster/rosterHelpers";
+import { RosterHistorySection } from "./roster/RosterHistorySection";
+import { RosterSectionTabs } from "./roster/RosterSectionTabs";
 
 /** Rosa fantasy, ledger crediti e inserimento manuale admin (EP05-01/02/03).
  * EP05-04 CSV import UI is implemented but temporarily hidden (`SHOW_ROSTER_CSV_IMPORT`).
@@ -1784,22 +1232,6 @@ export function RosterPage() {
     }
     return groups;
   }, [filledSlots]);
-  const compositionLimits = viewedTeam?.composition?.limits;
-  const roleLimit = (role: FantasyRole): number | null => {
-    if (!compositionLimits) {
-      return null;
-    }
-    if (role === "P") {
-      return compositionLimits.goalkeepers;
-    }
-    if (role === "D") {
-      return compositionLimits.defenders;
-    }
-    if (role === "C") {
-      return compositionLimits.midfielders;
-    }
-    return compositionLimits.forwards;
-  };
   const isEmpty = Boolean(viewedTeam && viewedTeam.filledSlots === 0);
   const showForbidden = (isDemoMode && demoState === "forbidden") || (!isDemoMode && !canView);
   const hasLedger = Boolean(ledger && ledger.entries.length > 0);
@@ -1846,195 +1278,25 @@ export function RosterPage() {
       ) : null}
 
       {!loading && !showForbidden && !loadError ? (
-        <div
-          style={{ display: "flex", gap: "0.5rem", marginBottom: "1rem" }}
-          data-testid="roster-section-tabs"
-        >
-          <Button
-            type="button"
-            variant={pageSection === "rosa" ? "primary" : "secondary"}
-            data-testid="roster-section-rosa"
-            onClick={() => setPageSection("rosa")}
-          >
-            Rosa
-          </Button>
-          <Button
-            type="button"
-            variant={pageSection === "storico" ? "primary" : "secondary"}
-            data-testid="roster-section-storico"
-            onClick={() => setPageSection("storico")}
-          >
-            Storico
-          </Button>
-        </div>
+        <RosterSectionTabs pageSection={pageSection} onSelect={setPageSection} />
       ) : null}
 
       {!loading && !showForbidden && !loadError && pageSection === "storico" ? (
-        <div data-testid="roster-history">
-          {historyLoading ? (
-            <UiStatePanel
-              state="loading"
-              title="Caricamento storico"
-              message="Recupero intervalli di possesso e snapshot…"
-              testId="roster-history-loading"
-            />
-          ) : null}
-          {!historyLoading && historyError ? (
-            <UiStatePanel
-              state="error"
-              title="Storico non disponibile"
-              message={historyError}
-              testId="roster-history-error"
-            />
-          ) : null}
-          {!historyLoading && !historyError && history && history.intervals.length === 0 ? (
-            <UiStatePanel
-              state="empty"
-              title="Nessun possesso registrato"
-              message="Gli intervalli compaiono dopo assegnazioni o rilasci in rosa."
-              testId="roster-history-empty"
-            />
-          ) : null}
-          {!historyLoading && !historyError && history && history.intervals.length > 0 ? (
-            <Card data-testid="roster-history-success">
-              <CardHeader title="Intervalli di possesso" />
-              <CardBody>
-                <Table compact>
-                  <TableHead>
-                    <TableRow>
-                      <TableHeaderCell>Calciatore</TableHeaderCell>
-                      <TableHeaderCell>Slot</TableHeaderCell>
-                      <TableHeaderCell>Crediti</TableHeaderCell>
-                      <TableHeaderCell>Dal</TableHeaderCell>
-                      <TableHeaderCell>Al</TableHeaderCell>
-                      <TableHeaderCell>Fonte</TableHeaderCell>
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {history.intervals.map((row) => (
-                      <TableRow key={row.id}>
-                        <TableCell>{row.athleteName ?? row.athleteId}</TableCell>
-                        <TableCell>{row.slotIndex + 1}</TableCell>
-                        <TableCell>{row.purchaseCredits}</TableCell>
-                        <TableCell>{new Date(row.acquiredAt).toLocaleString("it-IT")}</TableCell>
-                        <TableCell>
-                          {row.releasedAt
-                            ? new Date(row.releasedAt).toLocaleString("it-IT")
-                            : "In rosa"}
-                        </TableCell>
-                        <TableCell>{row.source}</TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </CardBody>
-            </Card>
-          ) : null}
-
-          <Card style={{ marginTop: "1rem" }} data-testid="roster-snapshots">
-            <CardHeader title="Snapshot per turno" />
-            <CardBody>
-              <div
-                style={{
-                  display: "flex",
-                  flexWrap: "wrap",
-                  gap: "0.5rem",
-                  alignItems: "center",
-                  marginBottom: "0.75rem",
-                }}
-              >
-                <label>
-                  Turno{" "}
-                  <input
-                    data-testid="roster-snapshot-round"
-                    value={snapshotRound}
-                    onChange={(event) => setSnapshotRound(event.target.value)}
-                    style={{ width: "4rem" }}
-                  />
-                </label>
-                {snapshots.length > 0 ? (
-                  <select
-                    data-testid="roster-snapshot-select"
-                    value={snapshotRound}
-                    onChange={(event) => void onSelectSnapshotRound(event.target.value)}
-                  >
-                    {snapshots.map((row) => (
-                      <option key={row.id} value={String(row.roundNumber)}>
-                        Turno {row.roundNumber} ({row.entryCount} slot)
-                      </option>
-                    ))}
-                  </select>
-                ) : null}
-                {isAdmin ? (
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    disabled={snapshotBusy}
-                    data-testid="roster-snapshot-create"
-                    onClick={() => void onCreateSnapshot()}
-                  >
-                    {snapshotBusy ? "Salvataggio…" : "Crea snapshot turno"}
-                  </Button>
-                ) : null}
-                <Button
-                  type="button"
-                  variant="secondary"
-                  disabled={snapshotBusy || !snapshotRound}
-                  data-testid="roster-snapshot-load"
-                  onClick={() => void onSelectSnapshotRound(snapshotRound)}
-                >
-                  Carica
-                </Button>
-              </div>
-              {snapshotMessage ? (
-                <p data-testid="roster-snapshot-ok">{snapshotMessage}</p>
-              ) : null}
-              {snapshotError ? (
-                <p data-testid="roster-snapshot-error">{snapshotError}</p>
-              ) : null}
-              {!snapshotDetail ? (
-                <UiStatePanel
-                  state="empty"
-                  title="Nessuno snapshot"
-                  message="Crea uno snapshot per congelare la rosa di un turno."
-                  testId="roster-snapshot-empty"
-                />
-              ) : (
-                <div data-testid="roster-snapshot-detail">
-                  <p>
-                    Turno {snapshotDetail.roundNumber} · catturato{" "}
-                    {new Date(snapshotDetail.capturedAt).toLocaleString("it-IT")} ·{" "}
-                    {snapshotDetail.entryCount} assegnazioni
-                  </p>
-                  <Table compact>
-                    <TableHead>
-                      <TableRow>
-                        <TableHeaderCell>Squadra</TableHeaderCell>
-                        <TableHeaderCell>Calciatore</TableHeaderCell>
-                        <TableHeaderCell>Ruolo</TableHeaderCell>
-                        <TableHeaderCell>Crediti</TableHeaderCell>
-                        <TableHeaderCell>Slot</TableHeaderCell>
-                      </TableRow>
-                    </TableHead>
-                    <TableBody>
-                      {snapshotDetail.entries.map((entry) => (
-                        <TableRow
-                          key={`${entry.fantasyTeamId}-${entry.slotIndex}-${entry.athleteId}`}
-                        >
-                          <TableCell>{entry.teamName}</TableCell>
-                          <TableCell>{entry.athleteName ?? entry.athleteId}</TableCell>
-                          <TableCell>{roleLabel(entry.role)}</TableCell>
-                          <TableCell>{entry.purchaseCredits}</TableCell>
-                          <TableCell>{entry.slotIndex + 1}</TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-              )}
-            </CardBody>
-          </Card>
-        </div>
+        <RosterHistorySection
+          historyLoading={historyLoading}
+          historyError={historyError}
+          history={history}
+          snapshots={snapshots}
+          snapshotDetail={snapshotDetail}
+          snapshotRound={snapshotRound}
+          snapshotBusy={snapshotBusy}
+          snapshotMessage={snapshotMessage}
+          snapshotError={snapshotError}
+          isAdmin={isAdmin}
+          onSnapshotRoundChange={setSnapshotRound}
+          onSelectSnapshotRound={onSelectSnapshotRound}
+          onCreateSnapshot={onCreateSnapshot}
+        />
       ) : null}
 
       {pageSection === "rosa" && !loading && !showForbidden && loadError ? (
@@ -2061,687 +1323,108 @@ export function RosterPage() {
       ) : null}
 
       {pageSection === "rosa" && !loading && !showForbidden && !loadError && (viewedTeam || team) ? (
-        <div data-testid="roster-credits" style={{ marginBottom: "1rem" }}>
-          {isAdmin && leagueTeams.length > 0 ? (
-            <label
-              style={{
-                display: "flex",
-                flexWrap: "wrap",
-                alignItems: "center",
-                gap: "0.5rem",
-                marginBottom: "0.75rem",
-              }}
-            >
-              <span style={{ fontWeight: 600 }}>Squadra target</span>
-              <select
-                data-testid="roster-admin-team"
-                value={adminTeamId}
-                onChange={(event) => onSelectAdminTeam(event.target.value)}
-                disabled={adminBusy || adjusting}
-                style={{ minWidth: "16rem", minHeight: "2.25rem" }}
-              >
-                {leagueTeams.map((row) => (
-                  <option key={row.id} value={row.id}>
-                    {row.name}
-                    {row.userType === "ai" ? " (IA)" : ""} ({row.filledSlots}/
-                    {row.rosterSize})
-                  </option>
-                ))}
-              </select>
-            </label>
-          ) : null}
-          <div
-            style={{
-              display: "flex",
-              flexWrap: "wrap",
-              alignItems: "center",
-              gap: "0.75rem 1rem",
-              marginBottom: "0.5rem",
-            }}
-          >
-            <p data-testid="roster-credits-balance" style={{ margin: 0 }}>
-              Crediti residui: <strong>{credits?.balance ?? "—"}</strong>
-              {credits ? ` (versione ${credits.version})` : null}
-            </p>
-            {isAdmin ? (
-              <div
-                data-testid="roster-admin-credits"
-                style={{
-                  display: "flex",
-                  flexWrap: "wrap",
-                  alignItems: "center",
-                  gap: "0.5rem",
-                }}
-              >
-                <label>
-                  Importo{" "}
-                  <input
-                    data-testid="roster-adjust-amount"
-                    value={adjustAmount}
-                    onChange={(event) => setAdjustAmount(event.target.value)}
-                  />
-                </label>
-                <label>
-                  Nota{" "}
-                  <input
-                    data-testid="roster-adjust-note"
-                    value={adjustNote}
-                    onChange={(event) => setAdjustNote(event.target.value)}
-                  />
-                </label>
-                <Button
-                  type="button"
-                  variant="secondary"
-                  disabled={adjusting || !(adminTeamId || team)}
-                  onClick={() => void onAdminAdjust()}
-                >
-                  {adjusting ? "Registrazione…" : "Aggiusta crediti"}
-                </Button>
-              </div>
-            ) : null}
-          </div>
-          {adjustMessage ? <p data-testid="roster-adjust-ok">{adjustMessage}</p> : null}
-          {adjustError ? <p data-testid="roster-adjust-error">{adjustError}</p> : null}
-          {hasLedger ? (
-            <div data-testid="roster-credits-ledger">
-              <ul>
-                {pagedLedgerEntries.map((entry) => (
-                  <li key={entry.id}>{formatLedgerEntry(entry)}</li>
-                ))}
-              </ul>
-              {ledgerEntriesNewestFirst.length > LEDGER_PAGE_SIZE ? (
-                <div
-                  style={{
-                    display: "flex",
-                    flexWrap: "wrap",
-                    alignItems: "center",
-                    gap: "0.5rem",
-                    marginTop: "0.5rem",
-                  }}
-                >
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    disabled={safeLedgerPage <= 0}
-                    data-testid="roster-credits-ledger-prev"
-                    onClick={() => setLedgerPage((page) => Math.max(0, page - 1))}
-                  >
-                    Precedenti
-                  </Button>
-                  <span data-testid="roster-credits-ledger-page">
-                    {safeLedgerPage + 1}/{ledgerPageCount}
-                  </span>
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    disabled={safeLedgerPage >= ledgerPageCount - 1}
-                    data-testid="roster-credits-ledger-next"
-                    onClick={() =>
-                      setLedgerPage((page) => Math.min(ledgerPageCount - 1, page + 1))
-                    }
-                  >
-                    Successivi
-                  </Button>
-                </div>
-              ) : null}
-            </div>
-          ) : (
-            <UiStatePanel
-              state="empty"
-              title="Nessun movimento"
-              message="Il ledger crediti non contiene ancora movimenti."
-              testId="roster-credits-empty"
-            />
-          )}
-        </div>
+        <RosterCreditsPanel
+          isAdmin={isAdmin}
+          leagueTeams={leagueTeams}
+          adminTeamId={adminTeamId}
+          onSelectAdminTeam={onSelectAdminTeam}
+          adminBusy={adminBusy}
+          adjusting={adjusting}
+          hasAdjustTarget={Boolean(adminTeamId || team)}
+          credits={credits}
+          adjustAmount={adjustAmount}
+          onAdjustAmountChange={setAdjustAmount}
+          adjustNote={adjustNote}
+          onAdjustNoteChange={setAdjustNote}
+          onAdminAdjust={onAdminAdjust}
+          adjustMessage={adjustMessage}
+          adjustError={adjustError}
+          hasLedger={hasLedger}
+          pagedLedgerEntries={pagedLedgerEntries}
+          ledgerEntriesCount={ledgerEntriesNewestFirst.length}
+          safeLedgerPage={safeLedgerPage}
+          ledgerPageCount={ledgerPageCount}
+          onLedgerPagePrev={() => setLedgerPage((page) => Math.max(0, page - 1))}
+          onLedgerPageNext={() =>
+            setLedgerPage((page) => Math.min(ledgerPageCount - 1, page + 1))
+          }
+        />
       ) : null}
 
       {isAdmin && !showForbidden && !loading ? (
         <>
           {SHOW_ROSTER_CSV_IMPORT ? (
-          <Card style={{ marginTop: "1rem" }} data-testid="roster-csv-import">
-            <CardHeader>
-              <h2 className="fa-auction-listone__title">Import CSV rose</h2>
-            </CardHeader>
-            <CardBody>
-              <p>
-                Scarica il modello, carica il file per l&apos;anteprima e conferma solo senza
-                errori bloccanti. Nessuna scrittura avviene prima della conferma.
-              </p>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: "0.75rem", marginTop: "0.75rem" }}>
-                <Button
-                  type="button"
-                  variant="secondary"
-                  disabled={csvBusy}
-                  onClick={() => void onDownloadCsvTemplate()}
-                  data-testid="roster-csv-download"
-                >
-                  Scarica modello CSV
-                </Button>
-                <Button
-                  type="button"
-                  variant="secondary"
-                  disabled={csvBusy}
-                  onClick={() => csvFileInputRef.current?.click()}
-                  data-testid="roster-csv-upload"
-                >
-                  {csvBusy ? "Elaborazione…" : "Carica CSV"}
-                </Button>
-                <input
-                  ref={csvFileInputRef}
-                  type="file"
-                  accept=".csv,text/csv"
-                  hidden
-                  data-testid="roster-csv-file"
-                  onChange={(event) => {
-                    const file = event.target.files?.[0] ?? null;
-                    event.target.value = "";
-                    void onCsvFileSelected(file);
-                  }}
-                />
-                <Button
-                  type="button"
-                  disabled={csvBusy || !csvCanConfirm}
-                  onClick={() => void onConfirmCsvImport()}
-                  data-testid="roster-csv-confirm"
-                >
-                  Conferma import
-                </Button>
-              </div>
-              {csvMessage ? (
-                <UiStatePanel
-                  state="success"
-                  title="Import CSV"
-                  message={csvMessage}
-                  testId="roster-csv-ok"
-                />
-              ) : null}
-              {csvError ? (
-                <UiStatePanel
-                  state="error"
-                  title="Import CSV"
-                  message={csvError}
-                  testId="roster-csv-error"
-                />
-              ) : null}
-              {csvPreview ? (
-                <div style={{ marginTop: "1rem" }} data-testid="roster-csv-preview">
-                  <p>
-                    Anteprima: {csvPreview.rowCount} righe · errori {csvPreview.errorCount} ·
-                    avvisi {csvPreview.warningCount}
-                  </p>
-                  <Table>
-                    <TableHead>
-                      <TableRow>
-                        <TableHeaderCell>Riga</TableHeaderCell>
-                        <TableHeaderCell>Squadra</TableHeaderCell>
-                        <TableHeaderCell>Calciatore</TableHeaderCell>
-                        <TableHeaderCell>Crediti</TableHeaderCell>
-                        <TableHeaderCell>Stato</TableHeaderCell>
-                        <TableHeaderCell>Dettaglio</TableHeaderCell>
-                      </TableRow>
-                    </TableHead>
-                    <TableBody>
-                      {csvPreview.rows.map((row) => (
-                        <TableRow key={row.rowNumber}>
-                          <TableCell>{row.rowNumber}</TableCell>
-                          <TableCell>{row.fantasyTeamName ?? row.squadra}</TableCell>
-                          <TableCell>{row.athleteName ?? row.nome ?? "—"}</TableCell>
-                          <TableCell>{row.crediti ?? "—"}</TableCell>
-                          <TableCell>{row.status}</TableCell>
-                          <TableCell>
-                            {row.issues.map((issue) => issue.message).join(" · ") || "—"}
-                            {row.status === "ambiguous" ? (
-                              <select
-                                aria-label={`Risolvi riga ${row.rowNumber}`}
-                                data-testid={`roster-csv-resolve-${row.rowNumber}`}
-                                value={csvResolutions[row.rowNumber] ?? ""}
-                                onChange={(event) =>
-                                  setCsvResolutions((current) => ({
-                                    ...current,
-                                    [row.rowNumber]: event.target.value,
-                                  }))
-                                }
-                              >
-                                <option value="">Seleziona calciatore…</option>
-                                {row.candidates.map((candidate) => (
-                                  <option key={candidate.athleteId} value={candidate.athleteId}>
-                                    {candidate.canonicalName} (#{candidate.providerId})
-                                  </option>
-                                ))}
-                              </select>
-                            ) : null}
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-              ) : null}
-            </CardBody>
-          </Card>
+            <RosterCsvImportCard
+              csvBusy={csvBusy}
+              onDownloadCsvTemplate={onDownloadCsvTemplate}
+              csvFileInputRef={csvFileInputRef}
+              onCsvFileSelected={onCsvFileSelected}
+              csvCanConfirm={csvCanConfirm}
+              onConfirmCsvImport={onConfirmCsvImport}
+              csvMessage={csvMessage}
+              csvError={csvError}
+              csvPreview={csvPreview}
+              csvResolutions={csvResolutions}
+              onCsvResolutionChange={(rowNumber, athleteId) =>
+                setCsvResolutions((current) => ({
+                  ...current,
+                  [rowNumber]: athleteId,
+                }))
+              }
+            />
           ) : null}
 
-          <div style={{ marginTop: "1rem" }} data-testid="roster-admin-tools">
-            <div
-              style={{
-                display: "flex",
-                flexWrap: "wrap",
-                gap: "0.5rem",
-                alignItems: "center",
-              }}
-            >
-              <Button
-                type="button"
-                variant="secondary"
-                disabled={ensuring || randomAiBusy}
-                onClick={() => void onEnsureTeams()}
-              >
-                {ensuring ? "Verifica in corso…" : "Assicura squadre partecipanti"}
-              </Button>
-              {leagueTeams.some((row) => row.userType === "ai") ? (
-                <Button
-                  type="button"
-                  variant="secondary"
-                  data-testid="roster-admin-random-ai"
-                  disabled={
-                    ensuring ||
-                    randomAiBusy ||
-                    (adminTeam ?? viewedTeam)?.userType !== "ai" ||
-                    ((adminTeam ?? viewedTeam)?.filledSlots ?? 0) >=
-                      ((adminTeam ?? viewedTeam)?.rosterSize ?? 0)
-                  }
-                  onClick={() => void onAssignRandomAiRoster()}
-                >
-                  {randomAiBusy
-                    ? "Assegnazione in corso…"
-                    : "Assegna rosa random (IA)"}
-                </Button>
-              ) : null}
-            </div>
-            {ensureMessage ? <p data-testid="roster-ensure-ok">{ensureMessage}</p> : null}
-            {ensureError ? <p data-testid="roster-ensure-error">{ensureError}</p> : null}
-            {randomAiMessage ? (
-              <p data-testid="roster-random-ai-ok">{randomAiMessage}</p>
-            ) : null}
-            {randomAiError ? (
-              <p data-testid="roster-random-ai-error">{randomAiError}</p>
-            ) : null}
-          </div>
+          <RosterAdminToolsPanel
+            ensuring={ensuring}
+            randomAiBusy={randomAiBusy}
+            onEnsureTeams={onEnsureTeams}
+            leagueTeams={leagueTeams}
+            adminOrViewedTeam={adminTeam ?? viewedTeam}
+            onAssignRandomAiRoster={onAssignRandomAiRoster}
+            ensureMessage={ensureMessage}
+            ensureError={ensureError}
+            randomAiMessage={randomAiMessage}
+            randomAiError={randomAiError}
+          />
         </>
       ) : null}
 
       {pageSection === "rosa" && !loading && !showForbidden && !loadError && viewedTeam && isEmpty ? (
-        <div data-testid="roster-empty">
-          <UiStatePanel
-            state="empty"
-            title="Rosa vuota"
-            message="Completa l'asta o importa i giocatori per popolare la rosa."
-          />
-          <p data-testid="roster-empty-summary">
-            {viewedTeam.name}: 0/{viewedTeam.rosterSize} slot occupati
-          </p>
-          <Button type="button" variant="secondary" onClick={() => void loadRoster()}>
-            Ricarica
-          </Button>
-        </div>
+        <RosterEmptyState viewedTeam={viewedTeam} onReload={loadRoster} />
       ) : null}
 
       {pageSection === "rosa" && !loading && !showForbidden && !loadError && viewedTeam && !isEmpty ? (
-        <div data-testid="wireframe-roster-success">
-          <p data-testid="roster-summary">
-            {viewedTeam.name}: {viewedTeam.filledSlots}/{viewedTeam.rosterSize} giocatori
-          </p>
-          {viewedTeam.composition ? (
-            <div data-testid="roster-composition">
-              <p>
-                Composizione:{" "}
-                <Badge variant={compositionStatusVariant(viewedTeam.composition.status)}>
-                  <span data-testid="roster-composition-status">
-                    {compositionStatusLabel(viewedTeam.composition.status)}
-                  </span>
-                </Badge>
-              </p>
-              <p data-testid="roster-composition-counts">
-                {viewedTeam.composition.counts.P}/{viewedTeam.composition.limits.goalkeepers}P ·{" "}
-                {viewedTeam.composition.counts.D}/{viewedTeam.composition.limits.defenders}D ·{" "}
-                {viewedTeam.composition.counts.C}/{viewedTeam.composition.limits.midfielders}C ·{" "}
-                {viewedTeam.composition.counts.A}/{viewedTeam.composition.limits.forwards}A ·{" "}
-                {viewedTeam.composition.competitionCount} campionati
-              </p>
-              {viewedTeam.composition.issues.length > 0 ? (
-                <ul data-testid="roster-composition-issues">
-                  {viewedTeam.composition.issues.map((issue) => (
-                    <li key={`${issue.code}-${issue.message}`}>{issue.message}</li>
-                  ))}
-                </ul>
-              ) : null}
-            </div>
-          ) : null}
-          <div className="fa-roster-role-tables" data-testid="roster-filled-table">
-            {ROLE_SECTION_ORDER.map((role) => {
-              const slots = filledByRole[role];
-              const limit = roleLimit(role);
-              return (
-                <section
-                  key={role}
-                  className="fa-roster-role-section"
-                  data-testid={`roster-filled-table-${role}`}
-                >
-                  <h3 className="fa-roster-role-section__title">
-                    <Badge variant={roleBadgeVariant(role)}>{role}</Badge>{" "}
-                    {ROLE_SECTION_TITLE[role]}
-                    <span className="fa-roster-role-section__count">
-                      {slots.length}
-                      {limit != null ? `/${limit}` : ""}
-                    </span>
-                  </h3>
-                  {slots.length === 0 ? (
-                    <p className="fa-roster-role-section__empty">Nessun giocatore in questo ruolo.</p>
-                  ) : (
-                    <Table compact>
-                      <TableHead>
-                        <TableRow>
-                          <TableHeaderCell>Calciatore</TableHeaderCell>
-                          <TableHeaderCell>Club</TableHeaderCell>
-                          <TableHeaderCell>Crediti acquisto</TableHeaderCell>
-                          <TableHeaderCell>Slot</TableHeaderCell>
-                          {canEdit ? <TableHeaderCell>Azione</TableHeaderCell> : null}
-                        </TableRow>
-                      </TableHead>
-                      <TableBody>
-                        {slots.map((slot) => (
-                          <TableRow key={slot.id}>
-                            <TableCell>{slot.athleteName ?? "Calciatore"}</TableCell>
-                            <TableCell>{slot.clubName ?? "—"}</TableCell>
-                            <TableCell>{slot.purchaseCredits ?? "—"}</TableCell>
-                            <TableCell>{slot.slotIndex + 1}</TableCell>
-                            {canEdit ? (
-                              <TableCell>
-                                {slot.athleteId ? (
-                                  <Button
-                                    type="button"
-                                    variant="secondary"
-                                    disabled={adminBusy}
-                                    data-testid={`roster-admin-release-${slot.athleteId}`}
-                                    onClick={() => void onReleaseAthlete(slot.athleteId!)}
-                                  >
-                                    Rimuovi
-                                  </Button>
-                                ) : null}
-                              </TableCell>
-                            ) : null}
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  )}
-                </section>
-              );
-            })}
-            {filledByRole.unknown.length > 0 ? (
-              <section
-                className="fa-roster-role-section"
-                data-testid="roster-filled-table-unknown"
-              >
-                <h3 className="fa-roster-role-section__title">
-                  Senza ruolo
-                  <span className="fa-roster-role-section__count">
-                    {filledByRole.unknown.length}
-                  </span>
-                </h3>
-                <Table compact>
-                  <TableHead>
-                    <TableRow>
-                      <TableHeaderCell>Calciatore</TableHeaderCell>
-                      <TableHeaderCell>Club</TableHeaderCell>
-                      <TableHeaderCell>Crediti acquisto</TableHeaderCell>
-                      <TableHeaderCell>Slot</TableHeaderCell>
-                      {canEdit ? <TableHeaderCell>Azione</TableHeaderCell> : null}
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {filledByRole.unknown.map((slot) => (
-                      <TableRow key={slot.id}>
-                        <TableCell>{slot.athleteName ?? "Calciatore"}</TableCell>
-                        <TableCell>{slot.clubName ?? "—"}</TableCell>
-                        <TableCell>{slot.purchaseCredits ?? "—"}</TableCell>
-                        <TableCell>{slot.slotIndex + 1}</TableCell>
-                        {canEdit ? (
-                          <TableCell>
-                            {slot.athleteId ? (
-                              <Button
-                                type="button"
-                                variant="secondary"
-                                disabled={adminBusy}
-                                data-testid={`roster-admin-release-${slot.athleteId}`}
-                                onClick={() => void onReleaseAthlete(slot.athleteId!)}
-                              >
-                                Rimuovi
-                              </Button>
-                            ) : null}
-                          </TableCell>
-                        ) : null}
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </section>
-            ) : null}
-          </div>
-        </div>
+        <RosterFilledSummary
+          viewedTeam={viewedTeam}
+          filledByRole={filledByRole}
+          canEdit={canEdit}
+          adminBusy={adminBusy}
+          onReleaseAthlete={onReleaseAthlete}
+        />
       ) : null}
 
       {pageSection === "rosa" && canEdit && !showForbidden ? (
-        <Card style={{ marginTop: "1rem" }} data-testid="roster-admin-manual">
-          <CardHeader>
-            <div className="fa-auction-listone__header">
-              <div>
-                <h2 className="fa-auction-listone__title">Inserimento manuale rose</h2>
-                <p className="fa-auction-listone__subtitle">
-                  {isAdmin
-                    ? "Assegna o rimuovi calciatori dal listone sulla squadra target selezionata sopra."
-                    : "Assegna o rimuovi calciatori dal listone sulla tua rosa."}
-                </p>
-              </div>
-            </div>
-          </CardHeader>
-          <CardBody>
-            {adminLoadError ? (
-              <UiStatePanel
-                state="error"
-                title="Caricamento non riuscito"
-                message={adminLoadError}
-                testId="roster-admin-manual-error"
-              />
-            ) : null}
-
-            {isAdmin && leagueTeams.length === 0 ? (
-              <UiStatePanel
-                state="empty"
-                title="Nessuna squadra"
-                message="Assicura prima le squadre dei partecipanti."
-                testId="roster-admin-manual-empty"
-              />
-            ) : !isAdmin && !targetTeam ? (
-              <UiStatePanel
-                state="empty"
-                title="Nessuna squadra"
-                message="La tua rosa non è ancora disponibile."
-                testId="roster-admin-manual-empty"
-              />
-            ) : (
-              <>
-                {targetTeam ? (
-                  <p data-testid="roster-admin-team-summary">
-                    {targetTeam.name}: {targetTeam.filledSlots}/{targetTeam.rosterSize} slot ·{" "}
-                    {emptySlots.length} liberi
-                  </p>
-                ) : null}
-
-                <div style={{ marginBottom: "0.75rem" }}>
-                  <Input
-                    label="Crediti acquisto"
-                    name="roster-purchase-credits"
-                    type="number"
-                    min={1}
-                    value={purchaseCredits}
-                    onChange={(event) => setPurchaseCredits(event.target.value)}
-                    data-testid="roster-purchase-credits"
-                  />
-                </div>
-
-                {adminMessage ? (
-                  <UiStatePanel
-                    state="success"
-                    title="Operazione riuscita"
-                    message={adminMessage}
-                    testId="roster-admin-ok"
-                  />
-                ) : null}
-                {adminError ? (
-                  <UiStatePanel
-                    state="error"
-                    title="Operazione non riuscita"
-                    message={adminError}
-                    testId="roster-admin-assign-error"
-                  />
-                ) : null}
-
-                {listone.length === 0 ? (
-                  <UiStatePanel
-                    state="empty"
-                    title="Listone vuoto"
-                    message="Il listone ufficiale non è ancora disponibile. Verrà popolato dagli operatori della piattaforma."
-                    testId="roster-admin-listone-empty"
-                  />
-                ) : (
-                  <>
-                    <div
-                      className="fa-roster-listone__search"
-                      style={{ marginBottom: "0.75rem" }}
-                    >
-                      <Input
-                        label="Cerca calciatore"
-                        name="roster-listone-query"
-                        value={listoneQuery}
-                        placeholder="Nome o club…"
-                        onChange={(event) => setListoneQuery(event.target.value)}
-                        data-testid="roster-admin-listone-search"
-                      />
-                    </div>
-                    <Tabs
-                      value={roleTab}
-                      onValueChange={(value) => setRoleTab(value as RoleTab)}
-                      aria-label="Filtra listone per ruolo"
-                    >
-                      <TabList>
-                        {ROLE_TABS.map((tab) => (
-                          <Tab key={tab.value} value={tab.value}>
-                            {tab.label}
-                          </Tab>
-                        ))}
-                      </TabList>
-                      {ROLE_TABS.map((tab) => {
-                        const rows = filterListone(listone, tab.value, listoneQuery);
-                        return (
-                          <TabPanel key={tab.value} value={tab.value}>
-                            {rows.length === 0 ? (
-                              <UiStatePanel
-                                state="empty"
-                                title="Nessun calciatore"
-                                message={
-                                  listoneQuery.trim()
-                                    ? "Nessun risultato per la ricerca corrente."
-                                    : tab.value === "all"
-                                      ? "Il listone è vuoto."
-                                      : `Nessun ${ROLE_LABEL[tab.value as FantasyRole].toLowerCase()} nel listone.`
-                                }
-                                testId={`roster-admin-listone-empty-${tab.value}`}
-                              />
-                            ) : (
-                              <Table
-                                compact
-                                data-testid={`roster-admin-listone-table-${tab.value}`}
-                              >
-                                <TableHead>
-                                  <TableRow>
-                                    <TableHeaderCell>Calciatore</TableHeaderCell>
-                                    <TableHeaderCell>Ruolo</TableHeaderCell>
-                                    <TableHeaderCell>Club</TableHeaderCell>
-                                    <TableHeaderCell>Stato</TableHeaderCell>
-                                    <TableHeaderCell>Azione</TableHeaderCell>
-                                  </TableRow>
-                                </TableHead>
-                                <TableBody>
-                                  {rows.map((entry) => {
-                                    const owner = ownership.get(entry.athleteId);
-                                    const canAssign = !owner && emptySlots.length > 0;
-                                    const canRelease = owner
-                                      ? canReleaseAthlete(owner.teamId)
-                                      : false;
-                                    return (
-                                      <TableRow key={entry.athleteId}>
-                                        <TableCell>{entry.canonicalName}</TableCell>
-                                        <TableCell>
-                                          <Badge variant={roleBadgeVariant(entry.effectiveRole)}>
-                                            {entry.effectiveRole}
-                                          </Badge>{" "}
-                                          {ROLE_LABEL[entry.effectiveRole]}
-                                        </TableCell>
-                                        <TableCell>{entry.clubName ?? "—"}</TableCell>
-                                        <TableCell>
-                                          {owner ? (
-                                            <Badge variant="warning">
-                                              In rosa: {owner.teamName}
-                                            </Badge>
-                                          ) : (
-                                            <Badge variant="success">Libero</Badge>
-                                          )}
-                                        </TableCell>
-                                        <TableCell>
-                                          {owner && canRelease ? (
-                                            <Button
-                                              type="button"
-                                              variant="secondary"
-                                              disabled={adminBusy}
-                                              data-testid={`roster-admin-release-${entry.athleteId}`}
-                                              onClick={() =>
-                                                void onReleaseAthlete(entry.athleteId)
-                                              }
-                                            >
-                                              Rimuovi
-                                            </Button>
-                                          ) : !owner ? (
-                                            <Button
-                                              type="button"
-                                              variant="secondary"
-                                              disabled={adminBusy || !canAssign}
-                                              data-testid={`roster-admin-assign-${entry.athleteId}`}
-                                              onClick={() =>
-                                                void onAssignAthlete(entry.athleteId)
-                                              }
-                                            >
-                                              Assegna
-                                            </Button>
-                                          ) : null}
-                                        </TableCell>
-                                      </TableRow>
-                                    );
-                                  })}
-                                </TableBody>
-                              </Table>
-                            )}
-                          </TabPanel>
-                        );
-                      })}
-                    </Tabs>
-                  </>
-                )}
-              </>
-            )}
-          </CardBody>
-        </Card>
+        <RosterAdminManualCard
+          isAdmin={isAdmin}
+          adminLoadError={adminLoadError}
+          leagueTeams={leagueTeams}
+          targetTeam={targetTeam}
+          emptySlotsCount={emptySlots.length}
+          purchaseCredits={purchaseCredits}
+          onPurchaseCreditsChange={setPurchaseCredits}
+          adminMessage={adminMessage}
+          adminError={adminError}
+          listone={listone}
+          listoneQuery={listoneQuery}
+          onListoneQueryChange={setListoneQuery}
+          roleTab={roleTab}
+          onRoleTabChange={setRoleTab}
+          ownership={ownership}
+          canReleaseAthlete={canReleaseAthlete}
+          adminBusy={adminBusy}
+          onReleaseAthlete={onReleaseAthlete}
+          onAssignAthlete={onAssignAthlete}
+        />
       ) : null}
     </PageContainer>
   );
