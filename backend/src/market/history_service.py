@@ -183,7 +183,9 @@ class MarketHistoryService:
             proposal_uuids = {UUID(value) for value in proposal_ids}
             for proposal_id, proposer_team_id, recipient_team_id in self._session.execute(
                 select(
-                    TradeProposal.id, TradeProposal.proposer_team_id, TradeProposal.recipient_team_id
+                    TradeProposal.id,
+                    TradeProposal.proposer_team_id,
+                    TradeProposal.recipient_team_id,
                 ).where(TradeProposal.id.in_(proposal_uuids))
             ):
                 proposal_teams[str(proposal_id)] = (

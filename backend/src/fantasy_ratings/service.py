@@ -295,7 +295,8 @@ def _overlay_eligibility(
     config: FormulaConfig,
 ) -> tuple[bool, str, float | None]:
     payload = dict(row.input_json or {})
-    events_raw = payload.get("relevant_events") if isinstance(payload.get("relevant_events"), dict) else {}
+    relevant_events = payload.get("relevant_events")
+    events_raw = relevant_events if isinstance(relevant_events, dict) else {}
     events = RelevantEvents(
         goal=bool(events_raw.get("goal")),
         assist=bool(events_raw.get("assist")),

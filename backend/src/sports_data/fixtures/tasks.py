@@ -9,8 +9,11 @@ import database.models  # noqa: F401 — register ORM mappers
 from app.worker import celery_app
 from config.settings import get_api_settings
 from database.session import create_engine_from_url, create_session_factory, session_scope
+from observability.logging import get_logger
 from sports_data.fixtures.sync import FixtureSyncResult, sync_mvp_fixtures_with_client
 from sports_data.provider.client import build_client_from_settings
+
+logger = get_logger(__name__)
 
 
 @celery_app.task(name="sports_data.sync_mvp_fixtures")
@@ -53,5 +56,5 @@ def sync_mvp_fixtures_task(
             ensure_upcoming_fantasy_turns_task.delay()
         except Exception:
             # Never fail fixture sync because turn ensure enqueue failed.
-            pass
+            logger.exception("fantasy_turns_ensure_enqueue_failed")
     return payload

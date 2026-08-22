@@ -368,7 +368,8 @@ def test_history_pagination(
     page_two = _history(client, league_id, admin_token, page=2, pageSize=2).json()
     assert len(page_two["items"]) == 1
 
-    seen_ids = {item["id"] for item in page_one["items"]} | {item["id"] for item in page_two["items"]}
+    seen_ids = {item["id"] for item in page_one["items"]}
+    seen_ids |= {item["id"] for item in page_two["items"]}
     assert len(seen_ids) == 3
 
 
