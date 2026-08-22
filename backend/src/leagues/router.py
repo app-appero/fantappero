@@ -66,7 +66,7 @@ from leagues.schemas import (
     UpdateLeagueRulesRequest,
 )
 from leagues.service import LeagueService
-from leagues.standings_service import list_league_standings
+from leagues.standings_service import compute_league_standings, list_league_standings
 
 router = APIRouter(prefix="/leagues", tags=["leagues"])
 
@@ -607,9 +607,18 @@ def get_league_standings(
     league_access: LeagueAccess = Depends(require_league_permissions(Permission.LEAGUE_VIEW)),
     session: Session = Depends(get_db_session),
 ) -> list[LeagueStandingResponse]:
-    """Classifica persistita (EP07-06), ordinata per posizione."""
+    """Classifica persistita (EP07-06), ordinata per posizione.
+
+    Se non è mai stata calcolata (nessun risultato di giornata ancora
+    finalizzato), la calcola al volo: ogni squadra iscritta parte da 0,
+    invece di mostrare una classifica vuota prima della prima giornata.
+    """
     league_id = league_access.league.id
     rows = list_league_standings(session, league_id=league_id)
+    if not rows:
+        compute_league_standings(session, league_id=league_id)
+        session.commit()
+        rows = list_league_standings(session, league_id=league_id)
     team_names = {
         team.id: team.name
         for team in session.scalars(
