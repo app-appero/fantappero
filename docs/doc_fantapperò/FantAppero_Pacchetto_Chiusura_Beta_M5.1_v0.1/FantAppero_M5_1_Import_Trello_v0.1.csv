@@ -1,0 +1,1343 @@
+﻿Name,Description,List,Labels,Members,Due Date,Position
+EP13-01 — Freeze della release candidate Beta,"CODICE: EP13-01
+
+USER STORY
+Come team vogliamo una release candidate immutabile e identificabile affinché tutte le evidenze del pilot descrivano esattamente lo stesso codice, schema dati e artefatto distribuito.
+
+OBIETTIVO E SCOPE
+- Ispezionare branch, upstream, commit locali, working tree e artefatti non tracciati; non eliminare né sovrascrivere modifiche dell’utente.
+- Confrontare la candidata con il commit/branch a cui si riferiscono le evidenze M5 e dichiarare quali prove devono essere rieseguite perché divenute stantie.
+- Definire e registrare release commit, tag/versione, revisione database, digest delle immagini, versione del protocollo e ambiente target del pilot.
+- Adeguare la CI alla branch/release candidate effettiva, eliminando riferimenti operativi obsoleti a branch precedenti.
+- Decidere e documentare quali job sono bloccanti; l’E2E critico non può restare implicitamente informativo senza accettazione firmata del rischio.
+- Creare un manifest di candidata versionato, privo di segreti e riferimenti temporanei, a cui possano puntare tutte le evidenze successive.
+
+DOCUMENTAZIONE OBBLIGATORIA
+- docs/operations/beta_readiness/README.md
+- docs/operations/beta_pilot_gate.md — §§1, 3 e 4
+- .github/workflows/ci.yml
+- docs/operations/evidence/ep12-07_internal_dry_run_2026-08-21.md
+- docs/doc_fantapperò/FantAppero_Documento_Master_v0.1.docx
+- docs/doc_fantapperò/FantAppero_Requisiti_Funzionali_MVP_v0.1.docx
+- docs/doc_fantapperò/FantAppero_Architettura_Tecnica_Modello_Dati_MVP_v0.1.docx
+
+CRITERI DI ACCETTAZIONE
+- Esiste un identificatore univoco e riproducibile della release candidate con commit, schema e digest coerenti.
+- Tutti i job CI richiesti sono eseguiti sulla candidata e il loro carattere bloccante/informativo è dichiarato.
+- Il manifest elenca evidenze valide, evidenze da rieseguire e rischi accettati, senza presentare come attuali prove di branch precedenti.
+- Il working tree e gli eventuali file QA dell’utente sono stati preservati e gestiti senza perdita di dati.
+
+TEST MINIMI
+- Validazione `docker compose config` e build pulita dei servizi della candidata.
+- Lint, type-check e test minimi di bootstrap/migrazione sullo schema corrente.
+- Verifica automatica che manifest, commit e digest non contengano placeholder o riferimenti a una candidata diversa.
+
+DELIVERABLE
+- Manifest versionato della release candidate e indice delle evidenze valide/da rigenerare.
+- Workflow CI riallineato alla strategia di rilascio approvata.
+- Report dei comandi eseguiti, esiti e rischi residui.
+
+DIPENDENZE
+EP12-01…06; branch candidato scelto dal team
+
+STIMA INIZIALE
+1–2 giorni
+
+PROMPT CODEX/CURSOR
+CONTESTO STANDARD — FANTAPPERÒ
+Stai lavorando su FantApperò, piattaforma fantasy football con backend Python/FastAPI, frontend React/TypeScript, PostgreSQL, Redis, worker asincroni e integrazione centralizzata con API-Football. L’architettura approvata è un monolite modulare API-first e gli ambienti applicativi sono gestiti con Docker Compose.
+
+Questa card appartiene al pacchetto proposto “M5.1 — Chiusura Beta e Pilot reale”. Non è un M6 funzionale: serve a completare EP12-07, eseguire il pilot reale e registrare il gate previsto dalla documentazione.
+
+GERARCHIA DOCUMENTALE
+- Per processo Beta, soglie, ruoli ed evidenze prevalgono i documenti operativi correnti in `docs/operations/`.
+- Per perimetro MVP/Fase 2 e architettura prevalgono Documento Master, Requisiti Funzionali e Architettura Tecnica v0.1.
+- Il Concept è una fonte iniziale; in caso di conflitto valgono le decisioni successive e più specifiche.
+- Nessun documento o dry-run autorizza a dichiarare eseguito un pilot reale o firmata una decisione umana.
+
+REGOLE GENERALI OBBLIGATORIE
+- Usa l’italiano per interfaccia, messaggi utente, documentazione funzionale, evidenze redatte e nuovi contenuti.
+- Prima di modificare file o codice, analizza lo stato reale del repository, produci un piano breve e attendi la conferma esplicita dell’utente.
+- Preserva modifiche, file non tracciati e dati dell’utente; non usare reset distruttivi, cancellazioni ricorsive o riscritture della cronologia senza autorizzazione.
+- Non cancellare dati a database. Eventuali migrazioni devono essere additive/backfill, con backup e prove prima/dopo.
+- Non modificare funzionalità, regole, API, schema, configurazioni o componenti non necessari alla card e non anticipare le card successive.
+- Prima di creare qualcosa, verifica cosa esiste già e riusa pattern, moduli, script, template e componenti compatibili.
+- Mantieni il monolite modulare API-first; un’estrazione a microservizio richiede evidenza reale di volumi, costi o isolamento operativo.
+- Autorizzazioni e validazioni decisive devono essere server-side; `?persona=` è soltanto una simulazione DEV.
+- Non inserire segreti, credenziali, PII o URL con token nel codice, nei log, nei test, nei commit, nei CSV o nella documentazione.
+- Usa Docker e Docker Compose per servizi, migrazioni e test pertinenti; non usare Makefile o il comando `make`.
+- Distingui sempre prove locali, prove sulla candidata, deploy pilot, pilot reale e firma umana. Non simulare un esito non verificato.
+- Azioni esterne come push, deploy, inviti, messaggi a partecipanti o firme richiedono autorizzazione esplicita e owner umano competente.
+
+INCARICO
+- Card Trello: EP13-01 — Freeze della release candidate Beta
+- Priorità: Must
+- Owner proposto: QA/BE/FE/INF
+- Dipendenze dichiarate: EP12-01…06; branch candidato scelto dal team
+
+DOCUMENTAZIONE OBBLIGATORIA
+- docs/operations/beta_readiness/README.md
+- docs/operations/beta_pilot_gate.md — §§1, 3 e 4
+- .github/workflows/ci.yml
+- docs/operations/evidence/ep12-07_internal_dry_run_2026-08-21.md
+- docs/doc_fantapperò/FantAppero_Documento_Master_v0.1.docx
+- docs/doc_fantapperò/FantAppero_Requisiti_Funzionali_MVP_v0.1.docx
+- docs/doc_fantapperò/FantAppero_Architettura_Tecnica_Modello_Dati_MVP_v0.1.docx
+
+PRIMA DI MODIFICARE IL CODICE O I DOCUMENTI
+1. Ispeziona branch, upstream, working tree, servizi Docker, migrazioni e documentazione realmente presenti.
+2. Verifica che le dipendenze dichiarate siano concluse con evidenze sulla stessa release candidate; se manca una dipendenza bloccante, fermati e descrivila.
+3. Identifica file, servizi, dati ed eventuali sistemi esterni coinvolti e separa attività automatizzabili da decisioni umane.
+4. Confronta lo stato corrente con i documenti obbligatori e segnala conflitti, placeholder e assunzioni stantie.
+5. Proponi un piano atomico, includendo test, evidenze, rollback e rischi; attendi la conferma esplicita prima di applicare modifiche.
+
+USER STORY
+Come team vogliamo una release candidate immutabile e identificabile affinché tutte le evidenze del pilot descrivano esattamente lo stesso codice, schema dati e artefatto distribuito.
+
+ATTIVITÀ RICHIESTE
+- Ispezionare branch, upstream, commit locali, working tree e artefatti non tracciati; non eliminare né sovrascrivere modifiche dell’utente.
+- Confrontare la candidata con il commit/branch a cui si riferiscono le evidenze M5 e dichiarare quali prove devono essere rieseguite perché divenute stantie.
+- Definire e registrare release commit, tag/versione, revisione database, digest delle immagini, versione del protocollo e ambiente target del pilot.
+- Adeguare la CI alla branch/release candidate effettiva, eliminando riferimenti operativi obsoleti a branch precedenti.
+- Decidere e documentare quali job sono bloccanti; l’E2E critico non può restare implicitamente informativo senza accettazione firmata del rischio.
+- Creare un manifest di candidata versionato, privo di segreti e riferimenti temporanei, a cui possano puntare tutte le evidenze successive.
+
+VINCOLI SPECIFICI
+- Non eseguire pulizie distruttive, reset o cancellazioni per ottenere un working tree pulito.
+- Non riutilizzare come corrente un’evidenza prodotta su un commit differente senza una motivazione e una rivalidazione esplicite.
+- Non effettuare deploy, push, tag remoto o modifica di ambienti esterni senza autorizzazione esplicita.
+
+CRITERI DI ACCETTAZIONE
+- Esiste un identificatore univoco e riproducibile della release candidate con commit, schema e digest coerenti.
+- Tutti i job CI richiesti sono eseguiti sulla candidata e il loro carattere bloccante/informativo è dichiarato.
+- Il manifest elenca evidenze valide, evidenze da rieseguire e rischi accettati, senza presentare come attuali prove di branch precedenti.
+- Il working tree e gli eventuali file QA dell’utente sono stati preservati e gestiti senza perdita di dati.
+
+TEST E VERIFICHE MINIME
+- Validazione `docker compose config` e build pulita dei servizi della candidata.
+- Lint, type-check e test minimi di bootstrap/migrazione sullo schema corrente.
+- Verifica automatica che manifest, commit e digest non contengano placeholder o riferimenti a una candidata diversa.
+
+DELIVERABLE ATTESI
+- Manifest versionato della release candidate e indice delle evidenze valide/da rigenerare.
+- Workflow CI riallineato alla strategia di rilascio approvata.
+- Report dei comandi eseguiti, esiti e rischi residui.
+- Evidenza breve e versionata, collegabile alla card e alla release candidate.
+- Elenco di file modificati, migrazioni, comandi eseguiti ed esiti reali.
+
+CHIUSURA DEL LAVORO
+- Esegui lint, type-check, test pertinenti e build dei moduli toccati usando i comandi ordinari `docker compose`.
+- Se la card contiene un passo umano o temporale non ancora avvenuto, fermati allo stato corretto e indica owner, prerequisito e prossima azione; non marcare la card completata.
+- Spiega decisioni tecniche non ovvie, deviazioni dalla documentazione e rischi residui.
+- Non creare commit, push, deploy o comunicazioni esterne se non richiesto espressamente.
+- Non iniziare la card successiva: consegna il risultato e attendi revisione/accettazione.
+",M5.1 — Ready,"M5.1, EP13, Must, QA, Backend, Frontend, Infrastructure",,,1
+EP13-02 — Tracciabilità Must e regressione completa,"CODICE: EP13-02
+
+USER STORY
+Come decision owner voglio una matrice verificabile di tutti i Must M0.5–M5 affinché nessuna funzionalità obbligatoria entri nel pilot soltanto per assunzione o per presenza apparente del codice.
+
+OBIETTIVO E SCOPE
+- Estrarre tutte le card Must M0.5–M5 e creare una matrice card → requisito → modulo/API/UI → test → evidenza → commit candidato.
+- Verificare endpoint attivi, autorizzazioni, migrazioni e comportamento reale; la sola presenza di file o classi non costituisce evidenza.
+- Ricontrollare esplicitamente EP04-07 ed EP06-05/06/07, già indicate dall’indice M5 come aree da verificare puntualmente.
+- Eseguire la regression completa backend/web e la suite E2E critica sulla candidata in un ambiente pulito e riproducibile.
+- Classificare ogni riga PASS, FAIL o N/A motivato; N/A non è ammesso sui Must pertinenti al pilot.
+- Aprire remediation atomiche per ogni FAIL, senza incorporare fix non correlati nella card di audit.
+
+DOCUMENTAZIONE OBBLIGATORIA
+- docs/operations/beta_readiness/README.md — sezione Precondizione Epic Must
+- docs/doc_fantapperò/FantAppero_Pacchetto_Completo_M0.5-M5_v0.3/FantAppero_M0.5-M5_Import_Trello_Completo_v0.3.csv
+- docs/operations/beta_readiness/ep12-01_suite_e2e.md
+- docs/operations/beta_readiness/ep12-02_test_proprieta_concorrenza.md
+- docs/operations/beta_pilot_gate.md — §3
+- docs/doc_fantapperò/FantAppero_Documento_Master_v0.1.docx
+- docs/doc_fantapperò/FantAppero_Requisiti_Funzionali_MVP_v0.1.docx
+- docs/doc_fantapperò/FantAppero_Architettura_Tecnica_Modello_Dati_MVP_v0.1.docx
+
+CRITERI DI ACCETTAZIONE
+- Il 100% dei Must pertinenti dispone di una riga tracciata e di un’evidenza riproducibile sulla candidata.
+- Non esistono Must in stato non verificato, ambiguo o coperto soltanto da documentazione storica.
+- Regression backend, web ed E2E critica risultano verdi oppure la card termina con FAIL bloccante e remediation esplicita.
+- Should, debito noto e rischi accettati sono separati dai gate obbligatori.
+
+TEST MINIMI
+- Suite backend completa in database di test isolato.
+- Lint, type-check, unit/integration test e build web.
+- Playwright del flusso registrazione → lega → rosa → formazione → risultato → mercato.
+- Test mirati di autorizzazione, concorrenza, idempotenza, ricalcolo e casi limite richiamati dalle card Must.
+
+DELIVERABLE
+- Matrice Must versionata e privacy-safe.
+- Report regression ed E2E collegato alla candidata.
+- Backlog remediation separato per eventuali FAIL.
+
+DIPENDENZE
+EP13-01
+
+STIMA INIZIALE
+2–4 giorni
+
+PROMPT CODEX/CURSOR
+CONTESTO STANDARD — FANTAPPERÒ
+Stai lavorando su FantApperò, piattaforma fantasy football con backend Python/FastAPI, frontend React/TypeScript, PostgreSQL, Redis, worker asincroni e integrazione centralizzata con API-Football. L’architettura approvata è un monolite modulare API-first e gli ambienti applicativi sono gestiti con Docker Compose.
+
+Questa card appartiene al pacchetto proposto “M5.1 — Chiusura Beta e Pilot reale”. Non è un M6 funzionale: serve a completare EP12-07, eseguire il pilot reale e registrare il gate previsto dalla documentazione.
+
+GERARCHIA DOCUMENTALE
+- Per processo Beta, soglie, ruoli ed evidenze prevalgono i documenti operativi correnti in `docs/operations/`.
+- Per perimetro MVP/Fase 2 e architettura prevalgono Documento Master, Requisiti Funzionali e Architettura Tecnica v0.1.
+- Il Concept è una fonte iniziale; in caso di conflitto valgono le decisioni successive e più specifiche.
+- Nessun documento o dry-run autorizza a dichiarare eseguito un pilot reale o firmata una decisione umana.
+
+REGOLE GENERALI OBBLIGATORIE
+- Usa l’italiano per interfaccia, messaggi utente, documentazione funzionale, evidenze redatte e nuovi contenuti.
+- Prima di modificare file o codice, analizza lo stato reale del repository, produci un piano breve e attendi la conferma esplicita dell’utente.
+- Preserva modifiche, file non tracciati e dati dell’utente; non usare reset distruttivi, cancellazioni ricorsive o riscritture della cronologia senza autorizzazione.
+- Non cancellare dati a database. Eventuali migrazioni devono essere additive/backfill, con backup e prove prima/dopo.
+- Non modificare funzionalità, regole, API, schema, configurazioni o componenti non necessari alla card e non anticipare le card successive.
+- Prima di creare qualcosa, verifica cosa esiste già e riusa pattern, moduli, script, template e componenti compatibili.
+- Mantieni il monolite modulare API-first; un’estrazione a microservizio richiede evidenza reale di volumi, costi o isolamento operativo.
+- Autorizzazioni e validazioni decisive devono essere server-side; `?persona=` è soltanto una simulazione DEV.
+- Non inserire segreti, credenziali, PII o URL con token nel codice, nei log, nei test, nei commit, nei CSV o nella documentazione.
+- Usa Docker e Docker Compose per servizi, migrazioni e test pertinenti; non usare Makefile o il comando `make`.
+- Distingui sempre prove locali, prove sulla candidata, deploy pilot, pilot reale e firma umana. Non simulare un esito non verificato.
+- Azioni esterne come push, deploy, inviti, messaggi a partecipanti o firme richiedono autorizzazione esplicita e owner umano competente.
+
+INCARICO
+- Card Trello: EP13-02 — Tracciabilità Must e regressione completa
+- Priorità: Must
+- Owner proposto: QA/BE/FE/PO
+- Dipendenze dichiarate: EP13-01
+
+DOCUMENTAZIONE OBBLIGATORIA
+- docs/operations/beta_readiness/README.md — sezione Precondizione Epic Must
+- docs/doc_fantapperò/FantAppero_Pacchetto_Completo_M0.5-M5_v0.3/FantAppero_M0.5-M5_Import_Trello_Completo_v0.3.csv
+- docs/operations/beta_readiness/ep12-01_suite_e2e.md
+- docs/operations/beta_readiness/ep12-02_test_proprieta_concorrenza.md
+- docs/operations/beta_pilot_gate.md — §3
+- docs/doc_fantapperò/FantAppero_Documento_Master_v0.1.docx
+- docs/doc_fantapperò/FantAppero_Requisiti_Funzionali_MVP_v0.1.docx
+- docs/doc_fantapperò/FantAppero_Architettura_Tecnica_Modello_Dati_MVP_v0.1.docx
+
+PRIMA DI MODIFICARE IL CODICE O I DOCUMENTI
+1. Ispeziona branch, upstream, working tree, servizi Docker, migrazioni e documentazione realmente presenti.
+2. Verifica che le dipendenze dichiarate siano concluse con evidenze sulla stessa release candidate; se manca una dipendenza bloccante, fermati e descrivila.
+3. Identifica file, servizi, dati ed eventuali sistemi esterni coinvolti e separa attività automatizzabili da decisioni umane.
+4. Confronta lo stato corrente con i documenti obbligatori e segnala conflitti, placeholder e assunzioni stantie.
+5. Proponi un piano atomico, includendo test, evidenze, rollback e rischi; attendi la conferma esplicita prima di applicare modifiche.
+
+USER STORY
+Come decision owner voglio una matrice verificabile di tutti i Must M0.5–M5 affinché nessuna funzionalità obbligatoria entri nel pilot soltanto per assunzione o per presenza apparente del codice.
+
+ATTIVITÀ RICHIESTE
+- Estrarre tutte le card Must M0.5–M5 e creare una matrice card → requisito → modulo/API/UI → test → evidenza → commit candidato.
+- Verificare endpoint attivi, autorizzazioni, migrazioni e comportamento reale; la sola presenza di file o classi non costituisce evidenza.
+- Ricontrollare esplicitamente EP04-07 ed EP06-05/06/07, già indicate dall’indice M5 come aree da verificare puntualmente.
+- Eseguire la regression completa backend/web e la suite E2E critica sulla candidata in un ambiente pulito e riproducibile.
+- Classificare ogni riga PASS, FAIL o N/A motivato; N/A non è ammesso sui Must pertinenti al pilot.
+- Aprire remediation atomiche per ogni FAIL, senza incorporare fix non correlati nella card di audit.
+
+VINCOLI SPECIFICI
+- Non trasformare i Should in gate impliciti; segnalarli separatamente e promuoverli a Must solo con decisione motivata.
+- Non correggere silenziosamente i test per adattarli al comportamento attuale: prima stabilire la fonte normativa corretta.
+- Ogni evidenza deve riferirsi alla release candidate congelata in EP13-01.
+
+CRITERI DI ACCETTAZIONE
+- Il 100% dei Must pertinenti dispone di una riga tracciata e di un’evidenza riproducibile sulla candidata.
+- Non esistono Must in stato non verificato, ambiguo o coperto soltanto da documentazione storica.
+- Regression backend, web ed E2E critica risultano verdi oppure la card termina con FAIL bloccante e remediation esplicita.
+- Should, debito noto e rischi accettati sono separati dai gate obbligatori.
+
+TEST E VERIFICHE MINIME
+- Suite backend completa in database di test isolato.
+- Lint, type-check, unit/integration test e build web.
+- Playwright del flusso registrazione → lega → rosa → formazione → risultato → mercato.
+- Test mirati di autorizzazione, concorrenza, idempotenza, ricalcolo e casi limite richiamati dalle card Must.
+
+DELIVERABLE ATTESI
+- Matrice Must versionata e privacy-safe.
+- Report regression ed E2E collegato alla candidata.
+- Backlog remediation separato per eventuali FAIL.
+- Evidenza breve e versionata, collegabile alla card e alla release candidate.
+- Elenco di file modificati, migrazioni, comandi eseguiti ed esiti reali.
+
+CHIUSURA DEL LAVORO
+- Esegui lint, type-check, test pertinenti e build dei moduli toccati usando i comandi ordinari `docker compose`.
+- Se la card contiene un passo umano o temporale non ancora avvenuto, fermati allo stato corretto e indica owner, prerequisito e prossima azione; non marcare la card completata.
+- Spiega decisioni tecniche non ovvie, deviazioni dalla documentazione e rischi residui.
+- Non creare commit, push, deploy o comunicazioni esterne se non richiesto espressamente.
+- Non iniziare la card successiva: consegna il risultato e attendi revisione/accettazione.
+",M5.1 — Ready,"M5.1, EP13, Must, QA, Backend, Frontend, Product",,,2
+EP13-03 — Performance e osservabilità della candidata,"CODICE: EP13-03
+
+USER STORY
+Come platform owner voglio SLO ratificati e misure aggregate affidabili affinché il pilot possa distinguere capacità controllata, disponibilità reale e problemi dei singoli processi.
+
+OBIETTIVO E SCOPE
+- Far ratificare dal team budget SLO, carico concordato, finestra di misura e soglie k6 prima di osservare i nuovi risultati.
+- Rieseguire profili smoke, steady e spike sulla candidata, includendo API, database e worker realmente coinvolti nel flusso critico.
+- Verificare che un run steady/spike valido sia entro 30 giorni e dopo ogni cambiamento critico; predisporre smoke finale entro 7 giorni dal gate.
+- Configurare o identificare una fonte aggregata per log, health e disponibilità del deployment pilot con retention approvata.
+- Documentare che `/metrics` è process-local e non usarlo come fonte autorevole aggregata finché non esiste una raccolta valida.
+- Registrare capacità, colli di bottiglia, modalità degradata e azioni di rollback senza inventare dati end-to-end live non misurati.
+
+DOCUMENTAZIONE OBBLIGATORIA
+- docs/operations/beta_readiness/ep12-03_performance_capacita.md
+- docs/operations/performance_capacity.md
+- docs/operations/evidence/ep12-03_capacity_2026-08-21.md
+- docs/operations/beta_pilot_gate.md — §§3 e 6
+- docs/doc_fantapperò/FantAppero_Documento_Master_v0.1.docx
+- docs/doc_fantapperò/FantAppero_Requisiti_Funzionali_MVP_v0.1.docx
+- docs/doc_fantapperò/FantAppero_Architettura_Tecnica_Modello_Dati_MVP_v0.1.docx
+
+CRITERI DI ACCETTAZIONE
+- SLO e soglie risultano approvati, versionati e collegati alla candidata.
+- Tutti i profili richiesti superano le threshold oppure producono un FAIL bloccante con remediation.
+- Esiste una sorgente aggregata e privacy-safe per log/health del pilot; limiti e retention sono espliciti.
+- Il report separa capacità sintetica, telemetria di processo ed esperienza reale.
+
+TEST MINIMI
+- k6 smoke, steady e spike con output machine-readable e threshold verificabili.
+- Smoke di API, DB, worker, retry e modalità degradata.
+- Verifica di correlazione log/metriche senza PII, token o segreti.
+
+DELIVERABLE
+- SLO ratificati e report capacity aggiornato.
+- Configurazione/runbook dell’osservabilità aggregata.
+- Evidenza dei run collegata alla candidata.
+
+DIPENDENZE
+EP13-01, EP13-02
+
+STIMA INIZIALE
+2–3 giorni
+
+PROMPT CODEX/CURSOR
+CONTESTO STANDARD — FANTAPPERÒ
+Stai lavorando su FantApperò, piattaforma fantasy football con backend Python/FastAPI, frontend React/TypeScript, PostgreSQL, Redis, worker asincroni e integrazione centralizzata con API-Football. L’architettura approvata è un monolite modulare API-first e gli ambienti applicativi sono gestiti con Docker Compose.
+
+Questa card appartiene al pacchetto proposto “M5.1 — Chiusura Beta e Pilot reale”. Non è un M6 funzionale: serve a completare EP12-07, eseguire il pilot reale e registrare il gate previsto dalla documentazione.
+
+GERARCHIA DOCUMENTALE
+- Per processo Beta, soglie, ruoli ed evidenze prevalgono i documenti operativi correnti in `docs/operations/`.
+- Per perimetro MVP/Fase 2 e architettura prevalgono Documento Master, Requisiti Funzionali e Architettura Tecnica v0.1.
+- Il Concept è una fonte iniziale; in caso di conflitto valgono le decisioni successive e più specifiche.
+- Nessun documento o dry-run autorizza a dichiarare eseguito un pilot reale o firmata una decisione umana.
+
+REGOLE GENERALI OBBLIGATORIE
+- Usa l’italiano per interfaccia, messaggi utente, documentazione funzionale, evidenze redatte e nuovi contenuti.
+- Prima di modificare file o codice, analizza lo stato reale del repository, produci un piano breve e attendi la conferma esplicita dell’utente.
+- Preserva modifiche, file non tracciati e dati dell’utente; non usare reset distruttivi, cancellazioni ricorsive o riscritture della cronologia senza autorizzazione.
+- Non cancellare dati a database. Eventuali migrazioni devono essere additive/backfill, con backup e prove prima/dopo.
+- Non modificare funzionalità, regole, API, schema, configurazioni o componenti non necessari alla card e non anticipare le card successive.
+- Prima di creare qualcosa, verifica cosa esiste già e riusa pattern, moduli, script, template e componenti compatibili.
+- Mantieni il monolite modulare API-first; un’estrazione a microservizio richiede evidenza reale di volumi, costi o isolamento operativo.
+- Autorizzazioni e validazioni decisive devono essere server-side; `?persona=` è soltanto una simulazione DEV.
+- Non inserire segreti, credenziali, PII o URL con token nel codice, nei log, nei test, nei commit, nei CSV o nella documentazione.
+- Usa Docker e Docker Compose per servizi, migrazioni e test pertinenti; non usare Makefile o il comando `make`.
+- Distingui sempre prove locali, prove sulla candidata, deploy pilot, pilot reale e firma umana. Non simulare un esito non verificato.
+- Azioni esterne come push, deploy, inviti, messaggi a partecipanti o firme richiedono autorizzazione esplicita e owner umano competente.
+
+INCARICO
+- Card Trello: EP13-03 — Performance e osservabilità della candidata
+- Priorità: Must
+- Owner proposto: QA/BE/INF
+- Dipendenze dichiarate: EP13-01, EP13-02
+
+DOCUMENTAZIONE OBBLIGATORIA
+- docs/operations/beta_readiness/ep12-03_performance_capacita.md
+- docs/operations/performance_capacity.md
+- docs/operations/evidence/ep12-03_capacity_2026-08-21.md
+- docs/operations/beta_pilot_gate.md — §§3 e 6
+- docs/doc_fantapperò/FantAppero_Documento_Master_v0.1.docx
+- docs/doc_fantapperò/FantAppero_Requisiti_Funzionali_MVP_v0.1.docx
+- docs/doc_fantapperò/FantAppero_Architettura_Tecnica_Modello_Dati_MVP_v0.1.docx
+
+PRIMA DI MODIFICARE IL CODICE O I DOCUMENTI
+1. Ispeziona branch, upstream, working tree, servizi Docker, migrazioni e documentazione realmente presenti.
+2. Verifica che le dipendenze dichiarate siano concluse con evidenze sulla stessa release candidate; se manca una dipendenza bloccante, fermati e descrivila.
+3. Identifica file, servizi, dati ed eventuali sistemi esterni coinvolti e separa attività automatizzabili da decisioni umane.
+4. Confronta lo stato corrente con i documenti obbligatori e segnala conflitti, placeholder e assunzioni stantie.
+5. Proponi un piano atomico, includendo test, evidenze, rollback e rischi; attendi la conferma esplicita prima di applicare modifiche.
+
+USER STORY
+Come platform owner voglio SLO ratificati e misure aggregate affidabili affinché il pilot possa distinguere capacità controllata, disponibilità reale e problemi dei singoli processi.
+
+ATTIVITÀ RICHIESTE
+- Far ratificare dal team budget SLO, carico concordato, finestra di misura e soglie k6 prima di osservare i nuovi risultati.
+- Rieseguire profili smoke, steady e spike sulla candidata, includendo API, database e worker realmente coinvolti nel flusso critico.
+- Verificare che un run steady/spike valido sia entro 30 giorni e dopo ogni cambiamento critico; predisporre smoke finale entro 7 giorni dal gate.
+- Configurare o identificare una fonte aggregata per log, health e disponibilità del deployment pilot con retention approvata.
+- Documentare che `/metrics` è process-local e non usarlo come fonte autorevole aggregata finché non esiste una raccolta valida.
+- Registrare capacità, colli di bottiglia, modalità degradata e azioni di rollback senza inventare dati end-to-end live non misurati.
+
+VINCOLI SPECIFICI
+- Non adattare le soglie dopo aver visto i risultati.
+- Non confondere k6 con l’esperienza reale degli utenti e non dichiarare coperti SSE/WebSocket/live se non testati end-to-end.
+- Non introdurre una nuova piattaforma di osservabilità se quella del deployment è già sufficiente e accessibile.
+
+CRITERI DI ACCETTAZIONE
+- SLO e soglie risultano approvati, versionati e collegati alla candidata.
+- Tutti i profili richiesti superano le threshold oppure producono un FAIL bloccante con remediation.
+- Esiste una sorgente aggregata e privacy-safe per log/health del pilot; limiti e retention sono espliciti.
+- Il report separa capacità sintetica, telemetria di processo ed esperienza reale.
+
+TEST E VERIFICHE MINIME
+- k6 smoke, steady e spike con output machine-readable e threshold verificabili.
+- Smoke di API, DB, worker, retry e modalità degradata.
+- Verifica di correlazione log/metriche senza PII, token o segreti.
+
+DELIVERABLE ATTESI
+- SLO ratificati e report capacity aggiornato.
+- Configurazione/runbook dell’osservabilità aggregata.
+- Evidenza dei run collegata alla candidata.
+- Evidenza breve e versionata, collegabile alla card e alla release candidate.
+- Elenco di file modificati, migrazioni, comandi eseguiti ed esiti reali.
+
+CHIUSURA DEL LAVORO
+- Esegui lint, type-check, test pertinenti e build dei moduli toccati usando i comandi ordinari `docker compose`.
+- Se la card contiene un passo umano o temporale non ancora avvenuto, fermati allo stato corretto e indica owner, prerequisito e prossima azione; non marcare la card completata.
+- Spiega decisioni tecniche non ovvie, deviazioni dalla documentazione e rischi residui.
+- Non creare commit, push, deploy o comunicazioni esterne se non richiesto espressamente.
+- Non iniziare la card successiva: consegna il risultato e attendi revisione/accettazione.
+",M5.1 — Ready,"M5.1, EP13, Must, QA, Backend, Infrastructure, Observability",,,3
+EP13-04 — Rivalidazione sicurezza pre-pilot,"CODICE: EP13-04
+
+USER STORY
+Come security owner voglio rivalidare la superficie della release candidate affinché il pilot non erediti finding o assunzioni riferite a codice precedente.
+
+OBIETTIVO E SCOPE
+- Calcolare il delta rispetto alla security review M5 e stabilire quali prove devono essere ripetute sulla candidata.
+- Rieseguire dependency audit, static analysis e test manuali mirati su autenticazione, autorizzazione, rate limit, upload, segreti, logging e isolamento tra leghe.
+- Verificare le route operatore globale e distinguere simulazioni DEV `?persona=` dall’autorizzazione server reale.
+- Controllare che log, manifest, CSV KPI e artefatti non contengano credenziali, token, dump o PII.
+- Classificare finding, assegnare owner e scadenza; ogni rischio residuo deve essere accettato esplicitamente dal ruolo competente.
+- Aggiornare il runbook di incidente security e provarne almeno una simulazione senza coinvolgere sistemi esterni non autorizzati.
+
+DOCUMENTAZIONE OBBLIGATORIA
+- docs/operations/beta_readiness/ep12-04_security_review.md
+- docs/operations/beta_pilot_gate.md — §§1, 3 e 6
+- docs/operations/pilot_incident_runbooks.md
+- .github/workflows/ci.yml
+- docs/doc_fantapperò/FantAppero_Documento_Master_v0.1.docx
+- docs/doc_fantapperò/FantAppero_Requisiti_Funzionali_MVP_v0.1.docx
+- docs/doc_fantapperò/FantAppero_Architettura_Tecnica_Modello_Dati_MVP_v0.1.docx
+
+CRITERI DI ACCETTAZIONE
+- Zero finding Critical/High aperti e non accettati sulla candidata.
+- Autorizzazione server, isolamento tra leghe e accesso operatore hanno prove positive e negative.
+- I rischi residui hanno owner, motivazione, scadenza e approvatore espliciti.
+- Il runbook security e la relativa escalation sono aggiornati e simulati.
+
+TEST MINIMI
+- Scanner dipendenze e static analysis previsti dal repository.
+- Test di autenticazione/autorizzazione, IDOR, rate limit, upload e gestione segreti.
+- Scansione privacy/secret degli artefatti destinati al gate.
+
+DELIVERABLE
+- Security review aggiornata sulla candidata.
+- Registro finding e accettazioni redatto.
+- Evidenza della simulazione del runbook security.
+
+DIPENDENZE
+EP13-01, EP13-02
+
+STIMA INIZIALE
+2–3 giorni
+
+PROMPT CODEX/CURSOR
+CONTESTO STANDARD — FANTAPPERÒ
+Stai lavorando su FantApperò, piattaforma fantasy football con backend Python/FastAPI, frontend React/TypeScript, PostgreSQL, Redis, worker asincroni e integrazione centralizzata con API-Football. L’architettura approvata è un monolite modulare API-first e gli ambienti applicativi sono gestiti con Docker Compose.
+
+Questa card appartiene al pacchetto proposto “M5.1 — Chiusura Beta e Pilot reale”. Non è un M6 funzionale: serve a completare EP12-07, eseguire il pilot reale e registrare il gate previsto dalla documentazione.
+
+GERARCHIA DOCUMENTALE
+- Per processo Beta, soglie, ruoli ed evidenze prevalgono i documenti operativi correnti in `docs/operations/`.
+- Per perimetro MVP/Fase 2 e architettura prevalgono Documento Master, Requisiti Funzionali e Architettura Tecnica v0.1.
+- Il Concept è una fonte iniziale; in caso di conflitto valgono le decisioni successive e più specifiche.
+- Nessun documento o dry-run autorizza a dichiarare eseguito un pilot reale o firmata una decisione umana.
+
+REGOLE GENERALI OBBLIGATORIE
+- Usa l’italiano per interfaccia, messaggi utente, documentazione funzionale, evidenze redatte e nuovi contenuti.
+- Prima di modificare file o codice, analizza lo stato reale del repository, produci un piano breve e attendi la conferma esplicita dell’utente.
+- Preserva modifiche, file non tracciati e dati dell’utente; non usare reset distruttivi, cancellazioni ricorsive o riscritture della cronologia senza autorizzazione.
+- Non cancellare dati a database. Eventuali migrazioni devono essere additive/backfill, con backup e prove prima/dopo.
+- Non modificare funzionalità, regole, API, schema, configurazioni o componenti non necessari alla card e non anticipare le card successive.
+- Prima di creare qualcosa, verifica cosa esiste già e riusa pattern, moduli, script, template e componenti compatibili.
+- Mantieni il monolite modulare API-first; un’estrazione a microservizio richiede evidenza reale di volumi, costi o isolamento operativo.
+- Autorizzazioni e validazioni decisive devono essere server-side; `?persona=` è soltanto una simulazione DEV.
+- Non inserire segreti, credenziali, PII o URL con token nel codice, nei log, nei test, nei commit, nei CSV o nella documentazione.
+- Usa Docker e Docker Compose per servizi, migrazioni e test pertinenti; non usare Makefile o il comando `make`.
+- Distingui sempre prove locali, prove sulla candidata, deploy pilot, pilot reale e firma umana. Non simulare un esito non verificato.
+- Azioni esterne come push, deploy, inviti, messaggi a partecipanti o firme richiedono autorizzazione esplicita e owner umano competente.
+
+INCARICO
+- Card Trello: EP13-04 — Rivalidazione sicurezza pre-pilot
+- Priorità: Must
+- Owner proposto: SEC/BE/FE/INF
+- Dipendenze dichiarate: EP13-01, EP13-02
+
+DOCUMENTAZIONE OBBLIGATORIA
+- docs/operations/beta_readiness/ep12-04_security_review.md
+- docs/operations/beta_pilot_gate.md — §§1, 3 e 6
+- docs/operations/pilot_incident_runbooks.md
+- .github/workflows/ci.yml
+- docs/doc_fantapperò/FantAppero_Documento_Master_v0.1.docx
+- docs/doc_fantapperò/FantAppero_Requisiti_Funzionali_MVP_v0.1.docx
+- docs/doc_fantapperò/FantAppero_Architettura_Tecnica_Modello_Dati_MVP_v0.1.docx
+
+PRIMA DI MODIFICARE IL CODICE O I DOCUMENTI
+1. Ispeziona branch, upstream, working tree, servizi Docker, migrazioni e documentazione realmente presenti.
+2. Verifica che le dipendenze dichiarate siano concluse con evidenze sulla stessa release candidate; se manca una dipendenza bloccante, fermati e descrivila.
+3. Identifica file, servizi, dati ed eventuali sistemi esterni coinvolti e separa attività automatizzabili da decisioni umane.
+4. Confronta lo stato corrente con i documenti obbligatori e segnala conflitti, placeholder e assunzioni stantie.
+5. Proponi un piano atomico, includendo test, evidenze, rollback e rischi; attendi la conferma esplicita prima di applicare modifiche.
+
+USER STORY
+Come security owner voglio rivalidare la superficie della release candidate affinché il pilot non erediti finding o assunzioni riferite a codice precedente.
+
+ATTIVITÀ RICHIESTE
+- Calcolare il delta rispetto alla security review M5 e stabilire quali prove devono essere ripetute sulla candidata.
+- Rieseguire dependency audit, static analysis e test manuali mirati su autenticazione, autorizzazione, rate limit, upload, segreti, logging e isolamento tra leghe.
+- Verificare le route operatore globale e distinguere simulazioni DEV `?persona=` dall’autorizzazione server reale.
+- Controllare che log, manifest, CSV KPI e artefatti non contengano credenziali, token, dump o PII.
+- Classificare finding, assegnare owner e scadenza; ogni rischio residuo deve essere accettato esplicitamente dal ruolo competente.
+- Aggiornare il runbook di incidente security e provarne almeno una simulazione senza coinvolgere sistemi esterni non autorizzati.
+
+VINCOLI SPECIFICI
+- Non pubblicare output raw degli scanner se contiene dettagli sensibili; allegare un riferimento protetto e un riepilogo redatto.
+- Non considerare `?persona=` o la sola visibilità UI una misura di sicurezza.
+- Nessun finding Critical/High non accettato può essere ignorato per rispettare una data del pilot.
+
+CRITERI DI ACCETTAZIONE
+- Zero finding Critical/High aperti e non accettati sulla candidata.
+- Autorizzazione server, isolamento tra leghe e accesso operatore hanno prove positive e negative.
+- I rischi residui hanno owner, motivazione, scadenza e approvatore espliciti.
+- Il runbook security e la relativa escalation sono aggiornati e simulati.
+
+TEST E VERIFICHE MINIME
+- Scanner dipendenze e static analysis previsti dal repository.
+- Test di autenticazione/autorizzazione, IDOR, rate limit, upload e gestione segreti.
+- Scansione privacy/secret degli artefatti destinati al gate.
+
+DELIVERABLE ATTESI
+- Security review aggiornata sulla candidata.
+- Registro finding e accettazioni redatto.
+- Evidenza della simulazione del runbook security.
+- Evidenza breve e versionata, collegabile alla card e alla release candidate.
+- Elenco di file modificati, migrazioni, comandi eseguiti ed esiti reali.
+
+CHIUSURA DEL LAVORO
+- Esegui lint, type-check, test pertinenti e build dei moduli toccati usando i comandi ordinari `docker compose`.
+- Se la card contiene un passo umano o temporale non ancora avvenuto, fermati allo stato corretto e indica owner, prerequisito e prossima azione; non marcare la card completata.
+- Spiega decisioni tecniche non ovvie, deviazioni dalla documentazione e rischi residui.
+- Non creare commit, push, deploy o comunicazioni esterne se non richiesto espressamente.
+- Non iniziare la card successiva: consegna il risultato e attendi revisione/accettazione.
+",M5.1 — Ready,"M5.1, EP13, Must, Security, Backend, Frontend, Infrastructure",,,4
+"EP13-05 — Ambiente pilot, backup offsite e cutover DR","CODICE: EP13-05
+
+USER STORY
+Come platform owner voglio un ambiente pilot separato, recuperabile e monitorato affinché un incidente reale possa essere gestito senza dipendere da backup locali o procedure teoriche.
+
+OBIETTIVO E SCOPE
+- Predisporre un ambiente pilot separato da test e sviluppo, identificando rete, dominio, servizi, storage, secrets management e owner reali.
+- Configurare `POSTGRES_BACKUP_HOST_PATH` verso storage indipendente, cifrato e offsite/replicato; i backup locali di sviluppo non soddisfano il gate.
+- Attivare monitor e alert del job di backup, verificarne consegna e definire escalation con platform owner e backup.
+- Eseguire un restore isolato su dati non distruttivi e validare integrità applicativa, migrazioni e smoke del flusso critico.
+- Documentare e provare il comando/procedura di cutover del deployment reale, distinguendo durata tecnica del restore da RTO end-to-end.
+- Ratificare RPO/RTO e soglie del gate; registrare timestamp e manifest senza includere dati personali o credenziali.
+
+DOCUMENTAZIONE OBBLIGATORIA
+- docs/operations/beta_readiness/ep12-05_backup_disaster_recovery.md
+- docs/operations/backup_disaster_recovery.md
+- docs/operations/evidence/ep12-05_restore_drill_2026-08-21.md
+- docs/operations/beta_pilot_gate.md — §§1, 2, 3 e 6
+- docs/doc_fantapperò/FantAppero_Documento_Master_v0.1.docx
+- docs/doc_fantapperò/FantAppero_Requisiti_Funzionali_MVP_v0.1.docx
+- docs/doc_fantapperò/FantAppero_Architettura_Tecnica_Modello_Dati_MVP_v0.1.docx
+
+CRITERI DI ACCETTAZIONE
+- Backup cifrato offsite, alert e owner risultano configurati sul deployment pilot.
+- Il massimo intervallo dei backup rispetta la soglia ratificata e il restore drill corrente è verde.
+- Il cutover reale è compilato e provato in modo sicuro, con RPO/RTO misurabili.
+- Ambiente pilot e restore isolato superano smoke applicativo e controllo di integrità.
+
+TEST MINIMI
+- Backup/manifest verification e restore isolato end-to-end.
+- Smoke API/web/worker dopo restore e controllo della revisione DB.
+- Test di alert del job fallito e simulazione di escalation/cutover.
+
+DELIVERABLE
+- Configurazione deployment-specifica di backup, alert e cutover.
+- Nuovo report DR sulla candidata/ambiente pilot.
+- Runbook aggiornato con owner e rischi residui.
+
+DIPENDENZE
+EP13-01, EP13-03, EP13-04
+
+STIMA INIZIALE
+2–4 giorni
+
+PROMPT CODEX/CURSOR
+CONTESTO STANDARD — FANTAPPERÒ
+Stai lavorando su FantApperò, piattaforma fantasy football con backend Python/FastAPI, frontend React/TypeScript, PostgreSQL, Redis, worker asincroni e integrazione centralizzata con API-Football. L’architettura approvata è un monolite modulare API-first e gli ambienti applicativi sono gestiti con Docker Compose.
+
+Questa card appartiene al pacchetto proposto “M5.1 — Chiusura Beta e Pilot reale”. Non è un M6 funzionale: serve a completare EP12-07, eseguire il pilot reale e registrare il gate previsto dalla documentazione.
+
+GERARCHIA DOCUMENTALE
+- Per processo Beta, soglie, ruoli ed evidenze prevalgono i documenti operativi correnti in `docs/operations/`.
+- Per perimetro MVP/Fase 2 e architettura prevalgono Documento Master, Requisiti Funzionali e Architettura Tecnica v0.1.
+- Il Concept è una fonte iniziale; in caso di conflitto valgono le decisioni successive e più specifiche.
+- Nessun documento o dry-run autorizza a dichiarare eseguito un pilot reale o firmata una decisione umana.
+
+REGOLE GENERALI OBBLIGATORIE
+- Usa l’italiano per interfaccia, messaggi utente, documentazione funzionale, evidenze redatte e nuovi contenuti.
+- Prima di modificare file o codice, analizza lo stato reale del repository, produci un piano breve e attendi la conferma esplicita dell’utente.
+- Preserva modifiche, file non tracciati e dati dell’utente; non usare reset distruttivi, cancellazioni ricorsive o riscritture della cronologia senza autorizzazione.
+- Non cancellare dati a database. Eventuali migrazioni devono essere additive/backfill, con backup e prove prima/dopo.
+- Non modificare funzionalità, regole, API, schema, configurazioni o componenti non necessari alla card e non anticipare le card successive.
+- Prima di creare qualcosa, verifica cosa esiste già e riusa pattern, moduli, script, template e componenti compatibili.
+- Mantieni il monolite modulare API-first; un’estrazione a microservizio richiede evidenza reale di volumi, costi o isolamento operativo.
+- Autorizzazioni e validazioni decisive devono essere server-side; `?persona=` è soltanto una simulazione DEV.
+- Non inserire segreti, credenziali, PII o URL con token nel codice, nei log, nei test, nei commit, nei CSV o nella documentazione.
+- Usa Docker e Docker Compose per servizi, migrazioni e test pertinenti; non usare Makefile o il comando `make`.
+- Distingui sempre prove locali, prove sulla candidata, deploy pilot, pilot reale e firma umana. Non simulare un esito non verificato.
+- Azioni esterne come push, deploy, inviti, messaggi a partecipanti o firme richiedono autorizzazione esplicita e owner umano competente.
+
+INCARICO
+- Card Trello: EP13-05 — Ambiente pilot, backup offsite e cutover DR
+- Priorità: Must
+- Owner proposto: INF/OPS/SEC
+- Dipendenze dichiarate: EP13-01, EP13-03, EP13-04
+
+DOCUMENTAZIONE OBBLIGATORIA
+- docs/operations/beta_readiness/ep12-05_backup_disaster_recovery.md
+- docs/operations/backup_disaster_recovery.md
+- docs/operations/evidence/ep12-05_restore_drill_2026-08-21.md
+- docs/operations/beta_pilot_gate.md — §§1, 2, 3 e 6
+- docs/doc_fantapperò/FantAppero_Documento_Master_v0.1.docx
+- docs/doc_fantapperò/FantAppero_Requisiti_Funzionali_MVP_v0.1.docx
+- docs/doc_fantapperò/FantAppero_Architettura_Tecnica_Modello_Dati_MVP_v0.1.docx
+
+PRIMA DI MODIFICARE IL CODICE O I DOCUMENTI
+1. Ispeziona branch, upstream, working tree, servizi Docker, migrazioni e documentazione realmente presenti.
+2. Verifica che le dipendenze dichiarate siano concluse con evidenze sulla stessa release candidate; se manca una dipendenza bloccante, fermati e descrivila.
+3. Identifica file, servizi, dati ed eventuali sistemi esterni coinvolti e separa attività automatizzabili da decisioni umane.
+4. Confronta lo stato corrente con i documenti obbligatori e segnala conflitti, placeholder e assunzioni stantie.
+5. Proponi un piano atomico, includendo test, evidenze, rollback e rischi; attendi la conferma esplicita prima di applicare modifiche.
+
+USER STORY
+Come platform owner voglio un ambiente pilot separato, recuperabile e monitorato affinché un incidente reale possa essere gestito senza dipendere da backup locali o procedure teoriche.
+
+ATTIVITÀ RICHIESTE
+- Predisporre un ambiente pilot separato da test e sviluppo, identificando rete, dominio, servizi, storage, secrets management e owner reali.
+- Configurare `POSTGRES_BACKUP_HOST_PATH` verso storage indipendente, cifrato e offsite/replicato; i backup locali di sviluppo non soddisfano il gate.
+- Attivare monitor e alert del job di backup, verificarne consegna e definire escalation con platform owner e backup.
+- Eseguire un restore isolato su dati non distruttivi e validare integrità applicativa, migrazioni e smoke del flusso critico.
+- Documentare e provare il comando/procedura di cutover del deployment reale, distinguendo durata tecnica del restore da RTO end-to-end.
+- Ratificare RPO/RTO e soglie del gate; registrare timestamp e manifest senza includere dati personali o credenziali.
+
+VINCOLI SPECIFICI
+- Non cancellare dati del database e non ripristinare sopra l’ambiente sorgente; usare destinazione isolata verificata.
+- Non inserire segreti o path locali personali nella documentazione versionata.
+- Non dichiarare dimostrato il cutover se è stato provato soltanto `pg_restore` in locale.
+
+CRITERI DI ACCETTAZIONE
+- Backup cifrato offsite, alert e owner risultano configurati sul deployment pilot.
+- Il massimo intervallo dei backup rispetta la soglia ratificata e il restore drill corrente è verde.
+- Il cutover reale è compilato e provato in modo sicuro, con RPO/RTO misurabili.
+- Ambiente pilot e restore isolato superano smoke applicativo e controllo di integrità.
+
+TEST E VERIFICHE MINIME
+- Backup/manifest verification e restore isolato end-to-end.
+- Smoke API/web/worker dopo restore e controllo della revisione DB.
+- Test di alert del job fallito e simulazione di escalation/cutover.
+
+DELIVERABLE ATTESI
+- Configurazione deployment-specifica di backup, alert e cutover.
+- Nuovo report DR sulla candidata/ambiente pilot.
+- Runbook aggiornato con owner e rischi residui.
+- Evidenza breve e versionata, collegabile alla card e alla release candidate.
+- Elenco di file modificati, migrazioni, comandi eseguiti ed esiti reali.
+
+CHIUSURA DEL LAVORO
+- Esegui lint, type-check, test pertinenti e build dei moduli toccati usando i comandi ordinari `docker compose`.
+- Se la card contiene un passo umano o temporale non ancora avvenuto, fermati allo stato corretto e indica owner, prerequisito e prossima azione; non marcare la card completata.
+- Spiega decisioni tecniche non ovvie, deviazioni dalla documentazione e rischi residui.
+- Non creare commit, push, deploy o comunicazioni esterne se non richiesto espressamente.
+- Non iniziare la card successiva: consegna il risultato e attendi revisione/accettazione.
+",M5.1 — Ready,"M5.1, EP13, Must, Infrastructure, Operations, Security, Database",,,5
+"EP13-06 — Governance, privacy e supporto del pilot","CODICE: EP13-06
+
+USER STORY
+Come pilot coordinator voglio protocollo, ruoli, privacy, canali e KPI ratificati prima degli inviti affinché il team non adatti regole e soglie ai risultati già osservati.
+
+OBIETTIVO E SCOPE
+- Assegnare decision owner, pilot coordinator, incident coordinator con backup, platform owner con backup, security owner, privacy contact e league admin pilota.
+- Ratificare dimensione, durata, KPI, formule, soglie, finestra e condizioni di GO/NO-GO prima del primo invito.
+- Scegliere canale partecipanti, canale urgente, sistema ticket/evidenze, copertura e obiettivi di risposta.
+- Far approvare informativa/acknowledgement, funzioni incluse/escluse, rischi noti, ritiro, retention e sistema ristretto per identità ed evidenze.
+- Configurare lo schema del registro privacy-safe, append-only e protetto contro CSV formula injection; nel repository devono restare solo aggregati redatti.
+- Eseguire un tabletop di supporto e incidente con i ruoli reali e chiudere ogni placeholder deployment-specifico.
+
+DOCUMENTAZIONE OBBLIGATORIA
+- docs/operations/beta_pilot_gate.md — §§1, 2, 4, 5 e 6
+- docs/operations/beta_readiness/ep12-06_runbook_supporto_pilot.md
+- docs/operations/pilot_support_process.md
+- docs/operations/pilot_incident_runbooks.md
+- docs/operations/templates/ep12-07_pilot_register.csv
+- docs/doc_fantapperò/FantAppero_Documento_Master_v0.1.docx
+- docs/doc_fantapperò/FantAppero_Requisiti_Funzionali_MVP_v0.1.docx
+- docs/doc_fantapperò/FantAppero_Architettura_Tecnica_Modello_Dati_MVP_v0.1.docx
+
+CRITERI DI ACCETTAZIONE
+- Tutti i ruoli e sostituti obbligatori sono assegnati fuori repo e referenziati in modo privacy-safe.
+- Protocollo, KPI, soglie e retention sono ratificati e congelati prima degli inviti.
+- Canali, supporto, ticketing, escalation e informativa sono approvati e testati.
+- Non restano placeholder organizzativi o deployment-specifici bloccanti.
+
+TEST MINIMI
+- Validatore del template registro su alias, enum, append-only e formula injection.
+- Tabletop P0/P1, support request e ritiro partecipante.
+- Review privacy/secret dei modelli e degli artefatti pubblicabili.
+
+DELIVERABLE
+- Protocollo pilot congelato e checklist di ingresso firmabile.
+- Matrice ruoli/canali conservata nel sistema ristretto con riferimento opaco.
+- Template comunicazione, acknowledgement e registro KPI approvati.
+
+DIPENDENZE
+EP13-03, EP13-04, EP13-05
+
+STIMA INIZIALE
+1–3 giorni + approvazioni umane
+
+PROMPT CODEX/CURSOR
+CONTESTO STANDARD — FANTAPPERÒ
+Stai lavorando su FantApperò, piattaforma fantasy football con backend Python/FastAPI, frontend React/TypeScript, PostgreSQL, Redis, worker asincroni e integrazione centralizzata con API-Football. L’architettura approvata è un monolite modulare API-first e gli ambienti applicativi sono gestiti con Docker Compose.
+
+Questa card appartiene al pacchetto proposto “M5.1 — Chiusura Beta e Pilot reale”. Non è un M6 funzionale: serve a completare EP12-07, eseguire il pilot reale e registrare il gate previsto dalla documentazione.
+
+GERARCHIA DOCUMENTALE
+- Per processo Beta, soglie, ruoli ed evidenze prevalgono i documenti operativi correnti in `docs/operations/`.
+- Per perimetro MVP/Fase 2 e architettura prevalgono Documento Master, Requisiti Funzionali e Architettura Tecnica v0.1.
+- Il Concept è una fonte iniziale; in caso di conflitto valgono le decisioni successive e più specifiche.
+- Nessun documento o dry-run autorizza a dichiarare eseguito un pilot reale o firmata una decisione umana.
+
+REGOLE GENERALI OBBLIGATORIE
+- Usa l’italiano per interfaccia, messaggi utente, documentazione funzionale, evidenze redatte e nuovi contenuti.
+- Prima di modificare file o codice, analizza lo stato reale del repository, produci un piano breve e attendi la conferma esplicita dell’utente.
+- Preserva modifiche, file non tracciati e dati dell’utente; non usare reset distruttivi, cancellazioni ricorsive o riscritture della cronologia senza autorizzazione.
+- Non cancellare dati a database. Eventuali migrazioni devono essere additive/backfill, con backup e prove prima/dopo.
+- Non modificare funzionalità, regole, API, schema, configurazioni o componenti non necessari alla card e non anticipare le card successive.
+- Prima di creare qualcosa, verifica cosa esiste già e riusa pattern, moduli, script, template e componenti compatibili.
+- Mantieni il monolite modulare API-first; un’estrazione a microservizio richiede evidenza reale di volumi, costi o isolamento operativo.
+- Autorizzazioni e validazioni decisive devono essere server-side; `?persona=` è soltanto una simulazione DEV.
+- Non inserire segreti, credenziali, PII o URL con token nel codice, nei log, nei test, nei commit, nei CSV o nella documentazione.
+- Usa Docker e Docker Compose per servizi, migrazioni e test pertinenti; non usare Makefile o il comando `make`.
+- Distingui sempre prove locali, prove sulla candidata, deploy pilot, pilot reale e firma umana. Non simulare un esito non verificato.
+- Azioni esterne come push, deploy, inviti, messaggi a partecipanti o firme richiedono autorizzazione esplicita e owner umano competente.
+
+INCARICO
+- Card Trello: EP13-06 — Governance, privacy e supporto del pilot
+- Priorità: Must
+- Owner proposto: PO/OPS/SEC/PRIV
+- Dipendenze dichiarate: EP13-03, EP13-04, EP13-05
+
+DOCUMENTAZIONE OBBLIGATORIA
+- docs/operations/beta_pilot_gate.md — §§1, 2, 4, 5 e 6
+- docs/operations/beta_readiness/ep12-06_runbook_supporto_pilot.md
+- docs/operations/pilot_support_process.md
+- docs/operations/pilot_incident_runbooks.md
+- docs/operations/templates/ep12-07_pilot_register.csv
+- docs/doc_fantapperò/FantAppero_Documento_Master_v0.1.docx
+- docs/doc_fantapperò/FantAppero_Requisiti_Funzionali_MVP_v0.1.docx
+- docs/doc_fantapperò/FantAppero_Architettura_Tecnica_Modello_Dati_MVP_v0.1.docx
+
+PRIMA DI MODIFICARE IL CODICE O I DOCUMENTI
+1. Ispeziona branch, upstream, working tree, servizi Docker, migrazioni e documentazione realmente presenti.
+2. Verifica che le dipendenze dichiarate siano concluse con evidenze sulla stessa release candidate; se manca una dipendenza bloccante, fermati e descrivila.
+3. Identifica file, servizi, dati ed eventuali sistemi esterni coinvolti e separa attività automatizzabili da decisioni umane.
+4. Confronta lo stato corrente con i documenti obbligatori e segnala conflitti, placeholder e assunzioni stantie.
+5. Proponi un piano atomico, includendo test, evidenze, rollback e rischi; attendi la conferma esplicita prima di applicare modifiche.
+
+USER STORY
+Come pilot coordinator voglio protocollo, ruoli, privacy, canali e KPI ratificati prima degli inviti affinché il team non adatti regole e soglie ai risultati già osservati.
+
+ATTIVITÀ RICHIESTE
+- Assegnare decision owner, pilot coordinator, incident coordinator con backup, platform owner con backup, security owner, privacy contact e league admin pilota.
+- Ratificare dimensione, durata, KPI, formule, soglie, finestra e condizioni di GO/NO-GO prima del primo invito.
+- Scegliere canale partecipanti, canale urgente, sistema ticket/evidenze, copertura e obiettivi di risposta.
+- Far approvare informativa/acknowledgement, funzioni incluse/escluse, rischi noti, ritiro, retention e sistema ristretto per identità ed evidenze.
+- Configurare lo schema del registro privacy-safe, append-only e protetto contro CSV formula injection; nel repository devono restare solo aggregati redatti.
+- Eseguire un tabletop di supporto e incidente con i ruoli reali e chiudere ogni placeholder deployment-specifico.
+
+VINCOLI SPECIFICI
+- Le approvazioni privacy, la nomina delle persone e la firma delle soglie sono decisioni umane: l’agente prepara e verifica, ma non può simularle.
+- Non conservare nomi, email, IP, user ID o mapping alias-identità nel repository.
+- Non modificare le soglie dopo l’avvio salvo decisione append-only con motivo, data e approvatore.
+
+CRITERI DI ACCETTAZIONE
+- Tutti i ruoli e sostituti obbligatori sono assegnati fuori repo e referenziati in modo privacy-safe.
+- Protocollo, KPI, soglie e retention sono ratificati e congelati prima degli inviti.
+- Canali, supporto, ticketing, escalation e informativa sono approvati e testati.
+- Non restano placeholder organizzativi o deployment-specifici bloccanti.
+
+TEST E VERIFICHE MINIME
+- Validatore del template registro su alias, enum, append-only e formula injection.
+- Tabletop P0/P1, support request e ritiro partecipante.
+- Review privacy/secret dei modelli e degli artefatti pubblicabili.
+
+DELIVERABLE ATTESI
+- Protocollo pilot congelato e checklist di ingresso firmabile.
+- Matrice ruoli/canali conservata nel sistema ristretto con riferimento opaco.
+- Template comunicazione, acknowledgement e registro KPI approvati.
+- Evidenza breve e versionata, collegabile alla card e alla release candidate.
+- Elenco di file modificati, migrazioni, comandi eseguiti ed esiti reali.
+
+CHIUSURA DEL LAVORO
+- Esegui lint, type-check, test pertinenti e build dei moduli toccati usando i comandi ordinari `docker compose`.
+- Se la card contiene un passo umano o temporale non ancora avvenuto, fermati allo stato corretto e indica owner, prerequisito e prossima azione; non marcare la card completata.
+- Spiega decisioni tecniche non ovvie, deviazioni dalla documentazione e rischi residui.
+- Non creare commit, push, deploy o comunicazioni esterne se non richiesto espressamente.
+- Non iniziare la card successiva: consegna il risultato e attendi revisione/accettazione.
+",M5.1 — Ready,"M5.1, EP13, Must, Product, Operations, Security, Privacy",,,6
+"EP13-07 — Selezione, onboarding e smoke delle leghe pilota","CODICE: EP13-07
+
+USER STORY
+Come pilot coordinator voglio ammettere e accompagnare una coorte reale conforme affinché il tabletop interno sia sostituito da un utilizzo verificabile senza esporre dati personali.
+
+OBIETTIVO E SCOPE
+- Selezionare la coorte secondo i criteri ratificati; la proposta documentale è 3–5 leghe con 6–12 partecipanti attivi e un league admin per lega.
+- Escludere dipendenze da denaro, obblighi legali o dati irrecuperabili e non coinvolgere minori finché il responsabile non decide diversamente.
+- Assegnare alias `PILOT-Lnn`; conservare il mapping identità-alias solo nel sistema ristretto approvato.
+- Raccogliere acknowledgement prima dell’accesso e comunicare durata, funzioni incluse/escluse, limiti, supporto, ritiro e retention.
+- Abilitare la candidata congelata e far completare a ogni league admin lo smoke registrazione → lega → rosa → formazione → risultato → mercato.
+- Registrare PASS/FAIL e aprire ticket per ogni scostamento; nessun invito reale o messaggio esterno può essere inviato senza autorizzazione esplicita.
+
+DOCUMENTAZIONE OBBLIGATORIA
+- docs/operations/beta_pilot_gate.md — §§2, 3, 4 e 5
+- docs/operations/pilot_support_process.md
+- docs/operations/templates/ep12-07_pilot_register.csv
+- docs/operations/beta_readiness/ep12-01_suite_e2e.md
+- docs/doc_fantapperò/FantAppero_Documento_Master_v0.1.docx
+- docs/doc_fantapperò/FantAppero_Requisiti_Funzionali_MVP_v0.1.docx
+- docs/doc_fantapperò/FantAppero_Architettura_Tecnica_Modello_Dati_MVP_v0.1.docx
+
+CRITERI DI ACCETTAZIONE
+- Coorte, durata e perimetro rispettano il protocollo ratificato.
+- Il 100% dei partecipanti ha acknowledgement valido prima dell’accesso.
+- Ogni lega supera lo smoke guidato dei sei step oppure l’onboarding viene fermato con ticket bloccante.
+- Alias, evidenze e ticket sono privacy-safe e riconducibili alla candidata congelata.
+
+TEST MINIMI
+- Smoke guidato per ogni league admin sui sei step del flusso critico.
+- Test di accesso, autorizzazione e isolamento tra leghe sull’ambiente pilot.
+- Validazione del registro onboarding e controllo assenza PII/segreti.
+
+DELIVERABLE
+- Registro onboarding validato e riferimenti agli acknowledgement protetti.
+- Report smoke per alias lega.
+- Ticket/remediation per eventuali FAIL di ingresso.
+
+DIPENDENZE
+EP13-02…06
+
+STIMA INIZIALE
+1–2 giorni + coordinamento partecipanti
+
+PROMPT CODEX/CURSOR
+CONTESTO STANDARD — FANTAPPERÒ
+Stai lavorando su FantApperò, piattaforma fantasy football con backend Python/FastAPI, frontend React/TypeScript, PostgreSQL, Redis, worker asincroni e integrazione centralizzata con API-Football. L’architettura approvata è un monolite modulare API-first e gli ambienti applicativi sono gestiti con Docker Compose.
+
+Questa card appartiene al pacchetto proposto “M5.1 — Chiusura Beta e Pilot reale”. Non è un M6 funzionale: serve a completare EP12-07, eseguire il pilot reale e registrare il gate previsto dalla documentazione.
+
+GERARCHIA DOCUMENTALE
+- Per processo Beta, soglie, ruoli ed evidenze prevalgono i documenti operativi correnti in `docs/operations/`.
+- Per perimetro MVP/Fase 2 e architettura prevalgono Documento Master, Requisiti Funzionali e Architettura Tecnica v0.1.
+- Il Concept è una fonte iniziale; in caso di conflitto valgono le decisioni successive e più specifiche.
+- Nessun documento o dry-run autorizza a dichiarare eseguito un pilot reale o firmata una decisione umana.
+
+REGOLE GENERALI OBBLIGATORIE
+- Usa l’italiano per interfaccia, messaggi utente, documentazione funzionale, evidenze redatte e nuovi contenuti.
+- Prima di modificare file o codice, analizza lo stato reale del repository, produci un piano breve e attendi la conferma esplicita dell’utente.
+- Preserva modifiche, file non tracciati e dati dell’utente; non usare reset distruttivi, cancellazioni ricorsive o riscritture della cronologia senza autorizzazione.
+- Non cancellare dati a database. Eventuali migrazioni devono essere additive/backfill, con backup e prove prima/dopo.
+- Non modificare funzionalità, regole, API, schema, configurazioni o componenti non necessari alla card e non anticipare le card successive.
+- Prima di creare qualcosa, verifica cosa esiste già e riusa pattern, moduli, script, template e componenti compatibili.
+- Mantieni il monolite modulare API-first; un’estrazione a microservizio richiede evidenza reale di volumi, costi o isolamento operativo.
+- Autorizzazioni e validazioni decisive devono essere server-side; `?persona=` è soltanto una simulazione DEV.
+- Non inserire segreti, credenziali, PII o URL con token nel codice, nei log, nei test, nei commit, nei CSV o nella documentazione.
+- Usa Docker e Docker Compose per servizi, migrazioni e test pertinenti; non usare Makefile o il comando `make`.
+- Distingui sempre prove locali, prove sulla candidata, deploy pilot, pilot reale e firma umana. Non simulare un esito non verificato.
+- Azioni esterne come push, deploy, inviti, messaggi a partecipanti o firme richiedono autorizzazione esplicita e owner umano competente.
+
+INCARICO
+- Card Trello: EP13-07 — Selezione, onboarding e smoke delle leghe pilota
+- Priorità: Must
+- Owner proposto: OPS/PO/INF/QA
+- Dipendenze dichiarate: EP13-02…06
+
+DOCUMENTAZIONE OBBLIGATORIA
+- docs/operations/beta_pilot_gate.md — §§2, 3, 4 e 5
+- docs/operations/pilot_support_process.md
+- docs/operations/templates/ep12-07_pilot_register.csv
+- docs/operations/beta_readiness/ep12-01_suite_e2e.md
+- docs/doc_fantapperò/FantAppero_Documento_Master_v0.1.docx
+- docs/doc_fantapperò/FantAppero_Requisiti_Funzionali_MVP_v0.1.docx
+- docs/doc_fantapperò/FantAppero_Architettura_Tecnica_Modello_Dati_MVP_v0.1.docx
+
+PRIMA DI MODIFICARE IL CODICE O I DOCUMENTI
+1. Ispeziona branch, upstream, working tree, servizi Docker, migrazioni e documentazione realmente presenti.
+2. Verifica che le dipendenze dichiarate siano concluse con evidenze sulla stessa release candidate; se manca una dipendenza bloccante, fermati e descrivila.
+3. Identifica file, servizi, dati ed eventuali sistemi esterni coinvolti e separa attività automatizzabili da decisioni umane.
+4. Confronta lo stato corrente con i documenti obbligatori e segnala conflitti, placeholder e assunzioni stantie.
+5. Proponi un piano atomico, includendo test, evidenze, rollback e rischi; attendi la conferma esplicita prima di applicare modifiche.
+
+USER STORY
+Come pilot coordinator voglio ammettere e accompagnare una coorte reale conforme affinché il tabletop interno sia sostituito da un utilizzo verificabile senza esporre dati personali.
+
+ATTIVITÀ RICHIESTE
+- Selezionare la coorte secondo i criteri ratificati; la proposta documentale è 3–5 leghe con 6–12 partecipanti attivi e un league admin per lega.
+- Escludere dipendenze da denaro, obblighi legali o dati irrecuperabili e non coinvolgere minori finché il responsabile non decide diversamente.
+- Assegnare alias `PILOT-Lnn`; conservare il mapping identità-alias solo nel sistema ristretto approvato.
+- Raccogliere acknowledgement prima dell’accesso e comunicare durata, funzioni incluse/escluse, limiti, supporto, ritiro e retention.
+- Abilitare la candidata congelata e far completare a ogni league admin lo smoke registrazione → lega → rosa → formazione → risultato → mercato.
+- Registrare PASS/FAIL e aprire ticket per ogni scostamento; nessun invito reale o messaggio esterno può essere inviato senza autorizzazione esplicita.
+
+VINCOLI SPECIFICI
+- Non usare soltanto membri del team come coorte reale.
+- Non scrivere PII o URL con token nei log, nei CSV o nelle evidenze Git.
+- Se un gate di ingresso fallisce, fermare l’onboarding e registrare NO-GO all’avvio; non aggirare il blocco con dati sintetici.
+
+CRITERI DI ACCETTAZIONE
+- Coorte, durata e perimetro rispettano il protocollo ratificato.
+- Il 100% dei partecipanti ha acknowledgement valido prima dell’accesso.
+- Ogni lega supera lo smoke guidato dei sei step oppure l’onboarding viene fermato con ticket bloccante.
+- Alias, evidenze e ticket sono privacy-safe e riconducibili alla candidata congelata.
+
+TEST E VERIFICHE MINIME
+- Smoke guidato per ogni league admin sui sei step del flusso critico.
+- Test di accesso, autorizzazione e isolamento tra leghe sull’ambiente pilot.
+- Validazione del registro onboarding e controllo assenza PII/segreti.
+
+DELIVERABLE ATTESI
+- Registro onboarding validato e riferimenti agli acknowledgement protetti.
+- Report smoke per alias lega.
+- Ticket/remediation per eventuali FAIL di ingresso.
+- Evidenza breve e versionata, collegabile alla card e alla release candidate.
+- Elenco di file modificati, migrazioni, comandi eseguiti ed esiti reali.
+
+CHIUSURA DEL LAVORO
+- Esegui lint, type-check, test pertinenti e build dei moduli toccati usando i comandi ordinari `docker compose`.
+- Se la card contiene un passo umano o temporale non ancora avvenuto, fermati allo stato corretto e indica owner, prerequisito e prossima azione; non marcare la card completata.
+- Spiega decisioni tecniche non ovvie, deviazioni dalla documentazione e rischi residui.
+- Non creare commit, push, deploy o comunicazioni esterne se non richiesto espressamente.
+- Non iniziare la card successiva: consegna il risultato e attendi revisione/accettazione.
+",M5.1 — Ready,"M5.1, EP13, Must, Operations, Product, Infrastructure, QA",,,7
+EP13-08 — Esecuzione del pilot e raccolta KPI,"CODICE: EP13-08
+
+USER STORY
+Come team vogliamo osservare leghe reali per la finestra concordata affinché la decisione Beta derivi da KPI, incidenti e feedback reali e non da un dry-run sintetico.
+
+OBIETTIVO E SCOPE
+- Aprire la finestra congelata e mantenere la stessa coorte; nuove leghe devono essere registrate come coorte distinta.
+- Raccogliere checkpoint settimanali e i KPI ratificati: leghe/partecipanti attivi, durata, turni, completamento flusso, ticket, incidenti, capacity, sicurezza, backup/DR e survey.
+- Gestire P0/P1 e problemi dati tramite i runbook, conservando timeline, owner-role ed evidenze redatte.
+- Mantenere il registro append-only: le correzioni aggiungono righe collegate e non riscrivono la cronologia.
+- Eseguire backup giornalieri, monitorare alert e mantenere capacity/security evidence entro le finestre richieste.
+- Raccogliere feedback in punteggi e categorie predefinite; testo libero soltanto nel sistema ristretto e previa revisione privacy.
+
+DOCUMENTAZIONE OBBLIGATORIA
+- docs/operations/beta_pilot_gate.md — §§2, 5, 6 e 7
+- docs/operations/pilot_support_process.md
+- docs/operations/pilot_incident_runbooks.md
+- docs/operations/templates/ep12-07_pilot_register.csv
+- docs/doc_fantapperò/FantAppero_Documento_Master_v0.1.docx
+- docs/doc_fantapperò/FantAppero_Requisiti_Funzionali_MVP_v0.1.docx
+- docs/doc_fantapperò/FantAppero_Architettura_Tecnica_Modello_Dati_MVP_v0.1.docx
+
+CRITERI DI ACCETTAZIONE
+- Ogni lega completa almeno la durata e il numero di turni ratificati; la proposta è almeno 28 giorni e almeno 4 turni completi.
+- Tutti i KPI obbligatori hanno numeratore, denominatore, fonte, status validated e riferimento verificabile.
+- Incidenti e ticket rispettano triage/escalation e non esistono blocker nascosti fuori registro.
+- Survey e feedback aggregati coprono tutte le leghe richieste senza esporre identità.
+
+TEST MINIMI
+- Validazione periodica del registro KPI e delle formule.
+- Smoke settimanale del flusso critico e smoke finale entro la finestra del gate.
+- Controllo backup/alert, capacity freshness e nuove evidenze security.
+
+DELIVERABLE
+- Registro KPI congelato e validato.
+- Report settimanali redatti, ticket e timeline incidenti.
+- Survey aggregata e report finale del pilot.
+
+DIPENDENZE
+EP13-07
+
+STIMA INIZIALE
+≥28 giorni e ≥4 turni per lega
+
+PROMPT CODEX/CURSOR
+CONTESTO STANDARD — FANTAPPERÒ
+Stai lavorando su FantApperò, piattaforma fantasy football con backend Python/FastAPI, frontend React/TypeScript, PostgreSQL, Redis, worker asincroni e integrazione centralizzata con API-Football. L’architettura approvata è un monolite modulare API-first e gli ambienti applicativi sono gestiti con Docker Compose.
+
+Questa card appartiene al pacchetto proposto “M5.1 — Chiusura Beta e Pilot reale”. Non è un M6 funzionale: serve a completare EP12-07, eseguire il pilot reale e registrare il gate previsto dalla documentazione.
+
+GERARCHIA DOCUMENTALE
+- Per processo Beta, soglie, ruoli ed evidenze prevalgono i documenti operativi correnti in `docs/operations/`.
+- Per perimetro MVP/Fase 2 e architettura prevalgono Documento Master, Requisiti Funzionali e Architettura Tecnica v0.1.
+- Il Concept è una fonte iniziale; in caso di conflitto valgono le decisioni successive e più specifiche.
+- Nessun documento o dry-run autorizza a dichiarare eseguito un pilot reale o firmata una decisione umana.
+
+REGOLE GENERALI OBBLIGATORIE
+- Usa l’italiano per interfaccia, messaggi utente, documentazione funzionale, evidenze redatte e nuovi contenuti.
+- Prima di modificare file o codice, analizza lo stato reale del repository, produci un piano breve e attendi la conferma esplicita dell’utente.
+- Preserva modifiche, file non tracciati e dati dell’utente; non usare reset distruttivi, cancellazioni ricorsive o riscritture della cronologia senza autorizzazione.
+- Non cancellare dati a database. Eventuali migrazioni devono essere additive/backfill, con backup e prove prima/dopo.
+- Non modificare funzionalità, regole, API, schema, configurazioni o componenti non necessari alla card e non anticipare le card successive.
+- Prima di creare qualcosa, verifica cosa esiste già e riusa pattern, moduli, script, template e componenti compatibili.
+- Mantieni il monolite modulare API-first; un’estrazione a microservizio richiede evidenza reale di volumi, costi o isolamento operativo.
+- Autorizzazioni e validazioni decisive devono essere server-side; `?persona=` è soltanto una simulazione DEV.
+- Non inserire segreti, credenziali, PII o URL con token nel codice, nei log, nei test, nei commit, nei CSV o nella documentazione.
+- Usa Docker e Docker Compose per servizi, migrazioni e test pertinenti; non usare Makefile o il comando `make`.
+- Distingui sempre prove locali, prove sulla candidata, deploy pilot, pilot reale e firma umana. Non simulare un esito non verificato.
+- Azioni esterne come push, deploy, inviti, messaggi a partecipanti o firme richiedono autorizzazione esplicita e owner umano competente.
+
+INCARICO
+- Card Trello: EP13-08 — Esecuzione del pilot e raccolta KPI
+- Priorità: Must
+- Owner proposto: OPS/QA/INF
+- Dipendenze dichiarate: EP13-07
+
+DOCUMENTAZIONE OBBLIGATORIA
+- docs/operations/beta_pilot_gate.md — §§2, 5, 6 e 7
+- docs/operations/pilot_support_process.md
+- docs/operations/pilot_incident_runbooks.md
+- docs/operations/templates/ep12-07_pilot_register.csv
+- docs/doc_fantapperò/FantAppero_Documento_Master_v0.1.docx
+- docs/doc_fantapperò/FantAppero_Requisiti_Funzionali_MVP_v0.1.docx
+- docs/doc_fantapperò/FantAppero_Architettura_Tecnica_Modello_Dati_MVP_v0.1.docx
+
+PRIMA DI MODIFICARE IL CODICE O I DOCUMENTI
+1. Ispeziona branch, upstream, working tree, servizi Docker, migrazioni e documentazione realmente presenti.
+2. Verifica che le dipendenze dichiarate siano concluse con evidenze sulla stessa release candidate; se manca una dipendenza bloccante, fermati e descrivila.
+3. Identifica file, servizi, dati ed eventuali sistemi esterni coinvolti e separa attività automatizzabili da decisioni umane.
+4. Confronta lo stato corrente con i documenti obbligatori e segnala conflitti, placeholder e assunzioni stantie.
+5. Proponi un piano atomico, includendo test, evidenze, rollback e rischi; attendi la conferma esplicita prima di applicare modifiche.
+
+USER STORY
+Come team vogliamo osservare leghe reali per la finestra concordata affinché la decisione Beta derivi da KPI, incidenti e feedback reali e non da un dry-run sintetico.
+
+ATTIVITÀ RICHIESTE
+- Aprire la finestra congelata e mantenere la stessa coorte; nuove leghe devono essere registrate come coorte distinta.
+- Raccogliere checkpoint settimanali e i KPI ratificati: leghe/partecipanti attivi, durata, turni, completamento flusso, ticket, incidenti, capacity, sicurezza, backup/DR e survey.
+- Gestire P0/P1 e problemi dati tramite i runbook, conservando timeline, owner-role ed evidenze redatte.
+- Mantenere il registro append-only: le correzioni aggiungono righe collegate e non riscrivono la cronologia.
+- Eseguire backup giornalieri, monitorare alert e mantenere capacity/security evidence entro le finestre richieste.
+- Raccogliere feedback in punteggi e categorie predefinite; testo libero soltanto nel sistema ristretto e previa revisione privacy.
+
+VINCOLI SPECIFICI
+- La durata reale non può essere accelerata o simulata dall’agente: se non è trascorsa, riportare correttamente lo stato in corso.
+- Non sostituire i KPI mancanti con metriche sintetiche o process-local.
+- Non pubblicare citazioni o feedback libero senza revisione privacy.
+
+CRITERI DI ACCETTAZIONE
+- Ogni lega completa almeno la durata e il numero di turni ratificati; la proposta è almeno 28 giorni e almeno 4 turni completi.
+- Tutti i KPI obbligatori hanno numeratore, denominatore, fonte, status validated e riferimento verificabile.
+- Incidenti e ticket rispettano triage/escalation e non esistono blocker nascosti fuori registro.
+- Survey e feedback aggregati coprono tutte le leghe richieste senza esporre identità.
+
+TEST E VERIFICHE MINIME
+- Validazione periodica del registro KPI e delle formule.
+- Smoke settimanale del flusso critico e smoke finale entro la finestra del gate.
+- Controllo backup/alert, capacity freshness e nuove evidenze security.
+
+DELIVERABLE ATTESI
+- Registro KPI congelato e validato.
+- Report settimanali redatti, ticket e timeline incidenti.
+- Survey aggregata e report finale del pilot.
+- Evidenza breve e versionata, collegabile alla card e alla release candidate.
+- Elenco di file modificati, migrazioni, comandi eseguiti ed esiti reali.
+
+CHIUSURA DEL LAVORO
+- Esegui lint, type-check, test pertinenti e build dei moduli toccati usando i comandi ordinari `docker compose`.
+- Se la card contiene un passo umano o temporale non ancora avvenuto, fermati allo stato corretto e indica owner, prerequisito e prossima azione; non marcare la card completata.
+- Spiega decisioni tecniche non ovvie, deviazioni dalla documentazione e rischi residui.
+- Non creare commit, push, deploy o comunicazioni esterne se non richiesto espressamente.
+- Non iniziare la card successiva: consegna il risultato e attendi revisione/accettazione.
+",M5.1 — Ready,"M5.1, EP13, Must, Operations, QA, Infrastructure, Pilot",,,8
+EP13-09 — Gate firmato GO/NO-GO e remediation,"CODICE: EP13-09
+
+USER STORY
+Come decision owner voglio una decisione riproducibile e firmata affinché la Beta sia dichiarata chiusa soltanto se tutti i gate e KPI obbligatori risultano realmente soddisfatti.
+
+OBIETTIVO E SCOPE
+- Congelare registro e fonti, validare formule e produrre una matrice finale gate/KPI con PASS, FAIL o N/A ammesso e motivato.
+- Verificare completezza di evidenze EP12-01…06, Must M0.5–M5, privacy, supporto, capacity, security e DR sulla stessa candidata.
+- Compilare il template decisionale con versione protocollo, coorte, finestra, commit/digest, deviazioni, rischi residui e riferimenti opachi.
+- Proporre GO soltanto se ogni gate obbligatorio e ogni KPI ratificato passa; in qualunque altro caso proporre NO-GO.
+- In caso di NO-GO, creare remediation atomiche con owner, priorità, scadenza, criterio di retest e nuovo gate; non usare un GO condizionato informale.
+- Richiedere firma umana del decision owner e delle approvazioni competenti; l’agente non può autocertificare o firmare la decisione.
+
+DOCUMENTAZIONE OBBLIGATORIA
+- docs/operations/beta_pilot_gate.md — §§6 e 7
+- docs/operations/templates/ep12-07_gate_decision.md
+- docs/operations/beta_readiness/ep12-07_pilot_gate_beta.md
+- docs/operations/beta_readiness/README.md
+- docs/doc_fantapperò/FantAppero_Documento_Master_v0.1.docx
+- docs/doc_fantapperò/FantAppero_Requisiti_Funzionali_MVP_v0.1.docx
+- docs/doc_fantapperò/FantAppero_Architettura_Tecnica_Modello_Dati_MVP_v0.1.docx
+
+CRITERI DI ACCETTAZIONE
+- Il template è completo, coerente con il registro congelato e firmato dal decision owner.
+- La decisione è inequivocabilmente GO oppure NO-GO; motivazioni ed evidenze sono riproducibili.
+- Per NO-GO esiste un piano di remediation e retest; per GO non esistono gate obbligatori falliti o non misurati.
+- L’indice Beta readiness viene aggiornato distinguendo completamento tecnico, pilot reale e firma del gate.
+
+TEST MINIMI
+- Esecuzione del validatore del gate su scenario reale completo e su scenari negativi/mancanti.
+- Controllo incrociato formule KPI, riferimenti evidenza e commit/digest.
+- Review privacy/secret e verifica assenza placeholder prima della firma.
+
+DELIVERABLE
+- Decisione GO/NO-GO firmata e redatta.
+- Matrice finale dei gate e KPI.
+- Backlog remediation/retest oppure attestazione di chiusura EP12-07.
+
+DIPENDENZE
+EP13-08
+
+STIMA INIZIALE
+1–3 giorni dopo il pilot
+
+PROMPT CODEX/CURSOR
+CONTESTO STANDARD — FANTAPPERÒ
+Stai lavorando su FantApperò, piattaforma fantasy football con backend Python/FastAPI, frontend React/TypeScript, PostgreSQL, Redis, worker asincroni e integrazione centralizzata con API-Football. L’architettura approvata è un monolite modulare API-first e gli ambienti applicativi sono gestiti con Docker Compose.
+
+Questa card appartiene al pacchetto proposto “M5.1 — Chiusura Beta e Pilot reale”. Non è un M6 funzionale: serve a completare EP12-07, eseguire il pilot reale e registrare il gate previsto dalla documentazione.
+
+GERARCHIA DOCUMENTALE
+- Per processo Beta, soglie, ruoli ed evidenze prevalgono i documenti operativi correnti in `docs/operations/`.
+- Per perimetro MVP/Fase 2 e architettura prevalgono Documento Master, Requisiti Funzionali e Architettura Tecnica v0.1.
+- Il Concept è una fonte iniziale; in caso di conflitto valgono le decisioni successive e più specifiche.
+- Nessun documento o dry-run autorizza a dichiarare eseguito un pilot reale o firmata una decisione umana.
+
+REGOLE GENERALI OBBLIGATORIE
+- Usa l’italiano per interfaccia, messaggi utente, documentazione funzionale, evidenze redatte e nuovi contenuti.
+- Prima di modificare file o codice, analizza lo stato reale del repository, produci un piano breve e attendi la conferma esplicita dell’utente.
+- Preserva modifiche, file non tracciati e dati dell’utente; non usare reset distruttivi, cancellazioni ricorsive o riscritture della cronologia senza autorizzazione.
+- Non cancellare dati a database. Eventuali migrazioni devono essere additive/backfill, con backup e prove prima/dopo.
+- Non modificare funzionalità, regole, API, schema, configurazioni o componenti non necessari alla card e non anticipare le card successive.
+- Prima di creare qualcosa, verifica cosa esiste già e riusa pattern, moduli, script, template e componenti compatibili.
+- Mantieni il monolite modulare API-first; un’estrazione a microservizio richiede evidenza reale di volumi, costi o isolamento operativo.
+- Autorizzazioni e validazioni decisive devono essere server-side; `?persona=` è soltanto una simulazione DEV.
+- Non inserire segreti, credenziali, PII o URL con token nel codice, nei log, nei test, nei commit, nei CSV o nella documentazione.
+- Usa Docker e Docker Compose per servizi, migrazioni e test pertinenti; non usare Makefile o il comando `make`.
+- Distingui sempre prove locali, prove sulla candidata, deploy pilot, pilot reale e firma umana. Non simulare un esito non verificato.
+- Azioni esterne come push, deploy, inviti, messaggi a partecipanti o firme richiedono autorizzazione esplicita e owner umano competente.
+
+INCARICO
+- Card Trello: EP13-09 — Gate firmato GO/NO-GO e remediation
+- Priorità: Must
+- Owner proposto: PO/OPS/SEC/INF
+- Dipendenze dichiarate: EP13-08
+
+DOCUMENTAZIONE OBBLIGATORIA
+- docs/operations/beta_pilot_gate.md — §§6 e 7
+- docs/operations/templates/ep12-07_gate_decision.md
+- docs/operations/beta_readiness/ep12-07_pilot_gate_beta.md
+- docs/operations/beta_readiness/README.md
+- docs/doc_fantapperò/FantAppero_Documento_Master_v0.1.docx
+- docs/doc_fantapperò/FantAppero_Requisiti_Funzionali_MVP_v0.1.docx
+- docs/doc_fantapperò/FantAppero_Architettura_Tecnica_Modello_Dati_MVP_v0.1.docx
+
+PRIMA DI MODIFICARE IL CODICE O I DOCUMENTI
+1. Ispeziona branch, upstream, working tree, servizi Docker, migrazioni e documentazione realmente presenti.
+2. Verifica che le dipendenze dichiarate siano concluse con evidenze sulla stessa release candidate; se manca una dipendenza bloccante, fermati e descrivila.
+3. Identifica file, servizi, dati ed eventuali sistemi esterni coinvolti e separa attività automatizzabili da decisioni umane.
+4. Confronta lo stato corrente con i documenti obbligatori e segnala conflitti, placeholder e assunzioni stantie.
+5. Proponi un piano atomico, includendo test, evidenze, rollback e rischi; attendi la conferma esplicita prima di applicare modifiche.
+
+USER STORY
+Come decision owner voglio una decisione riproducibile e firmata affinché la Beta sia dichiarata chiusa soltanto se tutti i gate e KPI obbligatori risultano realmente soddisfatti.
+
+ATTIVITÀ RICHIESTE
+- Congelare registro e fonti, validare formule e produrre una matrice finale gate/KPI con PASS, FAIL o N/A ammesso e motivato.
+- Verificare completezza di evidenze EP12-01…06, Must M0.5–M5, privacy, supporto, capacity, security e DR sulla stessa candidata.
+- Compilare il template decisionale con versione protocollo, coorte, finestra, commit/digest, deviazioni, rischi residui e riferimenti opachi.
+- Proporre GO soltanto se ogni gate obbligatorio e ogni KPI ratificato passa; in qualunque altro caso proporre NO-GO.
+- In caso di NO-GO, creare remediation atomiche con owner, priorità, scadenza, criterio di retest e nuovo gate; non usare un GO condizionato informale.
+- Richiedere firma umana del decision owner e delle approvazioni competenti; l’agente non può autocertificare o firmare la decisione.
+
+VINCOLI SPECIFICI
+- Non reinterpretare retroattivamente soglie o denominatori per ottenere un esito favorevole.
+- Non dichiarare chiuso EP12-07 prima della firma e della conservazione della decisione.
+- Non includere PII, credenziali o evidenze raw nel documento redatto versionato.
+
+CRITERI DI ACCETTAZIONE
+- Il template è completo, coerente con il registro congelato e firmato dal decision owner.
+- La decisione è inequivocabilmente GO oppure NO-GO; motivazioni ed evidenze sono riproducibili.
+- Per NO-GO esiste un piano di remediation e retest; per GO non esistono gate obbligatori falliti o non misurati.
+- L’indice Beta readiness viene aggiornato distinguendo completamento tecnico, pilot reale e firma del gate.
+
+TEST E VERIFICHE MINIME
+- Esecuzione del validatore del gate su scenario reale completo e su scenari negativi/mancanti.
+- Controllo incrociato formule KPI, riferimenti evidenza e commit/digest.
+- Review privacy/secret e verifica assenza placeholder prima della firma.
+
+DELIVERABLE ATTESI
+- Decisione GO/NO-GO firmata e redatta.
+- Matrice finale dei gate e KPI.
+- Backlog remediation/retest oppure attestazione di chiusura EP12-07.
+- Evidenza breve e versionata, collegabile alla card e alla release candidate.
+- Elenco di file modificati, migrazioni, comandi eseguiti ed esiti reali.
+
+CHIUSURA DEL LAVORO
+- Esegui lint, type-check, test pertinenti e build dei moduli toccati usando i comandi ordinari `docker compose`.
+- Se la card contiene un passo umano o temporale non ancora avvenuto, fermati allo stato corretto e indica owner, prerequisito e prossima azione; non marcare la card completata.
+- Spiega decisioni tecniche non ovvie, deviazioni dalla documentazione e rischi residui.
+- Non creare commit, push, deploy o comunicazioni esterne se non richiesto espressamente.
+- Non iniziare la card successiva: consegna il risultato e attendi revisione/accettazione.
+",M5.1 — Ready,"M5.1, EP13, Must, Product, Operations, Security, Infrastructure, Gate",,,9
+EP13-10 — Roadmap di Fase 2 basata sulle evidenze,"CODICE: EP13-10
+
+USER STORY
+Come product owner voglio trasformare gli esiti del pilot in una roadmap approvata affinché la Fase 2 risolva problemi e opportunità osservati senza introdurre un M6 arbitrario.
+
+OBIETTIVO E SCOPE
+- Aggregare decisione, KPI, ticket, incidenti, survey e debito emerso, distinguendo problemi Beta, Should preesistenti e nuove opportunità.
+- Se EP13-09 è NO-GO, produrre prima una roadmap di remediation e non iniziare feature di Fase 2.
+- Se il gate è GO, valutare e ordinare asta live, roster/migrazioni avanzate, calendari/playoff, capitano, Rating/calibrazione, automazioni IA autorizzate, mercato avanzato e Lega Pro completa.
+- Valutare separatamente debito operatore/anomalie-job, UI audit/export, E2E mobile, timezone, metriche aggregate e limiti di revoca/undo.
+- Definire per ogni iniziativa valore, evidenza pilot, rischio, dipendenze, costo, KPI e criterio di uscita; creare nuove epic/card soltanto dopo approvazione.
+- Mantenere l’IA consultiva finché una card di Fase 2 non autorizza automazioni con conferme e guardrail; estrarre microservizi solo se volumi/costi reali lo giustificano.
+
+DOCUMENTAZIONE OBBLIGATORIA
+- docs/doc_fantapperò/FantAppero_Documento_Master_v0.1.docx — roadmap e confini Fase 2
+- docs/doc_fantapperò/FantAppero_Requisiti_Funzionali_MVP_v0.1.docx — fuori MVP e priorità
+- docs/doc_fantapperò/FantAppero_Architettura_Tecnica_Modello_Dati_MVP_v0.1.docx — evoluzione condizionata e microservizi
+- docs/operations/beta_pilot_gate.md — evidenze e decisione
+- docs/operations/admin_operator_bootstrap.md
+- docs/data/api_football_open_questions.md
+- docs/data/api_football_requirement_matrix.md
+- docs/doc_fantapperò/FantAppero_Documento_Master_v0.1.docx
+- docs/doc_fantapperò/FantAppero_Requisiti_Funzionali_MVP_v0.1.docx
+- docs/doc_fantapperò/FantAppero_Architettura_Tecnica_Modello_Dati_MVP_v0.1.docx
+
+CRITERI DI ACCETTAZIONE
+- Ogni iniziativa proposta è collegata a un’evidenza reale o a un requisito documentato, con priorità motivata.
+- GO e NO-GO conducono a backlog distinti e coerenti.
+- Confini IA, autorizzazioni, dati, architettura e prodotto sono espliciti.
+- La nuova milestone viene nominata, dimensionata e approvata senza alterare retroattivamente M0.5–M5.
+
+TEST MINIMI
+- Review di tracciabilità requisito/evidenza per ogni iniziativa.
+- Controllo dipendenze, rischi, criteri di uscita e assenza di scope duplicato.
+- Sessione di approvazione umana con decisioni registrate.
+
+DELIVERABLE
+- Roadmap Fase 2 priorizzata e decision log.
+- Proposta di nuove epic/card con dipendenze e criteri di uscita.
+- Registro delle iniziative differite o respinte con motivazione.
+
+DIPENDENZE
+EP13-09; GO firmato per avviare nuove feature
+
+STIMA INIZIALE
+2–4 giorni
+
+PROMPT CODEX/CURSOR
+CONTESTO STANDARD — FANTAPPERÒ
+Stai lavorando su FantApperò, piattaforma fantasy football con backend Python/FastAPI, frontend React/TypeScript, PostgreSQL, Redis, worker asincroni e integrazione centralizzata con API-Football. L’architettura approvata è un monolite modulare API-first e gli ambienti applicativi sono gestiti con Docker Compose.
+
+Questa card appartiene al pacchetto proposto “M5.1 — Chiusura Beta e Pilot reale”. Non è un M6 funzionale: serve a completare EP12-07, eseguire il pilot reale e registrare il gate previsto dalla documentazione.
+
+GERARCHIA DOCUMENTALE
+- Per processo Beta, soglie, ruoli ed evidenze prevalgono i documenti operativi correnti in `docs/operations/`.
+- Per perimetro MVP/Fase 2 e architettura prevalgono Documento Master, Requisiti Funzionali e Architettura Tecnica v0.1.
+- Il Concept è una fonte iniziale; in caso di conflitto valgono le decisioni successive e più specifiche.
+- Nessun documento o dry-run autorizza a dichiarare eseguito un pilot reale o firmata una decisione umana.
+
+REGOLE GENERALI OBBLIGATORIE
+- Usa l’italiano per interfaccia, messaggi utente, documentazione funzionale, evidenze redatte e nuovi contenuti.
+- Prima di modificare file o codice, analizza lo stato reale del repository, produci un piano breve e attendi la conferma esplicita dell’utente.
+- Preserva modifiche, file non tracciati e dati dell’utente; non usare reset distruttivi, cancellazioni ricorsive o riscritture della cronologia senza autorizzazione.
+- Non cancellare dati a database. Eventuali migrazioni devono essere additive/backfill, con backup e prove prima/dopo.
+- Non modificare funzionalità, regole, API, schema, configurazioni o componenti non necessari alla card e non anticipare le card successive.
+- Prima di creare qualcosa, verifica cosa esiste già e riusa pattern, moduli, script, template e componenti compatibili.
+- Mantieni il monolite modulare API-first; un’estrazione a microservizio richiede evidenza reale di volumi, costi o isolamento operativo.
+- Autorizzazioni e validazioni decisive devono essere server-side; `?persona=` è soltanto una simulazione DEV.
+- Non inserire segreti, credenziali, PII o URL con token nel codice, nei log, nei test, nei commit, nei CSV o nella documentazione.
+- Usa Docker e Docker Compose per servizi, migrazioni e test pertinenti; non usare Makefile o il comando `make`.
+- Distingui sempre prove locali, prove sulla candidata, deploy pilot, pilot reale e firma umana. Non simulare un esito non verificato.
+- Azioni esterne come push, deploy, inviti, messaggi a partecipanti o firme richiedono autorizzazione esplicita e owner umano competente.
+
+INCARICO
+- Card Trello: EP13-10 — Roadmap di Fase 2 basata sulle evidenze
+- Priorità: Should
+- Owner proposto: PO/UX/BE/FE/INF
+- Dipendenze dichiarate: EP13-09; GO firmato per avviare nuove feature
+
+DOCUMENTAZIONE OBBLIGATORIA
+- docs/doc_fantapperò/FantAppero_Documento_Master_v0.1.docx — roadmap e confini Fase 2
+- docs/doc_fantapperò/FantAppero_Requisiti_Funzionali_MVP_v0.1.docx — fuori MVP e priorità
+- docs/doc_fantapperò/FantAppero_Architettura_Tecnica_Modello_Dati_MVP_v0.1.docx — evoluzione condizionata e microservizi
+- docs/operations/beta_pilot_gate.md — evidenze e decisione
+- docs/operations/admin_operator_bootstrap.md
+- docs/data/api_football_open_questions.md
+- docs/data/api_football_requirement_matrix.md
+- docs/doc_fantapperò/FantAppero_Documento_Master_v0.1.docx
+- docs/doc_fantapperò/FantAppero_Requisiti_Funzionali_MVP_v0.1.docx
+- docs/doc_fantapperò/FantAppero_Architettura_Tecnica_Modello_Dati_MVP_v0.1.docx
+
+PRIMA DI MODIFICARE IL CODICE O I DOCUMENTI
+1. Ispeziona branch, upstream, working tree, servizi Docker, migrazioni e documentazione realmente presenti.
+2. Verifica che le dipendenze dichiarate siano concluse con evidenze sulla stessa release candidate; se manca una dipendenza bloccante, fermati e descrivila.
+3. Identifica file, servizi, dati ed eventuali sistemi esterni coinvolti e separa attività automatizzabili da decisioni umane.
+4. Confronta lo stato corrente con i documenti obbligatori e segnala conflitti, placeholder e assunzioni stantie.
+5. Proponi un piano atomico, includendo test, evidenze, rollback e rischi; attendi la conferma esplicita prima di applicare modifiche.
+
+USER STORY
+Come product owner voglio trasformare gli esiti del pilot in una roadmap approvata affinché la Fase 2 risolva problemi e opportunità osservati senza introdurre un M6 arbitrario.
+
+ATTIVITÀ RICHIESTE
+- Aggregare decisione, KPI, ticket, incidenti, survey e debito emerso, distinguendo problemi Beta, Should preesistenti e nuove opportunità.
+- Se EP13-09 è NO-GO, produrre prima una roadmap di remediation e non iniziare feature di Fase 2.
+- Se il gate è GO, valutare e ordinare asta live, roster/migrazioni avanzate, calendari/playoff, capitano, Rating/calibrazione, automazioni IA autorizzate, mercato avanzato e Lega Pro completa.
+- Valutare separatamente debito operatore/anomalie-job, UI audit/export, E2E mobile, timezone, metriche aggregate e limiti di revoca/undo.
+- Definire per ogni iniziativa valore, evidenza pilot, rischio, dipendenze, costo, KPI e criterio di uscita; creare nuove epic/card soltanto dopo approvazione.
+- Mantenere l’IA consultiva finché una card di Fase 2 non autorizza automazioni con conferme e guardrail; estrarre microservizi solo se volumi/costi reali lo giustificano.
+
+VINCOLI SPECIFICI
+- Il documento di Concept è una fonte iniziale: in caso di conflitto prevalgono Master, Requisiti, Architettura e decisioni operative più recenti.
+- Non trasformare automaticamente tutte le idee di Fase 2 in Must.
+- Non implementare feature durante questa card: produrre e far approvare la roadmap prima di aprire il nuovo pacchetto operativo.
+
+CRITERI DI ACCETTAZIONE
+- Ogni iniziativa proposta è collegata a un’evidenza reale o a un requisito documentato, con priorità motivata.
+- GO e NO-GO conducono a backlog distinti e coerenti.
+- Confini IA, autorizzazioni, dati, architettura e prodotto sono espliciti.
+- La nuova milestone viene nominata, dimensionata e approvata senza alterare retroattivamente M0.5–M5.
+
+TEST E VERIFICHE MINIME
+- Review di tracciabilità requisito/evidenza per ogni iniziativa.
+- Controllo dipendenze, rischi, criteri di uscita e assenza di scope duplicato.
+- Sessione di approvazione umana con decisioni registrate.
+
+DELIVERABLE ATTESI
+- Roadmap Fase 2 priorizzata e decision log.
+- Proposta di nuove epic/card con dipendenze e criteri di uscita.
+- Registro delle iniziative differite o respinte con motivazione.
+- Evidenza breve e versionata, collegabile alla card e alla release candidate.
+- Elenco di file modificati, migrazioni, comandi eseguiti ed esiti reali.
+
+CHIUSURA DEL LAVORO
+- Esegui lint, type-check, test pertinenti e build dei moduli toccati usando i comandi ordinari `docker compose`.
+- Se la card contiene un passo umano o temporale non ancora avvenuto, fermati allo stato corretto e indica owner, prerequisito e prossima azione; non marcare la card completata.
+- Spiega decisioni tecniche non ovvie, deviazioni dalla documentazione e rischi residui.
+- Non creare commit, push, deploy o comunicazioni esterne se non richiesto espressamente.
+- Non iniziare la card successiva: consegna il risultato e attendi revisione/accettazione.
+",M5.1 — Ready,"M5.1, EP13, Should, Product, UX, Backend, Frontend, Infrastructure",,,10
