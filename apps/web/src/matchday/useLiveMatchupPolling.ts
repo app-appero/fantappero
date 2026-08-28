@@ -31,6 +31,12 @@ export function useLiveMatchupPolling(
     let intervalMs = BASE_INTERVAL_MS;
 
     async function tick() {
+      // Scheda in secondo piano: rimandiamo invece di interrogare l'API a
+      // vuoto (EP13-P04, parità con `AppState` sul mobile).
+      if (typeof document !== "undefined" && document.hidden) {
+        timer = setTimeout(() => void tick(), intervalMs);
+        return;
+      }
       const session = loadStoredSession();
       if (!session?.accessToken) {
         return;

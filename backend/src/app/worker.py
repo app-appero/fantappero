@@ -5,6 +5,7 @@ from __future__ import annotations
 from celery import Celery
 
 from config.settings.loader import validate_worker_settings
+from fantasy_lineups.schedule import ai_lineups_beat_schedule
 from fantasy_turns.schedule import fantasy_turns_beat_schedule
 from notifications.schedule import notifications_beat_schedule
 from observability.celery_signals import register_celery_observability
@@ -33,6 +34,12 @@ _beat_schedule.update(
     fantasy_turns_beat_schedule(
         enabled=_worker_settings.fantasy_turns_auto_generate_enabled,
         interval_seconds=_worker_settings.fantasy_turns_auto_generate_interval_seconds,
+    )
+)
+_beat_schedule.update(
+    ai_lineups_beat_schedule(
+        enabled=_worker_settings.ai_lineups_auto_generate_enabled,
+        interval_seconds=_worker_settings.ai_lineups_auto_generate_interval_seconds,
     )
 )
 _beat_schedule.update(
@@ -67,6 +74,7 @@ def fail() -> None:
 
 # Register task modules for the worker process (import side effects).
 import admin.listone_tasks  # noqa: E402, F401
+import fantasy_lineups.tasks  # noqa: E402, F401
 import fantasy_ratings.tasks  # noqa: E402, F401
 import fantasy_turns.tasks  # noqa: E402, F401
 import leagues.listone_tasks  # noqa: E402, F401

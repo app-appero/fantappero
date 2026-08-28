@@ -58,6 +58,10 @@ class SavedLineupResponse(ApiModel):
     module: str
     revision: int
     submitted_at: datetime = Field(alias="submittedAt")
+    # Formazione generata dall'automazione IA (EP13-P05 / ADR-0005).
+    system_generated_ai: bool = Field(default=False, alias="systemGeneratedAi")
+    ai_algorithm_version: str | None = Field(default=None, alias="aiAlgorithmVersion")
+    ai_decided_at: datetime | None = Field(default=None, alias="aiDecidedAt")
     starters: list[LineupPlayerResponse] = Field(default_factory=list)
     bench: list[LineupPlayerResponse] = Field(default_factory=list)
 
@@ -165,3 +169,24 @@ class EffectiveLineupResponse(ApiModel):
     substitutions: list[SubstitutionResponse] = Field(default_factory=list)
     skipped: list[SkippedBenchCandidateResponse] = Field(default_factory=list)
     computed_at: datetime = Field(alias="computedAt")
+
+
+class AiLineupTeamResultResponse(ApiModel):
+    """Esito per una singola squadra IA (EP13-P05)."""
+
+    fantasy_team_id: str = Field(alias="fantasyTeamId")
+    fantasy_team_name: str = Field(default="", alias="fantasyTeamName")
+    outcome: str
+    message: str | None = None
+    starters: int = 0
+    used_fallback: bool = Field(default=False, alias="usedFallback")
+
+
+class AiLineupRunResponse(ApiModel):
+    """Esito del comando amministrativo di preview/ricalcolo formazioni IA."""
+
+    round_id: str = Field(alias="roundId")
+    algorithm_version: str = Field(alias="algorithmVersion")
+    dry_run: bool = Field(alias="dryRun")
+    teams: list[AiLineupTeamResultResponse] = Field(default_factory=list)
+    summary: str

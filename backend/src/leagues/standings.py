@@ -25,6 +25,11 @@ AWAY_WIN = "away"
 DRAW = "draw"
 
 
+# I Fantapunti (Magic Points) sono somme di fantavoti con un decimale: le
+# arrotondiamo a ogni accumulo per non trascinare errori di virgola mobile.
+_FANTASY_POINTS_DECIMALS = 1
+
+
 @dataclass(frozen=True)
 class MatchResult:
     home_team_id: UUID
@@ -32,6 +37,10 @@ class MatchResult:
     home_fantasy_goals: int
     away_fantasy_goals: int
     outcome: str
+    # Punti grezzi di formazione (EP13-P02); assenti sugli slot storici
+    # calcolati prima dell'introduzione dell'aggregato.
+    home_fantasy_points: float | None = None
+    away_fantasy_points: float | None = None
 
 
 @dataclass(frozen=True)
@@ -43,6 +52,8 @@ class TeamRecord:
     lost: int = 0
     fantasy_goals_for: int = 0
     fantasy_goals_against: int = 0
+    fantasy_points_for: float = 0.0
+    fantasy_points_against: float = 0.0
 
     @property
     def points(self) -> int:
@@ -65,12 +76,20 @@ class TeamRecord:
             "lost": self.lost,
             "fantasyGoalsFor": self.fantasy_goals_for,
             "fantasyGoalsAgainst": self.fantasy_goals_against,
+            "fantasyPointsFor": self.fantasy_points_for,
+            "fantasyPointsAgainst": self.fantasy_points_against,
             "points": self.points,
         }
 
 
 def _add_match(
-    record: TeamRecord, *, goals_for: int, goals_against: int, result: str
+    record: TeamRecord,
+    *,
+    goals_for: int,
+    goals_against: int,
+    points_for: float | None,
+    points_against: float | None,
+    result: str,
 ) -> TeamRecord:
     won = record.won + (1 if result == "won" else 0)
     drawn = record.drawn + (1 if result == "drawn" else 0)
@@ -83,6 +102,12 @@ def _add_match(
         lost=lost,
         fantasy_goals_for=record.fantasy_goals_for + goals_for,
         fantasy_goals_against=record.fantasy_goals_against + goals_against,
+        fantasy_points_for=round(
+            record.fantasy_points_for + (points_for or 0.0), _FANTASY_POINTS_DECIMALS
+        ),
+        fantasy_points_against=round(
+            record.fantasy_points_against + (points_against or 0.0), _FANTASY_POINTS_DECIMALS
+        ),
     )
 
 
@@ -106,12 +131,16 @@ def build_standings(
             records[match.home_team_id],
             goals_for=match.home_fantasy_goals,
             goals_against=match.away_fantasy_goals,
+            points_for=match.home_fantasy_points,
+            points_against=match.away_fantasy_points,
             result=home_result,
         )
         records[match.away_team_id] = _add_match(
             records[match.away_team_id],
             goals_for=match.away_fantasy_goals,
             goals_against=match.home_fantasy_goals,
+            points_for=match.away_fantasy_points,
+            points_against=match.home_fantasy_points,
             result=away_result,
         )
     return records

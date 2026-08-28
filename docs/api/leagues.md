@@ -266,6 +266,9 @@ Per correggerli durante l'asta è necessario riaprire la configurazione.
 Endpoint amministrativi (`league:admin`):
 
 - `GET /leagues/{league_id}/amministrazione/calendario`
+- `GET /leagues/{league_id}/amministrazione/calendario/finestre` — anteprima finestre
+  europee: usate, scartate con motivo, cicli, riposi, impronta e versione algoritmo
+  (EP13-P03). Disponibile con parità su web e mobile.
 - `POST /leagues/{league_id}/amministrazione/calendario/genera`
 - `POST /leagues/{league_id}/amministrazione/calendario/conferma`
 
@@ -277,29 +280,123 @@ Endpoint consultazione matchday (`matchday:view`):
 
 - `GET /leagues/{league_id}/calendario/h2h` — calendario H2H confermato con risultati
   affiancati (punti/gol fantasy/esito/provvisorio|finale) e collegamento al turno
-  europeo (`fantasyRoundId`, `homologationStatus`, `europeanTurnStatus`) tramite
-  `FantasyRound.number == LeagueCalendarSlot.round_number`.
+  europeo (`fantasyRoundId`, `homologationStatus`, `europeanTurnStatus`) tramite la
+  mappatura descritta sotto.
 - `GET /leagues/{league_id}/calendario/scontri/{slot_id}` — dettaglio scontro:
   formazioni (effettiva se presente, altrimenti schierata) + fantavoti + totale.
 
-Formato Standard MVP: **girone di andata** (`single_round_robin`). Ogni coppia di
-partecipanti si affronta una sola volta; con numero dispari ogni turno ha un riposo
-esplicito (nessun avversario fantasma). L'algoritmo `circle_rr_v1` è deterministico
-sull'insieme ordinato dei membership id e conserva `algorithm_version` + fingerprint
-partecipanti. La generazione richiede che gli iscritti coincidano col regolamento ed
-è consentita in `configuring` o `auction`.
+### Calendario adattivo sulle finestre europee (EP13-P03)
+
+Il calendario segue le **finestre europee realmente utilizzabili**, non un numero
+fisso di giornate. Motore puro in `backend/src/leagues/calendar_planning.py`
+(`adaptive_windows_v2`):
+
+1. Le fixture della stagione, per le competizioni scelte dalla lega, vengono
+   raggruppate nelle finestre weekend (Ven–Lun) e infrasettimanale (Mar–Gio) in
+   `Europe/Rome`. Le due finestre coprono la settimana senza buchi né
+   sovrapposizioni.
+2. Una finestra è **eleggibile** se raggiunge `minFixturesPerRound`; le partite
+   annullate non contano. La soglia e il messaggio di scarto sono gli stessi dei
+   turni europei (`evaluate_threshold`).
+3. Lunghezza del ciclo: `N-1` giornate con N pari, `N` con N dispari e un riposo
+   per giornata.
+4. Vengono generati **tutti i cicli completi** che entrano nelle finestre
+   eleggibili. Nessun ciclo parziale: le finestre in eccesso restano inutilizzate
+   con motivo esplicito.
+5. Nei cicli successivi casa e trasferta si invertono. Il ciclo base è
+   riequilibrato con un orientamento euleriano, quindi lo scarto casa/trasferta è
+   `0` quando ogni squadra gioca un numero pari di partite e `±1` altrimenti — il
+   minimo teorico, per leghe da 4 a 10 partecipanti.
+
+**Mappatura giornata ↔ turno europeo.** Prima l'abbinamento era implicito
+(`FantasyRound.number == LeagueCalendarSlot.round_number`) e contava anche le
+finestre sotto soglia, che diventano turni `skipped`: una giornata H2H abbinata a
+una di quelle non era giocabile. Ora la mappatura è **esplicita e per finestra
+temporale**, persistita in `league_calendar_round_windows`
+(`round_number`, `cycle_number`, `cycle_round_number`, `window_start_at`,
+`window_end_at`, `window_kind`). Risoluzione condivisa in
+`leagues/calendar_round_mapping.py`.
+
+**Retrocompatibilità.** I calendari generati prima non hanno la mappatura e
+continuano a usare il criterio per numero progressivo: nessun dato storico cambia
+significato. Se la lega non ha ancora finestre eleggibili sufficienti per un ciclo
+completo, la generazione ricade sul girone singolo non ancorato e lo dichiara
+nell'audit (`anchoredToWindows: false`).
+
+**Staleness.** `windows_fingerprint` è l'impronta delle finestre eleggibili al
+momento della generazione; se il calendario provider o la soglia cambiano,
+`LeagueCalendarService.is_stale()` lo segnala. Le giornate già iniziate e i
+risultati non vengono mai riscritti automaticamente.
+
+La generazione richiede che gli iscritti coincidano col regolamento ed è consentita
+in `configuring` o `auction`.
 
 Flusso: genera anteprima (`draft`) → conferma (`confirmed`, idempotente). Una
 rigenerazione sostituisce l'anteprima. Se i partecipanti cambiano dopo la generazione,
 il calendario risulta stale e va rigenerato.
 
-Decisione prodotto documentata (aperta in FR-LEG-04): in questa card si adotta solo
-l'andata; andata/ritorno resta decisione futura (nessuna regola di scoring nuova).
-Il mapping ai turni europei è `FantasyRound.number ↔ LeagueCalendarSlot.round_number`.
+Eventi audit: `league_calendar_generated` (con `anchoredToWindows`, `cycleCount`,
+`cycleLength`, `eligibleWindows`, `discardedWindows`), `league_calendar_confirmed`.
+Tabelle: `league_calendars`, `league_calendar_slots`, `league_calendar_round_windows`
+(FK ai membership; le `fantasy_team` esistono da EP05-01 ma il calendario resta
+ancorato ai membership).
 
-Eventi audit: `league_calendar_generated`, `league_calendar_confirmed`.
-Tabelle: `league_calendars`, `league_calendar_slots` (FK ai membership; le `fantasy_team`
-esistono da EP05-01 ma il calendario resta ancorato ai membership).
+## Directory fantallenatori e profilo storico (EP13-P06)
+
+Endpoint amministrativi (`league:admin`), entrambi **paginati** e
+**rate-limited** (`coach_directory`):
+
+- `GET /leagues/{league_id}/amministrazione/fantallenatori` — elenco con
+  preview.
+- `GET /leagues/{league_id}/amministrazione/fantallenatori/{user_id}` —
+  profilo storico limitato.
+
+### Perimetro di visibilità
+
+Il profilo applica **lo stesso filtro dell'elenco**: chi non compare in
+directory non è interrogabile per id. Sono esclusi account cancellati
+(`deleted_at`), email non verificate, il richiedente stesso e chi è già
+iscritto alla lega. Un id fuori perimetro risponde `coach_not_found`, senza
+distinguere «non esiste» da «non visibile».
+
+### Minimizzazione
+
+| Esposto | Non esposto |
+| --- | --- |
+| Nome visualizzato, avatar, tipo (Manuale/IA) | Email, budget, rose, formazioni |
+| Anzianità in forma `MM/AAAA` | Data esatta di iscrizione |
+| Numero di leghe **concluse**, miglior piazzamento | **Nomi delle leghe** |
+| Per piazzamento: stagione, posizione, partecipanti, partite, punti | Id delle leghe, avversari |
+
+Il nome della lega non compare mai: un amministratore non deve poter dedurre a
+quali leghe private altrui una persona partecipa. Il numero di partecipanti
+resta perché un 3º su 4 non vale un 3º su 10.
+
+### Solo fatti osservabili
+
+La card vieta etichette interpretative («offensivo», «prudente») finché
+metrica, campione minimo e spiegabilità non sono documentati. Il motore puro
+`leagues/coach_history.py` conta piazzamenti in leghe **concluse o
+archiviate** (`LeagueState.CONCLUDED`/`ARCHIVED`); tutto è ricostruibile da
+`league_standings`. Ordinamento deterministico: stagione più recente, poi
+posizione, poi partecipanti.
+
+Una lega **in corso non conta**: una stagione non finita non è ancora un
+risultato. Chi non ha storico mostra «Nessuna lega conclusa» e nessuna
+metrica — uno `0` accanto a un nome si leggerebbe come giudizio negativo su
+chi è semplicemente nuovo.
+
+### Retention e account cancellati
+
+Lo storico non introduce nuova retention: è una **lettura derivata** da
+`league_standings`, che segue il ciclo di vita della lega. Alla cancellazione
+account (`docs/api/privacy.md`) l'utente è soft-deleted con email
+anonimizzata e sparisce sia dall'elenco sia dal profilo. I piazzamenti restano
+nelle classifiche delle leghe concluse, che appartengono a quelle leghe e ai
+loro partecipanti, ma non sono più associabili a una persona interrogabile.
+
+> Nota: la card EP13-P06 cita `docs/privacy/data-retention.md`, che **non
+> esiste**. Il documento privacy reale è [`privacy.md`](./privacy.md).
 
 ## Audit
 

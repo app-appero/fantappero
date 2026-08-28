@@ -30,9 +30,32 @@ EP07-05) in una **classifica per lega**, sempre ricalcolata dall'origine.
 ## Entità
 
 `league_standings`: unique `(league_id, fantasy_team_id)`; `played`, `won`,
-`drawn`, `lost`, `fantasy_goals_for`, `fantasy_goals_against`, `points`,
-`position`, `computed_at`. Include tutte le squadre della lega, anche con
-zero partite giocate.
+`drawn`, `lost`, `fantasy_goals_for`, `fantasy_goals_against`,
+`fantasy_points_for`, `fantasy_points_against`, `points`, `position`,
+`computed_at`. Include tutte le squadre della lega, anche con zero partite
+giocate.
+
+### Tre grandezze da non confondere (EP13-P02)
+
+| Colonna UI | Campi | Significato |
+| --- | --- | --- |
+| **Pt** | `points` | Punti di classifica: 3 vittoria / 1 pareggio / 0 sconfitta |
+| **GF:GS** | `fantasyGoalsFor` / `fantasyGoalsAgainst` | Gol fantasy fatti e subiti, cioè i risultati degli scontri |
+| **FP:FS** | `fantasyPointsFor` / `fantasyPointsAgainst` | Fantapunti: somma dei Punti di formazione fatti e subiti, con un decimale |
+
+`fantasy_points_*` è stato aggiunto da una migrazione **additiva**
+(`b4d7e2f9c118`) con default `0`: nessun dato è stato cancellato e i valori
+reali compaiono al primo ricalcolo, che riparte sempre dagli slot di
+calendario. Le righe calcolate prima di EP13-P02, o gli slot storici privi di
+`home_score`/`away_score`, restano coerenti con `0`.
+
+**I criteri di parità non sono cambiati**: i Fantapunti sono informativi e non
+entrano nell'ordinamento, che resta punti → differenza reti fantasy → gol
+fantasy fatti → nome squadra. Usarli come spareggio sarebbe una decisione di
+prodotto ancora da prendere.
+
+Vedi il glossario Punti / Gol fantasy in
+[`league_scoring.md`](./league_scoring.md).
 
 ## API
 

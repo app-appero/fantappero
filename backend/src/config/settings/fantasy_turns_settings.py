@@ -20,6 +20,20 @@ class FantasyTurnsSettingsMixin:
         le=86400,
         description="How often the ensure-upcoming task is enqueued (default hourly).",
     )
+    # Formazione automatica IA (EP13-P05 / ADR-0005). Le squadre IA
+    # partecipano al pilot reale, quindi il default è attivo.
+    ai_lineups_auto_generate_enabled: bool = Field(
+        default=True,
+        validation_alias="AI_LINEUPS_AUTO_GENERATE_ENABLED",
+        description="When true, Celery beat fields AI managers' lineups for open turns.",
+    )
+    ai_lineups_auto_generate_interval_seconds: int = Field(
+        default=1800,
+        validation_alias="AI_LINEUPS_AUTO_GENERATE_INTERVAL_SECONDS",
+        ge=300,
+        le=86400,
+        description="How often the AI lineup task is enqueued (default every 30 minutes).",
+    )
     fantasy_turns_horizon_days: int = Field(
         default=14,
         validation_alias="FANTASY_TURNS_HORIZON_DAYS",
@@ -28,7 +42,11 @@ class FantasyTurnsSettingsMixin:
         description="How far ahead to materialize weekend/midweek turns.",
     )
 
-    @field_validator("fantasy_turns_auto_generate_enabled", mode="before")
+    @field_validator(
+        "fantasy_turns_auto_generate_enabled",
+        "ai_lineups_auto_generate_enabled",
+        mode="before",
+    )
     @classmethod
     def _parse_bool(cls, value: object) -> object:
         if isinstance(value, str):

@@ -19,21 +19,28 @@ from database.enums import (
     LeagueAuditAction,
     LeagueMemberRole,
     NamedInviteStatus,
+    NotificationCategory,
     UserType,
 )
 from fantasy_teams.factory import ensure_team_for_membership
+from leagues.coach_history import placements_page, seniority_label, summary_line
+from leagues.coach_history_service import load_histories, load_history
 from leagues.models.league import League
 from leagues.models.league_audit_event import LeagueAuditEvent
 from leagues.models.league_membership import LeagueMembership
 from leagues.models.named_league_invite import NamedLeagueInvite
 from leagues.schemas import (
+    CoachPlacementResponse,
     CreateNamedLeagueInviteRequest,
     FantasyCoachDirectoryItem,
     FantasyCoachDirectoryResponse,
+    FantasyCoachProfileResponse,
     NamedLeagueInviteResponse,
+    PendingInviteCountResponse,
     RespondNamedLeagueInviteResponse,
 )
 from leagues.validators import validate_configurable_league_state
+from notifications.service import NotificationService
 from observability.context import get_correlation_id
 from observability.metrics import get_metrics
 
@@ -109,6 +116,9 @@ class NamedLeagueInviteService:
             .offset((page - 1) * page_size)
             .limit(page_size)
         ).all()
+        # Storico della sola pagina corrente, in una query: la card vieta
+        # esplicitamente l'N+1 sulla preview.
+        histories = load_histories(self._session, user_ids=[user.id for user, _, _ in rows])
         items = [
             FantasyCoachDirectoryItem(
                 userId=str(user.id),
@@ -119,6 +129,10 @@ class NamedLeagueInviteService:
                     user.user_type == UserType.AI or profile.available_for_invites
                 ),
                 namedInviteStatus=invite_status.value if invite_status is not None else None,
+                memberSince=seniority_label(user.created_at, now=now),
+                concludedLeagues=histories[user.id].concluded_leagues,
+                bestPosition=histories[user.id].best_position,
+                historySummary=summary_line(histories[user.id]),
             )
             for user, profile, invite_status in rows
         ]
@@ -129,6 +143,85 @@ class NamedLeagueInviteService:
             pageSize=page_size,
             total=total,
             totalPages=math.ceil(total / page_size) if total else 0,
+        )
+
+    def coach_profile(
+        self,
+        league_access: LeagueAccess,
+        user_id: UUID,
+        *,
+        page: int = 1,
+        page_size: int = 20,
+    ) -> FantasyCoachProfileResponse:
+        """Profilo storico limitato di un fantallenatore (EP13-P06).
+
+        Stesso perimetro della directory: se una persona non compare in
+        elenco non deve essere interrogabile per id. Restituisce solo fatti
+        derivati da leghe concluse — mai email, budget, rose o nomi di lega.
+        """
+        self._check_rate_limit("coach_directory", league_access)
+        now = datetime.now(UTC)
+
+        latest_status = (
+            select(NamedLeagueInvite.status)
+            .where(
+                NamedLeagueInvite.league_id == league_access.league.id,
+                NamedLeagueInvite.recipient_id == User.id,
+            )
+            .order_by(NamedLeagueInvite.created_at.desc())
+            .limit(1)
+            .correlate(User)
+            .scalar_subquery()
+        )
+        member_ids = select(LeagueMembership.user_id).where(
+            LeagueMembership.league_id == league_access.league.id
+        )
+        row = self._session.execute(
+            select(User, UserProfile, latest_status.label("invite_status"))
+            .join(UserProfile, UserProfile.user_id == User.id)
+            .where(
+                User.id == user_id,
+                User.deleted_at.is_(None),
+                User.email_verified_at.is_not(None),
+                User.id != league_access.user.id,
+                User.id.not_in(member_ids),
+                UserProfile.display_name.is_not(None),
+                UserProfile.display_name != "",
+            )
+        ).first()
+        if row is None:
+            self._fail("Fantallenatore non trovato.", "coach_not_found", "not_found")
+
+        user, profile, invite_status = row
+        history = load_history(self._session, user_id=user.id)
+        page_items, total = placements_page(history.placements, page=page, page_size=page_size)
+
+        get_metrics().incr("coach_profile_viewed_total", labels={"result": "success"})
+        return FantasyCoachProfileResponse(
+            userId=str(user.id),
+            displayName=profile.display_name or "",
+            avatarUrl=profile.avatar_url,
+            userType=user.user_type.value,
+            availableForInvites=(user.user_type == UserType.AI or profile.available_for_invites),
+            namedInviteStatus=invite_status.value if invite_status is not None else None,
+            memberSince=seniority_label(user.created_at, now=now),
+            concludedLeagues=history.concluded_leagues,
+            bestPosition=history.best_position,
+            historySummary=summary_line(history),
+            placements=[
+                CoachPlacementResponse(
+                    seasonYear=item.season_year,
+                    position=item.position,
+                    participantCount=item.participant_count,
+                    played=item.played,
+                    points=item.points,
+                    fantasyPoints=item.fantasy_points,
+                )
+                for item in page_items
+            ],
+            placementsPage=page,
+            placementsPageSize=page_size,
+            placementsTotal=total,
         )
 
     def create(
@@ -204,6 +297,21 @@ class NamedLeagueInviteService:
                 LeagueAuditAction.NAMED_INVITE_ACCEPTED,
                 invite,
             )
+        else:
+            # Notifica solo agli umani: un fantallenatore IA è già entrato e
+            # non ha nulla da decidere (EP13-P07). `dedup_key` sull'id invito
+            # rende l'operazione idempotente su retry e richieste concorrenti.
+            NotificationService(self._session).create_notification(
+                user_id=recipient.id,
+                category=NotificationCategory.SISTEMA,
+                template_key="sistema.invito_lega",
+                template_version=1,
+                params={
+                    "league_name": league.name,
+                    "inviter_name": league_access.user.display_name,
+                },
+                dedup_key=f"named_invite:{invite.id}",
+            )
         self._session.commit()
         get_metrics().incr(
             "named_invite_created_total",
@@ -215,6 +323,41 @@ class NamedLeagueInviteService:
             recipient,
             auto_accepted=recipient.user_type == UserType.AI,
         )
+
+    def pending_count(self, user: User) -> PendingInviteCountResponse:
+        """Inviti realmente pendenti per il badge (EP13-P07).
+
+        Distinto dal contatore della campanella, che conta le notifiche non
+        lette: leggere la notifica non chiude l'invito. Gli scaduti vengono
+        prima riconciliati, così il badge non conta ciò che non è più
+        actionable.
+        """
+        now = datetime.now(UTC)
+        result = self._session.execute(
+            update(NamedLeagueInvite)
+            .where(
+                NamedLeagueInvite.recipient_id == user.id,
+                NamedLeagueInvite.status == NamedInviteStatus.PENDING,
+                NamedLeagueInvite.expires_at <= now,
+            )
+            .values(status=NamedInviteStatus.EXPIRED)
+        )
+        if result.rowcount:
+            self._session.commit()
+
+        count = (
+            self._session.scalar(
+                select(func.count())
+                .select_from(NamedLeagueInvite)
+                .where(
+                    NamedLeagueInvite.recipient_id == user.id,
+                    NamedLeagueInvite.status == NamedInviteStatus.PENDING,
+                    NamedLeagueInvite.expires_at > now,
+                )
+            )
+            or 0
+        )
+        return PendingInviteCountResponse(pendingInviteCount=count)
 
     def received(self, user: User) -> list[NamedLeagueInviteResponse]:
         now = datetime.now(UTC)

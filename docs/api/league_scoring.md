@@ -40,16 +40,43 @@ Precondizione: la formazione effettiva (EP07-04) deve già essere calcolata
 per entrambe le squadre; in caso contrario lo scontro è saltato (`skipped`)
 e non produce un risultato parziale o errato.
 
+## Glossario delle due grandezze (EP13-P02)
+
+Lo scontro diretto produce **due** numeri distinti, che la UI deve nominare
+entrambi invece di mostrarne uno tra parentesi:
+
+| Nome UI | Campi API | Che cos'è |
+| --- | --- | --- |
+| **Punti** | `homeScore` / `awayScore` | Somma dei fantavoti degli undici effettivi, con un decimale (es. `72,5`) |
+| **Gol fantasy** | `homeFantasyGoals` / `awayFantasyGoals` | I Punti convertiti in gol con le soglie qui sopra: è il risultato dello scontro (es. `2 – 1`) |
+
+Due squadre nella stessa fascia hanno Punti diversi ma **stessi Gol fantasy**,
+quindi pareggiano: mostrare solo i Gol fantasy nasconde questa informazione,
+mostrare solo i Punti non spiega l'esito.
+
+Formattazione condivisa in `packages/contracts/src/h2hScore.ts`
+(`describeH2HResult`): locale `it-IT` con la virgola decimale, e un valore non
+calcolato resta `—` — **non viene mai reso come `0`**. La conversione Punti →
+Gol fantasy resta di competenza del backend e non va replicata nei client.
+
+In classifica gli aggregati corrispondenti sono `fantasyGoalsFor/Against`
+(**GF:GS**) e `fantasyPointsFor/Against` (**FP:FS**, i Fantapunti), entrambi
+distinti da `points`, che sono i punti di classifica 3/1/0. Vedi
+[`league_standings.md`](./league_standings.md).
+
 ## Entità
 
 `league_calendar_slots` (estesa, EP03-06 + EP07-05): `home_score`,
 `away_score`, `home_fantasy_goals`, `away_fantasy_goals`,
 `outcome` (`home`/`away`/`draw`), `result_final`, `result_computed_at`.
 
-Il turno fantasy `(league_id, round_number)` si abbina allo slot di
-calendario tramite `FantasyRound.number == LeagueCalendarSlot.round_number`
-sulla stessa lega; i lati home/away si risolvono da
-`LeagueMembership` → `FantasyTeam.membership_id`.
+Il turno fantasy si abbina alle giornate H2H tramite la mappatura esplicita
+per finestra temporale introdotta da EP13-P03
+(`league_calendar_round_windows`, risoluzione in
+`leagues/calendar_round_mapping.py`); sui calendari generati prima resta il
+criterio `FantasyRound.number == LeagueCalendarSlot.round_number` sulla stessa
+lega. I lati home/away si risolvono da `LeagueMembership` →
+`FantasyTeam.membership_id`.
 
 ## API
 

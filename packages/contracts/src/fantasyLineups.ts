@@ -63,6 +63,10 @@ export interface SavedLineup {
   module: FantasyModule;
   revision: number;
   submittedAt: string;
+  /** Formazione generata dall'automazione IA (EP13-P05). */
+  systemGeneratedAi: boolean;
+  aiAlgorithmVersion: string | null;
+  aiDecidedAt: string | null;
   starters: LineupPlayer[];
   bench: LineupPlayer[];
 }
@@ -860,4 +864,22 @@ export function copyPreviousLineup(input: {
     blocked: lockIssues.length > 0,
     canConfirm: confirmation.valid && lockIssues.length === 0,
   };
+}
+
+/** Esito per una squadra IA nel comando amministrativo (EP13-P05). */
+export interface AiLineupTeamResult {
+  fantasyTeamId: string;
+  fantasyTeamName: string;
+  outcome: string;
+  message: string | null;
+  starters: number;
+  usedFallback: boolean;
+}
+
+export interface AiLineupRun {
+  roundId: string;
+  algorithmVersion: string;
+  dryRun: boolean;
+  teams: AiLineupTeamResult[];
+  summary: string;
 }

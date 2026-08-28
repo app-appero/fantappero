@@ -14,6 +14,16 @@ export interface NavItemDefinition {
   surface: NavSurface;
 }
 
+/**
+ * Collapsible group of nav items (EP13-P01). Visibility is derived: a group is
+ * rendered only when at least one of its items survives the permission filter.
+ */
+export interface NavGroupDefinition {
+  id: string;
+  /** Ids of `NavItemDefinition` entries in this group, in display order. */
+  itemIds: readonly string[];
+}
+
 /** Breadcrumb segment (label from app layer). */
 export interface BreadcrumbItem {
   label: string;

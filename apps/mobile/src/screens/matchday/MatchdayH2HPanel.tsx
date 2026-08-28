@@ -1,8 +1,9 @@
-import type {
-  H2HCalendar,
-  H2HCalendarMatchup,
-  H2HCalendarRound,
-  H2HMatchupScore,
+import type { H2HCalendar, H2HCalendarMatchup, H2HCalendarRound } from "@fantappero/contracts";
+import {
+  H2H_GOALS_LABEL,
+  H2H_POINTS_LABEL,
+  describeH2HResult,
+  h2hResultAriaLabel,
 } from "@fantappero/contracts";
 import { theme } from "@fantappero/ui/theme";
 import { useEffect, useMemo, useState } from "react";
@@ -24,18 +25,35 @@ type Props = {
   onOpenMatchup: (slotId: string) => void;
 };
 
-function formatScore(score: number | null): string {
-  if (score === null || Number.isNaN(score)) {
-    return "—";
-  }
-  return score.toFixed(1);
-}
-
-function resultLabel(result: H2HMatchupScore): string {
-  const homeGoals = result.homeFantasyGoals ?? 0;
-  const awayGoals = result.awayFantasyGoals ?? 0;
-  const points = `${formatScore(result.homeScore)} – ${formatScore(result.awayScore)}`;
-  return `${homeGoals}–${awayGoals} (${points})`;
+/** Due grandezze nominate, come sul web (EP13-P02). */
+function H2HScoreLines({
+  display,
+  slotId,
+}: {
+  display: ReturnType<typeof describeH2HResult>;
+  slotId: string;
+}) {
+  return (
+    <View style={styles.scoreBox} testID={`h2h-score-${slotId}`}>
+      <View style={styles.scoreRow}>
+        <Text style={styles.scoreTerm}>{H2H_GOALS_LABEL}</Text>
+        <Text style={styles.scoreValue} testID={`h2h-score-goals-${slotId}`}>
+          {display.goalsLine}
+        </Text>
+      </View>
+      <View style={styles.scoreRow}>
+        <Text style={styles.scoreTerm}>{H2H_POINTS_LABEL}</Text>
+        <Text style={styles.scoreValue} testID={`h2h-score-points-${slotId}`}>
+          {display.pointsLine}
+        </Text>
+      </View>
+      {display.unavailableHint ? (
+        <Text style={styles.scoreHint} testID={`h2h-score-hint-${slotId}`}>
+          {display.unavailableHint}
+        </Text>
+      ) : null}
+    </View>
+  );
 }
 
 /** Prima giornata non ancora conclusa; se tutte finite, l'ultima. Port of the web helper. */
@@ -89,16 +107,13 @@ function MatchupRow({
   }
 
   const awayName = matchup.awayTeamName ?? matchup.awayDisplayName ?? "Avversario";
-  const statusLabel = matchup.result
-    ? matchup.result.resultFinal
-      ? "Finale"
-      : "Provvisorio"
-    : "In attesa";
-  const statusColor = matchup.result
-    ? matchup.result.resultFinal
+  const display = describeH2HResult(matchup.result);
+  const statusColor =
+    display.status === "final"
       ? colors.success
-      : colors.warning
-    : colors.foregroundMuted;
+      : display.status === "provisional"
+        ? colors.warning
+        : colors.foregroundMuted;
 
   return (
     <Pressable
@@ -106,16 +121,19 @@ function MatchupRow({
       onPress={() => onOpenMatchup(matchup.slotId)}
       testID={`h2h-matchup-${matchup.slotId}`}
       accessibilityRole="button"
+      accessibilityLabel={h2hResultAriaLabel(display, homeName, awayName)}
     >
       <View style={styles.matchupHeader}>
         <Text style={styles.teamLine}>
           {homeName} vs {awayName}
         </Text>
-        <StatusBadge label={statusLabel} color={statusColor} textColor={colors.accentContrast} />
+        <StatusBadge
+          label={display.statusLabel}
+          color={statusColor}
+          textColor={colors.accentContrast}
+        />
       </View>
-      <Text style={styles.body}>
-        {matchup.result ? resultLabel(matchup.result) : "Risultato non ancora calcolato"}
-      </Text>
+      <H2HScoreLines display={display} slotId={matchup.slotId} />
     </Pressable>
   );
 }
@@ -225,7 +243,7 @@ export function MatchdayH2HPanel({
     <View style={styles.stack} testID="h2h-calendar">
       <View style={styles.header}>
         <Text style={styles.lede}>
-          Girone di andata · {calendar.roundCount} giornate · {calendar.matchupCount} scontri
+          {calendar.roundCount} giornate · {calendar.matchupCount} scontri
           {calendar.byeCount > 0 ? ` · ${calendar.byeCount} riposi` : ""}
         </Text>
         <Text style={styles.hint}>
@@ -338,6 +356,36 @@ const styles = StyleSheet.create({
     flexShrink: 1,
   },
   body: {
+    color: colors.foregroundMuted,
+    fontSize: typography.fontSize.sm,
+  },
+  scoreBox: {
+    gap: spacing.xs,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+  },
+  scoreRow: {
+    flexDirection: "row",
+    alignItems: "baseline",
+    justifyContent: "space-between",
+    gap: spacing.sm,
+  },
+  scoreTerm: {
+    color: colors.foregroundMuted,
+    fontSize: typography.fontSize.sm,
+    fontWeight: "600",
+    textTransform: "uppercase",
+    letterSpacing: 0.4,
+  },
+  scoreValue: {
+    color: colors.foreground,
+    fontSize: typography.fontSize.md,
+    fontWeight: "700",
+  },
+  scoreHint: {
     color: colors.foregroundMuted,
     fontSize: typography.fontSize.sm,
   },

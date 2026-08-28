@@ -75,8 +75,7 @@ def build_fixture_snapshot(session: Session, fixture: Fixture) -> FixtureQuality
     ).scalar_one()
 
     conflict_rows = session.execute(
-        select(MatchEvent)
-        .where(
+        select(MatchEvent).where(
             MatchEvent.fixture_id == fixture.id,
             MatchEvent.is_active.is_(True),
         ),

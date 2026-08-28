@@ -6,7 +6,15 @@ from datetime import datetime
 from typing import TYPE_CHECKING
 from uuid import UUID
 
-from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Index, Integer, UniqueConstraint
+from sqlalchemy import (
+    CheckConstraint,
+    DateTime,
+    Float,
+    ForeignKey,
+    Index,
+    Integer,
+    UniqueConstraint,
+)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from database.base import Base, TimestampMixin, UUIDPrimaryKeyMixin
@@ -51,6 +59,15 @@ class LeagueStanding(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     lost: Mapped[int] = mapped_column(Integer, nullable=False)
     fantasy_goals_for: Mapped[int] = mapped_column(Integer, nullable=False)
     fantasy_goals_against: Mapped[int] = mapped_column(Integer, nullable=False)
+    # Fantapunti aggregati (EP13-P02): somma dei punti di formazione fatti e
+    # subiti. Default 0 per retrocompatibilita' con le righe gia' persistite,
+    # che vengono comunque riscritte al primo ricalcolo.
+    fantasy_points_for: Mapped[float] = mapped_column(
+        Float, nullable=False, server_default="0", default=0.0
+    )
+    fantasy_points_against: Mapped[float] = mapped_column(
+        Float, nullable=False, server_default="0", default=0.0
+    )
     points: Mapped[int] = mapped_column(Integer, nullable=False)
     position: Mapped[int] = mapped_column(Integer, nullable=False)
     computed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)

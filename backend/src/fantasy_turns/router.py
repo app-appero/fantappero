@@ -13,12 +13,14 @@ from auth.exceptions import AuthError
 from authorization.context import LeagueAccess
 from authorization.dependencies import require_league_permissions
 from database.enums import Permission
+from fantasy_turns.live_service import get_fixture_live_detail
 from fantasy_turns.schemas import (
     EnsureFantasyTurnsResponse,
     ExcludeFantasyTurnFixtureRequest,
     FantasyTurnDetailResponse,
     FantasyTurnPreviewResponse,
     FantasyTurnSummaryResponse,
+    FixtureLiveDetailResponse,
     GenerateFantasyTurnRequest,
 )
 from fantasy_turns.service import FantasyTurnService
@@ -57,6 +59,28 @@ def get_fantasy_turn(
     """Dettaglio turno con fixture, cutoff e stato effettivo."""
     try:
         return service.get_turn(league_access, round_id)
+    except AuthError as exc:
+        return _error_response(exc)
+
+
+@router.get(
+    "/{league_id}/turni/{round_id}/partite/{fixture_id}",
+    response_model=FixtureLiveDetailResponse,
+)
+def get_fantasy_turn_fixture(
+    round_id: UUID,
+    fixture_id: UUID,
+    league_access: LeagueAccess = Depends(require_league_permissions(Permission.MATCHDAY_VIEW)),
+    session: Session = Depends(get_db_session),
+) -> FixtureLiveDetailResponse | JSONResponse:
+    """Dettaglio partita: risultato, formazioni ufficiali e cronologia (EP13-P04)."""
+    try:
+        return get_fixture_live_detail(
+            session,
+            league_id=league_access.league.id,
+            round_id=round_id,
+            fixture_id=fixture_id,
+        )
     except AuthError as exc:
         return _error_response(exc)
 

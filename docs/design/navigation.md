@@ -1,6 +1,6 @@
 # Navigazione e layout (EPUI-03)
 
-Architettura shell per web (router leggero in `apps/web/src/router/simpleRouter.tsx`) e mobile (tab bar RN). Copy utente nelle app; componenti strutturali in `@fantappero/ui`.
+Architettura shell per web (router leggero in `apps/web/src/router/simpleRouter.tsx`) e mobile (drawer RN). Copy utente nelle app; componenti strutturali in `@fantappero/ui`.
 
 ## Superfici
 
@@ -50,6 +50,23 @@ Tipi e regole in `@fantappero/contracts` (`auth.ts`):
 
 Filtraggio voci menu: `hasPermissions` + catalogo in `apps/web/src/navigation/navConfig.ts`.
 
+## Gruppo «Lega» (EP13-P01)
+
+Le tre destinazioni di lega sono correlate ma non equivalenti: **Le mie leghe** (`/leghe`) sceglie il contesto globale, **Home lega** (`/lega/home`) mostra la lega attiva, **Amministrazione lega** (`/lega/amministrazione`) la modifica. Sono raccolte in un gruppo espandibile «Lega», definito in `APP_NAV_GROUPS` (web) e `MOBILE_NAV_GROUPS` (mobile) — stessi `itemIds`, stesse etichette.
+
+Regole:
+
+- **Turni** resta destinazione primaria indipendente: è il flusso più usato e non va nascosto in un sottomenu.
+- **Inviti ricevuti** resta fuori dal gruppo perché è account-level e può riguardare più leghe.
+- La visibilità del gruppo è **derivata**: un gruppo senza voci autorizzate non viene reso. «Amministrazione lega» compare solo con `league:admin`; per gli altri utenti la voce è assente e la route risponde comunque `forbidden` lato guard (vedi sotto).
+- Il gruppo è aperto per default; lo stato chiuso è conservato per la sessione (web: `sessionStorage` chiave `fa.nav.groups.collapsed`; mobile: stato del drawer).
+- Il toggle è un `<button>` con `aria-expanded`/`aria-controls` sul web e `accessibilityState={{ expanded }}` su mobile; il gruppo si evidenzia quando contiene la voce attiva.
+- Nessun path, deep link o permesso è stato modificato dal raggruppamento.
+
+**Bottom nav web (<768px):** resta piatta — una barra non annida sottomenu. Usa le etichette compatte di `NAV_SHORT_LABELS` («Leghe», «Admin lega»); sidebar e drawer usano quelle estese.
+
+**Deep link amministrativo:** sul web `/lega/amministrazione` è protetto da `RequirePermissions required={["league:admin"]}` (`apps/web/src/routes.tsx`) che rende `UiStatePanel state="forbidden"`. Su mobile la protezione equivalente è dentro `LeagueAdminScreen` (`can(["league:admin"])` → pannello forbidden). L'app mobile **non ha oggi una configurazione `linking`/URL scheme**: non esistono deep link URL, quindi la superficie verificabile è la navigazione programmatica alla route `LeagueAdmin`. Introdurre uno schema di deep link è una decisione fuori dallo scope di EP13-P01.
+
 **EP02-03:** policy applicate lato server (`backend/src/authorization/`). I client continuano a usare `@fantappero/contracts` per il filtraggio UX; la web app può collegare `GET /leagues/mine` al posto delle leghe demo quando non in modalità persona.
 
 ## Route web (MVP layout + wireframe EPUI-04)
@@ -73,7 +90,7 @@ Stati wireframe: `?stato=loading|empty|error|success|forbidden` — vedi [`wiref
 
 ## Mobile
 
-Tab bar in `apps/mobile/src/navigation/AppTabNavigator.tsx` con catalogo `MOBILE_NAV_ITEMS`, stack admin separato e stesso modello permessi della web. Vedi [`shell-mobile.md`](./shell-mobile.md).
+Navigazione **solo drawer**: `apps/mobile/src/navigation/AppTabNavigator.tsx` monta un `Tab.Navigator` con `tabBar={() => null}`, usato come router interno; la bottom tab bar non è visibile. Il menu è `AppDrawer` con catalogo `MOBILE_DRAWER_NAV_ITEMS` e gruppo `MOBILE_NAV_GROUPS`, stack admin separato e stesso modello permessi del web. Vedi [`shell-mobile.md`](./shell-mobile.md).
 
 ## Verifica locale
 

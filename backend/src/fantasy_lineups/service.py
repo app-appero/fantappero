@@ -995,6 +995,9 @@ class FantasyLineupService:
             module=submission.module.value,
             revision=submission.revision,
             submittedAt=submission.submitted_at,
+            systemGeneratedAi=submission.system_generated_ai,
+            aiAlgorithmVersion=submission.ai_algorithm_version,
+            aiDecidedAt=submission.ai_decided_at,
             starters=starters,
             bench=bench,
         )

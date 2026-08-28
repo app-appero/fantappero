@@ -38,7 +38,7 @@ import { getApiErrorMessage, useAuth } from "../auth/AuthContext";
 import { loadStoredSession } from "../auth/sessionStorage";
 import { useLiveH2HPolling } from "../matchday/useLiveH2HPolling";
 import { useLiveTurnPolling } from "../matchday/useLiveTurnPolling";
-import { useLocation } from "../router/simpleRouter";
+import { Link, useLocation } from "../router/simpleRouter";
 import { parseWireframeStateFromSearch } from "../wireframes/useWireframeState";
 import { MatchdayH2HPanel } from "./MatchdayH2HPanel";
 
@@ -90,6 +90,9 @@ const DEMO_TURN: FantasyTurnDetail = {
       awayClubName: "Chelsea",
       competitionName: "Premier League",
       providerId: 1035055,
+      updatedAt: "2026-08-15T13:55:00.000Z",
+      feedState: "fresh",
+      feedStateLabel: "Aggiornato",
     },
     {
       id: "rf-2",
@@ -107,6 +110,9 @@ const DEMO_TURN: FantasyTurnDetail = {
       awayClubName: "Milan",
       competitionName: "Serie A",
       providerId: 1035056,
+      updatedAt: null,
+      feedState: "unavailable",
+      feedStateLabel: "Dati non disponibili",
     },
   ],
 };
@@ -885,21 +891,38 @@ export function MatchdayPage() {
                         <div className="fa-matchday-competition__fixtures">
                           {fixtures.map((fixture) => (
                             <div key={fixture.id} className="fa-matchday-fixture">
-                              <MatchCard
-                                homeTeam={fixture.homeClubName}
-                                awayTeam={fixture.awayClubName}
-                                kickoffLabel={formatDateTime(fixture.kickoffAt)}
-                                status={mapFixtureMatchStatus(fixture.statusShort)}
-                                statusLabel={
-                                  MATCH_STATUS_LABEL[mapFixtureMatchStatus(fixture.statusShort)] ??
-                                  fixture.statusShort
-                                }
-                                score={
-                                  fixture.homeGoals !== null && fixture.awayGoals !== null
-                                    ? { home: fixture.homeGoals, away: fixture.awayGoals }
-                                    : null
-                                }
-                              />
+                              <Link
+                                to={`/turni/${selected.id}/partite/${fixture.fixtureId}`}
+                                className="fa-matchday-matchup-link"
+                                data-testid={`matchday-fixture-link-${fixture.fixtureId}`}
+                                aria-label={`${fixture.homeClubName} contro ${fixture.awayClubName}, dettaglio partita`}
+                              >
+                                <MatchCard
+                                  homeTeam={fixture.homeClubName}
+                                  awayTeam={fixture.awayClubName}
+                                  kickoffLabel={formatDateTime(fixture.kickoffAt)}
+                                  status={mapFixtureMatchStatus(fixture.statusShort)}
+                                  statusLabel={
+                                    MATCH_STATUS_LABEL[
+                                      mapFixtureMatchStatus(fixture.statusShort)
+                                    ] ?? fixture.statusShort
+                                  }
+                                  score={
+                                    fixture.homeGoals !== null && fixture.awayGoals !== null
+                                      ? { home: fixture.homeGoals, away: fixture.awayGoals }
+                                      : null
+                                  }
+                                />
+                              </Link>
+                              <p
+                                className="fa-matchday-hint"
+                                data-testid={`matchday-fixture-feed-${fixture.fixtureId}`}
+                              >
+                                {fixture.feedStateLabel}
+                                {fixture.updatedAt
+                                  ? ` · ultimo aggiornamento ${formatDateTime(fixture.updatedAt)}`
+                                  : ""}
+                              </p>
                               {fixture.lockLatchedAt ? (
                                 <p
                                   className="fa-matchday-hint"

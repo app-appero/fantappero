@@ -122,6 +122,13 @@ export interface LeagueStanding {
   lost: number;
   fantasyGoalsFor: number;
   fantasyGoalsAgainst: number;
+  /**
+   * Fantapunti aggregati (EP13-P02): somma dei punti di formazione fatti e
+   * subiti. Distinti sia dai gol fantasy sia da `points`, che sono i punti di
+   * classifica (3/1/0).
+   */
+  fantasyPointsFor: number;
+  fantasyPointsAgainst: number;
   points: number;
   computedAt: string;
 }
@@ -171,6 +178,40 @@ export interface FantasyCoachDirectoryItem {
   userType: import("./profile.js").UserType;
   availableForInvites: boolean;
   namedInviteStatus: NamedLeagueInviteStatus | null;
+  /** Anzianità in forma `MM/AAAA`; `null` se sconosciuta (EP13-P06). */
+  memberSince: string | null;
+  concludedLeagues: number;
+  /** `null` quando non ci sono leghe concluse: non è uno zero. */
+  bestPosition: number | null;
+  historySummary: string;
+}
+
+/** Piazzamento in una lega conclusa, senza identificare la lega (EP13-P06). */
+export interface CoachPlacement {
+  seasonYear: number;
+  position: number;
+  participantCount: number;
+  played: number;
+  points: number;
+  fantasyPoints: number;
+}
+
+/** Profilo storico limitato, visibile solo alla directory amministrativa. */
+export interface FantasyCoachProfile {
+  userId: string;
+  displayName: string;
+  avatarUrl: string | null;
+  userType: import("./profile.js").UserType;
+  availableForInvites: boolean;
+  namedInviteStatus: NamedLeagueInviteStatus | null;
+  memberSince: string | null;
+  concludedLeagues: number;
+  bestPosition: number | null;
+  historySummary: string;
+  placements: CoachPlacement[];
+  placementsPage: number;
+  placementsPageSize: number;
+  placementsTotal: number;
 }
 
 export interface PaginatedFantasyCoachDirectory {
@@ -179,6 +220,15 @@ export interface PaginatedFantasyCoachDirectory {
   pageSize: number;
   total: number;
   totalPages: number;
+}
+
+/** Inviti nominativi realmente pendenti, per il badge rosso (EP13-P07).
+ *
+ * Distinto dalle notifiche non lette della campanella: leggere la notifica
+ * non chiude l'invito, quindi i due conteggi possono differire.
+ */
+export interface PendingInviteCount {
+  pendingInviteCount: number;
 }
 
 export interface CreateNamedLeagueInviteRequest {
@@ -206,6 +256,48 @@ export interface RespondedNamedLeagueInvite extends NamedLeagueInvite {
 
 export type LeagueCalendarStatus = "draft" | "confirmed";
 export type LeagueCalendarFormat = "single_round_robin";
+
+/** Finestra europea con verdetto di eleggibilità e motivo (EP13-P03). */
+export interface CalendarWindow {
+  startAt: string;
+  endAt: string;
+  kind: string;
+  timezone: string;
+  fixtureCount: number;
+  minRequired: number;
+  eligible: boolean;
+  reason: string | null;
+}
+
+export interface CalendarPlannedRound {
+  roundNumber: number;
+  cycleNumber: number;
+  cycleRoundNumber: number;
+  windowStartAt: string;
+  windowEndAt: string;
+  windowKind: string;
+}
+
+/** Diagnostica amministrativa del calendario adattivo (EP13-P03). */
+export interface LeagueCalendarPlan {
+  algorithmVersion: string;
+  participantCount: number;
+  cycleLength: number;
+  cycleCount: number;
+  roundCount: number;
+  matchupCount: number;
+  byeCount: number;
+  eligibleWindowCount: number;
+  windowsFingerprint: string;
+  /** False quando non entra nemmeno un ciclo completo. */
+  generatable: boolean;
+  /** True quando le finestre sono cambiate dopo la generazione. */
+  stale: boolean;
+  rounds: CalendarPlannedRound[];
+  windowsUsed: CalendarWindow[];
+  windowsDiscarded: CalendarWindow[];
+  summary: string;
+}
 
 export interface LeagueCalendarMatchup {
   slotIndex: number;

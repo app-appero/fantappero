@@ -1,8 +1,9 @@
-import type {
-  H2HCalendar,
-  H2HCalendarMatchup,
-  H2HCalendarRound,
-  H2HMatchupScore,
+import type { H2HCalendar, H2HCalendarMatchup, H2HCalendarRound } from "@fantappero/contracts";
+import {
+  H2H_GOALS_LABEL,
+  H2H_POINTS_LABEL,
+  describeH2HResult,
+  h2hResultAriaLabel,
 } from "@fantappero/contracts";
 import {
   Badge,
@@ -23,18 +24,21 @@ type Props = {
   onRetry: () => void;
 };
 
-function formatScore(score: number | null): string {
-  if (score === null || Number.isNaN(score)) {
-    return "—";
-  }
-  return score.toFixed(1);
-}
+const KICKOFF_FORMATTER = new Intl.DateTimeFormat("it-IT", {
+  dateStyle: "short",
+  timeStyle: "short",
+});
 
-function resultLabel(result: H2HMatchupScore): string {
-  const homeGoals = result.homeFantasyGoals ?? 0;
-  const awayGoals = result.awayFantasyGoals ?? 0;
-  const points = `${formatScore(result.homeScore)} – ${formatScore(result.awayScore)}`;
-  return `${homeGoals}–${awayGoals} (${points})`;
+/** Riga temporale della card: quando il risultato è stato calcolato. */
+function computedAtLabel(computedAt: string | null | undefined): string {
+  if (!computedAt) {
+    return "Risultato non ancora calcolato";
+  }
+  const parsed = new Date(computedAt);
+  if (Number.isNaN(parsed.getTime())) {
+    return "Risultato non ancora calcolato";
+  }
+  return `Calcolato il ${KICKOFF_FORMATTER.format(parsed)}`;
 }
 
 /** Prima giornata non ancora conclusa; se tutte finite, l'ultima. */
@@ -87,16 +91,9 @@ function MatchupRow({ matchup }: { matchup: H2HCalendarMatchup }) {
   }
 
   const awayName = matchup.awayTeamName ?? matchup.awayDisplayName ?? "Avversario";
-  const status = matchup.result
-    ? matchup.result.resultFinal
-      ? "finished"
-      : "live"
-    : "scheduled";
-  const statusLabel = matchup.result
-    ? matchup.result.resultFinal
-      ? "Finale"
-      : "Provvisorio"
-    : "In attesa";
+  const display = describeH2HResult(matchup.result);
+  const status =
+    display.status === "final" ? "finished" : display.status === "provisional" ? "live" : "scheduled";
 
   return (
     <div className="fa-matchday-matchup" data-testid={`h2h-matchup-${matchup.slotId}`}>
@@ -104,29 +101,63 @@ function MatchupRow({ matchup }: { matchup: H2HCalendarMatchup }) {
         to={`/turni/scontro/${matchup.slotId}`}
         className="fa-matchday-matchup-link"
         data-testid={`h2h-matchup-link-${matchup.slotId}`}
+        aria-label={h2hResultAriaLabel(display, homeName, awayName)}
       >
         <MatchCard
           homeTeam={homeName}
           awayTeam={awayName}
-          kickoffLabel={
-            matchup.result ? resultLabel(matchup.result) : "Risultato non ancora calcolato"
-          }
+          kickoffLabel={computedAtLabel(matchup.result?.computedAt)}
           status={status}
-          statusLabel={statusLabel}
+          statusLabel={display.statusLabel}
           contextLabel="Scontro H2H"
           score={
-            matchup.result &&
-            matchup.result.homeFantasyGoals !== null &&
-            matchup.result.awayFantasyGoals !== null
+            display.goalsAvailable && matchup.result
               ? {
-                  home: matchup.result.homeFantasyGoals,
-                  away: matchup.result.awayFantasyGoals,
+                  home: matchup.result.homeFantasyGoals as number,
+                  away: matchup.result.awayFantasyGoals as number,
                 }
               : null
           }
         />
+        <H2HScoreLines display={display} slotId={matchup.slotId} />
       </Link>
     </div>
+  );
+}
+
+/**
+ * Le due grandezze nominate esplicitamente (EP13-P02): il numero grande della
+ * MatchCard sono i Gol fantasy, ma da solo resta anonimo.
+ */
+function H2HScoreLines({
+  display,
+  slotId,
+}: {
+  display: ReturnType<typeof describeH2HResult>;
+  slotId: string;
+}) {
+  return (
+    <>
+      <dl className="fa-h2h-score" data-testid={`h2h-score-${slotId}`}>
+        <div className="fa-h2h-score__row">
+          <dt className="fa-h2h-score__term">{H2H_GOALS_LABEL}</dt>
+          <dd className="fa-h2h-score__value" data-testid={`h2h-score-goals-${slotId}`}>
+            {display.goalsLine}
+          </dd>
+        </div>
+        <div className="fa-h2h-score__row">
+          <dt className="fa-h2h-score__term">{H2H_POINTS_LABEL}</dt>
+          <dd className="fa-h2h-score__value" data-testid={`h2h-score-points-${slotId}`}>
+            {display.pointsLine}
+          </dd>
+        </div>
+      </dl>
+      {display.unavailableHint ? (
+        <p className="fa-h2h-score__hint" data-testid={`h2h-score-hint-${slotId}`}>
+          {display.unavailableHint}
+        </p>
+      ) : null}
+    </>
   );
 }
 
@@ -234,7 +265,7 @@ export function MatchdayH2HPanel({
       <header className="fa-matchday-toolbar">
         <div className="fa-matchday-toolbar__meta">
           <p className="fa-matchday-lede">
-            Girone di andata · {calendar.roundCount} giornate · {calendar.matchupCount} scontri
+            {calendar.roundCount} giornate · {calendar.matchupCount} scontri
             {calendar.byeCount > 0 ? ` · ${calendar.byeCount} riposi` : ""}
           </p>
           <p className="fa-matchday-hint">

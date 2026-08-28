@@ -1,5 +1,5 @@
 import { theme } from "@fantappero/ui/theme";
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import {
   Animated,
   Modal,
@@ -12,7 +12,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { BrandLogo } from "./BrandLogo";
 import { NavIcon } from "../navigation/NavIcons";
-import type { ResolvedMobileNavItem } from "../navigation/navConfig";
+import { buildMobileNavSections, type ResolvedMobileNavItem } from "../navigation/navConfig";
 
 const { colors, spacing, typography, radius } = theme;
 
@@ -23,6 +23,14 @@ export type AppDrawerProps = {
   items: readonly ResolvedMobileNavItem[];
   userDisplayName: string;
   showAdminPanel?: boolean;
+  /** Id della voce corrispondente alla schermata corrente. */
+  activeItemId?: string | null;
+  /** Gruppi aperti; se omesso tutti i gruppi sono aperti. */
+  expandedGroupIds?: readonly string[];
+  onToggleGroup?: (groupId: string) => void;
+  /** Inviti pendenti da evidenziare sulla voce «Inviti» (EP13-P07). */
+  pendingInviteCount?: number;
+  onNotificationsPress?: () => void;
   onClose: () => void;
   onNavigate: (item: ResolvedMobileNavItem) => void;
   onAdminPanelPress?: () => void;
@@ -35,12 +43,20 @@ export function AppDrawer({
   items,
   userDisplayName,
   showAdminPanel = false,
+  activeItemId = null,
+  expandedGroupIds,
+  onToggleGroup,
+  pendingInviteCount = 0,
+  onNotificationsPress,
   onClose,
   onNavigate,
   onAdminPanelPress,
   onLogout,
 }: AppDrawerProps) {
   const insets = useSafeAreaInsets();
+  const sections = useMemo(() => buildMobileNavSections(items), [items]);
+  const isExpanded = (groupId: string) =>
+    expandedGroupIds ? expandedGroupIds.includes(groupId) : true;
   const slide = useRef(new Animated.Value(-DRAWER_WIDTH)).current;
   const fade = useRef(new Animated.Value(0)).current;
 
@@ -73,6 +89,33 @@ export function AppDrawer({
       }),
     ]).start();
   }, [fade, slide, visible]);
+
+  function renderItem(item: ResolvedMobileNavItem, nested: boolean) {
+    const active = item.id === activeItemId;
+    return (
+      <Pressable
+        key={item.id}
+        accessibilityRole="button"
+        accessibilityLabel={item.label}
+        accessibilityState={{ selected: active }}
+        onPress={() => onNavigate(item)}
+        style={[styles.row, nested && styles.rowNested, active && styles.rowActive]}
+        testID={`app-drawer-item-${item.id}`}
+      >
+        <NavIcon id={item.id} color={active ? colors.accent : colors.foregroundMuted} size={20} />
+        <Text style={[styles.rowLabel, active && styles.rowLabelActive]}>{item.label}</Text>
+        {item.id === "received-invites" && pendingInviteCount > 0 ? (
+          <Text
+            style={styles.badge}
+            accessibilityLabel={`${pendingInviteCount} inviti in attesa di risposta`}
+            testID="app-drawer-invite-badge"
+          >
+            {pendingInviteCount > 99 ? "99+" : pendingInviteCount}
+          </Text>
+        ) : null}
+      </Pressable>
+    );
+  }
 
   return (
     <Modal
@@ -120,19 +163,51 @@ export function AppDrawer({
           </Text>
 
           <ScrollView style={styles.scroll} contentContainerStyle={styles.list}>
-            {items.map((item) => (
+            {sections.map((section) => {
+              if (section.kind === "item") {
+                return renderItem(section.item, false);
+              }
+
+              const expanded = isExpanded(section.id);
+              const containsActive = section.items.some((item) => item.id === activeItemId);
+
+              return (
+                <View key={section.id} style={styles.group}>
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel={section.label}
+                    accessibilityState={{ expanded }}
+                    onPress={() => onToggleGroup?.(section.id)}
+                    style={styles.groupHeader}
+                    testID={`app-drawer-group-${section.id}`}
+                  >
+                    <Text
+                      style={[styles.groupLabel, containsActive && styles.groupLabelActive]}
+                    >
+                      {section.label}
+                    </Text>
+                    <Text style={styles.groupCaret}>{expanded ? "▾" : "▸"}</Text>
+                  </Pressable>
+                  {expanded ? (
+                    <View style={styles.groupList}>
+                      {section.items.map((item) => renderItem(item, true))}
+                    </View>
+                  ) : null}
+                </View>
+              );
+            })}
+            {onNotificationsPress ? (
               <Pressable
-                key={item.id}
                 accessibilityRole="button"
-                accessibilityLabel={item.label}
-                onPress={() => onNavigate(item)}
+                accessibilityLabel="Notifiche"
+                onPress={onNotificationsPress}
                 style={styles.row}
-                testID={`app-drawer-item-${item.id}`}
+                testID="app-drawer-item-notifications"
               >
-                <NavIcon id={item.id} color={colors.accent} size={20} />
-                <Text style={styles.rowLabel}>{item.label}</Text>
+                <NavIcon id="admin-home" color={colors.foregroundMuted} size={20} />
+                <Text style={styles.rowLabel}>Notifiche</Text>
               </Pressable>
-            ))}
+            ) : null}
             {showAdminPanel ? (
               <Pressable
                 accessibilityRole="button"
@@ -217,11 +292,65 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
     borderRadius: radius.md,
   },
+  rowNested: {
+    marginLeft: spacing.md,
+  },
+  rowActive: {
+    backgroundColor: colors.background,
+  },
   rowLabel: {
     color: colors.foreground,
     fontSize: typography.fontSize.md,
     fontWeight: typography.fontWeight.semibold,
     flexShrink: 1,
+  },
+  badge: {
+    marginLeft: "auto",
+    minWidth: 22,
+    paddingHorizontal: 6,
+    borderRadius: 999,
+    backgroundColor: colors.danger,
+    color: colors.accentContrast,
+    fontSize: typography.fontSize.sm,
+    fontWeight: "700",
+    textAlign: "center",
+    overflow: "hidden",
+  },
+  rowLabelActive: {
+    color: colors.accent,
+  },
+  group: {
+    gap: spacing.xs,
+  },
+  groupHeader: {
+    minHeight: 44,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    borderRadius: radius.md,
+  },
+  groupLabel: {
+    color: colors.foregroundMuted,
+    fontSize: typography.fontSize.sm,
+    fontWeight: typography.fontWeight.semibold,
+    textTransform: "uppercase",
+    letterSpacing: 0.6,
+  },
+  groupLabelActive: {
+    color: colors.accent,
+  },
+  groupCaret: {
+    color: colors.foregroundMuted,
+    fontSize: typography.fontSize.sm,
+  },
+  groupList: {
+    gap: spacing.xs,
+    borderLeftWidth: 1,
+    borderLeftColor: colors.border,
+    marginLeft: spacing.md,
+    paddingLeft: spacing.xs,
   },
   logoutBtn: {
     minHeight: 48,

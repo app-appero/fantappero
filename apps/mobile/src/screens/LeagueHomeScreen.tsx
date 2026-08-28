@@ -123,12 +123,22 @@ export function LeagueHomeScreen() {
       ) : null}
 
       {!loading && !loadError && !league ? (
-        <UiStatePanel
-          state="empty"
-          title="Nessuna lega selezionata"
-          message="Seleziona una lega dall'elenco oppure entra con un invito."
-          testID="league-home-empty"
-        />
+        <View style={styles.content}>
+          <UiStatePanel
+            state="empty"
+            title="Nessuna lega selezionata"
+            message="Seleziona una lega dall'elenco oppure entra con un invito."
+            testID="league-home-empty"
+          />
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Vai a Le mie leghe"
+            onPress={() => navigation.navigate("MainTabs", { screen: "Leagues" } as never)}
+            testID="league-home-empty-cta"
+          >
+            <Text style={styles.ghostLabel}>Vai a Le mie leghe</Text>
+          </Pressable>
+        </View>
       ) : null}
 
       {!loading && !loadError && league ? (

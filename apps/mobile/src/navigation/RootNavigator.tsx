@@ -10,7 +10,9 @@ import { JoinLeagueScreen } from "../screens/JoinLeagueScreen";
 import { LeagueAdminScreen } from "../screens/LeagueAdminScreen";
 import { LeagueHomeScreen } from "../screens/LeagueHomeScreen";
 import { ManagerDirectoryScreen } from "../screens/ManagerDirectoryScreen";
+import { FixtureDetailScreen } from "../screens/FixtureDetailScreen";
 import { MatchupDetailScreen } from "../screens/MatchupDetailScreen";
+import { NotificationsScreen } from "../screens/NotificationsScreen";
 import { ReceivedInvitesScreen } from "../screens/ReceivedInvitesScreen";
 import { useAuthSession } from "../session/DemoSessionContext";
 import { sceneBackgroundStyle } from "../theme/navigationTheme";
@@ -105,6 +107,11 @@ export function RootNavigator() {
             options={{ title: "Inviti ricevuti" }}
           />
           <Stack.Screen
+            name="Notifications"
+            component={NotificationsScreen}
+            options={{ title: "Notifiche" }}
+          />
+          <Stack.Screen
             name="ManagerDirectory"
             component={ManagerDirectoryScreen}
             options={{ title: "Fantallenatori" }}
@@ -113,6 +120,11 @@ export function RootNavigator() {
             name="MatchupDetail"
             component={MatchupDetailScreen}
             options={{ title: "Scontro diretto" }}
+          />
+          <Stack.Screen
+            name="FixtureDetail"
+            component={FixtureDetailScreen}
+            options={{ title: "Partita" }}
           />
           <Stack.Screen
             name="AdminPanel"

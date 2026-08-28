@@ -1,9 +1,10 @@
-import type { LeagueCalendar } from "@fantappero/contracts";
-import { Button, UiStatePanel } from "@fantappero/ui";
+import type { CalendarWindow, LeagueCalendar, LeagueCalendarPlan } from "@fantappero/contracts";
+import { Badge, Button, UiStatePanel } from "@fantappero/ui";
 import { useCallback, useEffect, useState } from "react";
 import {
   confirmLeagueCalendar,
   fetchLeagueCalendarAdmin,
+  fetchLeagueCalendarPlan,
   generateLeagueCalendar,
 } from "../api/leagues";
 import { getApiErrorMessage } from "../auth/AuthContext";
@@ -53,6 +54,62 @@ type Props = {
   search: string;
 };
 
+const WINDOW_DATE = new Intl.DateTimeFormat("it-IT", {
+  day: "2-digit",
+  month: "2-digit",
+  year: "numeric",
+});
+
+function windowLabel(window: CalendarWindow): string {
+  const start = new Date(window.startAt);
+  const end = new Date(window.endAt);
+  const kind = window.kind === "weekend" ? "Weekend" : "Infrasettimanale";
+  return `${kind} ${WINDOW_DATE.format(start)} – ${WINDOW_DATE.format(end)}`;
+}
+
+/** Diagnostica finestre europee: usate, scartate e motivo (EP13-P03). */
+export function CalendarWindowsPanel({ plan }: { plan: LeagueCalendarPlan }) {
+  return (
+    <section aria-labelledby="calendar-windows-title" data-testid="calendar-windows">
+      <h3 id="calendar-windows-title">Finestre europee</h3>
+      <p data-testid="calendar-windows-summary">{plan.summary}</p>
+      <ul>
+        <li>
+          Cicli completi: <strong>{plan.cycleCount}</strong> da {plan.cycleLength} giornate
+        </li>
+        <li>
+          Finestre eleggibili: <strong>{plan.eligibleWindowCount}</strong> · usate{" "}
+          <strong>{plan.windowsUsed.length}</strong>
+        </li>
+        <li>
+          Riposi: <strong>{plan.byeCount}</strong> · algoritmo{" "}
+          <code>{plan.algorithmVersion}</code>
+        </li>
+      </ul>
+
+      {plan.stale ? (
+        <Badge variant="warning" data-testid="calendar-windows-stale">
+          Anteprima non aggiornata
+        </Badge>
+      ) : null}
+
+      {plan.windowsDiscarded.length > 0 ? (
+        <details data-testid="calendar-windows-discarded">
+          <summary>Finestre non utilizzate ({plan.windowsDiscarded.length})</summary>
+          <ul>
+            {plan.windowsDiscarded.map((window) => (
+              <li key={window.startAt}>
+                {windowLabel(window)} — {window.fixtureCount}/{window.minRequired} partite.{" "}
+                {window.reason ?? "Nessun motivo registrato."}
+              </li>
+            ))}
+          </ul>
+        </details>
+      ) : null}
+    </section>
+  );
+}
+
 function requestedState(search: string): "loading" | "empty" | "error" | "forbidden" | null {
   const value = new URLSearchParams(search).get("calendario");
   return value === "loading" ||
@@ -74,6 +131,7 @@ export function LeagueCalendarPanel({ leagueId, isDemoMode, search }: Props) {
     }
     return DEMO_CALENDAR;
   });
+  const [plan, setPlan] = useState<LeagueCalendarPlan | null>(null);
   const [loading, setLoading] = useState(() => {
     if (isDemoMode) {
       return demoState === "loading";
@@ -146,6 +204,14 @@ export function LeagueCalendarPanel({ leagueId, isDemoMode, search }: Props) {
       setCalendar(null);
     } finally {
       setLoading(false);
+    }
+
+    // La diagnostica finestre è accessoria: un errore qui non deve
+    // impedire di vedere e confermare il calendario.
+    try {
+      setPlan(await fetchLeagueCalendarPlan(stored.accessToken, leagueId));
+    } catch {
+      setPlan(null);
     }
   }, [demoState, isDemoMode, leagueId]);
 
@@ -261,9 +327,11 @@ export function LeagueCalendarPanel({ leagueId, isDemoMode, search }: Props) {
     <section className="fa-calendar-panel" data-testid="league-calendar-panel">
       <h2>Calendario scontri diretti</h2>
       <p>
-        Genera un girone di andata bilanciato: ogni partecipante incontra gli altri una volta,
-        con riposo esplicito se il numero è dispari.
+        Le giornate seguono le finestre europee utilizzabili: vengono generati tutti i cicli
+        completi che ci stanno, con riposo esplicito se i partecipanti sono dispari.
       </p>
+
+      {plan ? <CalendarWindowsPanel plan={plan} /> : null}
 
       {!calendar ? (
         <UiStatePanel

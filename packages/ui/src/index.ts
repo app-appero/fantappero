@@ -60,7 +60,12 @@ export { AppHeader } from "./components/layout/AppHeader.js";
 export type { AppHeaderProps } from "./components/layout/AppHeader.js";
 
 export { SidebarNav } from "./components/layout/SidebarNav.js";
-export type { NavLinkAnchorProps, NavLinkItem, SidebarNavProps } from "./components/layout/SidebarNav.js";
+export type {
+  NavGroupItem,
+  NavLinkAnchorProps,
+  NavLinkItem,
+  SidebarNavProps,
+} from "./components/layout/SidebarNav.js";
 
 export { BottomNav } from "./components/layout/BottomNav.js";
 export type { BottomNavProps } from "./components/layout/BottomNav.js";

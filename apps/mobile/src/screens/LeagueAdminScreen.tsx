@@ -1,6 +1,7 @@
 import type {
   CreatedLeagueInvite,
   LeagueCalendar,
+  LeagueCalendarPlan,
   LeagueInvite,
   LeagueLifecycle,
   LeagueMember,
@@ -19,6 +20,7 @@ import {
   deleteLeague,
   fetchLeagueAdminPanel,
   fetchLeagueCalendarAdmin,
+  fetchLeagueCalendarPlan,
   fetchLeagueInvites,
   fetchLeagueMembers,
   generateLeagueCalendar,
@@ -87,6 +89,7 @@ export function LeagueAdminScreen() {
   const [invites, setInvites] = useState<LeagueInvite[]>([]);
   const [createdInvite, setCreatedInvite] = useState<CreatedLeagueInvite | null>(null);
   const [calendar, setCalendar] = useState<LeagueCalendar | null>(null);
+  const [calendarPlan, setCalendarPlan] = useState<LeagueCalendarPlan | null>(null);
   const [expiresInDays, setExpiresInDays] = useState(7);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -129,6 +132,12 @@ export function LeagueAdminScreen() {
         setMembers(memberRows);
         setInvites(inviteRows);
         setCalendar(cal);
+        // Diagnostica accessoria: un errore non deve bloccare il pannello.
+        try {
+          setCalendarPlan(await fetchLeagueCalendarPlan(accessToken, leagueId));
+        } catch {
+          setCalendarPlan(null);
+        }
       } catch (error) {
         setLoadError(getApiErrorMessage(error, "Impossibile caricare l'amministrazione."));
         setRules(null);
@@ -506,8 +515,42 @@ export function LeagueAdminScreen() {
                 ? `Calendario confermato: ${calendar.roundCount} giornate.`
                 : calendar
                   ? `Anteprima: ${calendar.matchupCount} incontri su ${calendar.roundCount} turni.`
-                  : "Genera un girone di andata bilanciato prima dell'avvio stagione."}
+                  : "Genera il calendario sulle finestre europee prima dell'avvio stagione."}
             </Text>
+
+            {calendarPlan ? (
+              <View style={styles.section} testID="calendar-windows">
+                <Text style={styles.body} testID="calendar-windows-summary">
+                  {calendarPlan.summary}
+                </Text>
+                <Text style={styles.body}>
+                  Cicli completi: {calendarPlan.cycleCount} da {calendarPlan.cycleLength}{" "}
+                  giornate · Finestre eleggibili: {calendarPlan.eligibleWindowCount} · usate:{" "}
+                  {calendarPlan.windowsUsed.length}
+                </Text>
+                <Text style={styles.body}>
+                  Riposi: {calendarPlan.byeCount} · algoritmo {calendarPlan.algorithmVersion}
+                </Text>
+                {calendarPlan.stale ? (
+                  <Text style={styles.body} testID="calendar-windows-stale">
+                    Anteprima non aggiornata: il calendario provider è cambiato.
+                  </Text>
+                ) : null}
+                {calendarPlan.windowsDiscarded.length > 0 ? (
+                  <View testID="calendar-windows-discarded">
+                    <Text style={styles.body}>
+                      Finestre non utilizzate ({calendarPlan.windowsDiscarded.length}):
+                    </Text>
+                    {calendarPlan.windowsDiscarded.slice(0, 10).map((window) => (
+                      <Text key={window.startAt} style={styles.body}>
+                        {formatDate(window.startAt)} — {window.fixtureCount}/
+                        {window.minRequired} partite. {window.reason ?? "Motivo non registrato."}
+                      </Text>
+                    ))}
+                  </View>
+                ) : null}
+              </View>
+            ) : null}
             <Pressable
               accessibilityRole="button"
               onPress={() => void onGenerateCalendar()}

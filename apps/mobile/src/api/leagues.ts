@@ -1,4 +1,5 @@
 import type {
+  AiLineupRun,
   AcceptedLeagueInvite,
   AcceptLeagueInviteRequest,
   CompetitionSummary,
@@ -26,12 +27,14 @@ import type {
   FantasyTurnDetail,
   FantasyTurnPreview,
   FantasyTurnSummary,
+  FixtureLiveDetail,
   GenerateFantasyTurnRequest,
   LineupContext,
   SaveLineupDraftRequest,
   SaveLineupRequest,
   LeagueAdminPanel,
   LeagueCalendar,
+  LeagueCalendarPlan,
   H2HCalendar,
   H2HMatchupDetail,
   LeagueDetail,
@@ -233,6 +236,17 @@ export function fetchLeagueCalendarAdmin(
   return apiRequest<LeagueCalendar | null>(`/leagues/${leagueId}/amministrazione/calendario`, {
     accessToken,
   });
+}
+
+/** Anteprima finestre europee: usate, scartate e motivo (EP13-P03). */
+export function fetchLeagueCalendarPlan(
+  accessToken: string,
+  leagueId: string,
+): Promise<LeagueCalendarPlan> {
+  return apiRequest<LeagueCalendarPlan>(
+    `/leagues/${leagueId}/amministrazione/calendario/finestre`,
+    { accessToken },
+  );
 }
 
 export function generateLeagueCalendar(
@@ -608,6 +622,32 @@ export function fetchFantasyTurn(
   roundId: string,
 ): Promise<FantasyTurnDetail> {
   return apiRequest<FantasyTurnDetail>(`/leagues/${leagueId}/turni/${roundId}`, { accessToken });
+}
+
+/** Dettaglio partita live: formazioni ufficiali e cronologia (EP13-P04). */
+export function fetchFixtureLiveDetail(
+  accessToken: string,
+  leagueId: string,
+  roundId: string,
+  fixtureId: string,
+): Promise<FixtureLiveDetail> {
+  return apiRequest<FixtureLiveDetail>(
+    `/leagues/${leagueId}/turni/${roundId}/partite/${fixtureId}`,
+    { accessToken },
+  );
+}
+
+/** Preview o ricalcolo delle formazioni automatiche IA (EP13-P05). */
+export function runAiLineups(
+  accessToken: string,
+  leagueId: string,
+  roundId: string,
+  dryRun: boolean,
+): Promise<AiLineupRun> {
+  return apiRequest<AiLineupRun>(
+    `/leagues/${leagueId}/turni/${roundId}/formazioni-ia?dry_run=${dryRun}`,
+    { method: "POST", accessToken },
+  );
 }
 
 export function previewFantasyTurn(

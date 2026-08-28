@@ -1,4 +1,5 @@
 import type { LeagueStanding } from "@fantappero/contracts";
+import { formatFantasyPoints } from "@fantappero/contracts";
 import { theme } from "@fantappero/ui/theme";
 import { useCallback, useMemo, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
@@ -165,6 +166,7 @@ function StandingsTableBlock({
         <Text style={[styles.cell, styles.statCell, styles.headerCell]}>G</Text>
         <Text style={[styles.cell, styles.statCell, styles.headerCell]}>Pt</Text>
         <Text style={[styles.cell, styles.goalsCell, styles.headerCell]}>GF:GS</Text>
+        <Text style={[styles.cell, styles.goalsCell, styles.headerCell]}>FP:FS</Text>
       </View>
       {rows.map((row) => (
         <View
@@ -185,6 +187,10 @@ function StandingsTableBlock({
           <Text style={[styles.cell, styles.statCell]}>{row.points}</Text>
           <Text style={[styles.cell, styles.goalsCell]}>
             {row.fantasyGoalsFor}:{row.fantasyGoalsAgainst}
+          </Text>
+          <Text style={[styles.cell, styles.goalsCell]}>
+            {formatFantasyPoints(row.fantasyPointsFor)}:
+            {formatFantasyPoints(row.fantasyPointsAgainst)}
           </Text>
         </View>
       ))}

@@ -150,6 +150,16 @@ class AcceptLeagueInviteResponse(ApiModel):
     already_member: bool = Field(alias="alreadyMember")
 
 
+class PendingInviteCountResponse(ApiModel):
+    """Conteggio inviti nominativi realmente pendenti (EP13-P07).
+
+    Volutamente separato dalle notifiche non lette: sono due grandezze con
+    semantiche diverse e possono differire.
+    """
+
+    pending_invite_count: int = Field(alias="pendingInviteCount")
+
+
 class FantasyCoachDirectoryItem(ApiModel):
     user_id: str = Field(alias="userId")
     display_name: str = Field(alias="displayName")
@@ -159,6 +169,44 @@ class FantasyCoachDirectoryItem(ApiModel):
     named_invite_status: Literal["pending", "accepted", "declined", "revoked", "expired"] | None = (
         Field(default=None, alias="namedInviteStatus")
     )
+    # Preview storico (EP13-P06): solo fatti osservabili. `None` quando il
+    # dato non esiste — non va reso come zero.
+    member_since: str | None = Field(default=None, alias="memberSince")
+    concluded_leagues: int = Field(default=0, alias="concludedLeagues")
+    best_position: int | None = Field(default=None, alias="bestPosition")
+    history_summary: str = Field(default="Nessuna lega conclusa", alias="historySummary")
+
+
+class CoachPlacementResponse(ApiModel):
+    """Piazzamento in una lega conclusa, senza identificare la lega."""
+
+    season_year: int = Field(alias="seasonYear")
+    position: int
+    participant_count: int = Field(alias="participantCount")
+    played: int
+    points: int
+    fantasy_points: float = Field(alias="fantasyPoints")
+
+
+class FantasyCoachProfileResponse(ApiModel):
+    """Profilo storico limitato, visibile alla sola directory amministrativa."""
+
+    user_id: str = Field(alias="userId")
+    display_name: str = Field(alias="displayName")
+    avatar_url: str | None = Field(default=None, alias="avatarUrl")
+    user_type: Literal["human", "ai"] = Field(alias="userType")
+    available_for_invites: bool = Field(alias="availableForInvites")
+    named_invite_status: Literal["pending", "accepted", "declined", "revoked", "expired"] | None = (
+        Field(default=None, alias="namedInviteStatus")
+    )
+    member_since: str | None = Field(default=None, alias="memberSince")
+    concluded_leagues: int = Field(alias="concludedLeagues")
+    best_position: int | None = Field(default=None, alias="bestPosition")
+    history_summary: str = Field(alias="historySummary")
+    placements: list[CoachPlacementResponse] = Field(default_factory=list)
+    placements_page: int = Field(alias="placementsPage")
+    placements_page_size: int = Field(alias="placementsPageSize")
+    placements_total: int = Field(alias="placementsTotal")
 
 
 class FantasyCoachDirectoryResponse(ApiModel):
@@ -358,6 +406,48 @@ class ComputeStandingsResponse(ApiModel):
     removed: int
 
 
+class CalendarWindowResponse(ApiModel):
+    """Una finestra europea con verdetto di eleggibilità e motivo (EP13-P03)."""
+
+    start_at: datetime = Field(alias="startAt")
+    end_at: datetime = Field(alias="endAt")
+    kind: str
+    timezone: str
+    fixture_count: int = Field(alias="fixtureCount")
+    min_required: int = Field(alias="minRequired")
+    eligible: bool
+    reason: str | None = None
+
+
+class CalendarPlannedRoundResponse(ApiModel):
+    round_number: int = Field(alias="roundNumber")
+    cycle_number: int = Field(alias="cycleNumber")
+    cycle_round_number: int = Field(alias="cycleRoundNumber")
+    window_start_at: datetime = Field(alias="windowStartAt")
+    window_end_at: datetime = Field(alias="windowEndAt")
+    window_kind: str = Field(alias="windowKind")
+
+
+class LeagueCalendarPlanResponse(ApiModel):
+    """Diagnostica amministrativa: cosa entra, cosa avanza e perché."""
+
+    algorithm_version: str = Field(alias="algorithmVersion")
+    participant_count: int = Field(alias="participantCount")
+    cycle_length: int = Field(alias="cycleLength")
+    cycle_count: int = Field(alias="cycleCount")
+    round_count: int = Field(alias="roundCount")
+    matchup_count: int = Field(alias="matchupCount")
+    bye_count: int = Field(alias="byeCount")
+    eligible_window_count: int = Field(alias="eligibleWindowCount")
+    windows_fingerprint: str = Field(alias="windowsFingerprint")
+    generatable: bool
+    stale: bool
+    rounds: list[CalendarPlannedRoundResponse]
+    windows_used: list[CalendarWindowResponse] = Field(alias="windowsUsed")
+    windows_discarded: list[CalendarWindowResponse] = Field(alias="windowsDiscarded")
+    summary: str
+
+
 class LeagueStandingResponse(ApiModel):
     fantasy_team_id: str = Field(alias="fantasyTeamId")
     team_name: str = Field(alias="teamName")
@@ -368,6 +458,10 @@ class LeagueStandingResponse(ApiModel):
     lost: int
     fantasy_goals_for: int = Field(alias="fantasyGoalsFor")
     fantasy_goals_against: int = Field(alias="fantasyGoalsAgainst")
+    # Fantapunti aggregati (EP13-P02): distinti dai gol fantasy e dai punti
+    # di classifica.
+    fantasy_points_for: float = Field(default=0.0, alias="fantasyPointsFor")
+    fantasy_points_against: float = Field(default=0.0, alias="fantasyPointsAgainst")
     points: int
     computed_at: datetime = Field(alias="computedAt")
 

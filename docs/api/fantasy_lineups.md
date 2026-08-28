@@ -137,6 +137,72 @@ confrontati in UTC) aprono la finestra insieme.
 Ogni mossa applicata conserva `from_payload` / `to_payload` (modulo e liste), autore,
 istante UTC e `sequence` 1–3.
 
+## Formazione automatica dei fantallenatori IA (EP13-P05)
+
+Decisione di riferimento: [`ADR-0005`](../adr/ADR-0005-ai-automatic-lineup.md).
+Motore puro in `fantasy_lineups/ai_selection.py`, orchestrazione in
+`fantasy_lineups/ai_service.py`.
+
+**Perimetro di scrittura.** Il servizio agisce **solo** su squadre la cui
+membership ha `user_type == UserType.AI`. Una squadra umana produce
+`skipped_not_ai` senza alcuna scrittura, anche se non ha formazione. Una
+formazione già schierata a mano non viene mai sovrascritta
+(`skipped_manual`): l'automazione supplisce a un'assenza, non corregge una
+scelta.
+
+**Formula** (`ai_lineup_v1`, deterministica e versionata):
+
+| Segnale | Peso | Fonte |
+| --- | --- | --- |
+| Disponibilità | **filtro assoluto** | `Athlete.injured` |
+| Titolarità ufficiale | 2 | `OfficialLineupEntry.is_starter` |
+| Forma recente | 1 | media `PlayerMatchRating.fantasy_score`, ultime 5 giornate **concluse** |
+
+Un infortunato è **escluso**, non penalizzato. Tie-break: score → presenze
+recenti → `athlete_id`, così a parità totale il risultato è stabile e
+riproducibile, mai casuale.
+
+**Regola anti-vantaggio.** La titolarità ufficiale è usata solo se
+`OfficialLineup.fetched_at` **precede** l'istante di decisione e il calciatore
+non è già bloccato dal fischio d'inizio. Senza `fetched_at` il segnale non
+viene usato: non potendo dimostrare quando il dato è stato acquisito, usarlo
+sarebbe un vantaggio invisibile rispetto ai lock umani. Le distinte acquisite
+prima di EP13-P05 hanno `fetched_at = NULL` e restano quindi ignorate.
+
+**Degrado.** L'automazione non salta mai il turno: senza distinta usa
+disponibilità e forma; senza forma usa disponibilità e ruolo; senza nulla
+schiera una formazione valida ordinata per `athlete_id`, marcata
+`local_fallback`. Una formazione mediocre è preferibile a nessuna formazione,
+perché altrimenti lo scontro diretto è falsato per l'avversario umano. Se la
+rosa non basta a completare il modulo l'esito è `incomplete` e **non viene
+persistito nulla**.
+
+**Tracciabilità.** Ogni formazione automatica persiste su
+`lineup_submissions`: `system_generated_ai`, `ai_algorithm_version`,
+`ai_decided_at` e `ai_decision_log` (score, segnali usati e motivo di
+esclusione per ogni candidato). Senza questi dati la regola anti-vantaggio non
+sarebbe dimostrabile a posteriori. I campi sono esposti in `SavedLineup` e resi
+come badge **«Gestita automaticamente»** su web e mobile.
+
+Migrazione additiva `d6f9a3b1c247`; le formazioni preesistenti restano con
+`system_generated_ai = false`, che è la verità: sono state schierate da persone.
+
+### Esecuzione
+
+| Env | Default | Ruolo |
+| --- | --- | --- |
+| `AI_LINEUPS_AUTO_GENERATE_ENABLED` | `true` | Abilita il beat delle formazioni IA |
+| `AI_LINEUPS_AUTO_GENERATE_INTERVAL_SECONDS` | `1800` | Frequenza del job |
+
+* Task `fantasy_lineups.generate_ai` — turni `scheduled`/`open` delle leghe
+  `active`.
+* `POST /leagues/{league_id}/turni/{round_id}/formazioni-ia` (`league:admin`),
+  con `dry_run=true` per la sola anteprima. Disponibile con parità su web e
+  mobile.
+
+Entrambi sono **idempotenti**: la formula è deterministica e il servizio non
+tocca né le squadre umane né le formazioni già schierate a mano.
+
 ## Entità
 
 | Tabella | Vincoli | Note |

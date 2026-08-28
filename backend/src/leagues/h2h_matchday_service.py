@@ -1,7 +1,8 @@
 """Read-only H2H calendar + matchup detail for /turni (matchday:view).
 
-Mapping ufficiale (EP07-05): ``FantasyRound.number == LeagueCalendarSlot.round_number``
-sulla stessa lega. Formato calendario MVP: solo andata (`single_round_robin`).
+Abbinamento giornata ↔ turno europeo in ``leagues.calendar_round_mapping``:
+esplicito per finestra sui calendari ancorati (EP13-P03), per numero
+progressivo su quelli generati prima (EP07-05).
 """
 
 from __future__ import annotations
@@ -27,6 +28,7 @@ from fantasy_ratings.models import PlayerMatchRating
 from fantasy_teams.models import FantasyTeam
 from fantasy_turns.models import FantasyRound, FantasyRoundFixture
 from fantasy_turns.rules import derive_effective_status
+from leagues.calendar_round_mapping import round_for_h2h_number, rounds_by_h2h_number
 from leagues.models.league_calendar import LeagueCalendar, LeagueCalendarSlot
 from leagues.models.league_membership import LeagueMembership
 from leagues.schemas import (
@@ -55,12 +57,7 @@ def get_h2h_calendar(session: Session, *, league_id: UUID) -> H2HCalendarRespons
             select(FantasyTeam).where(FantasyTeam.league_id == league_id)
         ).all()
     }
-    rounds_by_number = {
-        row.number: row
-        for row in session.scalars(
-            select(FantasyRound).where(FantasyRound.league_id == league_id)
-        ).all()
-    }
+    rounds_by_number = rounds_by_h2h_number(session, league_id=league_id, calendar=calendar)
 
     rounds_map: dict[int, list[LeagueCalendarSlot]] = defaultdict(list)
     for slot in calendar.slots:
@@ -156,12 +153,17 @@ def get_h2h_matchup_detail(
     if slot is None:
         raise ValidationAuthError("Scontro non trovato.", code="matchup_not_found")
 
-    fantasy_round = session.execute(
-        select(FantasyRound).where(
-            FantasyRound.league_id == league_id,
-            FantasyRound.number == slot.round_number,
+    calendar = session.get(LeagueCalendar, slot.calendar_id)
+    fantasy_round = (
+        None
+        if calendar is None
+        else round_for_h2h_number(
+            session,
+            league_id=league_id,
+            calendar=calendar,
+            round_number=slot.round_number,
         )
-    ).scalar_one_or_none()
+    )
 
     european_status = None
     homologation = None
@@ -232,6 +234,7 @@ def _load_confirmed_calendar(session: Session, league_id: UUID) -> LeagueCalenda
             .selectinload(LeagueCalendarSlot.away_membership)
             .selectinload(LeagueMembership.user)
             .selectinload(User.profile),
+            selectinload(LeagueCalendar.round_windows),
         )
     ).first()
     return calendar

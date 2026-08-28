@@ -44,6 +44,7 @@ vi.mock("../api/leagues", () => ({
   saveMyLineup: vi.fn(),
   copyPreviousLineupToDraft: vi.fn(),
   saveLineupDraft: vi.fn(),
+  runAiLineups: vi.fn(),
 }));
 
 function renderRoute(path: string) {
@@ -116,5 +117,20 @@ describe("EP06-06 formation page", () => {
   it("shows loading state", () => {
     const html = renderRoute("/formazione?persona=member&stato=loading");
     expect(html).toContain('data-testid="formation-loading"');
+  });
+});
+
+describe("EP13-P05 admin AI lineup trigger on Formazione (not Turni europei)", () => {
+  it("shows the AI lineup admin card for a league admin", () => {
+    const html = renderRoute("/formazione?persona=admin&stato=success");
+    expect(html).toContain('data-testid="formation-ai-admin"');
+    expect(html).toContain('data-testid="formation-ai-preview"');
+    expect(html).toContain('data-testid="formation-ai-regenerate"');
+    expect(html).toContain("Formazioni IA");
+  });
+
+  it("hides the AI lineup admin card for a plain member", () => {
+    const html = renderRoute("/formazione?persona=member&stato=success");
+    expect(html).not.toContain('data-testid="formation-ai-admin"');
   });
 });

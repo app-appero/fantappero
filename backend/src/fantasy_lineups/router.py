@@ -13,7 +13,13 @@ from auth.exceptions import AuthError
 from authorization.context import LeagueAccess
 from authorization.dependencies import require_league_permissions, require_permissions
 from database.enums import Permission
+from fantasy_lineups.ai_service import (
+    AI_LINEUP_ALGORITHM_VERSION,
+    run_ai_lineups_for_round,
+)
 from fantasy_lineups.schemas import (
+    AiLineupRunResponse,
+    AiLineupTeamResultResponse,
     ComputeEffectiveLineupsRequest,
     ComputeEffectiveLineupsResponse,
     EffectiveLineupResponse,
@@ -191,3 +197,57 @@ def get_round_effective_lineup(
             content={"message": "Formazione effettiva non trovata.", "code": "not_found"},
         )
     return _to_effective_lineup_response(row)
+
+
+@router.post(
+    "/{league_id}/turni/{round_id}/formazioni-ia",
+    response_model=AiLineupRunResponse,
+)
+def run_ai_lineups(
+    round_id: UUID,
+    dry_run: bool = False,
+    league_access: LeagueAccess = Depends(require_league_permissions(Permission.LEAGUE_ADMIN)),
+    session: Session = Depends(get_db_session),
+) -> AiLineupRunResponse | JSONResponse:
+    """Preview o ricalcolo delle formazioni automatiche IA (EP13-P05).
+
+    Idempotente: non tocca le squadre umane né le formazioni già schierate
+    a mano. Con ``dry_run=true`` non persiste nulla.
+    """
+    try:
+        results = run_ai_lineups_for_round(
+            session,
+            league_id=league_access.league.id,
+            round_id=round_id,
+            dry_run=dry_run,
+        )
+    except AuthError as exc:
+        return _error_response(exc)
+
+    if not dry_run:
+        session.commit()
+
+    teams = [
+        AiLineupTeamResultResponse(
+            fantasyTeamId=str(item.fantasy_team_id),
+            fantasyTeamName=item.fantasy_team_name,
+            outcome=item.outcome,
+            message=item.message,
+            starters=0 if item.plan is None else len(item.plan.starters),
+            usedFallback=False if item.plan is None else item.plan.used_fallback,
+        )
+        for item in results
+    ]
+    persisted = sum(1 for item in results if item.outcome in {"created", "updated"})
+    summary = (
+        f"{len(teams)} squadre IA valutate"
+        if dry_run
+        else f"{persisted} formazioni su {len(teams)} squadre IA aggiornate"
+    )
+    return AiLineupRunResponse(
+        roundId=str(round_id),
+        algorithmVersion=AI_LINEUP_ALGORITHM_VERSION,
+        dryRun=dry_run,
+        teams=teams,
+        summary=summary,
+    )

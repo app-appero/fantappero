@@ -1,4 +1,5 @@
 import type { LeagueStanding } from "@fantappero/contracts";
+import { formatFantasyPoints } from "@fantappero/contracts";
 import {
   Breadcrumb,
   Button,
@@ -16,6 +17,10 @@ import { useLocation } from "../router/simpleRouter";
 import { WireframePage } from "../wireframes/WireframePage";
 import { parseWireframeStateFromSearch } from "../wireframes/useWireframeState";
 
+/**
+ * I gol fantasy sono pochi per partita (0–3), i Fantapunti sono la somma dei
+ * punti di formazione: la demo teneva valori da Fantapunti nel campo dei gol.
+ */
 const DEMO_STANDINGS: LeagueStanding[] = [
   {
     fantasyTeamId: "1",
@@ -25,8 +30,10 @@ const DEMO_STANDINGS: LeagueStanding[] = [
     won: 7,
     drawn: 3,
     lost: 1,
-    fantasyGoalsFor: 820,
-    fantasyGoalsAgainst: 760,
+    fantasyGoalsFor: 21,
+    fantasyGoalsAgainst: 12,
+    fantasyPointsFor: 820,
+    fantasyPointsAgainst: 760,
     points: 24,
     computedAt: "2026-08-01T12:00:00.000Z",
   },
@@ -38,8 +45,10 @@ const DEMO_STANDINGS: LeagueStanding[] = [
     won: 6,
     drawn: 4,
     lost: 1,
-    fantasyGoalsFor: 798,
-    fantasyGoalsAgainst: 772,
+    fantasyGoalsFor: 19,
+    fantasyGoalsAgainst: 13,
+    fantasyPointsFor: 798.5,
+    fantasyPointsAgainst: 772,
     points: 22,
     computedAt: "2026-08-01T12:00:00.000Z",
   },
@@ -51,8 +60,10 @@ const DEMO_STANDINGS: LeagueStanding[] = [
     won: 5,
     drawn: 4,
     lost: 2,
-    fantasyGoalsFor: 755,
-    fantasyGoalsAgainst: 780,
+    fantasyGoalsFor: 16,
+    fantasyGoalsAgainst: 17,
+    fantasyPointsFor: 755,
+    fantasyPointsAgainst: 780,
     points: 19,
     computedAt: "2026-08-01T12:00:00.000Z",
   },
@@ -74,6 +85,8 @@ function toTableRows(
       points: row.points,
       goalsFor: row.fantasyGoalsFor,
       goalsAgainst: row.fantasyGoalsAgainst,
+      fantasyPointsFor: formatFantasyPoints(row.fantasyPointsFor),
+      fantasyPointsAgainst: formatFantasyPoints(row.fantasyPointsAgainst),
       isCurrentUser,
       highlightLabel: isCurrentUser ? "Tu" : undefined,
     };
@@ -96,6 +109,7 @@ function StandingsTableBlock({
         playedLabel="G"
         pointsLabel="Pt"
         goalsLabel="GF:GS"
+        fantasyPointsLabel="FP:FS"
         rows={rows}
         testId={testId}
       />

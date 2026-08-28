@@ -1,7 +1,10 @@
 import { Button, Input, Select, UiStatePanel } from "@fantappero/ui";
 import { useCallback, useEffect, useState } from "react";
+import type { FantasyCoachProfile } from "@fantappero/contracts";
+import { formatFantasyPoints } from "@fantappero/contracts";
 import {
   createNamedLeagueInvite,
+  fetchCoachProfile,
   fetchManagerDirectory,
   type FantasyCoachDirectoryItem,
   type PaginatedFantasyCoachDirectory,
@@ -19,6 +22,10 @@ const DEMO_MANAGERS: FantasyCoachDirectoryItem[] = [
     userType: "human",
     availableForInvites: true,
     namedInviteStatus: null,
+    memberSince: "03/2025",
+    concludedLeagues: 3,
+    bestPosition: 1,
+    historySummary: "3 leghe concluse · miglior 1º",
   },
   {
     userId: "manager-paolo",
@@ -27,6 +34,10 @@ const DEMO_MANAGERS: FantasyCoachDirectoryItem[] = [
     userType: "human",
     availableForInvites: false,
     namedInviteStatus: null,
+    memberSince: "11/2025",
+    concludedLeagues: 0,
+    bestPosition: null,
+    historySummary: "Nessuna lega conclusa",
   },
   {
     userId: "manager-ai",
@@ -35,6 +46,10 @@ const DEMO_MANAGERS: FantasyCoachDirectoryItem[] = [
     userType: "ai",
     availableForInvites: true,
     namedInviteStatus: "pending",
+    memberSince: "01/2026",
+    concludedLeagues: 1,
+    bestPosition: 4,
+    historySummary: "1 lega conclusa · miglior 4º",
   },
 ];
 
@@ -59,6 +74,70 @@ function inviteErrorMessage(error: unknown): string {
 
 function userTypeLabel(userType: UserType): string {
   return userType === "ai" ? "IA" : "Manuale";
+}
+
+/** Profilo storico limitato: solo fatti da leghe concluse (EP13-P06). */
+export function CoachProfilePanel({
+  profile,
+  onClose,
+}: {
+  profile: FantasyCoachProfile;
+  onClose: () => void;
+}) {
+  return (
+    <section
+      className="fa-coach-profile"
+      aria-labelledby="coach-profile-title"
+      data-testid="coach-profile"
+    >
+      <h3 id="coach-profile-title">{profile.displayName}</h3>
+      <p>
+        {userTypeLabel(profile.userType)} ·{" "}
+        {profile.availableForInvites ? "Disponibile" : "Non disponibile"}
+        {profile.memberSince ? ` · iscritto da ${profile.memberSince}` : ""}
+      </p>
+      <p data-testid="coach-profile-summary">{profile.historySummary}</p>
+
+      {profile.placements.length === 0 ? (
+        <p data-testid="coach-profile-empty">
+          Nessuna lega conclusa: questo fantallenatore non ha ancora uno storico.
+        </p>
+      ) : (
+        <table data-testid="coach-profile-placements">
+          <caption className="fa-sr-only">Piazzamenti in leghe concluse</caption>
+          <thead>
+            <tr>
+              <th scope="col">Stagione</th>
+              <th scope="col">Posizione</th>
+              <th scope="col">Partite</th>
+              <th scope="col">Punti</th>
+              <th scope="col">Fantapunti</th>
+            </tr>
+          </thead>
+          <tbody>
+            {profile.placements.map((item) => (
+              <tr key={`${item.seasonYear}-${item.position}-${item.participantCount}`}>
+                <td>{item.seasonYear}</td>
+                <td>
+                  {item.position}º su {item.participantCount}
+                </td>
+                <td>{item.played}</td>
+                <td>{item.points}</td>
+                <td>{formatFantasyPoints(item.fantasyPoints)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+
+      <p className="fa-manager-directory__hint">
+        Lo storico mostra solo leghe concluse. I nomi delle leghe non sono visibili.
+      </p>
+      <Button type="button" variant="secondary" onClick={onClose} data-testid="coach-profile-close">
+        Chiudi
+      </Button>
+    </section>
+  );
 }
 
 export function ManagerDirectory({
@@ -94,6 +173,8 @@ export function ManagerDirectory({
   });
   const [workingId, setWorkingId] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [profile, setProfile] = useState<FantasyCoachProfile | null>(null);
+  const [profileError, setProfileError] = useState<string | null>(null);
   const [capacityReached, setCapacityReached] = useState(isDemoMode && demoState === "capacity");
 
   useEffect(() => {
@@ -173,6 +254,41 @@ export function ManagerDirectory({
   useEffect(() => {
     void load();
   }, [load]);
+
+  async function openProfile(manager: FantasyCoachDirectoryItem) {
+    setProfileError(null);
+    if (isDemoMode || !leagueId) {
+      // In demo il profilo si costruisce dalla riga: nessuna chiamata API.
+      setProfile({
+        userId: manager.userId,
+        displayName: manager.displayName,
+        avatarUrl: manager.avatarUrl,
+        userType: manager.userType,
+        availableForInvites: manager.availableForInvites,
+        namedInviteStatus: manager.namedInviteStatus,
+        memberSince: manager.memberSince,
+        concludedLeagues: manager.concludedLeagues,
+        bestPosition: manager.bestPosition,
+        historySummary: manager.historySummary,
+        placements: [],
+        placementsPage: 1,
+        placementsPageSize: 20,
+        placementsTotal: 0,
+      });
+      return;
+    }
+    const stored = loadStoredSession();
+    if (!stored?.accessToken) {
+      setProfileError("Sessione non disponibile. Accedi di nuovo.");
+      return;
+    }
+    try {
+      setProfile(await fetchCoachProfile(stored.accessToken, leagueId, manager.userId));
+    } catch (error) {
+      setProfile(null);
+      setProfileError(getApiErrorMessage(error, "Impossibile caricare il profilo."));
+    }
+  }
 
   async function onInvite(manager: FantasyCoachDirectoryItem) {
     setError(null);
@@ -333,6 +449,14 @@ export function ManagerDirectory({
           testId="manager-directory-empty"
         />
       ) : null}
+      {profileError ? (
+        <p role="alert" data-testid="coach-profile-error">
+          {profileError}
+        </p>
+      ) : null}
+      {profile ? (
+        <CoachProfilePanel profile={profile} onClose={() => setProfile(null)} />
+      ) : null}
       {!loading && !error && result && result.items.length > 0 ? (
         <>
           <ul className="fa-manager-directory__list" data-testid="manager-directory-list">
@@ -345,13 +469,23 @@ export function ManagerDirectory({
                   <span className="fa-manager-directory__avatar" aria-hidden>
                     {manager.displayName.charAt(0)}
                   </span>
-                  <span className="fa-manager-directory__identity">
+                  <button
+                    type="button"
+                    className="fa-manager-directory__identity fa-manager-directory__open"
+                    onClick={() => void openProfile(manager)}
+                    aria-label={`Apri il profilo di ${manager.displayName}`}
+                    data-testid={`manager-open-${manager.userId}`}
+                  >
                     <strong>{manager.displayName}</strong>
                     <small>
                       {userTypeLabel(manager.userType)} ·{" "}
                       {unavailable ? "Non disponibile" : "Disponibile"}
+                      {manager.memberSince ? ` · dal ${manager.memberSince}` : ""}
                     </small>
-                  </span>
+                    <small data-testid={`manager-history-${manager.userId}`}>
+                      {manager.historySummary}
+                    </small>
+                  </button>
                   {leagueId ? (
                     <Button
                       type="button"

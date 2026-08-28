@@ -243,12 +243,19 @@ export function LeagueHomePage() {
       ) : null}
 
       {!loading && !loadError && !league ? (
-        <UiStatePanel
-          state="empty"
-          title="Nessuna lega selezionata"
-          message="Seleziona una lega dall'elenco oppure entra con un invito."
-          testId="league-home-empty"
-        />
+        <>
+          <UiStatePanel
+            state="empty"
+            title="Nessuna lega selezionata"
+            message="Seleziona una lega dall'elenco oppure entra con un invito."
+            testId="league-home-empty"
+          />
+          <p>
+            <Link to="/leghe" data-testid="league-home-empty-cta">
+              Vai a Le mie leghe
+            </Link>
+          </p>
+        </>
       ) : null}
 
       {!loading && !loadError && league ? (

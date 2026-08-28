@@ -89,6 +89,8 @@ def compute_league_standings(session: Session, *, league_id: UUID) -> LeagueStan
                     home_fantasy_goals=slot.home_fantasy_goals or 0,
                     away_fantasy_goals=slot.away_fantasy_goals or 0,
                     outcome=slot.outcome,
+                    home_fantasy_points=slot.home_score,
+                    away_fantasy_points=slot.away_score,
                 )
             )
 
@@ -174,6 +176,8 @@ def _upsert_standing(
             lost=record.lost,
             fantasy_goals_for=record.fantasy_goals_for,
             fantasy_goals_against=record.fantasy_goals_against,
+            fantasy_points_for=record.fantasy_points_for,
+            fantasy_points_against=record.fantasy_points_against,
             points=record.points,
             position=position,
             computed_at=computed_at,
@@ -189,6 +193,8 @@ def _upsert_standing(
         and row.lost == record.lost
         and row.fantasy_goals_for == record.fantasy_goals_for
         and row.fantasy_goals_against == record.fantasy_goals_against
+        and row.fantasy_points_for == record.fantasy_points_for
+        and row.fantasy_points_against == record.fantasy_points_against
         and row.points == record.points
         and row.position == position
     )
@@ -202,6 +208,8 @@ def _upsert_standing(
     row.lost = record.lost
     row.fantasy_goals_for = record.fantasy_goals_for
     row.fantasy_goals_against = record.fantasy_goals_against
+    row.fantasy_points_for = record.fantasy_points_for
+    row.fantasy_points_against = record.fantasy_points_against
     row.points = record.points
     row.position = position
     row.computed_at = computed_at

@@ -24,7 +24,11 @@ from fantasy_turns.models import FantasyRound, FantasyRoundFixture
 from leagues.models.competition import Competition
 from leagues.models.league import League
 from leagues.models.league_audit_event import LeagueAuditEvent
-from leagues.models.league_calendar import LeagueCalendar, LeagueCalendarSlot
+from leagues.models.league_calendar import (
+    LeagueCalendar,
+    LeagueCalendarRoundWindow,
+    LeagueCalendarSlot,
+)
 from leagues.models.league_competition import LeagueCompetition
 from leagues.models.league_invite import LeagueInvite
 from leagues.models.league_membership import LeagueMembership
@@ -65,6 +69,7 @@ __all__ = [
     "League",
     "LeagueAuditEvent",
     "LeagueCalendar",
+    "LeagueCalendarRoundWindow",
     "LeagueCalendarSlot",
     "LeagueCompetition",
     "LeagueInvite",

@@ -30,6 +30,7 @@ import {
   StandingsPage,
 } from "./pages/AppPages";
 import { DevShowcasePage } from "./pages/DevShowcasePage";
+import { FixtureDetailPage } from "./pages/FixtureDetailPage";
 import { WireframesHubPage } from "./pages/WireframesHubPage";
 import { useLocation } from "./router/simpleRouter";
 
@@ -139,6 +140,16 @@ export function AppRoutes() {
       <AppSection>
         <RequirePermissions required={["matchday:view"]}>
           <MatchupDetailPage />
+        </RequirePermissions>
+      </AppSection>
+    );
+  }
+
+  if (pathname.startsWith("/turni/") && pathname.includes("/partite/")) {
+    return (
+      <AppSection>
+        <RequirePermissions required={["matchday:view"]}>
+          <FixtureDetailPage />
         </RequirePermissions>
       </AppSection>
     );

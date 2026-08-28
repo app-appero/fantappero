@@ -24,6 +24,74 @@ export interface FantasyTurnFixture {
   awayClubName: string;
   competitionName: string | null;
   providerId: number;
+  /** Ultimo aggiornamento del dato normalizzato (EP13-P04). */
+  updatedAt: string | null;
+  feedState: ProviderFeedState;
+  feedStateLabel: string;
+}
+
+/**
+ * Quanto ci si può fidare di ciò che si vede (EP13-P04). Derivato dall'ultimo
+ * aggiornamento normalizzato: è un'inferenza, non un fatto registrato.
+ */
+export type ProviderFeedState =
+  | "fresh"
+  | "delayed"
+  | "stale"
+  | "degraded"
+  | "unavailable";
+
+export interface FixtureTimelineEvent {
+  id: string;
+  minuteElapsed: number | null;
+  minuteExtra: number | null;
+  /** Già formattato: `45+2'`, oppure `—` se il minuto non è noto. */
+  minuteLabel: string;
+  eventType: string;
+  eventDetail: string | null;
+  scoringKind: string | null;
+  clubName: string | null;
+  athleteName: string | null;
+  relatedAthleteName: string | null;
+  comments: string | null;
+}
+
+export interface FixtureLineupPlayer {
+  athleteId: string | null;
+  name: string;
+  shirtNumber: number | null;
+  position: string | null;
+  grid: string | null;
+}
+
+export interface FixtureLineup {
+  clubName: string;
+  formation: string | null;
+  starters: FixtureLineupPlayer[];
+  bench: FixtureLineupPlayer[];
+}
+
+/** Dettaglio partita live: risultato, formazioni ufficiali e cronologia. */
+export interface FixtureLiveDetail {
+  fixtureId: string;
+  turnId: string;
+  leagueId: string;
+  providerId: number;
+  competitionName: string | null;
+  homeClubName: string;
+  awayClubName: string;
+  homeGoals: number | null;
+  awayGoals: number | null;
+  statusShort: string;
+  statusElapsed: number | null;
+  kickoffAt: string | null;
+  updatedAt: string | null;
+  feedState: ProviderFeedState;
+  feedStateLabel: string;
+  /** `null` quando la formazione ufficiale non è ancora pubblicata. */
+  homeLineup: FixtureLineup | null;
+  awayLineup: FixtureLineup | null;
+  events: FixtureTimelineEvent[];
 }
 
 export interface FantasyTurnSummary {

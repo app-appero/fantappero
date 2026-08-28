@@ -385,12 +385,16 @@ def retract_missing_events(
     source_prefix: str = "events",
 ) -> None:
     """Mark active timeline events absent from the latest payload as retracted."""
-    rows = session.execute(
-        select(MatchEvent).where(
-            MatchEvent.fixture_id == fixture_id,
-            MatchEvent.is_active.is_(True),
-        ),
-    ).scalars().all()
+    rows = (
+        session.execute(
+            select(MatchEvent).where(
+                MatchEvent.fixture_id == fixture_id,
+                MatchEvent.is_active.is_(True),
+            ),
+        )
+        .scalars()
+        .all()
+    )
     now = datetime.now(UTC)
     for row in rows:
         sources = row.sources if isinstance(row.sources, list) else []
@@ -431,16 +435,24 @@ def upsert_official_lineup(
             OfficialLineup.club_id == club.id,
         ),
     ).scalar_one_or_none()
+    # Istante di acquisizione: prova che il dato esisteva prima di una
+    # decisione automatica (ADR-0005). Impostato una sola volta alla prima
+    # comparsa della distinta, così una ri-sincronizzazione non lo "ringiovanisce".
+    fetched_at = datetime.now(UTC)
+
     if row is None:
         row = OfficialLineup(
             fixture_id=fixture.id,
             club_id=club.id,
             formation=mapped.formation,
+            fetched_at=fetched_at,
         )
         session.add(row)
         session.flush()
         counters.incr_entity("lineups", "created")
     else:
+        if row.fetched_at is None:
+            row.fetched_at = fetched_at
         if row.formation != mapped.formation:
             row.formation = mapped.formation
             _touch_updated_at(row)
@@ -492,12 +504,16 @@ def upsert_official_lineup(
             else:
                 counters.incr_entity("lineup_entries", "unchanged")
 
-    stale = session.execute(
-        select(OfficialLineupEntry).where(
-            OfficialLineupEntry.lineup_id == row.id,
-            OfficialLineupEntry.athlete_provider_id.not_in(seen_provider_ids or {-1}),
-        ),
-    ).scalars().all()
+    stale = (
+        session.execute(
+            select(OfficialLineupEntry).where(
+                OfficialLineupEntry.lineup_id == row.id,
+                OfficialLineupEntry.athlete_provider_id.not_in(seen_provider_ids or {-1}),
+            ),
+        )
+        .scalars()
+        .all()
+    )
     for entry_row in stale:
         session.delete(entry_row)
         counters.incr_entity("lineup_entries", "removed")

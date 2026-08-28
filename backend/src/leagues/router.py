@@ -45,9 +45,11 @@ from leagues.schemas import (
     CreateLeagueRequest,
     CreateNamedLeagueInviteRequest,
     FantasyCoachDirectoryResponse,
+    FantasyCoachProfileResponse,
     H2HCalendarResponse,
     H2HMatchupDetailResponse,
     LeagueAdminPanelResponse,
+    LeagueCalendarPlanResponse,
     LeagueCalendarResponse,
     LeagueDetailResponse,
     LeagueInviteResponse,
@@ -60,6 +62,7 @@ from leagues.schemas import (
     LeagueStandingResponse,
     LeagueSummaryResponse,
     NamedLeagueInviteResponse,
+    PendingInviteCountResponse,
     RespondNamedLeagueInviteResponse,
     SetLeagueRoleOverrideRequest,
     TransitionLeagueStateRequest,
@@ -167,6 +170,18 @@ def accept_league_invite(
 
 
 @router.get(
+    "/inviti-ricevuti/conteggio",
+    response_model=PendingInviteCountResponse,
+)
+def count_pending_named_invites(
+    current_user: User = Depends(require_permissions(Permission.LEAGUE_VIEW)),
+    service: NamedLeagueInviteService = Depends(get_named_league_invite_service),
+) -> PendingInviteCountResponse:
+    """Inviti pendenti per il badge rosso (EP13-P07)."""
+    return service.pending_count(current_user)
+
+
+@router.get(
     "/inviti-ricevuti",
     response_model=list[NamedLeagueInviteResponse],
 )
@@ -242,6 +257,24 @@ def list_league_members_public(
 ) -> list[LeagueMemberResponse]:
     """Read-only participant roster for any league member (EP03-UX-02)."""
     return service.list(league_access)
+
+
+@router.get(
+    "/{league_id}/amministrazione/fantallenatori/{user_id}",
+    response_model=FantasyCoachProfileResponse,
+)
+def get_fantasy_coach_profile(
+    user_id: UUID,
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=20, ge=1, le=50, alias="pageSize"),
+    league_access: LeagueAccess = Depends(require_league_permissions(Permission.LEAGUE_ADMIN)),
+    service: NamedLeagueInviteService = Depends(get_named_league_invite_service),
+) -> FantasyCoachProfileResponse | JSONResponse:
+    """Profilo storico limitato di un fantallenatore (EP13-P06)."""
+    try:
+        return service.coach_profile(league_access, user_id, page=page, page_size=page_size)
+    except AuthError as exc:
+        return _error_response(exc)
 
 
 @router.get(
@@ -345,6 +378,18 @@ def get_admin_league_calendar(
 ) -> LeagueCalendarResponse | None:
     """Return the current draft or confirmed H2H calendar for league administration."""
     return service.get_admin_calendar(league_access)
+
+
+@router.get(
+    "/{league_id}/amministrazione/calendario/finestre",
+    response_model=LeagueCalendarPlanResponse,
+)
+def get_league_calendar_plan(
+    league_access: LeagueAccess = Depends(require_league_permissions(Permission.LEAGUE_ADMIN)),
+    service: LeagueCalendarService = Depends(get_league_calendar_service),
+) -> LeagueCalendarPlanResponse:
+    """Anteprima finestre europee: usate, scartate e motivo (EP13-P03)."""
+    return service.plan_preview_response(league_access)
 
 
 @router.post(
@@ -636,6 +681,8 @@ def get_league_standings(
             lost=row.lost,
             fantasyGoalsFor=row.fantasy_goals_for,
             fantasyGoalsAgainst=row.fantasy_goals_against,
+            fantasyPointsFor=row.fantasy_points_for,
+            fantasyPointsAgainst=row.fantasy_points_against,
             points=row.points,
             computedAt=row.computed_at,
         )

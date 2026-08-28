@@ -16,6 +16,14 @@ function renderAt(path: string, search = "?persona=admin&stato=success") {
   );
 }
 
+/** Isola il markup della sidebar: le pagine possono contenere gli stessi link. */
+function sidebarMarkup(html: string): string {
+  const start = html.indexOf('data-testid="sidebar-nav"');
+  expect(start).toBeGreaterThan(-1);
+  const end = html.indexOf("</nav>", start);
+  return html.slice(start, end);
+}
+
 describe("App navigation shell (EPUI-03)", () => {
   it("renders member app layout with sidebar and bottom nav on /turni", () => {
     const html = renderAt("/turni");
@@ -26,13 +34,34 @@ describe("App navigation shell (EPUI-03)", () => {
   });
 
   it("hides league admin link for default member persona", () => {
-    const html = renderAt("/leghe", "?persona=member&stato=success");
-    expect(html).not.toContain("Admin lega");
+    const sidebar = sidebarMarkup(renderAt("/leghe", "?persona=member&stato=success"));
+    expect(sidebar).not.toContain("Amministrazione lega");
+    expect(sidebar).not.toContain('href="/lega/amministrazione"');
   });
 
   it("shows league admin link when persona=admin", () => {
-    const html = renderAt("/leghe", "?persona=admin&stato=success");
-    expect(html).toContain("Admin lega");
+    const sidebar = sidebarMarkup(renderAt("/leghe", "?persona=admin&stato=success"));
+    expect(sidebar).toContain("Amministrazione lega");
+    expect(sidebar).toContain('href="/lega/amministrazione"');
+  });
+
+  it("renders the collapsible Lega group in the sidebar", () => {
+    const sidebar = sidebarMarkup(renderAt("/leghe", "?persona=admin&stato=success"));
+    expect(sidebar).toContain('data-testid="sidebar-nav-group-league"');
+    expect(sidebar).toContain('aria-expanded="true"');
+    expect(sidebar).toContain("Le mie leghe");
+    expect(sidebar).toContain('href="/lega/home"');
+  });
+
+  it("keeps Turni and Inviti outside the Lega group", () => {
+    const sidebar = sidebarMarkup(renderAt("/leghe", "?persona=admin&stato=success"));
+    const groupStart = sidebar.indexOf('class="fa-sidebar-nav__group-list"');
+    expect(groupStart).toBeGreaterThan(-1);
+    const insideGroup = sidebar.slice(groupStart, sidebar.indexOf("</ul>", groupStart));
+    expect(insideGroup).not.toContain('href="/turni"');
+    expect(insideGroup).not.toContain('href="/inviti"');
+    expect(sidebar).toContain('href="/turni"');
+    expect(sidebar).toContain('href="/inviti"');
   });
 
   it("blocks league admin route for members with forbidden state", () => {

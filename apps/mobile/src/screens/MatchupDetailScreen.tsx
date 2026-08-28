@@ -1,4 +1,11 @@
 import type { H2HMatchupDetail, H2HPlayerScore, H2HSideLineup } from "@fantappero/contracts";
+import {
+  H2H_GOALS_LABEL,
+  H2H_POINTS_LABEL,
+  describeH2HResult,
+  formatFantasyGoals,
+  formatFantasyPoints,
+} from "@fantappero/contracts";
 import { theme } from "@fantappero/ui/theme";
 import { useNavigation, useRoute, type RouteProp } from "@react-navigation/core";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
@@ -42,8 +49,8 @@ function SideBlock({ side, title }: { side: H2HSideLineup; title: string }) {
         {side.module ? ` · ${side.module}` : ""}
       </Text>
       <Text style={styles.body}>
-        Punti: {side.totalScore !== null ? side.totalScore.toFixed(1) : "—"} · Gol fantasy:{" "}
-        {side.fantasyGoals !== null ? side.fantasyGoals : "—"} · Fonte:{" "}
+        {H2H_POINTS_LABEL}: {formatFantasyPoints(side.totalScore)} · {H2H_GOALS_LABEL}:{" "}
+        {formatFantasyGoals(side.fantasyGoals)} · Fonte:{" "}
         {side.lineupSource === "effective"
           ? "formazione effettiva"
           : side.lineupSource === "submitted"
@@ -90,6 +97,7 @@ export function MatchupDetailScreen() {
   const canView = can(["matchday:view"]);
 
   const [detail, setDetail] = useState<H2HMatchupDetail | null>(null);
+  const resultDisplay = describeH2HResult(detail?.result);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -200,8 +208,8 @@ export function MatchupDetailScreen() {
             ) : null}
             {detail.result ? (
               <StatusBadge
-                label={detail.result.resultFinal ? "Finale" : "Provvisorio"}
-                color={detail.result.resultFinal ? colors.success : colors.warning}
+                label={resultDisplay.statusLabel}
+                color={resultDisplay.status === "final" ? colors.success : colors.warning}
                 textColor={colors.accentContrast}
                 testID="matchup-result-status"
               />
@@ -224,14 +232,30 @@ export function MatchupDetailScreen() {
             <>
               <View style={styles.stack} testID="matchup-result-summary">
                 <Text style={styles.body}>
-                  {detail.home.teamName ?? detail.home.displayName}{" "}
-                  {detail.result?.homeFantasyGoals ?? "—"}–{detail.result?.awayFantasyGoals ?? "—"}{" "}
+                  {detail.home.teamName ?? detail.home.displayName} contro{" "}
                   {detail.away?.teamName ?? detail.away?.displayName ?? "Avversario"}
                 </Text>
+                <View style={styles.scoreBox} testID="matchup-result-score">
+                  <View style={styles.scoreRow}>
+                    <Text style={styles.scoreTerm}>{H2H_GOALS_LABEL}</Text>
+                    <Text style={styles.scoreValue} testID="matchup-result-goals">
+                      {resultDisplay.goalsLine}
+                    </Text>
+                  </View>
+                  <View style={styles.scoreRow}>
+                    <Text style={styles.scoreTerm}>{H2H_POINTS_LABEL}</Text>
+                    <Text style={styles.scoreValue} testID="matchup-result-points">
+                      {resultDisplay.pointsLine}
+                    </Text>
+                  </View>
+                </View>
+                {resultDisplay.unavailableHint ? (
+                  <Text style={styles.body} testID="matchup-result-hint">
+                    {resultDisplay.unavailableHint}
+                  </Text>
+                ) : null}
                 <Text style={styles.body}>
-                  Punti {detail.home.totalScore?.toFixed(1) ?? "—"} –{" "}
-                  {detail.away?.totalScore?.toFixed(1) ?? "—"} ·{" "}
-                  {outcomeLabel(detail.result?.outcome ?? null)}
+                  {resultDisplay.statusLabel} · {outcomeLabel(detail.result?.outcome ?? null)}
                 </Text>
               </View>
               <View style={styles.sides}>
@@ -247,6 +271,32 @@ export function MatchupDetailScreen() {
 }
 
 const styles = StyleSheet.create({
+  scoreBox: {
+    gap: spacing.xs,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+  },
+  scoreRow: {
+    flexDirection: "row",
+    alignItems: "baseline",
+    justifyContent: "space-between",
+    gap: spacing.sm,
+  },
+  scoreTerm: {
+    color: colors.foregroundMuted,
+    fontSize: typography.fontSize.sm,
+    fontWeight: "600",
+    textTransform: "uppercase",
+    letterSpacing: 0.4,
+  },
+  scoreValue: {
+    color: colors.foreground,
+    fontSize: typography.fontSize.md,
+    fontWeight: "700",
+  },
   stack: {
     gap: spacing.md,
   },

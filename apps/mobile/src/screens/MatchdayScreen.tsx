@@ -304,10 +304,30 @@ export function MatchdayScreen() {
             ) : null}
             {selected.fixtures.map((fixture) => (
               <View key={fixture.id} style={styles.fixtureRow}>
-                <Text style={styles.body}>
-                  {fixture.homeClubName} – {fixture.awayClubName} ({formatDateTime(fixture.kickoffAt)}) —{" "}
-                  {MATCH_STATUS_LABEL[mapFixtureMatchStatus(fixture.statusShort)] ?? fixture.statusShort}
-                  {fixture.lockLatchedAt ? " — bloccata" : ""}
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={`${fixture.homeClubName} contro ${fixture.awayClubName}, dettaglio partita`}
+                  onPress={() =>
+                    navigation.navigate("FixtureDetail", {
+                      turnId: selected.id,
+                      fixtureId: fixture.fixtureId,
+                    })
+                  }
+                  testID={`matchday-fixture-link-${fixture.fixtureId}`}
+                >
+                  <Text style={styles.body}>
+                    {fixture.homeClubName} – {fixture.awayClubName} (
+                    {formatDateTime(fixture.kickoffAt)}) —{" "}
+                    {MATCH_STATUS_LABEL[mapFixtureMatchStatus(fixture.statusShort)] ??
+                      fixture.statusShort}
+                    {fixture.lockLatchedAt ? " — bloccata" : ""}
+                  </Text>
+                </Pressable>
+                <Text style={styles.hint} testID={`matchday-fixture-feed-${fixture.fixtureId}`}>
+                  {fixture.feedStateLabel}
+                  {fixture.updatedAt
+                    ? ` · ultimo aggiornamento ${formatDateTime(fixture.updatedAt)}`
+                    : ""}
                 </Text>
                 {isAdmin && selected.modificationAllowed ? (
                   <Pressable
@@ -532,6 +552,10 @@ const styles = StyleSheet.create({
   body: {
     color: colors.foreground,
     fontSize: typography.fontSize.md,
+  },
+  hint: {
+    color: colors.foregroundMuted,
+    fontSize: typography.fontSize.sm,
   },
   chip: {
     borderWidth: 1,

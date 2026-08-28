@@ -90,7 +90,10 @@ export type {
   LeagueAdminPanel,
   LeagueCalendar,
   LeagueCalendarFormat,
+  CalendarPlannedRound,
+  CalendarWindow,
   LeagueCalendarMatchup,
+  LeagueCalendarPlan,
   LeagueCalendarRound,
   LeagueCalendarStatus,
   H2HCalendar,
@@ -120,10 +123,13 @@ export type {
   TransitionLeagueStateRequest,
   UpdateLeagueRulesRequest,
   CreateNamedLeagueInviteRequest,
+  CoachPlacement,
   FantasyCoachDirectoryItem,
+  FantasyCoachProfile,
   NamedLeagueInvite,
   NamedLeagueInviteStatus,
   PaginatedFantasyCoachDirectory,
+  PendingInviteCount,
   RespondedNamedLeagueInvite,
 } from "./leagues.js";
 
@@ -143,6 +149,11 @@ export type {
   FantasyRoundHomologationStatus,
   FantasyTurnDetail,
   FantasyTurnFixture,
+  FixtureLineup,
+  FixtureLineupPlayer,
+  FixtureLiveDetail,
+  FixtureTimelineEvent,
+  ProviderFeedState,
   FantasyTurnKind,
   FantasyTurnPreview,
   FantasyTurnStatus,
@@ -154,6 +165,8 @@ export type {
 export type {
   CopyLineupResult,
   FantasyModule,
+  AiLineupRun,
+  AiLineupTeamResult,
   LineupContext,
   LineupDraft,
   LineupEvaluation,
@@ -201,6 +214,17 @@ export {
   starterTemplate,
 } from "./fantasyLineups.js";
 
+export {
+  H2H_GOALS_LABEL,
+  H2H_POINTS_LABEL,
+  H2H_VALUE_UNAVAILABLE,
+  describeH2HResult,
+  formatFantasyGoals,
+  formatFantasyPoints,
+  h2hResultAriaLabel,
+} from "./h2hScore.js";
+export type { H2HResultDisplay, H2HResultStatus } from "./h2hScore.js";
+
 export type {
   CounterTradeProposalRequest,
   CreateMarketSessionRequest,
@@ -229,7 +253,12 @@ export type {
   TradeStatus,
 } from "./market.js";
 
-export type { BreadcrumbItem, NavItemDefinition, NavSurface } from "./navigation.js";
+export type {
+  BreadcrumbItem,
+  NavGroupDefinition,
+  NavItemDefinition,
+  NavSurface,
+} from "./navigation.js";
 
 export {
   ALL_MACROFLOWS,

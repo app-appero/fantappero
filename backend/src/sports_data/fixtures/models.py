@@ -147,6 +147,11 @@ class OfficialLineup(Base, UUIDPrimaryKeyMixin, TimestampMixin):
         index=True,
     )
     formation: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    # Istante di acquisizione dal provider (EP13-P05 / ADR-0005). Distinto da
+    # `updated_at`, che cambia a ogni ri-sincronizzazione: senza questo campo
+    # non si potrebbe dimostrare che la formazione automatica IA non ha usato
+    # dati arrivati dopo il lock.
+    fetched_at: Mapped[datetime | None] = mapped_column(UTCDateTime(), nullable=True)
 
     fixture: Mapped[Fixture] = relationship(back_populates="official_lineups")
     club: Mapped[Club] = relationship()

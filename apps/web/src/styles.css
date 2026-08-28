@@ -883,6 +883,48 @@ button.fa-link-muted,
   padding: var(--fa-space-lg);
 }
 
+/* ── Punti e Gol fantasy esplicitati (EP13-P02) ─────────────────────── */
+
+.fa-h2h-score {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fa-space-xs);
+  margin: var(--fa-space-sm) 0 0;
+  padding: var(--fa-space-sm) var(--fa-space-md);
+  border: 1px solid var(--fa-color-border);
+  border-radius: var(--fa-radius-md);
+}
+
+.fa-h2h-score__row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--fa-space-sm);
+}
+
+.fa-h2h-score__term {
+  margin: 0;
+  color: var(--fa-color-foreground-muted);
+  font-size: var(--fa-text-xs);
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.fa-h2h-score__value {
+  margin: 0;
+  color: var(--fa-color-foreground);
+  font-size: var(--fa-text-sm);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.fa-h2h-score__hint {
+  margin: var(--fa-space-xs) 0 0;
+  color: var(--fa-color-foreground-muted);
+  font-size: var(--fa-text-xs);
+}
+
 .fa-matchday-competition {
   display: flex;
   flex-direction: column;

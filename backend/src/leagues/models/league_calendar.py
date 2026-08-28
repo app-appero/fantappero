@@ -77,6 +77,12 @@ class LeagueCalendar(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     round_count: Mapped[int] = mapped_column(Integer, nullable=False)
     matchup_count: Mapped[int] = mapped_column(Integer, nullable=False)
     bye_count: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("0"))
+    # Cicli round-robin completi ospitati dalle finestre europee (EP13-P03).
+    # NULL sui calendari generati prima dell'ancoraggio alle finestre.
+    cycle_length: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    cycle_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    # Impronta delle finestre eleggibili: se cambia, la preview è stale.
+    windows_fingerprint: Mapped[str | None] = mapped_column(String(64), nullable=True)
     generated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     confirmed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
@@ -86,6 +92,56 @@ class LeagueCalendar(Base, UUIDPrimaryKeyMixin, TimestampMixin):
         cascade="all, delete-orphan",
         order_by="LeagueCalendarSlot.round_number, LeagueCalendarSlot.slot_index",
     )
+    round_windows: Mapped[list[LeagueCalendarRoundWindow]] = relationship(
+        back_populates="calendar",
+        cascade="all, delete-orphan",
+        order_by="LeagueCalendarRoundWindow.round_number",
+    )
+
+
+class LeagueCalendarRoundWindow(Base, UUIDPrimaryKeyMixin, TimestampMixin):
+    """Mappatura esplicita giornata H2H → finestra europea (EP13-P03).
+
+    Sostituisce l'uguaglianza implicita ``FantasyRound.number ==
+    LeagueCalendarSlot.round_number``, che contava anche le finestre sotto
+    soglia: una giornata associata a un turno ``skipped`` non era giocabile.
+    """
+
+    __tablename__ = "league_calendar_round_windows"
+    __table_args__ = (
+        UniqueConstraint(
+            "calendar_id",
+            "round_number",
+            name="uq_league_calendar_round_windows_round",
+        ),
+        UniqueConstraint(
+            "calendar_id",
+            "window_start_at",
+            name="uq_league_calendar_round_windows_window",
+        ),
+        Index("ix_league_calendar_round_windows_calendar_id", "calendar_id"),
+        CheckConstraint(
+            "round_number > 0",
+            name="ck_league_calendar_round_windows_round",
+        ),
+        CheckConstraint(
+            "window_end_at > window_start_at",
+            name="ck_league_calendar_round_windows_order",
+        ),
+    )
+
+    calendar_id: Mapped[UUID] = mapped_column(
+        ForeignKey("league_calendars.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    round_number: Mapped[int] = mapped_column(Integer, nullable=False)
+    cycle_number: Mapped[int] = mapped_column(Integer, nullable=False)
+    cycle_round_number: Mapped[int] = mapped_column(Integer, nullable=False)
+    window_start_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    window_end_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    window_kind: Mapped[str] = mapped_column(String(16), nullable=False)
+
+    calendar: Mapped[LeagueCalendar] = relationship(back_populates="round_windows")
 
 
 class LeagueCalendarSlot(Base, UUIDPrimaryKeyMixin, TimestampMixin):

@@ -60,6 +60,27 @@ def _render_sistema_generico(params: NotificationParams) -> NotificationContent:
     )
 
 
+@register_template("sistema.invito_lega", 1)
+def _render_sistema_invito_lega(params: NotificationParams) -> NotificationContent:
+    """Invito nominativo ricevuto (EP13-P07).
+
+    Il deep link porta agli inviti, non alla lega: finché l'invito non è
+    accettato il destinatario non ha accesso alla lega.
+    """
+    league_name = params.get("league_name", "una lega")
+    inviter = params.get("inviter_name")
+    body = (
+        f"{inviter} ti ha invitato a «{league_name}»."
+        if inviter
+        else f"Hai ricevuto un invito per «{league_name}»."
+    )
+    return NotificationContent(
+        title="Nuovo invito a una lega",
+        body=f"{body} Accetta o rifiuta dagli inviti ricevuti.",
+        deep_link="/inviti",
+    )
+
+
 @register_template("formazione.scadenza_turno", 1)
 def _render_formazione_scadenza_turno(params: NotificationParams) -> NotificationContent:
     round_number = params.get("round_number")

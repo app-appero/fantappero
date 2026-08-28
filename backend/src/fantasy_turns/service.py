@@ -20,6 +20,11 @@ from database.enums import (
     LeagueMemberRole,
     LeagueState,
 )
+from fantasy_turns.live_view import (
+    PROVIDER_FEED_LABELS,
+    FixtureFreshness,
+    fixture_feed_state,
+)
 from fantasy_turns.models import FantasyRound, FantasyRoundFixture
 from fantasy_turns.rules import (
     EligibleFixtureRef,
@@ -66,6 +71,46 @@ class EnsureWindowResult:
     outcome: str  # created | upgraded | duplicate | waiting
     round_id: UUID | None = None
     opened: bool = False
+
+
+def load_league_candidate_fixtures(session: Session, league: League) -> list[EligibleFixtureRef]:
+    """Fixture della stagione per le competizioni scelte dalla lega.
+
+    Condiviso con la pianificazione del calendario H2H (EP13-P03): entrambi
+    devono guardare esattamente lo stesso insieme di partite, altrimenti la
+    preview delle finestre e i turni realmente generati divergono.
+    """
+    competition_ids = session.scalars(
+        select(LeagueCompetition.competition_id).where(LeagueCompetition.league_id == league.id)
+    ).all()
+    if not competition_ids:
+        return []
+    season_ids = session.scalars(
+        select(SportSeason.id).where(
+            SportSeason.competition_id.in_(competition_ids),
+            SportSeason.year == league.season_year,
+        )
+    ).all()
+    if not season_ids:
+        return []
+    rows = session.execute(
+        select(Fixture.id, Fixture.kickoff_at, Fixture.status_short).where(
+            Fixture.sport_season_id.in_(season_ids),
+            Fixture.kickoff_at.is_not(None),
+        )
+    ).all()
+    result: list[EligibleFixtureRef] = []
+    for fixture_id, kickoff_at, status_short in rows:
+        if kickoff_at is None:
+            continue
+        result.append(
+            EligibleFixtureRef(
+                fixture_id=fixture_id,
+                kickoff_at=kickoff_at,
+                status_short=status_short,
+            )
+        )
+    return result
 
 
 class FantasyTurnService:
@@ -794,37 +839,7 @@ class FantasyTurnService:
         return updated
 
     def _load_candidate_fixtures(self, league: League) -> list[EligibleFixtureRef]:
-        competition_ids = self._session.scalars(
-            select(LeagueCompetition.competition_id).where(LeagueCompetition.league_id == league.id)
-        ).all()
-        if not competition_ids:
-            return []
-        season_ids = self._session.scalars(
-            select(SportSeason.id).where(
-                SportSeason.competition_id.in_(competition_ids),
-                SportSeason.year == league.season_year,
-            )
-        ).all()
-        if not season_ids:
-            return []
-        rows = self._session.execute(
-            select(Fixture.id, Fixture.kickoff_at, Fixture.status_short).where(
-                Fixture.sport_season_id.in_(season_ids),
-                Fixture.kickoff_at.is_not(None),
-            )
-        ).all()
-        result: list[EligibleFixtureRef] = []
-        for fixture_id, kickoff_at, status_short in rows:
-            if kickoff_at is None:
-                continue
-            result.append(
-                EligibleFixtureRef(
-                    fixture_id=fixture_id,
-                    kickoff_at=kickoff_at,
-                    status_short=status_short,
-                )
-            )
-        return result
+        return load_league_candidate_fixtures(self._session, league)
 
     def _active_assigned_fixture_ids(self, league_id: UUID) -> set[UUID]:
         rows = self._session.scalars(
@@ -1017,6 +1032,15 @@ class FantasyTurnService:
         competition = None
         if fixture and fixture.sport_season and fixture.sport_season.competition:
             competition = fixture.sport_season.competition.name
+        # Freschezza del feed (EP13-P04): derivata dall'ultimo aggiornamento
+        # normalizzato confrontato con lo stato della partita.
+        feed_state = fixture_feed_state(
+            FixtureFreshness(
+                status_short=fixture.status_short if fixture else "NS",
+                updated_at=fixture.updated_at if fixture else None,
+            ),
+            now=datetime.now(UTC),
+        )
         return FantasyTurnFixtureResponse(
             id=str(link.id),
             fixtureId=str(link.fixture_id),
@@ -1033,6 +1057,9 @@ class FantasyTurnService:
             awayClubName=away,
             competitionName=competition,
             providerId=fixture.provider_id if fixture else 0,
+            updatedAt=fixture.updated_at if fixture else None,
+            feedState=feed_state.value,
+            feedStateLabel=PROVIDER_FEED_LABELS[feed_state],
         )
 
     def _add_audit(

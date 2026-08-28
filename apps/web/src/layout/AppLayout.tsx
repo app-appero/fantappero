@@ -6,11 +6,19 @@ import {
   LeagueSelector,
   SidebarNav,
 } from "@fantappero/ui";
-import { type ReactNode } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { Link, useLocation } from "../router/simpleRouter";
 import { useAuth } from "../auth/AuthContext";
 import { LogoutButton } from "../auth/LogoutButton";
-import { ADMIN_NAV_ITEMS, APP_NAV_ITEMS, filterNavItems } from "../navigation/navConfig";
+import { fetchPendingInviteCount } from "../api/managerInvites";
+import { loadStoredSession } from "../auth/sessionStorage";
+import {
+  ADMIN_NAV_ITEMS,
+  APP_NAV_ITEMS,
+  NAV_SHORT_LABELS,
+  filterNavItems,
+  resolveNavGroups,
+} from "../navigation/navConfig";
 import {
   IconCart,
   IconLayout,
@@ -43,16 +51,108 @@ function NavIcon({ id }: { id: string }) {
   return APP_ICONS[id] ?? null;
 }
 
+/** Gruppi chiusi manualmente: conservati per la sessione corrente (EP13-P01). */
+const COLLAPSED_GROUPS_STORAGE_KEY = "fa.nav.groups.collapsed";
+
+function readCollapsedGroups(): string[] {
+  try {
+    const raw = window.sessionStorage.getItem(COLLAPSED_GROUPS_STORAGE_KEY);
+    const parsed: unknown = raw ? JSON.parse(raw) : null;
+    return Array.isArray(parsed) ? parsed.filter((id): id is string => typeof id === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
+function useCollapsedNavGroups() {
+  const [collapsed, setCollapsed] = useState<string[]>(readCollapsedGroups);
+
+  const toggle = useCallback((groupId: string) => {
+    setCollapsed((current) => {
+      const next = current.includes(groupId)
+        ? current.filter((id) => id !== groupId)
+        : [...current, groupId];
+      try {
+        window.sessionStorage.setItem(COLLAPSED_GROUPS_STORAGE_KEY, JSON.stringify(next));
+      } catch {
+        // sessionStorage non disponibile: lo stato resta valido in memoria.
+      }
+      return next;
+    });
+  }, []);
+
+  return { collapsed, toggle };
+}
+
+/**
+ * Conteggio inviti pendenti per il badge (EP13-P07).
+ *
+ * Nessun polling: il dato cambia raramente e si aggiorna quando la finestra
+ * torna in primo piano, coerentemente con la sospensione a schermata inattiva
+ * introdotta in EP13-P04.
+ */
+function usePendingInviteCount(enabled: boolean): number {
+  const [count, setCount] = useState(0);
+
+  const refresh = useCallback(async () => {
+    if (!enabled) {
+      setCount(0);
+      return;
+    }
+    const stored = loadStoredSession();
+    if (!stored?.accessToken) {
+      setCount(0);
+      return;
+    }
+    try {
+      const result = await fetchPendingInviteCount(stored.accessToken);
+      setCount(result.pendingInviteCount);
+    } catch {
+      // Il badge è accessorio: un errore non deve rompere la navigazione.
+      setCount(0);
+    }
+  }, [enabled]);
+
+  useEffect(() => {
+    void refresh();
+    if (typeof window === "undefined") {
+      return;
+    }
+    const onFocus = () => void refresh();
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
+  }, [refresh]);
+
+  return count;
+}
+
 export function AppLayout({ children }: { children: React.ReactNode }) {
   const { user, leagues, activeLeagueId, setActiveLeagueId, can } = useAuth();
   const location = useLocation();
-  const navItems = filterNavItems(APP_NAV_ITEMS, can, location.pathname).map((item) => ({
+  const { collapsed, toggle } = useCollapsedNavGroups();
+  const pendingInvites = usePendingInviteCount(can(["league:view"]));
+  const resolvedItems = filterNavItems(APP_NAV_ITEMS, can, location.pathname);
+  const navItems = resolvedItems.map((item) => ({
     id: item.id,
     label: item.label,
     href: item.path,
     active: item.active,
     icon: <NavIcon id={item.id} />,
+    badgeCount: item.id === "received-invites" ? pendingInvites : undefined,
+    badgeLabel:
+      item.id === "received-invites" && pendingInvites > 0
+        ? `${pendingInvites} inviti in attesa di risposta`
+        : undefined,
   }));
+  // La bottom nav resta piatta: una barra non annida sottomenu.
+  const bottomNavItems = navItems.map((item) => ({
+    ...item,
+    label: NAV_SHORT_LABELS[item.id] ?? item.label,
+  }));
+  const navGroups = resolveNavGroups();
+  const expandedGroupIds = navGroups
+    .filter((group) => !collapsed.includes(group.id))
+    .map((group) => group.id);
 
   const showLeagueSelector =
     leagues.length > 0 && location.pathname !== "/leghe" && location.pathname !== "/leghe/crea";
@@ -102,13 +202,16 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
       sidebar={
         <SidebarNav
           items={navItems}
+          groups={navGroups}
+          expandedGroupIds={expandedGroupIds}
+          onToggleGroup={toggle}
           linkComponent={RouterNavLinkAdapter}
           ariaLabel="Navigazione lega"
         />
       }
       bottomNav={
         <BottomNav
-          items={navItems}
+          items={bottomNavItems}
           linkComponent={RouterBottomNavLink}
           ariaLabel="Navigazione mobile lega"
         />

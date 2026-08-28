@@ -241,6 +241,92 @@
   flex-shrink: 0;
 }
 
+.fa-sidebar-nav__badge {
+  margin-left: auto;
+  min-width: 1.25rem;
+  padding: 0 0.35rem;
+  border-radius: 999px;
+  background-color: var(--fa-color-danger, #d93025);
+  color: #fff;
+  font-size: var(--fa-text-xs);
+  font-weight: 700;
+  line-height: 1.25rem;
+  text-align: center;
+}
+
+/* ── Sidebar nav — gruppi (EP13-P01) ────────────────────────────────── */
+
+.fa-sidebar-nav__group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fa-space-xs);
+}
+
+.fa-sidebar-nav__group-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--fa-space-sm);
+  width: 100%;
+  padding: var(--fa-space-sm) var(--fa-space-md);
+  border: 0;
+  border-radius: var(--fa-radius-md);
+  background: transparent;
+  color: var(--fa-color-foreground-muted);
+  font: inherit;
+  font-size: var(--fa-text-xs);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition:
+    background-color var(--fa-duration-fast) var(--fa-easing-standard),
+    color var(--fa-duration-fast) var(--fa-easing-standard);
+}
+
+.fa-sidebar-nav__group-toggle:hover {
+  background-color: var(--fa-pitch-700);
+  color: var(--fa-color-foreground);
+}
+
+.fa-sidebar-nav__group-toggle:focus-visible {
+  outline: none;
+  box-shadow: var(--fa-shadow-focus);
+}
+
+.fa-sidebar-nav__group-toggle--active {
+  color: var(--fa-color-accent);
+}
+
+.fa-sidebar-nav__group-caret {
+  width: 0.5rem;
+  height: 0.5rem;
+  flex-shrink: 0;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: rotate(-45deg);
+  transition: transform var(--fa-duration-fast) var(--fa-easing-standard);
+}
+
+.fa-sidebar-nav__group-caret--expanded {
+  transform: rotate(45deg);
+}
+
+.fa-sidebar-nav__group-list {
+  list-style: none;
+  margin: 0;
+  padding: 0 0 0 var(--fa-space-sm);
+  display: flex;
+  flex-direction: column;
+  gap: var(--fa-space-xs);
+  border-left: 1px solid var(--fa-color-border);
+  margin-left: var(--fa-space-md);
+}
+
+.fa-sidebar-nav__group-list[hidden] {
+  display: none;
+}
+
 /* ── Bottom nav ─────────────────────────────────────────────────────── */
 
 .fa-bottom-nav__list {

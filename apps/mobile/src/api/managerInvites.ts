@@ -1,6 +1,8 @@
 import type {
   CreateNamedLeagueInviteRequest,
   FantasyCoachDirectoryItem,
+  FantasyCoachProfile,
+  PendingInviteCount,
   NamedLeagueInvite,
   PaginatedFantasyCoachDirectory,
   RespondedNamedLeagueInvite,
@@ -31,6 +33,27 @@ export function fetchManagerDirectory(
     `/leagues/${leagueId}/amministrazione/fantallenatori?${params.toString()}`,
     { accessToken },
   );
+}
+
+/** Profilo storico limitato di un fantallenatore (EP13-P06). */
+export function fetchCoachProfile(
+  accessToken: string,
+  leagueId: string,
+  userId: string,
+  options: { page?: number; pageSize?: number } = {},
+): Promise<FantasyCoachProfile> {
+  const params = new URLSearchParams();
+  params.set("page", String(options.page ?? 1));
+  params.set("pageSize", String(options.pageSize ?? 20));
+  return apiRequest<FantasyCoachProfile>(
+    `/leagues/${leagueId}/amministrazione/fantallenatori/${userId}?${params.toString()}`,
+    { accessToken },
+  );
+}
+
+/** Conteggio inviti pendenti per il badge (EP13-P07). */
+export function fetchPendingInviteCount(accessToken: string): Promise<PendingInviteCount> {
+  return apiRequest<PendingInviteCount>("/leagues/inviti-ricevuti/conteggio", { accessToken });
 }
 
 export function createNamedLeagueInvite(

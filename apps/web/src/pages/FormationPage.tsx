@@ -1,4 +1,5 @@
 import type {
+  AiLineupRun,
   FantasyModule,
   FantasyTurnSummary,
   LineupContext,
@@ -37,7 +38,14 @@ import {
   roleBadgeVariant,
 } from "@fantappero/ui";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { fetchFantasyTurns, fetchMyLineup, copyPreviousLineupToDraft, saveLineupDraft, saveMyLineup } from "../api/leagues";
+import {
+  fetchFantasyTurns,
+  fetchMyLineup,
+  copyPreviousLineupToDraft,
+  runAiLineups,
+  saveLineupDraft,
+  saveMyLineup,
+} from "../api/leagues";
 import { getApiErrorMessage, useAuth } from "../auth/AuthContext";
 import { loadStoredSession } from "../auth/sessionStorage";
 import { useLocation } from "../router/simpleRouter";
@@ -48,6 +56,17 @@ const ROLE_LABEL: Record<LineupRole, string> = {
   D: "Difensore",
   C: "Centrocampista",
   A: "Attaccante",
+};
+
+/** Esito del calcolo automatico per squadra (EP13-P05). */
+const AI_OUTCOME_LABEL: Record<string, string> = {
+  created: "Creata",
+  updated: "Aggiornata",
+  preview: "Anteprima",
+  skipped_not_ai: "Squadra manuale, ignorata",
+  skipped_locked: "Lock progressivo attivo, invariata",
+  skipped_manual: "Formazione manuale esistente, non sovrascritta",
+  incomplete: "Rosa insufficiente per il modulo",
 };
 
 const DEMO_ROSTER: LineupRosterPlayer[] = [
@@ -94,6 +113,9 @@ const DEMO_LINEUP: SavedLineup = {
   module: "4-3-3",
   revision: 1,
   submittedAt: "2026-08-14T10:00:00.000Z",
+  systemGeneratedAi: false,
+  aiAlgorithmVersion: null,
+  aiDecidedAt: null,
   starters: DEMO_STARTERS.map((athleteId, index) => {
     const player = DEMO_ROSTER.find((row) => row.athleteId === athleteId);
     return {
@@ -290,6 +312,7 @@ export function FormationPage() {
   const demoState = isDemoMode ? parseWireframeStateFromSearch(search) : null;
   const canView = can(["roster:view"]);
   const canEdit = can(["roster:edit"]);
+  const isAdmin = can(["league:admin"]);
 
   const [turns, setTurns] = useState<FantasyTurnSummary[]>(() =>
     isDemoMode && demoState === "success" ? DEMO_TURNS : [],
@@ -314,6 +337,9 @@ export function FormationPage() {
   );
   const [actionError, setActionError] = useState<string | null>(null);
   const [actionMessage, setActionMessage] = useState<string | null>(null);
+  const [aiLineupRun, setAiLineupRun] = useState<AiLineupRun | null>(null);
+  const [aiLineupBusy, setAiLineupBusy] = useState(false);
+  const [aiLineupError, setAiLineupError] = useState<string | null>(null);
 
   const showForbidden = useMemo(() => {
     if (isDemoMode && demoState === "forbidden") {
@@ -480,6 +506,8 @@ export function FormationPage() {
     setSelectedRoundId(roundId);
     setActionError(null);
     setActionMessage(null);
+    setAiLineupRun(null);
+    setAiLineupError(null);
     if (isDemoMode) {
       setContext(DEMO_CONTEXT);
       applyContext(DEMO_CONTEXT);
@@ -498,6 +526,39 @@ export function FormationPage() {
       setActionError(getApiErrorMessage(error, "Formazione del turno non disponibile."));
     } finally {
       setBusy(false);
+    }
+  }
+
+  /** Preview o ricalcolo delle formazioni delle sole squadre IA (EP13-P05). */
+  async function runAiLineupsAction(dryRun: boolean) {
+    setAiLineupError(null);
+    if (isDemoMode) {
+      setAiLineupRun({
+        roundId: selectedRoundId,
+        algorithmVersion: "ai_lineup_v1",
+        dryRun,
+        teams: [],
+        summary: "Nessuna squadra IA nella lega demo.",
+      });
+      return;
+    }
+    const session = loadStoredSession();
+    if (!session?.accessToken || !activeLeagueId || !selectedRoundId) {
+      return;
+    }
+    setAiLineupBusy(true);
+    try {
+      const run = await runAiLineups(session.accessToken, activeLeagueId, selectedRoundId, dryRun);
+      setAiLineupRun(run);
+    } catch (error) {
+      setAiLineupError(
+        getApiErrorMessage(
+          error,
+          dryRun ? "Anteprima non disponibile." : "Rigenerazione non riuscita.",
+        ),
+      );
+    } finally {
+      setAiLineupBusy(false);
     }
   }
 
@@ -918,6 +979,19 @@ export function FormationPage() {
                   ))}
                 </select>
               </label>
+              {context.lineup?.systemGeneratedAi ? (
+                <p data-testid="formation-ai-badge">
+                  <Badge variant="accent">Gestita automaticamente</Badge>{" "}
+                  Formazione scelta dall&apos;automazione IA
+                  {context.lineup.aiDecidedAt
+                    ? ` il ${formatDateTime(context.lineup.aiDecidedAt)}`
+                    : ""}
+                  {context.lineup.aiAlgorithmVersion
+                    ? ` · ${context.lineup.aiAlgorithmVersion}`
+                    : ""}
+                  .
+                </p>
+              ) : null}
               <p data-testid="formation-cutoff">
                 Cutoff (primo kickoff): {formatDateTime(context.cutoffAt)} — lock progressivo per
                 calciatore
@@ -969,6 +1043,71 @@ export function FormationPage() {
               ) : null}
             </CardBody>
           </Card>
+
+          {isAdmin ? (
+            <Card data-testid="formation-ai-admin">
+              <CardHeader title="Formazioni IA" />
+              <CardBody>
+                <p>
+                  Genera automaticamente la formazione delle sole squadre controllate da un
+                  fantallenatore IA per questo turno. Non tocca mai le formazioni schierate a
+                  mano da un umano.
+                </p>
+                <div className="fa-ds-showcase__row">
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    disabled={aiLineupBusy}
+                    onClick={() => void runAiLineupsAction(true)}
+                    data-testid="formation-ai-preview"
+                  >
+                    Anteprima formazioni IA
+                  </Button>
+                  <Button
+                    type="button"
+                    disabled={aiLineupBusy}
+                    onClick={() => void runAiLineupsAction(false)}
+                    data-testid="formation-ai-regenerate"
+                  >
+                    Rigenera formazioni IA
+                  </Button>
+                </div>
+                {aiLineupRun ? (
+                  <div data-testid="formation-ai-result">
+                    <p data-testid="formation-ai-summary">
+                      {aiLineupRun.summary} · {aiLineupRun.algorithmVersion}
+                      {aiLineupRun.dryRun ? " (anteprima, non salvata)" : ""}
+                    </p>
+                    {aiLineupRun.teams.length > 0 ? (
+                      <ul data-testid="formation-ai-teams">
+                        {aiLineupRun.teams.map((team) => (
+                          <li
+                            key={team.fantasyTeamId}
+                            data-testid={`formation-ai-team-${team.fantasyTeamId}`}
+                          >
+                            <strong>{team.fantasyTeamName || team.fantasyTeamId}</strong>
+                            {" — "}
+                            {AI_OUTCOME_LABEL[team.outcome] ?? team.outcome}
+                            {team.starters > 0 ? ` · ${team.starters} titolari` : ""}
+                            {team.usedFallback ? " · fallback locale" : ""}
+                            {team.message ? ` · ${team.message}` : ""}
+                          </li>
+                        ))}
+                      </ul>
+                    ) : null}
+                  </div>
+                ) : null}
+                {aiLineupError ? (
+                  <UiStatePanel
+                    state="error"
+                    title="Operazione non riuscita"
+                    message={aiLineupError}
+                    testId="formation-ai-error"
+                  />
+                ) : null}
+              </CardBody>
+            </Card>
+          ) : null}
 
           <Select
             label="Modulo"

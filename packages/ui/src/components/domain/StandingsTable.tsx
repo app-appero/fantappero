@@ -16,6 +16,9 @@ export type StandingsRow = {
   points: number;
   goalsFor: number;
   goalsAgainst: number;
+  /** Fantapunti fatti/subiti, già formattati dall'app (EP13-P02). */
+  fantasyPointsFor?: string;
+  fantasyPointsAgainst?: string;
   isCurrentUser?: boolean;
   highlightLabel?: string;
 };
@@ -27,6 +30,8 @@ export type StandingsTableProps = {
   playedLabel: string;
   pointsLabel: string;
   goalsLabel: string;
+  /** Quando presente aggiunge la colonna Fantapunti fatti:subiti. */
+  fantasyPointsLabel?: string;
   rows: StandingsRow[];
   testId?: string;
 };
@@ -39,6 +44,7 @@ export function StandingsTable({
   playedLabel,
   pointsLabel,
   goalsLabel,
+  fantasyPointsLabel,
   rows,
   testId = "standings-table",
 }: StandingsTableProps) {
@@ -52,6 +58,9 @@ export function StandingsTable({
           <TableHeaderCell>{playedLabel}</TableHeaderCell>
           <TableHeaderCell>{pointsLabel}</TableHeaderCell>
           <TableHeaderCell>{goalsLabel}</TableHeaderCell>
+          {fantasyPointsLabel ? (
+            <TableHeaderCell>{fantasyPointsLabel}</TableHeaderCell>
+          ) : null}
         </TableRow>
       </TableHead>
       <TableBody>
@@ -75,6 +84,11 @@ export function StandingsTable({
             <TableCell>
               {row.goalsFor}:{row.goalsAgainst}
             </TableCell>
+            {fantasyPointsLabel ? (
+              <TableCell>
+                {row.fantasyPointsFor ?? "—"}:{row.fantasyPointsAgainst ?? "—"}
+              </TableCell>
+            ) : null}
           </TableRow>
         ))}
       </TableBody>

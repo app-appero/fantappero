@@ -1,4 +1,4 @@
-import type { NavItemDefinition, Permission } from "@fantappero/contracts";
+import type { NavGroupDefinition, NavItemDefinition, Permission } from "@fantappero/contracts";
 
 /** Declarative navigation catalog for member app and global admin panel. */
 export const APP_NAV_ITEMS: readonly NavItemDefinition[] = [
@@ -109,8 +109,25 @@ export const ADMIN_NAV_ITEMS: readonly NavItemDefinition[] = [
   },
 ];
 
+/**
+ * Gruppo "Lega" (EP13-P01): le tre voci sono correlate ma non equivalenti —
+ * "Le mie leghe" sceglie il contesto, "Home lega" mostra la lega attiva,
+ * "Amministrazione lega" la modifica. "Turni" resta destinazione primaria
+ * indipendente e "Inviti ricevuti" resta fuori perché è account-level.
+ */
+export const APP_NAV_GROUPS: readonly NavGroupDefinition[] = [
+  {
+    id: "league",
+    itemIds: ["leagues", "league-home", "league-admin"],
+  },
+];
+
+export const NAV_GROUP_LABELS: Record<string, string> = {
+  league: "Lega",
+};
+
 export const NAV_LABELS: Record<string, string> = {
-  leagues: "Leghe",
+  leagues: "Le mie leghe",
   "league-home": "Home lega",
   "manager-directory": "Fantallenatori",
   "received-invites": "Inviti",
@@ -121,7 +138,7 @@ export const NAV_LABELS: Record<string, string> = {
   auction: "Asta",
   waiver: "Svincolati",
   market: "Mercato",
-  "league-admin": "Admin lega",
+  "league-admin": "Amministrazione lega",
   profile: "Profilo",
   "admin-home": "Pannello",
   "admin-leagues": "Leghe globali",
@@ -129,10 +146,36 @@ export const NAV_LABELS: Record<string, string> = {
   "admin-listone": "Listone",
 };
 
+/**
+ * Etichette compatte per la bottom nav (<768px), dove la larghezza per voce è
+ * ~6rem. La sidebar e i test usano `NAV_LABELS`.
+ */
+export const NAV_SHORT_LABELS: Record<string, string> = {
+  leagues: "Leghe",
+  "league-admin": "Admin lega",
+};
+
 export type ResolvedNavItem = NavItemDefinition & {
   label: string;
   active: boolean;
 };
+
+export type ResolvedNavGroup = {
+  id: string;
+  label: string;
+  itemIds: readonly string[];
+};
+
+/** Gruppi con label risolta; la visibilità è derivata dalle voci filtrate. */
+export function resolveNavGroups(
+  groups: readonly NavGroupDefinition[] = APP_NAV_GROUPS,
+): ResolvedNavGroup[] {
+  return groups.map((group) => ({
+    id: group.id,
+    label: NAV_GROUP_LABELS[group.id] ?? group.id,
+    itemIds: group.itemIds,
+  }));
+}
 
 export function filterNavItems(
   items: readonly NavItemDefinition[],

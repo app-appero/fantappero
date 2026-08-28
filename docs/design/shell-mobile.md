@@ -8,28 +8,31 @@ Dipendenze: [EPUI-01](./visual-identity.md), [EPUI-03](./navigation.md), [EPUI-0
 
 | Libreria | Ruolo |
 | --- | --- |
-| `@react-navigation/native` | Container e linking |
-| `@react-navigation/bottom-tabs` | Tab bar membro (scrollabile) |
+| `@react-navigation/native` | Container (nessuna configurazione `linking`: non esistono deep link URL) |
+| `@react-navigation/bottom-tabs` | Router interno delle schermate membro (tab bar non renderizzata) |
 | `@react-navigation/native-stack` | Stack root, admin, schermate fuori tab |
-| `react-native-safe-area-context` | Safe area header e tab bar |
+| `react-native-safe-area-context` | Safe area header e drawer |
 | `react-native-screens` | Performance native stack |
 
 ## Superfici
 
 | Superficie | Dove | Trattamento visivo |
 | --- | --- | --- |
-| App membro | `AppTabNavigator` | Header app + tab bar |
-| Admin lega | Stack `LeagueAdmin` | Header stack, link da header app |
+| App membro | `AppTabNavigator` | Header app + drawer laterale |
+| Admin lega | Stack `LeagueAdmin` | Header stack, voce nel gruppo «Lega» del drawer |
 | Operatore globale | `AdminNavigator` | Header `surface="admin"` (bordo warning) |
-| Autenticazione | Stack `Auth` | Full-page, senza tab bar |
+| Autenticazione | Stack `Auth` | Full-page, senza drawer |
 
-## Tab bar membro
+## Menu membro (drawer)
 
-Voci allineate alla web (`APP_NAV_ITEMS`), filtrate con `hasPermissions`:
+La navigazione è **solo drawer**: `AppTabNavigator` monta `Tab.Navigator` con `tabBar={() => null}` e lo usa come router interno; la bottom tab bar non è visibile. Voci allineate alla web (`APP_NAV_ITEMS` ↔ `MOBILE_DRAWER_NAV_ITEMS`), filtrate con `hasPermissions`:
 
-Leghe · Turni · Classifica · Rosa · Formazione · Asta · Mercato · Profilo
+- **Gruppo «Lega»** (espandibile, `MOBILE_NAV_GROUPS`): Le mie leghe · Home lega · Amministrazione lega
+- **Destinazioni indipendenti:** Turni · Fantallenatori · Inviti · Classifica · Rosa · Formazione · Asta · Svincolati · Mercato · Profilo
 
-**Fuori tab bar:** Admin lega (header), Pannello operatore (stack admin).
+Il gruppo è aperto per default, conserva lo stato aperto/chiuso per la sessione ed espone `accessibilityState={{ expanded }}`; la voce corrispondente alla schermata corrente è evidenziata. «Amministrazione lega» compare solo con `league:admin` e `LeagueAdminScreen` verifica comunque il permesso, mostrando il pannello `forbidden` a chi vi arriva per via programmatica.
+
+**Fuori dal drawer:** Pannello operatore (stack admin, voce dedicata in fondo al drawer per `global:operate`).
 
 ## Placeholder wireframe
 
@@ -68,9 +71,9 @@ pnpm --filter @fantappero/mobile start
 
 Demo permessi su device/emulator:
 
-1. Apri app → tab bar membro (8 voci)
-2. Header «Demo» → persona Admin lega → compare link «Admin lega»
-3. Persona Operatore → link «Pannello» → shell admin con bordo warning
+1. Apri app → icona menu in header → drawer con gruppo «Lega» e destinazioni indipendenti
+2. Header «Demo» → persona Admin lega → nel gruppo «Lega» compare «Amministrazione lega»
+3. Persona Operatore → voce «Pannello globale» → shell admin con bordo warning
 4. Su Leghe/Turni/Rosa → chip stati loading/empty/error/forbidden
 
 ## Fuori scope (M1 / EP02-03)

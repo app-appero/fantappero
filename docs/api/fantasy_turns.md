@@ -111,11 +111,63 @@ Task: `fantasy_turns.ensure_upcoming` — solo leghe `active`; non persiste `ski
 - `fantasy_turn_fixture_excluded_total`
 - `fantasy_turn_cutoff_recalculated_total`
 
+## Dettaglio partita live (EP13-P04)
+
+`GET /leagues/{league_id}/turni/{round_id}/partite/{fixture_id}` — permesso
+`matchday:view`. Espone ciò che il backend ha già normalizzato: risultato,
+stato partita, **formazioni ufficiali** (`official_lineups`, con modulo,
+titolari e panchina) e **cronologia eventi** (`match_events`). I client non
+contattano mai il provider (ADR-0001).
+
+La partita deve appartenere al turno richiesto: senza quel vincolo un id
+qualsiasi permetterebbe di leggere fixture fuori dalla lega. Fixture non
+collegata al turno ⇒ `fixture_not_found`.
+
+Regole di presentazione, in `fantasy_turns/live_view.py` (modulo puro):
+
+- **Eventi ritrattati esclusi.** Un evento con `is_active = false` o
+  `retracted_at` valorizzato sparisce dalla timeline: una correzione tardiva
+  non deve lasciare a schermo un gol annullato.
+- **Ordinamento** per minuto, poi recupero, poi id (deterministico). Gli
+  eventi senza minuto vanno in coda, non al minuto zero.
+- **Formazione assente ≠ formazione vuota**: `homeLineup`/`awayLineup` sono
+  `null` finché il provider non pubblica la distinta.
+- **Nessun valore di comodo**: un punteggio non noto resta `null`, non `0`.
+
+### Stato del feed
+
+`feedState` e `feedStateLabel` compaiono sia sul dettaglio sia su ogni riga
+della lista, insieme a `updatedAt`.
+
+| Stato | Quando |
+| --- | --- |
+| `fresh` | Aggiornato da meno di 2 min, oppure partita non in corso (non deve aggiornarsi) |
+| `delayed` | Partita live, ultimo aggiornamento fra 2 e 10 min |
+| `stale` | Partita live, ultimo aggiornamento oltre 10 min |
+| `degraded` | Aggregato di turno: solo una parte delle partite è in ritardo o ferma |
+| `unavailable` | Nessun dato normalizzato |
+
+**È un'inferenza, non un fatto registrato.** Il progetto non traccia l'esito di
+ogni sincronizzazione: lo stato è derivato da `Fixture.updated_at` confrontato
+con lo stato partita. Serve a dire all'utente quanto fidarsi di ciò che vede,
+non a diagnosticare il provider. Registrare gli esiti di sync resta un
+miglioramento possibile.
+
+### Polling
+
+Web e mobile riusano il backoff esistente (15s → 120s) e **sospendono** il
+polling quando la schermata non è attiva: `AppState` su mobile, `document.hidden`
+sul web — quest'ultimo aggiunto da EP13-P04, prima la scheda in secondo piano
+continuava a interrogare l'API.
+
 ## Rischi residui
 
-- Numerazione turni: mapping ufficiale H2H↔europeo è
-  `FantasyRound.number == LeagueCalendarSlot.round_number` (stessa lega).
-  Formato calendario MVP = solo andata (`single_round_robin`); andata/ritorno differita.
+- Numerazione turni: dal calendario adattivo (EP13-P03) l'abbinamento H2H↔europeo
+  è **esplicito e per finestra temporale**, persistito in
+  `league_calendar_round_windows`. Un turno `skipped` non consuma più una giornata
+  H2H. Il vecchio criterio `FantasyRound.number == LeagueCalendarSlot.round_number`
+  resta solo come fallback per i calendari generati prima. Vedi
+  [`leagues.md`](./leagues.md) — «Calendario adattivo sulle finestre europee».
 - Timezone lega non ancora modellata: default `Europe/Rome`.
 - Leghe non ancora `active` non ricevono turni automatici (serve attivazione o sync manuale).
 - Il latch usa lo snapshot `observed_kickoff_at` (impostato in generazione). Un ricalcolo **prima** del fischio adotta il nuovo orario; uno **dopo** aggancia il lock e non riapre la finestra. Tra sync provider e job/`GET` il cutoff persistito può restare stantio per pochi minuti.

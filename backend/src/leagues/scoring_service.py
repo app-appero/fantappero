@@ -23,6 +23,7 @@ from fantasy_ratings.models import PlayerMatchRating
 from fantasy_teams.models import FantasyTeam
 from fantasy_turns.homologation import assert_round_not_homologated
 from fantasy_turns.models import FantasyRound, FantasyRoundFixture
+from leagues.calendar_round_mapping import h2h_round_numbers_for_round
 from leagues.models.league_calendar import LeagueCalendar, LeagueCalendarSlot
 from leagues.scoring import MatchOutcome
 from leagues.standings_service import compute_league_standings
@@ -89,14 +90,23 @@ def compute_round_results(
         (status or "").upper() in FINISHED_FIXTURE_STATUSES for _, status in fixture_rows
     )
 
-    slots = list(
-        session.scalars(
-            select(LeagueCalendarSlot).where(
-                LeagueCalendarSlot.calendar_id == calendar.id,
-                LeagueCalendarSlot.round_number == fantasy_round.number,
-                LeagueCalendarSlot.is_bye.is_(False),
-            )
-        ).all()
+    # Giornate H2H ospitate da questo turno europeo: per finestra sui
+    # calendari ancorati, per numero progressivo su quelli storici.
+    h2h_round_numbers = h2h_round_numbers_for_round(
+        session, calendar=calendar, fantasy_round=fantasy_round
+    )
+    slots = (
+        []
+        if not h2h_round_numbers
+        else list(
+            session.scalars(
+                select(LeagueCalendarSlot).where(
+                    LeagueCalendarSlot.calendar_id == calendar.id,
+                    LeagueCalendarSlot.round_number.in_(h2h_round_numbers),
+                    LeagueCalendarSlot.is_bye.is_(False),
+                )
+            ).all()
+        )
     )
 
     counters = ScoringCounters()

@@ -33,6 +33,12 @@ export type MatchupDetailParams = {
   slotId: string;
 };
 
+/** Dettaglio partita del turno europeo (EP13-P04). */
+export type FixtureDetailParams = {
+  turnId: string;
+  fixtureId: string;
+};
+
 export type AppTabParamList = {
   Leagues: WireframeParams | undefined;
   Matchday: WireframeParams | undefined;
@@ -56,9 +62,11 @@ export type RootStackParamList = {
   LeagueAdmin: LeagueAdminParams | undefined;
   JoinLeague: JoinLeagueParams | undefined;
   ReceivedInvites: ReceivedInvitesParams | undefined;
+  Notifications: undefined;
   ManagerDirectory: undefined;
   AdminPanel: undefined;
   MatchupDetail: MatchupDetailParams;
+  FixtureDetail: FixtureDetailParams;
 };
 
 export type AdminStackParamList = {

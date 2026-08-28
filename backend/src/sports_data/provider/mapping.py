@@ -429,9 +429,7 @@ def map_player_match_stats(
                     club_provider_id=club_id,
                     minutes=_as_optional_int(games.get("minutes")),
                     position_raw=(
-                        position.strip()
-                        if isinstance(position, str) and position.strip()
-                        else None
+                        position.strip() if isinstance(position, str) and position.strip() else None
                     ),
                     is_substitute=bool(substitute) if isinstance(substitute, bool) else None,
                     provider_rating=(

@@ -1,5 +1,12 @@
 import type { H2HMatchupDetail, H2HPlayerScore, H2HSideLineup } from "@fantappero/contracts";
 import {
+  H2H_GOALS_LABEL,
+  H2H_POINTS_LABEL,
+  describeH2HResult,
+  formatFantasyGoals,
+  formatFantasyPoints,
+} from "@fantappero/contracts";
+import {
   Badge,
   Breadcrumb,
   Button,
@@ -122,9 +129,9 @@ function SideBlock({ side, title }: { side: H2HSideLineup; title: string }) {
         {side.module ? ` · ${side.module}` : ""}
       </h2>
       <p>
-        Punti: <strong>{side.totalScore !== null ? side.totalScore.toFixed(1) : "—"}</strong>
+        {H2H_POINTS_LABEL}: <strong>{formatFantasyPoints(side.totalScore)}</strong>
         {" · "}
-        Gol fantasy: <strong>{side.fantasyGoals !== null ? side.fantasyGoals : "—"}</strong>
+        {H2H_GOALS_LABEL}: <strong>{formatFantasyGoals(side.fantasyGoals)}</strong>
         {" · "}
         Fonte:{" "}
         {side.lineupSource === "effective"
@@ -178,6 +185,7 @@ export function MatchupDetailPage() {
   const [detail, setDetail] = useState<H2HMatchupDetail | null>(() =>
     isDemoMode && demoState === "success" ? DEMO_DETAIL : null,
   );
+  const resultDisplay = describeH2HResult(detail?.result);
   const [loading, setLoading] = useState(() => (isDemoMode ? demoState === "loading" : true));
   const [error, setError] = useState<string | null>(() =>
     isDemoMode && demoState === "error" ? "Impossibile caricare lo scontro (demo)." : null,
@@ -324,10 +332,10 @@ export function MatchupDetailPage() {
               <>
                 {" · "}
                 <Badge
-                  variant={detail.result.resultFinal ? "success" : "warning"}
+                  variant={resultDisplay.status === "final" ? "success" : "warning"}
                   data-testid="matchup-result-status"
                 >
-                  {detail.result.resultFinal ? "Finale" : "Provvisorio"}
+                  {resultDisplay.statusLabel}
                 </Badge>
               </>
             ) : null}
@@ -348,14 +356,30 @@ export function MatchupDetailPage() {
               <div data-testid="matchup-result-summary">
                 <p>
                   <strong>{detail.home.teamName ?? detail.home.displayName}</strong>
-                  {" "}
-                  {detail.result?.homeFantasyGoals ?? "—"}–
-                  {detail.result?.awayFantasyGoals ?? "—"}{" "}
+                  {" contro "}
                   <strong>{detail.away?.teamName ?? detail.away?.displayName ?? "Avversario"}</strong>
                 </p>
+                <dl className="fa-h2h-score" data-testid="matchup-result-score">
+                  <div className="fa-h2h-score__row">
+                    <dt className="fa-h2h-score__term">{H2H_GOALS_LABEL}</dt>
+                    <dd className="fa-h2h-score__value" data-testid="matchup-result-goals">
+                      {resultDisplay.goalsLine}
+                    </dd>
+                  </div>
+                  <div className="fa-h2h-score__row">
+                    <dt className="fa-h2h-score__term">{H2H_POINTS_LABEL}</dt>
+                    <dd className="fa-h2h-score__value" data-testid="matchup-result-points">
+                      {resultDisplay.pointsLine}
+                    </dd>
+                  </div>
+                </dl>
+                {resultDisplay.unavailableHint ? (
+                  <p className="fa-h2h-score__hint" data-testid="matchup-result-hint">
+                    {resultDisplay.unavailableHint}
+                  </p>
+                ) : null}
                 <p>
-                  Punti {detail.home.totalScore?.toFixed(1) ?? "—"} –{" "}
-                  {detail.away?.totalScore?.toFixed(1) ?? "—"}
+                  {resultDisplay.statusLabel}
                   {" · "}
                   {outcomeLabel(detail.result?.outcome ?? null)}
                 </p>

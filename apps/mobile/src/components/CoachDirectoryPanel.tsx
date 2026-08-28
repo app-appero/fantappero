@@ -1,10 +1,15 @@
-import type { FantasyCoachDirectoryItem } from "@fantappero/contracts";
+import type { FantasyCoachDirectoryItem, FantasyCoachProfile } from "@fantappero/contracts";
+import { formatFantasyPoints } from "@fantappero/contracts";
 import { theme } from "@fantappero/ui/theme";
 import { useFocusEffect } from "@react-navigation/native";
 import { useCallback, useEffect, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { ApiError } from "../api/client";
-import { createNamedLeagueInvite, fetchManagerDirectory } from "../api/managerInvites";
+import {
+  createNamedLeagueInvite,
+  fetchCoachProfile,
+  fetchManagerDirectory,
+} from "../api/managerInvites";
 import { getApiErrorMessage, useAuthSession } from "../session/DemoSessionContext";
 import { UiStatePanel } from "./UiStatePanel";
 
@@ -32,6 +37,8 @@ export function CoachDirectoryPanel({
 }: CoachDirectoryPanelProps) {
   const { accessToken, can } = useAuthSession();
   const [items, setItems] = useState<FantasyCoachDirectoryItem[]>([]);
+  const [profile, setProfile] = useState<FantasyCoachProfile | null>(null);
+  const [profileError, setProfileError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -94,6 +101,20 @@ export function CoachDirectoryPanel({
       cancelled = true;
     };
   }, [load, onReloadSettled, reloadToken]);
+
+  async function openProfile(coach: FantasyCoachDirectoryItem) {
+    setProfileError(null);
+    if (!accessToken) {
+      setProfileError("Sessione non disponibile. Accedi di nuovo.");
+      return;
+    }
+    try {
+      setProfile(await fetchCoachProfile(accessToken, leagueId, coach.userId));
+    } catch (error) {
+      setProfile(null);
+      setProfileError(getApiErrorMessage(error, "Impossibile caricare il profilo."));
+    }
+  }
 
   async function onInvite(manager: FantasyCoachDirectoryItem) {
     setError(null);
@@ -179,6 +200,51 @@ export function CoachDirectoryPanel({
           testID={`${testIDPrefix}-invite-error`}
         />
       ) : null}
+      {profileError ? (
+        <Text style={styles.status} testID={`${testIDPrefix}-profile-error`}>
+          {profileError}
+        </Text>
+      ) : null}
+      {profile ? (
+        <View style={styles.card} testID={`${testIDPrefix}-profile`}>
+          <Text style={styles.name}>{profile.displayName}</Text>
+          <Text style={styles.status}>
+            {profile.userType === "ai" ? "IA" : "Manuale"} ·{" "}
+            {profile.availableForInvites ? "Disponibile" : "Non disponibile"}
+            {profile.memberSince ? ` · iscritto da ${profile.memberSince}` : ""}
+          </Text>
+          <Text style={styles.status} testID={`${testIDPrefix}-profile-summary`}>
+            {profile.historySummary}
+          </Text>
+          {profile.placements.length === 0 ? (
+            <Text style={styles.status} testID={`${testIDPrefix}-profile-empty`}>
+              Nessuna lega conclusa: questo fantallenatore non ha ancora uno storico.
+            </Text>
+          ) : (
+            profile.placements.map((item) => (
+              <Text
+                key={`${item.seasonYear}-${item.position}-${item.participantCount}`}
+                style={styles.status}
+              >
+                {item.seasonYear}: {item.position}º su {item.participantCount} ·{" "}
+                {item.played} partite · {item.points} punti ·{" "}
+                {formatFantasyPoints(item.fantasyPoints)} fantapunti
+              </Text>
+            ))
+          )}
+          <Text style={styles.status}>
+            Lo storico mostra solo leghe concluse. I nomi delle leghe non sono visibili.
+          </Text>
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => setProfile(null)}
+            style={styles.button}
+            testID={`${testIDPrefix}-profile-close`}
+          >
+            <Text style={styles.buttonLabel}>Chiudi</Text>
+          </Pressable>
+        </View>
+      ) : null}
       {items.length === 0 ? (
         <UiStatePanel
           state="empty"
@@ -192,13 +258,23 @@ export function CoachDirectoryPanel({
           const unavailable = !coach.availableForInvites;
           return (
             <View key={coach.userId} style={styles.card}>
-              <View style={styles.identity}>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={`Apri il profilo di ${coach.displayName}`}
+                onPress={() => void openProfile(coach)}
+                style={styles.identity}
+                testID={`${testIDPrefix}-open-${coach.userId}`}
+              >
                 <Text style={styles.name}>{coach.displayName}</Text>
                 <Text style={styles.status}>
                   {coach.userType === "ai" ? "IA" : "Manuale"} ·{" "}
                   {coach.availableForInvites ? "Disponibile" : "Non disponibile"}
+                  {coach.memberSince ? ` · dal ${coach.memberSince}` : ""}
                 </Text>
-              </View>
+                <Text style={styles.status} testID={`${testIDPrefix}-history-${coach.userId}`}>
+                  {coach.historySummary}
+                </Text>
+              </Pressable>
               <Pressable
                 accessibilityRole="button"
                 disabled={pending || unavailable || workingId === coach.userId}

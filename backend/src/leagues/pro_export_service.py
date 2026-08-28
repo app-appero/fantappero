@@ -52,6 +52,8 @@ def build_league_export(session: Session, *, league_id: UUID) -> LeagueProExport
                 lost=row.lost,
                 fantasyGoalsFor=row.fantasy_goals_for,
                 fantasyGoalsAgainst=row.fantasy_goals_against,
+                fantasyPointsFor=row.fantasy_points_for,
+                fantasyPointsAgainst=row.fantasy_points_against,
                 points=row.points,
                 computedAt=row.computed_at,
             )

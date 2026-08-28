@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
 from sqlalchemy import (
@@ -13,6 +13,7 @@ from sqlalchemy import (
     ForeignKey,
     Index,
     Integer,
+    String,
     UniqueConstraint,
     text,
 )
@@ -74,6 +75,18 @@ class LineupSubmission(Base, UUIDPrimaryKeyMixin, TimestampMixin):
         ForeignKey("users.id", ondelete="RESTRICT"),
         nullable=False,
     )
+    # Tracciabilità della formazione automatica IA (EP13-P05 / ADR-0005).
+    # Senza questi campi la regola "nessun vantaggio post-lock" non sarebbe
+    # dimostrabile a posteriori.
+    system_generated_ai: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        server_default=text("false"),
+    )
+    ai_algorithm_version: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    ai_decided_at: Mapped[datetime | None] = mapped_column(UTCDateTime(), nullable=True)
+    #: Segnali effettivamente usati e loro provenienza, per l'audit.
+    ai_decision_log: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
 
     league: Mapped[League] = relationship()
     round: Mapped[FantasyRound] = relationship()

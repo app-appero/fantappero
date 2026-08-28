@@ -17,9 +17,23 @@ from database.enums import (
     LeagueCalendarFormat,
     LeagueCalendarStatus,
 )
+from fantasy_turns.rules import STANDARD_MIN_FIXTURES
+from fantasy_turns.service import load_league_candidate_fixtures
+from leagues.calendar_planning import (
+    CalendarPlan,
+    WindowCandidate,
+    assert_plan_invariants,
+    build_window_candidates,
+    plan_calendar,
+    windows_fingerprint,
+)
 from leagues.models.league import League
 from leagues.models.league_audit_event import LeagueAuditEvent
-from leagues.models.league_calendar import LeagueCalendar, LeagueCalendarSlot
+from leagues.models.league_calendar import (
+    LeagueCalendar,
+    LeagueCalendarRoundWindow,
+    LeagueCalendarSlot,
+)
 from leagues.models.league_membership import LeagueMembership
 from leagues.models.league_rules import LeagueRules
 from leagues.schedule import (
@@ -28,7 +42,10 @@ from leagues.schedule import (
     participant_fingerprint,
 )
 from leagues.schemas import (
+    CalendarPlannedRoundResponse,
+    CalendarWindowResponse,
     LeagueCalendarMatchupResponse,
+    LeagueCalendarPlanResponse,
     LeagueCalendarResponse,
     LeagueCalendarRoundResponse,
     LeagueCalendarSummaryResponse,
@@ -42,6 +59,19 @@ from observability.logging import get_logger
 from observability.metrics import get_metrics
 
 logger = get_logger(__name__)
+
+
+def _window_payload(window: WindowCandidate) -> CalendarWindowResponse:
+    return CalendarWindowResponse(
+        startAt=window.start_at,
+        endAt=window.end_at,
+        kind=window.kind.value,
+        timezone=window.timezone,
+        fixtureCount=window.fixture_count,
+        minRequired=window.min_required,
+        eligible=window.eligible,
+        reason=window.reason,
+    )
 
 
 class LeagueCalendarService:
@@ -87,15 +117,33 @@ class LeagueCalendarService:
             raise
 
         membership_ids = [row.id for row in memberships]
-        schedule = generate_single_round_robin(membership_ids)
-        assert_schedule_invariants(schedule, membership_ids)
+        # EP13-P03: il calendario segue le finestre europee realmente
+        # utilizzabili. Se non ce n'è abbastanza per un ciclo completo si
+        # ricade sul girone singolo non ancorato, dichiarandolo apertamente.
+        windows = self.build_windows(league)
+        plan = plan_calendar(membership_ids, windows)
+        anchored = plan.is_generatable
+        if anchored:
+            assert_plan_invariants(plan, membership_ids)
+            slots = plan.slots
+            round_count = plan.round_count
+            matchup_count = plan.matchup_count
+            bye_count = plan.bye_count
+            algorithm_version = plan.algorithm_version
+        else:
+            schedule = generate_single_round_robin(membership_ids)
+            assert_schedule_invariants(schedule, membership_ids)
+            slots = schedule.slots
+            round_count = schedule.round_count
+            matchup_count = schedule.matchup_count
+            bye_count = schedule.bye_count
+            algorithm_version = schedule.algorithm_version
+
         fingerprint = participant_fingerprint(membership_ids)
         now = datetime.now(UTC)
 
         calendar = self._session.scalars(
-            select(LeagueCalendar)
-            .where(LeagueCalendar.league_id == league.id)
-            .with_for_update()
+            select(LeagueCalendar).where(LeagueCalendar.league_id == league.id).with_for_update()
         ).first()
         if calendar is None:
             calendar = LeagueCalendar(league_id=league.id)
@@ -104,20 +152,28 @@ class LeagueCalendarService:
             self._session.execute(
                 delete(LeagueCalendarSlot).where(LeagueCalendarSlot.calendar_id == calendar.id)
             )
-            self._session.expire(calendar, ["slots"])
+            self._session.execute(
+                delete(LeagueCalendarRoundWindow).where(
+                    LeagueCalendarRoundWindow.calendar_id == calendar.id
+                )
+            )
+            self._session.expire(calendar, ["slots", "round_windows"])
 
         calendar.status = LeagueCalendarStatus.DRAFT
         calendar.format = LeagueCalendarFormat.SINGLE_ROUND_ROBIN
-        calendar.algorithm_version = schedule.algorithm_version
+        calendar.algorithm_version = algorithm_version
         calendar.participant_fingerprint = fingerprint
-        calendar.participant_count = schedule.participant_count
-        calendar.round_count = schedule.round_count
-        calendar.matchup_count = schedule.matchup_count
-        calendar.bye_count = schedule.bye_count
+        calendar.participant_count = len(membership_ids)
+        calendar.round_count = round_count
+        calendar.matchup_count = matchup_count
+        calendar.bye_count = bye_count
+        calendar.cycle_length = plan.cycle_length if anchored else None
+        calendar.cycle_count = plan.cycle_count if anchored else None
+        calendar.windows_fingerprint = plan.windows_fingerprint if anchored else None
         calendar.generated_at = now
         calendar.confirmed_at = None
         self._session.flush()
-        for slot in schedule.slots:
+        for slot in slots:
             calendar.slots.append(
                 LeagueCalendarSlot(
                     round_number=slot.round_number,
@@ -127,6 +183,18 @@ class LeagueCalendarService:
                     away_membership_id=slot.away_membership_id,
                 )
             )
+        if anchored:
+            for planned in plan.rounds:
+                calendar.round_windows.append(
+                    LeagueCalendarRoundWindow(
+                        round_number=planned.round_number,
+                        cycle_number=planned.cycle_number,
+                        cycle_round_number=planned.cycle_round_number,
+                        window_start_at=planned.window_start_at,
+                        window_end_at=planned.window_end_at,
+                        window_kind=planned.window_kind.value,
+                    )
+                )
 
         self._session.add(
             LeagueAuditEvent(
@@ -135,27 +203,113 @@ class LeagueCalendarService:
                 action=LeagueAuditAction.LEAGUE_CALENDAR_GENERATED,
                 correlation_id=get_correlation_id(),
                 details={
-                    "algorithmVersion": schedule.algorithm_version,
+                    "algorithmVersion": algorithm_version,
                     "format": LeagueCalendarFormat.SINGLE_ROUND_ROBIN.value,
-                    "participantCount": schedule.participant_count,
-                    "roundCount": schedule.round_count,
-                    "matchupCount": schedule.matchup_count,
-                    "byeCount": schedule.bye_count,
+                    "participantCount": len(membership_ids),
+                    "roundCount": round_count,
+                    "matchupCount": matchup_count,
+                    "byeCount": bye_count,
+                    "anchoredToWindows": anchored,
+                    "cycleCount": plan.cycle_count if anchored else None,
+                    "cycleLength": plan.cycle_length if anchored else None,
+                    "eligibleWindows": plan.eligible_window_count,
+                    "discardedWindows": len(plan.windows_discarded),
                 },
             )
         )
         self._session.commit()
-        get_metrics().incr("league_calendar_generated_total", labels={"result": "success"})
+        get_metrics().incr(
+            "league_calendar_generated_total",
+            labels={"result": "success", "anchored": str(anchored).lower()},
+        )
         logger.info(
             "league_calendar_generated",
             extra={
                 "result": "success",
-                "participant_count": schedule.participant_count,
-                "round_count": schedule.round_count,
-                "matchup_count": schedule.matchup_count,
+                "participant_count": len(membership_ids),
+                "round_count": round_count,
+                "matchup_count": matchup_count,
+                "anchored_to_windows": anchored,
+                "cycle_count": plan.cycle_count if anchored else None,
+                "eligible_windows": plan.eligible_window_count,
             },
         )
         return self._to_response(self._load_calendar(league.id))
+
+    def build_windows(self, league: League) -> tuple[WindowCandidate, ...]:
+        """Finestre europee della stagione con verdetto di eleggibilità."""
+        rules = self._load_rules(league.id)
+        min_fixtures = rules.min_fixtures_per_round if rules is not None else STANDARD_MIN_FIXTURES
+        fixtures = load_league_candidate_fixtures(self._session, league)
+        return build_window_candidates(fixtures, min_fixtures=min_fixtures)
+
+    def plan_preview(self, league_access: LeagueAccess) -> CalendarPlan:
+        """Diagnostica amministrativa: cosa entra, cosa avanza e perché."""
+        league = league_access.league
+        memberships = self._load_memberships(league.id)
+        return plan_calendar([row.id for row in memberships], self.build_windows(league))
+
+    def plan_preview_response(self, league_access: LeagueAccess) -> LeagueCalendarPlanResponse:
+        plan = self.plan_preview(league_access)
+        stale = self.is_stale(league_access.league.id)
+        if plan.cycle_length == 0:
+            summary = (
+                "Partecipanti insufficienti: servono almeno due iscritti per "
+                "costruire un calendario."
+            )
+        elif not plan.is_generatable:
+            summary = (
+                f"Finestre eleggibili insufficienti: ne servono almeno "
+                f"{plan.cycle_length} per un ciclo completo, ne risultano "
+                f"{plan.eligible_window_count}."
+            )
+        elif stale:
+            summary = (
+                "Il calendario provider è cambiato dopo la generazione: "
+                "rigenera per riallineare le giornate alle finestre."
+            )
+        else:
+            summary = (
+                f"{plan.cycle_count} cicli completi da {plan.cycle_length} giornate "
+                f"su {plan.eligible_window_count} finestre eleggibili."
+            )
+        return LeagueCalendarPlanResponse(
+            algorithmVersion=plan.algorithm_version,
+            participantCount=plan.participant_count,
+            cycleLength=plan.cycle_length,
+            cycleCount=plan.cycle_count,
+            roundCount=plan.round_count,
+            matchupCount=plan.matchup_count,
+            byeCount=plan.bye_count,
+            eligibleWindowCount=plan.eligible_window_count,
+            windowsFingerprint=plan.windows_fingerprint,
+            generatable=plan.is_generatable,
+            stale=stale,
+            rounds=[
+                CalendarPlannedRoundResponse(
+                    roundNumber=item.round_number,
+                    cycleNumber=item.cycle_number,
+                    cycleRoundNumber=item.cycle_round_number,
+                    windowStartAt=item.window_start_at,
+                    windowEndAt=item.window_end_at,
+                    windowKind=item.window_kind.value,
+                )
+                for item in plan.rounds
+            ],
+            windowsUsed=[_window_payload(item) for item in plan.windows_used],
+            windowsDiscarded=[_window_payload(item) for item in plan.windows_discarded],
+            summary=summary,
+        )
+
+    def is_stale(self, league_id: UUID) -> bool:
+        """True se le finestre eleggibili sono cambiate dopo la generazione."""
+        calendar = self._load_calendar(league_id)
+        if calendar is None or calendar.windows_fingerprint is None:
+            return False
+        league = self._session.get(League, league_id)
+        if league is None:
+            return False
+        return calendar.windows_fingerprint != windows_fingerprint(self.build_windows(league))
 
     def confirm(self, league_access: LeagueAccess) -> LeagueCalendarResponse:
         league = self._lock_league(league_access.league.id)
@@ -304,9 +458,7 @@ class LeagueCalendarService:
                         awayDisplayName=None if away is None else away.user.display_name,
                     )
                 )
-            rounds.append(
-                LeagueCalendarRoundResponse(roundNumber=round_number, matchups=matchups)
-            )
+            rounds.append(LeagueCalendarRoundResponse(roundNumber=round_number, matchups=matchups))
 
         return LeagueCalendarResponse(
             id=str(calendar.id),
