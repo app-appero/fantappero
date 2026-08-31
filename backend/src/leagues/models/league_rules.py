@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from decimal import Decimal
 from typing import TYPE_CHECKING
 from uuid import UUID
 
@@ -11,6 +12,7 @@ from sqlalchemy import (
     ForeignKey,
     Index,
     Integer,
+    Numeric,
     String,
     UniqueConstraint,
     text,
@@ -47,6 +49,10 @@ class LeagueRules(Base, UUIDPrimaryKeyMixin, TimestampMixin):
         CheckConstraint(
             "min_fixtures_per_round BETWEEN 10 AND 40",
             name="ck_league_rules_min_fixtures_per_round",
+        ),
+        CheckConstraint(
+            "turn_coverage_threshold BETWEEN 0.50 AND 1.00",
+            name="ck_league_rules_turn_coverage_threshold",
         ),
         CheckConstraint(
             "minutes_threshold BETWEEN 1 AND 30",
@@ -94,6 +100,13 @@ class LeagueRules(Base, UUIDPrimaryKeyMixin, TimestampMixin):
         Integer,
         nullable=False,
         server_default=text("25"),
+    )
+    # Frazione degli 11 titolari che ogni fantallenatore deve poter schierare
+    # perché una giornata diventi un Turno Europeo valido (EP-turni-copertura).
+    turn_coverage_threshold: Mapped[Decimal] = mapped_column(
+        Numeric(3, 2),
+        nullable=False,
+        server_default=text("0.75"),
     )
     minutes_threshold: Mapped[int] = mapped_column(
         Integer,

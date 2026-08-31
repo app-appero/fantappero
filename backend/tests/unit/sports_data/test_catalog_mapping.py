@@ -50,7 +50,15 @@ def test_map_clubs_marks_national_teams() -> None:
         results=2,
         paging=ProviderPaging(current=1, total=1),
         response=[
-            {"team": {"id": 50, "name": "Manchester City", "national": False, "code": "MCI"}},
+            {
+                "team": {
+                    "id": 50,
+                    "name": "Manchester City",
+                    "national": False,
+                    "code": "MCI",
+                    "logo": "https://media.api-sports.io/football/teams/50.png",
+                }
+            },
             {"team": {"id": 1, "name": "Belgium", "national": True, "code": "BEL"}},
         ],
     )
@@ -58,3 +66,5 @@ def test_map_clubs_marks_national_teams() -> None:
     assert len(clubs) == 2
     assert clubs[0].national is False
     assert clubs[1].national is True
+    assert clubs[0].logo_url == "https://media.api-sports.io/football/teams/50.png"
+    assert clubs[1].logo_url is None

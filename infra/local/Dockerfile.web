@@ -27,7 +27,16 @@ COPY packages/ui/src packages/ui/src
 COPY packages/api-client/package.json packages/api-client/tsconfig.json packages/api-client/
 COPY packages/api-client/src packages/api-client/src
 
-RUN pnpm install
+# Su Docker Desktop/Windows con backend WSL2, il primo `pnpm install` durante
+# la build può creare symlink dei pacchetti workspace risolti come path
+# assoluti verso il mount host usato da BuildKit per il context (es.
+# `/mnt/host/c/...`), che non esiste più a runtime nell'immagine finale — il
+# pacchetto risulta introvabile (Vite: "Failed to resolve import"). Un
+# secondo `pnpm install` da solo non basta: se il lockfile risulta già
+# soddisfatto pnpm salta il relink e il symlink assoluto rimane. `--force`
+# obbliga pnpm a ricreare i symlink adesso che `/app` è la working directory
+# reale dell'immagine, stavolta relativi e corretti.
+RUN pnpm install && pnpm install --force
 
 COPY infra/local/web-entrypoint.sh /usr/local/bin/web-entrypoint.sh
 RUN sed -i 's/\r$//' /usr/local/bin/web-entrypoint.sh \

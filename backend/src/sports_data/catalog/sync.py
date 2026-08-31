@@ -182,6 +182,7 @@ def upsert_club(
             name=mapped.name,
             code=mapped.code,
             country=mapped.country,
+            logo_url=mapped.logo_url,
             national=False,
         )
         session.add(row)
@@ -198,6 +199,9 @@ def upsert_club(
         changed = True
     if row.country != mapped.country:
         row.country = mapped.country
+        changed = True
+    if row.logo_url != mapped.logo_url:
+        row.logo_url = mapped.logo_url
         changed = True
     if row.national:
         row.national = False

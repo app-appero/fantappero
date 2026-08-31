@@ -158,6 +158,10 @@ importers:
         version: 5.8.3
 
   packages/ui:
+    dependencies:
+      '@fantappero/contracts':
+        specifier: workspace:*
+        version: link:../contracts
     devDependencies:
       '@types/react':
         specifier: 19.1.8

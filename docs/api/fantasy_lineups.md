@@ -158,7 +158,9 @@ scelta.
 | Titolarità ufficiale | 2 | `OfficialLineupEntry.is_starter` |
 | Forma recente | 1 | media `PlayerMatchRating.fantasy_score`, ultime 5 giornate **concluse** |
 
-Un infortunato è **escluso**, non penalizzato. Tie-break: score → presenze
+Un infortunato è **escluso dagli undici titolari**, non penalizzato. Rimane
+registrato in fondo alla panchina, perché il validatore condiviso richiede che
+tutta la rosa compaia nella formazione. Tie-break: score → presenze
 recenti → `athlete_id`, così a parità totale il risultato è stabile e
 riproducibile, mai casuale.
 
@@ -201,7 +203,17 @@ Migrazione additiva `d6f9a3b1c247`; le formazioni preesistenti restano con
   mobile.
 
 Entrambi sono **idempotenti**: la formula è deterministica e il servizio non
-tocca né le squadre umane né le formazioni già schierate a mano.
+tocca né le squadre umane né le formazioni già schierate a mano. Un secondo
+comando con lo stesso piano restituisce `unchanged` senza incrementare
+`revision`, cambiare timestamp o riscrivere i giocatori. Se il lock progressivo
+è iniziato, una formazione esistente resta immutata e una formazione mancante
+non viene creata retroattivamente.
+
+Nel tab **Calendario fantallenatori** il comando **Genera formazioni AI** è
+reso solo agli amministratori di lega; il backend applica comunque il permesso
+`league:admin`. Il feedback elenca l'esito per ogni squadra e il riepilogo
+create/aggiornate/già valide/bloccate/non generate. Ogni esecuzione effettiva
+scrive un audit con admin, turno, versione algoritmo, conteggi ed errori.
 
 ## Entità
 
@@ -275,6 +287,8 @@ fuori rosa e modifiche a calciatori locked restano rifiutati. La conferma
 - Metrica: `fantasy_lineup_draft_saved_total{result}`
 - Metrica: `fantasy_tactical_move_applied_total`
 - Audit: `fantasy_lineup_saved` (round, team, modulo, revision; niente PII)
+- Audit: `fantasy_lineup_saved` con `source=admin_ai_lineup_command` (admin,
+  turno, versione algoritmo, conteggi ed errori del comando generale AI)
 - Audit: `fantasy_lineup_copied` (round, team, sourceRoundId, dropped/unavailable count; niente PII)
 - Audit: `fantasy_lineup_draft_saved` (round, team, modulo; niente PII)
 - Audit: `fantasy_tactical_move_applied` (sequence, revision, moduli; niente PII)

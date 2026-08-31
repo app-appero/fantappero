@@ -91,6 +91,36 @@ export type { MatchCardProps, MatchStatus } from "./components/domain/MatchCard.
 export { FormationView } from "./components/domain/FormationView.js";
 export type { FormationSlot, FormationViewProps } from "./components/domain/FormationView.js";
 
+export { RoleBadge } from "./components/domain/RoleBadge.js";
+export type { RoleBadgeProps } from "./components/domain/RoleBadge.js";
+
+export { EventBadges } from "./components/domain/EventBadges.js";
+export type { EventBadgesProps } from "./components/domain/EventBadges.js";
+
+export { FootballPitch } from "./components/domain/FootballPitch.js";
+export type { FootballPitchProps, PitchPlayer } from "./components/domain/FootballPitch.js";
+
+export { MatchTimeline } from "./components/domain/MatchTimeline.js";
+export type {
+  MatchTimelineProps,
+  TimelineEntry,
+  TimelineEventItem,
+  TimelineMarkerItem,
+} from "./components/domain/MatchTimeline.js";
+
+export {
+  AssistIcon,
+  GoalIcon,
+  OwnGoalIcon,
+  PenaltyIcon,
+  PenaltyMissedIcon,
+  RedCardIcon,
+  SubstitutionInIcon,
+  SubstitutionOutIcon,
+  VarIcon,
+  YellowCardIcon,
+} from "./icons/MatchEventIcons.js";
+
 export { ResultCard } from "./components/domain/ResultCard.js";
 export type { ResultCardProps } from "./components/domain/ResultCard.js";
 

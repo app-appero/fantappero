@@ -41,9 +41,30 @@ class FantasyTurnsSettingsMixin:
         le=60,
         description="How far ahead to materialize weekend/midweek turns.",
     )
+    # "Aggiorna calendario" automatico (numerazione turni EP-turni-numerazione):
+    # oltre al pulsante admin on-demand, un giro periodico più raro copre
+    # l'intera stagione — così le fixture "da aggiornare" che ricevono una
+    # data lontana dall'orizzonte di ensure_upcoming entrano comunque in un
+    # turno senza bisogno che l'admin prema il pulsante.
+    fantasy_turns_full_refresh_enabled: bool = Field(
+        default=True,
+        validation_alias="FANTASY_TURNS_FULL_REFRESH_ENABLED",
+        description=(
+            "When true, Celery beat periodically runs the full-season calendar "
+            "refresh (provider sync + backfill + renumbering) for active leagues."
+        ),
+    )
+    fantasy_turns_full_refresh_interval_seconds: int = Field(
+        default=21_600,
+        validation_alias="FANTASY_TURNS_FULL_REFRESH_INTERVAL_SECONDS",
+        ge=3600,
+        le=604_800,
+        description="How often the full-season calendar refresh is enqueued (default every 6h).",
+    )
 
     @field_validator(
         "fantasy_turns_auto_generate_enabled",
+        "fantasy_turns_full_refresh_enabled",
         "ai_lineups_auto_generate_enabled",
         mode="before",
     )

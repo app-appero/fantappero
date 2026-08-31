@@ -103,7 +103,11 @@ def _build_live_fixture(
     db_session.add(fantasy_round)
     db_session.flush()
 
-    home = Club(provider_id=provider_seed + 1, name="Roma FC")
+    home = Club(
+        provider_id=provider_seed + 1,
+        name="Roma FC",
+        logo_url="https://media.api-sports.io/football/teams/home.png",
+    )
     away = Club(provider_id=provider_seed + 2, name="Milan FC")
     db_session.add_all([home, away])
     db_session.flush()
@@ -119,6 +123,9 @@ def _build_live_fixture(
         status_elapsed=63,
         home_goals=2,
         away_goals=1,
+        venue_name="Stadio Olimpico",
+        venue_city="Roma",
+        referee="M. Rossi",
     )
     db_session.add(fixture)
     db_session.flush()
@@ -145,13 +152,19 @@ def test_fixture_detail_exposes_lineups_and_ordered_timeline(
         provider_seed=970000,
     )
 
-    scorer = Athlete(provider_id=970101, canonical_name="Marco Rossi")
+    scorer = Athlete(
+        provider_id=970101,
+        canonical_name="Marco Rossi",
+        photo_url="https://media.api-sports.io/football/players/970101.png",
+    )
     assister = Athlete(provider_id=970102, canonical_name="Luca Bianchi")
     benched = Athlete(provider_id=970103, canonical_name="Paolo Verdi")
     db_session.add_all([scorer, assister, benched])
     db_session.flush()
 
-    lineup = OfficialLineup(fixture_id=fixture.id, club_id=home.id, formation="4-3-3")
+    lineup = OfficialLineup(
+        fixture_id=fixture.id, club_id=home.id, formation="4-3-3", coach_name="J. Mourinho"
+    )
     db_session.add(lineup)
     db_session.flush()
     db_session.add_all(
@@ -212,6 +225,30 @@ def test_fixture_detail_exposes_lineups_and_ordered_timeline(
                 minute_elapsed=30,
                 is_active=False,
             ),
+            # Stesso gol reale del provider (riga grezza) e la sua copia
+            # normalizzata usata per il fantavoto: la copia non deve comparire
+            # una seconda volta in cronologia (EP13-P04-ter).
+            MatchEvent(
+                provider_event_key="ev-dup-raw|primary",
+                fixture_id=fixture.id,
+                athlete_id=scorer.id,
+                club_id=home.id,
+                event_type="Goal",
+                event_detail="Normal Goal",
+                minute_elapsed=77,
+                sources=["events"],
+            ),
+            MatchEvent(
+                provider_event_key="ev-dup-raw|goal",
+                fixture_id=fixture.id,
+                athlete_id=scorer.id,
+                club_id=home.id,
+                event_type="Goal",
+                event_detail="Normal Goal",
+                scoring_kind="goal",
+                minute_elapsed=77,
+                sources=["events"],
+            ),
         ]
     )
     db_session.commit()
@@ -223,24 +260,43 @@ def test_fixture_detail_exposes_lineups_and_ordered_timeline(
     assert response.status_code == 200
     body = response.json()
 
+    assert body["homeClubId"] == str(home.id)
+    assert body["awayClubId"] == str(away.id)
     assert body["homeClubName"] == "Roma FC"
     assert body["awayClubName"] == "Milan FC"
     assert body["homeGoals"] == 2
     assert body["statusShort"] == "2H"
     assert body["statusElapsed"] == 63
+    assert body["venueName"] == "Stadio Olimpico"
+    assert body["venueCity"] == "Roma"
+    assert body["referee"] == "M. Rossi"
+    assert body["homeClubLogoUrl"] == "https://media.api-sports.io/football/teams/home.png"
+    # Il logo ospite non è mai stato sincronizzato: assente, non un placeholder.
+    assert body["awayClubLogoUrl"] is None
 
     assert body["homeLineup"]["formation"] == "4-3-3"
+    assert body["homeLineup"]["coachName"] == "J. Mourinho"
     assert [p["name"] for p in body["homeLineup"]["starters"]] == ["Marco Rossi"]
+    assert body["homeLineup"]["starters"][0]["photoUrl"] == (
+        "https://media.api-sports.io/football/players/970101.png"
+    )
+    # Il panchinaro non ha mai avuto una foto sincronizzata: assente, non un placeholder.
+    assert body["homeLineup"]["bench"][0]["photoUrl"] is None
     assert [p["name"] for p in body["homeLineup"]["bench"]] == ["Paolo Verdi"]
     # Formazione ospite non pubblicata: assente, non vuota.
     assert body["awayLineup"] is None
 
     events = body["events"]
-    assert [e["minuteElapsed"] for e in events] == [12, 63]
+    assert [e["minuteElapsed"] for e in events] == [12, 63, 77]
     assert events[0]["minuteLabel"] == "12'"
     assert events[0]["relatedAthleteName"] == "Luca Bianchi"
+    assert events[0]["athleteId"] == str(scorer.id)
+    assert events[0]["relatedAthleteId"] == str(assister.id)
+    assert events[0]["clubId"] == str(home.id)
     # L'evento ritrattato non deve comparire.
     assert all(e["minuteElapsed"] != 30 for e in events)
+    # La copia normalizzata dello stesso gol (77') non deve duplicare la riga grezza.
+    assert len([e for e in events if e["minuteElapsed"] == 77]) == 1
 
 
 def test_live_fixture_without_recent_updates_is_reported_as_stale(
@@ -255,9 +311,15 @@ def test_live_fixture_without_recent_updates_is_reported_as_stale(
         provider_seed=971000,
     )
     db_session.commit()
-    # Simula un feed fermo: la partita è live ma il dato non si aggiorna.
+    # Simula un feed fermo: la partita è live ma il dato non si aggiorna. Azzera
+    # anche venue/arbitro per verificare che restino assenti, non un placeholder.
     db_session.query(Fixture).filter(Fixture.id == fixture.id).update(
-        {Fixture.updated_at: datetime.now(UTC) - timedelta(minutes=30)}
+        {
+            Fixture.updated_at: datetime.now(UTC) - timedelta(minutes=30),
+            Fixture.venue_name: None,
+            Fixture.venue_city: None,
+            Fixture.referee: None,
+        }
     )
     db_session.commit()
 
@@ -271,6 +333,9 @@ def test_live_fixture_without_recent_updates_is_reported_as_stale(
     assert body["feedStateLabel"] == "Dati fermi"
     # Nessun evento inventato per compensare il buco.
     assert body["events"] == []
+    # Provider senza venue/arbitro per questa partita: assenti, non placeholder.
+    assert body["venueName"] is None
+    assert body["referee"] is None
 
 
 def test_fixture_outside_the_turn_is_not_readable(
@@ -317,3 +382,4 @@ def test_turn_list_exposes_feed_freshness(
     assert fixture_body["updatedAt"] is not None
     assert fixture_body["feedState"] == "fresh"
     assert fixture_body["feedStateLabel"] == "Aggiornato"
+    assert fixture_body["homeClubLogoUrl"] == "https://media.api-sports.io/football/teams/home.png"

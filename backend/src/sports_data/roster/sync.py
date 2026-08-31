@@ -145,6 +145,7 @@ def upsert_athlete(
             weight=mapped.weight,
             age=mapped.age,
             injured=mapped.injured,
+            photo_url=mapped.photo_url,
         )
         session.add(row)
         session.flush()
@@ -161,6 +162,7 @@ def upsert_athlete(
         "weight": mapped.weight,
         "age": mapped.age,
         "injured": mapped.injured,
+        "photo_url": mapped.photo_url,
     }
     changed = False
     for key, value in fields.items():
@@ -186,6 +188,7 @@ def upsert_athlete_from_membership(
             provider_id=mapped.athlete_provider_id,
             canonical_name=mapped.athlete_name,
             age=mapped.athlete_age,
+            photo_url=mapped.photo_url,
         ),
         counters,
     )

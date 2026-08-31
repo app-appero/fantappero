@@ -13,6 +13,7 @@ from sports_data.provider.mapping import (
     map_official_lineups,
     map_player_match_stats,
 )
+from sports_data.provider.types import ProviderEnvelope, ProviderPaging
 
 DATASET = Path(__file__).resolve().parents[2] / "fixtures" / "api_football"
 MATCH = DATASET / "matches" / "39" / "1035055"
@@ -38,6 +39,41 @@ def test_map_fixtures_includes_round_and_status_elapsed() -> None:
     assert fx.away_goals == 1
     assert fx.round_label == "Regular Season - 2"
     assert fx.home_club_name == "West Ham"
+    assert fx.venue_name == "London Stadium"
+    assert fx.venue_city == "London"
+    assert fx.referee == "J. Brooks"
+
+
+def test_map_fixtures_venue_and_referee_absent_are_none() -> None:
+    """Provider non ha ancora pubblicato venue/arbitro: nessun errore, campi None."""
+    envelope = ProviderEnvelope(
+        endpoint="/fixtures",
+        parameters={},
+        errors=[],
+        results=1,
+        paging=ProviderPaging(current=1, total=1),
+        response=[
+            {
+                "fixture": {
+                    "id": 999,
+                    "date": "2026-09-01T18:00:00+00:00",
+                    "status": {"short": "NS"},
+                },
+                "league": {"id": 39, "season": 2026, "round": "Regular Season - 3"},
+                "teams": {
+                    "home": {"id": 48, "name": "West Ham"},
+                    "away": {"id": 49, "name": "Chelsea"},
+                },
+                "goals": {"home": None, "away": None},
+            }
+        ],
+    )
+    rows = map_fixtures(envelope)
+    assert len(rows) == 1
+    fx = rows[0]
+    assert fx.venue_name is None
+    assert fx.venue_city is None
+    assert fx.referee is None
 
 
 def test_map_match_events_idempotent_keys() -> None:
@@ -70,6 +106,7 @@ def test_map_official_lineups_starters_and_subs() -> None:
     assert len(lineups) == 2
     west_ham = next(row for row in lineups if row.club_provider_id == 48)
     assert west_ham.formation == "4-2-3-1"
+    assert west_ham.coach_name == "D. Moyes"
     starters = [e for e in west_ham.entries if e.is_starter]
     subs = [e for e in west_ham.entries if not e.is_starter]
     assert len(starters) == 11

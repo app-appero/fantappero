@@ -13,21 +13,18 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from uuid import UUID
 
-from sqlalchemy import select, update
+from sqlalchemy import update
 from sqlalchemy.orm import Session
 
 from auth.exceptions import ValidationAuthError
 from database.enums import FantasyRoundHomologationStatus, LeagueAuditAction, NotificationCategory
 from fantasy_ratings.config import default_formula_config
-from fantasy_turns.models import FantasyRound, FantasyRoundFixture
+from fantasy_turns.models import FantasyRound
+from fantasy_turns.readiness import evaluate_round_readiness
 from leagues.models.league_audit_event import LeagueAuditEvent
 from notifications.recipients import user_ids_for_league
 from notifications.service import NotificationService
 from observability.context import get_correlation_id
-from sports_data.fixtures.models import Fixture
-
-# API-Football terminal "finished" statuses (same set used by EP07-05 scoring).
-FINISHED_FIXTURE_STATUSES = frozenset({"FT", "AET", "PEN"})
 
 
 @dataclass(frozen=True)
@@ -38,7 +35,13 @@ class HomologationResult:
     formula_version: str | None
 
 
-def homologate_round(session: Session, *, round_id: UUID, actor_id: UUID) -> HomologationResult:
+def homologate_round(
+    session: Session,
+    *,
+    round_id: UUID,
+    actor_id: UUID | None,
+    automatic: bool = False,
+) -> HomologationResult:
     """Omologa un turno: richiede tutte le partite terminate (dato reale finale).
 
     La transizione è una UPDATE condizionale sullo stato corrente: sotto
@@ -50,22 +53,16 @@ def homologate_round(session: Session, *, round_id: UUID, actor_id: UUID) -> Hom
     if fantasy_round is None:
         raise ValidationAuthError("Turno non trovato.", code="turn_not_found")
 
-    statuses = list(
-        session.scalars(
-            select(Fixture.status_short)
-            .join(FantasyRoundFixture, FantasyRoundFixture.fixture_id == Fixture.id)
-            .where(
-                FantasyRoundFixture.round_id == round_id,
-                FantasyRoundFixture.excluded_at.is_(None),
-            )
-        ).all()
-    )
-    if not statuses or not all(
-        (status or "").upper() in FINISHED_FIXTURE_STATUSES for status in statuses
-    ):
+    readiness = evaluate_round_readiness(session, round_id=round_id)
+    if not readiness.all_fixtures_finished:
         raise ValidationAuthError(
             "Non tutte le partite del turno sono terminate: il risultato resta provvisorio.",
             code="round_not_final",
+        )
+    if not readiness.all_statistics_available:
+        raise ValidationAuthError(
+            "Le partite sono terminate ma mancano ancora statistiche giocatore definitive.",
+            code="round_statistics_pending",
         )
 
     now = datetime.now(UTC)
@@ -97,7 +94,11 @@ def homologate_round(session: Session, *, round_id: UUID, actor_id: UUID) -> Hom
             actor_id=actor_id,
             action=LeagueAuditAction.FANTASY_ROUND_HOMOLOGATED,
             correlation_id=get_correlation_id(),
-            details={"roundId": str(round_id), "formulaVersion": formula_version},
+            details={
+                "roundId": str(round_id),
+                "formulaVersion": formula_version,
+                "source": "automatic_live_pipeline" if automatic else "manual_operator",
+            },
         )
     )
     notifications = NotificationService(session)

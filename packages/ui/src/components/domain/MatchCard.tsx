@@ -3,7 +3,7 @@ import { Badge } from "../Badge.js";
 import { Card, CardBody } from "../Card.js";
 import { classNames } from "../../utils/classNames.js";
 
-export type MatchStatus = "scheduled" | "live" | "finished" | "postponed";
+export type MatchStatus = "scheduled" | "live" | "finished" | "postponed" | "needs_update";
 
 export type MatchCardProps = HTMLAttributes<HTMLElement> & {
   homeTeam: string;
@@ -16,6 +16,9 @@ export type MatchCardProps = HTMLAttributes<HTMLElement> & {
   contextLabel?: string;
   /** Live/final score, when known (omitted before kickoff). */
   score?: { home: number; away: number } | null;
+  /** Club crest, when the provider has published one. */
+  homeLogoUrl?: string | null;
+  awayLogoUrl?: string | null;
 };
 
 const STATUS_VARIANTS = {
@@ -23,6 +26,7 @@ const STATUS_VARIANTS = {
   live: "accent",
   finished: "success",
   postponed: "warning",
+  needs_update: "warning",
 } as const;
 
 export function MatchCard({
@@ -33,6 +37,8 @@ export function MatchCard({
   statusLabel,
   contextLabel,
   score,
+  homeLogoUrl,
+  awayLogoUrl,
   className,
   ...rest
 }: MatchCardProps) {
@@ -41,7 +47,12 @@ export function MatchCard({
       <CardBody>
         {contextLabel ? <p className="fa-match-card__context">{contextLabel}</p> : null}
         <div className="fa-match-card__teams">
-          <span className="fa-match-card__team">{homeTeam}</span>
+          <span className="fa-match-card__team">
+            {homeTeam}
+            {homeLogoUrl ? (
+              <img className="fa-match-card__team-logo" src={homeLogoUrl} alt="" aria-hidden="true" />
+            ) : null}
+          </span>
           {score ? (
             <span className="fa-match-card__score" data-testid="match-card-score">
               {score.home} - {score.away}
@@ -51,7 +62,12 @@ export function MatchCard({
               vs
             </span>
           )}
-          <span className="fa-match-card__team">{awayTeam}</span>
+          <span className="fa-match-card__team">
+            {awayLogoUrl ? (
+              <img className="fa-match-card__team-logo" src={awayLogoUrl} alt="" aria-hidden="true" />
+            ) : null}
+            {awayTeam}
+          </span>
         </div>
         <div className="fa-match-card__footer">
           <time className="fa-match-card__kickoff">{kickoffLabel}</time>

@@ -18,6 +18,7 @@ from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from datetime import datetime
 from hashlib import sha256
+from math import ceil
 from uuid import UUID
 
 from database.enums import FantasyTurnKind
@@ -88,8 +89,8 @@ class CalendarPlan:
 
     @property
     def is_generatable(self) -> bool:
-        """False quando non entra nemmeno un ciclo completo."""
-        return self.cycle_count > 0
+        """False quando non c'è nemmeno una finestra valida da usare."""
+        return self.round_count > 0
 
 
 def window_bounds_for_kickoff(
@@ -345,12 +346,19 @@ def plan_calendar(
     cycle_length = cycle_length_for(participant_count)
     eligible = [window for window in windows if window.eligible]
 
-    cycle_count = len(eligible) // cycle_length
+    # Corrispondenza 1:1 con i Turni Europei: ogni finestra valida genera una
+    # giornata H2H. L'ultimo ciclo può restare parziale — meglio un girone
+    # incompleto in coda che turni europei senza la loro giornata fantasy.
+    rounds_needed = len(eligible)
     if max_cycles is not None:
-        cycle_count = min(cycle_count, max(max_cycles, 0))
+        rounds_needed = min(rounds_needed, max(max_cycles, 0) * cycle_length)
+    cycle_count = ceil(rounds_needed / cycle_length) if cycle_length else 0
 
-    rounds_needed = cycle_count * cycle_length
-    slots = generate_cycles(membership_ids, cycle_count=cycle_count)
+    slots = tuple(
+        slot
+        for slot in generate_cycles(membership_ids, cycle_count=cycle_count)
+        if slot.round_number <= rounds_needed
+    )
 
     rounds: list[PlannedRound] = []
     for index in range(rounds_needed):
@@ -410,8 +418,15 @@ def plan_calendar(
 
 
 def assert_plan_invariants(plan: CalendarPlan, membership_ids: list[UUID]) -> None:
-    """Verifica le regole FR-LEG-04 estese ai cicli multipli (EP13-P03)."""
-    if plan.cycle_count == 0:
+    """Verifica le regole FR-LEG-04 estese ai cicli multipli (EP13-P03).
+
+    Dalla corrispondenza 1:1 con i Turni Europei l'ultimo ciclo può essere
+    parziale: le invarianti *per giornata* (ogni squadra gioca una volta sola,
+    nessuno scontro senza avversario, finestre distinte e cronologiche)
+    restano assolute, quelle *per ciclo* (copertura completa degli
+    accoppiamenti, riposi equi) valgono solo sui cicli interi.
+    """
+    if plan.round_count == 0:
         if plan.slots or plan.rounds:
             raise AssertionError("piano vuoto con slot o giornate")
         return
@@ -419,10 +434,11 @@ def assert_plan_invariants(plan: CalendarPlan, membership_ids: list[UUID]) -> No
     ids = set(membership_ids)
     participant_count = len(membership_ids)
     pairs_per_cycle = participant_count * (participant_count - 1) // 2
+    full_cycles = plan.round_count // plan.cycle_length
 
-    if plan.round_count != plan.cycle_count * plan.cycle_length:
-        raise AssertionError("numero di giornate incoerente con i cicli")
-    if plan.matchup_count != pairs_per_cycle * plan.cycle_count:
+    if plan.cycle_count != ceil(plan.round_count / plan.cycle_length):
+        raise AssertionError("numero di cicli incoerente con le giornate")
+    if plan.matchup_count != sum(1 for slot in plan.slots if not slot.is_bye):
         raise AssertionError("numero di scontri incoerente")
     if len(plan.rounds) != plan.round_count:
         raise AssertionError("mappatura giornate incompleta")
@@ -470,17 +486,23 @@ def assert_plan_invariants(plan: CalendarPlan, membership_ids: list[UUID]) -> No
         if ids - set(appearing):
             raise AssertionError(f"squadra assente alla giornata {round_number}")
 
-    if len(pair_counts) != pairs_per_cycle:
+    # Copertura accoppiamenti: garantita solo sui cicli interi. Nel ciclo
+    # parziale finale una coppia può essersi incontrata una volta in più.
+    if full_cycles >= 1 and len(pair_counts) != pairs_per_cycle:
         raise AssertionError("copertura degli accoppiamenti incompleta")
-    if any(count != plan.cycle_count for count in pair_counts.values()):
-        raise AssertionError("una coppia non si incontra una volta per ciclo")
+    if any(count not in (full_cycles, full_cycles + 1) for count in pair_counts.values()):
+        raise AssertionError("una coppia si incontra troppe volte")
 
     if participant_count % 2 == 1:
-        for cycle_number in range(1, plan.cycle_count + 1):
+        for cycle_number in range(1, full_cycles + 1):
             resting = byes_per_cycle.get(cycle_number, [])
             if sorted(resting, key=str) != sorted(ids, key=str):
                 raise AssertionError(
                     f"riposi non equi nel ciclo {cycle_number}: attesa una volta per squadra"
                 )
+        # Ciclo parziale: nessuna squadra può riposare due volte.
+        trailing = byes_per_cycle.get(full_cycles + 1, [])
+        if len(trailing) != len(set(trailing)):
+            raise AssertionError("una squadra riposa due volte nel ciclo parziale")
     elif byes_per_cycle:
         raise AssertionError("riposi presenti con numero pari di partecipanti")

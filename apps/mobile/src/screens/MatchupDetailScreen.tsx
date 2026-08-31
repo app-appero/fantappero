@@ -3,8 +3,10 @@ import {
   H2H_GOALS_LABEL,
   H2H_POINTS_LABEL,
   describeH2HResult,
+  fantasyBadgesFromBonusMalus,
   formatFantasyGoals,
   formatFantasyPoints,
+  layoutFromModule,
 } from "@fantappero/contracts";
 import { theme } from "@fantappero/ui/theme";
 import { useNavigation, useRoute, type RouteProp } from "@react-navigation/core";
@@ -12,6 +14,7 @@ import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useCallback, useEffect, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { fetchH2HMatchup } from "../api/leagues";
+import { PitchView } from "../components/match/PitchView";
 import { StatusBadge } from "../components/StatusBadge";
 import { UiStatePanel } from "../components/UiStatePanel";
 import { PageContainer } from "../layout/PageContainer";
@@ -21,10 +24,45 @@ import { getApiErrorMessage, useAuthSession } from "../session/DemoSessionContex
 
 const { colors, spacing, typography, radius } = theme;
 
-function formatPlayerLabel(player: H2HPlayerScore): string {
-  return player.fantasyScore !== null
-    ? `${player.name} · ${player.fantasyScore.toFixed(1)}`
-    : player.name;
+/** `"7.5"`, `"7.5 LIVE"` mentre la partita reale del giocatore è in corso (§21). */
+function playerScoreLabel(player: H2HPlayerScore): string | null {
+  if (player.fantasyScore === null) {
+    return null;
+  }
+  const base = formatFantasyPoints(player.fantasyScore);
+  return player.fixtureStatusLabel === "LIVE" ? `${base} LIVE` : base;
+}
+
+function toFantasyPitchPlayers(players: readonly H2HPlayerScore[]) {
+  return players.map((player) => ({
+    id: player.athleteId,
+    name: player.name,
+    role: player.role,
+    badges: fantasyBadgesFromBonusMalus(player.bonusMalus ?? []),
+    scoreLabel: playerScoreLabel(player),
+    photoUrl: player.photoUrl,
+  }));
+}
+
+function PlayerBreakdown({ player }: { player: H2HPlayerScore }) {
+  const componentText = (player.bonusMalus ?? [])
+    .map((item) => `${item.id} ${item.contribution > 0 ? "+" : ""}${item.contribution.toFixed(1)}`)
+    .join(" · ");
+  return (
+    <View style={styles.playerScore} testID={`matchup-player-score-${player.athleteId}`}>
+      <Text style={styles.body}>
+        <Text style={styles.playerName}>{player.name}</Text> ({player.role}) ·{" "}
+        {player.realTeamName ?? "Squadra reale non associata"}
+      </Text>
+      <Text style={styles.meta}>
+        {player.fixtureStatusLabel ?? "Partita non associata"} · Voto{" "}
+        {formatFantasyPoints(player.baseScore ?? null)} · Bonus +
+        {(player.bonusTotal ?? 0).toFixed(1)} · Malus {(player.malusTotal ?? 0).toFixed(1)} · Totale{" "}
+        {formatFantasyPoints(player.fantasyScore)} · {player.scoreFinal ? "definitivo" : "provvisorio"}
+      </Text>
+      <Text style={styles.meta}>{componentText || "Nessun bonus o malus"}</Text>
+    </View>
+  );
 }
 
 function outcomeLabel(outcome: "home" | "away" | "draw" | null): string {
@@ -66,19 +104,27 @@ function SideBlock({ side, title }: { side: H2HSideLineup; title: string }) {
         />
       ) : (
         <View style={styles.lineupGroup}>
-          <Text style={styles.subheading}>Titolari</Text>
+          <PitchView
+            title={`Titolari — ${teamLabel}`}
+            players={toFantasyPitchPlayers(side.starters)}
+            positions={layoutFromModule(
+              side.starters,
+              side.module,
+              (player) => player.role,
+              (player) => player.athleteId,
+              (player) => side.starters.indexOf(player),
+            )}
+            testID={`matchup-pitch-${title}`}
+          />
+          <Text style={styles.subheading}>Dettaglio punteggi titolari</Text>
           {side.starters.map((player) => (
-            <Text key={player.athleteId} style={styles.body}>
-              {formatPlayerLabel(player)} ({player.role})
-            </Text>
+            <PlayerBreakdown key={player.athleteId} player={player} />
           ))}
           {side.bench.length > 0 ? (
             <>
               <Text style={styles.subheading}>Panchina</Text>
               {side.bench.map((player) => (
-                <Text key={player.athleteId} style={styles.body}>
-                  {formatPlayerLabel(player)} ({player.role})
-                </Text>
+                <PlayerBreakdown key={player.athleteId} player={player} />
               ))}
             </>
           ) : null}
@@ -313,6 +359,19 @@ const styles = StyleSheet.create({
   },
   lineupGroup: {
     gap: spacing.xs,
+  },
+  playerScore: {
+    gap: spacing.xs,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+    paddingTop: spacing.xs,
+  },
+  playerName: {
+    fontWeight: "700",
+  },
+  meta: {
+    color: colors.foregroundMuted,
+    fontSize: typography.fontSize.xs,
   },
   heading: {
     color: colors.foreground,

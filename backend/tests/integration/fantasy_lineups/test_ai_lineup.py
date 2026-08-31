@@ -2,19 +2,23 @@
 
 from __future__ import annotations
 
+import os
 from datetime import UTC, datetime, timedelta
 from uuid import uuid4
 
 import pytest
+from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 from tests.integration.database.helpers import create_engine_for_url
 
 from auth.models.user import User
+from auth.security import create_access_token
 from database.enums import (
     FantasyRole,
     FantasyTurnKind,
     FantasyTurnStatus,
+    LeagueAuditAction,
     LeagueMemberRole,
     LeagueState,
     LineupSlotKind,
@@ -28,6 +32,7 @@ from fantasy_teams.models import FantasyRosterSlot, FantasyTeam
 from fantasy_turns.models import FantasyRound, FantasyRoundFixture
 from leagues.models.competition import Competition
 from leagues.models.league import League
+from leagues.models.league_audit_event import LeagueAuditEvent
 from leagues.models.league_membership import LeagueMembership
 from leagues.models.league_rules import LeagueRules
 from sports_data.catalog.models import Club, SportSeason
@@ -252,7 +257,6 @@ def test_ai_lineup_never_touches_a_human_team(
         fantasy_team_id=human_team.id,
         now=NOW,
     )
-
     assert result.outcome == "skipped_not_ai"
     assert (
         db_session.execute(
@@ -261,6 +265,79 @@ def test_ai_lineup_never_touches_a_human_team(
         is None
     )
 
+
+def test_admin_endpoint_is_authorized_audited_and_human_safe(
+    client: TestClient,
+    db_session: Session,
+    scenario: dict[str, object],
+) -> None:
+    league = scenario["league"]
+    fantasy_round = scenario["round"]
+    fixture = scenario["fixture"]
+    ai_team = scenario["ai_team"]
+    human_team = scenario["human_team"]
+
+    # L'endpoint usa l'orologio reale: porta il turno seedato nella sua
+    # finestra attiva, mantenendo lo stesso scenario deterministico di rosa.
+    now = datetime.now(UTC)
+    fantasy_round.window_start_at = now - timedelta(hours=1)
+    fantasy_round.window_end_at = now + timedelta(days=1)
+    fantasy_round.cutoff_at = now + timedelta(hours=2)
+    fixture.kickoff_at = now + timedelta(hours=3)
+    db_session.commit()
+
+    ai_member = ai_team.membership.user
+    owner = human_team.membership.user
+    jwt_secret = os.environ.get("JWT_SECRET_KEY", "test_jwt_secret_for_pytest_only")
+    member_token, _ = create_access_token(
+        user_id=ai_member.id,
+        secret=jwt_secret,
+        expire_minutes=15,
+    )
+    owner_token, _ = create_access_token(
+        user_id=owner.id,
+        secret=jwt_secret,
+        expire_minutes=15,
+    )
+    endpoint = f"/leagues/{league.id}/turni/{fantasy_round.id}/formazioni-ia"
+
+    forbidden = client.post(
+        endpoint,
+        headers={"Authorization": f"Bearer {member_token}"},
+    )
+    assert forbidden.status_code == 403
+
+    response = client.post(
+        endpoint,
+        headers={"Authorization": f"Bearer {owner_token}"},
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["roundId"] == str(fantasy_round.id)
+    assert payload["teams"][0]["fantasyTeamId"] == str(ai_team.id)
+    assert payload["teams"][0]["outcome"] == "created"
+    assert "1/1" in payload["summary"]
+
+    assert db_session.scalars(
+        select(LineupSubmission).where(LineupSubmission.fantasy_team_id == ai_team.id)
+    ).one()
+    assert (
+        db_session.scalars(
+            select(LineupSubmission).where(LineupSubmission.fantasy_team_id == human_team.id)
+        ).one_or_none()
+        is None
+    )
+
+    audit = db_session.scalars(
+        select(LeagueAuditEvent).where(
+            LeagueAuditEvent.league_id == league.id,
+            LeagueAuditEvent.actor_id == owner.id,
+            LeagueAuditEvent.action == LeagueAuditAction.FANTASY_LINEUP_SAVED,
+        )
+    ).one()
+    assert audit.details["source"] == "admin_ai_lineup_command"
+    assert audit.details["roundId"] == str(fantasy_round.id)
+    assert audit.details["teamsHandled"] == 1
 
 def test_decision_log_records_scores_and_exclusions(
     db_session: Session, scenario: dict[str, object]
@@ -295,8 +372,15 @@ def test_decision_log_records_scores_and_exclusions(
     assert by_id[str(injured.id)]["excludedReason"] == "injured"
     assert by_id[str(injured.id)]["excludedLabel"] == "Infortunato"
 
-    fielded = {str(p.athlete_id) for p in submission.players}
-    assert str(injured.id) not in fielded
+    starters = {
+        str(p.athlete_id)
+        for p in submission.players
+        if p.slot_kind == LineupSlotKind.STARTER
+    }
+    assert str(injured.id) not in starters
+    # Come nel percorso umano, tutta la rosa rimane registrata: l'infortunato
+    # è in fondo alla panchina ma non può entrare negli undici iniziali.
+    assert str(injured.id) in {str(p.athlete_id) for p in submission.players}
 
 
 def test_official_lineup_without_provenance_is_ignored(
@@ -417,6 +501,44 @@ def test_generation_is_deterministic_across_runs(
     assert first.plan is not None and second.plan is not None
     assert first.plan.starters == second.plan.starters
     assert first.plan.bench == second.plan.bench
+
+
+def test_identical_persisted_generation_is_a_true_noop(
+    db_session: Session, scenario: dict[str, object]
+) -> None:
+    league = scenario["league"]
+    fantasy_round = scenario["round"]
+    ai_team = scenario["ai_team"]
+
+    first = generate_ai_lineup(
+        db_session,
+        league_id=league.id,
+        round_id=fantasy_round.id,
+        fantasy_team_id=ai_team.id,
+        now=NOW,
+    )
+    db_session.commit()
+    assert first.outcome == "created"
+
+    submission = db_session.scalars(
+        select(LineupSubmission).where(LineupSubmission.fantasy_team_id == ai_team.id)
+    ).one()
+    original_revision = submission.revision
+    original_submitted_at = submission.submitted_at
+
+    second = generate_ai_lineup(
+        db_session,
+        league_id=league.id,
+        round_id=fantasy_round.id,
+        fantasy_team_id=ai_team.id,
+        now=NOW + timedelta(minutes=5),
+    )
+    db_session.commit()
+
+    assert second.outcome == "unchanged"
+    db_session.refresh(submission)
+    assert submission.revision == original_revision
+    assert submission.submitted_at == original_submitted_at
 
 
 def test_dry_run_does_not_persist_anything(

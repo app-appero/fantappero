@@ -13,15 +13,21 @@ from auth.exceptions import AuthError
 from authorization.context import LeagueAccess
 from authorization.dependencies import require_league_permissions
 from database.enums import Permission
+from fantasy_turns.calendar_refresh_progress import load_progress, new_job_id, save_progress
+from fantasy_turns.calendar_refresh_progress import CalendarRefreshProgress
 from fantasy_turns.live_service import get_fixture_live_detail
 from fantasy_turns.schemas import (
     EnsureFantasyTurnsResponse,
     ExcludeFantasyTurnFixtureRequest,
+    FantasyCalendarRefreshJobResponse,
+    FantasyCalendarRefreshProgressResponse,
+    FantasyCalendarRefreshResultResponse,
     FantasyTurnDetailResponse,
     FantasyTurnPreviewResponse,
     FantasyTurnSummaryResponse,
     FixtureLiveDetailResponse,
     GenerateFantasyTurnRequest,
+    PendingFixtureResponse,
 )
 from fantasy_turns.service import FantasyTurnService
 
@@ -105,6 +111,80 @@ def ensure_fantasy_turns(
         )
     except AuthError as exc:
         return _error_response(exc)
+
+
+@router.get(
+    "/{league_id}/turni/da-aggiornare",
+    response_model=list[PendingFixtureResponse],
+)
+def list_pending_fixtures(
+    league_access: LeagueAccess = Depends(require_league_permissions(Permission.MATCHDAY_VIEW)),
+    service: FantasyTurnService = Depends(get_fantasy_turn_service),
+) -> list[PendingFixtureResponse]:
+    """Fixture note ma senza data/ora dal provider: non appartengono ancora a nessun turno."""
+    return service.list_pending_fixtures(league_access)
+
+
+@router.post(
+    "/{league_id}/turni/aggiorna-calendario",
+    response_model=FantasyCalendarRefreshJobResponse,
+)
+def start_calendar_refresh(
+    league_access: LeagueAccess = Depends(require_league_permissions(Permission.LEAGUE_ADMIN)),
+) -> FantasyCalendarRefreshJobResponse:
+    """Avvia il comando unico "Aggiorna calendario" (sync provider + backfill stagionale)."""
+    from fantasy_turns.tasks import refresh_full_calendar_task
+
+    job_id = new_job_id()
+    league_id = str(league_access.league.id)
+    save_progress(
+        CalendarRefreshProgress(
+            job_id=job_id,
+            league_id=league_id,
+            status="queued",
+            percent=0,
+            stage="queued",
+            message="Aggiornamento calendario in coda…",
+        )
+    )
+    refresh_full_calendar_task.delay(
+        job_id=job_id,
+        league_id=league_id,
+        actor_id=str(league_access.user.id),
+    )
+    return FantasyCalendarRefreshJobResponse(
+        jobId=job_id,
+        status="queued",
+        message="Aggiornamento calendario avviato.",
+    )
+
+
+@router.get(
+    "/{league_id}/turni/aggiorna-calendario/{job_id}",
+    response_model=FantasyCalendarRefreshProgressResponse,
+)
+def get_calendar_refresh_progress(
+    job_id: str,
+    league_access: LeagueAccess = Depends(require_league_permissions(Permission.LEAGUE_ADMIN)),
+) -> FantasyCalendarRefreshProgressResponse | JSONResponse:
+    progress = load_progress(job_id)
+    if progress is None or progress.league_id != str(league_access.league.id):
+        return JSONResponse(
+            status_code=status.HTTP_404_NOT_FOUND,
+            content={"message": "Job di aggiornamento non trovato.", "code": "calendar_refresh_job_not_found"},
+        )
+    result = None
+    if progress.result is not None:
+        result = FantasyCalendarRefreshResultResponse.model_validate(progress.result)
+    return FantasyCalendarRefreshProgressResponse(
+        jobId=progress.job_id,
+        status=progress.status,
+        percent=progress.percent,
+        stage=progress.stage,
+        message=progress.message,
+        errorCode=progress.error_code,
+        result=result,
+    )
 
 
 @router.post(

@@ -47,7 +47,11 @@ DEFAULT_POLICIES: dict[PollWindow, WindowPolicy] = {
         fetch_live_batch=True,
         fetch_events=True,
         fetch_lineups=False,
-        fetch_players=False,
+        # Per-player snapshots are required by the authoritative fantasy
+        # scoring engine; fetching only events can update the real score but
+        # can never update fantavoti. Quota degradation still caps/suspends
+        # detail calls through the existing criticality policy.
+        fetch_players=True,
     ),
     PollWindow.POST_MATCH: WindowPolicy(
         window=PollWindow.POST_MATCH,

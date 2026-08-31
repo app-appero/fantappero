@@ -76,6 +76,9 @@ def test_quota_mode_thresholds() -> None:
 
 def test_degraded_interval_and_criticality_drop() -> None:
     live = policy_for(PollWindow.LIVE)
+    assert live.fetch_events is True
+    assert live.fetch_players is True
+    assert live.players_criticality == "critical"
     assert effective_interval_seconds(PollWindow.LIVE, QuotaMode.OK) == live.base_interval_seconds
     degraded = effective_interval_seconds(PollWindow.LIVE, QuotaMode.DEGRADE)
     assert degraded == live.base_interval_seconds * 2.5

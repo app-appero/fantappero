@@ -1,13 +1,26 @@
-import type { FixtureLineup, FixtureLiveDetail, ProviderFeedState } from "@fantappero/contracts";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
+import type {
+  FixtureLineup,
+  FixtureLineupPlayer,
+  FixtureLiveDetail,
+  FixtureTimelineEvent,
+  MatchBadge,
+  ProviderFeedState,
+} from "@fantappero/contracts";
+import { layoutFromGrid, mapFixtureMatchStatus, realMatchBadgesByAthlete } from "@fantappero/contracts";
 import { theme } from "@fantappero/ui/theme";
 import { useRoute, type RouteProp } from "@react-navigation/core";
-import { useCallback, useState } from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { useCallback, useState, type ReactNode } from "react";
+import { Image, StyleSheet, Text, View } from "react-native";
 import { fetchFixtureLiveDetail } from "../api/leagues";
+import { MatchTimeline, type TimelineEntry } from "../components/match/MatchTimeline";
+import { PitchView } from "../components/match/PitchView";
+import { RoleBadge } from "../components/match/RoleBadge";
 import { StatusBadge } from "../components/StatusBadge";
 import { UiStatePanel } from "../components/UiStatePanel";
 import { useScreenData } from "../hooks/useScreenData";
 import { PageContainer } from "../layout/PageContainer";
+import { useLiveFixturePolling } from "../matchday/useLiveFixturePolling";
 import type { RootStackParamList } from "../navigation/types";
 import { getApiErrorMessage, useAuthSession } from "../session/DemoSessionContext";
 
@@ -63,7 +76,72 @@ function formatDateTime(value: string | null): string {
   }
 }
 
-function LineupBlock({ lineup, side }: { lineup: FixtureLineup | null; side: string }) {
+function pitchPlayerId(player: FixtureLineupPlayer): string {
+  return player.athleteId ?? `${player.name}-${player.shirtNumber ?? ""}`;
+}
+
+function toPitchPlayers(players: readonly FixtureLineupPlayer[], badgesByAthlete: Map<string, MatchBadge[]>) {
+  return players.map((player) => ({
+    id: pitchPlayerId(player),
+    shirtNumber: player.shirtNumber,
+    name: player.name,
+    role: player.position,
+    badges: player.athleteId ? badgesByAthlete.get(player.athleteId) : undefined,
+    photoUrl: player.photoUrl,
+  }));
+}
+
+/** Stato reale del panchinaro (§14): non un fisso "può subentrare" a partita finita. */
+function benchStatusLabel(player: FixtureLineupPlayer, events: readonly FixtureTimelineEvent[]): string {
+  if (!player.athleteId) {
+    return "Non utilizzato";
+  }
+  const entered = events.find(
+    (event) => event.eventType.toLowerCase() === "subst" && event.relatedAthleteId === player.athleteId,
+  );
+  if (entered) {
+    return `Entrato al ${entered.minuteLabel}`;
+  }
+  const sentOff = events.find(
+    (event) =>
+      event.athleteId === player.athleteId &&
+      event.eventType.toLowerCase() === "card" &&
+      (event.eventDetail ?? "").toLowerCase().includes("red"),
+  );
+  if (sentOff) {
+    return `Espulso dalla panchina al ${sentOff.minuteLabel}`;
+  }
+  return "Non utilizzato";
+}
+
+function BenchList({ players, events, side }: { players: readonly FixtureLineupPlayer[]; events: readonly FixtureTimelineEvent[]; side: string }) {
+  if (players.length === 0) {
+    return null;
+  }
+  return (
+    <View testID={`fixture-bench-${side}`}>
+      {players.map((player) => (
+        <View key={pitchPlayerId(player)} style={styles.playerRow} testID={`fixture-bench-player-${pitchPlayerId(player)}`}>
+          <RoleBadge code={player.position} />
+          <Text style={styles.body}>
+            {player.shirtNumber !== null ? `${player.shirtNumber}. ` : ""}
+            {player.name} — <Text style={styles.benchStatus}>{benchStatusLabel(player, events)}</Text>
+          </Text>
+        </View>
+      ))}
+    </View>
+  );
+}
+
+function LineupBlock({
+  lineup,
+  events,
+  side,
+}: {
+  lineup: FixtureLineup | null;
+  events: readonly FixtureTimelineEvent[];
+  side: string;
+}) {
   if (lineup === null) {
     return (
       <View style={styles.section} testID={`fixture-lineup-${side}`}>
@@ -77,36 +155,152 @@ function LineupBlock({ lineup, side }: { lineup: FixtureLineup | null; side: str
     );
   }
 
+  const badgesByAthlete = realMatchBadgesByAthlete(events);
+  const positions = layoutFromGrid(
+    lineup.starters.map((player) => ({ id: pitchPlayerId(player), grid: player.grid })),
+  );
+  const title = [lineup.clubName, lineup.formation, lineup.coachName ? `All. ${lineup.coachName}` : null]
+    .filter(Boolean)
+    .join(" · ");
+
   return (
     <View style={styles.section} testID={`fixture-lineup-${side}`}>
-      <Text style={styles.heading}>
-        {lineup.clubName}
-        {lineup.formation ? ` · ${lineup.formation}` : ""}
-      </Text>
-      <Text style={styles.subheading}>Titolari</Text>
-      {lineup.starters.map((player) => (
-        <Text key={`s-${player.athleteId ?? player.name}`} style={styles.body}>
-          {player.shirtNumber !== null ? `${player.shirtNumber}. ` : ""}
-          {player.name}
-          {player.position ? ` (${player.position})` : ""}
-        </Text>
-      ))}
-      {lineup.bench.length > 0 ? (
-        <>
-          <Text style={styles.subheading}>Panchina</Text>
-          {lineup.bench.map((player) => (
-            <Text key={`b-${player.athleteId ?? player.name}`} style={styles.body}>
-              {player.shirtNumber !== null ? `${player.shirtNumber}. ` : ""}
-              {player.name}
-            </Text>
-          ))}
-        </>
-      ) : null}
+      <PitchView
+        title={title}
+        players={toPitchPlayers(lineup.starters, badgesByAthlete)}
+        positions={positions}
+        testID={`fixture-pitch-${side}`}
+      />
+      <Text style={styles.subheading}>Panchina</Text>
+      <BenchList players={lineup.bench} events={events} side={side} />
     </View>
   );
 }
 
-/** Dettaglio partita del turno europeo — parità con il web (EP13-P04). */
+function eventSide(event: FixtureTimelineEvent, detail: FixtureLiveDetail): "home" | "away" | null {
+  if (!event.clubId) {
+    return null;
+  }
+  if (event.clubId === detail.homeClubId) {
+    return "home";
+  }
+  if (event.clubId === detail.awayClubId) {
+    return "away";
+  }
+  return null;
+}
+
+function eventVisual(event: FixtureTimelineEvent): { icon: ReactNode; headline: ReactNode; detail?: ReactNode } {
+  const type = event.eventType.toLowerCase();
+  const detailText = (event.eventDetail ?? "").toLowerCase();
+  const isOwnGoal = event.scoringKind === "own_goal" || detailText.includes("own");
+
+  if (type === "goal") {
+    if (isOwnGoal) {
+      return {
+        icon: <MaterialCommunityIcons name="soccer" size={16} color={colors.danger} />,
+        headline: `${event.athleteName ?? "?"} (autogol)`,
+      };
+    }
+    const isMissed = event.scoringKind === "penalty_missed" || detailText.includes("missed");
+    if (isMissed) {
+      return {
+        icon: <MaterialCommunityIcons name="close-circle" size={16} color={colors.danger} />,
+        headline: `${event.athleteName ?? "?"} — rigore sbagliato`,
+      };
+    }
+    const isPenalty = event.scoringKind === "penalty_scored" || detailText.includes("penalty");
+    return {
+      icon: <MaterialCommunityIcons name="soccer" size={16} color="#fff" />,
+      headline: `${event.athleteName ?? "?"}${isPenalty ? " (rigore)" : ""}`,
+      detail: event.relatedAthleteName ? `Assist: ${event.relatedAthleteName}` : undefined,
+    };
+  }
+  if (event.scoringKind === "penalty_saved" || type === "penalty_saved") {
+    return {
+      icon: <MaterialCommunityIcons name="hand-back-right" size={16} color="#fff" />,
+      headline: `Rigore parato${event.athleteName ? ` — ${event.athleteName}` : ""}`,
+    };
+  }
+  if (type === "card") {
+    const isRed = detailText.includes("red");
+    return {
+      icon: <MaterialCommunityIcons name="card" size={16} color={isRed ? colors.danger : colors.warning} />,
+      headline: event.athleteName ?? "?",
+    };
+  }
+  if (type === "subst") {
+    return {
+      icon: <MaterialCommunityIcons name="arrow-down-bold-box" size={16} color={colors.danger} />,
+      headline: event.athleteName ?? "?",
+      detail: event.relatedAthleteName ? `↑ ${event.relatedAthleteName}` : undefined,
+    };
+  }
+  if (type === "var") {
+    return {
+      icon: <MaterialCommunityIcons name="alert-decagram" size={16} color="#fff" />,
+      headline: `VAR — ${event.eventDetail ?? "Revisione"}`,
+      detail: event.athleteName ?? undefined,
+    };
+  }
+  return { icon: undefined, headline: `${event.eventType}${event.eventDetail ? ` (${event.eventDetail})` : ""}` };
+}
+
+function buildTimelineEntries(detail: FixtureLiveDetail): TimelineEntry[] {
+  const entries: TimelineEntry[] = [];
+  let homeScore = 0;
+  let awayScore = 0;
+  let insertedHalftime = false;
+  const hasFirstHalf = detail.events.some((e) => (e.minuteElapsed ?? 0) <= 45);
+  const hasSecondHalf = detail.events.some((e) => (e.minuteElapsed ?? 0) > 45);
+
+  if (detail.events.length > 0) {
+    entries.push({ type: "marker", id: "start", label: "Inizio partita" });
+  }
+
+  for (const event of detail.events) {
+    if (!insertedHalftime && hasFirstHalf && hasSecondHalf && (event.minuteElapsed ?? 0) > 45) {
+      entries.push({ type: "marker", id: "halftime", label: `Intervallo · ${homeScore}-${awayScore}` });
+      insertedHalftime = true;
+    }
+
+    const side = eventSide(event, detail);
+    const detailText = (event.eventDetail ?? "").toLowerCase();
+    const isOwnGoal = event.scoringKind === "own_goal" || detailText.includes("own");
+    const isMissed = event.scoringKind === "penalty_missed" || detailText.includes("missed");
+    const isGoal = event.eventType.toLowerCase() === "goal" && !isMissed;
+    if (isGoal && side) {
+      const scoringSide = isOwnGoal ? (side === "home" ? "away" : "home") : side;
+      if (scoringSide === "home") {
+        homeScore += 1;
+      } else {
+        awayScore += 1;
+      }
+    }
+
+    if (!side) {
+      continue;
+    }
+    const visual = eventVisual(event);
+    entries.push({
+      type: "event",
+      id: event.id,
+      side,
+      minuteLabel: event.minuteLabel,
+      icon: visual.icon,
+      headline: visual.headline,
+      detail: visual.detail,
+    });
+  }
+
+  if (mapFixtureMatchStatus(detail.statusShort) === "finished") {
+    entries.push({ type: "marker", id: "end", label: `Fine partita · ${homeScore}-${awayScore}` });
+  }
+
+  return entries;
+}
+
+/** Dettaglio partita del turno europeo — parità con il web (EP13-P04-quater). */
 export function FixtureDetailScreen() {
   const route = useRoute<RouteProp<RootStackParamList, "FixtureDetail">>();
   const { accessToken, activeLeagueId, can } = useAuthSession();
@@ -137,6 +331,16 @@ export function FixtureDetailScreen() {
 
   const { refreshing, onRefresh } = useScreenData(load);
 
+  useLiveFixturePolling(
+    accessToken,
+    activeLeagueId,
+    turnId,
+    fixtureId,
+    detail,
+    setDetail,
+    !loading && !loadError,
+  );
+
   if (!can(["matchday:view"])) {
     return (
       <PageContainer title="Partita" testID="screen-fixture-detail">
@@ -149,6 +353,9 @@ export function FixtureDetailScreen() {
       </PageContainer>
     );
   }
+
+  const matchStatus = detail ? mapFixtureMatchStatus(detail.statusShort) : null;
+  const isFinished = matchStatus === "finished";
 
   return (
     <PageContainer
@@ -177,34 +384,51 @@ export function FixtureDetailScreen() {
 
       {!loading && !loadError && detail ? (
         <View style={styles.stack} testID="fixture-detail">
-          <Text style={styles.score} testID="fixture-score">
-            {detail.homeClubName} {detail.homeGoals ?? "—"} – {detail.awayGoals ?? "—"}{" "}
-            {detail.awayClubName}
-          </Text>
+          <View style={styles.scoreRow}>
+            {detail.homeClubLogoUrl ? (
+              <Image source={{ uri: detail.homeClubLogoUrl }} style={styles.clubLogo} />
+            ) : null}
+            <Text style={styles.score} testID="fixture-score">
+              {detail.homeClubName} {detail.homeGoals ?? "—"} – {detail.awayGoals ?? "—"}{" "}
+              {detail.awayClubName}
+            </Text>
+            {detail.awayClubLogoUrl ? (
+              <Image source={{ uri: detail.awayClubLogoUrl }} style={styles.clubLogo} />
+            ) : null}
+          </View>
           <View style={styles.badgeRow}>
             <StatusBadge
               label={statusLabel(detail.statusShort, detail.statusElapsed)}
-              color={colors.accent}
+              color={isFinished ? colors.success : colors.accent}
               textColor={colors.accentContrast}
               testID="fixture-status"
             />
-            <StatusBadge
-              label={detail.feedStateLabel}
-              color={FEED_COLORS[detail.feedState]}
-              textColor={colors.accentContrast}
-              testID="fixture-feed-state"
-            />
+            {/* A partita finita "Aggiornato" non aggiunge informazione (§13). */}
+            {!isFinished ? (
+              <StatusBadge
+                label={detail.feedStateLabel}
+                color={FEED_COLORS[detail.feedState]}
+                textColor={colors.accentContrast}
+                testID="fixture-feed-state"
+              />
+            ) : null}
           </View>
           <Text style={styles.body}>
             {detail.competitionName ? `${detail.competitionName} · ` : ""}
             Inizio: {formatDateTime(detail.kickoffAt)}
           </Text>
-          <Text style={styles.body}>
-            Ultimo aggiornamento: {formatDateTime(detail.updatedAt)}
-          </Text>
+          {detail.venueName || detail.referee ? (
+            <Text style={styles.body} testID="fixture-venue-referee">
+              {detail.venueName
+                ? `${detail.venueName}${detail.venueCity ? ` (${detail.venueCity})` : ""}`
+                : ""}
+              {detail.venueName && detail.referee ? " · " : ""}
+              {detail.referee ? `Arbitro: ${detail.referee}` : ""}
+            </Text>
+          ) : null}
 
-          <LineupBlock lineup={detail.homeLineup} side="home" />
-          <LineupBlock lineup={detail.awayLineup} side="away" />
+          <LineupBlock lineup={detail.homeLineup} events={detail.events} side="home" />
+          <LineupBlock lineup={detail.awayLineup} events={detail.events} side="away" />
 
           <View style={styles.section}>
             <Text style={styles.heading}>Cronologia</Text>
@@ -216,16 +440,11 @@ export function FixtureDetailScreen() {
                 testID="fixture-timeline-empty"
               />
             ) : (
-              <View testID="fixture-timeline">
-                {detail.events.map((event) => (
-                  <Text key={event.id} style={styles.body}>
-                    {event.minuteLabel} — {event.eventType}
-                    {event.eventDetail ? ` (${event.eventDetail})` : ""}
-                    {event.athleteName ? `: ${event.athleteName}` : ""}
-                    {event.relatedAthleteName ? ` — assist ${event.relatedAthleteName}` : ""}
-                  </Text>
-                ))}
-              </View>
+              <MatchTimeline
+                homeLabel={detail.homeClubName}
+                awayLabel={detail.awayClubName}
+                entries={buildTimelineEntries(detail)}
+              />
             )}
           </View>
         </View>
@@ -271,5 +490,24 @@ const styles = StyleSheet.create({
   body: {
     color: colors.foreground,
     fontSize: typography.fontSize.sm,
+  },
+  benchStatus: {
+    fontStyle: "italic",
+    color: colors.foregroundMuted,
+  },
+  playerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.xs,
+  },
+  scoreRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.xs,
+  },
+  clubLogo: {
+    width: 24,
+    height: 24,
+    resizeMode: "contain",
   },
 });

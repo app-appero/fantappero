@@ -368,6 +368,14 @@ services:
       - fantappero_web_node_modules:/app/node_modules
       - fantappero_web_app_node_modules:/app/apps/web/node_modules
       - fantappero_mobile_app_node_modules:/app/apps/mobile/node_modules
+      # node_modules dei packages workspace isolati in volumi Docker dedicati
+      # (come sopra per apps/web e apps/mobile): altrimenti sarebbero la
+      # STESSA cartella bind-mounted vista da Windows e dal container Linux,
+      # e pnpm crea symlink incompatibili tra i due — ogni reinstall da un
+      # lato rompe la risoluzione dei moduli per l'altro.
+      - fantappero_ui_node_modules:/app/packages/ui/node_modules
+      - fantappero_contracts_node_modules:/app/packages/contracts/node_modules
+      - fantappero_api_client_node_modules:/app/packages/api-client/node_modules
     depends_on:
       api:
         condition: service_healthy
@@ -608,3 +616,9 @@ volumes:
     name: fantappero_web_app_node_modules
   fantappero_mobile_app_node_modules:
     name: fantappero_mobile_app_node_modules
+  fantappero_ui_node_modules:
+    name: fantappero_ui_node_modules
+  fantappero_contracts_node_modules:
+    name: fantappero_contracts_node_modules
+  fantappero_api_client_node_modules:
+    name: fantappero_api_client_node_modules

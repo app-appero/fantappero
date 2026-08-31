@@ -29,7 +29,9 @@ di calendario (`league_calendar_slots`, EP03-06).
 
 3. Confronta i gol fantasy delle due squadre: più gol vince, pari gol pareggio.
 4. Il risultato è **`resultFinal = true`** solo se tutte le fixture del turno
-   sono in stato terminale (`FT`/`AET`/`PEN`); altrimenti resta provvisorio
+   sono in stato terminale (`FT`/`AET`/`PEN`), le statistiche giocatore sono
+   disponibili per entrambe le squadre reali di ogni fixture e tutte le
+   formazioni effettive dei due lati sono risolte. Altrimenti resta provvisorio
    pur avendo un punteggio calcolato (FR-SCO-03: "distingue componenti
    definitive e ancora in attesa").
 5. **Decisione aperta** (FR-SCO-03 §Eccezioni): scarto minimo tra squadre
@@ -39,6 +41,27 @@ di calendario (`league_calendar_slots`, EP03-06).
 Precondizione: la formazione effettiva (EP07-04) deve già essere calcolata
 per entrambe le squadre; in caso contrario lo scontro è saltato (`skipped`)
 e non produce un risultato parziale o errato.
+
+## Pipeline automatica e LIVE
+
+I job centralizzati provider `LIVE` (60 s di base) e `POST_MATCH` (10 min)
+acquisiscono eventi e snapshot giocatore una sola volta per fixture. Nella
+stessa transazione `fantasy_turns.live_pipeline` riusa i service esistenti in
+quest'ordine: voto di lega → sostituzioni → risultato H2H → classifica →
+omologazione. Non esistono chiamate provider per giocatore dai browser.
+
+Durante il live i rating sono isolati per `league_id`, così la soglia minuti
+della lega non può sovrascrivere quella di un'altra lega sulla stessa fixture.
+La classifica viene sempre ricostruita dai soli slot `result_final=true`: un
+poll ripetuto sovrascrive lo stesso slot e non incrementa due volte giocate,
+punti o gol.
+
+`GET /leagues/{leagueId}/calendario/h2h` marca uno scontro `live=true` solo
+quando una fixture in corso coinvolge davvero un suo titolare, tramite ID
+atleta/provider e coppia stagione-club. Fra una partita reale e la successiva
+lo stato è **Provvisorio / in attesa**, non un falso LIVE. Il dettaglio espone
+per ogni giocatore squadra reale, stato fixture, voto base, bonus, malus,
+componenti e totale; web e mobile effettuano polling adattivo verso il backend.
 
 ## Glossario delle due grandezze (EP13-P02)
 

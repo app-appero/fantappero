@@ -31,6 +31,7 @@ class Athlete(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     weight: Mapped[str | None] = mapped_column(String(16), nullable=True)
     age: Mapped[int | None] = mapped_column(Integer, nullable=True)
     injured: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    photo_url: Mapped[str | None] = mapped_column(String(320), nullable=True)
 
     squad_memberships: Mapped[list[SquadMembership]] = relationship(
         back_populates="athlete",

@@ -113,8 +113,11 @@ class TimelineEvent:
     event_type: str
     event_detail: str | None
     scoring_kind: str | None
+    club_id: str | None
     club_name: str | None
+    athlete_id: str | None
     athlete_name: str | None
+    related_athlete_id: str | None
     related_athlete_name: str | None
     comments: str | None
 
@@ -129,12 +132,16 @@ class RawTimelineEvent:
     event_type: str
     event_detail: str | None
     scoring_kind: str | None
+    club_id: str | None
     club_name: str | None
+    athlete_id: str | None
     athlete_name: str | None
+    related_athlete_id: str | None
     related_athlete_name: str | None
     comments: str | None
     is_active: bool
     retracted_at: datetime | None
+    sources: tuple[str, ...] = ()
 
 
 def minute_label(minute_elapsed: int | None, minute_extra: int | None) -> str:
@@ -147,14 +154,30 @@ def minute_label(minute_elapsed: int | None, minute_extra: int | None) -> str:
 
 
 def build_timeline(events: Iterable[RawTimelineEvent]) -> tuple[TimelineEvent, ...]:
-    """Timeline ordinata, senza eventi ritrattati.
+    """Timeline ordinata, senza eventi ritrattati né duplicati sintetici.
 
     Un evento ritirato dal provider (correzione tardiva) sparisce invece di
     restare a schermo: mostrarlo significherebbe raccontare una partita che
     non è avvenuta. Gli eventi senza minuto finiscono in coda, perché non
     possono essere collocati con certezza.
+
+    Ogni evento di punteggio (gol, autogol, assist, rigore...) esiste in
+    doppio: la riga grezza del provider (`scoring_kind` assente) e una copia
+    normalizzata (`scoring_kind` valorizzato) usata internamente per il
+    fantavoto. Quando la copia normalizzata ha ``sources`` che include
+    ``"events"`` significa che una riga grezza equivalente è già presente in
+    timeline: mostrarla di nuovo duplicherebbe lo stesso momento di gioco. Le
+    normalizzazioni senza controparte grezza (es. un rigore parato dedotto
+    solo dalle statistiche giocatore) restano, perché sono l'unica traccia di
+    quel momento.
     """
-    active = [event for event in events if event.is_active and event.retracted_at is None]
+    active = [
+        event
+        for event in events
+        if event.is_active
+        and event.retracted_at is None
+        and not (event.scoring_kind is not None and "events" in event.sources)
+    ]
     active.sort(
         key=lambda event: (
             event.minute_elapsed is None,
@@ -171,8 +194,11 @@ def build_timeline(events: Iterable[RawTimelineEvent]) -> tuple[TimelineEvent, .
             event_type=event.event_type,
             event_detail=event.event_detail,
             scoring_kind=event.scoring_kind,
+            club_id=event.club_id,
             club_name=event.club_name,
+            athlete_id=event.athlete_id,
             athlete_name=event.athlete_name,
+            related_athlete_id=event.related_athlete_id,
             related_athlete_name=event.related_athlete_name,
             comments=event.comments,
         )

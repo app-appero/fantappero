@@ -34,11 +34,16 @@ def assert_round_not_homologated(fantasy_round: FantasyRound) -> None:
         raise ValidationAuthError(ROUND_HOMOLOGATED_MESSAGE, code="round_homologated")
 
 
-def assert_fixture_not_homologated(session: Session, *, fixture_id: UUID) -> None:
+def assert_fixture_not_homologated(
+    session: Session,
+    *,
+    fixture_id: UUID,
+    league_id: UUID | None = None,
+) -> None:
     """Blocca il ricalcolo del voto statistico (EP07-01/02/03) di una fixture
     che appartiene a un turno già omologato, in qualunque lega.
     """
-    homologated = session.execute(
+    query = (
         select(FantasyRound.id)
         .join(FantasyRoundFixture, FantasyRoundFixture.round_id == FantasyRound.id)
         .where(
@@ -47,6 +52,9 @@ def assert_fixture_not_homologated(session: Session, *, fixture_id: UUID) -> Non
             FantasyRound.homologation_status == FantasyRoundHomologationStatus.HOMOLOGATED,
         )
         .limit(1)
-    ).first()
+    )
+    if league_id is not None:
+        query = query.where(FantasyRound.league_id == league_id)
+    homologated = session.execute(query).first()
     if homologated is not None:
         raise ValidationAuthError(ROUND_HOMOLOGATED_MESSAGE, code="round_homologated")

@@ -6,6 +6,7 @@ import database.models  # noqa: F401 — register ORM mappers
 from app.worker import celery_app
 from config.settings import get_api_settings
 from database.session import create_engine_from_url, create_session_factory, session_scope
+from fantasy_turns.live_pipeline import process_live_fantasy_rounds
 from sports_data.provider.client import build_client_from_settings
 from sports_data.provider.errors import ProviderConfigError
 from sports_data.scheduler.locks import RedisJobLock
@@ -64,9 +65,17 @@ def _run_window(window: PollWindow) -> dict[str, object]:
                     client=client,
                     enabled=True,
                 )
+                pipeline = (
+                    process_live_fantasy_rounds(session)
+                    if window in {PollWindow.LIVE, PollWindow.POST_MATCH}
+                    else None
+                )
     finally:
         engine.dispose()
-    return _as_dict(result)
+    payload = _as_dict(result)
+    if pipeline is not None:
+        payload["fantasy_pipeline"] = pipeline.as_dict()
+    return payload
 
 
 def _as_dict(result: PollCycleResult) -> dict[str, object]:

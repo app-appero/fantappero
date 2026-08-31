@@ -10,7 +10,7 @@ from pathlib import Path
 from uuid import uuid4
 
 import pytest
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 from tests.integration.database.helpers import create_engine_for_url
 
@@ -21,6 +21,7 @@ from database.enums import (
     FantasyTurnKind,
     FantasyTurnStatus,
     LeagueAuditAction,
+    LeagueCalendarStatus,
     LeagueMemberRole,
     LeagueState,
     LineupSlotKind,
@@ -32,7 +33,9 @@ from fantasy_lineups.substitution_service import compute_round_effective_lineups
 from fantasy_ratings.service import compute_fixture_ratings
 from fantasy_teams.models import FantasyTeam
 from fantasy_turns.homologation_service import apply_round_correction, homologate_round
+from fantasy_turns.live_pipeline import process_live_fantasy_rounds
 from fantasy_turns.models import FantasyRound, FantasyRoundFixture
+from leagues.h2h_matchday_service import get_h2h_calendar
 from leagues.models.league import League
 from leagues.models.league_audit_event import LeagueAuditEvent
 from leagues.models.league_calendar import LeagueCalendar, LeagueCalendarSlot
@@ -43,7 +46,7 @@ from leagues.scoring import fantasy_goals_for_points
 from leagues.scoring_service import compute_round_results
 from leagues.standings_service import compute_league_standings
 from sports_data.catalog.sync import TeamsBatch, sync_catalog
-from sports_data.fixtures.models import Fixture
+from sports_data.fixtures.models import Fixture, PlayerMatchStat
 from sports_data.fixtures.sync import FixtureDetailBatch, sync_fixtures
 from sports_data.provider.envelope import parse_envelope
 from sports_data.roster.models import Athlete
@@ -254,6 +257,7 @@ def _build_two_team_round(session: Session, fixture: Fixture) -> tuple[FantasyRo
 
     calendar = LeagueCalendar(
         league_id=league.id,
+        status=LeagueCalendarStatus.CONFIRMED,
         algorithm_version="test",
         participant_fingerprint="test",
         participant_count=4,
@@ -261,6 +265,7 @@ def _build_two_team_round(session: Session, fixture: Fixture) -> tuple[FantasyRo
         matchup_count=1,
         bye_count=0,
         generated_at=now,
+        confirmed_at=now,
     )
     session.add(calendar)
     session.flush()
@@ -469,6 +474,148 @@ def test_compute_league_standings_after_round_results(db_session: Session) -> No
         )
     ).one()
     assert refreshed.played == 1
+
+
+def test_live_pipeline_keeps_provisional_then_finalizes_once(db_session: Session) -> None:
+    """Provider -> voti -> sostituzioni -> H2H -> classifica -> omologazione.
+
+    Durante il live i punteggi sono consultabili ma non valgono ancora in
+    classifica. Solo lo snapshot terminale con statistiche giocatore rende il
+    risultato definitivo; i poll successivi non riapplicano la giornata.
+    """
+    _seed_catalog(db_session)
+    db_session.commit()
+    fixture = _sync_match(db_session)
+    fixture.status_short = "1H"
+    db_session.commit()
+    fantasy_round, teams = _build_two_team_round(db_session, fixture)
+
+    live = process_live_fantasy_rounds(db_session)
+    db_session.commit()
+
+    calendar = db_session.scalars(
+        select(LeagueCalendar).where(LeagueCalendar.league_id == fantasy_round.league_id)
+    ).one()
+    slot = db_session.scalars(
+        select(LeagueCalendarSlot).where(LeagueCalendarSlot.calendar_id == calendar.id)
+    ).one()
+    standings = {
+        row.fantasy_team_id: row
+        for row in db_session.scalars(
+            select(LeagueStanding).where(LeagueStanding.league_id == fantasy_round.league_id)
+        ).all()
+    }
+
+    assert live.rounds_processed >= 1
+    assert live.rounds_finalized == 0
+    assert slot.home_score is not None and slot.away_score is not None
+    assert slot.result_final is False
+    live_calendar = get_h2h_calendar(db_session, league_id=fantasy_round.league_id)
+    assert live_calendar is not None
+    assert live_calendar.live is True
+    assert live_calendar.rounds[0].matchups[0].live is True
+    assert standings[teams["west_ham"].id].played == 0
+    assert standings[teams["chelsea"].id].played == 0
+    assert (
+        db_session.get(FantasyRound, fantasy_round.id).homologation_status
+        == FantasyRoundHomologationStatus.PROVISIONAL
+    )
+
+    # Il provider può pubblicare FT prima che l'ultimo snapshot giocatori sia
+    # completo. Con una sola squadra reale presente il risultato deve restare
+    # provvisorio e la classifica non deve muoversi.
+    db_session.execute(
+        delete(PlayerMatchStat).where(
+            PlayerMatchStat.fixture_id == fixture.id,
+            PlayerMatchStat.club_id == fixture.away_club_id,
+        )
+    )
+    fixture.status_short = "FT"
+    db_session.commit()
+    process_live_fantasy_rounds(db_session)
+    db_session.commit()
+    db_session.refresh(slot)
+    assert slot.result_final is False
+    assert (
+        db_session.get(FantasyRound, fantasy_round.id).homologation_status
+        == FantasyRoundHomologationStatus.PROVISIONAL
+    )
+
+    # Lo snapshot completo arriva al poll successivo: da qui la pipeline può
+    # finalizzare in sicurezza.
+    fixture = _sync_match(db_session)
+    db_session.commit()
+    final = process_live_fantasy_rounds(db_session)
+    db_session.commit()
+    db_session.refresh(slot)
+
+    assert final.rounds_finalized >= 1
+    assert slot.result_final is True
+    final_calendar = get_h2h_calendar(db_session, league_id=fantasy_round.league_id)
+    assert final_calendar is not None
+    assert final_calendar.live is False
+    assert final_calendar.rounds[0].matchups[0].live is False
+    stored_round = db_session.get(FantasyRound, fantasy_round.id)
+    assert stored_round.homologation_status == FantasyRoundHomologationStatus.HOMOLOGATED
+    assert stored_round.homologated_by_user_id is None
+
+    final_standings = {
+        row.fantasy_team_id: row
+        for row in db_session.scalars(
+            select(LeagueStanding).where(LeagueStanding.league_id == fantasy_round.league_id)
+        ).all()
+    }
+    assert final_standings[teams["west_ham"].id].played == 1
+    assert final_standings[teams["chelsea"].id].played == 1
+    before = {
+        team_id: (row.played, row.points, row.fantasy_goals_for, row.fantasy_goals_against)
+        for team_id, row in final_standings.items()
+    }
+
+    again = process_live_fantasy_rounds(db_session)
+    db_session.commit()
+    assert again.rounds_finalized == 0
+    after = {
+        row.fantasy_team_id: (
+            row.played,
+            row.points,
+            row.fantasy_goals_for,
+            row.fantasy_goals_against,
+        )
+        for row in db_session.scalars(
+            select(LeagueStanding).where(LeagueStanding.league_id == fantasy_round.league_id)
+        ).all()
+    }
+    assert after == before
+
+    audit = db_session.scalars(
+        select(LeagueAuditEvent).where(
+            LeagueAuditEvent.league_id == fantasy_round.league_id,
+            LeagueAuditEvent.action == LeagueAuditAction.FANTASY_ROUND_HOMOLOGATED,
+        )
+    ).one()
+    assert audit.actor_id is None
+    assert audit.details["source"] == "automatic_live_pipeline"
+
+    # La fixture del corpus viene riusata dai test successivi: riapri il turno
+    # dopo aver verificato l'idempotenza, senza alterare le asserzioni sopra.
+    operator = _make_user(db_session)
+    automatically_closed_round_ids = list(
+        db_session.scalars(
+            select(FantasyRound.id).where(
+                FantasyRound.homologation_status
+                == FantasyRoundHomologationStatus.HOMOLOGATED
+            )
+        ).all()
+    )
+    for closed_round_id in automatically_closed_round_ids:
+        apply_round_correction(
+            db_session,
+            round_id=closed_round_id,
+            actor_id=operator.id,
+            reason="Ripristino stato provvisorio per isolamento test",
+        )
+    db_session.commit()
 
 
 def _full_pipeline(db_session: Session) -> tuple[Fixture, FantasyRound, dict]:

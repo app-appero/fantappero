@@ -48,6 +48,9 @@ class LeagueRulesResponse(ApiModel):
     roster: LeagueRosterConfig
     total_credits: int = Field(alias="totalCredits")
     min_fixtures_per_round: int = Field(alias="minFixturesPerRound")
+    # Frazione degli 11 titolari che ogni fantallenatore deve poter schierare
+    # perché una giornata diventi un Turno Europeo valido.
+    turn_coverage_threshold: float = Field(alias="turnCoverageThreshold")
     minutes_threshold: int = Field(alias="minutesThreshold")
     max_automatic_substitutions: int = Field(alias="maxAutomaticSubstitutions")
     voluntary_release_refund_percent: int = Field(alias="voluntaryReleaseRefundPercent")
@@ -78,6 +81,9 @@ class UpdateLeagueRulesRequest(ApiModel):
     roster: LeagueRosterConfig
     total_credits: int = Field(alias="totalCredits")
     min_fixtures_per_round: int | None = Field(default=None, alias="minFixturesPerRound")
+    turn_coverage_threshold: float | None = Field(
+        default=None, alias="turnCoverageThreshold"
+    )
     minutes_threshold: int | None = Field(default=None, alias="minutesThreshold")
     max_automatic_substitutions: int | None = Field(default=None, alias="maxAutomaticSubstitutions")
     voluntary_release_refund_percent: int | None = Field(
@@ -296,6 +302,7 @@ class H2HCalendarMatchupResponse(ApiModel):
     away_user_id: str | None = Field(default=None, alias="awayUserId")
     away_display_name: str | None = Field(default=None, alias="awayDisplayName")
     away_team_name: str | None = Field(default=None, alias="awayTeamName")
+    live: bool = False
     result: H2HMatchupScoreResponse | None = None
 
 
@@ -308,6 +315,9 @@ class H2HCalendarRoundResponse(ApiModel):
     european_turn_status: Literal["scheduled", "open", "locked", "skipped"] | None = Field(
         default=None, alias="europeanTurnStatus"
     )
+    # Turno europeo antecedente alla creazione della lega: nessuno scontro,
+    # la UI mostra un messaggio invece della lista match (§ numerazione condivisa).
+    before_league_creation: bool = Field(default=False, alias="beforeLeagueCreation")
     matchups: list[H2HCalendarMatchupResponse]
 
 
@@ -333,8 +343,17 @@ class H2HCalendarResponse(ApiModel):
 class H2HPlayerScoreResponse(ApiModel):
     athlete_id: str = Field(alias="athleteId")
     name: str
+    photo_url: str | None = Field(default=None, alias="photoUrl")
     role: Literal["P", "D", "C", "A"]
     fantasy_score: float | None = Field(default=None, alias="fantasyScore")
+    base_score: float | None = Field(default=None, alias="baseScore")
+    bonus_total: float = Field(default=0.0, alias="bonusTotal")
+    malus_total: float = Field(default=0.0, alias="malusTotal")
+    bonus_malus: list[dict[str, object]] = Field(default_factory=list, alias="bonusMalus")
+    real_team_name: str | None = Field(default=None, alias="realTeamName")
+    fixture_status: str | None = Field(default=None, alias="fixtureStatus")
+    fixture_status_label: str = Field(default="Partita non associata", alias="fixtureStatusLabel")
+    score_final: bool = Field(default=False, alias="scoreFinal")
     is_effective_starter: bool = Field(alias="isEffectiveStarter")
     is_bench: bool = Field(alias="isBench")
 

@@ -229,6 +229,9 @@ def upsert_fixture(
             home_goals=mapped.home_goals,
             away_goals=mapped.away_goals,
             round_label=mapped.round_label,
+            venue_name=mapped.venue_name,
+            venue_city=mapped.venue_city,
+            referee=mapped.referee,
         )
         session.add(row)
         session.flush()
@@ -245,6 +248,9 @@ def upsert_fixture(
         "home_goals": mapped.home_goals,
         "away_goals": mapped.away_goals,
         "round_label": mapped.round_label,
+        "venue_name": mapped.venue_name,
+        "venue_city": mapped.venue_city,
+        "referee": mapped.referee,
     }
     changed = False
     for key, value in fields.items():
@@ -445,6 +451,7 @@ def upsert_official_lineup(
             fixture_id=fixture.id,
             club_id=club.id,
             formation=mapped.formation,
+            coach_name=mapped.coach_name,
             fetched_at=fetched_at,
         )
         session.add(row)
@@ -453,8 +460,14 @@ def upsert_official_lineup(
     else:
         if row.fetched_at is None:
             row.fetched_at = fetched_at
+        changed = False
         if row.formation != mapped.formation:
             row.formation = mapped.formation
+            changed = True
+        if row.coach_name != mapped.coach_name:
+            row.coach_name = mapped.coach_name
+            changed = True
+        if changed:
             _touch_updated_at(row)
             counters.incr_entity("lineups", "updated")
         else:

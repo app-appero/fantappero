@@ -85,6 +85,7 @@ class MappedClub:
     name: str
     code: str | None = None
     country: str | None = None
+    logo_url: str | None = None
     national: bool = False
 
 
@@ -103,6 +104,9 @@ class MappedFixture:
     round_label: str | None = None
     home_club_name: str | None = None
     away_club_name: str | None = None
+    venue_name: str | None = None
+    venue_city: str | None = None
+    referee: str | None = None
 
 
 @dataclass(frozen=True)
@@ -139,6 +143,7 @@ class MappedOfficialLineup:
     fixture_provider_id: int
     club_provider_id: int
     formation: str | None
+    coach_name: str | None = None
     entries: tuple[MappedLineupEntry, ...] = ()
 
 
@@ -172,6 +177,7 @@ class MappedAthlete:
     weight: str | None = None
     age: int | None = None
     injured: bool | None = None
+    photo_url: str | None = None
 
 
 @dataclass(frozen=True)
@@ -187,6 +193,7 @@ class MappedSquadMembership:
     provider_position_raw: str | None = None
     athlete_age: int | None = None
     source: str = "squads"
+    photo_url: str | None = None
 
 
 @dataclass(frozen=True)

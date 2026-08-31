@@ -1,4 +1,4 @@
-import type { H2HCalendar, H2HMatchupScore } from "@fantappero/contracts";
+import type { AiLineupRun, H2HCalendar, H2HMatchupScore } from "@fantappero/contracts";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
@@ -20,7 +20,7 @@ function result(overrides: Partial<H2HMatchupScore> = {}): H2HMatchupScore {
   };
 }
 
-function calendar(matchResult: H2HMatchupScore | null): H2HCalendar {
+function calendar(matchResult: H2HMatchupScore | null, matchupLive = false): H2HCalendar {
   return {
     id: "cal-1",
     leagueId: "lega-1",
@@ -40,6 +40,7 @@ function calendar(matchResult: H2HMatchupScore | null): H2HCalendar {
         fantasyRoundId: "turn-1",
         homologationStatus: "provisional",
         europeanTurnStatus: "locked",
+        beforeLeagueCreation: false,
         matchups: [
           {
             slotId: SLOT,
@@ -51,6 +52,7 @@ function calendar(matchResult: H2HMatchupScore | null): H2HCalendar {
             awayUserId: "u2",
             awayDisplayName: "Giulia",
             awayTeamName: "Milan FC",
+            live: matchupLive,
             result: matchResult,
           },
         ],
@@ -60,16 +62,34 @@ function calendar(matchResult: H2HMatchupScore | null): H2HCalendar {
   };
 }
 
-function render(matchResult: H2HMatchupScore | null): string {
+function render(matchResult: H2HMatchupScore | null, matchupLive = false): string {
   return renderToStaticMarkup(
     createElement(MemoryRouter, {
       initialEntries: ["/turni"],
       children: createElement(MatchdayH2HPanel, {
-        calendar: calendar(matchResult),
+        calendar: calendar(matchResult, matchupLive),
         loading: false,
         error: null,
         liveDegraded: false,
         canAdmin: false,
+        onRetry: () => {},
+      }),
+    }),
+  );
+}
+
+function renderAiAdmin(canAdmin: boolean, aiLineupRun: AiLineupRun | null = null): string {
+  return renderToStaticMarkup(
+    createElement(MemoryRouter, {
+      initialEntries: ["/turni"],
+      children: createElement(MatchdayH2HPanel, {
+        calendar: calendar(null),
+        loading: false,
+        error: null,
+        liveDegraded: false,
+        canAdmin,
+        aiLineupRun,
+        onGenerateAiLineups: () => {},
         onRetry: () => {},
       }),
     }),
@@ -124,7 +144,8 @@ describe("MatchdayH2HPanel — Punti e Gol fantasy espliciti (EP13-P02)", () => 
   });
 
   it("distingue provvisorio e finale", () => {
-    expect(render(result({ resultFinal: false }))).toContain("Provvisorio");
+    expect(render(result({ resultFinal: false }))).toContain("Provvisorio / in attesa");
+    expect(render(result({ resultFinal: false }), true)).toContain("LIVE / provvisorio");
     expect(render(result())).toContain("Finale");
   });
 
@@ -147,5 +168,54 @@ describe("MatchdayH2HPanel — Punti e Gol fantasy espliciti (EP13-P02)", () => 
   it("espone un'etichetta accessibile che nomina le grandezze", () => {
     const html = render(result());
     expect(html).toContain("Gol fantasy 2 – 1. Punti 72,5 – 68,0");
+  });
+});
+
+describe("MatchdayH2HPanel — comando amministrativo formazioni AI", () => {
+  it("non espone il comando a un partecipante senza permessi admin", () => {
+    const html = renderAiAdmin(false);
+    expect(html).not.toContain("h2h-ai-admin");
+    expect(html).not.toContain("Genera formazioni AI");
+  });
+
+  it("espone all'admin il comando per il turno fantasy selezionato", () => {
+    const html = renderAiAdmin(true);
+    expect(html).toContain('data-testid="h2h-ai-admin"');
+    expect(html).toContain('data-testid="h2h-generate-ai-lineups"');
+    expect(html).toContain("Genera formazioni AI");
+    expect(html).toContain("Le formazioni umane e quelle già bloccate non vengono modificate");
+  });
+
+  it("mostra riepilogo e motivazione per ogni squadra", () => {
+    const html = renderAiAdmin(true, {
+      roundId: "turn-1",
+      algorithmVersion: "ai-lineup-v1",
+      dryRun: false,
+      summary: "Formazioni AI generate: 1/2. Non generate: 1.",
+      teams: [
+        {
+          fantasyTeamId: "ai-1",
+          fantasyTeamName: "Robot Uno",
+          outcome: "created",
+          message: null,
+          starters: 11,
+          usedFallback: false,
+        },
+        {
+          fantasyTeamId: "ai-2",
+          fantasyTeamName: "Robot Due",
+          outcome: "incomplete",
+          message: "Rosa senza portiere disponibile.",
+          starters: 0,
+          usedFallback: true,
+        },
+      ],
+    });
+
+    expect(html).toContain("Formazioni AI generate: 1/2. Non generate: 1.");
+    expect(html).toContain("Robot Uno");
+    expect(html).toContain("Formazione creata");
+    expect(html).toContain("Robot Due");
+    expect(html).toContain("Rosa senza portiere disponibile.");
   });
 });

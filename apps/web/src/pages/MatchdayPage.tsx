@@ -1,11 +1,17 @@
 import type {
+  AiLineupRun,
   FantasyTurnDetail,
-  FantasyTurnPreview,
+  FantasyTurnFixture,
   FantasyTurnSummary,
-  FantasyTurnKind,
   H2HCalendar,
+  PendingFixtureSummary,
 } from "@fantappero/contracts";
-import { mapFixtureMatchStatus } from "@fantappero/contracts";
+import {
+  TURN_DISPLAY_LABEL,
+  mapFixtureMatchStatus,
+  resolveDefaultEuropeanTurn,
+  resolveTurnDisplayStates,
+} from "@fantappero/contracts";
 import {
   Badge,
   Breadcrumb,
@@ -25,14 +31,14 @@ import {
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   excludeFantasyTurnFixture,
-  ensureFantasyTurns,
   fetchFantasyTurn,
   fetchFantasyTurns,
   fetchH2HCalendar,
-  generateFantasyTurn,
+  fetchPendingFixtures,
   openFantasyTurn,
-  previewFantasyTurn,
   recalculateFantasyTurnCutoff,
+  refreshFullCalendar,
+  runAiLineups,
 } from "../api/leagues";
 import { getApiErrorMessage, useAuth } from "../auth/AuthContext";
 import { loadStoredSession } from "../auth/sessionStorage";
@@ -42,19 +48,23 @@ import { Link, useLocation } from "../router/simpleRouter";
 import { parseWireframeStateFromSearch } from "../wireframes/useWireframeState";
 import { MatchdayH2HPanel } from "./MatchdayH2HPanel";
 
-const STATUS_LABEL: Record<string, string> = {
-  scheduled: "Programmato",
-  open: "Aperto",
-  locked: "Chiuso",
-  skipped: "Non disputato",
-};
-
 const MATCH_STATUS_LABEL: Record<string, string> = {
   scheduled: "In programma",
   live: "In corso",
   finished: "Terminata",
   postponed: "Rinviata",
+  needs_update: "Da aggiornare",
 };
+
+/** Etichetta di stato per la card lista: include il minuto quando la partita è live. */
+function matchCardStatusLabel(fixture: FantasyTurnFixture): string {
+  const mapped = mapFixtureMatchStatus(fixture.statusShort, fixture.kickoffAt);
+  const base = MATCH_STATUS_LABEL[mapped] ?? fixture.statusShort;
+  if (mapped === "live" && fixture.statusElapsed !== null) {
+    return `${base} · ${fixture.statusElapsed}'`;
+  }
+  return base;
+}
 
 const DEMO_TURN: FantasyTurnDetail = {
   id: "turn-demo-1",
@@ -72,6 +82,7 @@ const DEMO_TURN: FantasyTurnDetail = {
   fixtureCount: 2,
   generatedAt: "2026-08-12T08:00:00.000Z",
   modificationAllowed: true,
+  matchStatus: "scheduled",
   homologationStatus: "provisional",
   fixtures: [
     {
@@ -88,6 +99,8 @@ const DEMO_TURN: FantasyTurnDetail = {
       awayGoals: null,
       homeClubName: "West Ham",
       awayClubName: "Chelsea",
+      homeClubLogoUrl: null,
+      awayClubLogoUrl: null,
       competitionName: "Premier League",
       providerId: 1035055,
       updatedAt: "2026-08-15T13:55:00.000Z",
@@ -108,6 +121,8 @@ const DEMO_TURN: FantasyTurnDetail = {
       awayGoals: null,
       homeClubName: "Inter",
       awayClubName: "Milan",
+      homeClubLogoUrl: null,
+      awayClubLogoUrl: null,
       competitionName: "Serie A",
       providerId: 1035056,
       updatedAt: null,
@@ -173,6 +188,7 @@ const DEMO_H2H: H2HCalendar = {
       fantasyRoundId: "turn-demo-0",
       homologationStatus: "homologated",
       europeanTurnStatus: "locked",
+      beforeLeagueCreation: false,
       matchups: [
         {
           slotId: "slot-demo-past",
@@ -221,6 +237,7 @@ const DEMO_H2H: H2HCalendar = {
       fantasyRoundId: "turn-demo-1",
       homologationStatus: "provisional",
       europeanTurnStatus: "open",
+      beforeLeagueCreation: false,
       matchups: [
         {
           slotId: "slot-demo-1",
@@ -261,6 +278,7 @@ const DEMO_H2H: H2HCalendar = {
       fantasyRoundId: null,
       homologationStatus: null,
       europeanTurnStatus: null,
+      beforeLeagueCreation: false,
       matchups: [
         {
           slotId: "slot-demo-3",
@@ -331,7 +349,15 @@ export function MatchdayPage() {
     }
     return null;
   });
-  const [preview, setPreview] = useState<FantasyTurnPreview | null>(null);
+
+  // Stato mostrato all'utente: dipende da dove cade il turno rispetto ad
+  // adesso, non dallo stato interno del ciclo di vita formazioni.
+  const turnDisplayStates = useMemo(() => resolveTurnDisplayStates(turns), [turns]);
+  const selectedDisplayState = useMemo(() => {
+    const index = turns.findIndex((turn) => turn.id === selected?.id);
+    return index >= 0 ? (turnDisplayStates[index] ?? "upcoming") : "upcoming";
+  }, [turns, turnDisplayStates, selected?.id]);
+  const [pendingFixtures, setPendingFixtures] = useState<PendingFixtureSummary[]>([]);
   const [loading, setLoading] = useState(() => {
     if (isDemoMode) {
       return demoState === "loading";
@@ -347,8 +373,17 @@ export function MatchdayPage() {
   });
   const [actionError, setActionError] = useState<string | null>(null);
   const [actionMessage, setActionMessage] = useState<string | null>(null);
-  const [anchorDate, setAnchorDate] = useState("2026-08-15");
-  const [kind, setKind] = useState<FantasyTurnKind>("weekend");
+  const [aiLineupBusy, setAiLineupBusy] = useState(false);
+  const [aiLineupRun, setAiLineupRun] = useState<AiLineupRun | null>(null);
+  const [aiLineupError, setAiLineupError] = useState<string | null>(null);
+  const [refreshingCalendar, setRefreshingCalendar] = useState(false);
+  const [calendarRefreshProgress, setCalendarRefreshProgress] = useState<{
+    percent: number;
+    stage: string;
+    message: string;
+  } | null>(null);
+  const [calendarRefreshError, setCalendarRefreshError] = useState<string | null>(null);
+  const [calendarRefreshSuccess, setCalendarRefreshSuccess] = useState<string | null>(null);
 
   const isAdmin = can(["league:admin"]);
   const canView = can(["matchday:view"]);
@@ -458,16 +493,12 @@ export function MatchdayPage() {
     try {
       const list = await fetchFantasyTurns(session.accessToken, activeLeagueId);
       setTurns(list);
-      if (list.length === 0) {
+      const defaultTurn = resolveDefaultEuropeanTurn(list);
+      if (!defaultTurn) {
         setSelected(null);
       } else {
-        const first = list[0];
-        if (!first) {
-          setSelected(null);
-        } else {
-          const detail = await fetchFantasyTurn(session.accessToken, activeLeagueId, first.id);
-          setSelected(detail);
-        }
+        const detail = await fetchFantasyTurn(session.accessToken, activeLeagueId, defaultTurn.id);
+        setSelected(detail);
       }
     } catch (error) {
       setLoadError(getApiErrorMessage(error, "Impossibile caricare i turni."));
@@ -478,6 +509,24 @@ export function MatchdayPage() {
     }
   }, [activeLeagueId, demoState, isDemoMode]);
 
+  const loadPendingFixtures = useCallback(async () => {
+    if (isDemoMode || !activeLeagueId) {
+      setPendingFixtures([]);
+      return;
+    }
+    const session = loadStoredSession();
+    if (!session?.accessToken) {
+      return;
+    }
+    try {
+      const list = await fetchPendingFixtures(session.accessToken, activeLeagueId);
+      setPendingFixtures(list);
+    } catch {
+      // Non bloccante: la sezione "da aggiornare" è puramente informativa.
+      setPendingFixtures([]);
+    }
+  }, [activeLeagueId, isDemoMode]);
+
   useEffect(() => {
     void loadH2H();
   }, [loadH2H]);
@@ -485,6 +534,10 @@ export function MatchdayPage() {
   useEffect(() => {
     void loadTurns();
   }, [loadTurns]);
+
+  useEffect(() => {
+    void loadPendingFixtures();
+  }, [loadPendingFixtures]);
 
   const { degraded: liveUpdateDegraded } = useLiveTurnPolling(
     activeLeagueId,
@@ -521,51 +574,9 @@ export function MatchdayPage() {
     }
   }
 
-  async function runPreview() {
+  async function runRefreshCalendar() {
     if (isDemoMode) {
-      setPreview({
-        kind,
-        windowStartAt: DEMO_TURN.windowStartAt,
-        windowEndAt: DEMO_TURN.windowEndAt,
-        timezone: "Europe/Rome",
-        eligibleCount: DEMO_TURN.fixtureCount,
-        minRequired: 10,
-        thresholdOk: true,
-        skipReason: null,
-        cutoffAt: DEMO_TURN.cutoffAt,
-        fixtures: DEMO_TURN.fixtures,
-      });
-      setActionMessage("Anteprima demo pronta.");
-      return;
-    }
-    const session = loadStoredSession();
-    if (!session?.accessToken || !activeLeagueId) {
-      return;
-    }
-    setBusy(true);
-    setActionError(null);
-    setActionMessage(null);
-    try {
-      const result = await previewFantasyTurn(session.accessToken, activeLeagueId, {
-        kind,
-        anchorDate,
-      });
-      setPreview(result);
-      setActionMessage(
-        result.thresholdOk
-          ? `Anteprima: ${result.eligibleCount} partite eleggibili.`
-          : (result.skipReason ?? "Soglia non raggiunta."),
-      );
-    } catch (error) {
-      setActionError(getApiErrorMessage(error, "Anteprima non disponibile."));
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function runEnsure() {
-    if (isDemoMode) {
-      setActionMessage("Turni sincronizzati dal calendario (demo).");
+      setCalendarRefreshSuccess("Calendario aggiornato (demo).");
       setSelected(DEMO_TURN);
       setTurns([DEMO_TURN]);
       return;
@@ -574,54 +585,27 @@ export function MatchdayPage() {
     if (!session?.accessToken || !activeLeagueId) {
       return;
     }
-    setBusy(true);
-    setActionError(null);
-    setActionMessage(null);
+    setRefreshingCalendar(true);
+    setCalendarRefreshError(null);
+    setCalendarRefreshSuccess(null);
+    setCalendarRefreshProgress({ percent: 0, stage: "queued", message: "Avvio in corso…" });
     try {
-      const result = await ensureFantasyTurns(session.accessToken, activeLeagueId);
-      setActionMessage(
-        `Sincronizzazione completata: ${result.created} creati, ${result.opened} aperti, ` +
-          `${result.upgraded} aggiornati, ${result.waiting} in attesa di partite.`,
-      );
-      await loadTurns();
-    } catch (error) {
-      setActionError(getApiErrorMessage(error, "Sincronizzazione turni non riuscita."));
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function runGenerate() {
-    if (isDemoMode) {
-      setActionMessage("Turno generato (demo).");
-      setSelected(DEMO_TURN);
-      setTurns([DEMO_TURN]);
-      return;
-    }
-    const session = loadStoredSession();
-    if (!session?.accessToken || !activeLeagueId) {
-      return;
-    }
-    setBusy(true);
-    setActionError(null);
-    setActionMessage(null);
-    try {
-      const detail = await generateFantasyTurn(session.accessToken, activeLeagueId, {
-        kind,
-        anchorDate,
+      const result = await refreshFullCalendar(session.accessToken, activeLeagueId, {
+        onProgress: (progress) =>
+          setCalendarRefreshProgress({
+            percent: progress.percent,
+            stage: progress.stage,
+            message: progress.message,
+          }),
       });
-      setSelected(detail);
-      setActionMessage(
-        detail.status === "skipped"
-          ? (detail.skipReason ?? "Turno non disputato.")
-          : `Turno ${detail.number} generato.`,
-      );
+      setCalendarRefreshSuccess(result.message);
       await loadTurns();
-      setSelected(detail);
+      await loadPendingFixtures();
     } catch (error) {
-      setActionError(getApiErrorMessage(error, "Generazione turno non riuscita."));
+      setCalendarRefreshError(getApiErrorMessage(error, "Aggiornamento calendario non riuscito."));
     } finally {
-      setBusy(false);
+      setRefreshingCalendar(false);
+      setCalendarRefreshProgress(null);
     }
   }
 
@@ -714,6 +698,33 @@ export function MatchdayPage() {
     }
   }
 
+  async function generateAiLineups(roundId: string) {
+    if (isDemoMode) {
+      setAiLineupRun({
+        roundId,
+        algorithmVersion: "ai_lineup_v1",
+        dryRun: false,
+        teams: [],
+        summary: "Formazioni AI gestite: 0/0 nella lega demo",
+      });
+      return;
+    }
+    const session = loadStoredSession();
+    if (!session?.accessToken || !activeLeagueId) {
+      return;
+    }
+    setAiLineupBusy(true);
+    setAiLineupError(null);
+    try {
+      setAiLineupRun(await runAiLineups(session.accessToken, activeLeagueId, roundId, false));
+      await loadH2H();
+    } catch (error) {
+      setAiLineupError(getApiErrorMessage(error, "Generazione delle formazioni AI non riuscita."));
+    } finally {
+      setAiLineupBusy(false);
+    }
+  }
+
   return (
     <PageContainer
       title="Turni"
@@ -757,10 +768,67 @@ export function MatchdayPage() {
               error={h2hError}
               liveDegraded={h2hLiveDegraded}
               canAdmin={isAdmin}
+              aiLineupBusy={aiLineupBusy}
+              aiLineupRun={aiLineupRun}
+              aiLineupError={aiLineupError}
+              onGenerateAiLineups={(roundId) => void generateAiLineups(roundId)}
               onRetry={() => void loadH2H()}
             />
           </TabPanel>
           <TabPanel value="europei">
+            {isAdmin ? (
+              <Card data-testid="matchday-admin">
+                <CardHeader title="Calendario turni" />
+                <CardBody>
+                  <p>
+                    Il sistema raggruppa automaticamente le partite dei campionati scelti in turni
+                    weekend e infrasettimanali, dall&apos;inizio alla fine della stagione. Usa il
+                    pulsante per sincronizzare il calendario dal provider e riallineare la
+                    numerazione dei turni.
+                  </p>
+                  <div className="fa-ds-showcase__row">
+                    <Button
+                      type="button"
+                      loading={refreshingCalendar}
+                      disabled={refreshingCalendar}
+                      onClick={() => void runRefreshCalendar()}
+                      data-testid="matchday-refresh-calendar"
+                    >
+                      Aggiorna calendario
+                    </Button>
+                  </div>
+                  {refreshingCalendar ? (
+                    <UiStatePanel
+                      state="loading"
+                      title="Aggiornamento in corso"
+                      message={
+                        calendarRefreshProgress
+                          ? `${calendarRefreshProgress.message} (${calendarRefreshProgress.percent}%)`
+                          : "Avvio in corso…"
+                      }
+                      testId="matchday-refresh-progress"
+                    />
+                  ) : null}
+                  {!refreshingCalendar && calendarRefreshError ? (
+                    <UiStatePanel
+                      state="error"
+                      title="Aggiornamento non riuscito"
+                      message={calendarRefreshError}
+                      testId="matchday-refresh-error"
+                    />
+                  ) : null}
+                  {!refreshingCalendar && calendarRefreshSuccess ? (
+                    <UiStatePanel
+                      state="success"
+                      title="Calendario aggiornato"
+                      message={calendarRefreshSuccess}
+                      testId="matchday-refresh-success"
+                    />
+                  ) : null}
+                </CardBody>
+              </Card>
+            ) : null}
+
             {loading ? (
               <UiStatePanel
                 state="loading"
@@ -788,7 +856,7 @@ export function MatchdayPage() {
               <UiStatePanel
                 state="empty"
                 title="Nessun turno ancora"
-                message="I turni vengono calcolati automaticamente dal sistema in base ai campionati della lega. Se non ne vedi ancora, attendi il sync del calendario o usa «Aggiorna dal calendario»."
+                message="Un turno esiste solo se ogni fantallenatore può schierare la formazione con i giocatori della propria rosa. Finché le rose non sono assegnate (asta non ancora svolta) il calendario resta vuoto: si popolerà da solo subito dopo."
                 testId="matchday-empty"
               />
             ) : null}
@@ -798,9 +866,9 @@ export function MatchdayPage() {
                 <div className="fa-matchday-toolbar">
                   <Select
                     label="Turno europeo"
-                    options={turns.map((turn) => ({
+                    options={turns.map((turn, index) => ({
                       value: turn.id,
-                      label: `Turno ${turn.number} — ${STATUS_LABEL[turn.effectiveStatus] ?? turn.effectiveStatus}`,
+                      label: `Turno ${turn.number} — ${TURN_DISPLAY_LABEL[turnDisplayStates[index] ?? "upcoming"]}`,
                     }))}
                     value={selected?.id ?? ""}
                     onChange={(event) => void selectTurn(event.target.value)}
@@ -816,13 +884,7 @@ export function MatchdayPage() {
                   <div>
                     <h2>Turno {selected.number}</h2>
                     <p className="fa-matchday-lede">
-                      Stato:{" "}
-                      <strong>
-                        {STATUS_LABEL[selected.effectiveStatus] ?? selected.effectiveStatus}
-                      </strong>
-                      {selected.status !== selected.effectiveStatus
-                        ? ` (persistito: ${STATUS_LABEL[selected.status]})`
-                        : null}
+                      Stato: <strong>{TURN_DISPLAY_LABEL[selectedDisplayState]}</strong>
                     </p>
                     <p className="fa-matchday-hint">
                       Finestra {formatDateTime(selected.windowStartAt)} →{" "}
@@ -901,12 +963,10 @@ export function MatchdayPage() {
                                   homeTeam={fixture.homeClubName}
                                   awayTeam={fixture.awayClubName}
                                   kickoffLabel={formatDateTime(fixture.kickoffAt)}
-                                  status={mapFixtureMatchStatus(fixture.statusShort)}
-                                  statusLabel={
-                                    MATCH_STATUS_LABEL[
-                                      mapFixtureMatchStatus(fixture.statusShort)
-                                    ] ?? fixture.statusShort
-                                  }
+                                  status={mapFixtureMatchStatus(fixture.statusShort, fixture.kickoffAt)}
+                                  statusLabel={matchCardStatusLabel(fixture)}
+                                  homeLogoUrl={fixture.homeClubLogoUrl}
+                                  awayLogoUrl={fixture.awayClubLogoUrl}
                                   score={
                                     fixture.homeGoals !== null && fixture.awayGoals !== null
                                       ? { home: fixture.homeGoals, away: fixture.awayGoals }
@@ -952,73 +1012,24 @@ export function MatchdayPage() {
               </div>
             ) : null}
 
-            {!loading && !loadError && isAdmin ? (
-              <Card data-testid="matchday-admin">
-                <CardHeader title="Calendario turni" />
+            {pendingFixtures.length > 0 ? (
+              <Card data-testid="matchday-pending-fixtures">
+                <CardHeader title="Partite da aggiornare" />
                 <CardBody>
                   <p>
-                    Il sistema raggruppa automaticamente le partite dei campionati scelti in turni
-                    weekend e infrasettimanali. Usa il pulsante per forzare un aggiornamento.
+                    Il provider conosce già competizione e squadre di queste partite, ma non
+                    ancora data e ora definitive: verranno inserite automaticamente in un turno
+                    non appena pubblicate.
                   </p>
-                  <div className="fa-ds-showcase__row">
-                    <Button
-                      type="button"
-                      disabled={busy}
-                      onClick={() => void runEnsure()}
-                      data-testid="matchday-ensure"
-                    >
-                      Aggiorna dal calendario
-                    </Button>
-                  </div>
-                  <details>
-                    <summary>Manuale avanzato</summary>
-                    <label>
-                      Tipo
-                      <select
-                        value={kind}
-                        onChange={(event) => setKind(event.target.value as FantasyTurnKind)}
-                        data-testid="matchday-kind"
-                      >
-                        <option value="weekend">Weekend (ven–lun)</option>
-                        <option value="midweek">Infrasettimanale (mar–gio)</option>
-                      </select>
-                    </label>
-                    <label>
-                      Data di riferimento
-                      <input
-                        type="date"
-                        value={anchorDate}
-                        onChange={(event) => setAnchorDate(event.target.value)}
-                        data-testid="matchday-anchor"
-                      />
-                    </label>
-                    <div className="fa-ds-showcase__row">
-                      <Button
-                        type="button"
-                        variant="secondary"
-                        disabled={busy}
-                        onClick={() => void runPreview()}
-                        data-testid="matchday-preview"
-                      >
-                        Anteprima
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="secondary"
-                        disabled={busy}
-                        onClick={() => void runGenerate()}
-                        data-testid="matchday-generate"
-                      >
-                        Genera turno
-                      </Button>
-                    </div>
-                    {preview ? (
-                      <p data-testid="matchday-preview-result">
-                        {preview.eligibleCount}/{preview.minRequired} partite — cutoff{" "}
-                        {formatDateTime(preview.cutoffAt)}
-                      </p>
-                    ) : null}
-                  </details>
+                  <ul className="fa-matchday-pending-list">
+                    {pendingFixtures.map((fixture) => (
+                      <li key={fixture.fixtureId} data-testid={`pending-fixture-${fixture.fixtureId}`}>
+                        {fixture.homeClubName} – {fixture.awayClubName}
+                        {fixture.competitionName ? ` · ${fixture.competitionName}` : ""}
+                        {fixture.roundLabel ? ` · ${fixture.roundLabel}` : ""}
+                      </li>
+                    ))}
+                  </ul>
                 </CardBody>
               </Card>
             ) : null}

@@ -12,7 +12,7 @@ from auth.dependencies import get_db_session
 from auth.exceptions import AuthError
 from authorization.context import LeagueAccess
 from authorization.dependencies import require_league_permissions, require_permissions
-from database.enums import Permission
+from database.enums import LeagueAuditAction, Permission
 from fantasy_lineups.ai_service import (
     AI_LINEUP_ALGORITHM_VERSION,
     run_ai_lineups_for_round,
@@ -34,6 +34,8 @@ from fantasy_lineups.substitution_service import (
     compute_round_effective_lineups,
     get_effective_lineup,
 )
+from leagues.models.league_audit_event import LeagueAuditEvent
+from observability.context import get_correlation_id
 
 router = APIRouter(prefix="/leagues", tags=["fantasy-lineups"])
 effective_lineup_router = APIRouter(prefix="/fantasy-lineups", tags=["fantasy-lineups"])
@@ -224,9 +226,6 @@ def run_ai_lineups(
     except AuthError as exc:
         return _error_response(exc)
 
-    if not dry_run:
-        session.commit()
-
     teams = [
         AiLineupTeamResultResponse(
             fantasyTeamId=str(item.fantasy_team_id),
@@ -238,12 +237,53 @@ def run_ai_lineups(
         )
         for item in results
     ]
-    persisted = sum(1 for item in results if item.outcome in {"created", "updated"})
-    summary = (
-        f"{len(teams)} squadre IA valutate"
-        if dry_run
-        else f"{persisted} formazioni su {len(teams)} squadre IA aggiornate"
-    )
+    counts = {
+        outcome: sum(1 for item in results if item.outcome == outcome)
+        for outcome in {
+            "created",
+            "updated",
+            "unchanged",
+            "skipped_locked",
+            "skipped_manual",
+            "incomplete",
+        }
+    }
+    handled = len(teams) - counts["incomplete"]
+    if dry_run:
+        summary = f"Anteprima: {len(teams)} squadre AI valutate"
+    else:
+        summary = (
+            f"Formazioni AI gestite: {handled}/{len(teams)} "
+            f"({counts['created']} create, {counts['updated']} aggiornate, "
+            f"{counts['unchanged']} già valide, "
+            f"{counts['skipped_locked']} bloccate, {counts['incomplete']} non generate)"
+        )
+        session.add(
+            LeagueAuditEvent(
+                league_id=league_access.league.id,
+                actor_id=league_access.user.id,
+                action=LeagueAuditAction.FANTASY_LINEUP_SAVED,
+                correlation_id=get_correlation_id(),
+                details={
+                    "source": "admin_ai_lineup_command",
+                    "roundId": str(round_id),
+                    "algorithmVersion": AI_LINEUP_ALGORITHM_VERSION,
+                    "teamsEvaluated": len(teams),
+                    "teamsHandled": handled,
+                    "counts": counts,
+                    "errors": [
+                        {
+                            "fantasyTeamId": item.fantasy_team_id,
+                            "fantasyTeamName": item.fantasy_team_name,
+                            "message": item.message,
+                        }
+                        for item in teams
+                        if item.outcome == "incomplete"
+                    ],
+                },
+            )
+        )
+        session.commit()
     return AiLineupRunResponse(
         roundId=str(round_id),
         algorithmVersion=AI_LINEUP_ALGORITHM_VERSION,

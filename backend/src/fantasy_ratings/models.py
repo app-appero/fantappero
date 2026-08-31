@@ -11,9 +11,9 @@ from sqlalchemy import (
     Enum,
     Float,
     ForeignKey,
+    Index,
     Integer,
     String,
-    UniqueConstraint,
     text,
 )
 from sqlalchemy.dialects.postgresql import JSONB
@@ -23,6 +23,7 @@ from database.base import Base, TimestampMixin, UUIDPrimaryKeyMixin
 from database.enums import FantasyRole
 
 if TYPE_CHECKING:
+    from leagues.models.league import League
     from sports_data.fixtures.models import Fixture
     from sports_data.roster.models import Athlete
 
@@ -32,11 +33,22 @@ class PlayerMatchRating(Base, UUIDPrimaryKeyMixin, TimestampMixin):
 
     __tablename__ = "player_match_ratings"
     __table_args__ = (
-        UniqueConstraint(
+        Index(
+            "uq_player_match_ratings_global_fixture_athlete_formula",
             "fixture_id",
             "athlete_provider_id",
             "formula_version",
-            name="uq_player_match_ratings_fixture_athlete_formula",
+            unique=True,
+            postgresql_where=text("league_id IS NULL"),
+        ),
+        Index(
+            "uq_player_match_ratings_league_fixture_athlete_formula",
+            "league_id",
+            "fixture_id",
+            "athlete_provider_id",
+            "formula_version",
+            unique=True,
+            postgresql_where=text("league_id IS NOT NULL"),
         ),
         CheckConstraint(
             "raw >= 3 AND raw <= 10",
@@ -51,6 +63,11 @@ class PlayerMatchRating(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     fixture_id: Mapped[UUID] = mapped_column(
         ForeignKey("fixtures.id", ondelete="CASCADE"),
         nullable=False,
+        index=True,
+    )
+    league_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("leagues.id", ondelete="CASCADE"),
+        nullable=True,
         index=True,
     )
     athlete_id: Mapped[UUID | None] = mapped_column(
@@ -107,4 +124,5 @@ class PlayerMatchRating(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     fantasy_score: Mapped[float | None] = mapped_column(Float, nullable=True)
 
     fixture: Mapped[Fixture] = relationship()
+    league: Mapped[League | None] = relationship()
     athlete: Mapped[Athlete | None] = relationship()

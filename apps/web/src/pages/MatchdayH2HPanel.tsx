@@ -1,4 +1,9 @@
-import type { H2HCalendar, H2HCalendarMatchup, H2HCalendarRound } from "@fantappero/contracts";
+import type {
+  AiLineupRun,
+  H2HCalendar,
+  H2HCalendarMatchup,
+  H2HCalendarRound,
+} from "@fantappero/contracts";
 import {
   H2H_GOALS_LABEL,
   H2H_POINTS_LABEL,
@@ -21,7 +26,20 @@ type Props = {
   error: string | null;
   liveDegraded: boolean;
   canAdmin: boolean;
+  aiLineupBusy?: boolean;
+  aiLineupRun?: AiLineupRun | null;
+  aiLineupError?: string | null;
+  onGenerateAiLineups?: (roundId: string) => void;
   onRetry: () => void;
+};
+
+const AI_OUTCOME_LABEL: Record<string, string> = {
+  created: "Formazione creata",
+  updated: "Formazione aggiornata",
+  unchanged: "Formazione già valida",
+  skipped_locked: "Formazione bloccata, nessuna modifica",
+  skipped_manual: "Formazione manuale preservata",
+  incomplete: "Formazione non generata",
 };
 
 const KICKOFF_FORMATTER = new Intl.DateTimeFormat("it-IT", {
@@ -44,7 +62,7 @@ function computedAtLabel(computedAt: string | null | undefined): string {
 /** Prima giornata non ancora conclusa; se tutte finite, l'ultima. */
 export function resolveDefaultH2HRound(calendar: H2HCalendar): number {
   for (const round of calendar.rounds) {
-    if (round.homologationStatus === "homologated") {
+    if (round.beforeLeagueCreation || round.homologationStatus === "homologated") {
       continue;
     }
     const played = round.matchups.filter((matchup) => !matchup.isBye);
@@ -59,13 +77,19 @@ export function resolveDefaultH2HRound(calendar: H2HCalendar): number {
 }
 
 function roundStatusHint(round: H2HCalendarRound): string {
+  if (round.beforeLeagueCreation) {
+    return "Lega creata dopo questo turno";
+  }
   if (round.homologationStatus === "homologated") {
     return "Risultati finali (storico)";
   }
   const played = round.matchups.filter((matchup) => !matchup.isBye);
+  if (played.some((matchup) => matchup.live)) {
+    return "LIVE / risultati provvisori";
+  }
   const hasResult = played.some((matchup) => matchup.result != null);
   if (hasResult) {
-    return "Risultati provvisori / in corso";
+    return "Risultati provvisori / in attesa";
   }
   if (round.europeanTurnStatus) {
     return `Turno europeo: ${round.europeanTurnStatus}`;
@@ -93,7 +117,12 @@ function MatchupRow({ matchup }: { matchup: H2HCalendarMatchup }) {
   const awayName = matchup.awayTeamName ?? matchup.awayDisplayName ?? "Avversario";
   const display = describeH2HResult(matchup.result);
   const status =
-    display.status === "final" ? "finished" : display.status === "provisional" ? "live" : "scheduled";
+    display.status === "final" ? "finished" : matchup.live ? "live" : "scheduled";
+  const statusLabel = matchup.live
+    ? "LIVE / provvisorio"
+    : display.status === "provisional"
+      ? "Provvisorio / in attesa"
+      : display.statusLabel;
 
   return (
     <div className="fa-matchday-matchup" data-testid={`h2h-matchup-${matchup.slotId}`}>
@@ -108,7 +137,7 @@ function MatchupRow({ matchup }: { matchup: H2HCalendarMatchup }) {
           awayTeam={awayName}
           kickoffLabel={computedAtLabel(matchup.result?.computedAt)}
           status={status}
-          statusLabel={display.statusLabel}
+          statusLabel={statusLabel}
           contextLabel="Scontro H2H"
           score={
             display.goalsAvailable && matchup.result
@@ -168,6 +197,10 @@ export function MatchdayH2HPanel({
   error,
   liveDegraded,
   canAdmin,
+  aiLineupBusy = false,
+  aiLineupRun = null,
+  aiLineupError = null,
+  onGenerateAiLineups = () => undefined,
   onRetry,
 }: Props) {
   const [selectedRound, setSelectedRound] = useState<number | null>(() =>
@@ -246,6 +279,12 @@ export function MatchdayH2HPanel({
   }
 
   const roundOptions = calendar.rounds.map((round) => {
+    if (round.beforeLeagueCreation) {
+      return {
+        value: String(round.roundNumber),
+        label: `Giornata ${round.roundNumber} · lega creata dopo`,
+      };
+    }
     const played = round.matchups.filter((matchup) => !matchup.isBye);
     const finals = played.filter((matchup) => matchup.result?.resultFinal).length;
     const suffix =
@@ -294,6 +333,48 @@ export function MatchdayH2HPanel({
         </div>
       </header>
 
+      {canAdmin && activeRound?.fantasyRoundId ? (
+        <section data-testid="h2h-ai-admin">
+          <h2>Formazioni dei fantallenatori AI</h2>
+          <p>
+            Genera le formazioni valide delle sole squadre controllate dall’AI per questa
+            giornata. Le formazioni umane e quelle già bloccate non vengono modificate.
+          </p>
+          <Button
+            type="button"
+            disabled={aiLineupBusy}
+            onClick={() => onGenerateAiLineups(activeRound.fantasyRoundId as string)}
+            data-testid="h2h-generate-ai-lineups"
+          >
+            {aiLineupBusy ? "Generazione in corso…" : "Genera formazioni AI"}
+          </Button>
+          {aiLineupRun?.roundId === activeRound.fantasyRoundId ? (
+            <div data-testid="h2h-ai-result">
+              <p>{aiLineupRun.summary}</p>
+              {aiLineupRun.teams.length > 0 ? (
+                <ul>
+                  {aiLineupRun.teams.map((team) => (
+                    <li key={team.fantasyTeamId}>
+                      <strong>{team.fantasyTeamName || team.fantasyTeamId}</strong>: {" "}
+                      {AI_OUTCOME_LABEL[team.outcome] ?? team.outcome}
+                      {team.message ? ` — ${team.message}` : ""}
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
+            </div>
+          ) : null}
+          {aiLineupError ? (
+            <UiStatePanel
+              state="error"
+              title="Formazioni AI non generate"
+              message={aiLineupError}
+              testId="h2h-ai-error"
+            />
+          ) : null}
+        </section>
+      ) : null}
+
       {activeRound ? (
         <section
           className="fa-matchday-round"
@@ -311,11 +392,20 @@ export function MatchdayH2HPanel({
               {roundStatusHint(activeRound)}
             </Badge>
           </div>
-          <div className="fa-matchday-matchups">
-            {activeRound.matchups.map((matchup) => (
-              <MatchupRow key={matchup.slotId} matchup={matchup} />
-            ))}
-          </div>
+          {activeRound.beforeLeagueCreation ? (
+            <UiStatePanel
+              state="empty"
+              title="Lega creata dopo questo turno"
+              message="Questo turno europeo è già trascorso al momento della creazione della lega: non ospita scontri fantasy."
+              testId="h2h-round-before-creation"
+            />
+          ) : (
+            <div className="fa-matchday-matchups">
+              {activeRound.matchups.map((matchup) => (
+                <MatchupRow key={matchup.slotId} matchup={matchup} />
+              ))}
+            </div>
+          )}
         </section>
       ) : null}
     </div>

@@ -12,12 +12,14 @@ from auth.exceptions import ValidationAuthError
 from database.enums import FantasyTurnStatus
 from fantasy_turns.rules import (
     EligibleFixtureRef,
+    aggregate_turn_status,
     apply_cutoff_recalculation,
     assert_modification_allowed,
     compute_cutoff,
     derive_effective_status,
     ensure_utc,
     evaluate_threshold,
+    full_season_turn_specs,
     is_modification_allowed,
     kickoff_counts_for_cutoff,
     midweek_window,
@@ -152,6 +154,42 @@ def test_upcoming_turn_specs_skips_fully_ended_windows() -> None:
     specs = upcoming_turn_specs(date(2026, 8, 19), horizon_days=7)  # Wednesday after a weekend
     weekend_anchors = [anchor for kind, anchor in specs if kind == FantasyTurnKind.WEEKEND]
     assert date(2026, 8, 14) not in weekend_anchors
+
+
+def test_full_season_turn_specs_covers_the_whole_range_in_chronological_order() -> None:
+    specs = full_season_turn_specs(date(2026, 8, 1), date(2026, 9, 30))
+    starts = [window_for_kind(kind, anchor).start_at for kind, anchor in specs]
+    assert starts == sorted(starts)
+    assert len(starts) == len(set(starts))
+    # Covers both the very first and the very last week of the range.
+    assert any(anchor <= date(2026, 8, 7) for _, anchor in specs)
+    assert any(anchor >= date(2026, 9, 24) for _, anchor in specs)
+
+
+def test_full_season_turn_specs_does_not_drop_past_windows_regardless_of_today() -> None:
+    """Unlike `upcoming_turn_specs`, must not be anchored to "today" at all."""
+    specs = full_season_turn_specs(date(2020, 1, 1), date(2020, 2, 1))
+    assert len(specs) > 0
+
+
+def test_aggregate_turn_status_live_wins_over_everything() -> None:
+    ko = datetime(2026, 8, 15, 14, 0, tzinfo=UTC)
+    assert aggregate_turn_status([("FT", ko), ("1H", ko)]) == "live"
+
+
+def test_aggregate_turn_status_needs_update_when_a_fixture_has_no_kickoff() -> None:
+    ko = datetime(2026, 8, 15, 14, 0, tzinfo=UTC)
+    assert aggregate_turn_status([("NS", ko), ("TBD", None)]) == "needs_update"
+
+
+def test_aggregate_turn_status_completed_only_when_all_terminal() -> None:
+    ko = datetime(2026, 8, 15, 14, 0, tzinfo=UTC)
+    assert aggregate_turn_status([("FT", ko), ("AET", ko)]) == "completed"
+    assert aggregate_turn_status([("FT", ko), ("NS", ko)]) == "scheduled"
+
+
+def test_aggregate_turn_status_empty_is_needs_update() -> None:
+    assert aggregate_turn_status([]) == "needs_update"
 
 
 def test_apply_cutoff_recalculation_simultaneous_and_timezones() -> None:

@@ -68,8 +68,9 @@ def test_player_without_a_fixture_is_excluded() -> None:
     assert is_eligible(candidate(1, has_fixture=False)) is ExclusionReason.NO_FIXTURE
 
 
-def test_player_whose_match_started_is_excluded() -> None:
-    assert is_eligible(candidate(1, kickoff_locked=True)) is ExclusionReason.KICKOFF_LOCKED
+def test_player_whose_match_started_is_still_eligible() -> None:
+    """Creazione retroattiva (EP13-P04-bis): il kickoff non esclude più il candidato."""
+    assert is_eligible(candidate(1, kickoff_locked=True)) is None
 
 
 def test_available_player_is_eligible() -> None:
@@ -233,6 +234,7 @@ def test_injured_players_never_reach_the_pitch() -> None:
     ]
     plan = build_lineup_plan(pool, [(FantasyRole.C, 1)], decided_at=DECIDED_AT)
     assert plan.starters == (UUID(int=21),)
+    assert plan.bench == (UUID(int=20),)
     excluded = {item.athlete_id: item.excluded_reason for item in plan.candidates}
     assert excluded[UUID(int=20)] is ExclusionReason.INJURED
 
@@ -281,7 +283,11 @@ def test_bench_size_is_capped_when_requested() -> None:
     assert len(plan.bench) == 2
 
 
-def test_locked_player_is_not_moved_into_the_starting_eleven() -> None:
+def test_locked_player_can_still_be_selected_for_retroactive_generation() -> None:
+    """Creazione retroattiva (EP13-P04-bis): il kickoff non esclude più il candidato
+
+    dalla selezione, quindi vince comunque il punteggio più alto.
+    """
     pool = [
         candidate(
             80, role=FantasyRole.C, official_starter=True, recent_form=9.0, kickoff_locked=True
@@ -289,7 +295,7 @@ def test_locked_player_is_not_moved_into_the_starting_eleven() -> None:
         candidate(81, role=FantasyRole.C, recent_form=4.0),
     ]
     plan = build_lineup_plan(pool, [(FantasyRole.C, 1)], decided_at=DECIDED_AT)
-    assert plan.starters == (UUID(int=81),)
+    assert plan.starters == (UUID(int=80),)
 
 
 @pytest.mark.parametrize("size", [0, 1, 3])

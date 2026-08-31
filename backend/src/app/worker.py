@@ -34,6 +34,8 @@ _beat_schedule.update(
     fantasy_turns_beat_schedule(
         enabled=_worker_settings.fantasy_turns_auto_generate_enabled,
         interval_seconds=_worker_settings.fantasy_turns_auto_generate_interval_seconds,
+        full_refresh_enabled=_worker_settings.fantasy_turns_full_refresh_enabled,
+        full_refresh_interval_seconds=_worker_settings.fantasy_turns_full_refresh_interval_seconds,
     )
 )
 _beat_schedule.update(

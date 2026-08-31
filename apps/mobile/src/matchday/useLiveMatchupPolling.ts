@@ -28,7 +28,10 @@ export function useLiveMatchupPolling(
   const accessTokenRef = useRef(accessToken);
   accessTokenRef.current = accessToken;
 
-  const shouldPoll = enabled && !!accessToken && !!leagueId && !!slotId && !!detail?.live;
+  const monitoring =
+    detail?.homologationStatus !== "homologated" &&
+    (detail?.europeanTurnStatus === "open" || detail?.europeanTurnStatus === "locked");
+  const shouldPoll = enabled && !!accessToken && !!leagueId && !!slotId && monitoring;
 
   useEffect(() => {
     if (!shouldPoll || !leagueId || !slotId) {
@@ -62,7 +65,10 @@ export function useLiveMatchupPolling(
         intervalMs = BASE_INTERVAL_MS;
         setDegraded(false);
         onUpdateRef.current(next);
-        if (!next.live) {
+        const nextMonitoring =
+          next.homologationStatus !== "homologated" &&
+          (next.europeanTurnStatus === "open" || next.europeanTurnStatus === "locked");
+        if (!nextMonitoring) {
           return;
         }
       } catch {

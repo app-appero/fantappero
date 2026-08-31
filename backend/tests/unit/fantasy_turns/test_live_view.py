@@ -121,6 +121,8 @@ def event(
     active: bool = True,
     retracted: datetime | None = None,
     event_type: str = "Goal",
+    scoring_kind: str | None = "goal",
+    sources: tuple[str, ...] = (),
 ) -> RawTimelineEvent:
     return RawTimelineEvent(
         id=identifier,
@@ -128,13 +130,17 @@ def event(
         minute_extra=extra,
         event_type=event_type,
         event_detail="Normal Goal",
-        scoring_kind="goal",
+        scoring_kind=scoring_kind,
+        club_id="club-1",
         club_name="Roma",
+        athlete_id="athlete-1",
         athlete_name="Rossi",
+        related_athlete_id="athlete-2",
         related_athlete_name="Bianchi",
         comments=None,
         is_active=active,
         retracted_at=retracted,
+        sources=sources,
     )
 
 
@@ -180,5 +186,53 @@ def test_timeline_preserves_event_detail_and_assist() -> None:
     assert timeline[0].related_athlete_name == "Bianchi"
 
 
+def test_timeline_exposes_athlete_and_club_ids_for_reliable_linking() -> None:
+    """Il collegamento evento↔formazione avviene per id, non per nome (EP13-P04-ter)."""
+    timeline = build_timeline([event("goal", minute=33, scoring_kind=None)])
+    assert timeline[0].athlete_id == "athlete-1"
+    assert timeline[0].related_athlete_id == "athlete-2"
+    assert timeline[0].club_id == "club-1"
+
+
 def test_empty_input_produces_an_empty_timeline() -> None:
     assert build_timeline([]) == ()
+
+
+# ---------------------------------------------------------------------------
+# Deduplicazione riga grezza / copia normalizzata (EP13-P04-ter)
+# ---------------------------------------------------------------------------
+
+
+def test_synthetic_scoring_copy_of_a_raw_event_is_hidden() -> None:
+    """Ogni gol produce una riga grezza e una copia `scoring_kind` per il
+
+    fantavoto: la copia non va mostrata una seconda volta in timeline.
+    """
+    raw = event("raw-goal", minute=17, scoring_kind=None, sources=("events",))
+    synthetic = event("synthetic-goal", minute=17, scoring_kind="goal", sources=("events",))
+    timeline = build_timeline([raw, synthetic])
+    assert len(timeline) == 1
+    assert timeline[0].id == "raw-goal"
+
+
+def test_synthetic_assist_copy_of_a_raw_goal_is_also_hidden() -> None:
+    raw = event("raw-goal", minute=17, scoring_kind=None, sources=("events",))
+    synthetic_assist = event(
+        "synthetic-assist", minute=17, scoring_kind="assist", sources=("events",)
+    )
+    timeline = build_timeline([raw, synthetic_assist])
+    assert len(timeline) == 1
+    assert timeline[0].id == "raw-goal"
+
+
+def test_synthetic_event_without_a_raw_counterpart_is_kept() -> None:
+    """Un rigore parato dedotto solo dalle statistiche giocatore non ha una
+
+    riga grezza equivalente: deve restare in timeline, è l'unica traccia.
+    """
+    only_from_stats = event(
+        "penalty-saved", minute=60, scoring_kind="penalty_saved", sources=("players",)
+    )
+    timeline = build_timeline([only_from_stats])
+    assert len(timeline) == 1
+    assert timeline[0].id == "penalty-saved"

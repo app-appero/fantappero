@@ -3,17 +3,19 @@ import {
   H2H_GOALS_LABEL,
   H2H_POINTS_LABEL,
   describeH2HResult,
+  fantasyBadgesFromBonusMalus,
   formatFantasyGoals,
   formatFantasyPoints,
+  layoutFromModule,
 } from "@fantappero/contracts";
 import {
   Badge,
   Breadcrumb,
   Button,
-  FormationView,
+  FootballPitch,
   PageContainer,
   UiStatePanel,
-  type FormationSlot,
+  type PitchPlayer,
 } from "@fantappero/ui";
 import { useCallback, useEffect, useState } from "react";
 import { fetchH2HMatchup } from "../api/leagues";
@@ -108,16 +110,70 @@ const DEMO_DETAIL: H2HMatchupDetail = {
   },
 };
 
-function toFormationSlots(players: H2HPlayerScore[]): FormationSlot[] {
+/** `"7.5"`, `"7.5 LIVE"` mentre la partita reale del giocatore è in corso, o `null` se non ancora sceso in campo (§21). */
+function playerScoreLabel(player: H2HPlayerScore): string | null {
+  if (player.fantasyScore === null) {
+    return null;
+  }
+  const base = formatFantasyPoints(player.fantasyScore);
+  return player.fixtureStatusLabel === "LIVE" ? `${base} LIVE` : base;
+}
+
+function toFantasyPitchPlayers(players: readonly H2HPlayerScore[]): PitchPlayer[] {
   return players.map((player) => ({
     id: player.athleteId,
-    label: player.fantasyScore !== null ? `${player.name} · ${player.fantasyScore.toFixed(1)}` : player.name,
-    playerName:
-      player.fantasyScore !== null
-        ? `${player.name} · ${player.fantasyScore.toFixed(1)}`
-        : player.name,
+    name: player.name,
     role: player.role,
+    badges: fantasyBadgesFromBonusMalus(player.bonusMalus ?? []),
+    scoreLabel: playerScoreLabel(player),
+    photoUrl: player.photoUrl,
   }));
+}
+
+const BONUS_LABELS: Record<string, string> = {
+  goal: "Gol",
+  assist: "Assist",
+  own_goal: "Autogol",
+  penalty_missed: "Rigore sbagliato",
+  yellow_card: "Ammonizione",
+  red_card: "Espulsione",
+  penalty_saved: "Rigore parato",
+  goalkeeper_goal_conceded: "Gol subito",
+  goalkeeper_clean_sheet: "Porta inviolata",
+};
+
+function PlayerBreakdown({ player }: { player: H2HPlayerScore }) {
+  const components = player.bonusMalus ?? [];
+  return (
+    <li data-testid={`matchup-player-score-${player.athleteId}`}>
+      <p>
+        <strong>{player.name}</strong> ({player.role}) · {player.realTeamName ?? "Squadra reale non associata"}
+        {" · "}
+        <Badge variant={player.fixtureStatusLabel === "LIVE" ? "warning" : "neutral"}>
+          {player.fixtureStatusLabel ?? "Partita non associata"}
+        </Badge>
+      </p>
+      <p>
+        Voto: <strong>{formatFantasyPoints(player.baseScore ?? null)}</strong>
+        {" · "}Bonus: <strong>+{(player.bonusTotal ?? 0).toFixed(1)}</strong>
+        {" · "}Malus: <strong>{(player.malusTotal ?? 0).toFixed(1)}</strong>
+        {" · "}Totale: <strong>{formatFantasyPoints(player.fantasyScore)}</strong>
+        {player.scoreFinal ? " · definitivo" : " · provvisorio"}
+      </p>
+      {components.length > 0 ? (
+        <ul aria-label={`Bonus e malus di ${player.name}`}>
+          {components.map((component, index) => (
+            <li key={`${component.id}-${index}`}>
+              {BONUS_LABELS[component.id] ?? component.id}: {component.contribution > 0 ? "+" : ""}
+              {component.contribution.toFixed(1)}
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p>Nessun bonus o malus.</p>
+      )}
+    </li>
+  );
 }
 
 function SideBlock({ side, title }: { side: H2HSideLineup; title: string }) {
@@ -148,12 +204,36 @@ function SideBlock({ side, title }: { side: H2HSideLineup; title: string }) {
           testId={`matchup-lineup-empty-${title}`}
         />
       ) : (
-        <FormationView
-          title={`Titolari — ${teamLabel}`}
-          slots={toFormationSlots(side.starters)}
-          bench={toFormationSlots(side.bench)}
-          benchTitle="Panchina"
-        />
+        <>
+          <FootballPitch
+            title={`Titolari — ${teamLabel}`}
+            players={toFantasyPitchPlayers(side.starters)}
+            positions={layoutFromModule(
+              side.starters,
+              side.module,
+              (player) => player.role,
+              (player) => player.athleteId,
+              (player) => side.starters.indexOf(player),
+            )}
+            pitchAriaLabel={`Titolari ${teamLabel}`}
+          />
+          <h3>Dettaglio punteggi titolari</h3>
+          <ul data-testid={`matchup-player-breakdown-${title}`}>
+            {side.starters.map((player) => (
+              <PlayerBreakdown key={player.athleteId} player={player} />
+            ))}
+          </ul>
+          {side.bench.length > 0 ? (
+            <details>
+              <summary>Dettaglio panchina</summary>
+              <ul>
+                {side.bench.map((player) => (
+                  <PlayerBreakdown key={player.athleteId} player={player} />
+                ))}
+              </ul>
+            </details>
+          ) : null}
+        </>
       )}
     </section>
   );
@@ -384,7 +464,7 @@ export function MatchupDetailPage() {
                   {outcomeLabel(detail.result?.outcome ?? null)}
                 </p>
               </div>
-              <div className="fa-ds-showcase__row" style={{ alignItems: "flex-start" }}>
+              <div className="fa-pitch-row">
                 <SideBlock side={detail.home} title="home" />
                 {detail.away ? <SideBlock side={detail.away} title="away" /> : null}
               </div>

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from decimal import Decimal
 from uuid import UUID
 
 from sqlalchemy import func, select
@@ -22,8 +23,12 @@ from fantasy_ratings.eligibility import STANDARD_MINUTES_THRESHOLD
 from fantasy_teams.composition_service import activation_roster_and_credit_blockers
 from fantasy_teams.factory import ensure_team_for_membership
 from fantasy_teams.ledger import find_account_for_team
+from fantasy_turns.coverage import DEFAULT_COVERAGE_THRESHOLD
 from fantasy_turns.rules import STANDARD_MIN_FIXTURES
-from fantasy_turns.validators import validate_min_fixtures_per_round
+from fantasy_turns.validators import (
+    validate_min_fixtures_per_round,
+    validate_turn_coverage_threshold,
+)
 from leagues.calendar_service import league_has_confirmed_calendar
 from leagues.models.competition import Competition
 from leagues.models.league import League
@@ -131,6 +136,7 @@ class LeagueService:
                 forwards=STANDARD_FORWARDS,
                 total_credits=STANDARD_TOTAL_CREDITS,
                 min_fixtures_per_round=STANDARD_MIN_FIXTURES,
+                turn_coverage_threshold=Decimal(str(DEFAULT_COVERAGE_THRESHOLD)),
                 minutes_threshold=STANDARD_MINUTES_THRESHOLD,
                 max_automatic_substitutions=STANDARD_AUTOMATIC_SUBSTITUTIONS,
                 allow_trades=True,
@@ -282,6 +288,11 @@ class LeagueService:
             if payload.min_fixtures_per_round is not None
             else rules.min_fixtures_per_round
         )
+        turn_coverage_threshold = (
+            validate_turn_coverage_threshold(payload.turn_coverage_threshold)
+            if payload.turn_coverage_threshold is not None
+            else rules.turn_coverage_threshold
+        )
         minutes_threshold = (
             validate_minutes_threshold(payload.minutes_threshold)
             if payload.minutes_threshold is not None
@@ -316,6 +327,7 @@ class LeagueService:
             or rules.participant_count != participant_count
             or rules.total_credits != total_credits
             or rules.min_fixtures_per_round != min_fixtures
+            or rules.turn_coverage_threshold != turn_coverage_threshold
             or rules.minutes_threshold != minutes_threshold
             or rules.max_automatic_substitutions != max_automatic_substitutions
             or rules.voluntary_release_refund_percent != voluntary_release_refund_percent
@@ -338,6 +350,7 @@ class LeagueService:
         rules.forwards = payload.roster.forwards
         rules.total_credits = total_credits
         rules.min_fixtures_per_round = min_fixtures
+        rules.turn_coverage_threshold = turn_coverage_threshold
         rules.minutes_threshold = minutes_threshold
         rules.max_automatic_substitutions = max_automatic_substitutions
         rules.voluntary_release_refund_percent = voluntary_release_refund_percent
@@ -524,6 +537,7 @@ class LeagueService:
             ),
             totalCredits=rules.total_credits,
             minFixturesPerRound=rules.min_fixtures_per_round,
+            turnCoverageThreshold=float(rules.turn_coverage_threshold),
             minutesThreshold=rules.minutes_threshold,
             maxAutomaticSubstitutions=rules.max_automatic_substitutions,
             voluntaryReleaseRefundPercent=rules.voluntary_release_refund_percent,

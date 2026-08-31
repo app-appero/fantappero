@@ -25,6 +25,8 @@ class FantasyTurnFixtureResponse(ApiModel):
     away_goals: int | None = Field(default=None, alias="awayGoals")
     home_club_name: str = Field(alias="homeClubName")
     away_club_name: str = Field(alias="awayClubName")
+    home_club_logo_url: str | None = Field(default=None, alias="homeClubLogoUrl")
+    away_club_logo_url: str | None = Field(default=None, alias="awayClubLogoUrl")
     competition_name: str | None = Field(default=None, alias="competitionName")
     provider_id: int = Field(alias="providerId")
     # Freschezza del dato normalizzato (EP13-P04): quando è stato aggiornato
@@ -44,8 +46,11 @@ class FixtureTimelineEventResponse(ApiModel):
     event_type: str = Field(alias="eventType")
     event_detail: str | None = Field(default=None, alias="eventDetail")
     scoring_kind: str | None = Field(default=None, alias="scoringKind")
+    club_id: str | None = Field(default=None, alias="clubId")
     club_name: str | None = Field(default=None, alias="clubName")
+    athlete_id: str | None = Field(default=None, alias="athleteId")
     athlete_name: str | None = Field(default=None, alias="athleteName")
+    related_athlete_id: str | None = Field(default=None, alias="relatedAthleteId")
     related_athlete_name: str | None = Field(default=None, alias="relatedAthleteName")
     comments: str | None = None
 
@@ -56,11 +61,14 @@ class FixtureLineupPlayerResponse(ApiModel):
     shirt_number: int | None = Field(default=None, alias="shirtNumber")
     position: str | None = None
     grid: str | None = None
+    photo_url: str | None = Field(default=None, alias="photoUrl")
 
 
 class FixtureLineupResponse(ApiModel):
     club_name: str = Field(alias="clubName")
+    club_logo_url: str | None = Field(default=None, alias="clubLogoUrl")
     formation: str | None = None
+    coach_name: str | None = Field(default=None, alias="coachName")
     starters: list[FixtureLineupPlayerResponse] = Field(default_factory=list)
     bench: list[FixtureLineupPlayerResponse] = Field(default_factory=list)
 
@@ -73,12 +81,19 @@ class FixtureLiveDetailResponse(ApiModel):
     league_id: str = Field(alias="leagueId")
     provider_id: int = Field(alias="providerId")
     competition_name: str | None = Field(default=None, alias="competitionName")
+    home_club_id: str = Field(alias="homeClubId")
+    away_club_id: str = Field(alias="awayClubId")
     home_club_name: str = Field(alias="homeClubName")
     away_club_name: str = Field(alias="awayClubName")
+    home_club_logo_url: str | None = Field(default=None, alias="homeClubLogoUrl")
+    away_club_logo_url: str | None = Field(default=None, alias="awayClubLogoUrl")
     home_goals: int | None = Field(default=None, alias="homeGoals")
     away_goals: int | None = Field(default=None, alias="awayGoals")
     status_short: str = Field(alias="statusShort")
     status_elapsed: int | None = Field(default=None, alias="statusElapsed")
+    venue_name: str | None = Field(default=None, alias="venueName")
+    venue_city: str | None = Field(default=None, alias="venueCity")
+    referee: str | None = None
     kickoff_at: datetime | None = Field(default=None, alias="kickoffAt")
     updated_at: datetime | None = Field(default=None, alias="updatedAt")
     feed_state: str = Field(alias="feedState")
@@ -104,6 +119,10 @@ class FantasyTurnSummaryResponse(ApiModel):
     fixture_count: int = Field(alias="fixtureCount")
     generated_at: datetime = Field(alias="generatedAt")
     modification_allowed: bool = Field(alias="modificationAllowed")
+    # Stato aggregato derivato dalle fixture reali (§23): completed | live |
+    # scheduled | needs_update — distinto dal ciclo di vita fantasy
+    # (status/effectiveStatus: scheduled/open/locked/skipped).
+    match_status: str = Field(alias="matchStatus")
 
 
 class FantasyTurnDetailResponse(FantasyTurnSummaryResponse):
@@ -141,6 +160,49 @@ class EnsureFantasyTurnsResponse(ApiModel):
     duplicates: int
     waiting: int
     horizon_days: int = Field(alias="horizonDays")
+
+
+class FantasyCalendarRefreshResultResponse(ApiModel):
+    """Esito del comando unico "Aggiorna calendario" (backfill stagionale)."""
+
+    league_id: str = Field(alias="leagueId")
+    fixtures_created: int = Field(alias="fixturesCreated")
+    fixtures_updated: int = Field(alias="fixturesUpdated")
+    fixtures_unchanged: int = Field(alias="fixturesUnchanged")
+    fixtures_needing_date: int = Field(alias="fixturesNeedingDate")
+    rounds_created: int = Field(alias="roundsCreated")
+    rounds_updated: int = Field(alias="roundsUpdated")
+    rounds_realigned: int = Field(alias="roundsRealigned")
+    # Turni "fantasma" (senza nessuna partita reale) rimossi in questo giro.
+    rounds_removed: int = Field(default=0, alias="roundsRemoved")
+    message: str
+
+
+class FantasyCalendarRefreshJobResponse(ApiModel):
+    job_id: str = Field(alias="jobId")
+    status: str
+    message: str
+
+
+class FantasyCalendarRefreshProgressResponse(ApiModel):
+    job_id: str = Field(alias="jobId")
+    status: str
+    percent: int
+    stage: str
+    message: str
+    error_code: str | None = Field(default=None, alias="errorCode")
+    result: FantasyCalendarRefreshResultResponse | None = None
+
+
+class PendingFixtureResponse(ApiModel):
+    """Fixture nota (competizione/squadre/round) ma senza data/ora dal provider."""
+
+    fixture_id: str = Field(alias="fixtureId")
+    competition_name: str | None = Field(default=None, alias="competitionName")
+    round_label: str | None = Field(default=None, alias="roundLabel")
+    home_club_name: str = Field(alias="homeClubName")
+    away_club_name: str = Field(alias="awayClubName")
+    status_short: str = Field(alias="statusShort")
 
 
 class ApplyRoundCorrectionRequest(ApiModel):

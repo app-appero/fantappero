@@ -58,6 +58,7 @@ const DEMO_LEAGUE: LeagueDetail = {
     },
     totalCredits: 1000,
     minFixturesPerRound: 25,
+    turnCoverageThreshold: 0.75,
     minutesThreshold: 15,
     voluntaryReleaseRefundPercent: 50,
     leagueExitRefundPercent: 100,

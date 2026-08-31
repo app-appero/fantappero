@@ -28,6 +28,7 @@ function baseTurn(overrides: Partial<FantasyTurnDetail> = {}): FantasyTurnDetail
     fixtureCount: 0,
     generatedAt: "2026-01-01T00:00:00Z",
     modificationAllowed: false,
+    matchStatus: "scheduled",
     homologationStatus: "provisional",
     fixtures: [],
     ...overrides,

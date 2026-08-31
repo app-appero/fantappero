@@ -27,9 +27,9 @@ class LeagueAuditEvent(Base, UUIDPrimaryKeyMixin, TimestampMixin):
         nullable=True,
         index=True,
     )
-    actor_id: Mapped[UUID] = mapped_column(
-        ForeignKey("users.id", ondelete="CASCADE"),
-        nullable=False,
+    actor_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
         index=True,
     )
     action: Mapped[LeagueAuditAction] = mapped_column(
@@ -46,4 +46,4 @@ class LeagueAuditEvent(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     details: Mapped[dict[str, object] | None] = mapped_column(JSONB, nullable=True)
 
     league: Mapped[League] = relationship()
-    actor: Mapped[User] = relationship()
+    actor: Mapped[User | None] = relationship()

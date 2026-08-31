@@ -22,6 +22,8 @@ export interface FantasyTurnFixture {
   awayGoals: number | null;
   homeClubName: string;
   awayClubName: string;
+  homeClubLogoUrl: string | null;
+  awayClubLogoUrl: string | null;
   competitionName: string | null;
   providerId: number;
   /** Ultimo aggiornamento del dato normalizzato (EP13-P04). */
@@ -50,8 +52,12 @@ export interface FixtureTimelineEvent {
   eventType: string;
   eventDetail: string | null;
   scoringKind: string | null;
+  clubId: string | null;
   clubName: string | null;
+  /** Id interno del calciatore: usare per collegare l'evento alla formazione, mai il nome. */
+  athleteId: string | null;
   athleteName: string | null;
+  relatedAthleteId: string | null;
   relatedAthleteName: string | null;
   comments: string | null;
 }
@@ -62,11 +68,14 @@ export interface FixtureLineupPlayer {
   shirtNumber: number | null;
   position: string | null;
   grid: string | null;
+  photoUrl: string | null;
 }
 
 export interface FixtureLineup {
   clubName: string;
+  clubLogoUrl: string | null;
   formation: string | null;
+  coachName: string | null;
   starters: FixtureLineupPlayer[];
   bench: FixtureLineupPlayer[];
 }
@@ -78,12 +87,19 @@ export interface FixtureLiveDetail {
   leagueId: string;
   providerId: number;
   competitionName: string | null;
+  homeClubId: string;
+  awayClubId: string;
   homeClubName: string;
   awayClubName: string;
+  homeClubLogoUrl: string | null;
+  awayClubLogoUrl: string | null;
   homeGoals: number | null;
   awayGoals: number | null;
   statusShort: string;
   statusElapsed: number | null;
+  venueName: string | null;
+  venueCity: string | null;
+  referee: string | null;
   kickoffAt: string | null;
   updatedAt: string | null;
   feedState: ProviderFeedState;
@@ -110,6 +126,8 @@ export interface FantasyTurnSummary {
   fixtureCount: number;
   generatedAt: string;
   modificationAllowed: boolean;
+  /** Stato aggregato dalle fixture reali (§23) — distinto dal ciclo di vita fantasy sopra. */
+  matchStatus: FantasyTurnAggregateStatus;
 }
 
 export interface FantasyTurnDetail extends FantasyTurnSummary {
@@ -130,6 +148,57 @@ export interface FantasyTurnPreview {
   fixtures: FantasyTurnFixture[];
 }
 
+export interface EnsureFantasyTurnsResponse {
+  leagueId: string;
+  created: number;
+  opened: number;
+  upgraded: number;
+  duplicates: number;
+  waiting: number;
+  horizonDays: number;
+}
+
+/** Esito del comando unico "Aggiorna calendario" (backfill stagionale). */
+export interface FantasyCalendarRefreshResult {
+  leagueId: string;
+  fixturesCreated: number;
+  fixturesUpdated: number;
+  fixturesUnchanged: number;
+  fixturesNeedingDate: number;
+  roundsCreated: number;
+  roundsUpdated: number;
+  roundsRealigned: number;
+  /** Turni "fantasma" (senza nessuna partita reale) rimossi in questo giro. */
+  roundsRemoved: number;
+  message: string;
+}
+
+export interface FantasyCalendarRefreshJob {
+  jobId: string;
+  status: string;
+  message: string;
+}
+
+export interface FantasyCalendarRefreshProgress {
+  jobId: string;
+  status: "queued" | "running" | "completed" | "failed" | string;
+  percent: number;
+  stage: string;
+  message: string;
+  errorCode?: string | null;
+  result?: FantasyCalendarRefreshResult | null;
+}
+
+/** Fixture nota (competizione/squadre/round) ma senza data/ora dal provider. */
+export interface PendingFixtureSummary {
+  fixtureId: string;
+  competitionName: string | null;
+  roundLabel: string | null;
+  homeClubName: string;
+  awayClubName: string;
+  statusShort: string;
+}
+
 export interface GenerateFantasyTurnRequest {
   kind: FantasyTurnKind;
   /** ISO date (YYYY-MM-DD) used to resolve the weekend/midweek window. */
@@ -140,7 +209,12 @@ export interface ExcludeFantasyTurnFixtureRequest {
   fixtureId: string;
 }
 
-export type FantasyFixtureMatchStatus = "scheduled" | "live" | "finished" | "postponed";
+export type FantasyFixtureMatchStatus =
+  | "scheduled"
+  | "live"
+  | "finished"
+  | "postponed"
+  | "needs_update";
 
 const STARTED_FIXTURE_STATUSES = new Set([
   "1H",
@@ -299,7 +373,10 @@ export function reconcileFixtureKickoffLock(input: {
   };
 }
 
-export function mapFixtureMatchStatus(statusShort: string | null | undefined): FantasyFixtureMatchStatus {
+export function mapFixtureMatchStatus(
+  statusShort: string | null | undefined,
+  kickoffAt?: string | Date | null,
+): FantasyFixtureMatchStatus {
   const status = (statusShort ?? "").trim().toUpperCase();
   if (POSTPONED_FIXTURE_STATUSES.has(status) || CUTOFF_EXCLUDED_STATUSES.has(status)) {
     return "postponed";
@@ -310,5 +387,95 @@ export function mapFixtureMatchStatus(statusShort: string | null | undefined): F
   if (STARTED_FIXTURE_STATUSES.has(status)) {
     return "live";
   }
+  // Nota fin qui dal provider (competizione/squadre/round) ma senza data/ora
+  // definitiva: non può ancora appartenere a nessuna finestra di turno.
+  if (kickoffAt === null || (kickoffAt === undefined && status === "TBD")) {
+    return "needs_update";
+  }
   return "scheduled";
+}
+
+/** Aggregato di stato per un turno con più partite (§23 numerazione turni). */
+export type FantasyTurnAggregateStatus = "completed" | "live" | "scheduled" | "needs_update";
+
+export function aggregateTurnStatus(
+  fixtures: ReadonlyArray<{ statusShort: string | null | undefined; kickoffAt: string | null }>,
+): FantasyTurnAggregateStatus {
+  if (fixtures.length === 0) {
+    return "needs_update";
+  }
+  const statuses = fixtures.map((fixture) =>
+    mapFixtureMatchStatus(fixture.statusShort, fixture.kickoffAt),
+  );
+  if (statuses.some((status) => status === "live")) {
+    return "live";
+  }
+  if (statuses.some((status) => status === "needs_update")) {
+    return "needs_update";
+  }
+  if (statuses.every((status) => status === "finished" || status === "postponed")) {
+    return "completed";
+  }
+  return "scheduled";
+}
+
+/**
+ * Stato mostrato all'utente per un turno. Deliberatamente ridotto a quattro
+ * voci: gli stati interni (`scheduled`/`open`/`locked`/`skipped`,
+ * `provisional`/`homologated`) servono al backend per il ciclo di vita delle
+ * formazioni, ma esporli produceva un elenco incomprensibile in cui turni
+ * futuri identici fra loro apparivano "Programmato" o "Aperto" a seconda del
+ * momento in cui erano stati generati.
+ */
+export type TurnDisplayState = "completed" | "live" | "next" | "upcoming";
+
+export const TURN_DISPLAY_LABEL: Record<TurnDisplayState, string> = {
+  completed: "Completato",
+  live: "In corso",
+  next: "Prossimo",
+  upcoming: "Da disputare",
+};
+
+/**
+ * Colloca ogni turno rispetto ad *adesso*, non rispetto al suo stato interno:
+ * concluso, in corso, il primo ancora da giocare, tutti gli altri. `turns`
+ * deve essere ordinato per numero crescente.
+ */
+export function resolveTurnDisplayStates<
+  T extends { matchStatus: FantasyTurnAggregateStatus },
+>(turns: readonly T[]): TurnDisplayState[] {
+  let nextAssigned = false;
+  return turns.map((turn) => {
+    if (turn.matchStatus === "live") {
+      // Un turno in corso è già "adesso": non c'è un prossimo prima di lui.
+      nextAssigned = true;
+      return "live";
+    }
+    if (turn.matchStatus === "completed") {
+      return "completed";
+    }
+    if (!nextAssigned) {
+      nextAssigned = true;
+      return "next";
+    }
+    return "upcoming";
+  });
+}
+
+/**
+ * Turno di default da mostrare all'apertura di Turni Europei: il primo non
+ * ancora concluso (i turni arrivano già ordinati per numero/cronologia); se
+ * sono tutti conclusi, l'ultimo. Il backfill copre l'intera stagione, quindi
+ * "il primo della lista" sarebbe sempre l'inizio stagione — questo riporta
+ * la vista di default a "adesso", come già fa `resolveDefaultH2HRound`.
+ */
+export function resolveDefaultEuropeanTurn<
+  T extends { matchStatus: FantasyTurnAggregateStatus },
+>(turns: readonly T[]): T | null {
+  for (const turn of turns) {
+    if (turn.matchStatus !== "completed") {
+      return turn;
+    }
+  }
+  return turns[turns.length - 1] ?? null;
 }

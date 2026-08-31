@@ -36,6 +36,34 @@ def test_map_squad_memberships_from_fixture() -> None:
     assert jimenez.club_provider_id == 39
     assert jimenez.provider_position_raw == "Attacker"
     assert jimenez.shirt_number == 9
+    # Il dataset di test non include il campo "photo": assente, non un placeholder.
+    assert jimenez.photo_url is None
+
+
+def test_map_squad_memberships_extracts_photo_when_the_provider_gives_one() -> None:
+    envelope = ProviderEnvelope(
+        endpoint="/players/squads",
+        parameters={"team": "50"},
+        errors=[],
+        results=1,
+        paging=ProviderPaging(current=1, total=1),
+        response=[
+            {
+                "team": {"id": 50},
+                "players": [
+                    {
+                        "id": 19012,
+                        "name": "M. Bettinelli",
+                        "number": 13,
+                        "position": "Goalkeeper",
+                        "photo": "https://media.api-sports.io/football/players/19012.png",
+                    }
+                ],
+            }
+        ],
+    )
+    rows = map_squad_memberships(envelope, competition_provider_id=39, season_year=2026)
+    assert rows[0].photo_url == "https://media.api-sports.io/football/players/19012.png"
 
 
 def test_map_athletes_from_players_fixture() -> None:
@@ -46,6 +74,8 @@ def test_map_athletes_from_players_fixture() -> None:
     assert patricio.canonical_name == "Rui Patrício"
     assert patricio.nationality == "Portugal"
     assert patricio.birth_date == date(1988, 2, 15)
+    # Idem qui: nessuna foto nel dataset curato, il campo resta None.
+    assert patricio.photo_url is None
 
 
 def test_map_transfers_fixture() -> None:

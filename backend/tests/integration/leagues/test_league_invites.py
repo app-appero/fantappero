@@ -16,6 +16,7 @@ from auth.models.user import User
 from auth.models.user_profile import UserProfile
 from database.enums import LeagueAuditAction, LeagueMemberRole, PlatformRole, UserType
 from database.session import create_session_factory
+from fantasy_teams.models import FantasyTeam
 from leagues.models.competition import Competition
 from leagues.models.league_audit_event import LeagueAuditEvent
 from leagues.models.league_invite import LeagueInvite
@@ -421,6 +422,21 @@ def test_ai_named_invite_auto_accepts_and_ai_cannot_login(
     )
     persisted = db_session.get(NamedLeagueInvite, UUID(created.json()["id"]))
     assert persisted is not None
+
+    # L'ingresso in lega di un fantallenatore IA deve creare anche la sua
+    # FantasyTeam, esattamente come ogni altro percorso di ingresso (owner,
+    # invito aperto/nominativo umano) — altrimenti resta un membro senza
+    # squadra: invisibile in classifica e alla generazione formazioni IA.
+    membership_id = db_session.scalar(
+        select(LeagueMembership.id).where(
+            LeagueMembership.league_id == UUID(league_id),
+            LeagueMembership.user_id == ai.id,
+        )
+    )
+    team = db_session.scalar(
+        select(FantasyTeam).where(FantasyTeam.membership_id == membership_id)
+    )
+    assert team is not None
 
     login = client.post(
         "/auth/login",

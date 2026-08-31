@@ -8,17 +8,17 @@ progressivo su quelli generati prima (EP07-05).
 from __future__ import annotations
 
 from collections import defaultdict
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.orm import Session, selectinload
 
 from auth.exceptions import ValidationAuthError
 from auth.models.user import User
 from database.enums import (
     FantasyRoundHomologationStatus,
-    FantasyTurnStatus,
     LeagueCalendarStatus,
     LineupSlotKind,
 )
@@ -27,8 +27,11 @@ from fantasy_ratings.config import default_formula_config
 from fantasy_ratings.models import PlayerMatchRating
 from fantasy_teams.models import FantasyTeam
 from fantasy_turns.models import FantasyRound, FantasyRoundFixture
+from fantasy_turns.readiness import FINISHED_FIXTURE_STATUSES, LIVE_FIXTURE_STATUSES
 from fantasy_turns.rules import derive_effective_status
+from fantasy_turns.service import FantasyTurnService
 from leagues.calendar_round_mapping import round_for_h2h_number, rounds_by_h2h_number
+from leagues.models.league import League
 from leagues.models.league_calendar import LeagueCalendar, LeagueCalendarSlot
 from leagues.models.league_membership import LeagueMembership
 from leagues.schemas import (
@@ -41,9 +44,21 @@ from leagues.schemas import (
     H2HSideLineupResponse,
     LeagueCalendarSummaryResponse,
 )
-from sports_data.roster.models import Athlete
+from sports_data.fixtures.models import Fixture, PlayerMatchStat
+from sports_data.roster.models import Athlete, SquadMembership
 
-LIVE_TURN_STATUSES = frozenset({FantasyTurnStatus.OPEN, FantasyTurnStatus.LOCKED})
+
+@dataclass(frozen=True)
+class _PlayerScoreSnapshot:
+    fantasy_score: float | None = None
+    base_score: float | None = None
+    bonus_total: float = 0.0
+    malus_total: float = 0.0
+    bonus_malus: tuple[dict[str, object], ...] = ()
+    real_team_name: str | None = None
+    fixture_status: str | None = None
+    fixture_status_label: str = "Partita non associata"
+    score_final: bool = False
 
 
 def get_h2h_calendar(session: Session, *, league_id: UUID) -> H2HCalendarResponse | None:
@@ -65,8 +80,39 @@ def get_h2h_calendar(session: Session, *, league_id: UUID) -> H2HCalendarRespons
 
     rounds: list[H2HCalendarRoundResponse] = []
     any_live = False
+
+    # Turni europei antecedenti alla creazione della lega (numerazione
+    # condivisa): nessuno scontro fantasy possibile, mostrati come
+    # segnaposto invece di essere assenti o rinumerati da 1. Un turno
+    # semplicemente "Non disputato" per soglia non raggiunta (una pausa del
+    # campionato successiva alla creazione) non è un segnaposto: non è mai
+    # stato un turno H2H giocabile, quindi non compare affatto.
+    if rounds_map:
+        first_real_number = min(rounds_map)
+        league = session.get(League, league_id)
+        turn_service = FantasyTurnService(session)
+        placeholder_numbers = (
+            turn_service.turn_numbers_before_creation(
+                league_id, before_number=first_real_number, created_at=league.created_at
+            )
+            if league is not None
+            else []
+        )
+        for placeholder_number in placeholder_numbers:
+            rounds.append(
+                H2HCalendarRoundResponse(
+                    roundNumber=placeholder_number,
+                    fantasyRoundId=None,
+                    homologationStatus=None,
+                    europeanTurnStatus=None,
+                    beforeLeagueCreation=True,
+                    matchups=[],
+                )
+            )
+
     for round_number in sorted(rounds_map):
         fantasy_round = rounds_by_number.get(round_number)
+        live_team_ids: set[UUID] = set()
         european_status = None
         homologation = None
         fantasy_round_id = None
@@ -74,8 +120,7 @@ def get_h2h_calendar(session: Session, *, league_id: UUID) -> H2HCalendarRespons
             fantasy_round_id = str(fantasy_round.id)
             european_status = _effective_turn_status(fantasy_round)
             homologation = fantasy_round.homologation_status.value
-            if _is_round_live(fantasy_round, european_status):
-                any_live = True
+            live_team_ids = _live_team_ids_for_round(session, fantasy_round)
 
         matchups: list[H2HCalendarMatchupResponse] = []
         for slot in sorted(rounds_map[round_number], key=lambda row: row.slot_index):
@@ -87,6 +132,14 @@ def get_h2h_calendar(session: Session, *, league_id: UUID) -> H2HCalendarRespons
                 if slot.away_membership_id is not None
                 else None
             )
+            matchup_live = (
+                fantasy_round is not None
+                and (
+                    (home_team is not None and home_team.id in live_team_ids)
+                    or (away_team is not None and away_team.id in live_team_ids)
+                )
+            )
+            any_live = any_live or matchup_live
             matchups.append(
                 H2HCalendarMatchupResponse(
                     slotId=str(slot.id),
@@ -98,6 +151,7 @@ def get_h2h_calendar(session: Session, *, league_id: UUID) -> H2HCalendarRespons
                     awayUserId=None if away is None else str(away.user_id),
                     awayDisplayName=None if away is None else away.user.display_name,
                     awayTeamName=away_team.name if away_team is not None else None,
+                    live=matchup_live,
                     result=_score_payload(slot),
                 )
             )
@@ -169,18 +223,24 @@ def get_h2h_matchup_detail(
     homologation = None
     fantasy_round_id = None
     live = False
+    home_team = _team_for_membership(session, slot.home_membership_id)
+    away_team = _team_for_membership(session, slot.away_membership_id)
     if fantasy_round is not None:
         fantasy_round_id = str(fantasy_round.id)
         european_status = _effective_turn_status(fantasy_round)
         homologation = fantasy_round.homologation_status.value
-        live = _is_round_live(fantasy_round, european_status)
+        relevant_team_ids = {
+            team.id for team in (home_team, away_team) if team is not None
+        }
+        live = bool(_live_team_ids_for_round(session, fantasy_round) & relevant_team_ids)
 
-    home_team = _team_for_membership(session, slot.home_membership_id)
-    away_team = _team_for_membership(session, slot.away_membership_id)
-
-    scores_by_athlete: dict[UUID, float | None] = {}
+    scores_by_athlete: dict[UUID, _PlayerScoreSnapshot] = {}
     if fantasy_round is not None:
-        scores_by_athlete = _round_athlete_scores(session, fantasy_round.id)
+        scores_by_athlete = _round_athlete_scores(
+            session,
+            fantasy_round.id,
+            league_id=league_id,
+        )
 
     home_side = _build_side(
         session,
@@ -265,10 +325,75 @@ def _effective_turn_status(fantasy_round: FantasyRound) -> str:
     ).value
 
 
-def _is_round_live(fantasy_round: FantasyRound, european_status: str) -> bool:
+def _live_team_ids_for_round(session: Session, fantasy_round: FantasyRound) -> set[UUID]:
+    """Squadre fantasy con un titolare coinvolto in una fixture LIVE.
+
+    Il collegamento usa gli identificativi persistenti di atleta, stagione e
+    club. Le statistiche normalizzate hanno precedenza; la membership copre
+    i primi minuti in cui il provider non ha ancora pubblicato i giocatori.
+    """
     if fantasy_round.homologation_status == FantasyRoundHomologationStatus.HOMOLOGATED:
-        return False
-    return european_status in {status.value for status in LIVE_TURN_STATUSES}
+        return set()
+
+    fixture_rows = list(
+        session.execute(
+            select(
+                Fixture.id,
+                Fixture.sport_season_id,
+                Fixture.home_club_id,
+                Fixture.away_club_id,
+            )
+            .join(FantasyRoundFixture, FantasyRoundFixture.fixture_id == Fixture.id)
+            .where(
+                FantasyRoundFixture.round_id == fantasy_round.id,
+                FantasyRoundFixture.excluded_at.is_(None),
+                Fixture.status_short.in_(LIVE_FIXTURE_STATUSES),
+            )
+        ).all()
+    )
+    if not fixture_rows:
+        return set()
+
+    fixture_ids = [row.id for row in fixture_rows]
+    live_athlete_ids = set(
+        session.scalars(
+            select(PlayerMatchStat.athlete_id).where(
+                PlayerMatchStat.fixture_id.in_(fixture_ids),
+                PlayerMatchStat.athlete_id.is_not(None),
+            )
+        ).all()
+    )
+    season_club_pairs = {
+        (row.sport_season_id, row.home_club_id) for row in fixture_rows
+    } | {(row.sport_season_id, row.away_club_id) for row in fixture_rows}
+    live_athlete_ids.update(
+        session.scalars(
+            select(SquadMembership.athlete_id).where(
+                or_(
+                    *(
+                        (SquadMembership.sport_season_id == season_id)
+                        & (SquadMembership.club_id == club_id)
+                        for season_id, club_id in season_club_pairs
+                    )
+                )
+            )
+        ).all()
+    )
+    if not live_athlete_ids:
+        return set()
+
+    return set(
+        session.scalars(
+            select(LineupSubmission.fantasy_team_id)
+            .join(LineupPlayer, LineupPlayer.submission_id == LineupSubmission.id)
+            .where(
+                LineupSubmission.round_id == fantasy_round.id,
+                LineupPlayer.slot_kind == LineupSlotKind.STARTER,
+                LineupPlayer.athlete_id.in_(live_athlete_ids),
+            )
+            .distinct()
+        ).all()
+    )
 
 
 def _team_for_membership(session: Session, membership_id: UUID | None) -> FantasyTeam | None:
@@ -279,37 +404,164 @@ def _team_for_membership(session: Session, membership_id: UUID | None) -> Fantas
     ).scalar_one_or_none()
 
 
-def _round_athlete_scores(session: Session, round_id: UUID) -> dict[UUID, float | None]:
+def _fixture_status_label(status: str | None) -> str:
+    normalized = (status or "").upper()
+    if normalized in FINISHED_FIXTURE_STATUSES:
+        return "Terminata"
+    if normalized in {"1H", "HT", "2H", "ET", "BT", "P", "LIVE", "INT"}:
+        return "LIVE"
+    if normalized in {"PST", "SUSP"}:
+        return "Rinviata o sospesa"
+    if normalized in {"CANC", "ABD", "AWD", "WO"}:
+        return "Non disputata"
+    if normalized in {"NS", "TBD"}:
+        return "Da giocare"
+    return "Stato non disponibile"
+
+
+def _round_athlete_scores(
+    session: Session,
+    round_id: UUID,
+    *,
+    league_id: UUID,
+) -> dict[UUID, _PlayerScoreSnapshot]:
     version = default_formula_config().version
-    fixture_ids = list(
+    fixtures = list(
         session.scalars(
-            select(FantasyRoundFixture.fixture_id).where(
+            select(Fixture)
+            .join(FantasyRoundFixture, FantasyRoundFixture.fixture_id == Fixture.id)
+            .where(
                 FantasyRoundFixture.round_id == round_id,
                 FantasyRoundFixture.excluded_at.is_(None),
             )
+            .options(selectinload(Fixture.home_club), selectinload(Fixture.away_club))
+            .order_by(Fixture.kickoff_at.asc(), Fixture.id.asc())
         ).all()
     )
+    fixture_ids = [fixture.id for fixture in fixtures]
     if not fixture_ids:
         return {}
-    rows = session.scalars(
+
+    fixture_by_id = {fixture.id: fixture for fixture in fixtures}
+    context_by_membership: dict[tuple[UUID, UUID], tuple[Fixture, str]] = {}
+    for fixture in fixtures:
+        context_by_membership[(fixture.sport_season_id, fixture.home_club_id)] = (
+            fixture,
+            fixture.home_club.name,
+        )
+        context_by_membership[(fixture.sport_season_id, fixture.away_club_id)] = (
+            fixture,
+            fixture.away_club.name,
+        )
+
+    snapshots: dict[UUID, _PlayerScoreSnapshot] = {}
+    memberships = session.scalars(
+        select(SquadMembership)
+        .where(
+            or_(
+                *(
+                    (SquadMembership.sport_season_id == season_id)
+                    & (SquadMembership.club_id == club_id)
+                    for season_id, club_id in context_by_membership
+                )
+            ),
+        )
+        .order_by(
+            SquadMembership.athlete_id.asc(),
+            SquadMembership.is_active.desc(),
+            SquadMembership.created_at.desc(),
+        )
+    ).all()
+    for membership in memberships:
+        context = context_by_membership.get(
+            (membership.sport_season_id, membership.club_id)
+        )
+        if context is None or membership.athlete_id in snapshots:
+            continue
+        fixture, team_name = context
+        snapshots[membership.athlete_id] = _PlayerScoreSnapshot(
+            real_team_name=team_name,
+            fixture_status=fixture.status_short,
+            fixture_status_label=_fixture_status_label(fixture.status_short),
+            score_final=(fixture.status_short or "").upper() in FINISHED_FIXTURE_STATUSES,
+        )
+
+    stat_club_by_player = {
+        (fixture_id, athlete_id): club_id
+        for fixture_id, athlete_id, club_id in session.execute(
+            select(
+                PlayerMatchStat.fixture_id,
+                PlayerMatchStat.athlete_id,
+                PlayerMatchStat.club_id,
+            ).where(
+                PlayerMatchStat.fixture_id.in_(fixture_ids),
+                PlayerMatchStat.athlete_id.is_not(None),
+                PlayerMatchStat.club_id.is_not(None),
+            )
+        ).all()
+        if athlete_id is not None and club_id is not None
+    }
+
+    rows = list(session.scalars(
         select(PlayerMatchRating).where(
             PlayerMatchRating.fixture_id.in_(fixture_ids),
             PlayerMatchRating.formula_version == version,
             PlayerMatchRating.athlete_id.is_not(None),
+            PlayerMatchRating.league_id == league_id,
         )
-    ).all()
-    scores: dict[UUID, float | None] = {}
+    ).all())
+    if not rows:
+        rows = list(session.scalars(
+            select(PlayerMatchRating).where(
+                PlayerMatchRating.fixture_id.in_(fixture_ids),
+                PlayerMatchRating.formula_version == version,
+                PlayerMatchRating.athlete_id.is_not(None),
+                PlayerMatchRating.league_id.is_(None),
+            )
+        ).all())
+
     for row in rows:
         if row.athlete_id is None:
             continue
-        current = scores.get(row.athlete_id)
-        if current is None and row.fantasy_score is not None:
-            scores[row.athlete_id] = row.fantasy_score
-        elif current is not None and row.fantasy_score is not None:
-            scores[row.athlete_id] = current + row.fantasy_score
-        elif row.athlete_id not in scores:
-            scores[row.athlete_id] = row.fantasy_score
-    return scores
+        fixture = fixture_by_id.get(row.fixture_id)
+        prior = snapshots.get(row.athlete_id, _PlayerScoreSnapshot())
+        real_team_name = prior.real_team_name
+        if fixture is not None and real_team_name is None:
+            stat_club_id = stat_club_by_player.get((row.fixture_id, row.athlete_id))
+            if stat_club_id == fixture.home_club_id:
+                real_team_name = fixture.home_club.name
+            elif stat_club_id == fixture.away_club_id:
+                real_team_name = fixture.away_club.name
+        positive = sum(
+            float(item.get("contribution", 0))
+            for item in row.bonus_malus_json
+            if float(item.get("contribution", 0)) > 0
+        )
+        negative = sum(
+            float(item.get("contribution", 0))
+            for item in row.bonus_malus_json
+            if float(item.get("contribution", 0)) < 0
+        )
+        snapshots[row.athlete_id] = _PlayerScoreSnapshot(
+            fantasy_score=row.fantasy_score,
+            base_score=row.display,
+            bonus_total=positive,
+            malus_total=negative,
+            bonus_malus=tuple(dict(item) for item in row.bonus_malus_json),
+            real_team_name=real_team_name,
+            fixture_status=fixture.status_short if fixture is not None else prior.fixture_status,
+            fixture_status_label=(
+                _fixture_status_label(fixture.status_short)
+                if fixture is not None
+                else prior.fixture_status_label
+            ),
+            score_final=(
+                (fixture.status_short or "").upper() in FINISHED_FIXTURE_STATUSES
+                if fixture is not None
+                else prior.score_final
+            ),
+        )
+    return snapshots
 
 
 def _build_side(
@@ -318,7 +570,7 @@ def _build_side(
     membership: LeagueMembership,
     team: FantasyTeam | None,
     fantasy_round: FantasyRound | None,
-    scores_by_athlete: dict[UUID, float | None],
+    scores_by_athlete: dict[UUID, _PlayerScoreSnapshot],
     persisted_total: float | None,
     persisted_goals: int | None,
 ) -> H2HSideLineupResponse:
@@ -392,7 +644,7 @@ def _side_from_effective(
     submission: LineupSubmission,
     team: FantasyTeam,
     display_name: str,
-    scores_by_athlete: dict[UUID, float | None],
+    scores_by_athlete: dict[UUID, _PlayerScoreSnapshot],
     persisted_total: float | None,
     persisted_goals: int | None,
     session: Session,
@@ -412,13 +664,14 @@ def _side_from_effective(
         athlete = player.athlete if player is not None else athletes_by_id.get(athlete_id)
         role = player.role.value if player is not None else "C"
         starters.append(
-            H2HPlayerScoreResponse(
-                athleteId=str(athlete_id),
+            _player_score_response(
+                athlete_id=athlete_id,
                 name=_athlete_name(athlete, athlete_id),
-                role=role,  # type: ignore[arg-type]
-                fantasyScore=scores_by_athlete.get(athlete_id),
-                isEffectiveStarter=True,
-                isBench=False,
+                photo_url=athlete.photo_url if athlete is not None else None,
+                role=role,
+                snapshot=scores_by_athlete.get(athlete_id),
+                is_effective_starter=True,
+                is_bench=False,
             )
         )
     bench: list[H2HPlayerScoreResponse] = []
@@ -429,13 +682,14 @@ def _side_from_effective(
         if player.athlete_id in starter_ids:
             continue
         bench.append(
-            H2HPlayerScoreResponse(
-                athleteId=str(player.athlete_id),
+            _player_score_response(
+                athlete_id=player.athlete_id,
                 name=_athlete_name(player.athlete, player.athlete_id),
-                role=player.role.value,  # type: ignore[arg-type]
-                fantasyScore=scores_by_athlete.get(player.athlete_id),
-                isEffectiveStarter=False,
-                isBench=True,
+                photo_url=player.athlete.photo_url if player.athlete is not None else None,
+                role=player.role.value,
+                snapshot=scores_by_athlete.get(player.athlete_id),
+                is_effective_starter=False,
+                is_bench=True,
             )
         )
     total = persisted_total
@@ -459,7 +713,7 @@ def _side_from_submission(
     submission: LineupSubmission,
     team: FantasyTeam,
     display_name: str,
-    scores_by_athlete: dict[UUID, float | None],
+    scores_by_athlete: dict[UUID, _PlayerScoreSnapshot],
     persisted_total: float | None,
     persisted_goals: int | None,
 ) -> H2HSideLineupResponse:
@@ -470,13 +724,14 @@ def _side_from_submission(
         key=lambda row: (0 if row.slot_kind == LineupSlotKind.STARTER else 1, row.sort_order),
     ):
         is_starter = player.slot_kind == LineupSlotKind.STARTER
-        payload = H2HPlayerScoreResponse(
-            athleteId=str(player.athlete_id),
+        payload = _player_score_response(
+            athlete_id=player.athlete_id,
             name=_athlete_name(player.athlete, player.athlete_id),
-            role=player.role.value,  # type: ignore[arg-type]
-            fantasyScore=scores_by_athlete.get(player.athlete_id),
-            isEffectiveStarter=is_starter,
-            isBench=not is_starter,
+            photo_url=player.athlete.photo_url if player.athlete is not None else None,
+            role=player.role.value,
+            snapshot=scores_by_athlete.get(player.athlete_id),
+            is_effective_starter=is_starter,
+            is_bench=not is_starter,
         )
         if is_starter:
             starters.append(payload)
@@ -502,3 +757,33 @@ def _athlete_name(athlete: Athlete | None, athlete_id: UUID) -> str:
     if athlete is not None and athlete.canonical_name:
         return athlete.canonical_name
     return f"Calciatore {str(athlete_id)[:8]}"
+
+
+def _player_score_response(
+    *,
+    athlete_id: UUID,
+    name: str,
+    photo_url: str | None,
+    role: str,
+    snapshot: _PlayerScoreSnapshot | None,
+    is_effective_starter: bool,
+    is_bench: bool,
+) -> H2HPlayerScoreResponse:
+    score = snapshot or _PlayerScoreSnapshot()
+    return H2HPlayerScoreResponse(
+        athleteId=str(athlete_id),
+        name=name,
+        photoUrl=photo_url,
+        role=role,  # type: ignore[arg-type]
+        fantasyScore=score.fantasy_score,
+        baseScore=score.base_score,
+        bonusTotal=score.bonus_total,
+        malusTotal=score.malus_total,
+        bonusMalus=list(score.bonus_malus),
+        realTeamName=score.real_team_name,
+        fixtureStatus=score.fixture_status,
+        fixtureStatusLabel=score.fixture_status_label,
+        scoreFinal=score.score_final,
+        isEffectiveStarter=is_effective_starter,
+        isBench=is_bench,
+    )

@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
+  aggregateTurnStatus,
   applyCutoffRecalculation,
   computeCutoff,
   deriveEffectiveStatus,
@@ -8,6 +9,8 @@ import {
   kickoffCountsForCutoff,
   mapFixtureMatchStatus,
   reconcileFixtureKickoffLock,
+  resolveDefaultEuropeanTurn,
+  resolveTurnDisplayStates,
 } from "./fantasyTurns.ts";
 
 describe("fantasyTurns rules", () => {
@@ -64,6 +67,74 @@ describe("fantasyTurns rules", () => {
     assert.equal(mapFixtureMatchStatus("PST"), "postponed");
   });
 
+  it("mapFixtureMatchStatus flags fixtures without a confirmed kickoff as needs_update", () => {
+    assert.equal(mapFixtureMatchStatus("TBD", null), "needs_update");
+    assert.equal(mapFixtureMatchStatus("NS", "2026-08-15T14:00:00.000Z"), "scheduled");
+  });
+
+  it("aggregateTurnStatus: any live fixture wins over everything else", () => {
+    assert.equal(
+      aggregateTurnStatus([
+        { statusShort: "FT", kickoffAt: "2026-08-15T14:00:00.000Z" },
+        { statusShort: "1H", kickoffAt: "2026-08-15T14:00:00.000Z" },
+      ]),
+      "live",
+    );
+  });
+
+  it("aggregateTurnStatus: needs_update when a fixture has no confirmed date", () => {
+    assert.equal(
+      aggregateTurnStatus([
+        { statusShort: "NS", kickoffAt: "2026-08-15T14:00:00.000Z" },
+        { statusShort: "TBD", kickoffAt: null },
+      ]),
+      "needs_update",
+    );
+  });
+
+  it("aggregateTurnStatus: completed only when every fixture is finished/postponed", () => {
+    assert.equal(
+      aggregateTurnStatus([
+        { statusShort: "FT", kickoffAt: "2026-08-15T14:00:00.000Z" },
+        { statusShort: "AET", kickoffAt: "2026-08-15T16:00:00.000Z" },
+      ]),
+      "completed",
+    );
+    assert.equal(
+      aggregateTurnStatus([
+        { statusShort: "FT", kickoffAt: "2026-08-15T14:00:00.000Z" },
+        { statusShort: "NS", kickoffAt: "2026-08-16T14:00:00.000Z" },
+      ]),
+      "scheduled",
+    );
+  });
+
+  it("aggregateTurnStatus: an empty turn is treated as needs_update", () => {
+    assert.equal(aggregateTurnStatus([]), "needs_update");
+  });
+
+  it("resolveDefaultEuropeanTurn: skips completed turns from the start of the season", () => {
+    const turns = [
+      { id: "1", matchStatus: "completed" as const },
+      { id: "2", matchStatus: "completed" as const },
+      { id: "3", matchStatus: "scheduled" as const },
+      { id: "4", matchStatus: "needs_update" as const },
+    ];
+    assert.equal(resolveDefaultEuropeanTurn(turns)?.id, "3");
+  });
+
+  it("resolveDefaultEuropeanTurn: falls back to the last turn when all are completed", () => {
+    const turns = [
+      { id: "1", matchStatus: "completed" as const },
+      { id: "2", matchStatus: "completed" as const },
+    ];
+    assert.equal(resolveDefaultEuropeanTurn(turns)?.id, "2");
+  });
+
+  it("resolveDefaultEuropeanTurn: null for an empty list", () => {
+    assert.equal(resolveDefaultEuropeanTurn([]), null);
+  });
+
   it("latches fixture lock after the published kickoff, not before a postponement", () => {
     const original = "2026-08-15T18:00:00+02:00";
     const postponed = "2026-08-16T18:00:00+02:00";
@@ -103,5 +174,34 @@ describe("fantasyTurns rules", () => {
       applyCutoffRecalculation(original, shifted, "2026-08-15T16:05:00.000Z"),
       "2026-08-15T16:00:00.000Z",
     );
+  });
+
+  it("resolveTurnDisplayStates: concluso / prossimo / da disputare", () => {
+    const turns = [
+      { matchStatus: "completed" as const },
+      { matchStatus: "scheduled" as const },
+      { matchStatus: "scheduled" as const },
+      { matchStatus: "needs_update" as const },
+    ];
+    assert.deepEqual(resolveTurnDisplayStates(turns), [
+      "completed",
+      "next",
+      "upcoming",
+      "upcoming",
+    ]);
+  });
+
+  it("resolveTurnDisplayStates: un turno in corso occupa il posto del prossimo", () => {
+    const turns = [
+      { matchStatus: "completed" as const },
+      { matchStatus: "live" as const },
+      { matchStatus: "scheduled" as const },
+    ];
+    assert.deepEqual(resolveTurnDisplayStates(turns), ["completed", "live", "upcoming"]);
+  });
+
+  it("resolveTurnDisplayStates: stagione finita, nessun prossimo", () => {
+    const turns = [{ matchStatus: "completed" as const }, { matchStatus: "completed" as const }];
+    assert.deepEqual(resolveTurnDisplayStates(turns), ["completed", "completed"]);
   });
 });

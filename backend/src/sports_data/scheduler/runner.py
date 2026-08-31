@@ -8,7 +8,7 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 import database.models  # noqa: F401 — register ORM mappers
@@ -16,7 +16,7 @@ from leagues.models.competition import Competition
 from observability.logging import get_logger
 from observability.metrics import Timer, get_metrics
 from sports_data.catalog.models import SportSeason
-from sports_data.fixtures.models import Fixture
+from sports_data.fixtures.models import Fixture, OfficialLineup
 from sports_data.fixtures.sync import (
     FixtureDetailBatch,
     FixtureSyncResult,
@@ -435,6 +435,23 @@ def _fetch_and_sync(
             want_events = True
             want_players = True
 
+    fixtures_with_both_lineups: set[int] = set()
+    if want_lineups and target_ids:
+        # Non richiamare /fixtures/lineups per una fixture di cui abbiamo già
+        # entrambe le formazioni ufficiali (casa+ospite): la lineup non
+        # cambia una volta pubblicata, è solo spreco di quota provider.
+        fixtures_with_both_lineups = set(
+            session.execute(
+                select(Fixture.provider_id)
+                .join(OfficialLineup, OfficialLineup.fixture_id == Fixture.id)
+                .where(Fixture.provider_id.in_(target_ids))
+                .group_by(Fixture.provider_id)
+                .having(func.count(OfficialLineup.id) >= 2)
+            )
+            .scalars()
+            .all()
+        )
+
     for fixture_id in target_ids:
         events_env = None
         lineups_env = None
@@ -442,7 +459,7 @@ def _fetch_and_sync(
         if want_events:
             events_env = client.get("/fixtures/events", {"fixture": fixture_id})
             requests += 1
-        if want_lineups:
+        if want_lineups and fixture_id not in fixtures_with_both_lineups:
             lineups_env = client.get("/fixtures/lineups", {"fixture": fixture_id})
             requests += 1
         if want_players:

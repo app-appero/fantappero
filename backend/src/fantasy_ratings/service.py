@@ -148,6 +148,11 @@ class FantasyRatingService:
             .where(
                 PlayerMatchRating.fixture_id == fixture_id,
                 PlayerMatchRating.formula_version == self._config.version,
+                (
+                    PlayerMatchRating.league_id == league_id
+                    if league_id is not None
+                    else PlayerMatchRating.league_id.is_(None)
+                ),
             )
             .order_by(PlayerMatchRating.athlete_provider_id.asc())
         ).all()
@@ -183,7 +188,7 @@ def compute_fixture_ratings(
         fixture_id=fixture_id,
         fixture_provider_id=fixture_provider_id,
     )
-    assert_fixture_not_homologated(session, fixture_id=fixture.id)
+    assert_fixture_not_homologated(session, fixture_id=fixture.id, league_id=league_id)
     counters = RatingComputeCounters()
     metrics = get_metrics()
     status = "ok"
@@ -222,6 +227,7 @@ def compute_fixture_ratings(
                     bonus=bonus,
                     formula_snapshot=formula_snapshot,
                     input_snapshot=player.as_input_snapshot(),
+                    league_id=league_id,
                     counters=counters,
                 )
                 kept_ids.add(stat.athlete_provider_id)
@@ -229,6 +235,11 @@ def compute_fixture_ratings(
             stale_query = select(PlayerMatchRating).where(
                 PlayerMatchRating.fixture_id == fixture.id,
                 PlayerMatchRating.formula_version == formula.version,
+                (
+                    PlayerMatchRating.league_id == league_id
+                    if league_id is not None
+                    else PlayerMatchRating.league_id.is_(None)
+                ),
             )
             if kept_ids:
                 stale_query = stale_query.where(
@@ -345,6 +356,7 @@ def _upsert_rating(
     bonus: BonusMalusResult,
     formula_snapshot: dict[str, Any],
     input_snapshot: dict[str, Any],
+    league_id: UUID | None,
     counters: RatingComputeCounters,
 ) -> PlayerMatchRating:
     validate_formula_snapshot(formula_snapshot)
@@ -374,6 +386,11 @@ def _upsert_rating(
             PlayerMatchRating.fixture_id == fixture.id,
             PlayerMatchRating.athlete_provider_id == stat.athlete_provider_id,
             PlayerMatchRating.formula_version == rating.formula_version,
+            (
+                PlayerMatchRating.league_id == league_id
+                if league_id is not None
+                else PlayerMatchRating.league_id.is_(None)
+            ),
         )
     ).scalar_one_or_none()
 
@@ -382,6 +399,7 @@ def _upsert_rating(
     if row is None:
         row = PlayerMatchRating(
             fixture_id=fixture.id,
+            league_id=league_id,
             athlete_id=stat.athlete_id,
             athlete_provider_id=stat.athlete_provider_id,
             formula_version=rating.formula_version,

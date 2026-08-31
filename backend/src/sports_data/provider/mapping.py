@@ -184,12 +184,14 @@ def map_clubs(envelope: ProviderEnvelope) -> list[MappedClub]:
             continue
         code = team.get("code")
         country = team.get("country")
+        logo = team.get("logo")
         out.append(
             MappedClub(
                 provider_id=provider_id,
                 name=name.strip(),
                 code=code.strip() if isinstance(code, str) and code.strip() else None,
                 country=country.strip() if isinstance(country, str) and country.strip() else None,
+                logo_url=logo.strip() if isinstance(logo, str) and logo.strip() else None,
                 national=bool(team.get("national")),
             )
         )
@@ -230,6 +232,10 @@ def map_fixtures(envelope: ProviderEnvelope) -> list[MappedFixture]:
         round_label = league.get("round")
         home_name = home.get("name")
         away_name = away.get("name")
+        venue = fixture.get("venue") if isinstance(fixture.get("venue"), dict) else {}
+        venue_name = venue.get("name")
+        venue_city = venue.get("city")
+        referee = fixture.get("referee")
         out.append(
             MappedFixture(
                 provider_id=provider_id,
@@ -253,6 +259,17 @@ def map_fixtures(envelope: ProviderEnvelope) -> list[MappedFixture]:
                 away_club_name=(
                     away_name.strip() if isinstance(away_name, str) and away_name.strip() else None
                 ),
+                venue_name=(
+                    venue_name.strip()
+                    if isinstance(venue_name, str) and venue_name.strip()
+                    else None
+                ),
+                venue_city=(
+                    venue_city.strip()
+                    if isinstance(venue_city, str) and venue_city.strip()
+                    else None
+                ),
+                referee=referee.strip() if isinstance(referee, str) and referee.strip() else None,
             )
         )
     return out
@@ -340,6 +357,11 @@ def map_official_lineups(
         formation_str = (
             formation.strip() if isinstance(formation, str) and formation.strip() else None
         )
+        coach = row.get("coach") if isinstance(row.get("coach"), dict) else {}
+        coach_name = coach.get("name")
+        coach_name_str = (
+            coach_name.strip() if isinstance(coach_name, str) and coach_name.strip() else None
+        )
         entries: list[MappedLineupEntry] = []
         start_xi = row.get("startXI") if isinstance(row.get("startXI"), list) else []
         for idx, item in enumerate(start_xi):
@@ -356,6 +378,7 @@ def map_official_lineups(
                 fixture_provider_id=fid,
                 club_provider_id=club_id,
                 formation=formation_str,
+                coach_name=coach_name_str,
                 entries=tuple(entries),
             )
         )
@@ -462,6 +485,7 @@ def _athlete_from_player_dict(player: dict[str, Any]) -> MappedAthlete | None:
         return None
     birth = player.get("birth") if isinstance(player.get("birth"), dict) else {}
     injured = player.get("injured")
+    photo = player.get("photo")
     return MappedAthlete(
         provider_id=provider_id,
         canonical_name=canonical_name,
@@ -475,6 +499,7 @@ def _athlete_from_player_dict(player: dict[str, Any]) -> MappedAthlete | None:
         weight=player.get("weight") if isinstance(player.get("weight"), str) else None,
         age=_as_optional_int(player.get("age")),
         injured=bool(injured) if isinstance(injured, bool) else None,
+        photo_url=photo.strip() if isinstance(photo, str) and photo.strip() else None,
     )
 
 
@@ -537,6 +562,7 @@ def map_squad_memberships(
             if athlete_provider_id is None or not isinstance(name, str) or not name.strip():
                 continue
             position = player.get("position")
+            photo = player.get("photo")
             out.append(
                 MappedSquadMembership(
                     athlete_provider_id=athlete_provider_id,
@@ -550,6 +576,7 @@ def map_squad_memberships(
                     ),
                     athlete_age=_as_optional_int(player.get("age")),
                     source=source,
+                    photo_url=photo.strip() if isinstance(photo, str) and photo.strip() else None,
                 )
             )
     return out
@@ -586,6 +613,7 @@ def map_squad_memberships_from_players(
             if allowed is not None and competition_id not in allowed:
                 continue
             position = games.get("position")
+            photo = player.get("photo")
             out.append(
                 MappedSquadMembership(
                     athlete_provider_id=athlete_provider_id,
@@ -598,6 +626,7 @@ def map_squad_memberships_from_players(
                     ),
                     athlete_age=_as_optional_int(player.get("age")),
                     source="players",
+                    photo_url=photo.strip() if isinstance(photo, str) and photo.strip() else None,
                 )
             )
     return out

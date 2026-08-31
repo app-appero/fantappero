@@ -23,12 +23,17 @@ import type {
   CreateRosterTurnSnapshotRequest,
   RosterTurnSnapshotSummary,
   RosterTurnSnapshotDetail,
+  EnsureFantasyTurnsResponse,
   ExcludeFantasyTurnFixtureRequest,
+  FantasyCalendarRefreshJob,
+  FantasyCalendarRefreshProgress,
+  FantasyCalendarRefreshResult,
   FantasyTurnDetail,
   FantasyTurnPreview,
   FantasyTurnSummary,
   FixtureLiveDetail,
   GenerateFantasyTurnRequest,
+  PendingFixtureSummary,
   LineupContext,
   SaveLineupDraftRequest,
   SaveLineupRequest,
@@ -677,19 +682,76 @@ export function generateFantasyTurn(
 export function ensureFantasyTurns(
   accessToken: string,
   leagueId: string,
-): Promise<{
-  leagueId: string;
-  created: number;
-  opened: number;
-  upgraded: number;
-  duplicates: number;
-  waiting: number;
-  horizonDays: number;
-}> {
+): Promise<EnsureFantasyTurnsResponse> {
   return apiRequest(`/leagues/${leagueId}/turni/sincronizza`, {
     method: "POST",
     accessToken,
   });
+}
+
+export function fetchPendingFixtures(
+  accessToken: string,
+  leagueId: string,
+): Promise<PendingFixtureSummary[]> {
+  return apiRequest<PendingFixtureSummary[]>(`/leagues/${leagueId}/turni/da-aggiornare`, {
+    accessToken,
+  });
+}
+
+export function startCalendarRefresh(
+  accessToken: string,
+  leagueId: string,
+): Promise<FantasyCalendarRefreshJob> {
+  return apiRequest<FantasyCalendarRefreshJob>(
+    `/leagues/${leagueId}/turni/aggiorna-calendario`,
+    { method: "POST", accessToken },
+  );
+}
+
+export function fetchCalendarRefreshProgress(
+  accessToken: string,
+  leagueId: string,
+  jobId: string,
+): Promise<FantasyCalendarRefreshProgress> {
+  return apiRequest<FantasyCalendarRefreshProgress>(
+    `/leagues/${leagueId}/turni/aggiorna-calendario/${jobId}`,
+    { accessToken },
+  );
+}
+
+/** Comando unico "Aggiorna calendario": sync provider + backfill stagionale + riallineo turni. */
+export async function refreshFullCalendar(
+  accessToken: string,
+  leagueId: string,
+  options?: {
+    onProgress?: (progress: FantasyCalendarRefreshProgress) => void;
+    pollIntervalMs?: number;
+  },
+): Promise<FantasyCalendarRefreshResult> {
+  const started = await startCalendarRefresh(accessToken, leagueId);
+  if (!started.jobId) {
+    throw new Error("Aggiornamento avviato ma senza jobId. Ricarica e riprova.");
+  }
+  const pollIntervalMs = options?.pollIntervalMs ?? 800;
+  for (;;) {
+    const progress = await fetchCalendarRefreshProgress(accessToken, leagueId, started.jobId);
+    options?.onProgress?.(progress);
+    if (progress.status === "completed") {
+      if (!progress.result) {
+        throw new Error("Aggiornamento completato senza risultato.");
+      }
+      return progress.result;
+    }
+    if (progress.status === "failed") {
+      throw new Error(
+        progress.message ||
+          "Aggiornamento calendario non riuscito (controlla quota API-Football / worker).",
+      );
+    }
+    await new Promise((resolve) => {
+      setTimeout(resolve, pollIntervalMs);
+    });
+  }
 }
 
 export function openFantasyTurn(

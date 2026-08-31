@@ -135,6 +135,47 @@ def is_fixture_status_eligible(status_short: str) -> bool:
     return status_short.upper() not in CANCELLED_FIXTURE_STATUSES
 
 
+LIVE_MATCH_STATUSES = frozenset({"1H", "HT", "2H", "ET", "BT", "P", "LIVE", "INT", "SUSP"})
+FINISHED_MATCH_STATUSES = frozenset({"FT", "AET", "PEN"})
+
+
+def aggregate_turn_status(
+    fixtures: Sequence[tuple[str | None, datetime | None]],
+) -> str:
+    """Stato aggregato di un turno per la UI (§23): completed | live | scheduled | needs_update.
+
+    Specchio Python di `aggregateTurnStatus` in `packages/contracts/src/fantasyTurns.ts`
+    — stessa logica, così web/mobile e l'elenco turni lato server restano coerenti.
+    """
+    if not fixtures:
+        return "needs_update"
+    has_live = False
+    has_needs_update = False
+    all_terminal = True
+    for status_short, kickoff_at in fixtures:
+        status = (status_short or "").strip().upper()
+        if status in LIVE_MATCH_STATUSES:
+            has_live = True
+            all_terminal = False
+            continue
+        if (
+            status in FINISHED_MATCH_STATUSES
+            or status in POSTPONED_FIXTURE_STATUSES
+            or status in CUTOFF_EXCLUDED_STATUSES
+        ):
+            continue
+        all_terminal = False
+        if kickoff_at is None:
+            has_needs_update = True
+    if has_live:
+        return "live"
+    if has_needs_update:
+        return "needs_update"
+    if all_terminal:
+        return "completed"
+    return "scheduled"
+
+
 def kickoff_in_window(kickoff_at: datetime, window: TimeWindow) -> bool:
     ko = ensure_utc(kickoff_at)
     return window.start_at <= ko < window.end_at
@@ -313,6 +354,47 @@ def select_eligible_from_candidates(
     return selected
 
 
+def _turn_specs_between(
+    walk_start: date,
+    walk_end: date,
+    *,
+    window_min_end_at: datetime,
+    window_max_start_at: datetime,
+    tz_name: str,
+) -> list[tuple[FantasyTurnKind, date]]:
+    """Unique (kind, anchor) windows overlapping [window_min_end_at, window_max_start_at).
+
+    Shared walk used by both the "orizzonte da oggi" (`upcoming_turn_specs`)
+    and "intera stagione" (`full_season_turn_specs`) enumerations, so the two
+    always produce identical, chronologically-sorted window boundaries.
+    """
+    tz = resolve_zone(tz_name)
+    specs: list[tuple[FantasyTurnKind, date]] = []
+    seen: set[tuple[FantasyTurnKind, datetime, datetime]] = set()
+    cursor = walk_start
+    while cursor <= walk_end:
+        for kind in (FantasyTurnKind.WEEKEND, FantasyTurnKind.MIDWEEK):
+            window = window_for_kind(kind, cursor, tz_name=tz_name)
+            key = (kind, window.start_at, window.end_at)
+            if key in seen:
+                continue
+            if window.end_at <= window_min_end_at:
+                continue
+            if window.start_at >= window_max_start_at:
+                continue
+            seen.add(key)
+            anchor = window.start_at.astimezone(tz).date()
+            specs.append((kind, anchor))
+        cursor += timedelta(days=1)
+    specs.sort(
+        key=lambda item: (
+            window_for_kind(item[0], item[1], tz_name=tz_name).start_at,
+            item[0].value,
+        )
+    )
+    return specs
+
+
 def upcoming_turn_specs(
     reference: date,
     *,
@@ -335,29 +417,43 @@ def upcoming_turn_specs(
     horizon_end = ensure_utc(
         datetime.combine(reference + timedelta(days=horizon_days), time.min, tzinfo=tz)
     )
-    specs: list[tuple[FantasyTurnKind, date]] = []
-    seen: set[tuple[FantasyTurnKind, datetime, datetime]] = set()
     # Walk a few days before reference so in-progress midweek/weekend still appear.
-    cursor = reference - timedelta(days=4)
-    last = reference + timedelta(days=horizon_days)
-    while cursor <= last:
-        for kind in (FantasyTurnKind.WEEKEND, FantasyTurnKind.MIDWEEK):
-            window = window_for_kind(kind, cursor, tz_name=tz_name)
-            key = (kind, window.start_at, window.end_at)
-            if key in seen:
-                continue
-            if window.end_at <= ref_start:
-                continue
-            if window.start_at >= horizon_end:
-                continue
-            seen.add(key)
-            anchor = window.start_at.astimezone(tz).date()
-            specs.append((kind, anchor))
-        cursor += timedelta(days=1)
-    specs.sort(
-        key=lambda item: (
-            window_for_kind(item[0], item[1], tz_name=tz_name).start_at,
-            item[0].value,
-        )
+    return _turn_specs_between(
+        reference - timedelta(days=4),
+        reference + timedelta(days=horizon_days),
+        window_min_end_at=ref_start,
+        window_max_start_at=horizon_end,
+        tz_name=tz_name,
     )
-    return specs
+
+
+def full_season_turn_specs(
+    season_start: date,
+    season_end: date,
+    *,
+    tz_name: str = "Europe/Rome",
+) -> list[tuple[FantasyTurnKind, date]]:
+    """Unique (kind, anchor) windows covering an entire season, in order.
+
+    Used by the "Aggiorna calendario" full backfill: unlike
+    `upcoming_turn_specs`, it is not anchored to "today" and does not drop
+    windows that are already in the past — it must be able to (re)materialize
+    the whole season regardless of when the sync actually runs.
+    """
+    if season_end < season_start:
+        raise ValidationAuthError(
+            "L'intervallo stagione non è valido.",
+            code="invalid_season_range",
+        )
+    tz = resolve_zone(tz_name)
+    range_start = ensure_utc(datetime.combine(season_start, time.min, tzinfo=tz))
+    range_end = ensure_utc(
+        datetime.combine(season_end + timedelta(days=1), time.min, tzinfo=tz)
+    )
+    return _turn_specs_between(
+        season_start - timedelta(days=4),
+        season_end + timedelta(days=4),
+        window_min_end_at=range_start,
+        window_max_start_at=range_end,
+        tz_name=tz_name,
+    )

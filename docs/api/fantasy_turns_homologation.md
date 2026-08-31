@@ -21,7 +21,7 @@ provider rettifica i dati ufficiali dopo l'omologazione.
 
 | Transizione | Funzione | Precondizione |
 | --- | --- | --- |
-| `provisional` → `homologated` | `homologate_round` | Tutte le fixture del turno sono in stato terminale (`FT`/`AET`/`PEN`) |
+| `provisional` → `homologated` | `homologate_round` | Tutte le fixture sono terminali (`FT`/`AET`/`PEN`) e hanno statistiche giocatore per entrambe le squadre reali |
 | `homologated` → `provisional` | `apply_round_correction` | Motivo obbligatorio (non vuoto) |
 
 Entrambe le transizioni sono una **UPDATE condizionale** sullo stato
@@ -69,6 +69,11 @@ finché un nuovo `homologate_round` non lo richiude esplicitamente.
 `fantasy_round_homologated` e `fantasy_round_correction_applied`
 (quest'ultima con `details.reason`, `previousHomologatedAt`,
 `previousFormulaVersion`).
+
+L'omologazione ordinaria conserva l'admin in `actor_id`; quella eseguita dalla
+pipeline automatica usa `actor_id = NULL` e
+`details.source = automatic_live_pipeline`, senza attribuire l'azione a una
+persona che non l'ha eseguita.
 
 ## API (permesso `global:operate`)
 

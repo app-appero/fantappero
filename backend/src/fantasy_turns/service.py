@@ -2,38 +2,54 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, date, datetime
 from uuid import UUID
 
-from sqlalchemy import func, select
+from sqlalchemy import delete, exists, func, select
 from sqlalchemy.orm import Session, selectinload
 
 from auth.exceptions import ValidationAuthError
 from auth.models.user import User
 from authorization.context import LeagueAccess
+from config.settings.loader import get_api_settings
 from database.enums import (
     FantasyRoundFixtureReason,
+    FantasyRoundHomologationStatus,
     FantasyTurnKind,
     FantasyTurnStatus,
     LeagueAuditAction,
     LeagueMemberRole,
     LeagueState,
 )
+from fantasy_lineups.models import EffectiveLineup, LineupSubmission
 from fantasy_turns.live_view import (
     PROVIDER_FEED_LABELS,
     FixtureFreshness,
     fixture_feed_state,
 )
+from fantasy_turns.coverage import (
+    RosteredPlayer,
+    clubs_playing_between,
+    coverage_by_team,
+    coverage_threshold_for,
+    load_league_rosters,
+    window_is_valid,
+)
 from fantasy_turns.models import FantasyRound, FantasyRoundFixture
 from fantasy_turns.rules import (
+    DEFAULT_LEAGUE_TZ,
     EligibleFixtureRef,
+    TimeWindow,
+    aggregate_turn_status,
     apply_cutoff_recalculation,
     assert_modification_allowed,
     compute_cutoff,
     derive_effective_status,
     ensure_utc,
     evaluate_threshold,
+    full_season_turn_specs,
     is_modification_allowed,
     kickoff_counts_for_cutoff,
     reconcile_fixture_kickoff_lock,
@@ -44,13 +60,16 @@ from fantasy_turns.rules import (
 from fantasy_turns.schemas import (
     EnsureFantasyTurnsResponse,
     ExcludeFantasyTurnFixtureRequest,
+    FantasyCalendarRefreshResultResponse,
     FantasyTurnDetailResponse,
     FantasyTurnFixtureResponse,
     FantasyTurnPreviewResponse,
     FantasyTurnSummaryResponse,
     GenerateFantasyTurnRequest,
+    PendingFixtureResponse,
 )
 from fantasy_turns.validators import validate_anchor_date, validate_turn_kind
+from leagues.models.competition import Competition
 from leagues.models.league import League
 from leagues.models.league_audit_event import LeagueAuditEvent
 from leagues.models.league_competition import LeagueCompetition
@@ -61,9 +80,23 @@ from observability.logging import get_logger
 from observability.metrics import get_metrics
 from sports_data.catalog.models import Club, SportSeason
 from sports_data.fixtures.models import Fixture
+from sports_data.fixtures.models import Fixture as _FixtureModel  # noqa: F401
+from sports_data.fixtures.models import OfficialLineup
+from sports_data.fixtures.sync import (
+    FixtureDetailBatch,
+    FixtureSyncCounters,
+    FixtureSyncResult,
+    sync_fixtures,
+    sync_mvp_fixtures_with_client,
+)
+from sports_data.provider.client import ApiFootballClient, build_client_from_settings
+from sports_data.provider.errors import ProviderConfigError
 
 logger = get_logger(__name__)
 _ = (User, Club)
+
+#: Stati provider di una partita conclusa.
+FINISHED_FIXTURE_STATUSES = ("FT", "AET", "PEN")
 
 
 @dataclass(frozen=True)
@@ -116,6 +149,9 @@ def load_league_candidate_fixtures(session: Session, league: League) -> list[Eli
 class FantasyTurnService:
     def __init__(self, session: Session) -> None:
         self._session = session
+        # Rose per lega: il backfill stagionale valuta molte finestre di
+        # seguito e la rosa non cambia durante quel ciclo.
+        self._rosters_cache: dict[UUID, dict[UUID, list[RosteredPlayer]]] = {}
 
     def list_turns(self, league_access: LeagueAccess) -> list[FantasyTurnSummaryResponse]:
         now = datetime.now(UTC)
@@ -125,6 +161,60 @@ class FantasyTurnService:
             .order_by(FantasyRound.number.asc())
         ).all()
         return [self._to_summary(row, now=now) for row in rounds]
+
+    def list_pending_fixtures(self, league_access: LeagueAccess) -> list[PendingFixtureResponse]:
+        """Fixture note (competizione/squadre/round) ma senza data/ora dal provider.
+
+        Non possono appartenere a nessuna finestra (non hanno un kickoff da
+        confrontare), quindi restano fuori dai Turni Europei finché il
+        provider non pubblica una data — vengono mostrate a parte come "Da
+        aggiornare" invece di sparire in silenzio.
+        """
+        league = league_access.league
+        competition_ids = self._session.scalars(
+            select(LeagueCompetition.competition_id).where(
+                LeagueCompetition.league_id == league.id
+            )
+        ).all()
+        if not competition_ids:
+            return []
+        season_ids = self._session.scalars(
+            select(SportSeason.id).where(
+                SportSeason.competition_id.in_(competition_ids),
+                SportSeason.year == league.season_year,
+            )
+        ).all()
+        if not season_ids:
+            return []
+        rows = self._session.scalars(
+            select(Fixture)
+            .where(
+                Fixture.sport_season_id.in_(season_ids),
+                Fixture.kickoff_at.is_(None),
+            )
+            .options(
+                selectinload(Fixture.home_club),
+                selectinload(Fixture.away_club),
+                selectinload(Fixture.sport_season).selectinload(SportSeason.competition),
+            )
+            .order_by(Fixture.round_label.asc())
+        ).all()
+        result: list[PendingFixtureResponse] = []
+        for fixture in rows:
+            competition = None
+            if fixture.sport_season and fixture.sport_season.competition:
+                competition = fixture.sport_season.competition.name
+            result.append(
+                PendingFixtureResponse(
+                    fixtureId=str(fixture.id),
+                    competitionName=competition,
+                    roundLabel=fixture.round_label,
+                    homeClubName=fixture.home_club.name if fixture.home_club else "?",
+                    awayClubName=fixture.away_club.name if fixture.away_club else "?",
+                    statusShort=fixture.status_short,
+                )
+            )
+        return result
 
     def get_turn(
         self,
@@ -211,7 +301,14 @@ class FantasyTurnService:
                 "Soglia partite non raggiunta e persistenza skipped disabilitata.",
                 code="turn_threshold_not_met",
             )
-        assert result.round_id is not None
+        if result.outcome == "empty" or result.round_id is None:
+            # La finestra non permette a tutti i fantallenatori di schierare
+            # la formazione (o non contiene partite): non è un turno valido.
+            raise ValidationAuthError(
+                "In questa finestra i fantallenatori non possono schierare una "
+                "formazione valida: non è un turno disputabile.",
+                code="turn_coverage_not_met",
+            )
         self._session.commit()
         return self.get_turn(league_access, result.round_id, reconcile_cutoff=False)
 
@@ -335,6 +432,280 @@ class FantasyTurnService:
             actor_id=league_access.user.id,
         )
 
+    def refresh_full_calendar_for_active_leagues(self) -> dict[str, int]:
+        """Giro periodico automatico del comando "Aggiorna calendario" (§11/§26).
+
+        Il pulsante admin resta disponibile per un aggiornamento immediato, ma
+        non deve essere l'unico modo per far entrare in un turno una fixture
+        che riceve la sua data definitiva lontano dall'orizzonte coperto da
+        `ensure_upcoming` (oggi±N giorni). Un fallimento provider su una lega
+        (rate limit, chiave assente) non deve bloccare le altre — viene
+        registrato e si prosegue.
+        """
+        leagues = list(
+            self._session.scalars(
+                select(League)
+                .where(League.state == LeagueState.ACTIVE)
+                .order_by(League.created_at.asc())
+            ).all()
+        )
+        totals = {
+            "leagues": len(leagues),
+            "refreshed": 0,
+            "failed": 0,
+            "fixturesCreated": 0,
+            "fixturesUpdated": 0,
+            "roundsRealigned": 0,
+            "roundsRemoved": 0,
+        }
+        for league in leagues:
+            try:
+                result = self.refresh_full_calendar(league, actor_id=None)
+            except Exception:
+                totals["failed"] += 1
+                logger.exception(
+                    "fantasy_calendar_refresh_periodic_failed",
+                    extra={"league_id": str(league.id)},
+                )
+                self._session.rollback()
+                continue
+            totals["refreshed"] += 1
+            totals["fixturesCreated"] += result.fixtures_created
+            totals["fixturesUpdated"] += result.fixtures_updated
+            totals["roundsRealigned"] += result.rounds_realigned
+            totals["roundsRemoved"] += result.rounds_removed
+        logger.info("fantasy_calendar_refresh_periodic_done", extra=totals)
+        return totals
+
+    def ensure_window_number(
+        self,
+        league: League,
+        *,
+        kind: FantasyTurnKind,
+        anchor: date,
+        actor_id: UUID | None,
+    ) -> int:
+        """Numero assoluto del Turno Europeo che ospita questa finestra.
+
+        Usato dal Calendario fantallenatori per allineare la propria
+        numerazione a quella dei Turni Europei: stessa finestra reale, stesso
+        numero mostrato in entrambe le sezioni. Materializza il turno se non
+        esiste ancora (idempotente, stessa logica di `_materialize_window`).
+        """
+        result = self._materialize_window(
+            league,
+            kind=kind,
+            anchor=anchor,
+            actor_id=actor_id,
+            persist_skipped=True,
+            auto_open=False,
+            raise_on_duplicate=False,
+        )
+        if result.round_id is None:
+            raise ValidationAuthError(
+                "Impossibile determinare il turno europeo per questa finestra.",
+                code="turn_window_not_materialized",
+            )
+        fantasy_round = self._session.get(FantasyRound, result.round_id)
+        assert fantasy_round is not None
+        return fantasy_round.number
+
+    def earliest_round_number_for_window(
+        self,
+        league_id: UUID,
+        *,
+        window_start_at: datetime,
+    ) -> int | None:
+        """Numero del primo Turno Europeo della lega dalla finestra data in poi.
+
+        Usato per determinare da quale numero deve partire il Calendario
+        fantallenatori quando la lega è stata creata a stagione iniziata.
+        """
+        return self._session.scalar(
+            select(func.min(FantasyRound.number)).where(
+                FantasyRound.league_id == league_id,
+                FantasyRound.window_start_at >= window_start_at,
+            )
+        )
+
+    def turn_numbers_before_creation(
+        self, league_id: UUID, *, before_number: int, created_at: datetime
+    ) -> list[int]:
+        """Numeri dei Turni Europei che precedono davvero la creazione della lega.
+
+        Usato per mostrare "Lega creata dopo questo turno" nel Calendario
+        fantallenatori. Non basta `number < before_number`: un turno può
+        avere un numero più basso del primo turno H2H giocabile semplicemente
+        perché è "Non disputato" per soglia non raggiunta (una pausa del
+        campionato), pur essendo successivo alla creazione della lega — in
+        quel caso non deve comparire come segnaposto, semplicemente non è un
+        turno H2H giocabile.
+        """
+        return list(
+            self._session.scalars(
+                select(FantasyRound.number)
+                .where(
+                    FantasyRound.league_id == league_id,
+                    FantasyRound.number < before_number,
+                    FantasyRound.window_start_at < created_at,
+                )
+                .order_by(FantasyRound.number.asc())
+            ).all()
+        )
+
+    def refresh_full_calendar(
+        self,
+        league: League,
+        *,
+        actor_id: UUID | None = None,
+        client: ApiFootballClient | None = None,
+        on_progress: Callable[[int, str, str], None] | None = None,
+    ) -> FantasyCalendarRefreshResultResponse:
+        """Comando unico "Aggiorna calendario": sync provider + backfill stagionale.
+
+        A differenza di `ensure_upcoming_for_league` (orizzonte oggi±N
+        giorni, pensato per il refresh automatico giornaliero), questo copre
+        l'intera stagione dall'inizio alla fine, così un Turno Europeo già
+        concluso prima che la lega/il sistema lo importasse risulta comunque
+        "Turno 1 — COMPLETATO" invece di ottenere un numero più alto solo per
+        essere stato importato più tardi. Il riallineamento cronologico dei
+        numeri (`_renumber_league_rounds`, già invocato da
+        `_materialize_window` ad ogni finestra) è anche il meccanismo di
+        auto-riparazione per leghe con turni già mal numerati.
+        """
+
+        def report(percent: int, stage: str, message: str) -> None:
+            if on_progress is not None:
+                on_progress(max(0, min(100, percent)), stage, message)
+
+        locked = self._lock_league(league.id)
+        system_actor = actor_id or self._league_owner_id(locked.id)
+        if system_actor is None:
+            raise ValidationAuthError(
+                "Impossibile aggiornare il calendario: la lega non ha un owner.",
+                code="league_owner_missing",
+            )
+
+        before_numbers = dict(
+            self._session.execute(
+                select(FantasyRound.id, FantasyRound.number).where(
+                    FantasyRound.league_id == locked.id
+                )
+            ).all()
+        )
+
+        report(2, "fixtures", "Recupero fixture dal provider…")
+        sync_result = self._sync_league_fixtures_from_provider(locked, client=client)
+
+        # Storico: risultati/stati arrivano con la sincronizzazione qui sopra,
+        # ma formazioni ed eventi delle partite già concluse no — quelli lo
+        # scheduler li chiede solo nella finestra di polling attorno alla
+        # partita. Senza questo passaggio una partita "Finita" resta senza
+        # formazione e senza cronologia per sempre.
+        report(12, "dettagli", "Recupero formazioni ed eventi delle partite concluse…")
+        details_backfilled = self.backfill_match_details(locked, client=client)
+
+        candidates = self._load_candidate_fixtures(locked)
+        if candidates:
+            kickoffs = [row.kickoff_at for row in candidates]
+            season_start = min(kickoffs).date()
+            season_end = max(kickoffs).date()
+        else:
+            # Nessuna fixture datata ancora nota: intervallo di stagione
+            # europea standard come base, il prossimo refresh lo affinerà
+            # quando il provider pubblica le date.
+            season_start = date(locked.season_year, 7, 1)
+            season_end = date(locked.season_year + 1, 6, 30)
+
+        report(20, "turni", "Ricostruzione turni dall'inizio della stagione…")
+        specs = full_season_turn_specs(season_start, season_end)
+        rounds_created = 0
+        rounds_updated = 0
+        total = len(specs) or 1
+        for index, (kind, anchor) in enumerate(specs):
+            result = self._materialize_window(
+                locked,
+                kind=kind,
+                anchor=anchor,
+                actor_id=system_actor,
+                persist_skipped=True,
+                auto_open=True,
+                raise_on_duplicate=False,
+            )
+            if result.outcome == "created":
+                rounds_created += 1
+            elif result.outcome == "upgraded":
+                rounds_updated += 1
+            report(
+                20 + int(((index + 1) / total) * 70),
+                "turni",
+                f"Turno {index + 1}/{total} elaborato…",
+            )
+
+        report(92, "turni", "Rimozione turni non validi…")
+        rounds_removed = self._prune_invalid_rounds(locked)
+        if rounds_removed:
+            self._renumber_league_rounds(locked.id)
+
+        after_numbers = dict(
+            self._session.execute(
+                select(FantasyRound.id, FantasyRound.number).where(
+                    FantasyRound.league_id == locked.id
+                )
+            ).all()
+        )
+        rounds_realigned = sum(
+            1
+            for round_id, number in after_numbers.items()
+            if round_id in before_numbers and before_numbers[round_id] != number
+        )
+        # Il Calendario fantallenatori porta lo stesso numero del Turno
+        # Europeo: dopo una rinumerazione va riportato in asse, altrimenti
+        # resta ancorato a numeri che non esistono più.
+        report(95, "calendario", "Riallineamento giornate fantallenatori…")
+        from leagues.calendar_service import LeagueCalendarService
+
+        LeagueCalendarService(self._session).realign_round_numbers(locked)
+        fixtures_needing_date = self._count_fixtures_needing_date(locked)
+        self._session.commit()
+
+        message = (
+            f"Fixture nuove: {sync_result.counters.fixtures_created}, "
+            f"aggiornate: {sync_result.counters.fixtures_updated}, "
+            f"invariate: {sync_result.counters.fixtures_unchanged}, "
+            f"da aggiornare: {fixtures_needing_date}. "
+            f"Formazioni/eventi recuperati: {details_backfilled}. "
+            f"Turni riallineati: {rounds_realigned}, rimossi (senza partite): {rounds_removed}."
+        )
+        report(100, "completed", message)
+        logger.info(
+            "fantasy_calendar_refreshed",
+            extra={
+                "league_id": str(locked.id),
+                "fixtures_created": sync_result.counters.fixtures_created,
+                "fixtures_updated": sync_result.counters.fixtures_updated,
+                "fixtures_unchanged": sync_result.counters.fixtures_unchanged,
+                "fixtures_needing_date": fixtures_needing_date,
+                "details_backfilled": details_backfilled,
+                "rounds_created": rounds_created,
+                "rounds_updated": rounds_updated,
+                "rounds_realigned": rounds_realigned,
+                "rounds_removed": rounds_removed,
+            },
+        )
+        return FantasyCalendarRefreshResultResponse(
+            leagueId=str(locked.id),
+            fixturesCreated=sync_result.counters.fixtures_created,
+            fixturesUpdated=sync_result.counters.fixtures_updated,
+            fixturesUnchanged=sync_result.counters.fixtures_unchanged,
+            fixturesNeedingDate=fixtures_needing_date,
+            roundsCreated=rounds_created,
+            roundsUpdated=rounds_updated,
+            roundsRealigned=rounds_realigned,
+            roundsRemoved=rounds_removed,
+            message=message,
+        )
+
     def open_turn(
         self,
         league_access: LeagueAccess,
@@ -456,7 +827,8 @@ class FantasyTurnService:
         ).first()
 
         candidates = self._load_candidate_fixtures(league)
-        assigned = self._active_assigned_fixture_ids(league.id)
+        already_linked = self._existing_fixture_ids(existing.id) if existing is not None else set()
+        assigned = self._active_assigned_fixture_ids(league.id) - already_linked
         selected = select_eligible_from_candidates(
             candidates,
             window,
@@ -464,6 +836,23 @@ class FantasyTurnService:
         )
         threshold = evaluate_threshold(len(selected), min_required)
         now = datetime.now(UTC)
+
+        # Regola di validità del turno (EP-turni-copertura): il numero di
+        # partite è solo un pre-filtro; ciò che rende un turno giocabile è
+        # che ogni fantallenatore possa schierare la formazione. Una finestra
+        # che non la supera non diventa un turno del tutto — niente turni
+        # numerati "Non disputato" che sfalsano la numerazione.
+        if not self._window_meets_coverage(league, window):
+            if existing is None:
+                return EnsureWindowResult(outcome="empty", round_id=None)
+            if existing.status == FantasyTurnStatus.SKIPPED:
+                return EnsureWindowResult(outcome="waiting", round_id=existing.id)
+
+        if existing is None and not selected:
+            # Finestra genuinamente vuota per le competizioni scelte (es. pausa
+            # internazionale): non materializzare un turno-fantasma senza
+            # nessuna partita reale — non c'è nulla da mostrare all'utente.
+            return EnsureWindowResult(outcome="empty", round_id=None)
 
         if existing is not None:
             if existing.status != FantasyTurnStatus.SKIPPED:
@@ -478,22 +867,21 @@ class FantasyTurnService:
                     )
                 return EnsureWindowResult(outcome="duplicate", round_id=existing.id)
             if not threshold.ok:
+                # Sotto soglia per il fantasy, ma le partite reali già note
+                # devono comunque comparire nel calendario (§ "il calendario
+                # con i risultati" anche per un turno "Non disputato").
+                linked = self._link_new_fixtures(existing.id, league.id, selected, already_linked)
+                if linked or existing.skip_reason != threshold.skip_reason:
+                    existing.skip_reason = threshold.skip_reason
+                    self._session.flush()
                 return EnsureWindowResult(outcome="waiting", round_id=existing.id)
             cutoff = compute_cutoff([row.kickoff_at for row in selected])
             existing.status = FantasyTurnStatus.SCHEDULED
             existing.skip_reason = None
             existing.cutoff_at = cutoff
             existing.generated_at = now
-            for row in selected:
-                self._session.add(
-                    FantasyRoundFixture(
-                        round_id=existing.id,
-                        league_id=league.id,
-                        fixture_id=row.fixture_id,  # type: ignore[arg-type]
-                        included_reason=FantasyRoundFixtureReason.WINDOW,
-                        observed_kickoff_at=row.kickoff_at,
-                    )
-                )
+            self._link_new_fixtures(existing.id, league.id, selected, already_linked)
+            self._renumber_league_rounds(league.id)
             self._add_audit(
                 league_id=league.id,
                 actor_id=actor_id,
@@ -521,10 +909,10 @@ class FantasyTurnService:
         if not threshold.ok:
             if not persist_skipped:
                 return EnsureWindowResult(outcome="waiting", round_id=None)
-            next_number = self._next_round_number(league.id)
+            placeholder_number = self._next_round_number(league.id)
             fantasy_round = FantasyRound(
                 league_id=league.id,
-                number=next_number,
+                number=placeholder_number,
                 kind=kind,
                 window_start_at=window.start_at,
                 window_end_at=window.end_at,
@@ -535,13 +923,15 @@ class FantasyTurnService:
             )
             self._session.add(fantasy_round)
             self._session.flush()
+            self._link_new_fixtures(fantasy_round.id, league.id, selected, set())
+            self._renumber_league_rounds(league.id)
             self._add_audit(
                 league_id=league.id,
                 actor_id=actor_id,
                 action=LeagueAuditAction.FANTASY_TURN_GENERATED,
                 details={
                     "roundId": str(fantasy_round.id),
-                    "number": next_number,
+                    "number": fantasy_round.number,
                     "status": FantasyTurnStatus.SKIPPED.value,
                     "eligibleCount": threshold.eligible_count,
                     "minRequired": threshold.min_required,
@@ -552,7 +942,7 @@ class FantasyTurnService:
                 "fantasy_turn_skipped",
                 extra={
                     "league_id": str(league.id),
-                    "round_number": next_number,
+                    "round_number": fantasy_round.number,
                     "eligible_count": threshold.eligible_count,
                     "min_required": threshold.min_required,
                 },
@@ -561,10 +951,10 @@ class FantasyTurnService:
             return EnsureWindowResult(outcome="created", round_id=fantasy_round.id)
 
         cutoff = compute_cutoff([row.kickoff_at for row in selected])
-        next_number = self._next_round_number(league.id)
+        placeholder_number = self._next_round_number(league.id)
         fantasy_round = FantasyRound(
             league_id=league.id,
-            number=next_number,
+            number=placeholder_number,
             kind=kind,
             window_start_at=window.start_at,
             window_end_at=window.end_at,
@@ -575,23 +965,15 @@ class FantasyTurnService:
         )
         self._session.add(fantasy_round)
         self._session.flush()
-        for row in selected:
-            self._session.add(
-                FantasyRoundFixture(
-                    round_id=fantasy_round.id,
-                    league_id=league.id,
-                    fixture_id=row.fixture_id,  # type: ignore[arg-type]
-                    included_reason=FantasyRoundFixtureReason.WINDOW,
-                    observed_kickoff_at=row.kickoff_at,
-                )
-            )
+        self._link_new_fixtures(fantasy_round.id, league.id, selected, set())
+        self._renumber_league_rounds(league.id)
         self._add_audit(
             league_id=league.id,
             actor_id=actor_id,
             action=LeagueAuditAction.FANTASY_TURN_GENERATED,
             details={
                 "roundId": str(fantasy_round.id),
-                "number": next_number,
+                "number": fantasy_round.number,
                 "status": FantasyTurnStatus.SCHEDULED.value,
                 "fixtureCount": len(selected),
                 "cutoffAt": cutoff.isoformat() if cutoff else None,
@@ -607,7 +989,7 @@ class FantasyTurnService:
             extra={
                 "league_id": str(league.id),
                 "round_id": str(fantasy_round.id),
-                "round_number": next_number,
+                "round_number": fantasy_round.number,
                 "fixture_count": len(selected),
             },
         )
@@ -841,6 +1223,193 @@ class FantasyTurnService:
     def _load_candidate_fixtures(self, league: League) -> list[EligibleFixtureRef]:
         return load_league_candidate_fixtures(self._session, league)
 
+    def _window_meets_coverage(self, league: League, window: TimeWindow) -> bool:
+        """La finestra permette a ogni fantallenatore di schierare la formazione?
+
+        Le rose sono lette una sola volta per lega (il backfill stagionale
+        valuta decine di finestre di fila) e riusate per tutte le finestre.
+        """
+        rosters = self._rosters_cache.get(league.id)
+        if rosters is None:
+            rosters = load_league_rosters(self._session, league)
+            self._rosters_cache[league.id] = rosters
+        if not rosters:
+            # Nessuna rosa assegnata (asta non svolta): nessun turno.
+            return False
+        rules = self._load_rules(league.id)
+        threshold = coverage_threshold_for(
+            rules.turn_coverage_threshold if rules is not None else None
+        )
+        playing_clubs = clubs_playing_between(
+            self._session,
+            league,
+            window_start_at=window.start_at,
+            window_end_at=window.end_at,
+        )
+        coverages = coverage_by_team(rosters, playing_clubs)
+        return window_is_valid(list(coverages.values()), threshold)
+
+    def _sync_league_fixtures_from_provider(
+        self,
+        league: League,
+        *,
+        client: ApiFootballClient | None = None,
+    ) -> FixtureSyncResult:
+        """Sync calendario (date/orari/stato/round) per le sole competizioni della lega.
+
+        Non richiede eventi/lineup/player stats: quelli restano di competenza
+        dei poll periodici PRE/LIVE/POST già esistenti (`sports_data.scheduler`).
+        """
+        competition_ids = self._session.scalars(
+            select(LeagueCompetition.competition_id).where(
+                LeagueCompetition.league_id == league.id
+            )
+        ).all()
+        if not competition_ids:
+            return FixtureSyncResult(counters=FixtureSyncCounters())
+        provider_ids = self._session.scalars(
+            select(Competition.provider_id).where(Competition.id.in_(competition_ids))
+        ).all()
+        if not provider_ids:
+            return FixtureSyncResult(counters=FixtureSyncCounters())
+        if client is None:
+            try:
+                client = build_client_from_settings(get_api_settings())
+            except ProviderConfigError as exc:
+                raise ValidationAuthError(
+                    "Chiave API-Football assente sul server. "
+                    "Imposta API_FOOTBALL_KEY nell'ambiente backend.",
+                    code="provider_key_missing",
+                ) from exc
+        return sync_mvp_fixtures_with_client(
+            self._session,
+            client,
+            league_ids=list(provider_ids),
+            include_details=False,
+        )
+
+    def backfill_match_details(
+        self,
+        league: League,
+        *,
+        client: ApiFootballClient | None = None,
+        limit: int = 25,
+    ) -> int:
+        """Recupera formazioni ed eventi delle partite già concluse.
+
+        Lo scheduler periodico li scarica solo per le partite che cadono in
+        una finestra di polling: una partita sincronizzata *dopo* la fine (o
+        conclusa mentre lo scheduler era fermo) resta senza formazioni né
+        eventi per sempre, perché nessuno torna più a chiederli. È il motivo
+        per cui una partita "Finita 90'" può mostrare "Formazione non
+        disponibile". Qui si colma il buco per la stagione della lega.
+
+        Incrementale di proposito: servono tre chiamate provider per partita
+        e il rate limit di API-Football farebbe durare minuti un backfill
+        completo. Ogni esecuzione recupera le più recenti ancora scoperte, e
+        il job periodico chiude lo storico nei giri successivi.
+
+        Ritorna il numero di partite per cui sono stati richiesti i dettagli.
+        """
+        season_ids = self._league_season_ids(league)
+        if not season_ids:
+            return 0
+        missing = self._session.execute(
+            select(Fixture.provider_id)
+            .where(
+                Fixture.sport_season_id.in_(season_ids),
+                Fixture.status_short.in_(FINISHED_FIXTURE_STATUSES),
+                ~exists().where(OfficialLineup.fixture_id == Fixture.id),
+            )
+            .order_by(Fixture.kickoff_at.desc())
+            .limit(limit)
+        ).scalars().all()
+        if not missing:
+            return 0
+        if client is None:
+            try:
+                client = build_client_from_settings(get_api_settings())
+            except ProviderConfigError as exc:
+                raise ValidationAuthError(
+                    "Chiave API-Football assente sul server. "
+                    "Imposta API_FOOTBALL_KEY nell'ambiente backend.",
+                    code="provider_key_missing",
+                ) from exc
+
+        provider_ids = self._league_provider_ids(league)
+        batches = [
+            FixtureDetailBatch(
+                fixture_provider_id=provider_id,
+                events_envelope=client.get("/fixtures/events", {"fixture": provider_id}),
+                lineups_envelope=client.get("/fixtures/lineups", {"fixture": provider_id}),
+                players_envelope=client.get("/fixtures/players", {"fixture": provider_id}),
+            )
+            for provider_id in missing
+        ]
+        sync_fixtures(
+            self._session,
+            fixtures_envelopes=[],
+            detail_batches=batches,
+            league_ids=list(provider_ids),
+        )
+        logger.info(
+            "fantasy_calendar_details_backfilled",
+            extra={"league_id": str(league.id), "fixtures": len(batches)},
+        )
+        return len(batches)
+
+    def _league_season_ids(self, league: League) -> list[UUID]:
+        competition_ids = self._session.scalars(
+            select(LeagueCompetition.competition_id).where(
+                LeagueCompetition.league_id == league.id
+            )
+        ).all()
+        if not competition_ids:
+            return []
+        return list(
+            self._session.scalars(
+                select(SportSeason.id).where(
+                    SportSeason.competition_id.in_(competition_ids),
+                    SportSeason.year == league.season_year,
+                )
+            ).all()
+        )
+
+    def _league_provider_ids(self, league: League) -> list[int]:
+        return list(
+            self._session.scalars(
+                select(Competition.provider_id)
+                .join(LeagueCompetition, LeagueCompetition.competition_id == Competition.id)
+                .where(LeagueCompetition.league_id == league.id)
+            ).all()
+        )
+
+    def _count_fixtures_needing_date(self, league: League) -> int:
+        competition_ids = self._session.scalars(
+            select(LeagueCompetition.competition_id).where(
+                LeagueCompetition.league_id == league.id
+            )
+        ).all()
+        if not competition_ids:
+            return 0
+        season_ids = self._session.scalars(
+            select(SportSeason.id).where(
+                SportSeason.competition_id.in_(competition_ids),
+                SportSeason.year == league.season_year,
+            )
+        ).all()
+        if not season_ids:
+            return 0
+        return int(
+            self._session.scalar(
+                select(func.count(Fixture.id)).where(
+                    Fixture.sport_season_id.in_(season_ids),
+                    Fixture.kickoff_at.is_(None),
+                )
+            )
+            or 0
+        )
+
     def _active_assigned_fixture_ids(self, league_id: UUID) -> set[UUID]:
         rows = self._session.scalars(
             select(FantasyRoundFixture.fixture_id)
@@ -852,6 +1421,47 @@ class FantasyTurnService:
         ).all()
         return set(rows)
 
+    def _existing_fixture_ids(self, round_id: UUID) -> set[UUID]:
+        return set(
+            self._session.scalars(
+                select(FantasyRoundFixture.fixture_id).where(
+                    FantasyRoundFixture.round_id == round_id,
+                    FantasyRoundFixture.excluded_at.is_(None),
+                )
+            ).all()
+        )
+
+    def _link_new_fixtures(
+        self,
+        round_id: UUID,
+        league_id: UUID,
+        selected: list[EligibleFixtureRef],
+        already_linked: set[UUID],
+    ) -> int:
+        """Collega al turno le fixture non ancora agganciate.
+
+        Usato anche per i turni "Non disputato" (sotto soglia fantasy): le
+        partite reali già note devono comunque comparire nel calendario con i
+        loro risultati, a prescindere dallo stato fantasy del turno.
+        """
+        added = 0
+        for row in selected:
+            if row.fixture_id in already_linked:
+                continue
+            self._session.add(
+                FantasyRoundFixture(
+                    round_id=round_id,
+                    league_id=league_id,
+                    fixture_id=row.fixture_id,  # type: ignore[arg-type]
+                    included_reason=FantasyRoundFixtureReason.WINDOW,
+                    observed_kickoff_at=row.kickoff_at,
+                )
+            )
+            added += 1
+        if added:
+            self._session.flush()
+        return added
+
     def _league_owner_id(self, league_id: UUID) -> UUID | None:
         return self._session.scalar(
             select(LeagueMembership.user_id).where(
@@ -861,10 +1471,114 @@ class FantasyTurnService:
         )
 
     def _next_round_number(self, league_id: UUID) -> int:
+        """Valore provvisorio e sicuro per l'inserimento di un nuovo turno.
+
+        Non è il numero definitivo: `_renumber_league_rounds` lo corregge
+        subito dopo in base all'ordine cronologico reale delle finestre.
+        """
         current = self._session.scalar(
             select(func.max(FantasyRound.number)).where(FantasyRound.league_id == league_id)
         )
         return int(current or 0) + 1
+
+    def _renumber_league_rounds(self, league_id: UUID) -> int:
+        """Riallinea `FantasyRound.number` all'ordine cronologico delle finestre.
+
+        `_materialize_window` può creare/aggiornare turni fuori ordine (una
+        finestra successiva può raggiungere la soglia minima di partite prima
+        di una precedente, o un admin può generare manualmente un ancoraggio
+        fuori sequenza): senza questo passaggio il numero rifletterebbe
+        l'ordine di inserimento invece di quello reale. Auto-correttivo — va
+        chiamato dopo ogni creazione/aggiornamento di turno nella stessa
+        transazione, così una lega con numerazione già sbagliata si riallinea
+        alla prossima sincronizzazione, senza bisogno di una migrazione dati
+        separata. Ritorna quanti turni hanno effettivamente cambiato numero.
+        """
+        rounds = self._session.scalars(
+            select(FantasyRound)
+            .where(FantasyRound.league_id == league_id)
+            .order_by(
+                FantasyRound.window_start_at.asc(),
+                FantasyRound.window_end_at.asc(),
+                FantasyRound.kind.asc(),
+            )
+            .with_for_update()
+        ).all()
+        original_numbers = [fantasy_round.number for fantasy_round in rounds]
+        # Prima passata a valori temporanei molto alti (mai negativi: c'è un
+        # vincolo CHECK number >= 1) per non violare il vincolo unico
+        # (league_id, number) mentre si riordina.
+        temp_offset = 1_000_000
+        for index, fantasy_round in enumerate(rounds):
+            fantasy_round.number = temp_offset + index
+        self._session.flush()
+        changed = 0
+        for index, fantasy_round in enumerate(rounds):
+            target = index + 1
+            fantasy_round.number = target
+            if original_numbers[index] != target:
+                changed += 1
+        self._session.flush()
+        if changed:
+            # Le giornate dei fantallenatori portano lo stesso numero del
+            # Turno Europeo: se i turni si rinumerano, il calendario H2H va
+            # riportato in asse nella stessa transazione, altrimenti resta
+            # ancorato a numeri che non esistono più.
+            # Import locale: `leagues.calendar_service` legge i modelli dei
+            # turni, importarlo qui in cima creerebbe un ciclo.
+            from leagues.calendar_service import LeagueCalendarService
+
+            league = self._session.get(League, league_id)
+            if league is not None:
+                LeagueCalendarService(self._session).realign_round_numbers(league)
+        return changed
+
+    def _prune_invalid_rounds(self, league: League) -> int:
+        """Rimuove i turni che con la regola attuale non sarebbero mai nati.
+
+        Auto-riparazione dei dati generati prima della regola di copertura
+        (turni "fantasma" senza partite, o finestre che non permettono a tutti
+        di schierare la formazione). **Non tocca mai un turno con dati di
+        gioco**: se ha formazioni inviate/effettive o è omologato viene
+        lasciato intatto, anche se oggi non supererebbe la regola.
+        """
+        candidates = list(
+            self._session.scalars(
+                select(FantasyRound)
+                .where(
+                    FantasyRound.league_id == league.id,
+                    FantasyRound.homologation_status
+                    == FantasyRoundHomologationStatus.PROVISIONAL,
+                    ~exists().where(LineupSubmission.round_id == FantasyRound.id),
+                    ~exists().where(EffectiveLineup.round_id == FantasyRound.id),
+                )
+                .with_for_update()
+            ).all()
+        )
+        removable: list[UUID] = []
+        for fantasy_round in candidates:
+            has_fixtures = self._session.scalar(
+                select(func.count(FantasyRoundFixture.id)).where(
+                    FantasyRoundFixture.round_id == fantasy_round.id,
+                    FantasyRoundFixture.excluded_at.is_(None),
+                )
+            )
+            if not has_fixtures:
+                removable.append(fantasy_round.id)
+                continue
+            window = TimeWindow(
+                start_at=fantasy_round.window_start_at,
+                end_at=fantasy_round.window_end_at,
+                kind=fantasy_round.kind,
+                timezone=str(DEFAULT_LEAGUE_TZ),
+            )
+            if not self._window_meets_coverage(league, window):
+                removable.append(fantasy_round.id)
+        if not removable:
+            return 0
+        self._session.execute(delete(FantasyRound).where(FantasyRound.id.in_(removable)))
+        self._session.flush()
+        return len(removable)
 
     def _lock_league(self, league_id: UUID) -> League:
         league = self._session.scalars(
@@ -971,6 +1685,17 @@ class FantasyTurnService:
                 FantasyRoundFixture.excluded_at.is_(None),
             )
         )
+        fixture_states = self._session.execute(
+            select(Fixture.status_short, Fixture.kickoff_at)
+            .join(
+                FantasyRoundFixture,
+                FantasyRoundFixture.fixture_id == Fixture.id,
+            )
+            .where(
+                FantasyRoundFixture.round_id == fantasy_round.id,
+                FantasyRoundFixture.excluded_at.is_(None),
+            )
+        ).all()
         effective = derive_effective_status(
             fantasy_round.status,
             now=now,
@@ -996,6 +1721,7 @@ class FantasyTurnService:
                 now=now,
                 cutoff_at=fantasy_round.cutoff_at,
             ),
+            matchStatus=aggregate_turn_status(list(fixture_states)),
         )
 
     def _to_detail(
@@ -1020,6 +1746,7 @@ class FantasyTurnService:
             fixtureCount=summary.fixture_count,
             generatedAt=summary.generated_at,
             modificationAllowed=summary.modification_allowed,
+            matchStatus=summary.match_status,
             homologationStatus=fantasy_round.homologation_status.value,
             fixtures=fixtures,
         )
@@ -1029,6 +1756,8 @@ class FantasyTurnService:
         fixture = link.fixture
         home = fixture.home_club.name if fixture and fixture.home_club else "?"
         away = fixture.away_club.name if fixture and fixture.away_club else "?"
+        home_logo = fixture.home_club.logo_url if fixture and fixture.home_club else None
+        away_logo = fixture.away_club.logo_url if fixture and fixture.away_club else None
         competition = None
         if fixture and fixture.sport_season and fixture.sport_season.competition:
             competition = fixture.sport_season.competition.name
@@ -1055,6 +1784,8 @@ class FantasyTurnService:
             awayGoals=fixture.away_goals if fixture else None,
             homeClubName=home,
             awayClubName=away,
+            homeClubLogoUrl=home_logo,
+            awayClubLogoUrl=away_logo,
             competitionName=competition,
             providerId=fixture.provider_id if fixture else 0,
             updatedAt=fixture.updated_at if fixture else None,

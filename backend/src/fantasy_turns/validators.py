@@ -39,3 +39,19 @@ def validate_min_fixtures_per_round(value: int) -> int:
             code="invalid_min_fixtures_per_round",
         )
     return value
+
+
+#: Estremi della soglia di copertura formazione (EP-turni-copertura).
+MIN_TURN_COVERAGE_THRESHOLD = 0.50
+MAX_TURN_COVERAGE_THRESHOLD = 1.00
+
+
+def validate_turn_coverage_threshold(value: float) -> float:
+    if value < MIN_TURN_COVERAGE_THRESHOLD or value > MAX_TURN_COVERAGE_THRESHOLD:
+        raise ValidationAuthError(
+            "La copertura formazione richiesta deve essere tra "
+            f"{int(MIN_TURN_COVERAGE_THRESHOLD * 100)}% e "
+            f"{int(MAX_TURN_COVERAGE_THRESHOLD * 100)}%.",
+            code="invalid_turn_coverage_threshold",
+        )
+    return round(value, 2)

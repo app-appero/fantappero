@@ -33,14 +33,12 @@ class ExclusionReason(StrEnum):
     """Perché un calciatore posseduto non è stato schierato."""
 
     INJURED = "injured"
-    KICKOFF_LOCKED = "kickoff_locked"
     NO_FIXTURE = "no_fixture"
     NOT_SELECTED = "not_selected"
 
 
 EXCLUSION_LABELS: dict[ExclusionReason, str] = {
     ExclusionReason.INJURED: "Infortunato",
-    ExclusionReason.KICKOFF_LOCKED: "Partita già iniziata",
     ExclusionReason.NO_FIXTURE: "Nessuna partita nel turno",
     ExclusionReason.NOT_SELECTED: "Non selezionato dalla formula",
 }
@@ -104,13 +102,17 @@ def is_eligible(candidate: CandidateInput) -> ExclusionReason | None:
 
     L'infortunio è un filtro assoluto, non una penalità: schierare un
     infortunato è un errore, non una scelta rischiosa.
+
+    Il kickoff della partita reale non esclude più il candidato (decisione
+    prodotto EP13-P04-bis): la formazione IA può essere generata anche
+    retroattivamente, a turno iniziato o concluso. ``kickoff_locked`` resta
+    calcolato sul candidato solo per il lock progressivo su una formazione
+    IA già esistente (vedi ``ai_service.generate_ai_lineup``).
     """
     if candidate.injured:
         return ExclusionReason.INJURED
     if not candidate.has_fixture:
         return ExclusionReason.NO_FIXTURE
-    if candidate.kickoff_locked:
-        return ExclusionReason.KICKOFF_LOCKED
     return None
 
 
@@ -202,6 +204,15 @@ def build_lineup_plan(
             unfilled.extend([role] * (needed - picked))
 
     remaining = [item for item in eligible if item.athlete_id not in taken]
+    # Il regolamento umano richiede che ogni elemento della rosa compaia tra
+    # titolari e panchina. Infortunati, senza fixture e giocatori già bloccati
+    # non possono partire titolari, ma restano in fondo alla panchina con il
+    # motivo di esclusione tracciato nel decision log.
+    excluded_remaining = sorted(
+        (item for item in scored if item.excluded_reason is not None),
+        key=lambda item: (item.role.value, str(item.athlete_id)),
+    )
+    remaining.extend(excluded_remaining)
     bench_ids = [item.athlete_id for item in remaining]
     if bench_size is not None:
         bench_ids = bench_ids[:bench_size]

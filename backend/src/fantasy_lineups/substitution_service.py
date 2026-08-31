@@ -15,7 +15,7 @@ from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.orm import Session, selectinload
 
 from auth.exceptions import ValidationAuthError
@@ -32,6 +32,8 @@ from fantasy_ratings.models import PlayerMatchRating
 from fantasy_turns.homologation import assert_round_not_homologated
 from fantasy_turns.models import FantasyRound, FantasyRoundFixture
 from leagues.models.league_rules import LeagueRules
+from sports_data.fixtures.models import Fixture
+from sports_data.roster.models import SquadMembership
 
 UpsertResult = str  # created | updated | unchanged
 
@@ -79,14 +81,23 @@ def compute_round_effective_lineups(
         else rules.max_automatic_substitutions
     )
 
-    fixture_ids = list(
-        session.scalars(
-            select(FantasyRoundFixture.fixture_id).where(
+    fixture_rows = list(
+        session.execute(
+            select(
+                FantasyRoundFixture.fixture_id,
+                Fixture.sport_season_id,
+                Fixture.home_club_id,
+                Fixture.away_club_id,
+                Fixture.status_short,
+            )
+            .join(Fixture, Fixture.id == FantasyRoundFixture.fixture_id)
+            .where(
                 FantasyRoundFixture.round_id == round_id,
                 FantasyRoundFixture.excluded_at.is_(None),
             )
         ).all()
     )
+    fixture_ids = [row.fixture_id for row in fixture_rows]
 
     version = formula_version or default_formula_config().version
     eligible_ids: set[UUID] = set()
@@ -98,9 +109,51 @@ def compute_round_effective_lineups(
                     PlayerMatchRating.formula_version == version,
                     PlayerMatchRating.eligible.is_(True),
                     PlayerMatchRating.athlete_id.is_not(None),
+                    PlayerMatchRating.league_id == fantasy_round.league_id,
                 )
             ).all()
         )
+        # Legacy fallback for snapshots created before ratings became scoped
+        # to the league rules used for the calculation.
+        if not eligible_ids:
+            eligible_ids = set(
+                session.scalars(
+                    select(PlayerMatchRating.athlete_id).where(
+                        PlayerMatchRating.fixture_id.in_(fixture_ids),
+                        PlayerMatchRating.formula_version == version,
+                        PlayerMatchRating.eligible.is_(True),
+                        PlayerMatchRating.athlete_id.is_not(None),
+                        PlayerMatchRating.league_id.is_(None),
+                    )
+                ).all()
+            )
+
+    # During LIVE, a starter whose real match is still scheduled/in progress
+    # must stay in the provisional XI. Otherwise the substitution engine
+    # would consume a bench player before that starter can receive a vote.
+    pending_pairs = {
+        (row.sport_season_id, row.home_club_id)
+        for row in fixture_rows
+        if (row.status_short or "").upper() not in {"FT", "AET", "PEN"}
+    } | {
+        (row.sport_season_id, row.away_club_id)
+        for row in fixture_rows
+        if (row.status_short or "").upper() not in {"FT", "AET", "PEN"}
+    }
+    if pending_pairs:
+        pending_athletes = session.scalars(
+            select(SquadMembership.athlete_id).where(
+                SquadMembership.is_active.is_(True),
+                or_(
+                    *(
+                        (SquadMembership.sport_season_id == season_id)
+                        & (SquadMembership.club_id == club_id)
+                        for season_id, club_id in pending_pairs
+                    )
+                ),
+            )
+        ).all()
+        eligible_ids.update(pending_athletes)
 
     submissions = session.scalars(
         select(LineupSubmission)

@@ -24,6 +24,9 @@
   "peerDependencies": {
     "react": ">=18"
   },
+  "dependencies": {
+    "@fantappero/contracts": "workspace:*"
+  },
   "files": [
     "src",
     "dist"

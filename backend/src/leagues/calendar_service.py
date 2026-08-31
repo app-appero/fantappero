@@ -17,13 +17,12 @@ from database.enums import (
     LeagueCalendarFormat,
     LeagueCalendarStatus,
 )
-from fantasy_turns.rules import STANDARD_MIN_FIXTURES
-from fantasy_turns.service import load_league_candidate_fixtures
+from fantasy_turns.models import FantasyRound
+from fantasy_turns.rules import DEFAULT_LEAGUE_TZ
 from leagues.calendar_planning import (
     CalendarPlan,
     WindowCandidate,
     assert_plan_invariants,
-    build_window_candidates,
     plan_calendar,
     windows_fingerprint,
 )
@@ -36,11 +35,7 @@ from leagues.models.league_calendar import (
 )
 from leagues.models.league_membership import LeagueMembership
 from leagues.models.league_rules import LeagueRules
-from leagues.schedule import (
-    assert_schedule_invariants,
-    generate_single_round_robin,
-    participant_fingerprint,
-)
+from leagues.schedule import participant_fingerprint
 from leagues.schemas import (
     CalendarPlannedRoundResponse,
     CalendarWindowResponse,
@@ -117,27 +112,56 @@ class LeagueCalendarService:
             raise
 
         membership_ids = [row.id for row in memberships]
-        # EP13-P03: il calendario segue le finestre europee realmente
-        # utilizzabili. Se non ce n'è abbastanza per un ciclo completo si
-        # ricade sul girone singolo non ancorato, dichiarandolo apertamente.
+        # Un solo motore temporale: le giornate H2H sono i Turni Europei
+        # della lega, non un calcolo parallelo. Quanti turni ci sono lo decide
+        # il motore dei turni; il numero di partecipanti decide solo *come*
+        # ruotano gli accoppiamenti, non quante giornate dura la stagione.
+        european_rounds = self._european_rounds(league)
+        if not european_rounds:
+            get_metrics().incr(
+                "league_calendar_generated_total",
+                labels={"result": "no_european_turns"},
+            )
+            raise ValidationAuthError(
+                "Non ci sono ancora Turni Europei validi per questa lega: il "
+                "calendario dei fantallenatori si genera da quelli.",
+                code="european_turns_missing",
+            )
+
         windows = self.build_windows(league)
         plan = plan_calendar(membership_ids, windows)
-        anchored = plan.is_generatable
-        if anchored:
-            assert_plan_invariants(plan, membership_ids)
-            slots = plan.slots
-            round_count = plan.round_count
-            matchup_count = plan.matchup_count
-            bye_count = plan.bye_count
-            algorithm_version = plan.algorithm_version
-        else:
-            schedule = generate_single_round_robin(membership_ids)
-            assert_schedule_invariants(schedule, membership_ids)
-            slots = schedule.slots
-            round_count = schedule.round_count
-            matchup_count = schedule.matchup_count
-            bye_count = schedule.bye_count
-            algorithm_version = schedule.algorithm_version
+        if plan.round_count == 0:
+            # Ci sono turni, ma tutti iniziati prima che la lega esistesse:
+            # nessuna giornata giocabile. Meglio dirlo che scrivere un
+            # calendario vuoto (che violerebbe anche il vincolo su round_count).
+            get_metrics().incr(
+                "league_calendar_generated_total",
+                labels={"result": "no_playable_turns"},
+            )
+            raise ValidationAuthError(
+                "Tutti i Turni Europei di questa lega iniziano prima della sua "
+                "creazione: non c'è ancora una giornata da disputare.",
+                code="european_turns_before_creation",
+            )
+        assert_plan_invariants(plan, membership_ids)
+        slots = plan.slots
+        round_count = plan.round_count
+        matchup_count = plan.matchup_count
+        bye_count = plan.bye_count
+        algorithm_version = plan.algorithm_version
+
+        # Numerazione presa **dai Turni Europei**, non ricalcolata: la giornata
+        # N dei fantallenatori è il Turno Europeo N. Agganciata sulla finestra
+        # temporale, l'unica identità stabile fra le due tabelle.
+        number_by_window = {
+            (row.window_start_at, row.window_end_at): row.number for row in european_rounds
+        }
+        local_to_absolute: dict[int, int] = {
+            planned.round_number: number_by_window[
+                (planned.window_start_at, planned.window_end_at)
+            ]
+            for planned in plan.rounds
+        }
 
         fingerprint = participant_fingerprint(membership_ids)
         now = datetime.now(UTC)
@@ -167,34 +191,33 @@ class LeagueCalendarService:
         calendar.round_count = round_count
         calendar.matchup_count = matchup_count
         calendar.bye_count = bye_count
-        calendar.cycle_length = plan.cycle_length if anchored else None
-        calendar.cycle_count = plan.cycle_count if anchored else None
-        calendar.windows_fingerprint = plan.windows_fingerprint if anchored else None
+        calendar.cycle_length = plan.cycle_length
+        calendar.cycle_count = plan.cycle_count
+        calendar.windows_fingerprint = plan.windows_fingerprint
         calendar.generated_at = now
         calendar.confirmed_at = None
         self._session.flush()
         for slot in slots:
             calendar.slots.append(
                 LeagueCalendarSlot(
-                    round_number=slot.round_number,
+                    round_number=local_to_absolute.get(slot.round_number, slot.round_number),
                     slot_index=slot.slot_index,
                     is_bye=slot.is_bye,
                     home_membership_id=slot.home_membership_id,
                     away_membership_id=slot.away_membership_id,
                 )
             )
-        if anchored:
-            for planned in plan.rounds:
-                calendar.round_windows.append(
-                    LeagueCalendarRoundWindow(
-                        round_number=planned.round_number,
-                        cycle_number=planned.cycle_number,
-                        cycle_round_number=planned.cycle_round_number,
-                        window_start_at=planned.window_start_at,
-                        window_end_at=planned.window_end_at,
-                        window_kind=planned.window_kind.value,
-                    )
+        for planned in plan.rounds:
+            calendar.round_windows.append(
+                LeagueCalendarRoundWindow(
+                    round_number=local_to_absolute[planned.round_number],
+                    cycle_number=planned.cycle_number,
+                    cycle_round_number=planned.cycle_round_number,
+                    window_start_at=planned.window_start_at,
+                    window_end_at=planned.window_end_at,
+                    window_kind=planned.window_kind.value,
                 )
+            )
 
         self._session.add(
             LeagueAuditEvent(
@@ -209,9 +232,8 @@ class LeagueCalendarService:
                     "roundCount": round_count,
                     "matchupCount": matchup_count,
                     "byeCount": bye_count,
-                    "anchoredToWindows": anchored,
-                    "cycleCount": plan.cycle_count if anchored else None,
-                    "cycleLength": plan.cycle_length if anchored else None,
+                    "cycleCount": plan.cycle_count,
+                    "cycleLength": plan.cycle_length,
                     "eligibleWindows": plan.eligible_window_count,
                     "discardedWindows": len(plan.windows_discarded),
                 },
@@ -220,7 +242,7 @@ class LeagueCalendarService:
         self._session.commit()
         get_metrics().incr(
             "league_calendar_generated_total",
-            labels={"result": "success", "anchored": str(anchored).lower()},
+            labels={"result": "success"},
         )
         logger.info(
             "league_calendar_generated",
@@ -229,19 +251,139 @@ class LeagueCalendarService:
                 "participant_count": len(membership_ids),
                 "round_count": round_count,
                 "matchup_count": matchup_count,
-                "anchored_to_windows": anchored,
-                "cycle_count": plan.cycle_count if anchored else None,
+                "cycle_count": plan.cycle_count,
                 "eligible_windows": plan.eligible_window_count,
             },
         )
         return self._to_response(self._load_calendar(league.id))
 
     def build_windows(self, league: League) -> tuple[WindowCandidate, ...]:
-        """Finestre europee della stagione con verdetto di eleggibilità."""
-        rules = self._load_rules(league.id)
-        min_fixtures = rules.min_fixtures_per_round if rules is not None else STANDARD_MIN_FIXTURES
-        fixtures = load_league_candidate_fixtures(self._session, league)
-        return build_window_candidates(fixtures, min_fixtures=min_fixtures)
+        """I Turni Europei della lega, letti così come sono.
+
+        **Un solo motore temporale**: le giornate dei fantallenatori non sono
+        ricalcolate da capo dalle fixture, sono i `FantasyRound` già validati
+        dal motore di copertura (`fantasy_turns.coverage`). Prima esistevano
+        due calcoli paralleli e bastava una rinumerazione dei turni per
+        sfasarli: il calendario H2H conservava numeri ormai inesistenti.
+
+        Restano escluse solo le finestre iniziate prima della creazione della
+        lega: non possono avere scontri. L'interfaccia le mostra comunque come
+        segnaposto "lega creata dopo questo turno", così la numerazione resta
+        allineata 1:1 con i Turni Europei.
+        """
+        rounds = self._european_rounds(league)
+        return tuple(
+            WindowCandidate(
+                start_at=row.window_start_at,
+                end_at=row.window_end_at,
+                kind=row.kind,
+                timezone=str(DEFAULT_LEAGUE_TZ),
+                fixture_count=0,
+                min_required=0,
+                eligible=row.window_start_at >= league.created_at,
+                reason=(
+                    None
+                    if row.window_start_at >= league.created_at
+                    else "Lega creata dopo questo turno."
+                ),
+            )
+            for row in rounds
+        )
+
+    def _european_rounds(self, league: League) -> list[FantasyRound]:
+        """I turni validi della lega, in ordine cronologico di numero."""
+        return list(
+            self._session.scalars(
+                select(FantasyRound)
+                .where(FantasyRound.league_id == league.id)
+                .order_by(FantasyRound.number.asc())
+            ).all()
+        )
+
+    def realign_round_numbers(self, league: League) -> int:
+        """Riporta le giornate H2H sui numeri attuali dei Turni Europei.
+
+        Il numero di giornata era una **copia** presa al momento della
+        generazione: rinumerare i turni (o rimuoverne di non validi) lo
+        rendeva obsoleto, ed è la causa delle giornate "5, 7, 8, 10…" viste
+        accanto a Turni Europei "1, 2, 3…". L'aggancio avviene sulla finestra
+        temporale, che è l'unica identità stabile fra le due tabelle.
+        """
+        calendar = self._load_calendar(league.id)
+        if calendar is None:
+            return 0
+        by_window = {
+            (row.window_start_at, row.window_end_at): row.number
+            for row in self._european_rounds(league)
+        }
+        # Giornate la cui finestra non è più un Turno Europeo valido: il turno
+        # non esiste, quindi non deve esistere nemmeno la giornata. Si
+        # eliminano solo se non hanno prodotto risultati — un risultato già
+        # calcolato non si butta via per una rinumerazione.
+        obsolete = {
+            window.round_number
+            for window in calendar.round_windows
+            if (window.window_start_at, window.window_end_at) not in by_window
+        }
+        protected = {
+            slot.round_number
+            for slot in calendar.slots
+            if slot.round_number in obsolete and slot.result_computed_at is not None
+        }
+        droppable = obsolete - protected
+        if droppable:
+            for window in list(calendar.round_windows):
+                if window.round_number in droppable:
+                    calendar.round_windows.remove(window)
+            for slot in list(calendar.slots):
+                if slot.round_number in droppable:
+                    calendar.slots.remove(slot)
+            self._session.flush()
+
+        # Mappa completa vecchio → nuovo, identità inclusa: una giornata che
+        # non si sposta occupa comunque un numero che un'altra potrebbe
+        # rivendicare, quindi va spostata anch'essa nella passata temporanea.
+        remap: dict[int, int] = {}
+        changed = 0
+        for window in calendar.round_windows:
+            target = by_window.get((window.window_start_at, window.window_end_at))
+            if target is None:
+                remap[window.round_number] = window.round_number
+                continue
+            remap[window.round_number] = target
+            if target != window.round_number:
+                changed += 1
+        if not changed and not droppable:
+            return 0
+        if len(set(remap.values())) != len(remap):
+            # Due giornate finirebbero sullo stesso turno: il calendario è
+            # incoerente oltre quello che una rinumerazione può sistemare,
+            # va rigenerato.
+            logger.warning(
+                "league_calendar_realign_conflict",
+                extra={"league_id": str(league.id)},
+            )
+            return 0
+
+        # Due passate: (calendar_id, round_number) è unico, quindi i numeri di
+        # arrivo collidono con quelli ancora da spostare.
+        offset = 1_000_000
+        for window in calendar.round_windows:
+            window.round_number += offset
+        for slot in calendar.slots:
+            slot.round_number += offset
+        self._session.flush()
+        for window in calendar.round_windows:
+            window.round_number = remap[window.round_number - offset]
+        for slot in calendar.slots:
+            original = slot.round_number - offset
+            slot.round_number = remap.get(original, original)
+        calendar.round_count = len({w.round_number for w in calendar.round_windows})
+        calendar.matchup_count = sum(1 for slot in calendar.slots if not slot.is_bye)
+        calendar.bye_count = sum(1 for slot in calendar.slots if slot.is_bye)
+        calendar.windows_fingerprint = windows_fingerprint(self.build_windows(league))
+        self._session.flush()
+        return changed
 
     def plan_preview(self, league_access: LeagueAccess) -> CalendarPlan:
         """Diagnostica amministrativa: cosa entra, cosa avanza e perché."""

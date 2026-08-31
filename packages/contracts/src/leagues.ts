@@ -55,6 +55,11 @@ export interface LeagueRules {
   totalCredits: number;
   /** Minimum real fixtures required to publish a european turn (10–40, default 25). */
   minFixturesPerRound: number;
+  /**
+   * Frazione degli 11 titolari che ogni fantallenatore deve poter schierare
+   * perché una giornata diventi un Turno Europeo valido (0.50–1.00, default 0.75).
+   */
+  turnCoverageThreshold: number;
   /** Minutes required for a statistical vote (1–30, default 15). */
   minutesThreshold: number;
   /** Credit refund percent for a voluntary release (0–100, EP08-04). */
@@ -89,6 +94,7 @@ export interface UpdateLeagueRulesRequest {
   roster: LeagueRosterConfig;
   totalCredits: number;
   minFixturesPerRound?: number;
+  turnCoverageThreshold?: number;
   minutesThreshold?: number;
   voluntaryReleaseRefundPercent?: number;
   leagueExitRefundPercent?: number;
@@ -352,6 +358,8 @@ export interface H2HCalendarMatchup {
   awayUserId: string | null;
   awayDisplayName: string | null;
   awayTeamName: string | null;
+  /** True solo se una fixture reale di almeno un titolare dello scontro è in corso. */
+  live?: boolean;
   result: H2HMatchupScore | null;
 }
 
@@ -361,6 +369,8 @@ export interface H2HCalendarRound {
   fantasyRoundId: string | null;
   homologationStatus: "provisional" | "homologated" | null;
   europeanTurnStatus: "scheduled" | "open" | "locked" | "skipped" | null;
+  /** Turno europeo antecedente alla creazione della lega: nessuno scontro. */
+  beforeLeagueCreation: boolean;
   matchups: H2HCalendarMatchup[];
 }
 
@@ -376,7 +386,7 @@ export interface H2HCalendar {
   byeCount: number;
   generatedAt: string;
   confirmedAt: string | null;
-  /** True se almeno un turno europeo collegato è open/locked e non omologato. */
+  /** True se almeno uno scontro ha una fixture reale rilevante in corso. */
   live: boolean;
   rounds: H2HCalendarRound[];
   summary: { message: string };
@@ -385,8 +395,23 @@ export interface H2HCalendar {
 export interface H2HPlayerScore {
   athleteId: string;
   name: string;
+  photoUrl?: string | null;
   role: FantasyRole;
   fantasyScore: number | null;
+  /** Voto statistico prima dei bonus/malus. */
+  baseScore?: number | null;
+  bonusTotal?: number;
+  malusTotal?: number;
+  bonusMalus?: Array<{
+    id: string;
+    count: number;
+    unit_value: number;
+    contribution: number;
+  }>;
+  realTeamName?: string | null;
+  fixtureStatus?: string | null;
+  fixtureStatusLabel?: string;
+  scoreFinal?: boolean;
   isEffectiveStarter: boolean;
   isBench: boolean;
 }

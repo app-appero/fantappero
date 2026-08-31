@@ -50,6 +50,7 @@ function buildPayloadFromRules(rules: LeagueRules): UpdateLeagueRulesRequest {
     roster: { ...rules.roster },
     totalCredits: rules.totalCredits,
     minFixturesPerRound: rules.minFixturesPerRound,
+    turnCoverageThreshold: rules.turnCoverageThreshold,
     minutesThreshold: rules.minutesThreshold,
     options: { ...rules.options },
   };

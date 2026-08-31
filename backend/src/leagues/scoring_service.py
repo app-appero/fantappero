@@ -22,17 +22,12 @@ from fantasy_ratings.config import default_formula_config
 from fantasy_ratings.models import PlayerMatchRating
 from fantasy_teams.models import FantasyTeam
 from fantasy_turns.homologation import assert_round_not_homologated
-from fantasy_turns.models import FantasyRound, FantasyRoundFixture
+from fantasy_turns.models import FantasyRound
+from fantasy_turns.readiness import evaluate_round_readiness
 from leagues.calendar_round_mapping import h2h_round_numbers_for_round
 from leagues.models.league_calendar import LeagueCalendar, LeagueCalendarSlot
 from leagues.scoring import MatchOutcome
 from leagues.standings_service import compute_league_standings
-from sports_data.fixtures.models import Fixture
-
-# API-Football terminal "finished" statuses. Live/not-started fixtures keep the
-# round's result provisional (FR-SCO-03: "distingue componenti definitive e
-# ancora in attesa").
-FINISHED_FIXTURE_STATUSES = frozenset({"FT", "AET", "PEN"})
 
 UpsertResult = str  # created | updated | unchanged
 
@@ -75,20 +70,8 @@ def compute_round_results(
         raise ValidationAuthError("Calendario di lega non trovato.", code="calendar_not_found")
 
     version = formula_version or default_formula_config().version
-    fixture_rows = list(
-        session.execute(
-            select(Fixture.id, Fixture.status_short)
-            .join(FantasyRoundFixture, FantasyRoundFixture.fixture_id == Fixture.id)
-            .where(
-                FantasyRoundFixture.round_id == round_id,
-                FantasyRoundFixture.excluded_at.is_(None),
-            )
-        ).all()
-    )
-    fixture_ids = [row[0] for row in fixture_rows]
-    result_final = bool(fixture_rows) and all(
-        (status or "").upper() in FINISHED_FIXTURE_STATUSES for _, status in fixture_rows
-    )
+    readiness = evaluate_round_readiness(session, round_id=round_id)
+    fixture_ids = list(readiness.fixture_ids)
 
     # Giornate H2H ospitate da questo turno europeo: per finestra sui
     # calendari ancorati, per numero progressivo su quelli storici.
@@ -110,6 +93,7 @@ def compute_round_results(
     )
 
     counters = ScoringCounters()
+    resolved_matchups: list[tuple[LeagueCalendarSlot, EffectiveLineup, EffectiveLineup]] = []
     for slot in slots:
         home_team = _team_for_membership(session, slot.home_membership_id)
         away_team = _team_for_membership(session, slot.away_membership_id)
@@ -119,6 +103,12 @@ def compute_round_results(
             counters.skipped += 1
             continue
 
+        resolved_matchups.append((slot, home_lineup, away_lineup))
+
+    result_final = (
+        readiness.final_data_ready and bool(slots) and len(resolved_matchups) == len(slots)
+    )
+    for slot, home_lineup, away_lineup in resolved_matchups:
         home_points = _team_points(session, home_lineup, fixture_ids, version)
         away_points = _team_points(session, away_lineup, fixture_ids, version)
         outcome = MatchOutcome.from_points(home_points=home_points, away_points=away_points)
@@ -174,13 +164,27 @@ def _team_points(
     athlete_ids = [UUID(item) for item in lineup.effective_starter_ids]
     if not athlete_ids or not fixture_ids:
         return 0.0
-    rows = session.scalars(
-        select(PlayerMatchRating).where(
-            PlayerMatchRating.athlete_id.in_(athlete_ids),
-            PlayerMatchRating.fixture_id.in_(fixture_ids),
-            PlayerMatchRating.formula_version == formula_version,
+    rows = list(
+        session.scalars(
+            select(PlayerMatchRating).where(
+                PlayerMatchRating.athlete_id.in_(athlete_ids),
+                PlayerMatchRating.fixture_id.in_(fixture_ids),
+                PlayerMatchRating.formula_version == formula_version,
+                PlayerMatchRating.league_id == lineup.league_id,
+            )
+        ).all()
+    )
+    if not rows:
+        rows = list(
+            session.scalars(
+                select(PlayerMatchRating).where(
+                    PlayerMatchRating.athlete_id.in_(athlete_ids),
+                    PlayerMatchRating.fixture_id.in_(fixture_ids),
+                    PlayerMatchRating.formula_version == formula_version,
+                    PlayerMatchRating.league_id.is_(None),
+                )
+            ).all()
         )
-    ).all()
     scores = {row.athlete_id: row.fantasy_score for row in rows}
     return sum(scores.get(athlete_id) or 0.0 for athlete_id in athlete_ids)
 

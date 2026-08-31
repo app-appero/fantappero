@@ -134,6 +134,8 @@ export type {
 } from "./leagues.js";
 
 export {
+  TURN_DISPLAY_LABEL,
+  aggregateTurnStatus,
   computeCutoff,
   deriveEffectiveStatus,
   isModificationAllowed,
@@ -141,18 +143,26 @@ export {
   kickoffCountsForCutoff,
   mapFixtureMatchStatus,
   reconcileFixtureKickoffLock,
+  resolveDefaultEuropeanTurn,
+  resolveTurnDisplayStates,
 } from "./fantasyTurns.js";
 export type {
+  EnsureFantasyTurnsResponse,
   ExcludeFantasyTurnFixtureRequest,
+  FantasyCalendarRefreshJob,
+  FantasyCalendarRefreshProgress,
+  FantasyCalendarRefreshResult,
   FantasyFixtureMatchStatus,
   FantasyRoundFixtureReason,
   FantasyRoundHomologationStatus,
+  FantasyTurnAggregateStatus,
   FantasyTurnDetail,
   FantasyTurnFixture,
   FixtureLineup,
   FixtureLineupPlayer,
   FixtureLiveDetail,
   FixtureTimelineEvent,
+  PendingFixtureSummary,
   ProviderFeedState,
   FantasyTurnKind,
   FantasyTurnPreview,
@@ -160,6 +170,7 @@ export type {
   FantasyTurnSummary,
   GenerateFantasyTurnRequest,
   KickoffLockState,
+  TurnDisplayState,
 } from "./fantasyTurns.js";
 
 export type {
@@ -316,6 +327,27 @@ export type {
   OsservatoreResult,
   ViceallenatoreAdvice,
 } from "./aiAssistant.js";
+
+export {
+  PITCH_ROLE_LABEL,
+  PITCH_ROLE_VARIANT,
+  fantasyBadgesFromBonusMalus,
+  layoutFromGrid,
+  layoutFromModule,
+  pitchRoleFullLabel,
+  pitchRoleVariant,
+  realMatchBadgesByAthlete,
+  resolvePitchRole,
+} from "./pitch.js";
+export type {
+  GridEntryLike,
+  MatchBadge,
+  MatchBadgeKind,
+  PitchPosition,
+  PitchRole,
+  PitchRoleVariant,
+  RealMatchBadgeEvent,
+} from "./pitch.js";
 
 export type {
   ListNotificationsFilters,

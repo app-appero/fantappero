@@ -20,7 +20,12 @@ export function useLiveH2HPolling(
   const onUpdateRef = useRef(onUpdate);
   onUpdateRef.current = onUpdate;
 
-  const shouldPoll = enabled && !!leagueId && !!calendar?.live;
+  const monitoring = calendar?.rounds.some(
+    (round) =>
+      round.homologationStatus !== "homologated" &&
+      (round.europeanTurnStatus === "open" || round.europeanTurnStatus === "locked"),
+  );
+  const shouldPoll = enabled && !!leagueId && monitoring === true;
 
   useEffect(() => {
     if (!shouldPoll || !leagueId) {
@@ -45,7 +50,12 @@ export function useLiveH2HPolling(
         intervalMs = BASE_INTERVAL_MS;
         setDegraded(false);
         onUpdateRef.current(next);
-        if (!next?.live) {
+        const nextMonitoring = next?.rounds.some(
+          (round) =>
+            round.homologationStatus !== "homologated" &&
+            (round.europeanTurnStatus === "open" || round.europeanTurnStatus === "locked"),
+        );
+        if (!nextMonitoring) {
           return;
         }
       } catch {

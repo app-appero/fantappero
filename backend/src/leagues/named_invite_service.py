@@ -284,13 +284,37 @@ class NamedLeagueInviteService:
             invite,
         )
         if recipient.user_type == UserType.AI:
-            self._session.add(
-                LeagueMembership(
-                    league_id=league.id,
-                    user_id=recipient.id,
-                    role=LeagueMemberRole.MEMBER,
-                )
+            ai_membership = LeagueMembership(
+                league_id=league.id,
+                user_id=recipient.id,
+                role=LeagueMemberRole.MEMBER,
             )
+            self._session.add(ai_membership)
+            self._session.flush()
+            # Ogni altro percorso di ingresso in lega (creazione owner,
+            # accettazione invito aperto/nominativo umano) crea subito anche
+            # la FantasyTeam — l'invito nominativo verso un fantallenatore IA
+            # era l'unico a saltarlo, lasciando il membro senza squadra in
+            # classifica e invisibile alla generazione formazioni IA.
+            team, created = ensure_team_for_membership(
+                self._session,
+                ai_membership,
+                name=recipient.display_name,
+                actor_id=recipient.id,
+            )
+            if created:
+                self._session.add(
+                    LeagueAuditEvent(
+                        league_id=league.id,
+                        actor_id=recipient.id,
+                        action=LeagueAuditAction.FANTASY_TEAM_CREATED,
+                        correlation_id=get_correlation_id(),
+                        details={
+                            "fantasyTeamId": str(team.id),
+                            "membershipId": str(ai_membership.id),
+                        },
+                    )
+                )
             self._add_audit(
                 league.id,
                 recipient.id,

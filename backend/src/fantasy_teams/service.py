@@ -116,6 +116,7 @@ from fantasy_teams.validators import (
 from leagues.models.league import League
 from leagues.models.league_audit_event import LeagueAuditEvent
 from leagues.models.league_membership import LeagueMembership
+from leagues.standings_service import compute_league_standings
 from observability.context import get_correlation_id
 from observability.logging import get_logger
 from observability.metrics import get_metrics
@@ -268,6 +269,14 @@ class FantasyTeamService:
             team = find_team_for_membership(self._session, membership.id, with_slots=True)
             assert team is not None
             summaries.append(self._to_summary(team, roster_size=roster_size))
+
+        if created:
+            # La classifica deve elencare **tutti** i fantallenatori della
+            # lega, anche a zero punti e senza incontri disputati. È
+            # persistita, non calcolata a ogni lettura: senza questo
+            # ricalcolo una squadra appena creata resterebbe assente fino al
+            # prossimo calcolo punteggi.
+            compute_league_standings(self._session, league_id=league.id)
 
         self._session.commit()
         get_metrics().incr(

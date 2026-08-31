@@ -33,9 +33,12 @@ from fantasy_lineups.ai_selection import (
 )
 from fantasy_lineups.models import LineupPlayer, LineupSubmission
 from fantasy_lineups.rules import (
+    LineupPlayerRef,
+    evaluate_lineup,
     is_athlete_kickoff_locked,
     module_counts,
 )
+from fantasy_ratings.config import DEFAULT_FORMULA_VERSION
 from fantasy_ratings.models import PlayerMatchRating
 from fantasy_teams.composition_service import resolve_effective_athlete_roles
 from fantasy_teams.models import FantasyRosterSlot, FantasyTeam
@@ -64,7 +67,7 @@ RECENT_FORM_WINDOW = 5
 class AiLineupResult:
     fantasy_team_id: UUID
     round_id: UUID
-    outcome: str  # created | updated | skipped_not_ai | skipped_locked | incomplete
+    outcome: str  # created | updated | unchanged | skipped_not_ai | skipped_locked | incomplete
     fantasy_team_name: str = ""
     plan: LineupPlan | None = None
     message: str | None = None
@@ -132,6 +135,21 @@ def generate_ai_lineup(
             message="Turno non disputato.",
         )
 
+    existing = session.execute(
+        select(LineupSubmission).where(
+            LineupSubmission.round_id == round_id,
+            LineupSubmission.fantasy_team_id == fantasy_team_id,
+        )
+    ).scalar_one_or_none()
+    if existing is not None and not existing.system_generated_ai:
+        return AiLineupResult(
+            fantasy_team_id=fantasy_team_id,
+            round_id=round_id,
+            outcome="skipped_manual",
+            fantasy_team_name=team.name,
+            message="La formazione già salvata manualmente resta invariata.",
+        )
+
     candidates = _collect_candidates(
         session,
         league_id=league_id,
@@ -140,16 +158,14 @@ def generate_ai_lineup(
         season_year=league.season_year,
         decided_at=decided_at,
     )
+    # Creazione retroattiva consentita (decisione prodotto EP13-P04-bis): una
+    # formazione IA può essere generata la prima volta anche a turno iniziato
+    # o concluso, usando i candidati disponibili senza filtro sul kickoff.
+
     # Lock progressivo (ADR-0005 §6): se esiste già una formazione automatica
     # e almeno un suo calciatore ha la partita iniziata, non si tocca più
     # nulla. Il piano escluderebbe i bloccati, quindi ricostruirlo qui
     # significherebbe cancellarli dalla formazione.
-    existing = session.execute(
-        select(LineupSubmission).where(
-            LineupSubmission.round_id == round_id,
-            LineupSubmission.fantasy_team_id == fantasy_team_id,
-        )
-    ).scalar_one_or_none()
     if existing is not None and existing.system_generated_ai:
         locked_ids = {
             candidate.athlete_id for candidate in candidates if candidate.kickoff_locked
@@ -172,17 +188,40 @@ def generate_ai_lineup(
     ]
     plan = build_lineup_plan(candidates, role_targets, decided_at=decided_at)
 
-    if not plan.is_complete:
+    roles_by_id = {candidate.athlete_id: candidate.role for candidate in candidates}
+    roster_ids = list(
+        session.scalars(
+            select(FantasyRosterSlot.athlete_id).where(
+                FantasyRosterSlot.fantasy_team_id == fantasy_team_id,
+                FantasyRosterSlot.athlete_id.is_not(None),
+            )
+        ).all()
+    )
+    validation = evaluate_lineup(
+        module=module.value,
+        starters=[
+            LineupPlayerRef(athlete_id=athlete_id, role=roles_by_id.get(athlete_id))
+            for athlete_id in plan.starters
+        ],
+        bench=[
+            LineupPlayerRef(athlete_id=athlete_id, role=roles_by_id.get(athlete_id))
+            for athlete_id in plan.bench
+        ],
+        roster_athlete_ids=roster_ids,
+    )
+
+    if not plan.is_complete or not validation.valid:
         # Rosa insufficiente: lo diciamo invece di persistere una formazione
         # illegale che il motore di validazione rifiuterebbe comunque.
         get_metrics().incr("ai_lineup_generated_total", labels={"result": "incomplete"})
+        issue_message = " ".join(issue.message for issue in validation.issues[:2])
         return AiLineupResult(
             fantasy_team_id=fantasy_team_id,
             round_id=round_id,
             outcome="incomplete",
             fantasy_team_name=team.name,
             plan=plan,
-            message="Rosa insufficiente per completare il modulo.",
+            message=issue_message or "Rosa insufficiente per completare il modulo.",
         )
 
     if dry_run:
@@ -358,25 +397,42 @@ def _recent_form(
     if not athlete_ids:
         return {}
 
-    rows = session.execute(
-        select(PlayerMatchRating.athlete_id, PlayerMatchRating.fantasy_score)
-        .join(Fixture, Fixture.id == PlayerMatchRating.fixture_id)
-        .join(FantasyRoundFixture, FantasyRoundFixture.fixture_id == Fixture.id)
-        .join(FantasyRound, FantasyRound.id == FantasyRoundFixture.round_id)
-        .where(
-            FantasyRound.league_id == league_id,
-            PlayerMatchRating.athlete_id.in_(athlete_ids),
-            PlayerMatchRating.fantasy_score.is_not(None),
-            Fixture.status_short.in_(("FT", "AET", "PEN")),
-        )
-        .order_by(Fixture.kickoff_at.desc())
-    ).all()
-
     buckets: dict[UUID, list[float]] = {}
-    for athlete_id, score in rows:
-        bucket = buckets.setdefault(athlete_id, [])
-        if len(bucket) < RECENT_FORM_WINDOW:
-            bucket.append(float(score))
+
+    def append_rows(*, scoped_league_id: UUID | None, selected_ids: list[UUID]) -> None:
+        if not selected_ids:
+            return
+        scope_filter = (
+            PlayerMatchRating.league_id == scoped_league_id
+            if scoped_league_id is not None
+            else PlayerMatchRating.league_id.is_(None)
+        )
+        rows = session.execute(
+            select(PlayerMatchRating.athlete_id, PlayerMatchRating.fantasy_score)
+            .join(Fixture, Fixture.id == PlayerMatchRating.fixture_id)
+            .join(FantasyRoundFixture, FantasyRoundFixture.fixture_id == Fixture.id)
+            .join(FantasyRound, FantasyRound.id == FantasyRoundFixture.round_id)
+            .where(
+                FantasyRound.league_id == league_id,
+                PlayerMatchRating.athlete_id.in_(selected_ids),
+                PlayerMatchRating.fantasy_score.is_not(None),
+                PlayerMatchRating.formula_version == DEFAULT_FORMULA_VERSION,
+                scope_filter,
+                Fixture.status_short.in_(("FT", "AET", "PEN")),
+            )
+            .order_by(Fixture.kickoff_at.desc())
+        ).all()
+        for athlete_id, score in rows:
+            bucket = buckets.setdefault(athlete_id, [])
+            if len(bucket) < RECENT_FORM_WINDOW:
+                bucket.append(float(score))
+
+    # I voti dipendono dalla soglia-minuti della lega: usa sempre prima lo
+    # snapshot isolato per lega. Il fallback globale mantiene leggibili i
+    # dati storici creati prima dell'introduzione dello scope ``league_id``.
+    append_rows(scoped_league_id=league_id, selected_ids=athlete_ids)
+    legacy_ids = [athlete_id for athlete_id in athlete_ids if athlete_id not in buckets]
+    append_rows(scoped_league_id=None, selected_ids=legacy_ids)
 
     return {
         athlete_id: (sum(scores) / len(scores), len(scores))
@@ -428,6 +484,33 @@ def _persist(
             # Una formazione già schierata a mano non viene sovrascritta:
             # l'automazione supplisce a un'assenza, non corregge una scelta.
             return "skipped_manual"
+
+        existing_starters = tuple(
+            player.athlete_id
+            for player in sorted(
+                (
+                    row
+                    for row in submission.players
+                    if row.slot_kind == LineupSlotKind.STARTER
+                ),
+                key=lambda row: row.sort_order,
+            )
+        )
+        existing_bench = tuple(
+            player.athlete_id
+            for player in sorted(
+                (row for row in submission.players if row.slot_kind == LineupSlotKind.BENCH),
+                key=lambda row: row.sort_order,
+            )
+        )
+        if (
+            submission.module == module
+            and existing_starters == plan.starters
+            and existing_bench == plan.bench
+        ):
+            # True idempotence: an identical admin click does not bump the
+            # revision or replace rows/timestamps merely because it ran again.
+            return "unchanged"
 
         submission.module = module
         submission.revision += 1

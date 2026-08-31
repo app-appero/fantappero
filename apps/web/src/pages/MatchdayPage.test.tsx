@@ -42,12 +42,13 @@ vi.mock("../api/leagues", () => ({
   confirmLeagueCalendar: vi.fn(),
   fetchFantasyTurns: vi.fn(),
   fetchFantasyTurn: vi.fn(),
-  previewFantasyTurn: vi.fn(),
-  generateFantasyTurn: vi.fn(),
   openFantasyTurn: vi.fn(),
   excludeFantasyTurnFixture: vi.fn(),
   recalculateFantasyTurnCutoff: vi.fn(),
-  ensureFantasyTurns: vi.fn(),
+  fetchPendingFixtures: vi.fn(),
+  startCalendarRefresh: vi.fn(),
+  fetchCalendarRefreshProgress: vi.fn(),
+  refreshFullCalendar: vi.fn(),
 }));
 
 function renderRoute(path: string) {
@@ -79,7 +80,8 @@ describe("Matchday page H2H + europei", () => {
     expect(html).toContain('data-testid="matchday-turn-detail"');
     expect(html).toContain('data-testid="matchday-turn-select"');
     expect(html).toContain('data-testid="matchday-admin"');
-    expect(html).toContain("Genera turno");
+    expect(html).toContain('data-testid="matchday-refresh-calendar"');
+    expect(html).toContain("Aggiorna calendario");
     expect(html).toContain("West Ham");
     expect(html).toContain("Premier League");
     expect(html).toContain("Serie A");
@@ -114,7 +116,7 @@ describe("Matchday page H2H + europei", () => {
     expect(html).toContain("Giulia United");
     expect(html).toContain("Provvisorio");
     expect(html).toContain("formazione effettiva");
-    expect(html).toContain('data-testid="formation-view"');
+    expect(html).toContain('data-testid="football-pitch"');
   });
 
   it("shows matchup forbidden state", () => {

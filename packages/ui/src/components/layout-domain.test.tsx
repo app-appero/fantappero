@@ -7,13 +7,17 @@ import {
   AppShell,
   BottomNav,
   Breadcrumb,
+  EventBadges,
+  FootballPitch,
   FormationView,
   KpiCard,
   LeagueSelector,
   MatchCard,
+  MatchTimeline,
   PageContainer,
   PlayerCard,
   ResultCard,
+  RoleBadge,
   SidebarNav,
 } from "../index.js";
 
@@ -132,5 +136,97 @@ describe("EPUI-03 domain components", () => {
     expect(html).toContain("fa-badge--success");
     expect(html).toContain('data-testid="result-card"');
     expect(html).toContain('data-testid="anomaly-indicator"');
+  });
+});
+
+describe("EP13-P04-quater match experience components", () => {
+  it("gives every canonical role a distinct badge colour, not just defenders", () => {
+    const html = renderToStaticMarkup(
+      createElement(
+        "div",
+        null,
+        createElement(RoleBadge, { code: "G" }),
+        createElement(RoleBadge, { code: "D" }),
+        createElement(RoleBadge, { code: "M" }),
+        createElement(RoleBadge, { code: "F" }),
+      ),
+    );
+    expect(html).toContain("fa-badge--success");
+    expect(html).toContain("fa-badge--warning");
+    expect(html).toContain("fa-badge--accent");
+    expect(html).toContain("fa-badge--danger");
+  });
+
+  it("renders event badges with a repeat count", () => {
+    const html = renderToStaticMarkup(
+      createElement(EventBadges, {
+        badges: [
+          { kind: "goal", count: 2 },
+          { kind: "yellowCard", count: 1 },
+        ],
+      }),
+    );
+    expect(html).toContain('data-testid="event-badge-goal"');
+    expect(html).toContain("×2");
+    expect(html).toContain('data-testid="event-badge-yellowCard"');
+  });
+
+  it("positions every player passed to the football pitch", () => {
+    const html = renderToStaticMarkup(
+      createElement(FootballPitch, {
+        title: "Roma FC · 4-3-3",
+        players: [
+          { id: "gk", name: "M. Svilar", shirtNumber: 1, role: "G" },
+          { id: "d1", name: "G. Mancini", shirtNumber: 23, role: "D" },
+        ],
+        positions: [
+          { id: "gk", xPercent: 50, yPercent: 90 },
+          { id: "d1", xPercent: 30, yPercent: 70 },
+        ],
+      }),
+    );
+    expect(html).toContain('data-testid="football-pitch"');
+    expect(html).toContain('data-testid="pitch-player-gk"');
+    expect(html).toContain('data-testid="pitch-player-d1"');
+    expect(html).toContain("Svilar");
+  });
+
+  it("renders a vertical timeline with home/away sides and period markers", () => {
+    const html = renderToStaticMarkup(
+      createElement(MatchTimeline, {
+        homeLabel: "Hull City",
+        awayLabel: "Manchester United",
+        entries: [
+          {
+            type: "event",
+            id: "e1",
+            side: "home",
+            minuteLabel: "17'",
+            headline: "S. Ajayi",
+          },
+          { type: "marker", id: "ht", label: "Intervallo · 1-0" },
+          {
+            type: "event",
+            id: "e2",
+            side: "away",
+            minuteLabel: "34'",
+            headline: "P. Dorgu",
+          },
+        ],
+      }),
+    );
+    expect(html).toContain('data-testid="match-timeline"');
+    expect(html).toContain('data-testid="timeline-event-e1"');
+    expect(html).toContain('data-testid="timeline-marker"');
+    expect(html).toContain("Intervallo · 1-0");
+    expect(html).toContain("fa-timeline__row--home");
+    expect(html).toContain("fa-timeline__row--away");
+  });
+
+  it("shows an empty-state message instead of an empty timeline", () => {
+    const html = renderToStaticMarkup(
+      createElement(MatchTimeline, { homeLabel: "A", awayLabel: "B", entries: [] }),
+    );
+    expect(html).toContain('data-testid="match-timeline-empty"');
   });
 });

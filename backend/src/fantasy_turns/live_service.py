@@ -88,12 +88,19 @@ def get_fixture_live_detail(
         leagueId=str(league_id),
         providerId=fixture.provider_id,
         competitionName=_competition_name(fixture),
+        homeClubId=str(fixture.home_club_id),
+        awayClubId=str(fixture.away_club_id),
         homeClubName=fixture.home_club.name,
         awayClubName=fixture.away_club.name,
+        homeClubLogoUrl=fixture.home_club.logo_url,
+        awayClubLogoUrl=fixture.away_club.logo_url,
         homeGoals=fixture.home_goals,
         awayGoals=fixture.away_goals,
         statusShort=fixture.status_short,
         statusElapsed=fixture.status_elapsed,
+        venueName=fixture.venue_name,
+        venueCity=fixture.venue_city,
+        referee=fixture.referee,
         kickoffAt=fixture.kickoff_at,
         updatedAt=fixture.updated_at,
         feedState=feed_state.value,
@@ -144,12 +151,15 @@ def _lineup_payload(
             shirtNumber=entry.shirt_number,
             position=entry.position_raw,
             grid=entry.grid,
+            photoUrl=None if athlete is None else athlete.photo_url,
         )
         (starters if entry.is_starter else bench).append(payload)
 
     return FixtureLineupResponse(
         clubName=lineup.club.name,
+        clubLogoUrl=lineup.club.logo_url,
         formation=lineup.formation,
+        coachName=lineup.coach_name,
         starters=starters,
         bench=bench,
     )
@@ -178,12 +188,18 @@ def _timeline_payload(
             event_type=row.event_type,
             event_detail=row.event_detail,
             scoring_kind=row.scoring_kind,
+            club_id=None if row.club_id is None else str(row.club_id),
             club_name=None if row.club is None else row.club.name,
+            athlete_id=None if row.athlete_id is None else str(row.athlete_id),
             athlete_name=_athlete_name(row.athlete),
+            related_athlete_id=(
+                None if row.related_athlete_id is None else str(row.related_athlete_id)
+            ),
             related_athlete_name=_athlete_name(row.related_athlete),
             comments=row.comments,
             is_active=row.is_active,
             retracted_at=row.retracted_at,
+            sources=tuple(row.sources) if isinstance(row.sources, list) else (),
         )
         for row in rows
     )
@@ -197,8 +213,11 @@ def _timeline_payload(
             eventType=event.event_type,
             eventDetail=event.event_detail,
             scoringKind=event.scoring_kind,
+            clubId=event.club_id,
             clubName=event.club_name,
+            athleteId=event.athlete_id,
             athleteName=event.athlete_name,
+            relatedAthleteId=event.related_athlete_id,
             relatedAthleteName=event.related_athlete_name,
             comments=event.comments,
         )

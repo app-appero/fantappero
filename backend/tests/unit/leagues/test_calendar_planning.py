@@ -54,6 +54,18 @@ def windows(count: int) -> list[WindowCandidate]:
     return [window(index) for index in range(count)]
 
 
+def full_cycle_windows(participants: int, cycles: int = 3) -> list[WindowCandidate]:
+    """Finestre in numero esattamente multiplo del ciclo.
+
+    Le proprietà *per ciclo* (ogni coppia una volta, riposi equi, equilibrio
+    casa/trasferta) valgono solo sui cicli interi: dalla corrispondenza 1:1
+    con i Turni Europei l'ultimo ciclo può essere parziale, quindi i test su
+    queste proprietà devono partire da un numero di finestre che chiude i
+    cicli.
+    """
+    return windows(cycle_length_for(participants) * cycles)
+
+
 # --------------------------------------------------------------------------
 # Lunghezza del ciclo
 # --------------------------------------------------------------------------
@@ -81,7 +93,7 @@ def test_cycle_length_requires_at_least_two_participants() -> None:
 @pytest.mark.parametrize("participants", [4, 5, 6, 7, 8, 9, 10])
 def test_plan_satisfies_invariants_for_every_league_size(participants: int) -> None:
     ids = members(participants)
-    plan = plan_calendar(ids, windows(40))
+    plan = plan_calendar(ids, full_cycle_windows(participants))
     assert_plan_invariants(plan, ids)
     assert plan.cycle_count >= 1
     assert plan.algorithm_version == CALENDAR_ALGORITHM_VERSION
@@ -90,7 +102,7 @@ def test_plan_satisfies_invariants_for_every_league_size(participants: int) -> N
 @pytest.mark.parametrize("participants", [4, 5, 6, 7, 8, 9, 10])
 def test_every_pair_meets_exactly_once_per_cycle(participants: int) -> None:
     ids = members(participants)
-    plan = plan_calendar(ids, windows(40))
+    plan = plan_calendar(ids, full_cycle_windows(participants))
 
     counts: dict[frozenset[UUID], int] = {}
     for slot in plan.slots:
@@ -108,7 +120,7 @@ def test_every_pair_meets_exactly_once_per_cycle(participants: int) -> None:
 @pytest.mark.parametrize("participants", [5, 7, 9])
 def test_odd_leagues_give_exactly_one_bye_per_team_per_cycle(participants: int) -> None:
     ids = members(participants)
-    plan = plan_calendar(ids, windows(40))
+    plan = plan_calendar(ids, full_cycle_windows(participants))
 
     for cycle in range(1, plan.cycle_count + 1):
         first = (cycle - 1) * plan.cycle_length + 1
@@ -124,14 +136,14 @@ def test_odd_leagues_give_exactly_one_bye_per_team_per_cycle(participants: int) 
 @pytest.mark.parametrize("participants", [4, 6, 8, 10])
 def test_even_leagues_have_no_byes(participants: int) -> None:
     ids = members(participants)
-    plan = plan_calendar(ids, windows(40))
+    plan = plan_calendar(ids, full_cycle_windows(participants))
     assert plan.bye_count == 0
 
 
 @pytest.mark.parametrize("participants", [4, 5, 6, 7, 8, 9, 10])
 def test_home_away_difference_stays_balanced(participants: int) -> None:
     ids = members(participants)
-    plan = plan_calendar(ids, windows(40))
+    plan = plan_calendar(ids, full_cycle_windows(participants))
 
     home: dict[UUID, int] = dict.fromkeys(ids, 0)
     away: dict[UUID, int] = dict.fromkeys(ids, 0)
@@ -160,7 +172,7 @@ def home_away_diffs(plan_slots: object, ids: list[UUID]) -> list[int]:
 def test_odd_leagues_reach_perfect_home_away_balance(participants: int) -> None:
     """Con N dispari ogni squadra gioca N-1 partite (numero pari): scarto 0."""
     ids = members(participants)
-    plan = plan_calendar(ids, windows(40))
+    plan = plan_calendar(ids, full_cycle_windows(participants))
     assert set(home_away_diffs(plan.slots, ids)) == {0}
 
 
@@ -168,7 +180,7 @@ def test_odd_leagues_reach_perfect_home_away_balance(participants: int) -> None:
 def test_even_leagues_stay_within_one_match(participants: int) -> None:
     """Con N pari ogni squadra gioca N-1 partite (dispari): ±1 è il minimo."""
     ids = members(participants)
-    plan = plan_calendar(ids, windows(40))
+    plan = plan_calendar(ids, full_cycle_windows(participants))
     assert max(abs(diff) for diff in home_away_diffs(plan.slots, ids)) <= 1
 
 
@@ -228,10 +240,11 @@ def test_only_eligible_windows_host_a_matchday() -> None:
     mixed = [window(0), window(1, eligible=False), window(2), window(3), window(4)]
     plan = plan_calendar(ids, mixed)
 
-    assert plan.cycle_count == 1
     used_starts = [round_.window_start_at for round_ in plan.rounds]
     assert window(1).start_at not in used_starts
-    assert len(used_starts) == 3
+    # Le 4 finestre eleggibili diventano 4 giornate: la finestra sotto soglia
+    # resta l'unica esclusa.
+    assert len(used_starts) == 4
 
 
 def test_discarded_windows_carry_a_reason() -> None:
@@ -244,25 +257,38 @@ def test_discarded_windows_carry_a_reason() -> None:
     assert below_threshold.eligible is False
     assert "Soglia non raggiunta" in (below_threshold.reason or "")
 
-    leftover = by_start[window(4).start_at]
-    assert leftover.eligible is True
-    assert leftover.reason == UNUSED_WINDOW_REASON
+    # Nessuna finestra eleggibile viene più scartata per "ciclo incompleto":
+    # la corrispondenza 1:1 con i Turni Europei le usa tutte.
+    assert all(item.eligible is False for item in plan.windows_discarded)
 
 
-def test_no_partial_cycles_are_created() -> None:
+def test_every_eligible_window_becomes_a_matchday() -> None:
+    """1:1 con i Turni Europei: l'ultimo ciclo può restare parziale."""
     ids = members(4)  # ciclo da 3 giornate
     plan = plan_calendar(ids, windows(5))
-    # 5 finestre eleggibili: un solo ciclo completo, 2 finestre avanzano.
-    assert plan.cycle_count == 1
-    assert plan.round_count == 3
-    assert len(plan.windows_used) == 3
-    assert sum(1 for item in plan.windows_discarded if item.eligible) == 2
+
+    assert plan.round_count == 5
+    assert plan.cycle_count == 2  # 3 + 2, il secondo ciclo è parziale
+    assert len(plan.windows_used) == 5
+    assert sum(1 for item in plan.windows_discarded if item.eligible) == 0
+    assert_plan_invariants(plan, ids)
 
 
-def test_plan_is_not_generatable_without_a_full_cycle() -> None:
+def test_fewer_windows_than_a_cycle_still_produce_matchdays() -> None:
     ids = members(6)  # ciclo da 5 giornate
     plan = plan_calendar(ids, windows(4))
-    assert plan.cycle_count == 0
+
+    assert plan.round_count == 4
+    assert plan.is_generatable is True
+    assert len(plan.rounds) == 4
+    assert_plan_invariants(plan, ids)
+
+
+def test_a_league_without_eligible_windows_has_no_matchdays() -> None:
+    ids = members(6)
+    plan = plan_calendar(ids, [window(0, eligible=False), window(1, eligible=False)])
+
+    assert plan.round_count == 0
     assert plan.is_generatable is False
     assert plan.slots == ()
     assert plan.rounds == ()

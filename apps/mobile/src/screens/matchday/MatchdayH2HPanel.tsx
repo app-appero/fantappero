@@ -1,4 +1,9 @@
-import type { H2HCalendar, H2HCalendarMatchup, H2HCalendarRound } from "@fantappero/contracts";
+import type {
+  AiLineupRun,
+  H2HCalendar,
+  H2HCalendarMatchup,
+  H2HCalendarRound,
+} from "@fantappero/contracts";
 import {
   H2H_GOALS_LABEL,
   H2H_POINTS_LABEL,
@@ -20,9 +25,22 @@ type Props = {
   error: string | null;
   liveDegraded: boolean;
   canAdmin: boolean;
+  aiLineupBusy?: boolean;
+  aiLineupRun?: AiLineupRun | null;
+  aiLineupError?: string | null;
+  onGenerateAiLineups?: (roundId: string) => void;
   onRetry: () => void;
   onOpenAdmin: () => void;
   onOpenMatchup: (slotId: string) => void;
+};
+
+const AI_OUTCOME_LABEL: Record<string, string> = {
+  created: "Formazione creata",
+  updated: "Formazione aggiornata",
+  unchanged: "Formazione già valida",
+  skipped_locked: "Formazione bloccata, nessuna modifica",
+  skipped_manual: "Formazione manuale preservata",
+  incomplete: "Formazione non generata",
 };
 
 /** Due grandezze nominate, come sul web (EP13-P02). */
@@ -59,7 +77,7 @@ function H2HScoreLines({
 /** Prima giornata non ancora conclusa; se tutte finite, l'ultima. Port of the web helper. */
 export function resolveDefaultH2HRound(calendar: H2HCalendar): number {
   for (const round of calendar.rounds) {
-    if (round.homologationStatus === "homologated") {
+    if (round.beforeLeagueCreation || round.homologationStatus === "homologated") {
       continue;
     }
     const played = round.matchups.filter((matchup) => !matchup.isBye);
@@ -74,13 +92,19 @@ export function resolveDefaultH2HRound(calendar: H2HCalendar): number {
 }
 
 function roundStatusHint(round: H2HCalendarRound): string {
+  if (round.beforeLeagueCreation) {
+    return "Lega creata dopo questo turno";
+  }
   if (round.homologationStatus === "homologated") {
     return "Risultati finali (storico)";
   }
   const played = round.matchups.filter((matchup) => !matchup.isBye);
+  if (played.some((matchup) => matchup.live)) {
+    return "LIVE / risultati provvisori";
+  }
   const hasResult = played.some((matchup) => matchup.result != null);
   if (hasResult) {
-    return "Risultati provvisori / in corso";
+    return "Risultati provvisori / in attesa";
   }
   if (round.europeanTurnStatus) {
     return `Turno europeo: ${round.europeanTurnStatus}`;
@@ -108,10 +132,15 @@ function MatchupRow({
 
   const awayName = matchup.awayTeamName ?? matchup.awayDisplayName ?? "Avversario";
   const display = describeH2HResult(matchup.result);
+  const statusLabel = matchup.live
+    ? "LIVE / provvisorio"
+    : display.status === "provisional"
+      ? "Provvisorio / in attesa"
+      : display.statusLabel;
   const statusColor =
     display.status === "final"
       ? colors.success
-      : display.status === "provisional"
+      : matchup.live
         ? colors.warning
         : colors.foregroundMuted;
 
@@ -128,7 +157,7 @@ function MatchupRow({
           {homeName} vs {awayName}
         </Text>
         <StatusBadge
-          label={display.statusLabel}
+          label={statusLabel}
           color={statusColor}
           textColor={colors.accentContrast}
         />
@@ -145,6 +174,10 @@ export function MatchdayH2HPanel({
   error,
   liveDegraded,
   canAdmin,
+  aiLineupBusy = false,
+  aiLineupRun = null,
+  aiLineupError = null,
+  onGenerateAiLineups = () => undefined,
   onRetry,
   onOpenAdmin,
   onOpenMatchup,
@@ -225,6 +258,12 @@ export function MatchdayH2HPanel({
   }
 
   const roundOptions = calendar.rounds.map((round) => {
+    if (round.beforeLeagueCreation) {
+      return {
+        value: String(round.roundNumber),
+        label: `Giornata ${round.roundNumber} · lega creata dopo`,
+      };
+    }
     const played = round.matchups.filter((matchup) => !matchup.isBye);
     const finals = played.filter((matchup) => matchup.result?.resultFinal).length;
     const suffix =
@@ -274,6 +313,46 @@ export function MatchdayH2HPanel({
         </View>
       </View>
 
+      {canAdmin && activeRound?.fantasyRoundId ? (
+        <View style={styles.adminBox} testID="h2h-ai-admin">
+          <Text style={styles.heading}>Formazioni dei fantallenatori AI</Text>
+          <Text style={styles.body}>
+            Genera le formazioni delle sole squadre AI per questa giornata. Le formazioni umane
+            e quelle già bloccate non vengono modificate.
+          </Text>
+          <Pressable
+            style={[styles.primaryButton, aiLineupBusy ? styles.disabled : null]}
+            disabled={aiLineupBusy}
+            onPress={() => onGenerateAiLineups(activeRound.fantasyRoundId as string)}
+            testID="h2h-generate-ai-lineups"
+          >
+            <Text style={styles.primaryLabel}>
+              {aiLineupBusy ? "Generazione in corso…" : "Genera formazioni AI"}
+            </Text>
+          </Pressable>
+          {aiLineupRun?.roundId === activeRound.fantasyRoundId ? (
+            <View style={styles.stack} testID="h2h-ai-result">
+              <Text style={styles.body}>{aiLineupRun.summary}</Text>
+              {aiLineupRun.teams.map((team) => (
+                <Text key={team.fantasyTeamId} style={styles.body}>
+                  {team.fantasyTeamName || team.fantasyTeamId}: {" "}
+                  {AI_OUTCOME_LABEL[team.outcome] ?? team.outcome}
+                  {team.message ? ` — ${team.message}` : ""}
+                </Text>
+              ))}
+            </View>
+          ) : null}
+          {aiLineupError ? (
+            <UiStatePanel
+              state="error"
+              title="Formazioni AI non generate"
+              message={aiLineupError}
+              testID="h2h-ai-error"
+            />
+          ) : null}
+        </View>
+      ) : null}
+
       {activeRound ? (
         <View style={styles.round} testID={`h2h-round-${activeRound.roundNumber}`}>
           <View style={styles.roundHeader}>
@@ -285,11 +364,20 @@ export function MatchdayH2HPanel({
               testID="h2h-round-status"
             />
           </View>
-          <View style={styles.stack}>
-            {activeRound.matchups.map((matchup) => (
-              <MatchupRow key={matchup.slotId} matchup={matchup} onOpenMatchup={onOpenMatchup} />
-            ))}
-          </View>
+          {activeRound.beforeLeagueCreation ? (
+            <UiStatePanel
+              state="empty"
+              title="Lega creata dopo questo turno"
+              message="Questo turno europeo è già trascorso al momento della creazione della lega: non ospita scontri fantasy."
+              testID="h2h-round-before-creation"
+            />
+          ) : (
+            <View style={styles.stack}>
+              {activeRound.matchups.map((matchup) => (
+                <MatchupRow key={matchup.slotId} matchup={matchup} onOpenMatchup={onOpenMatchup} />
+              ))}
+            </View>
+          )}
         </View>
       ) : null}
     </View>
@@ -323,6 +411,27 @@ const styles = StyleSheet.create({
   },
   round: {
     gap: spacing.sm,
+  },
+  adminBox: {
+    gap: spacing.sm,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    padding: spacing.md,
+    backgroundColor: colors.backgroundElevated,
+  },
+  primaryButton: {
+    borderRadius: radius.md,
+    padding: spacing.sm,
+    alignItems: "center",
+    backgroundColor: colors.accent,
+  },
+  primaryLabel: {
+    color: colors.accentContrast,
+    fontWeight: "700",
+  },
+  disabled: {
+    opacity: 0.5,
   },
   roundHeader: {
     flexDirection: "row",

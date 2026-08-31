@@ -186,6 +186,7 @@ const DEMO_TURNS: FantasyTurnSummary[] = [
     fixtureCount: 2,
     generatedAt: "2026-08-12T08:00:00.000Z",
     modificationAllowed: false,
+    matchStatus: "scheduled",
   },
 ];
 

@@ -55,6 +55,9 @@ class Fixture(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     home_goals: Mapped[int | None] = mapped_column(Integer, nullable=True)
     away_goals: Mapped[int | None] = mapped_column(Integer, nullable=True)
     round_label: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    venue_name: Mapped[str | None] = mapped_column(String(160), nullable=True)
+    venue_city: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    referee: Mapped[str | None] = mapped_column(String(160), nullable=True)
 
     sport_season: Mapped[SportSeason] = relationship()
     home_club: Mapped[Club] = relationship(foreign_keys=[home_club_id])
@@ -147,6 +150,7 @@ class OfficialLineup(Base, UUIDPrimaryKeyMixin, TimestampMixin):
         index=True,
     )
     formation: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    coach_name: Mapped[str | None] = mapped_column(String(160), nullable=True)
     # Istante di acquisizione dal provider (EP13-P05 / ADR-0005). Distinto da
     # `updated_at`, che cambia a ogni ri-sincronizzazione: senza questo campo
     # non si potrebbe dimostrare che la formazione automatica IA non ha usato

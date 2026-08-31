@@ -25,6 +25,7 @@ class Club(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     name: Mapped[str] = mapped_column(String(120), nullable=False)
     code: Mapped[str | None] = mapped_column(String(16), nullable=True)
     country: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    logo_url: Mapped[str | None] = mapped_column(String(320), nullable=True)
     national: Mapped[bool] = mapped_column(
         Boolean,
         nullable=False,
