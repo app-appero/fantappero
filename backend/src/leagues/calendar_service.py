@@ -385,6 +385,113 @@ class LeagueCalendarService:
         self._session.flush()
         return changed
 
+    def sync_with_european_turns(self, league: League, actor_id: UUID) -> str:
+        """Porta il Calendario fantallenatori in pari con i Turni Europei.
+
+        Sceglie da sé l'azione meno distruttiva possibile:
+        - nessun calendario o nessun risultato ancora calcolato → rigenera;
+        - risultati già presenti → **estende soltanto**, aggiungendo le
+          giornate mancanti in coda senza toccare gli scontri già disputati.
+
+        Ritorna una parola chiave sull'azione svolta, per il messaggio finale.
+        """
+        calendar = self._load_calendar(league.id)
+        has_results = calendar is not None and any(
+            slot.result_computed_at is not None for slot in calendar.slots
+        )
+        if calendar is not None and has_results:
+            added = self.extend_to_european_turns(league)
+            return f"esteso di {added} giornate" if added else "già allineato"
+
+        memberships = self._load_memberships(league.id)
+        rules = self._load_rules(league.id)
+        try:
+            validate_calendar_participant_alignment(
+                membership_count=len(memberships),
+                participant_count=rules.participant_count if rules is not None else None,
+            )
+        except ValidationAuthError:
+            return "non generato (partecipanti non allineati al regolamento)"
+
+        was_confirmed = calendar is not None and calendar.status == LeagueCalendarStatus.CONFIRMED
+        access = LeagueAccess(
+            league=league,
+            user=self._session.get(User, actor_id),
+            membership_role=None,
+            operator_bypass=True,
+        )
+        try:
+            self.generate(access)
+        except ValidationAuthError as exc:
+            return f"non generato ({exc.args[0]})"
+        if was_confirmed or calendar is None:
+            # Un calendario già pubblicato resta pubblicato: rigenerarlo non
+            # deve farlo sparire dalla vista dei fantallenatori.
+            self.confirm(access)
+        return "rigenerato"
+
+    def extend_to_european_turns(self, league: League) -> int:
+        """Aggiunge in coda le giornate per i Turni Europei non ancora coperti.
+
+        Serve alle leghe già in corso: gli scontri esistenti (e i risultati)
+        restano intatti, la rotazione degli accoppiamenti prosegue da dove
+        era arrivata.
+        """
+        calendar = self._load_calendar(league.id)
+        if calendar is None:
+            return 0
+        memberships = self._load_memberships(league.id)
+        membership_ids = [row.id for row in memberships]
+        if not membership_ids:
+            return 0
+
+        covered = {window.round_number for window in calendar.round_windows}
+        plan = plan_calendar(membership_ids, self.build_windows(league))
+        number_by_window = {
+            (row.window_start_at, row.window_end_at): row.number
+            for row in self._european_rounds(league)
+        }
+        missing = [
+            planned
+            for planned in plan.rounds
+            if number_by_window[(planned.window_start_at, planned.window_end_at)] not in covered
+        ]
+        if not missing:
+            return 0
+
+        slots_by_round: dict[int, list[object]] = defaultdict(list)
+        for slot in plan.slots:
+            slots_by_round[slot.round_number].append(slot)
+
+        for planned in missing:
+            absolute = number_by_window[(planned.window_start_at, planned.window_end_at)]
+            calendar.round_windows.append(
+                LeagueCalendarRoundWindow(
+                    round_number=absolute,
+                    cycle_number=planned.cycle_number,
+                    cycle_round_number=planned.cycle_round_number,
+                    window_start_at=planned.window_start_at,
+                    window_end_at=planned.window_end_at,
+                    window_kind=planned.window_kind.value,
+                )
+            )
+            for slot in slots_by_round[planned.round_number]:
+                calendar.slots.append(
+                    LeagueCalendarSlot(
+                        round_number=absolute,
+                        slot_index=slot.slot_index,
+                        is_bye=slot.is_bye,
+                        home_membership_id=slot.home_membership_id,
+                        away_membership_id=slot.away_membership_id,
+                    )
+                )
+        calendar.round_count = len({w.round_number for w in calendar.round_windows})
+        calendar.matchup_count = sum(1 for slot in calendar.slots if not slot.is_bye)
+        calendar.bye_count = sum(1 for slot in calendar.slots if slot.is_bye)
+        calendar.windows_fingerprint = windows_fingerprint(self.build_windows(league))
+        self._session.flush()
+        return len(missing)
+
     def plan_preview(self, league_access: LeagueAccess) -> CalendarPlan:
         """Diagnostica amministrativa: cosa entra, cosa avanza e perché."""
         league = league_access.league

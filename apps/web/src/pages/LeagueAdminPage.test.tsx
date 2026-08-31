@@ -69,9 +69,6 @@ describe("EP03-02 league admin page", () => {
     expect(html).toContain("Stato e avvio stagione");
     expect(html).toContain("Bozza");
     expect(html).toContain("Apri configurazione");
-    expect(html).toContain('data-testid="league-calendar-panel"');
-    expect(html).toContain("Calendario scontri diretti");
-    expect(html).toContain('data-testid="league-calendar-generate"');
   });
 
   it("renders empty state", () => {
@@ -140,29 +137,9 @@ describe("EP03-02 league admin page", () => {
     expect(html).toContain("Caricamento stato stagione");
   });
 
-  it("renders calendar empty state", () => {
-    const html = renderRoute("/lega/amministrazione?persona=admin&calendario=empty");
-    expect(html).toContain('data-testid="league-calendar-empty"');
-    expect(html).toContain("Nessun calendario");
-  });
 
-  it("renders calendar error state", () => {
-    const html = renderRoute("/lega/amministrazione?persona=admin&calendario=error");
-    expect(html).toContain('data-testid="league-calendar-error"');
-    expect(html).toContain("Calendario non disponibile");
-  });
 
-  it("renders calendar loading state", () => {
-    const html = renderRoute("/lega/amministrazione?persona=admin&calendario=loading");
-    expect(html).toContain('data-testid="league-calendar-loading"');
-    expect(html).toContain("Caricamento calendario");
-  });
 
-  it("renders calendar forbidden state", () => {
-    const html = renderRoute("/lega/amministrazione?persona=admin&calendario=forbidden");
-    expect(html).toContain('data-testid="league-calendar-forbidden"');
-    expect(html).toContain("Permessi insufficienti");
-  });
 
   it("renders invite code and link copy CTAs", () => {
     const html = renderRoute("/lega/amministrazione?persona=admin");

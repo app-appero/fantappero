@@ -81,7 +81,7 @@ describe("Matchday page H2H + europei", () => {
     expect(html).toContain('data-testid="matchday-turn-select"');
     expect(html).toContain('data-testid="matchday-admin"');
     expect(html).toContain('data-testid="matchday-refresh-calendar"');
-    expect(html).toContain("Aggiorna calendario");
+    expect(html).toContain("Genera calendario");
     expect(html).toContain("West Ham");
     expect(html).toContain("Premier League");
     expect(html).toContain("Serie A");

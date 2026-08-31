@@ -18,7 +18,6 @@ import { ManagerDirectory } from "../components/ManagerDirectory";
 import { loadStoredSession } from "../auth/sessionStorage";
 import { useLocation } from "../router/simpleRouter";
 import { parseWireframeStateFromSearch } from "../wireframes/useWireframeState";
-import { LeagueCalendarPanel } from "./LeagueCalendarPanel";
 import { LeagueDeletePanel } from "./LeagueDeletePanel";
 import { LeagueInvitesPanel } from "./LeagueInvitesPanel";
 import { LeagueMembersPanel } from "./LeagueMembersPanel";
@@ -468,11 +467,6 @@ export function LeagueAdminPage() {
           search={search}
           title="Inviti nominativi"
           compact
-        />
-        <LeagueCalendarPanel
-          leagueId={activeLeagueId}
-          isDemoMode={isDemoMode}
-          search={search}
         />
         {lifecycle ? (
           <LeagueSeasonPanel

@@ -275,6 +275,83 @@ export function MatchdayScreen() {
   return (
     <PageContainer title="Turni" testID="screen-matchday">
       <View style={styles.stack}>
+        {isAdmin ? (
+          <View style={styles.section} testID="matchday-admin">
+            <Text style={styles.heading}>Calendario della lega</Text>
+            <Text style={styles.body}>
+              Recupera dal provider le partite dei campionati scelti, ne ricava i Turni
+              Europei validi della stagione e genera da quelli le giornate dei fantallenatori.
+              Le due sezioni restano sempre allineate.
+            </Text>
+            <Pressable
+              style={[styles.button, refreshingCalendar && styles.disabled]}
+              disabled={refreshingCalendar}
+              onPress={() => {
+                if (!accessToken) {
+                  return;
+                }
+                setRefreshingCalendar(true);
+                setCalendarRefreshError(null);
+                setCalendarRefreshSuccess(null);
+                setCalendarRefreshProgress({ percent: 0, stage: "queued", message: "Avvio in corso…" });
+                void refreshFullCalendar(accessToken, activeLeagueId, {
+                  onProgress: (progress) =>
+                    setCalendarRefreshProgress({
+                      percent: progress.percent,
+                      stage: progress.stage,
+                      message: progress.message,
+                    }),
+                })
+                  .then(async (result) => {
+                    setCalendarRefreshSuccess(result.message);
+                    await loadTurns();
+                    await loadPendingFixtures();
+                  })
+                  .catch((error) =>
+                    setCalendarRefreshError(
+                      getApiErrorMessage(error, "Aggiornamento calendario non riuscito."),
+                    ),
+                  )
+                  .finally(() => {
+                    setRefreshingCalendar(false);
+                    setCalendarRefreshProgress(null);
+                  });
+              }}
+              testID="matchday-refresh-calendar"
+            >
+              <Text style={styles.buttonLabel}>Genera calendario</Text>
+            </Pressable>
+            {refreshingCalendar ? (
+              <UiStatePanel
+                state="loading"
+                title="Generazione in corso"
+                message={
+                  calendarRefreshProgress
+                    ? `${calendarRefreshProgress.message} (${calendarRefreshProgress.percent}%)`
+                    : "Avvio in corso…"
+                }
+                testID="matchday-refresh-progress"
+              />
+            ) : null}
+            {!refreshingCalendar && calendarRefreshError ? (
+              <UiStatePanel
+                state="error"
+                title="Generazione non riuscita"
+                message={calendarRefreshError}
+                testID="matchday-refresh-error"
+              />
+            ) : null}
+            {!refreshingCalendar && calendarRefreshSuccess ? (
+              <UiStatePanel
+                state="success"
+                title="Calendario generato"
+                message={calendarRefreshSuccess}
+                testID="matchday-refresh-success"
+              />
+            ) : null}
+          </View>
+        ) : null}
+
         <View style={styles.chipRow} testID="matchday-tabs">
           <Pressable
             style={[styles.chip, tab === "calendario" ? styles.chipActive : null]}
@@ -315,83 +392,6 @@ export function MatchdayScreen() {
 
         {tab === "europei" ? (
           <>
-        {isAdmin ? (
-          <View style={styles.section} testID="matchday-admin">
-            <Text style={styles.heading}>Calendario turni</Text>
-            <Text style={styles.body}>
-              Il sistema raggruppa automaticamente le partite dei campionati scelti in turni
-              weekend e infrasettimanali, dall&apos;inizio alla fine della stagione. Usa il
-              pulsante per sincronizzare il calendario dal provider e riallineare la numerazione
-              dei turni.
-            </Text>
-            <Pressable
-              style={[styles.button, refreshingCalendar && styles.disabled]}
-              disabled={refreshingCalendar}
-              onPress={() => {
-                if (!accessToken) {
-                  return;
-                }
-                setRefreshingCalendar(true);
-                setCalendarRefreshError(null);
-                setCalendarRefreshSuccess(null);
-                setCalendarRefreshProgress({ percent: 0, stage: "queued", message: "Avvio in corso…" });
-                void refreshFullCalendar(accessToken, activeLeagueId, {
-                  onProgress: (progress) =>
-                    setCalendarRefreshProgress({
-                      percent: progress.percent,
-                      stage: progress.stage,
-                      message: progress.message,
-                    }),
-                })
-                  .then(async (result) => {
-                    setCalendarRefreshSuccess(result.message);
-                    await loadTurns();
-                    await loadPendingFixtures();
-                  })
-                  .catch((error) =>
-                    setCalendarRefreshError(
-                      getApiErrorMessage(error, "Aggiornamento calendario non riuscito."),
-                    ),
-                  )
-                  .finally(() => {
-                    setRefreshingCalendar(false);
-                    setCalendarRefreshProgress(null);
-                  });
-              }}
-              testID="matchday-refresh-calendar"
-            >
-              <Text style={styles.buttonLabel}>Aggiorna calendario</Text>
-            </Pressable>
-            {refreshingCalendar ? (
-              <UiStatePanel
-                state="loading"
-                title="Aggiornamento in corso"
-                message={
-                  calendarRefreshProgress
-                    ? `${calendarRefreshProgress.message} (${calendarRefreshProgress.percent}%)`
-                    : "Avvio in corso…"
-                }
-                testID="matchday-refresh-progress"
-              />
-            ) : null}
-            {!refreshingCalendar && calendarRefreshError ? (
-              <UiStatePanel
-                state="error"
-                title="Aggiornamento non riuscito"
-                message={calendarRefreshError}
-                testID="matchday-refresh-error"
-              />
-            ) : null}
-            {!refreshingCalendar && calendarRefreshSuccess ? (
-              <UiStatePanel
-                state="success"
-                title="Calendario aggiornato"
-                message={calendarRefreshSuccess}
-                testID="matchday-refresh-success"
-              />
-            ) : null}
-          </View>
-        ) : null}
 
         {turns.length === 0 ? (
           <UiStatePanel

@@ -662,10 +662,15 @@ class FantasyTurnService:
         # Il Calendario fantallenatori porta lo stesso numero del Turno
         # Europeo: dopo una rinumerazione va riportato in asse, altrimenti
         # resta ancorato a numeri che non esistono più.
-        report(95, "calendario", "Riallineamento giornate fantallenatori…")
+        # Ultimo anello della catena: partite reali -> Turni Europei ->
+        # giornate dei fantallenatori. Un'unica azione le copre tutte, invece
+        # di lasciare all'utente due pulsanti in due schermate diverse.
+        report(95, "calendario", "Generazione calendario fantallenatori…")
         from leagues.calendar_service import LeagueCalendarService
 
-        LeagueCalendarService(self._session).realign_round_numbers(locked)
+        calendar_service = LeagueCalendarService(self._session)
+        calendar_service.realign_round_numbers(locked)
+        calendar_outcome = calendar_service.sync_with_european_turns(locked, system_actor)
         fixtures_needing_date = self._count_fixtures_needing_date(locked)
         self._session.commit()
 
@@ -675,6 +680,7 @@ class FantasyTurnService:
             f"invariate: {sync_result.counters.fixtures_unchanged}, "
             f"da aggiornare: {fixtures_needing_date}. "
             f"Formazioni/eventi recuperati: {details_backfilled}. "
+            f"Calendario fantallenatori: {calendar_outcome}. "
             f"Turni riallineati: {rounds_realigned}, rimossi (senza partite): {rounds_removed}."
         )
         report(100, "completed", message)
@@ -687,6 +693,7 @@ class FantasyTurnService:
                 "fixtures_unchanged": sync_result.counters.fixtures_unchanged,
                 "fixtures_needing_date": fixtures_needing_date,
                 "details_backfilled": details_backfilled,
+                "calendar_outcome": calendar_outcome,
                 "rounds_created": rounds_created,
                 "rounds_updated": rounds_updated,
                 "rounds_realigned": rounds_realigned,

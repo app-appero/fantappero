@@ -756,7 +756,60 @@ export function MatchdayPage() {
       ) : null}
 
       {!showForbidden && (activeLeagueId || isDemoMode) ? (
-        <Tabs value={tab} onValueChange={(value) => setTab(resolveMatchdayTab(value))}>
+        <>
+          {isAdmin ? (
+            <Card data-testid="matchday-admin">
+              <CardHeader title="Calendario della lega" />
+              <CardBody>
+                <p>
+                  Recupera dal provider le partite dei campionati scelti, ne ricava i Turni
+                  Europei validi della stagione e genera da quelli le giornate dei
+                  fantallenatori. Le due sezioni restano sempre allineate.
+                </p>
+                <div className="fa-ds-showcase__row">
+                  <Button
+                    type="button"
+                    loading={refreshingCalendar}
+                    disabled={refreshingCalendar}
+                    onClick={() => void runRefreshCalendar()}
+                    data-testid="matchday-refresh-calendar"
+                  >
+                    Genera calendario
+                  </Button>
+                </div>
+                {refreshingCalendar ? (
+                  <UiStatePanel
+                    state="loading"
+                    title="Generazione in corso"
+                    message={
+                      calendarRefreshProgress
+                        ? `${calendarRefreshProgress.message} (${calendarRefreshProgress.percent}%)`
+                        : "Avvio in corso…"
+                    }
+                    testId="matchday-refresh-progress"
+                  />
+                ) : null}
+                {!refreshingCalendar && calendarRefreshError ? (
+                  <UiStatePanel
+                    state="error"
+                    title="Generazione non riuscita"
+                    message={calendarRefreshError}
+                    testId="matchday-refresh-error"
+                  />
+                ) : null}
+                {!refreshingCalendar && calendarRefreshSuccess ? (
+                  <UiStatePanel
+                    state="success"
+                    title="Calendario generato"
+                    message={calendarRefreshSuccess}
+                    testId="matchday-refresh-success"
+                  />
+                ) : null}
+              </CardBody>
+            </Card>
+          ) : null}
+
+          <Tabs value={tab} onValueChange={(value) => setTab(resolveMatchdayTab(value))}>
           <TabList aria-label="Sezioni turni">
             <Tab value="calendario">Calendario fantallenatori</Tab>
             <Tab value="europei">Turni europei</Tab>
@@ -776,58 +829,6 @@ export function MatchdayPage() {
             />
           </TabPanel>
           <TabPanel value="europei">
-            {isAdmin ? (
-              <Card data-testid="matchday-admin">
-                <CardHeader title="Calendario turni" />
-                <CardBody>
-                  <p>
-                    Il sistema raggruppa automaticamente le partite dei campionati scelti in turni
-                    weekend e infrasettimanali, dall&apos;inizio alla fine della stagione. Usa il
-                    pulsante per sincronizzare il calendario dal provider e riallineare la
-                    numerazione dei turni.
-                  </p>
-                  <div className="fa-ds-showcase__row">
-                    <Button
-                      type="button"
-                      loading={refreshingCalendar}
-                      disabled={refreshingCalendar}
-                      onClick={() => void runRefreshCalendar()}
-                      data-testid="matchday-refresh-calendar"
-                    >
-                      Aggiorna calendario
-                    </Button>
-                  </div>
-                  {refreshingCalendar ? (
-                    <UiStatePanel
-                      state="loading"
-                      title="Aggiornamento in corso"
-                      message={
-                        calendarRefreshProgress
-                          ? `${calendarRefreshProgress.message} (${calendarRefreshProgress.percent}%)`
-                          : "Avvio in corso…"
-                      }
-                      testId="matchday-refresh-progress"
-                    />
-                  ) : null}
-                  {!refreshingCalendar && calendarRefreshError ? (
-                    <UiStatePanel
-                      state="error"
-                      title="Aggiornamento non riuscito"
-                      message={calendarRefreshError}
-                      testId="matchday-refresh-error"
-                    />
-                  ) : null}
-                  {!refreshingCalendar && calendarRefreshSuccess ? (
-                    <UiStatePanel
-                      state="success"
-                      title="Calendario aggiornato"
-                      message={calendarRefreshSuccess}
-                      testId="matchday-refresh-success"
-                    />
-                  ) : null}
-                </CardBody>
-              </Card>
-            ) : null}
 
             {loading ? (
               <UiStatePanel
@@ -1044,7 +1045,8 @@ export function MatchdayPage() {
               />
             ) : null}
           </TabPanel>
-        </Tabs>
+          </Tabs>
+        </>
       ) : null}
     </PageContainer>
   );
