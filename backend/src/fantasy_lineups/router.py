@@ -208,13 +208,17 @@ def get_round_effective_lineup(
 def run_ai_lineups(
     round_id: UUID,
     dry_run: bool = False,
-    league_access: LeagueAccess = Depends(require_league_permissions(Permission.LEAGUE_ADMIN)),
+    league_access: LeagueAccess = Depends(require_league_permissions(Permission.GLOBAL_OPERATE)),
     session: Session = Depends(get_db_session),
 ) -> AiLineupRunResponse | JSONResponse:
     """Preview o ricalcolo delle formazioni automatiche IA (EP13-P05).
 
     Idempotente: non tocca le squadre umane né le formazioni già schierate
     a mano. Con ``dry_run=true`` non persiste nulla.
+
+    Solo operatore di piattaforma (EP-turni-automazione): la generazione gira
+    già in automatico da cron per tutti i turni aperti, questo endpoint resta
+    l'override manuale puntuale.
     """
     try:
         results = run_ai_lineups_for_round(

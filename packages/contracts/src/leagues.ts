@@ -60,6 +60,13 @@ export interface LeagueRules {
    * perché una giornata diventi un Turno Europeo valido (0.50–1.00, default 0.75).
    */
   turnCoverageThreshold: number;
+  /**
+   * Minuti di preavviso prima del kickoff reale del singolo giocatore oltre
+   * cui si blocca in formazione (0–60, default 15). Il lock resta per
+   * atleta — formazione a step invariata, il margine anticipa solo
+   * l'istante in cui scatta.
+   */
+  lineupLockMarginMinutes: number;
   /** Minutes required for a statistical vote (1–30, default 15). */
   minutesThreshold: number;
   /** Credit refund percent for a voluntary release (0–100, EP08-04). */
@@ -95,6 +102,7 @@ export interface UpdateLeagueRulesRequest {
   totalCredits: number;
   minFixturesPerRound?: number;
   turnCoverageThreshold?: number;
+  lineupLockMarginMinutes?: number;
   minutesThreshold?: number;
   voluntaryReleaseRefundPercent?: number;
   leagueExitRefundPercent?: number;

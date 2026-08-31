@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections import Counter
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from database.enums import FantasyModule, FantasyRole, FantasyTurnStatus, LineupSlotKind
 from fantasy_turns.rules import (
@@ -32,6 +32,9 @@ MIN_AUTOMATIC_SUBSTITUTIONS = 0
 MAX_AUTOMATIC_SUBSTITUTIONS = 5
 STANDARD_AUTOMATIC_SUBSTITUTIONS = 5
 MAX_TACTICAL_MOVES = 3
+#: Margine di preavviso del lock per-giocatore quando la lega non ne ha uno
+#: configurato (EP-turni-automazione), editabile per lega in `LeagueRules`.
+DEFAULT_LINEUP_LOCK_MARGIN_MINUTES = 15
 BENCH_ORDER_LOCKED_MESSAGE = (
     "Non puoi cambiare l'ordine di panchina di un calciatore la cui partita è già iniziata."
 )
@@ -335,11 +338,17 @@ def is_athlete_kickoff_locked(
     kickoff_at: datetime | None,
     status_short: str | None = None,
     lock_latched: bool = False,
+    margin_minutes: int = 0,
 ) -> bool:
-    """True when the athlete's real match has started (server clock is authoritative).
+    """True when the athlete's real match has started, or is about to.
 
     ``lock_latched`` keeps the player frozen after a postponement or kickoff
     change that arrives only after the previously published time elapsed.
+
+    ``margin_minutes`` anticipates the lock instant (formazione a step,
+    EP-turni-automazione): a player still locks individually at his own real
+    kickoff, just with a configurable preavviso instead of exactly at it. 0
+    reproduces the previous exact-kickoff behavior.
     """
     if lock_latched:
         return True
@@ -350,7 +359,8 @@ def is_athlete_kickoff_locked(
         return False
     if kickoff_at is None:
         return False
-    return ensure_utc(now) >= ensure_utc(kickoff_at)
+    threshold = ensure_utc(kickoff_at) - timedelta(minutes=margin_minutes)
+    return ensure_utc(now) >= threshold
 
 
 def evaluate_progressive_lock(

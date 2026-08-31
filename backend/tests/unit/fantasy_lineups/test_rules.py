@@ -204,6 +204,38 @@ def test_athlete_lock_timezone_and_status() -> None:
     )
 
 
+def test_athlete_lock_margin_anticipates_the_lock_instant() -> None:
+    """EP-turni-automazione: preavviso configurabile, per giocatore."""
+    kickoff = datetime(2026, 8, 15, 16, 0, tzinfo=UTC)
+    # 20 minuti prima del kickoff, con margine 15': non ancora bloccato.
+    assert not is_athlete_kickoff_locked(
+        now=datetime(2026, 8, 15, 15, 40, tzinfo=UTC),
+        kickoff_at=kickoff,
+        status_short="NS",
+        margin_minutes=15,
+    )
+    # Esattamente 15' prima: scatta il lock.
+    assert is_athlete_kickoff_locked(
+        now=datetime(2026, 8, 15, 15, 45, tzinfo=UTC),
+        kickoff_at=kickoff,
+        status_short="NS",
+        margin_minutes=15,
+    )
+    # Margine 0 riproduce il comportamento precedente (esatto kickoff).
+    assert not is_athlete_kickoff_locked(
+        now=datetime(2026, 8, 15, 15, 45, tzinfo=UTC),
+        kickoff_at=kickoff,
+        status_short="NS",
+        margin_minutes=0,
+    )
+    assert is_athlete_kickoff_locked(
+        now=kickoff,
+        kickoff_at=kickoff,
+        status_short="NS",
+        margin_minutes=0,
+    )
+
+
 def test_athlete_lock_latched_survives_postponement_after_kickoff() -> None:
     now = datetime(2026, 8, 15, 16, 5, tzinfo=UTC)
     postponed = datetime(2026, 8, 16, 16, 0, tzinfo=UTC)

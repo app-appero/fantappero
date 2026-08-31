@@ -1,9 +1,4 @@
-import type {
-  AiLineupRun,
-  H2HCalendar,
-  H2HCalendarMatchup,
-  H2HCalendarRound,
-} from "@fantappero/contracts";
+import type { H2HCalendar, H2HCalendarMatchup, H2HCalendarRound } from "@fantappero/contracts";
 import {
   H2H_GOALS_LABEL,
   H2H_POINTS_LABEL,
@@ -25,22 +20,9 @@ type Props = {
   error: string | null;
   liveDegraded: boolean;
   canAdmin: boolean;
-  aiLineupBusy?: boolean;
-  aiLineupRun?: AiLineupRun | null;
-  aiLineupError?: string | null;
-  onGenerateAiLineups?: (roundId: string) => void;
   onRetry: () => void;
   onOpenAdmin: () => void;
   onOpenMatchup: (slotId: string) => void;
-};
-
-const AI_OUTCOME_LABEL: Record<string, string> = {
-  created: "Formazione creata",
-  updated: "Formazione aggiornata",
-  unchanged: "Formazione già valida",
-  skipped_locked: "Formazione bloccata, nessuna modifica",
-  skipped_manual: "Formazione manuale preservata",
-  incomplete: "Formazione non generata",
 };
 
 /** Due grandezze nominate, come sul web (EP13-P02). */
@@ -174,10 +156,6 @@ export function MatchdayH2HPanel({
   error,
   liveDegraded,
   canAdmin,
-  aiLineupBusy = false,
-  aiLineupRun = null,
-  aiLineupError = null,
-  onGenerateAiLineups = () => undefined,
   onRetry,
   onOpenAdmin,
   onOpenMatchup,
@@ -312,46 +290,6 @@ export function MatchdayH2HPanel({
           ) : null}
         </View>
       </View>
-
-      {canAdmin && activeRound?.fantasyRoundId ? (
-        <View style={styles.adminBox} testID="h2h-ai-admin">
-          <Text style={styles.heading}>Formazioni dei fantallenatori AI</Text>
-          <Text style={styles.body}>
-            Genera le formazioni delle sole squadre AI per questa giornata. Le formazioni umane
-            e quelle già bloccate non vengono modificate.
-          </Text>
-          <Pressable
-            style={[styles.primaryButton, aiLineupBusy ? styles.disabled : null]}
-            disabled={aiLineupBusy}
-            onPress={() => onGenerateAiLineups(activeRound.fantasyRoundId as string)}
-            testID="h2h-generate-ai-lineups"
-          >
-            <Text style={styles.primaryLabel}>
-              {aiLineupBusy ? "Generazione in corso…" : "Genera formazioni AI"}
-            </Text>
-          </Pressable>
-          {aiLineupRun?.roundId === activeRound.fantasyRoundId ? (
-            <View style={styles.stack} testID="h2h-ai-result">
-              <Text style={styles.body}>{aiLineupRun.summary}</Text>
-              {aiLineupRun.teams.map((team) => (
-                <Text key={team.fantasyTeamId} style={styles.body}>
-                  {team.fantasyTeamName || team.fantasyTeamId}: {" "}
-                  {AI_OUTCOME_LABEL[team.outcome] ?? team.outcome}
-                  {team.message ? ` — ${team.message}` : ""}
-                </Text>
-              ))}
-            </View>
-          ) : null}
-          {aiLineupError ? (
-            <UiStatePanel
-              state="error"
-              title="Formazioni AI non generate"
-              message={aiLineupError}
-              testID="h2h-ai-error"
-            />
-          ) : null}
-        </View>
-      ) : null}
 
       {activeRound ? (
         <View style={styles.round} testID={`h2h-round-${activeRound.roundNumber}`}>

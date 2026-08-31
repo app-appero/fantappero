@@ -648,6 +648,95 @@ def test_homologate_round_requires_finished_fixtures(db_session: Session) -> Non
     assert excinfo.value.code == "round_not_final"
 
 
+def test_homologate_round_opens_the_next_scheduled_round(db_session: Session) -> None:
+    """EP-turni-automazione: il "verdetto" (omologazione) apre il turno
+    successivo senza aspettare il giro del cron orario — sia che il turno
+    successivo sia programmato con cutoff futuro (si apre), sia che non sia
+    ancora pronto (nessun errore, resta come sta)."""
+    operator = _make_user(db_session)
+    db_session.commit()
+    _, fantasy_round, _teams = _full_pipeline(db_session)
+
+    future_window = datetime.now(UTC) + timedelta(days=7)
+    next_round = FantasyRound(
+        league_id=fantasy_round.league_id,
+        number=fantasy_round.number + 1,
+        kind=FantasyTurnKind.WEEKEND,
+        window_start_at=future_window,
+        window_end_at=future_window + timedelta(days=3),
+        cutoff_at=future_window,
+        status=FantasyTurnStatus.SCHEDULED,
+        generated_at=datetime.now(UTC),
+    )
+    db_session.add(next_round)
+    db_session.commit()
+
+    homologate_round(db_session, round_id=fantasy_round.id, actor_id=operator.id)
+    db_session.commit()
+
+    db_session.refresh(next_round)
+    assert next_round.status == FantasyTurnStatus.OPEN
+    assert next_round.opens_at is not None
+
+    audit = db_session.scalars(
+        select(LeagueAuditEvent).where(
+            LeagueAuditEvent.league_id == fantasy_round.league_id,
+            LeagueAuditEvent.action == LeagueAuditAction.FANTASY_TURN_OPENED,
+        )
+    ).one()
+    assert audit.details["roundId"] == str(next_round.id)
+    assert audit.details["auto"] is True
+    assert audit.details["trigger"] == "homologation"
+
+    apply_round_correction(
+        db_session,
+        round_id=fantasy_round.id,
+        actor_id=operator.id,
+        reason="Ripristino stato provvisorio per isolamento test",
+    )
+    db_session.commit()
+
+
+def test_homologate_round_does_not_open_a_round_whose_cutoff_already_passed(
+    db_session: Session,
+) -> None:
+    """Stessa guardia di `_try_auto_open`: un turno successivo il cui cutoff
+    è già scaduto (es. omologazione arrivata tardi) resta SCHEDULED — non lo
+    si apre già chiuso, evita di far credere ai fantallenatori che possano
+    ancora schierare."""
+    operator = _make_user(db_session)
+    db_session.commit()
+    _, fantasy_round, _teams = _full_pipeline(db_session)
+
+    past_window = datetime.now(UTC) - timedelta(days=1)
+    next_round = FantasyRound(
+        league_id=fantasy_round.league_id,
+        number=fantasy_round.number + 1,
+        kind=FantasyTurnKind.WEEKEND,
+        window_start_at=past_window,
+        window_end_at=past_window + timedelta(days=3),
+        cutoff_at=past_window,
+        status=FantasyTurnStatus.SCHEDULED,
+        generated_at=datetime.now(UTC),
+    )
+    db_session.add(next_round)
+    db_session.commit()
+
+    homologate_round(db_session, round_id=fantasy_round.id, actor_id=operator.id)
+    db_session.commit()
+
+    db_session.refresh(next_round)
+    assert next_round.status == FantasyTurnStatus.SCHEDULED
+
+    apply_round_correction(
+        db_session,
+        round_id=fantasy_round.id,
+        actor_id=operator.id,
+        reason="Ripristino stato provvisorio per isolamento test",
+    )
+    db_session.commit()
+
+
 def test_homologate_round_locks_data_and_correction_reopens_it(db_session: Session) -> None:
     """EP07-07 / FR-OMO-01: un turno omologato non cambia più; solo una
     correzione motivata e auditata lo riapre per un nuovo ricalcolo."""

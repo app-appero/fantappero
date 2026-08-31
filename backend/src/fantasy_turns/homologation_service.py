@@ -112,6 +112,20 @@ def homologate_round(
             dedup_key=f"round_homologated:{round_id}:{now.isoformat()}:{user_id}",
         )
     session.flush()
+
+    # Un turno omologato è il "verdetto" che sblocca il successivo
+    # (EP-turni-automazione): l'apertura non aspetta più il giro orario del
+    # cron, scatta qui — sia che l'omologazione sia manuale sia automatica,
+    # perché questo è l'unico punto di ingresso per entrambe.
+    from fantasy_turns.service import FantasyTurnService
+
+    FantasyTurnService(session).try_open_next_round(
+        league_id=fantasy_round.league_id,
+        current_number=fantasy_round.number,
+        actor_id=actor_id,
+    )
+    session.flush()
+
     return HomologationResult(
         round_id=round_id,
         homologation_status=FantasyRoundHomologationStatus.HOMOLOGATED.value,

@@ -11,6 +11,7 @@ from fastapi.responses import JSONResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 
 from admin.router import router as admin_router
+from admin.turni_router import router as admin_turni_router
 from ai_assistant.router import feedback_router as ai_assistant_feedback_router
 from ai_assistant.router import router as ai_assistant_router
 from app.deps_health import aggregate_health
@@ -81,6 +82,7 @@ app.add_middleware(
 app.include_router(auth_router)
 app.include_router(profile_router)
 app.include_router(admin_router)
+app.include_router(admin_turni_router)
 app.include_router(leagues_router)
 app.include_router(scoring_router)
 app.include_router(fantasy_teams_router)

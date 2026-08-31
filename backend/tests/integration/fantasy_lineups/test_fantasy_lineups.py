@@ -1064,7 +1064,7 @@ def test_postponement_after_kickoff_keeps_lock_and_tactical_moves(
     db_session: Session,
     competition_ids: list[str],
 ) -> None:
-    token, _ = _register_and_login(client, "lineup.postpone@example.com")
+    token, user_id = _register_and_login(client, "lineup.postpone@example.com")
     league_id = _create_league(client, token, competition_ids, "Lega Rinvio Formazione")
     client.get(f"/leagues/{league_id}/rosa", headers={"Authorization": f"Bearer {token}"})
     grouped = _seed_roster_athletes(db_session, id_offset=3_200_000)
@@ -1120,6 +1120,15 @@ def test_postponement_after_kickoff_keeps_lock_and_tactical_moves(
 
     first_fixture.kickoff_at = datetime.now(UTC) + timedelta(days=2)
     first_fixture.status_short = "PST"
+    db_session.commit()
+
+    # EP-turni-automazione: il ricalcolo cutoff è ora azione da operatore.
+    from auth.models.user import User
+    from database.enums import PlatformRole
+
+    operator = db_session.get(User, user_id)
+    assert operator is not None
+    operator.platform_role = PlatformRole.OPERATOR
     db_session.commit()
 
     recalc = client.post(

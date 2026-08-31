@@ -1012,6 +1012,7 @@ class FantasyTurnService:
         *,
         now: datetime,
         actor_id: UUID | None,
+        trigger: str = "schedule",
     ) -> bool:
         if fantasy_round.status != FantasyTurnStatus.SCHEDULED:
             return False
@@ -1029,10 +1030,45 @@ class FantasyTurnService:
                 "roundId": str(fantasy_round.id),
                 "number": fantasy_round.number,
                 "auto": True,
+                "trigger": trigger,
             },
         )
         get_metrics().incr("fantasy_turn_opened_total", labels={"result": "auto"})
         return True
+
+    def try_open_next_round(
+        self,
+        *,
+        league_id: UUID,
+        current_number: int,
+        actor_id: UUID | None = None,
+    ) -> bool:
+        """Apre il turno successivo se è pronto (EP-turni-automazione).
+
+        Chiamato dopo l'omologazione di un turno: la numerazione è garantita
+        contigua per lega (nessun turno-fantasma numerato), quindi "il turno
+        successivo" è sempre e solo ``number == current_number + 1``. Stessa
+        guardia di `_try_auto_open` — apre solo se `SCHEDULED` e il cutoff non
+        è già passato; un turno già aperto, saltato o inesistente è un no-op
+        silenzioso (non è un errore: capita per l'ultimo turno di stagione, o
+        se il successivo non è ancora stato materializzato).
+        """
+        next_round = self._session.scalars(
+            select(FantasyRound)
+            .where(
+                FantasyRound.league_id == league_id,
+                FantasyRound.number == current_number + 1,
+            )
+            .with_for_update()
+        ).first()
+        if next_round is None:
+            return False
+        return self._try_auto_open(
+            next_round,
+            now=datetime.now(UTC),
+            actor_id=actor_id,
+            trigger="homologation",
+        )
 
     def _open_round(
         self,

@@ -130,9 +130,14 @@ def list_pending_fixtures(
     response_model=FantasyCalendarRefreshJobResponse,
 )
 def start_calendar_refresh(
-    league_access: LeagueAccess = Depends(require_league_permissions(Permission.LEAGUE_ADMIN)),
+    league_access: LeagueAccess = Depends(require_league_permissions(Permission.GLOBAL_OPERATE)),
 ) -> FantasyCalendarRefreshJobResponse:
-    """Avvia il comando unico "Aggiorna calendario" (sync provider + backfill stagionale)."""
+    """Avvia il comando unico "Aggiorna calendario" (sync provider + backfill stagionale).
+
+    Solo operatore di piattaforma (EP-turni-automazione): il refresh gira già
+    da solo ogni 6 ore per tutte le leghe attive, questo endpoint resta
+    l'override manuale puntuale per una singola lega.
+    """
     from fantasy_turns.tasks import refresh_full_calendar_task
 
     job_id = new_job_id()
@@ -165,7 +170,7 @@ def start_calendar_refresh(
 )
 def get_calendar_refresh_progress(
     job_id: str,
-    league_access: LeagueAccess = Depends(require_league_permissions(Permission.LEAGUE_ADMIN)),
+    league_access: LeagueAccess = Depends(require_league_permissions(Permission.GLOBAL_OPERATE)),
 ) -> FantasyCalendarRefreshProgressResponse | JSONResponse:
     progress = load_progress(job_id)
     if progress is None or progress.league_id != str(league_access.league.id):
@@ -223,10 +228,15 @@ def generate_fantasy_turn(
 @router.post("/{league_id}/turni/{round_id}/apri", response_model=FantasyTurnDetailResponse)
 def open_fantasy_turn(
     round_id: UUID,
-    league_access: LeagueAccess = Depends(require_league_permissions(Permission.LEAGUE_ADMIN)),
+    league_access: LeagueAccess = Depends(require_league_permissions(Permission.GLOBAL_OPERATE)),
     service: FantasyTurnService = Depends(get_fantasy_turn_service),
 ) -> FantasyTurnDetailResponse | JSONResponse:
-    """Apre un turno programmato (scheduled → open)."""
+    """Apre un turno programmato (scheduled → open).
+
+    Solo operatore di piattaforma (EP-turni-automazione): l'apertura è
+    ormai automatica alla omologazione del turno precedente, questo resta
+    l'override manuale per i casi eccezionali.
+    """
     try:
         return service.open_turn(league_access, round_id)
     except AuthError as exc:
@@ -256,10 +266,13 @@ def exclude_fantasy_turn_fixture(
 )
 def recalculate_fantasy_turn_cutoff(
     round_id: UUID,
-    league_access: LeagueAccess = Depends(require_league_permissions(Permission.LEAGUE_ADMIN)),
+    league_access: LeagueAccess = Depends(require_league_permissions(Permission.GLOBAL_OPERATE)),
     service: FantasyTurnService = Depends(get_fantasy_turn_service),
 ) -> FantasyTurnDetailResponse | JSONResponse:
-    """Ricalcola cutoff e stato effettivo dagli orari fixture correnti."""
+    """Ricalcola cutoff e stato effettivo dagli orari fixture correnti.
+
+    Solo operatore di piattaforma (EP-turni-automazione).
+    """
     try:
         return service.recalculate_cutoff(league_access, round_id)
     except AuthError as exc:

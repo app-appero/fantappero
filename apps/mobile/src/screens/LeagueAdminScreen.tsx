@@ -51,6 +51,7 @@ function buildPayloadFromRules(rules: LeagueRules): UpdateLeagueRulesRequest {
     totalCredits: rules.totalCredits,
     minFixturesPerRound: rules.minFixturesPerRound,
     turnCoverageThreshold: rules.turnCoverageThreshold,
+    lineupLockMarginMinutes: rules.lineupLockMarginMinutes,
     minutesThreshold: rules.minutesThreshold,
     options: { ...rules.options },
   };
@@ -103,6 +104,7 @@ export function LeagueAdminScreen() {
   const [deleteSuccess, setDeleteSuccess] = useState<string | null>(null);
   const [participantCountText, setParticipantCountText] = useState("8");
   const [minutesThresholdText, setMinutesThresholdText] = useState("15");
+  const [lockMarginText, setLockMarginText] = useState("15");
 
   const loadAll = useCallback(
     async (options?: { silent?: boolean }) => {
@@ -130,6 +132,7 @@ export function LeagueAdminScreen() {
         setLifecycle(panel.lifecycle);
         setParticipantCountText(String(panel.rules.participantCount));
         setMinutesThresholdText(String(panel.rules.minutesThreshold));
+        setLockMarginText(String(panel.rules.lineupLockMarginMinutes));
         setMembers(memberRows);
         setInvites(inviteRows);
         setCalendar(cal);
@@ -175,6 +178,7 @@ export function LeagueAdminScreen() {
       ...rules,
       participantCount: Number(participantCountText) || rules.participantCount,
       minutesThreshold: Number(minutesThresholdText) || rules.minutesThreshold,
+      lineupLockMarginMinutes: Number(lockMarginText) || rules.lineupLockMarginMinutes,
     };
     if (!leagueId || !accessToken) {
       setActionError("Seleziona una lega e accedi di nuovo.");
@@ -431,6 +435,20 @@ export function LeagueAdminScreen() {
             accessibilityLabel="Soglia minuti per il voto"
             testID="league-admin-minutes-threshold"
           />
+          <Text style={styles.label}>Margine di preavviso lock formazione (minuti)</Text>
+          <TextInput
+            value={lockMarginText}
+            onChangeText={setLockMarginText}
+            keyboardType="number-pad"
+            editable={canConfigure}
+            style={styles.input}
+            accessibilityLabel="Margine di preavviso lock formazione"
+            testID="league-admin-lock-margin"
+          />
+          <Text style={styles.body} testID="league-admin-lock-margin-hint">
+            Un giocatore si blocca in formazione questi minuti prima dell&apos;inizio della sua
+            partita reale — non del turno intero: la formazione a step resta invariata.
+          </Text>
           <View style={styles.switchRow}>
             <Text style={styles.body}>Scambi consentiti</Text>
             <Switch

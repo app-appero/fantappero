@@ -92,3 +92,63 @@ export interface AdminListoneRefreshProgress {
   errorCode?: string | null;
   result?: AdminListoneRefreshResult | null;
 }
+
+/**
+ * Pannello operatore — turni, calendario, formazioni IA (EP-turni-automazione).
+ *
+ * Riga di sintesi per una lega attiva: il "turno corrente" è quello aperto,
+ * o il primo programmato, o l'ultimo esistente se la lega è a fine stagione.
+ */
+export interface AdminLeagueTurnStatus {
+  leagueId: string;
+  leagueName: string;
+  currentRoundId: string | null;
+  currentRoundNumber: number | null;
+  currentRoundStatus: string | null;
+  homologationStatus: string | null;
+  calendarUpdatedAt: string | null;
+}
+
+/** Esito di "Sincronizza turni" massivo (tutte le leghe attive). */
+export interface AdminTurniSyncResult {
+  leagues: number;
+  created: number;
+  opened: number;
+  upgraded: number;
+  duplicates: number;
+  waiting: number;
+}
+
+/** Esito di "Genera formazioni AI" massivo (tutte le leghe attive). */
+export interface AdminAiLineupsSyncResult {
+  rounds: number;
+  teamsUpdated: number;
+  teamsSkipped: number;
+}
+
+export interface AdminCalendarSyncJob {
+  jobId: string;
+  status: string;
+  message: string;
+}
+
+/** Esito di "Genera calendario" massivo (tutte le leghe attive). */
+export interface AdminCalendarSyncResult {
+  leagues: number;
+  refreshed: number;
+  failed: number;
+  fixturesCreated: number;
+  fixturesUpdated: number;
+  roundsRealigned: number;
+  roundsRemoved: number;
+}
+
+export interface AdminCalendarSyncProgress {
+  jobId: string;
+  status: "queued" | "running" | "completed" | "failed" | string;
+  percent: number;
+  stage: string;
+  message: string;
+  errorCode?: string | null;
+  result?: AdminCalendarSyncResult | null;
+}

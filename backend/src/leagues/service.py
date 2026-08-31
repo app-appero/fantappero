@@ -18,7 +18,11 @@ from database.enums import (
     LeagueState,
     league_member_role_to_league_role,
 )
-from fantasy_lineups.rules import STANDARD_AUTOMATIC_SUBSTITUTIONS
+from fantasy_lineups.rules import (
+    DEFAULT_LINEUP_LOCK_MARGIN_MINUTES,
+    STANDARD_AUTOMATIC_SUBSTITUTIONS,
+)
+from fantasy_lineups.validators import validate_lineup_lock_margin_minutes
 from fantasy_ratings.eligibility import STANDARD_MINUTES_THRESHOLD
 from fantasy_teams.composition_service import activation_roster_and_credit_blockers
 from fantasy_teams.factory import ensure_team_for_membership
@@ -137,6 +141,7 @@ class LeagueService:
                 total_credits=STANDARD_TOTAL_CREDITS,
                 min_fixtures_per_round=STANDARD_MIN_FIXTURES,
                 turn_coverage_threshold=Decimal(str(DEFAULT_COVERAGE_THRESHOLD)),
+                lineup_lock_margin_minutes=DEFAULT_LINEUP_LOCK_MARGIN_MINUTES,
                 minutes_threshold=STANDARD_MINUTES_THRESHOLD,
                 max_automatic_substitutions=STANDARD_AUTOMATIC_SUBSTITUTIONS,
                 allow_trades=True,
@@ -293,6 +298,11 @@ class LeagueService:
             if payload.turn_coverage_threshold is not None
             else rules.turn_coverage_threshold
         )
+        lineup_lock_margin_minutes = (
+            validate_lineup_lock_margin_minutes(payload.lineup_lock_margin_minutes)
+            if payload.lineup_lock_margin_minutes is not None
+            else rules.lineup_lock_margin_minutes
+        )
         minutes_threshold = (
             validate_minutes_threshold(payload.minutes_threshold)
             if payload.minutes_threshold is not None
@@ -328,6 +338,7 @@ class LeagueService:
             or rules.total_credits != total_credits
             or rules.min_fixtures_per_round != min_fixtures
             or rules.turn_coverage_threshold != turn_coverage_threshold
+            or rules.lineup_lock_margin_minutes != lineup_lock_margin_minutes
             or rules.minutes_threshold != minutes_threshold
             or rules.max_automatic_substitutions != max_automatic_substitutions
             or rules.voluntary_release_refund_percent != voluntary_release_refund_percent
@@ -351,6 +362,7 @@ class LeagueService:
         rules.total_credits = total_credits
         rules.min_fixtures_per_round = min_fixtures
         rules.turn_coverage_threshold = turn_coverage_threshold
+        rules.lineup_lock_margin_minutes = lineup_lock_margin_minutes
         rules.minutes_threshold = minutes_threshold
         rules.max_automatic_substitutions = max_automatic_substitutions
         rules.voluntary_release_refund_percent = voluntary_release_refund_percent
@@ -538,6 +550,7 @@ class LeagueService:
             totalCredits=rules.total_credits,
             minFixturesPerRound=rules.min_fixtures_per_round,
             turnCoverageThreshold=float(rules.turn_coverage_threshold),
+            lineupLockMarginMinutes=rules.lineup_lock_margin_minutes,
             minutesThreshold=rules.minutes_threshold,
             maxAutomaticSubstitutions=rules.max_automatic_substitutions,
             voluntaryReleaseRefundPercent=rules.voluntary_release_refund_percent,

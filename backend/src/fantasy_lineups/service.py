@@ -21,6 +21,7 @@ from database.enums import (
 )
 from fantasy_lineups.models import LineupDraft, LineupPlayer, LineupSubmission, TacticalMove
 from fantasy_lineups.rules import (
+    DEFAULT_LINEUP_LOCK_MARGIN_MINUTES,
     MAX_AUTOMATIC_SUBSTITUTIONS,
     MAX_TACTICAL_MOVES,
     LineupPlayerRef,
@@ -203,10 +204,11 @@ class FantasyLineupService:
             season_year=league_access.league.season_year,
             athlete_ids=[row.athlete_id for row in roster],
         )
+        lock_margin = self._lineup_lock_margin_for_league(league_access.league.id)
         locked_ids = [
             str(row.athlete_id)
             for row in roster
-            if self._is_row_locked(row.athlete_id, kickoffs, now)
+            if self._is_row_locked(row.athlete_id, kickoffs, now, lock_margin)
         ]
         submission = self._load_submission(fantasy_round.id, team.id, for_update=True)
         try:
@@ -412,10 +414,11 @@ class FantasyLineupService:
             season_year=league_access.league.season_year,
             athlete_ids=[row.athlete_id for row in roster],
         )
+        lock_margin = self._lineup_lock_margin_for_league(league_access.league.id)
         locked_ids = [
             str(row.athlete_id)
             for row in roster
-            if self._is_row_locked(row.athlete_id, kickoffs, now)
+            if self._is_row_locked(row.athlete_id, kickoffs, now, lock_margin)
         ]
         submission = self._load_submission(fantasy_round.id, team.id, for_update=True)
         copied = copy_previous_lineup(
@@ -543,10 +546,11 @@ class FantasyLineupService:
             season_year=league_access.league.season_year,
             athlete_ids=[row.athlete_id for row in roster],
         )
+        lock_margin = self._lineup_lock_margin_for_league(league_access.league.id)
         locked_ids = [
             str(row.athlete_id)
             for row in roster
-            if self._is_row_locked(row.athlete_id, kickoffs, now)
+            if self._is_row_locked(row.athlete_id, kickoffs, now, lock_margin)
         ]
         submission = self._load_submission(fantasy_round.id, team.id, for_update=True)
         filled_starters = [item for item in starter_ids if item]
@@ -691,8 +695,10 @@ class FantasyLineupService:
             season_year=season_year,
             athlete_ids=[row.athlete_id for row in roster],
         )
+        lock_margin = self._lineup_lock_margin_for_league(league_id)
         locked_flags = {
-            row.athlete_id: self._is_row_locked(row.athlete_id, kickoffs, now) for row in roster
+            row.athlete_id: self._is_row_locked(row.athlete_id, kickoffs, now, lock_margin)
+            for row in roster
         }
         any_unlocked = any(not locked for locked in locked_flags.values()) if roster else True
         turn_editable = is_lineup_modification_allowed(stored=fantasy_round.status)
@@ -891,6 +897,7 @@ class FantasyLineupService:
         athlete_id: UUID,
         kickoffs: dict[UUID, _KickoffRef],
         now: datetime,
+        margin_minutes: int,
     ) -> bool:
         ref = kickoffs.get(athlete_id)
         if ref is None:
@@ -900,7 +907,16 @@ class FantasyLineupService:
             kickoff_at=ref.kickoff_at,
             status_short=ref.status_short,
             lock_latched=ref.lock_latched,
+            margin_minutes=margin_minutes,
         )
+
+    def _lineup_lock_margin_for_league(self, league_id: UUID) -> int:
+        margin = self._session.execute(
+            select(LeagueRules.lineup_lock_margin_minutes).where(
+                LeagueRules.league_id == league_id
+            )
+        ).scalar_one_or_none()
+        return margin if margin is not None else DEFAULT_LINEUP_LOCK_MARGIN_MINUTES
 
     def _max_automatic_substitutions_for_league(self, league_id: UUID) -> int:
         rules = self._session.execute(

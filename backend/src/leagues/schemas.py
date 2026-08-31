@@ -51,6 +51,9 @@ class LeagueRulesResponse(ApiModel):
     # Frazione degli 11 titolari che ogni fantallenatore deve poter schierare
     # perché una giornata diventi un Turno Europeo valido.
     turn_coverage_threshold: float = Field(alias="turnCoverageThreshold")
+    # Minuti di preavviso prima del kickoff reale del singolo giocatore oltre
+    # cui si blocca in formazione (formazione a step, per-atleta).
+    lineup_lock_margin_minutes: int = Field(alias="lineupLockMarginMinutes")
     minutes_threshold: int = Field(alias="minutesThreshold")
     max_automatic_substitutions: int = Field(alias="maxAutomaticSubstitutions")
     voluntary_release_refund_percent: int = Field(alias="voluntaryReleaseRefundPercent")
@@ -83,6 +86,9 @@ class UpdateLeagueRulesRequest(ApiModel):
     min_fixtures_per_round: int | None = Field(default=None, alias="minFixturesPerRound")
     turn_coverage_threshold: float | None = Field(
         default=None, alias="turnCoverageThreshold"
+    )
+    lineup_lock_margin_minutes: int | None = Field(
+        default=None, alias="lineupLockMarginMinutes"
     )
     minutes_threshold: int | None = Field(default=None, alias="minutesThreshold")
     max_automatic_substitutions: int | None = Field(default=None, alias="maxAutomaticSubstitutions")

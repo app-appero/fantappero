@@ -1,9 +1,4 @@
-import type {
-  AiLineupRun,
-  H2HCalendar,
-  H2HCalendarMatchup,
-  H2HCalendarRound,
-} from "@fantappero/contracts";
+import type { H2HCalendar, H2HCalendarMatchup, H2HCalendarRound } from "@fantappero/contracts";
 import {
   H2H_GOALS_LABEL,
   H2H_POINTS_LABEL,
@@ -26,20 +21,7 @@ type Props = {
   error: string | null;
   liveDegraded: boolean;
   canAdmin: boolean;
-  aiLineupBusy?: boolean;
-  aiLineupRun?: AiLineupRun | null;
-  aiLineupError?: string | null;
-  onGenerateAiLineups?: (roundId: string) => void;
   onRetry: () => void;
-};
-
-const AI_OUTCOME_LABEL: Record<string, string> = {
-  created: "Formazione creata",
-  updated: "Formazione aggiornata",
-  unchanged: "Formazione già valida",
-  skipped_locked: "Formazione bloccata, nessuna modifica",
-  skipped_manual: "Formazione manuale preservata",
-  incomplete: "Formazione non generata",
 };
 
 const KICKOFF_FORMATTER = new Intl.DateTimeFormat("it-IT", {
@@ -197,10 +179,6 @@ export function MatchdayH2HPanel({
   error,
   liveDegraded,
   canAdmin,
-  aiLineupBusy = false,
-  aiLineupRun = null,
-  aiLineupError = null,
-  onGenerateAiLineups = () => undefined,
   onRetry,
 }: Props) {
   const [selectedRound, setSelectedRound] = useState<number | null>(() =>
@@ -332,48 +310,6 @@ export function MatchdayH2HPanel({
           ) : null}
         </div>
       </header>
-
-      {canAdmin && activeRound?.fantasyRoundId ? (
-        <section data-testid="h2h-ai-admin">
-          <h2>Formazioni dei fantallenatori AI</h2>
-          <p>
-            Genera le formazioni valide delle sole squadre controllate dall’AI per questa
-            giornata. Le formazioni umane e quelle già bloccate non vengono modificate.
-          </p>
-          <Button
-            type="button"
-            disabled={aiLineupBusy}
-            onClick={() => onGenerateAiLineups(activeRound.fantasyRoundId as string)}
-            data-testid="h2h-generate-ai-lineups"
-          >
-            {aiLineupBusy ? "Generazione in corso…" : "Genera formazioni AI"}
-          </Button>
-          {aiLineupRun?.roundId === activeRound.fantasyRoundId ? (
-            <div data-testid="h2h-ai-result">
-              <p>{aiLineupRun.summary}</p>
-              {aiLineupRun.teams.length > 0 ? (
-                <ul>
-                  {aiLineupRun.teams.map((team) => (
-                    <li key={team.fantasyTeamId}>
-                      <strong>{team.fantasyTeamName || team.fantasyTeamId}</strong>: {" "}
-                      {AI_OUTCOME_LABEL[team.outcome] ?? team.outcome}
-                      {team.message ? ` — ${team.message}` : ""}
-                    </li>
-                  ))}
-                </ul>
-              ) : null}
-            </div>
-          ) : null}
-          {aiLineupError ? (
-            <UiStatePanel
-              state="error"
-              title="Formazioni AI non generate"
-              message={aiLineupError}
-              testId="h2h-ai-error"
-            />
-          ) : null}
-        </section>
-      ) : null}
 
       {activeRound ? (
         <section

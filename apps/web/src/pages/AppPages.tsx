@@ -21,6 +21,7 @@ export { MatchupDetailPage } from "./MatchupDetailPage";
 export { AdminDashboardPage } from "./AdminDashboardPage";
 export { AdminLeaguesPage } from "./AdminLeaguesPage";
 export { AdminListonePage } from "./AdminListonePage";
+export { AdminTurniPage } from "./AdminTurniPage";
 export { AdminUsersPage } from "./AdminUsersPage";
 export { RosterPage } from "./RosterPage";
 export { StandingsPage } from "./StandingsPage";

@@ -26,6 +26,21 @@ def validate_max_automatic_substitutions_override(value: int) -> int:
         ) from exc
 
 
+#: Estremi del margine di preavviso del lock per-giocatore (EP-turni-automazione).
+MIN_LINEUP_LOCK_MARGIN_MINUTES = 0
+MAX_LINEUP_LOCK_MARGIN_MINUTES = 60
+
+
+def validate_lineup_lock_margin_minutes(value: int) -> int:
+    if value < MIN_LINEUP_LOCK_MARGIN_MINUTES or value > MAX_LINEUP_LOCK_MARGIN_MINUTES:
+        raise ValidationAuthError(
+            "Il margine di preavviso del lock deve essere tra "
+            f"{MIN_LINEUP_LOCK_MARGIN_MINUTES} e {MAX_LINEUP_LOCK_MARGIN_MINUTES} minuti.",
+            code="invalid_lineup_lock_margin_minutes",
+        )
+    return value
+
+
 def validate_athlete_id_list(values: list[UUID]) -> list[UUID]:
     if any(item is None for item in values):
         raise ValidationAuthError(

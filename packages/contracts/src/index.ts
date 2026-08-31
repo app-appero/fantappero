@@ -295,13 +295,19 @@ export {
 } from "./health.js";
 
 export type {
+  AdminAiLineupsSyncResult,
+  AdminCalendarSyncJob,
+  AdminCalendarSyncProgress,
+  AdminCalendarSyncResult,
   AdminLeague,
+  AdminLeagueTurnStatus,
   AdminListoneEntry,
   AdminListoneRefreshCounters,
   AdminListoneRefreshJob,
   AdminListoneRefreshProgress,
   AdminListoneRefreshResult,
   AdminOverview,
+  AdminTurniSyncResult,
   AdminUser,
   PaginatedAdminLeagues,
   PaginatedAdminUsers,

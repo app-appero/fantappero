@@ -38,6 +38,7 @@ const DEMO_RULES: LeagueRules = {
   totalCredits: 1000,
   minFixturesPerRound: 25,
   turnCoverageThreshold: 0.75,
+  lineupLockMarginMinutes: 15,
   minutesThreshold: 15,
   voluntaryReleaseRefundPercent: 50,
   leagueExitRefundPercent: 100,
@@ -71,6 +72,7 @@ function buildPayloadFromRules(rules: LeagueRules): UpdateLeagueRulesRequest {
     totalCredits: rules.totalCredits,
     minFixturesPerRound: rules.minFixturesPerRound,
     turnCoverageThreshold: rules.turnCoverageThreshold,
+    lineupLockMarginMinutes: rules.lineupLockMarginMinutes,
     minutesThreshold: rules.minutesThreshold,
     voluntaryReleaseRefundPercent: rules.voluntaryReleaseRefundPercent,
     leagueExitRefundPercent: rules.leagueExitRefundPercent,
@@ -311,6 +313,23 @@ export function LeagueAdminPage() {
               updateLocalRules({ minutesThreshold: Number(event.target.value) || 0 })
             }
           />
+
+          <Input
+            label="Margine di preavviso lock formazione (minuti)"
+            name="lineupLockMarginMinutes"
+            type="number"
+            min={0}
+            max={60}
+            disabled={!canConfigure}
+            value={String(rules.lineupLockMarginMinutes)}
+            onChange={(event) =>
+              updateLocalRules({ lineupLockMarginMinutes: Number(event.target.value) || 0 })
+            }
+          />
+          <p className="fa-field-hint" data-testid="league-admin-lock-margin-hint">
+            Un giocatore si blocca in formazione questi minuti prima dell&apos;inizio della sua
+            partita reale — non del turno intero: la formazione a step resta invariata.
+          </p>
 
           <fieldset data-testid="league-admin-roster" style={{ marginBottom: "1rem" }}>
             <legend>Rosa standard (fissa)</legend>

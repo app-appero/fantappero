@@ -107,6 +107,12 @@ export const ADMIN_NAV_ITEMS: readonly NavItemDefinition[] = [
     requiredPermissions: ["global:operate"],
     surface: "admin",
   },
+  {
+    id: "admin-turni",
+    path: "/admin/turni",
+    requiredPermissions: ["global:operate"],
+    surface: "admin",
+  },
 ];
 
 /**
@@ -144,6 +150,7 @@ export const NAV_LABELS: Record<string, string> = {
   "admin-leagues": "Leghe globali",
   "admin-users": "Utenti",
   "admin-listone": "Listone",
+  "admin-turni": "Turni",
 };
 
 /**

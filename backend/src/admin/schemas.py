@@ -52,6 +52,65 @@ class PaginatedAdminLeaguesResponse(ApiModel):
     total_pages: int = Field(alias="totalPages")
 
 
+class AdminLeagueTurnStatusResponse(ApiModel):
+    """Riga di sintesi per la scelta di un'azione puntuale (EP-turni-automazione)."""
+
+    league_id: str = Field(alias="leagueId")
+    league_name: str = Field(alias="leagueName")
+    current_round_id: str | None = Field(default=None, alias="currentRoundId")
+    current_round_number: int | None = Field(default=None, alias="currentRoundNumber")
+    current_round_status: str | None = Field(default=None, alias="currentRoundStatus")
+    homologation_status: str | None = Field(default=None, alias="homologationStatus")
+    calendar_updated_at: datetime | None = Field(default=None, alias="calendarUpdatedAt")
+
+
+class AdminTurniSyncResultResponse(ApiModel):
+    """Esito di `ensure_upcoming_for_active_leagues` innescato a mano."""
+
+    leagues: int
+    created: int
+    opened: int
+    upgraded: int
+    duplicates: int
+    waiting: int
+
+
+class AdminAiLineupsSyncResultResponse(ApiModel):
+    """Esito di `generate_ai_lineups_for_active_leagues` innescato a mano."""
+
+    rounds: int
+    teams_updated: int = Field(alias="teamsUpdated")
+    teams_skipped: int = Field(alias="teamsSkipped")
+
+
+class AdminCalendarSyncJobResponse(ApiModel):
+    job_id: str = Field(alias="jobId")
+    status: str
+    message: str
+
+
+class AdminCalendarSyncResultResponse(ApiModel):
+    """Esito di `refresh_full_calendar_for_active_leagues` innescato a mano."""
+
+    leagues: int
+    refreshed: int
+    failed: int
+    fixtures_created: int = Field(alias="fixturesCreated")
+    fixtures_updated: int = Field(alias="fixturesUpdated")
+    rounds_realigned: int = Field(alias="roundsRealigned")
+    rounds_removed: int = Field(alias="roundsRemoved")
+
+
+class AdminCalendarSyncProgressResponse(ApiModel):
+    job_id: str = Field(alias="jobId")
+    status: str
+    percent: int
+    stage: str
+    message: str
+    error_code: str | None = Field(default=None, alias="errorCode")
+    result: AdminCalendarSyncResultResponse | None = None
+
+
 class AdminListoneEntryResponse(ApiModel):
     athlete_id: str = Field(alias="athleteId")
     canonical_name: str = Field(alias="canonicalName")

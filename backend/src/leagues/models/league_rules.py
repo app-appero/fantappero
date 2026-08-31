@@ -55,6 +55,10 @@ class LeagueRules(Base, UUIDPrimaryKeyMixin, TimestampMixin):
             name="ck_league_rules_turn_coverage_threshold",
         ),
         CheckConstraint(
+            "lineup_lock_margin_minutes BETWEEN 0 AND 60",
+            name="ck_league_rules_lineup_lock_margin_minutes",
+        ),
+        CheckConstraint(
             "minutes_threshold BETWEEN 1 AND 30",
             name="ck_league_rules_minutes_threshold",
         ),
@@ -107,6 +111,14 @@ class LeagueRules(Base, UUIDPrimaryKeyMixin, TimestampMixin):
         Numeric(3, 2),
         nullable=False,
         server_default=text("0.75"),
+    )
+    # Minuti di preavviso prima del kickoff reale del singolo giocatore oltre
+    # cui si blocca in formazione (EP-turni-automazione): il lock è per
+    # atleta, non per turno — la "formazione a step" resta invariata.
+    lineup_lock_margin_minutes: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        server_default=text("15"),
     )
     minutes_threshold: Mapped[int] = mapped_column(
         Integer,

@@ -79,9 +79,9 @@ describe("Matchday page H2H + europei", () => {
     const html = renderRoute("/turni?persona=admin&stato=success&tab=europei");
     expect(html).toContain('data-testid="matchday-turn-detail"');
     expect(html).toContain('data-testid="matchday-turn-select"');
-    expect(html).toContain('data-testid="matchday-admin"');
-    expect(html).toContain('data-testid="matchday-refresh-calendar"');
-    expect(html).toContain("Genera calendario");
+    // EP-turni-automazione: "Genera calendario" non è più nella pagina di
+    // lega, è un'azione operatore in /admin/turni.
+    expect(html).not.toContain('data-testid="matchday-admin"');
     expect(html).toContain("West Ham");
     expect(html).toContain("Premier League");
     expect(html).toContain("Serie A");

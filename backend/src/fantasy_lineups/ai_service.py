@@ -20,6 +20,7 @@ from database.enums import (
     FantasyModule,
     FantasyRole,
     FantasyTurnStatus,
+    LeagueState,
     LineupSlotKind,
     UserType,
 )
@@ -33,6 +34,7 @@ from fantasy_lineups.ai_selection import (
 )
 from fantasy_lineups.models import LineupPlayer, LineupSubmission
 from fantasy_lineups.rules import (
+    DEFAULT_LINEUP_LOCK_MARGIN_MINUTES,
     LineupPlayerRef,
     evaluate_lineup,
     is_athlete_kickoff_locked,
@@ -45,6 +47,7 @@ from fantasy_teams.models import FantasyRosterSlot, FantasyTeam
 from fantasy_turns.models import FantasyRound, FantasyRoundFixture
 from leagues.models.league import League
 from leagues.models.league_membership import LeagueMembership
+from leagues.models.league_rules import LeagueRules
 from observability.logging import get_logger
 from observability.metrics import get_metrics
 from sports_data.fixtures.models import (
@@ -289,6 +292,7 @@ def _collect_candidates(
     fixtures_by_club = _round_fixtures_by_club(session, round_id=round_id)
     starters = _official_starters(session, round_id=round_id)
     form = _recent_form(session, league_id=league_id, athlete_ids=athlete_ids)
+    lock_margin = _lineup_lock_margin_for_league(session, league_id=league_id)
     # Stesso risolutore usato dal percorso umano: tiene conto degli override
     # di ruolo della lega e porta con sé il club di appartenenza.
     effective_roles = resolve_effective_athlete_roles(
@@ -317,6 +321,7 @@ def _collect_candidates(
                 now=decided_at,
                 kickoff_at=fixture.kickoff_at,
                 status_short=fixture.status_short,
+                margin_minutes=lock_margin,
             )
         )
         raw_starter, fetched_at = starters.get(slot.athlete_id, (None, None))
@@ -340,6 +345,14 @@ def _collect_candidates(
             )
         )
     return candidates
+
+
+def _lineup_lock_margin_for_league(session: Session, *, league_id: UUID) -> int:
+    """Stesso margine per-lega usato dal percorso umano (fantasy_lineups/service.py)."""
+    margin = session.execute(
+        select(LeagueRules.lineup_lock_margin_minutes).where(LeagueRules.league_id == league_id)
+    ).scalar_one_or_none()
+    return margin if margin is not None else DEFAULT_LINEUP_LOCK_MARGIN_MINUTES
 
 
 def _round_fixtures_by_club(session: Session, *, round_id: UUID) -> dict[UUID, Fixture]:
@@ -614,3 +627,44 @@ def run_ai_lineups_for_round(
         )
         for team_id in team_ids
     ]
+
+
+#: Stati turno per cui ha senso schierare: prima del lock definitivo.
+_OPEN_TURN_STATUSES = (FantasyTurnStatus.SCHEDULED, FantasyTurnStatus.OPEN)
+
+
+def generate_ai_lineups_for_active_leagues(session: Session) -> dict[str, int]:
+    """Schiera le squadre IA dei turni aperti di tutte le leghe attive.
+
+    Corpo puro, riusato sia dal task Celery periodico (`fantasy_lineups.
+    generate_ai`) sia dal pulsante massivo dell'operatore in `/admin`: stessa
+    logica, due modi di innescarla.
+    """
+    rounds_processed = 0
+    teams_updated = 0
+    teams_skipped = 0
+
+    rows = session.execute(
+        select(FantasyRound.id, FantasyRound.league_id)
+        .join(League, League.id == FantasyRound.league_id)
+        .where(
+            League.state == LeagueState.ACTIVE,
+            FantasyRound.status.in_(_OPEN_TURN_STATUSES),
+        )
+        .order_by(FantasyRound.league_id.asc(), FantasyRound.number.asc())
+    ).all()
+
+    for round_id, league_id in rows:
+        results = run_ai_lineups_for_round(session, league_id=league_id, round_id=round_id)
+        rounds_processed += 1
+        for item in results:
+            if item.outcome in {"created", "updated"}:
+                teams_updated += 1
+            else:
+                teams_skipped += 1
+
+    return {
+        "rounds": rounds_processed,
+        "teamsUpdated": teams_updated,
+        "teamsSkipped": teams_skipped,
+    }

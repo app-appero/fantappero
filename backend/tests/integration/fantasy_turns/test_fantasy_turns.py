@@ -25,6 +25,19 @@ from sports_data.catalog.models import Club, SportSeason
 from sports_data.fixtures.models import Fixture
 
 
+def _promote_to_operator(db_session: Session, user_id: UUID) -> None:
+    """Apri/ricalcola-cutoff/aggiorna-calendario sono ora azioni da
+    operatore di piattaforma (EP-turni-automazione), non più da admin di
+    lega: i test che le esercitano via HTTP devono autenticarsi come tale."""
+    from auth.models.user import User
+    from database.enums import PlatformRole
+
+    user = db_session.get(User, user_id)
+    assert user is not None
+    user.platform_role = PlatformRole.OPERATOR
+    db_session.commit()
+
+
 def _register_and_login(client: TestClient, email: str) -> tuple[str, UUID]:
     client.post(
         "/auth/register",
@@ -353,7 +366,7 @@ def test_exclude_before_open_and_reject_after_open(
     db_session: Session,
     competition_ids: list[str],
 ) -> None:
-    token, _ = _register_and_login(client, "turn.exclude@example.com")
+    token, user_id = _register_and_login(client, "turn.exclude@example.com")
     league_id = _create_league(client, token, competition_ids, "Lega Escludi")
     _set_min_fixtures(db_session, league_id, 10)
     today = datetime.now(UTC).date()
@@ -381,6 +394,7 @@ def test_exclude_before_open_and_reject_after_open(
     assert excluded.status_code == 200
     assert excluded.json()["fixtureCount"] == created.json()["fixtureCount"] - 1
 
+    _promote_to_operator(db_session, user_id)
     opened = client.post(
         f"/leagues/{league_id}/turni/{round_id}/apri",
         headers={"Authorization": f"Bearer {token}"},
@@ -402,7 +416,7 @@ def test_recalculate_cutoff_after_kickoff_change(
     db_session: Session,
     competition_ids: list[str],
 ) -> None:
-    token, _ = _register_and_login(client, "turn.cutoff@example.com")
+    token, user_id = _register_and_login(client, "turn.cutoff@example.com")
     league_id = _create_league(client, token, competition_ids, "Lega Cutoff")
     _set_min_fixtures(db_session, league_id, 10)
     kickoff = datetime(2026, 8, 15, 12, 0, tzinfo=UTC)
@@ -424,6 +438,7 @@ def test_recalculate_cutoff_after_kickoff_change(
     fixture.kickoff_at = datetime(2026, 8, 15, 11, 30, tzinfo=UTC)
     db_session.commit()
 
+    _promote_to_operator(db_session, user_id)
     recalculated = client.post(
         f"/leagues/{league_id}/turni/{round_id}/ricalcola-cutoff",
         headers={"Authorization": f"Bearer {token}"},
@@ -522,7 +537,7 @@ def test_recalculate_cutoff_does_not_move_later_after_elapsed_postponement(
     db_session: Session,
     competition_ids: list[str],
 ) -> None:
-    token, _ = _register_and_login(client, "turn.postpone@example.com")
+    token, user_id = _register_and_login(client, "turn.postpone@example.com")
     league_id = _create_league(client, token, competition_ids, "Lega Rinvii")
     _set_min_fixtures(db_session, league_id, 10)
     rome = ZoneInfo("Europe/Rome")
@@ -573,6 +588,7 @@ def test_recalculate_cutoff_does_not_move_later_after_elapsed_postponement(
     fixture.status_short = "PST"
     db_session.commit()
 
+    _promote_to_operator(db_session, user_id)
     recalculated = client.post(
         f"/leagues/{league_id}/turni/{round_id}/ricalcola-cutoff",
         headers={"Authorization": f"Bearer {token}"},
@@ -689,7 +705,7 @@ def test_kickoff_time_shift_before_elapsed_can_delay_cutoff(
     db_session: Session,
     competition_ids: list[str],
 ) -> None:
-    token, _ = _register_and_login(client, "turn.timeshift.before@example.com")
+    token, user_id = _register_and_login(client, "turn.timeshift.before@example.com")
     league_id = _create_league(client, token, competition_ids, "Lega Orario Prima")
     _set_min_fixtures(db_session, league_id, 10)
     first_kickoff = datetime(2026, 11, 7, 16, 0, tzinfo=UTC)
@@ -720,6 +736,7 @@ def test_kickoff_time_shift_before_elapsed_can_delay_cutoff(
         fixture.status_short = "NS"
     db_session.commit()
 
+    _promote_to_operator(db_session, user_id)
     recalculated = client.post(
         f"/leagues/{league_id}/turni/{round_id}/ricalcola-cutoff",
         headers={"Authorization": f"Bearer {token}"},
@@ -737,7 +754,7 @@ def test_kickoff_time_shift_after_elapsed_does_not_reopen(
     db_session: Session,
     competition_ids: list[str],
 ) -> None:
-    token, _ = _register_and_login(client, "turn.timeshift.after@example.com")
+    token, user_id = _register_and_login(client, "turn.timeshift.after@example.com")
     league_id = _create_league(client, token, competition_ids, "Lega Orario Dopo")
     _set_min_fixtures(db_session, league_id, 10)
     first_kickoff = datetime(2026, 11, 14, 16, 0, tzinfo=UTC)
@@ -785,6 +802,7 @@ def test_kickoff_time_shift_after_elapsed_does_not_reopen(
         fixture.status_short = "NS"
     db_session.commit()
 
+    _promote_to_operator(db_session, user_id)
     recalculated = client.post(
         f"/leagues/{league_id}/turni/{round_id}/ricalcola-cutoff",
         headers={"Authorization": f"Bearer {token}"},

@@ -85,6 +85,67 @@ def refresh_full_calendar_active_leagues_task() -> dict[str, int]:
     return totals
 
 
+@celery_app.task(name="fantasy_turns.refresh_full_calendar_active_leagues_now")
+def refresh_full_calendar_active_leagues_now_task(*, job_id: str, actor_id: str | None) -> dict:
+    """Azione massiva dell'operatore: "Aggiorna calendario" per tutte le leghe
+    attive, on-demand invece che al prossimo giro del cron 6h.
+
+    Stesso corpo del cron periodico (`refresh_full_calendar_active_leagues_task`)
+    — isola già i fallimenti per lega — solo tracciato come job con progress
+    perché può iterare molte leghe e ognuna chiama il provider esterno.
+    """
+    settings = get_api_settings()
+    engine = create_engine_from_url(settings.database_url)
+    factory = create_session_factory(engine)
+
+    PLATFORM_SCOPE = "platform"
+    try:
+        save_progress(
+            CalendarRefreshProgress(
+                job_id=job_id,
+                league_id=PLATFORM_SCOPE,
+                status="running",
+                percent=1,
+                stage="running",
+                message="Aggiornamento calendario avviato per tutte le leghe attive…",
+            )
+        )
+        with session_scope(factory) as session:
+            totals = FantasyTurnService(session).refresh_full_calendar_for_active_leagues()
+        message = (
+            f"Leghe attive: {totals['leagues']}, aggiornate: {totals['refreshed']}, "
+            f"fallite: {totals['failed']}. Fixture nuove: {totals['fixturesCreated']}, "
+            f"aggiornate: {totals['fixturesUpdated']}."
+        )
+        save_progress(
+            CalendarRefreshProgress(
+                job_id=job_id,
+                league_id=PLATFORM_SCOPE,
+                status="completed",
+                percent=100,
+                stage="completed",
+                message=message,
+                result=totals,
+            )
+        )
+        return {"status": "completed", "job_id": job_id, "actor_id": actor_id}
+    except Exception:
+        save_progress(
+            CalendarRefreshProgress(
+                job_id=job_id,
+                league_id=PLATFORM_SCOPE,
+                status="failed",
+                percent=0,
+                stage="failed",
+                message="Aggiornamento calendario massivo non riuscito.",
+                error_code="calendar_refresh_failed",
+            )
+        )
+        raise
+    finally:
+        engine.dispose()
+
+
 @celery_app.task(name="fantasy_turns.refresh_full_calendar_from_provider")
 def refresh_full_calendar_task(*, job_id: str, league_id: str, actor_id: str | None) -> dict:
     """Comando admin "Aggiorna calendario": sync provider + backfill stagionale."""

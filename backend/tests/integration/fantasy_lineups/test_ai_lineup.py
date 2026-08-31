@@ -266,7 +266,7 @@ def test_ai_lineup_never_touches_a_human_team(
     )
 
 
-def test_admin_endpoint_is_authorized_audited_and_human_safe(
+def test_operator_endpoint_is_authorized_audited_and_human_safe(
     client: TestClient,
     db_session: Session,
     scenario: dict[str, object],
@@ -306,6 +306,17 @@ def test_admin_endpoint_is_authorized_audited_and_human_safe(
         headers={"Authorization": f"Bearer {member_token}"},
     )
     assert forbidden.status_code == 403
+
+    # EP-turni-automazione: l'admin di lega non ha più accesso, solo
+    # l'operatore di piattaforma.
+    owner_forbidden = client.post(
+        endpoint,
+        headers={"Authorization": f"Bearer {owner_token}"},
+    )
+    assert owner_forbidden.status_code == 403
+
+    owner.platform_role = PlatformRole.OPERATOR
+    db_session.commit()
 
     response = client.post(
         endpoint,

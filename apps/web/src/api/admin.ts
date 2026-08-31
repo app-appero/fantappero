@@ -1,9 +1,15 @@
 import type {
+  AdminAiLineupsSyncResult,
+  AdminCalendarSyncJob,
+  AdminCalendarSyncProgress,
+  AdminCalendarSyncResult,
+  AdminLeagueTurnStatus,
   AdminListoneEntry,
   AdminListoneRefreshJob,
   AdminListoneRefreshProgress,
   AdminListoneRefreshResult,
   AdminOverview,
+  AdminTurniSyncResult,
   AdminUser,
   PaginatedAdminLeagues,
   PaginatedAdminUsers,
@@ -112,6 +118,79 @@ export async function refreshAdminListone(
       throw new Error(
         progress.message ||
           "Aggiornamento listone non riuscito (controlla quota API-Football / worker).",
+      );
+    }
+    await new Promise((resolve) => {
+      window.setTimeout(resolve, pollIntervalMs);
+    });
+  }
+}
+
+// --- Pannello operatore: turni, calendario, formazioni IA (EP-turni-automazione) ---
+
+export function fetchAdminLeagueTurnStatus(
+  accessToken: string,
+): Promise<AdminLeagueTurnStatus[]> {
+  return apiRequest<AdminLeagueTurnStatus[]>("/admin/turni/leghe", { accessToken });
+}
+
+export function syncAllLeagueTurns(accessToken: string): Promise<AdminTurniSyncResult> {
+  return apiRequest<AdminTurniSyncResult>("/admin/turni/sincronizza", {
+    accessToken,
+    method: "POST",
+  });
+}
+
+export function generateAllAiLineups(accessToken: string): Promise<AdminAiLineupsSyncResult> {
+  return apiRequest<AdminAiLineupsSyncResult>("/admin/formazioni-ia/genera", {
+    accessToken,
+    method: "POST",
+  });
+}
+
+export function startCalendarSyncAllLeagues(
+  accessToken: string,
+): Promise<AdminCalendarSyncJob> {
+  return apiRequest<AdminCalendarSyncJob>("/admin/calendario/sincronizza", {
+    accessToken,
+    method: "POST",
+  });
+}
+
+export function fetchCalendarSyncAllLeaguesProgress(
+  accessToken: string,
+  jobId: string,
+): Promise<AdminCalendarSyncProgress> {
+  return apiRequest<AdminCalendarSyncProgress>(`/admin/calendario/sincronizza/${jobId}`, {
+    accessToken,
+  });
+}
+
+export async function syncCalendarForAllLeagues(
+  accessToken: string,
+  options?: {
+    onProgress?: (progress: AdminCalendarSyncProgress) => void;
+    pollIntervalMs?: number;
+  },
+): Promise<AdminCalendarSyncResult> {
+  const started = await startCalendarSyncAllLeagues(accessToken);
+  if (!started.jobId) {
+    throw new Error("Aggiornamento avviato ma senza jobId. Ricarica la pagina e riprova.");
+  }
+  const pollIntervalMs = options?.pollIntervalMs ?? 800;
+  for (;;) {
+    const progress = await fetchCalendarSyncAllLeaguesProgress(accessToken, started.jobId);
+    options?.onProgress?.(progress);
+    if (progress.status === "completed") {
+      if (!progress.result) {
+        throw new Error("Aggiornamento completato senza risultato.");
+      }
+      return progress.result;
+    }
+    if (progress.status === "failed") {
+      throw new Error(
+        progress.message ||
+          "Aggiornamento calendario massivo non riuscito (controlla quota API-Football / worker).",
       );
     }
     await new Promise((resolve) => {

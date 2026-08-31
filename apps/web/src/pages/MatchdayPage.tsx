@@ -1,5 +1,4 @@
 import type {
-  AiLineupRun,
   FantasyTurnDetail,
   FantasyTurnFixture,
   FantasyTurnSummary,
@@ -35,10 +34,6 @@ import {
   fetchFantasyTurns,
   fetchH2HCalendar,
   fetchPendingFixtures,
-  openFantasyTurn,
-  recalculateFantasyTurnCutoff,
-  refreshFullCalendar,
-  runAiLineups,
 } from "../api/leagues";
 import { getApiErrorMessage, useAuth } from "../auth/AuthContext";
 import { loadStoredSession } from "../auth/sessionStorage";
@@ -373,17 +368,6 @@ export function MatchdayPage() {
   });
   const [actionError, setActionError] = useState<string | null>(null);
   const [actionMessage, setActionMessage] = useState<string | null>(null);
-  const [aiLineupBusy, setAiLineupBusy] = useState(false);
-  const [aiLineupRun, setAiLineupRun] = useState<AiLineupRun | null>(null);
-  const [aiLineupError, setAiLineupError] = useState<string | null>(null);
-  const [refreshingCalendar, setRefreshingCalendar] = useState(false);
-  const [calendarRefreshProgress, setCalendarRefreshProgress] = useState<{
-    percent: number;
-    stage: string;
-    message: string;
-  } | null>(null);
-  const [calendarRefreshError, setCalendarRefreshError] = useState<string | null>(null);
-  const [calendarRefreshSuccess, setCalendarRefreshSuccess] = useState<string | null>(null);
 
   const isAdmin = can(["league:admin"]);
   const canView = can(["matchday:view"]);
@@ -574,68 +558,6 @@ export function MatchdayPage() {
     }
   }
 
-  async function runRefreshCalendar() {
-    if (isDemoMode) {
-      setCalendarRefreshSuccess("Calendario aggiornato (demo).");
-      setSelected(DEMO_TURN);
-      setTurns([DEMO_TURN]);
-      return;
-    }
-    const session = loadStoredSession();
-    if (!session?.accessToken || !activeLeagueId) {
-      return;
-    }
-    setRefreshingCalendar(true);
-    setCalendarRefreshError(null);
-    setCalendarRefreshSuccess(null);
-    setCalendarRefreshProgress({ percent: 0, stage: "queued", message: "Avvio in corso…" });
-    try {
-      const result = await refreshFullCalendar(session.accessToken, activeLeagueId, {
-        onProgress: (progress) =>
-          setCalendarRefreshProgress({
-            percent: progress.percent,
-            stage: progress.stage,
-            message: progress.message,
-          }),
-      });
-      setCalendarRefreshSuccess(result.message);
-      await loadTurns();
-      await loadPendingFixtures();
-    } catch (error) {
-      setCalendarRefreshError(getApiErrorMessage(error, "Aggiornamento calendario non riuscito."));
-    } finally {
-      setRefreshingCalendar(false);
-      setCalendarRefreshProgress(null);
-    }
-  }
-
-  async function runOpen() {
-    if (!selected) {
-      return;
-    }
-    if (isDemoMode) {
-      setSelected({ ...selected, status: "open", effectiveStatus: "open", opensAt: new Date().toISOString(), modificationAllowed: false });
-      setActionMessage("Turno aperto (demo).");
-      return;
-    }
-    const session = loadStoredSession();
-    if (!session?.accessToken || !activeLeagueId) {
-      return;
-    }
-    setBusy(true);
-    setActionError(null);
-    try {
-      const detail = await openFantasyTurn(session.accessToken, activeLeagueId, selected.id);
-      setSelected(detail);
-      setActionMessage(`Turno ${detail.number} aperto.`);
-      await loadTurns();
-    } catch (error) {
-      setActionError(getApiErrorMessage(error, "Apertura turno non riuscita."));
-    } finally {
-      setBusy(false);
-    }
-  }
-
   async function runExclude(fixtureId: string) {
     if (!selected) {
       return;
@@ -666,62 +588,6 @@ export function MatchdayPage() {
       setActionError(getApiErrorMessage(error, "Esclusione non consentita."));
     } finally {
       setBusy(false);
-    }
-  }
-
-  async function runRecalculate() {
-    if (!selected) {
-      return;
-    }
-    if (isDemoMode) {
-      setActionMessage("Cutoff ricalcolato (demo).");
-      return;
-    }
-    const session = loadStoredSession();
-    if (!session?.accessToken || !activeLeagueId) {
-      return;
-    }
-    setBusy(true);
-    setActionError(null);
-    try {
-      const detail = await recalculateFantasyTurnCutoff(
-        session.accessToken,
-        activeLeagueId,
-        selected.id,
-      );
-      setSelected(detail);
-      setActionMessage("Cutoff aggiornato dagli orari correnti.");
-    } catch (error) {
-      setActionError(getApiErrorMessage(error, "Ricalcolo cutoff non riuscito."));
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function generateAiLineups(roundId: string) {
-    if (isDemoMode) {
-      setAiLineupRun({
-        roundId,
-        algorithmVersion: "ai_lineup_v1",
-        dryRun: false,
-        teams: [],
-        summary: "Formazioni AI gestite: 0/0 nella lega demo",
-      });
-      return;
-    }
-    const session = loadStoredSession();
-    if (!session?.accessToken || !activeLeagueId) {
-      return;
-    }
-    setAiLineupBusy(true);
-    setAiLineupError(null);
-    try {
-      setAiLineupRun(await runAiLineups(session.accessToken, activeLeagueId, roundId, false));
-      await loadH2H();
-    } catch (error) {
-      setAiLineupError(getApiErrorMessage(error, "Generazione delle formazioni AI non riuscita."));
-    } finally {
-      setAiLineupBusy(false);
     }
   }
 
@@ -756,59 +622,6 @@ export function MatchdayPage() {
       ) : null}
 
       {!showForbidden && (activeLeagueId || isDemoMode) ? (
-        <>
-          {isAdmin ? (
-            <Card data-testid="matchday-admin">
-              <CardHeader title="Calendario della lega" />
-              <CardBody>
-                <p>
-                  Recupera dal provider le partite dei campionati scelti, ne ricava i Turni
-                  Europei validi della stagione e genera da quelli le giornate dei
-                  fantallenatori. Le due sezioni restano sempre allineate.
-                </p>
-                <div className="fa-ds-showcase__row">
-                  <Button
-                    type="button"
-                    loading={refreshingCalendar}
-                    disabled={refreshingCalendar}
-                    onClick={() => void runRefreshCalendar()}
-                    data-testid="matchday-refresh-calendar"
-                  >
-                    Genera calendario
-                  </Button>
-                </div>
-                {refreshingCalendar ? (
-                  <UiStatePanel
-                    state="loading"
-                    title="Generazione in corso"
-                    message={
-                      calendarRefreshProgress
-                        ? `${calendarRefreshProgress.message} (${calendarRefreshProgress.percent}%)`
-                        : "Avvio in corso…"
-                    }
-                    testId="matchday-refresh-progress"
-                  />
-                ) : null}
-                {!refreshingCalendar && calendarRefreshError ? (
-                  <UiStatePanel
-                    state="error"
-                    title="Generazione non riuscita"
-                    message={calendarRefreshError}
-                    testId="matchday-refresh-error"
-                  />
-                ) : null}
-                {!refreshingCalendar && calendarRefreshSuccess ? (
-                  <UiStatePanel
-                    state="success"
-                    title="Calendario generato"
-                    message={calendarRefreshSuccess}
-                    testId="matchday-refresh-success"
-                  />
-                ) : null}
-              </CardBody>
-            </Card>
-          ) : null}
-
           <Tabs value={tab} onValueChange={(value) => setTab(resolveMatchdayTab(value))}>
           <TabList aria-label="Sezioni turni">
             <Tab value="calendario">Calendario fantallenatori</Tab>
@@ -821,10 +634,6 @@ export function MatchdayPage() {
               error={h2hError}
               liveDegraded={h2hLiveDegraded}
               canAdmin={isAdmin}
-              aiLineupBusy={aiLineupBusy}
-              aiLineupRun={aiLineupRun}
-              aiLineupError={aiLineupError}
-              onGenerateAiLineups={(roundId) => void generateAiLineups(roundId)}
               onRetry={() => void loadH2H()}
             />
           </TabPanel>
@@ -917,30 +726,6 @@ export function MatchdayPage() {
                   </p>
                 ) : null}
                 {selected.skipReason ? <p>{selected.skipReason}</p> : null}
-
-                <div className="fa-ds-showcase__row">
-                  {isAdmin && selected.status === "scheduled" ? (
-                    <Button
-                      type="button"
-                      disabled={busy}
-                      onClick={() => void runOpen()}
-                      data-testid="matchday-open"
-                    >
-                      Apri turno
-                    </Button>
-                  ) : null}
-                  {isAdmin && selected.status !== "skipped" ? (
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      disabled={busy}
-                      onClick={() => void runRecalculate()}
-                      data-testid="matchday-recalc"
-                    >
-                      Ricalcola cutoff
-                    </Button>
-                  ) : null}
-                </div>
 
                 <div className="fa-matchday-competitions" data-testid="matchday-fixtures">
                   {groupFixturesByCompetition(selected.fixtures).map(
@@ -1045,8 +830,7 @@ export function MatchdayPage() {
               />
             ) : null}
           </TabPanel>
-          </Tabs>
-        </>
+        </Tabs>
       ) : null}
     </PageContainer>
   );
