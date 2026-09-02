@@ -56,6 +56,7 @@ export interface LineupRosterPlayer {
   lockLatched?: boolean;
   kickoffAt?: string | null;
   fixtureStatus?: string | null;
+  photoUrl?: string | null;
 }
 
 /**

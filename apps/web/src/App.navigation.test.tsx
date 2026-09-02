@@ -92,7 +92,7 @@ describe("App navigation shell (EPUI-03)", () => {
 
   it("renders formation view on formazione page", () => {
     const html = renderAt("/formazione");
-    expect(html).toContain('data-testid="formation-view"');
+    expect(html).toContain('data-testid="football-pitch"');
   });
 
   it("renders leagues list or empty state on /leghe", () => {

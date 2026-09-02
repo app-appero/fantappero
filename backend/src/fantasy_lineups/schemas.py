@@ -43,6 +43,7 @@ class LineupRosterPlayerResponse(ApiModel):
     lock_latched: bool = Field(default=False, alias="lockLatched")
     kickoff_at: datetime | None = Field(default=None, alias="kickoffAt")
     fixture_status: str | None = Field(default=None, alias="fixtureStatus")
+    photo_url: str | None = Field(default=None, alias="photoUrl")
 
 
 class LineupPlayerResponse(ApiModel):

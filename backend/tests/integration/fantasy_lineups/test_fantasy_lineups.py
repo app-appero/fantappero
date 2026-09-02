@@ -291,6 +291,47 @@ def test_full_roster_and_lineup_query_counts_are_bounded(
     assert lineup_queries <= 35
 
 
+def test_roster_exposes_athlete_photo_url_when_available(
+    client: TestClient,
+    db_session: Session,
+    competition_ids: list[str],
+) -> None:
+    """La foto del calciatore (Athlete.photo_url) arriva fino al roster della formazione."""
+    token, _ = _register_and_login(client, "lineup.photo@example.com")
+    league_id = _create_league(client, token, competition_ids, "Lega Foto Calciatori")
+    grouped = _seed_roster_athletes(db_session, id_offset=2_420_000)
+    athletes = _fill_validated_roster(db_session, league_id, grouped)
+
+    photographed = grouped["P"][0]
+    photographed.photo_url = "https://cdn.example.com/athletes/photo.jpg"
+    db_session.commit()
+
+    fantasy_round, _clubs = _create_open_round(
+        db_session,
+        league_id,
+        cutoff=datetime.now(UTC) + timedelta(hours=4),
+        id_offset=2_425_000,
+        competition_ids=competition_ids,
+    )
+    headers = {"Authorization": f"Bearer {token}"}
+    saved = client.put(
+        f"/leagues/{league_id}/turni/{fantasy_round.id}/formazione",
+        headers=headers,
+        json=_lineup_payload(athletes),
+    )
+    assert saved.status_code == 200
+
+    context = client.get(
+        f"/leagues/{league_id}/turni/{fantasy_round.id}/formazione",
+        headers=headers,
+    )
+    assert context.status_code == 200
+    roster_by_id = {row["athleteId"]: row for row in context.json()["roster"]}
+    assert roster_by_id[str(photographed.id)]["photoUrl"] == "https://cdn.example.com/athletes/photo.jpg"
+    other = grouped["P"][1]
+    assert roster_by_id[str(other.id)]["photoUrl"] is None
+
+
 def test_save_valid_module_and_reject_incompatible(
     client: TestClient,
     db_session: Session,

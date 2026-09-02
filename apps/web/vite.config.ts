@@ -7,6 +7,7 @@ export default defineConfig({
     port: 5174,
     strictPort: true,
     host: true,
+    allowedHosts: ["fantappero-web-dev.up.railway.app"],
     watch: {
       usePolling: true,
       interval: 300,

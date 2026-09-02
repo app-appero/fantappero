@@ -92,6 +92,7 @@ class _RosterRow:
     athlete_name: str
     role: FantasyRole | None
     slot_index: int
+    photo_url: str | None = None
 
 
 class FantasyLineupService:
@@ -737,6 +738,7 @@ class FantasyLineupService:
                     athlete_name=slot.athlete.canonical_name,
                     role=resolved.role if resolved is not None else None,
                     slot_index=slot.slot_index,
+                    photo_url=slot.athlete.photo_url,
                 )
             )
         return rows
@@ -876,6 +878,7 @@ class FantasyLineupService:
                         if row.athlete_id in kickoffs
                         else None
                     ),
+                    photoUrl=row.photo_url,
                 )
                 for row in roster
             ],

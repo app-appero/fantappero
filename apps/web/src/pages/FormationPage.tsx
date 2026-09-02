@@ -1,5 +1,4 @@
 import type {
-  AiLineupRun,
   FantasyModule,
   FantasyTurnSummary,
   LineupContext,
@@ -18,6 +17,7 @@ import {
   evaluateProgressiveLock,
   evaluateTacticalMove,
   isAthleteKickoffLocked,
+  layoutFromModule,
   moveBenchToIndex,
   orderedBenchFromRoster,
   preserveLockedStarters,
@@ -31,18 +31,18 @@ import {
   Card,
   CardBody,
   CardHeader,
-  FormationView,
+  FootballPitch,
   PageContainer,
   Select,
   UiStatePanel,
   roleBadgeVariant,
+  type PitchPlayer,
 } from "@fantappero/ui";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   fetchFantasyTurns,
   fetchMyLineup,
   copyPreviousLineupToDraft,
-  runAiLineups,
   saveLineupDraft,
   saveMyLineup,
 } from "../api/leagues";
@@ -56,17 +56,6 @@ const ROLE_LABEL: Record<LineupRole, string> = {
   D: "Difensore",
   C: "Centrocampista",
   A: "Attaccante",
-};
-
-/** Esito del calcolo automatico per squadra (EP13-P05). */
-const AI_OUTCOME_LABEL: Record<string, string> = {
-  created: "Creata",
-  updated: "Aggiornata",
-  preview: "Anteprima",
-  skipped_not_ai: "Squadra manuale, ignorata",
-  skipped_locked: "Lock progressivo attivo, invariata",
-  skipped_manual: "Formazione manuale esistente, non sovrascritta",
-  incomplete: "Rosa insufficiente per il modulo",
 };
 
 const DEMO_ROSTER: LineupRosterPlayer[] = [
@@ -214,6 +203,10 @@ function playerRole(roster: LineupRosterPlayer[], athleteId: string): LineupRole
   return roster.find((row) => row.athleteId === athleteId)?.role ?? null;
 }
 
+function playerPhotoUrl(roster: LineupRosterPlayer[], athleteId: string): string | null {
+  return roster.find((row) => row.athleteId === athleteId)?.photoUrl ?? null;
+}
+
 function playerLocked(
   roster: LineupRosterPlayer[],
   athleteId: string,
@@ -323,6 +316,57 @@ function StarterSlotField({
   );
 }
 
+function BenchOrderRow({
+  athleteId,
+  index,
+  canEnter,
+  maxSubs,
+  name,
+  role,
+  locked,
+  disabled,
+  options,
+  onMove,
+}: {
+  athleteId: string;
+  index: number;
+  canEnter: boolean;
+  maxSubs: number;
+  name: string;
+  role: LineupRole | null;
+  locked: boolean;
+  disabled: boolean;
+  options: Array<{ value: string; label: string; disabled: boolean }>;
+  onMove: (target: number) => void;
+}) {
+  return (
+    <li
+      key={athleteId}
+      className={canEnter ? "fa-bench-order__row" : "fa-bench-order__row fa-bench-order__row--overflow"}
+    >
+      <span className="fa-bench-order__position">
+        <Select
+          className="fa-bench-order__select"
+          aria-label={`Ordine di ingresso di ${name}`}
+          value={String(index)}
+          disabled={disabled}
+          options={options}
+          onChange={(event) => onMove(Number(event.target.value))}
+          data-testid={`formation-bench-position-${index}`}
+        />
+      </span>
+      <span className="fa-bench-order__player">
+        <Badge variant={roleBadgeVariant(role)}>{role ?? "?"}</Badge>
+        {name}
+        {locked ? " — bloccato" : ""}
+        <span className="fa-bench-order__hint">
+          {canEnter ? "può subentrare" : `oltre i ${maxSubs} cambi`}
+        </span>
+      </span>
+    </li>
+  );
+}
+
 /** Formazione: copia precedente, bozza e tre mosse tattiche (EP06-05 / EP06-06). */
 export function FormationPage() {
   const { isDemoMode, activeLeagueId, can } = useAuth();
@@ -330,7 +374,6 @@ export function FormationPage() {
   const demoState = isDemoMode ? parseWireframeStateFromSearch(search) : null;
   const canView = can(["roster:view"]);
   const canEdit = can(["roster:edit"]);
-  const isAdmin = can(["league:admin"]);
 
   const [turns, setTurns] = useState<FantasyTurnSummary[]>(() =>
     isDemoMode && demoState === "success" ? DEMO_TURNS : [],
@@ -355,9 +398,6 @@ export function FormationPage() {
   );
   const [actionError, setActionError] = useState<string | null>(null);
   const [actionMessage, setActionMessage] = useState<string | null>(null);
-  const [aiLineupRun, setAiLineupRun] = useState<AiLineupRun | null>(null);
-  const [aiLineupBusy, setAiLineupBusy] = useState(false);
-  const [aiLineupError, setAiLineupError] = useState<string | null>(null);
 
   const showForbidden = useMemo(() => {
     if (isDemoMode && demoState === "forbidden") {
@@ -525,8 +565,6 @@ export function FormationPage() {
     setSelectedRoundId(roundId);
     setActionError(null);
     setActionMessage(null);
-    setAiLineupRun(null);
-    setAiLineupError(null);
     if (isDemoMode) {
       setContext(DEMO_CONTEXT);
       applyContext(DEMO_CONTEXT);
@@ -545,39 +583,6 @@ export function FormationPage() {
       setActionError(getApiErrorMessage(error, "Formazione del turno non disponibile."));
     } finally {
       setBusy(false);
-    }
-  }
-
-  /** Preview o ricalcolo delle formazioni delle sole squadre IA (EP13-P05). */
-  async function runAiLineupsAction(dryRun: boolean) {
-    setAiLineupError(null);
-    if (isDemoMode) {
-      setAiLineupRun({
-        roundId: selectedRoundId,
-        algorithmVersion: "ai_lineup_v1",
-        dryRun,
-        teams: [],
-        summary: "Nessuna squadra IA nella lega demo.",
-      });
-      return;
-    }
-    const session = loadStoredSession();
-    if (!session?.accessToken || !activeLeagueId || !selectedRoundId) {
-      return;
-    }
-    setAiLineupBusy(true);
-    try {
-      const run = await runAiLineups(session.accessToken, activeLeagueId, selectedRoundId, dryRun);
-      setAiLineupRun(run);
-    } catch (error) {
-      setAiLineupError(
-        getApiErrorMessage(
-          error,
-          dryRun ? "Anteprima non disponibile." : "Rigenerazione non riuscita.",
-        ),
-      );
-    } finally {
-      setAiLineupBusy(false);
     }
   }
 
@@ -884,22 +889,25 @@ export function FormationPage() {
     }
   }
 
-  const pitchSlots = template.map((role, index) => {
+  const pitchPlayers: PitchPlayer[] = template.map((role, index) => {
     const athleteId = displayStarters[index] ?? "";
     return {
       id: `starter-${index}`,
-      label: ROLE_LABEL[role],
+      name: athleteId ? playerName(roster, athleteId) : "Libero",
       role,
-      playerName: athleteId ? playerName(roster, athleteId) : "Libero",
+      photoUrl: athleteId ? playerPhotoUrl(roster, athleteId) : null,
     };
   });
-  const benchSlots = displayBench.map((athleteId) => ({
-    id: athleteId,
-    label: playerName(roster, athleteId),
-    role: playerRole(roster, athleteId) ?? "?",
-    playerName: playerName(roster, athleteId),
-  }));
+  const pitchPositions = layoutFromModule(
+    template.map((role, index) => ({ role, index })),
+    moduleCode,
+    (entry) => entry.role,
+    (entry) => `starter-${entry.index}`,
+    (entry) => entry.index,
+  );
   const maxSubs = context?.maxAutomaticSubstitutions ?? MAX_AUTOMATIC_SUBSTITUTIONS;
+  const panchinaIds = displayBench.slice(0, maxSubs);
+  const tribunaIds = displayBench.slice(maxSubs);
 
   const optionsForSlot = (index: number, role: LineupRole) => {
     const selected = new Set(
@@ -923,6 +931,7 @@ export function FormationPage() {
   return (
     <PageContainer
       title="Formazione"
+      className="fa-formation-page"
       header={
         <Breadcrumb
           items={[
@@ -983,7 +992,8 @@ export function FormationPage() {
       ) : null}
 
       {!showForbidden && !loading && !loadError && context ? (
-        <div data-testid="wireframe-formation-success" className="fa-ds-showcase__stack">
+        <div data-testid="wireframe-formation-success" className="fa-formation-layout">
+          <aside className="fa-formation-layout__sidebar">
           <Card>
             <CardHeader title={`Turno ${context.roundNumber}`} />
             <CardBody>
@@ -1072,183 +1082,6 @@ export function FormationPage() {
             </CardBody>
           </Card>
 
-          {isAdmin ? (
-            <Card data-testid="formation-ai-admin">
-              <CardHeader title="Formazioni IA" />
-              <CardBody>
-                <p>
-                  Genera automaticamente la formazione delle sole squadre controllate da un
-                  fantallenatore IA per questo turno. Non tocca mai le formazioni schierate a
-                  mano da un umano.
-                </p>
-                <div className="fa-ds-showcase__row">
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    disabled={aiLineupBusy}
-                    onClick={() => void runAiLineupsAction(true)}
-                    data-testid="formation-ai-preview"
-                  >
-                    Anteprima formazioni IA
-                  </Button>
-                  <Button
-                    type="button"
-                    disabled={aiLineupBusy}
-                    onClick={() => void runAiLineupsAction(false)}
-                    data-testid="formation-ai-regenerate"
-                  >
-                    Rigenera formazioni IA
-                  </Button>
-                </div>
-                {aiLineupRun ? (
-                  <div data-testid="formation-ai-result">
-                    <p data-testid="formation-ai-summary">
-                      {aiLineupRun.summary} · {aiLineupRun.algorithmVersion}
-                      {aiLineupRun.dryRun ? " (anteprima, non salvata)" : ""}
-                    </p>
-                    {aiLineupRun.teams.length > 0 ? (
-                      <ul data-testid="formation-ai-teams">
-                        {aiLineupRun.teams.map((team) => (
-                          <li
-                            key={team.fantasyTeamId}
-                            data-testid={`formation-ai-team-${team.fantasyTeamId}`}
-                          >
-                            <strong>{team.fantasyTeamName || team.fantasyTeamId}</strong>
-                            {" — "}
-                            {AI_OUTCOME_LABEL[team.outcome] ?? team.outcome}
-                            {team.starters > 0 ? ` · ${team.starters} titolari` : ""}
-                            {team.usedFallback ? " · fallback locale" : ""}
-                            {team.message ? ` · ${team.message}` : ""}
-                          </li>
-                        ))}
-                      </ul>
-                    ) : null}
-                  </div>
-                ) : null}
-                {aiLineupError ? (
-                  <UiStatePanel
-                    state="error"
-                    title="Operazione non riuscita"
-                    message={aiLineupError}
-                    testId="formation-ai-error"
-                  />
-                ) : null}
-              </CardBody>
-            </Card>
-          ) : null}
-
-          <Select
-            label="Modulo"
-            value={moduleCode}
-            onChange={(event) => changeModule(event.target.value as FantasyModule)}
-            options={APPROVED_MODULES.map((code) => {
-              const moduleMeta = context.modules.find((item) => item.code === code);
-              return {
-                value: code,
-                label: moduleMeta
-                  ? `${code} (1P–${moduleMeta.defenders}D–${moduleMeta.midfielders}C–${moduleMeta.forwards}A)`
-                  : code,
-              };
-            })}
-            data-testid="formation-module"
-            disabled={!context.modificationAllowed || !canEdit}
-          />
-
-          <div data-testid="formation-starters" className="fa-ds-showcase__stack">
-            {template.map((role, index) => {
-              const currentId = displayStarters[index] ?? "";
-              const lockedSlot =
-                Boolean(reservedIds[index]) || playerLocked(roster, currentId, clock, lockMarginMinutes);
-              return (
-                <StarterSlotField
-                  key={`${moduleCode}-${index}`}
-                  label={`${ROLE_LABEL[role]} ${index + 1}${lockedSlot ? " (bloccato)" : ""}`}
-                  role={role}
-                  value={currentId}
-                  placeholder="Seleziona calciatore"
-                  options={optionsForSlot(index, role)}
-                  testId={`formation-starter-${index}`}
-                  disabled={!context.modificationAllowed || !canEdit}
-                  hint={
-                    lockedSlot
-                      ? "Partita già iniziata: sostituirlo con un altro calciatore viene rifiutato."
-                      : undefined
-                  }
-                  error={
-                    lockedSlot && actionError === KICKOFF_LOCK_MESSAGE
-                      ? KICKOFF_LOCK_MESSAGE
-                      : undefined
-                  }
-                  onSelect={(athleteId) => assignStarter(index, athleteId)}
-                />
-              );
-            })}
-          </div>
-
-          <FormationView
-            title={`Modulo ${moduleCode}`}
-            pitchAriaLabel="Formazione titolare"
-            benchAriaLabel="Panchina ordinata"
-            benchTitle={`Panchina — massimo ${maxSubs} subentri`}
-            maxSubstitutions={maxSubs}
-            slots={pitchSlots}
-            bench={benchSlots}
-          />
-
-          <div data-testid="formation-bench-order" className="fa-ds-showcase__stack">
-            <p data-testid="formation-sub-hint">
-              Entrano al massimo {maxSubs} panchinari, nell&apos;ordine di ingresso sotto e solo a
-              parità di ruolo (P con P, D con D, C con C, A con A). Dal {maxSubs + 1}° in poi restano
-              fuori se i {maxSubs} cambi sono già stati usati.
-            </p>
-            {displayBench.length === 0 ? (
-              <p data-testid="formation-bench-empty">Nessun panchinaro: tutti i calciatori sono titolari.</p>
-            ) : (
-              <ol className="fa-bench-order">
-                {displayBench.map((athleteId, index) => {
-                  const locked = playerLocked(roster, athleteId, clock, lockMarginMinutes);
-                  const role = playerRole(roster, athleteId);
-                  const canEnter = index < maxSubs;
-                  const name = playerName(roster, athleteId);
-                  return (
-                    <li
-                      key={athleteId}
-                      className={
-                        canEnter ? "fa-bench-order__row" : "fa-bench-order__row fa-bench-order__row--overflow"
-                      }
-                    >
-                      <span className="fa-bench-order__position">
-                        <Select
-                          className="fa-bench-order__select"
-                          aria-label={`Ordine di ingresso di ${name}`}
-                          value={String(index)}
-                          disabled={!context.modificationAllowed || !canEdit}
-                          options={displayBench.map((_, target) => ({
-                            value: String(target),
-                            label: `${target + 1}°`,
-                            disabled: !canMoveBenchTo(index, target),
-                          }))}
-                          onChange={(event) => {
-                            moveBenchTo(index, Number(event.target.value));
-                          }}
-                          data-testid={`formation-bench-position-${index}`}
-                        />
-                      </span>
-                      <span className="fa-bench-order__player">
-                        <Badge variant={roleBadgeVariant(role)}>{role ?? "?"}</Badge>
-                        {name}
-                        {locked ? " — bloccato" : ""}
-                        <span className="fa-bench-order__hint">
-                          {canEnter ? "può subentrare" : `oltre i ${maxSubs} cambi`}
-                        </span>
-                      </span>
-                    </li>
-                  );
-                })}
-              </ol>
-            )}
-          </div>
-
           {clientEvaluation.issues.length > 0 ? (
             <ul data-testid="formation-issues">
               {clientEvaluation.issues.map((issue) => (
@@ -1259,7 +1092,7 @@ export function FormationPage() {
 
           {actionMessage ? <p data-testid="formation-success">{actionMessage}</p> : null}
 
-          <div className="fa-ds-showcase__stack">
+          <div className="fa-formation-layout__actions">
             <Button
               type="button"
               variant="secondary"
@@ -1292,6 +1125,151 @@ export function FormationPage() {
             >
               Salva formazione
             </Button>
+          </div>
+          </aside>
+
+          <div className="fa-formation-layout__main">
+          <Select
+            label="Modulo"
+            value={moduleCode}
+            onChange={(event) => changeModule(event.target.value as FantasyModule)}
+            options={APPROVED_MODULES.map((code) => {
+              const moduleMeta = context.modules.find((item) => item.code === code);
+              return {
+                value: code,
+                label: moduleMeta
+                  ? `${code} (1P–${moduleMeta.defenders}D–${moduleMeta.midfielders}C–${moduleMeta.forwards}A)`
+                  : code,
+              };
+            })}
+            data-testid="formation-module"
+            disabled={!context.modificationAllowed || !canEdit}
+          />
+
+          <div className="fa-formation-layout__pitch-row">
+          <div className="fa-formation-layout__pitch">
+            <FootballPitch
+              title={`Modulo ${moduleCode}`}
+              pitchAriaLabel="Formazione titolare"
+              players={pitchPlayers}
+              positions={pitchPositions}
+            />
+          </div>
+
+          <div
+            data-testid="formation-starters"
+            className="fa-ds-showcase__stack fa-formation-layout__editor"
+          >
+            <h3 className="fa-formation-layout__section-title">Modifica titolari</h3>
+            {template.map((role, index) => {
+              const currentId = displayStarters[index] ?? "";
+              const lockedSlot =
+                Boolean(reservedIds[index]) || playerLocked(roster, currentId, clock, lockMarginMinutes);
+              return (
+                <StarterSlotField
+                  key={`${moduleCode}-${index}`}
+                  label={`${ROLE_LABEL[role]} ${index + 1}${lockedSlot ? " (bloccato)" : ""}`}
+                  role={role}
+                  value={currentId}
+                  placeholder="Seleziona calciatore"
+                  options={optionsForSlot(index, role)}
+                  testId={`formation-starter-${index}`}
+                  disabled={!context.modificationAllowed || !canEdit}
+                  hint={
+                    lockedSlot
+                      ? "Partita già iniziata: sostituirlo con un altro calciatore viene rifiutato."
+                      : undefined
+                  }
+                  error={
+                    lockedSlot && actionError === KICKOFF_LOCK_MESSAGE
+                      ? KICKOFF_LOCK_MESSAGE
+                      : undefined
+                  }
+                  onSelect={(athleteId) => assignStarter(index, athleteId)}
+                />
+              );
+            })}
+          </div>
+          </div>
+
+          <div data-testid="formation-bench-order" className="fa-ds-showcase__stack">
+            <p data-testid="formation-sub-hint">
+              Entrano al massimo {maxSubs} panchinari, nell&apos;ordine di ingresso sotto e solo a
+              parità di ruolo (P con P, D con D, C con C, A con A). Dal {maxSubs + 1}° in poi restano
+              fuori se i {maxSubs} cambi sono già stati usati.
+            </p>
+            {displayBench.length === 0 ? (
+              <p data-testid="formation-bench-empty">Nessun panchinaro: tutti i calciatori sono titolari.</p>
+            ) : (
+              <div className="fa-formation-layout__benches">
+                <div>
+                  <h4 className="fa-formation-layout__section-title">
+                    Panchina — massimo {maxSubs} subentri
+                  </h4>
+                  {panchinaIds.length === 0 ? (
+                    <p data-testid="formation-panchina-empty">Nessun panchinaro disponibile.</p>
+                  ) : (
+                    <ol className="fa-bench-order" data-testid="formation-bench-panchina">
+                      {displayBench.map((athleteId, index) =>
+                        index < maxSubs ? (
+                          <BenchOrderRow
+                            key={athleteId}
+                            athleteId={athleteId}
+                            index={index}
+                            canEnter
+                            maxSubs={maxSubs}
+                            name={playerName(roster, athleteId)}
+                            role={playerRole(roster, athleteId)}
+                            locked={playerLocked(roster, athleteId, clock, lockMarginMinutes)}
+                            disabled={!context.modificationAllowed || !canEdit}
+                            options={displayBench.map((_, target) => ({
+                              value: String(target),
+                              label: `${target + 1}°`,
+                              disabled: !canMoveBenchTo(index, target),
+                            }))}
+                            onMove={(target) => moveBenchTo(index, target)}
+                          />
+                        ) : null,
+                      )}
+                    </ol>
+                  )}
+                </div>
+                <div>
+                  <h4 className="fa-formation-layout__section-title">Tribuna</h4>
+                  {tribunaIds.length === 0 ? (
+                    <p data-testid="formation-tribuna-empty">
+                      Nessuno oltre i {maxSubs} cambi: tutta la rosa disponibile è titolare o in
+                      panchina.
+                    </p>
+                  ) : (
+                    <ol className="fa-bench-order" data-testid="formation-bench-tribuna">
+                      {displayBench.map((athleteId, index) =>
+                        index >= maxSubs ? (
+                          <BenchOrderRow
+                            key={athleteId}
+                            athleteId={athleteId}
+                            index={index}
+                            canEnter={false}
+                            maxSubs={maxSubs}
+                            name={playerName(roster, athleteId)}
+                            role={playerRole(roster, athleteId)}
+                            locked={playerLocked(roster, athleteId, clock, lockMarginMinutes)}
+                            disabled={!context.modificationAllowed || !canEdit}
+                            options={displayBench.map((_, target) => ({
+                              value: String(target),
+                              label: `${target + 1}°`,
+                              disabled: !canMoveBenchTo(index, target),
+                            }))}
+                            onMove={(target) => moveBenchTo(index, target)}
+                          />
+                        ) : null,
+                      )}
+                    </ol>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
           </div>
         </div>
       ) : null}

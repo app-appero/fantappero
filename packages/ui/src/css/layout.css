@@ -200,6 +200,36 @@
   white-space: nowrap;
 }
 
+.fa-app-header__league-action {
+  font-size: var(--fa-text-sm);
+  font-weight: 700;
+  color: var(--fa-color-accent);
+  text-decoration: none;
+}
+
+.fa-app-header__league-action:hover {
+  color: var(--fa-color-accent-hover);
+  text-decoration: underline;
+}
+
+.fa-app-header__league-action-sep {
+  font-size: var(--fa-text-sm);
+  color: var(--fa-color-foreground-subtle);
+}
+
+/* "Lega attiva" resta il nome accessibile della select, senza occupare spazio visivo. */
+.fa-league-selector .fa-field__label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 .fa-app-header__actions {
   display: flex;
   align-items: center;

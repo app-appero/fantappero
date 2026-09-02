@@ -207,14 +207,17 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                 <div className="fa-app-header__league-actions">
                   <Link
                     to="/leghe/crea"
-                    className="fa-link-muted"
+                    className="fa-app-header__league-action"
                     data-testid="header-create-league-link"
                   >
                     Crea lega
                   </Link>
+                  <span className="fa-app-header__league-action-sep" aria-hidden="true">
+                    o
+                  </span>
                   <Link
                     to="/leghe/invito"
-                    className="fa-link-muted"
+                    className="fa-app-header__league-action"
                     data-testid="header-join-league-link"
                   >
                     Unisciti con codice

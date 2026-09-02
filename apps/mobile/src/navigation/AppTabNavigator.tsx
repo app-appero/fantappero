@@ -2,13 +2,14 @@ import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { useNavigation, useNavigationState } from "@react-navigation/core";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { StyleSheet, View } from "react-native";
+import { StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { theme } from "@fantappero/ui/theme";
 import { AppDrawer } from "../components/AppDrawer";
 import { LockCountdown } from "../components/LockCountdown";
 import { fetchPendingInviteCount } from "../api/managerInvites";
 import { AppHeader } from "../layout/AppHeader";
+import { leagueStateLabel } from "../leagues/leagueLabels";
 import { useLockCountdown } from "../matchday/useLockCountdown";
 import { AuctionScreen } from "../screens/AuctionScreen";
 import { FormationScreen } from "../screens/FormationScreen";
@@ -29,7 +30,7 @@ import type { AppTabParamList, RootStackParamList } from "./types";
 import { sceneBackgroundStyle } from "../theme/navigationTheme";
 
 const Tab = createBottomTabNavigator<AppTabParamList>();
-const { colors } = theme;
+const { colors, spacing, typography, radius } = theme;
 
 /** Drawer id → tab di destinazione quando l'id non è una sua stack route. */
 const TAB_ROUTE_MAP: Partial<Record<string, keyof AppTabParamList>> = {
@@ -127,6 +128,10 @@ function AppTabShell({
   const { countdown, refetch: refetchCountdown } = useLockCountdown(
     accessToken,
     leagues.length > 0 ? activeLeagueId : null,
+  );
+
+  const activeLeagueSummary = leagues.find(
+    (league) => league.id === (activeLeagueId ?? leagues[0]?.id),
   );
 
   const activeRouteName = useNavigationState((state) => {
@@ -285,5 +290,23 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
+  },
+  selectorAccessory: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+  },
+  statusBadge: {
+    backgroundColor: colors.backgroundSubtle,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.sm,
+    paddingHorizontal: spacing.xs,
+    paddingVertical: 2,
+  },
+  statusBadgeLabel: {
+    color: colors.foreground,
+    fontSize: typography.fontSize.xs,
+    fontWeight: typography.fontWeight.semibold,
   },
 });

@@ -44,7 +44,6 @@ vi.mock("../api/leagues", () => ({
   saveMyLineup: vi.fn(),
   copyPreviousLineupToDraft: vi.fn(),
   saveLineupDraft: vi.fn(),
-  runAiLineups: vi.fn(),
 }));
 
 function renderRoute(path: string) {
@@ -62,7 +61,7 @@ describe("EP06-06 formation page", () => {
   it("renders success demo with module, ordered bench, substitutions, tactical moves, copy and draft", () => {
     const html = renderRoute("/formazione?persona=member&stato=success");
     expect(html).toContain('data-testid="wireframe-formation-success"');
-    expect(html).toContain('data-testid="formation-view"');
+    expect(html).toContain('data-testid="football-pitch"');
     expect(html).toContain('data-testid="formation-module"');
     expect(html).toContain('data-testid="formation-save"');
     expect(html).toContain('data-testid="formation-copy"');
@@ -78,6 +77,8 @@ describe("EP06-06 formation page", () => {
     expect(html).toContain('data-testid="formation-bench-order"');
     expect(html).toContain('data-testid="formation-sub-hint"');
     expect(html).toContain('data-testid="formation-bench-position-0"');
+    expect(html).toContain('data-testid="formation-bench-panchina"');
+    expect(html).toContain('data-testid="formation-bench-tribuna"');
     expect(html).toContain("4-3-3");
     expect(html).toContain("Portiere 1 (bloccato)");
     expect(html).toContain("Maignan (bloccato)");
@@ -120,17 +121,10 @@ describe("EP06-06 formation page", () => {
   });
 });
 
-describe("EP13-P05 admin AI lineup trigger on Formazione (not Turni europei)", () => {
-  it("shows the AI lineup admin card for a league admin", () => {
+describe("EP-turni-automazione: nessun trigger IA duplicato su Formazione", () => {
+  it("non mostra più la card Formazioni IA: la generazione è automatica (cron) o manuale solo dal pannello operatore", () => {
     const html = renderRoute("/formazione?persona=admin&stato=success");
-    expect(html).toContain('data-testid="formation-ai-admin"');
-    expect(html).toContain('data-testid="formation-ai-preview"');
-    expect(html).toContain('data-testid="formation-ai-regenerate"');
-    expect(html).toContain("Formazioni IA");
-  });
-
-  it("hides the AI lineup admin card for a plain member", () => {
-    const html = renderRoute("/formazione?persona=member&stato=success");
     expect(html).not.toContain('data-testid="formation-ai-admin"');
+    expect(html).not.toContain("Formazioni IA");
   });
 });
