@@ -1,0 +1,418 @@
+﻿Name,Description,List,Labels,Members,Due Date,Position
+EP13-P01 — Navigazione gerarchica “Lega” su web e mobile,"EP13-P01 — Navigazione gerarchica “Lega” su web e mobile
+
+PRIORITÀ: Must — prima di EP13-01 / freeze M5.1
+DIPENDENZE: Nessuna; abilita una navigazione più chiara per le card successive
+
+DECISIONE DOCUMENTALE
+Le tre voci sono correlate ma non equivalenti: “Le mie leghe” seleziona il contesto globale, “Home lega” mostra la lega attiva, “Amministrazione” modifica la lega attiva. Vanno raccolte in un gruppo “Lega”; “Inviti ricevuti” resta globale perché può riguardare più leghe.
+
+OBIETTIVO
+Riorganizzare la navigazione senza cambiare URL, permessi o significato delle schermate, rendendo esplicito il passaggio dal portafoglio leghe al contesto della lega attiva.
+
+FONTI
+- docs/design/navigation.md
+- docs/design/wireframes.md
+- docs/api/leagues.md
+- apps/web/src/navigation/navConfig.ts
+- apps/mobile/src/navigation/navConfig.ts
+
+REGOLE COMUNI
+- Prima di modificare codice, analizza lo stato reale di backend, contratti, web, mobile, test e documentazione. Condividi un piano breve; se emerge un'ambiguità che cambia la regola di prodotto, fermati e chiedi conferma.
+- La parità mobile è obbligatoria: ogni comportamento, stato, autorizzazione, errore e test introdotto sul web deve essere riflesso nell'app mobile usando gli stessi contratti API. Non è sufficiente una UI soltanto responsive.
+- Mantieni il confine provider: i client non chiamano direttamente API-Football o altri provider; consumano solo dati normalizzati dal backend.
+- Migrazioni additive e retrocompatibili, senza eliminare dati. Job, notifiche e rigenerazioni devono essere idempotenti e osservabili.
+- Non confondere `?persona=` con autorizzazione reale. I permessi sono verificati lato backend e rispecchiati nella UI.
+- Aggiorna la documentazione citata, i contratti condivisi e i runbook interessati. Riporta separatamente test automatici, prova Docker locale e ciò che richiede ancora validazione reale del provider/pilot.
+- Non creare commit automaticamente. Al termine indica file cambiati, URL/schermate da provare, risultato atteso e comando di test riproducibile.
+
+SCOPE
+- Aggiungi un gruppo espandibile “Lega” con: “Le mie leghe” (`/leghe`), “Home lega” (`/lega/home`) e “Amministrazione lega” (`/lega/amministrazione`).
+- Mostra “Amministrazione lega” solo a league admin/operator realmente autorizzati; gli altri utenti non devono poterla aprire neppure via deep link.
+- Mantieni “Turni” come destinazione primaria indipendente per non nascondere il flusso più usato. Mantieni “Inviti ricevuti” fuori dal gruppo perché è account-level.
+- Evidenzia gruppo e voce attiva; conserva stato aperto/chiuso durante la sessione; gestisci assenza di lega attiva con messaggio e CTA verso “Le mie leghe”.
+- Web: sidebar desktop e drawer responsive. Mobile: drawer/menu equivalente; non sovraccaricare la bottom tab bar.
+- Preserva tutti i route path e i deep link esistenti; aggiungi test di visibilità per utente manuale, IA, admin di lega e operatore.
+
+ACCEPTANCE CRITERIA
+- Le tre destinazioni sono raggiungibili dal gruppo “Lega” su web e mobile e mantengono lo stesso URL/route name.
+- Un utente non admin non vede la voce amministrativa e riceve 403/redirect controllato se usa il deep link.
+- Senza lega attiva, Home/Admin non producono schermate vuote o errori tecnici.
+- Focus, tastiera, screen reader e badge futuri non vengono compromessi dal submenu.
+
+VERIFICA MANUALE
+- Web: `/leghe`, `/lega/home`, `/lega/amministrazione` con persona utente e admin.
+- Mobile: apri drawer, cambia lega attiva, chiudi/riapri il gruppo e prova il deep link amministrativo con ruolo non autorizzato.
+
+FUORI SCOPE
+- Ridisegno completo della Information Architecture
+- Spostamento di tutte le funzioni di lega dentro un menu profondo
+
+DoD: test automatici + prova Docker quando applicabile; parità web/mobile; documentazione aggiornata; handoff senza commit automatico.",PRE-M5.1 — Ready,"Pre-M5.1,UX,Web,Mobile,Autorizzazioni",,,1
+EP13-P02 — Magic Points e Score espliciti nei turni fantallenatori,"EP13-P02 — Magic Points e Score espliciti nei turni fantallenatori
+
+PRIORITÀ: Must — chiarezza del risultato prima del pilot
+DIPENDENZE: Motore scoring EP07 già disponibile
+
+DECISIONE DOCUMENTALE
+Nel contratto attuale `homeScore/awayScore` sono i punti grezzi di formazione (Magic Points), mentre `homeFantasyGoals/awayFantasyGoals` sono il risultato H2H convertito (Score). La UI deve nominarli, non mostrarli come numeri anonimi tra parentesi.
+
+OBIETTIVO
+Mostrare in ogni incontro dei turni fantallenatori sia i Magic Points sia lo Score, con semantica identica su lista, dettaglio, web e mobile.
+
+FONTI
+- docs/api/league_scoring.md
+- docs/api/fantasy_turns.md
+- docs/api/league_standings.md
+- apps/web/src/components/turns/MatchdayH2HPanel.tsx
+- apps/mobile/src/screens/turns
+
+REGOLE COMUNI
+- Prima di modificare codice, analizza lo stato reale di backend, contratti, web, mobile, test e documentazione. Condividi un piano breve; se emerge un'ambiguità che cambia la regola di prodotto, fermati e chiedi conferma.
+- La parità mobile è obbligatoria: ogni comportamento, stato, autorizzazione, errore e test introdotto sul web deve essere riflesso nell'app mobile usando gli stessi contratti API. Non è sufficiente una UI soltanto responsive.
+- Mantieni il confine provider: i client non chiamano direttamente API-Football o altri provider; consumano solo dati normalizzati dal backend.
+- Migrazioni additive e retrocompatibili, senza eliminare dati. Job, notifiche e rigenerazioni devono essere idempotenti e osservabili.
+- Non confondere `?persona=` con autorizzazione reale. I permessi sono verificati lato backend e rispecchiati nella UI.
+- Aggiorna la documentazione citata, i contratti condivisi e i runbook interessati. Riporta separatamente test automatici, prova Docker locale e ciò che richiede ancora validazione reale del provider/pilot.
+- Non creare commit automaticamente. Al termine indica file cambiati, URL/schermate da provare, risultato atteso e comando di test riproducibile.
+
+SCOPE
+- Visualizza due righe o due blocchi chiaramente etichettati: `Magic Points 72,5 – 68,0` e `Score 2 – 1`.
+- Usa le soglie e la conversione definite in `league_scoring.md`; non ricalcolare diversamente nel client.
+- Distingui stato provvisorio/live/finale e spiega quando punti o Score non sono ancora disponibili.
+- Mantieni precisione e formattazione locale coerenti; non trasformare valori null in zero.
+- Aggiorna contratti/serializer solo se serve a rimuovere ambiguità, mantenendo retrocompatibilità.
+- Applica la stessa gerarchia informativa nella lista giornata, nel dettaglio matchup e nelle viste classifica correlate su web e mobile.
+
+ACCEPTANCE CRITERIA
+- Ogni matchup con dati validi mostra contemporaneamente Magic Points e Score con etichette esplicite.
+- I valori coincidono con la risposta backend e con le soglie configurate per la lega.
+- In live i valori si aggiornano senza confondere parziale e finale; assenza dati ha uno stato dedicato.
+- Snapshot/component test coprono pareggio, soglia esatta, decimali, null e partita finalizzata.
+
+VERIFICA MANUALE
+- Web: `/turni`, tab “Turni fantallenatori”, apri una giornata con almeno un match finalizzato e uno provvisorio.
+- Mobile: stessa giornata; confronta numeri, etichette e stato con la risposta API.
+
+FUORI SCOPE
+- Cambio delle soglie di conversione dello scoring
+- Nuovo algoritmo voti/provider
+
+DoD: test automatici + prova Docker quando applicabile; parità web/mobile; documentazione aggiornata; handoff senza commit automatico.",PRE-M5.1 — Ready,"Pre-M5.1,Turni,H2H,Scoring,Web,Mobile",,,2
+EP13-P03 — Calendario H2H adattivo sui turni europei eleggibili,"EP13-P03 — Calendario H2H adattivo sui turni europei eleggibili
+
+PRIORITÀ: Must — chiude un dubbio esplicito dei requisiti Beta
+DIPENDENZE: Generazione/sync turni europei EP06-01
+
+DECISIONE DOCUMENTALE
+Il mapping MVP `FantasyRound.number == LeagueCalendarSlot.round_number` e il solo girone d'andata non massimizzano le finestre europee utilizzabili. Il calendario deve dipendere dalle finestre valide delle competizioni scelte, preservando cicli completi ed equi.
+
+OBIETTIVO
+Calcolare quante giornate H2H possono essere giocate sulle migliori finestre europee delle competizioni selezionate e generare il massimo numero di cicli completi compatibili.
+
+FONTI
+- FantAppero_Requisiti_Funzionali_MVP_v0.1.docx — decisione aperta “Andata/ritorno, turni eccedenti e numero dispari”
+- FantAppero_Master_Unificato_v0.2.docx — “Calendario degli scontri e casi dispari”
+- docs/api/fantasy_turns.md
+- docs/api/leagues.md — FR-LEG-04
+- docs/operations/sports_fixtures_sync.md
+
+REGOLE COMUNI
+- Prima di modificare codice, analizza lo stato reale di backend, contratti, web, mobile, test e documentazione. Condividi un piano breve; se emerge un'ambiguità che cambia la regola di prodotto, fermati e chiedi conferma.
+- La parità mobile è obbligatoria: ogni comportamento, stato, autorizzazione, errore e test introdotto sul web deve essere riflesso nell'app mobile usando gli stessi contratti API. Non è sufficiente una UI soltanto responsive.
+- Mantieni il confine provider: i client non chiamano direttamente API-Football o altri provider; consumano solo dati normalizzati dal backend.
+- Migrazioni additive e retrocompatibili, senza eliminare dati. Job, notifiche e rigenerazioni devono essere idempotenti e osservabili.
+- Non confondere `?persona=` con autorizzazione reale. I permessi sono verificati lato backend e rispecchiati nella UI.
+- Aggiorna la documentazione citata, i contratti condivisi e i runbook interessati. Riporta separatamente test automatici, prova Docker locale e ciò che richiede ancora validazione reale del provider/pilot.
+- Non creare commit automaticamente. Al termine indica file cambiati, URL/schermate da provare, risultato atteso e comando di test riproducibile.
+
+SCOPE
+- Costruisci una preview ordinata delle finestre europee eleggibili per stagione e competizioni selezionate, usando timezone Europe/Rome e la soglia minima fixture documentata.
+- Calcola la lunghezza del ciclo round-robin: `N-1` giornate con N pari, `N` con N dispari e un bye per giornata.
+- Genera il massimo numero di cicli completi che entra nelle finestre eleggibili; nei cicli successivi alterna casa/trasferta. Per default non creare cicli parziali.
+- Persisti un mapping esplicito tra giornata H2H e finestra/turno europeo; non affidarti soltanto all'uguaglianza dei numeri progressivi.
+- Mostra in preview: finestre usate, scartate, motivazione, numero cicli, bye, impronta delle competizioni e versione algoritmo. Richiedi conferma admin prima della prima generazione.
+- Se competizioni, calendario provider o soglia cambiano, marca la preview come stale; non riscrivere silenziosamente giornate già iniziate o risultati.
+- Migrazione additiva e backfill sicuro per calendari esistenti; job concorrenti idempotenti; audit di generazione/rigenerazione.
+- Web e mobile devono offrire la stessa preview/diagnostica amministrativa e la stessa lettura del calendario generato.
+
+ACCEPTANCE CRITERIA
+- Casi da 4 a 10 partecipanti producono cicli completi senza duplicati e con differenza casa/trasferta bilanciata.
+- Con partecipanti dispari ogni squadra ha esattamente un bye per ciclo.
+- Le giornate sono associate solo a finestre eleggibili e la UI spiega ogni finestra inutilizzata.
+- Fixture spostate/posticipate non cancellano dati storici e attivano una diagnosi amministrativa controllata.
+- Test property-based o equivalenti verificano unicità coppie, completezza cicli, bye e determinismo.
+
+VERIFICA MANUALE
+- Crea leghe demo da 4, 5, 8 e 10 partecipanti con combinazioni diverse di competizioni; confronta preview e calendario finale.
+- Simula una competizione rimossa e una finestra sotto soglia: deve apparire stale/scartata senza alterare giornate iniziate.
+
+FUORI SCOPE
+- Playoff o tabelloni a eliminazione
+- Calendari parziali non equi
+- Cancellazione automatica di giornate storiche
+
+DoD: test automatici + prova Docker quando applicabile; parità web/mobile; documentazione aggiornata; handoff senza commit automatico.",PRE-M5.1 — Ready,"Pre-M5.1,Calendario,Turni,H2H,Backend,Web,Mobile",,,3
+"EP13-P04 — Turni europei live con risultati, formazioni ed eventi","EP13-P04 — Turni europei live con risultati, formazioni ed eventi
+
+PRIORITÀ: Must — esperienza live promessa dal prodotto
+DIPENDENZE: EP13-P03 per il mapping calendario; sync provider normalizzato
+
+DECISIONE DOCUMENTALE
+Il backend normalizza già fixture, eventi e formazioni ufficiali, ma la vista dei turni non espone ancora un vero dettaglio live cliccabile. Il client deve leggere solo il backend e rendere visibile freschezza/degrado del feed.
+
+OBIETTIVO
+Rendere il tab “Turni europei” realmente live: risultati aggiornati e dettaglio partita con formazioni ed eventi, su web e mobile.
+
+FONTI
+- docs/api/fantasy_turns.md
+- docs/operations/sports_fixtures_sync.md
+- docs/operations/api_football_adapter.md
+- docs/data/api_football_requirement_matrix.md
+- docs/adr/ADR-0001-sports-data-provider-boundary.md
+- docs/operations/pilot_incident_runbooks.md
+
+REGOLE COMUNI
+- Prima di modificare codice, analizza lo stato reale di backend, contratti, web, mobile, test e documentazione. Condividi un piano breve; se emerge un'ambiguità che cambia la regola di prodotto, fermati e chiedi conferma.
+- La parità mobile è obbligatoria: ogni comportamento, stato, autorizzazione, errore e test introdotto sul web deve essere riflesso nell'app mobile usando gli stessi contratti API. Non è sufficiente una UI soltanto responsive.
+- Mantieni il confine provider: i client non chiamano direttamente API-Football o altri provider; consumano solo dati normalizzati dal backend.
+- Migrazioni additive e retrocompatibili, senza eliminare dati. Job, notifiche e rigenerazioni devono essere idempotenti e osservabili.
+- Non confondere `?persona=` con autorizzazione reale. I permessi sono verificati lato backend e rispecchiati nella UI.
+- Aggiorna la documentazione citata, i contratti condivisi e i runbook interessati. Riporta separatamente test automatici, prova Docker locale e ciò che richiede ancora validazione reale del provider/pilot.
+- Non creare commit automaticamente. Al termine indica file cambiati, URL/schermate da provare, risultato atteso e comando di test riproducibile.
+
+SCOPE
+- Nella lista mostra score, minuto/stato, competizione, kickoff e indicatore di ultimo aggiornamento per ogni fixture.
+- Rendi ogni riga cliccabile. Dettaglio proposto web `/turni/:turnId/partite/:fixtureId`; su mobile route/screen equivalente e deep-linkabile.
+- Nel dettaglio mostra titolari, panchina, modulo quando disponibile e timeline ordinata di gol, assist, ammonizioni/espulsioni, sostituzioni, rigori e autogol.
+- Implementa polling con backoff e sospensione quando la schermata non è attiva; usa SSE/WebSocket solo se una decisione tecnica motivata dimostra il beneficio.
+- Gestisci not-started, live, halftime, extra-time, penalties, finished, postponed, suspended, cancelled e correzioni tardive.
+- Mostra stati provider `fresh`, `stale`, `delayed`, `degraded` e `unavailable` senza inventare eventi mancanti.
+- Aggiungi metriche/log per ritardo sync, errori provider, fixture senza mapping e fallimenti di normalizzazione.
+
+ACCEPTANCE CRITERIA
+- Una variazione del risultato normalizzato compare nella vista attiva entro l'intervallo di polling previsto.
+- Il click apre la fixture corretta e mostra formazione/eventi coerenti con il payload backend.
+- Dati mancanti o provider in ritardo producono uno stato comprensibile, non un crash o una timeline falsa.
+- Web e mobile condividono contratti, ordinamento eventi e semantica dello stato live.
+
+VERIFICA MANUALE
+- Esegui uno scenario Docker con fixture live simulata: cambia score, aggiungi evento, posticipa partita e verifica lista/dettaglio.
+- Ripeti su mobile mettendo l'app in background e riaprendola: nessun polling duplicato e refresh immediato al ritorno.
+
+FUORI SCOPE
+- Chiamate dirette al provider da web/mobile
+- Streaming live non giustificato
+- Video o contenuti editoriali della partita
+
+DoD: test automatici + prova Docker quando applicabile; parità web/mobile; documentazione aggiornata; handoff senza commit automatico.",PRE-M5.1 — Ready,"Pre-M5.1,Live,Provider,Turni,Web,Mobile,Observability",,,4
+EP13-P05 — Formazione automatica dei fantallenatori IA,"EP13-P05 — Formazione automatica dei fantallenatori IA
+
+PRIORITÀ: Must se gli allenatori IA partecipano al pilot; altrimenti feature-flag fino alla validazione
+DIPENDENZE: EP13-P03 e dati provider disponibili prima dei rispettivi lock
+
+DECISIONE DOCUMENTALE
+Oggi l'IA può ricevere una rosa casuale, ma non esiste una regola documentata per schierare automaticamente la formazione. L'automazione deve usare solo informazioni disponibili al momento della decisione e non può avere vantaggi rispetto ai lock umani.
+
+OBIETTIVO
+Creare e mantenere automaticamente la migliore formazione valida per le sole squadre controllate da `UserType.AI`, usando i dati provider normalizzati disponibili prima del lock.
+
+FONTI
+- docs/api/fantasy_lineups.md
+- docs/api/fantasy_teams.md
+- docs/operations/sports_fixtures_sync.md
+- docs/data/api_football_requirement_matrix.md
+- docs/adr/ADR-0001-sports-data-provider-boundary.md
+- FantAppero_Architettura_Tecnica_v0.1.docx — determinismo, audit e guardrail IA
+
+REGOLE COMUNI
+- Prima di modificare codice, analizza lo stato reale di backend, contratti, web, mobile, test e documentazione. Condividi un piano breve; se emerge un'ambiguità che cambia la regola di prodotto, fermati e chiedi conferma.
+- La parità mobile è obbligatoria: ogni comportamento, stato, autorizzazione, errore e test introdotto sul web deve essere riflesso nell'app mobile usando gli stessi contratti API. Non è sufficiente una UI soltanto responsive.
+- Mantieni il confine provider: i client non chiamano direttamente API-Football o altri provider; consumano solo dati normalizzati dal backend.
+- Migrazioni additive e retrocompatibili, senza eliminare dati. Job, notifiche e rigenerazioni devono essere idempotenti e osservabili.
+- Non confondere `?persona=` con autorizzazione reale. I permessi sono verificati lato backend e rispecchiati nella UI.
+- Aggiorna la documentazione citata, i contratti condivisi e i runbook interessati. Riporta separatamente test automatici, prova Docker locale e ciò che richiede ancora validazione reale del provider/pilot.
+- Non creare commit automaticamente. Al termine indica file cambiati, URL/schermate da provare, risultato atteso e comando di test riproducibile.
+
+SCOPE
+- Prima del codice, formalizza una mini-ADR con funzione obiettivo, segnali ammessi, tie-break, orario decisione e comportamento quando i dati provider mancano.
+- Ordina i candidati con formula deterministica e versionata basata su disponibilità, probabilità/titolare ufficiale se già noto, forma/proiezione o rating locale e vincoli di ruolo/modulo.
+- Usa `official_lineup` solo se il relativo `fetched_at` precede la decisione e il lock del calciatore. Vietato usare informazioni future o correggere retroattivamente una scelta.
+- Genera 11 titolari, modulo ammesso e panchina ordinata; valida rosa, ruoli, duplicati e completezza con lo stesso motore usato dagli umani.
+- Dopo un lock progressivo, non modificare giocatori bloccati. Eventuali riottimizzazioni devono rispettare lo stesso limite di mosse tattiche previsto per gli umani e non creare vantaggi nascosti.
+- Persisti `system_generated_ai`, versione algoritmo, timestamp, snapshot/provider provenance, score candidati, motivi esclusione e risultato validazione.
+- Offri trigger schedulato idempotente e comando amministrativo di preview/ricalcolo. Non scrivere mai sulle formazioni di utenti manuali.
+- Web e mobile mostrano badge “Gestita automaticamente”, ultimo aggiornamento, formazione e spiegazione sintetica; nessuna azione manuale incoerente per account IA.
+
+ACCEPTANCE CRITERIA
+- A parità di input e versione algoritmo si ottiene la stessa formazione.
+- La formazione è valida e completa anche con provider parziale grazie a un fallback locale documentato.
+- Nessun dato acquisito dopo lock influenza titolari già bloccati; il log permette di provarlo.
+- Test coprono indisponibili, pari merito, moduli multipli, lineup ufficiale tardiva, retry job e account manuale non modificabile.
+
+VERIFICA MANUALE
+- Crea una squadra IA con rosa nota, esegui preview e generazione, poi varia il provider prima e dopo il lock confrontando audit e formazione.
+- Apri la stessa squadra da web e mobile: badge, timestamp e undici devono coincidere.
+
+FUORI SCOPE
+- LLM che sceglie senza formula verificabile
+- Uso di dati post-lock
+- Modifica automatica delle formazioni umane
+
+DoD: test automatici + prova Docker quando applicabile; parità web/mobile; documentazione aggiornata; handoff senza commit automatico.",PRE-M5.1 — Ready,"Pre-M5.1,IA,Formazioni,Provider,Fairness,Backend,Mobile",,,5
+EP13-P06 — Preview e profilo storico dei fantallenatori,"EP13-P06 — Preview e profilo storico dei fantallenatori
+
+PRIORITÀ: Must — migliora selezione e invito senza introdurre un nuovo dominio
+DIPENDENZE: Directory e standings già esistenti
+
+DECISIONE DOCUMENTALE
+La Beta documenta profilo personale, directory, inviti e squadre legate alla singola lega; non documenta una squadra/formazione globale posseduta da un allenatore libero. Il profilo Beta deve quindi essere fattuale e privacy-safe; la squadra personale va in discovery Fase 2.
+
+OBIETTIVO
+Rendere ogni riga allenatore informativa e cliccabile, con un dettaglio storico utile agli admin di lega senza esporre dati personali o classificazioni arbitrarie.
+
+FONTI
+- docs/api/profile.md
+- docs/api/leagues.md
+- docs/api/league_standings.md
+- docs/api/fantasy_teams.md
+- packages/contracts/src/leagues.ts
+- FantAppero_Requisiti_Funzionali_MVP_v0.1.docx
+- docs/privacy/data-retention.md e documenti privacy correlati
+
+REGOLE COMUNI
+- Prima di modificare codice, analizza lo stato reale di backend, contratti, web, mobile, test e documentazione. Condividi un piano breve; se emerge un'ambiguità che cambia la regola di prodotto, fermati e chiedi conferma.
+- La parità mobile è obbligatoria: ogni comportamento, stato, autorizzazione, errore e test introdotto sul web deve essere riflesso nell'app mobile usando gli stessi contratti API. Non è sufficiente una UI soltanto responsive.
+- Mantieni il confine provider: i client non chiamano direttamente API-Football o altri provider; consumano solo dati normalizzati dal backend.
+- Migrazioni additive e retrocompatibili, senza eliminare dati. Job, notifiche e rigenerazioni devono essere idempotenti e osservabili.
+- Non confondere `?persona=` con autorizzazione reale. I permessi sono verificati lato backend e rispecchiati nella UI.
+- Aggiorna la documentazione citata, i contratti condivisi e i runbook interessati. Riporta separatamente test automatici, prova Docker locale e ciò che richiede ancora validazione reale del provider/pilot.
+- Non creare commit automaticamente. Al termine indica file cambiati, URL/schermate da provare, risultato atteso e comando di test riproducibile.
+
+SCOPE
+- Estendi la preview riga con avatar/nome, tipo Manuale o IA, disponibilità inviti, anzianità in forma mese/anno e massimo 2–3 metriche sintetiche.
+- Al click apri un profilo limitato con: iscritto da, leghe concluse, piazzamenti in leghe concluse/omologate, miglior piazzamento, stato libero/disponibile e riepilogo performance deterministico.
+- Definisci “tipo di allenatore” in Beta solo con fatti osservabili; niente etichette come offensivo/prudente finché metrica, campione minimo e spiegabilità non sono documentati.
+- Calcola lo storico da standings e partecipazioni concluse; indica numero partecipanti, stagione e posizione. Non mostrare email, budget, rose private o nomi di leghe non visibili al richiedente.
+- Aggiungi endpoint/contratto paginato e autorizzato; limita la visibilità alla directory amministrativa o ad altri contesti esplicitamente ammessi.
+- Web: riga compatta e drawer/pagina dettaglio. Mobile: card preview e screen dettaglio equivalente, con CTA invito quando consentita.
+- Documenta retention, minimizzazione, visibility policy e comportamento in caso di account cancellato/anonymized.
+
+ACCEPTANCE CRITERIA
+- Ogni riga mostra una preview stabile senza N+1 query e il click apre il profilo corretto.
+- Piazzamenti e conteggi derivano solo da leghe concluse/omologate e coincidono con gli standings.
+- Un utente non autorizzato non può interrogare profili storici via API.
+- Web e mobile mostrano gli stessi fatti; dati assenti hanno testi neutri e non fuorvianti.
+
+VERIFICA MANUALE
+- Prova un allenatore nuovo, uno con più piazzamenti, uno IA, uno non disponibile e un account anonimizzato.
+- Verifica che la preview non riveli dati di una lega privata non accessibile al richiedente.
+
+FUORI SCOPE
+- Squadra o formazione globale pre-lega
+- Profilazione psicologica/comportamentale automatica
+- Profilo pubblico indicizzabile
+
+DoD: test automatici + prova Docker quando applicabile; parità web/mobile; documentazione aggiornata; handoff senza commit automatico.",PRE-M5.1 — Ready,"Pre-M5.1,Fantallenatori,Profilo,Privacy,Web,Mobile",,,6
+EP13-P07 — Notifica e badge rosso per gli inviti pendenti,"EP13-P07 — Notifica e badge rosso per gli inviti pendenti
+
+PRIORITÀ: Must — onboarding e inviti devono essere osservabili
+DIPENDENZE: Sistema named invites e centro notifiche esistenti; si integra con EP13-P01
+
+DECISIONE DOCUMENTALE
+La campanella web conta le notifiche non lette, mentre gli inviti nominativi hanno un proprio stato pending. Servono due conteggi coerenti ma semanticamente distinti: unread notifications sulla campanella e pending invites sulla voce “Inviti”.
+
+OBIETTIVO
+Creare la notifica per ogni invito nominativo e mostrare un badge rosso con il numero degli inviti pendenti su web e mobile.
+
+FONTI
+- docs/api/leagues.md
+- docs/api/notifications.md
+- docs/design/navigation.md
+- apps/web/src/components/notifications/NotificationCenter.tsx
+- apps/mobile/src/screens/invites/ReceivedInvitesScreen.tsx
+
+REGOLE COMUNI
+- Prima di modificare codice, analizza lo stato reale di backend, contratti, web, mobile, test e documentazione. Condividi un piano breve; se emerge un'ambiguità che cambia la regola di prodotto, fermati e chiedi conferma.
+- La parità mobile è obbligatoria: ogni comportamento, stato, autorizzazione, errore e test introdotto sul web deve essere riflesso nell'app mobile usando gli stessi contratti API. Non è sufficiente una UI soltanto responsive.
+- Mantieni il confine provider: i client non chiamano direttamente API-Football o altri provider; consumano solo dati normalizzati dal backend.
+- Migrazioni additive e retrocompatibili, senza eliminare dati. Job, notifiche e rigenerazioni devono essere idempotenti e osservabili.
+- Non confondere `?persona=` con autorizzazione reale. I permessi sono verificati lato backend e rispecchiati nella UI.
+- Aggiorna la documentazione citata, i contratti condivisi e i runbook interessati. Riporta separatamente test automatici, prova Docker locale e ciò che richiede ancora validazione reale del provider/pilot.
+- Non creare commit automaticamente. Al termine indica file cambiati, URL/schermate da provare, risultato atteso e comando di test riproducibile.
+
+SCOPE
+- Alla creazione di un named invite genera una notifica idempotente con template/versione, leagueId/inviteId e deep link a `/inviti` o route mobile equivalente.
+- Esponi un conteggio leggero `pendingInviteCount` oppure includilo in un endpoint shell/badge versionato; conta solo inviti realmente pending e non scaduti/revocati.
+- Mostra badge rosso sulla voce “Inviti ricevuti” nel menu web e mobile; `0` nasconde il badge, oltre 99 mostra `99+`.
+- Mantieni sulla campanella il conteggio delle notifiche non lette. Se l'invito genera una notifica, i due badge possono differire e la UI deve restare comprensibile.
+- Accept/decline/revoke/expire aggiornano immediatamente pending count; lettura della notifica non chiude l'invito.
+- Mobile deve avere parità del centro notifiche/campanella o un entry point equivalente chiaramente visibile, più il badge nel drawer/menu.
+- Aggiungi aria-label/accessibility announcement e contrasto sufficiente. Polling/refresh non deve duplicare notifiche.
+
+ACCEPTANCE CRITERIA
+- Un nuovo invito produce una sola notifica e incrementa di uno il badge inviti su web e mobile.
+- Leggere la notifica azzera soltanto l'unread relativo, non il pending invite count.
+- Accettare, rifiutare, revocare o far scadere l'invito riconcilia il badge senza refresh completo.
+- Retry e richieste concorrenti non duplicano notifica o conteggio.
+
+VERIFICA MANUALE
+- Da admin invita un utente: verifica campanella, badge menu e deep link; poi marca la notifica letta e confronta i due conteggi.
+- Ripeti accept, decline, revoke ed expire su web e mobile, incluso scenario offline/riapertura app.
+
+FUORI SCOPE
+- Unificazione forzata dei due conteggi
+- Push notification nativa se non già infrastrutturata
+- Email invito
+
+DoD: test automatici + prova Docker quando applicabile; parità web/mobile; documentazione aggiornata; handoff senza commit automatico.",PRE-M5.1 — Ready,"Pre-M5.1,Inviti,Notifiche,Badge,Web,Mobile",,,7
+EP13-F01 — Discovery Fase 2 — club/formazione personale prima della lega,"EP13-F01 — Discovery Fase 2 — club/formazione personale prima della lega
+
+PRIORITÀ: Should — non blocca M5.1/v0.2
+DIPENDENZE: Esiti pilot e decisione di prodotto successiva
+
+DECISIONE DOCUMENTALE
+Nella documentazione Beta squadra, rosa, budget, modulo e formazione sono league-scoped. Non esiste un'entità globale che un allenatore libero possa preparare e poi trasferire in una lega.
+
+OBIETTIVO
+Stabilire se in Fase 2 serve un club personale riutilizzabile, un semplice template di preferenze o nessuna portabilità, senza implementare codice prematuramente.
+
+FONTI
+- docs/api/fantasy_teams.md
+- docs/api/fantasy_lineups.md
+- docs/api/leagues.md
+- FantAppero_Requisiti_Funzionali_MVP_v0.1.docx
+- FantAppero_Master_Unificato_v0.2.docx
+
+REGOLE COMUNI
+- Prima di modificare codice, analizza lo stato reale di backend, contratti, web, mobile, test e documentazione. Condividi un piano breve; se emerge un'ambiguità che cambia la regola di prodotto, fermati e chiedi conferma.
+- La parità mobile è obbligatoria: ogni comportamento, stato, autorizzazione, errore e test introdotto sul web deve essere riflesso nell'app mobile usando gli stessi contratti API. Non è sufficiente una UI soltanto responsive.
+- Mantieni il confine provider: i client non chiamano direttamente API-Football o altri provider; consumano solo dati normalizzati dal backend.
+- Migrazioni additive e retrocompatibili, senza eliminare dati. Job, notifiche e rigenerazioni devono essere idempotenti e osservabili.
+- Non confondere `?persona=` con autorizzazione reale. I permessi sono verificati lato backend e rispecchiati nella UI.
+- Aggiorna la documentazione citata, i contratti condivisi e i runbook interessati. Riporta separatamente test automatici, prova Docker locale e ciò che richiede ancora validazione reale del provider/pilot.
+- Non creare commit automaticamente. Al termine indica file cambiati, URL/schermate da provare, risultato atteso e comando di test riproducibile.
+
+SCOPE
+- Confronta almeno tre opzioni: club globale persistente; template rosa/formazione senza proprietà giocatori; onboarding guidato che applica preferenze dopo l'ingresso in lega.
+- Per ogni opzione analizza conflitto con listone, esclusività rose, budget, regolamento della lega, provider/season mapping, privacy, abbandono lega e trasferimenti.
+- Definisci journey di allenatore libero, preview nel profilo, import nella lega e gestione dei calciatori non disponibili nella nuova lega.
+- Produci ADR/proposta prodotto, diagramma dati, API sketch, permission matrix, wireframe web e mobile e piano di migrazione additiva.
+- Definisci metriche pilot che giustificano la feature e criteri GO/NO-GO. Non creare tabelle, endpoint o UI finché la decisione non è approvata.
+- Qualunque futura implementazione deve avere parità web/mobile e non consentire di aggirare asta, budget o proprietà league-scoped.
+
+ACCEPTANCE CRITERIA
+- La discovery cita esplicitamente perché la funzione non appartiene alla Beta attuale.
+- Ogni alternativa contiene pro/contro, rischi, impatto dati e comportamento mobile.
+- La decisione finale identifica una sola opzione raccomandata o documenta il NO-GO.
+- Nessuna modifica runtime viene introdotta da questa card.
+
+VERIFICA MANUALE
+- Workshop prodotto con esempi: allenatore senza lega, ingresso in lega con listone diverso, uscita e reingresso, stagione successiva.
+
+FUORI SCOPE
+- Implementazione runtime
+- Migrazione database
+- Promessa di portabilità prima della decisione prodotto
+
+DoD: test automatici + prova Docker quando applicabile; parità web/mobile; documentazione aggiornata; handoff senza commit automatico.",Fase 2 — Discovery,"Fase2,Discovery,Product,DataModel,Web,Mobile",,,8

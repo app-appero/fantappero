@@ -1,0 +1,5 @@
+scenario,daily_requests,monthly_requests,peak_rpm,matches_pre,matches_live,matches_post,matches_late,leagues_active,max_concurrent_live,fantasy_users,catalog,pre_match,live,post_match,late_corrections,recommended_plan,minimum_daily_quota,operational_margin,assumptions_fingerprint
+empty,60.77,1823.1,0.0,0,0,0,0,0,0,10000,60.77,0.0,0.0,0.0,0.0,Ultra,8924,0.3,353d9ca46998
+average,1447.15,43414.5,5.15,8,8,8,6,3,4,10000,60.77,107.12,1019.7,210.12,49.44,Ultra,8924,0.3,353d9ca46998
+peak,6863.92,205917.6,21.63,45,45,45,30,5,20,10000,60.77,309.0,5211.8,1035.15,247.2,Ultra,8924,0.3,353d9ca46998
+degraded,2766.58,82997.4,8.65,45,45,45,30,5,20,10000,20.6,118.97,2084.72,418.69,123.6,Ultra,8924,0.3,353d9ca46998

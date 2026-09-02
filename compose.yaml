@@ -1,0 +1,622 @@
+# FantApperò local stack — EP01-02
+# Essential services: postgres, redis, api, worker, beat, web
+# Optional tools: docker compose --profile tools up -d
+#
+# Usage from repo root:
+#   docker compose --env-file infra/local/.env.example up -d --build
+#   make up
+
+name: fantappero
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: fantappero-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-fantappero}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-fantappero_local_dev_only}
+      POSTGRES_DB: ${POSTGRES_DB:-fantappero}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - fantappero_pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${POSTGRES_USER:-fantappero} -d ${POSTGRES_DB:-fantappero}",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  postgres-test:
+    profiles: ["test", "backup-test"]
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-fantappero}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-fantappero_local_dev_only}
+      POSTGRES_DB: fantappero_test
+    volumes:
+      - fantappero_pg_test_data:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${POSTGRES_USER:-fantappero} -d fantappero_test",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  # EP12-05: isolated scheduler/tooling for PostgreSQL + avatar backups.
+  # Kept behind a profile so local developers opt in explicitly; pilot must
+  # run this service continuously (see docs/operations/backup_disaster_recovery.md).
+  postgres-backup:
+    profiles: ["backup"]
+    image: postgres:16-alpine
+    container_name: fantappero-postgres-backup
+    restart: unless-stopped
+    entrypoint: ["/bin/sh", "/scripts/backup_loop.sh"]
+    environment:
+      PGHOST: postgres
+      PGPORT: 5432
+      PGUSER: ${POSTGRES_USER:-fantappero}
+      PGPASSWORD: ${POSTGRES_PASSWORD:-fantappero_local_dev_only}
+      PGDATABASE: ${POSTGRES_DB:-fantappero}
+      BACKUP_ROOT: /backups
+      AVATAR_SOURCE: /avatars
+      BACKUP_INTERVAL_SECONDS: ${BACKUP_INTERVAL_SECONDS:-86400}
+      BACKUP_MAX_AGE_SECONDS: ${BACKUP_MAX_AGE_SECONDS:-93600}
+      BACKUP_MAX_ATTEMPTS: ${BACKUP_MAX_ATTEMPTS:-3}
+      BACKUP_RETRY_DELAY_SECONDS: ${BACKUP_RETRY_DELAY_SECONDS:-30}
+      BACKUP_DAILY_RETENTION_COUNT: ${BACKUP_DAILY_RETENTION_COUNT:-14}
+      BACKUP_WEEKLY_RETENTION_COUNT: ${BACKUP_WEEKLY_RETENTION_COUNT:-8}
+      BACKUP_WEEKLY_DAY_UTC: ${BACKUP_WEEKLY_DAY_UTC:-7}
+      BACKUP_ALERT_WEBHOOK_URL: ${BACKUP_ALERT_WEBHOOK_URL:-}
+    volumes:
+      - type: bind
+        source: ${POSTGRES_BACKUP_HOST_PATH:-./artifacts/backups}
+        target: /backups
+      - type: bind
+        source: ./infra/scripts
+        target: /scripts
+        read_only: true
+      - type: volume
+        source: fantappero_avatar_data
+        target: /avatars
+        read_only: true
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "/bin/sh", "/scripts/backup_healthcheck.sh"]
+      interval: 5m
+      timeout: 10s
+      retries: 2
+      start_period: 5m
+
+  # One-shot restore tools. Their scripts hard-refuse hosts/databases outside
+  # the isolated allowlist even when an operator supplies unsafe overrides.
+  postgres-restore-test:
+    profiles: ["backup-test"]
+    image: postgres:16-alpine
+    entrypoint: ["/bin/sh", "/scripts/restore_postgres.sh"]
+    environment:
+      PGUSER: ${POSTGRES_USER:-fantappero}
+      PGPASSWORD: ${POSTGRES_PASSWORD:-fantappero_local_dev_only}
+      BACKUP_ROOT: /backups
+      RESTORE_BACKUP_FILE: ${RESTORE_BACKUP_FILE:-latest}
+      RESTORE_TARGET_HOST: postgres-test
+      RESTORE_TARGET_PORT: 5432
+      RESTORE_TARGET_DATABASE: fantappero_restore_ep12
+      CONFIRM_RESTORE: isolated-test-only
+    volumes:
+      - type: bind
+        source: ${POSTGRES_BACKUP_HOST_PATH:-./artifacts/backups}
+        target: /backups
+        read_only: true
+      - type: bind
+        source: ./infra/scripts
+        target: /scripts
+        read_only: true
+    depends_on:
+      postgres-test:
+        condition: service_healthy
+
+  avatar-restore-test:
+    profiles: ["backup-test"]
+    image: postgres:16-alpine
+    entrypoint: ["/bin/sh", "/scripts/restore_avatars.sh"]
+    environment:
+      BACKUP_ROOT: /backups
+      RESTORE_AVATAR_FILE: ${RESTORE_AVATAR_FILE:-latest}
+      RESTORE_AVATAR_TARGET: /restore/avatars
+      CONFIRM_AVATAR_RESTORE: isolated-target-only
+    volumes:
+      - type: bind
+        source: ${POSTGRES_BACKUP_HOST_PATH:-./artifacts/backups}
+        target: /backups
+        read_only: true
+      - type: bind
+        source: ./infra/scripts
+        target: /scripts
+        read_only: true
+    tmpfs:
+      - /restore
+
+  api-restore-test:
+    profiles: ["backup-test"]
+    image: fantappero-backend:local
+    container_name: fantappero-api-restore-test
+    restart: "no"
+    environment:
+      FANTAPPERO_ENV: development
+      SOURCE_DATABASE_URL: postgresql://${POSTGRES_USER:-fantappero}:${POSTGRES_PASSWORD:-fantappero_local_dev_only}@postgres:5432/${POSTGRES_DB:-fantappero}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-fantappero}:${POSTGRES_PASSWORD:-fantappero_local_dev_only}@postgres-test:5432/fantappero_restore_ep12
+      REDIS_URL: redis://redis:6379/0
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-fantappero_local_jwt_dev_only_change_in_production}
+      SMTP_HOST: ${SMTP_HOST:-mailpit}
+      SMTP_PORT: ${SMTP_PORT:-1025}
+      MAIL_FROM: ${MAIL_FROM:-noreply@fantappero.local}
+      WEB_APP_BASE_URL: ${WEB_APP_BASE_URL:-http://localhost:5174}
+      AVATAR_STORAGE_PATH: /tmp/restore-avatars
+      PROFILE_POLICY_VERSION: ${PROFILE_POLICY_VERSION:-2026-01}
+    ports:
+      - "${RESTORE_API_PORT:-8003}:8001"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      postgres-test:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      mailpit:
+        condition: service_started
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "curl -fsS http://127.0.0.1:8001/ready | grep -q '\"status\":\"ok\"'",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+
+  redis:
+    image: redis:7-alpine
+    container_name: fantappero-redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - fantappero_redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+
+  api:
+    build:
+      context: .
+      dockerfile: infra/local/Dockerfile
+    image: fantappero-backend:local
+    container_name: fantappero-api
+    restart: unless-stopped
+    env_file:
+      - path: infra/local/.env.example
+        required: true
+      - path: infra/local/.env
+        required: false
+    environment:
+      # Always use in-compose hostnames — ignore host .env DATABASE_URL (127.0.0.1).
+      DATABASE_URL: postgresql://${POSTGRES_USER:-fantappero}:${POSTGRES_PASSWORD:-fantappero_local_dev_only}@postgres:5432/${POSTGRES_DB:-fantappero}
+      TEST_DATABASE_URL: postgresql://${POSTGRES_USER:-fantappero}:${POSTGRES_PASSWORD:-fantappero_local_dev_only}@postgres-test:5432/fantappero_test
+      REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/1
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-fantappero_local_jwt_dev_only_change_in_production}
+      SMTP_HOST: ${SMTP_HOST:-mailpit}
+      SMTP_PORT: ${SMTP_PORT:-1025}
+      MAIL_FROM: ${MAIL_FROM:-noreply@fantappero.local}
+      WEB_APP_BASE_URL: ${WEB_APP_BASE_URL:-http://localhost:5174}
+      AVATAR_STORAGE_PATH: /data/avatars
+      PROFILE_POLICY_VERSION: ${PROFILE_POLICY_VERSION:-2026-01}
+    ports:
+      - "${API_PORT:-8001}:8001"
+    volumes:
+      - fantappero_avatar_data:/data/avatars
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      mailpit:
+        condition: service_started
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "curl -fsS http://127.0.0.1:8001/health | grep -q '\"status\":\"ok\"'",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  worker:
+    image: fantappero-backend:local
+    container_name: fantappero-worker
+    restart: unless-stopped
+    command:
+      [
+        "celery",
+        "-A",
+        "app.worker.celery_app",
+        "worker",
+        "--loglevel=INFO",
+        "--concurrency=1",
+      ]
+    env_file:
+      - path: infra/local/.env.example
+        required: true
+      - path: infra/local/.env
+        required: false
+    environment:
+      # Always use in-compose hostnames — ignore host .env DATABASE_URL (127.0.0.1).
+      DATABASE_URL: postgresql://${POSTGRES_USER:-fantappero}:${POSTGRES_PASSWORD:-fantappero_local_dev_only}@postgres:5432/${POSTGRES_DB:-fantappero}
+      REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/1
+      SMTP_HOST: ${SMTP_HOST:-mailpit}
+      SMTP_PORT: ${SMTP_PORT:-1025}
+      MAIL_FROM: ${MAIL_FROM:-noreply@fantappero.local}
+      WEB_APP_BASE_URL: ${WEB_APP_BASE_URL:-http://localhost:5174}
+      FANTASY_TURNS_AUTO_GENERATE_ENABLED: ${FANTASY_TURNS_AUTO_GENERATE_ENABLED:-true}
+      FANTASY_TURNS_AUTO_GENERATE_INTERVAL_SECONDS: ${FANTASY_TURNS_AUTO_GENERATE_INTERVAL_SECONDS:-3600}
+      FANTASY_TURNS_HORIZON_DAYS: ${FANTASY_TURNS_HORIZON_DAYS:-14}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      mailpit:
+        condition: service_started
+      api:
+        condition: service_started
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "celery -A app.worker.celery_app inspect ping -d celery@$$HOSTNAME | grep -q pong",
+        ]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 40s
+
+  beat:
+    image: fantappero-backend:local
+    container_name: fantappero-beat
+    restart: unless-stopped
+    command:
+      [
+        "celery",
+        "-A",
+        "app.worker.celery_app",
+        "beat",
+        "--loglevel=INFO",
+      ]
+    env_file:
+      - path: infra/local/.env.example
+        required: true
+      - path: infra/local/.env
+        required: false
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-fantappero}:${POSTGRES_PASSWORD:-fantappero_local_dev_only}@postgres:5432/${POSTGRES_DB:-fantappero}
+      REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/1
+      FANTASY_TURNS_AUTO_GENERATE_ENABLED: ${FANTASY_TURNS_AUTO_GENERATE_ENABLED:-true}
+      FANTASY_TURNS_AUTO_GENERATE_INTERVAL_SECONDS: ${FANTASY_TURNS_AUTO_GENERATE_INTERVAL_SECONDS:-3600}
+      FANTASY_TURNS_HORIZON_DAYS: ${FANTASY_TURNS_HORIZON_DAYS:-14}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      worker:
+        condition: service_started
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "celery -A app.worker.celery_app inspect ping >/dev/null 2>&1 || exit 0",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 20s
+
+  web:
+    build:
+      context: .
+      dockerfile: infra/local/Dockerfile.web
+    image: fantappero-web:local
+    container_name: fantappero-web
+    restart: unless-stopped
+    environment:
+      VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://127.0.0.1:8001}
+      CHOKIDAR_USEPOLLING: "true"
+      WATCHPACK_POLLING: "true"
+    ports:
+      - "${WEB_PORT:-5174}:5174"
+    volumes:
+      - ./apps/web:/app/apps/web
+      - ./apps/mobile:/app/apps/mobile
+      - ./packages:/app/packages
+      - fantappero_web_node_modules:/app/node_modules
+      - fantappero_web_app_node_modules:/app/apps/web/node_modules
+      - fantappero_mobile_app_node_modules:/app/apps/mobile/node_modules
+      # node_modules dei packages workspace isolati in volumi Docker dedicati
+      # (come sopra per apps/web e apps/mobile): altrimenti sarebbero la
+      # STESSA cartella bind-mounted vista da Windows e dal container Linux,
+      # e pnpm crea symlink incompatibili tra i due — ogni reinstall da un
+      # lato rompe la risoluzione dei moduli per l'altro.
+      - fantappero_ui_node_modules:/app/packages/ui/node_modules
+      - fantappero_contracts_node_modules:/app/packages/contracts/node_modules
+      - fantappero_api_client_node_modules:/app/packages/api-client/node_modules
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:5174/ >/dev/null"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 45s
+
+  # --- Isolated capacity environment (EP12-03, profile: performance) ---
+  # No service below connects to postgres/redis from the dev or pilot stack.
+  # Database and broker use container-local tmpfs and disappear with the
+  # dedicated containers; the seeder independently verifies host + DB name.
+  postgres-perf:
+    profiles: ["performance"]
+    image: postgres:16-alpine
+    container_name: fantappero-postgres-perf
+    environment:
+      POSTGRES_USER: fantappero_perf
+      POSTGRES_PASSWORD: fantappero_perf_local_only
+      POSTGRES_DB: fantappero_performance
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U fantappero_perf -d fantappero_performance"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+      start_period: 5s
+
+  redis-perf:
+    profiles: ["performance"]
+    image: redis:7-alpine
+    container_name: fantappero-redis-perf
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    tmpfs:
+      - /data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+      start_period: 3s
+
+  api-perf:
+    profiles: ["performance"]
+    build:
+      context: .
+      dockerfile: infra/local/Dockerfile
+    image: fantappero-backend:local
+    container_name: fantappero-api-perf
+    restart: "no"
+    command:
+      [
+        "uvicorn",
+        "app.main:app",
+        "--host",
+        "0.0.0.0",
+        "--port",
+        "8001",
+        "--workers",
+        "${PERF_API_WORKERS:-4}",
+      ]
+    environment:
+      FANTAPPERO_ENV: development
+      LOG_LEVEL: WARNING
+      DATABASE_URL: postgresql://fantappero_perf:fantappero_perf_local_only@postgres-perf:5432/fantappero_performance
+      REDIS_URL: redis://redis-perf:6379/0
+      CELERY_BROKER_URL: redis://redis-perf:6379/0
+      CELERY_RESULT_BACKEND: redis://redis-perf:6379/1
+      JWT_SECRET_KEY: fantappero_performance_jwt_local_only
+      WEB_APP_BASE_URL: http://performance.invalid
+      AVATAR_STORAGE_PATH: /tmp/performance-avatars
+      PROFILE_POLICY_VERSION: 2026-01
+      SPORTS_SCHEDULER_ENABLED: "false"
+      FANTASY_TURNS_AUTO_GENERATE_ENABLED: "false"
+      NOTIFICATIONS_LINEUP_REMINDER_ENABLED: "false"
+      PERFORMANCE_SEED_CONFIRM: isolated-performance-only
+      # k6 setup authenticates 20 synthetic accounts before each scenario.
+      # This override exists only on the disposable performance API; ordinary
+      # dev/pilot services retain the secure default of 5 attempts/minute.
+      AUTH_RATE_LIMIT_LOGIN_PER_MINUTE: ${PERF_AUTH_LOGIN_BURST:-50}
+    ports:
+      - "${PERF_API_PORT:-8004}:8001"
+    tmpfs:
+      - /tmp/performance-avatars
+    depends_on:
+      postgres-perf:
+        condition: service_healthy
+      redis-perf:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8001/ready >/dev/null"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+      start_period: 10s
+
+  worker-perf:
+    profiles: ["performance"]
+    image: fantappero-backend:local
+    container_name: fantappero-worker-perf
+    restart: "no"
+    command:
+      [
+        "celery",
+        "-A",
+        "app.worker.celery_app",
+        "worker",
+        "--loglevel=WARNING",
+        "--concurrency=${PERF_WORKER_CONCURRENCY:-2}",
+      ]
+    environment:
+      FANTAPPERO_ENV: development
+      LOG_LEVEL: WARNING
+      DATABASE_URL: postgresql://fantappero_perf:fantappero_perf_local_only@postgres-perf:5432/fantappero_performance
+      REDIS_URL: redis://redis-perf:6379/0
+      CELERY_BROKER_URL: redis://redis-perf:6379/0
+      CELERY_RESULT_BACKEND: redis://redis-perf:6379/1
+      SPORTS_SCHEDULER_ENABLED: "false"
+      FANTASY_TURNS_AUTO_GENERATE_ENABLED: "false"
+      NOTIFICATIONS_LINEUP_REMINDER_ENABLED: "false"
+      PERFORMANCE_SEED_CONFIRM: isolated-performance-only
+    depends_on:
+      postgres-perf:
+        condition: service_healthy
+      redis-perf:
+        condition: service_healthy
+      api-perf:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "celery -A app.worker.celery_app inspect ping -d celery@$$HOSTNAME | grep -q pong",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 15s
+
+  performance-seed:
+    profiles: ["performance"]
+    image: fantappero-backend:local
+    environment:
+      FANTAPPERO_ENV: development
+      LOG_LEVEL: WARNING
+      DATABASE_URL: postgresql://fantappero_perf:fantappero_perf_local_only@postgres-perf:5432/fantappero_performance
+      REDIS_URL: redis://redis-perf:6379/0
+      CELERY_BROKER_URL: redis://redis-perf:6379/0
+      CELERY_RESULT_BACKEND: redis://redis-perf:6379/1
+      JWT_SECRET_KEY: fantappero_performance_jwt_local_only
+      WEB_APP_BASE_URL: http://performance.invalid
+      AVATAR_STORAGE_PATH: /tmp/performance-avatars
+      PROFILE_POLICY_VERSION: 2026-01
+      SPORTS_SCHEDULER_ENABLED: "false"
+      FANTASY_TURNS_AUTO_GENERATE_ENABLED: "false"
+      NOTIFICATIONS_LINEUP_REMINDER_ENABLED: "false"
+      PERFORMANCE_SEED_CONFIRM: isolated-performance-only
+      PERF_TEST_PASSWORD: ${PERF_TEST_PASSWORD:-PerfBeta-Only-2026!}
+    volumes:
+      - type: bind
+        source: ./artifacts/performance
+        target: /artifacts
+    depends_on:
+      postgres-perf:
+        condition: service_healthy
+      redis-perf:
+        condition: service_healthy
+
+  k6:
+    profiles: ["performance"]
+    image: grafana/k6:0.54.0
+    environment:
+      PERF_BASE_URL: http://api-perf:8001
+      PERF_SEED_PATH: /artifacts/runtime/seed.json
+      PERF_OUTPUT_DIR: /artifacts/results
+    volumes:
+      - type: bind
+        source: ./tools/performance
+        target: /scripts
+        read_only: true
+      - type: bind
+        source: ./artifacts/performance
+        target: /artifacts
+    depends_on:
+      api-perf:
+        condition: service_healthy
+      worker-perf:
+        condition: service_healthy
+
+  # --- Optional tools (profile: tools) ---
+  adminer:
+    profiles: ["tools"]
+    image: adminer:4.8.1
+    container_name: fantappero-adminer
+    restart: unless-stopped
+    ports:
+      - "${ADMINER_PORT:-8081}:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  redis-commander:
+    profiles: ["tools"]
+    image: rediscommander/redis-commander:latest
+    container_name: fantappero-redis-commander
+    restart: unless-stopped
+    environment:
+      REDIS_HOSTS: local:redis:6379
+    ports:
+      - "${REDIS_COMMANDER_PORT:-8082}:8081"
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  mailpit:
+    image: axllent/mailpit:v1.22
+    container_name: fantappero-mailpit
+    restart: unless-stopped
+    ports:
+      - "${MAILPIT_SMTP_PORT:-1025}:1025"
+      - "${MAILPIT_UI_PORT:-8025}:8025"
+
+volumes:
+  fantappero_pg_data:
+    name: fantappero_pg_data
+  fantappero_pg_test_data:
+    name: fantappero_pg_test_data
+  fantappero_redis_data:
+    name: fantappero_redis_data
+  fantappero_avatar_data:
+    name: fantappero_avatar_data
+  fantappero_web_node_modules:
+    name: fantappero_web_node_modules
+  fantappero_web_app_node_modules:
+    name: fantappero_web_app_node_modules
+  fantappero_mobile_app_node_modules:
+    name: fantappero_mobile_app_node_modules
+  fantappero_ui_node_modules:
+    name: fantappero_ui_node_modules
+  fantappero_contracts_node_modules:
+    name: fantappero_contracts_node_modules
+  fantappero_api_client_node_modules:
+    name: fantappero_api_client_node_modules

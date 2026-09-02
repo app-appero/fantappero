@@ -1,0 +1,708 @@
+﻿Name,Description,List,Labels,Members,Due Date,Position
+EP12-01 — Suite end-to-end critica,"CODICE: EP12-01
+
+USER STORY
+Come team vogliamo rilasciare una Beta osservabile, sicura e recuperabile.
+
+OBIETTIVO E SCOPE
+- Coprire registrazione → lega → rosa → formazione → risultato → mercato.
+- Definire piano, dati di test, responsabile ed evidenze.
+- Correggere o accettare formalmente ogni scostamento.
+
+CRITERI DI ACCETTAZIONE
+- Flusso verde su ambiente pulito e dati fixture.
+- Evidenze collegate alla card.
+
+TEST MINIMI
+- Test unitari delle regole e delle validazioni introdotte.
+- Test del flusso UI positivo, vuoto, errore e permessi insufficienti.
+- Smoke test dell’ambiente e verifica di log, metriche, retry e configurazione.
+- Test di integrazione e regressione sui casi limite indicati nei criteri di accettazione.
+
+DELIVERABLE
+- Codice applicativo e configurazioni nel modulo coerente con l’architettura approvata.
+- API/servizi di dominio, validazioni e documentazione tecnica aggiornata.
+- Interfaccia web/mobile con stati di caricamento, vuoto, errore e successo.
+- Configurazione infrastrutturale, osservabilità e runbook pertinenti.
+- Test automatici e breve evidenza di verifica collegabile alla card.
+
+DIPENDENZE
+Tutte le Epic Must pertinenti
+
+STIMA INIZIALE
+3–5 giorni
+
+PROMPT CURSOR
+CONTESTO STANDARD — FANTAPPERÒ
+Stai lavorando su FantApperò, una piattaforma fantasy football web con backend Python/FastAPI, frontend React/TypeScript, PostgreSQL, Redis, worker asincroni e integrazione centralizzata con API-Football. L’architettura approvata è un monolite modulare API-first. Gli ambienti locali e i servizi applicativi devono essere gestiti con Docker e Docker Compose.
+
+REGOLE GENERALI OBBLIGATORIE
+- Usa l’italiano come lingua predefinita per interfaccia, messaggi utente, dati seed, documentazione funzionale e nuovi contenuti. Predisponi il codice per una futura internazionalizzazione, senza implementare ora lingue aggiuntive se la card non lo richiede.
+- Non modificare funzionalità, regole di gioco, API, schema dati, configurazioni o componenti non necessari alla card.
+- Non cancellare o rinominare codice, migrazioni, dati, test o funzioni esistenti senza una motivazione tecnica esplicita e verificata.
+- Prima di creare qualcosa, controlla cosa esiste già e riusa pattern, moduli e componenti compatibili.
+- Mantieni compatibilità con le funzionalità esistenti e non anticipare card o milestone successive.
+- Non inserire segreti nel codice, nei log, nei test, nei commit o nella documentazione.
+- Non usare Makefile, il comando `make` o wrapper equivalenti. Usa i normali comandi `docker compose` definiti dal progetto.
+- Non presupporre servizi installati localmente: esegui backend, worker, database, Redis, migrazioni e test attraverso Docker Compose, salvo attività puramente frontend già previste diversamente dal repository.
+- Se manca un servizio o un comando Compose necessario, aggiorna `compose.yaml` e la documentazione in modo minimale e coerente con lo scope.
+
+INCARICO
+- Card Trello: EP12-01 — Suite end-to-end critica
+- Dipendenze dichiarate: Tutte le Epic Must pertinenti
+
+Prima di modificare il codice:
+1. analizza la struttura del progetto aperto e individua tutti i file coinvolti nella card;
+2. leggi il README e la documentazione architetturale o tecnica effettivamente presenti e pertinenti;
+3. verifica cosa esiste già ed evita implementazioni duplicate;
+4. controlla che le dipendenze funzionali dichiarate siano già implementate; se manca una dipendenza bloccante, fermati e descrivi con precisione cosa manca;
+5. indicami brevemente il piano che seguirai prima di applicare le modifiche;
+6. riusa pattern, servizi e componenti già adottati quando sono compatibili;
+7. non introdurre segreti, credenziali, dipendenze non necessarie o modifiche fuori scope.
+
+USER STORY
+Come team vogliamo rilasciare una Beta osservabile, sicura e recuperabile.
+
+ATTIVITÀ RICHIESTE
+- Coprire registrazione → lega → rosa → formazione → risultato → mercato.
+- Definire piano, dati di test, responsabile ed evidenze.
+- Correggere o accettare formalmente ogni scostamento.
+
+VINCOLI DI IMPLEMENTAZIONE
+- Rispetta il monolite modulare API-first, i confini di dominio e il modello dati approvati.
+- Le autorizzazioni e le validazioni decisive devono essere applicate lato server.
+- Le operazioni che cambiano crediti, rose, mercato, risultati o configurazioni devono essere atomiche e auditabili.
+- Mantieni retrocompatibilità con migrazioni e API esistenti; se non è possibile, documenta esplicitamente la decisione.
+- Non implementare funzionalità appartenenti a card successive.
+- Aggiungi log e metriche utili senza esporre dati personali o segreti.
+
+CRITERI DI ACCETTAZIONE
+- Flusso verde su ambiente pulito e dati fixture.
+- Evidenze collegate alla card.
+
+TEST MINIMI
+- Test unitari delle regole e delle validazioni introdotte.
+- Test del flusso UI positivo, vuoto, errore e permessi insufficienti.
+- Smoke test dell’ambiente e verifica di log, metriche, retry e configurazione.
+- Test di integrazione e regressione sui casi limite indicati nei criteri di accettazione.
+
+DELIVERABLE ATTESI
+- Codice applicativo e configurazioni nel modulo coerente con l’architettura approvata.
+- API/servizi di dominio, validazioni e documentazione tecnica aggiornata.
+- Interfaccia web/mobile con stati di caricamento, vuoto, errore e successo.
+- Configurazione infrastrutturale, osservabilità e runbook pertinenti.
+- Test automatici e breve evidenza di verifica collegabile alla card.
+
+CHIUSURA DEL LAVORO
+- Esegui lint, type-check, test pertinenti e build dei moduli toccati usando i comandi ordinari `docker compose`; non usare `make`.
+- Riporta file modificati, migrazioni, comandi eseguiti e relativi esiti.
+- Spiega le decisioni tecniche non ovvie e gli eventuali rischi residui.
+- Se qualcosa non è verificabile nell’ambiente disponibile, dichiaralo chiaramente senza simulare un esito positivo.
+- Non creare commit o push se non richiesto espressamente.
+",M5 — Ready,"M5, EP12, Must, QA, Backend, Frontend, Infrastructure",,,1
+EP12-02 — Test proprietà e concorrenza,"CODICE: EP12-02
+
+USER STORY
+Come team vogliamo rilasciare una Beta osservabile, sicura e recuperabile.
+
+OBIETTIVO E SCOPE
+- Stressare ledger, buste, scambi, formazione e ricalcolo.
+- Definire piano, dati di test, responsabile ed evidenze.
+- Correggere o accettare formalmente ogni scostamento.
+
+CRITERI DI ACCETTAZIONE
+- Nessun saldo negativo, doppia assegnazione o risultato non deterministico.
+- Evidenze collegate alla card.
+
+TEST MINIMI
+- Test unitari delle regole e delle validazioni introdotte.
+- Test del flusso UI positivo, vuoto, errore e permessi insufficienti.
+- Smoke test dell’ambiente e verifica di log, metriche, retry e configurazione.
+- Test di integrazione e regressione sui casi limite indicati nei criteri di accettazione.
+
+DELIVERABLE
+- Codice applicativo e configurazioni nel modulo coerente con l’architettura approvata.
+- API/servizi di dominio, validazioni e documentazione tecnica aggiornata.
+- Interfaccia web/mobile con stati di caricamento, vuoto, errore e successo.
+- Configurazione infrastrutturale, osservabilità e runbook pertinenti.
+- Test automatici e breve evidenza di verifica collegabile alla card.
+
+DIPENDENZE
+Tutte le Epic Must pertinenti
+
+STIMA INIZIALE
+3–5 giorni
+
+PROMPT CURSOR
+CONTESTO STANDARD — FANTAPPERÒ
+Stai lavorando su FantApperò, una piattaforma fantasy football web con backend Python/FastAPI, frontend React/TypeScript, PostgreSQL, Redis, worker asincroni e integrazione centralizzata con API-Football. L’architettura approvata è un monolite modulare API-first. Gli ambienti locali e i servizi applicativi devono essere gestiti con Docker e Docker Compose.
+
+REGOLE GENERALI OBBLIGATORIE
+- Usa l’italiano come lingua predefinita per interfaccia, messaggi utente, dati seed, documentazione funzionale e nuovi contenuti. Predisponi il codice per una futura internazionalizzazione, senza implementare ora lingue aggiuntive se la card non lo richiede.
+- Non modificare funzionalità, regole di gioco, API, schema dati, configurazioni o componenti non necessari alla card.
+- Non cancellare o rinominare codice, migrazioni, dati, test o funzioni esistenti senza una motivazione tecnica esplicita e verificata.
+- Prima di creare qualcosa, controlla cosa esiste già e riusa pattern, moduli e componenti compatibili.
+- Mantieni compatibilità con le funzionalità esistenti e non anticipare card o milestone successive.
+- Non inserire segreti nel codice, nei log, nei test, nei commit o nella documentazione.
+- Non usare Makefile, il comando `make` o wrapper equivalenti. Usa i normali comandi `docker compose` definiti dal progetto.
+- Non presupporre servizi installati localmente: esegui backend, worker, database, Redis, migrazioni e test attraverso Docker Compose, salvo attività puramente frontend già previste diversamente dal repository.
+- Se manca un servizio o un comando Compose necessario, aggiorna `compose.yaml` e la documentazione in modo minimale e coerente con lo scope.
+
+INCARICO
+- Card Trello: EP12-02 — Test proprietà e concorrenza
+- Dipendenze dichiarate: Tutte le Epic Must pertinenti
+
+Prima di modificare il codice:
+1. analizza la struttura del progetto aperto e individua tutti i file coinvolti nella card;
+2. leggi il README e la documentazione architetturale o tecnica effettivamente presenti e pertinenti;
+3. verifica cosa esiste già ed evita implementazioni duplicate;
+4. controlla che le dipendenze funzionali dichiarate siano già implementate; se manca una dipendenza bloccante, fermati e descrivi con precisione cosa manca;
+5. indicami brevemente il piano che seguirai prima di applicare le modifiche;
+6. riusa pattern, servizi e componenti già adottati quando sono compatibili;
+7. non introdurre segreti, credenziali, dipendenze non necessarie o modifiche fuori scope.
+
+USER STORY
+Come team vogliamo rilasciare una Beta osservabile, sicura e recuperabile.
+
+ATTIVITÀ RICHIESTE
+- Stressare ledger, buste, scambi, formazione e ricalcolo.
+- Definire piano, dati di test, responsabile ed evidenze.
+- Correggere o accettare formalmente ogni scostamento.
+
+VINCOLI DI IMPLEMENTAZIONE
+- Rispetta il monolite modulare API-first, i confini di dominio e il modello dati approvati.
+- Le autorizzazioni e le validazioni decisive devono essere applicate lato server.
+- Le operazioni che cambiano crediti, rose, mercato, risultati o configurazioni devono essere atomiche e auditabili.
+- Mantieni retrocompatibilità con migrazioni e API esistenti; se non è possibile, documenta esplicitamente la decisione.
+- Non implementare funzionalità appartenenti a card successive.
+- Aggiungi log e metriche utili senza esporre dati personali o segreti.
+
+CRITERI DI ACCETTAZIONE
+- Nessun saldo negativo, doppia assegnazione o risultato non deterministico.
+- Evidenze collegate alla card.
+
+TEST MINIMI
+- Test unitari delle regole e delle validazioni introdotte.
+- Test del flusso UI positivo, vuoto, errore e permessi insufficienti.
+- Smoke test dell’ambiente e verifica di log, metriche, retry e configurazione.
+- Test di integrazione e regressione sui casi limite indicati nei criteri di accettazione.
+
+DELIVERABLE ATTESI
+- Codice applicativo e configurazioni nel modulo coerente con l’architettura approvata.
+- API/servizi di dominio, validazioni e documentazione tecnica aggiornata.
+- Interfaccia web/mobile con stati di caricamento, vuoto, errore e successo.
+- Configurazione infrastrutturale, osservabilità e runbook pertinenti.
+- Test automatici e breve evidenza di verifica collegabile alla card.
+
+CHIUSURA DEL LAVORO
+- Esegui lint, type-check, test pertinenti e build dei moduli toccati usando i comandi ordinari `docker compose`; non usare `make`.
+- Riporta file modificati, migrazioni, comandi eseguiti e relativi esiti.
+- Spiega le decisioni tecniche non ovvie e gli eventuali rischi residui.
+- Se qualcosa non è verificabile nell’ambiente disponibile, dichiaralo chiaramente senza simulare un esito positivo.
+- Non creare commit o push se non richiesto espressamente.
+",M5 — Ready,"M5, EP12, Must, QA, Backend, Frontend, Infrastructure",,,2
+EP12-03 — Performance e capacità,"CODICE: EP12-03
+
+USER STORY
+Come team vogliamo rilasciare una Beta osservabile, sicura e recuperabile.
+
+OBIETTIVO E SCOPE
+- Misurare API, DB, worker, live e picchi.
+- Definire piano, dati di test, responsabile ed evidenze.
+- Correggere o accettare formalmente ogni scostamento.
+
+CRITERI DI ACCETTAZIONE
+- SLO Beta definiti e rispettati sul carico concordato.
+- Evidenze collegate alla card.
+
+TEST MINIMI
+- Test unitari delle regole e delle validazioni introdotte.
+- Test del flusso UI positivo, vuoto, errore e permessi insufficienti.
+- Smoke test dell’ambiente e verifica di log, metriche, retry e configurazione.
+- Test di integrazione e regressione sui casi limite indicati nei criteri di accettazione.
+
+DELIVERABLE
+- Codice applicativo e configurazioni nel modulo coerente con l’architettura approvata.
+- API/servizi di dominio, validazioni e documentazione tecnica aggiornata.
+- Interfaccia web/mobile con stati di caricamento, vuoto, errore e successo.
+- Configurazione infrastrutturale, osservabilità e runbook pertinenti.
+- Test automatici e breve evidenza di verifica collegabile alla card.
+
+DIPENDENZE
+Tutte le Epic Must pertinenti
+
+STIMA INIZIALE
+3–5 giorni
+
+PROMPT CURSOR
+CONTESTO STANDARD — FANTAPPERÒ
+Stai lavorando su FantApperò, una piattaforma fantasy football web con backend Python/FastAPI, frontend React/TypeScript, PostgreSQL, Redis, worker asincroni e integrazione centralizzata con API-Football. L’architettura approvata è un monolite modulare API-first. Gli ambienti locali e i servizi applicativi devono essere gestiti con Docker e Docker Compose.
+
+REGOLE GENERALI OBBLIGATORIE
+- Usa l’italiano come lingua predefinita per interfaccia, messaggi utente, dati seed, documentazione funzionale e nuovi contenuti. Predisponi il codice per una futura internazionalizzazione, senza implementare ora lingue aggiuntive se la card non lo richiede.
+- Non modificare funzionalità, regole di gioco, API, schema dati, configurazioni o componenti non necessari alla card.
+- Non cancellare o rinominare codice, migrazioni, dati, test o funzioni esistenti senza una motivazione tecnica esplicita e verificata.
+- Prima di creare qualcosa, controlla cosa esiste già e riusa pattern, moduli e componenti compatibili.
+- Mantieni compatibilità con le funzionalità esistenti e non anticipare card o milestone successive.
+- Non inserire segreti nel codice, nei log, nei test, nei commit o nella documentazione.
+- Non usare Makefile, il comando `make` o wrapper equivalenti. Usa i normali comandi `docker compose` definiti dal progetto.
+- Non presupporre servizi installati localmente: esegui backend, worker, database, Redis, migrazioni e test attraverso Docker Compose, salvo attività puramente frontend già previste diversamente dal repository.
+- Se manca un servizio o un comando Compose necessario, aggiorna `compose.yaml` e la documentazione in modo minimale e coerente con lo scope.
+
+INCARICO
+- Card Trello: EP12-03 — Performance e capacità
+- Dipendenze dichiarate: Tutte le Epic Must pertinenti
+
+Prima di modificare il codice:
+1. analizza la struttura del progetto aperto e individua tutti i file coinvolti nella card;
+2. leggi il README e la documentazione architetturale o tecnica effettivamente presenti e pertinenti;
+3. verifica cosa esiste già ed evita implementazioni duplicate;
+4. controlla che le dipendenze funzionali dichiarate siano già implementate; se manca una dipendenza bloccante, fermati e descrivi con precisione cosa manca;
+5. indicami brevemente il piano che seguirai prima di applicare le modifiche;
+6. riusa pattern, servizi e componenti già adottati quando sono compatibili;
+7. non introdurre segreti, credenziali, dipendenze non necessarie o modifiche fuori scope.
+
+USER STORY
+Come team vogliamo rilasciare una Beta osservabile, sicura e recuperabile.
+
+ATTIVITÀ RICHIESTE
+- Misurare API, DB, worker, live e picchi.
+- Definire piano, dati di test, responsabile ed evidenze.
+- Correggere o accettare formalmente ogni scostamento.
+
+VINCOLI DI IMPLEMENTAZIONE
+- Rispetta il monolite modulare API-first, i confini di dominio e il modello dati approvati.
+- Le autorizzazioni e le validazioni decisive devono essere applicate lato server.
+- Le operazioni che cambiano crediti, rose, mercato, risultati o configurazioni devono essere atomiche e auditabili.
+- Mantieni retrocompatibilità con migrazioni e API esistenti; se non è possibile, documenta esplicitamente la decisione.
+- Non implementare funzionalità appartenenti a card successive.
+- Aggiungi log e metriche utili senza esporre dati personali o segreti.
+
+CRITERI DI ACCETTAZIONE
+- SLO Beta definiti e rispettati sul carico concordato.
+- Evidenze collegate alla card.
+
+TEST MINIMI
+- Test unitari delle regole e delle validazioni introdotte.
+- Test del flusso UI positivo, vuoto, errore e permessi insufficienti.
+- Smoke test dell’ambiente e verifica di log, metriche, retry e configurazione.
+- Test di integrazione e regressione sui casi limite indicati nei criteri di accettazione.
+
+DELIVERABLE ATTESI
+- Codice applicativo e configurazioni nel modulo coerente con l’architettura approvata.
+- API/servizi di dominio, validazioni e documentazione tecnica aggiornata.
+- Interfaccia web/mobile con stati di caricamento, vuoto, errore e successo.
+- Configurazione infrastrutturale, osservabilità e runbook pertinenti.
+- Test automatici e breve evidenza di verifica collegabile alla card.
+
+CHIUSURA DEL LAVORO
+- Esegui lint, type-check, test pertinenti e build dei moduli toccati usando i comandi ordinari `docker compose`; non usare `make`.
+- Riporta file modificati, migrazioni, comandi eseguiti e relativi esiti.
+- Spiega le decisioni tecniche non ovvie e gli eventuali rischi residui.
+- Se qualcosa non è verificabile nell’ambiente disponibile, dichiaralo chiaramente senza simulare un esito positivo.
+- Non creare commit o push se non richiesto espressamente.
+",M5 — Ready,"M5, EP12, Must, QA, Backend, Frontend, Infrastructure",,,3
+EP12-04 — Security review,"CODICE: EP12-04
+
+USER STORY
+Come team vogliamo rilasciare una Beta osservabile, sicura e recuperabile.
+
+OBIETTIVO E SCOPE
+- Verificare OWASP, autorizzazioni, rate limit, upload e segreti.
+- Definire piano, dati di test, responsabile ed evidenze.
+- Correggere o accettare formalmente ogni scostamento.
+
+CRITERI DI ACCETTAZIONE
+- Nessuna vulnerabilità critica/alta aperta.
+- Evidenze collegate alla card.
+
+TEST MINIMI
+- Test unitari delle regole e delle validazioni introdotte.
+- Test del flusso UI positivo, vuoto, errore e permessi insufficienti.
+- Smoke test dell’ambiente e verifica di log, metriche, retry e configurazione.
+- Test di integrazione e regressione sui casi limite indicati nei criteri di accettazione.
+
+DELIVERABLE
+- Codice applicativo e configurazioni nel modulo coerente con l’architettura approvata.
+- API/servizi di dominio, validazioni e documentazione tecnica aggiornata.
+- Interfaccia web/mobile con stati di caricamento, vuoto, errore e successo.
+- Configurazione infrastrutturale, osservabilità e runbook pertinenti.
+- Test automatici e breve evidenza di verifica collegabile alla card.
+
+DIPENDENZE
+Tutte le Epic Must pertinenti
+
+STIMA INIZIALE
+3–5 giorni
+
+PROMPT CURSOR
+CONTESTO STANDARD — FANTAPPERÒ
+Stai lavorando su FantApperò, una piattaforma fantasy football web con backend Python/FastAPI, frontend React/TypeScript, PostgreSQL, Redis, worker asincroni e integrazione centralizzata con API-Football. L’architettura approvata è un monolite modulare API-first. Gli ambienti locali e i servizi applicativi devono essere gestiti con Docker e Docker Compose.
+
+REGOLE GENERALI OBBLIGATORIE
+- Usa l’italiano come lingua predefinita per interfaccia, messaggi utente, dati seed, documentazione funzionale e nuovi contenuti. Predisponi il codice per una futura internazionalizzazione, senza implementare ora lingue aggiuntive se la card non lo richiede.
+- Non modificare funzionalità, regole di gioco, API, schema dati, configurazioni o componenti non necessari alla card.
+- Non cancellare o rinominare codice, migrazioni, dati, test o funzioni esistenti senza una motivazione tecnica esplicita e verificata.
+- Prima di creare qualcosa, controlla cosa esiste già e riusa pattern, moduli e componenti compatibili.
+- Mantieni compatibilità con le funzionalità esistenti e non anticipare card o milestone successive.
+- Non inserire segreti nel codice, nei log, nei test, nei commit o nella documentazione.
+- Non usare Makefile, il comando `make` o wrapper equivalenti. Usa i normali comandi `docker compose` definiti dal progetto.
+- Non presupporre servizi installati localmente: esegui backend, worker, database, Redis, migrazioni e test attraverso Docker Compose, salvo attività puramente frontend già previste diversamente dal repository.
+- Se manca un servizio o un comando Compose necessario, aggiorna `compose.yaml` e la documentazione in modo minimale e coerente con lo scope.
+
+INCARICO
+- Card Trello: EP12-04 — Security review
+- Dipendenze dichiarate: Tutte le Epic Must pertinenti
+
+Prima di modificare il codice:
+1. analizza la struttura del progetto aperto e individua tutti i file coinvolti nella card;
+2. leggi il README e la documentazione architetturale o tecnica effettivamente presenti e pertinenti;
+3. verifica cosa esiste già ed evita implementazioni duplicate;
+4. controlla che le dipendenze funzionali dichiarate siano già implementate; se manca una dipendenza bloccante, fermati e descrivi con precisione cosa manca;
+5. indicami brevemente il piano che seguirai prima di applicare le modifiche;
+6. riusa pattern, servizi e componenti già adottati quando sono compatibili;
+7. non introdurre segreti, credenziali, dipendenze non necessarie o modifiche fuori scope.
+
+USER STORY
+Come team vogliamo rilasciare una Beta osservabile, sicura e recuperabile.
+
+ATTIVITÀ RICHIESTE
+- Verificare OWASP, autorizzazioni, rate limit, upload e segreti.
+- Definire piano, dati di test, responsabile ed evidenze.
+- Correggere o accettare formalmente ogni scostamento.
+
+VINCOLI DI IMPLEMENTAZIONE
+- Rispetta il monolite modulare API-first, i confini di dominio e il modello dati approvati.
+- Le autorizzazioni e le validazioni decisive devono essere applicate lato server.
+- Le operazioni che cambiano crediti, rose, mercato, risultati o configurazioni devono essere atomiche e auditabili.
+- Mantieni retrocompatibilità con migrazioni e API esistenti; se non è possibile, documenta esplicitamente la decisione.
+- Non implementare funzionalità appartenenti a card successive.
+- Aggiungi log e metriche utili senza esporre dati personali o segreti.
+
+CRITERI DI ACCETTAZIONE
+- Nessuna vulnerabilità critica/alta aperta.
+- Evidenze collegate alla card.
+
+TEST MINIMI
+- Test unitari delle regole e delle validazioni introdotte.
+- Test del flusso UI positivo, vuoto, errore e permessi insufficienti.
+- Smoke test dell’ambiente e verifica di log, metriche, retry e configurazione.
+- Test di integrazione e regressione sui casi limite indicati nei criteri di accettazione.
+
+DELIVERABLE ATTESI
+- Codice applicativo e configurazioni nel modulo coerente con l’architettura approvata.
+- API/servizi di dominio, validazioni e documentazione tecnica aggiornata.
+- Interfaccia web/mobile con stati di caricamento, vuoto, errore e successo.
+- Configurazione infrastrutturale, osservabilità e runbook pertinenti.
+- Test automatici e breve evidenza di verifica collegabile alla card.
+
+CHIUSURA DEL LAVORO
+- Esegui lint, type-check, test pertinenti e build dei moduli toccati usando i comandi ordinari `docker compose`; non usare `make`.
+- Riporta file modificati, migrazioni, comandi eseguiti e relativi esiti.
+- Spiega le decisioni tecniche non ovvie e gli eventuali rischi residui.
+- Se qualcosa non è verificabile nell’ambiente disponibile, dichiaralo chiaramente senza simulare un esito positivo.
+- Non creare commit o push se non richiesto espressamente.
+",M5 — Ready,"M5, EP12, Must, QA, Backend, Frontend, Infrastructure",,,4
+EP12-05 — Backup e disaster recovery,"CODICE: EP12-05
+
+USER STORY
+Come team vogliamo rilasciare una Beta osservabile, sicura e recuperabile.
+
+OBIETTIVO E SCOPE
+- Automatizzare backup e testare restore.
+- Definire piano, dati di test, responsabile ed evidenze.
+- Correggere o accettare formalmente ogni scostamento.
+
+CRITERI DI ACCETTAZIONE
+- RPO/RTO Beta definiti; restore dimostrato.
+- Evidenze collegate alla card.
+
+TEST MINIMI
+- Test unitari delle regole e delle validazioni introdotte.
+- Test del flusso UI positivo, vuoto, errore e permessi insufficienti.
+- Smoke test dell’ambiente e verifica di log, metriche, retry e configurazione.
+- Test di integrazione e regressione sui casi limite indicati nei criteri di accettazione.
+
+DELIVERABLE
+- Codice applicativo e configurazioni nel modulo coerente con l’architettura approvata.
+- API/servizi di dominio, validazioni e documentazione tecnica aggiornata.
+- Interfaccia web/mobile con stati di caricamento, vuoto, errore e successo.
+- Configurazione infrastrutturale, osservabilità e runbook pertinenti.
+- Test automatici e breve evidenza di verifica collegabile alla card.
+
+DIPENDENZE
+Tutte le Epic Must pertinenti
+
+STIMA INIZIALE
+3–5 giorni
+
+PROMPT CURSOR
+CONTESTO STANDARD — FANTAPPERÒ
+Stai lavorando su FantApperò, una piattaforma fantasy football web con backend Python/FastAPI, frontend React/TypeScript, PostgreSQL, Redis, worker asincroni e integrazione centralizzata con API-Football. L’architettura approvata è un monolite modulare API-first. Gli ambienti locali e i servizi applicativi devono essere gestiti con Docker e Docker Compose.
+
+REGOLE GENERALI OBBLIGATORIE
+- Usa l’italiano come lingua predefinita per interfaccia, messaggi utente, dati seed, documentazione funzionale e nuovi contenuti. Predisponi il codice per una futura internazionalizzazione, senza implementare ora lingue aggiuntive se la card non lo richiede.
+- Non modificare funzionalità, regole di gioco, API, schema dati, configurazioni o componenti non necessari alla card.
+- Non cancellare o rinominare codice, migrazioni, dati, test o funzioni esistenti senza una motivazione tecnica esplicita e verificata.
+- Prima di creare qualcosa, controlla cosa esiste già e riusa pattern, moduli e componenti compatibili.
+- Mantieni compatibilità con le funzionalità esistenti e non anticipare card o milestone successive.
+- Non inserire segreti nel codice, nei log, nei test, nei commit o nella documentazione.
+- Non usare Makefile, il comando `make` o wrapper equivalenti. Usa i normali comandi `docker compose` definiti dal progetto.
+- Non presupporre servizi installati localmente: esegui backend, worker, database, Redis, migrazioni e test attraverso Docker Compose, salvo attività puramente frontend già previste diversamente dal repository.
+- Se manca un servizio o un comando Compose necessario, aggiorna `compose.yaml` e la documentazione in modo minimale e coerente con lo scope.
+
+INCARICO
+- Card Trello: EP12-05 — Backup e disaster recovery
+- Dipendenze dichiarate: Tutte le Epic Must pertinenti
+
+Prima di modificare il codice:
+1. analizza la struttura del progetto aperto e individua tutti i file coinvolti nella card;
+2. leggi il README e la documentazione architetturale o tecnica effettivamente presenti e pertinenti;
+3. verifica cosa esiste già ed evita implementazioni duplicate;
+4. controlla che le dipendenze funzionali dichiarate siano già implementate; se manca una dipendenza bloccante, fermati e descrivi con precisione cosa manca;
+5. indicami brevemente il piano che seguirai prima di applicare le modifiche;
+6. riusa pattern, servizi e componenti già adottati quando sono compatibili;
+7. non introdurre segreti, credenziali, dipendenze non necessarie o modifiche fuori scope.
+
+USER STORY
+Come team vogliamo rilasciare una Beta osservabile, sicura e recuperabile.
+
+ATTIVITÀ RICHIESTE
+- Automatizzare backup e testare restore.
+- Definire piano, dati di test, responsabile ed evidenze.
+- Correggere o accettare formalmente ogni scostamento.
+
+VINCOLI DI IMPLEMENTAZIONE
+- Rispetta il monolite modulare API-first, i confini di dominio e il modello dati approvati.
+- Le autorizzazioni e le validazioni decisive devono essere applicate lato server.
+- Le operazioni che cambiano crediti, rose, mercato, risultati o configurazioni devono essere atomiche e auditabili.
+- Mantieni retrocompatibilità con migrazioni e API esistenti; se non è possibile, documenta esplicitamente la decisione.
+- Non implementare funzionalità appartenenti a card successive.
+- Aggiungi log e metriche utili senza esporre dati personali o segreti.
+
+CRITERI DI ACCETTAZIONE
+- RPO/RTO Beta definiti; restore dimostrato.
+- Evidenze collegate alla card.
+
+TEST MINIMI
+- Test unitari delle regole e delle validazioni introdotte.
+- Test del flusso UI positivo, vuoto, errore e permessi insufficienti.
+- Smoke test dell’ambiente e verifica di log, metriche, retry e configurazione.
+- Test di integrazione e regressione sui casi limite indicati nei criteri di accettazione.
+
+DELIVERABLE ATTESI
+- Codice applicativo e configurazioni nel modulo coerente con l’architettura approvata.
+- API/servizi di dominio, validazioni e documentazione tecnica aggiornata.
+- Interfaccia web/mobile con stati di caricamento, vuoto, errore e successo.
+- Configurazione infrastrutturale, osservabilità e runbook pertinenti.
+- Test automatici e breve evidenza di verifica collegabile alla card.
+
+CHIUSURA DEL LAVORO
+- Esegui lint, type-check, test pertinenti e build dei moduli toccati usando i comandi ordinari `docker compose`; non usare `make`.
+- Riporta file modificati, migrazioni, comandi eseguiti e relativi esiti.
+- Spiega le decisioni tecniche non ovvie e gli eventuali rischi residui.
+- Se qualcosa non è verificabile nell’ambiente disponibile, dichiaralo chiaramente senza simulare un esito positivo.
+- Non creare commit o push se non richiesto espressamente.
+",M5 — Ready,"M5, EP12, Must, QA, Backend, Frontend, Infrastructure",,,5
+EP12-06 — Runbook e supporto pilot,"CODICE: EP12-06
+
+USER STORY
+Come team vogliamo rilasciare una Beta osservabile, sicura e recuperabile.
+
+OBIETTIVO E SCOPE
+- Documentare incidenti, dati mancanti, ricalcoli e rollback.
+- Definire piano, dati di test, responsabile ed evidenze.
+- Correggere o accettare formalmente ogni scostamento.
+
+CRITERI DI ACCETTAZIONE
+- Un operatore può gestire gli incidenti previsti senza intervento improvvisato.
+- Evidenze collegate alla card.
+
+TEST MINIMI
+- Test unitari delle regole e delle validazioni introdotte.
+- Test del flusso UI positivo, vuoto, errore e permessi insufficienti.
+- Smoke test dell’ambiente e verifica di log, metriche, retry e configurazione.
+- Test di integrazione e regressione sui casi limite indicati nei criteri di accettazione.
+
+DELIVERABLE
+- Codice applicativo e configurazioni nel modulo coerente con l’architettura approvata.
+- API/servizi di dominio, validazioni e documentazione tecnica aggiornata.
+- Interfaccia web/mobile con stati di caricamento, vuoto, errore e successo.
+- Configurazione infrastrutturale, osservabilità e runbook pertinenti.
+- Test automatici e breve evidenza di verifica collegabile alla card.
+
+DIPENDENZE
+Tutte le Epic Must pertinenti
+
+STIMA INIZIALE
+3–5 giorni
+
+PROMPT CURSOR
+CONTESTO STANDARD — FANTAPPERÒ
+Stai lavorando su FantApperò, una piattaforma fantasy football web con backend Python/FastAPI, frontend React/TypeScript, PostgreSQL, Redis, worker asincroni e integrazione centralizzata con API-Football. L’architettura approvata è un monolite modulare API-first. Gli ambienti locali e i servizi applicativi devono essere gestiti con Docker e Docker Compose.
+
+REGOLE GENERALI OBBLIGATORIE
+- Usa l’italiano come lingua predefinita per interfaccia, messaggi utente, dati seed, documentazione funzionale e nuovi contenuti. Predisponi il codice per una futura internazionalizzazione, senza implementare ora lingue aggiuntive se la card non lo richiede.
+- Non modificare funzionalità, regole di gioco, API, schema dati, configurazioni o componenti non necessari alla card.
+- Non cancellare o rinominare codice, migrazioni, dati, test o funzioni esistenti senza una motivazione tecnica esplicita e verificata.
+- Prima di creare qualcosa, controlla cosa esiste già e riusa pattern, moduli e componenti compatibili.
+- Mantieni compatibilità con le funzionalità esistenti e non anticipare card o milestone successive.
+- Non inserire segreti nel codice, nei log, nei test, nei commit o nella documentazione.
+- Non usare Makefile, il comando `make` o wrapper equivalenti. Usa i normali comandi `docker compose` definiti dal progetto.
+- Non presupporre servizi installati localmente: esegui backend, worker, database, Redis, migrazioni e test attraverso Docker Compose, salvo attività puramente frontend già previste diversamente dal repository.
+- Se manca un servizio o un comando Compose necessario, aggiorna `compose.yaml` e la documentazione in modo minimale e coerente con lo scope.
+
+INCARICO
+- Card Trello: EP12-06 — Runbook e supporto pilot
+- Dipendenze dichiarate: Tutte le Epic Must pertinenti
+
+Prima di modificare il codice:
+1. analizza la struttura del progetto aperto e individua tutti i file coinvolti nella card;
+2. leggi il README e la documentazione architetturale o tecnica effettivamente presenti e pertinenti;
+3. verifica cosa esiste già ed evita implementazioni duplicate;
+4. controlla che le dipendenze funzionali dichiarate siano già implementate; se manca una dipendenza bloccante, fermati e descrivi con precisione cosa manca;
+5. indicami brevemente il piano che seguirai prima di applicare le modifiche;
+6. riusa pattern, servizi e componenti già adottati quando sono compatibili;
+7. non introdurre segreti, credenziali, dipendenze non necessarie o modifiche fuori scope.
+
+USER STORY
+Come team vogliamo rilasciare una Beta osservabile, sicura e recuperabile.
+
+ATTIVITÀ RICHIESTE
+- Documentare incidenti, dati mancanti, ricalcoli e rollback.
+- Definire piano, dati di test, responsabile ed evidenze.
+- Correggere o accettare formalmente ogni scostamento.
+
+VINCOLI DI IMPLEMENTAZIONE
+- Rispetta il monolite modulare API-first, i confini di dominio e il modello dati approvati.
+- Le autorizzazioni e le validazioni decisive devono essere applicate lato server.
+- Le operazioni che cambiano crediti, rose, mercato, risultati o configurazioni devono essere atomiche e auditabili.
+- Mantieni retrocompatibilità con migrazioni e API esistenti; se non è possibile, documenta esplicitamente la decisione.
+- Non implementare funzionalità appartenenti a card successive.
+- Aggiungi log e metriche utili senza esporre dati personali o segreti.
+
+CRITERI DI ACCETTAZIONE
+- Un operatore può gestire gli incidenti previsti senza intervento improvvisato.
+- Evidenze collegate alla card.
+
+TEST MINIMI
+- Test unitari delle regole e delle validazioni introdotte.
+- Test del flusso UI positivo, vuoto, errore e permessi insufficienti.
+- Smoke test dell’ambiente e verifica di log, metriche, retry e configurazione.
+- Test di integrazione e regressione sui casi limite indicati nei criteri di accettazione.
+
+DELIVERABLE ATTESI
+- Codice applicativo e configurazioni nel modulo coerente con l’architettura approvata.
+- API/servizi di dominio, validazioni e documentazione tecnica aggiornata.
+- Interfaccia web/mobile con stati di caricamento, vuoto, errore e successo.
+- Configurazione infrastrutturale, osservabilità e runbook pertinenti.
+- Test automatici e breve evidenza di verifica collegabile alla card.
+
+CHIUSURA DEL LAVORO
+- Esegui lint, type-check, test pertinenti e build dei moduli toccati usando i comandi ordinari `docker compose`; non usare `make`.
+- Riporta file modificati, migrazioni, comandi eseguiti e relativi esiti.
+- Spiega le decisioni tecniche non ovvie e gli eventuali rischi residui.
+- Se qualcosa non è verificabile nell’ambiente disponibile, dichiaralo chiaramente senza simulare un esito positivo.
+- Non creare commit o push se non richiesto espressamente.
+",M5 — Ready,"M5, EP12, Must, QA, Backend, Frontend, Infrastructure",,,6
+EP12-07 — Pilot e gate Beta chiusa,"CODICE: EP12-07
+
+USER STORY
+Come team vogliamo rilasciare una Beta osservabile, sicura e recuperabile.
+
+OBIETTIVO E SCOPE
+- Onboardare leghe pilota, raccogliere KPI e decidere go/no-go.
+- Definire piano, dati di test, responsabile ed evidenze.
+- Correggere o accettare formalmente ogni scostamento.
+
+CRITERI DI ACCETTAZIONE
+- Criteri di uscita misurati e decisione registrata.
+- Evidenze collegate alla card.
+
+TEST MINIMI
+- Test unitari delle regole e delle validazioni introdotte.
+- Test del flusso UI positivo, vuoto, errore e permessi insufficienti.
+- Smoke test dell’ambiente e verifica di log, metriche, retry e configurazione.
+- Test di integrazione e regressione sui casi limite indicati nei criteri di accettazione.
+
+DELIVERABLE
+- Codice applicativo e configurazioni nel modulo coerente con l’architettura approvata.
+- API/servizi di dominio, validazioni e documentazione tecnica aggiornata.
+- Interfaccia web/mobile con stati di caricamento, vuoto, errore e successo.
+- Configurazione infrastrutturale, osservabilità e runbook pertinenti.
+- Test automatici e breve evidenza di verifica collegabile alla card.
+
+DIPENDENZE
+Tutte le Epic Must pertinenti
+
+STIMA INIZIALE
+3–5 giorni
+
+PROMPT CURSOR
+CONTESTO STANDARD — FANTAPPERÒ
+Stai lavorando su FantApperò, una piattaforma fantasy football web con backend Python/FastAPI, frontend React/TypeScript, PostgreSQL, Redis, worker asincroni e integrazione centralizzata con API-Football. L’architettura approvata è un monolite modulare API-first. Gli ambienti locali e i servizi applicativi devono essere gestiti con Docker e Docker Compose.
+
+REGOLE GENERALI OBBLIGATORIE
+- Usa l’italiano come lingua predefinita per interfaccia, messaggi utente, dati seed, documentazione funzionale e nuovi contenuti. Predisponi il codice per una futura internazionalizzazione, senza implementare ora lingue aggiuntive se la card non lo richiede.
+- Non modificare funzionalità, regole di gioco, API, schema dati, configurazioni o componenti non necessari alla card.
+- Non cancellare o rinominare codice, migrazioni, dati, test o funzioni esistenti senza una motivazione tecnica esplicita e verificata.
+- Prima di creare qualcosa, controlla cosa esiste già e riusa pattern, moduli e componenti compatibili.
+- Mantieni compatibilità con le funzionalità esistenti e non anticipare card o milestone successive.
+- Non inserire segreti nel codice, nei log, nei test, nei commit o nella documentazione.
+- Non usare Makefile, il comando `make` o wrapper equivalenti. Usa i normali comandi `docker compose` definiti dal progetto.
+- Non presupporre servizi installati localmente: esegui backend, worker, database, Redis, migrazioni e test attraverso Docker Compose, salvo attività puramente frontend già previste diversamente dal repository.
+- Se manca un servizio o un comando Compose necessario, aggiorna `compose.yaml` e la documentazione in modo minimale e coerente con lo scope.
+
+INCARICO
+- Card Trello: EP12-07 — Pilot e gate Beta chiusa
+- Dipendenze dichiarate: Tutte le Epic Must pertinenti
+
+Prima di modificare il codice:
+1. analizza la struttura del progetto aperto e individua tutti i file coinvolti nella card;
+2. leggi il README e la documentazione architetturale o tecnica effettivamente presenti e pertinenti;
+3. verifica cosa esiste già ed evita implementazioni duplicate;
+4. controlla che le dipendenze funzionali dichiarate siano già implementate; se manca una dipendenza bloccante, fermati e descrivi con precisione cosa manca;
+5. indicami brevemente il piano che seguirai prima di applicare le modifiche;
+6. riusa pattern, servizi e componenti già adottati quando sono compatibili;
+7. non introdurre segreti, credenziali, dipendenze non necessarie o modifiche fuori scope.
+
+USER STORY
+Come team vogliamo rilasciare una Beta osservabile, sicura e recuperabile.
+
+ATTIVITÀ RICHIESTE
+- Onboardare leghe pilota, raccogliere KPI e decidere go/no-go.
+- Definire piano, dati di test, responsabile ed evidenze.
+- Correggere o accettare formalmente ogni scostamento.
+
+VINCOLI DI IMPLEMENTAZIONE
+- Rispetta il monolite modulare API-first, i confini di dominio e il modello dati approvati.
+- Le autorizzazioni e le validazioni decisive devono essere applicate lato server.
+- Le operazioni che cambiano crediti, rose, mercato, risultati o configurazioni devono essere atomiche e auditabili.
+- Mantieni retrocompatibilità con migrazioni e API esistenti; se non è possibile, documenta esplicitamente la decisione.
+- Non implementare funzionalità appartenenti a card successive.
+- Aggiungi log e metriche utili senza esporre dati personali o segreti.
+
+CRITERI DI ACCETTAZIONE
+- Criteri di uscita misurati e decisione registrata.
+- Evidenze collegate alla card.
+
+TEST MINIMI
+- Test unitari delle regole e delle validazioni introdotte.
+- Test del flusso UI positivo, vuoto, errore e permessi insufficienti.
+- Smoke test dell’ambiente e verifica di log, metriche, retry e configurazione.
+- Test di integrazione e regressione sui casi limite indicati nei criteri di accettazione.
+
+DELIVERABLE ATTESI
+- Codice applicativo e configurazioni nel modulo coerente con l’architettura approvata.
+- API/servizi di dominio, validazioni e documentazione tecnica aggiornata.
+- Interfaccia web/mobile con stati di caricamento, vuoto, errore e successo.
+- Configurazione infrastrutturale, osservabilità e runbook pertinenti.
+- Test automatici e breve evidenza di verifica collegabile alla card.
+
+CHIUSURA DEL LAVORO
+- Esegui lint, type-check, test pertinenti e build dei moduli toccati usando i comandi ordinari `docker compose`; non usare `make`.
+- Riporta file modificati, migrazioni, comandi eseguiti e relativi esiti.
+- Spiega le decisioni tecniche non ovvie e gli eventuali rischi residui.
+- Se qualcosa non è verificabile nell’ambiente disponibile, dichiaralo chiaramente senza simulare un esito positivo.
+- Non creare commit o push se non richiesto espressamente.
+",M5 — Ready,"M5, EP12, Must, QA, Backend, Frontend, Infrastructure",,,7

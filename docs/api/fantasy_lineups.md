@@ -1,0 +1,310 @@
+# Formazione, moduli, lock progressivo, panchina, tre mosse, copia, bozze e rinvii — EP06-02 / EP06-03 / EP06-04 / EP06-05 / EP06-06 / EP06-07
+
+| Metadato | Valore |
+| --- | --- |
+| Card | EP06-02, EP06-03, EP06-04, EP06-05, EP06-06, EP06-07 |
+| Modulo | `backend/src/fantasy_lineups/` |
+| Dipendenze | EP04-05 (fixture/kickoff), EP05-05 (rosa P–D–C–A), EP06-01 (turno e cutoff) |
+| FR | FR-FOR-01, FR-FOR-02 (tre mosse), FR-TUR-02 (lock per-calciatore), FR-SUB-01 (panchina e subentri) |
+
+## Ruolo
+
+Consente al fantallenatore di **schierare una formazione valida** per un turno europeo
+aperto, scegliendo uno dei **sette moduli** e rispettando i vincoli **P–D–C–A**.
+
+**EP06-03** applica il lock **progressivo per kickoff**: si bloccano solo i calciatori
+la cui partita reale è già iniziata. I calciatori con kickoff futuro restano
+modificabili. Il timestamp **server UTC** è autorevole; il client può validare in
+anticipo ma il server resta decisivo.
+
+**EP06-04** rende la **panchina ordinata** (priorità di ingresso) e definisce il motore
+puro di **fino a 5 sostituzioni automatiche** (limite configurabile 0–5 per lega,
+`league_rules.max_automatic_substitutions`, EP07-04): un panchinaro con voto subentra
+al primo titolare **dello stesso ruolo** senza voto, camminando l'ordine di panchina.
+Il modulo resta valido perché il cambio è sempre a parità di ruolo. La risoluzione
+contro i voti reali (EP07-02) ed il salvataggio della formazione effettiva per turno
+sono **EP07-04**: vedi [`fantasy_lineups_effective.md`](./fantasy_lineups_effective.md).
+
+**EP06-05** registra le **tre mosse tattiche** del turno. Dopo la formazione iniziale,
+ogni salvataggio confermato che modifica slot o ordine di panchina **nella finestra
+progressiva** (almeno un calciatore già bloccato al kickoff) consuma **una** mossa.
+Il quarto tentativo è rifiutato. Le sostituzioni automatiche **non** consumano mosse.
+Nessuna mossa è retroattiva: i calciatori bloccati non cambiano slot né posizione in
+panchina. Una conferma composta (modulo + cambi sbloccati) vale **una** mossa.
+
+Il motore regole puro (`fantasy_lineups/rules.py` + `@fantappero/contracts` `fantasyLineups`)
+è condiviso tra API e UI.
+
+**EP06-06** consente di **copiare la formazione precedente** e di **salvare una bozza**.
+La copia è sempre rivalidata contro la rosa corrente e la disponibilità al kickoff
+(UTC; kickoff simultanei, anche espressi in fusi diversi, si bloccano insieme).
+I calciatori usciti dalla rosa vengono esclusi; quelli già locked non possono
+diventare nuovi titolari. Il salvataggio bozza può essere incompleto e **non**
+consuma mosse tattiche. Il server rifiuta copia e bozza fuori tempo (turno non
+aperto o tentativo sui calciatori bloccati).
+
+**EP06-07** ricalcola cutoff e lock quando una partita è rinviata o cambia orario.
+Un rinvio **dopo** il kickoff già trascorso non sblocca il calciatore e non
+rimborsa mosse tattiche. Un rinvio **prima** del fischio lascia il calciatore
+modificabile e può slittare il cutoff. Kickoff simultanei, anche espressi in fusi
+diversi, si confrontano in UTC.
+
+La formazione è agganciata al **turno europeo** `(round_id, fantasy_team_id)`, non allo
+scontro H2H: i matchup di calendario restano un dominio distinto.
+
+## Moduli approvati
+
+| Modulo | P | D | C | A |
+| --- | --- | --- | --- | --- |
+| 3-4-3 | 1 | 3 | 4 | 3 |
+| 3-5-2 | 1 | 3 | 5 | 2 |
+| 4-3-3 | 1 | 4 | 3 | 3 |
+| 4-4-2 | 1 | 4 | 4 | 2 |
+| 4-5-1 | 1 | 4 | 5 | 1 |
+| 5-3-2 | 1 | 5 | 3 | 2 |
+| 5-4-1 | 1 | 5 | 4 | 1 |
+
+Regole: esattamente 11 titolari, un portiere titolare, panchina = resto della rosa
+nell'ordine scelto, nessun duplicato, solo calciatori della propria rosa con ruolo
+listone risolvibile. Rosa **Convalidata** obbligatoria.
+
+## Cutoff di turno e lock per-calciatore
+
+Il cutoff del turno resta il **primo kickoff** delle fixture attive (kickoff
+simultanei → stesso istante). Non congela più l'intera formazione.
+
+| Condizione | Effetto |
+| --- | --- |
+| Turno `scheduled` | Nessun salvataggio (`turn_not_open`) |
+| Turno `skipped` | Nessun salvataggio (`turn_skipped`) |
+| Turno `open` o `locked` | Salvataggio ammesso se i calciatori bloccati non cambiano slot né ordine di panchina |
+| `now >= kickoff_at` (UTC) o status live/FT | Calciatore **bloccato** (`starter`/`bench` e posizione in panchina congelati) |
+| Kickoff futuro, PST/CANC **prima** del kickoff originale, nessuna fixture nel turno | Calciatore **modificabile** |
+| PST/CANC o orario spostato in avanti **dopo** `lock_latched_at` | Calciatore **resta bloccato** (nessun vantaggio retroattivo) |
+| Prima formazione e calciatore già locked | Non può essere schierato titolare |
+
+I panchinari bloccati sono **barriere**: gli altri non possono scavalcarli nell'ordine
+e i nuovi panchinari restano dopo tutti i locked. Così non si ottiene un vantaggio
+retroattivo dopo il fischio d'inizio. Kickoff simultanei (anche espressi in fusi
+diversi, confrontati in UTC) si bloccano insieme.
+
+Il club del calciatore si risolve da `role_assignments.club_id` (fallback
+`squad_memberships` attive della stagione) e si abbina alla fixture attiva del
+turno in cui quel club è casa o trasferta.
+
+## Panchina e sostituzioni automatiche
+
+Costante condivisa: `MAX_AUTOMATIC_SUBSTITUTIONS = 5` (limite massimo assoluto e
+default). Configurabile per lega 0–5 (`league_rules.max_automatic_substitutions`,
+EP07-04).
+
+Algoritmo puro `resolveAutomaticSubstitutions` / `resolve_automatic_substitutions`:
+
+1. Si percorre la panchina **nell'ordine salvato**.
+2. Un panchinaro presente in `playedAthleteIds` (ha un voto eleggibile, EP07-02)
+   cerca il primo titolare dello **stesso ruolo** assente da quel set e non
+   ancora sostituito.
+3. Si applicano al massimo `maxSubstitutions` cambi (standard 5). Oltre il
+   limite i restanti panchinari sono saltati.
+4. Un portiere entra solo al posto di un portiere; stesso vincolo per D/C/A.
+5. Il modulo dell'XI effettivo resta quello schierato (cambio same-role).
+6. Ogni panchinaro non utilizzato è restituito in `skipped` con un motivo
+   (`not_eligible`, `role_unresolved`, `no_compatible_starter`, `limit_reached`).
+
+Nessun fallback cross-ruolo in questa card. La risoluzione contro i voti reali
+e la persistenza per turno sono in
+[`fantasy_lineups_effective.md`](./fantasy_lineups_effective.md) (EP07-04).
+
+## Tre mosse tattiche
+
+Costante condivisa: `MAX_TACTICAL_MOVES = 3`.
+
+Una **mossa** è un salvataggio confermato che cambia modulo, titolari o ordine di
+panchina **dopo** che esiste una formazione iniziale e **almeno un** calciatore della
+rosa è bloccato al kickoff. Kickoff simultanei (anche espressi in fusi diversi,
+confrontati in UTC) aprono la finestra insieme.
+
+| Condizione | Consuma mossa |
+| --- | --- |
+| Prima formazione (nessun salvataggio precedente) | No |
+| Tutti i calciatori ancora sbloccati | No (formazione iniziale, FR-FOR-01) |
+| Salvataggio identico alla versione corrente | No |
+| Salvataggio con calciatori sbloccati dopo il primo lock | Sì (1), anche se composto |
+| Sostituzioni automatiche (EP06-04) | No |
+| Quarto salvataggio che cambierebbe la formazione | Rifiuto `tactical_moves_exhausted` |
+| Tentativo su calciatore bloccato | Rifiuto `athlete_kickoff_locked` / `bench_order_locked` (nessun consumo) |
+
+Ogni mossa applicata conserva `from_payload` / `to_payload` (modulo e liste), autore,
+istante UTC e `sequence` 1–3.
+
+## Formazione automatica dei fantallenatori IA (EP13-P05)
+
+Decisione di riferimento: [`ADR-0005`](../adr/ADR-0005-ai-automatic-lineup.md).
+Motore puro in `fantasy_lineups/ai_selection.py`, orchestrazione in
+`fantasy_lineups/ai_service.py`.
+
+**Perimetro di scrittura.** Il servizio agisce **solo** su squadre la cui
+membership ha `user_type == UserType.AI`. Una squadra umana produce
+`skipped_not_ai` senza alcuna scrittura, anche se non ha formazione. Una
+formazione già schierata a mano non viene mai sovrascritta
+(`skipped_manual`): l'automazione supplisce a un'assenza, non corregge una
+scelta.
+
+**Formula** (`ai_lineup_v1`, deterministica e versionata):
+
+| Segnale | Peso | Fonte |
+| --- | --- | --- |
+| Disponibilità | **filtro assoluto** | `Athlete.injured` |
+| Titolarità ufficiale | 2 | `OfficialLineupEntry.is_starter` |
+| Forma recente | 1 | media `PlayerMatchRating.fantasy_score`, ultime 5 giornate **concluse** |
+
+Un infortunato è **escluso dagli undici titolari**, non penalizzato. Rimane
+registrato in fondo alla panchina, perché il validatore condiviso richiede che
+tutta la rosa compaia nella formazione. Tie-break: score → presenze
+recenti → `athlete_id`, così a parità totale il risultato è stabile e
+riproducibile, mai casuale.
+
+**Regola anti-vantaggio.** La titolarità ufficiale è usata solo se
+`OfficialLineup.fetched_at` **precede** l'istante di decisione e il calciatore
+non è già bloccato dal fischio d'inizio. Senza `fetched_at` il segnale non
+viene usato: non potendo dimostrare quando il dato è stato acquisito, usarlo
+sarebbe un vantaggio invisibile rispetto ai lock umani. Le distinte acquisite
+prima di EP13-P05 hanno `fetched_at = NULL` e restano quindi ignorate.
+
+**Degrado.** L'automazione non salta mai il turno: senza distinta usa
+disponibilità e forma; senza forma usa disponibilità e ruolo; senza nulla
+schiera una formazione valida ordinata per `athlete_id`, marcata
+`local_fallback`. Una formazione mediocre è preferibile a nessuna formazione,
+perché altrimenti lo scontro diretto è falsato per l'avversario umano. Se la
+rosa non basta a completare il modulo l'esito è `incomplete` e **non viene
+persistito nulla**.
+
+**Tracciabilità.** Ogni formazione automatica persiste su
+`lineup_submissions`: `system_generated_ai`, `ai_algorithm_version`,
+`ai_decided_at` e `ai_decision_log` (score, segnali usati e motivo di
+esclusione per ogni candidato). Senza questi dati la regola anti-vantaggio non
+sarebbe dimostrabile a posteriori. I campi sono esposti in `SavedLineup` e resi
+come badge **«Gestita automaticamente»** su web e mobile.
+
+Migrazione additiva `d6f9a3b1c247`; le formazioni preesistenti restano con
+`system_generated_ai = false`, che è la verità: sono state schierate da persone.
+
+### Esecuzione
+
+| Env | Default | Ruolo |
+| --- | --- | --- |
+| `AI_LINEUPS_AUTO_GENERATE_ENABLED` | `true` | Abilita il beat delle formazioni IA |
+| `AI_LINEUPS_AUTO_GENERATE_INTERVAL_SECONDS` | `1800` | Frequenza del job |
+
+* Task `fantasy_lineups.generate_ai` — turni `scheduled`/`open` delle leghe
+  `active`.
+* `POST /leagues/{league_id}/turni/{round_id}/formazioni-ia` (`league:admin`),
+  con `dry_run=true` per la sola anteprima. Disponibile con parità su web e
+  mobile.
+
+Entrambi sono **idempotenti**: la formula è deterministica e il servizio non
+tocca né le squadre umane né le formazioni già schierate a mano. Un secondo
+comando con lo stesso piano restituisce `unchanged` senza incrementare
+`revision`, cambiare timestamp o riscrivere i giocatori. Se il lock progressivo
+è iniziato, una formazione esistente resta immutata e una formazione mancante
+non viene creata retroattivamente.
+
+Nel tab **Calendario fantallenatori** il comando **Genera formazioni AI** è
+reso solo agli amministratori di lega; il backend applica comunque il permesso
+`league:admin`. Il feedback elenca l'esito per ogni squadra e il riepilogo
+create/aggiornate/già valide/bloccate/non generate. Ogni esecuzione effettiva
+scrive un audit con admin, turno, versione algoritmo, conteggi ed errori.
+
+## Entità
+
+| Tabella | Vincoli | Note |
+| --- | --- | --- |
+| `lineup_submissions` | unique `(round_id, fantasy_team_id)`; `revision >= 1` | Una formazione corrente per squadra e turno |
+| `lineup_players` | unique `(submission_id, athlete_id)`; unique `(submission_id, slot_kind, sort_order)` | `starter` / `bench`; `sort_order` sulla panchina è la priorità di subentro |
+| `tactical_moves` | unique `(submission_id, sequence)`; `sequence` 1–3 | Uso e validità temporale; `status=applied` |
+| `lineup_drafts` | unique `(round_id, fantasy_team_id)` | Bozza incompleta; JSONB titolari/panchina; `copy_source_round_id` opzionale |
+
+Ogni salvataggio è atomico: sostituisce i giocatori, incrementa `revision` (salvo no-op
+identico), scrive audit `fantasy_lineup_saved` e, se consuma una mossa, inserisce
+`tactical_moves` + audit `fantasy_tactical_move_applied`. Il lock per-calciatore
+si deriva dal clock server, dallo stato fixture e da `lock_latched_at` persistito
+sul link turno–partita: un rinvio o un cambio orario dopo il fischio non sblocca
+il calciatore né rimborsa mosse.
+
+## API
+
+| Metodo | Percorso | Permesso |
+| --- | --- | --- |
+| `GET` | `/leagues/{id}/turni/{roundId}/formazione` | `roster:view` |
+| `PUT` | `/leagues/{id}/turni/{roundId}/formazione` | `roster:edit` |
+| `POST` | `/leagues/{id}/turni/{roundId}/formazione/copia` | `roster:edit` |
+| `PUT` | `/leagues/{id}/turni/{roundId}/formazione/bozza` | `roster:edit` |
+
+Il contesto include `serverNow`, `modificationAllowed` (turno editabile e almeno un
+calciatore sbloccato), `maxAutomaticSubstitutions`, `maxTacticalMoves`,
+`tacticalMovesUsed`, `tacticalMovesRemaining`, `tacticalMoves`, `previousLineup`,
+`draft`, `copyAvailable`, `copyIssues` e, per ogni elemento di
+`roster`: `locked`, `lockLatched`, `kickoffAt`, `fixtureStatus`.
+
+Body salvataggio:
+
+```json
+{
+  "module": "4-3-3",
+  "starterAthleteIds": ["…11 uuid…"],
+  "benchAthleteIds": ["…resto rosa, in ordine di subentro…"]
+}
+```
+
+Errori con motivazione: `invalid_module`, `module_role_mismatch`,
+`goalkeeper_count_invalid`, `starter_count_invalid`, `duplicate_athlete`,
+`athlete_not_in_roster`, `bench_incomplete`, `unresolved_role`,
+`roster_not_validated`, `turn_not_open`, `turn_skipped`,
+`turn_modification_closed`, `athlete_kickoff_locked`, `bench_order_locked`,
+`tactical_moves_exhausted`, `previous_lineup_not_found`,
+`copied_athlete_not_in_roster`, `copied_athlete_unavailable`.
+
+La **copia** prende l'ultima formazione confermata di un turno precedente della
+stessa squadra, la rivalida e la scrive in **bozza**. Non conferma e non consuma
+mosse. La **bozza** accetta uno schieramento incompleto; duplicati, calciatori
+fuori rosa e modifiche a calciatori locked restano rifiutati. La conferma
+(`PUT .../formazione`) cancella la bozza del turno.
+
+## UI
+
+- Web `/formazione` e Mobile tab Formazione: scelta turno, modulo, titolari per ruolo,
+  panchina **riordinabile** (menu ordine di ingresso), badge **bloccato** sugli slot e sulle posizioni
+  con partita iniziata, **contatore mosse** e anteprima del consumo, **copia formazione precedente**,
+  **salva bozza**, salvataggio confermato. Stati
+  caricamento / vuoto / errore / successo / permessi insufficienti.
+- Cambio modulo: i titolari locked restano nello slot del proprio ruolo.
+- Validazione preventiva nel client con lo stesso motore; il server resta decisivo.
+
+## Metriche e audit
+
+- Metrica: `fantasy_lineup_saved_total{result}` (`success`, `athlete_kickoff_locked`, `bench_order_locked`, `tactical_moves_exhausted`, …)
+- Metrica: `fantasy_lineup_copied_total{result}`
+- Metrica: `fantasy_lineup_draft_saved_total{result}`
+- Metrica: `fantasy_tactical_move_applied_total`
+- Audit: `fantasy_lineup_saved` (round, team, modulo, revision; niente PII)
+- Audit: `fantasy_lineup_saved` con `source=admin_ai_lineup_command` (admin,
+  turno, versione algoritmo, conteggi ed errori del comando generale AI)
+- Audit: `fantasy_lineup_copied` (round, team, sourceRoundId, dropped/unavailable count; niente PII)
+- Audit: `fantasy_lineup_draft_saved` (round, team, modulo; niente PII)
+- Audit: `fantasy_tactical_move_applied` (sequence, revision, moduli; niente PII)
+
+## Verifica
+
+```bash
+docker compose --env-file infra/local/.env.example build api
+docker compose --env-file infra/local/.env.example run --rm api \
+  python -m alembic upgrade head
+
+docker compose --env-file infra/local/.env.example --profile test run --rm api \
+  sh -lc 'DATABASE_URL="$TEST_DATABASE_URL" python -m pytest tests/unit/fantasy_turns tests/integration/fantasy_turns tests/unit/fantasy_lineups tests/integration/fantasy_lineups -ra'
+
+docker compose --env-file infra/local/.env.example run --rm web \
+  pnpm --filter @fantappero/contracts test
+docker compose --env-file infra/local/.env.example run --rm web \
+  pnpm --filter @fantappero/web test -- src/pages/MatchdayPage.test.tsx src/pages/FormationPage.test.tsx
+```

@@ -1,0 +1,40 @@
+{
+  "name": "@fantappero/mobile",
+  "version": "0.0.0",
+  "private": true,
+  "main": "index.js",
+  "scripts": {
+    "prestart": "pnpm --filter @fantappero/contracts build && pnpm --filter @fantappero/ui build && pnpm --filter @fantappero/api-client build",
+    "start": "expo start --lan -c",
+    "android": "expo start --android",
+    "ios": "expo start --ios",
+    "web": "expo start --web",
+    "typecheck": "tsc --noEmit --pretty false",
+    "lint": "tsc --noEmit --pretty false",
+    "test": "node --test --experimental-strip-types src/health.test.ts src/config/env.test.ts src/navigation/navConfig.test.ts src/wireframes/useWireframeState.test.ts src/wireframes/screenMap.test.ts src/screens/ProfileScreen.test.ts src/screens/inviteDemo.test.ts src/screens/directoryDemo.test.ts src/leagues/leagueDeleteHelpers.test.ts src/api/fantasyTeams.test.ts",
+    "build": "tsc --noEmit --pretty false"
+  },
+  "dependencies": {
+    "@expo/metro-runtime": "~6.1.2",
+    "@expo/vector-icons": "15.1.1",
+    "@fantappero/api-client": "workspace:*",
+    "@fantappero/contracts": "workspace:*",
+    "@fantappero/ui": "workspace:*",
+    "@react-navigation/bottom-tabs": "^7.18.14",
+    "@react-navigation/core": "^7.12.14",
+    "@react-navigation/native": "^7.3.14",
+    "@react-navigation/native-stack": "^7.18.6",
+    "expo": "~54.0.37",
+    "expo-image-picker": "^17.0.11",
+    "expo-status-bar": "~3.0.9",
+    "react": "19.1.0",
+    "react-native": "0.81.5",
+    "react-native-safe-area-context": "~5.6.0",
+    "react-native-screens": "~4.16.0",
+    "react-native-web": "~0.21.0"
+  },
+  "devDependencies": {
+    "@types/react": "~19.1.17",
+    "typescript": "5.9.3"
+  }
+}

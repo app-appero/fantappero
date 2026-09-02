@@ -1,0 +1,1561 @@
+﻿Name,Description,List,Labels,Members,Due Date,Position
+EP13-01 — Freeze della release candidate multipiattaforma,"CODICE: EP13-01
+
+USER STORY
+Come team vogliamo una release candidate immutabile e identificabile affinché tutte le evidenze Beta descrivano lo stesso codice, schema dati, web app, app mobile e artefatto distribuito.
+
+OBIETTIVO E SCOPE
+- Ispezionare branch, upstream, commit locali, working tree e artefatti non tracciati senza eliminare o sovrascrivere modifiche dell’utente.
+- Confrontare la candidata con il commit/branch delle evidenze M5 e dichiarare quali prove sono divenute stantie.
+- Registrare release commit, tag/versione, revisione database, digest immagini, versione web, versione/build mobile, protocollo e ambiente target.
+- Riallineare la CI alla branch/release candidate effettiva ed eliminare riferimenti operativi obsoleti.
+- Dichiarare quali job sono bloccanti; l’E2E critico web/mobile non può restare implicitamente informativo senza rischio firmato.
+- Creare un manifest versionato, privo di segreti e riferimenti temporanei, usato da tutte le evidenze successive.
+
+DOCUMENTAZIONE OBBLIGATORIA
+- docs/operations/beta_readiness/README.md
+- docs/operations/beta_pilot_gate.md — §§1, 3 e 4
+- .github/workflows/ci.yml
+- docs/operations/evidence/ep12-07_internal_dry_run_2026-08-21.md
+- docs/development/quality_gates.md
+- apps/mobile/README.md
+- docs/doc_fantapperò/FantAppero_Architettura_Tecnica_Modello_Dati_MVP_v0.1.docx — compatibilità mobile/API
+
+CRITERI DI ACCETTAZIONE
+- Esiste un identificatore riproducibile della candidata con commit, schema, immagini e build web/mobile coerenti.
+- Tutti i job richiesti sono eseguiti sulla candidata e il loro carattere bloccante o informativo è dichiarato.
+- Il manifest distingue evidenze valide, da rieseguire e rischi accettati senza presentare come attuali prove di branch precedenti.
+- Il working tree e i file QA dell’utente sono preservati senza perdita di dati.
+
+TEST MINIMI
+- `docker compose config` e build pulita dei servizi della candidata.
+- Lint, type-check, test bootstrap/migrazione e build di packages, web e mobile.
+- Verifica automatica che manifest, commit, digest e versioni non contengano placeholder o riferimenti divergenti.
+
+DELIVERABLE
+- Manifest versionato della release candidate e indice evidenze valide/da rigenerare.
+- Workflow CI riallineato e matrice degli artefatti web/mobile.
+- Report dei comandi, esiti e rischi residui.
+- Matrice o nota di parità web/mobile con prove mobile oppure `N/A mobile` motivato.
+
+DIPENDENZE
+EP12-01…06; branch candidato scelto dal team
+
+STIMA INIZIALE
+1–2 giorni
+
+PROMPT CODEX/CURSOR
+CONTESTO STANDARD — FANTAPPERÒ
+Stai lavorando su FantApperò, piattaforma fantasy football con backend Python/FastAPI, frontend React/TypeScript, app React Native/Expo, PostgreSQL, Redis, worker asincroni e integrazione centralizzata con API-Football. L’architettura approvata è un monolite modulare API-first gestito con Docker Compose.
+
+Questa card appartiene a “M5.1 — Chiusura Beta, copertura documentale e Pilot reale”. Non è un M6 funzionale: completa i requisiti approvati, rende obbligatoria la parità mobile, esegue il pilot reale e registra il gate umano previsto.
+
+GERARCHIA E DISPOSIZIONE DOCUMENTALE
+- Per processo Beta, soglie, ruoli ed evidenze prevalgono i documenti operativi correnti in `docs/operations/`.
+- Per perimetro MVP/Fase 2 e architettura prevalgono Documento Master, Requisiti Funzionali e Architettura Tecnica v0.1.
+- Il Concept è una fonte iniziale; in caso di conflitto valgono le decisioni successive, approvate e più specifiche.
+- Ogni voce documentata deve ricevere una disposizione esplicita: implementata e verificata, remediation MVP, backlog Fase 2, superseded, rifiutata con motivazione, gate umano/operativo oppure evidenza/template.
+- Nessun documento, test sintetico o dry-run autorizza a dichiarare eseguito un pilot reale o firmata una decisione umana.
+
+PARITÀ MOBILE OBBLIGATORIA
+Per ogni requisito o modifica controlla sempre backend/API, web e mobile. Ogni funzione destinata a utente, league admin o operatore deve avere comportamento equivalente in `apps/mobile`, usando gli stessi contratti e le stesse API del web, con stati loading, empty, error, success e forbidden, autorizzazioni server-side, accessibilità e test pertinenti. La card non può essere chiusa con una funzione web-only, un placeholder/demo o un semplice link dal mobile al web. Per attività esclusivamente server-side, dati o infrastruttura, dimostra la compatibilità del client mobile e registra `N/A mobile` soltanto con motivazione verificabile e assenza di una esperienza utente/admin correlata.
+
+REGOLE GENERALI OBBLIGATORIE
+- Usa l’italiano per interfaccia, messaggi utente, documentazione funzionale, evidenze e nuovi contenuti.
+- Prima di modificare file o codice, analizza lo stato reale del repository, presenta un piano breve e attendi la conferma esplicita dell’utente.
+- Preserva modifiche, file non tracciati e dati dell’utente; non usare reset distruttivi, cancellazioni ricorsive o riscritture della cronologia senza autorizzazione.
+- Non cancellare dati a database. Le migrazioni devono essere additive/backfill, con backup e prove prima/dopo.
+- Non anticipare card successive e non modificare funzionalità, regole, API o componenti non necessari alla card corrente.
+- Prima di creare qualcosa, verifica cosa esiste già e riusa moduli, contratti, pattern, script, template e componenti compatibili.
+- Mantieni il monolite modulare API-first; un’estrazione a microservizio richiede evidenza reale di volumi, costi o isolamento operativo.
+- Autorizzazioni e validazioni decisive devono essere server-side; `?persona=` è soltanto una simulazione DEV e non è sicurezza.
+- Non inserire segreti, credenziali, PII o URL con token nel codice, nei log, nei test, nei commit, nei CSV o nella documentazione.
+- Usa Docker e Docker Compose per servizi, migrazioni e test pertinenti; non usare Makefile o il comando `make`.
+- Distingui sempre implementazione tecnica, validazione locale, deployment e approvazioni umane; non simulare pilot, firme, inviti o decisioni reali.
+- Ogni affermazione di completamento deve essere accompagnata da comandi, risultati, URL/stati visibili e limiti residui riproducibili.
+
+CARD
+Codice: EP13-01
+Titolo: Freeze della release candidate multipiattaforma
+Dipendenze: EP12-01…06; branch candidato scelto dal team
+Stima iniziale: 1–2 giorni
+
+INCARICO
+Congela una candidata realmente riproducibile e multipiattaforma. Non dichiarare chiuso il freeze finché web e mobile non sono riferiti allo stesso contratto API, schema e commit.
+
+SCOPE DA REALIZZARE
+- Ispezionare branch, upstream, commit locali, working tree e artefatti non tracciati senza eliminare o sovrascrivere modifiche dell’utente.
+- Confrontare la candidata con il commit/branch delle evidenze M5 e dichiarare quali prove sono divenute stantie.
+- Registrare release commit, tag/versione, revisione database, digest immagini, versione web, versione/build mobile, protocollo e ambiente target.
+- Riallineare la CI alla branch/release candidate effettiva ed eliminare riferimenti operativi obsoleti.
+- Dichiarare quali job sono bloccanti; l’E2E critico web/mobile non può restare implicitamente informativo senza rischio firmato.
+- Creare un manifest versionato, privo di segreti e riferimenti temporanei, usato da tutte le evidenze successive.
+
+DOCUMENTAZIONE OBBLIGATORIA DA LEGGERE E CITARE NEL REPORT
+- docs/operations/beta_readiness/README.md
+- docs/operations/beta_pilot_gate.md — §§1, 3 e 4
+- .github/workflows/ci.yml
+- docs/operations/evidence/ep12-07_internal_dry_run_2026-08-21.md
+- docs/development/quality_gates.md
+- apps/mobile/README.md
+- docs/doc_fantapperò/FantAppero_Architettura_Tecnica_Modello_Dati_MVP_v0.1.docx — compatibilità mobile/API
+
+CRITERI DI ACCETTAZIONE
+- Esiste un identificatore riproducibile della candidata con commit, schema, immagini e build web/mobile coerenti.
+- Tutti i job richiesti sono eseguiti sulla candidata e il loro carattere bloccante o informativo è dichiarato.
+- Il manifest distingue evidenze valide, da rieseguire e rischi accettati senza presentare come attuali prove di branch precedenti.
+- Il working tree e i file QA dell’utente sono preservati senza perdita di dati.
+
+TEST MINIMI
+- `docker compose config` e build pulita dei servizi della candidata.
+- Lint, type-check, test bootstrap/migrazione e build di packages, web e mobile.
+- Verifica automatica che manifest, commit, digest e versioni non contengano placeholder o riferimenti divergenti.
+
+DELIVERABLE
+- Manifest versionato della release candidate e indice evidenze valide/da rigenerare.
+- Workflow CI riallineato e matrice degli artefatti web/mobile.
+- Report dei comandi, esiti e rischi residui.
+- Matrice o nota esplicita di parità web/mobile, con prove del percorso mobile; `N/A mobile` è ammesso solo secondo la regola obbligatoria.
+
+ORDINE DI LAVORO OBBLIGATORIO
+1. Ispeziona repository, documenti, branch, modifiche locali e dipendenze della card.
+2. Elenca fatti osservati, ambiguità materiali, rischi dati e conflitti documentali.
+3. Proponi un piano atomico con file/servizi/test coinvolti e attendi la conferma esplicita dell’utente.
+4. Implementa soltanto lo scope approvato, preservando dati e modifiche esistenti.
+5. Verifica backend/API, web e mobile; esegui test automatici e una prova manuale riproducibile quando esiste UI.
+6. Aggiorna documentazione, registro di tracciabilità ed evidenze nello stesso lavoro.
+7. Consegna un report finale con modifiche, comandi/esiti, URL o percorso mobile, stati visibili, limiti e lavoro umano ancora pendente.
+
+DEFINITION OF DONE
+La card è chiusa soltanto quando tutti i criteri sono provati sulla release candidate prevista, la documentazione riflette lo stato reale, la parità mobile è dimostrata o il `N/A` è motivato, e non restano placeholder, TODO senza owner o affermazioni non verificate. Le attività temporali o umane restano aperte finché non vengono realmente eseguite e firmate.
+",M5.1 — Chiusura Beta e Pilot reale,"M5.1, EP13, Must, QA, Backend, Frontend, Mobile, Infrastructure",,,1
+EP13-02 — Inventario normativo e registro di tracciabilità totale,"CODICE: EP13-02
+
+USER STORY
+Come product owner vogliamo che ogni requisito, decisione, vincolo e debito scritto nel progetto riceva una destinazione esplicita, così che nulla venga dimenticato o considerato implicitamente implementato.
+
+OBIETTIVO E SCOPE
+- Inventariare nuovamente tutti i `.md`, `.csv`, `.docx` e `.pdf` del repository; la baseline dell’audit v0.2 è 93 artefatti preesistenti, ma il conteggio va ricalcolato.
+- Estrarre le 72 card M0.5–M5, incluse 58 Must e 14 Should, e collegarle a requisiti, codice, migrazioni, API, UI web, UI mobile, test ed evidenze.
+- Estrarre anche decisioni normative non trasformate in card, open question provider, debiti dichiarati, runbook, vincoli privacy/security e attività umane.
+- Classificare ogni riga come `IMPLEMENTED_VERIFIED`, `MVP_REMEDIATION`, `PHASE2_BACKLOG`, `SUPERSEDED`, `REJECTED`, `HUMAN_OPERATIONAL_GATE` oppure `EVIDENCE_TEMPLATE`.
+- Per `SUPERSEDED` indicare la decisione più recente; per `REJECTED` owner, data e motivazione; per Fase 2 creare il collegamento alla card EP13-12.
+- Rilevare contraddizioni e documenti stantii, in particolare nelle descrizioni mobile, nei wireframe, nelle API di lega/turno e nel README root.
+- Creare un indice autorevole con regole di precedenza e una matrice filtrabile che impedisca righe senza disposizione.
+
+DOCUMENTAZIONE OBBLIGATORIA
+- docs/doc_fantapperò/📘 Documento di Concept — Progetto Fantacalcio “FantApperò”.pdf
+- docs/doc_fantapperò/FantAppero_Documento_Master_v0.1.docx
+- docs/doc_fantapperò/FantAppero_Requisiti_Funzionali_MVP_v0.1.docx
+- docs/doc_fantapperò/FantAppero_Architettura_Tecnica_Modello_Dati_MVP_v0.1.docx
+- docs/doc_fantapperò/FantAppero_Pacchetto_Completo_M0.5-M5_v0.3/*.csv e *.docx
+- docs/api/, docs/adr/, docs/data/, docs/design/, docs/development/, docs/operations/ — tutte le fonti
+- README.md, apps/mobile/README.md, infra/README.md e README dei moduli
+
+CRITERI DI ACCETTAZIONE
+- Il 100% degli artefatti documentali e delle 72 card è inventariato con owner, fonte, stato e disposizione.
+- Non esistono righe vuote, `unknown`, TODO senza owner o requisiti marcati implementati senza prova.
+- Ogni requisito con esperienza utente/admin contiene colonne separate backend, web, mobile, test ed evidenza visiva.
+- Le contraddizioni sono risolte o aperte come decisione bloccante; le fonti stantie sono aggiornate o marcate superseded.
+- Il registro è versionato, leggibile e diventa input obbligatorio per EP13-03 ed EP13-12.
+
+TEST MINIMI
+- Script di completezza: ogni file trovato ha almeno una riga nel registro e ogni codice M0.5–M5 compare una sola volta.
+- Validazione degli enum di disposizione e dei link a fonti/evidenze.
+- Campionamento incrociato di almeno una voce per dominio su backend, web e mobile.
+
+DELIVERABLE
+- Registro documentale completo e matrice requisito → backend/web/mobile/test/evidenza/disposizione.
+- Indice autorevole delle fonti con gerarchia, owner e stato di obsolescenza.
+- Elenco atomico dei gap MVP da affidare a EP13-03 e delle voci Fase 2 da affidare a EP13-12.
+- Matrice o nota di parità web/mobile con prove mobile oppure `N/A mobile` motivato.
+
+DIPENDENZE
+EP13-01
+
+STIMA INIZIALE
+2–4 giorni
+
+PROMPT CODEX/CURSOR
+CONTESTO STANDARD — FANTAPPERÒ
+Stai lavorando su FantApperò, piattaforma fantasy football con backend Python/FastAPI, frontend React/TypeScript, app React Native/Expo, PostgreSQL, Redis, worker asincroni e integrazione centralizzata con API-Football. L’architettura approvata è un monolite modulare API-first gestito con Docker Compose.
+
+Questa card appartiene a “M5.1 — Chiusura Beta, copertura documentale e Pilot reale”. Non è un M6 funzionale: completa i requisiti approvati, rende obbligatoria la parità mobile, esegue il pilot reale e registra il gate umano previsto.
+
+GERARCHIA E DISPOSIZIONE DOCUMENTALE
+- Per processo Beta, soglie, ruoli ed evidenze prevalgono i documenti operativi correnti in `docs/operations/`.
+- Per perimetro MVP/Fase 2 e architettura prevalgono Documento Master, Requisiti Funzionali e Architettura Tecnica v0.1.
+- Il Concept è una fonte iniziale; in caso di conflitto valgono le decisioni successive, approvate e più specifiche.
+- Ogni voce documentata deve ricevere una disposizione esplicita: implementata e verificata, remediation MVP, backlog Fase 2, superseded, rifiutata con motivazione, gate umano/operativo oppure evidenza/template.
+- Nessun documento, test sintetico o dry-run autorizza a dichiarare eseguito un pilot reale o firmata una decisione umana.
+
+PARITÀ MOBILE OBBLIGATORIA
+Per ogni requisito o modifica controlla sempre backend/API, web e mobile. Ogni funzione destinata a utente, league admin o operatore deve avere comportamento equivalente in `apps/mobile`, usando gli stessi contratti e le stesse API del web, con stati loading, empty, error, success e forbidden, autorizzazioni server-side, accessibilità e test pertinenti. La card non può essere chiusa con una funzione web-only, un placeholder/demo o un semplice link dal mobile al web. Per attività esclusivamente server-side, dati o infrastruttura, dimostra la compatibilità del client mobile e registra `N/A mobile` soltanto con motivazione verificabile e assenza di una esperienza utente/admin correlata.
+
+REGOLE GENERALI OBBLIGATORIE
+- Usa l’italiano per interfaccia, messaggi utente, documentazione funzionale, evidenze e nuovi contenuti.
+- Prima di modificare file o codice, analizza lo stato reale del repository, presenta un piano breve e attendi la conferma esplicita dell’utente.
+- Preserva modifiche, file non tracciati e dati dell’utente; non usare reset distruttivi, cancellazioni ricorsive o riscritture della cronologia senza autorizzazione.
+- Non cancellare dati a database. Le migrazioni devono essere additive/backfill, con backup e prove prima/dopo.
+- Non anticipare card successive e non modificare funzionalità, regole, API o componenti non necessari alla card corrente.
+- Prima di creare qualcosa, verifica cosa esiste già e riusa moduli, contratti, pattern, script, template e componenti compatibili.
+- Mantieni il monolite modulare API-first; un’estrazione a microservizio richiede evidenza reale di volumi, costi o isolamento operativo.
+- Autorizzazioni e validazioni decisive devono essere server-side; `?persona=` è soltanto una simulazione DEV e non è sicurezza.
+- Non inserire segreti, credenziali, PII o URL con token nel codice, nei log, nei test, nei commit, nei CSV o nella documentazione.
+- Usa Docker e Docker Compose per servizi, migrazioni e test pertinenti; non usare Makefile o il comando `make`.
+- Distingui sempre implementazione tecnica, validazione locale, deployment e approvazioni umane; non simulare pilot, firme, inviti o decisioni reali.
+- Ogni affermazione di completamento deve essere accompagnata da comandi, risultati, URL/stati visibili e limiti residui riproducibili.
+
+CARD
+Codice: EP13-02
+Titolo: Inventario normativo e registro di tracciabilità totale
+Dipendenze: EP13-01
+Stima iniziale: 2–4 giorni
+
+INCARICO
+Esegui un audit documentale realmente esaustivo, non una ricerca per parole chiave. Nulla può scomparire: ogni riga deve essere provata, rimediata, rinviata formalmente, superata da una decisione successiva o rifiutata con motivazione.
+
+SCOPE DA REALIZZARE
+- Inventariare nuovamente tutti i `.md`, `.csv`, `.docx` e `.pdf` del repository; la baseline dell’audit v0.2 è 93 artefatti preesistenti, ma il conteggio va ricalcolato.
+- Estrarre le 72 card M0.5–M5, incluse 58 Must e 14 Should, e collegarle a requisiti, codice, migrazioni, API, UI web, UI mobile, test ed evidenze.
+- Estrarre anche decisioni normative non trasformate in card, open question provider, debiti dichiarati, runbook, vincoli privacy/security e attività umane.
+- Classificare ogni riga come `IMPLEMENTED_VERIFIED`, `MVP_REMEDIATION`, `PHASE2_BACKLOG`, `SUPERSEDED`, `REJECTED`, `HUMAN_OPERATIONAL_GATE` oppure `EVIDENCE_TEMPLATE`.
+- Per `SUPERSEDED` indicare la decisione più recente; per `REJECTED` owner, data e motivazione; per Fase 2 creare il collegamento alla card EP13-12.
+- Rilevare contraddizioni e documenti stantii, in particolare nelle descrizioni mobile, nei wireframe, nelle API di lega/turno e nel README root.
+- Creare un indice autorevole con regole di precedenza e una matrice filtrabile che impedisca righe senza disposizione.
+
+DOCUMENTAZIONE OBBLIGATORIA DA LEGGERE E CITARE NEL REPORT
+- docs/doc_fantapperò/📘 Documento di Concept — Progetto Fantacalcio “FantApperò”.pdf
+- docs/doc_fantapperò/FantAppero_Documento_Master_v0.1.docx
+- docs/doc_fantapperò/FantAppero_Requisiti_Funzionali_MVP_v0.1.docx
+- docs/doc_fantapperò/FantAppero_Architettura_Tecnica_Modello_Dati_MVP_v0.1.docx
+- docs/doc_fantapperò/FantAppero_Pacchetto_Completo_M0.5-M5_v0.3/*.csv e *.docx
+- docs/api/, docs/adr/, docs/data/, docs/design/, docs/development/, docs/operations/ — tutte le fonti
+- README.md, apps/mobile/README.md, infra/README.md e README dei moduli
+
+CRITERI DI ACCETTAZIONE
+- Il 100% degli artefatti documentali e delle 72 card è inventariato con owner, fonte, stato e disposizione.
+- Non esistono righe vuote, `unknown`, TODO senza owner o requisiti marcati implementati senza prova.
+- Ogni requisito con esperienza utente/admin contiene colonne separate backend, web, mobile, test ed evidenza visiva.
+- Le contraddizioni sono risolte o aperte come decisione bloccante; le fonti stantie sono aggiornate o marcate superseded.
+- Il registro è versionato, leggibile e diventa input obbligatorio per EP13-03 ed EP13-12.
+
+TEST MINIMI
+- Script di completezza: ogni file trovato ha almeno una riga nel registro e ogni codice M0.5–M5 compare una sola volta.
+- Validazione degli enum di disposizione e dei link a fonti/evidenze.
+- Campionamento incrociato di almeno una voce per dominio su backend, web e mobile.
+
+DELIVERABLE
+- Registro documentale completo e matrice requisito → backend/web/mobile/test/evidenza/disposizione.
+- Indice autorevole delle fonti con gerarchia, owner e stato di obsolescenza.
+- Elenco atomico dei gap MVP da affidare a EP13-03 e delle voci Fase 2 da affidare a EP13-12.
+- Matrice o nota esplicita di parità web/mobile, con prove del percorso mobile; `N/A mobile` è ammesso solo secondo la regola obbligatoria.
+
+ORDINE DI LAVORO OBBLIGATORIO
+1. Ispeziona repository, documenti, branch, modifiche locali e dipendenze della card.
+2. Elenca fatti osservati, ambiguità materiali, rischi dati e conflitti documentali.
+3. Proponi un piano atomico con file/servizi/test coinvolti e attendi la conferma esplicita dell’utente.
+4. Implementa soltanto lo scope approvato, preservando dati e modifiche esistenti.
+5. Verifica backend/API, web e mobile; esegui test automatici e una prova manuale riproducibile quando esiste UI.
+6. Aggiorna documentazione, registro di tracciabilità ed evidenze nello stesso lavoro.
+7. Consegna un report finale con modifiche, comandi/esiti, URL o percorso mobile, stati visibili, limiti e lavoro umano ancora pendente.
+
+DEFINITION OF DONE
+La card è chiusa soltanto quando tutti i criteri sono provati sulla release candidate prevista, la documentazione riflette lo stato reale, la parità mobile è dimostrata o il `N/A` è motivato, e non restano placeholder, TODO senza owner o affermazioni non verificate. Le attività temporali o umane restano aperte finché non vengono realmente eseguite e firmate.
+",M5.1 — Chiusura Beta e Pilot reale,"M5.1, EP13, Must, Product, Documentation, QA, Backend, Frontend, Mobile",,,2
+EP13-03 — Chiusura atomica di tutti i gap MVP documentati,"CODICE: EP13-03
+
+USER STORY
+Come team vogliamo chiudere ogni requisito approvato per MVP che il registro segnala come mancante o non verificato, affinché il gate Beta non nasconda lacune dietro lo stato delle milestone.
+
+OBIETTIVO E SCOPE
+- Usare soltanto le righe `MVP_REMEDIATION` di EP13-02 come fonte del lavoro.
+- Creare una sub-card atomica per ogni gap o gruppo inscindibile, con dipendenze, rischio dati, backend, web, mobile, test ed evidenza.
+- Includere tutti i Must e gli Should che i documenti approvati collocano nel perimetro da consegnare; non limitarsi ai soli Must.
+- Implementare e verificare le sub-card una alla volta, rispettando il flusso piano → conferma → modifica → test → evidenza.
+- Aggiornare documentazione e registro nello stesso cambiamento; non chiudere un gap rendendo solo stantio il documento.
+- Richiedere una decisione formale se una riga deve cambiare da MVP a Fase 2 o essere rifiutata.
+
+DOCUMENTAZIONE OBBLIGATORIA
+- Registro e matrice prodotti da EP13-02
+- docs/doc_fantapperò/FantAppero_Documento_Master_v0.1.docx
+- docs/doc_fantapperò/FantAppero_Requisiti_Funzionali_MVP_v0.1.docx
+- docs/doc_fantapperò/FantAppero_Architettura_Tecnica_Modello_Dati_MVP_v0.1.docx
+- docs/doc_fantapperò/FantAppero_Pacchetto_Completo_M0.5-M5_v0.3/
+- Documenti API, design, data e operations collegati a ciascuna riga
+
+CRITERI DI ACCETTAZIONE
+- Tutte le righe inizialmente `MVP_REMEDIATION` sono diventate `IMPLEMENTED_VERIFIED` oppure hanno una decisione firmata di riclassificazione.
+- Ogni sub-card contiene prove backend, web e mobile quando esiste un’esperienza correlata.
+- Non restano placeholder, demo o link al web usati come sostituti di una funzione mobile richiesta.
+- Migrazioni e backfill sono additive, testate e senza perdita di dati.
+- La regressione completa sulla candidata resta verde dopo l’ultima remediation.
+
+TEST MINIMI
+- Test specifici di ogni sub-card, più suite backend, packages, web e mobile.
+- Regressione contratti/API e autorizzazioni negative per ruoli utente, league admin e operatore.
+- Smoke manuale documentato con URL web, percorso mobile e stati visibili attesi.
+
+DELIVERABLE
+- Sub-card atomiche completate con commit/evidenze separati.
+- Registro EP13-02 aggiornato senza righe MVP aperte.
+- Report finale di regressione e rischi residui approvati.
+- Matrice o nota di parità web/mobile con prove mobile oppure `N/A mobile` motivato.
+
+DIPENDENZE
+EP13-02
+
+STIMA INIZIALE
+Variabile; stimare dopo l’inventario
+
+PROMPT CODEX/CURSOR
+CONTESTO STANDARD — FANTAPPERÒ
+Stai lavorando su FantApperò, piattaforma fantasy football con backend Python/FastAPI, frontend React/TypeScript, app React Native/Expo, PostgreSQL, Redis, worker asincroni e integrazione centralizzata con API-Football. L’architettura approvata è un monolite modulare API-first gestito con Docker Compose.
+
+Questa card appartiene a “M5.1 — Chiusura Beta, copertura documentale e Pilot reale”. Non è un M6 funzionale: completa i requisiti approvati, rende obbligatoria la parità mobile, esegue il pilot reale e registra il gate umano previsto.
+
+GERARCHIA E DISPOSIZIONE DOCUMENTALE
+- Per processo Beta, soglie, ruoli ed evidenze prevalgono i documenti operativi correnti in `docs/operations/`.
+- Per perimetro MVP/Fase 2 e architettura prevalgono Documento Master, Requisiti Funzionali e Architettura Tecnica v0.1.
+- Il Concept è una fonte iniziale; in caso di conflitto valgono le decisioni successive, approvate e più specifiche.
+- Ogni voce documentata deve ricevere una disposizione esplicita: implementata e verificata, remediation MVP, backlog Fase 2, superseded, rifiutata con motivazione, gate umano/operativo oppure evidenza/template.
+- Nessun documento, test sintetico o dry-run autorizza a dichiarare eseguito un pilot reale o firmata una decisione umana.
+
+PARITÀ MOBILE OBBLIGATORIA
+Per ogni requisito o modifica controlla sempre backend/API, web e mobile. Ogni funzione destinata a utente, league admin o operatore deve avere comportamento equivalente in `apps/mobile`, usando gli stessi contratti e le stesse API del web, con stati loading, empty, error, success e forbidden, autorizzazioni server-side, accessibilità e test pertinenti. La card non può essere chiusa con una funzione web-only, un placeholder/demo o un semplice link dal mobile al web. Per attività esclusivamente server-side, dati o infrastruttura, dimostra la compatibilità del client mobile e registra `N/A mobile` soltanto con motivazione verificabile e assenza di una esperienza utente/admin correlata.
+
+REGOLE GENERALI OBBLIGATORIE
+- Usa l’italiano per interfaccia, messaggi utente, documentazione funzionale, evidenze e nuovi contenuti.
+- Prima di modificare file o codice, analizza lo stato reale del repository, presenta un piano breve e attendi la conferma esplicita dell’utente.
+- Preserva modifiche, file non tracciati e dati dell’utente; non usare reset distruttivi, cancellazioni ricorsive o riscritture della cronologia senza autorizzazione.
+- Non cancellare dati a database. Le migrazioni devono essere additive/backfill, con backup e prove prima/dopo.
+- Non anticipare card successive e non modificare funzionalità, regole, API o componenti non necessari alla card corrente.
+- Prima di creare qualcosa, verifica cosa esiste già e riusa moduli, contratti, pattern, script, template e componenti compatibili.
+- Mantieni il monolite modulare API-first; un’estrazione a microservizio richiede evidenza reale di volumi, costi o isolamento operativo.
+- Autorizzazioni e validazioni decisive devono essere server-side; `?persona=` è soltanto una simulazione DEV e non è sicurezza.
+- Non inserire segreti, credenziali, PII o URL con token nel codice, nei log, nei test, nei commit, nei CSV o nella documentazione.
+- Usa Docker e Docker Compose per servizi, migrazioni e test pertinenti; non usare Makefile o il comando `make`.
+- Distingui sempre implementazione tecnica, validazione locale, deployment e approvazioni umane; non simulare pilot, firme, inviti o decisioni reali.
+- Ogni affermazione di completamento deve essere accompagnata da comandi, risultati, URL/stati visibili e limiti residui riproducibili.
+
+CARD
+Codice: EP13-03
+Titolo: Chiusura atomica di tutti i gap MVP documentati
+Dipendenze: EP13-02
+Stima iniziale: Variabile; stimare dopo l’inventario
+
+INCARICO
+Trasforma il registro in lavoro verificabile. Non concentrare correzioni eterogenee in un unico commit e non cambiare silenziosamente il perimetro MVP per far risultare verde il gate.
+
+SCOPE DA REALIZZARE
+- Usare soltanto le righe `MVP_REMEDIATION` di EP13-02 come fonte del lavoro.
+- Creare una sub-card atomica per ogni gap o gruppo inscindibile, con dipendenze, rischio dati, backend, web, mobile, test ed evidenza.
+- Includere tutti i Must e gli Should che i documenti approvati collocano nel perimetro da consegnare; non limitarsi ai soli Must.
+- Implementare e verificare le sub-card una alla volta, rispettando il flusso piano → conferma → modifica → test → evidenza.
+- Aggiornare documentazione e registro nello stesso cambiamento; non chiudere un gap rendendo solo stantio il documento.
+- Richiedere una decisione formale se una riga deve cambiare da MVP a Fase 2 o essere rifiutata.
+
+DOCUMENTAZIONE OBBLIGATORIA DA LEGGERE E CITARE NEL REPORT
+- Registro e matrice prodotti da EP13-02
+- docs/doc_fantapperò/FantAppero_Documento_Master_v0.1.docx
+- docs/doc_fantapperò/FantAppero_Requisiti_Funzionali_MVP_v0.1.docx
+- docs/doc_fantapperò/FantAppero_Architettura_Tecnica_Modello_Dati_MVP_v0.1.docx
+- docs/doc_fantapperò/FantAppero_Pacchetto_Completo_M0.5-M5_v0.3/
+- Documenti API, design, data e operations collegati a ciascuna riga
+
+CRITERI DI ACCETTAZIONE
+- Tutte le righe inizialmente `MVP_REMEDIATION` sono diventate `IMPLEMENTED_VERIFIED` oppure hanno una decisione firmata di riclassificazione.
+- Ogni sub-card contiene prove backend, web e mobile quando esiste un’esperienza correlata.
+- Non restano placeholder, demo o link al web usati come sostituti di una funzione mobile richiesta.
+- Migrazioni e backfill sono additive, testate e senza perdita di dati.
+- La regressione completa sulla candidata resta verde dopo l’ultima remediation.
+
+TEST MINIMI
+- Test specifici di ogni sub-card, più suite backend, packages, web e mobile.
+- Regressione contratti/API e autorizzazioni negative per ruoli utente, league admin e operatore.
+- Smoke manuale documentato con URL web, percorso mobile e stati visibili attesi.
+
+DELIVERABLE
+- Sub-card atomiche completate con commit/evidenze separati.
+- Registro EP13-02 aggiornato senza righe MVP aperte.
+- Report finale di regressione e rischi residui approvati.
+- Matrice o nota esplicita di parità web/mobile, con prove del percorso mobile; `N/A mobile` è ammesso solo secondo la regola obbligatoria.
+
+ORDINE DI LAVORO OBBLIGATORIO
+1. Ispeziona repository, documenti, branch, modifiche locali e dipendenze della card.
+2. Elenca fatti osservati, ambiguità materiali, rischi dati e conflitti documentali.
+3. Proponi un piano atomico con file/servizi/test coinvolti e attendi la conferma esplicita dell’utente.
+4. Implementa soltanto lo scope approvato, preservando dati e modifiche esistenti.
+5. Verifica backend/API, web e mobile; esegui test automatici e una prova manuale riproducibile quando esiste UI.
+6. Aggiorna documentazione, registro di tracciabilità ed evidenze nello stesso lavoro.
+7. Consegna un report finale con modifiche, comandi/esiti, URL o percorso mobile, stati visibili, limiti e lavoro umano ancora pendente.
+
+DEFINITION OF DONE
+La card è chiusa soltanto quando tutti i criteri sono provati sulla release candidate prevista, la documentazione riflette lo stato reale, la parità mobile è dimostrata o il `N/A` è motivato, e non restano placeholder, TODO senza owner o affermazioni non verificate. Le attività temporali o umane restano aperte finché non vengono realmente eseguite e firmate.
+",M5.1 — Chiusura Beta e Pilot reale,"M5.1, EP13, Must, QA, Backend, Frontend, Mobile, Product",,,3
+EP13-04 — Parità funzionale web/mobile e E2E su dispositivo,"CODICE: EP13-04
+
+USER STORY
+Come partecipante, league admin o operatore voglio poter completare sul mobile gli stessi flussi disponibili sul web, con uguali regole e permessi, affinché l’app non sia una shell secondaria o dimostrativa.
+
+OBIETTIVO E SCOPE
+- Costruire una matrice route/schermata/azione/API/ruolo tra web e `apps/mobile`, includendo utente, league admin e operatore globale.
+- Verificare e colmare i gap effettivi: notifiche/inbox, assistente IA, billing/entitlement/audit/Lega Pro, superfici operatore e qualsiasi altra funzione presente nel registro.
+- Aggiornare i documenti stantii che descrivono mobile come placeholder, demo, web-only o non integrato.
+- Condividere contratti, validazioni e semantica errori; non duplicare regole di dominio nel client mobile.
+- Garantire loading, empty, error, success, forbidden, offline/retry, accessibilità, deep link e sessione reale per i flussi pertinenti.
+- Introdurre un framework E2E mobile adatto al progetto e una matrice minima Android/iOS o una decisione motivata sui dispositivi supportati.
+- Portare in CI almeno i journey critici autenticati: login, lega, rosa/formazione, turno/H2H, mercato e operatore dove previsto.
+
+DOCUMENTAZIONE OBBLIGATORIA
+- apps/mobile/README.md
+- apps/mobile/package.json e apps/mobile/src/
+- apps/web/src/api/ e apps/mobile/src/api/
+- docs/design/shell-mobile.md
+- docs/design/wireframes.md — nota Mobile RN
+- docs/design/navigation.md e docs/design/usage-guidelines.md
+- docs/api/leagues.md — sezione mobile
+- docs/api/fantasy_turns.md — dettaglio H2H mobile
+- docs/operations/beta_readiness/ep12-01_suite_e2e.md — gap E2E mobile
+- docs/doc_fantapperò/FantAppero_Architettura_Tecnica_Modello_Dati_MVP_v0.1.docx — API/DTO condivisi
+
+CRITERI DI ACCETTAZIONE
+- La matrice non contiene funzionalità web senza equivalente mobile, salvo `N/A` approvato e motivato per assenza di esperienza correlata.
+- Nessuna schermata mobile di produzione dipende da persona demo, placeholder o link al web per completare il flusso.
+- Permessi e risultati di dominio coincidono tra web e mobile perché derivano dalle stesse API e validazioni server-side.
+- La suite E2E mobile esegue i journey critici su build candidata e conserva artefatti diagnostici.
+- README e documenti di design/API riflettono lo stato reale del client mobile.
+
+TEST MINIMI
+- Type-check/build e test unitari/integrati di `apps/mobile`.
+- E2E su emulatore/simulatore o device farm, con almeno un percorso autenticato e uno forbidden.
+- Confronto contract test web/mobile per payload, error mapping e feature flag.
+- Smoke manuale su dispositivo fisico con URL API corretto, percorso e risultato visibile documentati.
+
+DELIVERABLE
+- Matrice di parità web/mobile chiusa e versionata.
+- Implementazioni mobile mancanti, framework E2E e integrazione CI.
+- Documentazione mobile aggiornata e report device/build.
+- Matrice o nota di parità web/mobile con prove mobile oppure `N/A mobile` motivato.
+
+DIPENDENZE
+EP13-03
+
+STIMA INIZIALE
+3–8 giorni, da affinare con la matrice
+
+PROMPT CODEX/CURSOR
+CONTESTO STANDARD — FANTAPPERÒ
+Stai lavorando su FantApperò, piattaforma fantasy football con backend Python/FastAPI, frontend React/TypeScript, app React Native/Expo, PostgreSQL, Redis, worker asincroni e integrazione centralizzata con API-Football. L’architettura approvata è un monolite modulare API-first gestito con Docker Compose.
+
+Questa card appartiene a “M5.1 — Chiusura Beta, copertura documentale e Pilot reale”. Non è un M6 funzionale: completa i requisiti approvati, rende obbligatoria la parità mobile, esegue il pilot reale e registra il gate umano previsto.
+
+GERARCHIA E DISPOSIZIONE DOCUMENTALE
+- Per processo Beta, soglie, ruoli ed evidenze prevalgono i documenti operativi correnti in `docs/operations/`.
+- Per perimetro MVP/Fase 2 e architettura prevalgono Documento Master, Requisiti Funzionali e Architettura Tecnica v0.1.
+- Il Concept è una fonte iniziale; in caso di conflitto valgono le decisioni successive, approvate e più specifiche.
+- Ogni voce documentata deve ricevere una disposizione esplicita: implementata e verificata, remediation MVP, backlog Fase 2, superseded, rifiutata con motivazione, gate umano/operativo oppure evidenza/template.
+- Nessun documento, test sintetico o dry-run autorizza a dichiarare eseguito un pilot reale o firmata una decisione umana.
+
+PARITÀ MOBILE OBBLIGATORIA
+Per ogni requisito o modifica controlla sempre backend/API, web e mobile. Ogni funzione destinata a utente, league admin o operatore deve avere comportamento equivalente in `apps/mobile`, usando gli stessi contratti e le stesse API del web, con stati loading, empty, error, success e forbidden, autorizzazioni server-side, accessibilità e test pertinenti. La card non può essere chiusa con una funzione web-only, un placeholder/demo o un semplice link dal mobile al web. Per attività esclusivamente server-side, dati o infrastruttura, dimostra la compatibilità del client mobile e registra `N/A mobile` soltanto con motivazione verificabile e assenza di una esperienza utente/admin correlata.
+
+REGOLE GENERALI OBBLIGATORIE
+- Usa l’italiano per interfaccia, messaggi utente, documentazione funzionale, evidenze e nuovi contenuti.
+- Prima di modificare file o codice, analizza lo stato reale del repository, presenta un piano breve e attendi la conferma esplicita dell’utente.
+- Preserva modifiche, file non tracciati e dati dell’utente; non usare reset distruttivi, cancellazioni ricorsive o riscritture della cronologia senza autorizzazione.
+- Non cancellare dati a database. Le migrazioni devono essere additive/backfill, con backup e prove prima/dopo.
+- Non anticipare card successive e non modificare funzionalità, regole, API o componenti non necessari alla card corrente.
+- Prima di creare qualcosa, verifica cosa esiste già e riusa moduli, contratti, pattern, script, template e componenti compatibili.
+- Mantieni il monolite modulare API-first; un’estrazione a microservizio richiede evidenza reale di volumi, costi o isolamento operativo.
+- Autorizzazioni e validazioni decisive devono essere server-side; `?persona=` è soltanto una simulazione DEV e non è sicurezza.
+- Non inserire segreti, credenziali, PII o URL con token nel codice, nei log, nei test, nei commit, nei CSV o nella documentazione.
+- Usa Docker e Docker Compose per servizi, migrazioni e test pertinenti; non usare Makefile o il comando `make`.
+- Distingui sempre implementazione tecnica, validazione locale, deployment e approvazioni umane; non simulare pilot, firme, inviti o decisioni reali.
+- Ogni affermazione di completamento deve essere accompagnata da comandi, risultati, URL/stati visibili e limiti residui riproducibili.
+
+CARD
+Codice: EP13-04
+Titolo: Parità funzionale web/mobile e E2E su dispositivo
+Dipendenze: EP13-03
+Stima iniziale: 3–8 giorni, da affinare con la matrice
+
+INCARICO
+Tratta il mobile come client di produzione di pari livello. Ispeziona prima il codice perché la documentazione corrente sottostima diverse schermate già esistenti, ma non confondere presenza di una schermata con parità completa o copertura E2E.
+
+SCOPE DA REALIZZARE
+- Costruire una matrice route/schermata/azione/API/ruolo tra web e `apps/mobile`, includendo utente, league admin e operatore globale.
+- Verificare e colmare i gap effettivi: notifiche/inbox, assistente IA, billing/entitlement/audit/Lega Pro, superfici operatore e qualsiasi altra funzione presente nel registro.
+- Aggiornare i documenti stantii che descrivono mobile come placeholder, demo, web-only o non integrato.
+- Condividere contratti, validazioni e semantica errori; non duplicare regole di dominio nel client mobile.
+- Garantire loading, empty, error, success, forbidden, offline/retry, accessibilità, deep link e sessione reale per i flussi pertinenti.
+- Introdurre un framework E2E mobile adatto al progetto e una matrice minima Android/iOS o una decisione motivata sui dispositivi supportati.
+- Portare in CI almeno i journey critici autenticati: login, lega, rosa/formazione, turno/H2H, mercato e operatore dove previsto.
+
+DOCUMENTAZIONE OBBLIGATORIA DA LEGGERE E CITARE NEL REPORT
+- apps/mobile/README.md
+- apps/mobile/package.json e apps/mobile/src/
+- apps/web/src/api/ e apps/mobile/src/api/
+- docs/design/shell-mobile.md
+- docs/design/wireframes.md — nota Mobile RN
+- docs/design/navigation.md e docs/design/usage-guidelines.md
+- docs/api/leagues.md — sezione mobile
+- docs/api/fantasy_turns.md — dettaglio H2H mobile
+- docs/operations/beta_readiness/ep12-01_suite_e2e.md — gap E2E mobile
+- docs/doc_fantapperò/FantAppero_Architettura_Tecnica_Modello_Dati_MVP_v0.1.docx — API/DTO condivisi
+
+CRITERI DI ACCETTAZIONE
+- La matrice non contiene funzionalità web senza equivalente mobile, salvo `N/A` approvato e motivato per assenza di esperienza correlata.
+- Nessuna schermata mobile di produzione dipende da persona demo, placeholder o link al web per completare il flusso.
+- Permessi e risultati di dominio coincidono tra web e mobile perché derivano dalle stesse API e validazioni server-side.
+- La suite E2E mobile esegue i journey critici su build candidata e conserva artefatti diagnostici.
+- README e documenti di design/API riflettono lo stato reale del client mobile.
+
+TEST MINIMI
+- Type-check/build e test unitari/integrati di `apps/mobile`.
+- E2E su emulatore/simulatore o device farm, con almeno un percorso autenticato e uno forbidden.
+- Confronto contract test web/mobile per payload, error mapping e feature flag.
+- Smoke manuale su dispositivo fisico con URL API corretto, percorso e risultato visibile documentati.
+
+DELIVERABLE
+- Matrice di parità web/mobile chiusa e versionata.
+- Implementazioni mobile mancanti, framework E2E e integrazione CI.
+- Documentazione mobile aggiornata e report device/build.
+- Matrice o nota esplicita di parità web/mobile, con prove del percorso mobile; `N/A mobile` è ammesso solo secondo la regola obbligatoria.
+
+ORDINE DI LAVORO OBBLIGATORIO
+1. Ispeziona repository, documenti, branch, modifiche locali e dipendenze della card.
+2. Elenca fatti osservati, ambiguità materiali, rischi dati e conflitti documentali.
+3. Proponi un piano atomico con file/servizi/test coinvolti e attendi la conferma esplicita dell’utente.
+4. Implementa soltanto lo scope approvato, preservando dati e modifiche esistenti.
+5. Verifica backend/API, web e mobile; esegui test automatici e una prova manuale riproducibile quando esiste UI.
+6. Aggiorna documentazione, registro di tracciabilità ed evidenze nello stesso lavoro.
+7. Consegna un report finale con modifiche, comandi/esiti, URL o percorso mobile, stati visibili, limiti e lavoro umano ancora pendente.
+
+DEFINITION OF DONE
+La card è chiusa soltanto quando tutti i criteri sono provati sulla release candidate prevista, la documentazione riflette lo stato reale, la parità mobile è dimostrata o il `N/A` è motivato, e non restano placeholder, TODO senza owner o affermazioni non verificate. Le attività temporali o umane restano aperte finché non vengono realmente eseguite e firmate.
+",M5.1 — Chiusura Beta e Pilot reale,"M5.1, EP13, Must, Mobile, Frontend, Backend, QA, UX",,,4
+EP13-05 — Performance e osservabilità della candidata web/mobile,"CODICE: EP13-05
+
+USER STORY
+Come platform owner vogliamo misurare capacità, latenza ed errori della candidata sotto carico realistico, distinguendo metriche aggregate da contatori process-local e includendo l’impatto sui client web/mobile.
+
+OBIETTIVO E SCOPE
+- Rieseguire profili k6 e scenari critici sulla candidata e sull’ambiente pilot dimensionato.
+- Misurare API, database, Redis/worker, code, sincronizzazioni sports-data e operazioni utente concorrenti.
+- Definire dashboard, log correlation, alert e retention realmente disponibili nell’ambiente pilot.
+- Misurare tempi percepiti, retry, timeout e consumo rete dei journey web/mobile critici.
+- Registrare soglie, dataset, warm-up, concorrenza, risultato e limiti senza estrapolare metriche process-local come aggregate.
+
+DOCUMENTAZIONE OBBLIGATORIA
+- docs/operations/performance_baseline.md
+- docs/operations/monitoring.md
+- docs/operations/beta_pilot_gate.md — gate performance/operability
+- docs/operations/beta_readiness/ep12-03_capacity_concurrency.md
+- docs/operations/k6/
+- docs/operations/api_football_adapter.md
+- apps/mobile/src/api/client.ts e apps/web/src/api/client.ts
+
+CRITERI DI ACCETTAZIONE
+- I profili richiesti raggiungono le soglie o producono una remediation con owner e retest.
+- Dashboard e alert usano segnali aggregati e sono verificati con un evento controllato.
+- Web e mobile gestiscono coerentemente timeout, retry ed errori senza loop o richieste duplicate.
+- Il report identifica ambiente, candidata, dataset e limiti di validità.
+
+TEST MINIMI
+- k6 smoke/load/stress pertinenti e test di concorrenza DB/worker.
+- Verifica alert con evento sintetico reversibile.
+- Profilo di almeno due journey mobile critici su rete normale e degradata.
+
+DELIVERABLE
+- Report performance/capacità aggiornato e confrontabile.
+- Dashboard/alert pilot e runbook di interpretazione.
+- Matrice impatto e compatibilità web/mobile.
+- Matrice o nota di parità web/mobile con prove mobile oppure `N/A mobile` motivato.
+
+DIPENDENZE
+EP13-04
+
+STIMA INIZIALE
+1–3 giorni
+
+PROMPT CODEX/CURSOR
+CONTESTO STANDARD — FANTAPPERÒ
+Stai lavorando su FantApperò, piattaforma fantasy football con backend Python/FastAPI, frontend React/TypeScript, app React Native/Expo, PostgreSQL, Redis, worker asincroni e integrazione centralizzata con API-Football. L’architettura approvata è un monolite modulare API-first gestito con Docker Compose.
+
+Questa card appartiene a “M5.1 — Chiusura Beta, copertura documentale e Pilot reale”. Non è un M6 funzionale: completa i requisiti approvati, rende obbligatoria la parità mobile, esegue il pilot reale e registra il gate umano previsto.
+
+GERARCHIA E DISPOSIZIONE DOCUMENTALE
+- Per processo Beta, soglie, ruoli ed evidenze prevalgono i documenti operativi correnti in `docs/operations/`.
+- Per perimetro MVP/Fase 2 e architettura prevalgono Documento Master, Requisiti Funzionali e Architettura Tecnica v0.1.
+- Il Concept è una fonte iniziale; in caso di conflitto valgono le decisioni successive, approvate e più specifiche.
+- Ogni voce documentata deve ricevere una disposizione esplicita: implementata e verificata, remediation MVP, backlog Fase 2, superseded, rifiutata con motivazione, gate umano/operativo oppure evidenza/template.
+- Nessun documento, test sintetico o dry-run autorizza a dichiarare eseguito un pilot reale o firmata una decisione umana.
+
+PARITÀ MOBILE OBBLIGATORIA
+Per ogni requisito o modifica controlla sempre backend/API, web e mobile. Ogni funzione destinata a utente, league admin o operatore deve avere comportamento equivalente in `apps/mobile`, usando gli stessi contratti e le stesse API del web, con stati loading, empty, error, success e forbidden, autorizzazioni server-side, accessibilità e test pertinenti. La card non può essere chiusa con una funzione web-only, un placeholder/demo o un semplice link dal mobile al web. Per attività esclusivamente server-side, dati o infrastruttura, dimostra la compatibilità del client mobile e registra `N/A mobile` soltanto con motivazione verificabile e assenza di una esperienza utente/admin correlata.
+
+REGOLE GENERALI OBBLIGATORIE
+- Usa l’italiano per interfaccia, messaggi utente, documentazione funzionale, evidenze e nuovi contenuti.
+- Prima di modificare file o codice, analizza lo stato reale del repository, presenta un piano breve e attendi la conferma esplicita dell’utente.
+- Preserva modifiche, file non tracciati e dati dell’utente; non usare reset distruttivi, cancellazioni ricorsive o riscritture della cronologia senza autorizzazione.
+- Non cancellare dati a database. Le migrazioni devono essere additive/backfill, con backup e prove prima/dopo.
+- Non anticipare card successive e non modificare funzionalità, regole, API o componenti non necessari alla card corrente.
+- Prima di creare qualcosa, verifica cosa esiste già e riusa moduli, contratti, pattern, script, template e componenti compatibili.
+- Mantieni il monolite modulare API-first; un’estrazione a microservizio richiede evidenza reale di volumi, costi o isolamento operativo.
+- Autorizzazioni e validazioni decisive devono essere server-side; `?persona=` è soltanto una simulazione DEV e non è sicurezza.
+- Non inserire segreti, credenziali, PII o URL con token nel codice, nei log, nei test, nei commit, nei CSV o nella documentazione.
+- Usa Docker e Docker Compose per servizi, migrazioni e test pertinenti; non usare Makefile o il comando `make`.
+- Distingui sempre implementazione tecnica, validazione locale, deployment e approvazioni umane; non simulare pilot, firme, inviti o decisioni reali.
+- Ogni affermazione di completamento deve essere accompagnata da comandi, risultati, URL/stati visibili e limiti residui riproducibili.
+
+CARD
+Codice: EP13-05
+Titolo: Performance e osservabilità della candidata web/mobile
+Dipendenze: EP13-04
+Stima iniziale: 1–3 giorni
+
+INCARICO
+Rivalida performance e osservabilità sullo stesso artefatto candidato e collega le metriche server all’esperienza reale web/mobile. Non dichiarare capacità aggregata da un solo processo.
+
+SCOPE DA REALIZZARE
+- Rieseguire profili k6 e scenari critici sulla candidata e sull’ambiente pilot dimensionato.
+- Misurare API, database, Redis/worker, code, sincronizzazioni sports-data e operazioni utente concorrenti.
+- Definire dashboard, log correlation, alert e retention realmente disponibili nell’ambiente pilot.
+- Misurare tempi percepiti, retry, timeout e consumo rete dei journey web/mobile critici.
+- Registrare soglie, dataset, warm-up, concorrenza, risultato e limiti senza estrapolare metriche process-local come aggregate.
+
+DOCUMENTAZIONE OBBLIGATORIA DA LEGGERE E CITARE NEL REPORT
+- docs/operations/performance_baseline.md
+- docs/operations/monitoring.md
+- docs/operations/beta_pilot_gate.md — gate performance/operability
+- docs/operations/beta_readiness/ep12-03_capacity_concurrency.md
+- docs/operations/k6/
+- docs/operations/api_football_adapter.md
+- apps/mobile/src/api/client.ts e apps/web/src/api/client.ts
+
+CRITERI DI ACCETTAZIONE
+- I profili richiesti raggiungono le soglie o producono una remediation con owner e retest.
+- Dashboard e alert usano segnali aggregati e sono verificati con un evento controllato.
+- Web e mobile gestiscono coerentemente timeout, retry ed errori senza loop o richieste duplicate.
+- Il report identifica ambiente, candidata, dataset e limiti di validità.
+
+TEST MINIMI
+- k6 smoke/load/stress pertinenti e test di concorrenza DB/worker.
+- Verifica alert con evento sintetico reversibile.
+- Profilo di almeno due journey mobile critici su rete normale e degradata.
+
+DELIVERABLE
+- Report performance/capacità aggiornato e confrontabile.
+- Dashboard/alert pilot e runbook di interpretazione.
+- Matrice impatto e compatibilità web/mobile.
+- Matrice o nota esplicita di parità web/mobile, con prove del percorso mobile; `N/A mobile` è ammesso solo secondo la regola obbligatoria.
+
+ORDINE DI LAVORO OBBLIGATORIO
+1. Ispeziona repository, documenti, branch, modifiche locali e dipendenze della card.
+2. Elenca fatti osservati, ambiguità materiali, rischi dati e conflitti documentali.
+3. Proponi un piano atomico con file/servizi/test coinvolti e attendi la conferma esplicita dell’utente.
+4. Implementa soltanto lo scope approvato, preservando dati e modifiche esistenti.
+5. Verifica backend/API, web e mobile; esegui test automatici e una prova manuale riproducibile quando esiste UI.
+6. Aggiorna documentazione, registro di tracciabilità ed evidenze nello stesso lavoro.
+7. Consegna un report finale con modifiche, comandi/esiti, URL o percorso mobile, stati visibili, limiti e lavoro umano ancora pendente.
+
+DEFINITION OF DONE
+La card è chiusa soltanto quando tutti i criteri sono provati sulla release candidate prevista, la documentazione riflette lo stato reale, la parità mobile è dimostrata o il `N/A` è motivato, e non restano placeholder, TODO senza owner o affermazioni non verificate. Le attività temporali o umane restano aperte finché non vengono realmente eseguite e firmate.
+",M5.1 — Chiusura Beta e Pilot reale,"M5.1, EP13, Must, QA, Backend, Mobile, Infrastructure, Observability",,,5
+EP13-06 — Rivalidazione sicurezza pre-pilot multipiattaforma,"CODICE: EP13-06
+
+USER STORY
+Come security owner vogliamo verificare la candidata, le dipendenze e i flussi autenticati web/mobile prima di esporre dati e utenti reali.
+
+OBIETTIVO E SCOPE
+- Rieseguire dependency, secret, container/image e configurazione scan sulla candidata.
+- Verificare authn/authz, isolamento lega, privilegi operatore, privacy export/delete e casi forbidden lato server.
+- Controllare storage token, deep link, log, variabili `EXPO_PUBLIC_*`, build mobile e dipendenze native.
+- Verificare rate limit, CORS/allowed origins, TLS/proxy, cookie/token e assenza di chiavi provider nei bundle web/mobile.
+- Triage delle vulnerabilità con severità, exploitability, owner, scadenza e decisione di rischio firmata.
+
+DOCUMENTAZIONE OBBLIGATORIA
+- docs/operations/security_review.md
+- docs/operations/configuration_and_secrets.md
+- docs/api/authentication.md e docs/api/authorization.md
+- docs/api/privacy.md
+- docs/operations/admin_operator_bootstrap.md
+- docs/operations/beta_readiness/ep12-04_security_review.md
+- apps/mobile/src/session/, apps/mobile/src/api/client.ts e apps/mobile/.env.example
+
+CRITERI DI ACCETTAZIONE
+- Nessun finding bloccante aperto; eccezioni hanno owner, scadenza e approvazione.
+- Test negativi dimostrano isolamento tra leghe e ruoli su endpoint usati da web e mobile.
+- Bundle, log e artefatti mobile/web non contengono segreti o PII non necessarie.
+- Le dipendenze native/mobile e le immagini container sono incluse nel report, non escluse per default.
+
+TEST MINIMI
+- Suite auth/authz/privacy e casi cross-league/forbidden.
+- Secret/dependency/image scan con output conservato.
+- Verifica install/build mobile release-like e ispezione configurazione pubblica.
+
+DELIVERABLE
+- Report sicurezza aggiornato con disposition completa.
+- Evidenze negative web/mobile/API e inventario dipendenze.
+- Registro rischi residui firmato dove necessario.
+- Matrice o nota di parità web/mobile con prove mobile oppure `N/A mobile` motivato.
+
+DIPENDENZE
+EP13-05
+
+STIMA INIZIALE
+1–3 giorni
+
+PROMPT CODEX/CURSOR
+CONTESTO STANDARD — FANTAPPERÒ
+Stai lavorando su FantApperò, piattaforma fantasy football con backend Python/FastAPI, frontend React/TypeScript, app React Native/Expo, PostgreSQL, Redis, worker asincroni e integrazione centralizzata con API-Football. L’architettura approvata è un monolite modulare API-first gestito con Docker Compose.
+
+Questa card appartiene a “M5.1 — Chiusura Beta, copertura documentale e Pilot reale”. Non è un M6 funzionale: completa i requisiti approvati, rende obbligatoria la parità mobile, esegue il pilot reale e registra il gate umano previsto.
+
+GERARCHIA E DISPOSIZIONE DOCUMENTALE
+- Per processo Beta, soglie, ruoli ed evidenze prevalgono i documenti operativi correnti in `docs/operations/`.
+- Per perimetro MVP/Fase 2 e architettura prevalgono Documento Master, Requisiti Funzionali e Architettura Tecnica v0.1.
+- Il Concept è una fonte iniziale; in caso di conflitto valgono le decisioni successive, approvate e più specifiche.
+- Ogni voce documentata deve ricevere una disposizione esplicita: implementata e verificata, remediation MVP, backlog Fase 2, superseded, rifiutata con motivazione, gate umano/operativo oppure evidenza/template.
+- Nessun documento, test sintetico o dry-run autorizza a dichiarare eseguito un pilot reale o firmata una decisione umana.
+
+PARITÀ MOBILE OBBLIGATORIA
+Per ogni requisito o modifica controlla sempre backend/API, web e mobile. Ogni funzione destinata a utente, league admin o operatore deve avere comportamento equivalente in `apps/mobile`, usando gli stessi contratti e le stesse API del web, con stati loading, empty, error, success e forbidden, autorizzazioni server-side, accessibilità e test pertinenti. La card non può essere chiusa con una funzione web-only, un placeholder/demo o un semplice link dal mobile al web. Per attività esclusivamente server-side, dati o infrastruttura, dimostra la compatibilità del client mobile e registra `N/A mobile` soltanto con motivazione verificabile e assenza di una esperienza utente/admin correlata.
+
+REGOLE GENERALI OBBLIGATORIE
+- Usa l’italiano per interfaccia, messaggi utente, documentazione funzionale, evidenze e nuovi contenuti.
+- Prima di modificare file o codice, analizza lo stato reale del repository, presenta un piano breve e attendi la conferma esplicita dell’utente.
+- Preserva modifiche, file non tracciati e dati dell’utente; non usare reset distruttivi, cancellazioni ricorsive o riscritture della cronologia senza autorizzazione.
+- Non cancellare dati a database. Le migrazioni devono essere additive/backfill, con backup e prove prima/dopo.
+- Non anticipare card successive e non modificare funzionalità, regole, API o componenti non necessari alla card corrente.
+- Prima di creare qualcosa, verifica cosa esiste già e riusa moduli, contratti, pattern, script, template e componenti compatibili.
+- Mantieni il monolite modulare API-first; un’estrazione a microservizio richiede evidenza reale di volumi, costi o isolamento operativo.
+- Autorizzazioni e validazioni decisive devono essere server-side; `?persona=` è soltanto una simulazione DEV e non è sicurezza.
+- Non inserire segreti, credenziali, PII o URL con token nel codice, nei log, nei test, nei commit, nei CSV o nella documentazione.
+- Usa Docker e Docker Compose per servizi, migrazioni e test pertinenti; non usare Makefile o il comando `make`.
+- Distingui sempre implementazione tecnica, validazione locale, deployment e approvazioni umane; non simulare pilot, firme, inviti o decisioni reali.
+- Ogni affermazione di completamento deve essere accompagnata da comandi, risultati, URL/stati visibili e limiti residui riproducibili.
+
+CARD
+Codice: EP13-06
+Titolo: Rivalidazione sicurezza pre-pilot multipiattaforma
+Dipendenze: EP13-05
+Stima iniziale: 1–3 giorni
+
+INCARICO
+Esegui una rivalidazione orientata alla candidata, includendo il client mobile e i suoi artefatti. Non limitarti a riutilizzare il report EP12-04 se commit, dipendenze o configurazione sono cambiati.
+
+SCOPE DA REALIZZARE
+- Rieseguire dependency, secret, container/image e configurazione scan sulla candidata.
+- Verificare authn/authz, isolamento lega, privilegi operatore, privacy export/delete e casi forbidden lato server.
+- Controllare storage token, deep link, log, variabili `EXPO_PUBLIC_*`, build mobile e dipendenze native.
+- Verificare rate limit, CORS/allowed origins, TLS/proxy, cookie/token e assenza di chiavi provider nei bundle web/mobile.
+- Triage delle vulnerabilità con severità, exploitability, owner, scadenza e decisione di rischio firmata.
+
+DOCUMENTAZIONE OBBLIGATORIA DA LEGGERE E CITARE NEL REPORT
+- docs/operations/security_review.md
+- docs/operations/configuration_and_secrets.md
+- docs/api/authentication.md e docs/api/authorization.md
+- docs/api/privacy.md
+- docs/operations/admin_operator_bootstrap.md
+- docs/operations/beta_readiness/ep12-04_security_review.md
+- apps/mobile/src/session/, apps/mobile/src/api/client.ts e apps/mobile/.env.example
+
+CRITERI DI ACCETTAZIONE
+- Nessun finding bloccante aperto; eccezioni hanno owner, scadenza e approvazione.
+- Test negativi dimostrano isolamento tra leghe e ruoli su endpoint usati da web e mobile.
+- Bundle, log e artefatti mobile/web non contengono segreti o PII non necessarie.
+- Le dipendenze native/mobile e le immagini container sono incluse nel report, non escluse per default.
+
+TEST MINIMI
+- Suite auth/authz/privacy e casi cross-league/forbidden.
+- Secret/dependency/image scan con output conservato.
+- Verifica install/build mobile release-like e ispezione configurazione pubblica.
+
+DELIVERABLE
+- Report sicurezza aggiornato con disposition completa.
+- Evidenze negative web/mobile/API e inventario dipendenze.
+- Registro rischi residui firmato dove necessario.
+- Matrice o nota esplicita di parità web/mobile, con prove del percorso mobile; `N/A mobile` è ammesso solo secondo la regola obbligatoria.
+
+ORDINE DI LAVORO OBBLIGATORIO
+1. Ispeziona repository, documenti, branch, modifiche locali e dipendenze della card.
+2. Elenca fatti osservati, ambiguità materiali, rischi dati e conflitti documentali.
+3. Proponi un piano atomico con file/servizi/test coinvolti e attendi la conferma esplicita dell’utente.
+4. Implementa soltanto lo scope approvato, preservando dati e modifiche esistenti.
+5. Verifica backend/API, web e mobile; esegui test automatici e una prova manuale riproducibile quando esiste UI.
+6. Aggiorna documentazione, registro di tracciabilità ed evidenze nello stesso lavoro.
+7. Consegna un report finale con modifiche, comandi/esiti, URL o percorso mobile, stati visibili, limiti e lavoro umano ancora pendente.
+
+DEFINITION OF DONE
+La card è chiusa soltanto quando tutti i criteri sono provati sulla release candidate prevista, la documentazione riflette lo stato reale, la parità mobile è dimostrata o il `N/A` è motivato, e non restano placeholder, TODO senza owner o affermazioni non verificate. Le attività temporali o umane restano aperte finché non vengono realmente eseguite e firmate.
+",M5.1 — Chiusura Beta e Pilot reale,"M5.1, EP13, Must, Security, Backend, Frontend, Mobile, Infrastructure",,,6
+"EP13-07 — Ambiente pilot, backup offsite e cutover DR","CODICE: EP13-07
+
+USER STORY
+Come incident/platform owner vogliamo un ambiente pilot recuperabile e osservabile, raggiungibile in sicurezza anche dal mobile, prima di invitare persone reali.
+
+OBIETTIVO E SCOPE
+- Provisionare o verificare ambiente pilot, DNS/TLS, proxy, secrets, storage, database, Redis/worker e accesso operativo.
+- Configurare backup cifrato su storage indipendente/offsite, retention, monitoraggio esiti e alert.
+- Eseguire restore e drill DR con misure RPO/RTO, controlli integrità e doppia approvazione del cutover.
+- Verificare URL pubblici e configurazioni web/mobile senza usare localhost, token nei link o endpoint temporanei.
+- Documentare rollback, ownership, escalation e dipendenze esterne senza eseguire deploy produzione non autorizzato.
+
+DOCUMENTAZIONE OBBLIGATORIA
+- docs/operations/backup_disaster_recovery.md
+- docs/operations/pilot_incident_runbooks.md
+- docs/operations/beta_pilot_gate.md
+- docs/operations/configuration_and_secrets.md
+- docs/operations/monitoring.md
+- infra/README.md e infra/local/.env.example
+- apps/mobile/README.md — configurazione device fisico
+
+CRITERI DI ACCETTAZIONE
+- Backup offsite cifrato, retention e alert sono attivi e verificati.
+- Restore/DR soddisfa le soglie approvate oppure blocca gli inviti con remediation.
+- Web e mobile raggiungono la stessa API pilot via TLS e completano health/login senza configurazioni locali.
+- Cutover e rollback hanno comandi, owner e approvazioni esplicite.
+
+TEST MINIMI
+- Backup + restore su destinazione isolata con verifica conteggi/integrità.
+- Tabletop/cutover DR controllato e misura RPO/RTO.
+- Smoke da browser e dispositivo fisico sull’endpoint pilot.
+
+DELIVERABLE
+- Scheda ambiente pilot e manifest configurazione non segreta.
+- Evidenze backup/restore/DR, alert e approvazioni.
+- Istruzioni di configurazione e smoke web/mobile.
+- Matrice o nota di parità web/mobile con prove mobile oppure `N/A mobile` motivato.
+
+DIPENDENZE
+EP13-06; owner e ambiente pilot disponibili
+
+STIMA INIZIALE
+2–4 giorni più tempi infrastrutturali
+
+PROMPT CODEX/CURSOR
+CONTESTO STANDARD — FANTAPPERÒ
+Stai lavorando su FantApperò, piattaforma fantasy football con backend Python/FastAPI, frontend React/TypeScript, app React Native/Expo, PostgreSQL, Redis, worker asincroni e integrazione centralizzata con API-Football. L’architettura approvata è un monolite modulare API-first gestito con Docker Compose.
+
+Questa card appartiene a “M5.1 — Chiusura Beta, copertura documentale e Pilot reale”. Non è un M6 funzionale: completa i requisiti approvati, rende obbligatoria la parità mobile, esegue il pilot reale e registra il gate umano previsto.
+
+GERARCHIA E DISPOSIZIONE DOCUMENTALE
+- Per processo Beta, soglie, ruoli ed evidenze prevalgono i documenti operativi correnti in `docs/operations/`.
+- Per perimetro MVP/Fase 2 e architettura prevalgono Documento Master, Requisiti Funzionali e Architettura Tecnica v0.1.
+- Il Concept è una fonte iniziale; in caso di conflitto valgono le decisioni successive, approvate e più specifiche.
+- Ogni voce documentata deve ricevere una disposizione esplicita: implementata e verificata, remediation MVP, backlog Fase 2, superseded, rifiutata con motivazione, gate umano/operativo oppure evidenza/template.
+- Nessun documento, test sintetico o dry-run autorizza a dichiarare eseguito un pilot reale o firmata una decisione umana.
+
+PARITÀ MOBILE OBBLIGATORIA
+Per ogni requisito o modifica controlla sempre backend/API, web e mobile. Ogni funzione destinata a utente, league admin o operatore deve avere comportamento equivalente in `apps/mobile`, usando gli stessi contratti e le stesse API del web, con stati loading, empty, error, success e forbidden, autorizzazioni server-side, accessibilità e test pertinenti. La card non può essere chiusa con una funzione web-only, un placeholder/demo o un semplice link dal mobile al web. Per attività esclusivamente server-side, dati o infrastruttura, dimostra la compatibilità del client mobile e registra `N/A mobile` soltanto con motivazione verificabile e assenza di una esperienza utente/admin correlata.
+
+REGOLE GENERALI OBBLIGATORIE
+- Usa l’italiano per interfaccia, messaggi utente, documentazione funzionale, evidenze e nuovi contenuti.
+- Prima di modificare file o codice, analizza lo stato reale del repository, presenta un piano breve e attendi la conferma esplicita dell’utente.
+- Preserva modifiche, file non tracciati e dati dell’utente; non usare reset distruttivi, cancellazioni ricorsive o riscritture della cronologia senza autorizzazione.
+- Non cancellare dati a database. Le migrazioni devono essere additive/backfill, con backup e prove prima/dopo.
+- Non anticipare card successive e non modificare funzionalità, regole, API o componenti non necessari alla card corrente.
+- Prima di creare qualcosa, verifica cosa esiste già e riusa moduli, contratti, pattern, script, template e componenti compatibili.
+- Mantieni il monolite modulare API-first; un’estrazione a microservizio richiede evidenza reale di volumi, costi o isolamento operativo.
+- Autorizzazioni e validazioni decisive devono essere server-side; `?persona=` è soltanto una simulazione DEV e non è sicurezza.
+- Non inserire segreti, credenziali, PII o URL con token nel codice, nei log, nei test, nei commit, nei CSV o nella documentazione.
+- Usa Docker e Docker Compose per servizi, migrazioni e test pertinenti; non usare Makefile o il comando `make`.
+- Distingui sempre implementazione tecnica, validazione locale, deployment e approvazioni umane; non simulare pilot, firme, inviti o decisioni reali.
+- Ogni affermazione di completamento deve essere accompagnata da comandi, risultati, URL/stati visibili e limiti residui riproducibili.
+
+CARD
+Codice: EP13-07
+Titolo: Ambiente pilot, backup offsite e cutover DR
+Dipendenze: EP13-06; owner e ambiente pilot disponibili
+Stima iniziale: 2–4 giorni più tempi infrastrutturali
+
+INCARICO
+Prepara e prova l’ambiente senza confondere locale, pilot e produzione. Per la parte infrastrutturale registra compatibilità mobile e prova su dispositivo; un `N/A mobile` non è valido perché l’ambiente deve essere consumato dall’app.
+
+SCOPE DA REALIZZARE
+- Provisionare o verificare ambiente pilot, DNS/TLS, proxy, secrets, storage, database, Redis/worker e accesso operativo.
+- Configurare backup cifrato su storage indipendente/offsite, retention, monitoraggio esiti e alert.
+- Eseguire restore e drill DR con misure RPO/RTO, controlli integrità e doppia approvazione del cutover.
+- Verificare URL pubblici e configurazioni web/mobile senza usare localhost, token nei link o endpoint temporanei.
+- Documentare rollback, ownership, escalation e dipendenze esterne senza eseguire deploy produzione non autorizzato.
+
+DOCUMENTAZIONE OBBLIGATORIA DA LEGGERE E CITARE NEL REPORT
+- docs/operations/backup_disaster_recovery.md
+- docs/operations/pilot_incident_runbooks.md
+- docs/operations/beta_pilot_gate.md
+- docs/operations/configuration_and_secrets.md
+- docs/operations/monitoring.md
+- infra/README.md e infra/local/.env.example
+- apps/mobile/README.md — configurazione device fisico
+
+CRITERI DI ACCETTAZIONE
+- Backup offsite cifrato, retention e alert sono attivi e verificati.
+- Restore/DR soddisfa le soglie approvate oppure blocca gli inviti con remediation.
+- Web e mobile raggiungono la stessa API pilot via TLS e completano health/login senza configurazioni locali.
+- Cutover e rollback hanno comandi, owner e approvazioni esplicite.
+
+TEST MINIMI
+- Backup + restore su destinazione isolata con verifica conteggi/integrità.
+- Tabletop/cutover DR controllato e misura RPO/RTO.
+- Smoke da browser e dispositivo fisico sull’endpoint pilot.
+
+DELIVERABLE
+- Scheda ambiente pilot e manifest configurazione non segreta.
+- Evidenze backup/restore/DR, alert e approvazioni.
+- Istruzioni di configurazione e smoke web/mobile.
+- Matrice o nota esplicita di parità web/mobile, con prove del percorso mobile; `N/A mobile` è ammesso solo secondo la regola obbligatoria.
+
+ORDINE DI LAVORO OBBLIGATORIO
+1. Ispeziona repository, documenti, branch, modifiche locali e dipendenze della card.
+2. Elenca fatti osservati, ambiguità materiali, rischi dati e conflitti documentali.
+3. Proponi un piano atomico con file/servizi/test coinvolti e attendi la conferma esplicita dell’utente.
+4. Implementa soltanto lo scope approvato, preservando dati e modifiche esistenti.
+5. Verifica backend/API, web e mobile; esegui test automatici e una prova manuale riproducibile quando esiste UI.
+6. Aggiorna documentazione, registro di tracciabilità ed evidenze nello stesso lavoro.
+7. Consegna un report finale con modifiche, comandi/esiti, URL o percorso mobile, stati visibili, limiti e lavoro umano ancora pendente.
+
+DEFINITION OF DONE
+La card è chiusa soltanto quando tutti i criteri sono provati sulla release candidate prevista, la documentazione riflette lo stato reale, la parità mobile è dimostrata o il `N/A` è motivato, e non restano placeholder, TODO senza owner o affermazioni non verificate. Le attività temporali o umane restano aperte finché non vengono realmente eseguite e firmate.
+",M5.1 — Chiusura Beta e Pilot reale,"M5.1, EP13, Must, Infrastructure, Operations, Security, Database, Mobile",,,7
+"EP13-08 — Governance, privacy e supporto del pilot","CODICE: EP13-08
+
+USER STORY
+Come pilot coordinator vogliamo ruoli, consenso, retention e supporto approvati prima di trattare dati e segnalazioni di partecipanti reali.
+
+OBIETTIVO E SCOPE
+- Assegnare decision owner, pilot coordinator, incident/platform/security owner, privacy contact, supporto e league admin.
+- Approvare informativa, acknowledgement, mapping alias-identità, retention, ritiro, export/delete e gestione incidenti.
+- Definire canali supporto, triage, SLA/SLO, severità, escalation, registro ticket e comunicazioni.
+- Verificare che privacy, preferenze e contatti siano fruibili e coerenti su web e mobile.
+- Eseguire tabletop con ruoli reali e conservare decisioni/approvazioni fuori dal repository quando contengono PII.
+
+DOCUMENTAZIONE OBBLIGATORIA
+- docs/operations/beta_pilot_gate.md
+- docs/operations/pilot_support_process.md
+- docs/operations/pilot_incident_runbooks.md
+- docs/api/privacy.md
+- docs/api/profile.md
+- docs/operations/security_review.md
+- apps/web/src/api/privacy.ts e apps/mobile/src/api/privacy.ts
+
+CRITERI DI ACCETTAZIONE
+- Tutti i ruoli obbligatori hanno una persona e un canale di escalation.
+- Informativa, acknowledgement, retention e ritiro sono approvati e versionati.
+- Export/delete e preferenze sono verificati end-to-end su API, web e mobile.
+- Il tabletop produce ticket, tempi, comunicazioni e azioni senza esporre PII nel repository.
+
+TEST MINIMI
+- Test API privacy/export/delete e autorizzazioni negative.
+- Smoke web/mobile di privacy, profilo, preferenze e richiesta supporto.
+- Tabletop incidente/supporto con checklist firmata dai ruoli reali.
+
+DELIVERABLE
+- RACI/contatti, documenti privacy approvati e registro acknowledgement.
+- Processo supporto/ticket ed evidenza tabletop.
+- Matrice di fruibilità e prova web/mobile.
+- Matrice o nota di parità web/mobile con prove mobile oppure `N/A mobile` motivato.
+
+DIPENDENZE
+EP13-07; persone e canali reali disponibili
+
+STIMA INIZIALE
+2–5 giorni più approvazioni
+
+PROMPT CODEX/CURSOR
+CONTESTO STANDARD — FANTAPPERÒ
+Stai lavorando su FantApperò, piattaforma fantasy football con backend Python/FastAPI, frontend React/TypeScript, app React Native/Expo, PostgreSQL, Redis, worker asincroni e integrazione centralizzata con API-Football. L’architettura approvata è un monolite modulare API-first gestito con Docker Compose.
+
+Questa card appartiene a “M5.1 — Chiusura Beta, copertura documentale e Pilot reale”. Non è un M6 funzionale: completa i requisiti approvati, rende obbligatoria la parità mobile, esegue il pilot reale e registra il gate umano previsto.
+
+GERARCHIA E DISPOSIZIONE DOCUMENTALE
+- Per processo Beta, soglie, ruoli ed evidenze prevalgono i documenti operativi correnti in `docs/operations/`.
+- Per perimetro MVP/Fase 2 e architettura prevalgono Documento Master, Requisiti Funzionali e Architettura Tecnica v0.1.
+- Il Concept è una fonte iniziale; in caso di conflitto valgono le decisioni successive, approvate e più specifiche.
+- Ogni voce documentata deve ricevere una disposizione esplicita: implementata e verificata, remediation MVP, backlog Fase 2, superseded, rifiutata con motivazione, gate umano/operativo oppure evidenza/template.
+- Nessun documento, test sintetico o dry-run autorizza a dichiarare eseguito un pilot reale o firmata una decisione umana.
+
+PARITÀ MOBILE OBBLIGATORIA
+Per ogni requisito o modifica controlla sempre backend/API, web e mobile. Ogni funzione destinata a utente, league admin o operatore deve avere comportamento equivalente in `apps/mobile`, usando gli stessi contratti e le stesse API del web, con stati loading, empty, error, success e forbidden, autorizzazioni server-side, accessibilità e test pertinenti. La card non può essere chiusa con una funzione web-only, un placeholder/demo o un semplice link dal mobile al web. Per attività esclusivamente server-side, dati o infrastruttura, dimostra la compatibilità del client mobile e registra `N/A mobile` soltanto con motivazione verificabile e assenza di una esperienza utente/admin correlata.
+
+REGOLE GENERALI OBBLIGATORIE
+- Usa l’italiano per interfaccia, messaggi utente, documentazione funzionale, evidenze e nuovi contenuti.
+- Prima di modificare file o codice, analizza lo stato reale del repository, presenta un piano breve e attendi la conferma esplicita dell’utente.
+- Preserva modifiche, file non tracciati e dati dell’utente; non usare reset distruttivi, cancellazioni ricorsive o riscritture della cronologia senza autorizzazione.
+- Non cancellare dati a database. Le migrazioni devono essere additive/backfill, con backup e prove prima/dopo.
+- Non anticipare card successive e non modificare funzionalità, regole, API o componenti non necessari alla card corrente.
+- Prima di creare qualcosa, verifica cosa esiste già e riusa moduli, contratti, pattern, script, template e componenti compatibili.
+- Mantieni il monolite modulare API-first; un’estrazione a microservizio richiede evidenza reale di volumi, costi o isolamento operativo.
+- Autorizzazioni e validazioni decisive devono essere server-side; `?persona=` è soltanto una simulazione DEV e non è sicurezza.
+- Non inserire segreti, credenziali, PII o URL con token nel codice, nei log, nei test, nei commit, nei CSV o nella documentazione.
+- Usa Docker e Docker Compose per servizi, migrazioni e test pertinenti; non usare Makefile o il comando `make`.
+- Distingui sempre implementazione tecnica, validazione locale, deployment e approvazioni umane; non simulare pilot, firme, inviti o decisioni reali.
+- Ogni affermazione di completamento deve essere accompagnata da comandi, risultati, URL/stati visibili e limiti residui riproducibili.
+
+CARD
+Codice: EP13-08
+Titolo: Governance, privacy e supporto del pilot
+Dipendenze: EP13-07; persone e canali reali disponibili
+Stima iniziale: 2–5 giorni più approvazioni
+
+INCARICO
+Completa artefatti tecnici e checklist, ma ferma la card davanti alle approvazioni umane mancanti. Non inventare firme, contatti o partecipanti e verifica ogni superficie privacy anche sul mobile.
+
+SCOPE DA REALIZZARE
+- Assegnare decision owner, pilot coordinator, incident/platform/security owner, privacy contact, supporto e league admin.
+- Approvare informativa, acknowledgement, mapping alias-identità, retention, ritiro, export/delete e gestione incidenti.
+- Definire canali supporto, triage, SLA/SLO, severità, escalation, registro ticket e comunicazioni.
+- Verificare che privacy, preferenze e contatti siano fruibili e coerenti su web e mobile.
+- Eseguire tabletop con ruoli reali e conservare decisioni/approvazioni fuori dal repository quando contengono PII.
+
+DOCUMENTAZIONE OBBLIGATORIA DA LEGGERE E CITARE NEL REPORT
+- docs/operations/beta_pilot_gate.md
+- docs/operations/pilot_support_process.md
+- docs/operations/pilot_incident_runbooks.md
+- docs/api/privacy.md
+- docs/api/profile.md
+- docs/operations/security_review.md
+- apps/web/src/api/privacy.ts e apps/mobile/src/api/privacy.ts
+
+CRITERI DI ACCETTAZIONE
+- Tutti i ruoli obbligatori hanno una persona e un canale di escalation.
+- Informativa, acknowledgement, retention e ritiro sono approvati e versionati.
+- Export/delete e preferenze sono verificati end-to-end su API, web e mobile.
+- Il tabletop produce ticket, tempi, comunicazioni e azioni senza esporre PII nel repository.
+
+TEST MINIMI
+- Test API privacy/export/delete e autorizzazioni negative.
+- Smoke web/mobile di privacy, profilo, preferenze e richiesta supporto.
+- Tabletop incidente/supporto con checklist firmata dai ruoli reali.
+
+DELIVERABLE
+- RACI/contatti, documenti privacy approvati e registro acknowledgement.
+- Processo supporto/ticket ed evidenza tabletop.
+- Matrice di fruibilità e prova web/mobile.
+- Matrice o nota esplicita di parità web/mobile, con prove del percorso mobile; `N/A mobile` è ammesso solo secondo la regola obbligatoria.
+
+ORDINE DI LAVORO OBBLIGATORIO
+1. Ispeziona repository, documenti, branch, modifiche locali e dipendenze della card.
+2. Elenca fatti osservati, ambiguità materiali, rischi dati e conflitti documentali.
+3. Proponi un piano atomico con file/servizi/test coinvolti e attendi la conferma esplicita dell’utente.
+4. Implementa soltanto lo scope approvato, preservando dati e modifiche esistenti.
+5. Verifica backend/API, web e mobile; esegui test automatici e una prova manuale riproducibile quando esiste UI.
+6. Aggiorna documentazione, registro di tracciabilità ed evidenze nello stesso lavoro.
+7. Consegna un report finale con modifiche, comandi/esiti, URL o percorso mobile, stati visibili, limiti e lavoro umano ancora pendente.
+
+DEFINITION OF DONE
+La card è chiusa soltanto quando tutti i criteri sono provati sulla release candidate prevista, la documentazione riflette lo stato reale, la parità mobile è dimostrata o il `N/A` è motivato, e non restano placeholder, TODO senza owner o affermazioni non verificate. Le attività temporali o umane restano aperte finché non vengono realmente eseguite e firmate.
+",M5.1 — Chiusura Beta e Pilot reale,"M5.1, EP13, Must, Product, Operations, Security, Privacy, Mobile",,,8
+"EP13-09 — Selezione, onboarding e smoke web/mobile delle leghe pilota","CODICE: EP13-09
+
+USER STORY
+Come pilot coordinator vogliamo invitare leghe idonee e accompagnarle su web e mobile con un onboarding riproducibile prima dell’avvio della finestra di misura.
+
+OBIETTIVO E SCOPE
+- Selezionare 3–5 leghe e 6–12 partecipanti per lega secondo criteri approvati, senza creare identità fittizie come prova del pilot.
+- Congelare protocollo, KPI, soglie, device/browser supportati, calendario e criteri di ritiro.
+- Preparare onboarding differenziato per partecipante, league admin e supporto, con percorsi equivalenti web/mobile.
+- Eseguire smoke autenticato su creazione/join lega, rosa, formazione, turno/H2H, mercato, privacy e notifiche pertinenti.
+- Registrare acknowledgement, blocchi, compatibilità device e remediation prima della data di partenza.
+
+DOCUMENTAZIONE OBBLIGATORIA
+- docs/operations/beta_pilot_gate.md — protocollo e prerequisiti
+- docs/operations/pilot_support_process.md
+- docs/operations/pilot_incident_runbooks.md
+- apps/mobile/README.md
+- docs/design/navigation.md
+- Documentazione API dei journey selezionati
+
+CRITERI DI ACCETTAZIONE
+- Protocollo/KPI/soglie sono congelati prima degli inviti.
+- Partecipanti e league admin reali completano onboarding e acknowledgement.
+- La matrice device/browser ha smoke verdi o eccezioni approvate con workaround.
+- Ogni journey critico ha percorso, stato visibile atteso e canale supporto su web e mobile.
+
+TEST MINIMI
+- Smoke autenticato completo su browser supportato e almeno un device Android/iOS previsto.
+- Verifica forbidden e isolamento lega per i ruoli pilota.
+- Simulazione reversibile di contatto supporto e raccolta diagnostica mobile.
+
+DELIVERABLE
+- Elenco leghe/ruoli conservato nel luogo approvato e protocollo congelato.
+- Guide onboarding web/mobile e matrice device/browser.
+- Report smoke, blocchi e remediation pre-avvio.
+- Matrice o nota di parità web/mobile con prove mobile oppure `N/A mobile` motivato.
+
+DIPENDENZE
+EP13-08; leghe e persone reali disponibili
+
+STIMA INIZIALE
+2–5 giorni più coordinamento
+
+PROMPT CODEX/CURSOR
+CONTESTO STANDARD — FANTAPPERÒ
+Stai lavorando su FantApperò, piattaforma fantasy football con backend Python/FastAPI, frontend React/TypeScript, app React Native/Expo, PostgreSQL, Redis, worker asincroni e integrazione centralizzata con API-Football. L’architettura approvata è un monolite modulare API-first gestito con Docker Compose.
+
+Questa card appartiene a “M5.1 — Chiusura Beta, copertura documentale e Pilot reale”. Non è un M6 funzionale: completa i requisiti approvati, rende obbligatoria la parità mobile, esegue il pilot reale e registra il gate umano previsto.
+
+GERARCHIA E DISPOSIZIONE DOCUMENTALE
+- Per processo Beta, soglie, ruoli ed evidenze prevalgono i documenti operativi correnti in `docs/operations/`.
+- Per perimetro MVP/Fase 2 e architettura prevalgono Documento Master, Requisiti Funzionali e Architettura Tecnica v0.1.
+- Il Concept è una fonte iniziale; in caso di conflitto valgono le decisioni successive, approvate e più specifiche.
+- Ogni voce documentata deve ricevere una disposizione esplicita: implementata e verificata, remediation MVP, backlog Fase 2, superseded, rifiutata con motivazione, gate umano/operativo oppure evidenza/template.
+- Nessun documento, test sintetico o dry-run autorizza a dichiarare eseguito un pilot reale o firmata una decisione umana.
+
+PARITÀ MOBILE OBBLIGATORIA
+Per ogni requisito o modifica controlla sempre backend/API, web e mobile. Ogni funzione destinata a utente, league admin o operatore deve avere comportamento equivalente in `apps/mobile`, usando gli stessi contratti e le stesse API del web, con stati loading, empty, error, success e forbidden, autorizzazioni server-side, accessibilità e test pertinenti. La card non può essere chiusa con una funzione web-only, un placeholder/demo o un semplice link dal mobile al web. Per attività esclusivamente server-side, dati o infrastruttura, dimostra la compatibilità del client mobile e registra `N/A mobile` soltanto con motivazione verificabile e assenza di una esperienza utente/admin correlata.
+
+REGOLE GENERALI OBBLIGATORIE
+- Usa l’italiano per interfaccia, messaggi utente, documentazione funzionale, evidenze e nuovi contenuti.
+- Prima di modificare file o codice, analizza lo stato reale del repository, presenta un piano breve e attendi la conferma esplicita dell’utente.
+- Preserva modifiche, file non tracciati e dati dell’utente; non usare reset distruttivi, cancellazioni ricorsive o riscritture della cronologia senza autorizzazione.
+- Non cancellare dati a database. Le migrazioni devono essere additive/backfill, con backup e prove prima/dopo.
+- Non anticipare card successive e non modificare funzionalità, regole, API o componenti non necessari alla card corrente.
+- Prima di creare qualcosa, verifica cosa esiste già e riusa moduli, contratti, pattern, script, template e componenti compatibili.
+- Mantieni il monolite modulare API-first; un’estrazione a microservizio richiede evidenza reale di volumi, costi o isolamento operativo.
+- Autorizzazioni e validazioni decisive devono essere server-side; `?persona=` è soltanto una simulazione DEV e non è sicurezza.
+- Non inserire segreti, credenziali, PII o URL con token nel codice, nei log, nei test, nei commit, nei CSV o nella documentazione.
+- Usa Docker e Docker Compose per servizi, migrazioni e test pertinenti; non usare Makefile o il comando `make`.
+- Distingui sempre implementazione tecnica, validazione locale, deployment e approvazioni umane; non simulare pilot, firme, inviti o decisioni reali.
+- Ogni affermazione di completamento deve essere accompagnata da comandi, risultati, URL/stati visibili e limiti residui riproducibili.
+
+CARD
+Codice: EP13-09
+Titolo: Selezione, onboarding e smoke web/mobile delle leghe pilota
+Dipendenze: EP13-08; leghe e persone reali disponibili
+Stima iniziale: 2–5 giorni più coordinamento
+
+INCARICO
+Predisponi materiale e prove tecniche, poi richiedi l’intervento umano per selezione e inviti. Non dichiarare onboarding reale da seed/demo e non ammettere al pilot una feature essenziale disponibile solo sul web.
+
+SCOPE DA REALIZZARE
+- Selezionare 3–5 leghe e 6–12 partecipanti per lega secondo criteri approvati, senza creare identità fittizie come prova del pilot.
+- Congelare protocollo, KPI, soglie, device/browser supportati, calendario e criteri di ritiro.
+- Preparare onboarding differenziato per partecipante, league admin e supporto, con percorsi equivalenti web/mobile.
+- Eseguire smoke autenticato su creazione/join lega, rosa, formazione, turno/H2H, mercato, privacy e notifiche pertinenti.
+- Registrare acknowledgement, blocchi, compatibilità device e remediation prima della data di partenza.
+
+DOCUMENTAZIONE OBBLIGATORIA DA LEGGERE E CITARE NEL REPORT
+- docs/operations/beta_pilot_gate.md — protocollo e prerequisiti
+- docs/operations/pilot_support_process.md
+- docs/operations/pilot_incident_runbooks.md
+- apps/mobile/README.md
+- docs/design/navigation.md
+- Documentazione API dei journey selezionati
+
+CRITERI DI ACCETTAZIONE
+- Protocollo/KPI/soglie sono congelati prima degli inviti.
+- Partecipanti e league admin reali completano onboarding e acknowledgement.
+- La matrice device/browser ha smoke verdi o eccezioni approvate con workaround.
+- Ogni journey critico ha percorso, stato visibile atteso e canale supporto su web e mobile.
+
+TEST MINIMI
+- Smoke autenticato completo su browser supportato e almeno un device Android/iOS previsto.
+- Verifica forbidden e isolamento lega per i ruoli pilota.
+- Simulazione reversibile di contatto supporto e raccolta diagnostica mobile.
+
+DELIVERABLE
+- Elenco leghe/ruoli conservato nel luogo approvato e protocollo congelato.
+- Guide onboarding web/mobile e matrice device/browser.
+- Report smoke, blocchi e remediation pre-avvio.
+- Matrice o nota esplicita di parità web/mobile, con prove del percorso mobile; `N/A mobile` è ammesso solo secondo la regola obbligatoria.
+
+ORDINE DI LAVORO OBBLIGATORIO
+1. Ispeziona repository, documenti, branch, modifiche locali e dipendenze della card.
+2. Elenca fatti osservati, ambiguità materiali, rischi dati e conflitti documentali.
+3. Proponi un piano atomico con file/servizi/test coinvolti e attendi la conferma esplicita dell’utente.
+4. Implementa soltanto lo scope approvato, preservando dati e modifiche esistenti.
+5. Verifica backend/API, web e mobile; esegui test automatici e una prova manuale riproducibile quando esiste UI.
+6. Aggiorna documentazione, registro di tracciabilità ed evidenze nello stesso lavoro.
+7. Consegna un report finale con modifiche, comandi/esiti, URL o percorso mobile, stati visibili, limiti e lavoro umano ancora pendente.
+
+DEFINITION OF DONE
+La card è chiusa soltanto quando tutti i criteri sono provati sulla release candidate prevista, la documentazione riflette lo stato reale, la parità mobile è dimostrata o il `N/A` è motivato, e non restano placeholder, TODO senza owner o affermazioni non verificate. Le attività temporali o umane restano aperte finché non vengono realmente eseguite e firmate.
+",M5.1 — Chiusura Beta e Pilot reale,"M5.1, EP13, Must, Operations, Product, Infrastructure, QA, Mobile",,,9
+EP13-10 — Esecuzione del pilot reale e raccolta KPI multipiattaforma,"CODICE: EP13-10
+
+USER STORY
+Come decision owner vogliamo misurare per almeno 28 giorni e 4 turni il comportamento di leghe reali su web e mobile per decidere sulla Beta con dati osservabili.
+
+OBIETTIVO E SCOPE
+- Avviare il pilot soltanto dopo tutti i prerequisiti firmati e mantenere immutata la candidata salvo remediation controllata.
+- Raccogliere KPI tecnici, di prodotto, supporto, affidabilità dati e completamento journey, separati per web/mobile e aggregati senza PII.
+- Eseguire checkpoint periodici, triage ticket, incident management, backup/restore check ed eventuali retest.
+- Registrare versione app mobile/device/OS e versione web per correlare errori senza identificare inutilmente le persone.
+- Applicare il protocollo per change, pausa, ritiro o sostituzione della candidata; non riscrivere a posteriori soglie o durata.
+
+DOCUMENTAZIONE OBBLIGATORIA
+- docs/operations/beta_pilot_gate.md — §§5–8
+- docs/operations/pilot_support_process.md
+- docs/operations/pilot_incident_runbooks.md
+- docs/operations/monitoring.md
+- docs/operations/backup_disaster_recovery.md
+- Protocollo e matrici prodotti da EP13-07…09
+
+CRITERI DI ACCETTAZIONE
+- Il pilot dura almeno 28 giorni e copre almeno 4 turni con 3–5 leghe e 6–12 partecipanti per lega, salvo decisione formale documentata.
+- KPI e soglie sono quelli congelati prima dell’avvio e hanno fonte/calcolo riproducibile.
+- I dati distinguono web/mobile e device supportati senza trasformare i log in un registro PII.
+- Incidenti, ticket, remediation e cambi candidata sono tracciati con impatto sulle misure.
+
+TEST MINIMI
+- Checkpoint E2E web/mobile e gate tecnici secondo cadenza del protocollo.
+- Controllo qualità KPI: completezza, denominatori, deduplica, timezone e privacy.
+- Verifica periodica backup/alert e journey critici sulla candidata in uso.
+
+DELIVERABLE
+- Dataset KPI aggregato e report checkpoint versionati.
+- Registro ticket/incidenti/remediation e versioni client.
+- Rapporto finale pilot pronto per il gate EP13-11.
+- Matrice o nota di parità web/mobile con prove mobile oppure `N/A mobile` motivato.
+
+DIPENDENZE
+EP13-09; finestra temporale, leghe e partecipanti reali
+
+STIMA INIZIALE
+Minimo 28 giorni e 4 turni
+
+PROMPT CODEX/CURSOR
+CONTESTO STANDARD — FANTAPPERÒ
+Stai lavorando su FantApperò, piattaforma fantasy football con backend Python/FastAPI, frontend React/TypeScript, app React Native/Expo, PostgreSQL, Redis, worker asincroni e integrazione centralizzata con API-Football. L’architettura approvata è un monolite modulare API-first gestito con Docker Compose.
+
+Questa card appartiene a “M5.1 — Chiusura Beta, copertura documentale e Pilot reale”. Non è un M6 funzionale: completa i requisiti approvati, rende obbligatoria la parità mobile, esegue il pilot reale e registra il gate umano previsto.
+
+GERARCHIA E DISPOSIZIONE DOCUMENTALE
+- Per processo Beta, soglie, ruoli ed evidenze prevalgono i documenti operativi correnti in `docs/operations/`.
+- Per perimetro MVP/Fase 2 e architettura prevalgono Documento Master, Requisiti Funzionali e Architettura Tecnica v0.1.
+- Il Concept è una fonte iniziale; in caso di conflitto valgono le decisioni successive, approvate e più specifiche.
+- Ogni voce documentata deve ricevere una disposizione esplicita: implementata e verificata, remediation MVP, backlog Fase 2, superseded, rifiutata con motivazione, gate umano/operativo oppure evidenza/template.
+- Nessun documento, test sintetico o dry-run autorizza a dichiarare eseguito un pilot reale o firmata una decisione umana.
+
+PARITÀ MOBILE OBBLIGATORIA
+Per ogni requisito o modifica controlla sempre backend/API, web e mobile. Ogni funzione destinata a utente, league admin o operatore deve avere comportamento equivalente in `apps/mobile`, usando gli stessi contratti e le stesse API del web, con stati loading, empty, error, success e forbidden, autorizzazioni server-side, accessibilità e test pertinenti. La card non può essere chiusa con una funzione web-only, un placeholder/demo o un semplice link dal mobile al web. Per attività esclusivamente server-side, dati o infrastruttura, dimostra la compatibilità del client mobile e registra `N/A mobile` soltanto con motivazione verificabile e assenza di una esperienza utente/admin correlata.
+
+REGOLE GENERALI OBBLIGATORIE
+- Usa l’italiano per interfaccia, messaggi utente, documentazione funzionale, evidenze e nuovi contenuti.
+- Prima di modificare file o codice, analizza lo stato reale del repository, presenta un piano breve e attendi la conferma esplicita dell’utente.
+- Preserva modifiche, file non tracciati e dati dell’utente; non usare reset distruttivi, cancellazioni ricorsive o riscritture della cronologia senza autorizzazione.
+- Non cancellare dati a database. Le migrazioni devono essere additive/backfill, con backup e prove prima/dopo.
+- Non anticipare card successive e non modificare funzionalità, regole, API o componenti non necessari alla card corrente.
+- Prima di creare qualcosa, verifica cosa esiste già e riusa moduli, contratti, pattern, script, template e componenti compatibili.
+- Mantieni il monolite modulare API-first; un’estrazione a microservizio richiede evidenza reale di volumi, costi o isolamento operativo.
+- Autorizzazioni e validazioni decisive devono essere server-side; `?persona=` è soltanto una simulazione DEV e non è sicurezza.
+- Non inserire segreti, credenziali, PII o URL con token nel codice, nei log, nei test, nei commit, nei CSV o nella documentazione.
+- Usa Docker e Docker Compose per servizi, migrazioni e test pertinenti; non usare Makefile o il comando `make`.
+- Distingui sempre implementazione tecnica, validazione locale, deployment e approvazioni umane; non simulare pilot, firme, inviti o decisioni reali.
+- Ogni affermazione di completamento deve essere accompagnata da comandi, risultati, URL/stati visibili e limiti residui riproducibili.
+
+CARD
+Codice: EP13-10
+Titolo: Esecuzione del pilot reale e raccolta KPI multipiattaforma
+Dipendenze: EP13-09; finestra temporale, leghe e partecipanti reali
+Stima iniziale: Minimo 28 giorni e 4 turni
+
+INCARICO
+Automatizza raccolta e controlli ammessi, ma non simulare tempo, persone, utilizzo o KPI. Se il pilot non è concluso, riporta lo stato e resta fermo sul gate umano/temporale.
+
+SCOPE DA REALIZZARE
+- Avviare il pilot soltanto dopo tutti i prerequisiti firmati e mantenere immutata la candidata salvo remediation controllata.
+- Raccogliere KPI tecnici, di prodotto, supporto, affidabilità dati e completamento journey, separati per web/mobile e aggregati senza PII.
+- Eseguire checkpoint periodici, triage ticket, incident management, backup/restore check ed eventuali retest.
+- Registrare versione app mobile/device/OS e versione web per correlare errori senza identificare inutilmente le persone.
+- Applicare il protocollo per change, pausa, ritiro o sostituzione della candidata; non riscrivere a posteriori soglie o durata.
+
+DOCUMENTAZIONE OBBLIGATORIA DA LEGGERE E CITARE NEL REPORT
+- docs/operations/beta_pilot_gate.md — §§5–8
+- docs/operations/pilot_support_process.md
+- docs/operations/pilot_incident_runbooks.md
+- docs/operations/monitoring.md
+- docs/operations/backup_disaster_recovery.md
+- Protocollo e matrici prodotti da EP13-07…09
+
+CRITERI DI ACCETTAZIONE
+- Il pilot dura almeno 28 giorni e copre almeno 4 turni con 3–5 leghe e 6–12 partecipanti per lega, salvo decisione formale documentata.
+- KPI e soglie sono quelli congelati prima dell’avvio e hanno fonte/calcolo riproducibile.
+- I dati distinguono web/mobile e device supportati senza trasformare i log in un registro PII.
+- Incidenti, ticket, remediation e cambi candidata sono tracciati con impatto sulle misure.
+
+TEST MINIMI
+- Checkpoint E2E web/mobile e gate tecnici secondo cadenza del protocollo.
+- Controllo qualità KPI: completezza, denominatori, deduplica, timezone e privacy.
+- Verifica periodica backup/alert e journey critici sulla candidata in uso.
+
+DELIVERABLE
+- Dataset KPI aggregato e report checkpoint versionati.
+- Registro ticket/incidenti/remediation e versioni client.
+- Rapporto finale pilot pronto per il gate EP13-11.
+- Matrice o nota esplicita di parità web/mobile, con prove del percorso mobile; `N/A mobile` è ammesso solo secondo la regola obbligatoria.
+
+ORDINE DI LAVORO OBBLIGATORIO
+1. Ispeziona repository, documenti, branch, modifiche locali e dipendenze della card.
+2. Elenca fatti osservati, ambiguità materiali, rischi dati e conflitti documentali.
+3. Proponi un piano atomico con file/servizi/test coinvolti e attendi la conferma esplicita dell’utente.
+4. Implementa soltanto lo scope approvato, preservando dati e modifiche esistenti.
+5. Verifica backend/API, web e mobile; esegui test automatici e una prova manuale riproducibile quando esiste UI.
+6. Aggiorna documentazione, registro di tracciabilità ed evidenze nello stesso lavoro.
+7. Consegna un report finale con modifiche, comandi/esiti, URL o percorso mobile, stati visibili, limiti e lavoro umano ancora pendente.
+
+DEFINITION OF DONE
+La card è chiusa soltanto quando tutti i criteri sono provati sulla release candidate prevista, la documentazione riflette lo stato reale, la parità mobile è dimostrata o il `N/A` è motivato, e non restano placeholder, TODO senza owner o affermazioni non verificate. Le attività temporali o umane restano aperte finché non vengono realmente eseguite e firmate.
+",M5.1 — Chiusura Beta e Pilot reale,"M5.1, EP13, Must, Operations, QA, Infrastructure, Pilot, Mobile",,,10
+EP13-11 — Gate firmato GO/NO-GO e remediation,"CODICE: EP13-11
+
+USER STORY
+Come decision owner vogliamo una decisione GO/NO-GO firmata che consideri documentazione, sicurezza, operatività, KPI e parità mobile senza confondere un dry-run tecnico con la chiusura Beta.
+
+OBIETTIVO E SCOPE
+- Consolidare evidenze EP13-01…10 e controllare completezza, freschezza, candidata e owner.
+- Valutare ogni soglia e requisito, inclusa la parità web/mobile e la matrice device, con esito PASS/FAIL/RISK_ACCEPTED.
+- Produrre un dossier decisionale che separi fatti, inferenze, eccezioni e raccomandazione.
+- Ottenere firme/approvazioni reali; in caso NO-GO creare remediation atomiche, nuova candidata e retest mirato/completo secondo impatto.
+- Chiudere EP12-07 e M5.1 soltanto dopo decisione registrata e nessun gate obbligatorio ambiguo.
+
+DOCUMENTAZIONE OBBLIGATORIA
+- docs/operations/beta_pilot_gate.md
+- docs/operations/beta_readiness/README.md
+- docs/operations/evidence/ep12-07_internal_dry_run_2026-08-21.md
+- Tutti i deliverable EP13-01…10
+- Registro documentale EP13-02 e matrice parità EP13-04
+
+CRITERI DI ACCETTAZIONE
+- Ogni gate ha esito, prova, data, candidata e owner; nessuna cella obbligatoria è vuota.
+- La decisione è firmata da persone autorizzate e non generata/simulata dall’agente.
+- Un GO non contiene gap MVP o mobile aperti; le eccezioni ammesse hanno perimetro e rischio espliciti.
+- Un NO-GO produce remediation, owner, scadenze e criteri di retest senza dichiarare chiuso M5.1.
+
+TEST MINIMI
+- Validator di completezza del dossier e dei riferimenti alle evidenze.
+- Riesecuzione dei gate tecnici divenuti stantii.
+- Controllo che KPI e risultati web/mobile corrispondano al protocollo congelato.
+
+DELIVERABLE
+- Dossier GO/NO-GO versionato e decisione firmata.
+- Eventuale piano remediation/retest e manifest nuova candidata.
+- Aggiornamento formale stato EP12-07/M5.1.
+- Matrice o nota di parità web/mobile con prove mobile oppure `N/A mobile` motivato.
+
+DIPENDENZE
+EP13-10; decision owner e firmatari disponibili
+
+STIMA INIZIALE
+1–3 giorni più approvazioni/retest
+
+PROMPT CODEX/CURSOR
+CONTESTO STANDARD — FANTAPPERÒ
+Stai lavorando su FantApperò, piattaforma fantasy football con backend Python/FastAPI, frontend React/TypeScript, app React Native/Expo, PostgreSQL, Redis, worker asincroni e integrazione centralizzata con API-Football. L’architettura approvata è un monolite modulare API-first gestito con Docker Compose.
+
+Questa card appartiene a “M5.1 — Chiusura Beta, copertura documentale e Pilot reale”. Non è un M6 funzionale: completa i requisiti approvati, rende obbligatoria la parità mobile, esegue il pilot reale e registra il gate umano previsto.
+
+GERARCHIA E DISPOSIZIONE DOCUMENTALE
+- Per processo Beta, soglie, ruoli ed evidenze prevalgono i documenti operativi correnti in `docs/operations/`.
+- Per perimetro MVP/Fase 2 e architettura prevalgono Documento Master, Requisiti Funzionali e Architettura Tecnica v0.1.
+- Il Concept è una fonte iniziale; in caso di conflitto valgono le decisioni successive, approvate e più specifiche.
+- Ogni voce documentata deve ricevere una disposizione esplicita: implementata e verificata, remediation MVP, backlog Fase 2, superseded, rifiutata con motivazione, gate umano/operativo oppure evidenza/template.
+- Nessun documento, test sintetico o dry-run autorizza a dichiarare eseguito un pilot reale o firmata una decisione umana.
+
+PARITÀ MOBILE OBBLIGATORIA
+Per ogni requisito o modifica controlla sempre backend/API, web e mobile. Ogni funzione destinata a utente, league admin o operatore deve avere comportamento equivalente in `apps/mobile`, usando gli stessi contratti e le stesse API del web, con stati loading, empty, error, success e forbidden, autorizzazioni server-side, accessibilità e test pertinenti. La card non può essere chiusa con una funzione web-only, un placeholder/demo o un semplice link dal mobile al web. Per attività esclusivamente server-side, dati o infrastruttura, dimostra la compatibilità del client mobile e registra `N/A mobile` soltanto con motivazione verificabile e assenza di una esperienza utente/admin correlata.
+
+REGOLE GENERALI OBBLIGATORIE
+- Usa l’italiano per interfaccia, messaggi utente, documentazione funzionale, evidenze e nuovi contenuti.
+- Prima di modificare file o codice, analizza lo stato reale del repository, presenta un piano breve e attendi la conferma esplicita dell’utente.
+- Preserva modifiche, file non tracciati e dati dell’utente; non usare reset distruttivi, cancellazioni ricorsive o riscritture della cronologia senza autorizzazione.
+- Non cancellare dati a database. Le migrazioni devono essere additive/backfill, con backup e prove prima/dopo.
+- Non anticipare card successive e non modificare funzionalità, regole, API o componenti non necessari alla card corrente.
+- Prima di creare qualcosa, verifica cosa esiste già e riusa moduli, contratti, pattern, script, template e componenti compatibili.
+- Mantieni il monolite modulare API-first; un’estrazione a microservizio richiede evidenza reale di volumi, costi o isolamento operativo.
+- Autorizzazioni e validazioni decisive devono essere server-side; `?persona=` è soltanto una simulazione DEV e non è sicurezza.
+- Non inserire segreti, credenziali, PII o URL con token nel codice, nei log, nei test, nei commit, nei CSV o nella documentazione.
+- Usa Docker e Docker Compose per servizi, migrazioni e test pertinenti; non usare Makefile o il comando `make`.
+- Distingui sempre implementazione tecnica, validazione locale, deployment e approvazioni umane; non simulare pilot, firme, inviti o decisioni reali.
+- Ogni affermazione di completamento deve essere accompagnata da comandi, risultati, URL/stati visibili e limiti residui riproducibili.
+
+CARD
+Codice: EP13-11
+Titolo: Gate firmato GO/NO-GO e remediation
+Dipendenze: EP13-10; decision owner e firmatari disponibili
+Stima iniziale: 1–3 giorni più approvazioni/retest
+
+INCARICO
+Prepara il dossier basandoti soltanto su evidenze reali. Fermati davanti alla firma umana: l’agente può verificare completezza e proporre una raccomandazione, non ratificare il GO/NO-GO.
+
+SCOPE DA REALIZZARE
+- Consolidare evidenze EP13-01…10 e controllare completezza, freschezza, candidata e owner.
+- Valutare ogni soglia e requisito, inclusa la parità web/mobile e la matrice device, con esito PASS/FAIL/RISK_ACCEPTED.
+- Produrre un dossier decisionale che separi fatti, inferenze, eccezioni e raccomandazione.
+- Ottenere firme/approvazioni reali; in caso NO-GO creare remediation atomiche, nuova candidata e retest mirato/completo secondo impatto.
+- Chiudere EP12-07 e M5.1 soltanto dopo decisione registrata e nessun gate obbligatorio ambiguo.
+
+DOCUMENTAZIONE OBBLIGATORIA DA LEGGERE E CITARE NEL REPORT
+- docs/operations/beta_pilot_gate.md
+- docs/operations/beta_readiness/README.md
+- docs/operations/evidence/ep12-07_internal_dry_run_2026-08-21.md
+- Tutti i deliverable EP13-01…10
+- Registro documentale EP13-02 e matrice parità EP13-04
+
+CRITERI DI ACCETTAZIONE
+- Ogni gate ha esito, prova, data, candidata e owner; nessuna cella obbligatoria è vuota.
+- La decisione è firmata da persone autorizzate e non generata/simulata dall’agente.
+- Un GO non contiene gap MVP o mobile aperti; le eccezioni ammesse hanno perimetro e rischio espliciti.
+- Un NO-GO produce remediation, owner, scadenze e criteri di retest senza dichiarare chiuso M5.1.
+
+TEST MINIMI
+- Validator di completezza del dossier e dei riferimenti alle evidenze.
+- Riesecuzione dei gate tecnici divenuti stantii.
+- Controllo che KPI e risultati web/mobile corrispondano al protocollo congelato.
+
+DELIVERABLE
+- Dossier GO/NO-GO versionato e decisione firmata.
+- Eventuale piano remediation/retest e manifest nuova candidata.
+- Aggiornamento formale stato EP12-07/M5.1.
+- Matrice o nota esplicita di parità web/mobile, con prove del percorso mobile; `N/A mobile` è ammesso solo secondo la regola obbligatoria.
+
+ORDINE DI LAVORO OBBLIGATORIO
+1. Ispeziona repository, documenti, branch, modifiche locali e dipendenze della card.
+2. Elenca fatti osservati, ambiguità materiali, rischi dati e conflitti documentali.
+3. Proponi un piano atomico con file/servizi/test coinvolti e attendi la conferma esplicita dell’utente.
+4. Implementa soltanto lo scope approvato, preservando dati e modifiche esistenti.
+5. Verifica backend/API, web e mobile; esegui test automatici e una prova manuale riproducibile quando esiste UI.
+6. Aggiorna documentazione, registro di tracciabilità ed evidenze nello stesso lavoro.
+7. Consegna un report finale con modifiche, comandi/esiti, URL o percorso mobile, stati visibili, limiti e lavoro umano ancora pendente.
+
+DEFINITION OF DONE
+La card è chiusa soltanto quando tutti i criteri sono provati sulla release candidate prevista, la documentazione riflette lo stato reale, la parità mobile è dimostrata o il `N/A` è motivato, e non restano placeholder, TODO senza owner o affermazioni non verificate. Le attività temporali o umane restano aperte finché non vengono realmente eseguite e firmate.
+",M5.1 — Chiusura Beta e Pilot reale,"M5.1, EP13, Must, Product, Operations, Security, Infrastructure, Gate, Mobile",,,11
+EP13-12 — Backlog Fase 2 completo da tutte le fonti,"CODICE: EP13-12
+
+USER STORY
+Come product owner vogliamo trasformare ogni voce documentata fuori MVP in un backlog Fase 2 completo e prioritizzabile, evitando che idee, Should e debiti scompaiano dopo il gate.
+
+OBIETTIVO E SCOPE
+- Importare tutte le righe `PHASE2_BACKLOG` del registro EP13-02 e verificare che nessuna fonte o Should resti senza card.
+- Includere almeno: organizzazioni, migrazione rose, asta live, calendari speciali, capitano/vice, playoff, automazioni autorizzate, sostituzioni avanzate, Rating stabilizzato/calibrazione, mercato evoluto, IA avanzata e Lega Pro completa.
+- Includere i 14 Should M0.5–M5: export/delete, scambi, push/email, staff IA, entitlement/subscription/audit/operatore/Lega Pro, oltre ai debiti operatore anomalie/job e alle open question provider.
+- Creare epic e card atomiche con user story, scope, fonti, criteri, test, dati/migrazioni, backend, web, mobile, dipendenze, rischio e stima.
+- Applicare la parità mobile a ogni feature futura fin dalla definizione; nessuna roadmap può introdurre nuovamente un’eccezione web-only implicita.
+- Prioritizzare con evidenze pilot, impatto, domanda, costo, rischio e dipendenze; non trasformare automaticamente il backlog in implementazione autorizzata.
+- Aggiornare o archiviare fonti stantie e collegare ogni card alla decisione originaria.
+
+DOCUMENTAZIONE OBBLIGATORIA
+- Registro documentale EP13-02 e decisione EP13-11
+- docs/doc_fantapperò/FantAppero_Documento_Master_v0.1.docx — sezione Fase 2
+- docs/doc_fantapperò/FantAppero_Requisiti_Funzionali_MVP_v0.1.docx — fuori MVP
+- docs/doc_fantapperò/FantAppero_Architettura_Tecnica_Modello_Dati_MVP_v0.1.docx
+- docs/doc_fantapperò/FantAppero_Pacchetto_Completo_M0.5-M5_v0.3/*.csv — tutte le card Should
+- docs/data/api_football_open_questions.md e docs/data/api_football_requirement_matrix.md
+- docs/operations/admin_operator_bootstrap.md e docs/operations/sports_data_quality.md
+- docs/design/wireframes.md e documenti API/operations con debiti dichiarati
+
+CRITERI DI ACCETTAZIONE
+- Il 100% delle righe Fase 2 e dei 14 Should è collegato a una epic/card oppure a un rifiuto motivato e approvato.
+- Ogni card futura contiene deliverable e criteri separati per backend, web e mobile quando applicabile.
+- Dipendenze, dati, migrazioni, sicurezza, operatività e test sono espliciti; non esistono titoli generici senza Definition of Done.
+- La priorità è motivata da evidenze e la roadmap non viene presentata come M6 approvata senza decisione del product owner.
+- Il registro EP13-02 non conserva righe Fase 2 orfane.
+
+TEST MINIMI
+- Validator copertura: ogni riga `PHASE2_BACKLOG` e ogni Should ha almeno un codice card.
+- Review di completezza dei campi e delle dipendenze/cicli.
+- Controllo automatico della presenza del paragrafo mobile o di un `N/A mobile` motivato in ogni card.
+
+DELIVERABLE
+- Roadmap Fase 2 completa con epic/card atomiche e priorità proposta.
+- Matrice fonte → decisione → card futura e registro senza orfani.
+- Elenco decisioni product ancora richieste prima di qualunque implementazione.
+- Matrice o nota di parità web/mobile con prove mobile oppure `N/A mobile` motivato.
+
+DIPENDENZE
+EP13-11; registro EP13-02 completo
+
+STIMA INIZIALE
+2–5 giorni di analisi; implementazione esclusa
+
+PROMPT CODEX/CURSOR
+CONTESTO STANDARD — FANTAPPERÒ
+Stai lavorando su FantApperò, piattaforma fantasy football con backend Python/FastAPI, frontend React/TypeScript, app React Native/Expo, PostgreSQL, Redis, worker asincroni e integrazione centralizzata con API-Football. L’architettura approvata è un monolite modulare API-first gestito con Docker Compose.
+
+Questa card appartiene a “M5.1 — Chiusura Beta, copertura documentale e Pilot reale”. Non è un M6 funzionale: completa i requisiti approvati, rende obbligatoria la parità mobile, esegue il pilot reale e registra il gate umano previsto.
+
+GERARCHIA E DISPOSIZIONE DOCUMENTALE
+- Per processo Beta, soglie, ruoli ed evidenze prevalgono i documenti operativi correnti in `docs/operations/`.
+- Per perimetro MVP/Fase 2 e architettura prevalgono Documento Master, Requisiti Funzionali e Architettura Tecnica v0.1.
+- Il Concept è una fonte iniziale; in caso di conflitto valgono le decisioni successive, approvate e più specifiche.
+- Ogni voce documentata deve ricevere una disposizione esplicita: implementata e verificata, remediation MVP, backlog Fase 2, superseded, rifiutata con motivazione, gate umano/operativo oppure evidenza/template.
+- Nessun documento, test sintetico o dry-run autorizza a dichiarare eseguito un pilot reale o firmata una decisione umana.
+
+PARITÀ MOBILE OBBLIGATORIA
+Per ogni requisito o modifica controlla sempre backend/API, web e mobile. Ogni funzione destinata a utente, league admin o operatore deve avere comportamento equivalente in `apps/mobile`, usando gli stessi contratti e le stesse API del web, con stati loading, empty, error, success e forbidden, autorizzazioni server-side, accessibilità e test pertinenti. La card non può essere chiusa con una funzione web-only, un placeholder/demo o un semplice link dal mobile al web. Per attività esclusivamente server-side, dati o infrastruttura, dimostra la compatibilità del client mobile e registra `N/A mobile` soltanto con motivazione verificabile e assenza di una esperienza utente/admin correlata.
+
+REGOLE GENERALI OBBLIGATORIE
+- Usa l’italiano per interfaccia, messaggi utente, documentazione funzionale, evidenze e nuovi contenuti.
+- Prima di modificare file o codice, analizza lo stato reale del repository, presenta un piano breve e attendi la conferma esplicita dell’utente.
+- Preserva modifiche, file non tracciati e dati dell’utente; non usare reset distruttivi, cancellazioni ricorsive o riscritture della cronologia senza autorizzazione.
+- Non cancellare dati a database. Le migrazioni devono essere additive/backfill, con backup e prove prima/dopo.
+- Non anticipare card successive e non modificare funzionalità, regole, API o componenti non necessari alla card corrente.
+- Prima di creare qualcosa, verifica cosa esiste già e riusa moduli, contratti, pattern, script, template e componenti compatibili.
+- Mantieni il monolite modulare API-first; un’estrazione a microservizio richiede evidenza reale di volumi, costi o isolamento operativo.
+- Autorizzazioni e validazioni decisive devono essere server-side; `?persona=` è soltanto una simulazione DEV e non è sicurezza.
+- Non inserire segreti, credenziali, PII o URL con token nel codice, nei log, nei test, nei commit, nei CSV o nella documentazione.
+- Usa Docker e Docker Compose per servizi, migrazioni e test pertinenti; non usare Makefile o il comando `make`.
+- Distingui sempre implementazione tecnica, validazione locale, deployment e approvazioni umane; non simulare pilot, firme, inviti o decisioni reali.
+- Ogni affermazione di completamento deve essere accompagnata da comandi, risultati, URL/stati visibili e limiti residui riproducibili.
+
+CARD
+Codice: EP13-12
+Titolo: Backlog Fase 2 completo da tutte le fonti
+Dipendenze: EP13-11; registro EP13-02 completo
+Stima iniziale: 2–5 giorni di analisi; implementazione esclusa
+
+INCARICO
+Crea backlog e prompt dettagliati nello stesso formato delle milestone M, ma non implementare le feature. La completezza deriva dal registro, non da una selezione arbitraria delle idee più visibili.
+
+SCOPE DA REALIZZARE
+- Importare tutte le righe `PHASE2_BACKLOG` del registro EP13-02 e verificare che nessuna fonte o Should resti senza card.
+- Includere almeno: organizzazioni, migrazione rose, asta live, calendari speciali, capitano/vice, playoff, automazioni autorizzate, sostituzioni avanzate, Rating stabilizzato/calibrazione, mercato evoluto, IA avanzata e Lega Pro completa.
+- Includere i 14 Should M0.5–M5: export/delete, scambi, push/email, staff IA, entitlement/subscription/audit/operatore/Lega Pro, oltre ai debiti operatore anomalie/job e alle open question provider.
+- Creare epic e card atomiche con user story, scope, fonti, criteri, test, dati/migrazioni, backend, web, mobile, dipendenze, rischio e stima.
+- Applicare la parità mobile a ogni feature futura fin dalla definizione; nessuna roadmap può introdurre nuovamente un’eccezione web-only implicita.
+- Prioritizzare con evidenze pilot, impatto, domanda, costo, rischio e dipendenze; non trasformare automaticamente il backlog in implementazione autorizzata.
+- Aggiornare o archiviare fonti stantie e collegare ogni card alla decisione originaria.
+
+DOCUMENTAZIONE OBBLIGATORIA DA LEGGERE E CITARE NEL REPORT
+- Registro documentale EP13-02 e decisione EP13-11
+- docs/doc_fantapperò/FantAppero_Documento_Master_v0.1.docx — sezione Fase 2
+- docs/doc_fantapperò/FantAppero_Requisiti_Funzionali_MVP_v0.1.docx — fuori MVP
+- docs/doc_fantapperò/FantAppero_Architettura_Tecnica_Modello_Dati_MVP_v0.1.docx
+- docs/doc_fantapperò/FantAppero_Pacchetto_Completo_M0.5-M5_v0.3/*.csv — tutte le card Should
+- docs/data/api_football_open_questions.md e docs/data/api_football_requirement_matrix.md
+- docs/operations/admin_operator_bootstrap.md e docs/operations/sports_data_quality.md
+- docs/design/wireframes.md e documenti API/operations con debiti dichiarati
+
+CRITERI DI ACCETTAZIONE
+- Il 100% delle righe Fase 2 e dei 14 Should è collegato a una epic/card oppure a un rifiuto motivato e approvato.
+- Ogni card futura contiene deliverable e criteri separati per backend, web e mobile quando applicabile.
+- Dipendenze, dati, migrazioni, sicurezza, operatività e test sono espliciti; non esistono titoli generici senza Definition of Done.
+- La priorità è motivata da evidenze e la roadmap non viene presentata come M6 approvata senza decisione del product owner.
+- Il registro EP13-02 non conserva righe Fase 2 orfane.
+
+TEST MINIMI
+- Validator copertura: ogni riga `PHASE2_BACKLOG` e ogni Should ha almeno un codice card.
+- Review di completezza dei campi e delle dipendenze/cicli.
+- Controllo automatico della presenza del paragrafo mobile o di un `N/A mobile` motivato in ogni card.
+
+DELIVERABLE
+- Roadmap Fase 2 completa con epic/card atomiche e priorità proposta.
+- Matrice fonte → decisione → card futura e registro senza orfani.
+- Elenco decisioni product ancora richieste prima di qualunque implementazione.
+- Matrice o nota esplicita di parità web/mobile, con prove del percorso mobile; `N/A mobile` è ammesso solo secondo la regola obbligatoria.
+
+ORDINE DI LAVORO OBBLIGATORIO
+1. Ispeziona repository, documenti, branch, modifiche locali e dipendenze della card.
+2. Elenca fatti osservati, ambiguità materiali, rischi dati e conflitti documentali.
+3. Proponi un piano atomico con file/servizi/test coinvolti e attendi la conferma esplicita dell’utente.
+4. Implementa soltanto lo scope approvato, preservando dati e modifiche esistenti.
+5. Verifica backend/API, web e mobile; esegui test automatici e una prova manuale riproducibile quando esiste UI.
+6. Aggiorna documentazione, registro di tracciabilità ed evidenze nello stesso lavoro.
+7. Consegna un report finale con modifiche, comandi/esiti, URL o percorso mobile, stati visibili, limiti e lavoro umano ancora pendente.
+
+DEFINITION OF DONE
+La card è chiusa soltanto quando tutti i criteri sono provati sulla release candidate prevista, la documentazione riflette lo stato reale, la parità mobile è dimostrata o il `N/A` è motivato, e non restano placeholder, TODO senza owner o affermazioni non verificate. Le attività temporali o umane restano aperte finché non vengono realmente eseguite e firmate.
+",M5.1 — Chiusura Beta e Pilot reale,"M5.1, EP13, Should, Product, UX, Backend, Frontend, Mobile, Infrastructure",,,12

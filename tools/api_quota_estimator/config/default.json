@@ -1,0 +1,188 @@
+{
+  "meta": {
+    "card": "EP00-04",
+    "version": "1.0.0",
+    "provider": "api-football-v3",
+    "notes": "Assunzioni operative modificabili. Il consumo sportivo e centrale (SPD): fantasy_users non scala le richieste."
+  },
+  "leagues": {
+    "count": 5,
+    "ids": [39, 140, 135, 78, 61],
+    "names": ["Premier League", "La Liga", "Serie A", "Bundesliga", "Ligue 1"]
+  },
+  "fantasy_users": 10000,
+  "calendar": {
+    "days_per_month": 30,
+    "month_mix": {
+      "empty": 8,
+      "average": 14,
+      "peak": 8
+    }
+  },
+  "catalog_daily": {
+    "description": "Sync anagrafiche e contesto non legato al ciclo singola partita",
+    "endpoints": [
+      {"endpoint": "/leagues", "scope": "global", "calls": 1, "criticality": "high"},
+      {"endpoint": "/teams", "scope": "per_league", "calls": 1, "criticality": "high"},
+      {"endpoint": "/injuries", "scope": "per_league", "calls": 1, "criticality": "medium"},
+      {"endpoint": "/transfers", "scope": "per_league", "calls": 1, "criticality": "medium"},
+      {"endpoint": "/standings", "scope": "per_league", "calls": 1, "criticality": "low"},
+      {"endpoint": "/players/squads", "scope": "global", "calls": 14, "criticality": "medium", "note": "ammortamento refresh settimanale rose"},
+      {"endpoint": "/players", "scope": "global", "calls": 20, "criticality": "medium", "note": "ammortamento refresh listone/stats stagione"},
+      {"endpoint": "/status", "scope": "global", "calls": 4, "criticality": "low", "note": "health + lettura header quota"}
+    ]
+  },
+  "windows": {
+    "pre_match": {
+      "description": "T-6h -> kickoff: schedule, lineup, predizioni",
+      "duration_minutes": 360,
+      "endpoints": [
+        {"endpoint": "/fixtures", "scope": "per_league", "interval_seconds": 900, "criticality": "high", "note": "batch per league+date"},
+        {"endpoint": "/fixtures/lineups", "scope": "per_match", "fixed_polls": 3, "criticality": "high", "note": "T-60 / T-30 / T-10 circa"},
+        {"endpoint": "/predictions", "scope": "per_match", "fixed_polls": 1, "criticality": "low", "note": "segnale IA, droppabile in degradazione"}
+      ]
+    },
+    "live": {
+      "description": "Kickoff -> FT (+ buffer recupero)",
+      "duration_minutes": 110,
+      "endpoints": [
+        {"endpoint": "/fixtures", "scope": "global", "interval_seconds": 60, "criticality": "high", "note": "fixtures?live=all filtrato ai 5 campionati"},
+        {"endpoint": "/fixtures/events", "scope": "per_match", "interval_seconds": 60, "criticality": "critical", "note": "bonus/malus live; un fixture_id per call"}
+      ]
+    },
+    "post_match": {
+      "description": "FT -> +2h: chiusura stats e timeline",
+      "duration_minutes": 120,
+      "endpoints": [
+        {"endpoint": "/fixtures", "scope": "per_league", "interval_seconds": 600, "criticality": "high"},
+        {"endpoint": "/fixtures/events", "scope": "per_match", "interval_seconds": 600, "criticality": "critical"},
+        {"endpoint": "/fixtures/players", "scope": "per_match", "interval_seconds": 900, "criticality": "critical", "note": "Rating Beta + minuti"},
+        {"endpoint": "/fixtures/lineups", "scope": "per_match", "fixed_polls": 1, "criticality": "medium", "note": "catch-up lineup tardiva"}
+      ]
+    },
+    "late_corrections": {
+      "description": "Fino a +72h: VAR / correzioni provider (R-06)",
+      "duration_minutes": 4320,
+      "endpoints": [
+        {"endpoint": "/fixtures/events", "scope": "per_match", "fixed_polls": 3, "criticality": "high", "note": "re-fetch sparso 2h / 24h / 72h"},
+        {"endpoint": "/fixtures/players", "scope": "per_match", "fixed_polls": 3, "criticality": "high"},
+        {"endpoint": "/fixtures", "scope": "per_match", "fixed_polls": 2, "criticality": "medium"}
+      ]
+    }
+  },
+  "scenarios": {
+    "empty": {
+      "description": "Giorno senza partite nei 5 campionati",
+      "matches_pre": 0,
+      "matches_live": 0,
+      "matches_post": 0,
+      "matches_late": 0,
+      "leagues_active": 0,
+      "max_concurrent_live": 0
+    },
+    "average": {
+      "description": "Giornata media (mix midweek / sabato leggero)",
+      "matches_pre": 8,
+      "matches_live": 8,
+      "matches_post": 8,
+      "matches_late": 6,
+      "leagues_active": 3,
+      "max_concurrent_live": 4
+    },
+    "peak": {
+      "description": "Picco weekend: tutti e 5 i campionati",
+      "matches_pre": 45,
+      "matches_live": 45,
+      "matches_post": 45,
+      "matches_late": 30,
+      "leagues_active": 5,
+      "max_concurrent_live": 20
+    }
+  },
+  "degraded_multipliers": {
+    "description": "Applicati allo scenario di riferimento (peak) quando quota quasi esaurita",
+    "interval_factor": 2.5,
+    "fixed_polls_factor": 0.5,
+    "catalog_factor": 0.4,
+    "drop_criticalities": ["low"]
+  },
+  "resilience": {
+    "cache_ttl_seconds": {
+      "/leagues": 86400,
+      "/teams": 43200,
+      "/players": 21600,
+      "/players/squads": 43200,
+      "/fixtures": 30,
+      "/fixtures/events": 20,
+      "/fixtures/lineups": 300,
+      "/fixtures/players": 120,
+      "/injuries": 1800,
+      "/transfers": 3600,
+      "/standings": 3600,
+      "/predictions": 3600
+    },
+    "batching": {
+      "fixtures_live_all": true,
+      "fixtures_by_league_date": true,
+      "events_multi_fixture": false,
+      "note": "events/lineups/players restano per fixture_id"
+    },
+    "jitter": {
+      "enabled": true,
+      "max_fraction_of_interval": 0.15,
+      "note": "spreading solo; non cambia il valore atteso delle richieste"
+    },
+    "retry": {
+      "max_attempts": 3,
+      "backoff_base_seconds": 1,
+      "backoff_multiplier": 2,
+      "retry_on_statuses": [408, 429, 500, 502, 503, 504],
+      "expected_amplification": 1.03,
+      "note": "fattore medio su errori transienti; applicato al totale giornaliero"
+    },
+    "rate_limit_budget": {
+      "target_utilization_of_plan_rpm": 0.7,
+      "note": "non superare il 70% del RPM del piano in regime normale"
+    },
+    "circuit_breaker": {
+      "failure_threshold": 5,
+      "open_seconds": 60,
+      "half_open_probes": 1,
+      "note": "su errori consecutivi o 429 persistenti: stop chiamate non critical"
+    },
+    "quota_exhaustion_policy": {
+      "warn_remaining_fraction": 0.25,
+      "degrade_remaining_fraction": 0.15,
+      "critical_only_remaining_fraction": 0.05,
+      "actions": {
+        "warn": [
+          "Alert ops",
+          "Log remaining da header x-ratelimit-requests-remaining",
+          "Sospendere refresh low-criticality (standings, predictions opzionali)"
+        ],
+        "degrade": [
+          "Allungare interval live (vedi degraded_multipliers)",
+          "Drop endpoint criticality=low",
+          "Servire ultimo snapshot valido con fetched_at (ADR-0001)",
+          "Non cancellare entita gia acquisite"
+        ],
+        "critical_only": [
+          "Solo fixtures status batch + events/players per partite live o post FT incomplete",
+          "Aprire circuit breaker su catalog e AI signals",
+          "Freeze omologazione se stats incomplete; stato Provvisorio"
+        ]
+      }
+    }
+  },
+  "plans": [
+    {"name": "Free", "daily_requests": 100, "requests_per_minute": 10},
+    {"name": "Pro", "daily_requests": 7500, "requests_per_minute": 300},
+    {"name": "Ultra", "daily_requests": 75000, "requests_per_minute": 450},
+    {"name": "Mega", "daily_requests": 150000, "requests_per_minute": 900}
+  ],
+  "recommendation": {
+    "operational_margin": 0.3,
+    "sizing_scenario": "peak",
+    "note": "quota_min = ceil(peak_daily * (1 + margin)); scegliere il piano piu basso che la copre e rispetta RPM budget"
+  }
+}

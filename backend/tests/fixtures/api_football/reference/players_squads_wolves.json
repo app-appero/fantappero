@@ -1,0 +1,19 @@
+{
+  "errors": [],
+  "get": "players/squads",
+  "parameters": {"team": "39"},
+  "paging": {"current": 1, "total": 1},
+  "results": 1,
+  "response": [
+    {
+      "team": {"id": 39, "name": "Wolves"},
+      "players": [
+        {"id": 2674, "name": "Rui Patrício", "age": 36, "number": 11, "position": "Goalkeeper"},
+        {"id": 18741, "name": "C. Coady", "age": 30, "number": 16, "position": "Defender"},
+        {"id": 2676, "name": "Rúben Neves", "age": 27, "number": 8, "position": "Midfielder"},
+        {"id": 2887, "name": "R. Jiménez", "age": 32, "number": 9, "position": "Attacker"},
+        {"id": 18753, "name": "Adama Traoré", "age": 28, "number": 37, "position": "Attacker"}
+      ]
+    }
+  ]
+}

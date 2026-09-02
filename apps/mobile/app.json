@@ -1,0 +1,34 @@
+{
+  "expo": {
+    "name": "FantAppero",
+    "slug": "fantappero",
+    "version": "0.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "dark",
+    "newArchEnabled": true,
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.fantappero.mobile",
+      "infoPlist": {
+        "NSPhotoLibraryUsageDescription": "Consenti l'accesso alle foto per impostare l'avatar del profilo."
+      }
+    },
+    "android": {
+      "package": "com.fantappero.mobile",
+      "adaptiveIcon": {
+        "backgroundColor": "#0f1419"
+      }
+    },
+    "web": {
+      "bundler": "metro"
+    },
+    "plugins": [
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Consenti l'accesso alle foto per impostare l'avatar del profilo."
+        }
+      ]
+    ]
+  }
+}

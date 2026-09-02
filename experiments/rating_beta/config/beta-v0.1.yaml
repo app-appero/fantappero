@@ -1,0 +1,158 @@
+# FantApperò Rating Beta — formula sperimentale (EP00-05)
+# Versione: beta-v0.1
+# Scope: solo voto statistico. Gol/assist restano fuori (bonus FR-SCO-02).
+# Provider rating (games.rating) non entra in formula: solo diagnostica.
+
+version: beta-v0.1
+card: EP00-05
+
+base: 6.0
+clamp_min: 3.0
+clamp_max: 10.0
+display_step: 0.5
+
+minutes_threshold: 15
+goalkeeper_starter_always_eligible: true
+
+# Eventi che sbloccano il voto sotto soglia minuti (Master §8.2).
+# "decisive_error" non ha campo affidabile nel corpus → non usato in v0.1.
+relevant_event_flags:
+  - goal
+  - assist
+  - penalty_missed
+  - own_goal
+  - red_card
+
+# Campi esplicitamente esclusi dal voto statistico (anti doppio premio).
+excluded_stat_paths:
+  - goals.total
+  - goals.assists
+
+# Mapping posizione provider → ruolo FantApperò.
+position_map:
+  G: P
+  D: D
+  M: C
+  F: A
+
+# Componenti per ruolo. contribution = clamp(coeff * value, -max_abs, +max_abs)
+# transform:
+#   raw      — usa il valore numerico
+#   rate     — value / denom_path (se denom>0)
+#   accuracy — gestisce passes.accuracy come conteggio o percentuale
+roles:
+  P:
+    components:
+      - id: saves
+        path: goals.saves
+        coeff: 0.18
+        max_abs: 1.8
+        transform: raw
+      - id: pass_volume
+        path: passes.total
+        coeff: 0.008
+        max_abs: 0.6
+        transform: raw
+      - id: fouls_committed
+        path: fouls.committed
+        coeff: -0.12
+        max_abs: 0.6
+        transform: raw
+  D:
+    components:
+      - id: tackles
+        path: tackles.total
+        coeff: 0.12
+        max_abs: 1.2
+        transform: raw
+      - id: interceptions
+        path: tackles.interceptions
+        coeff: 0.10
+        max_abs: 1.0
+        transform: raw
+      - id: blocks
+        path: tackles.blocks
+        coeff: 0.10
+        max_abs: 0.8
+        transform: raw
+      - id: duels_won
+        path: duels.won
+        coeff: 0.06
+        max_abs: 1.0
+        transform: raw
+      - id: pass_accuracy
+        path: passes.accuracy
+        denom_path: passes.total
+        coeff: 0.8
+        max_abs: 0.8
+        transform: accuracy
+      - id: fouls_committed
+        path: fouls.committed
+        coeff: -0.10
+        max_abs: 0.8
+        transform: raw
+  C:
+    components:
+      - id: key_passes
+        path: passes.key
+        coeff: 0.18
+        max_abs: 1.2
+        transform: raw
+      - id: pass_accuracy
+        path: passes.accuracy
+        denom_path: passes.total
+        coeff: 0.9
+        max_abs: 0.9
+        transform: accuracy
+      - id: tackles
+        path: tackles.total
+        coeff: 0.08
+        max_abs: 0.8
+        transform: raw
+      - id: dribbles_success
+        path: dribbles.success
+        coeff: 0.12
+        max_abs: 1.0
+        transform: raw
+      - id: shots_on
+        path: shots.on
+        coeff: 0.15
+        max_abs: 0.9
+        transform: raw
+      - id: fouls_committed
+        path: fouls.committed
+        coeff: -0.10
+        max_abs: 0.8
+        transform: raw
+  A:
+    components:
+      - id: shots_on
+        path: shots.on
+        coeff: 0.25
+        max_abs: 1.5
+        transform: raw
+      - id: shots_total
+        path: shots.total
+        coeff: 0.08
+        max_abs: 0.8
+        transform: raw
+      - id: key_passes
+        path: passes.key
+        coeff: 0.15
+        max_abs: 1.0
+        transform: raw
+      - id: dribbles_success
+        path: dribbles.success
+        coeff: 0.14
+        max_abs: 1.2
+        transform: raw
+      - id: duels_won
+        path: duels.won
+        coeff: 0.05
+        max_abs: 0.8
+        transform: raw
+      - id: fouls_committed
+        path: fouls.committed
+        coeff: -0.10
+        max_abs: 0.8
+        transform: raw

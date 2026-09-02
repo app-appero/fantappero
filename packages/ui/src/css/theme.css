@@ -1,0 +1,187 @@
+@import "./tokens.css";
+@import "./components.css";
+@import "./layout.css";
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  color-scheme: dark;
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  min-height: 100%;
+}
+
+body {
+  background-color: var(--fa-color-background);
+  color: var(--fa-color-foreground);
+  font-family: var(--fa-font-sans);
+  font-size: var(--fa-text-md);
+  line-height: var(--fa-leading-normal);
+  -webkit-font-smoothing: antialiased;
+  overflow-x: clip;
+}
+
+body[data-surface="auth"] {
+  min-height: 100vh;
+}
+
+.fa-page {
+  min-height: 100vh;
+  padding: var(--fa-space-xl);
+  background: radial-gradient(
+    circle at top left,
+    var(--fa-color-background-gradient-stop),
+    var(--fa-color-background)
+  );
+}
+
+/* Pitch-inspired surface — geometric field lines, token-driven (EPUI-04). */
+.fa-surface-pitch {
+  position: relative;
+  isolation: isolate;
+  background-color: var(--fa-color-background);
+  background-image: radial-gradient(
+    ellipse 100% 70% at 50% -10%,
+    color-mix(in srgb, var(--fa-color-accent) 14%, var(--fa-color-background-gradient-stop)),
+    var(--fa-color-background) 65%
+  );
+}
+
+.fa-surface-pitch::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0.07;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 800 520' fill='none'%3E%3Crect x='40' y='40' width='720' height='440' rx='8' stroke='%23f4f1ea' stroke-width='2'/%3E%3Cline x1='400' y1='40' x2='400' y2='480' stroke='%23f4f1ea' stroke-width='1.5'/%3E%3Ccircle cx='400' cy='260' r='72' stroke='%23f4f1ea' stroke-width='1.5'/%3E%3Crect x='40' y='150' width='120' height='220' stroke='%23f4f1ea' stroke-width='1.5'/%3E%3Crect x='640' y='150' width='120' height='220' stroke='%23f4f1ea' stroke-width='1.5'/%3E%3Crect x='40' y='210' width='48' height='100' stroke='%23f4f1ea' stroke-width='1.5'/%3E%3Crect x='712' y='210' width='48' height='100' stroke='%23f4f1ea' stroke-width='1.5'/%3E%3Ccircle cx='400' cy='260' r='4' fill='%23f4f1ea'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: center 45%;
+  background-size: min(960px, 130vw) auto;
+}
+
+.fa-surface-pitch > * {
+  position: relative;
+  z-index: 1;
+}
+
+.fa-surface-pitch--subtle::before {
+  opacity: 0.04;
+}
+
+.fa-surface-pitch--subtle {
+  background-image: radial-gradient(
+    ellipse 80% 50% at 50% -5%,
+    color-mix(in srgb, var(--fa-color-accent) 8%, var(--fa-color-background-gradient-stop)),
+    var(--fa-color-background) 60%
+  );
+}
+
+.fa-brand {
+  margin: 0;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--fa-color-foreground-muted);
+  font-size: var(--fa-text-sm);
+}
+
+.fa-title {
+  margin: var(--fa-space-md) 0;
+  font-size: var(--fa-text-2xl);
+  font-weight: 600;
+  line-height: var(--fa-leading-tight);
+}
+
+.fa-lede {
+  margin: 0;
+  max-width: 42rem;
+  color: var(--fa-color-foreground-muted);
+}
+
+.fa-meta-grid {
+  margin-top: var(--fa-space-lg);
+  display: grid;
+  gap: var(--fa-space-sm);
+  font-size: var(--fa-text-md);
+}
+
+.fa-meta-grid dt {
+  color: var(--fa-color-foreground-muted);
+}
+
+.fa-meta-grid dd {
+  margin: 0;
+}
+
+.fa-text-success {
+  color: var(--fa-color-success);
+}
+
+.fa-state-panel {
+  margin-top: var(--fa-space-xl);
+  padding: var(--fa-density-padding, var(--fa-space-md));
+  border: 1px solid var(--fa-color-border);
+  border-radius: var(--fa-radius-lg);
+  background-color: var(--fa-color-background-elevated);
+  box-shadow: var(--fa-shadow-sm);
+}
+
+.fa-state-panel__title {
+  margin: 0 0 var(--fa-space-sm);
+  font-size: var(--fa-text-lg);
+  font-weight: 600;
+}
+
+.fa-state-panel__message {
+  margin: 0;
+  color: var(--fa-color-foreground-muted);
+  font-size: var(--fa-text-sm);
+}
+
+.fa-state-panel--loading .fa-state-panel__title {
+  color: var(--fa-color-foreground-muted);
+}
+
+.fa-state-panel--empty .fa-state-panel__title {
+  color: var(--fa-color-foreground-muted);
+}
+
+.fa-state-panel--error {
+  border-color: var(--fa-danger-600);
+}
+
+.fa-state-panel--error .fa-state-panel__title {
+  color: var(--fa-color-danger);
+}
+
+.fa-state-panel--forbidden .fa-state-panel__title {
+  color: var(--fa-color-warning);
+}
+
+.fa-state-panel--success .fa-state-panel__title {
+  color: var(--fa-color-success);
+}
+
+.fa-state-panel--loading .fa-state-panel__message {
+  font-style: italic;
+}
+
+.fa-state-showcase {
+  margin-top: var(--fa-space-xl);
+  display: grid;
+  gap: var(--fa-density-gap, var(--fa-space-md));
+}
+
+.fa-state-showcase__heading {
+  margin: 0;
+  font-size: var(--fa-text-lg);
+  font-weight: 600;
+}

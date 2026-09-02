@@ -1,0 +1,51 @@
+{
+  "name": "fantappero",
+  "private": true,
+  "version": "0.0.0",
+  "packageManager": "pnpm@9.15.0",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "setup": "pnpm install",
+    "dev:web": "pnpm --filter @fantappero/web dev",
+    "dev:mobile": "pnpm --filter @fantappero/mobile start",
+    "build": "pnpm -r --filter \"./packages/**\" --filter @fantappero/web build",
+    "build:packages": "pnpm -r --filter \"./packages/**\" build",
+    "build:web": "pnpm --filter @fantappero/web build",
+    "test": "pnpm -r --if-present test",
+    "test:web": "pnpm --filter @fantappero/web test",
+    "test:mobile": "pnpm --filter @fantappero/mobile test",
+    "test:packages": "pnpm -r --filter \"./packages/**\" --if-present test",
+    "lint": "pnpm -r --if-present lint",
+    "typecheck": "pnpm -r --if-present typecheck"
+  },
+  "devDependencies": {
+    "typescript": "5.8.3"
+  },
+  "pnpm": {
+    "overrides": {
+      "metro": "0.83.3",
+      "metro-babel-transformer": "0.83.3",
+      "metro-cache": "0.83.3",
+      "metro-cache-key": "0.83.3",
+      "metro-config": "0.83.3",
+      "metro-core": "0.83.3",
+      "metro-file-map": "0.83.3",
+      "metro-minify-terser": "0.83.3",
+      "metro-resolver": "0.83.3",
+      "metro-runtime": "0.83.3",
+      "metro-source-map": "0.83.3",
+      "metro-symbolicate": "0.83.3",
+      "metro-transform-plugins": "0.83.3",
+      "metro-transform-worker": "0.83.3",
+      "postcss": "8.5.23",
+      "nanoid": "3.3.18",
+      "js-yaml@3": "3.15.1",
+      "js-yaml@4": "4.3.1",
+      "brace-expansion@1": "1.1.18",
+      "brace-expansion@2": "2.1.4",
+      "brace-expansion@5": "5.0.9"
+    }
+  }
+}

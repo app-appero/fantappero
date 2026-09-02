@@ -1,0 +1,31 @@
+{
+  "errors": [],
+  "get": "transfers",
+  "parameters": {"player": "2887"},
+  "paging": {"current": 1, "total": 1},
+  "results": 1,
+  "response": [
+    {
+      "player": {"id": 2887, "name": "R. Jiménez"},
+      "update": "2026-01-15T00:00:00+00:00",
+      "transfers": [
+        {
+          "date": "2026-01-10",
+          "type": "Free",
+          "teams": {
+            "in": {"id": 49, "name": "Chelsea"},
+            "out": {"id": 39, "name": "Wolves"}
+          }
+        },
+        {
+          "date": "2023-07-01",
+          "type": "Loan",
+          "teams": {
+            "in": {"id": 48, "name": "West Ham"},
+            "out": {"id": 39, "name": "Wolves"}
+          }
+        }
+      ]
+    }
+  ]
+}
