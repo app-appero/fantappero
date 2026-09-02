@@ -15,6 +15,6 @@ describe("App routing entry", () => {
         }),
       }),
     );
-    expect(html).toContain("Le tue leghe");
+    expect(html).toContain('data-testid="league-home-content"');
   });
 });

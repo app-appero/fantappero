@@ -3,14 +3,8 @@ import type { NavGroupDefinition, NavItemDefinition, Permission } from "@fantapp
 /** Declarative navigation catalog for member app and global admin panel. */
 export const APP_NAV_ITEMS: readonly NavItemDefinition[] = [
   {
-    id: "leagues",
+    id: "league-hub",
     path: "/leghe",
-    requiredPermissions: ["league:view"],
-    surface: "app",
-  },
-  {
-    id: "league-home",
-    path: "/lega/home",
     requiredPermissions: ["league:view"],
     surface: "app",
   },
@@ -39,8 +33,8 @@ export const APP_NAV_ITEMS: readonly NavItemDefinition[] = [
     surface: "app",
   },
   {
-    id: "roster",
-    path: "/rosa",
+    id: "market-hub",
+    path: "/mercato",
     requiredPermissions: ["roster:view"],
     surface: "app",
   },
@@ -48,30 +42,6 @@ export const APP_NAV_ITEMS: readonly NavItemDefinition[] = [
     id: "formation",
     path: "/formazione",
     requiredPermissions: ["roster:view"],
-    surface: "app",
-  },
-  {
-    id: "auction",
-    path: "/asta",
-    requiredPermissions: ["market:view"],
-    surface: "app",
-  },
-  {
-    id: "waiver",
-    path: "/svincoli",
-    requiredPermissions: ["market:view"],
-    surface: "app",
-  },
-  {
-    id: "market",
-    path: "/mercato",
-    requiredPermissions: ["market:view"],
-    surface: "app",
-  },
-  {
-    id: "league-admin",
-    path: "/lega/amministrazione",
-    requiredPermissions: ["league:admin"],
     surface: "app",
   },
   {
@@ -116,35 +86,22 @@ export const ADMIN_NAV_ITEMS: readonly NavItemDefinition[] = [
 ];
 
 /**
- * Gruppo "Lega" (EP13-P01): le tre voci sono correlate ma non equivalenti —
- * "Le mie leghe" sceglie il contesto, "Home lega" mostra la lega attiva,
- * "Amministrazione lega" la modifica. "Turni" resta destinazione primaria
- * indipendente e "Inviti ricevuti" resta fuori perché è account-level.
+ * "Lega" e "Mercato" (movimento giocatori) sono pagine a tab interne — le
+ * destinazioni correlate (Le mie leghe/Home lega/Amministrazione,
+ * Rosa/Asta/Svincolati/Mercato) non hanno più voci di menu separate.
  */
-export const APP_NAV_GROUPS: readonly NavGroupDefinition[] = [
-  {
-    id: "league",
-    itemIds: ["leagues", "league-home", "league-admin"],
-  },
-];
+export const APP_NAV_GROUPS: readonly NavGroupDefinition[] = [];
 
-export const NAV_GROUP_LABELS: Record<string, string> = {
-  league: "Lega",
-};
+export const NAV_GROUP_LABELS: Record<string, string> = {};
 
 export const NAV_LABELS: Record<string, string> = {
-  leagues: "Le mie leghe",
-  "league-home": "Home lega",
+  "league-hub": "Lega",
   "manager-directory": "Fantallenatori",
   "received-invites": "Inviti",
   matchday: "Turni",
   standings: "Classifica",
-  roster: "Rosa",
+  "market-hub": "Mercato",
   formation: "Formazione",
-  auction: "Asta",
-  waiver: "Svincolati",
-  market: "Mercato",
-  "league-admin": "Amministrazione lega",
   profile: "Profilo",
   "admin-home": "Pannello",
   "admin-leagues": "Leghe globali",
@@ -158,8 +115,8 @@ export const NAV_LABELS: Record<string, string> = {
  * ~6rem. La sidebar e i test usano `NAV_LABELS`.
  */
 export const NAV_SHORT_LABELS: Record<string, string> = {
-  leagues: "Leghe",
-  "league-admin": "Admin lega",
+  "league-hub": "Lega",
+  "market-hub": "Mercato",
 };
 
 export type ResolvedNavItem = NavItemDefinition & {

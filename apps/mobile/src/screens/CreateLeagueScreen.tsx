@@ -183,11 +183,11 @@ export function CreateLeagueScreen() {
             </Pressable>
             <Pressable
               accessibilityRole="button"
-              onPress={() => navigation.navigate("MainTabs", { screen: "Leagues" } as never)}
+              onPress={() => navigation.navigate("LeagueHome", { leagueId: createdLeague.id })}
               style={styles.secondaryButton}
               testID="create-league-back-list"
             >
-              <Text style={styles.secondaryButtonLabel}>Torna alle leghe</Text>
+              <Text style={styles.secondaryButtonLabel}>Vai alla home lega</Text>
             </Pressable>
           </View>
         )}

@@ -7,14 +7,8 @@ import type { NavGroupDefinition, NavItemDefinition } from "@fantappero/contract
  */
 export const MOBILE_DRAWER_NAV_ITEMS: readonly NavItemDefinition[] = [
   {
-    id: "leagues",
+    id: "league-hub",
     path: "/leghe",
-    requiredPermissions: ["league:view"],
-    surface: "app",
-  },
-  {
-    id: "league-home",
-    path: "/lega/home",
     requiredPermissions: ["league:view"],
     surface: "app",
   },
@@ -43,8 +37,8 @@ export const MOBILE_DRAWER_NAV_ITEMS: readonly NavItemDefinition[] = [
     surface: "app",
   },
   {
-    id: "roster",
-    path: "/rosa",
+    id: "market-hub",
+    path: "/mercato",
     requiredPermissions: ["roster:view"],
     surface: "app",
   },
@@ -52,30 +46,6 @@ export const MOBILE_DRAWER_NAV_ITEMS: readonly NavItemDefinition[] = [
     id: "formation",
     path: "/formazione",
     requiredPermissions: ["roster:view"],
-    surface: "app",
-  },
-  {
-    id: "auction",
-    path: "/asta",
-    requiredPermissions: ["market:view"],
-    surface: "app",
-  },
-  {
-    id: "waiver",
-    path: "/svincoli",
-    requiredPermissions: ["market:view"],
-    surface: "app",
-  },
-  {
-    id: "market",
-    path: "/mercato",
-    requiredPermissions: ["market:view"],
-    surface: "app",
-  },
-  {
-    id: "league-admin",
-    path: "/lega/amministrazione",
-    requiredPermissions: ["league:admin"],
     surface: "app",
   },
   {
@@ -123,31 +93,22 @@ export const MOBILE_ADMIN_NAV_ITEMS: readonly NavItemDefinition[] = [
   },
 ];
 
-/** Gruppo "Lega" — identico al web `APP_NAV_GROUPS` (EP13-P01). */
-export const MOBILE_NAV_GROUPS: readonly NavGroupDefinition[] = [
-  {
-    id: "league",
-    itemIds: ["leagues", "league-home", "league-admin"],
-  },
-];
+/**
+ * "Lega" e "Mercato" sono ora screen strip a tab interne — le destinazioni
+ * correlate non hanno più voci di drawer separate (EP13-P01, allineato al web).
+ */
+export const MOBILE_NAV_GROUPS: readonly NavGroupDefinition[] = [];
 
-export const NAV_GROUP_LABELS: Record<string, string> = {
-  league: "Lega",
-};
+export const NAV_GROUP_LABELS: Record<string, string> = {};
 
 export const NAV_LABELS: Record<string, string> = {
-  leagues: "Le mie leghe",
-  "league-home": "Home lega",
+  "league-hub": "Lega",
   "manager-directory": "Fantallenatori",
   "received-invites": "Inviti",
   matchday: "Turni",
   standings: "Classifica",
-  roster: "Rosa",
+  "market-hub": "Mercato",
   formation: "Formazione",
-  auction: "Asta",
-  waiver: "Svincolati",
-  market: "Mercato",
-  "league-admin": "Amministrazione lega",
   profile: "Profilo",
   "admin-home": "Pannello",
   "admin-leagues": "Leghe globali",

@@ -3,7 +3,7 @@ import type { WireframeScreenId } from "@fantappero/contracts";
 /** Maps tab/stack route keys to wireframe catalog entries. */
 export const ROUTE_TO_WIREFRAME: Record<string, WireframeScreenId> = {
   Auth: "auth",
-  Leagues: "league-dashboard",
+  LeagueHome: "league-dashboard",
   LeagueAdmin: "league-config",
   Matchday: "matchday",
   Standings: "standings",

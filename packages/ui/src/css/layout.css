@@ -183,7 +183,21 @@
 .fa-app-header__context {
   flex: 1;
   min-width: 12rem;
-  max-width: 20rem;
+  max-width: 34rem;
+}
+
+.fa-app-header__league-context {
+  display: flex;
+  align-items: center;
+  gap: var(--fa-space-md);
+  flex-wrap: wrap;
+}
+
+.fa-app-header__league-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--fa-space-sm);
+  white-space: nowrap;
 }
 
 .fa-app-header__actions {
@@ -467,6 +481,10 @@
 
 .fa-league-selector__accessory {
   margin-top: var(--fa-space-xs);
+  display: flex;
+  align-items: center;
+  gap: var(--fa-space-sm);
+  flex-wrap: wrap;
 }
 
 /* ── Lock countdown ─────────────────────────────────────────────────── */

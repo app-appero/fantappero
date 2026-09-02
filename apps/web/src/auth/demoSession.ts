@@ -6,8 +6,8 @@ import {
 
 /** Demo leagues — replaced by API in EP02-03+. */
 export const DEMO_LEAGUES: readonly LeagueSummary[] = [
-  { id: "lega-demo", name: "Lega Demo", role: "member" },
-  { id: "lega-admin", name: "Lega Amici", role: "league_admin" },
+  { id: "lega-demo", name: "Lega Demo", role: "member", state: "active" },
+  { id: "lega-admin", name: "Lega Amici", role: "league_admin", state: "configuring" },
 ];
 
 export const DEMO_MEMBER: SessionUser = {

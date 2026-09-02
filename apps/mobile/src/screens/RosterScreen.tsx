@@ -11,6 +11,7 @@ import type {
   RosterTurnSnapshotDetail,
   RosterTurnSnapshotSummary,
 } from "@fantappero/contracts";
+import { useNavigation, type NavigationProp } from "@react-navigation/core";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Pressable, Text, View } from "react-native";
 import {
@@ -35,9 +36,12 @@ import {
   previewRosterCsvImportText,
   releaseRosterSlot,
 } from "../api/leagues";
+import { ScreenTabs } from "../components/ScreenTabs";
 import { UiStatePanel } from "../components/UiStatePanel";
 import { useScreenData } from "../hooks/useScreenData";
 import { PageContainer } from "../layout/PageContainer";
+import { MARKET_HUB_TABS } from "../navigation/marketHubTabs";
+import type { AppTabParamList } from "../navigation/types";
 import { getApiErrorMessage, useAuthSession } from "../session/DemoSessionContext";
 import { RosterAdminManualCard } from "./roster/RosterAdminManualCard";
 import { RosterAdminToolsPanel } from "./roster/RosterAdminToolsPanel";
@@ -62,6 +66,7 @@ import { rosterStyles as styles } from "./roster/rosterStyles";
 const SHOW_ROSTER_CSV_IMPORT = false;
 
 export function RosterScreen() {
+  const navigation = useNavigation<NavigationProp<AppTabParamList>>();
   const { can, accessToken, activeLeagueId, activeLeague } = useAuthSession();
   const isAdmin = can(["league:admin"]);
   const canView = can(["roster:view"]);
@@ -693,6 +698,12 @@ export function RosterScreen() {
       refreshing={refreshing}
       onRefresh={onRefresh}
     >
+      <ScreenTabs
+        items={MARKET_HUB_TABS}
+        activeId="Roster"
+        onSelect={(id) => navigation.navigate(id as keyof AppTabParamList)}
+        testID="market-hub-tabs"
+      />
       <Text style={styles.meta}>
         {activeLeague ? `Lega: ${activeLeague.name}` : "Seleziona una lega dal selettore in alto."}
       </Text>

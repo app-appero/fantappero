@@ -51,39 +51,36 @@ function renderRoute(path: string) {
   );
 }
 
-describe("EP03-UX-01 leagues page", () => {
-  it("renders enter and join CTAs for members", () => {
+describe("EP03-UX-01 leghe: selettore e azioni sempre in header", () => {
+  it("shows create and join league actions in the header for members", () => {
     const html = renderRoute("/leghe?persona=member");
-    expect(html).toContain("Entra in lega");
-    expect(html).toContain('data-testid="leagues-join-link"');
+    expect(html).toContain('data-testid="header-create-league-link"');
+    expect(html).toContain("Crea lega");
+    expect(html).toContain('data-testid="header-join-league-link"');
     expect(html).toContain("Unisciti con codice");
-    expect(html).toContain('data-testid="leagues-create-link"');
     expect(html).not.toContain("Amministrazione lega");
   });
 
-  it("keeps admin secondary link alongside enter CTA", () => {
+  it("shows the active league status next to the selector", () => {
     const html = renderRoute("/leghe?persona=admin");
-    expect(html).toContain("Entra in lega");
+    expect(html).toContain('data-testid="active-league-status"');
+  });
+
+  it("keeps admin secondary link alongside league home content", () => {
+    const html = renderRoute("/leghe?persona=admin");
+    expect(html).toContain('data-testid="league-home-content"');
     expect(html).toContain("Amministrazione lega");
   });
 
-  it("shows delete CTA for admin deletable leagues", () => {
-    const html = renderRoute("/leghe?persona=admin");
-    expect(html).toContain('data-testid="league-delete-demo-league-1"');
-    expect(html).toContain('data-testid="league-delete-demo-league-3"');
-    expect(html).toContain("Elimina lega");
-  });
-
-  it("hides delete CTA for members", () => {
+  it("renders /leghe as the same Home lega content as /lega/home", () => {
     const html = renderRoute("/leghe?persona=member");
-    expect(html).not.toContain('data-testid="league-delete-demo-league-1"');
-    expect(html).not.toContain("Elimina lega");
+    expect(html).toContain('data-testid="league-home-content"');
   });
 
-  it("renders empty state with join CTA", () => {
+  it("renders empty state with header join CTA when there is nothing to select", () => {
     const html = renderRoute("/leghe?persona=member&stato=empty");
-    expect(html).toContain('data-testid="leagues-empty"');
-    expect(html).toContain('data-testid="leagues-join-link"');
+    expect(html).toContain('data-testid="league-home-empty"');
+    expect(html).toContain('data-testid="header-join-league-link"');
   });
 });
 

@@ -306,7 +306,7 @@ button.fa-link-muted,
 .fa-profile-avatar__placeholder {
   width: 4rem;
   height: 4rem;
-  border-radius: var(--fa-radius-full);
+  border-radius: var(--fa-radius-pill);
   object-fit: cover;
 }
 
@@ -315,9 +315,9 @@ button.fa-link-muted,
   align-items: center;
   justify-content: center;
   background-color: var(--fa-color-accent-muted);
-  color: var(--fa-color-accent);
+  color: var(--fa-pitch-900);
   font-size: var(--fa-text-xl);
-  font-weight: var(--fa-font-weight-semibold);
+  font-weight: 600;
 }
 
 .fa-profile-avatar__actions {
@@ -380,28 +380,75 @@ button.fa-link-muted,
   padding: var(--fa-space-md);
   border: 1px solid var(--fa-color-border);
   border-radius: var(--fa-radius-md);
-  background: var(--fa-color-surface);
+  background: var(--fa-color-background-elevated);
+  box-shadow: var(--fa-shadow-sm);
+  transition: border-color var(--fa-duration-fast) var(--fa-easing-standard);
+}
+
+.fa-manager-directory__item:hover {
+  border-color: var(--fa-color-border-strong);
 }
 
 .fa-manager-directory__avatar {
   display: grid;
-  width: 2.5rem;
-  height: 2.5rem;
+  flex-shrink: 0;
+  width: 2.75rem;
+  height: 2.75rem;
   place-items: center;
-  border-radius: var(--fa-radius-full);
+  border-radius: var(--fa-radius-pill);
   background: var(--fa-color-accent-muted);
-  color: var(--fa-color-accent);
-  font-weight: var(--fa-font-weight-semibold);
+  color: var(--fa-pitch-900);
+  font-weight: 600;
+  font-size: var(--fa-text-md);
+  object-fit: cover;
 }
 
 .fa-manager-directory__identity {
-  display: grid;
+  display: flex;
+  flex-direction: column;
   flex: 1;
+  min-width: 0;
+  gap: 2px;
+  color: inherit;
+  text-decoration: none;
+  border-radius: var(--fa-radius-sm);
 }
 
-.fa-manager-directory__identity small,
+.fa-manager-directory__identity:focus {
+  outline: none;
+}
+
+.fa-manager-directory__identity:focus-visible {
+  box-shadow: var(--fa-shadow-focus);
+}
+
+.fa-manager-directory__name {
+  font-weight: 600;
+  color: var(--fa-color-foreground);
+  transition: color var(--fa-duration-fast) var(--fa-easing-standard);
+}
+
+.fa-manager-directory__identity:hover .fa-manager-directory__name {
+  color: var(--fa-color-accent);
+}
+
+.fa-manager-directory__badges {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--fa-space-xs);
+  margin-top: 2px;
+}
+
+.fa-manager-directory__meta,
+.fa-manager-directory__history,
 .fa-manager-directory__status {
-  color: var(--fa-color-text-muted);
+  font-size: var(--fa-text-sm);
+  color: var(--fa-color-foreground-muted);
+}
+
+.fa-manager-directory__history {
+  margin-top: 2px;
 }
 
 .fa-manager-directory__pagination {
@@ -411,13 +458,76 @@ button.fa-link-muted,
   gap: var(--fa-space-md);
 }
 
+.fa-coach-profile {
+  display: grid;
+  gap: var(--fa-space-md);
+  max-width: 40rem;
+}
+
+.fa-coach-profile__header {
+  display: flex;
+  align-items: center;
+  gap: var(--fa-space-md);
+}
+
+.fa-coach-profile__avatar {
+  display: grid;
+  flex-shrink: 0;
+  width: 3.5rem;
+  height: 3.5rem;
+  place-items: center;
+  border-radius: var(--fa-radius-pill);
+  background: var(--fa-color-accent-muted);
+  color: var(--fa-pitch-900);
+  font-weight: 600;
+  font-size: var(--fa-text-lg);
+  object-fit: cover;
+}
+
+.fa-coach-profile__title {
+  margin: 0 0 var(--fa-space-xs);
+  font-size: var(--fa-text-xl);
+  font-weight: 600;
+}
+
+.fa-coach-profile__meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--fa-space-sm);
+  color: var(--fa-color-foreground-muted);
+  font-size: var(--fa-text-sm);
+}
+
+.fa-coach-profile__summary {
+  margin: 0;
+  font-size: var(--fa-text-md);
+  font-weight: 500;
+  color: var(--fa-color-foreground);
+}
+
+.fa-coach-profile__empty {
+  margin: 0;
+  color: var(--fa-color-foreground-muted);
+}
+
+.fa-coach-profile__hint {
+  margin: 0;
+  font-size: var(--fa-text-xs);
+  color: var(--fa-color-foreground-subtle);
+}
+
+.fa-coach-profile > .fa-btn {
+  justify-self: start;
+}
+
 .fa-received-invites__item {
   justify-content: space-between;
 }
 
 .fa-received-invites__item p {
   margin: var(--fa-space-xs) 0 0;
-  color: var(--fa-color-text-muted);
+  color: var(--fa-color-foreground-muted);
 }
 
 .fa-auction-page {

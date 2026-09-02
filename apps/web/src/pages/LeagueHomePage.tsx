@@ -2,7 +2,6 @@ import type {
   LeagueCalendar,
   LeagueDetail,
   LeagueMember,
-  LeagueState,
 } from "@fantappero/contracts";
 import {
   Breadcrumb,
@@ -20,18 +19,10 @@ import {
   fetchLeagueMembersPublic,
 } from "../api/leagues";
 import { getApiErrorMessage, useAuth } from "../auth/AuthContext";
+import { leagueStateLabel } from "../leagues/leagueLabels";
 import { loadStoredSession } from "../auth/sessionStorage";
 import { Link, useLocation } from "../router/simpleRouter";
 import { parseWireframeStateFromSearch } from "../wireframes/useWireframeState";
-
-const STATE_LABELS: Record<LeagueState, string> = {
-  draft: "Bozza",
-  configuring: "Configurazione",
-  auction: "Asta",
-  active: "Attiva",
-  concluded: "Conclusa",
-  archived: "Archiviata",
-};
 
 const DEMO_LEAGUE: LeagueDetail = {
   id: "lega-demo",
@@ -245,19 +236,12 @@ export function LeagueHomePage() {
       ) : null}
 
       {!loading && !loadError && !league ? (
-        <>
-          <UiStatePanel
-            state="empty"
-            title="Nessuna lega selezionata"
-            message="Seleziona una lega dall'elenco oppure entra con un invito."
-            testId="league-home-empty"
-          />
-          <p>
-            <Link to="/leghe" data-testid="league-home-empty-cta">
-              Vai a Le mie leghe
-            </Link>
-          </p>
-        </>
+        <UiStatePanel
+          state="empty"
+          title="Nessuna lega selezionata"
+          message="Scegli una lega dal selettore in alto, creane una o unisciti con un codice invito."
+          testId="league-home-empty"
+        />
       ) : null}
 
       {!loading && !loadError && league ? (
@@ -265,7 +249,7 @@ export function LeagueHomePage() {
           <section aria-labelledby="league-home-context-title">
             <h2 id="league-home-context-title">Contesto</h2>
             <p>
-              Stato: <strong>{STATE_LABELS[league.state]}</strong>
+              Stato: <strong>{leagueStateLabel(league.state)}</strong>
             </p>
             <p>
               Ruolo:{" "}

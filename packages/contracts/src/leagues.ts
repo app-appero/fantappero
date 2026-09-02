@@ -129,6 +129,8 @@ export interface LeagueMember {
 export interface LeagueStanding {
   fantasyTeamId: string;
   teamName: string;
+  /** Fantallenatore proprietario della squadra; già esposto da /leagues/{id}/membri. */
+  managerUserId: string;
   position: number;
   played: number;
   won: number;

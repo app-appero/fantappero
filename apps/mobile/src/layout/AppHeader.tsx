@@ -14,8 +14,11 @@ export type AppHeaderProps = {
   leagues?: readonly { value: string; label: string }[];
   activeLeagueId?: string | null;
   onLeagueChange?: (leagueId: string) => void;
-  /** Rendered next to the league selector's label, e.g. a lock countdown. */
+  /** Rendered next to the league selector's label, e.g. lo stato lega + un lock countdown. */
   leagueSelectorAccessory?: ReactNode;
+  /** Crea lega / Unisciti con codice — sempre visibili in header (EP13-P01). */
+  onCreateLeaguePress?: () => void;
+  onJoinLeaguePress?: () => void;
   onBrandPress?: () => void;
   onBackToAppPress?: () => void;
   /** Apre il drawer laterale (solo surface app). */
@@ -33,6 +36,8 @@ export function AppHeader({
   activeLeagueId,
   onLeagueChange,
   leagueSelectorAccessory,
+  onCreateLeaguePress,
+  onJoinLeaguePress,
   onBrandPress,
   onBackToAppPress,
   onMenuPress,
@@ -112,14 +117,44 @@ export function AppHeader({
           ) : null}
         </View>
       </View>
-      {showLeagueSelector && activeLeagueId && onLeagueChange ? (
-        <LeagueSelector
-          label="Lega attiva"
-          leagues={leagues}
-          value={activeLeagueId}
-          onChange={onLeagueChange}
-          accessory={leagueSelectorAccessory}
-        />
+      {!isAdmin && (showLeagueSelector || onCreateLeaguePress || onJoinLeaguePress) ? (
+        <View style={styles.leagueRow}>
+          {showLeagueSelector && activeLeagueId && onLeagueChange && leagues.length > 0 ? (
+            <LeagueSelector
+              label="Lega attiva"
+              leagues={leagues}
+              value={activeLeagueId}
+              onChange={onLeagueChange}
+              accessory={leagueSelectorAccessory}
+            />
+          ) : null}
+          {onCreateLeaguePress || onJoinLeaguePress ? (
+            <View style={styles.leagueActions}>
+              {onCreateLeaguePress ? (
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Crea lega"
+                  onPress={onCreateLeaguePress}
+                  style={styles.linkButton}
+                  testID="header-create-league-link"
+                >
+                  <Text style={styles.linkText}>Crea lega</Text>
+                </Pressable>
+              ) : null}
+              {onJoinLeaguePress ? (
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Unisciti con codice"
+                  onPress={onJoinLeaguePress}
+                  style={styles.linkButton}
+                  testID="header-join-league-link"
+                >
+                  <Text style={styles.linkText}>Unisciti con codice</Text>
+                </Pressable>
+              ) : null}
+            </View>
+          ) : null}
+        </View>
       ) : null}
     </View>
   );
@@ -198,5 +233,17 @@ const styles = StyleSheet.create({
   userChipText: {
     color: colors.foreground,
     fontSize: typography.fontSize.xs,
+  },
+  leagueRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    alignItems: "flex-start",
+    gap: spacing.md,
+  },
+  leagueActions: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: spacing.sm,
+    marginTop: spacing.xs,
   },
 });

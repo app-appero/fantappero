@@ -21,6 +21,8 @@ export type StandingsRow = {
   fantasyPointsAgainst?: string;
   isCurrentUser?: boolean;
   highlightLabel?: string;
+  /** Fantallenatore proprietario della squadra; abilita il click sul nome. */
+  managerUserId?: string;
 };
 
 export type StandingsTableProps = {
@@ -34,6 +36,12 @@ export type StandingsTableProps = {
   fantasyPointsLabel?: string;
   rows: StandingsRow[];
   testId?: string;
+  /**
+   * Se presente, il nome squadra diventa cliccabile per le righe con
+   * `managerUserId` — l'app decide dove portare (es. profilo fantallenatore),
+   * questo componente resta senza dipendenze di routing.
+   */
+  onManagerClick?: (row: StandingsRow) => void;
 };
 
 /** Presentational standings table for wireframes and future classifica views. */
@@ -47,6 +55,7 @@ export function StandingsTable({
   fantasyPointsLabel,
   rows,
   testId = "standings-table",
+  onManagerClick,
 }: StandingsTableProps) {
   return (
     <Table compact data-testid={testId}>
@@ -72,7 +81,18 @@ export function StandingsTable({
           >
             <TableCell>{row.position}</TableCell>
             <TableCell>
-              {row.teamName}
+              {onManagerClick && row.managerUserId ? (
+                <button
+                  type="button"
+                  className="fa-standings-row__manager-link"
+                  onClick={() => onManagerClick(row)}
+                  aria-label={`Apri il profilo del fantallenatore di ${row.teamName}`}
+                >
+                  {row.teamName}
+                </button>
+              ) : (
+                row.teamName
+              )}
               {row.highlightLabel ? (
                 <Badge variant="accent" className="fa-standings-row__badge">
                   {row.highlightLabel}

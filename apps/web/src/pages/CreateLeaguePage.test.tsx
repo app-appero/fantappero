@@ -76,10 +76,9 @@ function renderLeagues(path = "/leghe?persona=admin") {
 describe("EP03-01 leagues page", () => {
   it("renders create and join league actions in demo mode", () => {
     const html = renderLeagues();
-    expect(html).toContain('data-testid="leagues-create-link"');
+    expect(html).toContain('data-testid="header-create-league-link"');
     expect(html).toContain("Crea lega");
-    expect(html).toContain('data-testid="leagues-join-link"');
+    expect(html).toContain('data-testid="header-join-league-link"');
     expect(html).toContain("Unisciti con codice");
-    expect(html).toContain("Entra in lega");
   });
 });

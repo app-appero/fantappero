@@ -1,19 +1,29 @@
-import type { FantasyCoachDirectoryItem, FantasyCoachProfile } from "@fantappero/contracts";
-import { formatFantasyPoints } from "@fantappero/contracts";
+import type { FantasyCoachDirectoryItem } from "@fantappero/contracts";
 import { theme } from "@fantappero/ui/theme";
-import { useFocusEffect } from "@react-navigation/native";
+import { useFocusEffect, useNavigation } from "@react-navigation/native";
+import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useCallback, useEffect, useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Image, Pressable, StyleSheet, Text, View } from "react-native";
 import { ApiError } from "../api/client";
-import {
-  createNamedLeagueInvite,
-  fetchCoachProfile,
-  fetchManagerDirectory,
-} from "../api/managerInvites";
+import { createNamedLeagueInvite, fetchManagerDirectory } from "../api/managerInvites";
+import type { RootStackParamList } from "../navigation/types";
 import { getApiErrorMessage, useAuthSession } from "../session/DemoSessionContext";
+import { resolveAvatarUrl } from "../utils/avatar";
 import { UiStatePanel } from "./UiStatePanel";
 
 const { colors, spacing, typography, radius } = theme;
+
+function CoachAvatar({ name, avatarUrl }: { name: string; avatarUrl: string | null }) {
+  const src = resolveAvatarUrl(avatarUrl);
+  if (src) {
+    return <Image source={{ uri: src }} style={styles.avatarImage} />;
+  }
+  return (
+    <View style={styles.avatarPlaceholder}>
+      <Text style={styles.avatarInitial}>{name.charAt(0)}</Text>
+    </View>
+  );
+}
 
 export type CoachDirectoryPanelProps = {
   leagueId: string;
@@ -36,9 +46,8 @@ export function CoachDirectoryPanel({
   onReloadSettled,
 }: CoachDirectoryPanelProps) {
   const { accessToken, can } = useAuthSession();
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const [items, setItems] = useState<FantasyCoachDirectoryItem[]>([]);
-  const [profile, setProfile] = useState<FantasyCoachProfile | null>(null);
-  const [profileError, setProfileError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -102,18 +111,8 @@ export function CoachDirectoryPanel({
     };
   }, [load, onReloadSettled, reloadToken]);
 
-  async function openProfile(coach: FantasyCoachDirectoryItem) {
-    setProfileError(null);
-    if (!accessToken) {
-      setProfileError("Sessione non disponibile. Accedi di nuovo.");
-      return;
-    }
-    try {
-      setProfile(await fetchCoachProfile(accessToken, leagueId, coach.userId));
-    } catch (error) {
-      setProfile(null);
-      setProfileError(getApiErrorMessage(error, "Impossibile caricare il profilo."));
-    }
+  function openProfile(coach: FantasyCoachDirectoryItem) {
+    navigation.navigate("CoachProfile", { userId: coach.userId, leagueId });
   }
 
   async function onInvite(manager: FantasyCoachDirectoryItem) {
@@ -200,51 +199,6 @@ export function CoachDirectoryPanel({
           testID={`${testIDPrefix}-invite-error`}
         />
       ) : null}
-      {profileError ? (
-        <Text style={styles.status} testID={`${testIDPrefix}-profile-error`}>
-          {profileError}
-        </Text>
-      ) : null}
-      {profile ? (
-        <View style={styles.card} testID={`${testIDPrefix}-profile`}>
-          <Text style={styles.name}>{profile.displayName}</Text>
-          <Text style={styles.status}>
-            {profile.userType === "ai" ? "IA" : "Manuale"} ·{" "}
-            {profile.availableForInvites ? "Disponibile" : "Non disponibile"}
-            {profile.memberSince ? ` · iscritto da ${profile.memberSince}` : ""}
-          </Text>
-          <Text style={styles.status} testID={`${testIDPrefix}-profile-summary`}>
-            {profile.historySummary}
-          </Text>
-          {profile.placements.length === 0 ? (
-            <Text style={styles.status} testID={`${testIDPrefix}-profile-empty`}>
-              Nessuna lega conclusa: questo fantallenatore non ha ancora uno storico.
-            </Text>
-          ) : (
-            profile.placements.map((item) => (
-              <Text
-                key={`${item.seasonYear}-${item.position}-${item.participantCount}`}
-                style={styles.status}
-              >
-                {item.seasonYear}: {item.position}º su {item.participantCount} ·{" "}
-                {item.played} partite · {item.points} punti ·{" "}
-                {formatFantasyPoints(item.fantasyPoints)} fantapunti
-              </Text>
-            ))
-          )}
-          <Text style={styles.status}>
-            Lo storico mostra solo leghe concluse. I nomi delle leghe non sono visibili.
-          </Text>
-          <Pressable
-            accessibilityRole="button"
-            onPress={() => setProfile(null)}
-            style={styles.button}
-            testID={`${testIDPrefix}-profile-close`}
-          >
-            <Text style={styles.buttonLabel}>Chiudi</Text>
-          </Pressable>
-        </View>
-      ) : null}
       {items.length === 0 ? (
         <UiStatePanel
           state="empty"
@@ -258,10 +212,11 @@ export function CoachDirectoryPanel({
           const unavailable = !coach.availableForInvites;
           return (
             <View key={coach.userId} style={styles.card}>
+              <CoachAvatar name={coach.displayName} avatarUrl={coach.avatarUrl} />
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel={`Apri il profilo di ${coach.displayName}`}
-                onPress={() => void openProfile(coach)}
+                onPress={() => openProfile(coach)}
                 style={styles.identity}
                 testID={`${testIDPrefix}-open-${coach.userId}`}
               >
@@ -349,5 +304,22 @@ const styles = StyleSheet.create({
   retryLabel: {
     color: colors.accent,
     fontWeight: typography.fontWeight.semibold,
+  },
+  avatarImage: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+  },
+  avatarPlaceholder: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.accentMuted,
+  },
+  avatarInitial: {
+    fontWeight: typography.fontWeight.semibold,
+    color: colors.background,
   },
 });

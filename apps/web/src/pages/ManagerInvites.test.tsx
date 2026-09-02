@@ -42,15 +42,22 @@ function renderRoute(path: string) {
   );
 }
 
+function renderDirectory(props: Parameters<typeof ManagerDirectory>[0]) {
+  return renderToStaticMarkup(
+    createElement(MemoryRouter, {
+      initialEntries: ["/fantallenatori"],
+      children: createElement(ManagerDirectory, props),
+    }),
+  );
+}
+
 describe("directory fantallenatori", () => {
   it("mostra persone, AI e stati di invito nella demo", () => {
-    const html = renderToStaticMarkup(
-      createElement(ManagerDirectory, {
-        leagueId: "demo-league",
-        isDemoMode: true,
-        search: "",
-      }),
-    );
+    const html = renderDirectory({
+      leagueId: "demo-league",
+      isDemoMode: true,
+      search: "",
+    });
     expect(html).toContain('data-testid="manager-directory-list"');
     expect(html).toContain("Lucia Bianchi");
     expect(html).toContain("Manuale");
@@ -60,30 +67,22 @@ describe("directory fantallenatori", () => {
   });
 
   it("mostra lo stato errore e permessi insufficienti", () => {
-    const error = renderToStaticMarkup(
-      createElement(ManagerDirectory, { isDemoMode: true, search: "?directory=error" }),
-    );
-    const forbidden = renderToStaticMarkup(
-      createElement(ManagerDirectory, {
-        isDemoMode: true,
-        search: "?directory=forbidden",
-      }),
-    );
+    const error = renderDirectory({ isDemoMode: true, search: "?directory=error" });
+    const forbidden = renderDirectory({
+      isDemoMode: true,
+      search: "?directory=forbidden",
+    });
     expect(error).toContain('data-testid="manager-directory-error"');
     expect(forbidden).toContain("Non hai i permessi");
   });
 
   it("copre gli stati vuoto e capienza", () => {
-    const empty = renderToStaticMarkup(
-      createElement(ManagerDirectory, { isDemoMode: true, search: "?directory=empty" }),
-    );
-    const capacity = renderToStaticMarkup(
-      createElement(ManagerDirectory, {
-        leagueId: "demo-league",
-        isDemoMode: true,
-        search: "?directory=capacity",
-      }),
-    );
+    const empty = renderDirectory({ isDemoMode: true, search: "?directory=empty" });
+    const capacity = renderDirectory({
+      leagueId: "demo-league",
+      isDemoMode: true,
+      search: "?directory=capacity",
+    });
     expect(empty).toContain('data-testid="manager-directory-empty"');
     expect(capacity).toContain('data-testid="manager-directory-capacity"');
   });

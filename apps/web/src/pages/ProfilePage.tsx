@@ -27,7 +27,7 @@ import {
 import { deleteAccount, exportAccountData } from "../api/privacy";
 import { getApiErrorMessage, useAuth } from "../auth/AuthContext";
 import { loadStoredSession } from "../auth/sessionStorage";
-import { getWebEnv } from "../config/env";
+import { resolveAvatarUrl } from "../utils/avatar";
 
 const DEMO_PROFILE: UserProfile = {
   email: "demo@fantappero.local",
@@ -48,16 +48,6 @@ const DEMO_PROFILE: UserProfile = {
 
 function profileInviteAvailability(profile: UserProfile): boolean {
   return profile.availableForInvites;
-}
-
-function resolveAvatarUrl(avatarUrl: string | null): string | null {
-  if (!avatarUrl) {
-    return null;
-  }
-  if (avatarUrl.startsWith("http://") || avatarUrl.startsWith("https://")) {
-    return avatarUrl;
-  }
-  return `${getWebEnv().viteApiBaseUrl}${avatarUrl}`;
 }
 
 /** Profilo utente — preferenze, avatar e consenso policy (EP02-02). */

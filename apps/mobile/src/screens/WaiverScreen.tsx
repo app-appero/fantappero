@@ -1,4 +1,5 @@
 import type { LeagueListoneEntry } from "@fantappero/contracts";
+import { useNavigation, type NavigationProp } from "@react-navigation/core";
 import { useCallback, useMemo, useState } from "react";
 import { View } from "react-native";
 import { fetchLeagueListone, fetchMyCredits, fetchMyFantasyTeam } from "../api/leagues";
@@ -12,18 +13,22 @@ import {
   withdrawWaiverBid,
 } from "../api/market";
 import { OptionPicker } from "../components/OptionPicker";
+import { ScreenTabs } from "../components/ScreenTabs";
 import { UiStatePanel } from "../components/UiStatePanel";
 import { useScreenData } from "../hooks/useScreenData";
 import { PageContainer } from "../layout/PageContainer";
 import { parseLocalDateTimeInput } from "../market/dateTimeInput";
 import { marketUiStyles as styles } from "../market/marketUiStyles";
 import { useMarketSessionFlow } from "../market/useMarketSessionFlow";
+import { MARKET_HUB_TABS } from "../navigation/marketHubTabs";
+import type { AppTabParamList } from "../navigation/types";
 import { getApiErrorMessage, useAuthSession } from "../session/DemoSessionContext";
 import { AuctionAdminPanel } from "./auction/AuctionAdminPanel";
 import { AuctionBidPanel } from "./auction/AuctionBidPanel";
 
 /** Mercato svincolati: asta a buste chiuse con giocatore da tagliare abbinato all'offerta (EP08-03). */
 export function WaiverScreen() {
+  const navigation = useNavigation<NavigationProp<AppTabParamList>>();
   const { can, accessToken, activeLeagueId } = useAuthSession();
   const canManageSession = can(["market:manage"]);
 
@@ -136,6 +141,12 @@ export function WaiverScreen() {
 
   return (
     <PageContainer title="Svincolati" testID="screen-waiver" refreshing={refreshing} onRefresh={onRefresh}>
+      <ScreenTabs
+        items={MARKET_HUB_TABS}
+        activeId="Waiver"
+        onSelect={(id) => navigation.navigate(id as keyof AppTabParamList)}
+        testID="market-hub-tabs"
+      />
       {loading ? (
         <UiStatePanel
           state="loading"

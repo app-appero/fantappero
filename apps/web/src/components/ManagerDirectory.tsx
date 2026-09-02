@@ -1,10 +1,9 @@
-import { Button, Input, Select, UiStatePanel } from "@fantappero/ui";
+import { Badge, Button, Input, Select, UiStatePanel } from "@fantappero/ui";
 import { useCallback, useEffect, useState } from "react";
-import type { FantasyCoachProfile } from "@fantappero/contracts";
+import type { CoachPlacement, FantasyCoachProfile } from "@fantappero/contracts";
 import { formatFantasyPoints } from "@fantappero/contracts";
 import {
   createNamedLeagueInvite,
-  fetchCoachProfile,
   fetchManagerDirectory,
   type FantasyCoachDirectoryItem,
   type PaginatedFantasyCoachDirectory,
@@ -13,12 +12,19 @@ import {
 import { ApiError } from "../api/client";
 import { getApiErrorMessage } from "../auth/AuthContext";
 import { loadStoredSession } from "../auth/sessionStorage";
+import { Link } from "../router/simpleRouter";
+import { resolveAvatarUrl } from "../utils/avatar";
 
-const DEMO_MANAGERS: FantasyCoachDirectoryItem[] = [
+/** Foto fittizie (pravatar.cc) solo per popolare la demo — nessun dato reale. */
+function demoAvatar(seed: string): string {
+  return `https://i.pravatar.cc/150?u=${seed}`;
+}
+
+export const DEMO_MANAGERS: FantasyCoachDirectoryItem[] = [
   {
     userId: "manager-lucia",
     displayName: "Lucia Bianchi",
-    avatarUrl: null,
+    avatarUrl: demoAvatar("manager-lucia"),
     userType: "human",
     availableForInvites: true,
     namedInviteStatus: null,
@@ -42,7 +48,7 @@ const DEMO_MANAGERS: FantasyCoachDirectoryItem[] = [
   {
     userId: "manager-ai",
     displayName: "Allenatore IA 01",
-    avatarUrl: null,
+    avatarUrl: demoAvatar("manager-ai"),
     userType: "ai",
     availableForInvites: true,
     namedInviteStatus: "pending",
@@ -51,7 +57,148 @@ const DEMO_MANAGERS: FantasyCoachDirectoryItem[] = [
     bestPosition: 4,
     historySummary: "1 lega conclusa · miglior 4º",
   },
+  {
+    userId: "manager-ai-02",
+    displayName: "Allenatore IA 02",
+    avatarUrl: demoAvatar("manager-ai-02"),
+    userType: "ai",
+    availableForInvites: true,
+    namedInviteStatus: null,
+    memberSince: "02/2026",
+    concludedLeagues: 2,
+    bestPosition: 2,
+    historySummary: "2 leghe concluse · miglior 2º",
+  },
+  {
+    userId: "manager-ai-03",
+    displayName: "Allenatore IA 03",
+    avatarUrl: demoAvatar("manager-ai-03"),
+    userType: "ai",
+    availableForInvites: false,
+    namedInviteStatus: null,
+    memberSince: "02/2026",
+    concludedLeagues: 0,
+    bestPosition: null,
+    historySummary: "Nessuna lega conclusa",
+  },
+  {
+    userId: "manager-ai-04",
+    displayName: "Allenatore IA 04",
+    avatarUrl: null,
+    userType: "ai",
+    availableForInvites: true,
+    namedInviteStatus: null,
+    memberSince: "08/2026",
+    concludedLeagues: 0,
+    bestPosition: null,
+    historySummary: "Nessuna lega conclusa",
+  },
+  {
+    userId: "manager-ai-05",
+    displayName: "Allenatore IA 05",
+    avatarUrl: demoAvatar("manager-ai-05"),
+    userType: "ai",
+    availableForInvites: true,
+    namedInviteStatus: null,
+    memberSince: "08/2026",
+    concludedLeagues: 0,
+    bestPosition: null,
+    historySummary: "Nessuna lega conclusa",
+  },
+  {
+    userId: "manager-ai-06",
+    displayName: "Allenatore IA 06",
+    avatarUrl: demoAvatar("manager-ai-06"),
+    userType: "ai",
+    availableForInvites: true,
+    namedInviteStatus: "pending",
+    memberSince: "08/2026",
+    concludedLeagues: 0,
+    bestPosition: null,
+    historySummary: "Nessuna lega conclusa",
+  },
+  {
+    userId: "manager-ai-07",
+    displayName: "Allenatore IA 07",
+    avatarUrl: demoAvatar("manager-ai-07"),
+    userType: "ai",
+    availableForInvites: true,
+    namedInviteStatus: null,
+    memberSince: "01/2026",
+    concludedLeagues: 4,
+    bestPosition: 1,
+    historySummary: "4 leghe concluse · miglior 1º",
+  },
+  {
+    userId: "manager-ai-08",
+    displayName: "Allenatore IA 08",
+    avatarUrl: demoAvatar("manager-ai-08"),
+    userType: "ai",
+    availableForInvites: true,
+    namedInviteStatus: null,
+    memberSince: "08/2026",
+    concludedLeagues: 0,
+    bestPosition: null,
+    historySummary: "Nessuna lega conclusa",
+  },
+  {
+    userId: "manager-ai-09",
+    displayName: "Allenatore IA 09",
+    avatarUrl: demoAvatar("manager-ai-09"),
+    userType: "ai",
+    availableForInvites: false,
+    namedInviteStatus: "accepted",
+    memberSince: "07/2026",
+    concludedLeagues: 1,
+    bestPosition: 3,
+    historySummary: "1 lega conclusa · miglior 3º",
+  },
 ];
+
+/** Piazzamenti fittizi per userId, usati solo dalla vista profilo in modalità demo. */
+export const DEMO_PLACEMENTS: Record<string, CoachPlacement[]> = {
+  "manager-lucia": [
+    { seasonYear: 2026, position: 1, participantCount: 8, played: 14, points: 30, fantasyPoints: 812.5 },
+    { seasonYear: 2025, position: 3, participantCount: 8, played: 14, points: 24, fantasyPoints: 745 },
+    { seasonYear: 2024, position: 5, participantCount: 6, played: 10, points: 15, fantasyPoints: 610 },
+  ],
+  "manager-ai": [
+    { seasonYear: 2026, position: 4, participantCount: 8, played: 14, points: 18, fantasyPoints: 690 },
+  ],
+  "manager-ai-02": [
+    { seasonYear: 2026, position: 2, participantCount: 6, played: 10, points: 21, fantasyPoints: 720 },
+    { seasonYear: 2025, position: 6, participantCount: 8, played: 14, points: 12, fantasyPoints: 580 },
+  ],
+  "manager-ai-07": [
+    { seasonYear: 2026, position: 1, participantCount: 10, played: 18, points: 34, fantasyPoints: 905 },
+    { seasonYear: 2025, position: 2, participantCount: 10, played: 18, points: 30, fantasyPoints: 870 },
+    { seasonYear: 2024, position: 5, participantCount: 8, played: 14, points: 16, fantasyPoints: 650 },
+    { seasonYear: 2023, position: 3, participantCount: 6, played: 10, points: 19, fantasyPoints: 605 },
+  ],
+  "manager-ai-09": [
+    { seasonYear: 2026, position: 3, participantCount: 8, played: 14, points: 19, fantasyPoints: 700 },
+  ],
+};
+
+function CoachAvatar({
+  name,
+  avatarUrl,
+  className,
+}: {
+  name: string;
+  avatarUrl: string | null;
+  className: string;
+}) {
+  const src = resolveAvatarUrl(avatarUrl);
+  if (src) {
+    return <img src={src} alt="" className={className} />;
+  }
+  return (
+    <span className={className} aria-hidden>
+      {name.charAt(0)}
+    </span>
+  );
+}
 
 type ManagerDirectoryProps = {
   leagueId?: string | null;
@@ -80,9 +227,11 @@ function userTypeLabel(userType: UserType): string {
 export function CoachProfilePanel({
   profile,
   onClose,
+  closeLabel = "Chiudi",
 }: {
   profile: FantasyCoachProfile;
   onClose: () => void;
+  closeLabel?: string;
 }) {
   return (
     <section
@@ -90,51 +239,71 @@ export function CoachProfilePanel({
       aria-labelledby="coach-profile-title"
       data-testid="coach-profile"
     >
-      <h3 id="coach-profile-title">{profile.displayName}</h3>
-      <p>
-        {userTypeLabel(profile.userType)} ·{" "}
-        {profile.availableForInvites ? "Disponibile" : "Non disponibile"}
-        {profile.memberSince ? ` · iscritto da ${profile.memberSince}` : ""}
+      <header className="fa-coach-profile__header">
+        <CoachAvatar
+          name={profile.displayName}
+          avatarUrl={profile.avatarUrl}
+          className="fa-coach-profile__avatar"
+        />
+        <div>
+          <h3 id="coach-profile-title" className="fa-coach-profile__title">
+            {profile.displayName}
+          </h3>
+          <div className="fa-coach-profile__meta">
+            <Badge variant={profile.userType === "ai" ? "accent" : "neutral"}>
+              {userTypeLabel(profile.userType)}
+            </Badge>
+            <Badge variant={profile.availableForInvites ? "success" : "neutral"}>
+              {profile.availableForInvites ? "Disponibile" : "Non disponibile"}
+            </Badge>
+            {profile.memberSince ? <span>iscritto da {profile.memberSince}</span> : null}
+          </div>
+        </div>
+      </header>
+
+      <p className="fa-coach-profile__summary" data-testid="coach-profile-summary">
+        {profile.historySummary}
       </p>
-      <p data-testid="coach-profile-summary">{profile.historySummary}</p>
 
       {profile.placements.length === 0 ? (
-        <p data-testid="coach-profile-empty">
+        <p className="fa-coach-profile__empty" data-testid="coach-profile-empty">
           Nessuna lega conclusa: questo fantallenatore non ha ancora uno storico.
         </p>
       ) : (
-        <table data-testid="coach-profile-placements">
-          <caption className="fa-sr-only">Piazzamenti in leghe concluse</caption>
-          <thead>
-            <tr>
-              <th scope="col">Stagione</th>
-              <th scope="col">Posizione</th>
-              <th scope="col">Partite</th>
-              <th scope="col">Punti</th>
-              <th scope="col">Fantapunti</th>
-            </tr>
-          </thead>
-          <tbody>
-            {profile.placements.map((item) => (
-              <tr key={`${item.seasonYear}-${item.position}-${item.participantCount}`}>
-                <td>{item.seasonYear}</td>
-                <td>
-                  {item.position}º su {item.participantCount}
-                </td>
-                <td>{item.played}</td>
-                <td>{item.points}</td>
-                <td>{formatFantasyPoints(item.fantasyPoints)}</td>
+        <div className="fa-table-wrap">
+          <table className="fa-table" data-testid="coach-profile-placements">
+            <caption className="fa-sr-only">Piazzamenti in leghe concluse</caption>
+            <thead>
+              <tr>
+                <th scope="col">Stagione</th>
+                <th scope="col">Posizione</th>
+                <th scope="col">Partite</th>
+                <th scope="col">Punti</th>
+                <th scope="col">Fantapunti</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {profile.placements.map((item) => (
+                <tr key={`${item.seasonYear}-${item.position}-${item.participantCount}`}>
+                  <td>{item.seasonYear}</td>
+                  <td>
+                    {item.position}º su {item.participantCount}
+                  </td>
+                  <td>{item.played}</td>
+                  <td>{item.points}</td>
+                  <td>{formatFantasyPoints(item.fantasyPoints)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
 
-      <p className="fa-manager-directory__hint">
+      <p className="fa-coach-profile__hint">
         Lo storico mostra solo leghe concluse. I nomi delle leghe non sono visibili.
       </p>
       <Button type="button" variant="secondary" onClick={onClose} data-testid="coach-profile-close">
-        Chiudi
+        {closeLabel}
       </Button>
     </section>
   );
@@ -173,8 +342,6 @@ export function ManagerDirectory({
   });
   const [workingId, setWorkingId] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
-  const [profile, setProfile] = useState<FantasyCoachProfile | null>(null);
-  const [profileError, setProfileError] = useState<string | null>(null);
   const [capacityReached, setCapacityReached] = useState(isDemoMode && demoState === "capacity");
 
   useEffect(() => {
@@ -255,39 +422,11 @@ export function ManagerDirectory({
     void load();
   }, [load]);
 
-  async function openProfile(manager: FantasyCoachDirectoryItem) {
-    setProfileError(null);
-    if (isDemoMode || !leagueId) {
-      // In demo il profilo si costruisce dalla riga: nessuna chiamata API.
-      setProfile({
-        userId: manager.userId,
-        displayName: manager.displayName,
-        avatarUrl: manager.avatarUrl,
-        userType: manager.userType,
-        availableForInvites: manager.availableForInvites,
-        namedInviteStatus: manager.namedInviteStatus,
-        memberSince: manager.memberSince,
-        concludedLeagues: manager.concludedLeagues,
-        bestPosition: manager.bestPosition,
-        historySummary: manager.historySummary,
-        placements: [],
-        placementsPage: 1,
-        placementsPageSize: 20,
-        placementsTotal: 0,
-      });
-      return;
-    }
-    const stored = loadStoredSession();
-    if (!stored?.accessToken) {
-      setProfileError("Sessione non disponibile. Accedi di nuovo.");
-      return;
-    }
-    try {
-      setProfile(await fetchCoachProfile(stored.accessToken, leagueId, manager.userId));
-    } catch (error) {
-      setProfile(null);
-      setProfileError(getApiErrorMessage(error, "Impossibile caricare il profilo."));
-    }
+  function profileHref(manager: FantasyCoachDirectoryItem): string {
+    const params = new URLSearchParams(search);
+    if (leagueId) params.set("league", leagueId);
+    const qs = params.toString();
+    return `/fantallenatori/${manager.userId}${qs ? `?${qs}` : ""}`;
   }
 
   async function onInvite(manager: FantasyCoachDirectoryItem) {
@@ -449,14 +588,6 @@ export function ManagerDirectory({
           testId="manager-directory-empty"
         />
       ) : null}
-      {profileError ? (
-        <p role="alert" data-testid="coach-profile-error">
-          {profileError}
-        </p>
-      ) : null}
-      {profile ? (
-        <CoachProfilePanel profile={profile} onClose={() => setProfile(null)} />
-      ) : null}
       {!loading && !error && result && result.items.length > 0 ? (
         <>
           <ul className="fa-manager-directory__list" data-testid="manager-directory-list">
@@ -466,26 +597,36 @@ export function ManagerDirectory({
               const accepted = manager.namedInviteStatus === "accepted";
               return (
                 <li key={manager.userId} className="fa-manager-directory__item">
-                  <span className="fa-manager-directory__avatar" aria-hidden>
-                    {manager.displayName.charAt(0)}
-                  </span>
-                  <button
-                    type="button"
-                    className="fa-manager-directory__identity fa-manager-directory__open"
-                    onClick={() => void openProfile(manager)}
+                  <CoachAvatar
+                    name={manager.displayName}
+                    avatarUrl={manager.avatarUrl}
+                    className="fa-manager-directory__avatar"
+                  />
+                  <Link
+                    to={profileHref(manager)}
+                    className="fa-manager-directory__identity"
                     aria-label={`Apri il profilo di ${manager.displayName}`}
                     data-testid={`manager-open-${manager.userId}`}
                   >
-                    <strong>{manager.displayName}</strong>
-                    <small>
-                      {userTypeLabel(manager.userType)} ·{" "}
-                      {unavailable ? "Non disponibile" : "Disponibile"}
-                      {manager.memberSince ? ` · dal ${manager.memberSince}` : ""}
-                    </small>
-                    <small data-testid={`manager-history-${manager.userId}`}>
+                    <span className="fa-manager-directory__name">{manager.displayName}</span>
+                    <span className="fa-manager-directory__badges">
+                      <Badge variant={manager.userType === "ai" ? "accent" : "neutral"}>
+                        {userTypeLabel(manager.userType)}
+                      </Badge>
+                      <Badge variant={unavailable ? "neutral" : "success"}>
+                        {unavailable ? "Non disponibile" : "Disponibile"}
+                      </Badge>
+                      {manager.memberSince ? (
+                        <span className="fa-manager-directory__meta">dal {manager.memberSince}</span>
+                      ) : null}
+                    </span>
+                    <span
+                      className="fa-manager-directory__history"
+                      data-testid={`manager-history-${manager.userId}`}
+                    >
                       {manager.historySummary}
-                    </small>
-                  </button>
+                    </span>
+                  </Link>
                   {leagueId ? (
                     <Button
                       type="button"

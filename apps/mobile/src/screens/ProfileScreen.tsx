@@ -8,7 +8,6 @@ import { theme } from "@fantappero/ui/theme";
 import * as ImagePicker from "expo-image-picker";
 import { useCallback, useState } from "react";
 import { Image, Pressable, Share, StyleSheet, Switch, Text, TextInput, View } from "react-native";
-import { loadMobileEnv, MobileEnvError } from "../config/env";
 import { deleteAccount, exportAccountData } from "../api/privacy";
 import {
   fetchProfile,
@@ -22,25 +21,9 @@ import { UiStatePanel } from "../components/UiStatePanel";
 import { useScreenData } from "../hooks/useScreenData";
 import { PageContainer } from "../layout/PageContainer";
 import { getApiErrorMessage, useAuthSession } from "../session/DemoSessionContext";
+import { resolveAvatarUrl } from "../utils/avatar";
 
 const { colors, spacing, typography, radius } = theme;
-
-function resolveAvatarUrl(avatarUrl: string | null): string | null {
-  if (!avatarUrl) {
-    return null;
-  }
-  if (avatarUrl.startsWith("http://") || avatarUrl.startsWith("https://")) {
-    return avatarUrl;
-  }
-  try {
-    return `${loadMobileEnv().expoPublicApiBaseUrl}${avatarUrl}`;
-  } catch (error) {
-    if (error instanceof MobileEnvError) {
-      return null;
-    }
-    throw error;
-  }
-}
 
 function parseQuietHour(value: string): number | null | undefined {
   const trimmed = value.trim();

@@ -1,12 +1,15 @@
 import type { LeagueStanding } from "@fantappero/contracts";
 import { formatFantasyPoints } from "@fantappero/contracts";
 import { theme } from "@fantappero/ui/theme";
+import { useNavigation } from "@react-navigation/core";
+import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useCallback, useMemo, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { fetchLeagueStandings, fetchMyFantasyTeam } from "../api/leagues";
 import { UiStatePanel } from "../components/UiStatePanel";
 import { useScreenData } from "../hooks/useScreenData";
 import { PageContainer } from "../layout/PageContainer";
+import type { RootStackParamList } from "../navigation/types";
 import { getApiErrorMessage, useAuthSession } from "../session/DemoSessionContext";
 
 const { colors, spacing, typography, radius } = theme;
@@ -28,7 +31,8 @@ function formatDateTime(value: string | null): string {
 
 /** Classifica lega — porting mobile di StandingsPage (EP07-06 parity). */
 export function StandingsScreen() {
-  const { accessToken, activeLeagueId, activeLeague } = useAuthSession();
+  const { accessToken, activeLeagueId, activeLeague, can } = useAuthSession();
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
 
   const [standings, setStandings] = useState<LeagueStanding[]>([]);
   const [myTeamId, setMyTeamId] = useState<string | null>(null);
@@ -135,7 +139,19 @@ export function StandingsScreen() {
           {computedAt ? (
             <Text style={styles.meta}>Aggiornata: {formatDateTime(computedAt)}</Text>
           ) : null}
-          <StandingsTableBlock standings={standings} myTeamId={myTeamId} />
+          <StandingsTableBlock
+            standings={standings}
+            myTeamId={myTeamId}
+            onManagerPress={
+              can(["league:admin"]) && activeLeagueId
+                ? (managerUserId) =>
+                    navigation.navigate("CoachProfile", {
+                      userId: managerUserId,
+                      leagueId: activeLeagueId,
+                    })
+                : undefined
+            }
+          />
         </View>
       ) : null}
     </PageContainer>
@@ -145,9 +161,11 @@ export function StandingsScreen() {
 function StandingsTableBlock({
   standings,
   myTeamId,
+  onManagerPress,
 }: {
   standings: LeagueStanding[];
   myTeamId: string | null;
+  onManagerPress?: (managerUserId: string) => void;
 }) {
   const rows = useMemo(
     () =>
@@ -176,7 +194,18 @@ function StandingsTableBlock({
         >
           <Text style={[styles.cell, styles.posCell]}>{row.position}</Text>
           <View style={[styles.teamCell, styles.teamCellInner]}>
-            <Text style={styles.teamName}>{row.teamName}</Text>
+            {onManagerPress ? (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={`Apri il profilo del fantallenatore di ${row.teamName}`}
+                onPress={() => onManagerPress(row.managerUserId)}
+                testID={`standings-manager-${row.fantasyTeamId}`}
+              >
+                <Text style={[styles.teamName, styles.teamNameLink]}>{row.teamName}</Text>
+              </Pressable>
+            ) : (
+              <Text style={styles.teamName}>{row.teamName}</Text>
+            )}
             {row.isCurrentUser ? (
               <View style={styles.badge}>
                 <Text style={styles.badgeLabel}>Tu</Text>
@@ -261,6 +290,10 @@ const styles = StyleSheet.create({
     color: colors.foreground,
     fontSize: typography.fontSize.sm,
     flexShrink: 1,
+  },
+  teamNameLink: {
+    color: colors.accent,
+    fontWeight: typography.fontWeight.semibold,
   },
   statCell: {
     width: 32,

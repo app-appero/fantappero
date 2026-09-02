@@ -476,6 +476,9 @@ class LeagueCalendarPlanResponse(ApiModel):
 class LeagueStandingResponse(ApiModel):
     fantasy_team_id: str = Field(alias="fantasyTeamId")
     team_name: str = Field(alias="teamName")
+    # Proprietario della squadra fantasy: già visibile a ogni membro tramite
+    # /leagues/{id}/membri, riusato qui per collegare la riga al fantallenatore.
+    manager_user_id: str = Field(alias="managerUserId")
     position: int
     played: int
     won: int

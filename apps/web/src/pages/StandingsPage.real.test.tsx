@@ -55,6 +55,7 @@ const STANDINGS: LeagueStanding[] = [
   {
     fantasyTeamId: "team-rival",
     teamName: "Rivali FC",
+    managerUserId: "user-rival",
     position: 1,
     played: 2,
     won: 2,
@@ -70,6 +71,7 @@ const STANDINGS: LeagueStanding[] = [
   {
     fantasyTeamId: "team-mine",
     teamName: "La mia squadra",
+    managerUserId: "user-1",
     position: 2,
     played: 2,
     won: 1,

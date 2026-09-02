@@ -7,7 +7,6 @@ import {
   AdminListonePage,
   AdminTurniPage,
   AdminUsersPage,
-  AuctionPage,
   AuthForgotPasswordPage,
   AuthLoginPage,
   AuthRegisterPage,
@@ -15,19 +14,16 @@ import {
   AuthVerifyEmailPage,
   CreateLeaguePage,
   FormationPage,
-  LeagueAdminPage,
-  LeagueHomePage,
+  LeagueHubPage,
   JoinLeaguePage,
-  LeaguesPage,
-  MarketPage,
-  WaiverPage,
+  MarketHubPage,
   MatchdayPage,
   MatchupDetailPage,
   ManagerDirectoryPage,
+  CoachProfilePage,
   NotFoundPage,
   ProfilePage,
   ReceivedInvitesPage,
-  RosterPage,
   StandingsPage,
 } from "./pages/AppPages";
 import { DevShowcasePage } from "./pages/DevShowcasePage";
@@ -76,11 +72,11 @@ export function AppRoutes() {
     return <AuthVerifyEmailPage />;
   }
 
-  if (pathname === "/" || pathname === "/leghe") {
+  if (pathname === "/" || pathname === "/leghe" || pathname === "/lega/home" || pathname === "/lega/amministrazione") {
     return (
       <AppSection>
         <RequirePermissions required={["league:view"]}>
-          <LeaguesPage />
+          <LeagueHubPage />
         </RequirePermissions>
       </AppSection>
     );
@@ -111,6 +107,17 @@ export function AppRoutes() {
       <AppSection>
         <RequirePermissions required={["league:admin"]}>
           <ManagerDirectoryPage />
+        </RequirePermissions>
+      </AppSection>
+    );
+  }
+
+  if (pathname.startsWith("/fantallenatori/")) {
+    const userId = pathname.slice("/fantallenatori/".length);
+    return (
+      <AppSection>
+        <RequirePermissions required={["league:admin"]}>
+          <CoachProfilePage userId={userId} />
         </RequirePermissions>
       </AppSection>
     );
@@ -166,11 +173,16 @@ export function AppRoutes() {
     );
   }
 
-  if (pathname === "/rosa") {
+  if (
+    pathname === "/rosa" ||
+    pathname === "/asta" ||
+    pathname === "/svincoli" ||
+    pathname === "/mercato"
+  ) {
     return (
       <AppSection>
         <RequirePermissions required={["roster:view"]}>
-          <RosterPage />
+          <MarketHubPage />
         </RequirePermissions>
       </AppSection>
     );
@@ -181,56 +193,6 @@ export function AppRoutes() {
       <AppSection>
         <RequirePermissions required={["roster:view"]}>
           <FormationPage />
-        </RequirePermissions>
-      </AppSection>
-    );
-  }
-
-  if (pathname === "/asta") {
-    return (
-      <AppSection>
-        <RequirePermissions required={["market:view"]}>
-          <AuctionPage />
-        </RequirePermissions>
-      </AppSection>
-    );
-  }
-
-  if (pathname === "/svincoli") {
-    return (
-      <AppSection>
-        <RequirePermissions required={["market:view"]}>
-          <WaiverPage />
-        </RequirePermissions>
-      </AppSection>
-    );
-  }
-
-  if (pathname === "/mercato") {
-    return (
-      <AppSection>
-        <RequirePermissions required={["market:view"]}>
-          <MarketPage />
-        </RequirePermissions>
-      </AppSection>
-    );
-  }
-
-  if (pathname === "/lega/home") {
-    return (
-      <AppSection>
-        <RequirePermissions required={["league:view"]}>
-          <LeagueHomePage />
-        </RequirePermissions>
-      </AppSection>
-    );
-  }
-
-  if (pathname === "/lega/amministrazione") {
-    return (
-      <AppSection>
-        <RequirePermissions required={["league:admin"]}>
-          <LeagueAdminPage />
         </RequirePermissions>
       </AppSection>
     );

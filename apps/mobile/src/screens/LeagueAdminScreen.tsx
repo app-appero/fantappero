@@ -31,6 +31,7 @@ import {
   updateLeagueRules,
 } from "../api/leagues";
 import { CoachDirectoryPanel } from "../components/CoachDirectoryPanel";
+import { ScreenTabs } from "../components/ScreenTabs";
 import { UiStatePanel } from "../components/UiStatePanel";
 import { useScreenData } from "../hooks/useScreenData";
 import { PageContainer } from "../layout/PageContainer";
@@ -355,7 +356,7 @@ export function LeagueAdminScreen() {
         // Eliminazione già riuscita.
       }
       setDeleteSuccess("Lega eliminata definitivamente.");
-      navigation.navigate("MainTabs", { screen: "Leagues" } as never);
+      navigation.navigate("LeagueHome");
     } catch (error) {
       setActionError(getApiErrorMessage(error, "Impossibile eliminare la lega."));
     } finally {
@@ -375,6 +376,19 @@ export function LeagueAdminScreen() {
       refreshing={refreshing}
       onRefresh={onRefresh}
     >
+      <ScreenTabs
+        items={[
+          { id: "league-home", label: "Home lega" },
+          { id: "league-admin", label: "Amministrazione lega" },
+        ]}
+        activeId="league-admin"
+        onSelect={(id) => {
+          if (id === "league-home" && leagueId) {
+            navigation.replace("LeagueHome", { leagueId });
+          }
+        }}
+        testID="league-hub-tabs"
+      />
       {loading ? (
         <UiStatePanel
           state="loading"

@@ -9,6 +9,7 @@ import { CreateLeagueScreen } from "../screens/CreateLeagueScreen";
 import { JoinLeagueScreen } from "../screens/JoinLeagueScreen";
 import { LeagueAdminScreen } from "../screens/LeagueAdminScreen";
 import { LeagueHomeScreen } from "../screens/LeagueHomeScreen";
+import { CoachProfileScreen } from "../screens/CoachProfileScreen";
 import { ManagerDirectoryScreen } from "../screens/ManagerDirectoryScreen";
 import { FixtureDetailScreen } from "../screens/FixtureDetailScreen";
 import { MatchupDetailScreen } from "../screens/MatchupDetailScreen";
@@ -115,6 +116,11 @@ export function RootNavigator() {
             name="ManagerDirectory"
             component={ManagerDirectoryScreen}
             options={{ title: "Fantallenatori" }}
+          />
+          <Stack.Screen
+            name="CoachProfile"
+            component={CoachProfileScreen}
+            options={{ title: "Profilo fantallenatore" }}
           />
           <Stack.Screen
             name="MatchupDetail"

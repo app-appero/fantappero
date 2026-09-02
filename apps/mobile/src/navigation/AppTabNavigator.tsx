@@ -12,7 +12,6 @@ import { AppHeader } from "../layout/AppHeader";
 import { useLockCountdown } from "../matchday/useLockCountdown";
 import { AuctionScreen } from "../screens/AuctionScreen";
 import { FormationScreen } from "../screens/FormationScreen";
-import { LeaguesScreen } from "../screens/LeaguesScreen";
 import { MarketScreen } from "../screens/MarketScreen";
 import { MatchdayScreen } from "../screens/MatchdayScreen";
 import { ProfileScreen } from "../screens/ProfileScreen";
@@ -32,27 +31,37 @@ import { sceneBackgroundStyle } from "../theme/navigationTheme";
 const Tab = createBottomTabNavigator<AppTabParamList>();
 const { colors } = theme;
 
-const TAB_ROUTE_MAP: Record<string, keyof AppTabParamList> = {
-  leagues: "Leagues",
+/** Drawer id → tab di destinazione quando l'id non è una sua stack route. */
+const TAB_ROUTE_MAP: Partial<Record<string, keyof AppTabParamList>> = {
   matchday: "Matchday",
   standings: "Standings",
-  roster: "Roster",
+  // "Mercato" apre di default il tab Market; Rosa/Asta/Svincolati restano
+  // raggiungibili dalla screen-tabs strip in cima a ciascuna schermata.
+  "market-hub": "Market",
   formation: "Formation",
-  auction: "Auction",
-  waiver: "Waiver",
-  market: "Market",
   profile: "Profile",
 };
 
 const STACK_ROUTE_MAP: Partial<Record<string, keyof RootStackParamList>> = {
-  "league-home": "LeagueHome",
+  // "Lega" apre di default Home lega; Amministrazione resta raggiungibile
+  // dalla screen-tabs strip in cima a Home lega/Amministrazione.
+  "league-hub": "LeagueHome",
   "received-invites": "ReceivedInvites",
-  "league-admin": "LeagueAdmin",
   "manager-directory": "ManagerDirectory",
 };
 
+const TAB_SCREEN_NAMES: (keyof AppTabParamList)[] = [
+  "Matchday",
+  "Standings",
+  "Roster",
+  "Formation",
+  "Auction",
+  "Waiver",
+  "Market",
+  "Profile",
+];
+
 const SCREEN_COMPONENTS: Record<keyof AppTabParamList, React.ComponentType> = {
-  Leagues: LeaguesScreen,
   Matchday: MatchdayScreen,
   Standings: StandingsScreen,
   Roster: RosterScreen,
@@ -63,23 +72,21 @@ const SCREEN_COMPONENTS: Record<keyof AppTabParamList, React.ComponentType> = {
   Profile: ProfileScreen,
 };
 
-/** Route → id voce di menu, per evidenziare la destinazione corrente. */
+/** Route → id voce di menu, per evidenziare la destinazione corrente (più route → stesso hub). */
 const NAV_ID_BY_ROUTE: Record<string, string> = {
-  ...Object.fromEntries(Object.entries(TAB_ROUTE_MAP).map(([id, route]) => [route, id])),
-  ...Object.fromEntries(Object.entries(STACK_ROUTE_MAP).map(([id, route]) => [route, id])),
+  Matchday: "matchday",
+  Standings: "standings",
+  Roster: "market-hub",
+  Formation: "formation",
+  Auction: "market-hub",
+  Waiver: "market-hub",
+  Market: "market-hub",
+  Profile: "profile",
+  LeagueHome: "league-hub",
+  LeagueAdmin: "league-hub",
+  ReceivedInvites: "received-invites",
+  ManagerDirectory: "manager-directory",
 };
-
-const ALL_TAB_IDS = [
-  "leagues",
-  "matchday",
-  "standings",
-  "roster",
-  "formation",
-  "auction",
-  "waiver",
-  "market",
-  "profile",
-] as const;
 
 function AppTabShell({
   children,
@@ -134,8 +141,8 @@ function AppTabShell({
     if (nested && typeof nested.index === "number") {
       return nested.routes[nested.index]?.name;
     }
-    // Stato annidato non ancora idratato: la tab iniziale è "Leagues".
-    return "Leagues";
+    // Stato annidato non ancora idratato: la tab iniziale è "Matchday".
+    return "Matchday";
   });
   const activeItemId = activeRouteName ? (NAV_ID_BY_ROUTE[activeRouteName] ?? null) : null;
 
@@ -189,19 +196,30 @@ function AppTabShell({
         leagues={leagues.map((league) => ({ value: league.id, label: league.name }))}
         activeLeagueId={activeLeagueId}
         leagueSelectorAccessory={
-          countdown ? (
-            <LockCountdown
-              state={countdown.state}
-              nextLockAt={countdown.nextLockAt}
-              onExpire={refetchCountdown}
-            />
-          ) : undefined
+          <View style={styles.selectorAccessory}>
+            {activeLeagueSummary ? (
+              <View style={styles.statusBadge}>
+                <Text style={styles.statusBadgeLabel}>
+                  {leagueStateLabel(activeLeagueSummary.state)}
+                </Text>
+              </View>
+            ) : null}
+            {countdown ? (
+              <LockCountdown
+                state={countdown.state}
+                nextLockAt={countdown.nextLockAt}
+                onExpire={refetchCountdown}
+              />
+            ) : null}
+          </View>
         }
         onLeagueChange={(leagueId) => {
           setActiveLeagueId(leagueId);
           navigation.navigate("LeagueHome", { leagueId });
         }}
-        onBrandPress={() => navigation.navigate("MainTabs", { screen: "Leagues" } as never)}
+        onCreateLeaguePress={() => navigation.navigate("CreateLeague")}
+        onJoinLeaguePress={() => navigation.navigate("JoinLeague")}
+        onBrandPress={() => navigation.navigate("LeagueHome")}
       />
       <AppDrawer
         visible={drawerOpen}
@@ -246,14 +264,10 @@ export function AppTabNavigator() {
           sceneStyle: sceneBackgroundStyle,
         }}
       >
-        {ALL_TAB_IDS.map((id) => {
-          const routeName = TAB_ROUTE_MAP[id];
-          if (!routeName) {
-            return null;
-          }
+        {TAB_SCREEN_NAMES.map((routeName) => {
           return (
             <Tab.Screen
-              key={id}
+              key={routeName}
               name={routeName}
               component={SCREEN_COMPONENTS[routeName]}
             />

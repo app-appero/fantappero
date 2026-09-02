@@ -13,7 +13,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { fetchLeagueStandings, fetchMyFantasyTeam } from "../api/leagues";
 import { getApiErrorMessage, useAuth } from "../auth/AuthContext";
 import { loadStoredSession } from "../auth/sessionStorage";
-import { useLocation } from "../router/simpleRouter";
+import { useLocation, useNavigate } from "../router/simpleRouter";
 import { WireframePage } from "../wireframes/WireframePage";
 import { parseWireframeStateFromSearch } from "../wireframes/useWireframeState";
 
@@ -25,6 +25,7 @@ const DEMO_STANDINGS: LeagueStanding[] = [
   {
     fantasyTeamId: "1",
     teamName: "Rivali FC",
+    managerUserId: "manager-ai",
     position: 1,
     played: 11,
     won: 7,
@@ -40,6 +41,7 @@ const DEMO_STANDINGS: LeagueStanding[] = [
   {
     fantasyTeamId: "2",
     teamName: "La tua squadra",
+    managerUserId: "manager-lucia",
     position: 2,
     played: 11,
     won: 6,
@@ -55,6 +57,7 @@ const DEMO_STANDINGS: LeagueStanding[] = [
   {
     fantasyTeamId: "3",
     teamName: "Underdogs",
+    managerUserId: "manager-paolo",
     position: 3,
     played: 11,
     won: 5,
@@ -81,6 +84,7 @@ function toTableRows(
       id: row.fantasyTeamId,
       position: row.position,
       teamName: row.teamName,
+      managerUserId: row.managerUserId,
       played: row.played,
       points: row.points,
       goalsFor: row.fantasyGoalsFor,
@@ -96,9 +100,11 @@ function toTableRows(
 function StandingsTableBlock({
   rows,
   testId = "standings-table",
+  onManagerClick,
 }: {
   rows: StandingsRow[];
   testId?: string;
+  onManagerClick?: (row: StandingsRow) => void;
 }) {
   return (
     <WireframeSection label="Ranking lega" testId="wireframe-region-standings">
@@ -112,6 +118,7 @@ function StandingsTableBlock({
         fantasyPointsLabel="FP:FS"
         rows={rows}
         testId={testId}
+        onManagerClick={onManagerClick}
       />
     </WireframeSection>
   );
@@ -119,9 +126,11 @@ function StandingsTableBlock({
 
 /** Classifica lega aggiornata dai risultati H2H (EP07-06). */
 export function StandingsPage() {
-  const { isDemoMode, activeLeagueId, activeLeague } = useAuth();
+  const { isDemoMode, activeLeagueId, activeLeague, can } = useAuth();
   const { search } = useLocation();
+  const navigate = useNavigate();
   const demoState = isDemoMode ? parseWireframeStateFromSearch(search) : null;
+  const canViewCoachProfiles = can(["league:admin"]);
 
   const [standings, setStandings] = useState<LeagueStanding[]>(() =>
     isDemoMode && demoState !== "empty" && demoState !== "error" && demoState !== "loading"
@@ -206,6 +215,17 @@ export function StandingsPage() {
   const rows = useMemo(() => toTableRows(standings, myTeamId), [myTeamId, standings]);
   const computedAt = standings[0]?.computedAt ?? null;
 
+  const handleManagerClick = useCallback(
+    (row: StandingsRow) => {
+      if (!row.managerUserId) return;
+      const params = new URLSearchParams();
+      if (activeLeagueId) params.set("league", activeLeagueId);
+      const qs = params.toString();
+      navigate(`/fantallenatori/${row.managerUserId}${qs ? `?${qs}` : ""}`);
+    },
+    [activeLeagueId, navigate],
+  );
+
   if (isDemoMode) {
     return (
       <PageContainer
@@ -222,7 +242,12 @@ export function StandingsPage() {
       >
         <WireframePage
           screenId="standings"
-          successContent={<StandingsTableBlock rows={rows} />}
+          successContent={
+            <StandingsTableBlock
+              rows={rows}
+              onManagerClick={canViewCoachProfiles ? handleManagerClick : undefined}
+            />
+          }
         />
       </PageContainer>
     );
@@ -294,7 +319,10 @@ export function StandingsPage() {
               }).format(new Date(computedAt))}
             </p>
           ) : null}
-          <StandingsTableBlock rows={rows} />
+          <StandingsTableBlock
+            rows={rows}
+            onManagerClick={canViewCoachProfiles ? handleManagerClick : undefined}
+          />
         </div>
       ) : null}
     </PageContainer>

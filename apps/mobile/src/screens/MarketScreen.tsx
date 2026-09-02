@@ -7,6 +7,7 @@ import type {
   RosterOccupancyEntry,
   TeamRosterPlayer,
 } from "@fantappero/contracts";
+import { useNavigation, type NavigationProp } from "@react-navigation/core";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Pressable, Text, View } from "react-native";
 import {
@@ -18,12 +19,15 @@ import {
   fetchTeamPlayersForTrade,
 } from "../api/leagues";
 import { applyVoluntaryRelease, previewVoluntaryRelease } from "../api/market";
+import { ScreenTabs } from "../components/ScreenTabs";
 import { UiStatePanel } from "../components/UiStatePanel";
 import { useScreenData } from "../hooks/useScreenData";
 import { PageContainer } from "../layout/PageContainer";
 import { marketUiStyles as styles } from "../market/marketUiStyles";
 import { useMarketHistory } from "../market/useMarketHistory";
 import { useTradeFlow } from "../market/useTradeFlow";
+import { MARKET_HUB_TABS } from "../navigation/marketHubTabs";
+import type { AppTabParamList } from "../navigation/types";
 import { getApiErrorMessage, useAuthSession } from "../session/DemoSessionContext";
 import { MarketHistorySection } from "./market/MarketHistorySection";
 import { MarketReleaseSection } from "./market/MarketReleaseSection";
@@ -32,6 +36,7 @@ import { MarketTradeList } from "./market/MarketTradeList";
 
 /** Mercato: svincolo volontario + proposte di scambio tra squadre (EP08-04/05/06/07/08). */
 export function MarketScreen() {
+  const navigation = useNavigation<NavigationProp<AppTabParamList>>();
   const { can, accessToken, activeLeagueId } = useAuthSession();
   const canManageMarket = can(["market:manage"]);
 
@@ -275,6 +280,12 @@ export function MarketScreen() {
 
   return (
     <PageContainer title="Mercato" testID="screen-market" refreshing={refreshing} onRefresh={onRefresh}>
+      <ScreenTabs
+        items={MARKET_HUB_TABS}
+        activeId="Market"
+        onSelect={(id) => navigation.navigate(id as keyof AppTabParamList)}
+        testID="market-hub-tabs"
+      />
       {loading ? (
         <UiStatePanel
           state="loading"

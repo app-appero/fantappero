@@ -12,8 +12,8 @@ export { CreateLeaguePage } from "./CreateLeaguePage";
 export { LeagueAdminPage } from "./LeagueAdminPage";
 export { LeagueHomePage } from "./LeagueHomePage";
 export { JoinLeaguePage } from "./JoinLeaguePage";
-export { LeaguesPage } from "./LeaguesPage";
 export { ManagerDirectoryPage } from "./ManagerDirectoryPage";
+export { CoachProfilePage } from "./CoachProfilePage";
 export { ReceivedInvitesPage } from "./ReceivedInvitesPage";
 export { MarketPage } from "./MarketPage";
 export { MatchdayPage } from "./MatchdayPage";
@@ -25,6 +25,8 @@ export { AdminTurniPage } from "./AdminTurniPage";
 export { AdminUsersPage } from "./AdminUsersPage";
 export { RosterPage } from "./RosterPage";
 export { StandingsPage } from "./StandingsPage";
+export { MarketHubPage } from "./MarketHubPage";
+export { LeagueHubPage } from "./LeagueHubPage";
 
 export { NotFoundPage, ProfilePage } from "./ProfilePage";
 

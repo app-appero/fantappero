@@ -1,4 +1,5 @@
 import type { LeagueListoneEntry } from "@fantappero/contracts";
+import { useNavigation, type NavigationProp } from "@react-navigation/core";
 import { useCallback, useMemo, useState } from "react";
 import { fetchLeagueListone, fetchMyCredits } from "../api/leagues";
 import {
@@ -10,10 +11,13 @@ import {
   submitAuctionBid,
   withdrawAuctionBid,
 } from "../api/market";
+import { ScreenTabs } from "../components/ScreenTabs";
 import { useScreenData } from "../hooks/useScreenData";
 import { PageContainer } from "../layout/PageContainer";
 import { parseLocalDateTimeInput } from "../market/dateTimeInput";
 import { useMarketSessionFlow } from "../market/useMarketSessionFlow";
+import { MARKET_HUB_TABS } from "../navigation/marketHubTabs";
+import type { AppTabParamList } from "../navigation/types";
 import { getApiErrorMessage, useAuthSession } from "../session/DemoSessionContext";
 import { AuctionAdminPanel } from "./auction/AuctionAdminPanel";
 import { AuctionBidPanel } from "./auction/AuctionBidPanel";
@@ -22,6 +26,7 @@ import type { RoleTab } from "./auction/auctionListoneHelpers";
 
 /** Asta a buste chiuse: gestione sessione admin, offerte e listone ufficiale (EP08-01/02). */
 export function AuctionScreen() {
+  const navigation = useNavigation<NavigationProp<AppTabParamList>>();
   const { can, accessToken, activeLeagueId, activeLeague } = useAuthSession();
   const canManageSession = can(["market:manage"]);
 
@@ -127,6 +132,12 @@ export function AuctionScreen() {
       refreshing={refreshing}
       onRefresh={onRefresh}
     >
+      <ScreenTabs
+        items={MARKET_HUB_TABS}
+        activeId="Auction"
+        onSelect={(id) => navigation.navigate(id as keyof AppTabParamList)}
+        testID="market-hub-tabs"
+      />
       {canManageSession ? (
         <AuctionAdminPanel
           flow={flow}

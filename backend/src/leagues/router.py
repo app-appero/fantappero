@@ -33,6 +33,7 @@ from leagues.h2h_matchday_service import get_h2h_calendar, get_h2h_matchup_detai
 from leagues.invite_service import LeagueInviteService
 from leagues.listone_service import LeagueListoneService
 from leagues.membership_service import LeagueMembershipService
+from leagues.models.league_membership import LeagueMembership
 from leagues.named_invite_service import NamedLeagueInviteService
 from leagues.pro_export_schemas import LeagueProExportResponse
 from leagues.pro_export_service import build_league_export
@@ -664,16 +665,27 @@ def get_league_standings(
         compute_league_standings(session, league_id=league_id)
         session.commit()
         rows = list_league_standings(session, league_id=league_id)
-    team_names = {
-        team.id: team.name
-        for team in session.scalars(
-            select(FantasyTeam).where(FantasyTeam.league_id == league_id)
+    teams = session.scalars(
+        select(FantasyTeam).where(FantasyTeam.league_id == league_id)
+    ).all()
+    team_names = {team.id: team.name for team in teams}
+    membership_owners = dict(
+        session.execute(
+            select(LeagueMembership.id, LeagueMembership.user_id).where(
+                LeagueMembership.id.in_([team.membership_id for team in teams])
+            )
         ).all()
+    )
+    manager_ids = {
+        team.id: membership_owners[team.membership_id]
+        for team in teams
+        if team.membership_id in membership_owners
     }
     return [
         LeagueStandingResponse(
             fantasyTeamId=str(row.fantasy_team_id),
             teamName=team_names.get(row.fantasy_team_id, "Squadra"),
+            managerUserId=str(manager_ids[row.fantasy_team_id]),
             position=row.position,
             played=row.played,
             won=row.won,

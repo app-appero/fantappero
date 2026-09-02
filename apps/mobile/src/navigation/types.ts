@@ -40,7 +40,6 @@ export type FixtureDetailParams = {
 };
 
 export type AppTabParamList = {
-  Leagues: WireframeParams | undefined;
   Matchday: WireframeParams | undefined;
   Standings: WireframeParams | undefined;
   Roster: WireframeParams | undefined;
@@ -64,6 +63,7 @@ export type RootStackParamList = {
   ReceivedInvites: ReceivedInvitesParams | undefined;
   Notifications: undefined;
   ManagerDirectory: undefined;
+  CoachProfile: { userId: string; leagueId?: string };
   AdminPanel: undefined;
   MatchupDetail: MatchupDetailParams;
   FixtureDetail: FixtureDetailParams;

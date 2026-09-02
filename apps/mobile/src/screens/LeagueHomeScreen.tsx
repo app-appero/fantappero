@@ -13,6 +13,7 @@ import {
   fetchLeagueCalendar,
   fetchLeagueMembersPublic,
 } from "../api/leagues";
+import { ScreenTabs } from "../components/ScreenTabs";
 import { UiStatePanel } from "../components/UiStatePanel";
 import { useScreenData } from "../hooks/useScreenData";
 import { PageContainer } from "../layout/PageContainer";
@@ -87,6 +88,12 @@ export function LeagueHomeScreen() {
   const { refreshing, onRefresh } = useScreenData(loadHome);
 
   const isAdmin = league?.viewerRole === "league_admin" || can(["league:admin"]);
+  const leagueTabs = isAdmin
+    ? [
+        { id: "league-home", label: "Home lega" },
+        { id: "league-admin", label: "Amministrazione lega" },
+      ]
+    : [{ id: "league-home", label: "Home lega" }];
 
   return (
     <PageContainer
@@ -95,6 +102,16 @@ export function LeagueHomeScreen() {
       refreshing={refreshing}
       onRefresh={onRefresh}
     >
+      <ScreenTabs
+        items={leagueTabs}
+        activeId="league-home"
+        onSelect={(id) => {
+          if (id === "league-admin" && leagueId) {
+            navigation.replace("LeagueAdmin", { leagueId });
+          }
+        }}
+        testID="league-hub-tabs"
+      />
       {loading ? (
         <UiStatePanel
           state="loading"
@@ -127,17 +144,9 @@ export function LeagueHomeScreen() {
           <UiStatePanel
             state="empty"
             title="Nessuna lega selezionata"
-            message="Seleziona una lega dall'elenco oppure entra con un invito."
+            message="Scegli una lega dal selettore in alto, creane una o unisciti con un codice invito."
             testID="league-home-empty"
           />
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Vai a Le mie leghe"
-            onPress={() => navigation.navigate("MainTabs", { screen: "Leagues" } as never)}
-            testID="league-home-empty-cta"
-          >
-            <Text style={styles.ghostLabel}>Vai a Le mie leghe</Text>
-          </Pressable>
         </View>
       ) : null}
 

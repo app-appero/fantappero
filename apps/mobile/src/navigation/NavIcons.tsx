@@ -9,20 +9,15 @@ export type NavIconProps = {
 type FeatherName = ComponentProps<typeof Feather>["name"];
 
 export const NAV_ICON_MAP: Record<string, FeatherName> = {
-  leagues: "award",
-  "league-home": "home",
+  "league-hub": "award",
   "manager-directory": "users",
   "received-invites": "mail",
   matchday: "calendar",
   standings: "bar-chart-2",
-  roster: "users",
+  "market-hub": "repeat",
   formation: "grid",
-  auction: "shopping-cart",
-  waiver: "inbox",
-  market: "repeat",
   profile: "user",
   more: "menu",
-  "league-admin": "shield",
   "admin-home": "shield",
   "admin-leagues": "layers",
   "admin-users": "users",

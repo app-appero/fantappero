@@ -1,6 +1,7 @@
 import {
   AppHeader,
   AppShell,
+  Badge,
   BottomNav,
   BrandLogo,
   LeagueSelector,
@@ -12,6 +13,7 @@ import { Link, useLocation } from "../router/simpleRouter";
 import { useAuth } from "../auth/AuthContext";
 import { LogoutButton } from "../auth/LogoutButton";
 import { fetchPendingInviteCount } from "../api/managerInvites";
+import { leagueStateLabel } from "../leagues/leagueLabels";
 import { loadStoredSession } from "../auth/sessionStorage";
 import { useLockCountdown } from "../matchday/useLockCountdown";
 import {
@@ -34,18 +36,13 @@ import { NotificationCenter } from "../notifications/NotificationCenter";
 import { SkipLink } from "./SkipLink";
 
 const APP_ICONS: Record<string, ReactNode> = {
-  leagues: <IconTrophy />,
-  "league-home": <IconLayout />,
+  "league-hub": <IconTrophy />,
   "manager-directory": <IconUsers />,
   "received-invites": <IconUsers />,
   matchday: <IconLayout />,
   standings: <IconTrophy />,
-  roster: <IconUsers />,
+  "market-hub": <IconCart />,
   formation: <IconLayout />,
-  auction: <IconCart />,
-  waiver: <IconCart />,
-  market: <IconCart />,
-  "league-admin": <IconShield />,
   profile: <IconUser />,
 };
 
@@ -156,10 +153,12 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     .filter((group) => !collapsed.includes(group.id))
     .map((group) => group.id);
 
-  const showLeagueSelector =
-    leagues.length > 0 && location.pathname !== "/leghe" && location.pathname !== "/leghe/crea";
+  const canSeeLeagueContext = can(["league:view"]);
+  const activeLeagueSummary = leagues.find(
+    (league) => league.id === (activeLeagueId ?? leagues[0]?.id),
+  );
   const { countdown, refetch: refetchCountdown } = useLockCountdown(
-    showLeagueSelector ? activeLeagueId ?? leagues[0]?.id ?? null : null,
+    canSeeLeagueContext && leagues.length > 0 ? activeLeagueId ?? leagues[0]?.id ?? null : null,
   );
 
   return (
@@ -175,26 +174,53 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
             </Link>
           }
           contextSlot={
-            showLeagueSelector ? (
-              <LeagueSelector
-                label="Lega attiva"
-                leagues={leagues.map((league) => ({
-                  value: league.id,
-                  label: league.name,
-                }))}
-                value={activeLeagueId ?? leagues[0]?.id ?? ""}
-                onChange={setActiveLeagueId}
-                placeholder="Seleziona lega"
-                accessory={
-                  countdown ? (
-                    <LockCountdown
-                      state={countdown.state}
-                      nextLockAt={countdown.nextLockAt}
-                      onExpire={refetchCountdown}
-                    />
-                  ) : undefined
-                }
-              />
+            canSeeLeagueContext ? (
+              <div className="fa-app-header__league-context">
+                {leagues.length > 0 ? (
+                  <LeagueSelector
+                    label="Lega attiva"
+                    leagues={leagues.map((league) => ({
+                      value: league.id,
+                      label: league.name,
+                    }))}
+                    value={activeLeagueId ?? leagues[0]?.id ?? ""}
+                    onChange={setActiveLeagueId}
+                    placeholder="Seleziona lega"
+                    accessory={
+                      <>
+                        {activeLeagueSummary ? (
+                          <Badge variant="neutral" data-testid="active-league-status">
+                            {leagueStateLabel(activeLeagueSummary.state)}
+                          </Badge>
+                        ) : null}
+                        {countdown ? (
+                          <LockCountdown
+                            state={countdown.state}
+                            nextLockAt={countdown.nextLockAt}
+                            onExpire={refetchCountdown}
+                          />
+                        ) : null}
+                      </>
+                    }
+                  />
+                ) : null}
+                <div className="fa-app-header__league-actions">
+                  <Link
+                    to="/leghe/crea"
+                    className="fa-link-muted"
+                    data-testid="header-create-league-link"
+                  >
+                    Crea lega
+                  </Link>
+                  <Link
+                    to="/leghe/invito"
+                    className="fa-link-muted"
+                    data-testid="header-join-league-link"
+                  >
+                    Unisciti con codice
+                  </Link>
+                </div>
+              </div>
             ) : null
           }
           actionsSlot={

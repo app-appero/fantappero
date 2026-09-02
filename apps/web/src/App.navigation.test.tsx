@@ -39,29 +39,31 @@ describe("App navigation shell (EPUI-03)", () => {
     expect(sidebar).not.toContain('href="/lega/amministrazione"');
   });
 
-  it("shows league admin link when persona=admin", () => {
-    const sidebar = sidebarMarkup(renderAt("/leghe", "?persona=admin&stato=success"));
-    expect(sidebar).toContain("Amministrazione lega");
-    expect(sidebar).toContain('href="/lega/amministrazione"');
+  it("shows league admin tab when persona=admin", () => {
+    const html = renderAt("/leghe", "?persona=admin&stato=success");
+    expect(html).toContain("Amministrazione lega");
+    expect(html).toContain('id="tab-league-admin"');
   });
 
-  it("renders the collapsible Lega group in the sidebar", () => {
+  it("shows a single compact Lega entry in the sidebar instead of a submenu", () => {
     const sidebar = sidebarMarkup(renderAt("/leghe", "?persona=admin&stato=success"));
-    expect(sidebar).toContain('data-testid="sidebar-nav-group-league"');
-    expect(sidebar).toContain('aria-expanded="true"');
-    expect(sidebar).toContain("Le mie leghe");
-    expect(sidebar).toContain('href="/lega/home"');
+    expect(sidebar).not.toContain('data-testid="sidebar-nav-group-league"');
+    expect(sidebar).toContain("Lega");
+    expect(sidebar).toContain('href="/leghe"');
+    // Le mie leghe / Home lega / Amministrazione lega sono tab dentro la pagina, non più voci separate in sidebar.
+    expect(sidebar).not.toContain('href="/lega/home"');
+    expect(sidebar).not.toContain('href="/lega/amministrazione"');
   });
 
-  it("keeps Turni and Inviti outside the Lega group", () => {
-    const sidebar = sidebarMarkup(renderAt("/leghe", "?persona=admin&stato=success"));
-    const groupStart = sidebar.indexOf('class="fa-sidebar-nav__group-list"');
-    expect(groupStart).toBeGreaterThan(-1);
-    const insideGroup = sidebar.slice(groupStart, sidebar.indexOf("</ul>", groupStart));
-    expect(insideGroup).not.toContain('href="/turni"');
-    expect(insideGroup).not.toContain('href="/inviti"');
-    expect(sidebar).toContain('href="/turni"');
-    expect(sidebar).toContain('href="/inviti"');
+  it("shows Home lega e Amministrazione lega as tabs inside the Lega hub page", () => {
+    const html = renderAt("/leghe", "?persona=admin&stato=success");
+    expect(html).toContain("Home lega");
+    expect(html).toContain("Amministrazione lega");
+  });
+
+  it("hides the tab bar for members who only see one tab", () => {
+    const html = renderAt("/leghe", "?persona=member&stato=success");
+    expect(html).not.toContain('role="tablist"');
   });
 
   it("blocks league admin route for members with forbidden state", () => {
@@ -95,7 +97,7 @@ describe("App navigation shell (EPUI-03)", () => {
 
   it("renders leagues list or empty state on /leghe", () => {
     const html = renderAt("/leghe");
-    expect(html).toContain('data-testid="leagues-create-link"');
+    expect(html).toContain('data-testid="header-create-league-link"');
   });
 
   it("uses keyboard-focusable nav links", () => {
@@ -114,10 +116,10 @@ describe("App navigation shell (EPUI-03)", () => {
     expect(html).toContain('aria-label="FantApperò, home"');
   });
 
-  it("includes asta in member navigation", () => {
-    const html = renderAt("/leghe");
+  it("includes asta as a tab inside the movimento giocatori hub", () => {
+    const html = renderAt("/mercato");
     expect(html).toContain("Asta");
-    expect(html).toContain('href="/asta"');
+    expect(html).toContain('id="tab-asta"');
   });
 
   it("renders standings page on /classifica", () => {
