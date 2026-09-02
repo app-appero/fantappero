@@ -152,3 +152,37 @@ export interface AdminCalendarSyncProgress {
   errorCode?: string | null;
   result?: AdminCalendarSyncResult | null;
 }
+
+/** Esito di "Calcola giornata corrente" massivo (tutte le leghe attive). */
+export interface AdminRoundCalculationResult {
+  roundsConsidered: number;
+  roundsProcessed: number;
+  roundsFinalized: number;
+  fixturesScored: number;
+  errors: Array<Record<string, string>>;
+}
+
+export interface AdminHistoricalRepairJob {
+  jobId: string;
+  status: string;
+  message: string;
+}
+
+/** Esito di "Ricalcola storico" (tutte le leghe attive). */
+export interface AdminHistoricalRepairResult {
+  leagues: number;
+  roundsConsidered: number;
+  roundsRepaired: number;
+  roundsFailed: number;
+  errors: Array<Record<string, string>>;
+}
+
+export interface AdminHistoricalRepairProgress {
+  jobId: string;
+  status: "queued" | "running" | "completed" | "failed" | string;
+  percent: number;
+  stage: string;
+  message: string;
+  errorCode?: string | null;
+  result?: AdminHistoricalRepairResult | null;
+}

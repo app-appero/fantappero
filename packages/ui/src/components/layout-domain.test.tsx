@@ -1,6 +1,7 @@
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
+import type { LineupLockCountdownState } from "@fantappero/contracts";
 import {
   AnomalyIndicator,
   AppHeader,
@@ -12,6 +13,7 @@ import {
   FormationView,
   KpiCard,
   LeagueSelector,
+  LockCountdown,
   MatchCard,
   MatchTimeline,
   PageContainer,
@@ -86,6 +88,58 @@ describe("EPUI-03 layout components", () => {
 
     expect(html).toContain('data-testid="league-selector"');
     expect(html).toContain("Lega attiva");
+  });
+
+  it("renders no accessory by default, and the given one when provided", () => {
+    const withoutAccessory = renderToStaticMarkup(
+      createElement(LeagueSelector, {
+        label: "Lega attiva",
+        leagues: [{ value: "l1", label: "Lega Demo" }],
+        value: "l1",
+        onChange: () => undefined,
+      }),
+    );
+    expect(withoutAccessory).not.toContain("fa-league-selector__accessory");
+
+    const withAccessory = renderToStaticMarkup(
+      createElement(LeagueSelector, {
+        label: "Lega attiva",
+        leagues: [{ value: "l1", label: "Lega Demo" }],
+        value: "l1",
+        onChange: () => undefined,
+        accessory: createElement("span", null, "Prossimo blocco"),
+      }),
+    );
+    expect(withAccessory).toContain("fa-league-selector__accessory");
+    expect(withAccessory).toContain("Prossimo blocco");
+  });
+
+  it("renders a neutral label for each idle lock-countdown state", () => {
+    const states: LineupLockCountdownState[] = [
+      "no_active_turn",
+      "turn_not_open",
+      "no_roster",
+      "no_pending_lock",
+    ];
+    for (const state of states) {
+      const html = renderToStaticMarkup(
+        createElement(LockCountdown, { state, nextLockAt: null }),
+      );
+      expect(html).toContain(`data-state="${state}"`);
+      expect(html).toContain("fa-lock-countdown--idle");
+    }
+  });
+
+  it("ticks down toward the next lock using an injectable clock", () => {
+    const html = renderToStaticMarkup(
+      createElement(LockCountdown, {
+        state: "counting_down",
+        nextLockAt: "2026-08-15T18:03:05.000Z",
+        now: () => new Date("2026-08-15T16:00:00.000Z"),
+      }),
+    );
+    expect(html).toContain('data-state="counting_down"');
+    expect(html).toContain("02:03:05");
   });
 });
 

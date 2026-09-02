@@ -268,3 +268,73 @@ def refresh_full_calendar_task(*, job_id: str, league_id: str, actor_id: str | N
         raise
     finally:
         engine.dispose()
+
+
+@celery_app.task(name="fantasy_turns.repair_historical_rounds")
+def repair_historical_rounds_task(*, job_id: str, actor_id: str | None, reason: str) -> dict:
+    """Azione massiva dell'operatore: "Ricalcola storico" (EP-turni-calcolo).
+
+    Riapre (se serve, con motivo obbligatorio) e ricalcola i turni con un
+    buco storico — formazioni mai risolte, scontri H2H mai chiusi — con lo
+    stesso motore usato dal job automatico e dai comandi puntuali. Tracciato
+    come job con progress: può iterare molti turni di molte leghe.
+    """
+    from uuid import UUID
+
+    from fantasy_turns.round_calculation_progress import RoundRepairProgress
+    from fantasy_turns.round_calculation_progress import save_progress as save_repair_progress
+    from fantasy_turns.round_repair_service import repair_historical_rounds_for_active_leagues
+
+    PLATFORM_SCOPE = "platform"
+    settings = get_api_settings()
+    engine = create_engine_from_url(settings.database_url)
+    factory = create_session_factory(engine)
+    try:
+        save_repair_progress(
+            RoundRepairProgress(
+                job_id=job_id,
+                league_id=PLATFORM_SCOPE,
+                status="running",
+                percent=1,
+                stage="running",
+                message="Ricalcolo storico avviato…",
+            )
+        )
+        with session_scope(factory) as session:
+            result = repair_historical_rounds_for_active_leagues(
+                session,
+                actor_id=UUID(actor_id) if actor_id else None,
+                reason=reason,
+            )
+        message = (
+            f"Leghe attive: {result.leagues}, turni con un buco storico: "
+            f"{result.rounds_considered}, riparati: {result.rounds_repaired}, "
+            f"falliti: {result.rounds_failed}."
+        )
+        save_repair_progress(
+            RoundRepairProgress(
+                job_id=job_id,
+                league_id=PLATFORM_SCOPE,
+                status="completed",
+                percent=100,
+                stage="completed",
+                message=message,
+                result=result.as_dict(),
+            )
+        )
+        return {"status": "completed", "job_id": job_id, "actor_id": actor_id}
+    except Exception:
+        save_repair_progress(
+            RoundRepairProgress(
+                job_id=job_id,
+                league_id=PLATFORM_SCOPE,
+                status="failed",
+                percent=0,
+                stage="failed",
+                message="Ricalcolo storico non riuscito.",
+                error_code="round_repair_failed",
+            )
+        )
+        raise
+    finally:
+        engine.dispose()

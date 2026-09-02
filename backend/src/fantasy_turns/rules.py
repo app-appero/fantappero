@@ -5,10 +5,13 @@ from __future__ import annotations
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, time, timedelta
+from typing import TypeVar
 from zoneinfo import ZoneInfo
 
 from auth.exceptions import ValidationAuthError
 from database.enums import FantasyTurnKind, FantasyTurnStatus
+
+_T = TypeVar("_T")
 
 DEFAULT_LEAGUE_TZ = ZoneInfo("Europe/Rome")
 CANCELLED_FIXTURE_STATUSES = frozenset({"CANC"})
@@ -174,6 +177,21 @@ def aggregate_turn_status(
     if all_terminal:
         return "completed"
     return "scheduled"
+
+
+def resolve_default_turn(entries: Sequence[tuple[_T, str]]) -> _T | None:
+    """Turno di default da mostrare: il primo non ancora concluso, o l'ultimo.
+
+    Specchio Python di `resolveDefaultEuropeanTurn` in
+    `packages/contracts/src/fantasyTurns.ts` — stessa logica, così un
+    countdown risolto lato server e la pagina Turni lato client puntano
+    sempre allo stesso turno. Il chiamante passa le voci già ordinate per
+    numero crescente.
+    """
+    for item, match_status in entries:
+        if match_status != "completed":
+            return item
+    return entries[-1][0] if entries else None
 
 
 def kickoff_in_window(kickoff_at: datetime, window: TimeWindow) -> bool:

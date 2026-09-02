@@ -6,12 +6,14 @@ const workspaceRoot = path.resolve(projectRoot, "../..");
 
 const config = getDefaultConfig(projectRoot);
 
-config.watchFolders = [workspaceRoot];
+// Additive, not a replacement: keep whatever Expo's own monorepo detection
+// already put in watchFolders (expo-doctor flags a full override as
+// "dangerous"), just make sure the workspace root is also covered.
+config.watchFolders = [...new Set([...config.watchFolders, workspaceRoot])];
 config.resolver.nodeModulesPaths = [
   path.resolve(projectRoot, "node_modules"),
   path.resolve(workspaceRoot, "node_modules"),
 ];
-config.resolver.disableHierarchicalLookup = true;
 
 /** Workspace packages use TS ESM imports with a `.js` extension; Metro needs `.ts`/`.tsx`. */
 const TS_SOURCE_EXTENSIONS = [".ts", ".tsx"];

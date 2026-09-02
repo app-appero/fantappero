@@ -4,6 +4,7 @@ import {
   BottomNav,
   BrandLogo,
   LeagueSelector,
+  LockCountdown,
   SidebarNav,
 } from "@fantappero/ui";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
@@ -12,6 +13,7 @@ import { useAuth } from "../auth/AuthContext";
 import { LogoutButton } from "../auth/LogoutButton";
 import { fetchPendingInviteCount } from "../api/managerInvites";
 import { loadStoredSession } from "../auth/sessionStorage";
+import { useLockCountdown } from "../matchday/useLockCountdown";
 import {
   ADMIN_NAV_ITEMS,
   APP_NAV_ITEMS,
@@ -156,6 +158,9 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
 
   const showLeagueSelector =
     leagues.length > 0 && location.pathname !== "/leghe" && location.pathname !== "/leghe/crea";
+  const { countdown, refetch: refetchCountdown } = useLockCountdown(
+    showLeagueSelector ? activeLeagueId ?? leagues[0]?.id ?? null : null,
+  );
 
   return (
     <AppShell
@@ -180,6 +185,15 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                 value={activeLeagueId ?? leagues[0]?.id ?? ""}
                 onChange={setActiveLeagueId}
                 placeholder="Seleziona lega"
+                accessory={
+                  countdown ? (
+                    <LockCountdown
+                      state={countdown.state}
+                      nextLockAt={countdown.nextLockAt}
+                      onExpire={refetchCountdown}
+                    />
+                  ) : undefined
+                }
               />
             ) : null
           }

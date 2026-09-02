@@ -121,6 +121,16 @@ export function AdminDashboardScreen() {
             Consulta e aggiorna il listone ufficiale dal provider.
           </Text>
         </Pressable>
+        <Pressable
+          style={styles.linkCard}
+          onPress={() => navigation.navigate("AdminTurni")}
+          testID="admin-dashboard-link-turni"
+        >
+          <Text style={styles.linkCardTitle}>Turni</Text>
+          <Text style={styles.linkCardHint}>
+            Sincronizza turni e calendario, calcola la giornata, genera formazioni IA.
+          </Text>
+        </Pressable>
       </View>
     </PageContainer>
   );

@@ -38,6 +38,7 @@ from fantasy_turns.coverage import (
     window_is_valid,
 )
 from fantasy_turns.models import FantasyRound, FantasyRoundFixture
+from fantasy_turns.round_calculation_service import calculate_league_round
 from fantasy_turns.rules import (
     DEFAULT_LEAGUE_TZ,
     EligibleFixtureRef,
@@ -53,6 +54,7 @@ from fantasy_turns.rules import (
     is_modification_allowed,
     kickoff_counts_for_cutoff,
     reconcile_fixture_kickoff_lock,
+    resolve_default_turn,
     select_eligible_from_candidates,
     upcoming_turn_specs,
     window_for_kind,
@@ -67,6 +69,7 @@ from fantasy_turns.schemas import (
     FantasyTurnSummaryResponse,
     GenerateFantasyTurnRequest,
     PendingFixtureResponse,
+    RoundCalculationResponse,
 )
 from fantasy_turns.validators import validate_anchor_date, validate_turn_kind
 from leagues.models.competition import Competition
@@ -161,6 +164,36 @@ class FantasyTurnService:
             .order_by(FantasyRound.number.asc())
         ).all()
         return [self._to_summary(row, now=now) for row in rounds]
+
+    def resolve_reference_round(self, league_id: UUID) -> FantasyRound | None:
+        """Stessa scelta di "turno corrente" di `resolveDefaultEuropeanTurn`
+        (client) e `list_turns` (sopra), ma con 2 query totali invece di
+        2×N — pensata per un widget chiamato da ogni pagina (header globale),
+        non per l'elenco completo con tutti i dettagli.
+        """
+        rounds = self._session.scalars(
+            select(FantasyRound)
+            .where(FantasyRound.league_id == league_id)
+            .order_by(FantasyRound.number.asc())
+        ).all()
+        if not rounds:
+            return None
+        round_ids = [row.id for row in rounds]
+        fixture_rows = self._session.execute(
+            select(FantasyRoundFixture.round_id, Fixture.status_short, Fixture.kickoff_at)
+            .join(Fixture, FantasyRoundFixture.fixture_id == Fixture.id)
+            .where(
+                FantasyRoundFixture.round_id.in_(round_ids),
+                FantasyRoundFixture.excluded_at.is_(None),
+            )
+        ).all()
+        by_round: dict[UUID, list[tuple[str | None, datetime | None]]] = {}
+        for round_id, status_short, kickoff_at in fixture_rows:
+            by_round.setdefault(round_id, []).append((status_short, kickoff_at))
+        entries = [
+            (row, aggregate_turn_status(by_round.get(row.id, []))) for row in rounds
+        ]
+        return resolve_default_turn(entries)
 
     def list_pending_fixtures(self, league_access: LeagueAccess) -> list[PendingFixtureResponse]:
         """Fixture note (competizione/squadre/round) ma senza data/ora dal provider.
@@ -807,6 +840,42 @@ class FantasyTurnService:
             labels={"result": "updated" if changed else "noop"},
         )
         return self._to_detail(fantasy_round, now=now)
+
+    def calculate_round(
+        self,
+        league_access: LeagueAccess,
+        round_id: UUID,
+    ) -> RoundCalculationResponse:
+        """Comando manuale "Calcola giornata corrente" per singola lega.
+
+        Chiama lo stesso `calculate_league_round` usato dal job automatico
+        (EP-turni-calcolo, requisito 9): nessuna logica divergente.
+        """
+        result = calculate_league_round(
+            self._session,
+            round_id=round_id,
+            league_id=league_access.league.id,
+            actor_id=league_access.user.id,
+            automatic=False,
+        )
+        self._session.commit()
+        get_metrics().incr(
+            "fantasy_round_calculated_total",
+            labels={"result": "homologated" if result.homologated else "provisional"},
+        )
+        fallback = result.fallback
+        return RoundCalculationResponse(
+            roundId=str(result.round_id),
+            roundNumber=result.round_number,
+            fixturesScored=result.fixtures_scored,
+            fallbackResolvedFromDraft=fallback.resolved_from_draft if fallback else 0,
+            fallbackResolvedFromPreviousRound=(
+                fallback.resolved_from_previous_round if fallback else 0
+            ),
+            fallbackResolvedAsZero=fallback.resolved_as_zero if fallback else 0,
+            resultFinal=result.result_final,
+            homologated=result.homologated,
+        )
 
     def _materialize_window(
         self,

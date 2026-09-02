@@ -18,6 +18,7 @@ import {
   Card,
   CardBody,
   CardHeader,
+  LockCountdown,
   MatchCard,
   PageContainer,
   Select,
@@ -39,6 +40,7 @@ import { getApiErrorMessage, useAuth } from "../auth/AuthContext";
 import { loadStoredSession } from "../auth/sessionStorage";
 import { useLiveH2HPolling } from "../matchday/useLiveH2HPolling";
 import { useLiveTurnPolling } from "../matchday/useLiveTurnPolling";
+import { useLockCountdown } from "../matchday/useLockCountdown";
 import { Link, useLocation } from "../router/simpleRouter";
 import { parseWireframeStateFromSearch } from "../wireframes/useWireframeState";
 import { MatchdayH2HPanel } from "./MatchdayH2HPanel";
@@ -312,6 +314,9 @@ export function MatchdayPage() {
   const params = new URLSearchParams(search.startsWith("?") ? search.slice(1) : search);
   const initialTab = resolveMatchdayTab(params.get("tab"));
   const [tab, setTab] = useState(initialTab);
+  const { countdown, refetch: refetchCountdown } = useLockCountdown(
+    !isDemoMode ? activeLeagueId : null,
+  );
 
   const [h2hCalendar, setH2hCalendar] = useState<H2HCalendar | null>(() => {
     if (isDemoMode && demoState === "success") {
@@ -701,6 +706,13 @@ export function MatchdayPage() {
                       {formatDateTime(selected.windowEndAt)} · Cutoff{" "}
                       {formatDateTime(selected.cutoffAt)}
                     </p>
+                    {countdown && countdown.roundId === selected.id ? (
+                      <LockCountdown
+                        state={countdown.state}
+                        nextLockAt={countdown.nextLockAt}
+                        onExpire={refetchCountdown}
+                      />
+                    ) : null}
                   </div>
                   <div className="fa-matchday-toolbar__badges">
                     <Badge

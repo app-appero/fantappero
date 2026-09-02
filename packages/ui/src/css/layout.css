@@ -465,6 +465,35 @@
   min-width: 10rem;
 }
 
+.fa-league-selector__accessory {
+  margin-top: var(--fa-space-xs);
+}
+
+/* ── Lock countdown ─────────────────────────────────────────────────── */
+
+.fa-lock-countdown {
+  display: flex;
+  align-items: baseline;
+  gap: var(--fa-space-xs);
+}
+
+.fa-lock-countdown__label {
+  font-size: var(--fa-text-xs);
+  color: var(--fa-color-foreground-muted);
+}
+
+.fa-lock-countdown__value {
+  font-family: var(--fa-font-mono);
+  font-size: var(--fa-text-sm);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--fa-color-foreground);
+}
+
+.fa-lock-countdown--idle .fa-lock-countdown__label {
+  font-style: italic;
+}
+
 /* ── KPI card ───────────────────────────────────────────────────────── */
 
 .fa-kpi-card__label {

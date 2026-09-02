@@ -62,6 +62,12 @@ class SavedLineupResponse(ApiModel):
     system_generated_ai: bool = Field(default=False, alias="systemGeneratedAi")
     ai_algorithm_version: str | None = Field(default=None, alias="aiAlgorithmVersion")
     ai_decided_at: datetime | None = Field(default=None, alias="aiDecidedAt")
+    # Formazione sintetizzata dal motore di calcolo turno per assenza di
+    # formazione umana entro la chiusura (EP-turni-calcolo) — distinto da
+    # system_generated_ai (gestione IA di una squadra, non un fallback).
+    auto_resolution_source: Literal["draft", "previous_round", "zero_fallback"] | None = Field(
+        default=None, alias="autoResolutionSource"
+    )
     starters: list[LineupPlayerResponse] = Field(default_factory=list)
     bench: list[LineupPlayerResponse] = Field(default_factory=list)
 
@@ -102,6 +108,7 @@ class LineupContextResponse(ApiModel):
     modification_allowed: bool = Field(alias="modificationAllowed")
     server_now: datetime = Field(alias="serverNow")
     max_automatic_substitutions: int = Field(alias="maxAutomaticSubstitutions")
+    lineup_lock_margin_minutes: int = Field(alias="lineupLockMarginMinutes")
     max_tactical_moves: int = Field(alias="maxTacticalMoves")
     tactical_moves_used: int = Field(alias="tacticalMovesUsed")
     tactical_moves_remaining: int = Field(alias="tacticalMovesRemaining")
@@ -117,6 +124,29 @@ class LineupContextResponse(ApiModel):
     copy_available: bool = Field(default=False, alias="copyAvailable")
     copy_issues: list[LineupIssueResponse] = Field(default_factory=list, alias="copyIssues")
     issues: list[LineupIssueResponse] = Field(default_factory=list)
+
+
+class LineupLockCountdownResponse(ApiModel):
+    """Prossimo blocco per-giocatore della squadra del chiamante (EP-turni-automazione).
+
+    Leggero apposta: nessun round_id in input, nessuna rosa/moduli/mosse nel
+    payload — pensato per un widget chiamato da ogni pagina (header globale),
+    non per la schermata di editing formazione.
+    """
+
+    league_id: str = Field(alias="leagueId")
+    round_id: str | None = Field(default=None, alias="roundId")
+    round_number: int | None = Field(default=None, alias="roundNumber")
+    round_status: str | None = Field(default=None, alias="roundStatus")
+    state: Literal[
+        "counting_down",
+        "no_pending_lock",
+        "turn_not_open",
+        "no_roster",
+        "no_active_turn",
+    ]
+    next_lock_at: datetime | None = Field(default=None, alias="nextLockAt")
+    server_now: datetime = Field(alias="serverNow")
 
 
 class SaveLineupRequest(ApiModel):

@@ -74,6 +74,14 @@ function roleBadgeColors(role: string | null | undefined): { backgroundColor: st
 const KICKOFF_LOCK_MESSAGE =
   "Uno o più calciatori non sono più modificabili: la loro partita è già iniziata.";
 
+const AUTO_RESOLUTION_MESSAGE: Record<"draft" | "previous_round" | "zero_fallback", string> = {
+  draft: "non avevi confermato una formazione: è stata usata automaticamente la bozza salvata.",
+  previous_round:
+    "non avevi schierato una formazione né una bozza: è stata riproposta l'ultima formazione valida.",
+  zero_fallback:
+    "nessuna formazione disponibile per questo turno: il punteggio fantasy è stato impostato a 0.",
+};
+
 function formatDateTime(value: string | null): string {
   if (!value) {
     return "—";
@@ -268,12 +276,16 @@ export function FormationScreen() {
   const roster = context?.roster ?? [];
   const template = starterTemplate(moduleCode);
   const clock = context?.serverNow ? new Date(context.serverNow) : new Date();
+  const lockMarginMinutes = context?.lineupLockMarginMinutes ?? 0;
   const playerLocked = (athleteId: string) => {
     const player = roster.find((row) => row.athleteId === athleteId);
     if (!player) {
       return false;
     }
-    return player.locked === true || isAthleteKickoffLocked(clock, player.kickoffAt, player.fixtureStatus, player.lockLatched);
+    return (
+      player.locked === true ||
+      isAthleteKickoffLocked(clock, player.kickoffAt, player.fixtureStatus, player.lockLatched, lockMarginMinutes)
+    );
   };
   const reservedIds = preserveLockedStarters({
     template,
@@ -588,6 +600,12 @@ export function FormationScreen() {
               ? ` · ${context.lineup.aiAlgorithmVersion}`
               : ""}
             .
+          </Text>
+        ) : null}
+        {context.lineup?.autoResolutionSource ? (
+          <Text style={styles.meta} testID="formation-auto-resolution-badge">
+            Formazione applicata automaticamente —{" "}
+            {AUTO_RESOLUTION_MESSAGE[context.lineup.autoResolutionSource]}
           </Text>
         ) : null}
         <Text style={styles.meta} testID="formation-cutoff">

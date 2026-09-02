@@ -148,6 +148,17 @@ describe("fantasyLineups rules", () => {
     assert.equal(isAthleteKickoffLocked("2026-08-15T16:00:00.000Z", nyKickoff, "NS"), true);
   });
 
+  it("anticipates the lock by the league margin (mirrors is_athlete_kickoff_locked)", () => {
+    const kickoff = "2026-08-15T16:00:00.000Z";
+    assert.equal(isAthleteKickoffLocked("2026-08-15T15:44:59.000Z", kickoff, "NS", false, 15), false);
+    assert.equal(isAthleteKickoffLocked("2026-08-15T15:45:00.000Z", kickoff, "NS", false, 15), true);
+    // Default margin (omitted) reproduces the previous exact-kickoff behavior.
+    assert.equal(isAthleteKickoffLocked("2026-08-15T15:45:00.000Z", kickoff, "NS"), false);
+    // Started/latched/inactive statuses are unaffected by the margin.
+    assert.equal(isAthleteKickoffLocked("2026-08-15T15:00:00.000Z", kickoff, "1H", false, 15), true);
+    assert.equal(isAthleteKickoffLocked("2026-08-16T16:00:00.000Z", kickoff, "PST", false, 15), false);
+  });
+
   it("keeps future players editable and rejects locked slot changes", () => {
     const previous = slotsFromLineupIds(["locked-a"], ["future-b"]);
     const ok = evaluateProgressiveLock({

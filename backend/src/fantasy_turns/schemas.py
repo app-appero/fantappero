@@ -214,3 +214,19 @@ class RoundHomologationResponse(ApiModel):
     homologation_status: Literal["provisional", "homologated"] = Field(alias="homologationStatus")
     homologated_at: datetime | None = Field(default=None, alias="homologatedAt")
     formula_version: str | None = Field(default=None, alias="formulaVersion")
+
+
+class RoundCalculationResponse(ApiModel):
+    """Esito di `calculate_league_round` (EP-turni-calcolo) — stessa forma sia dal
+    pulsante per-lega sia (aggregata) dal pulsante massivo dell'operatore."""
+
+    round_id: str = Field(alias="roundId")
+    round_number: int = Field(alias="roundNumber")
+    fixtures_scored: int = Field(alias="fixturesScored")
+    fallback_resolved_from_draft: int = Field(default=0, alias="fallbackResolvedFromDraft")
+    fallback_resolved_from_previous_round: int = Field(
+        default=0, alias="fallbackResolvedFromPreviousRound"
+    )
+    fallback_resolved_as_zero: int = Field(default=0, alias="fallbackResolvedAsZero")
+    result_final: bool = Field(alias="resultFinal")
+    homologated: bool

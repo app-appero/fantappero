@@ -1,4 +1,4 @@
-import { type HTMLAttributes } from "react";
+import { type HTMLAttributes, type ReactNode } from "react";
 import { Select, type SelectOption } from "../Select.js";
 import { classNames } from "../../utils/classNames.js";
 
@@ -15,6 +15,8 @@ export type LeagueSelectorProps = Omit<
   placeholder?: string;
   hint?: string;
   disabled?: boolean;
+  /** Rendered once next to the selector, e.g. a lock countdown for the active league. */
+  accessory?: ReactNode;
 };
 
 export function LeagueSelector({
@@ -25,6 +27,7 @@ export function LeagueSelector({
   placeholder,
   hint,
   disabled,
+  accessory,
   className,
   ...rest
 }: LeagueSelectorProps) {
@@ -40,6 +43,7 @@ export function LeagueSelector({
         disabled={disabled}
         data-testid="league-selector"
       />
+      {accessory ? <div className="fa-league-selector__accessory">{accessory}</div> : null}
     </div>
   );
 }

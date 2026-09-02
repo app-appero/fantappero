@@ -30,6 +30,7 @@ from fantasy_lineups.rules import (
     is_lineup_modification_allowed,
     is_tactical_window_active,
     module_counts,
+    next_unlocked_kickoff,
     ordered_bench_from_roster,
     parse_module,
     remaining_roster_for_bench,
@@ -234,6 +235,54 @@ def test_athlete_lock_margin_anticipates_the_lock_instant() -> None:
         status_short="NS",
         margin_minutes=0,
     )
+
+
+def test_next_unlocked_kickoff_empty_list_is_none() -> None:
+    now = datetime(2026, 8, 15, 15, 0, tzinfo=UTC)
+    assert next_unlocked_kickoff([], now=now, margin_minutes=15) is None
+
+
+def test_next_unlocked_kickoff_all_locked_is_none() -> None:
+    now = datetime(2026, 8, 15, 16, 30, tzinfo=UTC)
+    kickoffs = [
+        (datetime(2026, 8, 15, 16, 0, tzinfo=UTC), "1H", False),
+        (datetime(2026, 8, 15, 16, 0, tzinfo=UTC), "NS", True),  # lock_latched
+    ]
+    assert next_unlocked_kickoff(kickoffs, now=now, margin_minutes=0) is None
+
+
+def test_next_unlocked_kickoff_picks_the_earliest_unlocked() -> None:
+    now = datetime(2026, 8, 15, 12, 0, tzinfo=UTC)
+    earlier = datetime(2026, 8, 15, 14, 0, tzinfo=UTC)
+    later = datetime(2026, 8, 15, 18, 0, tzinfo=UTC)
+    already_locked = datetime(2026, 8, 15, 11, 0, tzinfo=UTC)
+    kickoffs = [
+        (later, "NS", False),
+        (earlier, "NS", False),
+        (already_locked, "1H", False),
+    ]
+    assert next_unlocked_kickoff(kickoffs, now=now, margin_minutes=0) == earlier
+
+
+def test_next_unlocked_kickoff_applies_the_league_margin() -> None:
+    now = datetime(2026, 8, 15, 15, 50, tzinfo=UTC)
+    kickoff = datetime(2026, 8, 15, 16, 0, tzinfo=UTC)
+    # A 10' dal kickoff, con margine 15': è già considerato bloccato — non
+    # è un candidato al "prossimo" lock, quindi resta None.
+    assert next_unlocked_kickoff(
+        [(kickoff, "NS", False)], now=now, margin_minutes=15
+    ) is None
+    # Stesso identico kickoff, senza margine: ancora sbloccato.
+    assert next_unlocked_kickoff(
+        [(kickoff, "NS", False)], now=now, margin_minutes=0
+    ) == kickoff
+
+
+def test_next_unlocked_kickoff_ignores_entries_without_a_kickoff() -> None:
+    now = datetime(2026, 8, 15, 12, 0, tzinfo=UTC)
+    known = datetime(2026, 8, 15, 18, 0, tzinfo=UTC)
+    kickoffs = [(None, "TBD", False), (known, "NS", False)]
+    assert next_unlocked_kickoff(kickoffs, now=now, margin_minutes=0) == known
 
 
 def test_athlete_lock_latched_survives_postponement_after_kickoff() -> None:

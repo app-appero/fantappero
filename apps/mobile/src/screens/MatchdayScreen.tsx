@@ -26,11 +26,13 @@ import {
   fetchH2HCalendar,
   fetchPendingFixtures,
 } from "../api/leagues";
+import { LockCountdown } from "../components/LockCountdown";
 import { StatusBadge } from "../components/StatusBadge";
 import { UiStatePanel } from "../components/UiStatePanel";
 import { PageContainer } from "../layout/PageContainer";
 import { useLiveH2HPolling } from "../matchday/useLiveH2HPolling";
 import { useLiveTurnPolling } from "../matchday/useLiveTurnPolling";
+import { useLockCountdown } from "../matchday/useLockCountdown";
 import type { RootStackParamList } from "../navigation/types";
 import { MatchdayH2HPanel } from "./matchday/MatchdayH2HPanel";
 import { getApiErrorMessage, useAuthSession } from "../session/DemoSessionContext";
@@ -100,6 +102,7 @@ export function MatchdayScreen() {
   const [actionError, setActionError] = useState<string | null>(null);
   const [actionMessage, setActionMessage] = useState<string | null>(null);
   const [pendingFixtures, setPendingFixtures] = useState<PendingFixtureSummary[]>([]);
+  const { countdown, refetch: refetchCountdown } = useLockCountdown(accessToken, activeLeagueId);
 
   const loadH2H = useCallback(async () => {
     if (!canView || !accessToken || !activeLeagueId) {
@@ -321,6 +324,13 @@ export function MatchdayScreen() {
             <Text style={styles.heading}>Turno {selected.number}</Text>
             <Text style={styles.body}>Stato: {TURN_DISPLAY_LABEL[selectedDisplayState]}</Text>
             <Text style={styles.body}>Cutoff: {formatDateTime(selected.cutoffAt)}</Text>
+            {countdown && countdown.roundId === selected.id ? (
+              <LockCountdown
+                state={countdown.state}
+                nextLockAt={countdown.nextLockAt}
+                onExpire={refetchCountdown}
+              />
+            ) : null}
             {selected.fixtures.some((fixture) => fixture.lockLatchedAt) ? (
               <Text style={styles.body} testID="matchday-cutoff-latch">
                 Un rinvio non sblocca le partite il cui kickoff originale è già trascorso. Le mosse

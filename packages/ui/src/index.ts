@@ -79,6 +79,9 @@ export type { BreadcrumbItem, BreadcrumbProps } from "./components/layout/Breadc
 export { LeagueSelector } from "./components/layout/LeagueSelector.js";
 export type { LeagueOption, LeagueSelectorProps } from "./components/layout/LeagueSelector.js";
 
+export { LockCountdown } from "./components/domain/LockCountdown.js";
+export type { LockCountdownProps } from "./components/domain/LockCountdown.js";
+
 export { KpiCard } from "./components/domain/KpiCard.js";
 export type { KpiCardProps, KpiTrend } from "./components/domain/KpiCard.js";
 

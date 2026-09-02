@@ -170,6 +170,7 @@ export type {
   FantasyTurnSummary,
   GenerateFantasyTurnRequest,
   KickoffLockState,
+  RoundCalculationResult,
   TurnDisplayState,
 } from "./fantasyTurns.js";
 
@@ -178,10 +179,13 @@ export type {
   FantasyModule,
   AiLineupRun,
   AiLineupTeamResult,
+  LineupAutoResolutionSource,
   LineupContext,
   LineupDraft,
   LineupEvaluation,
   LineupIssue,
+  LineupLockCountdown,
+  LineupLockCountdownState,
   LineupPlayer,
   LineupPlayerInput,
   LineupRole,
@@ -299,6 +303,9 @@ export type {
   AdminCalendarSyncJob,
   AdminCalendarSyncProgress,
   AdminCalendarSyncResult,
+  AdminHistoricalRepairJob,
+  AdminHistoricalRepairProgress,
+  AdminHistoricalRepairResult,
   AdminLeague,
   AdminLeagueTurnStatus,
   AdminListoneEntry,
@@ -307,6 +314,7 @@ export type {
   AdminListoneRefreshProgress,
   AdminListoneRefreshResult,
   AdminOverview,
+  AdminRoundCalculationResult,
   AdminTurniSyncResult,
   AdminUser,
   PaginatedAdminLeagues,
@@ -365,3 +373,6 @@ export type {
   NotificationPreferenceList,
   UpdateNotificationPreferenceRequest,
 } from "./notifications.js";
+
+export { computeCountdown, formatCountdown } from "./countdown.js";
+export type { CountdownParts } from "./countdown.js";

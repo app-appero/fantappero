@@ -124,6 +124,7 @@ class LeagueAuditAction(str, enum.Enum):
     CREDIT_LEDGER_ENTRY_POSTED = "credit_ledger_entry_posted"
     FANTASY_ROUND_HOMOLOGATED = "fantasy_round_homologated"
     FANTASY_ROUND_CORRECTION_APPLIED = "fantasy_round_correction_applied"
+    FANTASY_LINEUP_AUTO_RESOLVED = "fantasy_lineup_auto_resolved"
     MARKET_SESSION_CREATED = "market_session_created"
     MARKET_SESSION_CLOSED = "market_session_closed"
     MARKET_BID_SUBMITTED = "market_bid_submitted"
@@ -155,6 +156,18 @@ class FantasyRoundHomologationStatus(str, enum.Enum):
 
     PROVISIONAL = "provisional"
     HOMOLOGATED = "homologated"
+
+
+class LineupAutoResolutionSource(str, enum.Enum):
+    """Why a lineup submission was synthesized instead of user-provided.
+
+    NULL on the model means a normal human/AI submission — see
+    `fantasy_lineups/fallback_service.py::ensure_lineup_submissions_for_round`.
+    """
+
+    DRAFT = "draft"
+    PREVIOUS_ROUND = "previous_round"
+    ZERO_FALLBACK = "zero_fallback"
 
 
 class FantasyTurnKind(str, enum.Enum):

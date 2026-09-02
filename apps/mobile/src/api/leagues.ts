@@ -34,7 +34,9 @@ import type {
   FixtureLiveDetail,
   GenerateFantasyTurnRequest,
   PendingFixtureSummary,
+  RoundCalculationResult,
   LineupContext,
+  LineupLockCountdown,
   SaveLineupDraftRequest,
   SaveLineupRequest,
   LeagueAdminPanel,
@@ -765,6 +767,17 @@ export function openFantasyTurn(
   });
 }
 
+export function calculateCurrentRound(
+  accessToken: string,
+  leagueId: string,
+  roundId: string,
+): Promise<RoundCalculationResult> {
+  return apiRequest<RoundCalculationResult>(
+    `/leagues/${leagueId}/turni/${roundId}/calcola-giornata`,
+    { method: "POST", accessToken },
+  );
+}
+
 export function excludeFantasyTurnFixture(
   accessToken: string,
   leagueId: string,
@@ -798,6 +811,15 @@ export function fetchMyLineup(
   roundId: string,
 ): Promise<LineupContext> {
   return apiRequest<LineupContext>(`/leagues/${leagueId}/turni/${roundId}/formazione`, {
+    accessToken,
+  });
+}
+
+export function fetchLineupLockCountdown(
+  accessToken: string,
+  leagueId: string,
+): Promise<LineupLockCountdown> {
+  return apiRequest<LineupLockCountdown>(`/leagues/${leagueId}/formazione/prossimo-blocco`, {
     accessToken,
   });
 }

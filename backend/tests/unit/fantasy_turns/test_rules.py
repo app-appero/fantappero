@@ -24,6 +24,7 @@ from fantasy_turns.rules import (
     kickoff_counts_for_cutoff,
     midweek_window,
     reconcile_fixture_kickoff_lock,
+    resolve_default_turn,
     select_eligible_from_candidates,
     upcoming_turn_specs,
     weekend_window,
@@ -190,6 +191,25 @@ def test_aggregate_turn_status_completed_only_when_all_terminal() -> None:
 
 def test_aggregate_turn_status_empty_is_needs_update() -> None:
     assert aggregate_turn_status([]) == "needs_update"
+
+
+def test_resolve_default_turn_empty_list_is_none() -> None:
+    assert resolve_default_turn([]) is None
+
+
+def test_resolve_default_turn_all_completed_returns_the_last() -> None:
+    entries = [("t1", "completed"), ("t2", "completed"), ("t3", "completed")]
+    assert resolve_default_turn(entries) == "t3"
+
+
+def test_resolve_default_turn_returns_first_not_completed() -> None:
+    entries = [
+        ("t1", "completed"),
+        ("t2", "completed"),
+        ("t3", "scheduled"),
+        ("t4", "needs_update"),
+    ]
+    assert resolve_default_turn(entries) == "t3"
 
 
 def test_apply_cutoff_recalculation_simultaneous_and_timezones() -> None:

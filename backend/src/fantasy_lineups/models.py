@@ -21,7 +21,13 @@ from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from database.base import Base, TimestampMixin, UUIDPrimaryKeyMixin
-from database.enums import FantasyModule, FantasyRole, LineupSlotKind, TacticalMoveStatus
+from database.enums import (
+    FantasyModule,
+    FantasyRole,
+    LineupAutoResolutionSource,
+    LineupSlotKind,
+    TacticalMoveStatus,
+)
 from database.types import UTCDateTime
 
 if TYPE_CHECKING:
@@ -87,6 +93,20 @@ class LineupSubmission(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     ai_decided_at: Mapped[datetime | None] = mapped_column(UTCDateTime(), nullable=True)
     #: Segnali effettivamente usati e loro provenienza, per l'audit.
     ai_decision_log: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
+    # Formazione sintetizzata dal motore di calcolo turno perché mancava una
+    # formazione umana entro la chiusura (EP-turni-calcolo). NULL = submission
+    # normale (umana o IA) — concetto distinto da `system_generated_ai`, che
+    # riguarda la gestione IA di una squadra, non l'assenza di formazione.
+    auto_resolution_source: Mapped[LineupAutoResolutionSource | None] = mapped_column(
+        Enum(
+            LineupAutoResolutionSource,
+            name="lineup_auto_resolution_source",
+            native_enum=True,
+            create_constraint=True,
+            values_callable=lambda enum_cls: [member.value for member in enum_cls],
+        ),
+        nullable=True,
+    )
 
     league: Mapped[League] = relationship()
     round: Mapped[FantasyRound] = relationship()

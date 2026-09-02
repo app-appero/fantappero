@@ -3,12 +3,16 @@ import type {
   AdminCalendarSyncJob,
   AdminCalendarSyncProgress,
   AdminCalendarSyncResult,
+  AdminHistoricalRepairJob,
+  AdminHistoricalRepairProgress,
+  AdminHistoricalRepairResult,
   AdminLeagueTurnStatus,
   AdminListoneEntry,
   AdminListoneRefreshJob,
   AdminListoneRefreshProgress,
   AdminListoneRefreshResult,
   AdminOverview,
+  AdminRoundCalculationResult,
   AdminTurniSyncResult,
   AdminUser,
   PaginatedAdminLeagues,
@@ -192,6 +196,66 @@ export async function syncCalendarForAllLeagues(
         progress.message ||
           "Aggiornamento calendario massivo non riuscito (controlla quota API-Football / worker).",
       );
+    }
+    await new Promise((resolve) => {
+      window.setTimeout(resolve, pollIntervalMs);
+    });
+  }
+}
+
+export function calculateCurrentRoundsAllLeagues(
+  accessToken: string,
+): Promise<AdminRoundCalculationResult> {
+  return apiRequest<AdminRoundCalculationResult>("/admin/turni/calcola-giornata", {
+    accessToken,
+    method: "POST",
+  });
+}
+
+export function startHistoricalRepair(
+  accessToken: string,
+  reason: string,
+): Promise<AdminHistoricalRepairJob> {
+  return apiRequest<AdminHistoricalRepairJob>("/admin/turni/ricalcola-storico", {
+    accessToken,
+    method: "POST",
+    body: { reason },
+  });
+}
+
+export function fetchHistoricalRepairProgress(
+  accessToken: string,
+  jobId: string,
+): Promise<AdminHistoricalRepairProgress> {
+  return apiRequest<AdminHistoricalRepairProgress>(`/admin/turni/ricalcola-storico/${jobId}`, {
+    accessToken,
+  });
+}
+
+export async function repairHistoricalRounds(
+  accessToken: string,
+  reason: string,
+  options?: {
+    onProgress?: (progress: AdminHistoricalRepairProgress) => void;
+    pollIntervalMs?: number;
+  },
+): Promise<AdminHistoricalRepairResult> {
+  const started = await startHistoricalRepair(accessToken, reason);
+  if (!started.jobId) {
+    throw new Error("Ricalcolo avviato ma senza jobId. Ricarica la pagina e riprova.");
+  }
+  const pollIntervalMs = options?.pollIntervalMs ?? 800;
+  for (;;) {
+    const progress = await fetchHistoricalRepairProgress(accessToken, started.jobId);
+    options?.onProgress?.(progress);
+    if (progress.status === "completed") {
+      if (!progress.result) {
+        throw new Error("Ricalcolo completato senza risultato.");
+      }
+      return progress.result;
+    }
+    if (progress.status === "failed") {
+      throw new Error(progress.message || "Ricalcolo storico non riuscito.");
     }
     await new Promise((resolve) => {
       window.setTimeout(resolve, pollIntervalMs);

@@ -363,6 +363,35 @@ def is_athlete_kickoff_locked(
     return ensure_utc(now) >= threshold
 
 
+def next_unlocked_kickoff(
+    kickoffs: Iterable[tuple[datetime | None, str | None, bool]],
+    *,
+    now: datetime,
+    margin_minutes: int,
+) -> datetime | None:
+    """Kickoff più vicino tra i candidati non ancora bloccati (EP-turni-automazione).
+
+    Ogni voce è ``(kickoff_at, status_short, lock_latched)`` — la stessa
+    forma di ``_KickoffRef``. Riusa ``is_athlete_kickoff_locked`` così il
+    "prossimo blocco" resta sempre coerente con la regola che decide se un
+    giocatore è già bloccato. Voci senza kickoff risolvibile (bye, club non
+    mappato) non sono candidate né bloccanti.
+    """
+    candidates = [
+        kickoff_at
+        for kickoff_at, status_short, lock_latched in kickoffs
+        if kickoff_at is not None
+        and not is_athlete_kickoff_locked(
+            now=now,
+            kickoff_at=kickoff_at,
+            status_short=status_short,
+            lock_latched=lock_latched,
+            margin_minutes=margin_minutes,
+        )
+    ]
+    return min(candidates) if candidates else None
+
+
 def evaluate_progressive_lock(
     *,
     previous_slots: Mapping[object, str],

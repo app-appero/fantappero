@@ -24,6 +24,7 @@ from fantasy_lineups.schemas import (
     ComputeEffectiveLineupsResponse,
     EffectiveLineupResponse,
     LineupContextResponse,
+    LineupLockCountdownResponse,
     SaveLineupDraftRequest,
     SaveLineupRequest,
     SkippedBenchCandidateResponse,
@@ -66,6 +67,26 @@ def get_my_lineup(
     """Formazione del chiamante per il turno (moduli, rosa, lock per kickoff)."""
     try:
         return service.get_my_lineup(league_access, round_id)
+    except AuthError as exc:
+        return _error_response(exc)
+
+
+@router.get(
+    "/{league_id}/formazione/prossimo-blocco",
+    response_model=LineupLockCountdownResponse,
+)
+def get_my_lock_countdown(
+    league_access: LeagueAccess = Depends(require_league_permissions(Permission.ROSTER_VIEW)),
+    service: FantasyLineupService = Depends(get_fantasy_lineup_service),
+) -> LineupLockCountdownResponse | JSONResponse:
+    """Prossimo blocco per-giocatore della squadra del chiamante (EP-turni-automazione).
+
+    Nessun round_id richiesto — si auto-risolve il turno corrente e la
+    squadra dell'utente, come `GET /leagues/{league_id}/rosa`. Pensato per un
+    widget chiamato da ogni pagina, non solo dalla schermata formazione.
+    """
+    try:
+        return service.get_lock_countdown(league_access)
     except AuthError as exc:
         return _error_response(exc)
 

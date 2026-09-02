@@ -111,6 +111,46 @@ class AdminCalendarSyncProgressResponse(ApiModel):
     result: AdminCalendarSyncResultResponse | None = None
 
 
+class AdminRoundCalculationResultResponse(ApiModel):
+    """Esito di `process_live_fantasy_rounds` innescato a mano (EP-turni-calcolo)."""
+
+    rounds_considered: int = Field(alias="roundsConsidered")
+    rounds_processed: int = Field(alias="roundsProcessed")
+    rounds_finalized: int = Field(alias="roundsFinalized")
+    fixtures_scored: int = Field(alias="fixturesScored")
+    errors: list[dict[str, str]] = Field(default_factory=list)
+
+
+class AdminHistoricalRepairRequest(ApiModel):
+    reason: str = Field(min_length=1)
+
+
+class AdminHistoricalRepairJobResponse(ApiModel):
+    job_id: str = Field(alias="jobId")
+    status: str
+    message: str
+
+
+class AdminHistoricalRepairResultResponse(ApiModel):
+    """Esito di `repair_historical_rounds_for_active_leagues` (EP-turni-calcolo)."""
+
+    leagues: int
+    rounds_considered: int = Field(alias="roundsConsidered")
+    rounds_repaired: int = Field(alias="roundsRepaired")
+    rounds_failed: int = Field(alias="roundsFailed")
+    errors: list[dict[str, str]] = Field(default_factory=list)
+
+
+class AdminHistoricalRepairProgressResponse(ApiModel):
+    job_id: str = Field(alias="jobId")
+    status: str
+    percent: int
+    stage: str
+    message: str
+    error_code: str | None = Field(default=None, alias="errorCode")
+    result: AdminHistoricalRepairResultResponse | None = None
+
+
 class AdminListoneEntryResponse(ApiModel):
     athlete_id: str = Field(alias="athleteId")
     canonical_name: str = Field(alias="canonicalName")

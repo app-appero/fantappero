@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { theme } from "@fantappero/ui/theme";
 
@@ -15,6 +16,8 @@ export type LeagueSelectorProps = {
   onChange: (value: string) => void;
   placeholder?: string;
   testID?: string;
+  /** Rendered once next to the label, e.g. a lock countdown for the active league. */
+  accessory?: ReactNode;
 };
 
 /** Compact league picker for the mobile shell header. */
@@ -25,6 +28,7 @@ export function LeagueSelector({
   onChange,
   placeholder = "Seleziona lega",
   testID = "league-selector",
+  accessory,
 }: LeagueSelectorProps) {
   if (leagues.length === 0) {
     return null;
@@ -32,9 +36,12 @@ export function LeagueSelector({
 
   return (
     <View style={styles.wrapper} testID={testID}>
-      <Text style={styles.label} accessibilityRole="text">
-        {label}
-      </Text>
+      <View style={styles.labelRow}>
+        <Text style={styles.label} accessibilityRole="text">
+          {label}
+        </Text>
+        {accessory}
+      </View>
       <View style={styles.options} accessibilityRole="radiogroup" accessibilityLabel={label}>
         {leagues.map((league) => {
           const selected = league.value === value;
@@ -63,10 +70,15 @@ const styles = StyleSheet.create({
   wrapper: {
     flexShrink: 1,
   },
+  labelRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+    marginBottom: spacing.xs,
+  },
   label: {
     color: colors.foregroundSubtle,
     fontSize: typography.fontSize.xs,
-    marginBottom: spacing.xs,
   },
   options: {
     flexDirection: "row",

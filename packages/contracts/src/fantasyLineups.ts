@@ -58,6 +58,14 @@ export interface LineupRosterPlayer {
   fixtureStatus?: string | null;
 }
 
+/**
+ * Perché una formazione è stata sintetizzata dal motore di calcolo turno
+ * invece di essere inviata dal fantallenatore (EP-turni-calcolo). `null` per
+ * una submission normale, umana o IA (distinto da `systemGeneratedAi`, che
+ * riguarda la gestione IA di una squadra, non un fallback per assenza).
+ */
+export type LineupAutoResolutionSource = "draft" | "previous_round" | "zero_fallback" | null;
+
 export interface SavedLineup {
   id: string;
   module: FantasyModule;
@@ -67,6 +75,7 @@ export interface SavedLineup {
   systemGeneratedAi: boolean;
   aiAlgorithmVersion: string | null;
   aiDecidedAt: string | null;
+  autoResolutionSource?: LineupAutoResolutionSource;
   starters: LineupPlayer[];
   bench: LineupPlayer[];
 }
@@ -126,6 +135,7 @@ export interface LineupContext {
   status: FantasyTurnStatus;
   effectiveStatus: FantasyTurnStatus;
   modificationAllowed: boolean;
+  lineupLockMarginMinutes: number;
   serverNow?: string;
   maxAutomaticSubstitutions?: number;
   maxTacticalMoves?: number;
@@ -163,6 +173,24 @@ export interface CopyLineupResult {
   issues: LineupIssue[];
   blocked: boolean;
   canConfirm: boolean;
+}
+
+export type LineupLockCountdownState =
+  | "counting_down"
+  | "no_pending_lock"
+  | "turn_not_open"
+  | "no_roster"
+  | "no_active_turn";
+
+/** Mirror of `LineupLockCountdownResponse` (backend `fantasy_lineups/schemas.py`). */
+export interface LineupLockCountdown {
+  leagueId: string;
+  roundId: string | null;
+  roundNumber: number | null;
+  roundStatus: string | null;
+  state: LineupLockCountdownState;
+  nextLockAt: string | null;
+  serverNow: string;
 }
 
 export const APPROVED_MODULES: readonly FantasyModule[] = [
@@ -367,14 +395,22 @@ const STARTED_FIXTURE_STATUSES = new Set([
 const INACTIVE_FIXTURE_STATUSES = new Set(["PST", "CANC", "ABD", "AWD", "WO"]);
 
 /**
- * True when the athlete's real match has started. Server clock is authoritative;
- * simultaneous kickoffs lock together at the same UTC instant.
+ * True when the athlete's real match has started, or is about to. Server
+ * clock is authoritative; simultaneous kickoffs lock together at the same
+ * UTC instant.
+ *
+ * `marginMinutes` anticipates the lock instant (formazione a step,
+ * EP-turni-automazione) — mirror of `is_athlete_kickoff_locked` in
+ * `backend/src/fantasy_lineups/rules.py`. Optional and trailing so every
+ * existing call site keeps working unchanged; 0 reproduces the previous
+ * exact-kickoff behavior.
  */
 export function isAthleteKickoffLocked(
   now: string | Date,
   kickoffAt: string | Date | null | undefined,
   statusShort?: string | null,
   lockLatched?: boolean,
+  marginMinutes = 0,
 ): boolean {
   if (lockLatched) {
     return true;
@@ -389,7 +425,7 @@ export function isAthleteKickoffLocked(
   if (!kickoffAt) {
     return false;
   }
-  return ensureUtcMs(now) >= ensureUtcMs(kickoffAt);
+  return ensureUtcMs(now) >= ensureUtcMs(kickoffAt) - marginMinutes * 60_000;
 }
 
 export function evaluateProgressiveLock(input: {

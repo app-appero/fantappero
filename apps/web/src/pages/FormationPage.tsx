@@ -147,6 +147,7 @@ const DEMO_CONTEXT: LineupContext = {
   status: "open",
   effectiveStatus: "open",
   modificationAllowed: true,
+  lineupLockMarginMinutes: 15,
   serverNow: "2026-08-15T14:05:00.000Z",
   maxAutomaticSubstitutions: MAX_AUTOMATIC_SUBSTITUTIONS,
   maxTacticalMoves: MAX_TACTICAL_MOVES,
@@ -213,16 +214,32 @@ function playerRole(roster: LineupRosterPlayer[], athleteId: string): LineupRole
   return roster.find((row) => row.athleteId === athleteId)?.role ?? null;
 }
 
-function playerLocked(roster: LineupRosterPlayer[], athleteId: string, now: Date): boolean {
+function playerLocked(
+  roster: LineupRosterPlayer[],
+  athleteId: string,
+  now: Date,
+  marginMinutes = 0,
+): boolean {
   const player = roster.find((row) => row.athleteId === athleteId);
   if (!player) {
     return false;
   }
-  return player.locked === true || isAthleteKickoffLocked(now, player.kickoffAt, player.fixtureStatus, player.lockLatched);
+  return (
+    player.locked === true ||
+    isAthleteKickoffLocked(now, player.kickoffAt, player.fixtureStatus, player.lockLatched, marginMinutes)
+  );
 }
 
 const KICKOFF_LOCK_MESSAGE =
   "Uno o più calciatori non sono più modificabili: la loro partita è già iniziata.";
+
+const AUTO_RESOLUTION_MESSAGE: Record<"draft" | "previous_round" | "zero_fallback", string> = {
+  draft: "Non avevi confermato una formazione: è stata usata automaticamente la bozza salvata.",
+  previous_round:
+    "Non avevi schierato una formazione né una bozza: è stata riproposta l'ultima formazione valida.",
+  zero_fallback:
+    "Nessuna formazione disponibile per questo turno: il punteggio fantasy è stato impostato a 0.",
+};
 
 type StarterSlotOption = { value: string; label: string };
 
@@ -350,6 +367,7 @@ export function FormationPage() {
   }, [canView, demoState, isDemoMode]);
 
   const roster = context?.roster ?? [];
+  const lockMarginMinutes = context?.lineupLockMarginMinutes ?? 0;
   const template = starterTemplate(moduleCode);
   const clock = context?.serverNow ? new Date(context.serverNow) : new Date();
   const reservedIds = preserveLockedStarters({
@@ -370,7 +388,7 @@ export function FormationPage() {
     benchIds,
   );
   const lockedAthleteIds = roster
-    .filter((row) => playerLocked(roster, row.athleteId, clock))
+    .filter((row) => playerLocked(roster, row.athleteId, clock, lockMarginMinutes))
     .map((row) => row.athleteId);
   const clientEvaluation = evaluateLineup({
     module: moduleCode,
@@ -567,10 +585,10 @@ export function FormationPage() {
     const now = context?.serverNow ? new Date(context.serverNow) : new Date();
     const lockedIds = [
       ...new Set([
-        ...starterIds.filter((id) => id && playerLocked(roster, id, now)),
+        ...starterIds.filter((id) => id && playerLocked(roster, id, now, lockMarginMinutes)),
         ...(context?.lineup?.starters ?? [])
           .map((player) => player.athleteId)
-          .filter((id) => playerLocked(roster, id, now)),
+          .filter((id) => playerLocked(roster, id, now, lockMarginMinutes)),
       ]),
     ];
     const preserved = preserveLockedStarters({
@@ -607,7 +625,10 @@ export function FormationPage() {
       });
       return;
     }
-    if (playerLocked(roster, athleteId, clock) && athleteId !== (displayStarters[index] ?? "")) {
+    if (
+      playerLocked(roster, athleteId, clock, lockMarginMinutes) &&
+      athleteId !== (displayStarters[index] ?? "")
+    ) {
       setActionError(KICKOFF_LOCK_MESSAGE);
       return;
     }
@@ -893,7 +914,7 @@ export function FormationPage() {
       })
       .map((row) => ({
         value: row.athleteId,
-        label: playerLocked(roster, row.athleteId, clock)
+        label: playerLocked(roster, row.athleteId, clock, lockMarginMinutes)
           ? `${row.athleteName} (bloccato)`
           : row.athleteName,
       }));
@@ -991,6 +1012,12 @@ export function FormationPage() {
                     ? ` · ${context.lineup.aiAlgorithmVersion}`
                     : ""}
                   .
+                </p>
+              ) : null}
+              {context.lineup?.autoResolutionSource ? (
+                <p data-testid="formation-auto-resolution-badge">
+                  <Badge variant="warning">Formazione applicata automaticamente</Badge>{" "}
+                  {AUTO_RESOLUTION_MESSAGE[context.lineup.autoResolutionSource]}
                 </p>
               ) : null}
               <p data-testid="formation-cutoff">
@@ -1130,7 +1157,8 @@ export function FormationPage() {
           <div data-testid="formation-starters" className="fa-ds-showcase__stack">
             {template.map((role, index) => {
               const currentId = displayStarters[index] ?? "";
-              const lockedSlot = Boolean(reservedIds[index]) || playerLocked(roster, currentId, clock);
+              const lockedSlot =
+                Boolean(reservedIds[index]) || playerLocked(roster, currentId, clock, lockMarginMinutes);
               return (
                 <StarterSlotField
                   key={`${moduleCode}-${index}`}
@@ -1178,7 +1206,7 @@ export function FormationPage() {
             ) : (
               <ol className="fa-bench-order">
                 {displayBench.map((athleteId, index) => {
-                  const locked = playerLocked(roster, athleteId, clock);
+                  const locked = playerLocked(roster, athleteId, clock, lockMarginMinutes);
                   const role = playerRole(roster, athleteId);
                   const canEnter = index < maxSubs;
                   const name = playerName(roster, athleteId);

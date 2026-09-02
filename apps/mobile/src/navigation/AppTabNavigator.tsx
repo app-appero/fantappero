@@ -6,8 +6,10 @@ import { StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { theme } from "@fantappero/ui/theme";
 import { AppDrawer } from "../components/AppDrawer";
+import { LockCountdown } from "../components/LockCountdown";
 import { fetchPendingInviteCount } from "../api/managerInvites";
 import { AppHeader } from "../layout/AppHeader";
+import { useLockCountdown } from "../matchday/useLockCountdown";
 import { AuctionScreen } from "../screens/AuctionScreen";
 import { FormationScreen } from "../screens/FormationScreen";
 import { LeaguesScreen } from "../screens/LeaguesScreen";
@@ -115,6 +117,11 @@ function AppTabShell({
     void refreshPendingInvites();
   }, [refreshPendingInvites]);
 
+  const { countdown, refetch: refetchCountdown } = useLockCountdown(
+    accessToken,
+    leagues.length > 0 ? activeLeagueId : null,
+  );
+
   const activeRouteName = useNavigationState((state) => {
     const route = state.routes[state.index];
     if (!route) {
@@ -181,6 +188,15 @@ function AppTabShell({
         showLeagueSelector={leagues.length > 0}
         leagues={leagues.map((league) => ({ value: league.id, label: league.name }))}
         activeLeagueId={activeLeagueId}
+        leagueSelectorAccessory={
+          countdown ? (
+            <LockCountdown
+              state={countdown.state}
+              nextLockAt={countdown.nextLockAt}
+              onExpire={refetchCountdown}
+            />
+          ) : undefined
+        }
         onLeagueChange={(leagueId) => {
           setActiveLeagueId(leagueId);
           navigation.navigate("LeagueHome", { leagueId });

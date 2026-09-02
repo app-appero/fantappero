@@ -173,6 +173,18 @@ export interface FantasyCalendarRefreshResult {
   message: string;
 }
 
+/** Esito di "Calcola giornata corrente" per singola lega (EP-turni-calcolo). */
+export interface RoundCalculationResult {
+  roundId: string;
+  roundNumber: number;
+  fixturesScored: number;
+  fallbackResolvedFromDraft: number;
+  fallbackResolvedFromPreviousRound: number;
+  fallbackResolvedAsZero: number;
+  resultFinal: boolean;
+  homologated: boolean;
+}
+
 export interface FantasyCalendarRefreshJob {
   jobId: string;
   status: string;

@@ -6,6 +6,7 @@ import { AppHeader } from "../layout/AppHeader";
 import { AdminDashboardScreen } from "../screens/admin/AdminDashboardScreen";
 import { AdminLeaguesScreen } from "../screens/admin/AdminLeaguesScreen";
 import { AdminListoneScreen } from "../screens/admin/AdminListoneScreen";
+import { AdminTurniScreen } from "../screens/admin/AdminTurniScreen";
 import { AdminUsersScreen } from "../screens/admin/AdminUsersScreen";
 import { useAuthSession } from "../session/DemoSessionContext";
 import { NAV_LABELS } from "./navConfig";
@@ -58,6 +59,9 @@ export function AdminNavigator() {
         </Stack.Screen>
         <Stack.Screen name="AdminListone" options={{ title: NAV_LABELS["admin-listone"] }}>
           {() => <AdminListoneScreen />}
+        </Stack.Screen>
+        <Stack.Screen name="AdminTurni" options={{ title: NAV_LABELS["admin-turni"] }}>
+          {() => <AdminTurniScreen />}
         </Stack.Screen>
       </Stack.Navigator>
     </AdminShell>

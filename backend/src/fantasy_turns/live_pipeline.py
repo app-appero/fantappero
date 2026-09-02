@@ -1,9 +1,9 @@
 """Automatic provider-to-standings orchestration for fantasy matchdays.
 
-This module composes the existing idempotent domain services.  It does not
-introduce a second scoring formula: provider snapshots are normalized first,
-then ratings, effective lineups, H2H results, standings and homologation run
-in that order inside one transaction.
+This module selects which rounds are ready to (re)compute, then delegates
+the actual per-round work to `round_calculation_service.calculate_league_round`
+— the same function the manual admin commands (global, per-league, and the
+historical repair) call, so the automatic job never has behavior of its own.
 """
 
 from __future__ import annotations
@@ -15,14 +15,11 @@ from sqlalchemy.orm import Session
 
 from auth.exceptions import ValidationAuthError
 from database.enums import FantasyRoundHomologationStatus, FantasyTurnStatus
-from fantasy_lineups.substitution_service import compute_round_effective_lineups
-from fantasy_ratings.service import compute_fixture_ratings
-from fantasy_turns.homologation_service import homologate_round
 from fantasy_turns.models import FantasyRound, FantasyRoundFixture
-from leagues.scoring_service import compute_round_results
+from fantasy_turns.round_calculation_service import calculate_league_round
 from observability.logging import get_logger
 from observability.metrics import get_metrics
-from sports_data.fixtures.models import Fixture, PlayerMatchStat
+from sports_data.fixtures.models import Fixture
 
 logger = get_logger(__name__)
 
@@ -76,42 +73,16 @@ def process_live_fantasy_rounds(session: Session) -> LivePipelineResult:
     for round_id, league_id in round_rows:
         try:
             with session.begin_nested():
-                fixture_ids = list(
-                    session.scalars(
-                        select(FantasyRoundFixture.fixture_id).where(
-                            FantasyRoundFixture.round_id == round_id,
-                            FantasyRoundFixture.excluded_at.is_(None),
-                        )
-                    ).all()
+                calculation = calculate_league_round(
+                    session,
+                    round_id=round_id,
+                    league_id=league_id,
+                    actor_id=None,
+                    automatic=True,
                 )
-                fixtures_with_stats = set(
-                    session.scalars(
-                        select(PlayerMatchStat.fixture_id)
-                        .where(PlayerMatchStat.fixture_id.in_(fixture_ids))
-                        .distinct()
-                    ).all()
-                )
-                for fixture_id in fixture_ids:
-                    if fixture_id not in fixtures_with_stats:
-                        continue
-                    compute_fixture_ratings(
-                        session,
-                        fixture_id=fixture_id,
-                        league_id=league_id,
-                    )
-                    result.fixtures_scored += 1
-
-                compute_round_effective_lineups(session, round_id=round_id)
-                scoring = compute_round_results(session, round_id=round_id)
+                result.fixtures_scored += calculation.fixtures_scored
                 result.rounds_processed += 1
-
-                if scoring.result_final and scoring.counters.skipped == 0:
-                    homologate_round(
-                        session,
-                        round_id=round_id,
-                        actor_id=None,
-                        automatic=True,
-                    )
+                if calculation.homologated:
                     result.rounds_finalized += 1
         except ValidationAuthError as exc:
             result.errors.append({"roundId": str(round_id), "code": exc.code})

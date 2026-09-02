@@ -36,6 +36,7 @@ from fantasy_lineups.rules import (
     is_athlete_kickoff_locked,
     is_lineup_modification_allowed,
     lineup_signature,
+    next_unlocked_kickoff,
     parse_module,
     remaining_tactical_moves,
 )
@@ -43,6 +44,7 @@ from fantasy_lineups.schemas import (
     LineupContextResponse,
     LineupDraftResponse,
     LineupIssueResponse,
+    LineupLockCountdownResponse,
     LineupPlayerResponse,
     LineupRosterPlayerResponse,
     ModuleCountsResponse,
@@ -131,6 +133,71 @@ class FantasyLineupService:
             season_year=league_access.league.season_year,
             fantasy_team_id=team.id,
         )
+
+    def get_lock_countdown(self, league_access: LeagueAccess) -> LineupLockCountdownResponse:
+        """Prossimo blocco per-giocatore della squadra del chiamante (EP-turni-automazione).
+
+        Leggero apposta — nessun round_id in input, si auto-risolve tutto
+        come `get_my_team`: turno di riferimento (stessa scelta della pagina
+        Turni) → squadra dalla membership → rosa → kickoff per atleta →
+        margine di lega → stato + prossimo istante di blocco.
+        """
+        now = datetime.now(UTC)
+        league = league_access.league
+        reference = FantasyTurnService(self._session).resolve_reference_round(league.id)
+        if reference is None:
+            return LineupLockCountdownResponse(
+                leagueId=str(league.id),
+                state="no_active_turn",
+                serverNow=now,
+            )
+        effective = derive_effective_status(
+            reference.status, now=now, cutoff_at=reference.cutoff_at
+        )
+        base = {
+            "leagueId": str(league.id),
+            "roundId": str(reference.id),
+            "roundNumber": reference.number,
+            "roundStatus": effective.value,
+            "serverNow": now,
+        }
+        if effective not in {FantasyTurnStatus.OPEN, FantasyTurnStatus.LOCKED}:
+            # Turno non ancora aperto (o saltato): nessuna formazione è
+            # schierabile, quindi non serve nemmeno risolvere/creare la
+            # squadra — un endpoint di sola lettura chiamato da ogni pagina
+            # non deve scrivere dati quando non ce n'è bisogno.
+            return LineupLockCountdownResponse(**base, state="turn_not_open")
+        membership = self._require_membership(league_access)
+        team, created = ensure_team_for_membership(
+            self._session,
+            membership,
+            name=self._default_team_name(league_access),
+            actor_id=league_access.user.id,
+        )
+        if created:
+            self._session.commit()
+        team = find_team_for_membership(self._session, membership.id, with_slots=True)
+        assert team is not None
+        roster = self._roster_rows(league.season_year, team)
+        if not roster:
+            return LineupLockCountdownResponse(**base, state="no_roster")
+        kickoffs = self._athlete_kickoffs(
+            round_id=reference.id,
+            season_year=league.season_year,
+            athlete_ids=[row.athlete_id for row in roster],
+        )
+        margin = self._lineup_lock_margin_for_league(league.id)
+        next_lock = next_unlocked_kickoff(
+            (
+                (ref.kickoff_at, ref.status_short, ref.lock_latched)
+                for ref in kickoffs.values()
+            ),
+            now=now,
+            margin_minutes=margin,
+        )
+        if next_lock is None:
+            return LineupLockCountdownResponse(**base, state="no_pending_lock")
+        return LineupLockCountdownResponse(**base, state="counting_down", nextLockAt=next_lock)
 
     def save_my_lineup(
         self,
@@ -774,6 +841,7 @@ class FantasyLineupService:
             modificationAllowed=turn_editable and any_unlocked,
             serverNow=now,
             maxAutomaticSubstitutions=max_automatic_substitutions,
+            lineupLockMarginMinutes=lock_margin,
             maxTacticalMoves=MAX_TACTICAL_MOVES,
             tacticalMovesUsed=used,
             tacticalMovesRemaining=remaining_tactical_moves(used=used),
@@ -1014,6 +1082,11 @@ class FantasyLineupService:
             systemGeneratedAi=submission.system_generated_ai,
             aiAlgorithmVersion=submission.ai_algorithm_version,
             aiDecidedAt=submission.ai_decided_at,
+            autoResolutionSource=(
+                submission.auto_resolution_source.value
+                if submission.auto_resolution_source
+                else None
+            ),
             starters=starters,
             bench=bench,
         )

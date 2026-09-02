@@ -1,4 +1,5 @@
 import { theme } from "@fantappero/ui/theme";
+import type { ReactNode } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { BrandLogo } from "../components/BrandLogo";
 import { LeagueSelector } from "../components/LeagueSelector";
@@ -13,6 +14,8 @@ export type AppHeaderProps = {
   leagues?: readonly { value: string; label: string }[];
   activeLeagueId?: string | null;
   onLeagueChange?: (leagueId: string) => void;
+  /** Rendered next to the league selector's label, e.g. a lock countdown. */
+  leagueSelectorAccessory?: ReactNode;
   onBrandPress?: () => void;
   onBackToAppPress?: () => void;
   /** Apre il drawer laterale (solo surface app). */
@@ -29,6 +32,7 @@ export function AppHeader({
   leagues = [],
   activeLeagueId,
   onLeagueChange,
+  leagueSelectorAccessory,
   onBrandPress,
   onBackToAppPress,
   onMenuPress,
@@ -114,6 +118,7 @@ export function AppHeader({
           leagues={leagues}
           value={activeLeagueId}
           onChange={onLeagueChange}
+          accessory={leagueSelectorAccessory}
         />
       ) : null}
     </View>

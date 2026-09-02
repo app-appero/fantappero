@@ -113,9 +113,11 @@ def test_upgrade_from_empty_database(clean_db: str) -> None:
             # formazione automatica IA), EP13-P04 live fix (a1c4f6e9b382,
             # venue/arbitro/logo squadra/allenatore), EP13-P04-quinquies
             # (c7f2a4d6e831, foto giocatore dal provider) ed
-            # EP-turni-copertura (d8e3b5f7c962, soglia copertura formazione) ed
-            # EP-turni-automazione (e2f5a8c1b374, margine di preavviso del lock).
-            assert version == "e2f5a8c1b374"
+            # EP-turni-copertura (d8e3b5f7c962, soglia copertura formazione),
+            # EP-turni-automazione (e2f5a8c1b374, margine di preavviso del
+            # lock) ed EP-turni-calcolo (b4d8e19a5f36, provenienza formazione
+            # sintetizzata dal motore di calcolo turno).
+            assert version == "b4d8e19a5f36"
         assert named_statuses == ["pending", "accepted", "declined", "revoked", "expired"]
         assert calendar_statuses == ["draft", "confirmed"]
         assert fantasy_roles == ["P", "D", "C", "A"]

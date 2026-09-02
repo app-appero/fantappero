@@ -28,6 +28,7 @@ from fantasy_turns.schemas import (
     FixtureLiveDetailResponse,
     GenerateFantasyTurnRequest,
     PendingFixtureResponse,
+    RoundCalculationResponse,
 )
 from fantasy_turns.service import FantasyTurnService
 
@@ -275,5 +276,26 @@ def recalculate_fantasy_turn_cutoff(
     """
     try:
         return service.recalculate_cutoff(league_access, round_id)
+    except AuthError as exc:
+        return _error_response(exc)
+
+
+@router.post(
+    "/{league_id}/turni/{round_id}/calcola-giornata",
+    response_model=RoundCalculationResponse,
+)
+def calculate_fantasy_round(
+    round_id: UUID,
+    league_access: LeagueAccess = Depends(require_league_permissions(Permission.GLOBAL_OPERATE)),
+    service: FantasyTurnService = Depends(get_fantasy_turn_service),
+) -> RoundCalculationResponse | JSONResponse:
+    """Forza il calcolo della giornata: stessa logica del job automatico (EP-turni-calcolo).
+
+    Solo operatore di piattaforma. Verifica formazioni (con fallback per
+    quelle mancanti), calcola punteggi fantasy e risultati H2H, aggiorna la
+    classifica, e omologa il turno se i dati sono definitivi.
+    """
+    try:
+        return service.calculate_round(league_access, round_id)
     except AuthError as exc:
         return _error_response(exc)
