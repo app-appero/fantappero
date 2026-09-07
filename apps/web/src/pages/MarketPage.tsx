@@ -94,7 +94,15 @@ const DEMO_TEAM: FantasyTeam = {
   ],
 };
 
-/** Schermata Mercato: svincolo volontario con recupero crediti (EP08-04 / FR-MKT-02). */
+// "Svincolo volontario" (rimborso parziale, EP08-04/FR-MKT-02) e "Storico mercato"
+// (EP08-08/FR-MKT-04) sono nascosti: la tab (ex "Mercato", ora "Scambi") propone solo
+// scambi tra squadre. Una squadra non può restare con uno slot vuoto — uno svincolo va
+// sempre seguito da un acquisto, e questo flusso vive già in Rosa (rimborso pieno,
+// tracciato nello storico rosa). Codice/test tenuti per un eventuale ripristino. ADR-0006.
+const SHOW_VOLUNTARY_RELEASE = false;
+const SHOW_MARKET_HISTORY = false;
+
+/** Schermata Scambi (ex "Mercato"): proposte di scambio tra squadre (EP08-05/06/07). */
 export function MarketPage() {
   const { isDemoMode, activeLeagueId, can } = useAuth();
   const canManageMarket = can(["market:manage"]);
@@ -385,13 +393,13 @@ export function MarketPage() {
   if (isDemoMode && demoState === "forbidden") {
     return (
       <PageContainer
-        title="Mercato"
-        header={<Breadcrumb items={[{ label: "Leghe", href: "/leghe" }, { label: "Mercato" }]} />}
+        title="Scambi"
+        header={<Breadcrumb items={[{ label: "Leghe", href: "/leghe" }, { label: "Scambi" }]} />}
       >
         <UiStatePanel
           state="forbidden"
           title="Permessi insufficienti"
-          message="Non hai accesso al mercato di questa lega."
+          message="Non hai accesso agli scambi di questa lega."
           testId="wireframe-market-forbidden"
         />
       </PageContainer>
@@ -400,8 +408,8 @@ export function MarketPage() {
 
   return (
     <PageContainer
-      title="Mercato"
-      header={<Breadcrumb items={[{ label: "Leghe", href: "/leghe" }, { label: "Mercato" }]} />}
+      title="Scambi"
+      header={<Breadcrumb items={[{ label: "Leghe", href: "/leghe" }, { label: "Scambi" }]} />}
     >
       <div className="fa-market-page">
         {loading ? (
@@ -436,7 +444,7 @@ export function MarketPage() {
           />
         ) : null}
 
-        {!loading && !loadError && (isDemoMode || activeLeagueId) ? (
+        {SHOW_VOLUNTARY_RELEASE && !loading && !loadError && (isDemoMode || activeLeagueId) ? (
           <WireframeSection label="Svincolo volontario" testId="market-release-section">
             {ownedSlots.length === 0 ? (
               <UiStatePanel
@@ -889,7 +897,7 @@ export function MarketPage() {
           </WireframeSection>
         ) : null}
 
-        {!isDemoMode && activeLeagueId ? (
+        {SHOW_MARKET_HISTORY && !isDemoMode && activeLeagueId ? (
           <WireframeSection label="Storico mercato" testId="wireframe-region-market-history">
             <div className="fa-ds-showcase__row">
               <Select

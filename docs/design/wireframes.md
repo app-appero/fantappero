@@ -14,7 +14,7 @@ Wireframe responsive navigabili nella web app per validare struttura e gerarchia
 | Turno + Risultati | `/turni` (tab) | M2, M3 | Partecipante |
 | Classifica | `/classifica` | M3 | Partecipante — pagina reale EP07-06 (wireframe solo in demo `?persona=`) |
 | Asta | `/asta` | M3 | Partecipante, Admin lega |
-| Mercato | `/mercato` | M3 | Partecipante, Admin lega |
+| Scambi (tab "Mercato", `/mercato`) | `/mercato` | M3 | Partecipante, Admin lega |
 
 **Pannello operatore (`/admin`, `/admin/leghe`, `/admin/utenti`) non è più un wireframe di questo inventario dalla EP11-04a**: sono pagine reali con dati dal backend, gated da sessione con `platform_role=operator`. Restano fuori scope per questa card: anomalie dati, job operatore, audit UI consultabile (EP11-04 resto / EP11-03).
 
@@ -60,7 +60,12 @@ Annotazioni PO (CTA, passaggi critici): aggiungere `?meta=1` oppure aprire `/dev
 | Risultati (tab) | — | Punteggi fantasy, provvisorio/definitivo | Consultazione esito turno |
 | Classifica | Consulta classifica | Posizione, punti, GF/GA | Ranking → propria squadra |
 | Asta | Invia offerta | Budget, giocatore, sessione | Target → offerta → conferma |
-| Mercato | Proponi scambio | Svincolati, crediti, proposte | Svincolati → proposta → approvazione |
+| Scambi | Proponi scambio | Squadra destinataria, giocatori, crediti | Selezione squadra → proposta → accetta/rifiuta/controproponi |
+
+Tab "Svincolati" e sezioni "Svincolo volontario"/"Storico mercato" (ex tab "Mercato")
+nascoste da UI — codice e route mantenuti. Uno svincolo va sempre seguito da un
+acquisto: il flusso vive in Rosa (rimborso pieno, storico proprio). Dettagli e
+motivazione: [`ADR-0006`](../adr/ADR-0006-mercato-focus-su-scambi.md).
 
 ### M4 — Operatore piattaforma
 

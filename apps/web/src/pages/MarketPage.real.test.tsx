@@ -170,7 +170,9 @@ async function renderAppAt(
   };
 }
 
-describe("Mercato — svincolo volontario collegato alle API reali (EP08-04)", () => {
+// Sezione nascosta da MarketPage (SHOW_VOLUNTARY_RELEASE = false, ADR-0006): la tab
+// "Scambi" propone solo scambi. Test tenuti per un eventuale ripristino della UI.
+describe.skip("Mercato — svincolo volontario collegato alle API reali (EP08-04)", () => {
   beforeEach(() => {
     clearStoredSession();
     fetchMyCreditsMock.mockReset().mockResolvedValue({
@@ -409,7 +411,9 @@ describe("Mercato — scambi collegati alle API reali (EP08-05/06)", () => {
   });
 });
 
-describe("Mercato — storico collegato alle API reali (EP08-08)", () => {
+// Sezione nascosta da MarketPage (SHOW_MARKET_HISTORY = false, ADR-0006): lo storico
+// scambi resta consultabile in Rosa. Test tenuti per un eventuale ripristino della UI.
+describe.skip("Mercato — storico collegato alle API reali (EP08-08)", () => {
   beforeEach(() => {
     clearStoredSession();
     fetchMyFantasyTeamMock.mockReset().mockResolvedValue(TEAM_WITH_PLAYER);
