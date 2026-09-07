@@ -18,6 +18,7 @@ import { ManagerDirectory } from "../components/ManagerDirectory";
 import { loadStoredSession } from "../auth/sessionStorage";
 import { useLocation } from "../router/simpleRouter";
 import { parseWireframeStateFromSearch } from "../wireframes/useWireframeState";
+import { LeagueCalendarPanel } from "./LeagueCalendarPanel";
 import { LeagueDeletePanel } from "./LeagueDeletePanel";
 import { LeagueInvitesPanel } from "./LeagueInvitesPanel";
 import { LeagueMembersPanel } from "./LeagueMembersPanel";
@@ -331,6 +332,26 @@ export function LeagueAdminPage() {
             partita reale — non del turno intero: la formazione a step resta invariata.
           </p>
 
+          <Input
+            label="Titolari minimi schierabili per giocare il turno (%)"
+            name="turnCoverageThreshold"
+            type="number"
+            min={50}
+            max={100}
+            disabled={!canConfigure}
+            value={String(Math.round(rules.turnCoverageThreshold * 100))}
+            onChange={(event) =>
+              updateLocalRules({
+                turnCoverageThreshold: (Number(event.target.value) || 0) / 100,
+              })
+            }
+          />
+          <p className="fa-field-hint" data-testid="league-admin-turn-coverage-hint">
+            Percentuale dei titolari che ogni fantallenatore deve poter schierare perché una
+            giornata diventi un Turno Europeo valido e quindi giocabile (minimo 50%, massimo
+            100%).
+          </p>
+
           <fieldset data-testid="league-admin-roster" style={{ marginBottom: "1rem" }}>
             <legend>Rosa standard (fissa)</legend>
             <p>{`${rules.roster.rosterSize} giocatori: ${rules.roster.goalkeepers}P-${rules.roster.defenders}D-${rules.roster.midfielders}C-${rules.roster.forwards}A`}</p>
@@ -487,6 +508,13 @@ export function LeagueAdminPage() {
           title="Inviti nominativi"
           compact
         />
+        {lifecycle ? (
+          <LeagueCalendarPanel
+            leagueId={activeLeagueId}
+            isDemoMode={isDemoMode}
+            search={search}
+          />
+        ) : null}
         {lifecycle ? (
           <LeagueSeasonPanel
             leagueId={activeLeagueId}

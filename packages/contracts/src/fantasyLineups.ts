@@ -57,6 +57,19 @@ export interface LineupRosterPlayer {
   kickoffAt?: string | null;
   fixtureStatus?: string | null;
   photoUrl?: string | null;
+  /** Voto fantacalcistico del turno corrente, se già disponibile (EP-formazione-voti). */
+  fantasyScore?: number | null;
+  /** Voto statistico prima dei bonus/malus. */
+  baseScore?: number | null;
+  bonusTotal?: number;
+  malusTotal?: number;
+  bonusMalus?: Array<{
+    id: string;
+    count: number;
+    unit_value: number;
+    contribution: number;
+  }>;
+  fixtureStatusLabel?: string | null;
 }
 
 /**
@@ -490,7 +503,15 @@ export function preserveLockedStarters(input: {
 }): string[] {
   const next = input.template.map(() => "");
   const rosterById = new Map(input.roster.map((row) => [row.athleteId, row]));
+  // `currentStarters` può contenere lo stesso atleta bloccato più di una
+  // volta (es. sia nella bozza in corso sia nella formazione confermata):
+  // senza questo controllo verrebbe riservato due volte, duplicandolo su
+  // due slot dello stesso ruolo.
+  const reserved = new Set<string>();
   for (const athleteId of input.currentStarters) {
+    if (reserved.has(athleteId)) {
+      continue;
+    }
     const player = rosterById.get(athleteId);
     if (!player?.role) {
       continue;
@@ -505,6 +526,7 @@ export function preserveLockedStarters(input: {
     const slot = next.findIndex((value, index) => !value && input.template[index] === player.role);
     if (slot >= 0) {
       next[slot] = athleteId;
+      reserved.add(athleteId);
     }
   }
   return next;

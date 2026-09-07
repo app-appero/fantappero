@@ -33,7 +33,12 @@ export function CoachProfilePage({ userId }: { userId: string }) {
   const { activeLeagueId, isDemoMode } = useAuth();
   const { search } = useLocation();
   const navigate = useNavigate();
-  const leagueId = new URLSearchParams(search).get("league") || activeLeagueId;
+  const searchParams = new URLSearchParams(search);
+  const leagueId = searchParams.get("league") || activeLeagueId;
+  const cameFromStandings = searchParams.get("from") === "classifica";
+  const backHref = cameFromStandings ? "/classifica" : "/fantallenatori";
+  const backLabel = cameFromStandings ? "Classifica" : "Fantallenatori";
+  const closeLabel = cameFromStandings ? "Torna alla classifica" : "Torna alla directory";
 
   const [profile, setProfile] = useState<FantasyCoachProfile | null>(() =>
     isDemoMode ? demoProfileFor(userId) : null,
@@ -82,7 +87,7 @@ export function CoachProfilePage({ userId }: { userId: string }) {
       header={
         <Breadcrumb
           items={[
-            { label: "Fantallenatori", href: "/fantallenatori" },
+            { label: backLabel, href: backHref },
             { label: profile?.displayName ?? "Profilo" },
           ]}
         />
@@ -107,8 +112,8 @@ export function CoachProfilePage({ userId }: { userId: string }) {
       {!loading && !error && profile ? (
         <CoachProfilePanel
           profile={profile}
-          closeLabel="Torna alla directory"
-          onClose={() => navigate("/fantallenatori")}
+          closeLabel={closeLabel}
+          onClose={() => navigate(backHref)}
         />
       ) : null}
     </PageContainer>

@@ -26,6 +26,8 @@ export type { TabListProps, TabPanelProps, TabProps, TabsProps } from "./compone
 
 export { Modal } from "./components/Modal.js";
 export type { ModalProps } from "./components/Modal.js";
+export { ProgressBar } from "./components/ProgressBar.js";
+export type { ProgressBarProps } from "./components/ProgressBar.js";
 
 export { ToastProvider, useToast } from "./components/Toast.js";
 export type { ToastInput, ToastProviderProps, ToastVariant } from "./components/Toast.js";

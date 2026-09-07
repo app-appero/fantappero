@@ -153,7 +153,7 @@ def generate_ai_lineup(
             message="La formazione già salvata manualmente resta invariata.",
         )
 
-    candidates = _collect_candidates(
+    candidates = collect_candidates_for_team(
         session,
         league_id=league_id,
         round_id=round_id,
@@ -265,7 +265,7 @@ def generate_ai_lineup(
     )
 
 
-def _collect_candidates(
+def collect_candidates_for_team(
     session: Session,
     *,
     league_id: UUID,
@@ -586,6 +586,7 @@ def _decision_log(plan: LineupPlan) -> dict[str, object]:
 __all__ = [
     "AI_LINEUP_ALGORITHM_VERSION",
     "AiLineupResult",
+    "collect_candidates_for_team",
     "generate_ai_lineup",
     "run_ai_lineups_for_round",
 ]

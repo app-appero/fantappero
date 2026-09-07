@@ -21,6 +21,7 @@ from fantasy_teams.models import FantasyRosterSlot
 from leagues.models.competition import Competition
 from leagues.models.league_membership import LeagueMembership
 from mail.capture import get_captured_emails
+from sports_data.catalog.models import Club, CompetitionSeasonClub, SportSeason
 from sports_data.listone.models import RoleAssignment
 from sports_data.roster.models import Athlete
 
@@ -122,9 +123,51 @@ def _seed_role_pool(db_session: Session, *, start_provider_id: int = 900_000) ->
             provider_id += 1
 
 
-def _create_ai_member(db_session: Session, league_id: str) -> User:
+def _seed_athlete_outside_competitions(
+    db_session: Session,
+    provider_id: int,
+    name: str,
+    *,
+    role: FantasyRole,
+    season_year: int = 2026,
+) -> Athlete:
+    """An athlete whose only club plays in a competition the league never joined —
+    a candidate the random-fill pool must exclude (EP05-08 regression)."""
+    other_competition = Competition(
+        provider_id=990100 + provider_id, name=f"Campionato Escluso {provider_id}", country="XX"
+    )
+    db_session.add(other_competition)
+    db_session.flush()
+    club = Club(provider_id=provider_id, name=f"Club Escluso {provider_id}")
+    db_session.add(club)
+    db_session.flush()
+    season = SportSeason(competition_id=other_competition.id, year=season_year)
+    db_session.add(season)
+    db_session.flush()
+    db_session.add(CompetitionSeasonClub(sport_season_id=season.id, club_id=club.id))
+    athlete = Athlete(provider_id=provider_id, canonical_name=name)
+    db_session.add(athlete)
+    db_session.flush()
+    db_session.add(
+        RoleAssignment(
+            athlete_id=athlete.id,
+            season_year=season_year,
+            role=role,
+            mapping_version="v1.0.0",
+            provider_position_raw=role.value,
+            club_id=club.id,
+        )
+    )
+    db_session.commit()
+    db_session.refresh(athlete)
+    return athlete
+
+
+def _create_ai_member(
+    db_session: Session, league_id: str, *, email: str = "ai.random.roster@ai-managers.example.com"
+) -> User:
     user = User(
-        email="ai.random.roster@ai-managers.example.com",
+        email=email,
         password_hash=hash_password("unused-secret"),
         platform_role=PlatformRole.USER,
         user_type=UserType.AI,
@@ -196,6 +239,57 @@ def test_assign_random_ai_roster_fills_complete_composition(
     assert members.status_code == 200
     ai_member = next(row for row in members.json() if row["userId"] == str(ai_user.id))
     assert ai_member["userType"] == "ai"
+
+
+def test_assign_random_ai_roster_ignores_athletes_outside_league_competitions(
+    client: TestClient,
+    db_session: Session,
+    competition_ids: list[str],
+) -> None:
+    """A league scoped to a subset of competitions must never have the random
+    fill pick an athlete whose only role assignment sits in a competition it
+    never joined — that used to slip into the candidate pool and blow up
+    later as "role_unresolved" (EP05-08 regression)."""
+    token, _ = _register_and_login(client, "random.ai.scoped@example.com")
+    league_id = _create_league(client, token, competition_ids, "Lega Random IA Scoped")
+    ai_user = _create_ai_member(
+        db_session, league_id, email="ai.random.roster.scoped@ai-managers.example.com"
+    )
+    _seed_role_pool(db_session, start_provider_id=920_000)
+
+    decoy_ids = {
+        str(
+            _seed_athlete_outside_competitions(
+                db_session, 930_000 + index, f"Decoy {role.value} {index}", role=role
+            ).id
+        )
+        for index, role in enumerate([FantasyRole.A] * 5 + [FantasyRole.D] * 5)
+    }
+
+    ensured = client.post(
+        f"/leagues/{league_id}/amministrazione/squadre",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert ensured.status_code == 200
+    ai_team = next(
+        team for team in ensured.json()["teams"] if team["userId"] == str(ai_user.id)
+    )
+
+    response = client.post(
+        f"/leagues/{league_id}/amministrazione/squadre/{ai_team['id']}/rosa/random",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert response.status_code == 200, response.json()
+    body = response.json()
+    assert body["filledSlots"] == 35
+    assert body["composition"]["counts"] == {"P": 3, "D": 11, "C": 11, "A": 10}
+
+    assigned_ids = {
+        str(slot["athleteId"])
+        for slot in body["slots"]
+        if slot["athleteId"] is not None
+    }
+    assert assigned_ids.isdisjoint(decoy_ids)
 
 
 def test_assign_random_ai_roster_rejects_human_team(

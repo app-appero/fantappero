@@ -10,7 +10,6 @@ import type {
   AdminListoneEntry,
   AdminListoneRefreshJob,
   AdminListoneRefreshProgress,
-  AdminListoneRefreshResult,
   AdminOverview,
   AdminRoundCalculationResult,
   AdminTurniSyncResult,
@@ -96,38 +95,13 @@ export function fetchAdminListoneRefreshProgress(
   });
 }
 
-export async function refreshAdminListone(
+/** Lets any operator discover a refresh already in progress, not just the one who started it. */
+export function fetchActiveAdminListoneRefresh(
   accessToken: string,
-  seasonYear: number,
-  options?: {
-    onProgress?: (progress: AdminListoneRefreshProgress) => void;
-    pollIntervalMs?: number;
-  },
-): Promise<AdminListoneRefreshResult> {
-  const started = await startAdminListoneRefresh(accessToken, seasonYear);
-  if (!started.jobId) {
-    throw new Error("Aggiornamento avviato ma senza jobId. Ricarica la pagina e riprova.");
-  }
-  const pollIntervalMs = options?.pollIntervalMs ?? 800;
-  for (;;) {
-    const progress = await fetchAdminListoneRefreshProgress(accessToken, started.jobId);
-    options?.onProgress?.(progress);
-    if (progress.status === "completed") {
-      if (!progress.result) {
-        throw new Error("Aggiornamento completato senza risultato.");
-      }
-      return progress.result;
-    }
-    if (progress.status === "failed") {
-      throw new Error(
-        progress.message ||
-          "Aggiornamento listone non riuscito (controlla quota API-Football / worker).",
-      );
-    }
-    await new Promise((resolve) => {
-      window.setTimeout(resolve, pollIntervalMs);
-    });
-  }
+): Promise<AdminListoneRefreshProgress | null> {
+  return apiRequest<AdminListoneRefreshProgress | null>(`/admin/listone/aggiorna`, {
+    accessToken,
+  });
 }
 
 // --- Pannello operatore: turni, calendario, formazioni IA (EP-turni-automazione) ---

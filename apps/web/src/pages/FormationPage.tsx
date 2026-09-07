@@ -16,11 +16,15 @@ import {
   evaluateLineup,
   evaluateProgressiveLock,
   evaluateTacticalMove,
+  fantasyBadgesFromBonusMalus,
+  formatFantasyPoints,
   isAthleteKickoffLocked,
   layoutFromModule,
+  lineupSignature,
   moveBenchToIndex,
   orderedBenchFromRoster,
   preserveLockedStarters,
+  resolveDefaultEuropeanTurn,
   slotsFromLineupIds,
   starterTemplate,
 } from "@fantappero/contracts";
@@ -36,12 +40,14 @@ import {
   Select,
   UiStatePanel,
   roleBadgeVariant,
+  useToast,
   type PitchPlayer,
 } from "@fantappero/ui";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   fetchFantasyTurns,
   fetchMyLineup,
+  applyBestLineup,
   copyPreviousLineupToDraft,
   saveLineupDraft,
   saveMyLineup,
@@ -207,6 +213,21 @@ function playerPhotoUrl(roster: LineupRosterPlayer[], athleteId: string): string
   return roster.find((row) => row.athleteId === athleteId)?.photoUrl ?? null;
 }
 
+/** `"7.5"`, `"7.5 LIVE"` mentre la partita reale è in corso, o `null` se non ancora giocata. */
+function playerScoreLabel(roster: LineupRosterPlayer[], athleteId: string): string | null {
+  const player = roster.find((row) => row.athleteId === athleteId);
+  if (!player || player.fantasyScore == null) {
+    return null;
+  }
+  const base = formatFantasyPoints(player.fantasyScore);
+  return player.fixtureStatusLabel === "LIVE" ? `${base} LIVE` : base;
+}
+
+function playerBadges(roster: LineupRosterPlayer[], athleteId: string) {
+  const player = roster.find((row) => row.athleteId === athleteId);
+  return fantasyBadgesFromBonusMalus(player?.bonusMalus ?? []);
+}
+
 function playerLocked(
   roster: LineupRosterPlayer[],
   athleteId: string,
@@ -243,7 +264,6 @@ function StarterSlotField({
   options,
   disabled,
   hint,
-  error,
   testId,
   placeholder,
   onSelect,
@@ -254,7 +274,6 @@ function StarterSlotField({
   options: StarterSlotOption[];
   disabled: boolean;
   hint?: string;
-  error?: string;
   testId: string;
   placeholder: string;
   onSelect: (athleteId: string) => void;
@@ -274,7 +293,6 @@ function StarterSlotField({
         className="fa-select fa-starter-slot__trigger"
         data-testid={testId}
         disabled={disabled}
-        aria-invalid={error ? true : undefined}
         aria-expanded={open}
         aria-haspopup="listbox"
         onClick={() => {
@@ -306,12 +324,7 @@ function StarterSlotField({
           ))}
         </ul>
       ) : null}
-      {hint && !error ? <p className="fa-field__hint">{hint}</p> : null}
-      {error ? (
-        <p className="fa-field__error" role="alert">
-          {error}
-        </p>
-      ) : null}
+      {hint ? <p className="fa-field__hint">{hint}</p> : null}
     </div>
   );
 }
@@ -327,6 +340,7 @@ function BenchOrderRow({
   disabled,
   options,
   onMove,
+  scoreLabel,
 }: {
   athleteId: string;
   index: number;
@@ -338,6 +352,7 @@ function BenchOrderRow({
   disabled: boolean;
   options: Array<{ value: string; label: string; disabled: boolean }>;
   onMove: (target: number) => void;
+  scoreLabel?: string | null;
 }) {
   return (
     <li
@@ -359,6 +374,15 @@ function BenchOrderRow({
         <Badge variant={roleBadgeVariant(role)}>{role ?? "?"}</Badge>
         {name}
         {locked ? " — bloccato" : ""}
+        {scoreLabel ? (
+          <strong
+            className="fa-bench-order__score"
+            data-testid={`formation-bench-score-${athleteId}`}
+          >
+            {" "}
+            {scoreLabel}
+          </strong>
+        ) : null}
         <span className="fa-bench-order__hint">
           {canEnter ? "può subentrare" : `oltre i ${maxSubs} cambi`}
         </span>
@@ -374,6 +398,7 @@ export function FormationPage() {
   const demoState = isDemoMode ? parseWireframeStateFromSearch(search) : null;
   const canView = can(["roster:view"]);
   const canEdit = can(["roster:edit"]);
+  const { push: pushToast } = useToast();
 
   const [turns, setTurns] = useState<FantasyTurnSummary[]>(() =>
     isDemoMode && demoState === "success" ? DEMO_TURNS : [],
@@ -396,8 +421,6 @@ export function FormationPage() {
   const [loadError, setLoadError] = useState<string | null>(() =>
     isDemoMode && demoState === "error" ? "Impossibile caricare la formazione (demo)." : null,
   );
-  const [actionError, setActionError] = useState<string | null>(null);
-  const [actionMessage, setActionMessage] = useState<string | null>(null);
 
   const showForbidden = useMemo(() => {
     if (isDemoMode && demoState === "forbidden") {
@@ -410,18 +433,17 @@ export function FormationPage() {
   const lockMarginMinutes = context?.lineupLockMarginMinutes ?? 0;
   const template = starterTemplate(moduleCode);
   const clock = context?.serverNow ? new Date(context.serverNow) : new Date();
-  const reservedIds = preserveLockedStarters({
-    template,
-    currentStarters: [
-      ...starterIds,
-      ...(context?.lineup?.starters ?? []).map((player) => player.athleteId),
-    ],
-    roster,
-    now: clock,
-  });
-  const displayStarters = template.map(
-    (_, index) => reservedIds[index] || starterIds[index] || "",
-  );
+  // Solo la bozza/stato mostrato a schermo: mai concatenato con
+  // `context.lineup.starters` (l'ultima formazione confermata), che può
+  // legittimamente differire dalla bozza (es. dopo "Applica formazione
+  // migliore") e riservare un bloccato in uno slot diverso da quello già
+  // corretto assegnato dal server — duplicando o svuotando uno slot.
+  // `preserveLockedStarters` **ri-colloca** i bloccati nel primo slot libero
+  // del loro ruolo: è ciò che serve quando cambia il modulo, ma a template
+  // invariato sposterebbe un bloccato in uno slot precedente lasciandolo
+  // anche in quello originale — duplicandolo in campo. Qui la formazione
+  // mostrata è semplicemente la bozza, senza ri-collocazioni.
+  const displayStarters = template.map((_, index) => starterIds[index] ?? "");
   const displayBench = orderedBenchFromRoster(
     roster.map((row) => row.athleteId),
     displayStarters,
@@ -430,15 +452,33 @@ export function FormationPage() {
   const lockedAthleteIds = roster
     .filter((row) => playerLocked(roster, row.athleteId, clock, lockMarginMinutes))
     .map((row) => row.athleteId);
+
+  // Ruolo con cui il calciatore è stato effettivamente schierato nella
+  // formazione confermata. Per chi è già bloccato vale questo, non il ruolo
+  // ricalcolato oggi dal listone: una riclassificazione a stagione in corso
+  // non deve invalidare a posteriori una formazione legittima che ormai non
+  // è più modificabile. Stessa regola applicata dal server
+  // (`FantasyLineupService._validation_roles`).
+  const fieldedRoleById = new Map<string, LineupRole>(
+    [...(context?.lineup?.starters ?? []), ...(context?.lineup?.bench ?? [])].map((player) => [
+      player.athleteId,
+      player.role,
+    ]),
+  );
+  const lockedSet = new Set(lockedAthleteIds);
+  const validationRole = (athleteId: string): LineupRole | null =>
+    (lockedSet.has(athleteId) ? fieldedRoleById.get(athleteId) : undefined) ??
+    playerRole(roster, athleteId);
+
   const clientEvaluation = evaluateLineup({
     module: moduleCode,
     starters: displayStarters.filter(Boolean).map((athleteId) => ({
       athleteId,
-      role: playerRole(roster, athleteId),
+      role: validationRole(athleteId),
     })),
     bench: displayBench.map((athleteId) => ({
       athleteId,
-      role: playerRole(roster, athleteId),
+      role: validationRole(athleteId),
     })),
     rosterAthleteIds: roster.map((row) => row.athleteId),
   });
@@ -456,9 +496,24 @@ export function FormationPage() {
     previousBenchIds: context?.lineup?.bench.map((player) => player.athleteId) ?? [],
     maximum: maxMoves,
   });
-  const movesRemaining = tacticalEvaluation.wouldConsume
-    ? tacticalEvaluation.remainingAfter
-    : (context?.tacticalMovesRemaining ?? maxMoves - movesUsed);
+  // Mosse *già usate*, non un'anteprima di quante ne resterebbero dopo un
+  // salvataggio non ancora avvenuto.
+  const movesRemaining = context?.tacticalMovesRemaining ?? maxMoves - movesUsed;
+
+  // Modifiche non ancora salvate: confronto con lo stato caricato dal server
+  // (bozza se c'è, altrimenti formazione confermata).
+  const savedState = savedEditorState(context);
+  const hasUnsavedChanges =
+    lineupSignature({
+      module: moduleCode,
+      starterIds: displayStarters,
+      benchIds: displayBench,
+    }) !==
+    lineupSignature({
+      module: savedState.module,
+      starterIds: savedState.starterIds,
+      benchIds: savedState.benchIds,
+    });
 
   const load = useCallback(async () => {
     if (isDemoMode) {
@@ -509,12 +564,11 @@ export function FormationPage() {
     setLoadError(null);
     try {
       const list = await fetchFantasyTurns(session.accessToken, activeLeagueId);
-      const openTurns = list.filter(
-        (turn) => turn.effectiveStatus === "open" || turn.status === "open" || turn.status === "locked",
-      );
-      setTurns(openTurns.length > 0 ? openTurns : list);
-      const preferred =
-        openTurns.find((turn) => turn.effectiveStatus === "open") ?? openTurns[0] ?? list[0];
+      setTurns(list);
+      // Stesso turno di default di Turni (EP07-05): il primo non ancora
+      // concluso, non un filtro proprio della pagina Formazione — altrimenti
+      // le due pagine possono aprirsi su giornate diverse.
+      const preferred = resolveDefaultEuropeanTurn(list);
       if (!preferred) {
         setSelectedRoundId("");
         setContext(null);
@@ -537,34 +591,48 @@ export function FormationPage() {
     void load();
   }, [load]);
 
-  function applyContext(detail: LineupContext) {
-    const draft = detail.draft;
+  /** Stato "come salvato sul server": bozza se c'è, altrimenti formazione confermata. */
+  function savedEditorState(detail: LineupContext | null): {
+    module: FantasyModule;
+    starterIds: string[];
+    benchIds: string[];
+  } {
+    const draft = detail?.draft;
     if (draft) {
       const templateSlots = starterTemplate(draft.module);
       const starters = [...draft.starterAthleteIds];
       while (starters.length < templateSlots.length) {
         starters.push("");
       }
-      setModuleCode(draft.module);
-      setStarterIds(starters.slice(0, templateSlots.length));
-      setBenchIds(draft.benchAthleteIds);
-      return;
+      return {
+        module: draft.module,
+        starterIds: starters.slice(0, templateSlots.length),
+        benchIds: draft.benchAthleteIds,
+      };
     }
-    if (detail.lineup) {
-      setModuleCode(detail.lineup.module);
-      setStarterIds(detail.lineup.starters.map((player) => player.athleteId));
-      setBenchIds(detail.lineup.bench.map((player) => player.athleteId));
-      return;
+    if (detail?.lineup) {
+      return {
+        module: detail.lineup.module,
+        starterIds: detail.lineup.starters.map((player) => player.athleteId),
+        benchIds: detail.lineup.bench.map((player) => player.athleteId),
+      };
     }
-    setModuleCode("4-3-3");
-    setStarterIds(starterTemplate("4-3-3").map(() => ""));
-    setBenchIds([]);
+    return {
+      module: "4-3-3",
+      starterIds: starterTemplate("4-3-3").map(() => ""),
+      benchIds: [],
+    };
+  }
+
+  function applyContext(detail: LineupContext) {
+    const saved = savedEditorState(detail);
+    setModuleCode(saved.module);
+    setStarterIds(saved.starterIds);
+    setBenchIds(saved.benchIds);
   }
 
   async function selectRound(roundId: string) {
     setSelectedRoundId(roundId);
-    setActionError(null);
-    setActionMessage(null);
     if (isDemoMode) {
       setContext(DEMO_CONTEXT);
       applyContext(DEMO_CONTEXT);
@@ -580,7 +648,10 @@ export function FormationPage() {
       setContext(detail);
       applyContext(detail);
     } catch (error) {
-      setActionError(getApiErrorMessage(error, "Formazione del turno non disponibile."));
+      pushToast({
+        title: getApiErrorMessage(error, "Formazione del turno non disponibile."),
+        variant: "danger",
+      });
     } finally {
       setBusy(false);
     }
@@ -588,14 +659,9 @@ export function FormationPage() {
 
   function changeModule(next: FantasyModule) {
     const now = context?.serverNow ? new Date(context.serverNow) : new Date();
-    const lockedIds = [
-      ...new Set([
-        ...starterIds.filter((id) => id && playerLocked(roster, id, now, lockMarginMinutes)),
-        ...(context?.lineup?.starters ?? [])
-          .map((player) => player.athleteId)
-          .filter((id) => playerLocked(roster, id, now, lockMarginMinutes)),
-      ]),
-    ];
+    // Solo la bozza corrente come fonte, mai concatenata con
+    // `context.lineup.starters` — stesso motivo del calcolo di `reservedIds`.
+    const lockedIds = starterIds.filter((id) => id && playerLocked(roster, id, now, lockMarginMinutes));
     const preserved = preserveLockedStarters({
       template: starterTemplate(next),
       currentStarters: [...lockedIds, ...starterIds],
@@ -603,7 +669,7 @@ export function FormationPage() {
       now,
     });
     if (lockedIds.some((id) => id && !preserved.includes(id))) {
-      setActionError(KICKOFF_LOCK_MESSAGE);
+      pushToast({ title: KICKOFF_LOCK_MESSAGE, variant: "danger" });
       return;
     }
     setModuleCode(next);
@@ -615,26 +681,18 @@ export function FormationPage() {
         benchIds,
       ),
     );
-    setActionMessage(null);
-    setActionError(null);
   }
 
   function assignStarter(index: number, athleteId: string) {
-    const reservedId = reservedIds[index] ?? "";
-    if (reservedId && athleteId !== reservedId) {
-      setActionError(KICKOFF_LOCK_MESSAGE);
-      setStarterIds((current) => {
-        const next = [...current];
-        next[index] = reservedId;
-        return next;
-      });
+    const currentId = displayStarters[index] ?? "";
+    // Chi occupa lo slot ha già la partita iniziata: non si tocca più.
+    if (currentId && currentId !== athleteId && playerLocked(roster, currentId, clock, lockMarginMinutes)) {
+      pushToast({ title: KICKOFF_LOCK_MESSAGE, variant: "danger" });
       return;
     }
-    if (
-      playerLocked(roster, athleteId, clock, lockMarginMinutes) &&
-      athleteId !== (displayStarters[index] ?? "")
-    ) {
-      setActionError(KICKOFF_LOCK_MESSAGE);
+    // …e non si può far entrare ora chi è già sceso in campo altrove.
+    if (playerLocked(roster, athleteId, clock, lockMarginMinutes) && athleteId !== currentId) {
+      pushToast({ title: KICKOFF_LOCK_MESSAGE, variant: "danger" });
       return;
     }
     const nextStarters = [...starterIds];
@@ -643,12 +701,10 @@ export function FormationPage() {
     setBenchIds(
       orderedBenchFromRoster(
         roster.map((row) => row.athleteId),
-        nextStarters.map((value, slotIndex) => reservedIds[slotIndex] || value || ""),
+        nextStarters,
         benchIds,
       ),
     );
-    setActionMessage(null);
-    setActionError(null);
   }
 
   function previousBenchIds() {
@@ -666,12 +722,10 @@ export function FormationPage() {
       lockedAthleteIds,
     });
     if (orderIssues.length > 0) {
-      setActionError(orderIssues[0]?.message ?? KICKOFF_LOCK_MESSAGE);
+      pushToast({ title: orderIssues[0]?.message ?? KICKOFF_LOCK_MESSAGE, variant: "danger" });
       return;
     }
     setBenchIds(next);
-    setActionError(null);
-    setActionMessage(null);
   }
 
   function canMoveBenchTo(fromIndex: number, toIndex: number): boolean {
@@ -692,8 +746,9 @@ export function FormationPage() {
   }
 
   async function save() {
-    setActionError(null);
-    setActionMessage(null);
+    // Mosse esaurite e formazione non valida disabilitano già il bottone
+    // "Salva formazione" (vedi tacticalEvaluation.issues/clientEvaluation.valid
+    // più sotto) — nessun bisogno di intercettarli di nuovo qui.
     const previousSlots = slotsFromLineupIds(
       context?.lineup?.starters.map((player) => player.athleteId) ?? [],
       context?.lineup?.bench.map((player) => player.athleteId) ?? [],
@@ -711,27 +766,23 @@ export function FormationPage() {
       }),
     ];
     if (lockIssues.length > 0) {
-      setActionError(lockIssues[0]?.message ?? KICKOFF_LOCK_MESSAGE);
-      return;
-    }
-    if (tacticalEvaluation.issues.length > 0) {
-      setActionError(tacticalEvaluation.issues[0]?.message ?? "Mosse tattiche esaurite.");
-      return;
-    }
-    if (!clientEvaluation.valid) {
-      setActionError(clientEvaluation.issues[0]?.message ?? "Formazione non valida.");
+      pushToast({ title: lockIssues[0]?.message ?? KICKOFF_LOCK_MESSAGE, variant: "danger" });
       return;
     }
     if (isDemoMode) {
       if (!DEMO_CONTEXT.modificationAllowed) {
-        setActionError("Modifica fuori tempo: il cutoff del turno è già trascorso.");
+        pushToast({
+          title: "Modifica fuori tempo: il cutoff del turno è già trascorso.",
+          variant: "danger",
+        });
         return;
       }
-      setActionMessage(
-        tacticalEvaluation.wouldConsume
+      pushToast({
+        title: tacticalEvaluation.wouldConsume
           ? `Formazione salvata (demo). Mossa tattica ${movesUsed + 1}/${maxMoves} registrata.`
           : "Formazione salvata (demo).",
-      );
+        variant: "success",
+      });
       return;
     }
     const session = loadStoredSession();
@@ -747,25 +798,29 @@ export function FormationPage() {
       });
       setContext(detail);
       applyContext(detail);
-      setActionMessage("Formazione salvata.");
+      pushToast({ title: "Formazione salvata.", variant: "success" });
     } catch (error) {
-      setActionError(getApiErrorMessage(error, "Salvataggio formazione non riuscito."));
+      pushToast({
+        title: getApiErrorMessage(error, "Salvataggio formazione non riuscito."),
+        variant: "danger",
+      });
     } finally {
       setBusy(false);
     }
   }
 
   async function copyFromPrevious() {
-    setActionError(null);
-    setActionMessage(null);
     if (isDemoMode) {
       if (!DEMO_CONTEXT.modificationAllowed) {
-        setActionError("Modifica fuori tempo: il cutoff del turno è già trascorso.");
+        pushToast({
+          title: "Modifica fuori tempo: il cutoff del turno è già trascorso.",
+          variant: "danger",
+        });
         return;
       }
       const previous = DEMO_CONTEXT.previousLineup;
       if (!previous) {
-        setActionError("Non c'è una formazione precedente da copiare.");
+        pushToast({ title: "Non c'è una formazione precedente da copiare.", variant: "danger" });
         return;
       }
       const copied = copyPreviousLineup({
@@ -782,17 +837,19 @@ export function FormationPage() {
         roleByAthleteId: Object.fromEntries(roster.map((row) => [row.athleteId, row.role])),
       });
       if (copied.blocked) {
-        setActionError(copied.issues[0]?.message ?? KICKOFF_LOCK_MESSAGE);
+        pushToast({ title: copied.issues[0]?.message ?? KICKOFF_LOCK_MESSAGE, variant: "danger" });
         return;
       }
       setModuleCode(copied.module as FantasyModule);
       setStarterIds(copied.starterIds);
       setBenchIds(copied.benchIds);
-      setActionMessage(
-        copied.issues.length > 0
-          ? "Formazione precedente copiata in bozza (demo), rivalidata sulla rosa corrente."
-          : "Formazione precedente copiata in bozza (demo).",
-      );
+      pushToast({
+        title:
+          copied.issues.length > 0
+            ? "Formazione precedente copiata in bozza (demo), rivalidata sulla rosa corrente."
+            : "Formazione precedente copiata in bozza (demo).",
+        variant: "success",
+      });
       return;
     }
     const session = loadStoredSession();
@@ -808,21 +865,60 @@ export function FormationPage() {
       );
       setContext(detail);
       applyContext(detail);
-      setActionMessage(
-        detail.copyIssues && detail.copyIssues.length > 0
-          ? "Formazione precedente copiata in bozza e rivalidata sulla rosa corrente."
-          : "Formazione precedente copiata in bozza.",
-      );
+      pushToast({
+        title:
+          detail.copyIssues && detail.copyIssues.length > 0
+            ? "Formazione precedente copiata in bozza e rivalidata sulla rosa corrente."
+            : "Formazione precedente copiata in bozza.",
+        variant: "success",
+      });
     } catch (error) {
-      setActionError(getApiErrorMessage(error, "Copia della formazione precedente non riuscita."));
+      pushToast({
+        title: getApiErrorMessage(error, "Copia della formazione precedente non riuscita."),
+        variant: "danger",
+      });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function revertChanges() {
+    if (!context) {
+      return;
+    }
+    applyContext(context);
+    pushToast({ title: "Modifiche annullate.", variant: "info" });
+  }
+
+  async function applyBestFormation() {
+    if (isDemoMode) {
+      pushToast({
+        title: "Applica formazione migliore non è disponibile in modalità demo.",
+        variant: "danger",
+      });
+      return;
+    }
+    const session = loadStoredSession();
+    if (!session?.accessToken || !activeLeagueId || !selectedRoundId) {
+      return;
+    }
+    setBusy(true);
+    try {
+      const detail = await applyBestLineup(session.accessToken, activeLeagueId, selectedRoundId);
+      setContext(detail);
+      applyContext(detail);
+      pushToast({ title: "Formazione migliore applicata in bozza.", variant: "success" });
+    } catch (error) {
+      pushToast({
+        title: getApiErrorMessage(error, "Applicazione della formazione migliore non riuscita."),
+        variant: "danger",
+      });
     } finally {
       setBusy(false);
     }
   }
 
   async function saveDraft() {
-    setActionError(null);
-    setActionMessage(null);
     const previousSlots = slotsFromLineupIds(
       context?.lineup?.starters.map((player) => player.athleteId) ?? [],
       context?.lineup?.bench.map((player) => player.athleteId) ?? [],
@@ -840,32 +936,38 @@ export function FormationPage() {
       }),
     ];
     if (lockIssues.length > 0) {
-      setActionError(lockIssues[0]?.message ?? KICKOFF_LOCK_MESSAGE);
+      pushToast({ title: lockIssues[0]?.message ?? KICKOFF_LOCK_MESSAGE, variant: "danger" });
       return;
     }
     const draftEvaluation = evaluateLineup({
       module: moduleCode,
       starters: displayStarters.map((athleteId) => ({
         athleteId,
-        role: athleteId ? playerRole(roster, athleteId) : null,
+        role: athleteId ? validationRole(athleteId) : null,
       })),
       bench: displayBench.map((athleteId) => ({
         athleteId,
-        role: playerRole(roster, athleteId),
+        role: validationRole(athleteId),
       })),
       rosterAthleteIds: roster.map((row) => row.athleteId),
       strict: false,
     });
     if (!draftEvaluation.valid) {
-      setActionError(draftEvaluation.issues[0]?.message ?? "Bozza non valida.");
+      pushToast({ title: draftEvaluation.issues[0]?.message ?? "Bozza non valida.", variant: "danger" });
       return;
     }
     if (isDemoMode) {
       if (!DEMO_CONTEXT.modificationAllowed) {
-        setActionError("Modifica fuori tempo: il cutoff del turno è già trascorso.");
+        pushToast({
+          title: "Modifica fuori tempo: il cutoff del turno è già trascorso.",
+          variant: "danger",
+        });
         return;
       }
-      setActionMessage("Bozza salvata (demo). La conferma non consuma mosse tattiche.");
+      pushToast({
+        title: "Bozza salvata (demo). La conferma non consuma mosse tattiche.",
+        variant: "success",
+      });
       return;
     }
     const session = loadStoredSession();
@@ -881,9 +983,15 @@ export function FormationPage() {
       });
       setContext(detail);
       applyContext(detail);
-      setActionMessage("Bozza salvata. Conferma la formazione quando è completa.");
+      pushToast({
+        title: "Bozza salvata. Conferma la formazione quando è completa.",
+        variant: "success",
+      });
     } catch (error) {
-      setActionError(getApiErrorMessage(error, "Salvataggio bozza non riuscito."));
+      pushToast({
+        title: getApiErrorMessage(error, "Salvataggio bozza non riuscito."),
+        variant: "danger",
+      });
     } finally {
       setBusy(false);
     }
@@ -896,6 +1004,8 @@ export function FormationPage() {
       name: athleteId ? playerName(roster, athleteId) : "Libero",
       role,
       photoUrl: athleteId ? playerPhotoUrl(roster, athleteId) : null,
+      scoreLabel: athleteId ? playerScoreLabel(roster, athleteId) : null,
+      badges: athleteId ? playerBadges(roster, athleteId) : [],
     };
   });
   const pitchPositions = layoutFromModule(
@@ -910,22 +1020,34 @@ export function FormationPage() {
   const tribunaIds = displayBench.slice(maxSubs);
 
   const optionsForSlot = (index: number, role: LineupRole) => {
+    const currentId = displayStarters[index] ?? "";
     const selected = new Set(
       displayStarters.filter((id, currentIndex) => currentIndex !== index && id),
     );
     return roster
       .filter((row) => {
+        // Chi occupa lo slot compare sempre, anche se il suo ruolo non
+        // corrisponde a quello dello slot: altrimenti la casella mostra
+        // "Seleziona calciatore" pur avendo un calciatore in campo e non si
+        // capisce chi stia rendendo il modulo non valido.
+        if (row.athleteId === currentId) {
+          return true;
+        }
         if (row.role !== role || selected.has(row.athleteId)) {
           return false;
         }
         return true;
       })
-      .map((row) => ({
-        value: row.athleteId,
-        label: playerLocked(roster, row.athleteId, clock, lockMarginMinutes)
-          ? `${row.athleteName} (bloccato)`
-          : row.athleteName,
-      }));
+      .map((row) => {
+        const notes = [
+          row.role && row.role !== role ? `ruolo ${row.role}, non compatibile` : null,
+          playerLocked(roster, row.athleteId, clock, lockMarginMinutes) ? "bloccato" : null,
+        ].filter(Boolean);
+        return {
+          value: row.athleteId,
+          label: notes.length > 0 ? `${row.athleteName} (${notes.join(", ")})` : row.athleteName,
+        };
+      });
   };
 
   return (
@@ -1039,21 +1161,6 @@ export function FormationPage() {
                   ? "I calciatori la cui partita è già iniziata restano bloccati anche se l'orario viene rinviato; gli altri restano modificabili."
                   : "Nessun calciatore è più modificabile."}
               </p>
-              <p data-testid="formation-moves">
-                Mosse tattiche: {movesUsed}/{maxMoves} usate — ne restano {movesRemaining}.
-              </p>
-              <p data-testid="formation-moves-hint">
-                {tacticalEvaluation.wouldConsume
-                  ? "Questo salvataggio consumerà 1 mossa tattica."
-                  : "Questo salvataggio non consuma mosse."}{" "}
-                Le sostituzioni automatiche non consumano mosse. Nessuna mossa è retroattiva sui
-                calciatori bloccati.
-              </p>
-              {actionError ? (
-                <p data-testid="formation-action-error" role="alert">
-                  {actionError}
-                </p>
-              ) : null}
               {context.previousLineup ? (
                 <p data-testid="formation-previous-hint">
                   Formazione precedente disponibile: turno {context.previousLineup.roundNumber} (
@@ -1073,24 +1180,39 @@ export function FormationPage() {
                 </p>
               ) : null}
               {(context.copyIssues ?? []).length > 0 ? (
-                <ul data-testid="formation-copy-issues">
-                  {context.copyIssues?.map((issue) => (
-                    <li key={`${issue.code}-${issue.message}`}>{issue.message}</li>
-                  ))}
-                </ul>
+                <div data-testid="formation-copy-issues">
+                  <p className="fa-formation-layout__issues-title">
+                    Se copi la formazione precedente:
+                  </p>
+                  <ul>
+                    {context.copyIssues?.map((issue) => (
+                      <li key={`${issue.code}-${issue.message}`}>{issue.message}</li>
+                    ))}
+                  </ul>
+                </div>
               ) : null}
             </CardBody>
           </Card>
 
           {clientEvaluation.issues.length > 0 ? (
-            <ul data-testid="formation-issues">
-              {clientEvaluation.issues.map((issue) => (
-                <li key={`${issue.code}-${issue.message}`}>{issue.message}</li>
-              ))}
-            </ul>
+            <div data-testid="formation-issues" className="fa-formation-layout__issues" role="alert">
+              <p className="fa-formation-layout__issues-title">
+                Da correggere prima di salvare:
+              </p>
+              <ul>
+                {clientEvaluation.issues.map((issue) => (
+                  <li key={`${issue.code}-${issue.message}`}>{issue.message}</li>
+                ))}
+              </ul>
+            </div>
           ) : null}
 
-          {actionMessage ? <p data-testid="formation-success">{actionMessage}</p> : null}
+          {tacticalEvaluation.wouldConsume ? (
+            <p data-testid="formation-moves-hint" className="fa-formation-layout__moves-hint">
+              Questo salvataggio consumerà 1 mossa tattica ({movesRemaining} di {maxMoves}{" "}
+              disponibili). Le sostituzioni automatiche non consumano mosse.
+            </p>
+          ) : null}
 
           <div className="fa-formation-layout__actions">
             <Button
@@ -1101,6 +1223,24 @@ export function FormationPage() {
               data-testid="formation-copy"
             >
               Copia formazione precedente
+            </Button>
+            <Button
+              type="button"
+              variant="secondary"
+              disabled={busy || !context.modificationAllowed || !canEdit}
+              onClick={() => void applyBestFormation()}
+              data-testid="formation-apply-best"
+            >
+              Applica formazione migliore
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              disabled={busy || !canEdit || !hasUnsavedChanges}
+              onClick={() => revertChanges()}
+              data-testid="formation-revert"
+            >
+              Annulla modifiche
             </Button>
             <Button
               type="button"
@@ -1118,7 +1258,8 @@ export function FormationPage() {
                 busy ||
                 !context.modificationAllowed ||
                 !canEdit ||
-                tacticalEvaluation.issues.length > 0
+                tacticalEvaluation.issues.length > 0 ||
+                !clientEvaluation.valid
               }
               onClick={() => void save()}
               data-testid="formation-save"
@@ -1129,22 +1270,31 @@ export function FormationPage() {
           </aside>
 
           <div className="fa-formation-layout__main">
-          <Select
-            label="Modulo"
-            value={moduleCode}
-            onChange={(event) => changeModule(event.target.value as FantasyModule)}
-            options={APPROVED_MODULES.map((code) => {
-              const moduleMeta = context.modules.find((item) => item.code === code);
-              return {
-                value: code,
-                label: moduleMeta
-                  ? `${code} (1P–${moduleMeta.defenders}D–${moduleMeta.midfielders}C–${moduleMeta.forwards}A)`
-                  : code,
-              };
-            })}
-            data-testid="formation-module"
-            disabled={!context.modificationAllowed || !canEdit}
-          />
+          <div className="fa-formation-layout__module-row">
+            <Select
+              label="Modulo"
+              value={moduleCode}
+              onChange={(event) => changeModule(event.target.value as FantasyModule)}
+              options={APPROVED_MODULES.map((code) => {
+                const moduleMeta = context.modules.find((item) => item.code === code);
+                return {
+                  value: code,
+                  label: moduleMeta
+                    ? `${code} (1P–${moduleMeta.defenders}D–${moduleMeta.midfielders}C–${moduleMeta.forwards}A)`
+                    : code,
+                };
+              })}
+              data-testid="formation-module"
+              disabled={!context.modificationAllowed || !canEdit}
+            />
+            <Badge
+              variant={movesRemaining === 0 ? "danger" : movesRemaining === 1 ? "warning" : "neutral"}
+              data-testid="formation-moves-badge"
+              title={`Mosse tattiche: ${movesUsed}/${maxMoves} usate`}
+            >
+              Mosse {movesRemaining}/{maxMoves}
+            </Badge>
+          </div>
 
           <div className="fa-formation-layout__pitch-row">
           <div className="fa-formation-layout__pitch">
@@ -1163,8 +1313,7 @@ export function FormationPage() {
             <h3 className="fa-formation-layout__section-title">Modifica titolari</h3>
             {template.map((role, index) => {
               const currentId = displayStarters[index] ?? "";
-              const lockedSlot =
-                Boolean(reservedIds[index]) || playerLocked(roster, currentId, clock, lockMarginMinutes);
+              const lockedSlot = playerLocked(roster, currentId, clock, lockMarginMinutes);
               return (
                 <StarterSlotField
                   key={`${moduleCode}-${index}`}
@@ -1178,11 +1327,6 @@ export function FormationPage() {
                   hint={
                     lockedSlot
                       ? "Partita già iniziata: sostituirlo con un altro calciatore viene rifiutato."
-                      : undefined
-                  }
-                  error={
-                    lockedSlot && actionError === KICKOFF_LOCK_MESSAGE
-                      ? KICKOFF_LOCK_MESSAGE
                       : undefined
                   }
                   onSelect={(athleteId) => assignStarter(index, athleteId)}
@@ -1228,6 +1372,7 @@ export function FormationPage() {
                               disabled: !canMoveBenchTo(index, target),
                             }))}
                             onMove={(target) => moveBenchTo(index, target)}
+                            scoreLabel={playerScoreLabel(roster, athleteId)}
                           />
                         ) : null,
                       )}
@@ -1261,6 +1406,7 @@ export function FormationPage() {
                               disabled: !canMoveBenchTo(index, target),
                             }))}
                             onMove={(target) => moveBenchTo(index, target)}
+                            scoreLabel={playerScoreLabel(roster, athleteId)}
                           />
                         ) : null,
                       )}

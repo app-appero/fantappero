@@ -247,3 +247,80 @@ def test_admin_listone_refresh_progress_unknown_job_not_found(
     )
     assert response.status_code == 404
     assert response.json()["code"] == "listone_refresh_job_not_found"
+
+
+def test_admin_active_listone_refresh_denied_for_member(
+    client: TestClient, db_session: Session
+) -> None:
+    token, _ = _register_and_login(client, "admin.listone.active.member@example.com")
+    response = client.get(
+        "/admin/listone/aggiorna",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert response.status_code == 403
+    assert response.json()["code"] == "forbidden"
+
+
+def test_admin_active_listone_refresh_discoverable_by_any_operator(
+    client: TestClient, db_session: Session
+) -> None:
+    """A second operator (who never called .../aggiorna to start it) must still
+    be able to discover and watch a job someone else started (EP11-05)."""
+    from admin.listone_service import PLATFORM_JOB_SCOPE
+    from leagues.listone_refresh_progress import ListoneRefreshProgress, save_progress
+
+    starter_token, starter_id = _register_and_login(client, "admin.operator.eight@example.com")
+    _promote(db_session, starter_id)
+    watcher_token, watcher_id = _register_and_login(client, "admin.operator.nine@example.com")
+    _promote(db_session, watcher_id)
+
+    save_progress(
+        ListoneRefreshProgress(
+            job_id="integration-active-job",
+            league_id=PLATFORM_JOB_SCOPE,
+            status="running",
+            percent=42,
+            stage="roster",
+            message="Rosa 80/190: Test Club",
+        )
+    )
+    try:
+        response = client.get(
+            "/admin/listone/aggiorna",
+            headers={"Authorization": f"Bearer {watcher_token}"},
+        )
+        assert response.status_code == 200
+        body = response.json()
+        assert body is not None
+        assert body["jobId"] == "integration-active-job"
+        assert body["status"] == "running"
+        assert body["percent"] == 42
+
+        save_progress(
+            ListoneRefreshProgress(
+                job_id="integration-active-job",
+                league_id=PLATFORM_JOB_SCOPE,
+                status="completed",
+                percent=100,
+                stage="completed",
+                message="Fatto.",
+            )
+        )
+        cleared = client.get(
+            "/admin/listone/aggiorna",
+            headers={"Authorization": f"Bearer {starter_token}"},
+        )
+        assert cleared.status_code == 200
+        assert cleared.json() is None
+    finally:
+        # Never leave a fake "active" job pointer behind for later tests.
+        save_progress(
+            ListoneRefreshProgress(
+                job_id="integration-active-job",
+                league_id=PLATFORM_JOB_SCOPE,
+                status="completed",
+                percent=100,
+                stage="completed",
+                message="Fatto.",
+            )
+        )

@@ -12,7 +12,7 @@ const { colors, spacing, typography, radius } = theme;
 // rendered and nudge the user toward the search box instead.
 const OPTIONS_RENDER_LIMIT = 60;
 
-export type OptionPickerOption = { value: string; label: string };
+export type OptionPickerOption = { value: string; label: string; disabled?: boolean };
 
 export type OptionPickerProps = {
   label?: string;
@@ -95,15 +95,24 @@ export function OptionPicker({
                 {filtered.slice(0, OPTIONS_RENDER_LIMIT).map((option) => (
                 <Pressable
                   key={option.value}
-                  style={[styles.option, option.value === value ? styles.optionActive : null]}
+                  disabled={option.disabled}
+                  accessibilityState={{ disabled: option.disabled }}
+                  style={[
+                    styles.option,
+                    option.value === value ? styles.optionActive : null,
+                    option.disabled ? styles.optionDisabled : null,
+                  ]}
                   onPress={() => {
+                    if (option.disabled) return;
                     onChange(option.value);
                     setOpen(false);
                     setQuery("");
                   }}
                   testID={testID ? `${testID}-option-${option.value}` : undefined}
                 >
-                  <Text style={styles.optionLabel}>{option.label}</Text>
+                  <Text style={[styles.optionLabel, option.disabled ? styles.optionLabelDisabled : null]}>
+                    {option.label}
+                  </Text>
                 </Pressable>
                 ))}
               </>
@@ -186,8 +195,14 @@ const styles = StyleSheet.create({
   optionActive: {
     backgroundColor: colors.background,
   },
+  optionDisabled: {
+    opacity: 0.4,
+  },
   optionLabel: {
     color: colors.foreground,
     fontSize: typography.fontSize.sm,
+  },
+  optionLabelDisabled: {
+    color: colors.foregroundMuted,
   },
 });

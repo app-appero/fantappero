@@ -15,8 +15,10 @@ from observability.logging import get_logger
 logger = get_logger(__name__)
 
 _KEY_PREFIX = "listone:refresh:job:"
+_ACTIVE_KEY_PREFIX = "listone:refresh:active:"
 _TTL_SECONDS = 60 * 60
 _memory_store: dict[str, str] = {}
+_ACTIVE_STATUSES = ("queued", "running")
 
 
 @dataclass
@@ -65,13 +67,29 @@ def _redis_client() -> redis.Redis | None:
 
 
 def save_progress(progress: ListoneRefreshProgress) -> None:
+    """Persist progress and maintain the "active job for this scope" pointer.
+
+    The pointer lets any client discover an in-progress refresh without
+    already knowing its job_id — the only way another operator's session
+    (that didn't start the job) can find out one is running (EP11-05).
+    """
     payload = json.dumps(progress.to_dict())
     key = f"{_KEY_PREFIX}{progress.job_id}"
+    active_key = f"{_ACTIVE_KEY_PREFIX}{progress.league_id}"
+    is_active = progress.status in _ACTIVE_STATUSES
     client = _redis_client()
     if client is None:
         _memory_store[key] = payload
+        if is_active:
+            _memory_store[active_key] = progress.job_id
+        else:
+            _memory_store.pop(active_key, None)
         return
     client.setex(key, _TTL_SECONDS, payload)
+    if is_active:
+        client.setex(active_key, _TTL_SECONDS, progress.job_id)
+    else:
+        client.delete(active_key)
 
 
 def load_progress(job_id: str) -> ListoneRefreshProgress | None:
@@ -89,6 +107,16 @@ def load_progress(job_id: str) -> ListoneRefreshProgress | None:
         return ListoneRefreshProgress.from_dict(json.loads(raw))
     except (TypeError, ValueError, KeyError):
         return None
+
+
+def load_active_job_id(league_id: str) -> str | None:
+    """The job_id of the currently queued/running refresh for this scope, if any."""
+    key = f"{_ACTIVE_KEY_PREFIX}{league_id}"
+    client = _redis_client()
+    if client is None:
+        return _memory_store.get(key)
+    value = client.get(key)
+    return value if isinstance(value, str) else None
 
 
 def clear_memory_store() -> None:

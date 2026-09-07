@@ -454,6 +454,102 @@ def test_member_can_edit_own_roster_not_others_and_purchase_is_tracked(
     assert credits_refunded.json()["balance"] == balance_before
 
 
+def test_purchase_price_edit_applies_credits_even_when_revisiting_a_prior_price(
+    client: TestClient,
+    db_session: Session,
+    competition_ids: list[str],
+) -> None:
+    """Regressione: rettificare il prezzo a un valore già usato in precedenza
+    per lo stesso slot non deve essere trattato come un replay idempotente
+    del vecchio movimento — il saldo crediti deve riflettere ogni modifica."""
+    owner_token, _ = _register_and_login(client, "ft.price.revisit@example.com")
+    league_id = _create_league(client, owner_token, competition_ids, "Lega Prezzo Rettifica")
+    athlete = _seed_athlete(db_session, provider_id=900010, name="Calciatore Rettifica")
+
+    ensured = client.post(
+        f"/leagues/{league_id}/amministrazione/squadre",
+        headers={"Authorization": f"Bearer {owner_token}"},
+    )
+    assert ensured.status_code == 200
+    team_id = client.get(
+        f"/leagues/{league_id}/rosa",
+        headers={"Authorization": f"Bearer {owner_token}"},
+    ).json()["id"]
+
+    balance_start = client.get(
+        f"/leagues/{league_id}/crediti",
+        headers={"Authorization": f"Bearer {owner_token}"},
+    ).json()["balance"]
+
+    def assign(price: int) -> int:
+        response = client.put(
+            f"/leagues/{league_id}/amministrazione/squadre/{team_id}/slot/0",
+            headers={"Authorization": f"Bearer {owner_token}"},
+            json={"athleteId": str(athlete.id), "purchaseCredits": price},
+        )
+        assert response.status_code == 200
+        return client.get(
+            f"/leagues/{league_id}/crediti",
+            headers={"Authorization": f"Bearer {owner_token}"},
+        ).json()["balance"]
+
+    assert assign(15) == balance_start - 15
+    assert assign(25) == balance_start - 25
+    assert assign(30) == balance_start - 30
+    # Revisits price 25, previously used above — must still apply the delta.
+    assert assign(25) == balance_start - 25
+
+
+def test_release_refund_applies_credits_even_when_repeating_a_prior_release(
+    client: TestClient,
+    db_session: Session,
+    competition_ids: list[str],
+) -> None:
+    """Regressione: assegnare e rilasciare lo stesso calciatore sullo stesso
+    slot più di una volta non deve essere trattato come un replay idempotente
+    del primo rimborso — il saldo crediti deve riflettere ogni rilascio."""
+    owner_token, _ = _register_and_login(client, "ft.refund.revisit@example.com")
+    league_id = _create_league(client, owner_token, competition_ids, "Lega Rimborso Ripetuto")
+    athlete = _seed_athlete(db_session, provider_id=900011, name="Calciatore Rimborso")
+
+    ensured = client.post(
+        f"/leagues/{league_id}/amministrazione/squadre",
+        headers={"Authorization": f"Bearer {owner_token}"},
+    )
+    assert ensured.status_code == 200
+    team_id = client.get(
+        f"/leagues/{league_id}/rosa",
+        headers={"Authorization": f"Bearer {owner_token}"},
+    ).json()["id"]
+
+    balance_start = client.get(
+        f"/leagues/{league_id}/crediti",
+        headers={"Authorization": f"Bearer {owner_token}"},
+    ).json()["balance"]
+
+    def balance() -> int:
+        return client.get(
+            f"/leagues/{league_id}/crediti",
+            headers={"Authorization": f"Bearer {owner_token}"},
+        ).json()["balance"]
+
+    for _ in range(2):
+        assigned = client.put(
+            f"/leagues/{league_id}/amministrazione/squadre/{team_id}/slot/0",
+            headers={"Authorization": f"Bearer {owner_token}"},
+            json={"athleteId": str(athlete.id), "purchaseCredits": 20},
+        )
+        assert assigned.status_code == 200
+        assert balance() == balance_start - 20
+
+        released = client.delete(
+            f"/leagues/{league_id}/amministrazione/squadre/{team_id}/slot/0",
+            headers={"Authorization": f"Bearer {owner_token}"},
+        )
+        assert released.status_code == 200
+        assert balance() == balance_start
+
+
 def test_assign_rejects_role_quota_exceeded(
     client: TestClient,
     db_session: Session,

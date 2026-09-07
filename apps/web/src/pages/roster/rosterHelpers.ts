@@ -49,6 +49,8 @@ export const ROLE_SECTION_TITLE: Record<FantasyRole, string> = {
 };
 
 export const LEDGER_PAGE_SIZE = 10;
+export const ROSTER_PAGE_SIZE = 10;
+export const LISTONE_PAGE_SIZE = 20;
 
 export function reasonLabel(reason: string): string {
   if (reason === "initial_allocation") {

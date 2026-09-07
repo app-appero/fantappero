@@ -31,6 +31,7 @@ from config.settings.api import ApiSettings
 from config.settings.loader import get_api_settings
 from leagues.listone_refresh_progress import (
     ListoneRefreshProgress,
+    load_active_job_id,
     load_progress,
     new_job_id,
     save_progress,
@@ -291,6 +292,22 @@ class AdminListoneService:
                 "Job di aggiornamento non trovato.",
                 code="listone_refresh_job_not_found",
             )
+        return self._to_progress_response(progress)
+
+    def get_active_refresh_progress(self) -> AdminListoneRefreshProgressResponse | None:
+        """The platform-wide job any operator's client can discover and watch,
+        even if it didn't start it (EP11-05)."""
+        job_id = load_active_job_id(PLATFORM_JOB_SCOPE)
+        if job_id is None:
+            return None
+        progress = load_progress(job_id)
+        if progress is None:
+            return None
+        return self._to_progress_response(progress)
+
+    def _to_progress_response(
+        self, progress: ListoneRefreshProgress
+    ) -> AdminListoneRefreshProgressResponse:
         result = None
         if progress.result is not None:
             result = AdminListoneRefreshResultResponse.model_validate(progress.result)

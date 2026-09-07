@@ -2,7 +2,8 @@ import type { AdminListoneEntry, FantasyRole } from "@fantappero/contracts";
 import { theme } from "@fantappero/ui/theme";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Pressable, Text, TextInput, View } from "react-native";
-import { fetchAdminListone, refreshAdminListone } from "../../api/admin";
+import { useListoneRefresh } from "../../admin/ListoneRefreshContext";
+import { fetchAdminListone } from "../../api/admin";
 import { ApiError } from "../../api/client";
 import { adminUiStyles as styles } from "../../admin/adminUiStyles";
 import { StatusBadge } from "../../components/StatusBadge";
@@ -42,22 +43,34 @@ function roleBadgeColor(role: FantasyRole): string {
   return colors.danger;
 }
 
-function filterByTab(entries: AdminListoneEntry[], tab: RoleTab): AdminListoneEntry[] {
-  if (tab === "all") {
-    return entries;
-  }
-  return entries.filter((entry) => entry.officialRole === tab);
+function filterEntries(
+  entries: AdminListoneEntry[],
+  tab: RoleTab,
+  query: string,
+): AdminListoneEntry[] {
+  const normalized = query.trim().toLocaleLowerCase("it-IT");
+  return entries.filter((entry) => {
+    if (tab !== "all" && entry.officialRole !== tab) {
+      return false;
+    }
+    if (!normalized) {
+      return true;
+    }
+    const haystack = `${entry.canonicalName} ${entry.clubName ?? ""}`.toLocaleLowerCase("it-IT");
+    return haystack.includes(normalized);
+  });
 }
 
 const CURRENT_YEAR = new Date().getFullYear();
 
 // The global listone can hold thousands of athletes across every
-// competition. Rendering it as plain Views with no virtualization (this
-// screen scrolls inside a plain ScrollView, so a FlatList wouldn't help
-// here — see apps/mobile/src/screens/roster/RosterAdminManualCard.tsx)
-// mounts too many native views at once and gets the app killed for
-// excessive memory use on a real device.
-const LISTONE_RENDER_LIMIT = 60;
+// competition. This screen scrolls inside a plain ScrollView (no
+// FlatList/virtualization available here — see
+// apps/mobile/src/screens/roster/RosterAdminManualCard.tsx for the same
+// constraint), so mounting every row as a native View at once gets the app
+// killed for excessive memory use on a real device. Paginate client-side
+// instead of rendering everything.
+const LISTONE_PAGE_SIZE = 20;
 
 /** Listone ufficiale globale — mobile port of `apps/web/src/pages/AdminListonePage.tsx` (EP11-05). */
 export function AdminListoneScreen() {
@@ -66,14 +79,12 @@ export function AdminListoneScreen() {
   const [seasonYear, setSeasonYear] = useState(String(CURRENT_YEAR));
   const [entries, setEntries] = useState<AdminListoneEntry[]>([]);
   const [activeTab, setActiveTab] = useState<RoleTab>("all");
+  const [query, setQuery] = useState("");
+  const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [refreshingListone, setRefreshingListone] = useState(false);
-  const [refreshProgress, setRefreshProgress] = useState<{
-    percent: number;
-    stage: string;
-    message: string;
-  } | null>(null);
+  const { refreshing: refreshingListone, progress: refreshProgress, startRefresh } =
+    useListoneRefresh();
   const [refreshError, setRefreshError] = useState<string | null>(null);
   const [refreshSuccess, setRefreshSuccess] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
@@ -134,32 +145,32 @@ export function AdminListoneScreen() {
       setRefreshError("Sessione non disponibile. Accedi di nuovo.");
       return;
     }
-    setRefreshingListone(true);
     setRefreshError(null);
     setRefreshSuccess(null);
-    setRefreshProgress({ percent: 0, stage: "queued", message: "Avvio in corso…" });
     try {
-      const result = await refreshAdminListone(accessToken, year, {
-        onProgress: (progress) =>
-          setRefreshProgress({
-            percent: progress.percent,
-            stage: progress.stage,
-            message: progress.message,
-          }),
-      });
+      const result = await startRefresh(accessToken, year);
       setRefreshSuccess(
         `${result.message} Creati: ${result.counters.listoneCreated}, aggiornati: ${result.counters.listoneUpdated}.`,
       );
       await load();
     } catch (refreshErr) {
       setRefreshError(getApiErrorMessage(refreshErr, "Aggiornamento listone non riuscito."));
-    } finally {
-      setRefreshingListone(false);
-      setRefreshProgress(null);
     }
   }
 
-  const visibleEntries = useMemo(() => filterByTab(entries, activeTab), [activeTab, entries]);
+  const visibleEntries = useMemo(
+    () => filterEntries(entries, activeTab, query),
+    [activeTab, entries, query],
+  );
+  useEffect(() => {
+    setPage(1);
+  }, [activeTab, query, entries]);
+  const pageCount = Math.max(1, Math.ceil(visibleEntries.length / LISTONE_PAGE_SIZE));
+  const safePage = Math.min(page, pageCount);
+  const pagedEntries = visibleEntries.slice(
+    (safePage - 1) * LISTONE_PAGE_SIZE,
+    safePage * LISTONE_PAGE_SIZE,
+  );
 
   return (
     <PageContainer
@@ -236,8 +247,27 @@ export function AdminListoneScreen() {
           />
         ) : null}
 
-        {!loading && !error ? (
+        {!loading && !error && entries.length === 0 ? (
+          <UiStatePanel
+            state="empty"
+            title="Nessun calciatore"
+            message="Il listone è vuoto per questa stagione. Aggiornalo dal provider."
+            testID="admin-listone-empty-all"
+          />
+        ) : null}
+
+        {!loading && !error && entries.length > 0 ? (
           <View>
+            <TextInput
+              style={styles.input}
+              value={query}
+              onChangeText={setQuery}
+              placeholder="Cerca per nome o club…"
+              autoCapitalize="none"
+              autoCorrect={false}
+              testID="admin-listone-search"
+            />
+
             <View style={styles.chipRow} testID="admin-listone-tabs">
               {ROLE_TABS.map((tab) => (
                 <Pressable
@@ -262,18 +292,16 @@ export function AdminListoneScreen() {
               <UiStatePanel
                 state="empty"
                 title="Nessun calciatore"
-                message="Il listone è vuoto per questa stagione. Aggiornalo dal provider."
+                message={
+                  query.trim()
+                    ? "Nessun risultato per la ricerca corrente."
+                    : "Nessun calciatore in questo ruolo."
+                }
                 testID={`admin-listone-empty-${activeTab}`}
               />
             ) : (
               <View testID={`admin-listone-table-${activeTab}`}>
-                {visibleEntries.length > LISTONE_RENDER_LIMIT ? (
-                  <Text style={styles.meta} testID="admin-listone-truncated">
-                    Mostrati i primi {LISTONE_RENDER_LIMIT} di {visibleEntries.length} calciatori.
-                    Usa i filtri ruolo per restringere l'elenco.
-                  </Text>
-                ) : null}
-                {visibleEntries.slice(0, LISTONE_RENDER_LIMIT).map((entry) => (
+                {pagedEntries.map((entry) => (
                   <View key={entry.athleteId} style={styles.listRow}>
                     <View style={styles.identityRow}>
                       <Text style={styles.name}>{entry.canonicalName}</Text>
@@ -290,6 +318,29 @@ export function AdminListoneScreen() {
                     </Text>
                   </View>
                 ))}
+                {pageCount > 1 ? (
+                  <View style={styles.rowActions} testID="admin-listone-pagination">
+                    <Pressable
+                      style={[styles.secondaryButton, safePage <= 1 && styles.disabled]}
+                      disabled={safePage <= 1}
+                      onPress={() => setPage((current) => Math.max(1, current - 1))}
+                      testID="admin-listone-prev-page"
+                    >
+                      <Text style={styles.secondaryButtonLabel}>Precedente</Text>
+                    </Pressable>
+                    <Text style={styles.meta}>
+                      Pagina {safePage} di {pageCount} ({visibleEntries.length} calciatori)
+                    </Text>
+                    <Pressable
+                      style={[styles.secondaryButton, safePage >= pageCount && styles.disabled]}
+                      disabled={safePage >= pageCount}
+                      onPress={() => setPage((current) => Math.min(pageCount, current + 1))}
+                      testID="admin-listone-next-page"
+                    >
+                      <Text style={styles.secondaryButtonLabel}>Successiva</Text>
+                    </Pressable>
+                  </View>
+                ) : null}
               </View>
             )}
           </View>

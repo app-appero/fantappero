@@ -9,7 +9,9 @@ const fetchAdminOverviewMock = vi.fn();
 const fetchAdminUsersMock = vi.fn();
 const fetchAdminLeaguesMock = vi.fn();
 const fetchAdminListoneMock = vi.fn();
-const refreshAdminListoneMock = vi.fn();
+const startAdminListoneRefreshMock = vi.fn();
+const fetchAdminListoneRefreshProgressMock = vi.fn();
+const fetchActiveAdminListoneRefreshMock = vi.fn().mockResolvedValue(null);
 
 vi.mock("./api/auth", () => ({
   fetchMe: (...args: unknown[]) => fetchMeMock(...args),
@@ -34,11 +36,16 @@ vi.mock("./api/admin", () => ({
   fetchAdminUsers: (...args: unknown[]) => fetchAdminUsersMock(...args),
   fetchAdminLeagues: (...args: unknown[]) => fetchAdminLeaguesMock(...args),
   fetchAdminListone: (...args: unknown[]) => fetchAdminListoneMock(...args),
-  refreshAdminListone: (...args: unknown[]) => refreshAdminListoneMock(...args),
+  startAdminListoneRefresh: (...args: unknown[]) => startAdminListoneRefreshMock(...args),
+  fetchAdminListoneRefreshProgress: (...args: unknown[]) =>
+    fetchAdminListoneRefreshProgressMock(...args),
+  fetchActiveAdminListoneRefresh: (...args: unknown[]) =>
+    fetchActiveAdminListoneRefreshMock(...args),
   promoteOperator: vi.fn(),
   revokeOperator: vi.fn(),
 }));
 
+import { ListoneRefreshProvider } from "./admin/ListoneRefreshContext";
 import { AuthProvider } from "./auth/AuthContext";
 import { clearStoredSession, saveStoredSession } from "./auth/sessionStorage";
 import { MemoryRouter } from "./router/simpleRouter";
@@ -81,7 +88,11 @@ async function renderAppAt(
     root.render(
       createElement(MemoryRouter, {
         initialEntries: [path],
-        children: createElement(AuthProvider, { children: createElement(AppRoutes) }),
+        children: createElement(AuthProvider, {
+          children: createElement(ListoneRefreshProvider, {
+            children: createElement(AppRoutes),
+          }),
+        }),
       }),
     );
   });
@@ -105,7 +116,9 @@ describe("Admin panel identity gate (EP11-04a)", () => {
     fetchAdminUsersMock.mockReset();
     fetchAdminLeaguesMock.mockReset();
     fetchAdminListoneMock.mockReset();
-    refreshAdminListoneMock.mockReset();
+    startAdminListoneRefreshMock.mockReset();
+    fetchAdminListoneRefreshProgressMock.mockReset();
+    fetchActiveAdminListoneRefreshMock.mockReset().mockResolvedValue(null);
   });
 
   afterEach(() => {

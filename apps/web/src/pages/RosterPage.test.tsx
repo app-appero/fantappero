@@ -92,13 +92,15 @@ describe("EP05-01/02/03 roster, credits and manual assignment", () => {
     expect(html).toContain("Attaccanti");
     expect(html).toContain('data-testid="roster-credits-balance"');
     expect(html).toContain("Crediti residui");
+    expect(html).toContain('data-testid="roster-purchase-credits-a1"');
+    expect(html).toContain('value="50"');
   });
 
   it("renders empty roster state", () => {
     const html = renderRoute("/rosa?persona=member&stato=empty");
     expect(html).toContain('data-testid="roster-empty"');
     expect(html).toContain("Rosa vuota");
-    expect(html).toContain('data-testid="roster-credits"');
+    expect(html).toContain('data-testid="roster-credits-balance"');
   });
 
   it("renders error roster state", () => {
@@ -126,6 +128,7 @@ describe("EP05-01/02/03 roster, credits and manual assignment", () => {
     expect(html).toContain('data-testid="roster-admin-listone-search"');
     expect(html).toContain('data-testid="roster-admin-release-a1"');
     expect(html).toContain('data-testid="roster-admin-assign-a3"');
+    expect(html).toContain('data-testid="roster-admin-listone-price-a3"');
     expect(html).toContain(">Rimuovi<");
     expect(html).toContain(">Assegna<");
     expect(html).toContain('data-testid="roster-admin-credits"');
@@ -155,6 +158,8 @@ describe("EP05-01/02/03 roster, credits and manual assignment", () => {
     const html = renderRoute("/rosa?persona=member&stato=success&sezione=storico");
     expect(html).toContain('data-testid="roster-section-tabs"');
     expect(html).toContain('data-testid="roster-history"');
+    expect(html).toContain("Movimenti crediti");
+    expect(html).toContain('data-testid="roster-credits-ledger"');
     expect(html).toContain('data-testid="roster-history-success"');
     expect(html).toContain("Intervalli di possesso");
     expect(html).toContain('data-testid="roster-snapshots"');

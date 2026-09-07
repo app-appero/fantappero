@@ -180,4 +180,20 @@ export const marketUiStyles = StyleSheet.create({
     fontSize: typography.fontSize.sm,
     fontWeight: typography.fontWeight.semibold,
   },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: spacing.lg,
+  },
+  modalCard: {
+    width: "100%",
+    maxWidth: 420,
+    maxHeight: "80%",
+    borderRadius: radius.md,
+    backgroundColor: colors.backgroundElevated,
+    padding: spacing.md,
+    gap: spacing.sm,
+  },
 });

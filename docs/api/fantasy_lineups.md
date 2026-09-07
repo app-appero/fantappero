@@ -201,8 +201,18 @@ Migrazione additiva `d6f9a3b1c247`; le formazioni preesistenti restano con
 * `POST /leagues/{league_id}/turni/{round_id}/formazioni-ia` (`league:admin`),
   con `dry_run=true` per la sola anteprima. Disponibile con parità su web e
   mobile.
+* **Self-service** — `POST /leagues/{league_id}/turni/{round_id}/formazione/migliore`
+  (`roster:edit`, ogni membro lega sulla **propria** squadra). Riusa la stessa
+  formula `ai_lineup_v1` (ADR-0005 §10) ma precompila solo la **bozza**, non
+  conferma nulla: l'utente deve comunque salvare per rendere effettiva la
+  formazione, come "Copia formazione precedente". Non imposta mai
+  `system_generated_ai`. Se qualche calciatore ha già la partita iniziata,
+  vincola solo quelli al ruolo già confermato (titolare resta titolare,
+  panchinaro resta panchinaro) e ottimizza liberamente il resto — stesso
+  principio del salvataggio manuale (`assert_progressive_lock`), non il
+  blocco totale del percorso IA-automatico.
 
-Entrambi sono **idempotenti**: la formula è deterministica e il servizio non
+Tutti e tre sono **idempotenti**: la formula è deterministica e il servizio non
 tocca né le squadre umane né le formazioni già schierate a mano. Un secondo
 comando con lo stesso piano restituisce `unchanged` senza incrementare
 `revision`, cambiare timestamp o riscrivere i giocatori. Se il lock progressivo
@@ -238,6 +248,7 @@ il calciatore né rimborsa mosse.
 | `GET` | `/leagues/{id}/turni/{roundId}/formazione` | `roster:view` |
 | `PUT` | `/leagues/{id}/turni/{roundId}/formazione` | `roster:edit` |
 | `POST` | `/leagues/{id}/turni/{roundId}/formazione/copia` | `roster:edit` |
+| `POST` | `/leagues/{id}/turni/{roundId}/formazione/migliore` | `roster:edit` |
 | `PUT` | `/leagues/{id}/turni/{roundId}/formazione/bozza` | `roster:edit` |
 
 Il contesto include `serverNow`, `modificationAllowed` (turno editabile e almeno un
@@ -262,7 +273,9 @@ Errori con motivazione: `invalid_module`, `module_role_mismatch`,
 `roster_not_validated`, `turn_not_open`, `turn_skipped`,
 `turn_modification_closed`, `athlete_kickoff_locked`, `bench_order_locked`,
 `tactical_moves_exhausted`, `previous_lineup_not_found`,
-`copied_athlete_not_in_roster`, `copied_athlete_unavailable`.
+`copied_athlete_not_in_roster`, `copied_athlete_unavailable`,
+`ai_lineup_incomplete` (rosa insufficiente per completare il modulo con la
+formula automatica).
 
 La **copia** prende l'ultima formazione confermata di un turno precedente della
 stessa squadra, la rivalida e la scrive in **bozza**. Non conferma e non consuma
@@ -275,7 +288,8 @@ fuori rosa e modifiche a calciatori locked restano rifiutati. La conferma
 - Web `/formazione` e Mobile tab Formazione: scelta turno, modulo, titolari per ruolo,
   panchina **riordinabile** (menu ordine di ingresso), badge **bloccato** sugli slot e sulle posizioni
   con partita iniziata, **contatore mosse** e anteprima del consumo, **copia formazione precedente**,
-  **salva bozza**, salvataggio confermato. Stati
+  **applica formazione migliore** (bottone self-service, ogni membro lega), **salva bozza**,
+  salvataggio confermato. Stati
   caricamento / vuoto / errore / successo / permessi insufficienti.
 - Cambio modulo: i titolari locked restano nello slot del proprio ruolo.
 - Validazione preventiva nel client con lo stesso motore; il server resta decisivo.
@@ -285,12 +299,14 @@ fuori rosa e modifiche a calciatori locked restano rifiutati. La conferma
 - Metrica: `fantasy_lineup_saved_total{result}` (`success`, `athlete_kickoff_locked`, `bench_order_locked`, `tactical_moves_exhausted`, …)
 - Metrica: `fantasy_lineup_copied_total{result}`
 - Metrica: `fantasy_lineup_draft_saved_total{result}`
+- Metrica: `fantasy_lineup_best_applied_total{result}` (`success`, `incomplete`, `roster_not_validated`, …)
 - Metrica: `fantasy_tactical_move_applied_total`
 - Audit: `fantasy_lineup_saved` (round, team, modulo, revision; niente PII)
 - Audit: `fantasy_lineup_saved` con `source=admin_ai_lineup_command` (admin,
   turno, versione algoritmo, conteggi ed errori del comando generale AI)
 - Audit: `fantasy_lineup_copied` (round, team, sourceRoundId, dropped/unavailable count; niente PII)
 - Audit: `fantasy_lineup_draft_saved` (round, team, modulo; niente PII)
+- Audit: `fantasy_lineup_best_applied` (round, team, modulo, versione algoritmo; niente PII)
 - Audit: `fantasy_tactical_move_applied` (sequence, revision, moduli; niente PII)
 
 ## Verifica

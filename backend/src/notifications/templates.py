@@ -112,6 +112,52 @@ def _render_mercato_esito_busta(params: NotificationParams) -> NotificationConte
     )
 
 
+@register_template("mercato.asta_live_aggiudicato", 1)
+def _render_mercato_asta_live_aggiudicato(params: NotificationParams) -> NotificationContent:
+    athlete_name = params.get("athlete_name", "un giocatore")
+    amount = params.get("amount_credits")
+    return NotificationContent(
+        title="Lotto aggiudicato",
+        body=f"Hai aggiudicato {athlete_name} per {amount} crediti.",
+        deep_link="/mercato",
+    )
+
+
+@register_template("mercato.asta_live_sorpassato", 1)
+def _render_mercato_asta_live_sorpassato(params: NotificationParams) -> NotificationContent:
+    """Solo la modalità live può notificare un sorpasso: nelle buste chiuse gli
+    importi restano nascosti fino alla risoluzione, quindi non esiste un
+    concetto di "sorpasso" da comunicare in tempo reale."""
+    athlete_name = params.get("athlete_name", "un giocatore")
+    return NotificationContent(
+        title="Sei stato sorpassato",
+        body=f"Un altro fantallenatore ha rilanciato su {athlete_name}.",
+        deep_link="/mercato",
+    )
+
+
+@register_template("mercato.asta_live_scambio_richiesto", 1)
+def _render_mercato_asta_live_scambio_richiesto(params: NotificationParams) -> NotificationContent:
+    athlete_name = params.get("athlete_name", "un giocatore")
+    return NotificationContent(
+        title="Scelta richiesta: rosa al completo",
+        body=(
+            f"Hai aggiudicato {athlete_name} ma la tua rosa in quel ruolo è al completo: "
+            "scegli chi scambiare."
+        ),
+        deep_link="/mercato",
+    )
+
+
+@register_template("mercato.asta_live_iniziata", 1)
+def _render_mercato_asta_live_iniziata(params: NotificationParams) -> NotificationContent:
+    return NotificationContent(
+        title="Asta a rilanci iniziata",
+        body="La sessione d'asta a rilanci è aperta: raggiungi la lega per partecipare.",
+        deep_link="/mercato",
+    )
+
+
 _TRADE_STATUS_MESSAGES: dict[str, tuple[str, str]] = {
     "proposed": (
         "Nuova proposta di scambio",

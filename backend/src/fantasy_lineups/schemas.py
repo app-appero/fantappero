@@ -44,6 +44,15 @@ class LineupRosterPlayerResponse(ApiModel):
     kickoff_at: datetime | None = Field(default=None, alias="kickoffAt")
     fixture_status: str | None = Field(default=None, alias="fixtureStatus")
     photo_url: str | None = Field(default=None, alias="photoUrl")
+    # Voto fantacalcistico del turno corrente (EP-formazione-voti): stesso
+    # shape di `H2HPlayerScoreResponse` per riuso diretto degli helper di
+    # rendering condivisi tra Formazione e Turni.
+    fantasy_score: float | None = Field(default=None, alias="fantasyScore")
+    base_score: float | None = Field(default=None, alias="baseScore")
+    bonus_total: float = Field(default=0.0, alias="bonusTotal")
+    malus_total: float = Field(default=0.0, alias="malusTotal")
+    bonus_malus: list[dict[str, object]] = Field(default_factory=list, alias="bonusMalus")
+    fixture_status_label: str | None = Field(default=None, alias="fixtureStatusLabel")
 
 
 class LineupPlayerResponse(ApiModel):

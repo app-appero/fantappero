@@ -19,6 +19,11 @@ from database.enums import (
     RosterCompositionStatus,
     TacticalMoveStatus,
 )
+from fantasy_lineups.ai_service import DEFAULT_MODULE
+from fantasy_lineups.best_lineup_service import (
+    compute_best_lineup_for_team,
+    compute_best_lineup_respecting_locks,
+)
 from fantasy_lineups.models import LineupDraft, LineupPlayer, LineupSubmission, TacticalMove
 from fantasy_lineups.rules import (
     DEFAULT_LINEUP_LOCK_MARGIN_MINUTES,
@@ -54,6 +59,7 @@ from fantasy_lineups.schemas import (
     SaveLineupRequest,
     TacticalMoveResponse,
 )
+from fantasy_ratings.round_scores import RoundAthleteScore, compute_round_athlete_scores
 from fantasy_lineups.validators import (
     parse_optional_athlete_ids,
     validate_athlete_id_list,
@@ -243,8 +249,28 @@ class FantasyLineupService:
             )
 
         roster = self._roster_rows(league_access.league.season_year, team)
-        roles_by_id = {row.athlete_id: row.role for row in roster}
         roster_ids = [str(row.athlete_id) for row in roster]
+
+        # Chi è bloccato e con quale ruolo è stato schierato va saputo *prima*
+        # di validare il modulo (vedi `_validation_roles`).
+        kickoffs = self._athlete_kickoffs(
+            round_id=fantasy_round.id,
+            season_year=league_access.league.season_year,
+            athlete_ids=[row.athlete_id for row in roster],
+        )
+        lock_margin = self._lineup_lock_margin_for_league(league_access.league.id)
+        locked_ids = [
+            str(row.athlete_id)
+            for row in roster
+            if self._is_row_locked(row.athlete_id, kickoffs, now, lock_margin)
+        ]
+        submission = self._load_submission(fantasy_round.id, team.id, for_update=True)
+
+        roles_by_id = self._validation_roles(
+            roster=roster,
+            submission=submission,
+            locked_athlete_ids={UUID(item) for item in locked_ids},
+        )
         starters = [
             LineupPlayerRef(athlete_id=str(athlete_id), role=roles_by_id.get(athlete_id))
             for athlete_id in starter_ids
@@ -267,18 +293,6 @@ class FantasyLineupService:
             )
             raise ValidationAuthError(first.message, code=first.code)
 
-        kickoffs = self._athlete_kickoffs(
-            round_id=fantasy_round.id,
-            season_year=league_access.league.season_year,
-            athlete_ids=[row.athlete_id for row in roster],
-        )
-        lock_margin = self._lineup_lock_margin_for_league(league_access.league.id)
-        locked_ids = [
-            str(row.athlete_id)
-            for row in roster
-            if self._is_row_locked(row.athlete_id, kickoffs, now, lock_margin)
-        ]
-        submission = self._load_submission(fantasy_round.id, team.id, for_update=True)
         try:
             assert_progressive_lock(
                 previous_slots=self._slots_from_submission(submission),
@@ -543,6 +557,156 @@ class FantasyLineupService:
             fantasy_team_id=team.id,
         )
 
+    def apply_best_lineup(
+        self,
+        league_access: LeagueAccess,
+        round_id: UUID,
+    ) -> LineupContextResponse:
+        """Precompila la bozza con la stessa formula ``ai_lineup_v1`` delle squadre IA.
+
+        Riusa `compute_best_lineup_for_team` (pura selezione, EP-self-service)
+        e scrive il risultato in bozza con `_upsert_draft` — non tocca mai la
+        formazione già confermata: l'utente deve comunque premere "Salva
+        formazione" per renderla effettiva, esattamente come dopo "Copia
+        formazione precedente".
+
+        Se uno o più calciatori della rosa hanno già la partita iniziata,
+        passa invece da `compute_best_lineup_respecting_locks`: chi era
+        titolare confermato resta titolare, chi era in panchina (o non aveva
+        ancora una formazione confermata) resta in panchina — l'euristica
+        ottimizza solo i calciatori non ancora bloccati, esattamente come
+        farebbe un salvataggio manuale.
+        """
+        now = datetime.now(UTC)
+        fantasy_round = self._load_round(league_access.league.id, round_id, for_update=True)
+        try:
+            assert_lineup_modification_allowed(stored=fantasy_round.status)
+        except ValidationAuthError as exc:
+            get_metrics().incr(
+                "fantasy_lineup_best_applied_total",
+                labels={"result": exc.code},
+            )
+            raise
+        self._sync_round_kickoffs(
+            fantasy_round,
+            now=now,
+            actor_id=league_access.user.id,
+            commit=False,
+        )
+
+        membership = self._require_membership(league_access)
+        self._lock_team_for_membership(league_access.league.id, membership.id)
+        team = find_team_for_membership(self._session, membership.id, with_slots=True)
+        assert team is not None
+        try:
+            self._require_validated_roster(team)
+        except ValidationAuthError as exc:
+            get_metrics().incr(
+                "fantasy_lineup_best_applied_total",
+                labels={"result": exc.code},
+            )
+            raise
+
+        submission = self._load_submission(fantasy_round.id, team.id)
+        draft = self._load_draft(fantasy_round.id, team.id)
+        if submission is not None:
+            module = submission.module
+        elif draft is not None:
+            module = draft.module
+        else:
+            module = DEFAULT_MODULE
+
+        roster = self._roster_rows(league_access.league.season_year, team)
+        kickoffs = self._athlete_kickoffs(
+            round_id=fantasy_round.id,
+            season_year=league_access.league.season_year,
+            athlete_ids=[row.athlete_id for row in roster],
+        )
+        lock_margin = self._lineup_lock_margin_for_league(league_access.league.id)
+        locked_ids = {
+            row.athlete_id
+            for row in roster
+            if self._is_row_locked(row.athlete_id, kickoffs, now, lock_margin)
+        }
+
+        if not locked_ids:
+            plan = compute_best_lineup_for_team(
+                self._session,
+                league_id=league_access.league.id,
+                round_id=fantasy_round.id,
+                team_id=team.id,
+                season_year=league_access.league.season_year,
+                module=module,
+                decided_at=now,
+            )
+        else:
+            confirmed_slots = self._slots_from_submission(submission)
+            confirmed_starter_ids = {
+                UUID(athlete_id)
+                for athlete_id, slot_kind in confirmed_slots.items()
+                if slot_kind == LineupSlotKind.STARTER.value
+            }
+            confirmed_bench_order = [
+                UUID(athlete_id)
+                for athlete_id in self._bench_order_from_submission(submission)
+            ]
+            plan = compute_best_lineup_respecting_locks(
+                self._session,
+                league_id=league_access.league.id,
+                round_id=fantasy_round.id,
+                team_id=team.id,
+                season_year=league_access.league.season_year,
+                module=module,
+                decided_at=now,
+                locked_athlete_ids=locked_ids,
+                confirmed_starter_ids=confirmed_starter_ids,
+                confirmed_bench_order=confirmed_bench_order,
+            )
+        if not plan.is_complete:
+            get_metrics().incr(
+                "fantasy_lineup_best_applied_total",
+                labels={"result": "incomplete"},
+            )
+            raise ValidationAuthError(
+                "La rosa non permette di completare il modulo con la formula automatica.",
+                code="ai_lineup_incomplete",
+            )
+
+        self._upsert_draft(
+            league_id=league_access.league.id,
+            round_id=fantasy_round.id,
+            team_id=team.id,
+            user_id=league_access.user.id,
+            module_code=module.value,
+            starter_ids=[str(athlete_id) for athlete_id in plan.starters],
+            bench_ids=[str(athlete_id) for athlete_id in plan.bench],
+            now=now,
+            copy_source_round_id=None,
+        )
+        self._add_audit(
+            league_id=league_access.league.id,
+            actor_id=league_access.user.id,
+            action=LeagueAuditAction.FANTASY_LINEUP_BEST_APPLIED,
+            details={
+                "roundId": str(fantasy_round.id),
+                "fantasyTeamId": str(team.id),
+                "module": module.value,
+                "algorithmVersion": plan.algorithm_version,
+            },
+        )
+        self._session.commit()
+        get_metrics().incr("fantasy_lineup_best_applied_total", labels={"result": "success"})
+        logger.info("fantasy_lineup_best_applied", extra={"result": "success"})
+        return self._to_context(
+            league_id=league_access.league.id,
+            fantasy_round=fantasy_round,
+            roster=roster,
+            submission=self._load_submission(fantasy_round.id, team.id),
+            now=now,
+            season_year=league_access.league.season_year,
+            fantasy_team_id=team.id,
+        )
+
     def save_my_draft(
         self,
         league_access: LeagueAccess,
@@ -578,8 +742,29 @@ class FantasyLineupService:
             raise
 
         roster = self._roster_rows(league_access.league.season_year, team)
-        roles_by_id = {str(row.athlete_id): row.role for row in roster}
         roster_ids = [str(row.athlete_id) for row in roster]
+
+        # Come in `save_my_lineup`: serve sapere chi è bloccato prima di
+        # validare, per usare il ruolo di schieramento (vedi `_validation_roles`).
+        kickoffs = self._athlete_kickoffs(
+            round_id=fantasy_round.id,
+            season_year=league_access.league.season_year,
+            athlete_ids=[row.athlete_id for row in roster],
+        )
+        lock_margin = self._lineup_lock_margin_for_league(league_access.league.id)
+        locked_ids = [
+            str(row.athlete_id)
+            for row in roster
+            if self._is_row_locked(row.athlete_id, kickoffs, now, lock_margin)
+        ]
+        submission = self._load_submission(fantasy_round.id, team.id, for_update=True)
+
+        roles_by_uuid = self._validation_roles(
+            roster=roster,
+            submission=submission,
+            locked_athlete_ids={UUID(item) for item in locked_ids},
+        )
+        roles_by_id = {str(athlete_id): role for athlete_id, role in roles_by_uuid.items()}
         starters = [
             LineupPlayerRef(
                 athlete_id=athlete_id,
@@ -609,18 +794,6 @@ class FantasyLineupService:
             )
             raise ValidationAuthError(first.message, code=first.code)
 
-        kickoffs = self._athlete_kickoffs(
-            round_id=fantasy_round.id,
-            season_year=league_access.league.season_year,
-            athlete_ids=[row.athlete_id for row in roster],
-        )
-        lock_margin = self._lineup_lock_margin_for_league(league_access.league.id)
-        locked_ids = [
-            str(row.athlete_id)
-            for row in roster
-            if self._is_row_locked(row.athlete_id, kickoffs, now, lock_margin)
-        ]
-        submission = self._load_submission(fantasy_round.id, team.id, for_update=True)
         filled_starters = [item for item in starter_ids if item]
         filled_bench = [item for item in bench_ids if item]
         try:
@@ -715,6 +888,31 @@ class FantasyLineupService:
         self._session.add_all(rows)
         self._session.flush()
 
+    @staticmethod
+    def _validation_roles(
+        *,
+        roster: list[_RosterRow],
+        submission: LineupSubmission | None,
+        locked_athlete_ids: set[UUID],
+    ) -> dict[UUID, FantasyRole | None]:
+        """Ruolo con cui validare il modulo, per calciatore.
+
+        Per chi è **già bloccato** vale il ruolo con cui è stato schierato
+        (`lineup_players.role`), non quello ricalcolato oggi dal listone: una
+        riclassificazione a stagione in corso non deve invalidare a posteriori
+        una formazione che era legittima e che ormai non è più modificabile —
+        il calciatore è bloccato, quindi non potrebbe nemmeno essere
+        sostituito per rimediare. È lo stesso ruolo che il motore di
+        sostituzioni/punteggio usa già (`substitution_service`).
+        """
+        roles: dict[UUID, FantasyRole | None] = {row.athlete_id: row.role for row in roster}
+        if submission is None:
+            return roles
+        for player in submission.players:
+            if player.athlete_id in locked_athlete_ids:
+                roles[player.athlete_id] = player.role
+        return roles
+
     def _roster_rows(self, season_year: int, team: FantasyTeam) -> list[_RosterRow]:
         athlete_ids = [
             slot.athlete_id
@@ -763,6 +961,11 @@ class FantasyLineupService:
             round_id=fantasy_round.id,
             season_year=season_year,
             athlete_ids=[row.athlete_id for row in roster],
+        )
+        scores_by_athlete = compute_round_athlete_scores(
+            self._session,
+            fantasy_round.id,
+            league_id=league_id,
         )
         lock_margin = self._lineup_lock_margin_for_league(league_id)
         locked_flags = {
@@ -859,26 +1062,11 @@ class FantasyLineupService:
                 for item in approved_module_catalog()
             ],
             roster=[
-                LineupRosterPlayerResponse(
-                    athleteId=str(row.athlete_id),
-                    athleteName=row.athlete_name,
-                    role=row.role.value if row.role is not None else None,
-                    slotIndex=row.slot_index,
-                    locked=locked_flags[row.athlete_id],
-                    lockLatched=(
-                        kickoffs[row.athlete_id].lock_latched
-                        if row.athlete_id in kickoffs
-                        else False
-                    ),
-                    kickoffAt=(
-                        kickoffs[row.athlete_id].kickoff_at if row.athlete_id in kickoffs else None
-                    ),
-                    fixtureStatus=(
-                        kickoffs[row.athlete_id].status_short
-                        if row.athlete_id in kickoffs
-                        else None
-                    ),
-                    photoUrl=row.photo_url,
+                self._to_roster_player(
+                    row,
+                    kickoffs=kickoffs,
+                    locked_flags=locked_flags,
+                    scores_by_athlete=scores_by_athlete,
                 )
                 for row in roster
             ],
@@ -1092,6 +1280,34 @@ class FantasyLineupService:
             ),
             starters=starters,
             bench=bench,
+        )
+
+    @staticmethod
+    def _to_roster_player(
+        row: _RosterRow,
+        *,
+        kickoffs: dict[UUID, _KickoffRef],
+        locked_flags: dict[UUID, bool],
+        scores_by_athlete: dict[UUID, RoundAthleteScore],
+    ) -> LineupRosterPlayerResponse:
+        kickoff = kickoffs.get(row.athlete_id)
+        score = scores_by_athlete.get(row.athlete_id)
+        return LineupRosterPlayerResponse(
+            athleteId=str(row.athlete_id),
+            athleteName=row.athlete_name,
+            role=row.role.value if row.role is not None else None,
+            slotIndex=row.slot_index,
+            locked=locked_flags[row.athlete_id],
+            lockLatched=kickoff.lock_latched if kickoff is not None else False,
+            kickoffAt=kickoff.kickoff_at if kickoff is not None else None,
+            fixtureStatus=kickoff.status_short if kickoff is not None else None,
+            photoUrl=row.photo_url,
+            fantasyScore=score.fantasy_score if score is not None else None,
+            baseScore=score.base_score if score is not None else None,
+            bonusTotal=score.bonus_total if score is not None else 0.0,
+            malusTotal=score.malus_total if score is not None else 0.0,
+            bonusMalus=list(score.bonus_malus) if score is not None else [],
+            fixtureStatusLabel=score.fixture_status_label if score is not None else None,
         )
 
     def _to_previous(self, submission: LineupSubmission) -> PreviousLineupResponse:

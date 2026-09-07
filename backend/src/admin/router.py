@@ -125,6 +125,16 @@ def start_listone_refresh(
     return service.start_refresh_job(season_year=season_year, actor=operator)
 
 
+@router.get("/listone/aggiorna", response_model=AdminListoneRefreshProgressResponse | None)
+def get_active_listone_refresh(
+    _operator: User = Depends(require_permissions(Permission.GLOBAL_OPERATE)),
+    service: AdminListoneService = Depends(get_admin_listone_service),
+) -> AdminListoneRefreshProgressResponse | None:
+    """Lets any operator discover a refresh already in progress, not just the
+    one who started it (EP11-05)."""
+    return service.get_active_refresh_progress()
+
+
 @router.get("/listone/aggiorna/{job_id}", response_model=AdminListoneRefreshProgressResponse)
 def get_listone_refresh_progress(
     job_id: str,

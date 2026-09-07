@@ -25,6 +25,8 @@ from database.enums import (
 from database.session import create_session_factory
 from fantasy_lineups.models import LineupPlayer, LineupSubmission
 from fantasy_lineups.rules import remaining_roster_for_bench
+from fantasy_ratings.config import DEFAULT_FORMULA_VERSION
+from fantasy_ratings.models import PlayerMatchRating
 from fantasy_teams.models import FantasyRosterSlot, FantasyTeam
 from fantasy_turns.models import FantasyRound, FantasyRoundFixture
 from leagues.models.competition import Competition
@@ -288,7 +290,10 @@ def test_full_roster_and_lineup_query_counts_are_bounded(
     assert roster_queries <= 25
     assert lineup.status_code == 200
     assert len(lineup.json()["roster"]) == 35
-    assert lineup_queries <= 35
+    # Budget alzato di un pugno di query bulk (non per-giocatore) per
+    # `compute_round_athlete_scores` (EP-formazione-voti): stesso numero
+    # costante di query indipendentemente dalla dimensione della rosa.
+    assert lineup_queries <= 45
 
 
 def test_roster_exposes_athlete_photo_url_when_available(
@@ -328,6 +333,79 @@ def test_roster_exposes_athlete_photo_url_when_available(
     assert context.status_code == 200
     roster_by_id = {row["athleteId"]: row for row in context.json()["roster"]}
     assert roster_by_id[str(photographed.id)]["photoUrl"] == "https://cdn.example.com/athletes/photo.jpg"
+
+
+def test_roster_exposes_fantasy_score_for_a_concluded_fixture(
+    client: TestClient,
+    db_session: Session,
+    competition_ids: list[str],
+) -> None:
+    """Il voto di un turno concluso arriva sulla rosa di Formazione (EP-formazione-voti),
+    non solo su Turni — stesso dato, stesso `compute_round_athlete_scores`."""
+    token, _ = _register_and_login(client, "lineup.voti@example.com")
+    league_id = _create_league(client, token, competition_ids, "Lega Voti Formazione")
+    grouped = _seed_roster_athletes(db_session, id_offset=2_430_000)
+    athletes = _fill_validated_roster(db_session, league_id, grouped)
+
+    fantasy_round, _clubs = _create_open_round(
+        db_session,
+        league_id,
+        cutoff=datetime.now(UTC) + timedelta(hours=4),
+        id_offset=2_435_000,
+        competition_ids=competition_ids,
+    )
+    headers = {"Authorization": f"Bearer {token}"}
+    saved = client.put(
+        f"/leagues/{league_id}/turni/{fantasy_round.id}/formazione",
+        headers=headers,
+        json=_lineup_payload(athletes),
+    )
+    assert saved.status_code == 200
+
+    # Il turno "finisce" solo dopo il salvataggio: altrimenti il calciatore
+    # risulterebbe già bloccato al momento di schierarlo per la prima volta
+    # (`athlete_kickoff_locked`), come farebbe un salvataggio manuale reale.
+    fixture = db_session.scalars(
+        select(Fixture)
+        .join(FantasyRoundFixture, FantasyRoundFixture.fixture_id == Fixture.id)
+        .where(FantasyRoundFixture.round_id == fantasy_round.id)
+    ).first()
+    assert fixture is not None
+    fixture.status_short = "FT"
+
+    scored_athlete = grouped["A"][0]
+    db_session.add(
+        PlayerMatchRating(
+            fixture_id=fixture.id,
+            league_id=UUID(league_id),
+            athlete_id=scored_athlete.id,
+            athlete_provider_id=scored_athlete.provider_id,
+            formula_version=DEFAULT_FORMULA_VERSION,
+            role=FantasyRole.A,
+            minutes=90,
+            eligible=True,
+            eligibility_reason="played",
+            base=6.0,
+            raw_before_clamp=7.5,
+            raw=7.5,
+            display=7.5,
+            fantasy_score=7.5,
+            stats_hash=f"hash-{fixture.id}",
+        )
+    )
+    db_session.commit()
+
+    context = client.get(
+        f"/leagues/{league_id}/turni/{fantasy_round.id}/formazione",
+        headers=headers,
+    )
+    assert context.status_code == 200
+    roster_by_id = {row["athleteId"]: row for row in context.json()["roster"]}
+    scored_row = roster_by_id[str(scored_athlete.id)]
+    assert scored_row["fantasyScore"] == 7.5
+
+    unscored_row = roster_by_id[str(grouped["A"][1].id)]
+    assert unscored_row["fantasyScore"] is None
     other = grouped["P"][1]
     assert roster_by_id[str(other.id)]["photoUrl"] is None
 

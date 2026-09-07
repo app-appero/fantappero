@@ -123,6 +123,81 @@ def assign_winning_bid(
     )
 
 
+class _SwapNotHonored(Exception):
+    """Internal sentinel: rolls back the swap's savepoint via ``begin_nested``."""
+
+
+def resolve_live_swap(
+    session: Session,
+    *,
+    league: League,
+    team: FantasyTeam,
+    release_athlete_id: UUID,
+    acquire_athlete_id: UUID,
+    amount_credits: int,
+    transaction_id: str,
+    refund_transaction_id: str,
+    actor_id: UUID | None,
+) -> FantasyRosterSlot | None:
+    """Resolve a live-auction roster-full swap prompt (EP08-09).
+
+    The coach releases ``release_athlete_id`` (refunded in full — this is a
+    forced choice created by winning a lot with no room, not a voluntary
+    release, so the usual partial-refund rule doesn't apply) and the newly
+    won ``acquire_athlete_id`` takes its slot. The refund is applied before
+    the acquisition charge so a refund that covers the gap can fund the win;
+    both happen in a savepoint so a failed swap (slot changed underneath,
+    role quota violated) undoes the refund too. Returns ``None`` — not a
+    fatal error — if the declared slot no longer holds that athlete or the
+    swap can't be honored.
+    """
+    slot = session.scalar(
+        select(FantasyRosterSlot)
+        .where(
+            FantasyRosterSlot.fantasy_team_id == team.id,
+            FantasyRosterSlot.athlete_id == release_athlete_id,
+        )
+        .with_for_update()
+    )
+    if slot is None:
+        return None
+    account = find_account_for_team(session, team.id, for_update=True)
+    if account is None:
+        return None
+    refund_credits = slot.purchase_credits or 0
+
+    try:
+        with session.begin_nested():
+            if refund_credits > 0:
+                apply_ledger_movement(
+                    session,
+                    account,
+                    amount=refund_credits,
+                    reason=CreditLedgerReason.MARKET_RELEASE_REFUND,
+                    transaction_id=refund_transaction_id,
+                    actor_id=actor_id,
+                    note="Rimborso per scambio da asta a rilanci (rosa al completo)",
+                )
+            updated = _finalize_slot_assignment(
+                session,
+                league=league,
+                team=team,
+                slot=slot,
+                acquire_athlete_id=acquire_athlete_id,
+                previous_athlete_id=release_athlete_id,
+                amount_credits=amount_credits,
+                reason=CreditLedgerReason.MARKET_AUCTION_WIN,
+                transaction_id=transaction_id,
+                actor_id=actor_id,
+                note="Scambio da asta a rilanci (rosa al completo)",
+            )
+            if updated is None:
+                raise _SwapNotHonored
+    except _SwapNotHonored:
+        return None
+    return updated
+
+
 def assign_winning_waiver_bid(
     session: Session,
     *,

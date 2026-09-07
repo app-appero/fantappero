@@ -20,8 +20,9 @@ import {
   Tabs,
   UiStatePanel,
 } from "@fantappero/ui";
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { fetchAdminListone, refreshAdminListone } from "../api/admin";
+import { useCallback, useEffect, useState } from "react";
+import { useListoneRefresh } from "../admin/ListoneRefreshContext";
+import { fetchAdminListone } from "../api/admin";
 import { ApiError } from "../api/client";
 import { getApiErrorMessage } from "../auth/AuthContext";
 import { loadStoredSession } from "../auth/sessionStorage";
@@ -43,6 +44,8 @@ const ROLE_LABEL: Record<FantasyRole, string> = {
   A: "Attaccante",
 };
 
+const LISTONE_PAGE_SIZE = 20;
+
 function roleBadgeVariant(role: FantasyRole): "success" | "warning" | "accent" | "danger" {
   if (role === "P") {
     return "success";
@@ -56,11 +59,91 @@ function roleBadgeVariant(role: FantasyRole): "success" | "warning" | "accent" |
   return "danger";
 }
 
-function filterByTab(entries: AdminListoneEntry[], tab: RoleTab): AdminListoneEntry[] {
-  if (tab === "all") {
-    return entries;
-  }
-  return entries.filter((entry) => entry.officialRole === tab);
+function filterEntries(
+  entries: AdminListoneEntry[],
+  tab: RoleTab,
+  query: string,
+): AdminListoneEntry[] {
+  const normalized = query.trim().toLocaleLowerCase("it-IT");
+  return entries.filter((entry) => {
+    if (tab !== "all" && entry.officialRole !== tab) {
+      return false;
+    }
+    if (!normalized) {
+      return true;
+    }
+    const haystack = `${entry.canonicalName} ${entry.clubName ?? ""}`.toLocaleLowerCase("it-IT");
+    return haystack.includes(normalized);
+  });
+}
+
+function AdminListoneTable({ tabValue, rows }: { tabValue: RoleTab; rows: AdminListoneEntry[] }) {
+  const [page, setPage] = useState(0);
+  useEffect(() => {
+    setPage(0);
+  }, [rows]);
+  const pageCount = Math.max(1, Math.ceil(rows.length / LISTONE_PAGE_SIZE));
+  const safePage = Math.min(page, pageCount - 1);
+  const pagedRows = rows.slice(
+    safePage * LISTONE_PAGE_SIZE,
+    safePage * LISTONE_PAGE_SIZE + LISTONE_PAGE_SIZE,
+  );
+
+  return (
+    <>
+      <Table compact data-testid={`admin-listone-table-${tabValue}`}>
+        <TableHead>
+          <TableRow>
+            <TableHeaderCell>Calciatore</TableHeaderCell>
+            <TableHeaderCell>Ruolo</TableHeaderCell>
+            <TableHeaderCell>Club</TableHeaderCell>
+            <TableHeaderCell>Posizione provider</TableHeaderCell>
+          </TableRow>
+        </TableHead>
+        <TableBody>
+          {pagedRows.map((entry) => (
+            <TableRow key={entry.athleteId}>
+              <TableCell>{entry.canonicalName}</TableCell>
+              <TableCell>
+                <Badge variant={roleBadgeVariant(entry.officialRole)}>
+                  {entry.officialRole}
+                </Badge>{" "}
+                {ROLE_LABEL[entry.officialRole]}
+              </TableCell>
+              <TableCell>{entry.clubName ?? "—"}</TableCell>
+              <TableCell>{entry.providerPositionRaw ?? "—"}</TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+      {pageCount > 1 ? (
+        <div
+          className="fa-admin-listone__pagination"
+          data-testid={`admin-listone-pagination-${tabValue}`}
+        >
+          <Button
+            type="button"
+            variant="ghost"
+            disabled={safePage === 0}
+            onClick={() => setPage((current) => Math.max(0, current - 1))}
+          >
+            Precedente
+          </Button>
+          <span>
+            Pagina {safePage + 1} di {pageCount} · {rows.length} calciatori
+          </span>
+          <Button
+            type="button"
+            variant="ghost"
+            disabled={safePage >= pageCount - 1}
+            onClick={() => setPage((current) => Math.min(pageCount - 1, current + 1))}
+          >
+            Successiva
+          </Button>
+        </div>
+      ) : null}
+    </>
+  );
 }
 
 const CURRENT_YEAR = new Date().getFullYear();
@@ -69,14 +152,10 @@ export function AdminListonePage() {
   const [seasonYear, setSeasonYear] = useState(String(CURRENT_YEAR));
   const [entries, setEntries] = useState<AdminListoneEntry[]>([]);
   const [activeTab, setActiveTab] = useState<RoleTab>("all");
+  const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [refreshing, setRefreshing] = useState(false);
-  const [refreshProgress, setRefreshProgress] = useState<{
-    percent: number;
-    stage: string;
-    message: string;
-  } | null>(null);
+  const { refreshing, progress: refreshProgress, startRefresh } = useListoneRefresh();
   const [refreshError, setRefreshError] = useState<string | null>(null);
   const [refreshSuccess, setRefreshSuccess] = useState<string | null>(null);
 
@@ -124,32 +203,18 @@ export function AdminListonePage() {
       setRefreshError("Sessione non disponibile. Accedi di nuovo.");
       return;
     }
-    setRefreshing(true);
     setRefreshError(null);
     setRefreshSuccess(null);
-    setRefreshProgress({ percent: 0, stage: "queued", message: "Avvio in corso…" });
     try {
-      const result = await refreshAdminListone(session.accessToken, year, {
-        onProgress: (progress) =>
-          setRefreshProgress({
-            percent: progress.percent,
-            stage: progress.stage,
-            message: progress.message,
-          }),
-      });
+      const result = await startRefresh(session.accessToken, year);
       setRefreshSuccess(
         `${result.message} Creati: ${result.counters.listoneCreated}, aggiornati: ${result.counters.listoneUpdated}.`,
       );
       await load();
     } catch (refreshErr) {
       setRefreshError(getApiErrorMessage(refreshErr, "Aggiornamento listone non riuscito."));
-    } finally {
-      setRefreshing(false);
-      setRefreshProgress(null);
     }
   }
-
-  const visibleEntries = useMemo(() => filterByTab(entries, activeTab), [activeTab, entries]);
 
   return (
     <PageContainer
@@ -225,58 +290,61 @@ export function AdminListonePage() {
               testId="admin-listone-error"
             />
           ) : null}
-          {!loading && !error ? (
-            <Tabs
-              value={activeTab}
-              onValueChange={(value) => setActiveTab(value as RoleTab)}
-              aria-label="Filtra listone per ruolo"
-            >
-              <TabList>
-                {ROLE_TABS.map((tab) => (
-                  <Tab key={tab.value} value={tab.value}>
-                    {tab.label}
-                  </Tab>
-                ))}
-              </TabList>
-              {ROLE_TABS.map((tab) => (
-                <TabPanel key={tab.value} value={tab.value}>
-                  {visibleEntries.length === 0 ? (
-                    <UiStatePanel
-                      state="empty"
-                      title="Nessun calciatore"
-                      message="Il listone è vuoto per questa stagione. Aggiornalo dal provider."
-                      testId={`admin-listone-empty-${tab.value}`}
-                    />
-                  ) : (
-                    <Table compact data-testid={`admin-listone-table-${tab.value}`}>
-                      <TableHead>
-                        <TableRow>
-                          <TableHeaderCell>Calciatore</TableHeaderCell>
-                          <TableHeaderCell>Ruolo</TableHeaderCell>
-                          <TableHeaderCell>Club</TableHeaderCell>
-                          <TableHeaderCell>Posizione provider</TableHeaderCell>
-                        </TableRow>
-                      </TableHead>
-                      <TableBody>
-                        {visibleEntries.map((entry) => (
-                          <TableRow key={entry.athleteId}>
-                            <TableCell>{entry.canonicalName}</TableCell>
-                            <TableCell>
-                              <Badge variant={roleBadgeVariant(entry.officialRole)}>
-                                {entry.officialRole}
-                              </Badge>{" "}
-                              {ROLE_LABEL[entry.officialRole]}
-                            </TableCell>
-                            <TableCell>{entry.clubName ?? "—"}</TableCell>
-                            <TableCell>{entry.providerPositionRaw ?? "—"}</TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  )}
-                </TabPanel>
-              ))}
-            </Tabs>
+          {!loading && !error && entries.length === 0 ? (
+            <UiStatePanel
+              state="empty"
+              title="Nessun calciatore"
+              message="Il listone è vuoto per questa stagione. Aggiornalo dal provider."
+              testId="admin-listone-empty-all"
+            />
+          ) : null}
+          {!loading && !error && entries.length > 0 ? (
+            <>
+              <div className="fa-admin-listone__search">
+                <Input
+                  label="Cerca calciatore"
+                  name="admin-listone-query"
+                  value={query}
+                  placeholder="Nome o club…"
+                  onChange={(event) => setQuery(event.target.value)}
+                  data-testid="admin-listone-search"
+                />
+              </div>
+              <Tabs
+                value={activeTab}
+                onValueChange={(value) => setActiveTab(value as RoleTab)}
+                aria-label="Filtra listone per ruolo"
+              >
+                <TabList>
+                  {ROLE_TABS.map((tab) => (
+                    <Tab key={tab.value} value={tab.value}>
+                      {tab.label}
+                    </Tab>
+                  ))}
+                </TabList>
+                {ROLE_TABS.map((tab) => {
+                  const rows = filterEntries(entries, tab.value, query);
+                  return (
+                    <TabPanel key={tab.value} value={tab.value}>
+                      {rows.length === 0 ? (
+                        <UiStatePanel
+                          state="empty"
+                          title="Nessun calciatore"
+                          message={
+                            query.trim()
+                              ? "Nessun risultato per la ricerca corrente."
+                              : "Nessun calciatore in questo ruolo."
+                          }
+                          testId={`admin-listone-empty-${tab.value}`}
+                        />
+                      ) : (
+                        <AdminListoneTable tabValue={tab.value} rows={rows} />
+                      )}
+                    </TabPanel>
+                  );
+                })}
+              </Tabs>
+            </>
           ) : null}
         </CardBody>
       </Card>

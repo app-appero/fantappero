@@ -133,6 +133,23 @@ class MarketService:
                 "Esiste già una sessione di questo tipo attiva per questa lega.",
                 code="market_session_already_active",
             )
+        if kind == MarketSessionKind.INITIAL_AUCTION:
+            # A league cannot run both auction mechanisms for the initial auction
+            # at once (EP08-09): reject sealed creation while a live session is active.
+            conflicting_live = self._session.scalar(
+                select(MarketSession).where(
+                    MarketSession.league_id == league.id,
+                    MarketSession.kind == MarketSessionKind.LIVE_AUCTION,
+                    MarketSession.status.in_(
+                        (MarketSessionStatus.SCHEDULED, MarketSessionStatus.OPEN)
+                    ),
+                )
+            )
+            if conflicting_live is not None:
+                raise ValidationAuthError(
+                    "Esiste già una sessione d'asta a rilanci attiva per questa lega.",
+                    code="market_session_already_active",
+                )
 
         market_session = MarketSession(
             league_id=league.id,

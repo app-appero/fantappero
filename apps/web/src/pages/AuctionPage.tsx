@@ -7,13 +7,11 @@ import type {
 import {
   AuctionBidPanel,
   Badge,
-  Breadcrumb,
   Button,
   Card,
   CardBody,
   CardHeader,
   Input,
-  PageContainer,
   Tab,
   Table,
   TableBody,
@@ -321,27 +319,18 @@ export function AuctionPage() {
 
   if (isDemoMode && demoState === "forbidden") {
     return (
-      <PageContainer
-        title="Asta"
-        header={<Breadcrumb items={[{ label: "Leghe", href: "/leghe" }, { label: "Asta" }]} />}
-      >
-        <UiStatePanel
-          state="forbidden"
-          title="Permessi insufficienti"
-          message="Non puoi partecipare all'asta di questa lega."
-          testId="auction-forbidden"
-        />
-      </PageContainer>
+      <UiStatePanel
+        state="forbidden"
+        title="Permessi insufficienti"
+        message="Non puoi partecipare all'asta di questa lega."
+        testId="auction-forbidden"
+      />
     );
   }
 
   return (
-    <PageContainer
-      title="Asta"
-      header={<Breadcrumb items={[{ label: "Leghe", href: "/leghe" }, { label: "Asta" }]} />}
-    >
-      <div className="fa-auction-page">
-        {canManageSession ? (
+    <div className="fa-auction-page">
+      {canManageSession ? (
           <WireframeSection label="Gestione sessione (admin)" testId="wireframe-region-auction-admin">
             {isDemoMode ? (
               <div className="fa-ds-showcase__row">
@@ -671,8 +660,7 @@ export function AuctionPage() {
               </Tabs>
             ) : null}
           </CardBody>
-        </Card>
-      </div>
-    </PageContainer>
+      </Card>
+    </div>
   );
 }

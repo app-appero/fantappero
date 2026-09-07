@@ -1,3 +1,4 @@
+import { ToastProvider } from "@fantappero/ui";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { MemoryRouter } from "./router/simpleRouter";
@@ -9,8 +10,10 @@ function renderAt(path: string, search = "?persona=admin&stato=success") {
   return renderToStaticMarkup(
     createElement(MemoryRouter, {
       initialEntries: [`${path}${search.startsWith("?") ? search : `?${search}`}`],
-      children: createElement(AuthProvider, {
-        children: createElement(AppRoutes),
+      children: createElement(ToastProvider, {
+        children: createElement(AuthProvider, {
+          children: createElement(AppRoutes),
+        }),
       }),
     }),
   );

@@ -1,4 +1,5 @@
 import type {
+  CreditLedgerList,
   RosterOwnershipHistory,
   RosterTurnSnapshotDetail,
   RosterTurnSnapshotSummary,
@@ -16,7 +17,7 @@ import {
   TableRow,
   UiStatePanel,
 } from "@fantappero/ui";
-import { roleLabel } from "./rosterHelpers";
+import { formatLedgerEntry, LEDGER_PAGE_SIZE, roleLabel } from "./rosterHelpers";
 
 export function RosterHistorySection({
   historyLoading,
@@ -32,6 +33,13 @@ export function RosterHistorySection({
   onSnapshotRoundChange,
   onSelectSnapshotRound,
   onCreateSnapshot,
+  hasLedger,
+  pagedLedgerEntries,
+  ledgerEntriesCount,
+  safeLedgerPage,
+  ledgerPageCount,
+  onLedgerPagePrev,
+  onLedgerPageNext,
 }: {
   historyLoading: boolean;
   historyError: string | null;
@@ -46,9 +54,71 @@ export function RosterHistorySection({
   onSnapshotRoundChange: (value: string) => void;
   onSelectSnapshotRound: (value: string) => void | Promise<void>;
   onCreateSnapshot: () => void | Promise<void>;
+  hasLedger: boolean;
+  pagedLedgerEntries: CreditLedgerList["entries"];
+  ledgerEntriesCount: number;
+  safeLedgerPage: number;
+  ledgerPageCount: number;
+  onLedgerPagePrev: () => void;
+  onLedgerPageNext: () => void;
 }) {
   return (
     <div data-testid="roster-history">
+      <Card data-testid="roster-credits" style={{ marginBottom: "1rem" }}>
+        <CardHeader title="Movimenti crediti" />
+        <CardBody>
+          {hasLedger ? (
+            <div data-testid="roster-credits-ledger">
+              <ul>
+                {pagedLedgerEntries.map((entry) => (
+                  <li key={entry.id}>{formatLedgerEntry(entry)}</li>
+                ))}
+              </ul>
+              {ledgerEntriesCount > LEDGER_PAGE_SIZE ? (
+                <div
+                  style={{
+                    display: "flex",
+                    flexWrap: "wrap",
+                    alignItems: "center",
+                    gap: "0.5rem",
+                    marginTop: "0.5rem",
+                  }}
+                >
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    disabled={safeLedgerPage <= 0}
+                    data-testid="roster-credits-ledger-prev"
+                    onClick={onLedgerPagePrev}
+                  >
+                    Precedenti
+                  </Button>
+                  <span data-testid="roster-credits-ledger-page">
+                    {safeLedgerPage + 1}/{ledgerPageCount}
+                  </span>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    disabled={safeLedgerPage >= ledgerPageCount - 1}
+                    data-testid="roster-credits-ledger-next"
+                    onClick={onLedgerPageNext}
+                  >
+                    Successivi
+                  </Button>
+                </div>
+              ) : null}
+            </div>
+          ) : (
+            <UiStatePanel
+              state="empty"
+              title="Nessun movimento"
+              message="Il ledger crediti non contiene ancora movimenti."
+              testId="roster-credits-empty"
+            />
+          )}
+        </CardBody>
+      </Card>
+
       {historyLoading ? (
         <UiStatePanel
           state="loading"

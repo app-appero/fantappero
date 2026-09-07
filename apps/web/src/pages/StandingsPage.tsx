@@ -220,6 +220,7 @@ export function StandingsPage() {
       if (!row.managerUserId) return;
       const params = new URLSearchParams();
       if (activeLeagueId) params.set("league", activeLeagueId);
+      params.set("from", "classifica");
       const qs = params.toString();
       navigate(`/fantallenatori/${row.managerUserId}${qs ? `?${qs}` : ""}`);
     },

@@ -155,8 +155,10 @@ class NamedLeagueInviteService:
     ) -> FantasyCoachProfileResponse:
         """Profilo storico limitato di un fantallenatore (EP13-P06).
 
-        Stesso perimetro della directory: se una persona non compare in
-        elenco non deve essere interrogabile per id. Restituisce solo fatti
+        Reso accessibile a qualunque utente verificato diverso dal chiamante
+        (candidati da invitare così come membri già in questa lega, es. dal
+        click su un nome in Classifica): l'endpoint resta protetto da
+        `Permission.LEAGUE_ADMIN` sulla lega indicata. Restituisce solo fatti
         derivati da leghe concluse — mai email, budget, rose o nomi di lega.
         """
         self._check_rate_limit("coach_directory", league_access)
@@ -173,9 +175,6 @@ class NamedLeagueInviteService:
             .correlate(User)
             .scalar_subquery()
         )
-        member_ids = select(LeagueMembership.user_id).where(
-            LeagueMembership.league_id == league_access.league.id
-        )
         row = self._session.execute(
             select(User, UserProfile, latest_status.label("invite_status"))
             .join(UserProfile, UserProfile.user_id == User.id)
@@ -184,7 +183,6 @@ class NamedLeagueInviteService:
                 User.deleted_at.is_(None),
                 User.email_verified_at.is_not(None),
                 User.id != league_access.user.id,
-                User.id.not_in(member_ids),
                 UserProfile.display_name.is_not(None),
                 UserProfile.display_name != "",
             )

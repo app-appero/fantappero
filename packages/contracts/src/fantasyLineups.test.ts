@@ -200,6 +200,44 @@ describe("fantasyLineups rules", () => {
     assert.equal(next.filter(Boolean).length, 2);
   });
 
+  it("never reserves the same locked athlete into two slots of the same role", () => {
+    // `currentStarters` può ripetere lo stesso atleta bloccato (bozza in
+    // corso + formazione confermata): senza deduplica finiva su due slot
+    // difensivi diversi, duplicandolo in campo.
+    const next = preserveLockedStarters({
+      template: starterTemplate("4-3-3"),
+      currentStarters: ["d1", "d1", "d2"],
+      roster: [
+        { athleteId: "d1", athleteName: "D1", role: "D", slotIndex: 0, locked: true },
+        { athleteId: "d2", athleteName: "D2", role: "D", slotIndex: 1, locked: true },
+      ],
+    });
+    const occurrences = next.filter((athleteId) => athleteId === "d1");
+    assert.equal(occurrences.length, 1);
+    assert.equal(next.filter((athleteId) => athleteId === "d2").length, 1);
+  });
+
+  it("RELOCATES a locked starter to the first free slot of its role", () => {
+    // Comportamento voluto quando cambia il modulo, ma è anche la trappola
+    // che ha duplicato i titolari in campo: il risultato NON va mai unito
+    // slot-per-slot con la lista originale (`reserved[i] || original[i]`),
+    // perché chi è stato spostato resterebbe anche nella posizione di
+    // partenza. A template invariato non va usata affatto.
+    const next = preserveLockedStarters({
+      template: starterTemplate("4-3-3"), // [P, D, D, D, D, C, C, C, A, A, A]
+      currentStarters: ["p1", "d1", "d2", "d3", "d4", "c1", "c2", "c3", "a1", "a2", "a3"],
+      roster: [
+        { athleteId: "d2", athleteName: "D2", role: "D", slotIndex: 0, locked: true },
+      ],
+    });
+    // d2 stava in posizione 2, viene riservato nel primo slot D libero (1).
+    assert.equal(next[1], "d2");
+    assert.equal(next[2], "");
+    // Unire ingenuamente con l'originale duplicherebbe d2 (slot 1 e slot 2).
+    const naiveMerge = next.map((value, index) => value || ["p1", "d1", "d2"][index] || "");
+    assert.equal(naiveMerge.filter((id) => id === "d2").length, 2);
+  });
+
   it("keeps saved bench order and appends newcomers", () => {
     const ordered = orderedBenchFromRoster(
       ["p1", "d1", "d2", "c1"],

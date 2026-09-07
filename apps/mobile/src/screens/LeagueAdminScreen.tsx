@@ -14,10 +14,12 @@ import { useNavigation, useRoute, type RouteProp } from "@react-navigation/core"
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useCallback, useEffect, useState } from "react";
 import { Pressable, StyleSheet, Switch, Text, TextInput, View } from "react-native";
+import { ApiError } from "../api/client";
 import {
   confirmLeagueCalendar,
   createLeagueInvite,
   deleteLeague,
+  ensureFantasyTurns,
   fetchLeagueAdminPanel,
   fetchLeagueCalendarAdmin,
   fetchLeagueCalendarPlan,
@@ -292,7 +294,19 @@ export function LeagueAdminScreen() {
     }
     setWorkingId("calendar-generate");
     try {
-      setCalendar(await generateLeagueCalendar(accessToken, leagueId));
+      try {
+        setCalendar(await generateLeagueCalendar(accessToken, leagueId));
+      } catch (error) {
+        // I Turni Europei di questa lega non esistono ancora (lega nuova, mai
+        // entrata nella finestra del cron automatico che copre solo le leghe
+        // già attive): li sincronizziamo al volo e riproviamo, così "Genera
+        // anteprima" resta un solo bottone per l'intera catena.
+        if (!(error instanceof ApiError) || error.code !== "european_turns_missing") {
+          throw error;
+        }
+        await ensureFantasyTurns(accessToken, leagueId);
+        setCalendar(await generateLeagueCalendar(accessToken, leagueId));
+      }
     } catch (error) {
       setActionError(getApiErrorMessage(error, "Impossibile generare il calendario."));
     } finally {

@@ -1,5 +1,4 @@
 import type { LeagueListoneEntry } from "@fantappero/contracts";
-import { useNavigation, type NavigationProp } from "@react-navigation/core";
 import { useCallback, useMemo, useState } from "react";
 import { fetchLeagueListone, fetchMyCredits } from "../api/leagues";
 import {
@@ -11,22 +10,24 @@ import {
   submitAuctionBid,
   withdrawAuctionBid,
 } from "../api/market";
-import { ScreenTabs } from "../components/ScreenTabs";
 import { useScreenData } from "../hooks/useScreenData";
-import { PageContainer } from "../layout/PageContainer";
 import { parseLocalDateTimeInput } from "../market/dateTimeInput";
 import { useMarketSessionFlow } from "../market/useMarketSessionFlow";
-import { MARKET_HUB_TABS } from "../navigation/marketHubTabs";
-import type { AppTabParamList } from "../navigation/types";
 import { getApiErrorMessage, useAuthSession } from "../session/DemoSessionContext";
 import { AuctionAdminPanel } from "./auction/AuctionAdminPanel";
 import { AuctionBidPanel } from "./auction/AuctionBidPanel";
 import { AuctionListone } from "./auction/AuctionListone";
 import type { RoleTab } from "./auction/auctionListoneHelpers";
 
-/** Asta a buste chiuse: gestione sessione admin, offerte e listone ufficiale (EP08-01/02). */
+export type { RoleTab as AuctionRoleTab } from "./auction/auctionListoneHelpers";
+
+/**
+ * Asta a buste chiuse: gestione sessione admin, offerte e listone ufficiale
+ * (EP08-01/02). Contenuto puro, senza PageContainer/ScreenTabs propri —
+ * viene montato dentro la sotto-scheda "Buste chiuse" di `AuctionHubScreen`,
+ * che lo rimonta (via `key`) per il pull-to-refresh condiviso.
+ */
 export function AuctionScreen() {
-  const navigation = useNavigation<NavigationProp<AppTabParamList>>();
   const { can, accessToken, activeLeagueId, activeLeague } = useAuthSession();
   const canManageSession = can(["market:manage"]);
 
@@ -68,7 +69,7 @@ export function AuctionScreen() {
     }
   }, [accessToken, activeLeagueId]);
 
-  const { refreshing, onRefresh } = useScreenData(loadListone);
+  useScreenData(loadListone);
 
   const flow = useMarketSessionFlow(
     {
@@ -126,18 +127,7 @@ export function AuctionScreen() {
   }, [entries]);
 
   return (
-    <PageContainer
-      title="Asta"
-      testID="screen-auction"
-      refreshing={refreshing}
-      onRefresh={onRefresh}
-    >
-      <ScreenTabs
-        items={MARKET_HUB_TABS}
-        activeId="Auction"
-        onSelect={(id) => navigation.navigate(id as keyof AppTabParamList)}
-        testID="market-hub-tabs"
-      />
+    <>
       {canManageSession ? (
         <AuctionAdminPanel
           flow={flow}
@@ -178,6 +168,6 @@ export function AuctionScreen() {
         tab={tab}
         onTabChange={setTab}
       />
-    </PageContainer>
+    </>
   );
 }

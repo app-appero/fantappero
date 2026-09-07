@@ -1,8 +1,10 @@
 import type { CalendarWindow, LeagueCalendar, LeagueCalendarPlan } from "@fantappero/contracts";
 import { Badge, Button, UiStatePanel } from "@fantappero/ui";
 import { useCallback, useEffect, useState } from "react";
+import { ApiError } from "../api/client";
 import {
   confirmLeagueCalendar,
+  ensureFantasyTurns,
   fetchLeagueCalendarAdmin,
   fetchLeagueCalendarPlan,
   generateLeagueCalendar,
@@ -238,7 +240,20 @@ export function LeagueCalendarPanel({ leagueId, isDemoMode, search }: Props) {
     }
     setWorking("generate");
     try {
-      const next = await generateLeagueCalendar(stored.accessToken, leagueId);
+      let next;
+      try {
+        next = await generateLeagueCalendar(stored.accessToken, leagueId);
+      } catch (error) {
+        // I Turni Europei di questa lega non esistono ancora (lega nuova, mai
+        // entrata nella finestra del cron automatico che copre solo le leghe
+        // già attive): li sincronizziamo al volo e riproviamo, così "Genera
+        // anteprima" resta un solo bottone per l'intera catena.
+        if (!(error instanceof ApiError) || error.code !== "european_turns_missing") {
+          throw error;
+        }
+        await ensureFantasyTurns(stored.accessToken, leagueId);
+        next = await generateLeagueCalendar(stored.accessToken, leagueId);
+      }
       setCalendar(next);
       setSuccess(
         `Anteprima generata: ${next.matchupCount} incontri su ${next.roundCount} turni.`,

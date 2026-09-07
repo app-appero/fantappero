@@ -1,3 +1,4 @@
+import { ToastProvider } from "@fantappero/ui";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
@@ -50,8 +51,10 @@ function renderRoute(path: string) {
   return renderToStaticMarkup(
     createElement(MemoryRouter, {
       initialEntries: [path],
-      children: createElement(AuthProvider, {
-        children: createElement(AppRoutes),
+      children: createElement(ToastProvider, {
+        children: createElement(AuthProvider, {
+          children: createElement(AppRoutes),
+        }),
       }),
     }),
   );
@@ -65,15 +68,18 @@ describe("EP06-06 formation page", () => {
     expect(html).toContain('data-testid="formation-module"');
     expect(html).toContain('data-testid="formation-save"');
     expect(html).toContain('data-testid="formation-copy"');
+    expect(html).toContain('data-testid="formation-apply-best"');
+    expect(html).toContain('data-testid="formation-revert"');
+    expect(html).toContain("Annulla modifiche");
     expect(html).toContain('data-testid="formation-draft"');
     expect(html).toContain('data-testid="formation-previous-hint"');
     expect(html).toContain("Copia formazione precedente");
+    expect(html).toContain("Applica formazione migliore");
     expect(html).toContain("Salva bozza");
     expect(html).toContain("rivalidata su rosa e disponibilità");
     expect(html).toContain('data-testid="formation-lock-hint"');
     expect(html).toContain("viene rinviato");
-    expect(html).toContain('data-testid="formation-moves"');
-    expect(html).toContain('data-testid="formation-moves-hint"');
+    expect(html).toContain('data-testid="formation-moves-badge"');
     expect(html).toContain('data-testid="formation-bench-order"');
     expect(html).toContain('data-testid="formation-sub-hint"');
     expect(html).toContain('data-testid="formation-bench-position-0"');
@@ -88,9 +94,7 @@ describe("EP06-06 formation page", () => {
     expect(html).toContain("può subentrare");
     expect(html).toContain("oltre i 5 cambi");
     expect(html).toContain("Entrano al massimo 5 panchinari");
-    expect(html).toContain("Mosse tattiche: 0/3 usate");
-    expect(html).toContain("Questo salvataggio non consuma mosse");
-    expect(html).toContain("Le sostituzioni automatiche non consumano mosse");
+    expect(html).toContain("Mosse 3/3");
     expect(html).toContain("fa-badge--success");
     expect(html).toContain("fa-badge--warning");
     expect(html).toContain("Partita già iniziata");

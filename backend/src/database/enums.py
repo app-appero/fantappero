@@ -119,6 +119,7 @@ class LeagueAuditAction(str, enum.Enum):
     FANTASY_LINEUP_SAVED = "fantasy_lineup_saved"
     FANTASY_LINEUP_COPIED = "fantasy_lineup_copied"
     FANTASY_LINEUP_DRAFT_SAVED = "fantasy_lineup_draft_saved"
+    FANTASY_LINEUP_BEST_APPLIED = "fantasy_lineup_best_applied"
     FANTASY_TACTICAL_MOVE_APPLIED = "fantasy_tactical_move_applied"
     CREDIT_ACCOUNT_INITIALIZED = "credit_account_initialized"
     CREDIT_LEDGER_ENTRY_POSTED = "credit_ledger_entry_posted"
@@ -138,6 +139,17 @@ class LeagueAuditAction(str, enum.Enum):
     MARKET_TRADE_COUNTERED = "market_trade_countered"
     MARKET_TRADE_APPROVED = "market_trade_approved"
     MARKET_TRADE_REJECTED_BY_ADMIN = "market_trade_rejected_by_admin"
+    MARKET_LIVE_SESSION_CREATED = "market_live_session_created"
+    MARKET_LIVE_SESSION_STARTED = "market_live_session_started"
+    MARKET_LIVE_LOT_NOMINATED = "market_live_lot_nominated"
+    MARKET_LIVE_RAISE_PLACED = "market_live_raise_placed"
+    MARKET_LIVE_LOT_SOLD = "market_live_lot_sold"
+    MARKET_LIVE_LOT_PASSED = "market_live_lot_passed"
+    MARKET_LIVE_LOT_CANCELLED = "market_live_lot_cancelled"
+    MARKET_LIVE_SESSION_ENDED = "market_live_session_ended"
+    MARKET_LIVE_LOT_SWAP_PENDING = "market_live_lot_swap_pending"
+    MARKET_LIVE_LOT_SWAP_RESOLVED = "market_live_lot_swap_resolved"
+    MARKET_LIVE_LOT_SWAP_DECLINED = "market_live_lot_swap_declined"
     PLATFORM_OPERATOR_PROMOTED = "platform_operator_promoted"
     PLATFORM_OPERATOR_REVOKED = "platform_operator_revoked"
 
@@ -278,10 +290,16 @@ class PrivacyAuditAction(str, enum.Enum):
 
 
 class MarketSessionKind(str, enum.Enum):
-    """Kind of sealed-bid market window (EP08-01 / FR-AST-01, FR-MKT-01)."""
+    """Kind of market window (EP08-01 / FR-AST-01, FR-MKT-01).
+
+    ``LIVE_AUCTION`` (EP08-09) is a distinct kind, not a flag on the sealed
+    ``INITIAL_AUCTION`` — the sealed router/service always filter by kind, so a
+    live session is structurally invisible to the sealed-bid code path.
+    """
 
     INITIAL_AUCTION = "initial_auction"
     WAIVER = "waiver"
+    LIVE_AUCTION = "live_auction"
 
 
 class MarketSessionStatus(str, enum.Enum):
@@ -320,6 +338,23 @@ class MarketBidStatus(str, enum.Enum):
     WON = "won"
     LOST = "lost"
     CANCELLED = "cancelled"
+
+
+class MarketLiveLotStatus(str, enum.Enum):
+    """Lifecycle of one athlete's live-auction lot (EP08-09)."""
+
+    OPEN = "open"
+    SOLD = "sold"
+    PASSED = "passed"
+    CANCELLED = "cancelled"
+    PENDING_SWAP = "pending_swap"
+
+
+class MarketLiveNominationMode(str, enum.Enum):
+    """How the next athlete is called up in a live-auction session (EP08-09)."""
+
+    MANUAL = "manual"
+    SEQUENTIAL = "sequential"
 
 
 class MarketReleaseReason(str, enum.Enum):

@@ -23,7 +23,9 @@ import {
   Tabs,
   UiStatePanel,
 } from "@fantappero/ui";
+import { useEffect, useState } from "react";
 import {
+  LISTONE_PAGE_SIZE,
   ROLE_LABEL,
   ROLE_TABS,
   filterListone,
@@ -32,14 +34,183 @@ import {
   type RoleTab,
 } from "./rosterHelpers";
 
+function ListoneAssignRow({
+  entry,
+  owner,
+  canAssign,
+  canRelease,
+  adminBusy,
+  onReleaseAthlete,
+  onAssignAthlete,
+}: {
+  entry: LeagueListoneEntry;
+  owner: AthleteOwnership | undefined;
+  canAssign: boolean;
+  canRelease: boolean;
+  adminBusy: boolean;
+  onReleaseAthlete: (athleteId: string) => void | Promise<void>;
+  onAssignAthlete: (athleteId: string, purchaseCredits: number) => void | Promise<void>;
+}) {
+  const [draft, setDraft] = useState("1");
+  const parsed = Number.parseInt(draft, 10);
+  const isValid = Number.isFinite(parsed) && parsed >= 1;
+
+  return (
+    <TableRow>
+      <TableCell>{entry.canonicalName}</TableCell>
+      <TableCell>
+        <Badge variant={roleBadgeVariant(entry.effectiveRole)}>{entry.effectiveRole}</Badge>{" "}
+        {ROLE_LABEL[entry.effectiveRole]}
+      </TableCell>
+      <TableCell>{entry.clubName ?? "—"}</TableCell>
+      <TableCell>
+        {owner ? (
+          <Badge variant="warning">In rosa: {owner.teamName}</Badge>
+        ) : (
+          <Badge variant="success">Libero</Badge>
+        )}
+      </TableCell>
+      <TableCell>
+        {!owner ? (
+          <Input
+            type="number"
+            min={1}
+            aria-label={`Prezzo acquisto ${entry.canonicalName}`}
+            value={draft}
+            disabled={adminBusy || !canAssign}
+            onChange={(event) => setDraft(event.target.value)}
+            data-testid={`roster-admin-listone-price-${entry.athleteId}`}
+          />
+        ) : (
+          "—"
+        )}
+      </TableCell>
+      <TableCell>
+        {owner && canRelease ? (
+          <Button
+            type="button"
+            variant="secondary"
+            disabled={adminBusy}
+            data-testid={`roster-admin-release-${entry.athleteId}`}
+            onClick={() => void onReleaseAthlete(entry.athleteId)}
+          >
+            Rimuovi
+          </Button>
+        ) : !owner ? (
+          <Button
+            type="button"
+            variant="secondary"
+            disabled={adminBusy || !canAssign || !isValid}
+            data-testid={`roster-admin-assign-${entry.athleteId}`}
+            onClick={() => void onAssignAthlete(entry.athleteId, parsed)}
+          >
+            Assegna
+          </Button>
+        ) : null}
+      </TableCell>
+    </TableRow>
+  );
+}
+
+function ListoneTable({
+  tabValue,
+  rows,
+  ownership,
+  canReleaseAthlete,
+  emptySlotsCount,
+  adminBusy,
+  onReleaseAthlete,
+  onAssignAthlete,
+}: {
+  tabValue: RoleTab;
+  rows: LeagueListoneEntry[];
+  ownership: Map<string, AthleteOwnership>;
+  canReleaseAthlete: (ownerTeamId: string) => boolean;
+  emptySlotsCount: number;
+  adminBusy: boolean;
+  onReleaseAthlete: (athleteId: string) => void | Promise<void>;
+  onAssignAthlete: (athleteId: string, purchaseCredits: number) => void | Promise<void>;
+}) {
+  const [page, setPage] = useState(0);
+  useEffect(() => {
+    setPage(0);
+  }, [rows]);
+  const pageCount = Math.max(1, Math.ceil(rows.length / LISTONE_PAGE_SIZE));
+  const safePage = Math.min(page, pageCount - 1);
+  const pagedRows = rows.slice(
+    safePage * LISTONE_PAGE_SIZE,
+    safePage * LISTONE_PAGE_SIZE + LISTONE_PAGE_SIZE,
+  );
+
+  return (
+    <>
+      <Table compact data-testid={`roster-admin-listone-table-${tabValue}`}>
+        <TableHead>
+          <TableRow>
+            <TableHeaderCell>Calciatore</TableHeaderCell>
+            <TableHeaderCell>Ruolo</TableHeaderCell>
+            <TableHeaderCell>Club</TableHeaderCell>
+            <TableHeaderCell>Stato</TableHeaderCell>
+            <TableHeaderCell>Prezzo acquisto</TableHeaderCell>
+            <TableHeaderCell>Azione</TableHeaderCell>
+          </TableRow>
+        </TableHead>
+        <TableBody>
+          {pagedRows.map((entry) => {
+            const owner = ownership.get(entry.athleteId);
+            const canAssign = !owner && emptySlotsCount > 0;
+            const canRelease = owner ? canReleaseAthlete(owner.teamId) : false;
+            return (
+              <ListoneAssignRow
+                key={entry.athleteId}
+                entry={entry}
+                owner={owner}
+                canAssign={canAssign}
+                canRelease={canRelease}
+                adminBusy={adminBusy}
+                onReleaseAthlete={onReleaseAthlete}
+                onAssignAthlete={onAssignAthlete}
+              />
+            );
+          })}
+        </TableBody>
+      </Table>
+      {pageCount > 1 ? (
+        <div
+          className="fa-roster-role-section__pagination"
+          data-testid={`roster-admin-listone-pagination-${tabValue}`}
+        >
+          <Button
+            type="button"
+            variant="ghost"
+            disabled={safePage === 0}
+            onClick={() => setPage((current) => Math.max(0, current - 1))}
+          >
+            Precedente
+          </Button>
+          <span>
+            Pagina {safePage + 1} di {pageCount} · {rows.length} calciatori
+          </span>
+          <Button
+            type="button"
+            variant="ghost"
+            disabled={safePage >= pageCount - 1}
+            onClick={() => setPage((current) => Math.min(pageCount - 1, current + 1))}
+          >
+            Successiva
+          </Button>
+        </div>
+      ) : null}
+    </>
+  );
+}
+
 export function RosterAdminManualCard({
   isAdmin,
   adminLoadError,
   leagueTeams,
   targetTeam,
   emptySlotsCount,
-  purchaseCredits,
-  onPurchaseCreditsChange,
   adminMessage,
   adminError,
   listone,
@@ -58,8 +229,6 @@ export function RosterAdminManualCard({
   leagueTeams: FantasyTeamSummary[];
   targetTeam: FantasyTeam | null;
   emptySlotsCount: number;
-  purchaseCredits: string;
-  onPurchaseCreditsChange: (value: string) => void;
   adminMessage: string | null;
   adminError: string | null;
   listone: LeagueListoneEntry[];
@@ -71,10 +240,10 @@ export function RosterAdminManualCard({
   canReleaseAthlete: (ownerTeamId: string) => boolean;
   adminBusy: boolean;
   onReleaseAthlete: (athleteId: string) => void | Promise<void>;
-  onAssignAthlete: (athleteId: string) => void | Promise<void>;
+  onAssignAthlete: (athleteId: string, purchaseCredits: number) => void | Promise<void>;
 }) {
   return (
-    <Card style={{ marginTop: "1rem" }} data-testid="roster-admin-manual">
+    <Card data-testid="roster-admin-manual">
       <CardHeader>
         <div className="fa-auction-listone__header">
           <div>
@@ -119,18 +288,6 @@ export function RosterAdminManualCard({
                 {emptySlotsCount} liberi
               </p>
             ) : null}
-
-            <div style={{ marginBottom: "0.75rem" }}>
-              <Input
-                label="Crediti acquisto"
-                name="roster-purchase-credits"
-                type="number"
-                min={1}
-                value={purchaseCredits}
-                onChange={(event) => onPurchaseCreditsChange(event.target.value)}
-                data-testid="roster-purchase-credits"
-              />
-            </div>
 
             {adminMessage ? (
               <UiStatePanel
@@ -198,66 +355,16 @@ export function RosterAdminManualCard({
                             testId={`roster-admin-listone-empty-${tab.value}`}
                           />
                         ) : (
-                          <Table compact data-testid={`roster-admin-listone-table-${tab.value}`}>
-                            <TableHead>
-                              <TableRow>
-                                <TableHeaderCell>Calciatore</TableHeaderCell>
-                                <TableHeaderCell>Ruolo</TableHeaderCell>
-                                <TableHeaderCell>Club</TableHeaderCell>
-                                <TableHeaderCell>Stato</TableHeaderCell>
-                                <TableHeaderCell>Azione</TableHeaderCell>
-                              </TableRow>
-                            </TableHead>
-                            <TableBody>
-                              {rows.map((entry) => {
-                                const owner = ownership.get(entry.athleteId);
-                                const canAssign = !owner && emptySlotsCount > 0;
-                                const canRelease = owner ? canReleaseAthlete(owner.teamId) : false;
-                                return (
-                                  <TableRow key={entry.athleteId}>
-                                    <TableCell>{entry.canonicalName}</TableCell>
-                                    <TableCell>
-                                      <Badge variant={roleBadgeVariant(entry.effectiveRole)}>
-                                        {entry.effectiveRole}
-                                      </Badge>{" "}
-                                      {ROLE_LABEL[entry.effectiveRole]}
-                                    </TableCell>
-                                    <TableCell>{entry.clubName ?? "—"}</TableCell>
-                                    <TableCell>
-                                      {owner ? (
-                                        <Badge variant="warning">In rosa: {owner.teamName}</Badge>
-                                      ) : (
-                                        <Badge variant="success">Libero</Badge>
-                                      )}
-                                    </TableCell>
-                                    <TableCell>
-                                      {owner && canRelease ? (
-                                        <Button
-                                          type="button"
-                                          variant="secondary"
-                                          disabled={adminBusy}
-                                          data-testid={`roster-admin-release-${entry.athleteId}`}
-                                          onClick={() => void onReleaseAthlete(entry.athleteId)}
-                                        >
-                                          Rimuovi
-                                        </Button>
-                                      ) : !owner ? (
-                                        <Button
-                                          type="button"
-                                          variant="secondary"
-                                          disabled={adminBusy || !canAssign}
-                                          data-testid={`roster-admin-assign-${entry.athleteId}`}
-                                          onClick={() => void onAssignAthlete(entry.athleteId)}
-                                        >
-                                          Assegna
-                                        </Button>
-                                      ) : null}
-                                    </TableCell>
-                                  </TableRow>
-                                );
-                              })}
-                            </TableBody>
-                          </Table>
+                          <ListoneTable
+                            tabValue={tab.value}
+                            rows={rows}
+                            ownership={ownership}
+                            canReleaseAthlete={canReleaseAthlete}
+                            emptySlotsCount={emptySlotsCount}
+                            adminBusy={adminBusy}
+                            onReleaseAthlete={onReleaseAthlete}
+                            onAssignAthlete={onAssignAthlete}
+                          />
                         )}
                       </TabPanel>
                     );

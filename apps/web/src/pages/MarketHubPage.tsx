@@ -2,16 +2,22 @@ import { Tab, TabList, TabPanel, Tabs } from "@fantappero/ui";
 import { useAuth } from "../auth/AuthContext";
 import { RequirePermissions } from "../auth/RequirePermissions";
 import { useLocation, useNavigate } from "../router/simpleRouter";
-import { AuctionPage } from "./AuctionPage";
+import { AuctionHubPage } from "./AuctionHubPage";
 import { MarketPage } from "./MarketPage";
 import { RosterPage } from "./RosterPage";
 import { WaiverPage } from "./WaiverPage";
 
 const TABS = [
-  { value: "rosa", label: "Rosa", path: "/rosa", permission: "roster:view" as const },
-  { value: "asta", label: "Asta", path: "/asta", permission: "market:view" as const },
-  { value: "svincoli", label: "Svincolati", path: "/svincoli", permission: "market:view" as const },
-  { value: "mercato", label: "Mercato", path: "/mercato", permission: "market:view" as const },
+  { value: "rosa", label: "Rosa", path: "/rosa", matchPaths: ["/rosa"], permission: "roster:view" as const },
+  {
+    value: "asta",
+    label: "Asta",
+    path: "/asta",
+    matchPaths: ["/asta", "/asta-live"],
+    permission: "market:view" as const,
+  },
+  { value: "svincoli", label: "Svincolati", path: "/svincoli", matchPaths: ["/svincoli"], permission: "market:view" as const },
+  { value: "mercato", label: "Mercato", path: "/mercato", matchPaths: ["/mercato"], permission: "market:view" as const },
 ];
 
 /** Rosa/Asta/Svincolati/Mercato riuniti in un'unica pagina: sono tutti movimento giocatori. */
@@ -19,7 +25,7 @@ export function MarketHubPage() {
   const { pathname } = useLocation();
   const navigate = useNavigate();
   const { can } = useAuth();
-  const activeTab = TABS.find((tab) => tab.path === pathname)?.value ?? "mercato";
+  const activeTab = TABS.find((tab) => tab.matchPaths.includes(pathname))?.value ?? "mercato";
 
   return (
     <Tabs
@@ -44,7 +50,7 @@ export function MarketHubPage() {
       </TabPanel>
       <TabPanel value="asta">
         <RequirePermissions required={["market:view"]}>
-          <AuctionPage />
+          <AuctionHubPage />
         </RequirePermissions>
       </TabPanel>
       <TabPanel value="svincoli">

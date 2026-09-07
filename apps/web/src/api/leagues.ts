@@ -840,6 +840,17 @@ export function copyPreviousLineupToDraft(
   });
 }
 
+export function applyBestLineup(
+  accessToken: string,
+  leagueId: string,
+  roundId: string,
+): Promise<LineupContext> {
+  return apiRequest<LineupContext>(`/leagues/${leagueId}/turni/${roundId}/formazione/migliore`, {
+    method: "POST",
+    accessToken,
+  });
+}
+
 export function saveLineupDraft(
   accessToken: string,
   leagueId: string,

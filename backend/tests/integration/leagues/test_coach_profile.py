@@ -292,6 +292,33 @@ def test_requester_cannot_query_their_own_profile(
     assert response.json()["code"] == "coach_not_found"
 
 
+def test_current_league_member_is_reachable_from_standings(
+    client: TestClient, db_session: Session, competition_ids: list[str]
+) -> None:
+    """Click su un nome in Classifica: il compagno/avversario di lega è
+    già membro della lega interrogata, e deve restare profilabile
+    (regressione: prima veniva escluso come i candidati già iscritti)."""
+    token, _ = _register_and_login(client, "dir-standings-admin@example.com")
+    league_id = _create_league(client, token, competition_ids, "Lega Classifica")
+
+    seed = int(datetime.now(UTC).timestamp() * 1000) % 400_000
+    coach = _make_coach(db_session, "compagno", seed)
+    membership = LeagueMembership(
+        league_id=UUID(league_id),
+        user_id=coach.id,
+        role=LeagueMemberRole.MEMBER,
+    )
+    db_session.add(membership)
+    db_session.commit()
+
+    response = client.get(
+        f"/leagues/{league_id}/amministrazione/fantallenatori/{coach.id}",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert response.status_code == 200
+    assert response.json()["userId"] == str(coach.id)
+
+
 def test_deleted_coach_disappears_from_the_profile_endpoint(
     client: TestClient, db_session: Session, competition_ids: list[str]
 ) -> None:

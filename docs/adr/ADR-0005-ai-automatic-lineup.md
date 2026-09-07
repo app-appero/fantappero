@@ -139,6 +139,42 @@ Due percorsi, entrambi idempotenti:
 Rieseguirli non produce effetti diversi: la formula è deterministica e il
 servizio non tocca né le squadre umane né le formazioni già schierate a mano.
 
+### 10. Uso self-service (EP-self-service)
+
+Un terzo percorso, aggiunto successivamente, riusa la stessa formula
+`ai_lineup_v1` (`ai_selection.build_lineup_plan`) e la stessa raccolta
+candidati (rinominata da privata a pubblica: `ai_service._collect_candidates`
+→ `ai_service.collect_candidates_for_team`) tramite un nuovo modulo puro,
+`fantasy_lineups/best_lineup_service.py::compute_best_lineup_for_team`.
+
+* **Self-service** — `POST /leagues/{id}/turni/{roundId}/formazione/migliore`
+  (`roster:edit`, qualunque membro lega, non solo l'admin). Precompila la
+  **bozza** della propria squadra, non tocca la formazione confermata — come
+  "Copia formazione precedente", l'utente deve comunque salvare per
+  confermarla. Non imposta mai `system_generated_ai`: quel flag resta
+  riservato al perimetro di scrittura IA del §7 (l'iniziativa qui è
+  esplicitamente di un umano sulla propria squadra).
+
+Diversamente dal percorso IA-automatico (che al primo calciatore bloccato
+rinuncia del tutto, §6), il self-service applica lo **stesso principio del
+salvataggio manuale**: `compute_best_lineup_respecting_locks` vincola solo i
+calciatori con la partita già iniziata al ruolo già confermato (titolare
+resta titolare, panchinaro resta panchinaro — mai promosso, anche se
+punteggerebbe più alto), e lascia che l'euristica ottimizzi liberamente il
+resto della rosa. L'ordine di panchina già confermato non si tocca per chi
+vi compariva già: solo i nuovi arrivi si accodano, ordinati per punteggio —
+scelta deliberatamente più conservativa di quanto un salvataggio manuale
+permetterebbe (che può riordinare i panchinari sbloccati attorno a uno
+bloccato), per garantire per costruzione di non violare mai
+`assert_bench_order_lock` al salvataggio finale.
+
+**Roadmap futura (non implementata).** Una versione successiva potrà
+sostituire `build_lineup_plan` con un modello ML addestrato, mantenendo
+invariati la firma di `compute_best_lineup_for_team` e il contratto
+dell'endpoint sopra: il codice chiamante (router, servizio di salvataggio,
+UI) non cambierebbe, cambierebbe solo `algorithm_version` e l'implementazione
+interna della selezione.
+
 ## Conseguenze
 
 **Positive.** Le leghe con IA producono risultati H2H sensati. Il

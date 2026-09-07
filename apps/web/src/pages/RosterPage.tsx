@@ -141,7 +141,6 @@ export function RosterPage() {
   );
   const [roleTab, setRoleTab] = useState<RoleTab>("all");
   const [listoneQuery, setListoneQuery] = useState("");
-  const [purchaseCredits, setPurchaseCredits] = useState("1");
   const [occupancy, setOccupancy] = useState<RosterOccupancyEntry[]>(() =>
     isDemoMode && demoState !== "forbidden" && demoState !== "error" && demoState !== "loading"
       ? DEMO_OCCUPANCY
@@ -1007,7 +1006,7 @@ export function RosterPage() {
     })();
   };
 
-  const onAssignAthlete = async (athleteId: string) => {
+  const onAssignAthlete = async (athleteId: string, creditsInput: number) => {
     setAdminMessage(null);
     setAdminError(null);
     if (!targetTeamId || !targetTeam) {
@@ -1023,7 +1022,7 @@ export function RosterPage() {
       setAdminError("Il calciatore appartiene già a una squadra di questa lega.");
       return;
     }
-    const credits = Number.parseInt(purchaseCredits, 10);
+    const credits = creditsInput;
     if (!Number.isFinite(credits) || credits < 1) {
       setAdminError("Inserisci crediti acquisto validi (minimo 1).");
       return;
@@ -1085,6 +1084,69 @@ export function RosterPage() {
       );
     } catch (error) {
       setAdminError(getApiErrorMessage(error, "Impossibile assegnare il calciatore."));
+    } finally {
+      setAdminBusy(false);
+    }
+  };
+
+  const onUpdatePurchaseCredits = async (
+    slotIndex: number,
+    athleteId: string,
+    purchaseCredits: number,
+  ) => {
+    setAdminMessage(null);
+    setAdminError(null);
+    if (!targetTeamId || !targetTeam) {
+      setAdminError("Seleziona una squadra.");
+      return;
+    }
+    if (!Number.isFinite(purchaseCredits) || purchaseCredits < 0) {
+      setAdminError("Inserisci un prezzo di acquisto valido (minimo 0).");
+      return;
+    }
+
+    if (isDemoMode) {
+      setAdminBusy(true);
+      window.setTimeout(() => {
+        const previousSlot = targetTeam.slots.find((slot) => slot.slotIndex === slotIndex);
+        const delta = purchaseCredits - (previousSlot?.purchaseCredits ?? 0);
+        const updated: FantasyTeam = {
+          ...targetTeam,
+          slots: targetTeam.slots.map((slot) =>
+            slot.slotIndex === slotIndex ? { ...slot, purchaseCredits } : slot,
+          ),
+        };
+        applyTeamUpdate(updated);
+        applyDemoCreditDelta(updated.id, -delta);
+        setAdminMessage(`Prezzo di acquisto aggiornato a ${purchaseCredits} crediti (demo).`);
+        setAdminBusy(false);
+      }, 200);
+      return;
+    }
+
+    if (!activeLeagueId) {
+      setAdminError("Seleziona una lega.");
+      return;
+    }
+    const stored = loadStoredSession();
+    if (!stored?.accessToken) {
+      setAdminError("Sessione non disponibile. Accedi di nuovo.");
+      return;
+    }
+    setAdminBusy(true);
+    try {
+      const updated = await assignRosterSlot(
+        stored.accessToken,
+        activeLeagueId,
+        targetTeamId,
+        slotIndex,
+        { athleteId, purchaseCredits },
+      );
+      applyTeamUpdate(updated);
+      await refreshViewedCredits(stored.accessToken, activeLeagueId);
+      setAdminMessage(`Prezzo di acquisto aggiornato a ${purchaseCredits} crediti.`);
+    } catch (error) {
+      setAdminError(getApiErrorMessage(error, "Impossibile aggiornare il prezzo di acquisto."));
     } finally {
       setAdminBusy(false);
     }
@@ -1250,6 +1312,7 @@ export function RosterPage() {
     <PageContainer
       title="Rosa"
       density="compact"
+      className="fa-roster-page"
       header={
         <Breadcrumb
           items={[
@@ -1257,6 +1320,27 @@ export function RosterPage() {
             { label: activeLeague?.name ?? "Rosa" },
           ]}
         />
+      }
+      actions={
+        !loading && !showForbidden && !loadError && (viewedTeam || team) ? (
+          <RosterCreditsPanel
+            isAdmin={isAdmin}
+            leagueTeams={leagueTeams}
+            adminTeamId={adminTeamId}
+            onSelectAdminTeam={onSelectAdminTeam}
+            credits={credits}
+            adminBusy={adminBusy}
+            adjusting={adjusting}
+            hasAdjustTarget={Boolean(adminTeamId || team)}
+            adjustAmount={adjustAmount}
+            onAdjustAmountChange={setAdjustAmount}
+            adjustNote={adjustNote}
+            onAdjustNoteChange={setAdjustNote}
+            onAdminAdjust={onAdminAdjust}
+            adjustMessage={adjustMessage}
+            adjustError={adjustError}
+          />
+        ) : null
       }
     >
       {loading ? (
@@ -1296,6 +1380,15 @@ export function RosterPage() {
           onSnapshotRoundChange={setSnapshotRound}
           onSelectSnapshotRound={onSelectSnapshotRound}
           onCreateSnapshot={onCreateSnapshot}
+          hasLedger={hasLedger}
+          pagedLedgerEntries={pagedLedgerEntries}
+          ledgerEntriesCount={ledgerEntriesNewestFirst.length}
+          safeLedgerPage={safeLedgerPage}
+          ledgerPageCount={ledgerPageCount}
+          onLedgerPagePrev={() => setLedgerPage((page) => Math.max(0, page - 1))}
+          onLedgerPageNext={() =>
+            setLedgerPage((page) => Math.min(ledgerPageCount - 1, page + 1))
+          }
         />
       ) : null}
 
@@ -1319,35 +1412,6 @@ export function RosterPage() {
           title="Nessuna lega attiva"
           message="Seleziona una lega per consultare la rosa."
           testId="roster-no-league"
-        />
-      ) : null}
-
-      {pageSection === "rosa" && !loading && !showForbidden && !loadError && (viewedTeam || team) ? (
-        <RosterCreditsPanel
-          isAdmin={isAdmin}
-          leagueTeams={leagueTeams}
-          adminTeamId={adminTeamId}
-          onSelectAdminTeam={onSelectAdminTeam}
-          adminBusy={adminBusy}
-          adjusting={adjusting}
-          hasAdjustTarget={Boolean(adminTeamId || team)}
-          credits={credits}
-          adjustAmount={adjustAmount}
-          onAdjustAmountChange={setAdjustAmount}
-          adjustNote={adjustNote}
-          onAdjustNoteChange={setAdjustNote}
-          onAdminAdjust={onAdminAdjust}
-          adjustMessage={adjustMessage}
-          adjustError={adjustError}
-          hasLedger={hasLedger}
-          pagedLedgerEntries={pagedLedgerEntries}
-          ledgerEntriesCount={ledgerEntriesNewestFirst.length}
-          safeLedgerPage={safeLedgerPage}
-          ledgerPageCount={ledgerPageCount}
-          onLedgerPagePrev={() => setLedgerPage((page) => Math.max(0, page - 1))}
-          onLedgerPageNext={() =>
-            setLedgerPage((page) => Math.min(ledgerPageCount - 1, page + 1))
-          }
         />
       ) : null}
 
@@ -1389,42 +1453,46 @@ export function RosterPage() {
         </>
       ) : null}
 
-      {pageSection === "rosa" && !loading && !showForbidden && !loadError && viewedTeam && isEmpty ? (
-        <RosterEmptyState viewedTeam={viewedTeam} onReload={loadRoster} />
-      ) : null}
-
-      {pageSection === "rosa" && !loading && !showForbidden && !loadError && viewedTeam && !isEmpty ? (
-        <RosterFilledSummary
-          viewedTeam={viewedTeam}
-          filledByRole={filledByRole}
-          canEdit={canEdit}
-          adminBusy={adminBusy}
-          onReleaseAthlete={onReleaseAthlete}
-        />
-      ) : null}
-
-      {pageSection === "rosa" && canEdit && !showForbidden ? (
-        <RosterAdminManualCard
-          isAdmin={isAdmin}
-          adminLoadError={adminLoadError}
-          leagueTeams={leagueTeams}
-          targetTeam={targetTeam}
-          emptySlotsCount={emptySlots.length}
-          purchaseCredits={purchaseCredits}
-          onPurchaseCreditsChange={setPurchaseCredits}
-          adminMessage={adminMessage}
-          adminError={adminError}
-          listone={listone}
-          listoneQuery={listoneQuery}
-          onListoneQueryChange={setListoneQuery}
-          roleTab={roleTab}
-          onRoleTabChange={setRoleTab}
-          ownership={ownership}
-          canReleaseAthlete={canReleaseAthlete}
-          adminBusy={adminBusy}
-          onReleaseAthlete={onReleaseAthlete}
-          onAssignAthlete={onAssignAthlete}
-        />
+      {pageSection === "rosa" && !loading && !showForbidden && !loadError && viewedTeam ? (
+        <div className="fa-roster-columns">
+          <div className="fa-roster-columns__left">
+            {isEmpty ? (
+              <RosterEmptyState />
+            ) : (
+              <RosterFilledSummary
+                viewedTeam={viewedTeam}
+                filledByRole={filledByRole}
+                canEdit={canEdit}
+                adminBusy={adminBusy}
+                onReleaseAthlete={onReleaseAthlete}
+                onUpdatePurchaseCredits={onUpdatePurchaseCredits}
+              />
+            )}
+          </div>
+          {canEdit ? (
+            <div className="fa-roster-columns__right">
+              <RosterAdminManualCard
+                isAdmin={isAdmin}
+                adminLoadError={adminLoadError}
+                leagueTeams={leagueTeams}
+                targetTeam={targetTeam}
+                emptySlotsCount={emptySlots.length}
+                adminMessage={adminMessage}
+                adminError={adminError}
+                listone={listone}
+                listoneQuery={listoneQuery}
+                onListoneQueryChange={setListoneQuery}
+                roleTab={roleTab}
+                onRoleTabChange={setRoleTab}
+                ownership={ownership}
+                canReleaseAthlete={canReleaseAthlete}
+                adminBusy={adminBusy}
+                onReleaseAthlete={onReleaseAthlete}
+                onAssignAthlete={onAssignAthlete}
+              />
+            </div>
+          ) : null}
+        </div>
       ) : null}
     </PageContainer>
   );

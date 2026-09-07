@@ -19,7 +19,13 @@ from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from database.base import Base, TimestampMixin, UUIDPrimaryKeyMixin
-from database.enums import MarketBidStatus, MarketSessionKind, MarketSessionStatus, TradeStatus
+from database.enums import (
+    MarketBidStatus,
+    MarketLiveNominationMode,
+    MarketSessionKind,
+    MarketSessionStatus,
+    TradeStatus,
+)
 from database.types import UTCDateTime
 
 if TYPE_CHECKING:
@@ -37,6 +43,25 @@ class MarketSession(Base, UUIDPrimaryKeyMixin, TimestampMixin):
         Index("ix_market_sessions_league_id", "league_id"),
         Index("ix_market_sessions_status", "status"),
         CheckConstraint("closes_at > opens_at", name="ck_market_sessions_window_order"),
+        CheckConstraint(
+            "kind::text <> 'live_auction' OR ("
+            "nomination_mode IS NOT NULL AND min_increment_credits IS NOT NULL "
+            "AND soft_close_seconds IS NOT NULL AND lot_duration_seconds IS NOT NULL"
+            ")",
+            name="ck_market_sessions_live_fields",
+        ),
+        CheckConstraint(
+            "min_increment_credits IS NULL OR min_increment_credits >= 1",
+            name="ck_market_sessions_min_increment_credits",
+        ),
+        CheckConstraint(
+            "soft_close_seconds IS NULL OR soft_close_seconds BETWEEN 5 AND 120",
+            name="ck_market_sessions_soft_close_seconds",
+        ),
+        CheckConstraint(
+            "lot_duration_seconds IS NULL OR lot_duration_seconds BETWEEN 10 AND 300",
+            name="ck_market_sessions_lot_duration_seconds",
+        ),
     )
 
     league_id: Mapped[UUID] = mapped_column(
@@ -84,9 +109,31 @@ class MarketSession(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     )
     # Tiebreak child sessions only: restricts bidding to these fantasy team ids.
     eligible_team_ids: Mapped[list[str] | None] = mapped_column(JSONB, nullable=True)
+    # Live-auction sessions only (EP08-09, kind=LIVE_AUCTION): configuration for the
+    # lot-by-lot ascending auction. Never set on sealed sessions.
+    nomination_mode: Mapped[MarketLiveNominationMode | None] = mapped_column(
+        Enum(
+            MarketLiveNominationMode,
+            name="market_live_nomination_mode",
+            native_enum=True,
+            create_constraint=True,
+            values_callable=lambda enum_cls: [member.value for member in enum_cls],
+        ),
+        nullable=True,
+    )
+    min_increment_credits: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    soft_close_seconds: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    lot_duration_seconds: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    # Delegate who can run this single session (call players, close/pass lots)
+    # without holding the league admin's full MARKET_MANAGE permission.
+    operator_user_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+    )
 
     league: Mapped[League] = relationship()
-    creator: Mapped[User | None] = relationship()
+    creator: Mapped[User | None] = relationship(foreign_keys=[created_by])
+    operator: Mapped[User | None] = relationship(foreign_keys=[operator_user_id])
     parent_session: Mapped[MarketSession | None] = relationship(
         remote_side="MarketSession.id",
         foreign_keys=[parent_session_id],

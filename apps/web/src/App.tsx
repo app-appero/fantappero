@@ -1,4 +1,6 @@
+import { ToastProvider } from "@fantappero/ui";
 import { BrowserRouter } from "./router/simpleRouter";
+import { ListoneRefreshProvider } from "./admin/ListoneRefreshContext";
 import { AuthProvider } from "./auth/AuthContext";
 import { AppErrorBoundary } from "./errors/AppErrorBoundary";
 import { AppRoutes } from "./routes";
@@ -8,11 +10,15 @@ export function App() {
   return (
     <BrowserRouter>
       <ThemeProvider>
-        <AuthProvider>
-          <AppErrorBoundary>
-            <AppRoutes />
-          </AppErrorBoundary>
-        </AuthProvider>
+        <ToastProvider>
+          <AuthProvider>
+            <ListoneRefreshProvider>
+              <AppErrorBoundary>
+                <AppRoutes />
+              </AppErrorBoundary>
+            </ListoneRefreshProvider>
+          </AuthProvider>
+        </ToastProvider>
       </ThemeProvider>
     </BrowserRouter>
   );

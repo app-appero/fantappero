@@ -1,6 +1,8 @@
 /** Market module contracts: auction/waiver sessions, releases, trades, history (EP08-01..08). */
 
-export type MarketSessionKind = "initial_auction" | "waiver";
+import type { FantasyRole } from "./leagues.js";
+
+export type MarketSessionKind = "initial_auction" | "waiver" | "live_auction";
 
 export type MarketSessionStatus = "scheduled" | "open" | "closed" | "resolved";
 
@@ -164,4 +166,119 @@ export interface MarketHistoryFilters {
   dateTo?: string;
   page?: number;
   pageSize?: number;
+}
+
+/** Live/ascending auction: sessione, lotti e rilanci (EP08-09).
+ *
+ * Modalità distinta dalle buste chiuse sopra — un lotto (un calciatore) alla
+ * volta, con rilanci visibili a tutti i partecipanti nel momento in cui
+ * vengono piazzati, invece di offerte segrete risolte in un unico passaggio.
+ */
+
+export type MarketLiveNominationMode = "manual" | "sequential";
+
+export type MarketLiveLotStatus = "open" | "sold" | "passed" | "cancelled" | "pending_swap";
+
+export interface CreateLiveAuctionSessionRequest {
+  opensAt: string;
+  closesAt: string;
+  nominationMode: MarketLiveNominationMode;
+  minIncrementCredits: number;
+  softCloseSeconds: number;
+  lotDurationSeconds: number;
+  operatorUserId?: string | null;
+  /** Richiesto, non vuoto, solo se nominationMode è "sequential". */
+  nominationQueueAthleteIds?: string[] | null;
+}
+
+export interface ConfigureLiveAuctionSessionRequest {
+  minIncrementCredits?: number | null;
+  softCloseSeconds?: number | null;
+  lotDurationSeconds?: number | null;
+  operatorUserId?: string | null;
+  nominationQueueAthleteIds?: string[] | null;
+}
+
+export interface LiveAuctionSession {
+  id: string;
+  leagueId: string;
+  status: MarketSessionStatus;
+  opensAt: string;
+  closesAt: string;
+  nominationMode: MarketLiveNominationMode;
+  minIncrementCredits: number;
+  softCloseSeconds: number;
+  lotDurationSeconds: number;
+  operatorUserId: string | null;
+  queueRemaining: number;
+  pendingSwapCount: number;
+}
+
+export interface NominateLotRequest {
+  /** Richiesto solo in modalità "manual"; ignorato in "sequential". */
+  athleteId?: string | null;
+}
+
+export interface PlaceRaiseRequest {
+  amountCredits: number;
+}
+
+export interface LiveLot {
+  id: string;
+  sessionId: string;
+  athleteId: string;
+  athleteName: string;
+  sequenceNumber: number;
+  status: MarketLiveLotStatus;
+  openedAt: string;
+  closesAt: string;
+  minIncrementCredits: number;
+  currentLeaderTeamId: string | null;
+  currentLeaderTeamName: string | null;
+  currentAmountCredits: number;
+  minimumNextAmountCredits: number;
+  closedAt: string | null;
+}
+
+export interface LiveRaise {
+  id: string;
+  lotId: string;
+  fantasyTeamId: string;
+  fantasyTeamName: string;
+  amountCredits: number;
+  placedAt: string;
+}
+
+export interface LiveSwapCandidate {
+  slotIndex: number;
+  athleteId: string;
+  athleteName: string;
+  purchaseCredits: number;
+}
+
+export interface PendingSwapDecision {
+  lotId: string;
+  athleteId: string;
+  athleteName: string;
+  amountCredits: number;
+  role: FantasyRole;
+  roleLabel: string;
+  candidates: LiveSwapCandidate[];
+}
+
+export interface ResolveSwapRequest {
+  releaseAthleteId: string;
+}
+
+export interface LiveLotState {
+  session: LiveAuctionSession;
+  currentLot: LiveLot | null;
+  recentRaises: LiveRaise[];
+  secondsRemaining: number | null;
+  pendingSwap: PendingSwapDecision | null;
+}
+
+export interface LiveLotList {
+  sessionId: string;
+  lots: LiveLot[];
 }

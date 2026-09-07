@@ -241,9 +241,17 @@ export {
 export type { H2HResultDisplay, H2HResultStatus } from "./h2hScore.js";
 
 export type {
+  ConfigureLiveAuctionSessionRequest,
   CounterTradeProposalRequest,
+  CreateLiveAuctionSessionRequest,
   CreateMarketSessionRequest,
   CreateTradeProposalRequest,
+  LiveAuctionSession,
+  LiveLot,
+  LiveLotList,
+  LiveLotState,
+  LiveRaise,
+  LiveSwapCandidate,
   MarketBid,
   MarketBidList,
   MarketBidStatus,
@@ -251,6 +259,8 @@ export type {
   MarketHistoryEntry,
   MarketHistoryFilters,
   MarketHistoryList,
+  MarketLiveLotStatus,
+  MarketLiveNominationMode,
   MarketReleasePreview,
   MarketReleaseReason,
   MarketReleaseRequest,
@@ -261,12 +271,18 @@ export type {
   MarketSession,
   MarketSessionKind,
   MarketSessionStatus,
+  NominateLotRequest,
+  PendingSwapDecision,
+  PlaceRaiseRequest,
+  ResolveSwapRequest,
   SubmitMarketBidRequest,
   TradeAthlete,
   TradeProposal,
   TradeProposalList,
   TradeStatus,
 } from "./market.js";
+
+export { computeMinimumNextBid, secondsRemaining, shouldTriggerSoftClose } from "./liveAuction.js";
 
 export type {
   BreadcrumbItem,

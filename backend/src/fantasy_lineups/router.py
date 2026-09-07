@@ -124,6 +124,22 @@ def copy_previous_lineup_to_draft(
         return _error_response(exc)
 
 
+@router.post(
+    "/{league_id}/turni/{round_id}/formazione/migliore",
+    response_model=LineupContextResponse,
+)
+def apply_best_lineup(
+    round_id: UUID,
+    league_access: LeagueAccess = Depends(require_league_permissions(Permission.ROSTER_EDIT)),
+    service: FantasyLineupService = Depends(get_fantasy_lineup_service),
+) -> LineupContextResponse | JSONResponse:
+    """Precompila la bozza con la stessa formula ``ai_lineup_v1`` delle squadre IA."""
+    try:
+        return service.apply_best_lineup(league_access, round_id)
+    except AuthError as exc:
+        return _error_response(exc)
+
+
 @router.put(
     "/{league_id}/turni/{round_id}/formazione/bozza",
     response_model=LineupContextResponse,

@@ -130,52 +130,6 @@ function toFantasyPitchPlayers(players: readonly H2HPlayerScore[]): PitchPlayer[
   }));
 }
 
-const BONUS_LABELS: Record<string, string> = {
-  goal: "Gol",
-  assist: "Assist",
-  own_goal: "Autogol",
-  penalty_missed: "Rigore sbagliato",
-  yellow_card: "Ammonizione",
-  red_card: "Espulsione",
-  penalty_saved: "Rigore parato",
-  goalkeeper_goal_conceded: "Gol subito",
-  goalkeeper_clean_sheet: "Porta inviolata",
-};
-
-function PlayerBreakdown({ player }: { player: H2HPlayerScore }) {
-  const components = player.bonusMalus ?? [];
-  return (
-    <li data-testid={`matchup-player-score-${player.athleteId}`}>
-      <p>
-        <strong>{player.name}</strong> ({player.role}) · {player.realTeamName ?? "Squadra reale non associata"}
-        {" · "}
-        <Badge variant={player.fixtureStatusLabel === "LIVE" ? "warning" : "neutral"}>
-          {player.fixtureStatusLabel ?? "Partita non associata"}
-        </Badge>
-      </p>
-      <p>
-        Voto: <strong>{formatFantasyPoints(player.baseScore ?? null)}</strong>
-        {" · "}Bonus: <strong>+{(player.bonusTotal ?? 0).toFixed(1)}</strong>
-        {" · "}Malus: <strong>{(player.malusTotal ?? 0).toFixed(1)}</strong>
-        {" · "}Totale: <strong>{formatFantasyPoints(player.fantasyScore)}</strong>
-        {player.scoreFinal ? " · definitivo" : " · provvisorio"}
-      </p>
-      {components.length > 0 ? (
-        <ul aria-label={`Bonus e malus di ${player.name}`}>
-          {components.map((component, index) => (
-            <li key={`${component.id}-${index}`}>
-              {BONUS_LABELS[component.id] ?? component.id}: {component.contribution > 0 ? "+" : ""}
-              {component.contribution.toFixed(1)}
-            </li>
-          ))}
-        </ul>
-      ) : (
-        <p>Nessun bonus o malus.</p>
-      )}
-    </li>
-  );
-}
-
 function SideBlock({ side, title }: { side: H2HSideLineup; title: string }) {
   const teamLabel = side.teamName ?? side.displayName;
   return (
@@ -217,21 +171,29 @@ function SideBlock({ side, title }: { side: H2HSideLineup; title: string }) {
             )}
             pitchAriaLabel={`Titolari ${teamLabel}`}
           />
-          <h3>Dettaglio punteggi titolari</h3>
-          <ul data-testid={`matchup-player-breakdown-${title}`}>
-            {side.starters.map((player) => (
-              <PlayerBreakdown key={player.athleteId} player={player} />
-            ))}
-          </ul>
           {side.bench.length > 0 ? (
-            <details>
-              <summary>Dettaglio panchina</summary>
-              <ul>
-                {side.bench.map((player) => (
-                  <PlayerBreakdown key={player.athleteId} player={player} />
-                ))}
+            <>
+              <h3>Panchina</h3>
+              <ul data-testid={`matchup-bench-${title}`}>
+                {side.bench.map((player) => {
+                  const scoreLabel = playerScoreLabel(player);
+                  return (
+                    <li key={player.athleteId} data-testid={`matchup-bench-player-${player.athleteId}`}>
+                      <strong>{player.name}</strong> ({player.role}) ·{" "}
+                      {player.realTeamName ?? "Squadra reale non associata"}
+                      {scoreLabel ? (
+                        <>
+                          {" · "}
+                          <strong data-testid={`matchup-bench-player-score-${player.athleteId}`}>
+                            {scoreLabel}
+                          </strong>
+                        </>
+                      ) : null}
+                    </li>
+                  );
+                })}
               </ul>
-            </details>
+            </>
           ) : null}
         </>
       )}

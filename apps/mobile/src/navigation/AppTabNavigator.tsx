@@ -11,7 +11,7 @@ import { fetchPendingInviteCount } from "../api/managerInvites";
 import { AppHeader } from "../layout/AppHeader";
 import { leagueStateLabel } from "../leagues/leagueLabels";
 import { useLockCountdown } from "../matchday/useLockCountdown";
-import { AuctionScreen } from "../screens/AuctionScreen";
+import { AuctionHubScreen } from "../screens/AuctionHubScreen";
 import { FormationScreen } from "../screens/FormationScreen";
 import { MarketScreen } from "../screens/MarketScreen";
 import { MatchdayScreen } from "../screens/MatchdayScreen";
@@ -67,7 +67,7 @@ const SCREEN_COMPONENTS: Record<keyof AppTabParamList, React.ComponentType> = {
   Standings: StandingsScreen,
   Roster: RosterScreen,
   Formation: FormationScreen,
-  Auction: AuctionScreen,
+  Auction: AuctionHubScreen,
   Waiver: WaiverScreen,
   Market: MarketScreen,
   Profile: ProfileScreen,

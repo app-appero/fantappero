@@ -176,6 +176,7 @@ export function AppRoutes() {
   if (
     pathname === "/rosa" ||
     pathname === "/asta" ||
+    pathname === "/asta-live" ||
     pathname === "/svincoli" ||
     pathname === "/mercato"
   ) {

@@ -13,10 +13,12 @@ import {
   evaluateLineup,
   evaluateProgressiveLock,
   evaluateTacticalMove,
+  formatFantasyPoints,
   isAthleteKickoffLocked,
   moveBenchToIndex,
   orderedBenchFromRoster,
   preserveLockedStarters,
+  resolveDefaultEuropeanTurn,
   slotsFromLineupIds,
   starterTemplate,
 } from "@fantappero/contracts";
@@ -26,6 +28,7 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import {
   fetchFantasyTurns,
   fetchMyLineup,
+  applyBestLineup,
   copyPreviousLineupToDraft,
   runAiLineups,
   saveLineupDraft,
@@ -203,8 +206,10 @@ export function FormationScreen() {
     try {
       const list = await fetchFantasyTurns(accessToken, activeLeagueId);
       setTurns(list);
-      const preferred =
-        list.find((turn) => turn.effectiveStatus === "open") ?? list[0] ?? null;
+      // Stesso turno di default di Turni (EP07-05): il primo non ancora
+      // concluso, non una scelta propria di questa schermata — altrimenti le
+      // due schermate possono aprirsi su giornate diverse.
+      const preferred = resolveDefaultEuropeanTurn(list);
       if (!preferred) {
         setSelectedRoundId("");
         setContext(null);
@@ -287,18 +292,20 @@ export function FormationScreen() {
       isAthleteKickoffLocked(clock, player.kickoffAt, player.fixtureStatus, player.lockLatched, lockMarginMinutes)
     );
   };
-  const reservedIds = preserveLockedStarters({
-    template,
-    currentStarters: [
-      ...starterIds,
-      ...(context?.lineup?.starters ?? []).map((player) => player.athleteId),
-    ],
-    roster,
-    now: clock,
-  });
-  const displayStarters = template.map(
-    (_, index) => reservedIds[index] || starterIds[index] || "",
-  );
+  const playerScoreLabel = (athleteId: string): string | null => {
+    const player = roster.find((row) => row.athleteId === athleteId);
+    if (!player || player.fantasyScore == null) {
+      return null;
+    }
+    const base = formatFantasyPoints(player.fantasyScore);
+    return player.fixtureStatusLabel === "LIVE" ? `${base} LIVE` : base;
+  };
+  // `preserveLockedStarters` **ri-colloca** i bloccati nel primo slot libero
+  // del loro ruolo: è ciò che serve quando cambia il modulo, ma a template
+  // invariato sposterebbe un bloccato in uno slot precedente lasciandolo
+  // anche in quello originale — duplicandolo in campo. Qui la formazione
+  // mostrata è semplicemente la bozza, senza ri-collocazioni.
+  const displayStarters = template.map((_, index) => starterIds[index] ?? "");
   const displayBench = orderedBenchFromRoster(
     roster.map((row) => row.athleteId),
     displayStarters,
@@ -369,9 +376,10 @@ export function FormationScreen() {
     previousBenchIds: context?.lineup?.bench.map((player) => player.athleteId) ?? [],
     maximum: maxMoves,
   });
-  const movesRemaining = tacticalEvaluation.wouldConsume
-    ? tacticalEvaluation.remainingAfter
-    : (context?.tacticalMovesRemaining ?? maxMoves - movesUsed);
+  // Mosse *già usate*, non un'anteprima di quante ne resterebbero dopo un
+  // salvataggio non ancora avvenuto — quella previsione resta nel solo
+  // messaggio "consumerà 1 mossa tattica" mostrato altrove.
+  const movesRemaining = context?.tacticalMovesRemaining ?? maxMoves - movesUsed;
 
   const optionsForSlot = useMemo(() => {
     return (index: number, role: LineupRole) => {
@@ -454,6 +462,25 @@ export function FormationScreen() {
       );
     } catch (error) {
       setActionError(getApiErrorMessage(error, "Copia della formazione precedente non riuscita."));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function applyBestFormation() {
+    setActionError(null);
+    setActionMessage(null);
+    if (!accessToken || !activeLeagueId || !selectedRoundId) {
+      return;
+    }
+    setBusy(true);
+    try {
+      const detail = await applyBestLineup(accessToken, activeLeagueId, selectedRoundId);
+      setContext(detail);
+      applyEditor(detail);
+      setActionMessage("Formazione migliore applicata in bozza.");
+    } catch (error) {
+      setActionError(getApiErrorMessage(error, "Applicazione della formazione migliore non riuscita."));
     } finally {
       setBusy(false);
     }
@@ -714,14 +741,10 @@ export function FormationScreen() {
               style={[styles.chip, moduleCode === code ? styles.chipActive : null]}
               disabled={!context.modificationAllowed || !canEdit}
               onPress={() => {
-                const lockedIds = [
-                  ...new Set([
-                    ...starterIds.filter((id) => id && playerLocked(id)),
-                    ...(context.lineup?.starters ?? [])
-                      .map((player) => player.athleteId)
-                      .filter((id) => playerLocked(id)),
-                  ]),
-                ];
+                // Solo la bozza corrente come fonte, mai concatenata con
+                // `context.lineup.starters` — stesso motivo del calcolo di
+                // `reservedIds` più sopra.
+                const lockedIds = starterIds.filter((id) => id && playerLocked(id));
                 const preserved = preserveLockedStarters({
                   template: starterTemplate(code),
                   currentStarters: [...lockedIds, ...starterIds],
@@ -751,8 +774,7 @@ export function FormationScreen() {
 
         {template.map((role, index) => {
           const currentId = displayStarters[index] ?? "";
-          const reservedId = reservedIds[index] ?? "";
-          const lockedSlot = Boolean(reservedId) || playerLocked(currentId);
+          const lockedSlot = playerLocked(currentId);
           const roleColors = roleBadgeColors(role);
           return (
             <View key={`${moduleCode}-${index}`} testID={`formation-starter-${index}`}>
@@ -780,13 +802,9 @@ export function FormationScreen() {
                     ]}
                     disabled={!context.modificationAllowed || !canEdit}
                     onPress={() => {
-                      if (reservedId && player.athleteId !== reservedId) {
+                      // Chi occupa lo slot ha già la partita iniziata: non si tocca più.
+                      if (currentId && currentId !== player.athleteId && playerLocked(currentId)) {
                         setActionError(KICKOFF_LOCK_MESSAGE);
-                        setStarterIds((current) => {
-                          const next = [...current];
-                          next[index] = reservedId;
-                          return next;
-                        });
                         return;
                       }
                       if (playerLocked(player.athleteId) && player.athleteId !== currentId) {
@@ -799,7 +817,7 @@ export function FormationScreen() {
                       setBenchIds(
                         orderedBenchFromRoster(
                           roster.map((row) => row.athleteId),
-                          nextStarters.map((value, slotIndex) => reservedIds[slotIndex] || value || ""),
+                          nextStarters,
                           benchIds,
                         ),
                       );
@@ -810,6 +828,7 @@ export function FormationScreen() {
                     <Text style={styles.chipLabel}>
                       {player.athleteName}
                       {playerLocked(player.athleteId) ? " (bloccato)" : ""}
+                      {playerScoreLabel(player.athleteId) ? ` · ${playerScoreLabel(player.athleteId)}` : ""}
                     </Text>
                   </Pressable>
                 ))}
@@ -860,6 +879,7 @@ export function FormationScreen() {
                     <Text style={styles.body}>
                       {name}
                       {playerLocked(id) ? " — bloccato" : ""}
+                      {playerScoreLabel(id) ? ` · ${playerScoreLabel(id)}` : ""}
                     </Text>
                   </BenchOrderPicker>
                   <Text style={styles.meta}>
@@ -895,6 +915,18 @@ export function FormationScreen() {
           testID="formation-copy"
         >
           <Text style={styles.buttonSecondaryLabel}>Copia formazione precedente</Text>
+        </Pressable>
+        <Pressable
+          style={[
+            styles.button,
+            styles.buttonSecondary,
+            busy || !context.modificationAllowed || !canEdit ? styles.disabled : null,
+          ]}
+          disabled={busy || !context.modificationAllowed || !canEdit}
+          onPress={() => void applyBestFormation()}
+          testID="formation-apply-best"
+        >
+          <Text style={styles.buttonSecondaryLabel}>Applica formazione migliore</Text>
         </Pressable>
         <Pressable
           style={[

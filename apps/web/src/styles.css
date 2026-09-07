@@ -560,10 +560,78 @@ button.fa-link-muted,
   font-size: 0.9rem;
 }
 
+.fa-roster-target-header__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--fa-space-md);
+  margin-bottom: var(--fa-space-md);
+}
+
+.fa-roster-target-header__row:last-child {
+  margin-bottom: 0;
+}
+
+.fa-roster-target-header__row .fa-field {
+  margin: 0;
+  min-width: 14rem;
+}
+
+.fa-roster-target-header__credits {
+  margin: 0;
+  white-space: nowrap;
+}
+
+.fa-roster-adjust-card {
+  width: 100%;
+}
+
+.fa-roster-adjust-card .fa-card__body {
+  padding: var(--fa-space-sm) var(--fa-space-md);
+}
+
+.fa-roster-adjust-card__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--fa-space-sm);
+}
+
+.fa-roster-adjust-card__row .fa-field {
+  margin: 0;
+}
+
+.fa-roster-adjust-card [data-testid="roster-adjust-amount"] {
+  width: 6rem;
+}
+
 .fa-roster-role-tables {
   display: grid;
   gap: var(--fa-space-lg);
   margin-top: var(--fa-space-md);
+}
+
+.fa-roster-page {
+  max-width: 100rem;
+}
+
+.fa-roster-columns {
+  display: grid;
+  grid-template-columns: 0.85fr 1.15fr;
+  gap: var(--fa-space-lg);
+  align-items: start;
+}
+
+.fa-roster-columns__left,
+.fa-roster-columns__right {
+  min-width: 0;
+}
+
+@media (max-width: 64rem) {
+  .fa-roster-columns {
+    grid-template-columns: 1fr;
+  }
 }
 
 .fa-roster-role-section__title {
@@ -587,6 +655,54 @@ button.fa-link-muted,
   margin: 0;
   color: var(--fa-color-text-muted);
   font-size: 0.9rem;
+}
+
+.fa-roster-role-section__pagination {
+  display: flex;
+  align-items: center;
+  gap: var(--fa-space-sm);
+  margin-top: var(--fa-space-sm);
+  font-size: 0.85rem;
+  color: var(--fa-color-foreground-muted);
+}
+
+.fa-admin-listone__search {
+  margin-bottom: var(--fa-space-md);
+  max-width: 24rem;
+}
+
+.fa-admin-listone__pagination {
+  display: flex;
+  align-items: center;
+  gap: var(--fa-space-sm);
+  margin-top: var(--fa-space-sm);
+  font-size: 0.85rem;
+  color: var(--fa-color-foreground-muted);
+}
+
+.fa-listone-refresh-bar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: var(--fa-z-toast);
+  padding: var(--fa-space-xs);
+  background-color: var(--fa-color-background);
+  box-shadow: var(--fa-shadow-md);
+}
+
+.fa-roster-price-edit {
+  display: flex;
+  align-items: center;
+  gap: var(--fa-space-xs);
+}
+
+.fa-roster-price-edit .fa-field {
+  margin: 0;
+}
+
+.fa-roster-price-edit .fa-input {
+  width: 5rem;
 }
 
 @media (max-width: 44rem) {
@@ -807,6 +923,29 @@ button.fa-link-muted,
   display: grid;
   gap: var(--fa-space-lg);
   min-width: 0;
+}
+
+.fa-formation-layout__module-row {
+  display: flex;
+  align-items: center;
+  gap: var(--fa-space-md);
+  flex-wrap: wrap;
+}
+
+.fa-formation-layout__issues {
+  border-left: 3px solid var(--fa-color-danger);
+  padding-left: var(--fa-space-md);
+}
+
+.fa-formation-layout__issues-title {
+  margin: 0 0 var(--fa-space-xs);
+  font-weight: 600;
+}
+
+.fa-formation-layout__moves-hint {
+  margin: 0;
+  color: var(--fa-color-foreground-muted);
+  font-size: var(--fa-text-sm);
 }
 
 .fa-formation-layout__actions {
@@ -1155,4 +1294,108 @@ button.fa-link-muted,
     gap: var(--fa-space-xl);
   }
 }
+
+.fa-live-auction-table {
+  display: flex;
+  justify-content: center;
+  padding: var(--fa-space-md) 0;
+}
+
+.fa-live-auction-table__surface {
+  position: relative;
+  width: min(100%, 40rem);
+  aspect-ratio: 16 / 10;
+  border-radius: 50%;
+  background: radial-gradient(ellipse at center, #164a2c 0%, #0d2f1e 70%, #0a2418 100%);
+  border: 6px solid #3a2416;
+  box-shadow:
+    inset 0 0 0 2px rgba(255, 255, 255, 0.08),
+    0 10px 30px rgba(0, 0, 0, 0.4);
+}
+
+.fa-live-auction-table__center {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 55%;
+  text-align: center;
+  color: var(--fa-color-foreground);
+}
+
+.fa-live-auction-table__athlete {
+  margin: 0;
+  font-size: var(--fa-text-lg);
+  font-weight: 700;
+}
+
+.fa-live-auction-table__amount {
+  margin: var(--fa-space-xs) 0 0;
+  font-size: var(--fa-text-md);
+  color: var(--fa-color-accent-muted);
+  font-weight: 600;
+}
+
+.fa-live-auction-table__countdown {
+  margin: var(--fa-space-xs) 0 0;
+  font-size: var(--fa-text-sm);
+  color: var(--fa-color-foreground-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.fa-live-auction-table__waiting {
+  margin: 0;
+  font-size: var(--fa-text-sm);
+  color: var(--fa-color-foreground-muted);
+}
+
+.fa-live-auction-table__seat {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  width: 5.5rem;
+}
+
+.fa-live-auction-table__avatar {
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--fa-color-background-elevated);
+  border: 2px solid rgba(255, 255, 255, 0.35);
+  color: var(--fa-color-foreground);
+  font-weight: 700;
+  font-size: var(--fa-text-md);
+}
+
+.fa-live-auction-table__seat--leading .fa-live-auction-table__avatar {
+  border-color: var(--fa-color-accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--fa-color-accent) 40%, transparent);
+}
+
+.fa-live-auction-table__seat-name {
+  font-size: 0.7rem;
+  color: #fff;
+  text-align: center;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+.fa-live-auction-table__seat--leading .fa-live-auction-table__seat-name {
+  color: var(--fa-color-accent-muted);
+  font-weight: 700;
+}
+
+.fa-auction-hub__subtabs {
+  margin-top: var(--fa-space-sm);
+}
+
 

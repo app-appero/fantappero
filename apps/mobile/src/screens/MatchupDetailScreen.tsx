@@ -44,23 +44,17 @@ function toFantasyPitchPlayers(players: readonly H2HPlayerScore[]) {
   }));
 }
 
-function PlayerBreakdown({ player }: { player: H2HPlayerScore }) {
-  const componentText = (player.bonusMalus ?? [])
-    .map((item) => `${item.id} ${item.contribution > 0 ? "+" : ""}${item.contribution.toFixed(1)}`)
-    .join(" · ");
+function BenchRow({ player }: { player: H2HPlayerScore }) {
+  const scoreLabel = playerScoreLabel(player);
   return (
-    <View style={styles.playerScore} testID={`matchup-player-score-${player.athleteId}`}>
+    <View style={styles.playerScore} testID={`matchup-bench-player-${player.athleteId}`}>
       <Text style={styles.body}>
         <Text style={styles.playerName}>{player.name}</Text> ({player.role}) ·{" "}
         {player.realTeamName ?? "Squadra reale non associata"}
+        {scoreLabel ? (
+          <Text testID={`matchup-bench-player-score-${player.athleteId}`}> · {scoreLabel}</Text>
+        ) : null}
       </Text>
-      <Text style={styles.meta}>
-        {player.fixtureStatusLabel ?? "Partita non associata"} · Voto{" "}
-        {formatFantasyPoints(player.baseScore ?? null)} · Bonus +
-        {(player.bonusTotal ?? 0).toFixed(1)} · Malus {(player.malusTotal ?? 0).toFixed(1)} · Totale{" "}
-        {formatFantasyPoints(player.fantasyScore)} · {player.scoreFinal ? "definitivo" : "provvisorio"}
-      </Text>
-      <Text style={styles.meta}>{componentText || "Nessun bonus o malus"}</Text>
     </View>
   );
 }
@@ -116,15 +110,11 @@ function SideBlock({ side, title }: { side: H2HSideLineup; title: string }) {
             )}
             testID={`matchup-pitch-${title}`}
           />
-          <Text style={styles.subheading}>Dettaglio punteggi titolari</Text>
-          {side.starters.map((player) => (
-            <PlayerBreakdown key={player.athleteId} player={player} />
-          ))}
           {side.bench.length > 0 ? (
             <>
               <Text style={styles.subheading}>Panchina</Text>
               {side.bench.map((player) => (
-                <PlayerBreakdown key={player.athleteId} player={player} />
+                <BenchRow key={player.athleteId} player={player} />
               ))}
             </>
           ) : null}

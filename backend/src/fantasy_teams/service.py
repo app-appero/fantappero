@@ -121,7 +121,7 @@ from observability.context import get_correlation_id
 from observability.logging import get_logger
 from observability.metrics import get_metrics
 from sports_data.catalog.models import Club
-from sports_data.listone.models import RoleAssignment
+from sports_data.listone.generate import list_role_assignments
 from sports_data.roster.models import Athlete
 
 logger = get_logger(__name__)
@@ -379,16 +379,38 @@ class FantasyTeamService:
             assert refreshed is not None
             return self._to_team_response(refreshed)
 
-        owned_athlete_ids = select(FantasyRosterSlot.athlete_id).where(
-            FantasyRosterSlot.league_id == league.id,
-            FantasyRosterSlot.athlete_id.is_not(None),
-        )
-        free_rows = self._session.execute(
-            select(RoleAssignment.athlete_id, RoleAssignment.role).where(
-                RoleAssignment.season_year == league.season_year,
-                RoleAssignment.athlete_id.not_in(owned_athlete_ids),
+        owned_athlete_ids = set(
+            self._session.scalars(
+                select(FantasyRosterSlot.athlete_id).where(
+                    FantasyRosterSlot.league_id == league.id,
+                    FantasyRosterSlot.athlete_id.is_not(None),
+                )
             )
-        ).all()
+        )
+        # Scoped to the league's own competitions (and overrides resolved via
+        # resolve_effective_athlete_roles below) — matching exactly what
+        # assert_assignment_respects_role_quota checks at assignment time.
+        # Querying RoleAssignment directly here (unscoped) let this pick an
+        # athlete whose only role assignment is in a competition the league
+        # never joined, which assert_assignment_respects_role_quota then
+        # rejected as "role_unresolved".
+        competition_ids = {competition.id for competition in league.competitions}
+        candidate_ids = [
+            assignment.athlete_id
+            for assignment in list_role_assignments(
+                self._session,
+                season_year=league.season_year,
+                competition_ids=competition_ids,
+            )
+            if assignment.athlete_id not in owned_athlete_ids
+        ]
+        effective_roles = resolve_effective_athlete_roles(
+            self._session,
+            league_id=league.id,
+            athlete_ids=candidate_ids,
+            season_year=league.season_year,
+            competition_ids=competition_ids,
+        )
 
         pool: dict[FantasyRole, list[UUID]] = {
             FantasyRole.P: [],
@@ -396,8 +418,10 @@ class FantasyTeamService:
             FantasyRole.C: [],
             FantasyRole.A: [],
         }
-        for athlete_id, role in free_rows:
-            pool[role].append(athlete_id)
+        for athlete_id in candidate_ids:
+            resolved = effective_roles.get(athlete_id)
+            if resolved is not None:
+                pool[resolved.role].append(athlete_id)
 
         rng = random.Random()
         picks: list[tuple[FantasyRole, UUID]] = []
@@ -756,7 +780,9 @@ class FantasyTeamService:
                 account,
                 amount=-purchase_credits,
                 reason=CreditLedgerReason.ROSTER_PURCHASE,
-                transaction_id=f"purchase:{team.id}:{slot_index}:{athlete_id}",
+                transaction_id=(
+                    f"purchase:{team.id}:{slot_index}:{athlete_id}:{account.version}"
+                ),
                 actor_id=league_access.user.id,
                 note=f"Acquisto {athlete.canonical_name}",
             )
@@ -772,7 +798,10 @@ class FantasyTeamService:
                     account,
                     amount=-delta,
                     reason=CreditLedgerReason.ROSTER_PURCHASE,
-                    transaction_id=f"purchase-adjust:{team.id}:{slot_index}:{athlete_id}:{purchase_credits}",
+                    transaction_id=(
+                        f"purchase-adjust:{team.id}:{slot_index}:{athlete_id}:"
+                        f"{purchase_credits}:{account.version}"
+                    ),
                     actor_id=league_access.user.id,
                     note=f"Rettifica prezzo {athlete.canonical_name}",
                 )
@@ -1463,7 +1492,7 @@ class FantasyTeamService:
             account,
             amount=purchase_credits,
             reason=CreditLedgerReason.ROSTER_RELEASE_REFUND,
-            transaction_id=f"refund:{team_id}:{slot_index}:{athlete_id}",
+            transaction_id=f"refund:{team_id}:{slot_index}:{athlete_id}:{account.version}",
             actor_id=actor_id,
             note=f"Rimborso {athlete_name}",
         )
