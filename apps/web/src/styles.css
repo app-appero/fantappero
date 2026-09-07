@@ -634,6 +634,51 @@ button.fa-link-muted,
   }
 }
 
+/* Form scambi: rosa offerta (sinistra) e squadra destinataria + sua rosa
+   richiesta (destra), ciascuna come lista verticale invece che a capo. */
+.fa-trade-columns {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--fa-space-lg);
+  align-items: start;
+  margin-bottom: var(--fa-space-md);
+}
+
+.fa-trade-columns__left,
+.fa-trade-columns__right {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--fa-space-sm);
+}
+
+@media (max-width: 64rem) {
+  .fa-trade-columns {
+    grid-template-columns: 1fr;
+  }
+}
+
+.fa-trade-athlete-list {
+  display: flex;
+  flex-direction: column;
+  max-height: 22rem;
+  overflow-y: auto;
+  border: 1px solid var(--fa-color-border);
+  border-radius: var(--fa-radius-md);
+}
+
+.fa-trade-athlete-list label {
+  display: flex;
+  align-items: center;
+  gap: var(--fa-space-sm);
+  padding: var(--fa-space-sm) var(--fa-space-md);
+  border-bottom: 1px solid var(--fa-color-border);
+}
+
+.fa-trade-athlete-list label:last-child {
+  border-bottom: none;
+}
+
 .fa-roster-role-section__title {
   display: flex;
   align-items: center;

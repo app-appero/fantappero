@@ -547,101 +547,111 @@ export function MarketPage() {
         {!loading && !loadError && !isDemoMode && activeLeagueId ? (
           <WireframeSection label="Nuova proposta di scambio" testId="market-trade-form-section">
             <form data-testid="market-trade-create-form" onSubmit={handleCreateProposal}>
-              <Select
-                label="Squadra destinataria"
-                name="trade-recipient"
-                options={recipientOptions}
-                placeholder="Scegli una squadra…"
-                value={recipientTeamId}
-                onChange={(event) => {
-                  const nextId = event.target.value;
-                  setRecipientTeamId(nextId);
-                  setRequestedAthleteIds([]);
-                  void loadRecipientRoster(nextId);
-                }}
-                required
-              />
+              <div className="fa-trade-columns">
+                <div className="fa-trade-columns__left">
+                  <fieldset data-testid="market-trade-offered-athletes">
+                    <legend>Giocatori offerti (dalla tua rosa)</legend>
+                    {ownedSlots.length === 0 ? (
+                      <p>Nessun giocatore in rosa da offrire.</p>
+                    ) : (
+                      <div className="fa-trade-athlete-list">
+                        {ownedSlots.map((slot) => (
+                          <label key={slot.id}>
+                            <input
+                              type="checkbox"
+                              checked={offeredAthleteIds.includes(slot.athleteId as string)}
+                              onChange={() =>
+                                setOfferedAthleteIds((prev) =>
+                                  toggleAthleteId(prev, slot.athleteId as string),
+                                )
+                              }
+                            />
+                            <span>{slot.athleteName}</span>
+                          </label>
+                        ))}
+                      </div>
+                    )}
+                  </fieldset>
+                </div>
 
-              <fieldset data-testid="market-trade-offered-athletes">
-                <legend>Giocatori offerti (dalla tua rosa)</legend>
-                {ownedSlots.length === 0 ? (
-                  <p>Nessun giocatore in rosa da offrire.</p>
-                ) : (
-                  ownedSlots.map((slot) => (
-                    <label key={slot.id}>
-                      <input
-                        type="checkbox"
-                        checked={offeredAthleteIds.includes(slot.athleteId as string)}
-                        onChange={() =>
-                          setOfferedAthleteIds((prev) =>
-                            toggleAthleteId(prev, slot.athleteId as string),
-                          )
-                        }
-                      />{" "}
-                      {slot.athleteName}
-                    </label>
-                  ))
-                )}
-              </fieldset>
-
-              <fieldset data-testid="market-trade-requested-athletes">
-                <legend>Giocatori richiesti</legend>
-                {!recipientTeamId ? (
-                  <p>Scegli prima una squadra destinataria.</p>
-                ) : null}
-                {recipientTeamId && recipientRosterLoading ? (
-                  <UiStatePanel
-                    state="loading"
-                    title="Caricamento rosa"
-                    message="Recupero i giocatori della squadra selezionata…"
-                    testId="market-trade-recipient-loading"
+                <div className="fa-trade-columns__right">
+                  <Select
+                    label="Squadra destinataria"
+                    name="trade-recipient"
+                    options={recipientOptions}
+                    placeholder="Scegli una squadra…"
+                    value={recipientTeamId}
+                    onChange={(event) => {
+                      const nextId = event.target.value;
+                      setRecipientTeamId(nextId);
+                      setRequestedAthleteIds([]);
+                      void loadRecipientRoster(nextId);
+                    }}
+                    required
                   />
-                ) : null}
-                {recipientTeamId && !recipientRosterLoading && recipientRosterError ? (
-                  <div>
-                    <UiStatePanel
-                      state="error"
-                      title="Rosa non disponibile"
-                      message={recipientRosterError}
-                      testId="market-trade-recipient-error"
-                    />
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      onClick={() => void loadRecipientRoster(recipientTeamId)}
-                    >
-                      Riprova
-                    </Button>
-                  </div>
-                ) : null}
-                {recipientTeamId &&
-                !recipientRosterLoading &&
-                !recipientRosterError &&
-                recipientPlayers.length === 0 ? (
-                  <p data-testid="market-trade-recipient-empty">
-                    Questa squadra non ha ancora giocatori in rosa.
-                  </p>
-                ) : null}
-                {recipientTeamId &&
-                !recipientRosterLoading &&
-                !recipientRosterError &&
-                recipientPlayers.length > 0
-                  ? recipientPlayers.map((athlete) => (
-                      <label key={athlete.athleteId}>
-                        <input
-                          type="checkbox"
-                          checked={requestedAthleteIds.includes(athlete.athleteId)}
-                          onChange={() =>
-                            setRequestedAthleteIds((prev) =>
-                              toggleAthleteId(prev, athlete.athleteId),
-                            )
-                          }
-                        />{" "}
-                        {athlete.athleteName}
-                      </label>
-                    ))
-                  : null}
-              </fieldset>
+
+                  <fieldset data-testid="market-trade-requested-athletes">
+                    <legend>Giocatori richiesti</legend>
+                    {!recipientTeamId ? (
+                      <p>Scegli prima una squadra destinataria.</p>
+                    ) : null}
+                    {recipientTeamId && recipientRosterLoading ? (
+                      <UiStatePanel
+                        state="loading"
+                        title="Caricamento rosa"
+                        message="Recupero i giocatori della squadra selezionata…"
+                        testId="market-trade-recipient-loading"
+                      />
+                    ) : null}
+                    {recipientTeamId && !recipientRosterLoading && recipientRosterError ? (
+                      <div>
+                        <UiStatePanel
+                          state="error"
+                          title="Rosa non disponibile"
+                          message={recipientRosterError}
+                          testId="market-trade-recipient-error"
+                        />
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          onClick={() => void loadRecipientRoster(recipientTeamId)}
+                        >
+                          Riprova
+                        </Button>
+                      </div>
+                    ) : null}
+                    {recipientTeamId &&
+                    !recipientRosterLoading &&
+                    !recipientRosterError &&
+                    recipientPlayers.length === 0 ? (
+                      <p data-testid="market-trade-recipient-empty">
+                        Questa squadra non ha ancora giocatori in rosa.
+                      </p>
+                    ) : null}
+                    {recipientTeamId &&
+                    !recipientRosterLoading &&
+                    !recipientRosterError &&
+                    recipientPlayers.length > 0 ? (
+                      <div className="fa-trade-athlete-list">
+                        {recipientPlayers.map((athlete) => (
+                          <label key={athlete.athleteId}>
+                            <input
+                              type="checkbox"
+                              checked={requestedAthleteIds.includes(athlete.athleteId)}
+                              onChange={() =>
+                                setRequestedAthleteIds((prev) =>
+                                  toggleAthleteId(prev, athlete.athleteId),
+                                )
+                              }
+                            />
+                            <span>{athlete.athleteName}</span>
+                          </label>
+                        ))}
+                      </div>
+                    ) : null}
+                  </fieldset>
+                </div>
+              </div>
 
               <Input
                 label="Crediti offerti"
@@ -811,46 +821,58 @@ export function MarketPage() {
                           data-testid={`market-trade-counter-form-${proposal.id}`}
                           onSubmit={(event) => handleCounterSubmit(event, proposal.id)}
                         >
-                          <fieldset>
-                            <legend>Giocatori offerti nella controproposta</legend>
-                            {ownedSlots.map((slot) => (
-                              <label key={slot.id}>
-                                <input
-                                  type="checkbox"
-                                  checked={counterOfferedAthleteIds.includes(
-                                    slot.athleteId as string,
-                                  )}
-                                  onChange={() =>
-                                    setCounterOfferedAthleteIds((prev) =>
-                                      toggleAthleteId(prev, slot.athleteId as string),
-                                    )
-                                  }
-                                />{" "}
-                                {slot.athleteName}
-                              </label>
-                            ))}
-                          </fieldset>
-                          <fieldset>
-                            <legend>Giocatori richiesti nella controproposta</legend>
-                            {occupancy
-                              .filter((entry) => entry.fantasyTeamId === proposal.proposerTeamId)
-                              .map((entry) => (
-                                <label key={entry.athleteId}>
-                                  <input
-                                    type="checkbox"
-                                    checked={counterRequestedAthleteIds.includes(entry.athleteId)}
-                                    onChange={() =>
-                                      setCounterRequestedAthleteIds((prev) =>
-                                        toggleAthleteId(prev, entry.athleteId),
-                                      )
-                                    }
-                                  />{" "}
-                                  {entry.athleteName ??
-                                    athleteNameById.get(entry.athleteId) ??
-                                    "Giocatore"}
-                                </label>
-                              ))}
-                          </fieldset>
+                          <div className="fa-trade-columns">
+                            <div className="fa-trade-columns__left">
+                              <fieldset>
+                                <legend>Giocatori offerti nella controproposta</legend>
+                                <div className="fa-trade-athlete-list">
+                                  {ownedSlots.map((slot) => (
+                                    <label key={slot.id}>
+                                      <input
+                                        type="checkbox"
+                                        checked={counterOfferedAthleteIds.includes(
+                                          slot.athleteId as string,
+                                        )}
+                                        onChange={() =>
+                                          setCounterOfferedAthleteIds((prev) =>
+                                            toggleAthleteId(prev, slot.athleteId as string),
+                                          )
+                                        }
+                                      />
+                                      <span>{slot.athleteName}</span>
+                                    </label>
+                                  ))}
+                                </div>
+                              </fieldset>
+                            </div>
+                            <div className="fa-trade-columns__right">
+                              <fieldset>
+                                <legend>Giocatori richiesti nella controproposta</legend>
+                                <div className="fa-trade-athlete-list">
+                                  {occupancy
+                                    .filter((entry) => entry.fantasyTeamId === proposal.proposerTeamId)
+                                    .map((entry) => (
+                                      <label key={entry.athleteId}>
+                                        <input
+                                          type="checkbox"
+                                          checked={counterRequestedAthleteIds.includes(entry.athleteId)}
+                                          onChange={() =>
+                                            setCounterRequestedAthleteIds((prev) =>
+                                              toggleAthleteId(prev, entry.athleteId),
+                                            )
+                                          }
+                                        />
+                                        <span>
+                                          {entry.athleteName ??
+                                            athleteNameById.get(entry.athleteId) ??
+                                            "Giocatore"}
+                                        </span>
+                                      </label>
+                                    ))}
+                                </div>
+                              </fieldset>
+                            </div>
+                          </div>
                           <Input
                             label="Crediti offerti"
                             name="counter-offered-credits"
