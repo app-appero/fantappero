@@ -383,6 +383,55 @@ def test_expired_proposal_reads_as_expired_without_a_write(
     assert detail.json()["status"] == "expired"
 
 
+def test_trade_proposal_expiry_is_optional(
+    client: TestClient,
+    db_session: Session,
+    competition_ids: list[str],
+) -> None:
+    """A proposal created with no expiry (EP08-05/FR-MKT-03) stays 'proposed' forever."""
+    owner_token, owner_id = _register_and_login(client, "trade.noexpiry@example.com")
+    member_token, member_id = _register_and_login(client, "trade.noexpiry.member@example.com")
+    league_id = _create_league(client, owner_token, competition_ids, "Lega Scambio Senza Scadenza")
+    _add_member(db_session, league_id, member_id)
+    recipient_athlete = _seed_athlete(db_session, 9509, "Destinatario Senza Scadenza")
+    recipient_team_id = _own_athlete_at_slot(
+        client, league_id, member_token, 0, recipient_athlete
+    )
+
+    proposal = client.post(
+        f"/leagues/{league_id}/mercato/scambi/proposte",
+        headers={"Authorization": f"Bearer {owner_token}"},
+        json={
+            "recipientTeamId": recipient_team_id,
+            "offeredCredits": 15,
+            "requestedAthleteIds": [str(recipient_athlete.id)],
+            # expiresAt intentionally omitted.
+        },
+    )
+    assert proposal.status_code == 201
+    body = proposal.json()
+    assert body["expiresAt"] is None
+    assert body["status"] == "proposed"
+
+    row = db_session.get(TradeProposal, UUID(body["id"]))
+    assert row is not None
+    assert row.expires_at is None
+
+    # Far in the future it must still read as "proposed", never "expired".
+    detail = client.get(
+        f"/leagues/{league_id}/mercato/scambi/proposte/{body['id']}",
+        headers={"Authorization": f"Bearer {owner_token}"},
+    )
+    assert detail.json()["status"] == "proposed"
+
+    accepted = client.post(
+        f"/leagues/{league_id}/mercato/scambi/proposte/{body['id']}/accetta",
+        headers={"Authorization": f"Bearer {member_token}"},
+    )
+    assert accepted.status_code == 200
+    assert accepted.json()["status"] == "accepted"
+
+
 def test_concurrent_cancel_attempts_only_one_succeeds(
     client: TestClient,
     db_session: Session,

@@ -277,6 +277,8 @@ export function MarketPage() {
   const [requestedAthleteIds, setRequestedAthleteIds] = useState<string[]>([]);
   const [offeredCredits, setOfferedCredits] = useState("0");
   const [requestedCredits, setRequestedCredits] = useState("0");
+  // Scadenza opzionale (EP08-05/FR-MKT-03): senza spunta la proposta non scade mai da sola.
+  const [hasExpiry, setHasExpiry] = useState(false);
   const [expiresAt, setExpiresAt] = useState("");
 
   const recipientOptions = useMemo(
@@ -331,12 +333,13 @@ export function MarketPage() {
     setRequestedAthleteIds([]);
     setOfferedCredits("0");
     setRequestedCredits("0");
+    setHasExpiry(false);
     setExpiresAt("");
   }
 
   function handleCreateProposal(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!recipientTeamId || !expiresAt) {
+    if (!recipientTeamId || (hasExpiry && !expiresAt)) {
       return;
     }
     void trade
@@ -346,7 +349,7 @@ export function MarketPage() {
         requestedAthleteIds,
         offeredCredits: Number(offeredCredits) || 0,
         requestedCredits: Number(requestedCredits) || 0,
-        expiresAt: new Date(expiresAt).toISOString(),
+        expiresAt: hasExpiry && expiresAt ? new Date(expiresAt).toISOString() : null,
       })
       .then(resetTradeForm);
   }
@@ -356,6 +359,7 @@ export function MarketPage() {
   const [counterRequestedAthleteIds, setCounterRequestedAthleteIds] = useState<string[]>([]);
   const [counterOfferedCredits, setCounterOfferedCredits] = useState("0");
   const [counterRequestedCredits, setCounterRequestedCredits] = useState("0");
+  const [counterHasExpiry, setCounterHasExpiry] = useState(false);
   const [counterExpiresAt, setCounterExpiresAt] = useState("");
 
   function startCounter(proposalId: string) {
@@ -364,12 +368,13 @@ export function MarketPage() {
     setCounterRequestedAthleteIds([]);
     setCounterOfferedCredits("0");
     setCounterRequestedCredits("0");
+    setCounterHasExpiry(false);
     setCounterExpiresAt("");
   }
 
   function handleCounterSubmit(event: FormEvent<HTMLFormElement>, proposalId: string) {
     event.preventDefault();
-    if (!counterExpiresAt) {
+    if (counterHasExpiry && !counterExpiresAt) {
       return;
     }
     void trade
@@ -378,7 +383,7 @@ export function MarketPage() {
         requestedAthleteIds: counterRequestedAthleteIds,
         offeredCredits: Number(counterOfferedCredits) || 0,
         requestedCredits: Number(counterRequestedCredits) || 0,
-        expiresAt: new Date(counterExpiresAt).toISOString(),
+        expiresAt: counterHasExpiry && counterExpiresAt ? new Date(counterExpiresAt).toISOString() : null,
       })
       .then(() => setCounteringProposalId(null));
   }
@@ -669,14 +674,32 @@ export function MarketPage() {
                 value={requestedCredits}
                 onChange={(event) => setRequestedCredits(event.target.value)}
               />
-              <Input
-                label="Scadenza"
-                name="trade-expires-at"
-                type="datetime-local"
-                value={expiresAt}
-                onChange={(event) => setExpiresAt(event.target.value)}
-                required
-              />
+              <label>
+                <input
+                  type="checkbox"
+                  name="trade-has-expires-at"
+                  checked={hasExpiry}
+                  onChange={(event) => {
+                    setHasExpiry(event.target.checked);
+                    if (!event.target.checked) {
+                      setExpiresAt("");
+                    }
+                  }}
+                />
+                <span> Imposta una scadenza</span>
+              </label>
+              {hasExpiry ? (
+                <Input
+                  label="Scadenza"
+                  name="trade-expires-at"
+                  type="datetime-local"
+                  value={expiresAt}
+                  onChange={(event) => setExpiresAt(event.target.value)}
+                  required
+                />
+              ) : (
+                <p>Nessuna scadenza: la proposta resta valida finché non viene decisa o annullata.</p>
+              )}
 
               {trade.createError ? (
                 <UiStatePanel
@@ -753,6 +776,11 @@ export function MarketPage() {
                       <p>
                         Richiesti: {proposal.requestedAthletes.map((a) => a.name).join(", ") || "—"}
                         {proposal.requestedCredits > 0 ? ` + ${proposal.requestedCredits} crediti` : ""}
+                      </p>
+                      <p>
+                        {proposal.expiresAt
+                          ? `Scade il ${new Date(proposal.expiresAt).toLocaleString("it-IT")}`
+                          : "Nessuna scadenza"}
                       </p>
 
                       {proposal.status === "proposed" && isProposer ? (
@@ -889,14 +917,32 @@ export function MarketPage() {
                             value={counterRequestedCredits}
                             onChange={(event) => setCounterRequestedCredits(event.target.value)}
                           />
-                          <Input
-                            label="Scadenza"
-                            name="counter-expires-at"
-                            type="datetime-local"
-                            value={counterExpiresAt}
-                            onChange={(event) => setCounterExpiresAt(event.target.value)}
-                            required
-                          />
+                          <label>
+                            <input
+                              type="checkbox"
+                              name="counter-has-expires-at"
+                              checked={counterHasExpiry}
+                              onChange={(event) => {
+                                setCounterHasExpiry(event.target.checked);
+                                if (!event.target.checked) {
+                                  setCounterExpiresAt("");
+                                }
+                              }}
+                            />
+                            <span> Imposta una scadenza</span>
+                          </label>
+                          {counterHasExpiry ? (
+                            <Input
+                              label="Scadenza"
+                              name="counter-expires-at"
+                              type="datetime-local"
+                              value={counterExpiresAt}
+                              onChange={(event) => setCounterExpiresAt(event.target.value)}
+                              required
+                            />
+                          ) : (
+                            <p>Nessuna scadenza: la controproposta resta valida finché non viene decisa o annullata.</p>
+                          )}
                           <div className="fa-ds-showcase__row">
                             <Button type="submit" variant="primary" disabled={pending}>
                               Invia controproposta

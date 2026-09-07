@@ -105,7 +105,8 @@ export interface CreateTradeProposalRequest {
   requestedAthleteIds: string[];
   offeredCredits: number;
   requestedCredits: number;
-  expiresAt: string;
+  /** Optional: omit or send null for a proposal that never expires on its own. */
+  expiresAt: string | null;
 }
 
 export interface CounterTradeProposalRequest {
@@ -113,7 +114,7 @@ export interface CounterTradeProposalRequest {
   requestedAthleteIds: string[];
   offeredCredits: number;
   requestedCredits: number;
-  expiresAt: string;
+  expiresAt: string | null;
 }
 
 export interface TradeAthlete {
@@ -131,7 +132,7 @@ export interface TradeProposal {
   offeredCredits: number;
   requestedCredits: number;
   status: TradeStatus;
-  expiresAt: string;
+  expiresAt: string | null;
   createdAt: string;
   counterOfId: string | null;
 }
