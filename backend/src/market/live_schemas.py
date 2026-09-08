@@ -10,12 +10,15 @@ from auth.schemas import ApiModel
 class CreateLiveAuctionSessionRequest(ApiModel):
     opens_at: str = Field(alias="opensAt", min_length=1)
     closes_at: str = Field(alias="closesAt", min_length=1)
-    nomination_mode: str = Field(alias="nominationMode")  # "manual" | "sequential"
+    # "manual" | "sequential" | "turn_based" | "alphabetical_by_role" | "random"
+    nomination_mode: str = Field(alias="nominationMode")
     min_increment_credits: int = Field(alias="minIncrementCredits", ge=1)
     soft_close_seconds: int = Field(alias="softCloseSeconds", ge=5, le=120)
     lot_duration_seconds: int = Field(alias="lotDurationSeconds", ge=10, le=300)
     operator_user_id: str | None = Field(default=None, alias="operatorUserId")
-    # Required, non-empty, iff nominationMode == "sequential".
+    # Required, non-empty, iff nominationMode == "sequential". Ignored (must be
+    # empty/omitted) for every other mode — "turn_based", "alphabetical_by_role"
+    # and "random" all build their own queue/rotation server-side.
     nomination_queue_athlete_ids: list[str] | None = Field(
         default=None, alias="nominationQueueAthleteIds"
     )
@@ -24,11 +27,21 @@ class CreateLiveAuctionSessionRequest(ApiModel):
 class ConfigureLiveAuctionSessionRequest(ApiModel):
     min_increment_credits: int | None = Field(default=None, alias="minIncrementCredits", ge=1)
     soft_close_seconds: int | None = Field(default=None, alias="softCloseSeconds", ge=5, le=120)
-    lot_duration_seconds: int | None = Field(default=None, alias="lotDurationSeconds", ge=10, le=300)
+    lot_duration_seconds: int | None = Field(
+        default=None, alias="lotDurationSeconds", ge=10, le=300
+    )
     operator_user_id: str | None = Field(default=None, alias="operatorUserId")
     nomination_queue_athlete_ids: list[str] | None = Field(
         default=None, alias="nominationQueueAthleteIds"
     )
+
+
+class LiveTurnOrderEntryResponse(ApiModel):
+    """One seat in the ``turn_based`` rotation (drawn once at session creation)."""
+
+    fantasy_team_id: str = Field(alias="fantasyTeamId")
+    fantasy_team_name: str = Field(alias="fantasyTeamName")
+    position: int
 
 
 class LiveAuctionSessionResponse(ApiModel):
@@ -44,10 +57,15 @@ class LiveAuctionSessionResponse(ApiModel):
     operator_user_id: str | None = Field(default=None, alias="operatorUserId")
     queue_remaining: int = Field(default=0, alias="queueRemaining")
     pending_swap_count: int = Field(default=0, alias="pendingSwapCount")
+    # Only populated for nominationMode == "turn_based": the team rotation
+    # drawn at creation, in call order.
+    turn_order: list[LiveTurnOrderEntryResponse] = Field(default_factory=list, alias="turnOrder")
 
 
 class NominateLotRequest(ApiModel):
-    # Required iff the session's nominationMode is "manual"; ignored in "sequential".
+    # Required iff the session's nominationMode is "manual" or "turn_based";
+    # ignored for the auto-generated queue modes ("sequential",
+    # "alphabetical_by_role", "random").
     athlete_id: str | None = Field(default=None, alias="athleteId")
 
 
@@ -108,6 +126,11 @@ class LiveLotStateResponse(ApiModel):
     recent_raises: list[LiveRaiseResponse] = Field(default_factory=list, alias="recentRaises")
     seconds_remaining: int | None = Field(default=None, alias="secondsRemaining")
     pending_swap: PendingSwapResponse | None = Field(default=None, alias="pendingSwap")
+    # Only meaningful for nominationMode == "turn_based": whose turn it is to
+    # call the next lot. Null once the queue/rotation runs out or for every
+    # other nomination mode.
+    current_turn_team_id: str | None = Field(default=None, alias="currentTurnTeamId")
+    current_turn_team_name: str | None = Field(default=None, alias="currentTurnTeamName")
 
 
 class LiveLotListResponse(ApiModel):

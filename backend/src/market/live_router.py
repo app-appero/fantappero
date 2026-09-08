@@ -146,10 +146,18 @@ def end_live_auction_session(
 def nominate_live_auction_lot(
     session_id: UUID,
     body: NominateLotRequest,
-    league_access: LeagueAccess = Depends(require_live_session_operator),
+    league_access: LeagueAccess = Depends(require_league_permissions(Permission.MARKET_VIEW)),
     service: LiveMarketService = Depends(get_live_market_service),
 ) -> LiveLotResponse | JSONResponse:
-    """Open the next lot: explicit athlete (manual mode) or next in queue (sequential)."""
+    """Open the next lot.
+
+    Who may call it depends on the session's ``nominationMode``: the admin or
+    delegate chooses the athlete (``manual``) or triggers the next queue entry
+    (``sequential`` / ``alphabetical_by_role`` / ``random``); in ``turn_based``
+    the fantasy team whose turn it is may also call, naming the athlete — the
+    admin/delegate can still call on anyone's behalf. Fine-grained "whose turn
+    is it" enforcement lives in ``LiveMarketService.nominate_lot``.
+    """
     try:
         return service.nominate_lot(league_access, session_id, body)
     except AuthError as exc:

@@ -351,10 +351,20 @@ class MarketLiveLotStatus(str, enum.Enum):
 
 
 class MarketLiveNominationMode(str, enum.Enum):
-    """How the next athlete is called up in a live-auction session (EP08-09)."""
+    """How the next athlete is called up in a live-auction session (EP08-09).
+
+    ``MANUAL`` and ``SEQUENTIAL`` are the original two modes. ``TURN_BASED``,
+    ``ALPHABETICAL_BY_ROLE`` and ``RANDOM`` are additive (EP08-09 follow-up):
+    a rotating "a richiamo" turn among fantasy teams, and two auto-generated
+    queues (reusing the same ``MarketLiveNominationQueueEntry`` mechanism as
+    SEQUENTIAL) ordered alphabetically per role or shuffled at random.
+    """
 
     MANUAL = "manual"
     SEQUENTIAL = "sequential"
+    TURN_BASED = "turn_based"
+    ALPHABETICAL_BY_ROLE = "alphabetical_by_role"
+    RANDOM = "random"
 
 
 class MarketReleaseReason(str, enum.Enum):

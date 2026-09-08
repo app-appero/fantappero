@@ -2,7 +2,10 @@
 <project version="4">
   <component name="ProjectModuleManager">
     <modules>
+      <module fileurl="file://$PROJECT_DIR$/.idea/api-quota-estimator.iml" filepath="$PROJECT_DIR$/.idea/api-quota-estimator.iml" />
       <module fileurl="file://$PROJECT_DIR$/.idea/fantappero.iml" filepath="$PROJECT_DIR$/.idea/fantappero.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/fantappero-backend.iml" filepath="$PROJECT_DIR$/.idea/fantappero-backend.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/fantappero-rating-beta.iml" filepath="$PROJECT_DIR$/.idea/fantappero-rating-beta.iml" />
     </modules>
   </component>
 </project>

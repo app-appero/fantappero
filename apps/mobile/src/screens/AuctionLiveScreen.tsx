@@ -37,7 +37,15 @@ import { StatusBadge } from "../components/StatusBadge";
 import { UiStatePanel } from "../components/UiStatePanel";
 import { useScreenData } from "../hooks/useScreenData";
 import { parseLocalDateTimeInput } from "../market/dateTimeInput";
-import { LIVE_LOT_STATUS_LABEL, LIVE_SESSION_STATUS_COLOR, LIVE_SESSION_STATUS_LABEL } from "../market/liveAuctionLabels";
+import {
+  AUTO_QUEUE_MODES,
+  LIVE_LOT_STATUS_LABEL,
+  LIVE_SESSION_STATUS_COLOR,
+  LIVE_SESSION_STATUS_LABEL,
+  NOMINATION_MODE_HINT,
+  NOMINATION_MODE_OPTIONS,
+  NOMINATION_MODE_SHORT_LABEL,
+} from "../market/liveAuctionLabels";
 import { marketUiStyles as styles } from "../market/marketUiStyles";
 import { useLiveAuctionPolling } from "../market/useLiveAuctionPolling";
 import { getApiErrorMessage, useAuthSession } from "../session/DemoSessionContext";
@@ -66,10 +74,26 @@ export function AuctionLiveScreen() {
   const [secondsRemaining, setSecondsRemaining] = useState<number | null>(null);
   const [lotHistory, setLotHistory] = useState<LiveLot[]>([]);
   const [pendingSwap, setPendingSwap] = useState<PendingSwapDecision | null>(null);
+  const [currentTurnTeamId, setCurrentTurnTeamId] = useState<string | null>(null);
+  const [currentTurnTeamName, setCurrentTurnTeamName] = useState<string | null>(null);
 
   const currentSession = sessions.find((row) => row.status !== "resolved") ?? null;
   const isOperator =
     !!currentSession && !!user && (canManageSession || currentSession.operatorUserId === user.id);
+  // Modalità "a richiamo": la squadra sul cui turno tocca chiamare può farlo
+  // anche senza essere admin/delegato (autorizzazione fine lato server).
+  const myTeam = useMemo(
+    () => (user ? (teams.find((row) => row.userId === user.id) ?? null) : null),
+    [teams, user],
+  );
+  const isMyTurnToNominate =
+    !!currentSession &&
+    currentSession.nominationMode === "turn_based" &&
+    !!myTeam &&
+    myTeam.id === currentTurnTeamId;
+  const canNominate = isOperator || isMyTurnToNominate;
+  const needsExplicitAthlete =
+    currentSession?.nominationMode === "manual" || currentSession?.nominationMode === "turn_based";
 
   const load = useCallback(async () => {
     if (!activeLeagueId) {
@@ -132,6 +156,8 @@ export function AuctionLiveScreen() {
       setRecentRaises(next.recentRaises);
       setSecondsRemaining(next.secondsRemaining);
       setPendingSwap(next.pendingSwap);
+      setCurrentTurnTeamId(next.currentTurnTeamId);
+      setCurrentTurnTeamName(next.currentTurnTeamName);
       if (next.currentLot === null) {
         void loadLots();
       }
@@ -233,7 +259,7 @@ export function AuctionLiveScreen() {
     if (!activeLeagueId || !accessToken || !currentSession) return;
     void runOperatorAction(async () => {
       const lot = await nominateLiveAuctionLot(accessToken, activeLeagueId, currentSession.id, {
-        athleteId: currentSession.nominationMode === "manual" ? manualAthleteId : null,
+        athleteId: needsExplicitAthlete ? manualAthleteId : null,
       });
       setCurrentLot(lot);
       setManualAthleteId("");
@@ -369,21 +395,22 @@ export function AuctionLiveScreen() {
 
           <Text style={styles.fieldLabel}>Modalità di chiamata</Text>
           <View style={styles.chipRow}>
-            <Pressable
-              style={[styles.chip, nominationMode === "manual" && styles.chipActive]}
-              onPress={() => setNominationMode("manual")}
-              testID="auction-live-mode-manual"
-            >
-              <Text style={[styles.chipLabel, nominationMode === "manual" && styles.chipLabelActive]}>Scelta libera</Text>
-            </Pressable>
-            <Pressable
-              style={[styles.chip, nominationMode === "sequential" && styles.chipActive]}
-              onPress={() => setNominationMode("sequential")}
-              testID="auction-live-mode-sequential"
-            >
-              <Text style={[styles.chipLabel, nominationMode === "sequential" && styles.chipLabelActive]}>Lista prestabilita</Text>
-            </Pressable>
+            {NOMINATION_MODE_OPTIONS.map((option) => (
+              <Pressable
+                key={option.value}
+                style={[styles.chip, nominationMode === option.value && styles.chipActive]}
+                onPress={() => setNominationMode(option.value)}
+                testID={`auction-live-mode-${option.value}`}
+              >
+                <Text style={[styles.chipLabel, nominationMode === option.value && styles.chipLabelActive]}>
+                  {option.label}
+                </Text>
+              </Pressable>
+            ))}
           </View>
+          <Text style={styles.meta} testID="auction-live-mode-hint">
+            {NOMINATION_MODE_HINT[nominationMode]}
+          </Text>
 
           <Text style={styles.fieldLabel}>Incremento minimo (crediti)</Text>
           <TextInput style={styles.input} value={minIncrement} onChangeText={setMinIncrement} keyboardType="numeric" testID="auction-live-min-increment" />
@@ -451,15 +478,33 @@ export function AuctionLiveScreen() {
               textColor={LIVE_SESSION_STATUS_COLOR[currentSession.status].text}
             />
             <Text style={styles.meta}>
-              {currentSession.nominationMode === "manual" ? "Scelta libera" : `Lista (${currentSession.queueRemaining} rimasti)`}
+              {NOMINATION_MODE_SHORT_LABEL[currentSession.nominationMode] ?? currentSession.nominationMode}
+              {AUTO_QUEUE_MODES.includes(currentSession.nominationMode)
+                ? ` (${currentSession.queueRemaining} rimasti)`
+                : ""}
+              {currentSession.nominationMode === "turn_based" && currentLot === null
+                ? ` · turno di: ${currentTurnTeamName ?? "—"}`
+                : ""}
               {currentSession.pendingSwapCount > 0
                 ? ` · ${currentSession.pendingSwapCount} in attesa di scambio`
                 : ""}
             </Text>
           </View>
 
+          {currentSession.nominationMode === "turn_based" && currentSession.turnOrder.length > 0 ? (
+            <Text style={styles.meta} testID="auction-live-turn-order">
+              Ordine di chiamata (estratto a sorte):{" "}
+              {currentSession.turnOrder.map((entry) => entry.fantasyTeamName).join(" → ")}
+            </Text>
+          ) : null}
+
           {currentSession.status === "open" ? (
-            <LiveAuctionTable teams={teams} currentLot={currentLot} secondsRemaining={secondsRemaining} />
+            <LiveAuctionTable
+              teams={teams}
+              currentLot={currentLot}
+              secondsRemaining={secondsRemaining}
+              currentTurnTeamId={currentLot === null ? currentTurnTeamId : null}
+            />
           ) : null}
 
           {isOperator && currentSession.status === "scheduled" ? (
@@ -468,9 +513,9 @@ export function AuctionLiveScreen() {
             </Pressable>
           ) : null}
 
-          {isOperator && currentSession.status === "open" && !currentLot ? (
+          {canNominate && currentSession.status === "open" && !currentLot ? (
             <View style={styles.field} testID="auction-live-nominate">
-              {currentSession.nominationMode === "manual" ? (
+              {needsExplicitAthlete ? (
                 <OptionPicker
                   label="Calciatore da chiamare"
                   options={playerOptions}
@@ -482,21 +527,38 @@ export function AuctionLiveScreen() {
                 />
               ) : null}
               <Pressable
-                style={[styles.button, (actionBusy || (currentSession.nominationMode === "manual" && !manualAthleteId)) && styles.disabled]}
-                disabled={actionBusy || (currentSession.nominationMode === "manual" && !manualAthleteId)}
+                style={[styles.button, (actionBusy || (needsExplicitAthlete && !manualAthleteId)) && styles.disabled]}
+                disabled={actionBusy || (needsExplicitAthlete && !manualAthleteId)}
                 onPress={handleNominate}
                 testID="auction-live-nominate-submit"
               >
                 <Text style={styles.buttonLabel}>Chiama</Text>
               </Pressable>
-              <Pressable style={[styles.secondaryButton, actionBusy && styles.disabled]} disabled={actionBusy} onPress={handleEnd} testID="auction-live-end">
-                <Text style={styles.secondaryButtonLabel}>Termina sessione</Text>
-              </Pressable>
             </View>
+          ) : null}
+
+          {!canNominate &&
+          !isOperator &&
+          currentSession.nominationMode === "turn_based" &&
+          currentSession.status === "open" &&
+          !currentLot ? (
+            <UiStatePanel
+              state="empty"
+              title="In attesa del tuo turno"
+              message={`Tocca a ${currentTurnTeamName ?? "un altro fantallenatore"}: aspetta il tuo turno per chiamare un calciatore.`}
+              testID="auction-live-waiting-turn"
+            />
+          ) : null}
+
+          {isOperator && currentSession.status === "open" && !currentLot ? (
+            <Pressable style={[styles.secondaryButton, actionBusy && styles.disabled]} disabled={actionBusy} onPress={handleEnd} testID="auction-live-end">
+              <Text style={styles.secondaryButtonLabel}>Termina sessione</Text>
+            </Pressable>
           ) : null}
 
           {actionMessage ? <UiStatePanel state="success" title="Fatto" message={actionMessage} testID="auction-live-action-ok" /> : null}
           {actionError ? <UiStatePanel state="error" title="Operazione non riuscita" message={actionError} testID="auction-live-action-error" /> : null}
+
 
           {currentLot ? (
             <View style={styles.section} testID="auction-live-current-lot">

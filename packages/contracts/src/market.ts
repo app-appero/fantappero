@@ -176,7 +176,24 @@ export interface MarketHistoryFilters {
  * vengono piazzati, invece di offerte segrete risolte in un unico passaggio.
  */
 
-export type MarketLiveNominationMode = "manual" | "sequential";
+/**
+ * Come viene scelto il prossimo calciatore da mettere all'asta:
+ * - `manual`: l'admin/delegato sceglie liberamente, in qualsiasi momento.
+ * - `turn_based` ("a richiamo"): a ogni turno tocca a un fantallenatore
+ *   diverso scegliere il calciatore, secondo una rotazione estratta a sorte
+ *   all'avvio della sessione (vedi `LiveAuctionSession.turnOrder`).
+ * - `sequential`: l'admin carica in anticipo l'elenco esatto e ordinato.
+ * - `alphabetical_by_role`: coda generata automaticamente, calciatori liberi
+ *   in ordine alfabetico raggruppati per ruolo (P poi D poi C poi A).
+ * - `random`: coda generata automaticamente, calciatori liberi in ordine
+ *   casuale (estratto una sola volta all'avvio).
+ */
+export type MarketLiveNominationMode =
+  | "manual"
+  | "turn_based"
+  | "sequential"
+  | "alphabetical_by_role"
+  | "random";
 
 export type MarketLiveLotStatus = "open" | "sold" | "passed" | "cancelled" | "pending_swap";
 
@@ -200,6 +217,13 @@ export interface ConfigureLiveAuctionSessionRequest {
   nominationQueueAthleteIds?: string[] | null;
 }
 
+/** Una posizione nella rotazione "a turno" (estratta una volta alla creazione). */
+export interface LiveTurnOrderEntry {
+  fantasyTeamId: string;
+  fantasyTeamName: string;
+  position: number;
+}
+
 export interface LiveAuctionSession {
   id: string;
   leagueId: string;
@@ -213,10 +237,12 @@ export interface LiveAuctionSession {
   operatorUserId: string | null;
   queueRemaining: number;
   pendingSwapCount: number;
+  /** Popolato solo per nominationMode "turn_based": l'ordine di chiamata. */
+  turnOrder: LiveTurnOrderEntry[];
 }
 
 export interface NominateLotRequest {
-  /** Richiesto solo in modalità "manual"; ignorato in "sequential". */
+  /** Richiesto in modalità "manual" e "turn_based"; ignorato nelle modalità a coda automatica. */
   athleteId?: string | null;
 }
 
@@ -277,6 +303,9 @@ export interface LiveLotState {
   recentRaises: LiveRaise[];
   secondsRemaining: number | null;
   pendingSwap: PendingSwapDecision | null;
+  /** Significativo solo per nominationMode "turn_based": a chi tocca chiamare. */
+  currentTurnTeamId: string | null;
+  currentTurnTeamName: string | null;
 }
 
 export interface LiveLotList {

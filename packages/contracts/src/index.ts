@@ -252,6 +252,7 @@ export type {
   LiveLotState,
   LiveRaise,
   LiveSwapCandidate,
+  LiveTurnOrderEntry,
   MarketBid,
   MarketBidList,
   MarketBidStatus,
@@ -392,3 +393,4 @@ export type {
 
 export { computeCountdown, formatCountdown } from "./countdown.js";
 export type { CountdownParts } from "./countdown.js";
+

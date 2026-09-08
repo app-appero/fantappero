@@ -23,10 +23,13 @@ export function LiveAuctionTable({
   teams,
   currentLot,
   secondsRemaining,
+  currentTurnTeamId = null,
 }: {
   teams: readonly FantasyTeamSummary[];
   currentLot: LiveLot | null;
   secondsRemaining: number | null;
+  /** Modalità "a turno": id della squadra a cui tocca chiamare (null altrimenti). */
+  currentTurnTeamId?: string | null;
 }) {
   if (teams.length === 0) {
     return null;
@@ -53,13 +56,20 @@ export function LiveAuctionTable({
         {teams.map((team, index) => {
           const position = seatPosition(index, teams.length);
           const isLeader = currentLot?.currentLeaderTeamId === team.id;
+          const isOnTurn = !isLeader && currentTurnTeamId === team.id;
           return (
             <View
               key={team.id}
               style={[styles.seat, { left: position.left, top: position.top }]}
               testID={`auction-live-seat-${team.id}`}
             >
-              <View style={[styles.avatar, isLeader && styles.avatarLeading]}>
+              <View
+                style={[
+                  styles.avatar,
+                  isLeader && styles.avatarLeading,
+                  isOnTurn && styles.avatarOnTurn,
+                ]}
+              >
                 <Text style={styles.avatarLabel}>{team.name.charAt(0).toUpperCase()}</Text>
               </View>
               <Text style={[styles.seatName, isLeader && styles.seatNameLeading]} numberOfLines={1}>
@@ -136,6 +146,10 @@ const styles = StyleSheet.create({
   },
   avatarLeading: {
     borderColor: colors.accent,
+  },
+  avatarOnTurn: {
+    borderColor: "#fff",
+    borderStyle: "dashed",
   },
   avatarLabel: {
     color: colors.foreground,
