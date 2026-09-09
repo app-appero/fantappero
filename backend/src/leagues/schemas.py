@@ -84,12 +84,8 @@ class UpdateLeagueRulesRequest(ApiModel):
     roster: LeagueRosterConfig
     total_credits: int = Field(alias="totalCredits")
     min_fixtures_per_round: int | None = Field(default=None, alias="minFixturesPerRound")
-    turn_coverage_threshold: float | None = Field(
-        default=None, alias="turnCoverageThreshold"
-    )
-    lineup_lock_margin_minutes: int | None = Field(
-        default=None, alias="lineupLockMarginMinutes"
-    )
+    turn_coverage_threshold: float | None = Field(default=None, alias="turnCoverageThreshold")
+    lineup_lock_margin_minutes: int | None = Field(default=None, alias="lineupLockMarginMinutes")
     minutes_threshold: int | None = Field(default=None, alias="minutesThreshold")
     max_automatic_substitutions: int | None = Field(default=None, alias="maxAutomaticSubstitutions")
     voluntary_release_refund_percent: int | None = Field(
@@ -105,6 +101,11 @@ class UpdateLeagueRulesRequest(ApiModel):
 class LeagueLifecycleBlocker(ApiModel):
     code: str
     message: str
+    # Sezione del pannello a cui la UI può rimandare l'admin per risolvere il
+    # blocker (EP03-05-UX). Assente quando non esiste una sezione dedicata.
+    action_hint: Literal["rules", "members", "calendar", "teams"] | None = Field(
+        default=None, alias="actionHint"
+    )
 
 
 class LeagueLifecycleResponse(ApiModel):

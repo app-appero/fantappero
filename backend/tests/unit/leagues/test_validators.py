@@ -224,6 +224,12 @@ def test_configuration_blockers_report_all_missing_requirements() -> None:
         "participant_count_mismatch",
         "league_admin_required",
     }
+    # EP03-05-UX: ogni blocker deve indicare dove la UI può rimandare l'admin.
+    hints_by_code = {blocker.code: blocker.action_hint for blocker in blockers}
+    assert hints_by_code["rules_invalid"] == "rules"
+    assert hints_by_code["insufficient_competitions"] == "rules"
+    assert hints_by_code["participant_count_mismatch"] == "members"
+    assert hints_by_code["league_admin_required"] == "members"
 
 
 def test_auction_activation_blockers_include_calendar_until_configured() -> None:
@@ -236,8 +242,14 @@ def test_auction_activation_blockers_include_calendar_until_configured() -> None
         "fantasy_teams_not_configured",
         "credits_not_configured",
     }
-    assert auction_activation_blockers(
-        calendar_configured=True,
-        roster_blockers=[],
-    ) == []
-
+    assert (
+        auction_activation_blockers(
+            calendar_configured=True,
+            roster_blockers=[],
+        )
+        == []
+    )
+    hints_by_code = {blocker.code: blocker.action_hint for blocker in auction_activation_blockers()}
+    assert hints_by_code["calendar_not_configured"] == "calendar"
+    assert hints_by_code["fantasy_teams_not_configured"] == "teams"
+    assert hints_by_code["credits_not_configured"] == "teams"

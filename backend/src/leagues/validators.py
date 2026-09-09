@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from typing import Literal
 from uuid import UUID
 
 from auth.exceptions import ValidationAuthError
@@ -49,10 +50,18 @@ CONFIGURABLE_LEAGUE_STATES = frozenset((LeagueState.DRAFT, LeagueState.CONFIGURI
 DELETABLE_LEAGUE_STATES = frozenset((LeagueState.DRAFT, LeagueState.CONFIGURING))
 
 
+# Sezione del pannello amministrazione a cui la UI può rimandare l'admin per
+# risolvere un blocker (EP03-05-UX). Puramente indicativo: nessuna logica di
+# business dipende da questo valore, solo la navigazione lato client.
+LifecycleActionHint = Literal["rules", "members", "calendar", "teams"]
+
+
 @dataclass(frozen=True)
 class LifecycleBlocker:
     code: str
     message: str
+    # Facoltativo: assente per i blocker senza una sezione dedicata nella UI.
+    action_hint: LifecycleActionHint | None = None
 
 
 def validate_league_name(name: str) -> str:
@@ -260,6 +269,7 @@ def configuration_blockers(
             LifecycleBlocker(
                 code="rules_invalid",
                 message="Completa un regolamento valido prima di avviare l'asta.",
+                action_hint="rules",
             )
         )
     if competition_count < MIN_COMPETITIONS:
@@ -267,6 +277,7 @@ def configuration_blockers(
             LifecycleBlocker(
                 code="insufficient_competitions",
                 message=f"Seleziona almeno {MIN_COMPETITIONS} campionati.",
+                action_hint="rules",
             )
         )
     if participant_count is None or membership_count != participant_count:
@@ -274,6 +285,7 @@ def configuration_blockers(
             LifecycleBlocker(
                 code="participant_count_mismatch",
                 message="Il numero di partecipanti deve coincidere con quello del regolamento.",
+                action_hint="members",
             )
         )
     if owner_count != 1:
@@ -281,6 +293,7 @@ def configuration_blockers(
             LifecycleBlocker(
                 code="league_admin_required",
                 message="La lega deve avere esattamente un amministratore.",
+                action_hint="members",
             )
         )
     return blockers
@@ -302,6 +315,7 @@ def auction_activation_blockers(
             LifecycleBlocker(
                 code="calendar_not_configured",
                 message="Genera il calendario prima di avviare la stagione.",
+                action_hint="calendar",
             )
         )
     if roster_blockers is not None:
@@ -312,10 +326,12 @@ def auction_activation_blockers(
                 LifecycleBlocker(
                     code="fantasy_teams_not_configured",
                     message="Completa squadre e rose prima di avviare la stagione.",
+                    action_hint="teams",
                 ),
                 LifecycleBlocker(
                     code="credits_not_configured",
                     message="Verifica i crediti di tutte le squadre prima di avviare la stagione.",
+                    action_hint="teams",
                 ),
             ]
         )

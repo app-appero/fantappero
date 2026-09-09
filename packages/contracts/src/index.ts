@@ -107,7 +107,11 @@ export type {
   LeagueInvite,
   LeagueInviteStatus,
   LeagueLifecycle,
+  LeagueLifecycleActionHint,
   LeagueLifecycleBlocker,
+  LeagueLifecyclePhase,
+  LeagueLifecyclePhaseKey,
+  LeagueLifecycleStep,
   LeagueListoneEntry,
   LeagueListoneOverride,
   LeagueListoneRefreshCounters,
@@ -131,6 +135,13 @@ export type {
   PaginatedFantasyCoachDirectory,
   PendingInviteCount,
   RespondedNamedLeagueInvite,
+} from "./leagues.js";
+
+export {
+  LEAGUE_LIFECYCLE_ACTION_HINT_LABEL,
+  LEAGUE_LIFECYCLE_PHASES,
+  describeLeagueLifecycleStep,
+  leagueLifecyclePhaseIndex,
 } from "./leagues.js";
 
 export {

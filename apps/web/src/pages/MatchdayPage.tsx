@@ -43,6 +43,7 @@ import { useLiveTurnPolling } from "../matchday/useLiveTurnPolling";
 import { useLockCountdown } from "../matchday/useLockCountdown";
 import { Link, useLocation } from "../router/simpleRouter";
 import { parseWireframeStateFromSearch } from "../wireframes/useWireframeState";
+import { LeagueCalendarPanel } from "./LeagueCalendarPanel";
 import { MatchdayH2HPanel } from "./MatchdayH2HPanel";
 
 const MATCH_STATUS_LABEL: Record<string, string> = {
@@ -633,6 +634,16 @@ export function MatchdayPage() {
             <Tab value="europei">Turni europei</Tab>
           </TabList>
           <TabPanel value="calendario">
+            {/* Generazione/conferma del calendario H2H (EP03-06): per il
+                momento vive qui, nello stesso tab in cui si consulta, invece
+                che in Amministrazione lega — solo l'admin la vede. */}
+            {isAdmin ? (
+              <LeagueCalendarPanel
+                leagueId={activeLeagueId}
+                isDemoMode={isDemoMode}
+                search={search}
+              />
+            ) : null}
             <MatchdayH2HPanel
               calendar={h2hCalendar}
               loading={h2hLoading}
