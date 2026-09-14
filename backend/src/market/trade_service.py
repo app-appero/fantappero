@@ -63,6 +63,13 @@ def _parse_required_datetime(value: str, *, field: str) -> datetime:
     return parsed.astimezone(UTC)
 
 
+def _parse_optional_datetime(value: str | None, *, field: str) -> datetime | None:
+    """A blank/absent expiry means the proposal never expires on its own."""
+    if value is None or not value.strip():
+        return None
+    return _parse_required_datetime(value, field=field)
+
+
 class TradeService:
     def __init__(self, session: Session) -> None:
         self._session = session
@@ -113,7 +120,7 @@ class TradeService:
                 "requestedAthleteIds": proposal.requested_athlete_ids,
                 "offeredCredits": proposal.offered_credits,
                 "requestedCredits": proposal.requested_credits,
-                "expiresAt": proposal.expires_at.isoformat(),
+                "expiresAt": proposal.expires_at.isoformat() if proposal.expires_at else None,
             },
         )
         self._notify_trade_status(
@@ -135,7 +142,7 @@ class TradeService:
         requested_athlete_ids_raw: list[str],
         offered_credits: int,
         requested_credits: int,
-        expires_at_raw: str,
+        expires_at_raw: str | None,
         created_by: UUID,
     ) -> TradeProposal:
         rules = self._session.scalar(select(LeagueRules).where(LeagueRules.league_id == league_id))
@@ -175,8 +182,9 @@ class TradeService:
         validate_offered_credits_within_balance(offered_credits=offered_credits, balance=balance)
 
         now = datetime.now(UTC)
-        expires_at = _parse_required_datetime(expires_at_raw, field="expiresAt")
-        validate_trade_expiry(expires_at, now=now)
+        expires_at = _parse_optional_datetime(expires_at_raw, field="expiresAt")
+        if expires_at is not None:
+            validate_trade_expiry(expires_at, now=now)
 
         return TradeProposal(
             league_id=league_id,
@@ -547,7 +555,8 @@ class TradeService:
             select(TradeProposal).where(
                 TradeProposal.proposer_team_id == proposer_team_id,
                 TradeProposal.status == TradeStatus.PROPOSED,
-                TradeProposal.expires_at > now,
+                # No expiry means the proposal never expires on its own — still active.
+                or_(TradeProposal.expires_at.is_(None), TradeProposal.expires_at > now),
             )
         ).all()
         return len(rows)
@@ -598,7 +607,7 @@ class TradeService:
             offeredCredits=proposal.offered_credits,
             requestedCredits=proposal.requested_credits,
             status=effective_trade_status(proposal, now=now).value,
-            expiresAt=proposal.expires_at.isoformat(),
+            expiresAt=proposal.expires_at.isoformat() if proposal.expires_at else None,
             createdAt=proposal.created_at.isoformat(),
             counterOfId=str(proposal.counter_of_id) if proposal.counter_of_id else None,
         )

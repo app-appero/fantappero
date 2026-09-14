@@ -7,6 +7,11 @@ import { MarketPage } from "./MarketPage";
 import { RosterPage } from "./RosterPage";
 import { WaiverPage } from "./WaiverPage";
 
+// Mercato svincolati (sessione a buste chiuse) nascosta dalla tab bar: ADR-0006.
+// Route, TabPanel e backend restano intatti e raggiungibili via URL diretto
+// (/svincoli) — riattivare riportando questo flag a true.
+const SHOW_WAIVER_TAB = false;
+
 const TABS = [
   { value: "rosa", label: "Rosa", path: "/rosa", matchPaths: ["/rosa"], permission: "roster:view" as const },
   {
@@ -17,10 +22,14 @@ const TABS = [
     permission: "market:view" as const,
   },
   { value: "svincoli", label: "Svincolati", path: "/svincoli", matchPaths: ["/svincoli"], permission: "market:view" as const },
-  { value: "mercato", label: "Mercato", path: "/mercato", matchPaths: ["/mercato"], permission: "market:view" as const },
+  { value: "mercato", label: "Scambi", path: "/mercato", matchPaths: ["/mercato"], permission: "market:view" as const },
 ];
 
-/** Rosa/Asta/Svincolati/Mercato riuniti in un'unica pagina: sono tutti movimento giocatori. */
+/**
+ * Rosa/Asta/Svincolati/Scambi riuniti in un'unica pagina: sono tutti movimento giocatori.
+ * La tab "svincoli" è nascosta (`SHOW_WAIVER_TAB`) e la tab "mercato" (route invariata
+ * `/mercato`) mostra solo `MarketPage`, ora limitata alla proposta/gestione scambi — ADR-0006.
+ */
 export function MarketHubPage() {
   const { pathname } = useLocation();
   const navigate = useNavigate();
@@ -37,11 +46,13 @@ export function MarketHubPage() {
       aria-label="Mercato"
     >
       <TabList>
-        {TABS.filter((tab) => can([tab.permission])).map((tab) => (
-          <Tab key={tab.value} value={tab.value}>
-            {tab.label}
-          </Tab>
-        ))}
+        {TABS.filter((tab) => can([tab.permission]) && (tab.value !== "svincoli" || SHOW_WAIVER_TAB)).map(
+          (tab) => (
+            <Tab key={tab.value} value={tab.value}>
+              {tab.label}
+            </Tab>
+          ),
+        )}
       </TabList>
       <TabPanel value="rosa">
         <RequirePermissions required={["roster:view"]}>

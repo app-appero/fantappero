@@ -13,6 +13,7 @@ reach the other.
 
 from __future__ import annotations
 
+import random
 from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
@@ -22,8 +23,10 @@ from sqlalchemy.orm import Session, selectinload
 
 from auth.exceptions import ValidationAuthError
 from authorization.context import LeagueAccess
+from authorization.exceptions import ForbiddenError
 from database.enums import (
     LeagueAuditAction,
+    LeagueRole,
     MarketLiveLotStatus,
     MarketLiveNominationMode,
     MarketSessionKind,
@@ -42,7 +45,12 @@ from leagues.models.league import League
 from leagues.models.league_audit_event import LeagueAuditEvent
 from leagues.models.league_membership import LeagueMembership
 from market.assignment import assign_winning_bid, resolve_live_swap
-from market.live_models import MarketLiveLot, MarketLiveNominationQueueEntry, MarketLiveRaise
+from market.live_models import (
+    MarketLiveLot,
+    MarketLiveNominationQueueEntry,
+    MarketLiveRaise,
+    MarketLiveTurnOrderEntry,
+)
 from market.live_schemas import (
     ConfigureLiveAuctionSessionRequest,
     CreateLiveAuctionSessionRequest,
@@ -52,6 +60,7 @@ from market.live_schemas import (
     LiveLotStateResponse,
     LiveRaiseResponse,
     LiveSwapCandidateResponse,
+    LiveTurnOrderEntryResponse,
     NominateLotRequest,
     PendingSwapResponse,
     PlaceRaiseRequest,
@@ -59,6 +68,9 @@ from market.live_schemas import (
 )
 from market.live_validators import (
     compute_minimum_next_amount,
+    compute_turn_team_index,
+    shuffle_athlete_ids,
+    sort_athletes_alphabetical_by_role,
     validate_live_session_config,
     validate_not_current_leader,
     validate_raise_amount,
@@ -74,7 +86,18 @@ from market.windows import effective_status
 from notifications.recipients import user_ids_for_league, user_ids_for_teams
 from notifications.service import NotificationService
 from observability.metrics import get_metrics
+from sports_data.listone.generate import list_role_assignments
 from sports_data.roster.models import Athlete
+
+# SEQUENTIAL, ALPHABETICAL_BY_ROLE and RANDOM all pull the next athlete from
+# ``MarketLiveNominationQueueEntry`` — the only difference between them is how
+# that queue got populated at session-creation time (admin-supplied list,
+# server-generated alphabetical-by-role, or server-generated shuffle).
+_QUEUE_BASED_MODES = (
+    MarketLiveNominationMode.SEQUENTIAL,
+    MarketLiveNominationMode.ALPHABETICAL_BY_ROLE,
+    MarketLiveNominationMode.RANDOM,
+)
 
 
 def _parse_required_datetime(value: str, *, field: str) -> datetime:
@@ -125,7 +148,9 @@ class LiveMarketService:
                 "Indica l'elenco dei calciatori per la modalità a lista.",
                 code="nomination_queue_required",
             )
-        if nomination_mode == MarketLiveNominationMode.MANUAL and queue_ids_raw:
+        # turn_based/alphabetical_by_role/random all build their own queue/rotation
+        # server-side (below); an admin-supplied list only makes sense for sequential.
+        if nomination_mode != MarketLiveNominationMode.SEQUENTIAL and queue_ids_raw:
             raise ValidationAuthError(
                 "La lista di chiamata è prevista solo in modalità sequenziale.",
                 code="nomination_queue_not_allowed",
@@ -152,6 +177,16 @@ class LiveMarketService:
 
         if nomination_mode == MarketLiveNominationMode.SEQUENTIAL:
             self._set_nomination_queue(market_session.id, queue_ids_raw)
+        elif nomination_mode == MarketLiveNominationMode.ALPHABETICAL_BY_ROLE:
+            self._set_nomination_queue(
+                market_session.id, self._generate_alphabetical_queue(league_access)
+            )
+        elif nomination_mode == MarketLiveNominationMode.RANDOM:
+            self._set_nomination_queue(
+                market_session.id, self._generate_random_queue(league_access)
+            )
+        elif nomination_mode == MarketLiveNominationMode.TURN_BASED:
+            self._set_turn_order(market_session.id, league.id)
 
         self._add_audit(
             league.id,
@@ -324,6 +359,7 @@ class LiveMarketService:
                 "La sessione non è aperta.",
                 code="market_live_session_not_open",
             )
+        self._authorize_nomination(league_access, market_session)
 
         existing_open = self._session.scalar(
             select(MarketLiveLot).where(
@@ -338,7 +374,7 @@ class LiveMarketService:
             )
 
         queue_entry: MarketLiveNominationQueueEntry | None = None
-        if market_session.nomination_mode == MarketLiveNominationMode.SEQUENTIAL:
+        if market_session.nomination_mode in _QUEUE_BASED_MODES:
             queue_entry = self._session.scalar(
                 select(MarketLiveNominationQueueEntry)
                 .where(
@@ -418,7 +454,11 @@ class LiveMarketService:
             market_session.league_id,
             league_access.user.id,
             LeagueAuditAction.MARKET_LIVE_LOT_NOMINATED,
-            details={"lotId": str(lot.id), "sessionId": str(market_session.id), "athleteId": str(athlete_id)},
+            details={
+                "lotId": str(lot.id),
+                "sessionId": str(market_session.id),
+                "athleteId": str(athlete_id),
+            },
         )
         self._session.commit()
         get_metrics().incr("market_live_lot_nominated_total")
@@ -472,7 +512,9 @@ class LiveMarketService:
         if lot.closes_at - now <= timedelta(seconds=market_session.soft_close_seconds):
             lot.closes_at = now + timedelta(seconds=market_session.soft_close_seconds)
         self._session.add(
-            MarketLiveRaise(lot_id=lot.id, fantasy_team_id=team.id, amount_credits=payload.amount_credits)
+            MarketLiveRaise(
+                lot_id=lot.id, fantasy_team_id=team.id, amount_credits=payload.amount_credits
+            )
         )
         self._session.flush()
 
@@ -695,6 +737,14 @@ class LiveMarketService:
             ).all()
             recent_raises = [self._to_raise_response(row) for row in raises]
 
+        current_turn_team_id = self._current_turn_team_id(market_session)
+        current_turn_team_name: str | None = None
+        if current_turn_team_id is not None:
+            current_turn_team = self._session.get(FantasyTeam, current_turn_team_id)
+            current_turn_team_name = (
+                current_turn_team.name if current_turn_team is not None else None
+            )
+
         return LiveLotStateResponse(
             session=self._to_session_response(market_session),
             currentLot=(
@@ -705,6 +755,8 @@ class LiveMarketService:
             recentRaises=recent_raises,
             secondsRemaining=seconds_remaining,
             pendingSwap=self._my_pending_swap(league_access, market_session),
+            currentTurnTeamId=str(current_turn_team_id) if current_turn_team_id else None,
+            currentTurnTeamName=current_turn_team_name,
         )
 
     def _my_pending_swap(
@@ -842,7 +894,9 @@ class LiveMarketService:
                 return
             # No same-role player to release either (rare) — a legitimate pass,
             # not a fatal error (mirrors sealed resolution's own "lost bid" outcome).
-            self._pass_lot_internal(league_access, market_session, lot, now=now, reason="assignment_failed")
+            self._pass_lot_internal(
+                league_access, market_session, lot, now=now, reason="assignment_failed"
+            )
             return
         lot.status = MarketLiveLotStatus.SOLD
         lot.closed_at = now
@@ -985,6 +1039,154 @@ class LiveMarketService:
             position += 1
         self._session.flush()
 
+    def _occupied_athlete_ids(self, league_id: UUID) -> set[UUID]:
+        return set(
+            self._session.scalars(
+                select(FantasyRosterSlot.athlete_id).where(
+                    FantasyRosterSlot.league_id == league_id,
+                    FantasyRosterSlot.athlete_id.is_not(None),
+                )
+            ).all()
+        )
+
+    def _generate_alphabetical_queue(self, league_access: LeagueAccess) -> list[str]:
+        """Free-agent pool for ``ALPHABETICAL_BY_ROLE``: every listone role
+        assignment in the league's competitions/season year, minus whoever
+        already holds a roster slot in this league. Ordered P→D→C→A, then
+        alphabetically within role (``sort_athletes_alphabetical_by_role``)."""
+        league = league_access.league
+        occupied_ids = self._occupied_athlete_ids(league.id)
+        assignments = list_role_assignments(
+            self._session,
+            season_year=league.season_year,
+            competition_ids={competition.id for competition in league.competitions},
+        )
+        candidates = [
+            (str(assignment.athlete_id), assignment.role.value, assignment.athlete.canonical_name)
+            for assignment in assignments
+            if assignment.athlete_id not in occupied_ids
+        ]
+        return sort_athletes_alphabetical_by_role(candidates)
+
+    def _generate_random_queue(self, league_access: LeagueAccess) -> list[str]:
+        """Free-agent pool for ``RANDOM``: same pool as alphabetical, shuffled
+        once at session creation and never reshuffled afterwards."""
+        league = league_access.league
+        occupied_ids = self._occupied_athlete_ids(league.id)
+        assignments = list_role_assignments(
+            self._session,
+            season_year=league.season_year,
+            competition_ids={competition.id for competition in league.competitions},
+        )
+        candidate_ids = [
+            str(assignment.athlete_id)
+            for assignment in assignments
+            if assignment.athlete_id not in occupied_ids
+        ]
+        return shuffle_athlete_ids(candidate_ids)
+
+    def _set_turn_order(self, session_id: UUID, league_id: UUID) -> None:
+        """Draw the fixed ``TURN_BASED`` team rotation once, at session creation.
+
+        Every league membership gets a seat — ``ensure_team_for_membership``
+        lazily creates a team for anyone who hasn't touched one yet, so the
+        rotation always covers every participant, not just whoever already
+        has a fantasy team.
+        """
+        memberships = list(
+            self._session.scalars(
+                select(LeagueMembership)
+                .where(LeagueMembership.league_id == league_id)
+                .options(selectinload(LeagueMembership.user))
+            ).all()
+        )
+        team_ids: list[UUID] = []
+        for membership in memberships:
+            team, _created = ensure_team_for_membership(
+                self._session,
+                membership,
+                name=membership.user.display_name or "Squadra",
+            )
+            team_ids.append(team.id)
+        if not team_ids:
+            raise ValidationAuthError(
+                "Servono squadre iscritte alla lega per la modalità a turno.",
+                code="market_live_no_teams_for_turn_order",
+            )
+        random.shuffle(team_ids)
+        for position, team_id in enumerate(team_ids):
+            self._session.add(
+                MarketLiveTurnOrderEntry(
+                    session_id=session_id, fantasy_team_id=team_id, position=position
+                )
+            )
+        self._session.flush()
+
+    def _current_turn_team_id(self, market_session: MarketSession) -> UUID | None:
+        """Whose turn it is to call the next lot in a ``TURN_BASED`` session.
+
+        Rotates strictly by how many lots have already been opened
+        (``sequence_number`` high-water mark), per ``compute_turn_team_index``
+        — cancelled/passed/unsold lots still consume a turn, same as a real
+        live auction. ``None`` for every other nomination mode.
+        """
+        if market_session.nomination_mode != MarketLiveNominationMode.TURN_BASED:
+            return None
+        nominated_count = int(
+            self._session.scalar(
+                select(func.coalesce(func.max(MarketLiveLot.sequence_number), 0)).where(
+                    MarketLiveLot.session_id == market_session.id
+                )
+            )
+            or 0
+        )
+        team_count = int(
+            self._session.scalar(
+                select(func.count(MarketLiveTurnOrderEntry.id)).where(
+                    MarketLiveTurnOrderEntry.session_id == market_session.id
+                )
+            )
+            or 0
+        )
+        index = compute_turn_team_index(nominated_count=nominated_count, team_count=team_count)
+        if index is None:
+            return None
+        entry = self._session.scalar(
+            select(MarketLiveTurnOrderEntry).where(
+                MarketLiveTurnOrderEntry.session_id == market_session.id,
+                MarketLiveTurnOrderEntry.position == index,
+            )
+        )
+        return entry.fantasy_team_id if entry is not None else None
+
+    def _authorize_nomination(
+        self, league_access: LeagueAccess, market_session: MarketSession
+    ) -> None:
+        """Who may call the next lot depends on ``nomination_mode`` (EP08-09 follow-up).
+
+        League admin and the session's delegate may always call, on anyone's
+        behalf. Beyond that: only the fantasy team whose turn it is may call
+        in ``turn_based``; every other mode (``manual`` and the auto-queue
+        modes, which the admin/delegate triggers one queue entry at a time)
+        is admin/delegate-only.
+        """
+        if league_access.api_role == LeagueRole.LEAGUE_ADMIN or league_access.operator_bypass:
+            return
+        if (
+            market_session.operator_user_id is not None
+            and market_session.operator_user_id == league_access.user.id
+        ):
+            return
+        if market_session.nomination_mode == MarketLiveNominationMode.TURN_BASED:
+            team = self._my_team(league_access)
+            if self._current_turn_team_id(market_session) == team.id:
+                return
+            raise ValidationAuthError(
+                "Non è il turno della tua squadra per chiamare un calciatore.",
+                code="market_live_not_your_turn",
+            )
+        raise ForbiddenError()
+
     def _assert_no_conflicting_initial_auction(self, league_id: UUID) -> None:
         """A league cannot run both auction mechanisms for the initial auction."""
         existing_sealed = self._session.scalar(
@@ -992,9 +1194,7 @@ class LiveMarketService:
                 MarketSession.league_id == league_id,
                 MarketSession.kind == MarketSessionKind.INITIAL_AUCTION,
                 MarketSession.parent_session_id.is_(None),
-                MarketSession.status.in_(
-                    (MarketSessionStatus.SCHEDULED, MarketSessionStatus.OPEN)
-                ),
+                MarketSession.status.in_((MarketSessionStatus.SCHEDULED, MarketSessionStatus.OPEN)),
             )
         )
         if existing_sealed is not None and effective_status(
@@ -1177,7 +1377,28 @@ class LiveMarketService:
             ),
             queueRemaining=self._count_queue_remaining(market_session.id),
             pendingSwapCount=self._count_pending_swaps(market_session.id),
+            turnOrder=self._to_turn_order_response(market_session),
         )
+
+    def _to_turn_order_response(
+        self, market_session: MarketSession
+    ) -> list[LiveTurnOrderEntryResponse]:
+        if market_session.nomination_mode != MarketLiveNominationMode.TURN_BASED:
+            return []
+        rows = self._session.scalars(
+            select(MarketLiveTurnOrderEntry)
+            .options(selectinload(MarketLiveTurnOrderEntry.fantasy_team))
+            .where(MarketLiveTurnOrderEntry.session_id == market_session.id)
+            .order_by(MarketLiveTurnOrderEntry.position.asc())
+        ).all()
+        return [
+            LiveTurnOrderEntryResponse(
+                fantasyTeamId=str(row.fantasy_team_id),
+                fantasyTeamName=row.fantasy_team.name,
+                position=row.position,
+            )
+            for row in rows
+        ]
 
     def _count_pending_swaps(self, session_id: UUID) -> int:
         return int(

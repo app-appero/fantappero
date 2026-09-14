@@ -86,7 +86,7 @@ class _FakeTradeProposal:
     """Duck-typed stand-in for ``TradeProposal``."""
 
     status: TradeStatus
-    expires_at: datetime
+    expires_at: datetime | None
 
 
 def test_effective_trade_status_is_proposed_before_deadline() -> None:
@@ -101,6 +101,18 @@ def test_effective_trade_status_expires_after_deadline_without_a_write() -> None
     proposal = _FakeTradeProposal(status=TradeStatus.PROPOSED, expires_at=now - timedelta(hours=1))
     assert effective_trade_status(proposal, now=now) == TradeStatus.EXPIRED
     assert not is_trade_actionable(proposal, now=now)
+
+
+def test_effective_trade_status_never_expires_without_a_deadline() -> None:
+    """A proposal created with no expiry (EP08-05/FR-MKT-03) stays PROPOSED forever."""
+    now = datetime.now(UTC)
+    proposal = _FakeTradeProposal(status=TradeStatus.PROPOSED, expires_at=None)
+    assert effective_trade_status(proposal, now=now) == TradeStatus.PROPOSED
+    assert is_trade_actionable(proposal, now=now)
+
+    far_future = now + timedelta(days=365)
+    assert effective_trade_status(proposal, now=far_future) == TradeStatus.PROPOSED
+    assert is_trade_actionable(proposal, now=far_future)
 
 
 def test_effective_trade_status_terminal_state_wins_even_before_deadline() -> None:

@@ -170,7 +170,9 @@ async function renderAppAt(
   };
 }
 
-describe("Mercato — svincolo volontario collegato alle API reali (EP08-04)", () => {
+// Sezione nascosta da MarketPage (SHOW_VOLUNTARY_RELEASE = false, ADR-0006): la tab
+// "Scambi" propone solo scambi. Test tenuti per un eventuale ripristino della UI.
+describe.skip("Mercato — svincolo volontario collegato alle API reali (EP08-04)", () => {
   beforeEach(() => {
     clearStoredSession();
     fetchMyCreditsMock.mockReset().mockResolvedValue({
@@ -304,6 +306,59 @@ describe("Mercato — scambi collegati alle API reali (EP08-05/06)", () => {
     unmount();
   });
 
+  it("senza spuntare 'Imposta una scadenza' la proposta viene inviata senza scadenza", async () => {
+    createTradeProposalMock.mockReset().mockResolvedValue({});
+    const { container, unmount } = await renderAppAt("/mercato");
+    const select = container.querySelector('select[name="trade-recipient"]') as HTMLSelectElement | null;
+    const form = container.querySelector(
+      '[data-testid="market-trade-create-form"]',
+    ) as HTMLFormElement | null;
+    expect(select).not.toBeNull();
+    expect(form).not.toBeNull();
+    await act(async () => {
+      select!.value = "team-2";
+      select!.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+    await flushAsync();
+    expect(container.querySelector('input[name="trade-expires-at"]')).toBeNull();
+    await act(async () => {
+      form!.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+    });
+    await flushAsync();
+    expect(createTradeProposalMock).toHaveBeenCalledWith(
+      "access-token",
+      "league-1",
+      expect.objectContaining({ expiresAt: null }),
+    );
+    unmount();
+  });
+
+  it("con 'Imposta una scadenza' spuntato ma senza data la proposta non viene inviata", async () => {
+    createTradeProposalMock.mockReset().mockResolvedValue({});
+    const { container, unmount } = await renderAppAt("/mercato");
+    const select = container.querySelector('select[name="trade-recipient"]') as HTMLSelectElement | null;
+    const checkbox = container.querySelector(
+      'input[name="trade-has-expires-at"]',
+    ) as HTMLInputElement | null;
+    const form = container.querySelector(
+      '[data-testid="market-trade-create-form"]',
+    ) as HTMLFormElement | null;
+    expect(checkbox).not.toBeNull();
+    await act(async () => {
+      select!.value = "team-2";
+      select!.dispatchEvent(new Event("change", { bubbles: true }));
+      checkbox!.click();
+    });
+    await flushAsync();
+    expect(container.querySelector('input[name="trade-expires-at"]')).not.toBeNull();
+    await act(async () => {
+      form!.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+    });
+    await flushAsync();
+    expect(createTradeProposalMock).not.toHaveBeenCalled();
+    unmount();
+  });
+
   it("errore nel caricamento delle proposte mostra lo stato di errore", async () => {
     fetchTradeProposalsMock.mockReset().mockRejectedValue(
       new ApiError("Errore dal server.", 500, "internal_error"),
@@ -409,7 +464,9 @@ describe("Mercato — scambi collegati alle API reali (EP08-05/06)", () => {
   });
 });
 
-describe("Mercato — storico collegato alle API reali (EP08-08)", () => {
+// Sezione nascosta da MarketPage (SHOW_MARKET_HISTORY = false, ADR-0006): lo storico
+// scambi resta consultabile in Rosa. Test tenuti per un eventuale ripristino della UI.
+describe.skip("Mercato — storico collegato alle API reali (EP08-08)", () => {
   beforeEach(() => {
     clearStoredSession();
     fetchMyFantasyTeamMock.mockReset().mockResolvedValue(TEAM_WITH_PLAYER);

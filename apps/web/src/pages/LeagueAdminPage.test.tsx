@@ -68,7 +68,7 @@ describe("EP03-02 league admin page", () => {
     expect(html).toContain('data-testid="league-season-panel"');
     expect(html).toContain("Stato e avvio stagione");
     expect(html).toContain("Bozza");
-    expect(html).toContain("Apri configurazione");
+    expect(html).toContain("Inizia la configurazione");
   });
 
   it("renders empty state", () => {

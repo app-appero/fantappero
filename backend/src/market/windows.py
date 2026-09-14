@@ -33,12 +33,14 @@ def effective_trade_status(proposal: TradeProposal, *, now: datetime) -> TradeSt
 
     A ``PROPOSED`` trade past its deadline reads as ``EXPIRED`` even before anyone
     (EP08-06) has persisted the transition — "offerte scadute non sono accettabili".
-    Any other status is already terminal (or will be handled by EP08-06/07's own
+    The deadline is optional (EP08-05/FR-MKT-03): a proposal with no ``expires_at``
+    never expires on its own and stays ``PROPOSED`` until someone acts on it. Any
+    other status is already terminal (or will be handled by EP08-06/07's own
     transitions) and wins as-is.
     """
     if proposal.status != TradeStatus.PROPOSED:
         return proposal.status
-    if now >= proposal.expires_at:
+    if proposal.expires_at is not None and now >= proposal.expires_at:
         return TradeStatus.EXPIRED
     return TradeStatus.PROPOSED
 

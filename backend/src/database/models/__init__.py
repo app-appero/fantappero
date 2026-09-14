@@ -35,6 +35,12 @@ from leagues.models.league_membership import LeagueMembership
 from leagues.models.league_rules import LeagueRules
 from leagues.models.league_standing import LeagueStanding
 from leagues.models.named_league_invite import NamedLeagueInvite
+from market.live_models import (
+    MarketLiveLot,
+    MarketLiveNominationQueueEntry,
+    MarketLiveRaise,
+    MarketLiveTurnOrderEntry,
+)
 from market.models import MarketBid, MarketSession, TradeProposal
 from notifications.models import Notification, NotificationPreference
 from sports_data.catalog.models import Club, CompetitionSeasonClub, SportSeason
@@ -82,6 +88,10 @@ __all__ = [
     "LineupSubmission",
     "TacticalMove",
     "MarketBid",
+    "MarketLiveLot",
+    "MarketLiveNominationQueueEntry",
+    "MarketLiveRaise",
+    "MarketLiveTurnOrderEntry",
     "MarketSession",
     "MatchEvent",
     "NamedLeagueInvite",

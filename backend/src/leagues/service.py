@@ -446,7 +446,11 @@ class LeagueService:
             state=league.state,
             allowedTransitions=allowed,
             blockers=[
-                LeagueLifecycleBlocker(code=blocker.code, message=blocker.message)
+                LeagueLifecycleBlocker(
+                    code=blocker.code,
+                    message=blocker.message,
+                    action_hint=blocker.action_hint,
+                )
                 for blocker in blockers
             ],
         )

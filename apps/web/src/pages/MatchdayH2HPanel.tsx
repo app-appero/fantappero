@@ -242,16 +242,11 @@ export function MatchdayH2HPanel({
           title="Calendario non ancora confermato"
           message={
             canAdmin
-              ? "Genera e conferma il calendario scontri diretti in Amministrazione lega."
+              ? "Genera e conferma il calendario scontri diretti qui sopra."
               : "L'amministratore deve generare e confermare il calendario H2H prima che compaia qui."
           }
           testId="h2h-empty"
         />
-        {canAdmin ? (
-          <Link to="/lega/amministrazione" data-testid="h2h-admin-link">
-            Vai ad Amministrazione lega
-          </Link>
-        ) : null}
       </div>
     );
   }

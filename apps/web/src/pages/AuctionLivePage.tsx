@@ -62,6 +62,42 @@ const LOT_STATUS_LABEL: Record<string, string> = {
   pending_swap: "In attesa di scambio",
 };
 
+// Le 5 modalità di chiamata: due storiche (manual, sequential) più tre nuove
+// (turn_based, alphabetical_by_role, random). Etichetta breve per lo stato
+// sessione + opzione/spiegazione estesa per il form di creazione, così
+// l'admin sa cosa sta scegliendo *prima* di avviare l'asta live.
+const NOMINATION_MODE_SHORT_LABEL: Record<MarketLiveNominationMode, string> = {
+  manual: "scelta libera",
+  turn_based: "a richiamo (a turno)",
+  sequential: "lista prestabilita",
+  alphabetical_by_role: "alfabetico per ruolo",
+  random: "casuale",
+};
+
+const NOMINATION_MODE_OPTIONS: Array<{ value: MarketLiveNominationMode; label: string }> = [
+  { value: "manual", label: "Libera — sceglie l'admin/delegato" },
+  { value: "turn_based", label: "A richiamo (a turno)" },
+  { value: "sequential", label: "Lista prestabilita" },
+  { value: "alphabetical_by_role", label: "Alfabetico per ruolo" },
+  { value: "random", label: "Casuale" },
+];
+
+const NOMINATION_MODE_HINT: Record<MarketLiveNominationMode, string> = {
+  manual:
+    "L'amministratore (o il delegato) sceglie liberamente, in qualsiasi momento della sessione, quale calciatore mettere all'asta.",
+  turn_based:
+    "A ogni chiamata tocca a un fantallenatore diverso: l'ordine di turno viene estratto a sorte all'avvio della sessione e si ripete ciclicamente finché la sessione è aperta. L'admin/delegato può comunque chiamare in ogni momento, ad esempio se un fantallenatore non è disponibile.",
+  sequential:
+    "Prepari tu l'elenco esatto e ordinato dei calciatori: verranno chiamati automaticamente uno dopo l'altro, nell'ordine scelto qui sotto.",
+  alphabetical_by_role:
+    "I calciatori liberi vengono chiamati automaticamente in ordine alfabetico, raggruppati per ruolo: prima i portieri, poi difensori, centrocampisti e attaccanti.",
+  random:
+    "I calciatori liberi vengono chiamati automaticamente in un ordine casuale, estratto una sola volta all'avvio della sessione.",
+};
+
+// Modalità che generano da sole la coda di chiamata (nessun elenco da compilare).
+const AUTO_QUEUE_MODES: MarketLiveNominationMode[] = ["sequential", "alphabetical_by_role", "random"];
+
 // Solo per l'anteprima visiva del tavolo in modalità demo: nessun dato reale.
 const DEMO_TABLE_TEAMS: FantasyTeamSummary[] = [
   { id: "d1", leagueId: "demo", membershipId: "d1", userId: "d1", userType: "human", name: "Romy", rosterSize: 35, filledSlots: 4, compositionStatus: "incomplete" },
@@ -109,6 +145,8 @@ export function AuctionLivePage() {
   const [secondsRemaining, setSecondsRemaining] = useState<number | null>(null);
   const [lotHistory, setLotHistory] = useState<LiveLot[]>([]);
   const [pendingSwap, setPendingSwap] = useState<PendingSwapDecision | null>(null);
+  const [currentTurnTeamId, setCurrentTurnTeamId] = useState<string | null>(null);
+  const [currentTurnTeamName, setCurrentTurnTeamName] = useState<string | null>(null);
 
   const [actionMessage, setActionMessage] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -119,6 +157,20 @@ export function AuctionLivePage() {
     !!currentSession &&
     !!user &&
     (canManageSession || currentSession.operatorUserId === user.id);
+  // Modalità "a richiamo": la squadra sul cui turno tocca chiamare può farlo
+  // anche senza essere admin/delegato (autorizzazione fine lato server).
+  const myTeam = useMemo(
+    () => (user ? (teams.find((row) => row.userId === user.id) ?? null) : null),
+    [teams, user],
+  );
+  const isMyTurnToNominate =
+    !!currentSession &&
+    currentSession.nominationMode === "turn_based" &&
+    !!myTeam &&
+    myTeam.id === currentTurnTeamId;
+  const canNominate = isOperator || isMyTurnToNominate;
+  const needsExplicitAthlete =
+    currentSession?.nominationMode === "manual" || currentSession?.nominationMode === "turn_based";
 
   const load = useCallback(async () => {
     if (isDemoMode) {
@@ -193,6 +245,8 @@ export function AuctionLivePage() {
       setRecentRaises(next.recentRaises);
       setSecondsRemaining(next.secondsRemaining);
       setPendingSwap(next.pendingSwap);
+      setCurrentTurnTeamId(next.currentTurnTeamId);
+      setCurrentTurnTeamName(next.currentTurnTeamName);
       if (next.currentLot === null) {
         void loadLots();
       }
@@ -250,7 +304,8 @@ export function AuctionLivePage() {
     }
   }
 
-  // -- azioni operatore --------------------------------------------------------
+  // -- azioni operatore (e, per la chiamata in modalità "a turno", anche il
+  // fantallenatore di turno — vedi `canNominate`) -----------------------------
 
   async function runOperatorAction<T>(action: () => Promise<T>, successMessage: string) {
     setActionMessage(null);
@@ -296,7 +351,7 @@ export function AuctionLivePage() {
     if (!stored?.accessToken) return;
     void runOperatorAction(async () => {
       const lot = await nominateLiveAuctionLot(stored.accessToken, activeLeagueId, currentSession.id, {
-        athleteId: currentSession.nominationMode === "manual" ? manualAthleteId : null,
+        athleteId: needsExplicitAthlete ? manualAthleteId : null,
       });
       setCurrentLot(lot);
       setManualAthleteId("");
@@ -445,12 +500,10 @@ export function AuctionLivePage() {
                 <Select
                   label="Modalità di chiamata"
                   name="nomination-mode"
+                  hint={NOMINATION_MODE_HINT[nominationMode]}
                   value={nominationMode}
                   onChange={(e) => setNominationMode(e.target.value as MarketLiveNominationMode)}
-                  options={[
-                    { value: "manual", label: "Scelta libera dell'admin/delegato" },
-                    { value: "sequential", label: "Lista prestabilita" },
-                  ]}
+                  options={NOMINATION_MODE_OPTIONS}
                 />
                 <Input label="Incremento minimo (crediti)" name="min-increment" type="number" min={1} value={minIncrement} onChange={(e) => setMinIncrement(e.target.value)} />
                 <Input label="Soft-close (secondi)" name="soft-close" type="number" min={5} max={120} value={softClose} onChange={(e) => setSoftClose(e.target.value)} />
@@ -483,6 +536,14 @@ export function AuctionLivePage() {
                     })}
                   </fieldset>
                 ) : null}
+                {AUTO_QUEUE_MODES.includes(nominationMode) && nominationMode !== "sequential" ? (
+                  <UiStatePanel
+                    state="empty"
+                    title="Lista generata automaticamente"
+                    message={NOMINATION_MODE_HINT[nominationMode]}
+                    testId="auction-live-auto-queue-hint"
+                  />
+                ) : null}
                 {createError ? (
                   <UiStatePanel state="error" title="Sessione non creata" message={createError} testId="auction-live-create-error" />
                 ) : null}
@@ -506,16 +567,33 @@ export function AuctionLivePage() {
             <WireframeSection label="Sessione asta a rilanci" testId="auction-live-session">
               <p data-testid="auction-live-session-status">
                 Stato: <Badge variant={currentSession.status === "open" ? "success" : "neutral"}>{SESSION_STATUS_LABEL[currentSession.status]}</Badge>
-                {" · "}Modalità: {currentSession.nominationMode === "manual" ? "scelta libera" : "lista prestabilita"}
-                {currentSession.nominationMode === "sequential" ? ` (${currentSession.queueRemaining} rimasti)` : null}
+                {" · "}Modalità: {NOMINATION_MODE_SHORT_LABEL[currentSession.nominationMode] ?? currentSession.nominationMode}
+                {AUTO_QUEUE_MODES.includes(currentSession.nominationMode)
+                  ? ` (${currentSession.queueRemaining} rimasti)`
+                  : null}
+                {currentSession.nominationMode === "turn_based" && currentLot === null
+                  ? ` · turno di: ${currentTurnTeamName ?? "—"}`
+                  : null}
                 {currentSession.pendingSwapCount > 0
                   ? ` · ${currentSession.pendingSwapCount} in attesa di scambio`
                   : null}
                 {degraded ? " · aggiornamento in ritardo" : null}
               </p>
 
+              {currentSession.nominationMode === "turn_based" && currentSession.turnOrder.length > 0 ? (
+                <p data-testid="auction-live-turn-order" className="fa-field__hint">
+                  Ordine di chiamata (estratto a sorte):{" "}
+                  {currentSession.turnOrder.map((entry) => entry.fantasyTeamName).join(" → ")}
+                </p>
+              ) : null}
+
               {currentSession.status === "open" ? (
-                <LiveAuctionTable teams={teams} currentLot={currentLot} secondsRemaining={secondsRemaining} />
+                <LiveAuctionTable
+                  teams={teams}
+                  currentLot={currentLot}
+                  secondsRemaining={secondsRemaining}
+                  currentTurnTeamId={currentLot === null ? currentTurnTeamId : null}
+                />
               ) : null}
 
               {isOperator && currentSession.status === "scheduled" ? (
@@ -524,9 +602,9 @@ export function AuctionLivePage() {
                 </Button>
               ) : null}
 
-              {isOperator && currentSession.status === "open" && !currentLot ? (
+              {canNominate && currentSession.status === "open" && !currentLot ? (
                 <div className="fa-ds-showcase__row" data-testid="auction-live-nominate">
-                  {currentSession.nominationMode === "manual" ? (
+                  {needsExplicitAthlete ? (
                     <Select
                       label="Calciatore da chiamare"
                       name="manual-athlete"
@@ -544,12 +622,25 @@ export function AuctionLivePage() {
                   ) : null}
                   <Button
                     variant="primary"
-                    disabled={actionBusy || (currentSession.nominationMode === "manual" && !manualAthleteId)}
+                    disabled={actionBusy || (needsExplicitAthlete && !manualAthleteId)}
                     onClick={handleNominate}
                   >
                     Chiama
                   </Button>
                 </div>
+              ) : null}
+
+              {!canNominate &&
+              !isOperator &&
+              currentSession.nominationMode === "turn_based" &&
+              currentSession.status === "open" &&
+              !currentLot ? (
+                <UiStatePanel
+                  state="empty"
+                  title="In attesa del tuo turno"
+                  message={`Tocca a ${currentTurnTeamName ?? "un altro fantallenatore"}: aspetta il tuo turno per chiamare un calciatore.`}
+                  testId="auction-live-waiting-turn"
+                />
               ) : null}
 
               {isOperator && currentSession.status === "open" && !currentLot ? (

@@ -251,7 +251,9 @@ class TradeProposal(Base, UUIDPrimaryKeyMixin, TimestampMixin):
         nullable=False,
         server_default=text("'proposed'"),
     )
-    expires_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False)
+    # Optional (EP08-05/FR-MKT-03): a proposal with no expiry never expires on its
+    # own — it stays PROPOSED until accepted/rejected/countered/cancelled.
+    expires_at: Mapped[datetime | None] = mapped_column(UTCDateTime(), nullable=True)
     created_by: Mapped[UUID | None] = mapped_column(
         ForeignKey("users.id", ondelete="SET NULL"),
         nullable=True,

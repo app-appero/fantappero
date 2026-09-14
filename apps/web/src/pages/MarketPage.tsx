@@ -94,7 +94,15 @@ const DEMO_TEAM: FantasyTeam = {
   ],
 };
 
-/** Schermata Mercato: svincolo volontario con recupero crediti (EP08-04 / FR-MKT-02). */
+// "Svincolo volontario" (rimborso parziale, EP08-04/FR-MKT-02) e "Storico mercato"
+// (EP08-08/FR-MKT-04) sono nascosti: la tab (ex "Mercato", ora "Scambi") propone solo
+// scambi tra squadre. Una squadra non può restare con uno slot vuoto — uno svincolo va
+// sempre seguito da un acquisto, e questo flusso vive già in Rosa (rimborso pieno,
+// tracciato nello storico rosa). Codice/test tenuti per un eventuale ripristino. ADR-0006.
+const SHOW_VOLUNTARY_RELEASE = false;
+const SHOW_MARKET_HISTORY = false;
+
+/** Schermata Scambi (ex "Mercato"): proposte di scambio tra squadre (EP08-05/06/07). */
 export function MarketPage() {
   const { isDemoMode, activeLeagueId, can } = useAuth();
   const canManageMarket = can(["market:manage"]);
@@ -269,6 +277,8 @@ export function MarketPage() {
   const [requestedAthleteIds, setRequestedAthleteIds] = useState<string[]>([]);
   const [offeredCredits, setOfferedCredits] = useState("0");
   const [requestedCredits, setRequestedCredits] = useState("0");
+  // Scadenza opzionale (EP08-05/FR-MKT-03): senza spunta la proposta non scade mai da sola.
+  const [hasExpiry, setHasExpiry] = useState(false);
   const [expiresAt, setExpiresAt] = useState("");
 
   const recipientOptions = useMemo(
@@ -323,12 +333,13 @@ export function MarketPage() {
     setRequestedAthleteIds([]);
     setOfferedCredits("0");
     setRequestedCredits("0");
+    setHasExpiry(false);
     setExpiresAt("");
   }
 
   function handleCreateProposal(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!recipientTeamId || !expiresAt) {
+    if (!recipientTeamId || (hasExpiry && !expiresAt)) {
       return;
     }
     void trade
@@ -338,7 +349,7 @@ export function MarketPage() {
         requestedAthleteIds,
         offeredCredits: Number(offeredCredits) || 0,
         requestedCredits: Number(requestedCredits) || 0,
-        expiresAt: new Date(expiresAt).toISOString(),
+        expiresAt: hasExpiry && expiresAt ? new Date(expiresAt).toISOString() : null,
       })
       .then(resetTradeForm);
   }
@@ -348,6 +359,7 @@ export function MarketPage() {
   const [counterRequestedAthleteIds, setCounterRequestedAthleteIds] = useState<string[]>([]);
   const [counterOfferedCredits, setCounterOfferedCredits] = useState("0");
   const [counterRequestedCredits, setCounterRequestedCredits] = useState("0");
+  const [counterHasExpiry, setCounterHasExpiry] = useState(false);
   const [counterExpiresAt, setCounterExpiresAt] = useState("");
 
   function startCounter(proposalId: string) {
@@ -356,12 +368,13 @@ export function MarketPage() {
     setCounterRequestedAthleteIds([]);
     setCounterOfferedCredits("0");
     setCounterRequestedCredits("0");
+    setCounterHasExpiry(false);
     setCounterExpiresAt("");
   }
 
   function handleCounterSubmit(event: FormEvent<HTMLFormElement>, proposalId: string) {
     event.preventDefault();
-    if (!counterExpiresAt) {
+    if (counterHasExpiry && !counterExpiresAt) {
       return;
     }
     void trade
@@ -370,7 +383,7 @@ export function MarketPage() {
         requestedAthleteIds: counterRequestedAthleteIds,
         offeredCredits: Number(counterOfferedCredits) || 0,
         requestedCredits: Number(counterRequestedCredits) || 0,
-        expiresAt: new Date(counterExpiresAt).toISOString(),
+        expiresAt: counterHasExpiry && counterExpiresAt ? new Date(counterExpiresAt).toISOString() : null,
       })
       .then(() => setCounteringProposalId(null));
   }
@@ -385,13 +398,13 @@ export function MarketPage() {
   if (isDemoMode && demoState === "forbidden") {
     return (
       <PageContainer
-        title="Mercato"
-        header={<Breadcrumb items={[{ label: "Leghe", href: "/leghe" }, { label: "Mercato" }]} />}
+        title="Scambi"
+        header={<Breadcrumb items={[{ label: "Leghe", href: "/leghe" }, { label: "Scambi" }]} />}
       >
         <UiStatePanel
           state="forbidden"
           title="Permessi insufficienti"
-          message="Non hai accesso al mercato di questa lega."
+          message="Non hai accesso agli scambi di questa lega."
           testId="wireframe-market-forbidden"
         />
       </PageContainer>
@@ -400,8 +413,8 @@ export function MarketPage() {
 
   return (
     <PageContainer
-      title="Mercato"
-      header={<Breadcrumb items={[{ label: "Leghe", href: "/leghe" }, { label: "Mercato" }]} />}
+      title="Scambi"
+      header={<Breadcrumb items={[{ label: "Leghe", href: "/leghe" }, { label: "Scambi" }]} />}
     >
       <div className="fa-market-page">
         {loading ? (
@@ -436,7 +449,7 @@ export function MarketPage() {
           />
         ) : null}
 
-        {!loading && !loadError && (isDemoMode || activeLeagueId) ? (
+        {SHOW_VOLUNTARY_RELEASE && !loading && !loadError && (isDemoMode || activeLeagueId) ? (
           <WireframeSection label="Svincolo volontario" testId="market-release-section">
             {ownedSlots.length === 0 ? (
               <UiStatePanel
@@ -539,101 +552,111 @@ export function MarketPage() {
         {!loading && !loadError && !isDemoMode && activeLeagueId ? (
           <WireframeSection label="Nuova proposta di scambio" testId="market-trade-form-section">
             <form data-testid="market-trade-create-form" onSubmit={handleCreateProposal}>
-              <Select
-                label="Squadra destinataria"
-                name="trade-recipient"
-                options={recipientOptions}
-                placeholder="Scegli una squadra…"
-                value={recipientTeamId}
-                onChange={(event) => {
-                  const nextId = event.target.value;
-                  setRecipientTeamId(nextId);
-                  setRequestedAthleteIds([]);
-                  void loadRecipientRoster(nextId);
-                }}
-                required
-              />
+              <div className="fa-trade-columns">
+                <div className="fa-trade-columns__left">
+                  <fieldset data-testid="market-trade-offered-athletes">
+                    <legend>Giocatori offerti (dalla tua rosa)</legend>
+                    {ownedSlots.length === 0 ? (
+                      <p>Nessun giocatore in rosa da offrire.</p>
+                    ) : (
+                      <div className="fa-trade-athlete-list">
+                        {ownedSlots.map((slot) => (
+                          <label key={slot.id}>
+                            <input
+                              type="checkbox"
+                              checked={offeredAthleteIds.includes(slot.athleteId as string)}
+                              onChange={() =>
+                                setOfferedAthleteIds((prev) =>
+                                  toggleAthleteId(prev, slot.athleteId as string),
+                                )
+                              }
+                            />
+                            <span>{slot.athleteName}</span>
+                          </label>
+                        ))}
+                      </div>
+                    )}
+                  </fieldset>
+                </div>
 
-              <fieldset data-testid="market-trade-offered-athletes">
-                <legend>Giocatori offerti (dalla tua rosa)</legend>
-                {ownedSlots.length === 0 ? (
-                  <p>Nessun giocatore in rosa da offrire.</p>
-                ) : (
-                  ownedSlots.map((slot) => (
-                    <label key={slot.id}>
-                      <input
-                        type="checkbox"
-                        checked={offeredAthleteIds.includes(slot.athleteId as string)}
-                        onChange={() =>
-                          setOfferedAthleteIds((prev) =>
-                            toggleAthleteId(prev, slot.athleteId as string),
-                          )
-                        }
-                      />{" "}
-                      {slot.athleteName}
-                    </label>
-                  ))
-                )}
-              </fieldset>
-
-              <fieldset data-testid="market-trade-requested-athletes">
-                <legend>Giocatori richiesti</legend>
-                {!recipientTeamId ? (
-                  <p>Scegli prima una squadra destinataria.</p>
-                ) : null}
-                {recipientTeamId && recipientRosterLoading ? (
-                  <UiStatePanel
-                    state="loading"
-                    title="Caricamento rosa"
-                    message="Recupero i giocatori della squadra selezionata…"
-                    testId="market-trade-recipient-loading"
+                <div className="fa-trade-columns__right">
+                  <Select
+                    label="Squadra destinataria"
+                    name="trade-recipient"
+                    options={recipientOptions}
+                    placeholder="Scegli una squadra…"
+                    value={recipientTeamId}
+                    onChange={(event) => {
+                      const nextId = event.target.value;
+                      setRecipientTeamId(nextId);
+                      setRequestedAthleteIds([]);
+                      void loadRecipientRoster(nextId);
+                    }}
+                    required
                   />
-                ) : null}
-                {recipientTeamId && !recipientRosterLoading && recipientRosterError ? (
-                  <div>
-                    <UiStatePanel
-                      state="error"
-                      title="Rosa non disponibile"
-                      message={recipientRosterError}
-                      testId="market-trade-recipient-error"
-                    />
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      onClick={() => void loadRecipientRoster(recipientTeamId)}
-                    >
-                      Riprova
-                    </Button>
-                  </div>
-                ) : null}
-                {recipientTeamId &&
-                !recipientRosterLoading &&
-                !recipientRosterError &&
-                recipientPlayers.length === 0 ? (
-                  <p data-testid="market-trade-recipient-empty">
-                    Questa squadra non ha ancora giocatori in rosa.
-                  </p>
-                ) : null}
-                {recipientTeamId &&
-                !recipientRosterLoading &&
-                !recipientRosterError &&
-                recipientPlayers.length > 0
-                  ? recipientPlayers.map((athlete) => (
-                      <label key={athlete.athleteId}>
-                        <input
-                          type="checkbox"
-                          checked={requestedAthleteIds.includes(athlete.athleteId)}
-                          onChange={() =>
-                            setRequestedAthleteIds((prev) =>
-                              toggleAthleteId(prev, athlete.athleteId),
-                            )
-                          }
-                        />{" "}
-                        {athlete.athleteName}
-                      </label>
-                    ))
-                  : null}
-              </fieldset>
+
+                  <fieldset data-testid="market-trade-requested-athletes">
+                    <legend>Giocatori richiesti</legend>
+                    {!recipientTeamId ? (
+                      <p>Scegli prima una squadra destinataria.</p>
+                    ) : null}
+                    {recipientTeamId && recipientRosterLoading ? (
+                      <UiStatePanel
+                        state="loading"
+                        title="Caricamento rosa"
+                        message="Recupero i giocatori della squadra selezionata…"
+                        testId="market-trade-recipient-loading"
+                      />
+                    ) : null}
+                    {recipientTeamId && !recipientRosterLoading && recipientRosterError ? (
+                      <div>
+                        <UiStatePanel
+                          state="error"
+                          title="Rosa non disponibile"
+                          message={recipientRosterError}
+                          testId="market-trade-recipient-error"
+                        />
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          onClick={() => void loadRecipientRoster(recipientTeamId)}
+                        >
+                          Riprova
+                        </Button>
+                      </div>
+                    ) : null}
+                    {recipientTeamId &&
+                    !recipientRosterLoading &&
+                    !recipientRosterError &&
+                    recipientPlayers.length === 0 ? (
+                      <p data-testid="market-trade-recipient-empty">
+                        Questa squadra non ha ancora giocatori in rosa.
+                      </p>
+                    ) : null}
+                    {recipientTeamId &&
+                    !recipientRosterLoading &&
+                    !recipientRosterError &&
+                    recipientPlayers.length > 0 ? (
+                      <div className="fa-trade-athlete-list">
+                        {recipientPlayers.map((athlete) => (
+                          <label key={athlete.athleteId}>
+                            <input
+                              type="checkbox"
+                              checked={requestedAthleteIds.includes(athlete.athleteId)}
+                              onChange={() =>
+                                setRequestedAthleteIds((prev) =>
+                                  toggleAthleteId(prev, athlete.athleteId),
+                                )
+                              }
+                            />
+                            <span>{athlete.athleteName}</span>
+                          </label>
+                        ))}
+                      </div>
+                    ) : null}
+                  </fieldset>
+                </div>
+              </div>
 
               <Input
                 label="Crediti offerti"
@@ -651,14 +674,32 @@ export function MarketPage() {
                 value={requestedCredits}
                 onChange={(event) => setRequestedCredits(event.target.value)}
               />
-              <Input
-                label="Scadenza"
-                name="trade-expires-at"
-                type="datetime-local"
-                value={expiresAt}
-                onChange={(event) => setExpiresAt(event.target.value)}
-                required
-              />
+              <label>
+                <input
+                  type="checkbox"
+                  name="trade-has-expires-at"
+                  checked={hasExpiry}
+                  onChange={(event) => {
+                    setHasExpiry(event.target.checked);
+                    if (!event.target.checked) {
+                      setExpiresAt("");
+                    }
+                  }}
+                />
+                <span> Imposta una scadenza</span>
+              </label>
+              {hasExpiry ? (
+                <Input
+                  label="Scadenza"
+                  name="trade-expires-at"
+                  type="datetime-local"
+                  value={expiresAt}
+                  onChange={(event) => setExpiresAt(event.target.value)}
+                  required
+                />
+              ) : (
+                <p>Nessuna scadenza: la proposta resta valida finché non viene decisa o annullata.</p>
+              )}
 
               {trade.createError ? (
                 <UiStatePanel
@@ -736,6 +777,11 @@ export function MarketPage() {
                         Richiesti: {proposal.requestedAthletes.map((a) => a.name).join(", ") || "—"}
                         {proposal.requestedCredits > 0 ? ` + ${proposal.requestedCredits} crediti` : ""}
                       </p>
+                      <p>
+                        {proposal.expiresAt
+                          ? `Scade il ${new Date(proposal.expiresAt).toLocaleString("it-IT")}`
+                          : "Nessuna scadenza"}
+                      </p>
 
                       {proposal.status === "proposed" && isProposer ? (
                         <Button
@@ -803,46 +849,58 @@ export function MarketPage() {
                           data-testid={`market-trade-counter-form-${proposal.id}`}
                           onSubmit={(event) => handleCounterSubmit(event, proposal.id)}
                         >
-                          <fieldset>
-                            <legend>Giocatori offerti nella controproposta</legend>
-                            {ownedSlots.map((slot) => (
-                              <label key={slot.id}>
-                                <input
-                                  type="checkbox"
-                                  checked={counterOfferedAthleteIds.includes(
-                                    slot.athleteId as string,
-                                  )}
-                                  onChange={() =>
-                                    setCounterOfferedAthleteIds((prev) =>
-                                      toggleAthleteId(prev, slot.athleteId as string),
-                                    )
-                                  }
-                                />{" "}
-                                {slot.athleteName}
-                              </label>
-                            ))}
-                          </fieldset>
-                          <fieldset>
-                            <legend>Giocatori richiesti nella controproposta</legend>
-                            {occupancy
-                              .filter((entry) => entry.fantasyTeamId === proposal.proposerTeamId)
-                              .map((entry) => (
-                                <label key={entry.athleteId}>
-                                  <input
-                                    type="checkbox"
-                                    checked={counterRequestedAthleteIds.includes(entry.athleteId)}
-                                    onChange={() =>
-                                      setCounterRequestedAthleteIds((prev) =>
-                                        toggleAthleteId(prev, entry.athleteId),
-                                      )
-                                    }
-                                  />{" "}
-                                  {entry.athleteName ??
-                                    athleteNameById.get(entry.athleteId) ??
-                                    "Giocatore"}
-                                </label>
-                              ))}
-                          </fieldset>
+                          <div className="fa-trade-columns">
+                            <div className="fa-trade-columns__left">
+                              <fieldset>
+                                <legend>Giocatori offerti nella controproposta</legend>
+                                <div className="fa-trade-athlete-list">
+                                  {ownedSlots.map((slot) => (
+                                    <label key={slot.id}>
+                                      <input
+                                        type="checkbox"
+                                        checked={counterOfferedAthleteIds.includes(
+                                          slot.athleteId as string,
+                                        )}
+                                        onChange={() =>
+                                          setCounterOfferedAthleteIds((prev) =>
+                                            toggleAthleteId(prev, slot.athleteId as string),
+                                          )
+                                        }
+                                      />
+                                      <span>{slot.athleteName}</span>
+                                    </label>
+                                  ))}
+                                </div>
+                              </fieldset>
+                            </div>
+                            <div className="fa-trade-columns__right">
+                              <fieldset>
+                                <legend>Giocatori richiesti nella controproposta</legend>
+                                <div className="fa-trade-athlete-list">
+                                  {occupancy
+                                    .filter((entry) => entry.fantasyTeamId === proposal.proposerTeamId)
+                                    .map((entry) => (
+                                      <label key={entry.athleteId}>
+                                        <input
+                                          type="checkbox"
+                                          checked={counterRequestedAthleteIds.includes(entry.athleteId)}
+                                          onChange={() =>
+                                            setCounterRequestedAthleteIds((prev) =>
+                                              toggleAthleteId(prev, entry.athleteId),
+                                            )
+                                          }
+                                        />
+                                        <span>
+                                          {entry.athleteName ??
+                                            athleteNameById.get(entry.athleteId) ??
+                                            "Giocatore"}
+                                        </span>
+                                      </label>
+                                    ))}
+                                </div>
+                              </fieldset>
+                            </div>
+                          </div>
                           <Input
                             label="Crediti offerti"
                             name="counter-offered-credits"
@@ -859,14 +917,32 @@ export function MarketPage() {
                             value={counterRequestedCredits}
                             onChange={(event) => setCounterRequestedCredits(event.target.value)}
                           />
-                          <Input
-                            label="Scadenza"
-                            name="counter-expires-at"
-                            type="datetime-local"
-                            value={counterExpiresAt}
-                            onChange={(event) => setCounterExpiresAt(event.target.value)}
-                            required
-                          />
+                          <label>
+                            <input
+                              type="checkbox"
+                              name="counter-has-expires-at"
+                              checked={counterHasExpiry}
+                              onChange={(event) => {
+                                setCounterHasExpiry(event.target.checked);
+                                if (!event.target.checked) {
+                                  setCounterExpiresAt("");
+                                }
+                              }}
+                            />
+                            <span> Imposta una scadenza</span>
+                          </label>
+                          {counterHasExpiry ? (
+                            <Input
+                              label="Scadenza"
+                              name="counter-expires-at"
+                              type="datetime-local"
+                              value={counterExpiresAt}
+                              onChange={(event) => setCounterExpiresAt(event.target.value)}
+                              required
+                            />
+                          ) : (
+                            <p>Nessuna scadenza: la controproposta resta valida finché non viene decisa o annullata.</p>
+                          )}
                           <div className="fa-ds-showcase__row">
                             <Button type="submit" variant="primary" disabled={pending}>
                               Invia controproposta
@@ -889,7 +965,7 @@ export function MarketPage() {
           </WireframeSection>
         ) : null}
 
-        {!isDemoMode && activeLeagueId ? (
+        {SHOW_MARKET_HISTORY && !isDemoMode && activeLeagueId ? (
           <WireframeSection label="Storico mercato" testId="wireframe-region-market-history">
             <div className="fa-ds-showcase__row">
               <Select

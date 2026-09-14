@@ -356,6 +356,7 @@ def activation_roster_and_credit_blockers(
                     "Completa squadre e rose prima di avviare la stagione "
                     f"({'; '.join(detail_parts)})."
                 ),
+                action_hint="teams",
             )
         )
     if missing_credits:
@@ -366,6 +367,7 @@ def activation_roster_and_credit_blockers(
                     "Verifica i crediti di tutte le squadre prima di avviare la stagione "
                     f"({missing_credits} conti assenti o non validi)."
                 ),
+                action_hint="teams",
             )
         )
     return blockers

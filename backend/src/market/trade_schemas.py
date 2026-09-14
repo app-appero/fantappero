@@ -13,7 +13,8 @@ class CreateTradeProposalRequest(ApiModel):
     requested_athlete_ids: list[str] = Field(default_factory=list, alias="requestedAthleteIds")
     offered_credits: int = Field(default=0, alias="offeredCredits", ge=0)
     requested_credits: int = Field(default=0, alias="requestedCredits", ge=0)
-    expires_at: str = Field(alias="expiresAt", min_length=1)
+    # Optional: omit or send null for a proposal that never expires on its own.
+    expires_at: str | None = Field(default=None, alias="expiresAt")
 
 
 class CounterTradeProposalRequest(ApiModel):
@@ -23,7 +24,7 @@ class CounterTradeProposalRequest(ApiModel):
     requested_athlete_ids: list[str] = Field(default_factory=list, alias="requestedAthleteIds")
     offered_credits: int = Field(default=0, alias="offeredCredits", ge=0)
     requested_credits: int = Field(default=0, alias="requestedCredits", ge=0)
-    expires_at: str = Field(alias="expiresAt", min_length=1)
+    expires_at: str | None = Field(default=None, alias="expiresAt")
 
 
 class TradeAthleteResponse(ApiModel):
@@ -45,7 +46,7 @@ class TradeProposalResponse(ApiModel):
     offered_credits: int = Field(alias="offeredCredits")
     requested_credits: int = Field(alias="requestedCredits")
     status: str
-    expires_at: str = Field(alias="expiresAt")
+    expires_at: str | None = Field(default=None, alias="expiresAt")
     created_at: str = Field(alias="createdAt")
     counter_of_id: str | None = Field(default=None, alias="counterOfId")
 

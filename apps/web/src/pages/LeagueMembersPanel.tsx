@@ -198,7 +198,11 @@ export function LeagueMembersPanel({
   }
 
   return (
-    <section className="fa-members" aria-labelledby="league-members-title">
+    <section
+      className="fa-members"
+      aria-labelledby="league-members-title"
+      data-testid="league-members-panel"
+    >
       <h2 id="league-members-title">Partecipanti iscritti</h2>
       <p>Trasferisci il ruolo admin o rimuovi un partecipante prima dell’avvio.</p>
 

@@ -4,7 +4,10 @@ A live session (``MarketSession.kind == LIVE_AUCTION``) opens one athlete at a
 time as a ``MarketLiveLot``. Every raise on that lot is an append-only
 ``MarketLiveRaise`` row — unlike sealed bids, live raises are visible to every
 participant the moment they are placed. ``MarketLiveNominationQueueEntry`` is
-only populated when the session's ``nomination_mode`` is ``SEQUENTIAL``.
+populated whenever ``nomination_mode`` is one of the auto/preset queue modes
+(``SEQUENTIAL``, ``ALPHABETICAL_BY_ROLE``, ``RANDOM``). ``MarketLiveTurnOrderEntry``
+is only populated for ``TURN_BASED``: the fixed team rotation drawn once, at
+random, when the session is created.
 """
 
 from __future__ import annotations
@@ -157,3 +160,41 @@ class MarketLiveNominationQueueEntry(Base, UUIDPrimaryKeyMixin, TimestampMixin):
 
     session: Mapped[MarketSession] = relationship()
     athlete: Mapped[Athlete] = relationship()
+
+
+class MarketLiveTurnOrderEntry(Base, UUIDPrimaryKeyMixin, TimestampMixin):
+    """Fixed team rotation for ``nomination_mode == TURN_BASED`` sessions.
+
+    Drawn once, at random, when the session is created — like physically
+    drawing lots before a live auction party — and never reshuffled after
+    that. Whose turn it is only depends on how many lots have been opened so
+    far in the session, cycling through this list: see
+    ``LiveMarketService._current_turn_team_id`` /
+    ``live_validators.compute_turn_team_index``. Calling a player and getting
+    no bids still consumes that team's turn, exactly like a real auction.
+    """
+
+    __tablename__ = "market_live_turn_order"
+    __table_args__ = (
+        Index("ix_market_live_turn_order_session_id", "session_id"),
+        UniqueConstraint(
+            "session_id", "fantasy_team_id", name="uq_market_live_turn_order_session_team"
+        ),
+        UniqueConstraint(
+            "session_id", "position", name="uq_market_live_turn_order_session_position"
+        ),
+    )
+
+    session_id: Mapped[UUID] = mapped_column(
+        ForeignKey("market_sessions.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    fantasy_team_id: Mapped[UUID] = mapped_column(
+        ForeignKey("fantasy_teams.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    position: Mapped[int] = mapped_column(Integer, nullable=False)
+
+    session: Mapped[MarketSession] = relationship()
+    fantasy_team: Mapped[FantasyTeam] = relationship()
+

@@ -20,10 +20,13 @@ export function LiveAuctionTable({
   teams,
   currentLot,
   secondsRemaining,
+  currentTurnTeamId = null,
 }: {
   teams: readonly FantasyTeamSummary[];
   currentLot: LiveLot | null;
   secondsRemaining: number | null;
+  /** Modalità "a turno": id della squadra a cui tocca chiamare (null altrimenti). */
+  currentTurnTeamId?: string | null;
 }) {
   if (teams.length === 0) {
     return null;
@@ -48,14 +51,18 @@ export function LiveAuctionTable({
         {teams.map((team, index) => {
           const position = seatPosition(index, teams.length);
           const isLeader = currentLot?.currentLeaderTeamId === team.id;
+          const isOnTurn = !isLeader && currentTurnTeamId === team.id;
+          const seatClassName = [
+            "fa-live-auction-table__seat",
+            isLeader ? "fa-live-auction-table__seat--leading" : null,
+            isOnTurn ? "fa-live-auction-table__seat--on-turn" : null,
+          ]
+            .filter(Boolean)
+            .join(" ");
           return (
             <div
               key={team.id}
-              className={
-                isLeader
-                  ? "fa-live-auction-table__seat fa-live-auction-table__seat--leading"
-                  : "fa-live-auction-table__seat"
-              }
+              className={seatClassName}
               style={{ left: position.left, top: position.top }}
               data-testid={`auction-live-seat-${team.id}`}
             >

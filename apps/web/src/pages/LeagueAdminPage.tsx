@@ -18,7 +18,6 @@ import { ManagerDirectory } from "../components/ManagerDirectory";
 import { loadStoredSession } from "../auth/sessionStorage";
 import { useLocation } from "../router/simpleRouter";
 import { parseWireframeStateFromSearch } from "../wireframes/useWireframeState";
-import { LeagueCalendarPanel } from "./LeagueCalendarPanel";
 import { LeagueDeletePanel } from "./LeagueDeletePanel";
 import { LeagueInvitesPanel } from "./LeagueInvitesPanel";
 import { LeagueMembersPanel } from "./LeagueMembersPanel";
@@ -269,6 +268,15 @@ export function LeagueAdminPage() {
 
       {!loading && !loadError && rules ? (
         <>
+        {lifecycle ? (
+          <LeagueSeasonPanel
+            leagueId={activeLeagueId}
+            lifecycle={lifecycle}
+            isDemoMode={isDemoMode}
+            search={search}
+            onChange={setLifecycle}
+          />
+        ) : null}
         <form data-testid="league-admin-form" onSubmit={(event) => void onSubmit(event)}>
           <Select
             label="Preset regolamento"
@@ -508,22 +516,8 @@ export function LeagueAdminPage() {
           title="Inviti nominativi"
           compact
         />
-        {lifecycle ? (
-          <LeagueCalendarPanel
-            leagueId={activeLeagueId}
-            isDemoMode={isDemoMode}
-            search={search}
-          />
-        ) : null}
-        {lifecycle ? (
-          <LeagueSeasonPanel
-            leagueId={activeLeagueId}
-            lifecycle={lifecycle}
-            isDemoMode={isDemoMode}
-            search={search}
-            onChange={setLifecycle}
-          />
-        ) : null}
+        {/* Generazione/conferma calendario H2H: spostata (per il momento) in
+            Turni ▸ tab "Calendario fantallenatori", dove si consulta. */}
         {lifecycle ? (
           <LeagueDeletePanel
             leagueId={activeLeagueId}
@@ -537,6 +531,7 @@ export function LeagueAdminPage() {
     </PageContainer>
   );
 }
+
 
 
 

@@ -8,9 +8,16 @@ export type LeagueState =
   | "concluded"
   | "archived";
 
+/**
+ * Sezione del pannello amministrazione a cui la UI può rimandare l'admin per
+ * risolvere un blocker (EP03-05-UX). Puramente indicativo lato client.
+ */
+export type LeagueLifecycleActionHint = "rules" | "members" | "calendar" | "teams";
+
 export interface LeagueLifecycleBlocker {
   code: string;
   message: string;
+  actionHint?: LeagueLifecycleActionHint | null;
 }
 
 export interface LeagueLifecycle {
@@ -22,6 +29,85 @@ export interface LeagueLifecycle {
 export interface TransitionLeagueStateRequest {
   targetState: LeagueState;
 }
+
+/**
+ * Percorso "a tappe" mostrato all'admin al posto dei 6 stati grezzi
+ * (EP03-05-UX): Bozza e Configurazione sono la stessa fase percepita.
+ */
+export type LeagueLifecyclePhaseKey = "setup" | "auction" | "season";
+
+export interface LeagueLifecyclePhase {
+  key: LeagueLifecyclePhaseKey;
+  label: string;
+  states: LeagueState[];
+}
+
+export const LEAGUE_LIFECYCLE_PHASES: readonly LeagueLifecyclePhase[] = [
+  { key: "setup", label: "Impostazione", states: ["draft", "configuring"] },
+  { key: "auction", label: "Asta", states: ["auction"] },
+  { key: "season", label: "Campionato", states: ["active", "concluded", "archived"] },
+];
+
+/** Indice (0-based) della fase corrente nello stepper, -1 se non mappato. */
+export function leagueLifecyclePhaseIndex(state: LeagueState): number {
+  return LEAGUE_LIFECYCLE_PHASES.findIndex((phase) => phase.states.includes(state));
+}
+
+const FORWARD_TARGET: Partial<Record<LeagueState, LeagueState>> = {
+  draft: "configuring",
+  configuring: "auction",
+  auction: "active",
+  active: "concluded",
+  concluded: "archived",
+};
+
+const FORWARD_ACTION_LABEL: Record<LeagueState, string> = {
+  draft: "Inizia la configurazione",
+  configuring: "Avvia l'asta",
+  auction: "Avvia il campionato",
+  active: "Concludi la stagione",
+  concluded: "Archivia la lega",
+  archived: "Lega archiviata",
+};
+
+const ROLLBACK_TARGET: Partial<Record<LeagueState, LeagueState>> = {
+  auction: "configuring",
+};
+
+const ROLLBACK_ACTION_LABEL: Partial<Record<LeagueState, string>> = {
+  auction: "Torna in configurazione",
+};
+
+/** Un solo passo "in avanti" per volta, invece di un elenco di stati grezzi. */
+export interface LeagueLifecycleStep {
+  forwardTarget: LeagueState | null;
+  forwardLabel: string | null;
+  /** True quando nessun blocker impedisce la transizione in avanti. */
+  forwardEnabled: boolean;
+  rollbackTarget: LeagueState | null;
+  rollbackLabel: string | null;
+}
+
+export function describeLeagueLifecycleStep(lifecycle: LeagueLifecycle): LeagueLifecycleStep {
+  const forwardTarget = FORWARD_TARGET[lifecycle.state] ?? null;
+  const rollbackTarget = ROLLBACK_TARGET[lifecycle.state] ?? null;
+  return {
+    forwardTarget,
+    forwardLabel: forwardTarget ? FORWARD_ACTION_LABEL[lifecycle.state] : null,
+    forwardEnabled:
+      forwardTarget !== null && lifecycle.allowedTransitions.includes(forwardTarget),
+    rollbackTarget,
+    rollbackLabel: rollbackTarget ? (ROLLBACK_ACTION_LABEL[lifecycle.state] ?? null) : null,
+  };
+}
+
+/** Etichetta del link "vai a sistemare" mostrato accanto a ogni blocker. */
+export const LEAGUE_LIFECYCLE_ACTION_HINT_LABEL: Record<LeagueLifecycleActionHint, string> = {
+  rules: "Vai al regolamento",
+  members: "Vai ai partecipanti",
+  calendar: "Vai al calendario",
+  teams: "Vai a squadre e rose",
+};
 
 /** Competition available in the MVP catalog. */
 export interface CompetitionSummary {

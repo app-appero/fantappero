@@ -2,7 +2,14 @@
 
 from __future__ import annotations
 
+import random
+from collections.abc import Sequence
+
 from auth.exceptions import ValidationAuthError
+
+# P→D→C→A: same canonical role order used league-wide (fantasy_teams.composition
+# .ROLE_LABEL_IT, RosterCompositionLimits fields, FantasyRole enum declaration).
+_ROLE_SORT_ORDER: dict[str, int] = {"P": 0, "D": 1, "C": 2, "A": 3}
 
 
 def validate_live_session_config(
@@ -71,3 +78,54 @@ def validate_not_current_leader(*, current_leader_team_id: object | None, team_i
             "Sei già il miglior offerente su questo lotto.",
             code="market_live_already_leader",
         )
+
+
+def sort_athletes_alphabetical_by_role(
+    athletes: Sequence[tuple[str, str, str]],
+) -> list[str]:
+    """Order free-agent athletes for the ``ALPHABETICAL_BY_ROLE`` nomination queue.
+
+    ``athletes`` is a sequence of ``(athlete_id, role, canonical_name)`` triples.
+    Sorted P→D→C→A, then alphabetically (case/locale-insensitive) by name inside
+    each role group. Unknown/unresolved role codes sort after A, alphabetically
+    among themselves, rather than raising — a listone gap should never block
+    queue generation for the rest of the league.
+    """
+    ordered = sorted(
+        athletes,
+        key=lambda row: (
+            _ROLE_SORT_ORDER.get(row[1], len(_ROLE_SORT_ORDER)),
+            row[2].casefold(),
+        ),
+    )
+    return [athlete_id for athlete_id, _role, _name in ordered]
+
+
+def shuffle_athlete_ids(
+    athlete_ids: Sequence[str], *, rng: random.Random | None = None
+) -> list[str]:
+    """Order free-agent athletes for the ``RANDOM`` nomination queue.
+
+    Drawn once at session creation, same principle as a real live auction
+    shuffling the deck before play starts — never reshuffled afterwards.
+    ``rng`` is injectable so tests can assert a deterministic order; production
+    call sites pass no ``rng`` (a fresh, unseeded ``random.Random()``).
+    """
+    pool = list(athlete_ids)
+    (rng or random.Random()).shuffle(pool)
+    return pool
+
+
+def compute_turn_team_index(*, nominated_count: int, team_count: int) -> int | None:
+    """Which position in the ``TURN_BASED`` rotation gets to call the next lot.
+
+    Rotates strictly by how many lots have already been opened in the session
+    so far (``nominated_count``), regardless of their outcome — a lot that got
+    no raises, or was cancelled, still consumes that team's turn, exactly like
+    a real live auction where calling a player uses up your turn whether or
+    not anybody bids. Returns ``None`` if there is no team to take a turn.
+    """
+    if team_count <= 0:
+        return None
+    return nominated_count % team_count
+
