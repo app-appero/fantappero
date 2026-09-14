@@ -11,6 +11,8 @@ export type NavLinkItem = {
   badgeCount?: number;
   /** Etichetta accessibile del badge, fornita dall'app. */
   badgeLabel?: string;
+  /** Nome completo quando `label` è abbreviato (bottom nav). */
+  ariaLabel?: string;
   /** When true the item is omitted from assistive nav (handled by parent filter). */
   hidden?: boolean;
 };

@@ -127,6 +127,20 @@ describe("App navigation shell (EPUI-03)", () => {
     expect(html).toContain('aria-label="FantApperò, home"');
   });
 
+  it("uses compact labels in the bottom nav instead of clipping long names", () => {
+    const html = renderAt("/leghe", "?persona=admin&stato=success");
+    const start = html.indexOf('data-testid="bottom-nav"');
+    expect(start).toBeGreaterThan(-1);
+    const end = html.indexOf("</nav>", start);
+    const bottom = html.slice(start, end);
+    expect(bottom).toContain(">Fanta</span>");
+    expect(bottom).toContain(">Formaz.</span>");
+    expect(bottom).toContain(">Class.</span>");
+    expect(bottom).not.toContain(">Fantallenatori</span>");
+    expect(bottom).toContain('aria-label="Fantallenatori"');
+    expect(bottom).toContain('aria-label="Formazione"');
+  });
+
   it("includes asta as a tab inside the movimento giocatori hub", () => {
     const html = renderAt("/mercato");
     expect(html).toContain("Asta");

@@ -49,6 +49,16 @@ describe("EPUI-03 layout components", () => {
     expect(html).toContain('aria-current="page"');
   });
 
+  it("exposes the full destination name when the bottom-nav label is abbreviated", () => {
+    const html = renderToStaticMarkup(
+      createElement(BottomNav, {
+        items: [{ id: "a", label: "Fanta", href: "/fantallenatori", ariaLabel: "Fantallenatori" }],
+      }),
+    );
+    expect(html).toContain("Fanta");
+    expect(html).toContain('aria-label="Fantallenatori"');
+  });
+
   it("renders app header slots used by the compact mobile chrome", () => {
     const html = renderToStaticMarkup(
       createElement(AppHeader, {
