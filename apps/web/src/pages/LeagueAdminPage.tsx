@@ -462,6 +462,7 @@ export function LeagueAdminPage() {
 
               <TabPanel value="configurazione">
                 <form
+                  className="fa-league-admin-form"
                   data-testid="league-admin-form"
                   onSubmit={(event) => void onSubmit(event)}
                 >

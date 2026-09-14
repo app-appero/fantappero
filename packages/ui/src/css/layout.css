@@ -112,12 +112,20 @@
   z-index: var(--fa-z-sticky);
   border-top: 1px solid var(--fa-color-border);
   background-color: var(--fa-color-background-elevated);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
 }
 
 @media (max-width: 767px) {
   .fa-app-shell__main {
     padding-inline: var(--fa-space-sm);
     padding-top: var(--fa-space-sm);
+    padding-bottom: calc(var(--fa-space-md) + 4.75rem + env(safe-area-inset-bottom, 0px));
+    overflow-x: clip;
+  }
+
+  fieldset {
+    min-width: 0;
+    max-width: 100%;
   }
 }
 
@@ -360,18 +368,34 @@
 
 /* ── Bottom nav ─────────────────────────────────────────────────────── */
 
+.fa-bottom-nav {
+  width: 100%;
+}
+
 .fa-bottom-nav__list {
   list-style: none;
   margin: 0;
   padding: var(--fa-space-xs) var(--fa-space-sm);
   display: flex;
   justify-content: space-around;
+  align-items: stretch;
   gap: var(--fa-space-xs);
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  touch-action: pan-x;
+}
+
+.fa-bottom-nav__list::-webkit-scrollbar {
+  display: none;
 }
 
 .fa-bottom-nav__item {
-  flex: 1;
-  max-width: 6rem;
+  flex: 1 1 0;
+  min-width: 0;
+  max-width: 5.5rem;
 }
 
 .fa-bottom-nav__link {
@@ -379,7 +403,7 @@
   flex-direction: column;
   align-items: center;
   gap: 0.125rem;
-  padding: var(--fa-space-xs);
+  padding: var(--fa-space-xs) 0.125rem;
   border-radius: var(--fa-radius-md);
   color: var(--fa-color-foreground-muted);
   text-decoration: none;
@@ -402,11 +426,16 @@
   display: inline-flex;
   width: 1.25rem;
   height: 1.25rem;
+  flex-shrink: 0;
 }
 
 .fa-bottom-nav__label {
   line-height: 1.1;
   text-align: center;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* ── Page container ─────────────────────────────────────────────────── */
@@ -1228,5 +1257,11 @@
   .fa-state-panel__title {
     font-size: var(--fa-text-md);
     margin-bottom: var(--fa-space-xs);
+  }
+
+  .fa-page-container,
+  .fa-page-container__header {
+    min-width: 0;
+    max-width: 100%;
   }
 }

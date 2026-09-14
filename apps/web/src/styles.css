@@ -1635,5 +1635,25 @@ button.fa-link-muted,
   margin-top: 0;
 }
 
+@media (max-width: 767px) {
+  .fa-lifecycle-stepper {
+    flex-wrap: wrap;
+    gap: var(--fa-space-xs);
+  }
+
+  .fa-lifecycle-step {
+    flex: 1 1 auto;
+    min-width: 0;
+    padding: var(--fa-space-xs) var(--fa-space-sm);
+  }
+
+  .fa-league-admin-form,
+  .fa-league-admin-form fieldset,
+  .fa-league-admin-form label {
+    min-width: 0;
+    max-width: 100%;
+  }
+}
+
 
 

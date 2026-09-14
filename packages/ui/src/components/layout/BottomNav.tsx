@@ -38,7 +38,11 @@ export function BottomNav({
       <ul className="fa-bottom-nav__list">
         {visibleItems.map((item) => (
           <li key={item.id} className="fa-bottom-nav__item">
-            <LinkComponent href={item.href} active={item.active}>
+            <LinkComponent
+              href={item.href}
+              active={item.active}
+              aria-label={item.ariaLabel ?? item.label}
+            >
               {item.icon ? (
                 <span className="fa-bottom-nav__icon" aria-hidden="true">
                   {item.icon}

@@ -111,12 +111,24 @@ export const NAV_LABELS: Record<string, string> = {
 };
 
 /**
- * Etichette compatte per la bottom nav (<768px), dove la larghezza per voce è
- * ~6rem. La sidebar e i test usano `NAV_LABELS`.
+ * Etichette compatte per la bottom nav (<768px). Otto voci da admin non
+ * stanno in un telefono se usano i nomi lunghi (`Fantallenatori`, `Formazione`).
+ * La sidebar e i test della navigazione desktop usano `NAV_LABELS`.
  */
 export const NAV_SHORT_LABELS: Record<string, string> = {
   "league-hub": "Lega",
-  "market-hub": "Mercato",
+  matchday: "Turni",
+  "manager-directory": "Fanta",
+  "received-invites": "Inviti",
+  standings: "Class.",
+  "market-hub": "Merc.",
+  formation: "Form.",
+  profile: "Profilo",
+  "admin-home": "Pannello",
+  "admin-leagues": "Leghe",
+  "admin-users": "Utenti",
+  "admin-listone": "Listone",
+  "admin-turni": "Turni",
 };
 
 export type ResolvedNavItem = NavItemDefinition & {

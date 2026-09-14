@@ -147,6 +147,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   const bottomNavItems = navItems.map((item) => ({
     ...item,
     label: NAV_SHORT_LABELS[item.id] ?? item.label,
+    ariaLabel: item.label,
   }));
   const navGroups = resolveNavGroups();
   const expandedGroupIds = navGroups
@@ -275,6 +276,11 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
     active: item.active,
     icon: <IconShield />,
   }));
+  const bottomNavItems = navItems.map((item) => ({
+    ...item,
+    label: NAV_SHORT_LABELS[item.id] ?? item.label,
+    ariaLabel: item.label,
+  }));
 
   return (
     <AppShell
@@ -310,7 +316,7 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
       }
       bottomNav={
         <BottomNav
-          items={navItems}
+          items={bottomNavItems}
           linkComponent={RouterBottomNavLink}
           ariaLabel="Navigazione mobile operatore"
         />
