@@ -10,6 +10,7 @@ import {
   mapFixtureMatchStatus,
   reconcileFixtureKickoffLock,
   resolveDefaultEuropeanTurn,
+  resolveDefaultFormationTurn,
   resolveTurnDisplayStates,
 } from "./fantasyTurns.ts";
 
@@ -133,6 +134,23 @@ describe("fantasyTurns rules", () => {
 
   it("resolveDefaultEuropeanTurn: null for an empty list", () => {
     assert.equal(resolveDefaultEuropeanTurn([]), null);
+  });
+
+  it("resolveDefaultFormationTurn: prefers the first open or locked turn", () => {
+    const turns = [
+      { id: "4", matchStatus: "live" as const, effectiveStatus: "scheduled" as const },
+      { id: "5", matchStatus: "scheduled" as const, effectiveStatus: "open" as const },
+      { id: "6", matchStatus: "scheduled" as const, effectiveStatus: "scheduled" as const },
+    ];
+    assert.equal(resolveDefaultFormationTurn(turns)?.id, "5");
+  });
+
+  it("resolveDefaultFormationTurn: falls back to the current european turn", () => {
+    const turns = [
+      { id: "1", matchStatus: "completed" as const, effectiveStatus: "scheduled" as const },
+      { id: "2", matchStatus: "scheduled" as const, effectiveStatus: "scheduled" as const },
+    ];
+    assert.equal(resolveDefaultFormationTurn(turns)?.id, "2");
   });
 
   it("latches fixture lock after the published kickoff, not before a postponement", () => {

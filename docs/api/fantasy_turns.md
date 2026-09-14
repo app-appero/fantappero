@@ -23,6 +23,12 @@ I turni sono **calcolati automaticamente** dal sistema:
   se la stagione è assente o parziale usa lo stesso backfill full-season);
 - anche dopo sync fixture MVP.
 
+Alla creazione i turni restano `scheduled` (non si aprono tutte le giornate
+future). Il **primo turno ancora giocabile** (cutoff nel futuro) passa a `open`
+quando la stagione diventa `active`, al job `ensure_upcoming`, o al countdown
+formazione se la catena di omologazione non è mai partita (lega nata a stagione
+in corso). Senza questo passaggio Formazione resta bloccata (`turn_not_open`).
+
 Lo stesso job ricalcola cutoff e latch dei turni già materializzati
 quando il provider sposta un orario. L’admin può forzare `POST …/turni/sincronizza`
 o `POST …/ricalcola-cutoff`. La generazione manuale resta disponibile come

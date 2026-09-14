@@ -11,10 +11,11 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 from tests.integration.database.helpers import create_engine_for_url
 
-from database.enums import FantasyTurnKind, FantasyTurnStatus
+from database.enums import FantasyTurnKind, FantasyTurnStatus, LeagueState
 from database.session import create_session_factory
 from fantasy_turns.models import FantasyRound
 from leagues.models.competition import Competition
+from leagues.models.league import League
 from leagues.models.league_rules import LeagueRules
 from tests.integration.fantasy_lineups.test_fantasy_lineups import (
     _create_league,
@@ -93,6 +94,50 @@ def test_turn_not_open_when_the_reference_round_is_scheduled(
     assert body["state"] == "turn_not_open"
     assert body["nextLockAt"] is None
     assert body["roundNumber"] == 1
+
+
+def test_countdown_opens_playable_turn_when_league_is_active(
+    client: TestClient,
+    db_session: Session,
+    competition_ids: list[str],
+) -> None:
+    token, _ = _register_and_login(client, "countdown.active.open@example.com")
+    league_id = _create_league(client, token, competition_ids, "Lega Countdown Active")
+    league = db_session.get(League, UUID(league_id))
+    assert league is not None
+    league.state = LeagueState.ACTIVE
+    now = datetime.now(UTC)
+    db_session.add_all(
+        [
+            FantasyRound(
+                league_id=UUID(league_id),
+                number=1,
+                kind=FantasyTurnKind.WEEKEND,
+                window_start_at=now - timedelta(days=4),
+                window_end_at=now - timedelta(days=1),
+                cutoff_at=now - timedelta(days=3),
+                status=FantasyTurnStatus.SCHEDULED,
+                generated_at=now,
+            ),
+            FantasyRound(
+                league_id=UUID(league_id),
+                number=2,
+                kind=FantasyTurnKind.WEEKEND,
+                window_start_at=now + timedelta(days=1),
+                window_end_at=now + timedelta(days=4),
+                cutoff_at=now + timedelta(days=2),
+                status=FantasyTurnStatus.SCHEDULED,
+                generated_at=now,
+            ),
+        ]
+    )
+    db_session.commit()
+
+    body = _countdown(client, token, league_id)
+    assert body["roundNumber"] == 2
+    assert body["roundStatus"] == "open"
+    assert body["state"] == "no_roster"
+
 
 
 def test_no_roster_when_the_team_has_no_players_assigned(

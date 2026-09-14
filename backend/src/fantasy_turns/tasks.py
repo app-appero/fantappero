@@ -95,7 +95,9 @@ def materialize_initial_fantasy_turns_task(*, league_id: str, actor_id: str | No
     l'admin che ha appena creato la lega. Materializza la struttura
     stagionale dalle fixture anche a rose vuote; se il task non gira,
     ``ensure_upcoming_for_league`` recupera lo stesso backfill alla prima
-    occasione utile. ``auto_open=False``: alla creazione non si aprono turni.
+    occasione utile. ``auto_open=False``: non si aprono *tutti* i turni
+    futuri; il turno giocabile corrente si apre a stagione attiva
+    (``open_current_playable_turn``).
     """
     try:
         worker = validate_worker_settings()
