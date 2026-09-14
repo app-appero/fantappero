@@ -15,6 +15,7 @@ from database.enums import (
     FantasyRole,
     FantasyTurnStatus,
     LeagueAuditAction,
+    LeagueState,
     LineupSlotKind,
     RosterCompositionStatus,
     TacticalMoveStatus,
@@ -151,7 +152,18 @@ class FantasyLineupService:
         """
         now = datetime.now(UTC)
         league = league_access.league
-        reference = FantasyTurnService(self._session).resolve_reference_round(league.id)
+        turn_service = FantasyTurnService(self._session)
+        if league.state == LeagueState.ACTIVE:
+            # Recupero per leghe nate a stagione in corso: i turni restano
+            # tutti scheduled e Formazione/header restano bloccati finché
+            # non parte la catena di omologazione. Idempotente.
+            turn_service.open_current_playable_turn(
+                league.id,
+                now=now,
+                actor_id=None,
+                trigger="countdown",
+            )
+        reference = turn_service.resolve_reference_round(league.id, prefer_playable=True)
         if reference is None:
             return LineupLockCountdownResponse(
                 leagueId=str(league.id),

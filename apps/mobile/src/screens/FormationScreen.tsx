@@ -18,7 +18,7 @@ import {
   moveBenchToIndex,
   orderedBenchFromRoster,
   preserveLockedStarters,
-  resolveDefaultEuropeanTurn,
+  resolveDefaultFormationTurn,
   slotsFromLineupIds,
   starterTemplate,
 } from "@fantappero/contracts";
@@ -206,10 +206,7 @@ export function FormationScreen() {
     try {
       const list = await fetchFantasyTurns(accessToken, activeLeagueId);
       setTurns(list);
-      // Stesso turno di default di Turni (EP07-05): il primo non ancora
-      // concluso, non una scelta propria di questa schermata — altrimenti le
-      // due schermate possono aprirsi su giornate diverse.
-      const preferred = resolveDefaultEuropeanTurn(list);
+      const preferred = resolveDefaultFormationTurn(list);
       if (!preferred) {
         setSelectedRoundId("");
         setContext(null);

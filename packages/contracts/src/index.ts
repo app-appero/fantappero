@@ -147,6 +147,7 @@ export {
 } from "./leagues.js";
 
 export {
+  FANTASY_TURN_STATUS_LABEL,
   TURN_DISPLAY_LABEL,
   aggregateTurnStatus,
   computeCutoff,
@@ -157,6 +158,7 @@ export {
   mapFixtureMatchStatus,
   reconcileFixtureKickoffLock,
   resolveDefaultEuropeanTurn,
+  resolveDefaultFormationTurn,
   resolveTurnDisplayStates,
 } from "./fantasyTurns.js";
 export type {

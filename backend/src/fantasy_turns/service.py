@@ -181,11 +181,20 @@ class FantasyTurnService:
         ).all()
         return [self._to_summary(row, now=now) for row in rounds]
 
-    def resolve_reference_round(self, league_id: UUID) -> FantasyRound | None:
-        """Stessa scelta di "turno corrente" di `resolveDefaultEuropeanTurn`
-        (client) e `list_turns` (sopra), ma con 2 query totali invece di
-        2×N — pensata per un widget chiamato da ogni pagina (header globale),
-        non per l'elenco completo con tutti i dettagli.
+    def resolve_reference_round(
+        self,
+        league_id: UUID,
+        *,
+        prefer_playable: bool = False,
+    ) -> FantasyRound | None:
+        """Turno di riferimento per countdown/header.
+
+        Di default stessa scelta di ``resolveDefaultEuropeanTurn`` (primo turno
+        le cui partite non sono tutte concluse). Con ``prefer_playable`` si
+        privilegia il primo turno già ``open`` o ``locked``: è quello su cui
+        si può schierare la formazione, distinto dal turno calcistico in corso
+        che potrebbe essere ancora ``scheduled`` in una lega nata a stagione
+        iniziata.
         """
         rounds = self._session.scalars(
             select(FantasyRound)
@@ -194,6 +203,14 @@ class FantasyTurnService:
         ).all()
         if not rounds:
             return None
+        if prefer_playable:
+            playable = [
+                row
+                for row in rounds
+                if row.status in {FantasyTurnStatus.OPEN, FantasyTurnStatus.LOCKED}
+            ]
+            if playable:
+                return playable[0]
         round_ids = [row.id for row in rounds]
         fixture_rows = self._session.execute(
             select(FantasyRoundFixture.round_id, Fixture.status_short, Fixture.kickoff_at)
@@ -404,6 +421,13 @@ class FantasyTurnService:
                 now=datetime.now(UTC),
                 actor_id=system_actor,
             )
+            opened = full.opened
+            if auto_open and self.open_current_playable_turn(
+                locked.id,
+                now=datetime.now(UTC),
+                actor_id=system_actor,
+            ):
+                opened += 1
             self._session.commit()
             get_metrics().incr("fantasy_turn_ensure_total", labels={"result": "full_season"})
             logger.info(
@@ -411,7 +435,7 @@ class FantasyTurnService:
                 extra={
                     "league_id": str(locked.id),
                     "created": full.created,
-                    "opened": full.opened,
+                    "opened": opened,
                     "upgraded": full.upgraded,
                     "removed": full.removed,
                 },
@@ -419,7 +443,7 @@ class FantasyTurnService:
             return EnsureFantasyTurnsResponse(
                 leagueId=str(locked.id),
                 created=full.created,
-                opened=full.opened,
+                opened=opened,
                 upgraded=full.upgraded,
                 duplicates=0,
                 waiting=0,
@@ -452,6 +476,12 @@ class FantasyTurnService:
             now=datetime.now(UTC),
             actor_id=system_actor,
         )
+        if auto_open and self.open_current_playable_turn(
+            locked.id,
+            now=datetime.now(UTC),
+            actor_id=system_actor,
+        ):
+            opened += 1
         self._session.commit()
         get_metrics().incr("fantasy_turn_ensure_total", labels={"result": "ok"})
         logger.info(
@@ -1240,6 +1270,64 @@ class FantasyTurnService:
         )
         get_metrics().incr("fantasy_turn_opened_total", labels={"result": "auto"})
         return True
+
+    def open_current_playable_turn(
+        self,
+        league_id: UUID,
+        *,
+        now: datetime,
+        actor_id: UUID | None,
+        trigger: str = "current_playable",
+    ) -> bool:
+        """Apre il primo turno ancora giocabile se nessuno è già in corso.
+
+        Dopo il backfill stagionale i turni nascono tutti ``scheduled``
+        (``auto_open=False`` alla creazione). La catena di omologazione apre
+        il successivo solo dopo il precedente: in una lega nata a stagione
+        iniziata quella catena non parte mai e Formazione resta bloccata.
+        Qui si apre un solo turno: il primo ``scheduled`` con cutoff ancora
+        nel futuro. Se esiste già un ``open`` o ``locked`` è un no-op.
+        """
+        already_in_play = self._session.scalar(
+            select(FantasyRound.id)
+            .where(
+                FantasyRound.league_id == league_id,
+                FantasyRound.status.in_(
+                    (FantasyTurnStatus.OPEN, FantasyTurnStatus.LOCKED)
+                ),
+            )
+            .limit(1)
+        )
+        if already_in_play is not None:
+            return False
+        rounds = self._session.scalars(
+            select(FantasyRound)
+            .where(
+                FantasyRound.league_id == league_id,
+                FantasyRound.status != FantasyTurnStatus.SKIPPED,
+            )
+            .order_by(FantasyRound.number.asc())
+            .with_for_update()
+        ).all()
+        if any(
+            row.status in {FantasyTurnStatus.OPEN, FantasyTurnStatus.LOCKED} for row in rounds
+        ):
+            return False
+        now_utc = ensure_utc(now)
+        for fantasy_round in rounds:
+            if fantasy_round.status != FantasyTurnStatus.SCHEDULED:
+                continue
+            if fantasy_round.cutoff_at is None:
+                continue
+            if self._try_auto_open(
+                fantasy_round,
+                now=now_utc,
+                actor_id=actor_id,
+                trigger=trigger,
+            ):
+                self._session.flush()
+                return True
+        return False
 
     def try_open_next_round(
         self,

@@ -8,6 +8,7 @@ import type {
 } from "@fantappero/contracts";
 import {
   APPROVED_MODULES,
+  FANTASY_TURN_STATUS_LABEL,
   MAX_AUTOMATIC_SUBSTITUTIONS,
   MAX_TACTICAL_MOVES,
   approvedModuleCatalog,
@@ -24,7 +25,7 @@ import {
   moveBenchToIndex,
   orderedBenchFromRoster,
   preserveLockedStarters,
-  resolveDefaultEuropeanTurn,
+  resolveDefaultFormationTurn,
   slotsFromLineupIds,
   starterTemplate,
 } from "@fantappero/contracts";
@@ -185,6 +186,19 @@ const DEMO_TURNS: FantasyTurnSummary[] = [
     matchStatus: "scheduled",
   },
 ];
+
+function formationLockHint(context: LineupContext): string {
+  if (context.effectiveStatus === "scheduled") {
+    return "Questo turno è ancora programmato: non è aperto. Schiera la formazione sul turno con etichetta «aperto», oppure attendi l'apertura automatica.";
+  }
+  if (context.effectiveStatus === "skipped") {
+    return "Questo turno non è stato disputato: non si può schierare la formazione.";
+  }
+  if (!context.modificationAllowed) {
+    return "Nessun calciatore è più modificabile.";
+  }
+  return "I calciatori la cui partita è già iniziata restano bloccati anche se l'orario viene rinviato; gli altri restano modificabili.";
+}
 
 function formatDateTime(value: string | null): string {
   if (!value) {
@@ -565,10 +579,11 @@ export function FormationPage() {
     try {
       const list = await fetchFantasyTurns(session.accessToken, activeLeagueId);
       setTurns(list);
-      // Stesso turno di default di Turni (EP07-05): il primo non ancora
-      // concluso, non un filtro proprio della pagina Formazione — altrimenti
-      // le due pagine possono aprirsi su giornate diverse.
-      const preferred = resolveDefaultEuropeanTurn(list);
+      // Preferisce il primo turno su cui si può schierare (open/locked).
+      // I turni ancora "programmati" restano in elenco ma non sbloccano modulo
+      // e calciatori; allinearli al calendario partite lascerebbe Formazione
+      // aperta su una giornata non ancora sbloccata.
+      const preferred = resolveDefaultFormationTurn(list);
       if (!preferred) {
         setSelectedRoundId("");
         setContext(null);
@@ -1128,7 +1143,7 @@ export function FormationPage() {
                 >
                   {turns.map((turn) => (
                     <option key={turn.id} value={turn.id}>
-                      Turno {turn.number} ({turn.effectiveStatus === "open" ? "aperto" : turn.effectiveStatus})
+                      Turno {turn.number} ({FANTASY_TURN_STATUS_LABEL[turn.effectiveStatus]})
                     </option>
                   ))}
                 </select>
@@ -1156,11 +1171,7 @@ export function FormationPage() {
                 Cutoff (primo kickoff): {formatDateTime(context.cutoffAt)} — lock progressivo per
                 calciatore
               </p>
-              <p data-testid="formation-lock-hint">
-                {context.modificationAllowed
-                  ? "I calciatori la cui partita è già iniziata restano bloccati anche se l'orario viene rinviato; gli altri restano modificabili."
-                  : "Nessun calciatore è più modificabile."}
-              </p>
+              <p data-testid="formation-lock-hint">{formationLockHint(context)}</p>
               {context.previousLineup ? (
                 <p data-testid="formation-previous-hint">
                   Formazione precedente disponibile: turno {context.previousLineup.roundNumber} (

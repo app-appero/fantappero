@@ -77,6 +77,8 @@ describe("EP06-06 formation page", () => {
     expect(html).toContain("Applica formazione migliore");
     expect(html).toContain("Salva bozza");
     expect(html).toContain("rivalidata su rosa e disponibilità");
+    expect(html).toContain('data-testid="formation-round"');
+    expect(html).toContain("aperto");
     expect(html).toContain('data-testid="formation-lock-hint"');
     expect(html).toContain("viene rinviato");
     expect(html).toContain('data-testid="formation-moves-badge"');

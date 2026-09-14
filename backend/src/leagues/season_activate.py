@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from uuid import UUID
 
 from sqlalchemy import func, select
@@ -91,6 +92,14 @@ def try_advance_league_lifecycle(
             after=LeagueState.ACTIVE,
             actor_id=audit_actor_id,
             source="auto_season_start",
+        )
+        from fantasy_turns.service import FantasyTurnService
+
+        FantasyTurnService(session).open_current_playable_turn(
+            league.id,
+            now=datetime.now(UTC),
+            actor_id=audit_actor_id,
+            trigger="season_start",
         )
         return LeagueState.ACTIVE
 

@@ -978,3 +978,61 @@ def test_prune_invalid_rounds_removes_phantom_turns_and_renumbers(
     assert [row.number for row in remaining] == [1, 2]
     assert db_session.get(FantasyRound, phantom_1.id) is None
     assert db_session.get(FantasyRound, phantom_2.id) is None
+
+
+def test_open_current_playable_turn_skips_elapsed_cutoff_and_opens_next(
+    client: TestClient,
+    db_session: Session,
+    competition_ids: list[str],
+) -> None:
+    """Lega nata a stagione in corso: non aprire turni già scaduti, uno solo futuro."""
+    from database.enums import FantasyTurnKind, FantasyTurnStatus
+    from fantasy_turns.service import FantasyTurnService
+
+    token, _ = _register_and_login(client, "turn.playable.current@example.com")
+    league_id = _create_league(client, token, competition_ids, "Lega Playable")
+    now = datetime.now(UTC)
+    past = FantasyRound(
+        league_id=UUID(league_id),
+        number=1,
+        kind=FantasyTurnKind.WEEKEND,
+        window_start_at=now - timedelta(days=4),
+        window_end_at=now - timedelta(days=1),
+        cutoff_at=now - timedelta(days=3),
+        status=FantasyTurnStatus.SCHEDULED,
+        generated_at=now,
+    )
+    current = FantasyRound(
+        league_id=UUID(league_id),
+        number=2,
+        kind=FantasyTurnKind.WEEKEND,
+        window_start_at=now + timedelta(days=1),
+        window_end_at=now + timedelta(days=4),
+        cutoff_at=now + timedelta(days=2),
+        status=FantasyTurnStatus.SCHEDULED,
+        generated_at=now,
+    )
+    later = FantasyRound(
+        league_id=UUID(league_id),
+        number=3,
+        kind=FantasyTurnKind.WEEKEND,
+        window_start_at=now + timedelta(days=8),
+        window_end_at=now + timedelta(days=11),
+        cutoff_at=now + timedelta(days=9),
+        status=FantasyTurnStatus.SCHEDULED,
+        generated_at=now,
+    )
+    db_session.add_all([past, current, later])
+    db_session.commit()
+
+    service = FantasyTurnService(db_session)
+    assert service.open_current_playable_turn(UUID(league_id), now=now, actor_id=None) is True
+    db_session.commit()
+    db_session.refresh(past)
+    db_session.refresh(current)
+    db_session.refresh(later)
+    assert past.status == FantasyTurnStatus.SCHEDULED
+    assert current.status == FantasyTurnStatus.OPEN
+    assert later.status == FantasyTurnStatus.SCHEDULED
+
+    assert service.open_current_playable_turn(UUID(league_id), now=now, actor_id=None) is False

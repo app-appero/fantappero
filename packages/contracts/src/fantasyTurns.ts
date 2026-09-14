@@ -448,6 +448,14 @@ export const TURN_DISPLAY_LABEL: Record<TurnDisplayState, string> = {
   upcoming: "Da disputare",
 };
 
+/** Etichette italiane dello stato di ciclo di vita del turno (scheduled/open/…). */
+export const FANTASY_TURN_STATUS_LABEL: Record<FantasyTurnStatus, string> = {
+  scheduled: "programmato",
+  open: "aperto",
+  locked: "chiuso",
+  skipped: "non disputato",
+};
+
 /**
  * Colloca ogni turno rispetto ad *adesso*, non rispetto al suo stato interno:
  * concluso, in corso, il primo ancora da giocare, tutti gli altri. `turns`
@@ -490,4 +498,18 @@ export function resolveDefaultEuropeanTurn<
     }
   }
   return turns[turns.length - 1] ?? null;
+}
+
+/**
+ * Turno di default per Formazione: il primo su cui si può ancora schierare
+ * (`open` / `locked`). I turni `scheduled` restano in elenco ma non sono
+ * modificabili; se nessuno è giocabile si ricade sul turno europeo corrente.
+ */
+export function resolveDefaultFormationTurn<
+  T extends { effectiveStatus: FantasyTurnStatus; matchStatus: FantasyTurnAggregateStatus },
+>(turns: readonly T[]): T | null {
+  const playable = turns.find(
+    (turn) => turn.effectiveStatus === "open" || turn.effectiveStatus === "locked",
+  );
+  return playable ?? resolveDefaultEuropeanTurn(turns);
 }
