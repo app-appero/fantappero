@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import { AuthProvider } from "../auth/AuthContext";
 import { AppRoutes } from "../routes";
 import { MemoryRouter } from "../router/simpleRouter";
+import { CreateLeagueSuccess } from "./CreateLeaguePage";
 
 vi.mock("../api/auth", () => ({
   login: vi.fn(),
@@ -47,6 +48,60 @@ describe("EP03-01 create league page", () => {
     const year = new Date().getFullYear();
     expect(html).toContain(`${year}-${year + 1}`);
     expect(html).toContain('data-testid="create-league-season"');
+  });
+
+  it("renders a compact success view with optional invites after creation", () => {
+    const html = renderToStaticMarkup(
+      createElement(MemoryRouter, {
+        initialEntries: ["/leghe/crea?persona=admin"],
+        children: createElement(CreateLeagueSuccess, {
+          league: {
+            id: "demo-created-league",
+            name: "Test",
+            seasonYear: new Date().getFullYear(),
+            state: "draft",
+            viewerRole: "league_admin",
+            competitions: [],
+            rules: {
+              presetName: "standard",
+              participantCount: 8,
+              participantMin: 4,
+              participantMax: 10,
+              roster: {
+                rosterSize: 35,
+                goalkeepers: 3,
+                defenders: 11,
+                midfielders: 11,
+                forwards: 10,
+              },
+              totalCredits: 1000,
+              minFixturesPerRound: 25,
+              turnCoverageThreshold: 0.75,
+              lineupLockMarginMinutes: 15,
+              minutesThreshold: 15,
+              voluntaryReleaseRefundPercent: 50,
+              leagueExitRefundPercent: 100,
+              maxActiveTradeProposalsPerTeam: 10,
+              options: {
+                allowTrades: true,
+                allowManualInvites: true,
+                requireTradeApproval: false,
+              },
+            },
+          },
+          isDemoMode: true,
+          search: "?persona=admin",
+        }),
+      }),
+    );
+    expect(html).toContain("fa-create-league-success");
+    expect(html).toContain('data-testid="create-league-success"');
+    expect(html).toContain("Fase 1 completata: lega salvata");
+    expect(html).toContain("Invita fantallenatori");
+    expect(html).toContain("fa-manager-directory--compact");
+    expect(html).toContain('data-testid="create-league-go-admin"');
+    expect(html).toContain("Configura la lega");
+    expect(html).toContain('data-testid="create-league-done"');
   });
 
   it("redirects unauthenticated users away from create route", () => {

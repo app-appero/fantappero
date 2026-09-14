@@ -51,6 +51,8 @@ async function createLeague(page: import("@playwright/test").Page, leagueName: s
   await page.getByTestId("create-league-select-all").click();
   await page.getByTestId("create-league-submit").click();
 
+  await expect(page.getByTestId("create-league-success")).toBeVisible();
+  await page.getByTestId("create-league-go-admin").click();
   await expect(page).toHaveURL(/\/lega\/amministrazione/);
   await expect(page.getByTestId("league-admin-form")).toBeVisible();
 }

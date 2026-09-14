@@ -13,6 +13,12 @@
   border-color: color-mix(in srgb, var(--fa-color-warning) 40%, var(--fa-color-border));
 }
 
+@media (max-width: 767px) {
+  .fa-user-chip {
+    display: none;
+  }
+}
+
 .fa-admin-brand {
   color: var(--fa-color-warning);
   text-decoration: none;
@@ -335,10 +341,17 @@ button.fa-link-muted,
   gap: var(--fa-space-md);
 }
 
-.fa-manager-directory {
-  display: grid;
-  gap: var(--fa-space-md);
-  margin-block: var(--fa-space-lg);
+.fa-manager-directory__title {
+  margin: 0;
+  font-size: var(--fa-text-lg);
+  font-weight: 600;
+  line-height: var(--fa-leading-tight);
+}
+
+.fa-manager-directory__intro {
+  margin: 0;
+  font-size: var(--fa-text-sm);
+  color: var(--fa-color-foreground-muted);
 }
 
 .fa-manager-directory--compact {
@@ -741,14 +754,47 @@ button.fa-link-muted,
 }
 
 @media (max-width: 44rem) {
-  .fa-manager-directory__filters {
-    grid-template-columns: 1fr;
+  .fa-manager-directory {
+    margin-block: var(--fa-space-md);
+    gap: var(--fa-space-sm);
   }
 
-  .fa-manager-directory__item,
+  .fa-manager-directory--compact {
+    padding-block: var(--fa-space-sm);
+  }
+
+  .fa-manager-directory__filters {
+    grid-template-columns: 1fr 1fr;
+    gap: var(--fa-space-sm);
+  }
+
+  .fa-manager-directory__filters > :first-child {
+    grid-column: 1 / -1;
+  }
+
+  .fa-manager-directory__item {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: start;
+    gap: var(--fa-space-sm);
+    padding: var(--fa-space-sm);
+  }
+
   .fa-received-invites__item {
     align-items: flex-start;
     flex-wrap: wrap;
+  }
+
+  .fa-manager-directory__item > .fa-btn,
+  .fa-manager-directory__status {
+    grid-column: 1 / -1;
+    width: 100%;
+    justify-self: stretch;
+  }
+
+  .fa-manager-directory__pagination {
+    flex-wrap: wrap;
+    gap: var(--fa-space-sm);
   }
 }
 
@@ -842,6 +888,52 @@ button.fa-link-muted,
 .fa-competition-picker__country {
   color: var(--fa-color-foreground-muted);
   font-size: var(--fa-text-xs);
+}
+
+.fa-create-league-success__hint {
+  margin: 0;
+  font-size: var(--fa-text-sm);
+  color: var(--fa-color-foreground-muted);
+}
+
+.fa-create-league-success__actions,
+.fa-create-league-page__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--fa-space-sm);
+}
+
+@media (max-width: 767px) {
+  .fa-competition-picker {
+    padding: var(--fa-space-sm);
+    margin-bottom: var(--fa-space-md);
+  }
+
+  .fa-create-league-success__actions,
+  .fa-create-league-page__actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .fa-create-league-success__actions a,
+  .fa-create-league-page__actions a,
+  .fa-create-league-success__actions .fa-btn,
+  .fa-create-league-page__actions .fa-btn {
+    width: 100%;
+  }
+
+  .fa-create-league-success__actions {
+    position: sticky;
+    bottom: calc(4.25rem + env(safe-area-inset-bottom, 0px));
+    z-index: 1;
+    margin-inline: calc(-1 * var(--fa-space-sm));
+    margin-bottom: calc(-1 * var(--fa-space-sm));
+    padding: var(--fa-space-sm);
+    border-top: 1px solid var(--fa-color-border);
+    background: color-mix(in srgb, var(--fa-color-background) 92%, transparent);
+    backdrop-filter: blur(8px);
+  }
 }
 
 .fa-starter-slot__trigger {

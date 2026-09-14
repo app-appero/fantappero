@@ -520,8 +520,12 @@ export function ManagerDirectory({
       className={compact ? "fa-manager-directory fa-manager-directory--compact" : "fa-manager-directory"}
       aria-labelledby="manager-directory-title"
     >
-      <h2 id="manager-directory-title">{title}</h2>
-      <p>Consulta i fantallenatori e invitali nominativamente nella lega.</p>
+      <h2 id="manager-directory-title" className="fa-manager-directory__title">
+        {title}
+      </h2>
+      <p className="fa-manager-directory__intro">
+        Consulta i fantallenatori e invitali nominativamente nella lega.
+      </p>
 
       <div className="fa-manager-directory__filters">
         <Input

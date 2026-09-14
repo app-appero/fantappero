@@ -49,6 +49,19 @@ describe("EPUI-03 layout components", () => {
     expect(html).toContain('aria-current="page"');
   });
 
+  it("renders app header slots used by the compact mobile chrome", () => {
+    const html = renderToStaticMarkup(
+      createElement(AppHeader, {
+        brand: "FantApperò",
+        contextSlot: createElement("span", null, "Lega"),
+        actionsSlot: createElement("span", null, "Esci"),
+      }),
+    );
+    expect(html).toContain("fa-app-header__brand");
+    expect(html).toContain("fa-app-header__context");
+    expect(html).toContain("fa-app-header__actions");
+  });
+
   it("applies admin visual treatment on global operator shell", () => {
     const html = renderToStaticMarkup(
       createElement(

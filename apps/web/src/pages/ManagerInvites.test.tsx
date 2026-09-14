@@ -60,6 +60,8 @@ describe("directory fantallenatori", () => {
     });
     expect(html).toContain('data-testid="manager-directory-list"');
     expect(html).toContain("Lucia Bianchi");
+    expect(html).toContain("fa-manager-directory__title");
+    expect(html).toContain("fa-manager-directory__intro");
     expect(html).toContain("Manuale");
     expect(html).toContain("IA");
     expect(html).toContain("Indisponibile");

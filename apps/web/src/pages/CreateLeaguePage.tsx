@@ -1,4 +1,4 @@
-import type { CompetitionSummary } from "@fantappero/contracts";
+import type { CompetitionSummary, LeagueDetail, LeagueRules } from "@fantappero/contracts";
 import {
   Breadcrumb,
   Button,
@@ -9,8 +9,9 @@ import {
 import { type FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { createLeague, fetchCompetitions } from "../api/leagues";
 import { getApiErrorMessage, useAuth } from "../auth/AuthContext";
+import { ManagerDirectory } from "../components/ManagerDirectory";
 import { loadStoredSession } from "../auth/sessionStorage";
-import { Link, useLocation, useNavigate } from "../router/simpleRouter";
+import { Link, useLocation } from "../router/simpleRouter";
 import { parseWireframeStateFromSearch } from "../wireframes/useWireframeState";
 
 const DEMO_COMPETITIONS: CompetitionSummary[] = [
@@ -30,9 +31,107 @@ export function formatSeasonLabel(seasonYear: number): string {
   return `${seasonYear}-${seasonYear + 1}`;
 }
 
+const DEMO_CREATED_RULES: LeagueRules = {
+  presetName: "standard",
+  participantCount: 8,
+  participantMin: 4,
+  participantMax: 10,
+  roster: {
+    rosterSize: 35,
+    goalkeepers: 3,
+    defenders: 11,
+    midfielders: 11,
+    forwards: 10,
+  },
+  totalCredits: 1000,
+  minFixturesPerRound: 25,
+  turnCoverageThreshold: 0.75,
+  lineupLockMarginMinutes: 15,
+  minutesThreshold: 15,
+  voluntaryReleaseRefundPercent: 50,
+  leagueExitRefundPercent: 100,
+  maxActiveTradeProposalsPerTeam: 10,
+  options: {
+    allowTrades: true,
+    allowManualInvites: true,
+    requireTradeApproval: false,
+  },
+};
+
+function buildDemoCreatedLeague(
+  name: string,
+  seasonYear: number,
+  competitions: CompetitionSummary[],
+): LeagueDetail {
+  return {
+    id: "demo-created-league",
+    name,
+    seasonYear,
+    state: "draft",
+    viewerRole: "league_admin",
+    competitions,
+    rules: DEMO_CREATED_RULES,
+  };
+}
+
+type CreateLeagueSuccessProps = {
+  league: LeagueDetail;
+  isDemoMode: boolean;
+  search: string;
+};
+
+/** Schermata post-creazione: conferma + inviti facoltativi, pensata anche per viewport stretti. */
+export function CreateLeagueSuccess({ league, isDemoMode, search }: CreateLeagueSuccessProps) {
+  return (
+    <PageContainer
+      className="fa-create-league-success"
+      density="compact"
+      title="Lega creata"
+      header={
+        <Breadcrumb
+          items={[
+            { label: "Leghe", href: "/leghe" },
+            { label: "Crea lega" },
+          ]}
+        />
+      }
+    >
+      <UiStatePanel
+        state="success"
+        title="Fase 1 completata: lega salvata"
+        message={`«${league.name}» è pronta per la configurazione. Sei amministratore della lega.`}
+        testId="create-league-success"
+      />
+      <ManagerDirectory
+        leagueId={league.id}
+        isDemoMode={isDemoMode}
+        search={search}
+        title="Invita fantallenatori"
+        compact
+        memberCount={1}
+        participantCount={league.rules?.participantCount ?? null}
+      />
+      <p className="fa-create-league-success__hint">
+        Fase 2 facoltativa: puoi invitare ora o farlo dopo dalla tab Invitati.
+      </p>
+      <div className="fa-create-league-success__actions">
+        <Link to="/lega/amministrazione">
+          <Button variant="primary" data-testid="create-league-go-admin">
+            Configura la lega
+          </Button>
+        </Link>
+        <Link to="/leghe">
+          <Button type="button" variant="ghost" data-testid="create-league-done">
+            Più tardi
+          </Button>
+        </Link>
+      </div>
+    </PageContainer>
+  );
+}
+
 /** Configurazione iniziale di una lega privata in bozza (EP03-01). */
 export function CreateLeaguePage() {
-  const navigate = useNavigate();
   const { isDemoMode, registerLeague } = useAuth();
   const { search } = useLocation();
   const demoState = isDemoMode ? parseWireframeStateFromSearch(search) : null;
@@ -53,6 +152,7 @@ export function CreateLeaguePage() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [formError, setFormError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [createdLeague, setCreatedLeague] = useState<LeagueDetail | null>(null);
   const allSelected = competitions.length > 0 && selectedIds.size === competitions.length;
 
   const loadCatalog = useCallback(async () => {
@@ -143,7 +243,13 @@ export function CreateLeaguePage() {
         name: name.trim(),
         role: "league_admin",
       });
-      navigate("/lega/amministrazione");
+      setCreatedLeague(
+        buildDemoCreatedLeague(
+          name.trim(),
+          seasonYear,
+          competitions.filter((row) => selectedIds.has(row.id)),
+        ),
+      );
       return;
     }
 
@@ -165,7 +271,7 @@ export function CreateLeaguePage() {
         name: created.name,
         role: created.viewerRole === "league_admin" ? "league_admin" : "member",
       });
-      navigate("/lega/amministrazione");
+      setCreatedLeague(created);
     } catch (error) {
       setFormError(getApiErrorMessage(error, "Impossibile creare la lega."));
     } finally {
@@ -173,8 +279,16 @@ export function CreateLeaguePage() {
     }
   }
 
+  if (createdLeague) {
+    return (
+      <CreateLeagueSuccess league={createdLeague} isDemoMode={isDemoMode} search={search} />
+    );
+  }
+
   return (
     <PageContainer
+      className="fa-create-league-page"
+      density="compact"
       title="Crea lega"
       header={
         <Breadcrumb
@@ -285,7 +399,7 @@ export function CreateLeaguePage() {
             />
           ) : null}
 
-          <div className="fa-ds-showcase__row">
+          <div className="fa-create-league-page__actions">
             <Button
               type="submit"
               variant="primary"
