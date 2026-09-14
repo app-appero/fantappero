@@ -101,6 +101,7 @@ describe("EP03-01 create league page", () => {
     expect(html).toContain("fa-manager-directory--compact");
     expect(html).toContain('data-testid="create-league-go-admin"');
     expect(html).toContain("Configura la lega");
+    expect(html).toContain('href="/lega/amministrazione?persona=admin"');
     expect(html).toContain('data-testid="create-league-done"');
   });
 

@@ -115,12 +115,12 @@ export function CreateLeagueSuccess({ league, isDemoMode, search }: CreateLeague
         Fase 2 facoltativa: puoi invitare ora o farlo dopo dalla tab Invitati.
       </p>
       <div className="fa-create-league-success__actions">
-        <Link to="/lega/amministrazione">
+        <Link to={`/lega/amministrazione${search}`}>
           <Button variant="primary" data-testid="create-league-go-admin">
             Configura la lega
           </Button>
         </Link>
-        <Link to="/leghe">
+        <Link to={`/leghe${search}`}>
           <Button type="button" variant="ghost" data-testid="create-league-done">
             Più tardi
           </Button>

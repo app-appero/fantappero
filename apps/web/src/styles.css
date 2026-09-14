@@ -902,6 +902,7 @@ button.fa-link-muted,
   flex-wrap: wrap;
   align-items: center;
   gap: var(--fa-space-sm);
+  margin-top: var(--fa-space-md);
 }
 
 @media (max-width: 767px) {
@@ -924,15 +925,13 @@ button.fa-link-muted,
   }
 
   .fa-create-league-success__actions {
-    position: sticky;
-    bottom: calc(4.25rem + env(safe-area-inset-bottom, 0px));
-    z-index: 1;
-    margin-inline: calc(-1 * var(--fa-space-sm));
-    margin-bottom: calc(-1 * var(--fa-space-sm));
-    padding: var(--fa-space-sm);
+    margin-top: var(--fa-space-sm);
+    padding-top: var(--fa-space-sm);
     border-top: 1px solid var(--fa-color-border);
-    background: color-mix(in srgb, var(--fa-color-background) 92%, transparent);
-    backdrop-filter: blur(8px);
+    background: transparent;
+    position: static;
+    margin-inline: 0;
+    margin-bottom: 0;
   }
 }
 
