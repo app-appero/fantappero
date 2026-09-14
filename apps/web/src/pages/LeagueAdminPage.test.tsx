@@ -112,6 +112,16 @@ describe("EP03-02 league admin page", () => {
     expect(html).toContain("Inviti non disponibili");
   });
 
+  it("a directory piena in setup mostra Lega al completo e tiene la lista", () => {
+    const html = renderRoute(
+      "/lega/amministrazione?persona=admin&inviti=empty&directory=capacity",
+    );
+    expect(html).toContain('data-testid="manager-directory-capacity"');
+    expect(html).toContain("Lega al completo");
+    expect(html).toContain('data-testid="manager-directory-list"');
+    expect(html).not.toContain("Directory non disponibile");
+  });
+
   it("renders empty participant state", () => {
     const html = renderRoute("/lega/amministrazione?persona=admin&partecipanti=empty");
     expect(html).toContain('data-testid="league-members-empty"');

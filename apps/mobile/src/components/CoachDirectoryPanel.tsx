@@ -34,6 +34,8 @@ export type CoachDirectoryPanelProps = {
   reloadToken?: number;
   /** Chiamato quando un reload richiesto via reloadToken è terminato. */
   onReloadSettled?: () => void;
+  /** Ricarica iscritti e prerequisiti dopo un ingresso in lega o a capienza piena. */
+  onMembershipChanged?: () => void;
 };
 
 /** Directory fantallenatori via API (come web ManagerDirectory). */
@@ -44,26 +46,33 @@ export function CoachDirectoryPanel({
   testIDPrefix,
   reloadToken,
   onReloadSettled,
+  onMembershipChanged,
 }: CoachDirectoryPanelProps) {
   const { accessToken, can } = useAuthSession();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const [items, setItems] = useState<FantasyCoachDirectoryItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [inviteError, setInviteError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [workingId, setWorkingId] = useState<string | null>(null);
+  const [capacityReached, setCapacityReached] = useState(false);
+  const leagueFull = capacityReached || memberCount >= capacity;
 
   const load = useCallback(
     async (options?: { silent?: boolean }) => {
-      setSuccess(null);
+      if (!options?.silent) {
+        setSuccess(null);
+        setInviteError(null);
+      }
       if (!can(["league:admin"])) {
-        setError("Solo l’amministratore della lega può consultare la directory.");
+        setLoadError("Solo l’amministratore della lega può consultare la directory.");
         setItems([]);
         setLoading(false);
         return;
       }
       if (!accessToken) {
-        setError("Sessione non disponibile. Accedi di nuovo.");
+        setLoadError("Sessione non disponibile. Accedi di nuovo.");
         setItems([]);
         setLoading(false);
         return;
@@ -71,15 +80,15 @@ export function CoachDirectoryPanel({
       if (!options?.silent) {
         setLoading(true);
       }
-      setError(null);
+      setLoadError(null);
       try {
         const page = await fetchManagerDirectory(accessToken, leagueId, { pageSize: 20 });
         setItems(page.items);
-      } catch (loadError) {
-        if (loadError instanceof ApiError && loadError.status === 403) {
-          setError("Non hai i permessi per consultare la directory.");
+      } catch (directoryError) {
+        if (directoryError instanceof ApiError && directoryError.status === 403) {
+          setLoadError("Non hai i permessi per consultare la directory.");
         } else {
-          setError(getApiErrorMessage(loadError, "Impossibile caricare la directory."));
+          setLoadError(getApiErrorMessage(directoryError, "Impossibile caricare la directory."));
         }
         setItems([]);
       } finally {
@@ -116,31 +125,42 @@ export function CoachDirectoryPanel({
   }
 
   async function onInvite(manager: FantasyCoachDirectoryItem) {
-    setError(null);
+    setInviteError(null);
     setSuccess(null);
     if (!manager.availableForInvites) {
-      setError("Questo fantallenatore non accetta inviti.");
+      setInviteError("Questo fantallenatore non accetta inviti.");
       return;
     }
     if (manager.namedInviteStatus === "pending") {
-      setError("Hai già invitato questo fantallenatore.");
+      setInviteError("Hai già invitato questo fantallenatore.");
       return;
     }
-    if (memberCount >= capacity) {
-      setError("La lega ha raggiunto la capienza massima.");
+    if (leagueFull) {
       return;
     }
     if (!accessToken) {
-      setError("Sessione non disponibile. Accedi di nuovo.");
+      setInviteError("Sessione non disponibile. Accedi di nuovo.");
       return;
     }
     setWorkingId(manager.userId);
     try {
-      await createNamedLeagueInvite(accessToken, leagueId, manager.userId);
-      setSuccess(`Invito inviato a ${manager.displayName}.`);
+      const created = await createNamedLeagueInvite(accessToken, leagueId, manager.userId);
+      setSuccess(
+        created.autoAccepted
+          ? `${manager.displayName} è entrato automaticamente nella lega.`
+          : `Invito inviato a ${manager.displayName}.`,
+      );
       await load({ silent: true });
-    } catch (inviteError) {
-      setError(getApiErrorMessage(inviteError, "Impossibile inviare l'invito."));
+      if (created.autoAccepted) {
+        onMembershipChanged?.();
+      }
+    } catch (error) {
+      if (error instanceof ApiError && error.code === "league_full") {
+        setCapacityReached(true);
+        onMembershipChanged?.();
+        return;
+      }
+      setInviteError(getApiErrorMessage(error, "Impossibile inviare l'invito."));
     } finally {
       setWorkingId(null);
     }
@@ -157,13 +177,13 @@ export function CoachDirectoryPanel({
     );
   }
 
-  if (error && items.length === 0) {
+  if (loadError && items.length === 0) {
     return (
       <View style={styles.section}>
         <UiStatePanel
           state="error"
           title="Directory non disponibile"
-          message={error}
+          message={loadError}
           testID={`${testIDPrefix}-error`}
         />
         <Pressable
@@ -191,11 +211,19 @@ export function CoachDirectoryPanel({
           testID={`${testIDPrefix}-invite-success`}
         />
       ) : null}
-      {error ? (
+      {leagueFull ? (
+        <UiStatePanel
+          state="empty"
+          title="Lega al completo"
+          message="La lega è al completo: non puoi inviare altri inviti. La directory resta consultabile."
+          testID={`${testIDPrefix}-capacity`}
+        />
+      ) : null}
+      {inviteError ? (
         <UiStatePanel
           state="error"
           title="Invito non riuscito"
-          message={error}
+          message={inviteError}
           testID={`${testIDPrefix}-invite-error`}
         />
       ) : null}
@@ -232,11 +260,12 @@ export function CoachDirectoryPanel({
               </Pressable>
               <Pressable
                 accessibilityRole="button"
-                disabled={pending || unavailable || workingId === coach.userId}
+                disabled={pending || unavailable || leagueFull || workingId === coach.userId}
                 onPress={() => void onInvite(coach)}
                 style={[
                   styles.button,
-                  (pending || unavailable || workingId === coach.userId) && styles.buttonDisabled,
+                  (pending || unavailable || leagueFull || workingId === coach.userId) &&
+                    styles.buttonDisabled,
                 ]}
                 testID={`${testIDPrefix}-invite-${coach.userId}`}
               >

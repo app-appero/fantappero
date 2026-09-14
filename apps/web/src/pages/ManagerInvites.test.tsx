@@ -85,6 +85,25 @@ describe("directory fantallenatori", () => {
     });
     expect(empty).toContain('data-testid="manager-directory-empty"');
     expect(capacity).toContain('data-testid="manager-directory-capacity"');
+    expect(capacity).toContain("Lega al completo");
+    expect(capacity).toContain('data-testid="manager-directory-list"');
+    expect(capacity).not.toContain('data-testid="manager-directory-error"');
+    expect(capacity).not.toContain("Directory non disponibile");
+  });
+
+  it("a lega piena mostra l'avviso e tiene visibile la directory", () => {
+    const html = renderDirectory({
+      leagueId: "demo-league",
+      isDemoMode: true,
+      search: "",
+      memberCount: 8,
+      participantCount: 8,
+    });
+    expect(html).toContain('data-testid="manager-directory-capacity"');
+    expect(html).toContain("Lega al completo");
+    expect(html).toContain('data-testid="manager-directory-list"');
+    expect(html).not.toContain("Directory non disponibile");
+    expect(html).toContain("Invita");
   });
 });
 

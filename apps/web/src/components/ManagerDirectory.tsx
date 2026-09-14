@@ -206,6 +206,12 @@ type ManagerDirectoryProps = {
   search?: string;
   title?: string;
   compact?: boolean;
+  /** Iscritti attuali, per mostrare «lega al completo» senza un invito fallito. */
+  memberCount?: number | null;
+  /** Capienza regolamento (`participantCount`). */
+  participantCount?: number | null;
+  /** Ricarica iscritti e prerequisiti dopo un ingresso in lega o a capienza piena. */
+  onMembershipChanged?: () => void;
 };
 
 function inviteErrorMessage(error: unknown): string {
@@ -315,6 +321,9 @@ export function ManagerDirectory({
   search = "",
   title = "Directory fantallenatori",
   compact = false,
+  memberCount = null,
+  participantCount = null,
+  onMembershipChanged,
 }: ManagerDirectoryProps) {
   const demoState = new URLSearchParams(search).get("directory");
   const [query, setQuery] = useState("");
@@ -334,15 +343,19 @@ export function ManagerDirectory({
       : null,
   );
   const [loading, setLoading] = useState(!isDemoMode);
-  const [error, setError] = useState<string | null>(() => {
+  const [loadError, setLoadError] = useState<string | null>(() => {
     if (!isDemoMode) return null;
     if (demoState === "error") return "Impossibile caricare la directory (demo).";
     if (demoState === "forbidden") return "Non hai i permessi per consultare la directory.";
     return null;
   });
+  const [inviteError, setInviteError] = useState<string | null>(null);
   const [workingId, setWorkingId] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [capacityReached, setCapacityReached] = useState(isDemoMode && demoState === "capacity");
+  const membersFull =
+    memberCount != null && participantCount != null && memberCount >= participantCount;
+  const leagueFull = capacityReached || membersFull;
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -354,16 +367,17 @@ export function ManagerDirectory({
 
   const load = useCallback(async () => {
     setSuccess(null);
+    setInviteError(null);
     if (isDemoMode) {
       setLoading(demoState === "loading");
       setCapacityReached(demoState === "capacity");
       if (demoState === "error") {
-        setError("Impossibile caricare la directory (demo).");
+        setLoadError("Impossibile caricare la directory (demo).");
         setResult(null);
         return;
       }
       if (demoState === "forbidden") {
-        setError("Non hai i permessi per consultare la directory.");
+        setLoadError("Non hai i permessi per consultare la directory.");
         setResult(null);
         return;
       }
@@ -379,23 +393,23 @@ export function ManagerDirectory({
                   manager.availableForInvites === (availableFilter === "true")),
             );
       setResult({ items: filtered, page: 1, pageSize: 12, total: filtered.length, totalPages: 1 });
-      setError(null);
+      setLoadError(null);
       return;
     }
 
     const session = loadStoredSession();
     if (!session?.accessToken) {
-      setError("Sessione non disponibile. Accedi di nuovo.");
+      setLoadError("Sessione non disponibile. Accedi di nuovo.");
       setLoading(false);
       return;
     }
     if (!leagueId) {
-      setError("Seleziona una lega amministrata per consultare la directory.");
+      setLoadError("Seleziona una lega amministrata per consultare la directory.");
       setLoading(false);
       return;
     }
     setLoading(true);
-    setError(null);
+    setLoadError(null);
     try {
       setResult(
         await fetchManagerDirectory(session.accessToken, leagueId, {
@@ -406,11 +420,11 @@ export function ManagerDirectory({
           page,
         }),
       );
-    } catch (loadError) {
-      if (loadError instanceof ApiError && loadError.status === 403) {
-        setError("Non hai i permessi per consultare la directory.");
+    } catch (directoryError) {
+      if (directoryError instanceof ApiError && directoryError.status === 403) {
+        setLoadError("Non hai i permessi per consultare la directory.");
       } else {
-        setError(getApiErrorMessage(loadError, "Impossibile caricare la directory."));
+        setLoadError(getApiErrorMessage(directoryError, "Impossibile caricare la directory."));
       }
       setResult(null);
     } finally {
@@ -430,22 +444,21 @@ export function ManagerDirectory({
   }
 
   async function onInvite(manager: FantasyCoachDirectoryItem) {
-    setError(null);
+    setInviteError(null);
     setSuccess(null);
     if (!manager.availableForInvites) {
-      setError("Questo fantallenatore non accetta inviti.");
+      setInviteError("Questo fantallenatore non accetta inviti.");
       return;
     }
     if (manager.namedInviteStatus === "pending") {
-      setError("Hai già invitato questo fantallenatore.");
+      setInviteError("Hai già invitato questo fantallenatore.");
       return;
     }
-    if (capacityReached) {
-      setError("La lega ha raggiunto la capienza massima.");
+    if (leagueFull) {
       return;
     }
     if (!leagueId) {
-      setError("Seleziona una lega prima di inviare un invito.");
+      setInviteError("Seleziona una lega prima di inviare un invito.");
       return;
     }
     if (isDemoMode) {
@@ -464,13 +477,12 @@ export function ManagerDirectory({
     }
     const session = loadStoredSession();
     if (!session?.accessToken) {
-      setError("Sessione non disponibile. Accedi di nuovo.");
+      setInviteError("Sessione non disponibile. Accedi di nuovo.");
       return;
     }
     setWorkingId(manager.userId);
     try {
       const created = await createNamedLeagueInvite(session.accessToken, leagueId, manager.userId);
-      setCapacityReached(false);
       setSuccess(
         created.autoAccepted
           ? `${manager.displayName} è entrato automaticamente nella lega.`
@@ -488,11 +500,16 @@ export function ManagerDirectory({
             }
           : current,
       );
-    } catch (inviteError) {
-      if (inviteError instanceof ApiError && inviteError.code === "league_full") {
-        setCapacityReached(true);
+      if (created.autoAccepted) {
+        onMembershipChanged?.();
       }
-      setError(inviteErrorMessage(inviteError));
+    } catch (error) {
+      if (error instanceof ApiError && error.code === "league_full") {
+        setCapacityReached(true);
+        onMembershipChanged?.();
+        return;
+      }
+      setInviteError(inviteErrorMessage(error));
     } finally {
       setWorkingId(null);
     }
@@ -551,12 +568,20 @@ export function ManagerDirectory({
           testId="manager-directory-success"
         />
       ) : null}
-      {capacityReached ? (
+      {leagueFull ? (
+        <UiStatePanel
+          state="empty"
+          title="Lega al completo"
+          message="La lega è al completo: non puoi inviare altri inviti. La directory resta consultabile."
+          testId="manager-directory-capacity"
+        />
+      ) : null}
+      {inviteError ? (
         <UiStatePanel
           state="error"
-          title="Lega al completo"
-          message="Non puoi inviare altri inviti: è stata raggiunta la capienza massima."
-          testId="manager-directory-capacity"
+          title="Invito non riuscito"
+          message={inviteError}
+          testId="manager-directory-invite-error"
         />
       ) : null}
       {loading ? (
@@ -567,12 +592,12 @@ export function ManagerDirectory({
           testId="manager-directory-loading"
         />
       ) : null}
-      {!loading && error ? (
+      {!loading && loadError ? (
         <div>
           <UiStatePanel
-            state={error.includes("permessi") ? "forbidden" : "error"}
+            state={loadError.includes("permessi") ? "forbidden" : "error"}
             title="Directory non disponibile"
-            message={error}
+            message={loadError}
             testId="manager-directory-error"
           />
           <Button type="button" variant="ghost" onClick={() => void load()}>
@@ -580,7 +605,7 @@ export function ManagerDirectory({
           </Button>
         </div>
       ) : null}
-      {!loading && !error && result?.items.length === 0 ? (
+      {!loading && !loadError && result?.items.length === 0 ? (
         <UiStatePanel
           state="empty"
           title="Nessun fantallenatore trovato"
@@ -588,7 +613,7 @@ export function ManagerDirectory({
           testId="manager-directory-empty"
         />
       ) : null}
-      {!loading && !error && result && result.items.length > 0 ? (
+      {!loading && !loadError && result && result.items.length > 0 ? (
         <>
           <ul className="fa-manager-directory__list" data-testid="manager-directory-list">
             {result.items.map((manager) => {
@@ -632,7 +657,7 @@ export function ManagerDirectory({
                       type="button"
                       size="sm"
                       variant={unavailable || alreadyInvited || accepted ? "secondary" : "primary"}
-                      disabled={unavailable || alreadyInvited || accepted || capacityReached}
+                      disabled={unavailable || alreadyInvited || accepted || leagueFull}
                       loading={workingId === manager.userId}
                       onClick={() => void onInvite(manager)}
                       data-testid={`manager-invite-${manager.userId}`}

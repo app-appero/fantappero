@@ -623,6 +623,7 @@ export function LeagueAdminScreen() {
               capacity={rules.participantCount}
               memberCount={members.length}
               testIDPrefix="league-admin-directory"
+              onMembershipChanged={() => void loadAll({ silent: true })}
             />
           ) : null}
 

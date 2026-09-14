@@ -178,6 +178,8 @@ export function LeagueAdminPage() {
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [membersReloadToken, setMembersReloadToken] = useState(0);
+  const [memberCount, setMemberCount] = useState<number | null>(null);
   const configurationSavedRef = useRef(configurationSaved);
   configurationSavedRef.current = configurationSaved;
 
@@ -186,6 +188,26 @@ export function LeagueAdminPage() {
     setSetupTab(next.tab);
     setPendingScrollTarget(next.scroll);
   }, []);
+
+  const refreshAfterMembershipChange = useCallback(() => {
+    if (isDemoMode || !activeLeagueId) {
+      return;
+    }
+    setMembersReloadToken((current) => current + 1);
+    const stored = loadStoredSession();
+    if (!stored?.accessToken) {
+      return;
+    }
+    void fetchLeagueAdminPanel(stored.accessToken, activeLeagueId)
+      .then((panel) => {
+        setLifecycle(panel.lifecycle);
+        setRules(panel.rules);
+        setConfigurationSaved(panel.configurationSaved);
+      })
+      .catch(() => {
+        // I membri si aggiornano comunque; il lifecycle al prossimo refresh.
+      });
+  }, [activeLeagueId, isDemoMode]);
 
   const loadPanel = useCallback(async () => {
     setSaveSuccess(false);
@@ -689,7 +711,9 @@ export function LeagueAdminPage() {
                       isDemoMode={isDemoMode}
                       search={search}
                       participantCount={rules.participantCount}
-                      onMembersChanged={() => void loadPanel()}
+                      reloadToken={membersReloadToken}
+                      onMembersLoaded={setMemberCount}
+                      onMembersChanged={refreshAfterMembershipChange}
                     />
                     <LeagueInvitesPanel
                       leagueId={activeLeagueId}
@@ -702,6 +726,9 @@ export function LeagueAdminPage() {
                       search={search}
                       title="Inviti nominativi"
                       compact
+                      memberCount={memberCount}
+                      participantCount={rules.participantCount}
+                      onMembershipChanged={refreshAfterMembershipChange}
                     />
                   </>
                 )}

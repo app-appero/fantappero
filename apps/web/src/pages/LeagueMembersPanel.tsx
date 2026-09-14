@@ -1,6 +1,6 @@
 import type { LeagueMember } from "@fantappero/contracts";
 import { Button, UiStatePanel } from "@fantappero/ui";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   assignRandomAiRoster,
   ensureFantasyTeams,
@@ -41,6 +41,10 @@ type LeagueMembersPanelProps = {
   search: string;
   /** Capienza regolamento (`participantCount`). */
   participantCount?: number | null;
+  /** Incrementato dal parent per ricaricare gli iscritti dopo un invito. */
+  reloadToken?: number;
+  /** Conteggio iscritti dopo ogni load, per la directory. */
+  onMembersLoaded?: (count: number) => void;
   /** Ricarica regolamento/lifecycle dopo rimozione (il backend può abbassare il target). */
   onMembersChanged?: () => void;
 };
@@ -50,6 +54,8 @@ export function LeagueMembersPanel({
   isDemoMode,
   search,
   participantCount = null,
+  reloadToken = 0,
+  onMembersLoaded,
   onMembersChanged,
 }: LeagueMembersPanelProps) {
   const demoState = new URLSearchParams(search).get("partecipanti");
@@ -64,6 +70,8 @@ export function LeagueMembersPanel({
   );
   const [success, setSuccess] = useState<string | null>(null);
   const [workingId, setWorkingId] = useState<string | null>(null);
+  const onMembersLoadedRef = useRef(onMembersLoaded);
+  onMembersLoadedRef.current = onMembersLoaded;
 
   const loadMembers = useCallback(async () => {
     setSuccess(null);
@@ -72,12 +80,15 @@ export function LeagueMembersPanel({
       setError(
         demoState === "error" ? "Impossibile caricare i partecipanti (demo)." : null,
       );
-      setMembers(demoState === "empty" || demoState === "error" ? [] : DEMO_MEMBERS);
+      const next = demoState === "empty" || demoState === "error" ? [] : DEMO_MEMBERS;
+      setMembers(next);
+      onMembersLoadedRef.current?.(next.length);
       return;
     }
     if (!leagueId) {
       setLoading(false);
       setMembers([]);
+      onMembersLoadedRef.current?.(0);
       return;
     }
     const session = loadStoredSession();
@@ -89,9 +100,12 @@ export function LeagueMembersPanel({
     setLoading(true);
     setError(null);
     try {
-      setMembers(await fetchLeagueMembers(session.accessToken, leagueId));
+      const next = await fetchLeagueMembers(session.accessToken, leagueId);
+      setMembers(next);
+      onMembersLoadedRef.current?.(next.length);
     } catch (loadError) {
       setMembers([]);
+      onMembersLoadedRef.current?.(0);
       setError(getApiErrorMessage(loadError, "Impossibile caricare i partecipanti."));
     } finally {
       setLoading(false);
@@ -100,7 +114,7 @@ export function LeagueMembersPanel({
 
   useEffect(() => {
     void loadMembers();
-  }, [loadMembers]);
+  }, [loadMembers, reloadToken]);
 
   async function onTransfer(target: LeagueMember) {
     setError(null);
@@ -145,7 +159,9 @@ export function LeagueMembersPanel({
     setError(null);
     setSuccess(null);
     if (isDemoMode) {
-      setMembers((current) => current.filter((member) => member.userId !== target.userId));
+      const next = members.filter((member) => member.userId !== target.userId);
+      setMembers(next);
+      onMembersLoadedRef.current?.(next.length);
       setSuccess(`${target.displayName} è stato rimosso dalla lega.`);
       return;
     }
@@ -157,7 +173,9 @@ export function LeagueMembersPanel({
     setWorkingId(`remove-${target.userId}`);
     try {
       const removed = await removeLeagueMember(session.accessToken, leagueId, target.userId);
-      setMembers((current) => current.filter((member) => member.userId !== removed.userId));
+      const next = members.filter((member) => member.userId !== removed.userId);
+      setMembers(next);
+      onMembersLoadedRef.current?.(next.length);
       setSuccess(
         `${removed.displayName} è stato rimosso dalla lega. Il numero partecipanti previsti è stato allineato agli iscritti.`,
       );
