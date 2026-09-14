@@ -28,7 +28,7 @@ import { LeagueInvitesPanel } from "./LeagueInvitesPanel";
 import { LeagueMembersPanel } from "./LeagueMembersPanel";
 import { LeagueSeasonPanel } from "./LeagueSeasonPanel";
 
-type SetupHint = Exclude<LeagueLifecycleActionHint, "calendar">;
+type SetupHint = Exclude<LeagueLifecycleActionHint, "calendar" | "teams">;
 type SetupScrollTarget = "form" | "members";
 
 const DEMO_RULES: LeagueRules = {
@@ -95,9 +95,6 @@ function setupHintFromSearch(search: string): SetupHint | null {
   }
   if (setup === "invitati" || setup === "members" || setup === "partecipanti") {
     return "members";
-  }
-  if (setup === "squadre" || setup === "teams" || setup === "rose") {
-    return "teams";
   }
   return null;
 }
@@ -244,7 +241,7 @@ export function LeagueAdminPage() {
       const params = new URLSearchParams(search);
       const forceInvitesTab = params.has("inviti") || params.has("partecipanti");
       const setupHint = setupHintFromSearch(search);
-      const saved = forceInvitesTab || setupHint === "members" || setupHint === "teams";
+      const saved = forceInvitesTab || setupHint === "members";
       setConfigurationSaved(saved);
       if (setupHint) {
         const next = resolveSetupNavigation(setupHint, saved);

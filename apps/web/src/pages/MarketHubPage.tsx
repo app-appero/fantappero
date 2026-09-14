@@ -34,7 +34,7 @@ export function MarketHubPage() {
   const { pathname } = useLocation();
   const navigate = useNavigate();
   const { can } = useAuth();
-  const activeTab = TABS.find((tab) => tab.matchPaths.includes(pathname))?.value ?? "mercato";
+  const activeTab = TABS.find((tab) => tab.matchPaths.includes(pathname))?.value ?? "rosa";
 
   return (
     <Tabs

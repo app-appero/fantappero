@@ -34,7 +34,7 @@ export const APP_NAV_ITEMS: readonly NavItemDefinition[] = [
   },
   {
     id: "market-hub",
-    path: "/mercato",
+    path: "/rosa",
     requiredPermissions: ["roster:view"],
     surface: "app",
   },
@@ -141,6 +141,24 @@ export function resolveNavGroups(
   }));
 }
 
+/** Path delle tab interne a Mercato: Rosa è l'ingresso, le altre restano evidenziate. */
+export const MARKET_HUB_PATHS = [
+  "/rosa",
+  "/asta",
+  "/asta-live",
+  "/svincoli",
+  "/mercato",
+] as const;
+
+function isNavItemActive(item: NavItemDefinition, pathname: string): boolean {
+  if (item.id === "market-hub") {
+    return MARKET_HUB_PATHS.some(
+      (path) => pathname === path || pathname.startsWith(`${path}/`),
+    );
+  }
+  return pathname === item.path || pathname.startsWith(`${item.path}/`);
+}
+
 export function filterNavItems(
   items: readonly NavItemDefinition[],
   can: (required: readonly Permission[]) => boolean,
@@ -151,6 +169,6 @@ export function filterNavItems(
     .map((item) => ({
       ...item,
       label: NAV_LABELS[item.id] ?? item.id,
-      active: pathname === item.path || pathname.startsWith(`${item.path}/`),
+      active: isNavItemActive(item, pathname),
     }));
 }

@@ -38,7 +38,7 @@ export const MOBILE_DRAWER_NAV_ITEMS: readonly NavItemDefinition[] = [
   },
   {
     id: "market-hub",
-    path: "/mercato",
+    path: "/rosa",
     requiredPermissions: ["roster:view"],
     surface: "app",
   },

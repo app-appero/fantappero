@@ -82,6 +82,6 @@ describe("hub a tab: Lega e Mercato — mobile (EP13-P01)", () => {
   it("punta ai path canonici degli hub", () => {
     const byId = new Map(MOBILE_DRAWER_NAV_ITEMS.map((item) => [item.id, item.path]));
     assert.equal(byId.get("league-hub"), "/leghe");
-    assert.equal(byId.get("market-hub"), "/mercato");
+    assert.equal(byId.get("market-hub"), "/rosa");
   });
 });

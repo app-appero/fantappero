@@ -15,8 +15,17 @@ type Props = {
   isDemoMode: boolean;
   search: string;
   /** Apre la tab Inviti (o Configurazione) e scrolla alla sezione target. */
-  onOpenSetupHint?: (hint: Exclude<LeagueLifecycleActionHint, "calendar">) => void;
+  onOpenSetupHint?: (hint: Exclude<LeagueLifecycleActionHint, "calendar" | "teams">) => void;
 };
+
+/** Destinazione fuori da Amministrazione: calendario → Turni, rose → Mercato/Rosa. */
+export function hrefForLifecycleAction(
+  hint: LeagueLifecycleActionHint | null | undefined,
+): string | null {
+  if (hint === "calendar") return "/turni?tab=calendario";
+  if (hint === "teams") return "/rosa";
+  return null;
+}
 
 function requestedState(search: string): "loading" | "empty" | "error" | null {
   const value = new URLSearchParams(search).get("stagione");
@@ -131,11 +140,17 @@ export function LeagueSeasonPanel({
                     variant="ghost"
                     size="sm"
                     onClick={() => {
-                      if (blocker.actionHint === "calendar") {
-                        navigate("/turni?tab=calendario");
+                      const href = hrefForLifecycleAction(blocker.actionHint);
+                      if (href) {
+                        navigate(href);
                         return;
                       }
-                      onOpenSetupHint?.(blocker.actionHint);
+                      if (
+                        blocker.actionHint === "rules" ||
+                        blocker.actionHint === "members"
+                      ) {
+                        onOpenSetupHint?.(blocker.actionHint);
+                      }
                     }}
                   >
                     {LEAGUE_LIFECYCLE_ACTION_HINT_LABEL[blocker.actionHint]} →

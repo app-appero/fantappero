@@ -36,9 +36,9 @@ const { colors, spacing, typography, radius } = theme;
 const TAB_ROUTE_MAP: Partial<Record<string, keyof AppTabParamList>> = {
   matchday: "Matchday",
   standings: "Standings",
-  // "Mercato" apre di default il tab Market; Rosa/Asta/Svincolati restano
+  // "Mercato" apre di default il tab Rosa; Asta/Svincolati/Scambi restano
   // raggiungibili dalla screen-tabs strip in cima a ciascuna schermata.
-  "market-hub": "Market",
+  "market-hub": "Roster",
   formation: "Formation",
   profile: "Profile",
 };

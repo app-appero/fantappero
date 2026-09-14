@@ -37,10 +37,13 @@ describe("filterNavItems", () => {
     expect(ids).toContain("matchday");
   });
 
-  it("marks active route", () => {
-    const items = filterNavItems(APP_NAV_ITEMS, canFactory(memberContext), "/mercato");
-    const marketHub = items.find((item) => item.id === "market-hub");
-    expect(marketHub?.active).toBe(true);
+  it("marks the Mercato hub active on Rosa and on the other market tabs", () => {
+    const onRosa = filterNavItems(APP_NAV_ITEMS, canFactory(memberContext), "/rosa");
+    const onTrades = filterNavItems(APP_NAV_ITEMS, canFactory(memberContext), "/mercato");
+    const onAuction = filterNavItems(APP_NAV_ITEMS, canFactory(memberContext), "/asta");
+    expect(onRosa.find((item) => item.id === "market-hub")?.active).toBe(true);
+    expect(onTrades.find((item) => item.id === "market-hub")?.active).toBe(true);
+    expect(onAuction.find((item) => item.id === "market-hub")?.active).toBe(true);
   });
 
   it("keeps ai-controlled managers on the same member catalog", () => {
@@ -86,6 +89,6 @@ describe("hub a tab: Lega e Movimento giocatori (EP13-P01)", () => {
   it("punta ai path canonici degli hub", () => {
     const byId = new Map(APP_NAV_ITEMS.map((item) => [item.id, item.path]));
     expect(byId.get("league-hub")).toBe("/leghe");
-    expect(byId.get("market-hub")).toBe("/mercato");
+    expect(byId.get("market-hub")).toBe("/rosa");
   });
 });

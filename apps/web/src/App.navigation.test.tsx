@@ -62,7 +62,8 @@ describe("App navigation shell (EPUI-03)", () => {
     const html = renderAt("/leghe", "?persona=admin&stato=success");
     expect(html).toContain("Amministrazione lega");
     expect(html).not.toContain("Home lega");
-    expect(html).not.toContain('role="tablist"');
+    expect(html).not.toContain('id="tab-league-home"');
+    expect(html).not.toContain('id="tab-league-admin"');
   });
 
   it("shows only Home lega for member persona (no Amministrazione tab)", () => {
@@ -111,8 +112,8 @@ describe("App navigation shell (EPUI-03)", () => {
   });
 
   it("uses keyboard-focusable nav links", () => {
-    const html = renderAt("/mercato");
-    expect(html).toContain('href="/mercato"');
+    const html = renderAt("/rosa");
+    expect(html).toContain('href="/rosa"');
     expect(html).toContain("Mercato");
   });
 
