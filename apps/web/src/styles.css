@@ -1642,15 +1642,9 @@ button.fa-link-muted,
   }
 
   .fa-lifecycle-step {
-    flex: 1 1 5.5rem;
+    flex: 1 1 auto;
     min-width: 0;
     padding: var(--fa-space-xs) var(--fa-space-sm);
-  }
-
-  .fa-lifecycle-step__label {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
   }
 
   .fa-league-admin-form,

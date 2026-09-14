@@ -89,7 +89,7 @@ describe("hub a tab: Lega e Movimento giocatori (EP13-P01)", () => {
 
   it("abbrevia le voci lunghe nella bottom nav", () => {
     expect(NAV_SHORT_LABELS["manager-directory"]).toBe("Fanta");
-    expect(NAV_SHORT_LABELS.formation).toBe("Formaz.");
+    expect(NAV_SHORT_LABELS.formation).toBe("Form.");
     expect(NAV_SHORT_LABELS.standings).toBe("Class.");
     expect(NAV_SHORT_LABELS["admin-leagues"]).toBe("Leghe");
   });

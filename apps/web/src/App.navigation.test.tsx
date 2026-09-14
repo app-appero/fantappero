@@ -134,8 +134,9 @@ describe("App navigation shell (EPUI-03)", () => {
     const end = html.indexOf("</nav>", start);
     const bottom = html.slice(start, end);
     expect(bottom).toContain(">Fanta</span>");
-    expect(bottom).toContain(">Formaz.</span>");
+    expect(bottom).toContain(">Form.</span>");
     expect(bottom).toContain(">Class.</span>");
+    expect(bottom).toContain(">Merc.</span>");
     expect(bottom).not.toContain(">Fantallenatori</span>");
     expect(bottom).toContain('aria-label="Fantallenatori"');
     expect(bottom).toContain('aria-label="Formazione"');
