@@ -159,6 +159,105 @@ def test_remove_member_is_atomic_and_cannot_remove_admin(
     )
 
 
+def test_remove_member_lowers_participant_count_to_remaining(
+    client: TestClient,
+    db_session: Session,
+    competition_ids: list[str],
+) -> None:
+    """8 previsti → rimozione fino a 4 iscritti allinea il regolamento a 4."""
+    from datetime import UTC, datetime
+
+    from auth.models.user import User
+    from auth.models.user_profile import UserProfile
+    from database.enums import PlatformRole, UserType
+    from leagues.models.league_rules import LeagueRules
+
+    owner_token, _ = _register_and_login(client, "sync.pc.owner@example.com")
+    league_id = _create_league(client, owner_token, competition_ids, "Lega Sync Partecipanti")
+    rules_put = client.put(
+        f"/leagues/{league_id}/amministrazione/regolamento",
+        headers={"Authorization": f"Bearer {owner_token}"},
+        json={
+            "presetName": "standard",
+            "participantCount": 8,
+            "roster": {
+                "rosterSize": 35,
+                "goalkeepers": 3,
+                "defenders": 11,
+                "midfielders": 11,
+                "forwards": 10,
+            },
+            "totalCredits": 1000,
+            "options": {"allowTrades": True, "allowManualInvites": True},
+        },
+    )
+    assert rules_put.status_code == 200
+
+    member_ids: list[UUID] = []
+    for index in range(7):
+        user = User(
+            email=f"sync.pc.orm{index}@example.com",
+            password_hash="x",
+            platform_role=PlatformRole.USER,
+            user_type=UserType.HUMAN,
+            email_verified_at=datetime.now(UTC),
+        )
+        db_session.add(user)
+        db_session.flush()
+        db_session.add(
+            UserProfile(user_id=user.id, display_name=f"Sync Member {index}")
+        )
+        member_ids.append(user.id)
+    db_session.commit()
+    for member_id in member_ids:
+        _add_member(db_session, league_id, member_id)
+
+    url = f"/leagues/{league_id}/amministrazione/partecipanti"
+    for member_id in member_ids[3:]:
+        removed = client.delete(
+            f"{url}/{member_id}",
+            headers={"Authorization": f"Bearer {owner_token}"},
+        )
+        assert removed.status_code == 200, removed.text
+
+    db_session.expire_all()
+    rules = db_session.scalars(
+        select(LeagueRules).where(LeagueRules.league_id == UUID(league_id))
+    ).first()
+    assert rules is not None
+    assert rules.participant_count == 4
+    membership_count = db_session.scalar(
+        select(func.count(LeagueMembership.id)).where(
+            LeagueMembership.league_id == UUID(league_id)
+        )
+    )
+    assert membership_count == 4
+    assert (
+        db_session.scalar(
+            select(func.count(LeagueAuditEvent.id)).where(
+                LeagueAuditEvent.league_id == UUID(league_id),
+                LeagueAuditEvent.action == LeagueAuditAction.LEAGUE_RULES_UPDATED,
+            )
+        )
+        >= 1
+    )
+
+    configuring = client.post(
+        f"/leagues/{league_id}/amministrazione/stato",
+        headers={"Authorization": f"Bearer {owner_token}"},
+        json={"targetState": "configuring"},
+    )
+    assert configuring.status_code == 200
+    auction = client.post(
+        f"/leagues/{league_id}/amministrazione/stato",
+        headers={"Authorization": f"Bearer {owner_token}"},
+        json={"targetState": "auction"},
+    )
+    assert auction.status_code == 200
+    blockers = {row["code"] for row in auction.json()["blockers"]}
+    assert "participant_count_mismatch" not in blockers
+
+
 def test_transfer_admin_is_atomic_idempotent_and_draft_only(
     client: TestClient,
     db_session: Session,

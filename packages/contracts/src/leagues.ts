@@ -31,10 +31,10 @@ export interface TransitionLeagueStateRequest {
 }
 
 /**
- * Percorso "a tappe" mostrato all'admin al posto dei 6 stati grezzi
- * (EP03-05-UX): Bozza e Configurazione sono la stessa fase percepita.
+ * Percorso "a tappe" mostrato all'admin (fase 1 semplificata):
+ * Impostazione (include asta opzionale) → Campionato → Conclusa.
  */
-export type LeagueLifecyclePhaseKey = "setup" | "auction" | "season";
+export type LeagueLifecyclePhaseKey = "setup" | "season" | "done";
 
 export interface LeagueLifecyclePhase {
   key: LeagueLifecyclePhaseKey;
@@ -43,9 +43,9 @@ export interface LeagueLifecyclePhase {
 }
 
 export const LEAGUE_LIFECYCLE_PHASES: readonly LeagueLifecyclePhase[] = [
-  { key: "setup", label: "Impostazione", states: ["draft", "configuring"] },
-  { key: "auction", label: "Asta", states: ["auction"] },
-  { key: "season", label: "Campionato", states: ["active", "concluded", "archived"] },
+  { key: "setup", label: "Impostazione", states: ["draft", "configuring", "auction"] },
+  { key: "season", label: "Campionato", states: ["active"] },
+  { key: "done", label: "Conclusa", states: ["concluded", "archived"] },
 ];
 
 /** Indice (0-based) della fase corrente nello stepper, -1 se non mappato. */
@@ -53,22 +53,23 @@ export function leagueLifecyclePhaseIndex(state: LeagueState): number {
   return LEAGUE_LIFECYCLE_PHASES.findIndex((phase) => phase.states.includes(state));
 }
 
+/** Target primario "avanti": da setup si punta al campionato, non più all'asta. */
 const FORWARD_TARGET: Partial<Record<LeagueState, LeagueState>> = {
   draft: "configuring",
-  configuring: "auction",
+  configuring: "active",
   auction: "active",
-  active: "concluded",
   concluded: "archived",
 };
 
-const FORWARD_ACTION_LABEL: Record<LeagueState, string> = {
+const FORWARD_ACTION_LABEL: Partial<Record<LeagueState, string>> = {
   draft: "Inizia la configurazione",
-  configuring: "Avvia l'asta",
-  auction: "Avvia il campionato",
-  active: "Concludi la stagione",
+  configuring: "Avvia stagione",
+  auction: "Avvia stagione",
   concluded: "Archivia la lega",
-  archived: "Lega archiviata",
 };
+
+/** Asta opzionale durante l'impostazione (secondaria rispetto ad Avvia stagione). */
+const OPTIONAL_AUCTION_LABEL = "Avvia l'asta";
 
 const ROLLBACK_TARGET: Partial<Record<LeagueState, LeagueState>> = {
   auction: "configuring",
@@ -84,6 +85,9 @@ export interface LeagueLifecycleStep {
   forwardLabel: string | null;
   /** True quando nessun blocker impedisce la transizione in avanti. */
   forwardEnabled: boolean;
+  /** CTA secondaria: asta da configuring, se ancora consentita. */
+  optionalAuctionEnabled: boolean;
+  optionalAuctionLabel: string | null;
   rollbackTarget: LeagueState | null;
   rollbackLabel: string | null;
 }
@@ -91,11 +95,15 @@ export interface LeagueLifecycleStep {
 export function describeLeagueLifecycleStep(lifecycle: LeagueLifecycle): LeagueLifecycleStep {
   const forwardTarget = FORWARD_TARGET[lifecycle.state] ?? null;
   const rollbackTarget = ROLLBACK_TARGET[lifecycle.state] ?? null;
+  const optionalAuctionEnabled =
+    lifecycle.state === "configuring" && lifecycle.allowedTransitions.includes("auction");
   return {
     forwardTarget,
-    forwardLabel: forwardTarget ? FORWARD_ACTION_LABEL[lifecycle.state] : null,
+    forwardLabel: forwardTarget ? (FORWARD_ACTION_LABEL[lifecycle.state] ?? null) : null,
     forwardEnabled:
       forwardTarget !== null && lifecycle.allowedTransitions.includes(forwardTarget),
+    optionalAuctionEnabled,
+    optionalAuctionLabel: optionalAuctionEnabled ? OPTIONAL_AUCTION_LABEL : null,
     rollbackTarget,
     rollbackLabel: rollbackTarget ? (ROLLBACK_ACTION_LABEL[lifecycle.state] ?? null) : null,
   };
@@ -108,6 +116,39 @@ export const LEAGUE_LIFECYCLE_ACTION_HINT_LABEL: Record<LeagueLifecycleActionHin
   calendar: "Vai al calendario",
   teams: "Vai a squadre e rose",
 };
+
+/**
+ * Ordine setup stagione (EP13): partecipanti → rose → calendario.
+ * I passaggi successivi restano disabilitati finché i precedenti non sono ok.
+ */
+export const LEAGUE_SETUP_BLOCKER_ORDER: readonly string[] = [
+  "rules_invalid",
+  "insufficient_competitions",
+  "participant_count_mismatch",
+  "league_admin_required",
+  "fantasy_teams_not_configured",
+  "credits_not_configured",
+  "calendar_not_configured",
+] as const;
+
+function setupBlockerRank(code: string): number {
+  const index = LEAGUE_SETUP_BLOCKER_ORDER.indexOf(code);
+  return index === -1 ? LEAGUE_SETUP_BLOCKER_ORDER.length : index;
+}
+
+/** Ordina i blocker e marca solo il primo come actionable. */
+export function orderLeagueSetupBlockers(
+  blockers: LeagueLifecycleBlocker[],
+): Array<LeagueLifecycleBlocker & { actionable: boolean }> {
+  const sorted = [...blockers].sort(
+    (left, right) => setupBlockerRank(left.code) - setupBlockerRank(right.code),
+  );
+  const firstCode = sorted[0]?.code ?? null;
+  return sorted.map((blocker) => ({
+    ...blocker,
+    actionable: blocker.code === firstCode,
+  }));
+}
 
 /** Competition available in the MVP catalog. */
 export interface CompetitionSummary {
@@ -201,6 +242,8 @@ export interface LeagueAdminPanel {
   message: string;
   rules: LeagueRules;
   lifecycle: LeagueLifecycle;
+  /** True dopo almeno un salvataggio esplicito del regolamento. */
+  configurationSaved: boolean;
 }
 
 export interface LeagueMember {
@@ -473,7 +516,7 @@ export interface H2HCalendarRound {
 export interface H2HCalendar {
   id: string;
   leagueId: string;
-  status: "confirmed";
+  status: "draft" | "confirmed";
   format: LeagueCalendarFormat;
   algorithmVersion: string;
   participantCount: number;

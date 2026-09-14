@@ -123,6 +123,9 @@ class LeagueAdminPanelResponse(ApiModel):
     message: str
     rules: LeagueRulesResponse
     lifecycle: LeagueLifecycleResponse
+    # True dopo almeno un salvataggio esplicito del regolamento: sblocca
+    # la tab Inviti in Amministrazione (EP13 setup a tappe).
+    configuration_saved: bool = Field(alias="configurationSaved")
 
 
 class LeagueMemberResponse(ApiModel):
@@ -329,11 +332,11 @@ class H2HCalendarRoundResponse(ApiModel):
 
 
 class H2HCalendarResponse(ApiModel):
-    """Calendario H2H confermato con risultati affiancati (consultazione /turni)."""
+    """Calendario H2H (confermato per tutti; bozza visibile solo all'admin)."""
 
     id: str
     league_id: str = Field(alias="leagueId")
-    status: Literal["confirmed"]
+    status: Literal["draft", "confirmed"]
     format: Literal["single_round_robin"]
     algorithm_version: str = Field(alias="algorithmVersion")
     participant_count: int = Field(alias="participantCount")

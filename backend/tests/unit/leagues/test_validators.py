@@ -161,6 +161,7 @@ def test_admin_transfer_requires_participant_target() -> None:
     [
         (LeagueState.DRAFT, LeagueState.CONFIGURING),
         (LeagueState.CONFIGURING, LeagueState.AUCTION),
+        (LeagueState.CONFIGURING, LeagueState.ACTIVE),
         (LeagueState.AUCTION, LeagueState.CONFIGURING),
         (LeagueState.AUCTION, LeagueState.ACTIVE),
         (LeagueState.ACTIVE, LeagueState.CONCLUDED),
@@ -233,11 +234,12 @@ def test_configuration_blockers_report_all_missing_requirements() -> None:
 
 
 def test_auction_activation_blockers_include_calendar_until_configured() -> None:
-    assert {blocker.code for blocker in auction_activation_blockers()} == {
-        "calendar_not_configured",
+    blockers = auction_activation_blockers()
+    assert [blocker.code for blocker in blockers] == [
         "fantasy_teams_not_configured",
         "credits_not_configured",
-    }
+        "calendar_not_configured",
+    ]
     assert {blocker.code for blocker in auction_activation_blockers(calendar_configured=True)} == {
         "fantasy_teams_not_configured",
         "credits_not_configured",

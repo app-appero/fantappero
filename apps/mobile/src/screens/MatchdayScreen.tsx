@@ -287,7 +287,7 @@ export function MatchdayScreen() {
           <UiStatePanel
             state="empty"
             title="Nessun turno ancora"
-            message="Un turno esiste solo se ogni fantallenatore può schierare la formazione con i giocatori della propria rosa. Finché le rose non sono assegnate (asta non ancora svolta) il calendario resta vuoto: si popolerà da solo subito dopo."
+            message="I Turni Europei seguono le finestre del calendario multi-campionato. La copertura formazione resta obbligatoria quando le rose sono assegnate: completa le rose in Partecipanti per sbloccare il calendario fantallenatori."
             testID="matchday-empty"
           />
         ) : (

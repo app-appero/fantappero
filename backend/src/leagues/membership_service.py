@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import NoReturn
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
 
 from auth.exceptions import ValidationAuthError
@@ -13,14 +13,18 @@ from auth.models.user import User
 from authorization.context import LeagueAccess
 from database.enums import (
     LeagueAuditAction,
+    LeagueCalendarStatus,
     LeagueMemberRole,
     league_member_role_to_league_role,
 )
 from leagues.models.league import League
 from leagues.models.league_audit_event import LeagueAuditEvent
+from leagues.models.league_calendar import LeagueCalendar
 from leagues.models.league_membership import LeagueMembership
+from leagues.models.league_rules import LeagueRules
 from leagues.schemas import LeagueMemberResponse
 from leagues.validators import (
+    MIN_PARTICIPANTS,
     validate_admin_transfer_target,
     validate_configurable_league_state,
     validate_member_removal,
@@ -67,6 +71,23 @@ class LeagueMembershipService:
 
         response = self._to_response(membership)
         self._session.delete(membership)
+        self._session.flush()
+
+        remaining = (
+            self._session.scalar(
+                select(func.count(LeagueMembership.id)).where(
+                    LeagueMembership.league_id == league.id
+                )
+            )
+            or 0
+        )
+        self._sync_participant_count_after_removal(
+            league,
+            actor_id=league_access.user.id,
+            remaining=remaining,
+        )
+        self._invalidate_stale_draft_calendar(league.id)
+
         self._add_audit(
             league.id,
             league_access.user.id,
@@ -128,6 +149,54 @@ class LeagueMembershipService:
         get_metrics().incr("league_admin_transferred_total", labels={"result": "success"})
         logger.info("league_admin_transferred", extra={"result": "success"})
         return self._to_response(target)
+
+    def _sync_participant_count_after_removal(
+        self,
+        league: League,
+        *,
+        actor_id: UUID,
+        remaining: int,
+    ) -> None:
+        """Abbassa il target regolamento agli iscritti rimasti (min 4).
+
+        Se restano meno di 4 iscritti non forziamo un valore fuori range: il
+        mismatch resta e blocca asta/calendario finché non si torna nel range.
+        """
+        if remaining < MIN_PARTICIPANTS:
+            return
+        rules = self._session.scalars(
+            select(LeagueRules).where(LeagueRules.league_id == league.id).with_for_update()
+        ).first()
+        if rules is None or rules.participant_count <= remaining:
+            return
+        previous = rules.participant_count
+        rules.participant_count = remaining
+        self._session.add(
+            LeagueAuditEvent(
+                league_id=league.id,
+                actor_id=actor_id,
+                action=LeagueAuditAction.LEAGUE_RULES_UPDATED,
+                correlation_id=get_correlation_id(),
+                details={
+                    "source": "member_removed",
+                    "participantCount": {"from": previous, "to": remaining},
+                },
+            )
+        )
+
+    def _invalidate_stale_draft_calendar(self, league_id: UUID) -> None:
+        """Cancella l'anteprima H2H: i partecipanti sono cambiati, va rigenerata."""
+        calendar = self._session.scalars(
+            select(LeagueCalendar)
+            .where(
+                LeagueCalendar.league_id == league_id,
+                LeagueCalendar.status == LeagueCalendarStatus.DRAFT,
+            )
+            .with_for_update()
+        ).first()
+        if calendar is None:
+            return
+        self._session.delete(calendar)
 
     def _load_memberships(
         self,

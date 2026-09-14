@@ -109,6 +109,22 @@ class EnsureWindowResult:
     opened: bool = False
 
 
+@dataclass(frozen=True)
+class FullSeasonMaterializeResult:
+    """Esito del backfill stagionale completo dei Turni Europei (EP13-P04).
+
+    Condiviso fra ``create_league`` (post-commit), la prima chiamata utile di
+    ``ensure_upcoming_for_league`` e "Aggiorna calendario": stesso motore,
+    stesso esito riportabile, un solo posto dove i conteggi possono
+    disallinearsi.
+    """
+
+    created: int
+    upgraded: int
+    opened: int
+    removed: int
+
+
 def load_league_candidate_fixtures(session: Session, league: League) -> list[EligibleFixtureRef]:
     """Fixture della stagione per le competizioni scelte dalla lega.
 
@@ -354,7 +370,20 @@ class FantasyTurnService:
         auto_open: bool = True,
         actor_id: UUID | None = None,
     ) -> EnsureFantasyTurnsResponse:
-        """Idempotently create upcoming weekend/midweek turns from league fixtures."""
+        """Idempotently create upcoming weekend/midweek turns from league fixtures.
+
+        Se la lega non ha ancora Turni Europei, oppure ne ha solo un sottoinsieme
+        rispetto alle fixture già note (calendario parziale / fixture pubblicate
+        dopo la creazione), la materializzazione copre l'intera stagione
+        corrente (stesso motore di "Aggiorna calendario") invece dell'orizzonte
+        breve oggi±``horizon_days``. Quest'ultimo, usato da solo per "scoprire"
+        turni mancanti a posteriori, produceva prima 1-2 turni e solo più tardi,
+        con un backfill manuale, i turni storici — la cui comparsa sposta
+        retroattivamente la numerazione dei turni già usati nel calendario
+        H2H confermato (EP13-P04). Con stagione già completa l'orizzonte breve
+        resta il comportamento giusto: intercetta solo le nuove fixture
+        pubblicate dal provider nella finestra prossima.
+        """
         locked = self._lock_league(league.id)
         ref = reference_date or datetime.now(UTC).date()
         system_actor = actor_id or self._league_owner_id(locked.id)
@@ -363,6 +392,40 @@ class FantasyTurnService:
                 "Impossibile generare turni: la lega non ha un owner.",
                 code="league_owner_missing",
             )
+
+        if self._season_calendar_needs_full_materialize(locked):
+            full = self.materialize_full_season(
+                locked,
+                actor_id=system_actor,
+                auto_open=auto_open,
+            )
+            self._reconcile_existing_rounds(
+                locked.id,
+                now=datetime.now(UTC),
+                actor_id=system_actor,
+            )
+            self._session.commit()
+            get_metrics().incr("fantasy_turn_ensure_total", labels={"result": "full_season"})
+            logger.info(
+                "fantasy_turns_ensured_full_season",
+                extra={
+                    "league_id": str(locked.id),
+                    "created": full.created,
+                    "opened": full.opened,
+                    "upgraded": full.upgraded,
+                    "removed": full.removed,
+                },
+            )
+            return EnsureFantasyTurnsResponse(
+                leagueId=str(locked.id),
+                created=full.created,
+                opened=full.opened,
+                upgraded=full.upgraded,
+                duplicates=0,
+                waiting=0,
+                horizonDays=horizon_days,
+            )
+
         created = opened = upgraded = duplicates = waiting = 0
         for kind, anchor in upcoming_turn_specs(ref, horizon_days=horizon_days):
             result = self._materialize_window(
@@ -406,6 +469,7 @@ class FantasyTurnService:
         )
         return EnsureFantasyTurnsResponse(
             leagueId=str(locked.id),
+
             created=created,
             opened=opened,
             upgraded=upgraded,
@@ -586,6 +650,102 @@ class FantasyTurnService:
             ).all()
         )
 
+    def materialize_full_season(
+        self,
+        league: League,
+        *,
+        actor_id: UUID | None = None,
+        on_step: Callable[[int, int], None] | None = None,
+        auto_open: bool = True,
+        persist_skipped: bool = False,
+    ) -> FullSeasonMaterializeResult:
+        """Materializza tutti i Turni Europei della stagione corrente della lega.
+
+        Stesso motore di "Aggiorna calendario" (`full_season_turn_specs` +
+        `_materialize_window`), ma senza toccare il provider: usa solo le
+        fixture già note in DB per le competizioni scelte dalla lega. Fissa
+        da subito la numerazione cronologica definitiva — condiviso da
+        `create_league` (post-commit) e da `ensure_upcoming_for_league` quando
+        la stagione è assente o parziale, così il primo turno mai
+        materializzato per una lega copre già l'intera stagione invece del
+        solo orizzonte breve (causa dello shift di numerazione in EP13-P04).
+
+        Pianificazione vs giocabilità (EP13-P04): con rose ancora vuote le
+        finestre si materializzano comunque dalle fixture (struttura e
+        numerazione stagionale). La soglia di copertura resta obbligatoria
+        quando esistono giocatori in rosa; la generazione H2H resta bloccata
+        da ``league_rosters_complete`` finché le rose non sono complete.
+
+        Di default ``persist_skipped=False``: le finestre sotto soglia partite
+        non diventano turni numerati "Non disputato" (evita di sfalsare la
+        numerazione H2H). "Aggiorna calendario" può passare ``True`` per
+        materializzare anche quelli nel tab Turni europei.
+        """
+        locked = self._lock_league(league.id)
+        system_actor = actor_id or self._league_owner_id(locked.id)
+        if system_actor is None:
+            raise ValidationAuthError(
+                "Impossibile generare turni: la lega non ha un owner.",
+                code="league_owner_missing",
+            )
+
+        candidates = self._load_candidate_fixtures(locked)
+        if candidates:
+            kickoffs = [row.kickoff_at for row in candidates]
+            season_start = min(kickoffs).date()
+            season_end = max(kickoffs).date()
+        else:
+            # Nessuna fixture datata ancora nota: intervallo di stagione
+            # europea standard come base, il prossimo refresh lo affinerà
+            # quando il provider pubblica le date.
+            season_start = date(locked.season_year, 7, 1)
+            season_end = date(locked.season_year + 1, 6, 30)
+
+        specs = full_season_turn_specs(season_start, season_end)
+        created = upgraded = opened = 0
+        total = len(specs) or 1
+        for index, (kind, anchor) in enumerate(specs):
+            result = self._materialize_window(
+                locked,
+                kind=kind,
+                anchor=anchor,
+                actor_id=system_actor,
+                persist_skipped=persist_skipped,
+                auto_open=auto_open,
+                raise_on_duplicate=False,
+            )
+            if result.outcome == "created":
+                created += 1
+            elif result.outcome == "upgraded":
+                upgraded += 1
+            if result.opened:
+                opened += 1
+            if on_step is not None:
+                on_step(index + 1, total)
+
+        removed = self._prune_invalid_rounds(locked)
+        if removed:
+            self._renumber_league_rounds(locked.id)
+
+        logger.info(
+            "fantasy_turns_full_season_materialized",
+            extra={
+                "league_id": str(locked.id),
+                "created": created,
+                "upgraded": upgraded,
+                "opened": opened,
+                "removed": removed,
+                "season_start": season_start.isoformat(),
+                "season_end": season_end.isoformat(),
+            },
+        )
+        return FullSeasonMaterializeResult(
+            created=created,
+            upgraded=upgraded,
+            opened=opened,
+            removed=removed,
+        )
+
     def refresh_full_calendar(
         self,
         league: League,
@@ -638,47 +798,23 @@ class FantasyTurnService:
         report(12, "dettagli", "Recupero formazioni ed eventi delle partite concluse…")
         details_backfilled = self.backfill_match_details(locked, client=client)
 
-        candidates = self._load_candidate_fixtures(locked)
-        if candidates:
-            kickoffs = [row.kickoff_at for row in candidates]
-            season_start = min(kickoffs).date()
-            season_end = max(kickoffs).date()
-        else:
-            # Nessuna fixture datata ancora nota: intervallo di stagione
-            # europea standard come base, il prossimo refresh lo affinerà
-            # quando il provider pubblica le date.
-            season_start = date(locked.season_year, 7, 1)
-            season_end = date(locked.season_year + 1, 6, 30)
-
         report(20, "turni", "Ricostruzione turni dall'inizio della stagione…")
-        specs = full_season_turn_specs(season_start, season_end)
-        rounds_created = 0
-        rounds_updated = 0
-        total = len(specs) or 1
-        for index, (kind, anchor) in enumerate(specs):
-            result = self._materialize_window(
-                locked,
-                kind=kind,
-                anchor=anchor,
-                actor_id=system_actor,
-                persist_skipped=True,
-                auto_open=True,
-                raise_on_duplicate=False,
-            )
-            if result.outcome == "created":
-                rounds_created += 1
-            elif result.outcome == "upgraded":
-                rounds_updated += 1
-            report(
-                20 + int(((index + 1) / total) * 70),
-                "turni",
-                f"Turno {index + 1}/{total} elaborato…",
-            )
+
+        def on_step(index: int, total: int) -> None:
+            report(20 + int((index / total) * 70), "turni", f"Turno {index}/{total} elaborato…")
+
+        full = self.materialize_full_season(
+            locked,
+            actor_id=system_actor,
+            on_step=on_step,
+            auto_open=True,
+            persist_skipped=True,
+        )
+        rounds_created = full.created
+        rounds_updated = full.upgraded
 
         report(92, "turni", "Rimozione turni non validi…")
-        rounds_removed = self._prune_invalid_rounds(locked)
-        if rounds_removed:
-            self._renumber_league_rounds(locked.id)
+        rounds_removed = full.removed
 
         after_numbers = dict(
             self._session.execute(
@@ -1335,19 +1471,29 @@ class FantasyTurnService:
     def _load_candidate_fixtures(self, league: League) -> list[EligibleFixtureRef]:
         return load_league_candidate_fixtures(self._session, league)
 
+    def _league_rosters_cached(self, league: League) -> dict[UUID, list[RosteredPlayer]]:
+        rosters = self._rosters_cache.get(league.id)
+        if rosters is None:
+            rosters = load_league_rosters(self._session, league)
+            self._rosters_cache[league.id] = rosters
+        return rosters
+
     def _window_meets_coverage(self, league: League, window: TimeWindow) -> bool:
         """La finestra permette a ogni fantallenatore di schierare la formazione?
 
         Le rose sono lette una sola volta per lega (il backfill stagionale
         valuta decine di finestre di fila) e riusate per tutte le finestre.
+
+        Distinzione EP13-P04 fra **pianificazione** e **giocabilità**:
+        - rose ancora vuote → la copertura non è valutabile; non blocca la
+          materializzazione strutturale dalle fixture (numerazione stagionale);
+        - rose presenti → ogni squadra deve raggiungere la soglia, altrimenti
+          la finestra non è un turno disputabile.
+        La generazione/conferma H2H resta protetta da ``league_rosters_complete``.
         """
-        rosters = self._rosters_cache.get(league.id)
-        if rosters is None:
-            rosters = load_league_rosters(self._session, league)
-            self._rosters_cache[league.id] = rosters
+        rosters = self._league_rosters_cached(league)
         if not rosters:
-            # Nessuna rosa assegnata (asta non svolta): nessun turno.
-            return False
+            return True
         rules = self._load_rules(league.id)
         threshold = coverage_threshold_for(
             rules.turn_coverage_threshold if rules is not None else None
@@ -1360,6 +1506,59 @@ class FantasyTurnService:
         )
         coverages = coverage_by_team(rosters, playing_clubs)
         return window_is_valid(list(coverages.values()), threshold)
+
+    def _season_bounds(self, league: League) -> tuple[date, date]:
+        candidates = self._load_candidate_fixtures(league)
+        if candidates:
+            kickoffs = [row.kickoff_at for row in candidates]
+            return min(kickoffs).date(), max(kickoffs).date()
+        return date(league.season_year, 7, 1), date(league.season_year + 1, 6, 30)
+
+    def _season_calendar_needs_full_materialize(self, league: League) -> bool:
+        """True se manca l'intera stagione o restano finestre con fixture senza turno.
+
+        Usato da ``ensure_upcoming_for_league`` per recuperare leghe create
+        senza task Celery, calendari parziali e fixture pubblicate dopo il
+        primo bootstrap — senza aspettare un "Aggiorna calendario" manuale.
+        """
+        existing = {
+            (start, end, kind)
+            for start, end, kind, status in self._session.execute(
+                select(
+                    FantasyRound.window_start_at,
+                    FantasyRound.window_end_at,
+                    FantasyRound.kind,
+                    FantasyRound.status,
+                ).where(FantasyRound.league_id == league.id)
+            ).all()
+            if status != FantasyTurnStatus.SKIPPED
+        }
+        if not existing:
+            return True
+
+        season_start, season_end = self._season_bounds(league)
+        candidates = self._load_candidate_fixtures(league)
+        if not candidates:
+            return False
+        rules = self._load_rules(league.id)
+        min_required = rules.min_fixtures_per_round if rules is not None else 25
+        assigned = self._active_assigned_fixture_ids(league.id)
+        for kind, anchor in full_season_turn_specs(season_start, season_end):
+            window = window_for_kind(kind, anchor)
+            key = (window.start_at, window.end_at, kind)
+            if key in existing:
+                continue
+            selected = select_eligible_from_candidates(
+                candidates,
+                window,
+                already_assigned_ids=assigned,
+            )
+            if not evaluate_threshold(len(selected), min_required).ok:
+                continue
+            if not self._window_meets_coverage(league, window):
+                continue
+            return True
+        return False
 
     def _sync_league_fixtures_from_provider(
         self,
@@ -1653,6 +1852,10 @@ class FantasyTurnService:
         di schierare la formazione). **Non tocca mai un turno con dati di
         gioco**: se ha formazioni inviate/effettive o è omologato viene
         lasciato intatto, anche se oggi non supererebbe la regola.
+
+        Con rose ancora vuote la copertura non è valutabile (EP13-P04): si
+        potano solo i fantasma senza fixture, così il bootstrap stagionale
+        non viene cancellato prima dell'assegnazione rose.
         """
         candidates = list(
             self._session.scalars(
@@ -1667,6 +1870,7 @@ class FantasyTurnService:
                 .with_for_update()
             ).all()
         )
+        rosters_present = bool(self._league_rosters_cached(league))
         removable: list[UUID] = []
         for fantasy_round in candidates:
             has_fixtures = self._session.scalar(
@@ -1677,6 +1881,8 @@ class FantasyTurnService:
             )
             if not has_fixtures:
                 removable.append(fantasy_round.id)
+                continue
+            if not rosters_present:
                 continue
             window = TimeWindow(
                 start_at=fantasy_round.window_start_at,

@@ -140,7 +140,8 @@ def test_h2h_calendar_and_matchup_detail_mapping(db_session: Session) -> None:
 
     payload = get_h2h_calendar(db_session, league_id=league.id)
     assert payload is not None
-    assert payload.live is True
+    # Senza fixture LIVE collegate al turno, il calendario non è "in diretta".
+    assert payload.live is False
     assert payload.round_count == 1
     assert len(payload.rounds) == 1
     round_row = payload.rounds[0]
@@ -168,7 +169,7 @@ def test_h2h_calendar_and_matchup_detail_mapping(db_session: Session) -> None:
     )
     assert detail.slot_id == str(match_slot.id)
     assert detail.fantasy_round_id == str(fantasy_round.id)
-    assert detail.live is True
+    assert detail.live is False
     assert detail.home.team_name == "Casa FC"
     assert detail.away is not None
     assert detail.away.team_name == "Trasferta FC"

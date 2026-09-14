@@ -1,4 +1,5 @@
 import { Tab, TabList, TabPanel, Tabs } from "@fantappero/ui";
+import { useEffect } from "react";
 import { useAuth } from "../auth/AuthContext";
 import { RequirePermissions } from "../auth/RequirePermissions";
 import { useLocation, useNavigate } from "../router/simpleRouter";
@@ -18,13 +19,31 @@ const TABS = [
 /**
  * Home lega/Amministrazione riunite in un'unica pagina a tab (EP13-P01).
  * Scegliere/creare/unirsi a una lega è ora nell'header, sempre visibile.
+ *
+ * Per evitare contenuti duplicati (EP13-P02), i due tab non sono più mostrati
+ * entrambi allo stesso utente: chi ha `league:admin` vede solo Amministrazione
+ * (che include già stato lega, regolamento e partecipanti), gli altri membri
+ * vedono solo Home lega. Un admin che atterra su /lega/home (link vecchi,
+ * preferiti…) viene reindirizzato in automatico su Amministrazione.
  */
 export function LeagueHubPage() {
   const { pathname } = useLocation();
   const navigate = useNavigate();
   const { can } = useAuth();
-  const activeTab = TABS.find((tab) => tab.path === pathname)?.value ?? "league-home";
-  const visibleTabs = TABS.filter((tab) => can([tab.permission]));
+  const isAdmin = can(["league:admin"]);
+  const visibleTabs = isAdmin
+    ? TABS.filter((tab) => tab.value === "league-admin")
+    : TABS.filter((tab) => tab.value === "league-home" && can([tab.permission]));
+
+  const requestedTab = TABS.find((tab) => tab.path === pathname)?.value ?? "league-home";
+  const activeTab = isAdmin && requestedTab === "league-home" ? "league-admin" : requestedTab;
+
+  useEffect(() => {
+    const target = TABS.find((tab) => tab.value === activeTab);
+    if (target && target.path !== pathname) {
+      navigate(target.path, { replace: true });
+    }
+  }, [activeTab, pathname, navigate]);
 
   return (
     <Tabs

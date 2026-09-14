@@ -63,6 +63,19 @@ def _clear_auth_rate_limits(redis_url: str) -> None:
         client.delete(key)
 
 
+@pytest.fixture(autouse=True)
+def _disable_initial_fantasy_turn_materialize(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Evita il backfill eager post-create: le fixture sono condivise fra test
+    dello stesso modulo e inquinerebbero numerazione/turni di leghe nuove.
+    I test EP13-P04 sul bootstrap chiamano `materialize_full_season` / mockano
+    `delay` esplicitamente.
+    """
+    monkeypatch.setattr(
+        "fantasy_turns.tasks.materialize_initial_fantasy_turns_task.delay",
+        lambda **_kwargs: None,
+    )
+
+
 @pytest.fixture
 def client(migrated_engine: object) -> TestClient:
     from app.main import app

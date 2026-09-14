@@ -463,6 +463,7 @@ export function RosterScreen() {
       );
       setRandomAiMessage(`Rosa random assegnata: ${updated.filledSlots}/${updated.rosterSize} giocatori.`);
       await loadEditContext(updated.id);
+      await refreshViewedCredits();
     } catch (error) {
       setRandomAiError(getApiErrorMessage(error, "Impossibile assegnare la rosa random."));
     } finally {

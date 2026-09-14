@@ -54,21 +54,32 @@ function renderRoute(path: string) {
 describe("EP03-02 league admin page", () => {
   it("renders positive flow in demo admin mode", () => {
     const html = renderRoute("/lega/amministrazione?persona=admin");
+    expect(html).toContain('data-testid="league-admin-setup"');
     expect(html).toContain('data-testid="league-admin-form"');
     expect(html).toContain("Preset regolamento");
     expect(html).toContain("Partecipanti");
     expect(html).toContain("Crediti iniziali");
     expect(html).toContain("Salva configurazione");
-    expect(html).toContain("Inviti");
-    expect(html).toContain("Partecipanti iscritti");
-    expect(html).toContain('data-testid="league-members-list"');
-    expect(html).toContain("Trasferisci admin");
-    expect(html).toContain("Rimuovi");
-    expect(html).toContain('data-testid="league-invite-create"');
+    expect(html).toContain("Prossime fasi");
+    expect(html).toContain('id="tab-configurazione"');
+    expect(html).toContain('id="tab-invitati"');
+    expect(html).toContain("Invitati");
+    // Tab Invitati bloccata finché non si salva: contenuto invitati non montato.
+    expect(html).not.toContain('data-testid="league-invite-create"');
+    expect(html).not.toContain('data-testid="league-members-list"');
     expect(html).toContain('data-testid="league-season-panel"');
-    expect(html).toContain("Stato e avvio stagione");
-    expect(html).toContain("Bozza");
-    expect(html).toContain("Inizia la configurazione");
+    expect(html).toContain("Stato stagione");
+    expect(html).toContain("Prerequisiti mancanti");
+    expect(html).toContain("partecipanti → rose → calendario");
+    expect(html).toContain('data-testid="league-season-blocker-participant_count_mismatch"');
+    expect(html).toContain('data-testid="league-season-blocker-locked-fantasy_teams_not_configured"');
+    expect(html).toContain('data-testid="league-season-blocker-locked-calendar_not_configured"');
+    expect(html).toContain("Vai ai partecipanti");
+    expect(html).not.toContain("Vai a squadre e rose →");
+    expect(html).not.toContain("Vai al calendario →");
+    expect(html).not.toContain("Inizia la configurazione");
+    expect(html).not.toContain("Avvia stagione");
+    expect(html).toMatch(/id="tab-invitati"[^>]*disabled/);
   });
 
   it("renders empty state", () => {
@@ -122,7 +133,7 @@ describe("EP03-02 league admin page", () => {
   it("renders season empty state", () => {
     const html = renderRoute("/lega/amministrazione?persona=admin&stagione=empty");
     expect(html).toContain('data-testid="league-season-empty"');
-    expect(html).toContain("Nessuna transizione disponibile");
+    expect(html).toContain("Nessuna informazione di stagione");
   });
 
   it("renders season error state", () => {
@@ -141,12 +152,12 @@ describe("EP03-02 league admin page", () => {
 
 
 
-  it("renders invite code and link copy CTAs", () => {
+  it("keeps invite CTAs behind the locked Invitati tab until configuration is saved", () => {
     const html = renderRoute("/lega/amministrazione?persona=admin");
-    expect(html).toContain('data-testid="league-invite-copy-code"');
-    expect(html).toContain('data-testid="league-invite-copy-url"');
-    expect(html).toContain("Copia codice");
-    expect(html).toContain("Copia link");
+    expect(html).toContain('id="tab-invitati"');
+    expect(html).toMatch(/id="tab-invitati"[^>]*disabled/);
+    expect(html).not.toContain('data-testid="league-invite-copy-code"');
+    expect(html).not.toContain('data-testid="league-invite-create"');
   });
 
   it("renders delete panel for draft leagues", () => {
@@ -154,5 +165,16 @@ describe("EP03-02 league admin page", () => {
     expect(html).toContain('data-testid="league-delete-panel"');
     expect(html).toContain("Elimina lega");
   });
+
+  it("shows Prossime fasi with Configurazione and locked Invitati tabs", () => {
+    const html = renderRoute("/lega/amministrazione?persona=admin");
+    expect(html).toContain("Prossime fasi");
+    expect(html).toContain('data-testid="league-admin-setup"');
+    expect(html).toContain('id="tab-configurazione"');
+    expect(html).toContain('id="tab-invitati"');
+    expect(html).toContain("Prima salva la configurazione della lega");
+    expect(html).not.toContain('data-testid="league-home-roster-link"');
+  });
 });
+
 

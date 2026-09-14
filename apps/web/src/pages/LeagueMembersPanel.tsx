@@ -39,12 +39,18 @@ type LeagueMembersPanelProps = {
   leagueId: string | null;
   isDemoMode: boolean;
   search: string;
+  /** Capienza regolamento (`participantCount`). */
+  participantCount?: number | null;
+  /** Ricarica regolamento/lifecycle dopo rimozione (il backend può abbassare il target). */
+  onMembersChanged?: () => void;
 };
 
 export function LeagueMembersPanel({
   leagueId,
   isDemoMode,
   search,
+  participantCount = null,
+  onMembersChanged,
 }: LeagueMembersPanelProps) {
   const demoState = new URLSearchParams(search).get("partecipanti");
   const [members, setMembers] = useState<LeagueMember[]>(
@@ -152,7 +158,10 @@ export function LeagueMembersPanel({
     try {
       const removed = await removeLeagueMember(session.accessToken, leagueId, target.userId);
       setMembers((current) => current.filter((member) => member.userId !== removed.userId));
-      setSuccess(`${removed.displayName} è stato rimosso dalla lega.`);
+      setSuccess(
+        `${removed.displayName} è stato rimosso dalla lega. Il numero partecipanti previsti è stato allineato agli iscritti.`,
+      );
+      onMembersChanged?.();
     } catch (removeError) {
       setError(getApiErrorMessage(removeError, "Impossibile rimuovere il partecipante."));
     } finally {
@@ -205,6 +214,28 @@ export function LeagueMembersPanel({
     >
       <h2 id="league-members-title">Partecipanti iscritti</h2>
       <p>Trasferisci il ruolo admin o rimuovi un partecipante prima dell’avvio.</p>
+      {!loading && !error && participantCount != null ? (
+        <p data-testid="league-members-capacity">
+          Iscritti: <strong>{members.length}</strong>
+          {" / "}
+          Previsti: <strong>{participantCount}</strong>
+        </p>
+      ) : null}
+      {!loading &&
+      !error &&
+      participantCount != null &&
+      members.length !== participantCount ? (
+        <UiStatePanel
+          state="empty"
+          title="Numero partecipanti non allineato"
+          message={
+            members.length < participantCount
+              ? `Servono ancora ${participantCount - members.length} iscritti, oppure abbassa «Partecipanti» nel regolamento a ${members.length} e salva.`
+              : `Ci sono più iscritti del previsto: alza «Partecipanti» a ${members.length} e salva, oppure rimuovi i membri in eccesso.`
+          }
+          testId="league-members-mismatch"
+        />
+      ) : null}
 
       {loading ? (
         <UiStatePanel

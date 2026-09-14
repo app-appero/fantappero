@@ -1,15 +1,11 @@
-import type { LeagueLifecycle, LeagueState } from "@fantappero/contracts";
+import type { LeagueLifecycle, LeagueLifecycleActionHint } from "@fantappero/contracts";
 import {
   LEAGUE_LIFECYCLE_ACTION_HINT_LABEL,
   LEAGUE_LIFECYCLE_PHASES,
-  describeLeagueLifecycleStep,
   leagueLifecyclePhaseIndex,
+  orderLeagueSetupBlockers,
 } from "@fantappero/contracts";
 import { Badge, Button, UiStatePanel } from "@fantappero/ui";
-import { useState } from "react";
-import { transitionLeagueState } from "../api/leagues";
-import { getApiErrorMessage } from "../auth/AuthContext";
-import { loadStoredSession } from "../auth/sessionStorage";
 import { leagueStateLabel } from "../leagues/leagueLabels";
 import { useNavigate } from "../router/simpleRouter";
 
@@ -18,7 +14,8 @@ type Props = {
   lifecycle: LeagueLifecycle;
   isDemoMode: boolean;
   search: string;
-  onChange: (lifecycle: LeagueLifecycle) => void;
+  /** Apre la tab Inviti (o Configurazione) e scrolla alla sezione target. */
+  onOpenSetupHint?: (hint: Exclude<LeagueLifecycleActionHint, "calendar">) => void;
 };
 
 function requestedState(search: string): "loading" | "empty" | "error" | null {
@@ -26,36 +23,15 @@ function requestedState(search: string): "loading" | "empty" | "error" | null {
   return value === "loading" || value === "empty" || value === "error" ? value : null;
 }
 
-// Selettore della sezione a cui rimandare l'admin per risolvere un blocker
-// (EP03-05-UX). "teams" riusa la sezione Partecipanti: è lì che si assegnano
-// le rose IA e si verificano i crediti, non esiste (ancora) un pannello dedicato.
-// "calendar" non ha un anchor: la generazione/conferma calendario vive in
-// Turni ▸ Calendario fantallenatori, quindi richiede una navigazione.
-const ACTION_HINT_SELECTOR: Record<"rules" | "members" | "teams", string> = {
-  rules: '[data-testid="league-admin-form"]',
-  members: '[data-testid="league-members-panel"]',
-  teams: '[data-testid="league-members-panel"]',
-};
-
-function scrollToActionHint(hint: "rules" | "members" | "teams") {
-  document
-    .querySelector(ACTION_HINT_SELECTOR[hint])
-    ?.scrollIntoView({ behavior: "smooth", block: "start" });
-}
-
+/** Stato stagione in sola lettura: le transizioni avvengono in automatico. */
 export function LeagueSeasonPanel({
-  leagueId,
   lifecycle,
   isDemoMode,
   search,
-  onChange,
+  onOpenSetupHint,
 }: Props) {
   const demoState = isDemoMode ? requestedState(search) : null;
   const navigate = useNavigate();
-  const [working, setWorking] = useState<LeagueState | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
-  const [confirmingRollback, setConfirmingRollback] = useState(false);
 
   if (demoState === "loading") {
     return (
@@ -81,49 +57,19 @@ export function LeagueSeasonPanel({
     return (
       <UiStatePanel
         state="empty"
-        title="Nessuna transizione disponibile"
-        message="La lega non ha azioni di stagione disponibili."
+        title="Nessuna informazione di stagione"
+        message="La lega non ha ancora prerequisiti di stagione da mostrare."
         testId="league-season-empty"
       />
     );
   }
 
-  const step = describeLeagueLifecycleStep(lifecycle);
   const currentPhaseIndex = leagueLifecyclePhaseIndex(lifecycle.state);
-
-  async function transition(targetState: LeagueState) {
-    setError(null);
-    setSuccess(null);
-    setConfirmingRollback(false);
-    if (isDemoMode) {
-      onChange({ state: targetState, allowedTransitions: [], blockers: [] });
-      setSuccess(`Stato aggiornato: ${leagueStateLabel(targetState)}.`);
-      return;
-    }
-    if (!leagueId) {
-      setError("Seleziona una lega prima di cambiarne lo stato.");
-      return;
-    }
-    const stored = loadStoredSession();
-    if (!stored?.accessToken) {
-      setError("Sessione non disponibile. Accedi di nuovo.");
-      return;
-    }
-    setWorking(targetState);
-    try {
-      const updated = await transitionLeagueState(stored.accessToken, leagueId, { targetState });
-      onChange(updated);
-      setSuccess(`Stato aggiornato: ${leagueStateLabel(updated.state)}.`);
-    } catch (caught) {
-      setError(getApiErrorMessage(caught, "Impossibile aggiornare lo stato della lega."));
-    } finally {
-      setWorking(null);
-    }
-  }
+  const orderedBlockers = orderLeagueSetupBlockers(lifecycle.blockers);
 
   return (
     <section className="fa-season-panel" data-testid="league-season-panel">
-      <h2>Stato e avvio stagione</h2>
+      <h2>Stato stagione</h2>
 
       <ol className="fa-lifecycle-stepper" data-testid="league-season-stepper">
         {LEAGUE_LIFECYCLE_PHASES.map((phase, index) => (
@@ -148,15 +94,38 @@ export function LeagueSeasonPanel({
         Stato corrente: <strong>{leagueStateLabel(lifecycle.state)}</strong>
       </p>
 
-      {lifecycle.blockers.length > 0 ? (
+      {orderedBlockers.length > 0 ? (
         <div className="fa-lifecycle-checklist" data-testid="league-season-blockers">
           <h3>Prerequisiti mancanti</h3>
+          <p className="fa-lifecycle-checklist__hint">
+            Completa i passaggi in ordine: partecipanti → rose → calendario. I passaggi successivi
+            restano bloccati finché il precedente non è completo; la stagione parte in automatico.
+          </p>
           <ul>
-            {lifecycle.blockers.map((blocker) => (
-              <li key={blocker.code} className="fa-lifecycle-checklist__item">
-                <Badge variant="warning">Da sistemare</Badge>
-                <span className="fa-lifecycle-checklist__message">{blocker.message}</span>
-                {blocker.actionHint ? (
+            {orderedBlockers.map((blocker) => (
+              <li
+                key={blocker.code}
+                className={[
+                  "fa-lifecycle-checklist__item",
+                  blocker.actionable ? "" : "fa-lifecycle-checklist__item--locked",
+                ]
+                  .filter(Boolean)
+                  .join(" ")}
+                data-testid={
+                  blocker.actionable
+                    ? `league-season-blocker-${blocker.code}`
+                    : `league-season-blocker-locked-${blocker.code}`
+                }
+              >
+                <Badge variant={blocker.actionable ? "warning" : "neutral"}>
+                  {blocker.actionable ? "Da sistemare" : "In attesa"}
+                </Badge>
+                <span className="fa-lifecycle-checklist__message">
+                  {blocker.actionable
+                    ? blocker.message
+                    : `Completa prima il passaggio precedente. (${blocker.message})`}
+                </span>
+                {blocker.actionHint && blocker.actionable ? (
                   <Button
                     type="button"
                     variant="ghost"
@@ -166,7 +135,7 @@ export function LeagueSeasonPanel({
                         navigate("/turni?tab=calendario");
                         return;
                       }
-                      scrollToActionHint(blocker.actionHint!);
+                      onOpenSetupHint?.(blocker.actionHint);
                     }}
                   >
                     {LEAGUE_LIFECYCLE_ACTION_HINT_LABEL[blocker.actionHint]} →
@@ -178,87 +147,35 @@ export function LeagueSeasonPanel({
         </div>
       ) : null}
 
-      {error ? (
-        <UiStatePanel
-          state="error"
-          title="Stato non aggiornato"
-          message={error}
-          testId="league-season-transition-error"
-        />
-      ) : null}
-      {success ? (
-        <UiStatePanel
-          state="success"
-          title="Stato aggiornato"
-          message={success}
-          testId="league-season-transition-success"
-        />
-      ) : null}
-
-      {step.forwardTarget === null ? (
+      {lifecycle.state === "active" ? (
         <UiStatePanel
           state="empty"
-          title="Nessuna transizione disponibile"
-          message="Non ci sono ulteriori azioni disponibili per lo stato corrente."
-          testId="league-season-no-transitions"
+          title="Stagione in corso"
+          message="La lega si concluderà automaticamente quando tutte le giornate saranno omologate."
+          testId="league-season-in-progress"
         />
-      ) : (
-        <div className="fa-lifecycle-actions">
-          <div className="fa-ds-showcase__row">
-            <Button
-              type="button"
-              variant="primary"
-              disabled={!step.forwardEnabled || working !== null}
-              onClick={() => void transition(step.forwardTarget!)}
-              data-testid="league-season-cta-forward"
-            >
-              {working === step.forwardTarget ? "Aggiornamento…" : step.forwardLabel}
-            </Button>
+      ) : null}
 
-            {step.rollbackTarget && !confirmingRollback ? (
-              <Button
-                type="button"
-                variant="ghost"
-                disabled={working !== null}
-                onClick={() => setConfirmingRollback(true)}
-                data-testid="league-season-cta-rollback"
-              >
-                {step.rollbackLabel}
-              </Button>
-            ) : null}
-          </div>
+      {lifecycle.state === "concluded" || lifecycle.state === "archived" ? (
+        <UiStatePanel
+          state="empty"
+          title="Stagione conclusa"
+          message="Non ci sono ulteriori azioni di lifecycle disponibili."
+          testId="league-season-done"
+        />
+      ) : null}
 
-          {step.rollbackTarget && confirmingRollback ? (
-            <div className="fa-lifecycle-confirm" data-testid="league-season-rollback-confirm">
-              <p>
-                Sei sicuro? L&apos;asta in corso verrà interrotta e la lega tornerà in
-                configurazione.
-              </p>
-              <div className="fa-ds-showcase__row">
-                <Button
-                  type="button"
-                  variant="danger"
-                  disabled={working !== null}
-                  onClick={() => void transition(step.rollbackTarget!)}
-                  data-testid="league-season-rollback-confirm-submit"
-                >
-                  {working === step.rollbackTarget ? "Aggiornamento…" : "Conferma"}
-                </Button>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  disabled={working !== null}
-                  onClick={() => setConfirmingRollback(false)}
-                >
-                  Annulla
-                </Button>
-              </div>
-            </div>
-          ) : null}
-        </div>
-      )}
+      {(lifecycle.state === "draft" ||
+        lifecycle.state === "configuring" ||
+        lifecycle.state === "auction") &&
+      orderedBlockers.length === 0 ? (
+        <UiStatePanel
+          state="empty"
+          title="Prerequisiti soddisfatti"
+          message="La stagione parte in automatico non appena i controlli di avvio sono completi."
+          testId="league-season-auto-ready"
+        />
+      ) : null}
     </section>
   );
 }
-
-

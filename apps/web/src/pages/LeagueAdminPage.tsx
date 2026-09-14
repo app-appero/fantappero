@@ -1,5 +1,6 @@
 import type {
   LeagueLifecycle,
+  LeagueLifecycleActionHint,
   LeagueRules,
   UpdateLeagueRulesRequest,
 } from "@fantappero/contracts";
@@ -9,9 +10,13 @@ import {
   Input,
   PageContainer,
   Select,
+  Tab,
+  TabList,
+  TabPanel,
+  Tabs,
   UiStatePanel,
 } from "@fantappero/ui";
-import { type FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { type FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { fetchLeagueAdminPanel, updateLeagueRules } from "../api/leagues";
 import { getApiErrorMessage, useAuth } from "../auth/AuthContext";
 import { ManagerDirectory } from "../components/ManagerDirectory";
@@ -22,6 +27,9 @@ import { LeagueDeletePanel } from "./LeagueDeletePanel";
 import { LeagueInvitesPanel } from "./LeagueInvitesPanel";
 import { LeagueMembersPanel } from "./LeagueMembersPanel";
 import { LeagueSeasonPanel } from "./LeagueSeasonPanel";
+
+type SetupHint = Exclude<LeagueLifecycleActionHint, "calendar">;
+type SetupScrollTarget = "form" | "members";
 
 const DEMO_RULES: LeagueRules = {
   presetName: "standard",
@@ -51,10 +59,71 @@ const DEMO_RULES: LeagueRules = {
 };
 
 const DEMO_LIFECYCLE: LeagueLifecycle = {
-  state: "draft",
-  allowedTransitions: ["configuring"],
-  blockers: [],
+  state: "configuring",
+  allowedTransitions: [],
+  blockers: [
+    {
+      code: "participant_count_mismatch",
+      message: "Il numero di partecipanti iscritti deve coincidere con il regolamento.",
+      actionHint: "members",
+    },
+    {
+      code: "fantasy_teams_not_configured",
+      message: "Completa squadre e rose prima di avviare la stagione.",
+      actionHint: "teams",
+    },
+    {
+      code: "calendar_not_configured",
+      message: "Genera il calendario prima di avviare la stagione.",
+      actionHint: "calendar",
+    },
+  ],
 };
+
+type SetupTab = "configurazione" | "invitati";
+
+function demoForceInvitesTab(search: string): boolean {
+  const params = new URLSearchParams(search);
+  return params.has("inviti") || params.has("partecipanti");
+}
+
+/** Deep-link da Turni / prerequisiti: apre Configurazione o Invitati. */
+function setupHintFromSearch(search: string): SetupHint | null {
+  const setup = new URLSearchParams(search).get("setup");
+  if (setup === "configurazione" || setup === "rules") {
+    return "rules";
+  }
+  if (setup === "invitati" || setup === "members" || setup === "partecipanti") {
+    return "members";
+  }
+  if (setup === "squadre" || setup === "teams" || setup === "rose") {
+    return "teams";
+  }
+  return null;
+}
+
+function scrollToSetupTarget(target: SetupScrollTarget): boolean {
+  const selector =
+    target === "form"
+      ? '[data-testid="league-admin-form"]'
+      : '[data-testid="league-members-panel"]';
+  const element = document.querySelector(selector);
+  if (!(element instanceof HTMLElement)) {
+    return false;
+  }
+  element.scrollIntoView({ behavior: "smooth", block: "start" });
+  return true;
+}
+
+function resolveSetupNavigation(
+  hint: SetupHint,
+  configurationSaved: boolean,
+): { tab: SetupTab; scroll: SetupScrollTarget } {
+  if (hint === "rules" || !configurationSaved) {
+    return { tab: "configurazione", scroll: "form" };
+  }
+  return { tab: "invitati", scroll: "members" };
+}
 
 function toParticipantOptions(min: number, max: number): Array<{ value: string; label: string }> {
   const options: Array<{ value: string; label: string }> = [];
@@ -93,6 +162,15 @@ export function LeagueAdminPage() {
   const [lifecycle, setLifecycle] = useState<LeagueLifecycle | null>(() =>
     isDemoMode && demoState === "success" ? DEMO_LIFECYCLE : null,
   );
+  const [configurationSaved, setConfigurationSaved] = useState(() =>
+    isDemoMode && demoState === "success" ? demoForceInvitesTab(search) : false,
+  );
+  const [setupTab, setSetupTab] = useState<SetupTab>(() =>
+    isDemoMode && demoState === "success" && demoForceInvitesTab(search)
+      ? "invitati"
+      : "configurazione",
+  );
+  const [pendingScrollTarget, setPendingScrollTarget] = useState<SetupScrollTarget | null>(null);
   const [loading, setLoading] = useState(() => (isDemoMode ? demoState === "loading" : true));
   const [loadError, setLoadError] = useState<string | null>(() =>
     isDemoMode && demoState === "error" ? "Impossibile caricare il regolamento (demo)." : null,
@@ -100,6 +178,14 @@ export function LeagueAdminPage() {
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [saving, setSaving] = useState(false);
+  const configurationSavedRef = useRef(configurationSaved);
+  configurationSavedRef.current = configurationSaved;
+
+  const openSetupHint = useCallback((hint: SetupHint) => {
+    const next = resolveSetupNavigation(hint, configurationSavedRef.current);
+    setSetupTab(next.tab);
+    setPendingScrollTarget(next.scroll);
+  }, []);
 
   const loadPanel = useCallback(async () => {
     setSaveSuccess(false);
@@ -109,6 +195,7 @@ export function LeagueAdminPage() {
         setLoading(true);
         setRules(null);
         setLifecycle(null);
+        setConfigurationSaved(false);
         setLoadError(null);
         return;
       }
@@ -116,6 +203,7 @@ export function LeagueAdminPage() {
         setLoading(false);
         setRules(null);
         setLifecycle(null);
+        setConfigurationSaved(false);
         setLoadError("Impossibile caricare il regolamento (demo).");
         return;
       }
@@ -123,12 +211,26 @@ export function LeagueAdminPage() {
         setLoading(false);
         setRules(null);
         setLifecycle(null);
+        setConfigurationSaved(false);
         setLoadError(null);
         return;
       }
       setLoading(false);
       setRules(DEMO_RULES);
       setLifecycle(DEMO_LIFECYCLE);
+      // Wireframe inviti/partecipanti: sblocca la tab per ispezionare quegli stati.
+      const params = new URLSearchParams(search);
+      const forceInvitesTab = params.has("inviti") || params.has("partecipanti");
+      const setupHint = setupHintFromSearch(search);
+      const saved = forceInvitesTab || setupHint === "members" || setupHint === "teams";
+      setConfigurationSaved(saved);
+      if (setupHint) {
+        const next = resolveSetupNavigation(setupHint, saved);
+        setSetupTab(next.tab);
+        setPendingScrollTarget(next.scroll);
+      } else {
+        setSetupTab(forceInvitesTab ? "invitati" : "configurazione");
+      }
       setLoadError(null);
       return;
     }
@@ -137,6 +239,7 @@ export function LeagueAdminPage() {
       setLoading(false);
       setRules(null);
       setLifecycle(null);
+      setConfigurationSaved(false);
       setLoadError(null);
       return;
     }
@@ -155,18 +258,40 @@ export function LeagueAdminPage() {
       const panel = await fetchLeagueAdminPanel(stored.accessToken, activeLeagueId);
       setRules(panel.rules);
       setLifecycle(panel.lifecycle);
+      setConfigurationSaved(panel.configurationSaved);
+      const setupHint = setupHintFromSearch(search);
+      if (setupHint) {
+        const next = resolveSetupNavigation(setupHint, panel.configurationSaved);
+        setSetupTab(next.tab);
+        setPendingScrollTarget(next.scroll);
+      } else {
+        setSetupTab("configurazione");
+      }
     } catch (error) {
       setLoadError(getApiErrorMessage(error, "Impossibile caricare il regolamento."));
       setRules(null);
       setLifecycle(null);
+      setConfigurationSaved(false);
     } finally {
       setLoading(false);
     }
-  }, [activeLeagueId, demoState, isDemoMode]);
+  }, [activeLeagueId, demoState, isDemoMode, search]);
 
   useEffect(() => {
     void loadPanel();
   }, [loadPanel]);
+
+  useEffect(() => {
+    if (!pendingScrollTarget || loading) {
+      return;
+    }
+    const frame = window.requestAnimationFrame(() => {
+      if (scrollToSetupTarget(pendingScrollTarget)) {
+        setPendingScrollTarget(null);
+      }
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [loading, pendingScrollTarget, setupTab]);
 
   const participantOptions = useMemo(
     () =>
@@ -197,6 +322,8 @@ export function LeagueAdminPage() {
 
     if (isDemoMode) {
       setSaveSuccess(true);
+      setConfigurationSaved(true);
+      setSetupTab("invitati");
       return;
     }
 
@@ -220,6 +347,15 @@ export function LeagueAdminPage() {
       );
       setRules(saved);
       setSaveSuccess(true);
+      setConfigurationSaved(true);
+      setSetupTab("invitati");
+      try {
+        const panel = await fetchLeagueAdminPanel(stored.accessToken, activeLeagueId);
+        setLifecycle(panel.lifecycle);
+        setConfigurationSaved(panel.configurationSaved);
+      } catch {
+        // Salvataggio già riuscito; il lifecycle si aggiorna al prossimo refresh.
+      }
     } catch (error) {
       setSaveError(getApiErrorMessage(error, "Impossibile salvare il regolamento."));
     } finally {
@@ -268,270 +404,321 @@ export function LeagueAdminPage() {
 
       {!loading && !loadError && rules ? (
         <>
-        {lifecycle ? (
-          <LeagueSeasonPanel
-            leagueId={activeLeagueId}
-            lifecycle={lifecycle}
-            isDemoMode={isDemoMode}
-            search={search}
-            onChange={setLifecycle}
-          />
-        ) : null}
-        <form data-testid="league-admin-form" onSubmit={(event) => void onSubmit(event)}>
-          <Select
-            label="Preset regolamento"
-            name="preset"
-            value={rules.presetName}
-            onChange={() => undefined}
-            options={[{ value: "standard", label: "Standard" }]}
-            disabled
-          />
-
-          <Select
-            label="Partecipanti"
-            name="participants"
-            value={String(rules.participantCount)}
-            onChange={(event) =>
-              updateLocalRules({ participantCount: Number(event.target.value) })
-            }
-            options={participantOptions}
-            disabled={!canConfigure}
-          />
-
-          <Input
-            label="Crediti iniziali"
-            name="credits"
-            type="number"
-            min={1}
-            disabled={!canConfigure}
-            value={String(rules.totalCredits)}
-            onChange={(event) =>
-              updateLocalRules({ totalCredits: Number(event.target.value) || 0 })
-            }
-          />
-
-          <Input
-            label="Soglia minuti per il voto"
-            name="minutesThreshold"
-            type="number"
-            min={1}
-            max={30}
-            disabled={!canConfigure}
-            value={String(rules.minutesThreshold)}
-            onChange={(event) =>
-              updateLocalRules({ minutesThreshold: Number(event.target.value) || 0 })
-            }
-          />
-
-          <Input
-            label="Margine di preavviso lock formazione (minuti)"
-            name="lineupLockMarginMinutes"
-            type="number"
-            min={0}
-            max={60}
-            disabled={!canConfigure}
-            value={String(rules.lineupLockMarginMinutes)}
-            onChange={(event) =>
-              updateLocalRules({ lineupLockMarginMinutes: Number(event.target.value) || 0 })
-            }
-          />
-          <p className="fa-field-hint" data-testid="league-admin-lock-margin-hint">
-            Un giocatore si blocca in formazione questi minuti prima dell&apos;inizio della sua
-            partita reale — non del turno intero: la formazione a step resta invariata.
-          </p>
-
-          <Input
-            label="Titolari minimi schierabili per giocare il turno (%)"
-            name="turnCoverageThreshold"
-            type="number"
-            min={50}
-            max={100}
-            disabled={!canConfigure}
-            value={String(Math.round(rules.turnCoverageThreshold * 100))}
-            onChange={(event) =>
-              updateLocalRules({
-                turnCoverageThreshold: (Number(event.target.value) || 0) / 100,
-              })
-            }
-          />
-          <p className="fa-field-hint" data-testid="league-admin-turn-coverage-hint">
-            Percentuale dei titolari che ogni fantallenatore deve poter schierare perché una
-            giornata diventi un Turno Europeo valido e quindi giocabile (minimo 50%, massimo
-            100%).
-          </p>
-
-          <fieldset data-testid="league-admin-roster" style={{ marginBottom: "1rem" }}>
-            <legend>Rosa standard (fissa)</legend>
-            <p>{`${rules.roster.rosterSize} giocatori: ${rules.roster.goalkeepers}P-${rules.roster.defenders}D-${rules.roster.midfielders}C-${rules.roster.forwards}A`}</p>
-          </fieldset>
-
-          <fieldset data-testid="league-admin-options" style={{ marginBottom: "1rem" }}>
-            <legend>Opzioni lega</legend>
-            <label>
-              <input
-                type="checkbox"
-                disabled={!canConfigure}
-                checked={rules.options.allowTrades}
-                onChange={(event) =>
-                  updateLocalRules({
-                    options: {
-                      ...rules.options,
-                      allowTrades: event.target.checked,
-                    },
-                  })
-                }
-              />{" "}
-              Abilita scambi
-            </label>
-            <label>
-              <input
-                type="checkbox"
-                disabled={!canConfigure}
-                checked={rules.options.allowManualInvites}
-                onChange={(event) =>
-                  updateLocalRules({
-                    options: {
-                      ...rules.options,
-                      allowManualInvites: event.target.checked,
-                    },
-                  })
-                }
-              />{" "}
-              Abilita inviti manuali
-            </label>
-            <label>
-              <input
-                type="checkbox"
-                disabled={!canConfigure}
-                checked={rules.options.requireTradeApproval}
-                onChange={(event) =>
-                  updateLocalRules({
-                    options: {
-                      ...rules.options,
-                      requireTradeApproval: event.target.checked,
-                    },
-                  })
-                }
-              />{" "}
-              Richiedi approvazione amministratore per gli scambi
-            </label>
-          </fieldset>
-
-          <fieldset data-testid="league-admin-market-rules" style={{ marginBottom: "1rem" }}>
-            <legend>Regole mercato</legend>
-
-            <Input
-              label="Rimborso svincolo volontario (%)"
-              name="voluntaryReleaseRefundPercent"
-              type="number"
-              min={0}
-              max={100}
-              disabled={!canConfigure}
-              value={String(rules.voluntaryReleaseRefundPercent)}
-              onChange={(event) =>
-                updateLocalRules({
-                  voluntaryReleaseRefundPercent: Number(event.target.value) || 0,
-                })
-              }
-            />
-
-            <Input
-              label="Rimborso svincolo per uscita dai cinque campionati (%)"
-              name="leagueExitRefundPercent"
-              type="number"
-              min={0}
-              max={100}
-              disabled={!canConfigure}
-              value={String(rules.leagueExitRefundPercent)}
-              onChange={(event) =>
-                updateLocalRules({
-                  leagueExitRefundPercent: Number(event.target.value) || 0,
-                })
-              }
-            />
-
-            <Input
-              label="Proposte di scambio attive per squadra (max)"
-              name="maxActiveTradeProposalsPerTeam"
-              type="number"
-              min={1}
-              disabled={!canConfigure}
-              value={String(rules.maxActiveTradeProposalsPerTeam)}
-              onChange={(event) =>
-                updateLocalRules({
-                  maxActiveTradeProposalsPerTeam: Number(event.target.value) || 1,
-                })
-              }
-            />
-          </fieldset>
-
-          {saveError ? (
-            <UiStatePanel
-              state="error"
-              title="Configurazione non salvata"
-              message={saveError}
-              testId="league-admin-save-error"
+          {lifecycle ? (
+            <LeagueSeasonPanel
+              leagueId={activeLeagueId}
+              lifecycle={lifecycle}
+              isDemoMode={isDemoMode}
+              search={search}
+              onOpenSetupHint={openSetupHint}
             />
           ) : null}
 
-          {saveSuccess ? (
-            <UiStatePanel
-              state="success"
-              title="Configurazione salvata"
-              message="Regolamento aggiornato con preset Standard."
-              testId="league-admin-save-success"
-            />
-          ) : null}
+          <section
+            aria-labelledby="league-admin-next-title"
+            style={{ marginTop: "1.5rem" }}
+            data-testid="league-admin-setup"
+          >
+            <h2 id="league-admin-next-title">Prossime fasi</h2>
+            <p>
+              Prima salva la configurazione della lega, poi invita i fantallenatori.
+            </p>
 
-          <div className="fa-ds-showcase__row">
-            <Button
-              type="submit"
-              variant="primary"
-              disabled={saving || !canConfigure}
-              data-testid="league-admin-submit"
+            <Tabs
+              value={setupTab}
+              onValueChange={(value) => {
+                if (value === "invitati" && !configurationSaved) {
+                  return;
+                }
+                setSetupTab(value as SetupTab);
+              }}
+              aria-label="Fasi di setup lega"
             >
-              {saving ? "Salvataggio…" : "Salva configurazione"}
-            </Button>
-            {loadError ? (
-              <Button type="button" variant="ghost" onClick={() => void loadPanel()}>
-                Riprova
-              </Button>
-            ) : null}
-          </div>
-        </form>
-        <LeagueMembersPanel
-          leagueId={activeLeagueId}
-          isDemoMode={isDemoMode}
-          search={search}
-        />
-        <LeagueInvitesPanel
-          leagueId={activeLeagueId}
-          isDemoMode={isDemoMode}
-          search={search}
-        />
-        <ManagerDirectory
-          leagueId={activeLeagueId}
-          isDemoMode={isDemoMode}
-          search={search}
-          title="Inviti nominativi"
-          compact
-        />
-        {/* Generazione/conferma calendario H2H: spostata (per il momento) in
-            Turni ▸ tab "Calendario fantallenatori", dove si consulta. */}
-        {lifecycle ? (
-          <LeagueDeletePanel
-            leagueId={activeLeagueId}
-            state={lifecycle.state}
-            leagueName={activeLeague?.name ?? "questa lega"}
-            isDemoMode={isDemoMode}
-          />
-        ) : null}
+              <TabList>
+                <Tab value="configurazione">Configurazione</Tab>
+                <Tab value="invitati" disabled={!configurationSaved}>
+                  Invitati
+                </Tab>
+              </TabList>
+
+              <TabPanel value="configurazione">
+                <form
+                  data-testid="league-admin-form"
+                  onSubmit={(event) => void onSubmit(event)}
+                >
+                  <Select
+                    label="Preset regolamento"
+                    name="preset"
+                    value={rules.presetName}
+                    onChange={() => undefined}
+                    options={[{ value: "standard", label: "Standard" }]}
+                    disabled
+                  />
+
+                  <Select
+                    label="Partecipanti"
+                    name="participants"
+                    value={String(rules.participantCount)}
+                    onChange={(event) =>
+                      updateLocalRules({ participantCount: Number(event.target.value) })
+                    }
+                    options={participantOptions}
+                    disabled={!canConfigure}
+                  />
+
+                  <Input
+                    label="Crediti iniziali"
+                    name="credits"
+                    type="number"
+                    min={1}
+                    disabled={!canConfigure}
+                    value={String(rules.totalCredits)}
+                    onChange={(event) =>
+                      updateLocalRules({ totalCredits: Number(event.target.value) || 0 })
+                    }
+                  />
+
+                  <Input
+                    label="Soglia minuti per il voto"
+                    name="minutesThreshold"
+                    type="number"
+                    min={1}
+                    max={30}
+                    disabled={!canConfigure}
+                    value={String(rules.minutesThreshold)}
+                    onChange={(event) =>
+                      updateLocalRules({ minutesThreshold: Number(event.target.value) || 0 })
+                    }
+                  />
+
+                  <Input
+                    label="Margine di preavviso lock formazione (minuti)"
+                    name="lineupLockMarginMinutes"
+                    type="number"
+                    min={0}
+                    max={60}
+                    disabled={!canConfigure}
+                    value={String(rules.lineupLockMarginMinutes)}
+                    onChange={(event) =>
+                      updateLocalRules({
+                        lineupLockMarginMinutes: Number(event.target.value) || 0,
+                      })
+                    }
+                  />
+                  <p className="fa-field-hint" data-testid="league-admin-lock-margin-hint">
+                    Un giocatore si blocca in formazione questi minuti prima dell&apos;inizio della
+                    sua partita reale — non del turno intero: la formazione a step resta invariata.
+                  </p>
+
+                  <Input
+                    label="Titolari minimi schierabili per giocare il turno (%)"
+                    name="turnCoverageThreshold"
+                    type="number"
+                    min={50}
+                    max={100}
+                    disabled={!canConfigure}
+                    value={String(Math.round(rules.turnCoverageThreshold * 100))}
+                    onChange={(event) =>
+                      updateLocalRules({
+                        turnCoverageThreshold: (Number(event.target.value) || 0) / 100,
+                      })
+                    }
+                  />
+                  <p className="fa-field-hint" data-testid="league-admin-turn-coverage-hint">
+                    Percentuale dei titolari che ogni fantallenatore deve poter schierare perché una
+                    giornata diventi un Turno Europeo valido e quindi giocabile (minimo 50%, massimo
+                    100%).
+                  </p>
+
+                  <fieldset data-testid="league-admin-roster" style={{ marginBottom: "1rem" }}>
+                    <legend>Rosa standard (fissa)</legend>
+                    <p>{`${rules.roster.rosterSize} giocatori: ${rules.roster.goalkeepers}P-${rules.roster.defenders}D-${rules.roster.midfielders}C-${rules.roster.forwards}A`}</p>
+                  </fieldset>
+
+                  <fieldset data-testid="league-admin-options" style={{ marginBottom: "1rem" }}>
+                    <legend>Opzioni lega</legend>
+                    <label>
+                      <input
+                        type="checkbox"
+                        disabled={!canConfigure}
+                        checked={rules.options.allowTrades}
+                        onChange={(event) =>
+                          updateLocalRules({
+                            options: {
+                              ...rules.options,
+                              allowTrades: event.target.checked,
+                            },
+                          })
+                        }
+                      />{" "}
+                      Abilita scambi
+                    </label>
+                    <label>
+                      <input
+                        type="checkbox"
+                        disabled={!canConfigure}
+                        checked={rules.options.allowManualInvites}
+                        onChange={(event) =>
+                          updateLocalRules({
+                            options: {
+                              ...rules.options,
+                              allowManualInvites: event.target.checked,
+                            },
+                          })
+                        }
+                      />{" "}
+                      Abilita inviti manuali
+                    </label>
+                    <label>
+                      <input
+                        type="checkbox"
+                        disabled={!canConfigure}
+                        checked={rules.options.requireTradeApproval}
+                        onChange={(event) =>
+                          updateLocalRules({
+                            options: {
+                              ...rules.options,
+                              requireTradeApproval: event.target.checked,
+                            },
+                          })
+                        }
+                      />{" "}
+                      Richiedi approvazione amministratore per gli scambi
+                    </label>
+                  </fieldset>
+
+                  <fieldset
+                    data-testid="league-admin-market-rules"
+                    style={{ marginBottom: "1rem" }}
+                  >
+                    <legend>Regole mercato</legend>
+
+                    <Input
+                      label="Rimborso svincolo volontario (%)"
+                      name="voluntaryReleaseRefundPercent"
+                      type="number"
+                      min={0}
+                      max={100}
+                      disabled={!canConfigure}
+                      value={String(rules.voluntaryReleaseRefundPercent)}
+                      onChange={(event) =>
+                        updateLocalRules({
+                          voluntaryReleaseRefundPercent: Number(event.target.value) || 0,
+                        })
+                      }
+                    />
+
+                    <Input
+                      label="Rimborso svincolo per uscita dai cinque campionati (%)"
+                      name="leagueExitRefundPercent"
+                      type="number"
+                      min={0}
+                      max={100}
+                      disabled={!canConfigure}
+                      value={String(rules.leagueExitRefundPercent)}
+                      onChange={(event) =>
+                        updateLocalRules({
+                          leagueExitRefundPercent: Number(event.target.value) || 0,
+                        })
+                      }
+                    />
+
+                    <Input
+                      label="Proposte di scambio attive per squadra (max)"
+                      name="maxActiveTradeProposalsPerTeam"
+                      type="number"
+                      min={1}
+                      disabled={!canConfigure}
+                      value={String(rules.maxActiveTradeProposalsPerTeam)}
+                      onChange={(event) =>
+                        updateLocalRules({
+                          maxActiveTradeProposalsPerTeam: Number(event.target.value) || 1,
+                        })
+                      }
+                    />
+                  </fieldset>
+
+                  {saveError ? (
+                    <UiStatePanel
+                      state="error"
+                      title="Configurazione non salvata"
+                      message={saveError}
+                      testId="league-admin-save-error"
+                    />
+                  ) : null}
+
+                  {saveSuccess ? (
+                    <UiStatePanel
+                      state="success"
+                      title="Configurazione salvata"
+                      message="Regolamento aggiornato. Puoi passare alla tab Invitati."
+                      testId="league-admin-save-success"
+                    />
+                  ) : null}
+
+                  <div className="fa-ds-showcase__row">
+                    <Button
+                      type="submit"
+                      variant="primary"
+                      disabled={saving || !canConfigure}
+                      data-testid="league-admin-submit"
+                    >
+                      {saving ? "Salvataggio…" : "Salva configurazione"}
+                    </Button>
+                    {loadError ? (
+                      <Button type="button" variant="ghost" onClick={() => void loadPanel()}>
+                        Riprova
+                      </Button>
+                    ) : null}
+                  </div>
+                </form>
+              </TabPanel>
+
+              <TabPanel value="invitati">
+                {!configurationSaved ? (
+                  <UiStatePanel
+                    state="empty"
+                    title="Salva prima la configurazione"
+                    message="La tab Invitati si sblocca dopo aver salvato il regolamento."
+                    testId="league-admin-invites-locked"
+                  />
+                ) : (
+                  <>
+                    <LeagueMembersPanel
+                      leagueId={activeLeagueId}
+                      isDemoMode={isDemoMode}
+                      search={search}
+                      participantCount={rules.participantCount}
+                      onMembersChanged={() => void loadPanel()}
+                    />
+                    <LeagueInvitesPanel
+                      leagueId={activeLeagueId}
+                      isDemoMode={isDemoMode}
+                      search={search}
+                    />
+                    <ManagerDirectory
+                      leagueId={activeLeagueId}
+                      isDemoMode={isDemoMode}
+                      search={search}
+                      title="Inviti nominativi"
+                      compact
+                    />
+                  </>
+                )}
+              </TabPanel>
+            </Tabs>
+          </section>
+
+          {lifecycle ? (
+            <LeagueDeletePanel
+              leagueId={activeLeagueId}
+              state={lifecycle.state}
+              leagueName={activeLeague?.name ?? "questa lega"}
+              isDemoMode={isDemoMode}
+            />
+          ) : null}
         </>
       ) : null}
     </PageContainer>
   );
 }
-
-
-
-

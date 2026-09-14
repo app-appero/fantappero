@@ -45,7 +45,7 @@ describe("App navigation shell (EPUI-03)", () => {
   it("shows league admin tab when persona=admin", () => {
     const html = renderAt("/leghe", "?persona=admin&stato=success");
     expect(html).toContain("Amministrazione lega");
-    expect(html).toContain('id="tab-league-admin"');
+    expect(html).toContain('data-testid="league-admin-form"');
   });
 
   it("shows a single compact Lega entry in the sidebar instead of a submenu", () => {
@@ -58,10 +58,17 @@ describe("App navigation shell (EPUI-03)", () => {
     expect(sidebar).not.toContain('href="/lega/amministrazione"');
   });
 
-  it("shows Home lega e Amministrazione lega as tabs inside the Lega hub page", () => {
+  it("shows only Amministrazione lega for admin persona (no duplicate Home tab)", () => {
     const html = renderAt("/leghe", "?persona=admin&stato=success");
-    expect(html).toContain("Home lega");
     expect(html).toContain("Amministrazione lega");
+    expect(html).not.toContain("Home lega");
+    expect(html).not.toContain('role="tablist"');
+  });
+
+  it("shows only Home lega for member persona (no Amministrazione tab)", () => {
+    const html = renderAt("/leghe", "?persona=member&stato=success");
+    expect(html).toContain('data-testid="league-home-content"');
+    expect(html).not.toContain("Amministrazione lega");
   });
 
   it("hides the tab bar for members who only see one tab", () => {

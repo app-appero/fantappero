@@ -223,6 +223,18 @@ def test_assign_random_ai_roster_fills_complete_composition(
     assert body["userType"] == "ai"
     assert body["filledSlots"] == 35
     assert body["composition"]["counts"] == {"P": 3, "D": 11, "C": 11, "A": 10}
+    assert all(
+        slot["purchaseCredits"] == 1
+        for slot in body["slots"]
+        if slot["athleteId"] is not None
+    )
+
+    credits = client.get(
+        f"/leagues/{league_id}/amministrazione/squadre/{ai_team['id']}/crediti",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert credits.status_code == 200
+    assert credits.json()["balance"] == 1000 - 35
 
     filled = db_session.scalar(
         select(FantasyRosterSlot).where(

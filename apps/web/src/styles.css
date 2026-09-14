@@ -131,16 +131,6 @@ button.fa-link-muted,
   border-top: 1px solid var(--fa-color-border);
 }
 
-.fa-calendar-rounds {
-  margin: var(--fa-space-md) 0;
-  padding-left: var(--fa-space-lg);
-}
-
-.fa-calendar-rounds ul {
-  margin: var(--fa-space-xs) 0 var(--fa-space-sm);
-  padding-left: var(--fa-space-lg);
-}
-
 .fa-member-list {
   list-style: none;
   margin: var(--fa-space-md) 0 0;
@@ -1504,6 +1494,12 @@ button.fa-link-muted,
   margin-top: 0;
 }
 
+.fa-lifecycle-checklist__hint {
+  margin: 0 0 0.75rem;
+  color: var(--fa-color-foreground-muted, #9aa3b2);
+  font-size: 0.9rem;
+}
+
 .fa-lifecycle-checklist ul {
   list-style: none;
   margin: 0;
@@ -1517,6 +1513,14 @@ button.fa-link-muted,
   flex-wrap: wrap;
   align-items: center;
   gap: var(--fa-space-sm);
+}
+
+.fa-lifecycle-checklist__item--locked {
+  opacity: 0.65;
+}
+
+.fa-lifecycle-checklist__item--locked .fa-lifecycle-checklist__message {
+  color: var(--fa-color-foreground-muted, #9aa3b2);
 }
 
 .fa-lifecycle-checklist__message {

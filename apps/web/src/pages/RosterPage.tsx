@@ -718,7 +718,7 @@ export function RosterPage() {
             athleteId: `ai-demo-${index}`,
             athleteName: `Calciatore IA ${index + 1}`,
             role: (["P", "P", "P", "D", "D", "D", "D", "D", "D", "D", "D", "D", "D", "D", "C", "C", "C", "C", "C", "C", "C", "C", "C", "C", "C", "A", "A", "A", "A", "A", "A", "A", "A", "A", "A"] as const)[index] ?? "A",
-            purchaseCredits: 0,
+            purchaseCredits: 1,
           })),
         };
         setAdminTeam(filled);
@@ -732,6 +732,7 @@ export function RosterPage() {
               : row,
           ),
         );
+        applyDemoCreditDelta(filled.id, -filled.rosterSize);
         setRandomAiMessage("Rosa random assegnata al fantallenatore IA (demo).");
         setRandomAiBusy(false);
       }, 300);
@@ -773,6 +774,7 @@ export function RosterPage() {
         `Rosa random assegnata: ${updated.filledSlots}/${updated.rosterSize} giocatori.`,
       );
       await loadEditContext(updated.id);
+      await refreshViewedCredits(stored.accessToken, activeLeagueId);
     } catch (error) {
       setRandomAiError(
         getApiErrorMessage(error, "Impossibile assegnare la rosa random."),

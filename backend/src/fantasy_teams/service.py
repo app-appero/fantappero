@@ -294,9 +294,13 @@ class FantasyTeamService:
         league_access: LeagueAccess,
         team_id: UUID,
         *,
-        purchase_credits: int = 0,
+        purchase_credits: int = 1,
     ) -> FantasyTeamResponse:
-        """Fill empty slots of an AI manager roster with random free listone athletes."""
+        """Fill empty slots of an AI manager roster with random free listone athletes.
+
+        Ogni assegnazione addebita ``purchase_credits`` (default 1, come
+        l'inserimento manuale minimo) sul ledger della squadra IA.
+        """
         if not self._is_league_admin(league_access):
             raise ValidationAuthError(
                 "Solo l'amministratore di lega può assegnare una rosa random.",
@@ -472,6 +476,13 @@ class FantasyTeamService:
             },
         )
         report = self._sync_composition(team, league, actor_id=league_access.user.id)
+        from leagues.season_activate import try_advance_league_lifecycle
+
+        try_advance_league_lifecycle(
+            self._session,
+            league.id,
+            actor_id=league_access.user.id,
+        )
         self._session.commit()
         get_metrics().incr("fantasy_roster_random_ai_total", labels={"result": "success"})
         logger.info(

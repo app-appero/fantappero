@@ -126,6 +126,16 @@ def homologate_round(
     )
     session.flush()
 
+    # Se questa omologazione completa tutte le giornate H2H, chiudi la stagione.
+    from leagues.season_conclude import try_conclude_league_if_season_complete
+
+    try_conclude_league_if_season_complete(
+        session,
+        fantasy_round.league_id,
+        actor_id=actor_id,
+    )
+    session.flush()
+
     return HomologationResult(
         round_id=round_id,
         homologation_status=FantasyRoundHomologationStatus.HOMOLOGATED.value,

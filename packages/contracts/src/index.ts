@@ -140,8 +140,10 @@ export type {
 export {
   LEAGUE_LIFECYCLE_ACTION_HINT_LABEL,
   LEAGUE_LIFECYCLE_PHASES,
+  LEAGUE_SETUP_BLOCKER_ORDER,
   describeLeagueLifecycleStep,
   leagueLifecyclePhaseIndex,
+  orderLeagueSetupBlockers,
 } from "./leagues.js";
 
 export {

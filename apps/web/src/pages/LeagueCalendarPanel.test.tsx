@@ -44,6 +44,18 @@ function render(value: LeagueCalendarPlan): string {
 }
 
 describe("CalendarWindowsPanel — diagnostica finestre (EP13-P03)", () => {
+  it("resta disponibile come dettaglio collassabile nel pannello principale", () => {
+    const html = renderToStaticMarkup(
+      createElement("details", { "data-testid": "calendar-windows-details" }, [
+        createElement("summary", { key: "s" }, "Dettaglio finestre europee"),
+        createElement(CalendarWindowsPanel, { key: "p", plan: plan() }),
+      ]),
+    );
+    expect(html).toContain('data-testid="calendar-windows-details"');
+    expect(html).toContain("Dettaglio finestre europee");
+    expect(html).toContain('data-testid="calendar-windows"');
+  });
+
   it("mostra cicli, finestre eleggibili e versione algoritmo", () => {
     const html = render(plan());
     expect(html).toContain('data-testid="calendar-windows"');

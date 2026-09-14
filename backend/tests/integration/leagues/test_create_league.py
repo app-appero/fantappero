@@ -121,14 +121,14 @@ def test_create_league_persists_draft_with_admin_and_audit(
     body = response.json()
     assert body["name"] == "Lega Privata"
     assert body["seasonYear"] == 2026
-    assert body["state"] == "draft"
+    assert body["state"] == "configuring"
     assert body["viewerRole"] == "league_admin"
     assert len(body["competitions"]) == 3
 
     league_id = UUID(body["id"])
     league = db_session.get(League, league_id)
     assert league is not None
-    assert league.state == LeagueState.DRAFT
+    assert league.state == LeagueState.CONFIGURING
 
     membership = db_session.scalars(
         select(LeagueMembership).where(

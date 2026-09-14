@@ -12,7 +12,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 from tests.integration.database.helpers import create_engine_for_url
 
-from database.enums import LeagueAuditAction, LeagueCalendarStatus
+from database.enums import LeagueAuditAction, LeagueCalendarStatus, LeagueState
 from database.session import create_session_factory
 from fantasy_turns.rules import weekend_window
 from leagues.calendar_service import LeagueCalendarService
@@ -165,6 +165,117 @@ def _seed_turns(
         assert created.status_code == 201, created.text
 
 
+def _complete_league_rosters(
+    client: TestClient,
+    db_session: Session,
+    competition_ids: list[str],
+    *,
+    league_id: str,
+    owner_token: str,
+    id_offset: int,
+) -> None:
+    """Completa le rose di tutti i partecipanti (35: 3P-11D-11C-10A, >=3 campionati).
+
+    Dal punto EP13-P04, generare/confermare il calendario H2H richiede rose
+    complete di tutti i partecipanti, non più uno stato lega specifico:
+    `_seed_turns`/`_stock_rosters_for_window` assegna solo gli 11 titolari
+    che coprono la soglia di un Turno Europeo, qui si completano gli slot
+    restanti fino alla distribuzione esatta del regolamento standard.
+    Scrive via ORM diretto sugli slot già creati da `ensure_team_for_membership`
+    (via l'endpoint "assicura squadre"): l'endpoint "rosa random" è riservato
+    ai soli fantallenatori IA, quindi non è utilizzabile qui per squadre umane.
+    """
+    from database.enums import FantasyRole
+    from fantasy_teams.composition_service import resolve_effective_athlete_roles
+    from fantasy_teams.models import FantasyRosterSlot, FantasyTeam
+    from sports_data.catalog.models import Club, CompetitionSeasonClub, SportSeason
+    from sports_data.listone.models import RoleAssignment
+    from sports_data.roster.models import Athlete
+
+    ensured = client.post(
+        f"/leagues/{league_id}/amministrazione/squadre",
+        headers={"Authorization": f"Bearer {owner_token}"},
+    )
+    assert ensured.status_code == 200, ensured.text
+
+    quotas: list[tuple[object, int]] = [
+        (FantasyRole.P, 3),
+        (FantasyRole.D, 11),
+        (FantasyRole.C, 11),
+        (FantasyRole.A, 10),
+    ]
+    comp_uuids = [UUID(cid) for cid in competition_ids[:3]]
+    clubs: list[Club] = []
+    for index, competition_id in enumerate(comp_uuids):
+        season = db_session.scalars(
+            select(SportSeason).where(
+                SportSeason.competition_id == competition_id,
+                SportSeason.year == 2026,
+            )
+        ).first()
+        if season is None:
+            season = SportSeason(competition_id=competition_id, year=2026, is_current=True)
+            db_session.add(season)
+            db_session.flush()
+        club = Club(provider_id=id_offset + index, name=f"Rosa Completa {id_offset}-{index}")
+        db_session.add(club)
+        db_session.flush()
+        db_session.add(CompetitionSeasonClub(sport_season_id=season.id, club_id=club.id))
+        clubs.append(club)
+    db_session.flush()
+
+    teams = db_session.scalars(
+        select(FantasyTeam).where(FantasyTeam.league_id == UUID(league_id))
+    ).all()
+    provider_id = id_offset + 1_000
+    for team in teams:
+        slots = list(
+            db_session.scalars(
+                select(FantasyRosterSlot)
+                .where(FantasyRosterSlot.fantasy_team_id == team.id)
+                .order_by(FantasyRosterSlot.slot_index.asc())
+            ).all()
+        )
+        athlete_ids = [slot.athlete_id for slot in slots if slot.athlete_id is not None]
+        resolved = resolve_effective_athlete_roles(
+            db_session,
+            league_id=UUID(league_id),
+            athlete_ids=athlete_ids,
+            season_year=2026,
+        )
+        filled_by_role: dict[object, int] = {role: 0 for role, _ in quotas}
+        for athlete_id in athlete_ids:
+            item = resolved.get(athlete_id)
+            if item is not None:
+                filled_by_role[item.role] += 1
+
+        empty_slots = [slot for slot in slots if slot.athlete_id is None]
+        cursor = 0
+        for role, quota in quotas:
+            needed = max(0, quota - filled_by_role[role])
+            for _ in range(needed):
+                if cursor >= len(empty_slots):
+                    break
+                club = clubs[provider_id % len(clubs)]
+                athlete = Athlete(provider_id=provider_id, canonical_name=f"Rosa {provider_id}")
+                db_session.add(athlete)
+                db_session.flush()
+                db_session.add(
+                    RoleAssignment(
+                        athlete_id=athlete.id,
+                        season_year=2026,
+                        role=role,
+                        club_id=club.id,
+                        mapping_version="v1.0.0",
+                        provider_position_raw=role.value,
+                    )
+                )
+                empty_slots[cursor].athlete_id = athlete.id
+                provider_id += 1
+                cursor += 1
+    db_session.commit()
+
+
 def test_generate_confirm_calendar_is_audited_and_clears_blocker(
     client: TestClient,
     db_session: Session,
@@ -185,6 +296,14 @@ def test_generate_confirm_calendar_is_audited_and_clears_blocker(
         token=owner_token,
         anchors=[date(2026, 12, 4), date(2026, 12, 11), date(2026, 12, 18)],
         id_offset=960_000,
+    )
+    _complete_league_rosters(
+        client,
+        db_session,
+        competition_ids,
+        league_id=league_id,
+        owner_token=owner_token,
+        id_offset=700_000,
     )
 
     empty = client.get(
@@ -242,20 +361,21 @@ def test_generate_confirm_calendar_is_audited_and_clears_blocker(
     assert public_after.status_code == 200
     assert public_after.json()["status"] == "confirmed"
 
-    auction = client.post(
-        f"/leagues/{league_id}/amministrazione/stato",
+    # Rose complete + calendario confermato → avvio stagione automatico.
+    panel = client.get(
+        f"/leagues/{league_id}/amministrazione",
         headers={"Authorization": f"Bearer {owner_token}"},
-        json={"targetState": "auction"},
     )
-    assert auction.status_code == 200
-    assert "calendar_not_configured" not in {
-        row["code"] for row in auction.json()["blockers"]
-    }
-    assert {row["code"] for row in auction.json()["blockers"]} == {
-        "fantasy_teams_not_configured",
-    }
+    assert panel.status_code == 200
+    assert panel.json()["lifecycle"]["state"] == "active"
+    blockers = {row["code"] for row in panel.json()["lifecycle"]["blockers"]}
+    assert "calendar_not_configured" not in blockers
+    assert "fantasy_teams_not_configured" not in blockers
 
     db_session.expire_all()
+    league = db_session.get(League, UUID(league_id))
+    assert league is not None
+    assert league.state == LeagueState.ACTIVE
     calendar = db_session.scalars(
         select(LeagueCalendar).where(LeagueCalendar.league_id == UUID(league_id))
     ).first()
@@ -270,6 +390,13 @@ def test_generate_confirm_calendar_is_audited_and_clears_blocker(
     assert LeagueAuditAction.LEAGUE_CALENDAR_GENERATED in actions
     assert LeagueAuditAction.LEAGUE_CALENDAR_CONFIRMED in actions
     assert actions.count(LeagueAuditAction.LEAGUE_CALENDAR_CONFIRMED) == 1
+    assert LeagueAuditAction.LEAGUE_STATE_CHANGED in actions
+    state_audits = [
+        audit.details
+        for audit in audits
+        if audit.action == LeagueAuditAction.LEAGUE_STATE_CHANGED
+    ]
+    assert {"before": "configuring", "after": "active", "source": "auto_season_start"} in state_audits
 
 
 def test_calendar_generation_requires_exact_participant_count(
@@ -331,6 +458,14 @@ def test_odd_participant_calendar_uses_explicit_byes(
             date(2027, 2, 5),
         ],
         id_offset=965_000,
+    )
+    _complete_league_rosters(
+        client,
+        db_session,
+        competition_ids,
+        league_id=league_id,
+        owner_token=owner_token,
+        id_offset=701_000,
     )
     generated = client.post(
         f"/leagues/{league_id}/amministrazione/calendario/genera",
@@ -474,6 +609,14 @@ def test_h2h_round_numbers_match_absolute_european_turn_numbers(
         )
         assert turn.status_code == 201, turn.text
 
+    _complete_league_rosters(
+        client,
+        db_session,
+        competition_ids,
+        league_id=league_id,
+        owner_token=owner_token,
+        id_offset=702_000,
+    )
     generated = client.post(
         f"/leagues/{league_id}/amministrazione/calendario/genera",
         headers={"Authorization": f"Bearer {owner_token}"},
@@ -584,6 +727,14 @@ def test_a_window_that_is_not_a_valid_turn_produces_no_h2h_round(
         )
         assert turn.status_code == 201, turn.text
 
+    _complete_league_rosters(
+        client,
+        db_session,
+        competition_ids,
+        league_id=league_id,
+        owner_token=owner_token,
+        id_offset=703_000,
+    )
     generated = client.post(
         f"/leagues/{league_id}/amministrazione/calendario/genera",
         headers={"Authorization": f"Bearer {owner_token}"},
@@ -612,3 +763,336 @@ def test_a_window_that_is_not_a_valid_turn_produces_no_h2h_round(
     # L'unico segnaposto e' il turno precedente alla creazione della lega.
     placeholders = [row["roundNumber"] for row in rounds if row["beforeLeagueCreation"]]
     assert placeholders == [historical.json()["number"]]
+
+
+def test_materialize_full_season_creates_turns_with_empty_rosters(
+    client: TestClient,
+    db_session: Session,
+    competition_ids: list[str],
+) -> None:
+    """EP13-P04: a rose vuote la pianificazione stagionale crea comunque i turni."""
+    from fantasy_turns.models import FantasyRound
+    from fantasy_turns.service import FantasyTurnService
+
+    owner_token, _ = _register_and_login(client, "cal.bootstrap.owner@example.com")
+    created = client.post(
+        "/leagues",
+        headers={"Authorization": f"Bearer {owner_token}"},
+        json={
+            "name": "Lega Bootstrap Turni",
+            "seasonYear": 2026,
+            "competitionIds": competition_ids,
+        },
+    )
+    assert created.status_code == 201
+    league_id = created.json()["id"]
+    _set_min_fixtures(db_session, league_id, 10)
+
+    # Fixture senza stock rose: copertura non valutabile, ma i turni devono nascere.
+    for index, anchor in enumerate((date(2026, 10, 3), date(2026, 10, 10), date(2026, 10, 17))):
+        _seed_weekend_fixtures(
+            db_session,
+            competition_ids,
+            count=10,
+            kickoff=datetime(anchor.year, anchor.month, anchor.day, 15, 0, tzinfo=UTC),
+            id_offset=710_000 + index * 1_000,
+            clubs_offset=771_000,
+        )
+
+    league = db_session.get(League, UUID(league_id))
+    assert league is not None
+    result = FantasyTurnService(db_session).materialize_full_season(
+        league,
+        auto_open=False,
+    )
+    db_session.commit()
+    assert result.created >= 3
+    assert result.opened == 0
+
+    numbers = db_session.scalars(
+        select(FantasyRound.number)
+        .where(FantasyRound.league_id == UUID(league_id))
+        .order_by(FantasyRound.number.asc())
+    ).all()
+    assert numbers[:3] == [1, 2, 3]
+
+    # Idempotenza: rieseguire non crea duplicati né sposta i numeri.
+    again = FantasyTurnService(db_session).materialize_full_season(league, auto_open=False)
+    db_session.commit()
+    assert again.created == 0
+    numbers_after = db_session.scalars(
+        select(FantasyRound.number)
+        .where(FantasyRound.league_id == UUID(league_id))
+        .order_by(FantasyRound.number.asc())
+    ).all()
+    assert numbers_after == numbers
+
+
+def test_ensure_upcoming_backfills_partial_calendar_without_renumbering(
+    client: TestClient,
+    db_session: Session,
+    competition_ids: list[str],
+) -> None:
+    """Calendario parziale: ensure recupera le finestre mancanti senza shift."""
+    from fantasy_turns.models import FantasyRound
+    from fantasy_turns.service import FantasyTurnService
+
+    league_id, owner_token, _ = _create_league_with_members(
+        client,
+        competition_ids,
+        size=4,
+        prefix="cal.partial",
+    )
+    _set_min_fixtures(db_session, league_id, 10)
+
+    first_anchor = date(2026, 10, 24)
+    _seed_weekend_fixtures(
+        db_session,
+        competition_ids,
+        count=10,
+        kickoff=datetime(2026, 10, 24, 15, 0, tzinfo=UTC),
+        id_offset=720_000,
+        clubs_offset=772_000,
+        league_id=league_id,
+    )
+    first = client.post(
+        f"/leagues/{league_id}/turni",
+        headers={"Authorization": f"Bearer {owner_token}"},
+        json={"kind": "weekend", "anchorDate": first_anchor.isoformat()},
+    )
+    assert first.status_code == 201
+    assert first.json()["number"] == 1
+    first_id = first.json()["id"]
+
+    # Fixture successive pubblicate dopo: il calendario è parziale.
+    for index, anchor in enumerate((date(2026, 10, 31), date(2026, 11, 7))):
+        _seed_weekend_fixtures(
+            db_session,
+            competition_ids,
+            count=10,
+            kickoff=datetime(anchor.year, anchor.month, anchor.day, 15, 0, tzinfo=UTC),
+            id_offset=721_000 + index * 1_000,
+            clubs_offset=772_000,
+            league_id=league_id,
+        )
+
+    league = db_session.get(League, UUID(league_id))
+    assert league is not None
+    summary = FantasyTurnService(db_session).ensure_upcoming_for_league(
+        league,
+        auto_open=False,
+    )
+    assert summary.created >= 2
+
+    rounds = db_session.scalars(
+        select(FantasyRound)
+        .where(FantasyRound.league_id == UUID(league_id))
+        .order_by(FantasyRound.number.asc())
+    ).all()
+    assert len(rounds) >= 3
+    assert str(rounds[0].id) == first_id
+    assert rounds[0].number == 1
+
+
+def test_calendar_generation_requires_complete_rosters_even_in_active(
+    client: TestClient,
+    db_session: Session,
+    competition_ids: list[str],
+) -> None:
+    """Rose incomplete bloccano genera/conferma; rose complete sbloccano anche in ACTIVE."""
+    from database.enums import LeagueState
+
+    league_id, owner_token, _ = _create_league_with_members(
+        client,
+        competition_ids,
+        size=4,
+        prefix="cal.rosters",
+    )
+    _set_min_fixtures(db_session, league_id, 10)
+    _seed_turns(
+        client,
+        db_session,
+        competition_ids,
+        league_id=league_id,
+        token=owner_token,
+        anchors=[date(2026, 12, 5), date(2026, 12, 12), date(2026, 12, 19)],
+        id_offset=730_000,
+    )
+
+    locked = client.post(
+        f"/leagues/{league_id}/amministrazione/calendario/genera",
+        headers={"Authorization": f"Bearer {owner_token}"},
+    )
+    assert locked.status_code == 400
+    assert locked.json()["code"] == "league_calendar_locked"
+
+    _complete_league_rosters(
+        client,
+        db_session,
+        competition_ids,
+        league_id=league_id,
+        owner_token=owner_token,
+        id_offset=731_000,
+    )
+
+    # Simula lega già attiva: il prerequisito sono le rose, non lo stato asta.
+    league = db_session.get(League, UUID(league_id))
+    assert league is not None
+    league.state = LeagueState.ACTIVE
+    db_session.commit()
+
+    generated = client.post(
+        f"/leagues/{league_id}/amministrazione/calendario/genera",
+        headers={"Authorization": f"Bearer {owner_token}"},
+    )
+    assert generated.status_code == 200
+    assert generated.json()["status"] == "draft"
+
+    confirmed = client.post(
+        f"/leagues/{league_id}/amministrazione/calendario/conferma",
+        headers={"Authorization": f"Bearer {owner_token}"},
+    )
+    assert confirmed.status_code == 200
+    assert confirmed.json()["status"] == "confirmed"
+
+
+def test_calendar_regeneration_blocked_when_results_already_computed(
+    client: TestClient,
+    db_session: Session,
+    competition_ids: list[str],
+) -> None:
+    """Storico risultati: generate rifiuta la rigenerazione da zero."""
+    from leagues.models.league_calendar import LeagueCalendarSlot
+
+    league_id, owner_token, _ = _create_league_with_members(
+        client,
+        competition_ids,
+        size=4,
+        prefix="cal.locked",
+    )
+    _set_min_fixtures(db_session, league_id, 10)
+    _seed_turns(
+        client,
+        db_session,
+        competition_ids,
+        league_id=league_id,
+        token=owner_token,
+        anchors=[date(2027, 1, 9), date(2027, 1, 16), date(2027, 1, 23)],
+        id_offset=740_000,
+    )
+    _complete_league_rosters(
+        client,
+        db_session,
+        competition_ids,
+        league_id=league_id,
+        owner_token=owner_token,
+        id_offset=741_000,
+    )
+    assert (
+        client.post(
+            f"/leagues/{league_id}/amministrazione/calendario/genera",
+            headers={"Authorization": f"Bearer {owner_token}"},
+        ).status_code
+        == 200
+    )
+    assert (
+        client.post(
+            f"/leagues/{league_id}/amministrazione/calendario/conferma",
+            headers={"Authorization": f"Bearer {owner_token}"},
+        ).status_code
+        == 200
+    )
+
+    calendar = db_session.scalars(
+        select(LeagueCalendar).where(LeagueCalendar.league_id == UUID(league_id))
+    ).first()
+    assert calendar is not None
+    slot = db_session.scalars(
+        select(LeagueCalendarSlot)
+        .where(LeagueCalendarSlot.calendar_id == calendar.id)
+        .order_by(LeagueCalendarSlot.round_number.asc())
+    ).first()
+    assert slot is not None
+    slot.result_computed_at = datetime.now(UTC)
+    db_session.commit()
+
+    blocked = client.post(
+        f"/leagues/{league_id}/amministrazione/calendario/genera",
+        headers={"Authorization": f"Bearer {owner_token}"},
+    )
+    assert blocked.status_code == 400
+    assert blocked.json()["code"] == "league_calendar_results_locked"
+
+
+def test_calendar_generation_blocked_for_concluded_league(
+    client: TestClient,
+    db_session: Session,
+    competition_ids: list[str],
+) -> None:
+    from database.enums import LeagueState
+
+    league_id, owner_token, _ = _create_league_with_members(
+        client,
+        competition_ids,
+        size=4,
+        prefix="cal.ended",
+    )
+    _set_min_fixtures(db_session, league_id, 10)
+    _seed_turns(
+        client,
+        db_session,
+        competition_ids,
+        league_id=league_id,
+        token=owner_token,
+        anchors=[date(2027, 2, 6), date(2027, 2, 13), date(2027, 2, 20)],
+        id_offset=750_000,
+    )
+    _complete_league_rosters(
+        client,
+        db_session,
+        competition_ids,
+        league_id=league_id,
+        owner_token=owner_token,
+        id_offset=751_000,
+    )
+    league = db_session.get(League, UUID(league_id))
+    assert league is not None
+    league.state = LeagueState.CONCLUDED
+    db_session.commit()
+
+    blocked = client.post(
+        f"/leagues/{league_id}/amministrazione/calendario/genera",
+        headers={"Authorization": f"Bearer {owner_token}"},
+    )
+    assert blocked.status_code == 400
+    assert blocked.json()["code"] == "league_calendar_locked"
+
+
+def test_create_league_enqueue_failure_does_not_rollback_league(
+    client: TestClient,
+    db_session: Session,
+    competition_ids: list[str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Se Celery non accoda, la lega resta creata (recupero via ensure)."""
+
+    def _boom(**_kwargs: object) -> None:
+        raise ConnectionError("broker unavailable")
+
+    monkeypatch.setattr(
+        "fantasy_turns.tasks.materialize_initial_fantasy_turns_task.delay",
+        _boom,
+    )
+    owner_token, _ = _register_and_login(client, "cal.enqueue.owner@example.com")
+    created = client.post(
+        "/leagues",
+        headers={"Authorization": f"Bearer {owner_token}"},
+        json={
+            "name": "Lega Enqueue Fail",
+            "seasonYear": 2026,
+            "competitionIds": competition_ids,
+        },
+    )
+    assert created.status_code == 201
+    league_id = created.json()["id"]
+    assert db_session.get(League, UUID(league_id)) is not None

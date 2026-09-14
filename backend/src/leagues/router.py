@@ -24,7 +24,7 @@ from authorization.service import AuthorizationService
 from billing.entitlement_service import EntitlementService
 from config.settings.api import ApiSettings
 from config.settings.loader import get_api_settings
-from database.enums import LeagueAuditAction, Permission, SubscriptionPlan, UserType
+from database.enums import LeagueAuditAction, LeagueRole, Permission, SubscriptionPlan, UserType
 from fantasy_teams.models import FantasyTeam
 from leagues.audit_log_schemas import AuditLogListResponse
 from leagues.audit_log_service import DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE, AuditLogService
@@ -440,8 +440,16 @@ def get_league_h2h_calendar(
     league_access: LeagueAccess = Depends(require_league_permissions(Permission.MATCHDAY_VIEW)),
     session: Session = Depends(get_db_session),
 ) -> H2HCalendarResponse | None:
-    """Calendario H2H confermato con risultati affiancati (tab Calendario fantallenatori)."""
-    return get_h2h_calendar(session, league_id=league_access.league.id)
+    """Calendario H2H: confermato per tutti; bozza solo per admin (anteprima post-genera)."""
+    include_draft = (
+        league_access.operator_bypass
+        or league_access.api_role == LeagueRole.LEAGUE_ADMIN
+    )
+    return get_h2h_calendar(
+        session,
+        league_id=league_access.league.id,
+        include_draft=include_draft,
+    )
 
 
 @router.get(

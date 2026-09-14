@@ -66,10 +66,10 @@ describe("EP03-UX-01 leghe: selettore e azioni sempre in header", () => {
     expect(html).toContain('data-testid="active-league-status"');
   });
 
-  it("keeps admin secondary link alongside league home content", () => {
+  it("shows Amministrazione lega directly for admin persona (no Home duplication)", () => {
     const html = renderRoute("/leghe?persona=admin");
-    expect(html).toContain('data-testid="league-home-content"');
-    expect(html).toContain("Amministrazione lega");
+    expect(html).toContain('data-testid="league-admin-form"');
+    expect(html).not.toContain('data-testid="league-home-content"');
   });
 
   it("renders /leghe as the same Home lega content as /lega/home", () => {
@@ -95,9 +95,10 @@ describe("EP03-UX-02 league home", () => {
     expect(html).toContain("Vai alla formazione");
   });
 
-  it("shows admin link for admin persona", () => {
+  it("redirects admin persona from /lega/home to Amministrazione lega content", () => {
     const html = renderRoute("/lega/home?persona=admin");
-    expect(html).toContain('data-testid="league-home-admin-link"');
+    expect(html).toContain('data-testid="league-admin-form"');
+    expect(html).not.toContain('data-testid="league-home-content"');
   });
 
   it("renders empty state without selected league content when forced empty", () => {

@@ -1,4 +1,4 @@
-import type { CompetitionSummary, LeagueDetail } from "@fantappero/contracts";
+import type { CompetitionSummary } from "@fantappero/contracts";
 import {
   Breadcrumb,
   Button,
@@ -9,7 +9,6 @@ import {
 import { type FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { createLeague, fetchCompetitions } from "../api/leagues";
 import { getApiErrorMessage, useAuth } from "../auth/AuthContext";
-import { ManagerDirectory } from "../components/ManagerDirectory";
 import { loadStoredSession } from "../auth/sessionStorage";
 import { Link, useLocation, useNavigate } from "../router/simpleRouter";
 import { parseWireframeStateFromSearch } from "../wireframes/useWireframeState";
@@ -54,7 +53,6 @@ export function CreateLeaguePage() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [formError, setFormError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  const [createdLeague, setCreatedLeague] = useState<LeagueDetail | null>(null);
   const allSelected = competitions.length > 0 && selectedIds.size === competitions.length;
 
   const loadCatalog = useCallback(async () => {
@@ -140,40 +138,12 @@ export function CreateLeaguePage() {
     }
 
     if (isDemoMode) {
-      setCreatedLeague({
+      registerLeague({
         id: "demo-created-league",
         name: name.trim(),
-        seasonYear,
-        state: "draft",
-        viewerRole: "league_admin",
-        competitions: DEMO_COMPETITIONS.filter((row) => selectedIds.has(row.id)),
-        rules: {
-          presetName: "standard",
-          participantCount: 8,
-          participantMin: 4,
-          participantMax: 10,
-          roster: {
-            rosterSize: 35,
-            goalkeepers: 3,
-            defenders: 11,
-            midfielders: 11,
-            forwards: 10,
-          },
-          totalCredits: 1000,
-          minFixturesPerRound: 25,
-          turnCoverageThreshold: 0.75,
-          lineupLockMarginMinutes: 15,
-          minutesThreshold: 15,
-          voluntaryReleaseRefundPercent: 50,
-          leagueExitRefundPercent: 100,
-          maxActiveTradeProposalsPerTeam: 10,
-          options: {
-            allowTrades: true,
-            allowManualInvites: true,
-            requireTradeApproval: false,
-          },
-        },
+        role: "league_admin",
       });
+      navigate("/lega/amministrazione");
       return;
     }
 
@@ -195,50 +165,12 @@ export function CreateLeaguePage() {
         name: created.name,
         role: created.viewerRole === "league_admin" ? "league_admin" : "member",
       });
-      setCreatedLeague(created);
+      navigate("/lega/amministrazione");
     } catch (error) {
       setFormError(getApiErrorMessage(error, "Impossibile creare la lega."));
     } finally {
       setSubmitting(false);
     }
-  }
-
-  if (createdLeague) {
-    return (
-      <PageContainer
-        title="Lega creata"
-        header={
-          <Breadcrumb
-            items={[
-              { label: "Leghe", href: "/leghe" },
-              { label: "Crea lega" },
-            ]}
-          />
-        }
-      >
-        <UiStatePanel
-          state="success"
-          title="Fase 1 completata: lega salvata"
-          message={`"${createdLeague.name}" è pronta per la configurazione. Sei amministratore della lega.`}
-          testId="create-league-success"
-        />
-        <ManagerDirectory
-          leagueId={createdLeague.id}
-          isDemoMode={isDemoMode}
-          search={search}
-          title="Fase 2 (facoltativa): invita fantallenatori"
-          compact
-        />
-        <div className="fa-ds-showcase__row" style={{ marginTop: "1rem" }}>
-          <Button variant="primary" onClick={() => navigate("/leghe")} data-testid="create-league-done">
-            Concludi
-          </Button>
-          <Link to="/lega/amministrazione">
-            <Button variant="secondary">Amministrazione lega</Button>
-          </Link>
-        </div>
-      </PageContainer>
-    );
   }
 
   return (

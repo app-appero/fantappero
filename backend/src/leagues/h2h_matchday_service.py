@@ -47,8 +47,13 @@ from sports_data.fixtures.models import Fixture, PlayerMatchStat
 from sports_data.roster.models import Athlete, SquadMembership
 
 
-def get_h2h_calendar(session: Session, *, league_id: UUID) -> H2HCalendarResponse | None:
-    calendar = _load_confirmed_calendar(session, league_id)
+def get_h2h_calendar(
+    session: Session,
+    *,
+    league_id: UUID,
+    include_draft: bool = False,
+) -> H2HCalendarResponse | None:
+    calendar = _load_h2h_calendar(session, league_id, include_draft=include_draft)
     if calendar is None:
         return None
 
@@ -151,10 +156,16 @@ def get_h2h_calendar(session: Session, *, league_id: UUID) -> H2HCalendarRespons
             )
         )
 
+    status = calendar.status.value
+    summary_message = (
+        "Calendario H2H confermato: scontri e risultati fantasy."
+        if status == LeagueCalendarStatus.CONFIRMED.value
+        else "Anteprima calendario H2H: conferma per renderlo consultabile a tutti."
+    )
     return H2HCalendarResponse(
         id=str(calendar.id),
         leagueId=str(calendar.league_id),
-        status="confirmed",
+        status=status,
         format=calendar.format.value,
         algorithmVersion=calendar.algorithm_version,
         participantCount=calendar.participant_count,
@@ -165,9 +176,7 @@ def get_h2h_calendar(session: Session, *, league_id: UUID) -> H2HCalendarRespons
         confirmedAt=calendar.confirmed_at,
         live=any_live,
         rounds=rounds,
-        summary=LeagueCalendarSummaryResponse(
-            message="Calendario H2H confermato: scontri e risultati fantasy."
-        ),
+        summary=LeagueCalendarSummaryResponse(message=summary_message),
     )
 
 
@@ -183,7 +192,9 @@ def get_h2h_matchup_detail(
         .where(
             LeagueCalendarSlot.id == slot_id,
             LeagueCalendar.league_id == league_id,
-            LeagueCalendar.status == LeagueCalendarStatus.CONFIRMED,
+            LeagueCalendar.status.in_(
+                [LeagueCalendarStatus.CONFIRMED, LeagueCalendarStatus.DRAFT]
+            ),
         )
         .options(
             selectinload(LeagueCalendarSlot.home_membership).selectinload(LeagueMembership.user),
@@ -264,12 +275,20 @@ def get_h2h_matchup_detail(
     )
 
 
-def _load_confirmed_calendar(session: Session, league_id: UUID) -> LeagueCalendar | None:
+def _load_h2h_calendar(
+    session: Session,
+    league_id: UUID,
+    *,
+    include_draft: bool = False,
+) -> LeagueCalendar | None:
+    statuses = [LeagueCalendarStatus.CONFIRMED]
+    if include_draft:
+        statuses.append(LeagueCalendarStatus.DRAFT)
     calendar = session.scalars(
         select(LeagueCalendar)
         .where(
             LeagueCalendar.league_id == league_id,
-            LeagueCalendar.status == LeagueCalendarStatus.CONFIRMED,
+            LeagueCalendar.status.in_(statuses),
         )
         .options(
             selectinload(LeagueCalendar.slots)
@@ -284,6 +303,10 @@ def _load_confirmed_calendar(session: Session, league_id: UUID) -> LeagueCalenda
         )
     ).first()
     return calendar
+
+
+def _load_confirmed_calendar(session: Session, league_id: UUID) -> LeagueCalendar | None:
+    return _load_h2h_calendar(session, league_id, include_draft=False)
 
 
 def _score_payload(slot: LeagueCalendarSlot) -> H2HMatchupScoreResponse | None:

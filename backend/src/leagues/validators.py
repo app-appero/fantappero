@@ -38,8 +38,11 @@ MAX_INVITE_EXPIRY_DAYS = 30
 
 LEAGUE_TRANSITIONS: dict[LeagueState, tuple[LeagueState, ...]] = {
     LeagueState.DRAFT: (LeagueState.CONFIGURING,),
-    LeagueState.CONFIGURING: (LeagueState.AUCTION,),
+    # Da configurazione si può andare in asta (opzionale) o dritto al campionato.
+    LeagueState.CONFIGURING: (LeagueState.AUCTION, LeagueState.ACTIVE),
     LeagueState.AUCTION: (LeagueState.CONFIGURING, LeagueState.ACTIVE),
+    # ACTIVE → CONCLUDED resta nel grafo per l'auto-conclusione; non è esposta
+    # come CTA manuale in `_to_lifecycle_response`.
     LeagueState.ACTIVE: (LeagueState.CONCLUDED,),
     LeagueState.CONCLUDED: (LeagueState.ARCHIVED,),
     LeagueState.ARCHIVED: (),
@@ -48,6 +51,9 @@ CONFIGURABLE_LEAGUE_STATES = frozenset((LeagueState.DRAFT, LeagueState.CONFIGURI
 # Hard-delete allowed only before auction/season start (EP03-05-EXT).
 # configuring is included: no irreversible gameplay yet; archive remains post-season path.
 DELETABLE_LEAGUE_STATES = frozenset((LeagueState.DRAFT, LeagueState.CONFIGURING))
+# Stati terminali: la stagione è finita, non ha più senso (ri)generare il
+# calendario H2H (EP13-P04).
+CALENDAR_LOCKED_LEAGUE_STATES = frozenset((LeagueState.CONCLUDED, LeagueState.ARCHIVED))
 
 
 # Sezione del pannello amministrazione a cui la UI può rimandare l'admin per
@@ -304,20 +310,13 @@ def auction_activation_blockers(
     calendar_configured: bool = False,
     roster_blockers: list[LifecycleBlocker] | None = None,
 ) -> list[LifecycleBlocker]:
-    """Blockers for auction → active.
+    """Blockers for setup → active (anche da configuring, saltando l'asta).
 
+    Ordine obbligato: prima rose/crediti, poi calendario (EP13 setup a tappe).
     Calendar is owned by EP03-06. Roster/credit checks are supplied by EP05-05
     (``roster_blockers``); when omitted, keep legacy placeholders for unit tests.
     """
     blockers: list[LifecycleBlocker] = []
-    if not calendar_configured:
-        blockers.append(
-            LifecycleBlocker(
-                code="calendar_not_configured",
-                message="Genera il calendario prima di avviare la stagione.",
-                action_hint="calendar",
-            )
-        )
     if roster_blockers is not None:
         blockers.extend(roster_blockers)
     else:
@@ -335,13 +334,37 @@ def auction_activation_blockers(
                 ),
             ]
         )
+    if not calendar_configured:
+        blockers.append(
+            LifecycleBlocker(
+                code="calendar_not_configured",
+                message="Genera il calendario prima di avviare la stagione.",
+                action_hint="calendar",
+            )
+        )
     return blockers
 
 
-def validate_calendar_generation_state(state: LeagueState) -> None:
-    if state not in CONFIGURABLE_LEAGUE_STATES and state != LeagueState.AUCTION:
+def validate_calendar_generation_state(state: LeagueState, *, rosters_complete: bool) -> None:
+    """Prerequisito reale per generare/confermare il calendario H2H (EP13-P04).
+
+    Prima il blocco era legato allo stato macro della lega (configuring o
+    auction): concettualmente sbagliato, perché una lega può popolare le
+    rose anche senza passare per l'asta (assegnazione manuale/random IA in
+    Amministrazione lega). Il vero prerequisito sono le rose complete di
+    tutti i partecipanti — riusa lo stesso controllo dei blocker di
+    attivazione stagione (`league_rosters_complete`). Restano bloccati solo
+    gli stati terminali, dove la stagione è comunque conclusa.
+    """
+    if state in CALENDAR_LOCKED_LEAGUE_STATES:
         raise ValidationAuthError(
-            "Puoi generare il calendario solo in configurazione o durante l'asta.",
+            "La stagione è conclusa: il calendario non può più essere generato.",
+            code="league_calendar_locked",
+        )
+    if not rosters_complete:
+        raise ValidationAuthError(
+            "Completa le rose di tutti i partecipanti nella sezione Partecipanti "
+            "prima di generare il calendario.",
             code="league_calendar_locked",
         )
 

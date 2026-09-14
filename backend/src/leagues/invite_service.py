@@ -271,6 +271,9 @@ class LeagueInviteService:
                 LeagueAuditAction.NAMED_INVITE_ACCEPTED,
             )
         self._add_audit(league.id, user.id, LeagueAuditAction.LEAGUE_MEMBER_JOINED)
+        from leagues.season_activate import try_advance_league_lifecycle
+
+        try_advance_league_lifecycle(self._session, league.id, actor_id=user.id)
         self._session.commit()
         get_metrics().incr("league_invite_accepted_total", labels={"result": "success"})
         return AcceptLeagueInviteResponse(

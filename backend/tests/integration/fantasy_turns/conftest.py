@@ -63,6 +63,15 @@ def _clear_auth_rate_limits(redis_url: str) -> None:
         client.delete(key)
 
 
+@pytest.fixture(autouse=True)
+def _disable_initial_fantasy_turn_materialize(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Evita il backfill eager post-create (fixture condivise fra test)."""
+    monkeypatch.setattr(
+        "fantasy_turns.tasks.materialize_initial_fantasy_turns_task.delay",
+        lambda **_kwargs: None,
+    )
+
+
 @pytest.fixture
 def client(migrated_engine: object) -> TestClient:
     from app.main import app

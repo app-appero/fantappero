@@ -35,7 +35,7 @@ describe("App responsive shell (EPUI-05)", () => {
 
   it("renders empty leagues state with create action", () => {
     const html = renderShellAt("/leghe", "?persona=admin&stato=empty");
-    expect(html).toContain('data-testid="league-home-empty"');
+    expect(html).toContain('data-testid="league-admin-empty"');
     expect(html).toContain("Crea lega");
   });
 

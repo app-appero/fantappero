@@ -1,11 +1,10 @@
-import type { CompetitionSummary, LeagueDetail } from "@fantappero/contracts";
+import type { CompetitionSummary } from "@fantappero/contracts";
 import { theme } from "@fantappero/ui/theme";
 import { useNavigation } from "@react-navigation/core";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useCallback, useMemo, useState } from "react";
 import { Pressable, StyleSheet, Switch, Text, TextInput, View } from "react-native";
 import { createLeague, fetchCompetitions } from "../api/leagues";
-import { CoachDirectoryPanel } from "../components/CoachDirectoryPanel";
 import { UiStatePanel } from "../components/UiStatePanel";
 import { useScreenData } from "../hooks/useScreenData";
 import { PageContainer } from "../layout/PageContainer";
@@ -37,8 +36,6 @@ export function CreateLeagueScreen() {
   const [selected, setSelected] = useState<Record<string, boolean>>({});
   const [formError, setFormError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  const [createdLeague, setCreatedLeague] = useState<LeagueDetail | null>(null);
-  const [directoryCompleted, setDirectoryCompleted] = useState(false);
 
   const selectedCount = competitions.filter((row) => selected[row.id]).length;
   const allSelected = competitions.length > 0 && selectedCount === competitions.length;
@@ -131,68 +128,12 @@ export function CreateLeagueScreen() {
       } catch {
         // Creazione già riuscita; registerLeague ha aggiornato lo stato locale.
       }
-      setCreatedLeague(created);
+      navigation.replace("LeagueAdmin", { leagueId: created.id });
     } catch (error) {
       setFormError(getApiErrorMessage(error, "Impossibile creare la lega."));
     } finally {
       setSubmitting(false);
     }
-  }
-
-  if (createdLeague) {
-    return (
-      <PageContainer title="Crea lega · Fase 2" testID="screen-create-league-directory">
-        <UiStatePanel
-          state="success"
-          title={directoryCompleted ? "Configurazione completata" : "Lega creata"}
-          message={
-            directoryCompleted
-              ? "Puoi continuare dall'elenco leghe o dall'amministrazione."
-              : `"${createdLeague.name}" salvata in bozza. Sei amministratore.`
-          }
-          testID={
-            directoryCompleted ? "create-league-directory-complete" : "create-league-phase-2"
-          }
-        />
-        {!directoryCompleted ? (
-          <>
-            <CoachDirectoryPanel
-              leagueId={createdLeague.id}
-              memberCount={1}
-              capacity={createdLeague.rules?.participantCount ?? 8}
-              testIDPrefix="create-league-directory"
-            />
-            <Pressable
-              accessibilityRole="button"
-              onPress={() => setDirectoryCompleted(true)}
-              style={styles.secondaryButton}
-              testID="create-league-directory-skip"
-            >
-              <Text style={styles.secondaryButtonLabel}>Salta e termina</Text>
-            </Pressable>
-          </>
-        ) : (
-          <View style={styles.footerActions}>
-            <Pressable
-              accessibilityRole="button"
-              onPress={() => navigation.navigate("LeagueAdmin", { leagueId: createdLeague.id })}
-              style={styles.primaryButton}
-              testID="create-league-open-admin"
-            >
-              <Text style={styles.primaryButtonLabel}>Apri amministrazione</Text>
-            </Pressable>
-            <Pressable
-              accessibilityRole="button"
-              onPress={() => navigation.navigate("LeagueHome", { leagueId: createdLeague.id })}
-              style={styles.secondaryButton}
-              testID="create-league-back-list"
-            >
-              <Text style={styles.secondaryButtonLabel}>Vai alla home lega</Text>
-            </Pressable>
-          </View>
-        )}
-      </PageContainer>
-    );
   }
 
   return (
@@ -397,19 +338,6 @@ const styles = StyleSheet.create({
     color: colors.accentContrast,
     fontWeight: typography.fontWeight.semibold,
     fontSize: typography.fontSize.md,
-  },
-  secondaryButton: {
-    minHeight: 44,
-    borderWidth: 1,
-    borderColor: colors.accent,
-    borderRadius: radius.md,
-    paddingVertical: spacing.md,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  secondaryButtonLabel: {
-    color: colors.accent,
-    fontWeight: typography.fontWeight.semibold,
   },
   footerActions: {
     gap: spacing.sm,

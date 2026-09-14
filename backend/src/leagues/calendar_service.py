@@ -16,7 +16,9 @@ from database.enums import (
     LeagueAuditAction,
     LeagueCalendarFormat,
     LeagueCalendarStatus,
+    FantasyTurnStatus,
 )
+from fantasy_teams.composition_service import league_rosters_complete
 from fantasy_turns.models import FantasyRound
 from fantasy_turns.rules import DEFAULT_LEAGUE_TZ
 from leagues.calendar_planning import (
@@ -91,12 +93,6 @@ class LeagueCalendarService:
 
     def generate(self, league_access: LeagueAccess) -> LeagueCalendarResponse:
         league = self._lock_league(league_access.league.id)
-        try:
-            validate_calendar_generation_state(league.state)
-        except ValidationAuthError:
-            get_metrics().incr("league_calendar_generated_total", labels={"result": "locked"})
-            raise
-
         memberships = self._load_memberships(league.id, for_update=True)
         rules = self._load_rules(league.id)
         try:
@@ -110,6 +106,34 @@ class LeagueCalendarService:
                 labels={"result": exc.code},
             )
             raise
+
+        rosters_complete = league_rosters_complete(self._session, league)
+        try:
+            validate_calendar_generation_state(league.state, rosters_complete=rosters_complete)
+        except ValidationAuthError:
+            get_metrics().incr("league_calendar_generated_total", labels={"result": "locked"})
+            raise
+
+        # Un calendario con risultati già calcolati non va sovrascritto da un
+        # rigenera-da-zero: `generate` cancella e ricrea tutti gli slot,
+        # `extend_to_european_turns`/`sync_with_european_turns` è il percorso
+        # sicuro per aggiungere solo le giornate mancanti in coda (usato da
+        # "Aggiorna calendario"). Sbloccare la generazione dalle sole rose,
+        # raggiungibile ora anche in `active`, non deve poter cancellare lo
+        # storico di una lega già in corso.
+        existing_calendar = self._load_calendar(league.id)
+        if existing_calendar is not None and any(
+            slot.result_computed_at is not None for slot in existing_calendar.slots
+        ):
+            get_metrics().incr(
+                "league_calendar_generated_total",
+                labels={"result": "results_locked"},
+            )
+            raise ValidationAuthError(
+                "Il calendario ha già risultati calcolati: usa \"Aggiorna calendario\" "
+                "per aggiungere le giornate mancanti senza perdere lo storico.",
+                code="league_calendar_results_locked",
+            )
 
         membership_ids = [row.id for row in memberships]
         # Un solo motore temporale: le giornate H2H sono i Turni Europei
@@ -291,11 +315,20 @@ class LeagueCalendarService:
         )
 
     def _european_rounds(self, league: League) -> list[FantasyRound]:
-        """I turni validi della lega, in ordine cronologico di numero."""
+        """I turni giocabili della lega, in ordine cronologico di numero.
+
+        Esclude i ``skipped`` (sotto soglia partite): non sono giornate H2H
+        disputabili e non devono entrare nel calendario fantallenatori
+        (EP13-P03/P04). I segnaposto "lega creata dopo" restano i turni
+        non-skipped con finestra precedente a ``league.created_at``.
+        """
         return list(
             self._session.scalars(
                 select(FantasyRound)
-                .where(FantasyRound.league_id == league.id)
+                .where(
+                    FantasyRound.league_id == league.id,
+                    FantasyRound.status != FantasyTurnStatus.SKIPPED,
+                )
                 .order_by(FantasyRound.number.asc())
             ).all()
         )
@@ -562,8 +595,9 @@ class LeagueCalendarService:
 
     def confirm(self, league_access: LeagueAccess) -> LeagueCalendarResponse:
         league = self._lock_league(league_access.league.id)
+        rosters_complete = league_rosters_complete(self._session, league)
         try:
-            validate_calendar_generation_state(league.state)
+            validate_calendar_generation_state(league.state, rosters_complete=rosters_complete)
         except ValidationAuthError:
             get_metrics().incr("league_calendar_confirmed_total", labels={"result": "locked"})
             raise
@@ -599,6 +633,14 @@ class LeagueCalendarService:
             )
 
         if calendar.status == LeagueCalendarStatus.CONFIRMED:
+            from leagues.season_activate import try_advance_league_lifecycle
+
+            try_advance_league_lifecycle(
+                self._session,
+                league.id,
+                actor_id=league_access.user.id,
+            )
+            self._session.commit()
             get_metrics().incr("league_calendar_confirmed_total", labels={"result": "noop"})
             return self._to_response(calendar)
 
@@ -616,6 +658,13 @@ class LeagueCalendarService:
                     "byeCount": calendar.bye_count,
                 },
             )
+        )
+        from leagues.season_activate import try_advance_league_lifecycle
+
+        try_advance_league_lifecycle(
+            self._session,
+            league.id,
+            actor_id=league_access.user.id,
         )
         self._session.commit()
         get_metrics().incr("league_calendar_confirmed_total", labels={"result": "success"})

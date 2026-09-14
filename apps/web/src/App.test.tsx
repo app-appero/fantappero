@@ -15,6 +15,6 @@ describe("App routing entry", () => {
         }),
       }),
     );
-    expect(html).toContain('data-testid="league-home-content"');
+    expect(html).toContain('data-testid="league-admin-form"');
   });
 });

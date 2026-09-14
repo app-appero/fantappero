@@ -6,11 +6,11 @@ import {
   confirmLeagueCalendar,
   ensureFantasyTurns,
   fetchLeagueCalendarAdmin,
-  fetchLeagueCalendarPlan,
   generateLeagueCalendar,
 } from "../api/leagues";
 import { getApiErrorMessage } from "../auth/AuthContext";
 import { loadStoredSession } from "../auth/sessionStorage";
+import { useNavigate } from "../router/simpleRouter";
 
 const DEMO_CALENDAR: LeagueCalendar = {
   id: "demo-calendar",
@@ -54,6 +54,8 @@ type Props = {
   leagueId: string | null;
   isDemoMode: boolean;
   search: string;
+  /** Notifica il parent (MatchdayPage) per ricaricare il pannello H2H sotto. */
+  onCalendarChanged?: () => void;
 };
 
 const WINDOW_DATE = new Intl.DateTimeFormat("it-IT", {
@@ -112,6 +114,13 @@ export function CalendarWindowsPanel({ plan }: { plan: LeagueCalendarPlan }) {
   );
 }
 
+function calendarStatusLabel(calendar: LeagueCalendar | null): string {
+  if (!calendar) {
+    return "Non generato";
+  }
+  return calendar.status === "confirmed" ? "Confermato" : "Anteprima";
+}
+
 function requestedState(search: string): "loading" | "empty" | "error" | "forbidden" | null {
   const value = new URLSearchParams(search).get("calendario");
   return value === "loading" ||
@@ -122,7 +131,13 @@ function requestedState(search: string): "loading" | "empty" | "error" | "forbid
     : null;
 }
 
-export function LeagueCalendarPanel({ leagueId, isDemoMode, search }: Props) {
+export function LeagueCalendarPanel({
+  leagueId,
+  isDemoMode,
+  search,
+  onCalendarChanged,
+}: Props) {
+  const navigate = useNavigate();
   const demoState = isDemoMode ? requestedState(search) : null;
   const [calendar, setCalendar] = useState<LeagueCalendar | null>(() => {
     if (!isDemoMode) {
@@ -133,7 +148,6 @@ export function LeagueCalendarPanel({ leagueId, isDemoMode, search }: Props) {
     }
     return DEMO_CALENDAR;
   });
-  const [plan, setPlan] = useState<LeagueCalendarPlan | null>(null);
   const [loading, setLoading] = useState(() => {
     if (isDemoMode) {
       return demoState === "loading";
@@ -207,14 +221,6 @@ export function LeagueCalendarPanel({ leagueId, isDemoMode, search }: Props) {
     } finally {
       setLoading(false);
     }
-
-    // La diagnostica finestre è accessoria: un errore qui non deve
-    // impedire di vedere e confermare il calendario.
-    try {
-      setPlan(await fetchLeagueCalendarPlan(stored.accessToken, leagueId));
-    } catch {
-      setPlan(null);
-    }
   }, [demoState, isDemoMode, leagueId]);
 
   useEffect(() => {
@@ -226,7 +232,8 @@ export function LeagueCalendarPanel({ leagueId, isDemoMode, search }: Props) {
     setSuccess(null);
     if (isDemoMode) {
       setCalendar(DEMO_CALENDAR);
-      setSuccess("Anteprima calendario generata.");
+      setSuccess("Calendario generato.");
+      onCalendarChanged?.();
       return;
     }
     if (!leagueId) {
@@ -247,7 +254,7 @@ export function LeagueCalendarPanel({ leagueId, isDemoMode, search }: Props) {
         // I Turni Europei di questa lega non esistono ancora (lega nuova, mai
         // entrata nella finestra del cron automatico che copre solo le leghe
         // già attive): li sincronizziamo al volo e riproviamo, così "Genera
-        // anteprima" resta un solo bottone per l'intera catena.
+        // calendario" resta un solo bottone per l'intera catena.
         if (!(error instanceof ApiError) || error.code !== "european_turns_missing") {
           throw error;
         }
@@ -256,10 +263,19 @@ export function LeagueCalendarPanel({ leagueId, isDemoMode, search }: Props) {
       }
       setCalendar(next);
       setSuccess(
-        `Anteprima generata: ${next.matchupCount} incontri su ${next.roundCount} turni.`,
+        `Calendario generato: ${next.matchupCount} incontri su ${next.roundCount} giornate.`,
       );
+      onCalendarChanged?.();
     } catch (error) {
-      setActionError(getApiErrorMessage(error, "Impossibile generare il calendario."));
+      const message = getApiErrorMessage(error, "Impossibile generare il calendario.");
+      setActionError(message);
+      if (
+        error instanceof ApiError &&
+        error.code === "league_calendar_locked" &&
+        /rose|Partecipanti/i.test(message)
+      ) {
+        // Messaggio già allineato al backend: il link Partecipanti è sotto.
+      }
     } finally {
       setWorking(null);
     }
@@ -276,6 +292,7 @@ export function LeagueCalendarPanel({ leagueId, isDemoMode, search }: Props) {
         summary: { message: "Calendario confermato e consultabile dai partecipanti." },
       });
       setSuccess("Calendario confermato.");
+      onCalendarChanged?.();
       return;
     }
     if (!leagueId) {
@@ -292,6 +309,7 @@ export function LeagueCalendarPanel({ leagueId, isDemoMode, search }: Props) {
       const next = await confirmLeagueCalendar(stored.accessToken, leagueId);
       setCalendar(next);
       setSuccess("Calendario confermato.");
+      onCalendarChanged?.();
     } catch (error) {
       setActionError(getApiErrorMessage(error, "Impossibile confermare il calendario."));
     } finally {
@@ -324,7 +342,7 @@ export function LeagueCalendarPanel({ leagueId, isDemoMode, search }: Props) {
   if (loadError) {
     return (
       <section className="fa-calendar-panel" data-testid="league-calendar-panel">
-        <h2>Calendario scontri diretti</h2>
+        <h2>Calendario fantallenatori</h2>
         <UiStatePanel
           state="error"
           title="Calendario non disponibile"
@@ -338,49 +356,39 @@ export function LeagueCalendarPanel({ leagueId, isDemoMode, search }: Props) {
     );
   }
 
+  // Dopo la conferma restano solo gli scontri nel pannello H2H sotto:
+  // niente più bottoni Genera/Conferma né banner di successo.
+  if (calendar?.status === "confirmed") {
+    return null;
+  }
+
+  const rosterLocked =
+    Boolean(actionError) && /Completa le rose|Partecipanti/i.test(actionError ?? "");
+
   return (
     <section className="fa-calendar-panel" data-testid="league-calendar-panel">
-      <h2>Calendario scontri diretti</h2>
+      <h2>Calendario fantallenatori</h2>
       <p>
-        Le giornate seguono le finestre europee utilizzabili: vengono generati tutti i cicli
-        completi che ci stanno, con riposo esplicito se i partecipanti sono dispari.
+        Stato: <strong data-testid="league-calendar-status">{calendarStatusLabel(calendar)}</strong>
+        {calendar
+          ? ` · ${calendar.matchupCount} incontri · ${calendar.roundCount} giornate${
+              calendar.byeCount > 0 ? ` · ${calendar.byeCount} riposi` : ""
+            }`
+          : null}
       </p>
-
-      {plan ? <CalendarWindowsPanel plan={plan} /> : null}
+      <p>
+        Genera e conferma il calendario quando tutte le rose in Partecipanti sono complete. Gli
+        scontri compaiono sotto, giornata per giornata.
+      </p>
 
       {!calendar ? (
         <UiStatePanel
           state="empty"
           title="Nessun calendario"
-          message="Genera l'anteprima quando i partecipanti iscritti coincidono con il regolamento."
+          message="Completa le rose di tutti i partecipanti, poi genera il calendario."
           testId="league-calendar-empty"
         />
-      ) : (
-        <div data-testid="league-calendar-preview">
-          <p>
-            Stato: <strong>{calendar.status === "confirmed" ? "Confermato" : "Anteprima"}</strong>
-            {" · "}
-            {calendar.matchupCount} incontri · {calendar.roundCount} turni
-            {calendar.byeCount > 0 ? ` · ${calendar.byeCount} riposi` : ""}
-          </p>
-          <ul className="fa-calendar-rounds">
-            {calendar.rounds.map((round) => (
-              <li key={round.roundNumber}>
-                <strong>Turno {round.roundNumber}</strong>
-                <ul>
-                  {round.matchups.map((matchup) => (
-                    <li key={`${round.roundNumber}-${matchup.slotIndex}`}>
-                      {matchup.isBye
-                        ? `${matchup.homeDisplayName} (riposo)`
-                        : `${matchup.homeDisplayName} vs ${matchup.awayDisplayName}`}
-                    </li>
-                  ))}
-                </ul>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
+      ) : null}
 
       {actionError ? (
         <UiStatePanel
@@ -389,6 +397,16 @@ export function LeagueCalendarPanel({ leagueId, isDemoMode, search }: Props) {
           message={actionError}
           testId="league-calendar-action-error"
         />
+      ) : null}
+      {rosterLocked ? (
+        <Button
+          type="button"
+          variant="ghost"
+          onClick={() => navigate("/lega/amministrazione?setup=invitati")}
+          data-testid="league-calendar-goto-participants"
+        >
+          Vai a Partecipanti
+        </Button>
       ) : null}
       {success ? (
         <UiStatePanel
@@ -407,7 +425,7 @@ export function LeagueCalendarPanel({ leagueId, isDemoMode, search }: Props) {
           onClick={() => void onGenerate()}
           data-testid="league-calendar-generate"
         >
-          {working === "generate" ? "Generazione…" : "Genera anteprima"}
+          {working === "generate" ? "Generazione…" : "Genera calendario"}
         </Button>
         <Button
           type="button"

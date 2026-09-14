@@ -279,6 +279,7 @@ export function MatchdayH2HPanel({
           <p className="fa-matchday-lede">
             {calendar.roundCount} giornate · {calendar.matchupCount} scontri
             {calendar.byeCount > 0 ? ` · ${calendar.byeCount} riposi` : ""}
+            {calendar.status === "draft" ? " · anteprima" : ""}
           </p>
           <p className="fa-matchday-hint">
             Seleziona una giornata per vedere gli scontri. Le giornate già concluse restano

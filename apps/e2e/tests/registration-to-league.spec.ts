@@ -62,9 +62,8 @@ test("un utente si registra, verifica l'email, accede, crea una lega, schiera la
     await page.getByTestId("create-league-select-all").click();
     await page.getByTestId("create-league-submit").click();
 
-    const success = page.getByTestId("create-league-success");
-    await expect(success).toBeVisible();
-    await expect(success).toContainText(leagueName);
+    await expect(page).toHaveURL(/\/lega\/amministrazione/);
+    await expect(page.getByTestId("league-admin-form")).toBeVisible();
   });
 
   await test.step("seed rosa + turno (bypass asta reale — EP12-01 decisione rosa)", async () => {

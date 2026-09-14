@@ -51,9 +51,8 @@ async function createLeague(page: import("@playwright/test").Page, leagueName: s
   await page.getByTestId("create-league-select-all").click();
   await page.getByTestId("create-league-submit").click();
 
-  const success = page.getByTestId("create-league-success");
-  await expect(success).toBeVisible();
-  await expect(success).toContainText(leagueName);
+  await expect(page).toHaveURL(/\/lega\/amministrazione/);
+  await expect(page.getByTestId("league-admin-form")).toBeVisible();
 }
 
 test("un utente crea una lega senza rosa e vede lo stato vuoto in formazione", async ({ page }) => {

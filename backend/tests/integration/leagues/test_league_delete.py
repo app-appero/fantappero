@@ -99,7 +99,7 @@ def test_admin_can_delete_draft_league(
     assert audits[0].details == {
         "leagueId": league_id,
         "name": "Lega Da Eliminare",
-        "state": "draft",
+        "state": "configuring",
         "seasonYear": 2026,
     }
 

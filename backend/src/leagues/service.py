@@ -117,7 +117,10 @@ class LeagueService:
         league = League(
             name=name,
             season_year=season_year,
-            state=LeagueState.DRAFT,
+            # Niente bozza manuale: alla creazione si entra subito in setup
+            # (EP13): inviti/rose/calendario vivono in Amministrazione, senza
+            # CTA "Inizia la configurazione".
+            state=LeagueState.CONFIGURING,
         )
         self._session.add(league)
         self._session.flush()
@@ -194,6 +197,22 @@ class LeagueService:
         self._session.commit()
 
         get_metrics().incr("league_created_total", labels={"result": "success"})
+        # Post-commit: materializza i Turni Europei dell'intera stagione
+        # corrente (EP13-P04). Spostato su Celery per non appesantire la
+        # request; se l'accodamento fallisce la lega resta creata e
+        # `ensure_upcoming_for_league` recupera lo stesso backfill.
+        from fantasy_turns.tasks import materialize_initial_fantasy_turns_task
+
+        try:
+            materialize_initial_fantasy_turns_task.delay(
+                league_id=str(league.id),
+                actor_id=str(user.id),
+            )
+        except Exception:
+            logger.exception(
+                "fantasy_turns_materialize_initial_enqueue_failed",
+                extra={"league_id": str(league.id)},
+            )
         return self._to_league_detail(
             league,
             viewer_role=league_member_role_to_league_role(LeagueMemberRole.OWNER).value,
@@ -228,6 +247,7 @@ class LeagueService:
             message="Configura il regolamento della lega prima dell'avvio.",
             rules=self._to_rules_response(rules),
             lifecycle=self._to_lifecycle_response(league),
+            configuration_saved=self._configuration_saved(league.id),
         )
 
     def transition_state(
@@ -349,6 +369,25 @@ class LeagueService:
             or rules.require_trade_approval != payload.options.require_trade_approval
         )
         if not changed:
+            # Anche un salvataggio senza modifiche conferma la configurazione
+            # e sblocca la tab Inviti (EP13 setup a tappe).
+            self._session.add(
+                LeagueAuditEvent(
+                    league_id=league.id,
+                    actor_id=league_access.user.id,
+                    action=LeagueAuditAction.LEAGUE_RULES_UPDATED,
+                    correlation_id=get_correlation_id(),
+                    details={"confirmed": True, "unchanged": True},
+                ),
+            )
+            from leagues.season_activate import try_advance_league_lifecycle
+
+            try_advance_league_lifecycle(
+                self._session,
+                league.id,
+                actor_id=league_access.user.id,
+            )
+            self._session.commit()
             get_metrics().incr("league_rules_updated_total", labels={"result": "noop"})
             return self._to_rules_response(rules)
 
@@ -378,6 +417,13 @@ class LeagueService:
                 action=LeagueAuditAction.LEAGUE_RULES_UPDATED,
                 correlation_id=get_correlation_id(),
             ),
+        )
+        from leagues.season_activate import try_advance_league_lifecycle
+
+        try_advance_league_lifecycle(
+            self._session,
+            league.id,
+            actor_id=league_access.user.id,
         )
         self._session.commit()
         get_metrics().incr("league_rules_updated_total", labels={"result": "success"})
@@ -437,14 +483,49 @@ class LeagueService:
 
     def _to_lifecycle_response(self, league: League) -> LeagueLifecycleResponse:
         blockers = self._lifecycle_blockers(league)
+        blocker_codes = {blocker.code for blocker in blockers}
         allowed = list(LEAGUE_TRANSITIONS[league.state])
-        if league.state == LeagueState.CONFIGURING and blockers:
-            allowed.remove(LeagueState.AUCTION)
-        elif league.state == LeagueState.AUCTION and blockers:
-            allowed.remove(LeagueState.ACTIVE)
+
+        # La conclusione stagione non è una CTA manuale: avviene in automatico
+        # quando tutte le giornate H2H sono omologate.
+        if league.state == LeagueState.ACTIVE:
+            allowed = [state for state in allowed if state != LeagueState.CONCLUDED]
+
+        if league.state == LeagueState.CONFIGURING:
+            config_codes = {
+                "rules_invalid",
+                "insufficient_competitions",
+                "participant_count_mismatch",
+                "league_admin_required",
+            }
+            activation_codes = {
+                "calendar_not_configured",
+                "fantasy_teams_not_configured",
+                "credits_not_configured",
+            }
+            has_config_blockers = bool(blocker_codes & config_codes)
+            has_activation_blockers = bool(blocker_codes & activation_codes)
+            if has_config_blockers:
+                allowed = []
+            elif has_activation_blockers:
+                # Asta ancora raggiungibile; "Avvia stagione" no finché manca
+                # calendario / rose / crediti.
+                allowed = [state for state in allowed if state != LeagueState.ACTIVE]
+
+        if league.state == LeagueState.AUCTION and any(
+            code
+            in {
+                "calendar_not_configured",
+                "fantasy_teams_not_configured",
+                "credits_not_configured",
+            }
+            for code in blocker_codes
+        ):
+            allowed = [state for state in allowed if state != LeagueState.ACTIVE]
+
         return LeagueLifecycleResponse(
             state=league.state,
-            allowedTransitions=allowed,
+            allowed_transitions=allowed,
             blockers=[
                 LeagueLifecycleBlocker(
                     code=blocker.code,
@@ -454,6 +535,16 @@ class LeagueService:
                 for blocker in blockers
             ],
         )
+
+    def _configuration_saved(self, league_id: UUID) -> bool:
+        """True se l'admin ha salvato almeno una volta il regolamento."""
+        count = self._session.scalar(
+            select(func.count(LeagueAuditEvent.id)).where(
+                LeagueAuditEvent.league_id == league_id,
+                LeagueAuditEvent.action == LeagueAuditAction.LEAGUE_RULES_UPDATED,
+            )
+        )
+        return bool(count)
 
     def _lifecycle_blockers(self, league: League):
         if league.state == LeagueState.CONFIGURING:
@@ -469,13 +560,22 @@ class LeagueService:
                     LeagueMembership.role == LeagueMemberRole.OWNER,
                 )
             )
-            return configuration_blockers(
+            config = configuration_blockers(
                 rules_valid=self._rules_are_valid(rules),
                 competition_count=len(league.competitions),
                 membership_count=membership_count or 0,
                 participant_count=rules.participant_count if rules is not None else None,
                 owner_count=owner_count or 0,
             )
+            # Per "Avvia stagione" servono anche calendario + rose/crediti;
+            # l'asta resta raggiungibile con i soli blocker di configurazione.
+            return [
+                *config,
+                *auction_activation_blockers(
+                    calendar_configured=league_has_confirmed_calendar(self._session, league.id),
+                    roster_blockers=activation_roster_and_credit_blockers(self._session, league),
+                ),
+            ]
         if league.state == LeagueState.AUCTION:
             return auction_activation_blockers(
                 calendar_configured=league_has_confirmed_calendar(self._session, league.id),

@@ -30,14 +30,14 @@ Endpoint sotto `/leagues` per la configurazione iniziale di leghe private.
 
 ### Effetti atomici
 
-1. Inserimento lega con `state = draft`
+1. Inserimento lega con `state = configuring` (setup immediato, senza bozza manuale)
 2. Membership del creatore con ruolo `owner` (API: `league_admin`)
 3. Associazione campionati su `league_competitions`
 4. Evento audit `league_created` in `league_audit_events`
 
 ### Response `201`
 
-Restituisce `LeagueDetail` con `state: draft`, `viewerRole: league_admin` e l'elenco campionati selezionati.
+Restituisce `LeagueDetail` con `state: configuring`, `viewerRole: league_admin` e l'elenco campionati selezionati.
 
 ### Errori
 
@@ -199,9 +199,12 @@ Le operazioni amministrative usano il prefisso
   il precedente amministratore diventa partecipante e il destinatario diventa amministratore.
   Ripetere la richiesta verso l'amministratore corrente è un no-op.
 - `DELETE /partecipanti/{user_id}` rimuove un partecipante, ma rifiuta sempre la rimozione
-  dell'amministratore.
+  dell'amministratore. Se dopo la rimozione restano almeno 4 iscritti e
+  `rules.participantCount` era più alto, il regolamento viene abbassato automaticamente
+  al conteggio attuale (audit `league_rules_updated` con `source: member_removed`).
+  Un'eventuale anteprima calendario H2H in `draft` viene invalidata (va rigenerata).
 
-Trasferimento e rimozione sono consentiti solo quando la lega è in bozza. La lega viene
+Trasferimento e rimozione sono consentiti in `draft` e `configuring`. La lega viene
 bloccata durante la mutazione; aggiornamento membership ed evento audit avvengono nella
 stessa transazione. Gli eventi sono `league_admin_transferred` e `league_member_removed`.
 Non vengono registrati nomi o email nei log e nelle metriche.
@@ -216,8 +219,30 @@ Metriche:
 
 ## Stati e avvio stagione
 
-`GET /leagues/{league_id}/amministrazione` include `lifecycle`, con stato corrente,
-transizioni immediatamente eseguibili e prerequisiti mancanti:
+`GET /leagues/{league_id}/amministrazione` include `lifecycle` (stato corrente,
+transizioni eseguibili, prerequisiti) e `configurationSaved` (true dopo almeno
+un salvataggio esplicito del regolamento: sblocca la tab Inviti in UI):
+
+```json
+{
+  "leagueId": "uuid-league",
+  "message": "Configura il regolamento della lega prima dell'avvio.",
+  "rules": { },
+  "lifecycle": {
+    "state": "configuring",
+    "allowedTransitions": ["auction"],
+    "blockers": [
+      {
+        "code": "calendar_not_configured",
+        "message": "Genera il calendario prima di avviare la stagione."
+      }
+    ]
+  },
+  "configurationSaved": false
+}
+```
+
+Il campo `lifecycle` in dettaglio:
 
 ```json
 {
@@ -235,24 +260,35 @@ transizioni immediatamente eseguibili e prerequisiti mancanti:
 `POST /leagues/{league_id}/amministrazione/stato` richiede `league:admin` e un body:
 
 ```json
-{ "targetState": "configuring" }
+{ "targetState": "auction" }
 ```
 
 La sequenza principale è:
 
-`draft → configuring → auction → active → concluded → archived`.
+`configuring → active → concluded → archived`
 
-Prima dell'avvio è inoltre ammesso `auction → configuring`, per correggere la
-configurazione. Le richieste verso lo stato corrente sono idempotenti e non producono
+(con `draft` ancora nel grafo solo per leghe legacy; le nuove leghe nascono già in
+`configuring`).
+
+Da `configuring` l'API ammette ancora `auction` (asta opzionale, non esposta come
+CTA nella UI), e da `auction` si può tornare in `configuring` o passare ad
+`active`. L'avvio stagione `configuring|auction → active` e la conclusione
+`active → concluded` **non** sono CTA manuali: avvengono in automatico quando i
+prerequisiti sono soddisfatti (partecipanti allineati, calendario confermato,
+rose/crediti ok; tutte le giornate H2H omologate per la conclusione). Resta
+ammesso `concluded → archived`.
+
+Le richieste verso lo stato corrente sono idempotenti e non producono
 un secondo evento audit. Salti e regressioni non previsti restituiscono
 `invalid_league_transition`. Una transizione prevista ma non pronta restituisce
 `league_transition_blocked`.
 
-Il passaggio ad asta richiede regolamento valido, almeno tre campionati, un
+Il passaggio ad asta (API) richiede regolamento valido, almeno tre campionati, un
 amministratore e il numero esatto di partecipanti configurato. Il passaggio ad `active`
-è il vero avvio stagione e resta bloccato finché non risultano validi calendario,
-squadre con rose **convalidate** (composizione 3P–11D–11C–10A da regolamento,
-≥3 campionati rappresentati — EP05-05) e conti crediti. EP03-06 implementa il calendario H2H.
+(automatico da `configuring` o da `auction`) è il vero avvio stagione e resta
+bloccato finché non risultano validi calendario, squadre con rose **convalidate**
+(composizione 3P–11D–11C–10A da regolamento, ≥3 campionati rappresentati — EP05-05)
+e conti crediti. EP03-06 implementa il calendario H2H.
 
 La transizione acquisisce un lock sulla lega e salva stato ed evento
 `league_state_changed` nella stessa transazione. L'audit conserva stato precedente e
@@ -285,7 +321,7 @@ Endpoint consultazione matchday (`matchday:view`):
 - `GET /leagues/{league_id}/calendario/scontri/{slot_id}` — dettaglio scontro:
   formazioni (effettiva se presente, altrimenti schierata) + fantavoti + totale.
 
-### Calendario adattivo sulle finestre europee (EP13-P03)
+### Calendario adattivo sulle finestre europee (EP13-P03 / EP13-P04)
 
 Il calendario segue le **finestre europee realmente utilizzabili**, non un numero
 fisso di giornate. Motore puro in `backend/src/leagues/calendar_planning.py`
@@ -308,6 +344,29 @@ fisso di giornate. Motore puro in `backend/src/leagues/calendar_planning.py`
    `0` quando ogni squadra gioca un numero pari di partite e `±1` altrimenti — il
    minimo teorico, per leghe da 4 a 10 partecipanti.
 
+**Bootstrap Turni Europei (EP13-P04).** Alla creazione lega il backend accoda
+`fantasy_turns.materialize_initial_for_league` (Celery, post-commit) per
+materializzare subito tutti i Turni Europei della stagione dalle fixture già
+note, con numerazione cronologica definitiva. Distinzione esplicita:
+
+- **pianificazione**: con rose ancora vuote i turni strutturali nascono comunque
+  dalle fixture (niente shift di numerazione al primo backfill);
+- **giocabilità**: quando esistono giocatori in rosa vale la soglia di copertura
+  formazione (`turn_coverage_threshold`); la generazione H2H resta bloccata da
+  rose complete (`league_rosters_complete`).
+
+Se l'accodamento Celery fallisce la lega resta creata: `ensure_upcoming` (e
+"Genera anteprima") recuperano lo stesso backfill full-season anche su calendari
+parziali / fixture pubblicate dopo. `auto_open` del chiamante è rispettato
+(il task iniziale usa `false`).
+
+**Prerequisiti genera/conferma H2H.** Iscritti = regolamento; rose complete di
+tutti i partecipanti (non uno stato macro specifico come `auction`). Stati
+terminali `concluded` / `archived` restano bloccati (`league_calendar_locked`).
+Una rigenerazione con slot che hanno già `result_computed_at` è rifiutata
+(`league_calendar_results_locked`): usare "Aggiorna calendario" per estendere
+senza cancellare lo storico.
+
 **Mappatura giornata ↔ turno europeo.** Prima l'abbinamento era implicito
 (`FantasyRound.number == LeagueCalendarSlot.round_number`) e contava anche le
 finestre sotto soglia, che diventano turni `skipped`: una giornata H2H abbinata a
@@ -315,7 +374,8 @@ una di quelle non era giocabile. Ora la mappatura è **esplicita e per finestra
 temporale**, persistita in `league_calendar_round_windows`
 (`round_number`, `cycle_number`, `cycle_round_number`, `window_start_at`,
 `window_end_at`, `window_kind`). Risoluzione condivisa in
-`leagues/calendar_round_mapping.py`.
+`leagues/calendar_round_mapping.py`. Corrispondenza **1:1** fra giornata H2H e
+Turno Europeo.
 
 **Retrocompatibilità.** I calendari generati prima non hanno la mappatura e
 continuano a usare il criterio per numero progressivo: nessun dato storico cambia
@@ -328,12 +388,10 @@ momento della generazione; se il calendario provider o la soglia cambiano,
 `LeagueCalendarService.is_stale()` lo segnala. Le giornate già iniziate e i
 risultati non vengono mai riscritti automaticamente.
 
-La generazione richiede che gli iscritti coincidano col regolamento ed è consentita
-in `configuring` o `auction`.
-
 Flusso: genera anteprima (`draft`) → conferma (`confirmed`, idempotente). Una
-rigenerazione sostituisce l'anteprima. Se i partecipanti cambiano dopo la generazione,
-il calendario risulta stale e va rigenerato.
+rigenerazione sostituisce l'anteprima solo se non ci sono risultati calcolati.
+Se i partecipanti cambiano dopo la generazione, il calendario risulta stale e va
+rigenerato.
 
 Eventi audit: `league_calendar_generated` (con `anchoredToWindows`, `cycleCount`,
 `cycleLength`, `eligibleWindows`, `discardedWindows`), `league_calendar_confirmed`.

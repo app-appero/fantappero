@@ -7,10 +7,15 @@ giocatori disponibili: avere 11 attaccanti che giocano non permette comunque
 di schierare un modulo valido.
 
 Regola (configurabile per lega da `LeagueRules.turn_coverage_threshold`):
-una finestra è un turno valido se **ogni** squadra della lega copre almeno la
-soglia degli 11 titolari con i propri giocatori il cui club reale gioca in
-quella finestra. Se nessuna squadra ha giocatori in rosa (asta non ancora
-svolta) la finestra non è valida: niente turni prima dell'asta.
+una finestra è un turno **giocabile** se **ogni** squadra della lega copre
+almeno la soglia degli 11 titolari con i propri giocatori il cui club reale
+gioca in quella finestra.
+
+Pianificazione stagionale (EP13-P04): se nessuna squadra ha ancora giocatori
+in rosa la copertura non è valutabile — il motore dei turni può comunque
+materializzare la struttura dalle fixture per fissare la numerazione. La
+giocabilità del calendario H2H resta bloccata da `league_rosters_complete`
+finché le rose non sono complete.
 """
 
 from __future__ import annotations
@@ -74,8 +79,9 @@ def coverage_threshold_for(threshold: float | None) -> float:
 def window_is_valid(coverages: list[float], threshold: float) -> bool:
     """Vero se **ogni** squadra raggiunge la soglia.
 
-    Una lista vuota significa "nessuna squadra con giocatori in rosa": la
-    finestra non è un turno valido (regola "niente turni prima dell'asta").
+    Una lista vuota significa "nessuna squadra con giocatori in rosa": a
+    questo livello la copertura non è ancora valutabile (il chiamante in
+    `FantasyTurnService` distingue pianificazione da giocabilità).
     """
     if not coverages:
         return False

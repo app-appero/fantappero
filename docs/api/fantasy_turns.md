@@ -15,12 +15,23 @@ ven–lun o infrasettimanale mar–gio, timezone `Europe/Rome`), calcola il **cu
 come primo kickoff incluso e espone uno **stato effettivo** coerente anche quando
 gli orari provider cambiano.
 
-I turni sono **calcolati automaticamente** dal sistema per le leghe `active`
-(job Celery `fantasy_turns.ensure_upcoming`, default orario; anche dopo sync
-fixture MVP). Lo stesso job ricalcola cutoff e latch dei turni già materializzati
+I turni sono **calcolati automaticamente** dal sistema:
+
+- alla **creazione lega** (task Celery `fantasy_turns.materialize_initial_for_league`,
+  backfill full-season dalle fixture note — EP13-P04 riallineamento calendario);
+- per le leghe `active` (job Celery `fantasy_turns.ensure_upcoming`, default orario;
+  se la stagione è assente o parziale usa lo stesso backfill full-season);
+- anche dopo sync fixture MVP.
+
+Lo stesso job ricalcola cutoff e latch dei turni già materializzati
 quando il provider sposta un orario. L’admin può forzare `POST …/turni/sincronizza`
 o `POST …/ricalcola-cutoff`. La generazione manuale resta disponibile come
 strumento avanzato.
+
+**Pianificazione vs giocabilità (EP13-P04).** Con rose vuote i turni strutturali
+nascono comunque dalle fixture (numerazione stagionale stabile). Con giocatori
+in rosa vale la soglia di copertura formazione. Il calendario H2H richiede rose
+complete (`league_rosters_complete`), indipendentemente dallo stato asta.
 
 Il motore regole puro (`fantasy_turns/rules.py` + `@fantappero/contracts` `fantasyTurns`)
 è condiviso tra API e UI; le decisioni autoritative restano sul server.
@@ -101,7 +112,14 @@ docker compose --env-file infra/local/.env.example --profile test run --rm api \
 | `FANTASY_TURNS_AUTO_GENERATE_INTERVAL_SECONDS` | `3600` | Frequenza job |
 | `FANTASY_TURNS_HORIZON_DAYS` | `14` | Orizzonte weekend/midweek da materializzare |
 
-Task: `fantasy_turns.ensure_upcoming` — solo leghe `active`; non persiste `skipped` in attesa di più partite (riprova al giro successivo); auto-apre i turni creati se il cutoff è ancora futuro. Dopo la materializzazione ricalcola cutoff e lock dei turni già esistenti (rinvii / variazioni orario, EP06-07) senza sbloccare azioni già consumate.
+Task: `fantasy_turns.ensure_upcoming` — leghe `active`; se non esistono turni o
+restano finestre con fixture senza turno esegue il backfill full-season
+(`materialize_full_season`), altrimenti l'orizzonte breve; non persiste `skipped`
+in attesa di più partite sul percorso breve (riprova al giro successivo);
+rispetta `auto_open` del chiamante. Dopo la materializzazione ricalcola cutoff e
+lock dei turni già esistenti (rinvii / variazioni orario, EP06-07) senza
+sbloccare azioni già consumate. Task iniziale post-creazione:
+`fantasy_turns.materialize_initial_for_league` (`auto_open=false`).
 
 ## Metriche
 

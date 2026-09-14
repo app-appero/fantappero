@@ -371,3 +371,38 @@ def activation_roster_and_credit_blockers(
             )
         )
     return blockers
+
+
+def league_rosters_complete(session: Session, league: League) -> bool:
+    """True se ogni membership ha una squadra con rosa completa e valida.
+
+    Stesso controllo di composizione usato per sbloccare l'avvio stagione
+    (`activation_roster_and_credit_blockers`), ma senza il vincolo sui
+    crediti: qui serve solo sapere se le rose sono pronte per generare il
+    calendario H2H (EP13-P04) — le rose si possono completare anche senza
+    passare per lo stato "asta" (es. assegnazione manuale/random IA in
+    Amministrazione lega), quindi il prerequisito è sulle rose stesse, non
+    sullo stato macro della lega.
+    """
+    memberships = list(
+        session.scalars(
+            select(LeagueMembership).where(LeagueMembership.league_id == league.id)
+        ).all()
+    )
+    if not memberships:
+        return False
+    teams = {
+        team.membership_id: team
+        for team in session.scalars(
+            select(FantasyTeam).where(FantasyTeam.league_id == league.id)
+        ).all()
+    }
+    for membership in memberships:
+        team = teams.get(membership.id)
+        if team is None:
+            return False
+        report = evaluate_team_composition(session, team, league=league, require_complete=True)
+        if not report.is_valid_for_season_start:
+            return False
+    return True
+

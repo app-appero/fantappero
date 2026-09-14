@@ -85,6 +85,60 @@ def refresh_full_calendar_active_leagues_task() -> dict[str, int]:
     return totals
 
 
+@celery_app.task(name="fantasy_turns.materialize_initial_for_league")
+def materialize_initial_fantasy_turns_task(*, league_id: str, actor_id: str | None) -> dict[str, int]:
+    """Backfill stagionale post-creazione lega (EP13-P04).
+
+    Agganciato alla fine di ``LeagueService.create_league`` invece che
+    eseguito in modo sincrono nella request: sposta all'esterno il costo
+    (potenzialmente decine di finestre da valutare) senza far attendere
+    l'admin che ha appena creato la lega. Materializza la struttura
+    stagionale dalle fixture anche a rose vuote; se il task non gira,
+    ``ensure_upcoming_for_league`` recupera lo stesso backfill alla prima
+    occasione utile. ``auto_open=False``: alla creazione non si aprono turni.
+    """
+    try:
+        worker = validate_worker_settings()
+        enabled = worker.fantasy_turns_auto_generate_enabled
+    except Exception:
+        api = get_api_settings()
+        enabled = api.fantasy_turns_auto_generate_enabled
+
+    if not enabled:
+        logger.info("fantasy_turns_materialize_initial_skipped_disabled", extra={"league_id": league_id})
+        return {"created": 0, "upgraded": 0, "opened": 0, "removed": 0}
+
+    from uuid import UUID
+
+    settings = get_api_settings()
+    engine = create_engine_from_url(settings.database_url)
+    factory = create_session_factory(engine)
+    try:
+        with session_scope(factory) as session:
+            league = session.get(League, UUID(league_id))
+            if league is None:
+                logger.warning(
+                    "fantasy_turns_materialize_initial_league_missing",
+                    extra={"league_id": league_id},
+                )
+                return {"created": 0, "upgraded": 0, "opened": 0, "removed": 0}
+            result = FantasyTurnService(session).materialize_full_season(
+                league,
+                actor_id=UUID(actor_id) if actor_id else None,
+                auto_open=False,
+            )
+    finally:
+        engine.dispose()
+    totals = {
+        "created": result.created,
+        "upgraded": result.upgraded,
+        "opened": result.opened,
+        "removed": result.removed,
+    }
+    logger.info("fantasy_turns_materialize_initial_done", extra={"league_id": league_id, **totals})
+    return totals
+
+
 @celery_app.task(name="fantasy_turns.refresh_full_calendar_active_leagues_now")
 def refresh_full_calendar_active_leagues_now_task(*, job_id: str, actor_id: str | None) -> dict:
     """Azione massiva dell'operatore: "Aggiorna calendario" per tutte le leghe
