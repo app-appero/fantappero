@@ -6,6 +6,7 @@ from decimal import Decimal
 from uuid import UUID
 
 from sqlalchemy import func, select
+from sqlalchemy.exc import ProgrammingError
 from sqlalchemy.orm import Session, selectinload
 
 from auth.exceptions import ValidationAuthError
@@ -219,17 +220,44 @@ class LeagueService:
         )
 
     def list_user_leagues(self, user_id: UUID) -> list[LeagueSummaryResponse]:
-        memberships = self._authz.list_memberships_for_user(user_id)
+        # Select only columns that existed before the market-gate migration.
+        # Loading the full League row 500s on an unmigrated database
+        # (`leagues.market_open` missing) and the web client then hides every
+        # membership as if the user had no leagues.
+        rows = self._session.execute(
+            select(
+                LeagueMembership.league_id,
+                LeagueMembership.role,
+                League.name,
+                League.state,
+            )
+            .join(League, League.id == LeagueMembership.league_id)
+            .where(LeagueMembership.user_id == user_id)
+            .order_by(LeagueMembership.created_at.asc())
+        ).all()
+        flags = self._market_open_by_ids([row.league_id for row in rows])
         return [
             LeagueSummaryResponse(
-                id=str(membership.league_id),
-                name=membership.league.name,
-                role=league_member_role_to_league_role(membership.role).value,
-                state=membership.league.state,
-                marketOpen=membership.league.market_open,
+                id=str(row.league_id),
+                name=row.name,
+                role=league_member_role_to_league_role(row.role).value,
+                state=row.state,
+                marketOpen=flags.get(row.league_id, True),
             )
-            for membership in memberships
+            for row in rows
         ]
+
+    def _market_open_by_ids(self, league_ids: list[UUID]) -> dict[UUID, bool]:
+        if not league_ids:
+            return {}
+        try:
+            flag_rows = self._session.execute(
+                select(League.id, League.market_open).where(League.id.in_(league_ids))
+            ).all()
+        except ProgrammingError:
+            self._session.rollback()
+            return {}
+        return {row.id: bool(row.market_open) for row in flag_rows}
 
     def get_league_detail(self, league_access: LeagueAccess) -> LeagueDetailResponse:
         league = self._load_league_with_competitions(league_access.league.id)

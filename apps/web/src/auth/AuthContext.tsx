@@ -48,6 +48,7 @@ export type AuthContextValue = {
   registerLeague: (league: LeagueSummary) => void;
   unregisterLeague: (leagueId: string) => void;
   patchLeague: (leagueId: string, patch: Partial<LeagueSummary>) => void;
+  leaguesError: string | null;
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   applySession: (tokens: AuthTokensResponse) => void;
@@ -97,6 +98,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     return loadStoredSession() !== null;
   });
   const [leaguesState, setLeaguesState] = useState<LeagueSummary[]>([]);
+  const [leaguesError, setLeaguesError] = useState<string | null>(null);
   const [demoLeaguePatches, setDemoLeaguePatches] = useState<Record<string, Partial<LeagueSummary>>>(
     {},
   );
@@ -118,6 +120,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     if (isDemoMode) {
       setUser(demoUser);
       setActiveLeagueIdState(resolveInitialLeagueId(searchParams, demoLeagues));
+      setLeaguesError(null);
       setLoading(false);
       return;
     }
@@ -126,6 +129,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     if (!stored) {
       setUser(null);
       setLeaguesState([]);
+      setLeaguesError(null);
       setActiveLeagueIdState(null);
       clearStoredActiveLeagueId();
       setLoading(false);
@@ -172,6 +176,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         if (cancelled) {
           return;
         }
+        setLeaguesError(null);
         setLeaguesState(memberships);
         setActiveLeagueIdState((current) => {
           const nextLeagueId = resolvePreferredLeagueId(
@@ -185,13 +190,11 @@ export function AuthProvider({ children }: AuthProviderProps) {
           }
           return nextLeagueId;
         });
-      } catch {
+      } catch (cause) {
         if (cancelled) {
           return;
         }
-        setLeaguesState([]);
-        setActiveLeagueIdState(null);
-        clearStoredActiveLeagueId();
+        setLeaguesError(getApiErrorMessage(cause, "Impossibile caricare le tue leghe."));
       } finally {
         if (!cancelled) {
           setLoading(false);
@@ -237,6 +240,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       }
       try {
         const memberships = await fetchMyLeagues(tokens.accessToken);
+        setLeaguesError(null);
         setLeaguesState(memberships);
         const nextLeagueId = resolvePreferredLeagueId(memberships, loadStoredActiveLeagueId());
         setActiveLeagueIdState(nextLeagueId);
@@ -245,10 +249,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
         } else {
           clearStoredActiveLeagueId();
         }
-      } catch {
-        setLeaguesState([]);
-        setActiveLeagueIdState(null);
-        clearStoredActiveLeagueId();
+      } catch (cause) {
+        setLeaguesError(getApiErrorMessage(cause, "Impossibile caricare le tue leghe."));
       }
     },
     [applySession, isDemoMode],
@@ -260,6 +262,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     clearStoredActiveLeagueId();
     setUser(null);
     setLeaguesState([]);
+    setLeaguesError(null);
     setActiveLeagueIdState(null);
     if (stored?.refreshToken) {
       try {
@@ -364,6 +367,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       isDemoMode,
       loading,
       leagues,
+      leaguesError,
       activeLeagueId,
       activeLeague,
       permissionContext,
@@ -382,6 +386,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       isDemoMode,
       loading,
       leagues,
+      leaguesError,
       activeLeagueId,
       activeLeague,
       permissionContext,

@@ -141,11 +141,8 @@ export function AuthSessionProvider({ children }: { children: ReactNode }) {
           await clearStoredActiveLeagueId();
         }
       } catch {
-        if (!cancelled) {
-          setLeagues([]);
-          setActiveLeagueIdState(null);
-          await clearStoredActiveLeagueId();
-        }
+        // Keep memberships already in memory; a schema/API error must not
+        // look like the user lost every league.
       } finally {
         if (!cancelled) {
           setLoading(false);
@@ -212,9 +209,7 @@ export function AuthSessionProvider({ children }: { children: ReactNode }) {
           await clearStoredActiveLeagueId();
         }
       } catch {
-        setLeagues([]);
-        setActiveLeagueIdState(null);
-        await clearStoredActiveLeagueId();
+        // Keep memberships already in memory.
       }
     },
     [applySession],
