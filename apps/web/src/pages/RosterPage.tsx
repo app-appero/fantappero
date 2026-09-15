@@ -38,6 +38,7 @@ import {
 } from "../api/leagues";
 import { getApiErrorMessage, useAuth } from "../auth/AuthContext";
 import { loadStoredSession } from "../auth/sessionStorage";
+import { useMarketGate } from "../market/MarketGateContext";
 import { useLocation } from "../router/simpleRouter";
 import { parseWireframeStateFromSearch } from "../wireframes/useWireframeState";
 import { RosterAdminManualCard } from "./roster/RosterAdminManualCard";
@@ -86,6 +87,7 @@ export function RosterPage() {
   const isAdmin = can(["league:admin"]);
   const canView = can(["roster:view"]);
   const canEdit = can(["roster:edit"]);
+  const { marketOpen } = useMarketGate();
 
   const [team, setTeam] = useState<FantasyTeam | null>(() =>
     initialDemoTeam(isDemoMode, demoState),
@@ -1443,6 +1445,7 @@ export function RosterPage() {
           <RosterAdminToolsPanel
             ensuring={ensuring}
             randomAiBusy={randomAiBusy}
+            marketOpen={marketOpen}
             onEnsureTeams={onEnsureTeams}
             leagueTeams={leagueTeams}
             adminOrViewedTeam={adminTeam ?? viewedTeam}
@@ -1465,7 +1468,7 @@ export function RosterPage() {
                 viewedTeam={viewedTeam}
                 filledByRole={filledByRole}
                 canEdit={canEdit}
-                adminBusy={adminBusy}
+                adminBusy={adminBusy || !marketOpen}
                 onReleaseAthlete={onReleaseAthlete}
                 onUpdatePurchaseCredits={onUpdatePurchaseCredits}
               />
@@ -1488,7 +1491,7 @@ export function RosterPage() {
                 onRoleTabChange={setRoleTab}
                 ownership={ownership}
                 canReleaseAthlete={canReleaseAthlete}
-                adminBusy={adminBusy}
+                adminBusy={adminBusy || !marketOpen}
                 onReleaseAthlete={onReleaseAthlete}
                 onAssignAthlete={onAssignAthlete}
               />

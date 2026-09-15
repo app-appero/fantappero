@@ -122,6 +122,7 @@ export function CreateLeagueScreen() {
         name: created.name,
         role: created.viewerRole === "league_admin" ? "league_admin" : "member",
         state: created.state,
+        marketOpen: created.marketOpen,
       });
       try {
         await refreshMemberships();

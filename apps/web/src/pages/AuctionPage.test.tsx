@@ -55,6 +55,8 @@ vi.mock("../api/market", () => ({
   approveTradeProposal: vi.fn(),
   rejectTradeProposalAsAdmin: vi.fn(),
   fetchMarketHistory: vi.fn(),
+  fetchMarketGate: vi.fn().mockResolvedValue({ marketOpen: true }),
+  setMarketGate: vi.fn().mockResolvedValue({ marketOpen: true }),
 }));
 
 function renderRoute(path: string) {
@@ -83,6 +85,7 @@ describe("AuctionPage layout + listone", () => {
     expect(html).toContain("Centrocampisti");
     expect(html).toContain("Attaccanti");
     expect(html).not.toContain('data-testid="auction-listone-refresh"');
+    expect(html).toContain('data-testid="market-gate-switch"');
   });
 
   it("member: offerta + listone senza admin e senza Aggiorna", () => {
@@ -92,6 +95,8 @@ describe("AuctionPage layout + listone", () => {
     expect(html).toContain('data-testid="auction-bid-panel"');
     expect(html).toContain('data-testid="auction-listone-card"');
     expect(html).not.toContain('data-testid="auction-listone-refresh"');
+    expect(html).toContain('data-testid="market-gate-bar"');
+    expect(html).not.toContain('data-testid="market-gate-switch"');
   });
 
   it("mostra empty state demo sul listone", () => {

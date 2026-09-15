@@ -196,4 +196,27 @@ export const marketUiStyles = StyleSheet.create({
     padding: spacing.md,
     gap: spacing.sm,
   },
+  gateBar: {
+    padding: spacing.md,
+    borderRadius: radius.md,
+    backgroundColor: colors.backgroundElevated,
+    gap: spacing.sm,
+    marginBottom: spacing.sm,
+  },
+  gateRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: spacing.sm,
+  },
+  gateTitle: {
+    fontSize: typography.fontSize.md,
+    fontWeight: typography.fontWeight.semibold,
+    color: colors.foreground,
+    flex: 1,
+  },
+  gateHint: {
+    fontSize: typography.fontSize.sm,
+    color: colors.foregroundMuted,
+  },
 });

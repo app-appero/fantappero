@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from sqlalchemy import Enum, Integer, String, text
+from sqlalchemy import Boolean, Enum, Integer, String, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from database.base import Base, TimestampMixin, UUIDPrimaryKeyMixin
@@ -36,6 +36,13 @@ class League(Base, UUIDPrimaryKeyMixin, TimestampMixin):
         ),
         nullable=False,
         server_default=text("'draft'"),
+    )
+    # Admin-controlled transfer window: rosa purchases and auctions. Trades ignore this.
+    market_open: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        server_default=text("true"),
+        default=True,
     )
 
     memberships: Mapped[list[LeagueMembership]] = relationship(

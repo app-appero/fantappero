@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
   hasPermissions,
+  isMarketOpen,
   resolvePermissions,
   type PermissionContext,
 } from "./auth.ts";
@@ -67,5 +68,13 @@ describe("hasPermissions", () => {
 
   it("returns true for empty requirement list", () => {
     assert.equal(hasPermissions(leagueMember, []), true);
+  });
+});
+
+describe("isMarketOpen", () => {
+  it("treats missing or true as open, false as closed", () => {
+    assert.equal(isMarketOpen(undefined), true);
+    assert.equal(isMarketOpen({ marketOpen: true }), true);
+    assert.equal(isMarketOpen({ marketOpen: false }), false);
   });
 });

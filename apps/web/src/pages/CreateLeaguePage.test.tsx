@@ -61,6 +61,7 @@ describe("EP03-01 create league page", () => {
             seasonYear: new Date().getFullYear(),
             state: "draft",
             viewerRole: "league_admin",
+            marketOpen: true,
             competitions: [],
             rules: {
               presetName: "standard",

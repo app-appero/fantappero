@@ -25,6 +25,7 @@ export function AuctionBidPanel({
   statusMessage = "Asta a buste chiusa — offerta visibile solo a te fino alla chiusura.",
   testIdPrefix = "auction",
   extraField,
+  marketOpen = true,
 }: {
   flow: MarketSessionFlow;
   balance: number | null;
@@ -39,8 +40,9 @@ export function AuctionBidPanel({
   statusMessage?: string;
   testIdPrefix?: string;
   extraField?: ReactNode;
+  marketOpen?: boolean;
 }) {
-  const sessionOpen = flow.currentSession?.status === "open";
+  const sessionOpen = marketOpen && flow.currentSession?.status === "open";
 
   return (
     <View style={styles.section} testID={`wireframe-region-${testIdPrefix}-bid`}>
@@ -49,8 +51,12 @@ export function AuctionBidPanel({
       {!sessionOpen ? (
         <UiStatePanel
           state="empty"
-          title="Asta non aperta"
-          message={notOpenMessage}
+          title={!marketOpen ? "Mercato chiuso" : "Asta non aperta"}
+          message={
+            !marketOpen
+              ? "L'amministratore ha chiuso il mercato. Restano disponibili solo gli scambi."
+              : notOpenMessage
+          }
           testID={`${testIdPrefix}-bid-not-open`}
         />
       ) : (

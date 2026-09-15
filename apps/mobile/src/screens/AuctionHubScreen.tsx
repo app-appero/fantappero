@@ -4,6 +4,7 @@ import { ScreenTabs } from "../components/ScreenTabs";
 import { PageContainer } from "../layout/PageContainer";
 import { MARKET_HUB_TABS } from "../navigation/marketHubTabs";
 import type { AppTabParamList } from "../navigation/types";
+import { MarketGateBar } from "../market/MarketGateBar";
 import { AuctionLiveScreen } from "./AuctionLiveScreen";
 import { AuctionScreen } from "./AuctionScreen";
 
@@ -40,6 +41,7 @@ export function AuctionHubScreen() {
         onSelect={(id) => navigation.navigate(id as keyof AppTabParamList)}
         testID="market-hub-tabs"
       />
+      <MarketGateBar />
       <ScreenTabs
         items={AUCTION_MODE_TABS}
         activeId={mode}

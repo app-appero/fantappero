@@ -7,6 +7,14 @@ from pydantic import Field
 from auth.schemas import ApiModel
 
 
+class MarketGateResponse(ApiModel):
+    market_open: bool = Field(alias="marketOpen")
+
+
+class SetMarketGateRequest(ApiModel):
+    open: bool
+
+
 class CreateMarketSessionRequest(ApiModel):
     opens_at: str = Field(alias="opensAt", min_length=1)
     closes_at: str = Field(alias="closesAt", min_length=1)

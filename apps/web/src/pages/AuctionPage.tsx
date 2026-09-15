@@ -38,6 +38,7 @@ import {
 import { fetchLeagueListone, fetchMyCredits } from "../api/leagues";
 import { getApiErrorMessage, useAuth } from "../auth/AuthContext";
 import { loadStoredSession } from "../auth/sessionStorage";
+import { useMarketGate } from "../market/MarketGateContext";
 import { useMarketSessionFlow } from "../market/useMarketSessionFlow";
 import { useLocation } from "../router/simpleRouter";
 import { parseWireframeStateFromSearch } from "../wireframes/useWireframeState";
@@ -184,6 +185,7 @@ export function AuctionPage() {
   const { search } = useLocation();
   const demoState = isDemoMode ? parseWireframeStateFromSearch(search) : null;
   const canManageSession = can(["market:manage"]);
+  const { marketOpen } = useMarketGate();
 
   const [entries, setEntries] = useState<LeagueListoneEntry[]>(() =>
     initialDemoEntries(isDemoMode, demoState),
@@ -455,7 +457,7 @@ export function AuctionPage() {
                     testId="auction-create-session-error"
                   />
                 ) : null}
-                <Button type="submit" variant="primary" disabled={flow.creating}>
+                <Button type="submit" variant="primary" disabled={flow.creating || !marketOpen}>
                   {flow.creating ? "Creazione…" : "Crea sessione"}
                 </Button>
               </form>
@@ -464,12 +466,16 @@ export function AuctionPage() {
         ) : null}
 
         <WireframeSection label="Offerta busta chiusa" testId="wireframe-region-auction-bid">
-          {!isDemoMode && flow.currentSession?.status !== "open" ? (
+          {!isDemoMode && (!marketOpen || flow.currentSession?.status !== "open") ? (
             <UiStatePanel
               state="empty"
-              title="Asta non aperta"
-              message="Le offerte si possono inviare solo mentre la sessione è aperta."
-              testId="auction-bid-not-open"
+              title={marketOpen ? "Asta non aperta" : "Mercato chiuso"}
+              message={
+                marketOpen
+                  ? "Le offerte si possono inviare solo mentre la sessione è aperta."
+                  : "L'amministratore ha chiuso il mercato. Restano disponibili solo gli scambi."
+              }
+              testId={marketOpen ? "auction-bid-not-open" : "auction-bid-market-closed"}
             />
           ) : (
             <AuctionBidPanel

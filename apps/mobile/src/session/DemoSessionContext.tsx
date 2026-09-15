@@ -45,6 +45,7 @@ export type AuthSessionContextValue = {
   can: (required: readonly Permission[]) => boolean;
   registerLeague: (league: LeagueSummary) => void;
   unregisterLeague: (leagueId: string) => void;
+  patchLeague: (leagueId: string, patch: Partial<LeagueSummary>) => void;
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   applySession: (tokens: AuthTokensResponse) => Promise<void>;
@@ -251,6 +252,12 @@ export function AuthSessionProvider({ children }: { children: ReactNode }) {
     void saveStoredActiveLeagueId(league.id);
   }, []);
 
+  const patchLeague = useCallback((leagueId: string, patch: Partial<LeagueSummary>) => {
+    setLeagues((current) =>
+      current.map((row) => (row.id === leagueId ? { ...row, ...patch } : row)),
+    );
+  }, []);
+
   const unregisterLeague = useCallback((leagueId: string) => {
     setLeagues((current) => {
       const next = current.filter((row) => row.id !== leagueId);
@@ -320,6 +327,7 @@ export function AuthSessionProvider({ children }: { children: ReactNode }) {
       can,
       registerLeague,
       unregisterLeague,
+      patchLeague,
       login,
       logout,
       applySession,
@@ -338,6 +346,7 @@ export function AuthSessionProvider({ children }: { children: ReactNode }) {
       can,
       registerLeague,
       unregisterLeague,
+      patchLeague,
       login,
       logout,
       applySession,

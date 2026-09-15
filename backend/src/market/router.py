@@ -20,11 +20,13 @@ from market.schemas import (
     CreateMarketSessionRequest,
     MarketBidListResponse,
     MarketBidResponse,
+    MarketGateResponse,
     MarketReleasePreviewResponse,
     MarketReleaseRequest,
     MarketReleaseResultResponse,
     MarketResolutionResponse,
     MarketSessionResponse,
+    SetMarketGateRequest,
     SubmitMarketBidRequest,
 )
 from market.service import MarketService
@@ -58,6 +60,37 @@ def get_market_history_service(
     session: Session = Depends(get_db_session),
 ) -> MarketHistoryService:
     return MarketHistoryService(session)
+
+
+@router.get(
+    "/{league_id}/mercato/stato",
+    response_model=MarketGateResponse,
+)
+def get_market_gate(
+    league_access: LeagueAccess = Depends(require_league_permissions(Permission.LEAGUE_VIEW)),
+    service: MarketService = Depends(get_market_service),
+) -> MarketGateResponse | JSONResponse:
+    """Read whether the admin has opened the transfer window (rosa + asta)."""
+    try:
+        return service.get_gate(league_access)
+    except AuthError as exc:
+        return _error_response(exc)
+
+
+@router.post(
+    "/{league_id}/mercato/stato",
+    response_model=MarketGateResponse,
+)
+def set_market_gate(
+    body: SetMarketGateRequest,
+    league_access: LeagueAccess = Depends(require_league_permissions(Permission.MARKET_MANAGE)),
+    service: MarketService = Depends(get_market_service),
+) -> MarketGateResponse | JSONResponse:
+    """Open or close rosa/auction transfers. Trades stay available either way."""
+    try:
+        return service.set_gate(league_access, body)
+    except AuthError as exc:
+        return _error_response(exc)
 
 
 @router.post(

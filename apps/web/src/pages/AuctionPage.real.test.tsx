@@ -63,6 +63,8 @@ vi.mock("../api/market", () => ({
   approveTradeProposal: vi.fn(),
   rejectTradeProposalAsAdmin: vi.fn(),
   fetchMarketHistory: vi.fn(),
+  fetchMarketGate: vi.fn().mockResolvedValue({ marketOpen: true }),
+  setMarketGate: vi.fn().mockResolvedValue({ marketOpen: true }),
 }));
 
 vi.mock("../api/notifications", () => ({

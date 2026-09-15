@@ -133,6 +133,7 @@ describe("EP05-01/02/03 roster, credits and manual assignment", () => {
     expect(html).toContain(">Assegna<");
     expect(html).toContain('data-testid="roster-admin-credits"');
     expect(html).toContain("Aggiusta crediti");
+    expect(html).toContain('data-testid="market-gate-switch"');
     expect(html).not.toContain('data-testid="roster-csv-import"');
     expect(html).not.toContain("Import CSV rose");
     expect(html).not.toContain('data-testid="roster-listone-refresh"');
@@ -152,6 +153,14 @@ describe("EP05-01/02/03 roster, credits and manual assignment", () => {
     expect(html).not.toContain('data-testid="roster-csv-import"');
     expect(html).not.toContain("Assicura squadre partecipanti");
     expect(html).not.toContain("Aggiusta crediti");
+    expect(html).toContain('data-testid="market-gate-bar"');
+    expect(html).not.toContain('data-testid="market-gate-switch"');
+  });
+
+  it("shows admin market switch on scambi", () => {
+    const html = renderRoute("/mercato?persona=admin");
+    expect(html).toContain('data-testid="market-gate-switch"');
+    expect(html).toContain("Gli scambi restano sempre disponibili.");
   });
 
   it("renders roster history success in demo mode", () => {

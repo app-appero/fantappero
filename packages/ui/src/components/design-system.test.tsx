@@ -9,6 +9,7 @@ import { Input } from "./Input.js";
 import { Modal } from "./Modal.js";
 import { Select } from "./Select.js";
 import { Skeleton } from "./Skeleton.js";
+import { Switch } from "./Switch.js";
 import { Tab, TabList, TabPanel, Tabs } from "./Tabs.js";
 import { Table, TableBody, TableCell, TableHead, TableHeaderCell, TableRow } from "./Table.js";
 import { ToastProvider } from "./Toast.js";
@@ -34,6 +35,25 @@ describe("Button", () => {
     const html = renderToStaticMarkup(createElement(Button, { disabled: true }, "Disabilitato"));
     expect(html).toContain('disabled');
     expect(html).toContain('aria-disabled="true"');
+  });
+});
+
+describe("Switch", () => {
+  it("exposes role=switch and checked state", () => {
+    const html = renderToStaticMarkup(
+      createElement(Switch, {
+        checked: true,
+        onCheckedChange: () => undefined,
+        label: "Mercato",
+        statusLabel: "Aperto",
+        testId: "market-gate-switch",
+      }),
+    );
+    expect(html).toContain('role="switch"');
+    expect(html).toContain('aria-checked="true"');
+    expect(html).toContain("fa-switch__control--on");
+    expect(html).toContain('data-testid="market-gate-switch"');
+    expect(html).toContain("Aperto");
   });
 });
 

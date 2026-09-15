@@ -83,6 +83,13 @@ export interface LeagueSummary {
   name: string;
   role: LeagueRole;
   state?: import("./leagues.js").LeagueState;
+  /** Admin-controlled transfer window for rosa and auctions. Trades ignore this. */
+  marketOpen?: boolean;
+}
+
+/** True unless the admin has explicitly closed the market. */
+export function isMarketOpen(league?: { marketOpen?: boolean } | null): boolean {
+  return league?.marketOpen !== false;
 }
 
 /** Resolved permission set for the active session + optional league context. */

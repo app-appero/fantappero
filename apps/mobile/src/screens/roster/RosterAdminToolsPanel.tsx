@@ -5,6 +5,7 @@ import { rosterStyles as styles } from "./rosterStyles";
 export function RosterAdminToolsPanel({
   ensuring,
   randomAiBusy,
+  marketOpen = true,
   onEnsureTeams,
   leagueTeams,
   adminOrViewedTeam,
@@ -16,6 +17,7 @@ export function RosterAdminToolsPanel({
 }: {
   ensuring: boolean;
   randomAiBusy: boolean;
+  marketOpen?: boolean;
   onEnsureTeams: () => void | Promise<void>;
   leagueTeams: FantasyTeamSummary[];
   adminOrViewedTeam: FantasyTeam | null | undefined;
@@ -26,6 +28,7 @@ export function RosterAdminToolsPanel({
   randomAiError: string | null;
 }) {
   const canAssignRandomAi =
+    marketOpen &&
     !ensuring &&
     !randomAiBusy &&
     adminOrViewedTeam?.userType === "ai" &&

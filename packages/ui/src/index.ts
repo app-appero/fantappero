@@ -9,6 +9,9 @@ export type { UiState, UiStatePanelProps } from "./components/UiStatePanel.js";
 export { Button } from "./components/Button.js";
 export type { ButtonProps, ButtonSize, ButtonVariant } from "./components/Button.js";
 
+export { Switch } from "./components/Switch.js";
+export type { SwitchProps } from "./components/Switch.js";
+
 export { Input } from "./components/Input.js";
 export type { InputProps } from "./components/Input.js";
 

@@ -212,6 +212,7 @@ export interface LeagueDetail {
   seasonYear: number;
   state: LeagueState;
   viewerRole: "member" | "league_admin" | null;
+  marketOpen: boolean;
   competitions: CompetitionSummary[];
   rules: LeagueRules | null;
 }

@@ -42,6 +42,8 @@ import { useScreenData } from "../hooks/useScreenData";
 import { PageContainer } from "../layout/PageContainer";
 import { MARKET_HUB_TABS } from "../navigation/marketHubTabs";
 import type { AppTabParamList } from "../navigation/types";
+import { MarketGateBar } from "../market/MarketGateBar";
+import { useMarketGate } from "../market/useMarketGate";
 import { getApiErrorMessage, useAuthSession } from "../session/DemoSessionContext";
 import { RosterAdminManualCard } from "./roster/RosterAdminManualCard";
 import { RosterAdminToolsPanel } from "./roster/RosterAdminToolsPanel";
@@ -71,6 +73,7 @@ export function RosterScreen() {
   const isAdmin = can(["league:admin"]);
   const canView = can(["roster:view"]);
   const canEdit = can(["roster:edit"]);
+  const { marketOpen } = useMarketGate();
 
   const [team, setTeam] = useState<FantasyTeam | null>(null);
   const [credits, setCredits] = useState<CreditAccount | null>(null);
@@ -705,6 +708,7 @@ export function RosterScreen() {
         onSelect={(id) => navigation.navigate(id as keyof AppTabParamList)}
         testID="market-hub-tabs"
       />
+      <MarketGateBar />
       <Text style={styles.meta}>
         {activeLeague ? `Lega: ${activeLeague.name}` : "Seleziona una lega dal selettore in alto."}
       </Text>
@@ -818,6 +822,7 @@ export function RosterScreen() {
           <RosterAdminToolsPanel
             ensuring={ensuring}
             randomAiBusy={randomAiBusy}
+            marketOpen={marketOpen}
             onEnsureTeams={onEnsureTeams}
             leagueTeams={leagueTeams}
             adminOrViewedTeam={adminTeam ?? viewedTeam}
@@ -839,7 +844,7 @@ export function RosterScreen() {
           viewedTeam={viewedTeam}
           filledByRole={filledByRole}
           canEdit={canEdit}
-          adminBusy={adminBusy}
+          adminBusy={adminBusy || !marketOpen}
           onReleaseAthlete={onReleaseAthlete}
         />
       ) : null}
@@ -858,7 +863,7 @@ export function RosterScreen() {
           filteredListone={filteredListone}
           ownership={ownership}
           canReleaseAthlete={canReleaseAthlete}
-          adminBusy={adminBusy}
+          adminBusy={adminBusy || !marketOpen}
           onReleaseAthlete={onReleaseAthlete}
           onAssignAthlete={onAssignAthlete}
           adminMessage={adminMessage}

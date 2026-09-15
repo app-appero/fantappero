@@ -3,6 +3,7 @@
 export {
   hasAnyPermission,
   hasPermissions,
+  isMarketOpen,
   resolvePermissions,
 } from "./auth.js";
 export type {
@@ -269,6 +270,7 @@ export type {
   MarketBid,
   MarketBidList,
   MarketBidStatus,
+  MarketGate,
   MarketHistoryCategory,
   MarketHistoryEntry,
   MarketHistoryFilters,
@@ -289,6 +291,7 @@ export type {
   PendingSwapDecision,
   PlaceRaiseRequest,
   ResolveSwapRequest,
+  SetMarketGateRequest,
   SubmitMarketBidRequest,
   TradeAthlete,
   TradeProposal,

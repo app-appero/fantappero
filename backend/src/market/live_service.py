@@ -45,6 +45,7 @@ from leagues.models.league import League
 from leagues.models.league_audit_event import LeagueAuditEvent
 from leagues.models.league_membership import LeagueMembership
 from market.assignment import assign_winning_bid, resolve_live_swap
+from market.gate import assert_market_open
 from market.live_models import (
     MarketLiveLot,
     MarketLiveNominationQueueEntry,
@@ -126,6 +127,7 @@ class LiveMarketService:
         payload: CreateLiveAuctionSessionRequest,
     ) -> LiveAuctionSessionResponse:
         league = self._lock_league(league_access.league.id)
+        assert_market_open(league)
         opens_at = _parse_required_datetime(payload.opens_at, field="opensAt")
         closes_at = _parse_required_datetime(payload.closes_at, field="closesAt")
         validate_session_window(opens_at=opens_at, closes_at=closes_at)
@@ -266,6 +268,8 @@ class LiveMarketService:
     def start_session(
         self, league_access: LeagueAccess, session_id: UUID
     ) -> LiveAuctionSessionResponse:
+        league = self._lock_league(league_access.league.id)
+        assert_market_open(league)
         market_session = self._get_session_for_update(league_access.league.id, session_id)
         self._assert_is_live(market_session)
         if market_session.status != MarketSessionStatus.SCHEDULED:
@@ -351,6 +355,8 @@ class LiveMarketService:
         session_id: UUID,
         payload: NominateLotRequest,
     ) -> LiveLotResponse:
+        league = self._lock_league(league_access.league.id)
+        assert_market_open(league)
         market_session = self._get_session_for_update(league_access.league.id, session_id)
         self._assert_is_live(market_session)
         self._tick_current_lot(league_access, market_session)
@@ -471,6 +477,8 @@ class LiveMarketService:
         lot_id: UUID,
         payload: PlaceRaiseRequest,
     ) -> LiveLotResponse:
+        league = self._lock_league(league_access.league.id)
+        assert_market_open(league)
         market_session = self._find_session(league_access.league.id, session_id)
         self._assert_is_live(market_session)
         self._tick_current_lot(league_access, market_session)

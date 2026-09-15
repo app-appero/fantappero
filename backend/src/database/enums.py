@@ -150,6 +150,7 @@ class LeagueAuditAction(str, enum.Enum):
     MARKET_LIVE_LOT_SWAP_PENDING = "market_live_lot_swap_pending"
     MARKET_LIVE_LOT_SWAP_RESOLVED = "market_live_lot_swap_resolved"
     MARKET_LIVE_LOT_SWAP_DECLINED = "market_live_lot_swap_declined"
+    MARKET_GATE_TOGGLED = "market_gate_toggled"
     PLATFORM_OPERATOR_PROMOTED = "platform_operator_promoted"
     PLATFORM_OPERATOR_REVOKED = "platform_operator_revoked"
 

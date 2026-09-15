@@ -160,6 +160,14 @@ export interface MarketHistoryList {
   totalPages: number;
 }
 
+export interface MarketGate {
+  marketOpen: boolean;
+}
+
+export interface SetMarketGateRequest {
+  open: boolean;
+}
+
 export interface MarketHistoryFilters {
   category?: MarketHistoryCategory;
   fantasyTeamId?: string;

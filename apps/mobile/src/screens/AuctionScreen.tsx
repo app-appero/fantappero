@@ -12,6 +12,7 @@ import {
 } from "../api/market";
 import { useScreenData } from "../hooks/useScreenData";
 import { parseLocalDateTimeInput } from "../market/dateTimeInput";
+import { useMarketGate } from "../market/useMarketGate";
 import { useMarketSessionFlow } from "../market/useMarketSessionFlow";
 import { getApiErrorMessage, useAuthSession } from "../session/DemoSessionContext";
 import { AuctionAdminPanel } from "./auction/AuctionAdminPanel";
@@ -30,6 +31,7 @@ export type { RoleTab as AuctionRoleTab } from "./auction/auctionListoneHelpers"
 export function AuctionScreen() {
   const { can, accessToken, activeLeagueId, activeLeague } = useAuthSession();
   const canManageSession = can(["market:manage"]);
+  const { marketOpen } = useMarketGate();
 
   const [entries, setEntries] = useState<LeagueListoneEntry[]>([]);
   const [tab, setTab] = useState<RoleTab>("all");
@@ -142,6 +144,7 @@ export function AuctionScreen() {
           emptyTitle="Nessuna sessione d'asta"
           emptyMessage="Crea la finestra d'asta a buste chiuse per iniziare."
           testIdPrefix="auction"
+          marketOpen={marketOpen}
         />
       ) : null}
 
@@ -156,6 +159,7 @@ export function AuctionScreen() {
         onSubmit={handleSubmitBid}
         athleteNameById={athleteNameById}
         testIdPrefix="auction"
+        marketOpen={marketOpen}
       />
 
       <AuctionListone

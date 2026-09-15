@@ -226,6 +226,7 @@ class LeagueService:
                 name=membership.league.name,
                 role=league_member_role_to_league_role(membership.role).value,
                 state=membership.league.state,
+                marketOpen=membership.league.market_open,
             )
             for membership in memberships
         ]
@@ -626,6 +627,7 @@ class LeagueService:
             seasonYear=league.season_year,
             state=league.state.value,
             viewerRole=viewer_role,
+            marketOpen=league.market_open,
             competitions=[self._to_competition_summary(row) for row in competitions],
             rules=self._to_rules_response(league.rules) if league.rules is not None else None,
         )

@@ -44,6 +44,7 @@ import {
   startLiveAuctionSession,
 } from "../api/marketLive";
 import { getApiErrorMessage, useAuth } from "../auth/AuthContext";
+import { useMarketGate } from "../market/MarketGateContext";
 import { loadStoredSession } from "../auth/sessionStorage";
 import { useLiveAuctionPolling } from "../market/useLiveAuctionPolling";
 import { LiveAuctionTable } from "./auction-live/LiveAuctionTable";
@@ -129,6 +130,7 @@ const DEMO_TABLE_LOT: LiveLot = {
 export function AuctionLivePage() {
   const { isDemoMode, activeLeagueId, can, user } = useAuth();
   const canManageSession = can(["market:manage"]);
+  const { marketOpen } = useMarketGate();
 
   const [entries, setEntries] = useState<LeagueListoneEntry[]>([]);
   const [members, setMembers] = useState<Array<{ userId: string; displayName: string }>>([]);
@@ -547,7 +549,7 @@ export function AuctionLivePage() {
                 {createError ? (
                   <UiStatePanel state="error" title="Sessione non creata" message={createError} testId="auction-live-create-error" />
                 ) : null}
-                <Button type="submit" variant="primary" disabled={creating}>
+                <Button type="submit" variant="primary" disabled={creating || !marketOpen}>
                   {creating ? "Creazione…" : "Crea sessione"}
                 </Button>
               </form>
@@ -597,7 +599,7 @@ export function AuctionLivePage() {
               ) : null}
 
               {isOperator && currentSession.status === "scheduled" ? (
-                <Button variant="primary" disabled={actionBusy} onClick={handleStart}>
+                <Button variant="primary" disabled={actionBusy || !marketOpen} onClick={handleStart}>
                   Avvia sessione
                 </Button>
               ) : null}
@@ -622,7 +624,7 @@ export function AuctionLivePage() {
                   ) : null}
                   <Button
                     variant="primary"
-                    disabled={actionBusy || (needsExplicitAthlete && !manualAthleteId)}
+                    disabled={actionBusy || !marketOpen || (needsExplicitAthlete && !manualAthleteId)}
                     onClick={handleNominate}
                   >
                     Chiama
@@ -666,7 +668,7 @@ export function AuctionLivePage() {
                     <div className="fa-ds-showcase__row">
                       <Button
                         variant="primary"
-                        disabled={raiseBusy || minimumNextBid === null}
+                        disabled={raiseBusy || minimumNextBid === null || !marketOpen}
                         onClick={() => minimumNextBid !== null && handleRaise(minimumNextBid)}
                         data-testid="auction-live-raise-min"
                       >

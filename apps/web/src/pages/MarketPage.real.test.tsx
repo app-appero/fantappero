@@ -15,6 +15,8 @@ const fetchLeagueListoneMock = vi.fn();
 const previewVoluntaryReleaseMock = vi.fn();
 const applyVoluntaryReleaseMock = vi.fn();
 const fetchMarketHistoryMock = vi.fn();
+const fetchMarketGateMock = vi.fn();
+const setMarketGateMock = vi.fn();
 const fetchTradeProposalsMock = vi.fn();
 const createTradeProposalMock = vi.fn();
 const acceptTradeProposalMock = vi.fn();
@@ -77,6 +79,8 @@ vi.mock("../api/market", () => ({
   approveTradeProposal: (...args: unknown[]) => approveTradeProposalMock(...args),
   rejectTradeProposalAsAdmin: (...args: unknown[]) => rejectTradeProposalAsAdminMock(...args),
   fetchMarketHistory: (...args: unknown[]) => fetchMarketHistoryMock(...args),
+  fetchMarketGate: (...args: unknown[]) => fetchMarketGateMock(...args),
+  setMarketGate: (...args: unknown[]) => setMarketGateMock(...args),
 }));
 
 vi.mock("../api/notifications", () => ({
@@ -273,6 +277,8 @@ describe("Mercato — scambi collegati alle API reali (EP08-05/06)", () => {
     fetchMarketHistoryMock
       .mockReset()
       .mockResolvedValue({ items: [], page: 1, pageSize: 20, total: 0, totalPages: 0 });
+    fetchMarketGateMock.mockReset().mockResolvedValue({ marketOpen: true });
+    setMarketGateMock.mockReset().mockResolvedValue({ marketOpen: true });
     createTradeProposalMock.mockReset();
     acceptTradeProposalMock.mockReset();
     rejectTradeProposalMock.mockReset();
@@ -288,6 +294,26 @@ describe("Mercato — scambi collegati alle API reali (EP08-05/06)", () => {
     expect(html).toContain('data-testid="market-trade-empty"');
     expect(html).toContain('data-testid="market-trade-create-form"');
     expect(html).toContain("Squadra Avversaria");
+    expect(html).toContain('data-testid="market-gate-bar"');
+    expect(html).not.toContain('data-testid="market-gate-switch"');
+    unmount();
+  });
+
+  it("l'admin vede l'interruttore del mercato nella tab scambi", async () => {
+    const { html, unmount } = await renderAppAt("/mercato", [
+      { id: "league-1", name: "Lega Test", role: "league_admin" },
+    ]);
+    expect(html).toContain('data-testid="market-gate-switch"');
+    expect(html).toContain('data-testid="market-trade-create-form"');
+    unmount();
+  });
+
+  it("con mercato chiuso il form scambi resta disponibile", async () => {
+    fetchMarketGateMock.mockReset().mockResolvedValue({ marketOpen: false });
+    const { html, unmount } = await renderAppAt("/mercato");
+    expect(html).toContain("Rosa e asta sono bloccate");
+    expect(html).toContain('data-testid="market-trade-create-form"');
+    expect(html).toContain("Proponi scambio");
     unmount();
   });
 

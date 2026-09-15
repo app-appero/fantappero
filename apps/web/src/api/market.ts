@@ -4,6 +4,7 @@ import type {
   CreateTradeProposalRequest,
   MarketBid,
   MarketBidList,
+  MarketGate,
   MarketHistoryFilters,
   MarketHistoryList,
   MarketReleasePreview,
@@ -11,11 +12,28 @@ import type {
   MarketReleaseResult,
   MarketResolution,
   MarketSession,
+  SetMarketGateRequest,
   SubmitMarketBidRequest,
   TradeProposal,
   TradeProposalList,
 } from "@fantappero/contracts";
 import { apiRequest } from "./client";
+
+export function fetchMarketGate(accessToken: string, leagueId: string): Promise<MarketGate> {
+  return apiRequest<MarketGate>(`/leagues/${leagueId}/mercato/stato`, { accessToken });
+}
+
+export function setMarketGate(
+  accessToken: string,
+  leagueId: string,
+  body: SetMarketGateRequest,
+): Promise<MarketGate> {
+  return apiRequest<MarketGate>(`/leagues/${leagueId}/mercato/stato`, {
+    accessToken,
+    method: "POST",
+    body,
+  });
+}
 
 // -- Asta a buste chiuse (EP08-01/02) -----------------------------------------
 

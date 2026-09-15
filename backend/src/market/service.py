@@ -30,16 +30,19 @@ from leagues.models.league_audit_event import LeagueAuditEvent
 from leagues.models.league_membership import LeagueMembership
 from leagues.models.league_rules import LeagueRules
 from market.assignment import assign_winning_bid, assign_winning_waiver_bid
+from market.gate import assert_market_open
 from market.models import MarketBid, MarketSession
 from market.schemas import (
     CreateMarketSessionRequest,
     MarketBidListResponse,
     MarketBidResponse,
+    MarketGateResponse,
     MarketReleasePreviewResponse,
     MarketReleaseResultResponse,
     MarketResolutionOutcomeResponse,
     MarketResolutionResponse,
     MarketSessionResponse,
+    SetMarketGateRequest,
     SubmitMarketBidRequest,
 )
 from market.validators import (
@@ -89,6 +92,32 @@ class MarketService:
     def __init__(self, session: Session) -> None:
         self._session = session
 
+    def get_gate(self, league_access: LeagueAccess) -> MarketGateResponse:
+        league = self._session.get(League, league_access.league.id)
+        if league is None:
+            raise ValidationAuthError("Lega non trovata.", code="league_not_found")
+        return MarketGateResponse(marketOpen=league.market_open)
+
+    def set_gate(
+        self,
+        league_access: LeagueAccess,
+        payload: SetMarketGateRequest,
+    ) -> MarketGateResponse:
+        league = self._lock_league(league_access.league.id)
+        league.market_open = payload.open
+        self._add_audit(
+            league.id,
+            league_access.user.id,
+            LeagueAuditAction.MARKET_GATE_TOGGLED,
+            details={"open": payload.open},
+        )
+        self._session.commit()
+        get_metrics().incr(
+            "market_gate_toggled_total",
+            labels={"open": "true" if payload.open else "false"},
+        )
+        return MarketGateResponse(marketOpen=league.market_open)
+
     # -- sessions ---------------------------------------------------------
 
     def create_auction_session(
@@ -113,6 +142,7 @@ class MarketService:
         kind: MarketSessionKind,
     ) -> MarketSessionResponse:
         league = self._lock_league(league_access.league.id)
+        assert_market_open(league)
         opens_at = _parse_required_datetime(payload.opens_at, field="opensAt")
         closes_at = _parse_required_datetime(payload.closes_at, field="closesAt")
         validate_session_window(opens_at=opens_at, closes_at=closes_at)
@@ -448,6 +478,8 @@ class MarketService:
         athlete_id: UUID,
         payload: SubmitMarketBidRequest,
     ) -> MarketBidResponse:
+        league = self._lock_league(league_access.league.id)
+        assert_market_open(league)
         market_session = self._find_session(league_access.league.id, session_id)
         now = datetime.now(UTC)
         if not is_open_for_bids(market_session, now=now):
@@ -691,6 +723,7 @@ class MarketService:
         reason_raw: str,
     ) -> MarketReleaseResultResponse:
         league = self._lock_league(league_access.league.id)
+        assert_market_open(league)
         team = self._my_team(league_access)
         reason, percent = self._resolve_release_reason(league.id, reason_raw)
 

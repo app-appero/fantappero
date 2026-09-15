@@ -30,6 +30,7 @@ const DEMO_LEAGUE: LeagueDetail = {
   seasonYear: 2026,
   state: "configuring",
   viewerRole: "member",
+  marketOpen: true,
   competitions: [
     { id: "c1", providerId: 39, name: "Premier League", country: "England" },
     { id: "c2", providerId: 140, name: "La Liga", country: "Spain" },

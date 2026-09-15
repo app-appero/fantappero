@@ -48,6 +48,7 @@ import {
 } from "../market/liveAuctionLabels";
 import { marketUiStyles as styles } from "../market/marketUiStyles";
 import { useLiveAuctionPolling } from "../market/useLiveAuctionPolling";
+import { useMarketGate } from "../market/useMarketGate";
 import { getApiErrorMessage, useAuthSession } from "../session/DemoSessionContext";
 import { LiveAuctionTable } from "./auction-live/LiveAuctionTable";
 
@@ -59,6 +60,7 @@ import { LiveAuctionTable } from "./auction-live/LiveAuctionTable";
 export function AuctionLiveScreen() {
   const { can, accessToken, activeLeagueId, user } = useAuthSession();
   const canManageSession = can(["market:manage"]);
+  const { marketOpen } = useMarketGate();
 
   const [entries, setEntries] = useState<LeagueListoneEntry[]>([]);
   const [members, setMembers] = useState<Array<{ userId: string; displayName: string }>>([]);
@@ -187,7 +189,7 @@ export function AuctionLiveScreen() {
   }
 
   async function handleCreateSession() {
-    if (!activeLeagueId || !accessToken) return;
+    if (!activeLeagueId || !accessToken || !marketOpen) return;
     const opensAtIso = parseLocalDateTimeInput(opensAt);
     const closesAtIso = parseLocalDateTimeInput(closesAt);
     if (!opensAtIso || !closesAtIso) {
@@ -240,7 +242,7 @@ export function AuctionLiveScreen() {
   const [manualAthleteId, setManualAthleteId] = useState("");
 
   function handleStart() {
-    if (!activeLeagueId || !accessToken || !currentSession) return;
+    if (!activeLeagueId || !accessToken || !currentSession || !marketOpen) return;
     void runOperatorAction(
       () => startLiveAuctionSession(accessToken, activeLeagueId, currentSession.id),
       "Sessione avviata.",
@@ -256,7 +258,7 @@ export function AuctionLiveScreen() {
   }
 
   function handleNominate() {
-    if (!activeLeagueId || !accessToken || !currentSession) return;
+    if (!activeLeagueId || !accessToken || !currentSession || !marketOpen) return;
     void runOperatorAction(async () => {
       const lot = await nominateLiveAuctionLot(accessToken, activeLeagueId, currentSession.id, {
         athleteId: needsExplicitAthlete ? manualAthleteId : null,
@@ -304,7 +306,7 @@ export function AuctionLiveScreen() {
     : null;
 
   function handleRaise(amount: number) {
-    if (!activeLeagueId || !accessToken || !currentSession || !currentLot) return;
+    if (!activeLeagueId || !accessToken || !currentSession || !currentLot || !marketOpen) return;
     setRaiseBusy(true);
     setRaiseError(null);
     placeLiveAuctionRaise(accessToken, activeLeagueId, currentSession.id, currentLot.id, {
@@ -454,7 +456,12 @@ export function AuctionLiveScreen() {
           ) : null}
 
           {createError ? <Text style={styles.error} testID="auction-live-create-error">{createError}</Text> : null}
-          <Pressable style={[styles.button, creating && styles.disabled]} disabled={creating} onPress={() => void handleCreateSession()} testID="auction-live-create-submit">
+          <Pressable
+            style={[styles.button, (creating || !marketOpen) && styles.disabled]}
+            disabled={creating || !marketOpen}
+            onPress={() => void handleCreateSession()}
+            testID="auction-live-create-submit"
+          >
             <Text style={styles.buttonLabel}>{creating ? "Creazione…" : "Crea sessione"}</Text>
           </Pressable>
         </View>
@@ -508,7 +515,12 @@ export function AuctionLiveScreen() {
           ) : null}
 
           {isOperator && currentSession.status === "scheduled" ? (
-            <Pressable style={[styles.button, actionBusy && styles.disabled]} disabled={actionBusy} onPress={handleStart} testID="auction-live-start">
+            <Pressable
+              style={[styles.button, (actionBusy || !marketOpen) && styles.disabled]}
+              disabled={actionBusy || !marketOpen}
+              onPress={handleStart}
+              testID="auction-live-start"
+            >
               <Text style={styles.buttonLabel}>Avvia sessione</Text>
             </Pressable>
           ) : null}
@@ -527,8 +539,8 @@ export function AuctionLiveScreen() {
                 />
               ) : null}
               <Pressable
-                style={[styles.button, (actionBusy || (needsExplicitAthlete && !manualAthleteId)) && styles.disabled]}
-                disabled={actionBusy || (needsExplicitAthlete && !manualAthleteId)}
+                style={[styles.button, (actionBusy || !marketOpen || (needsExplicitAthlete && !manualAthleteId)) && styles.disabled]}
+                disabled={actionBusy || !marketOpen || (needsExplicitAthlete && !manualAthleteId)}
                 onPress={handleNominate}
                 testID="auction-live-nominate-submit"
               >
@@ -571,8 +583,8 @@ export function AuctionLiveScreen() {
               <Text style={styles.meta}>Budget residuo: {balance !== null ? `${balance} crediti` : "—"}</Text>
 
               <Pressable
-                style={[styles.button, (raiseBusy || minimumNextBid === null) && styles.disabled]}
-                disabled={raiseBusy || minimumNextBid === null}
+                style={[styles.button, (raiseBusy || minimumNextBid === null || !marketOpen) && styles.disabled]}
+                disabled={raiseBusy || minimumNextBid === null || !marketOpen}
                 onPress={() => minimumNextBid !== null && handleRaise(minimumNextBid)}
                 testID="auction-live-raise-min"
               >

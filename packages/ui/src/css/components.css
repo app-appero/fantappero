@@ -821,6 +821,106 @@
   border-radius: var(--fa-radius-sm);
 }
 
+/* ── Switch ─────────────────────────────────────────────────────────── */
+
+.fa-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--fa-space-sm);
+}
+
+.fa-switch__label {
+  font-size: var(--fa-text-sm);
+  font-weight: 600;
+  color: var(--fa-color-foreground);
+}
+
+.fa-switch__control {
+  position: relative;
+  width: 2.75rem;
+  height: 1.5rem;
+  padding: 0;
+  border: 1px solid var(--fa-color-border);
+  border-radius: 999px;
+  background-color: var(--fa-pitch-700);
+  cursor: pointer;
+  transition:
+    background-color var(--fa-duration-fast) var(--fa-easing-standard),
+    border-color var(--fa-duration-fast) var(--fa-easing-standard);
+}
+
+.fa-switch__control:focus {
+  outline: none;
+}
+
+.fa-switch__control:focus-visible {
+  box-shadow: var(--fa-shadow-focus);
+}
+
+.fa-switch__control:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.fa-switch__control--on {
+  background-color: var(--fa-color-accent);
+  border-color: var(--fa-color-accent);
+}
+
+.fa-switch__thumb {
+  position: absolute;
+  top: 0.125rem;
+  left: 0.125rem;
+  width: 1.125rem;
+  height: 1.125rem;
+  border-radius: 999px;
+  background-color: var(--fa-ivory-50);
+  transition: transform var(--fa-duration-fast) var(--fa-easing-standard);
+}
+
+.fa-switch__control--on .fa-switch__thumb {
+  transform: translateX(1.25rem);
+}
+
+.fa-switch__status {
+  font-size: var(--fa-text-sm);
+  font-weight: 600;
+  color: var(--fa-color-foreground);
+}
+
+.fa-market-gate {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--fa-space-md);
+  margin-bottom: var(--fa-space-md);
+  padding: var(--fa-space-md);
+  border: 1px solid var(--fa-color-border);
+  border-radius: var(--fa-radius-md);
+  background-color: var(--fa-color-background-elevated);
+}
+
+.fa-market-gate__copy {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fa-space-xs);
+  min-width: 0;
+}
+
+.fa-market-gate__title {
+  margin: 0;
+  font-size: var(--fa-text-sm);
+  font-weight: 600;
+  color: var(--fa-color-foreground);
+}
+
+.fa-market-gate__hint {
+  margin: 0;
+  font-size: var(--fa-text-sm);
+  color: var(--fa-color-foreground-muted);
+}
+
 .fa-sr-only {
   position: absolute;
   width: 1px;

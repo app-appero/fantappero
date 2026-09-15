@@ -22,6 +22,7 @@ export function AuctionAdminPanel({
   emptyTitle = "Nessuna sessione d'asta",
   emptyMessage = "Crea la finestra d'asta a buste chiuse per iniziare.",
   testIdPrefix = "auction",
+  marketOpen = true,
 }: {
   flow: MarketSessionFlow;
   opensAt: string;
@@ -35,6 +36,7 @@ export function AuctionAdminPanel({
   emptyTitle?: string;
   emptyMessage?: string;
   testIdPrefix?: string;
+  marketOpen?: boolean;
 }) {
   return (
     <View style={styles.section} testID={`wireframe-region-${testIdPrefix}-admin`}>
@@ -169,8 +171,8 @@ export function AuctionAdminPanel({
           </Text>
         ) : null}
         <Pressable
-          style={[styles.button, flow.creating && styles.disabled]}
-          disabled={flow.creating}
+          style={[styles.button, (flow.creating || !marketOpen) && styles.disabled]}
+          disabled={flow.creating || !marketOpen}
           onPress={onCreateSession}
           testID={`${testIdPrefix}-create-session-submit`}
         >

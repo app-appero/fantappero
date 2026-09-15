@@ -4,6 +4,7 @@ import { Button } from "@fantappero/ui";
 export function RosterAdminToolsPanel({
   ensuring,
   randomAiBusy,
+  marketOpen = true,
   onEnsureTeams,
   leagueTeams,
   adminOrViewedTeam,
@@ -15,6 +16,7 @@ export function RosterAdminToolsPanel({
 }: {
   ensuring: boolean;
   randomAiBusy: boolean;
+  marketOpen?: boolean;
   onEnsureTeams: () => void | Promise<void>;
   leagueTeams: FantasyTeamSummary[];
   adminOrViewedTeam: FantasyTeam | null | undefined;
@@ -50,6 +52,7 @@ export function RosterAdminToolsPanel({
             disabled={
               ensuring ||
               randomAiBusy ||
+              !marketOpen ||
               adminOrViewedTeam?.userType !== "ai" ||
               (adminOrViewedTeam?.filledSlots ?? 0) >= (adminOrViewedTeam?.rosterSize ?? 0)
             }

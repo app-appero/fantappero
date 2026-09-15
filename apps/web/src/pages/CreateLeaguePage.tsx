@@ -69,6 +69,7 @@ function buildDemoCreatedLeague(
     seasonYear,
     state: "draft",
     viewerRole: "league_admin",
+    marketOpen: true,
     competitions,
     rules: DEMO_CREATED_RULES,
   };
@@ -242,6 +243,7 @@ export function CreateLeaguePage() {
         id: "demo-created-league",
         name: name.trim(),
         role: "league_admin",
+        marketOpen: true,
       });
       setCreatedLeague(
         buildDemoCreatedLeague(
@@ -270,6 +272,7 @@ export function CreateLeaguePage() {
         id: created.id,
         name: created.name,
         role: created.viewerRole === "league_admin" ? "league_admin" : "member",
+        marketOpen: created.marketOpen,
       });
       setCreatedLeague(created);
     } catch (error) {

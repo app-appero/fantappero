@@ -47,6 +47,7 @@ export type AuthContextValue = {
   can: (required: readonly Permission[]) => boolean;
   registerLeague: (league: LeagueSummary) => void;
   unregisterLeague: (leagueId: string) => void;
+  patchLeague: (leagueId: string, patch: Partial<LeagueSummary>) => void;
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   applySession: (tokens: AuthTokensResponse) => void;
@@ -284,6 +285,15 @@ export function AuthProvider({ children }: AuthProviderProps) {
     [isDemoMode],
   );
 
+  const patchLeague = useCallback(
+    (leagueId: string, patch: Partial<LeagueSummary>) => {
+      setLeaguesState((current) =>
+        current.map((row) => (row.id === leagueId ? { ...row, ...patch } : row)),
+      );
+    },
+    [],
+  );
+
   const unregisterLeague = useCallback(
     (leagueId: string) => {
       if (isDemoMode) {
@@ -342,6 +352,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       can,
       registerLeague,
       unregisterLeague,
+      patchLeague,
       login,
       logout,
       applySession,
@@ -359,6 +370,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       can,
       registerLeague,
       unregisterLeague,
+      patchLeague,
       login,
       logout,
       applySession,

@@ -17,6 +17,7 @@ class LeagueSummaryResponse(ApiModel):
     name: str
     role: str
     state: LeagueState
+    market_open: bool = Field(alias="marketOpen")
 
 
 class CompetitionSummaryResponse(ApiModel):
@@ -68,6 +69,7 @@ class LeagueDetailResponse(ApiModel):
     season_year: int = Field(alias="seasonYear")
     state: str
     viewer_role: str | None = Field(default=None, alias="viewerRole")
+    market_open: bool = Field(alias="marketOpen")
     competitions: list[CompetitionSummaryResponse] = Field(default_factory=list)
     rules: LeagueRulesResponse | None = None
 

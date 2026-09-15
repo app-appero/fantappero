@@ -1,6 +1,8 @@
 import { Tab, TabList, TabPanel, Tabs } from "@fantappero/ui";
 import { useAuth } from "../auth/AuthContext";
 import { RequirePermissions } from "../auth/RequirePermissions";
+import { MarketGateBar } from "../market/MarketGateBar";
+import { MarketGateProvider } from "../market/MarketGateContext";
 import { useLocation, useNavigate } from "../router/simpleRouter";
 import { AuctionHubPage } from "./AuctionHubPage";
 import { MarketPage } from "./MarketPage";
@@ -37,43 +39,46 @@ export function MarketHubPage() {
   const activeTab = TABS.find((tab) => tab.matchPaths.includes(pathname))?.value ?? "rosa";
 
   return (
-    <Tabs
-      value={activeTab}
-      onValueChange={(value) => {
-        const target = TABS.find((tab) => tab.value === value);
-        if (target) navigate(target.path);
-      }}
-      aria-label="Mercato"
-    >
-      <TabList>
-        {TABS.filter((tab) => can([tab.permission]) && (tab.value !== "svincoli" || SHOW_WAIVER_TAB)).map(
-          (tab) => (
-            <Tab key={tab.value} value={tab.value}>
-              {tab.label}
-            </Tab>
-          ),
-        )}
-      </TabList>
-      <TabPanel value="rosa">
-        <RequirePermissions required={["roster:view"]}>
-          <RosterPage />
-        </RequirePermissions>
-      </TabPanel>
-      <TabPanel value="asta">
-        <RequirePermissions required={["market:view"]}>
-          <AuctionHubPage />
-        </RequirePermissions>
-      </TabPanel>
-      <TabPanel value="svincoli">
-        <RequirePermissions required={["market:view"]}>
-          <WaiverPage />
-        </RequirePermissions>
-      </TabPanel>
-      <TabPanel value="mercato">
-        <RequirePermissions required={["market:view"]}>
-          <MarketPage />
-        </RequirePermissions>
-      </TabPanel>
-    </Tabs>
+    <MarketGateProvider>
+      <MarketGateBar />
+      <Tabs
+        value={activeTab}
+        onValueChange={(value) => {
+          const target = TABS.find((tab) => tab.value === value);
+          if (target) navigate(target.path);
+        }}
+        aria-label="Mercato"
+      >
+        <TabList>
+          {TABS.filter((tab) => can([tab.permission]) && (tab.value !== "svincoli" || SHOW_WAIVER_TAB)).map(
+            (tab) => (
+              <Tab key={tab.value} value={tab.value}>
+                {tab.label}
+              </Tab>
+            ),
+          )}
+        </TabList>
+        <TabPanel value="rosa">
+          <RequirePermissions required={["roster:view"]}>
+            <RosterPage />
+          </RequirePermissions>
+        </TabPanel>
+        <TabPanel value="asta">
+          <RequirePermissions required={["market:view"]}>
+            <AuctionHubPage />
+          </RequirePermissions>
+        </TabPanel>
+        <TabPanel value="svincoli">
+          <RequirePermissions required={["market:view"]}>
+            <WaiverPage />
+          </RequirePermissions>
+        </TabPanel>
+        <TabPanel value="mercato">
+          <RequirePermissions required={["market:view"]}>
+            <MarketPage />
+          </RequirePermissions>
+        </TabPanel>
+      </Tabs>
+    </MarketGateProvider>
   );
 }

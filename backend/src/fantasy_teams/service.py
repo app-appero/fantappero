@@ -117,6 +117,7 @@ from leagues.models.league import League
 from leagues.models.league_audit_event import LeagueAuditEvent
 from leagues.models.league_membership import LeagueMembership
 from leagues.standings_service import compute_league_standings
+from market.gate import assert_market_open
 from observability.context import get_correlation_id
 from observability.logging import get_logger
 from observability.metrics import get_metrics
@@ -308,6 +309,7 @@ class FantasyTeamService:
             )
 
         league = self._lock_league(league_access.league.id)
+        assert_market_open(league)
         team = self._get_team_for_update(league.id, team_id)
         membership = self._session.scalar(
             select(LeagueMembership)
@@ -688,6 +690,7 @@ class FantasyTeamService:
         payload: AssignRosterSlotRequest,
     ) -> FantasyTeamResponse:
         league = self._lock_league(league_access.league.id)
+        assert_market_open(league)
         team = self._get_team_for_update(league.id, team_id)
         self._assert_can_edit_team(league_access, team)
         roster_size = resolve_roster_size(self._session, league.id)
@@ -886,6 +889,7 @@ class FantasyTeamService:
         slot_index: int,
     ) -> FantasyTeamResponse:
         league = self._lock_league(league_access.league.id)
+        assert_market_open(league)
         team = self._get_team_for_update(league.id, team_id)
         self._assert_can_edit_team(league_access, team)
         roster_size = resolve_roster_size(self._session, league.id)
@@ -1176,6 +1180,7 @@ class FantasyTeamService:
         payload: RosterImportConfirmRequest,
     ) -> RosterImportConfirmResponse:
         league = self._lock_league(league_access.league.id)
+        assert_market_open(league)
         session = self._session.scalars(
             select(RosterImportSession)
             .where(
