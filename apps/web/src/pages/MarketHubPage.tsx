@@ -33,7 +33,7 @@ const TABS = [
  * `/mercato`) mostra solo `MarketPage`, ora limitata alla proposta/gestione scambi — ADR-0006.
  */
 export function MarketHubPage() {
-  const { pathname } = useLocation();
+  const { pathname, search } = useLocation();
   const navigate = useNavigate();
   const { can } = useAuth();
   const activeTab = TABS.find((tab) => tab.matchPaths.includes(pathname))?.value ?? "rosa";
@@ -45,7 +45,9 @@ export function MarketHubPage() {
         value={activeTab}
         onValueChange={(value) => {
           const target = TABS.find((tab) => tab.value === value);
-          if (target) navigate(target.path);
+          if (!target) return;
+          const persona = new URLSearchParams(search).get("persona");
+          navigate(persona ? `${target.path}?persona=${encodeURIComponent(persona)}` : target.path);
         }}
         aria-label="Mercato"
       >
