@@ -221,7 +221,7 @@ services:
       - path: infra/local/.env
         required: false
     environment:
-      # From --env-file (infra/local/.env points at remote Postgres in this machine's setup).
+      # From --env-file (infra/local/.env). Do not force @postgres — that hid remote URLs.
       DATABASE_URL: ${DATABASE_URL}
       TEST_DATABASE_URL: postgresql://${POSTGRES_USER:-fantappero}:${POSTGRES_PASSWORD:-fantappero_local_dev_only}@postgres-test:5432/fantappero_test
       REDIS_URL: redis://redis:6379/0
