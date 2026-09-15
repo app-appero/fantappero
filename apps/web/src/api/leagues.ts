@@ -59,7 +59,7 @@ import type {
   UpdateLeagueRulesRequest,
 } from "@fantappero/contracts";
 import { apiRequest, apiUpload, ApiError } from "./client";
-import { getWebEnv } from "../config/env";
+import { getWebEnv, resolveApiBaseUrl } from "../config/env";
 
 export function fetchCompetitions(accessToken: string): Promise<CompetitionSummary[]> {
   return apiRequest<CompetitionSummary[]>("/leagues/competitions", { accessToken });
@@ -868,8 +868,8 @@ async function apiRequestBlob(
   path: string,
   options: { accessToken: string },
 ): Promise<Blob> {
-  const { viteApiBaseUrl } = getWebEnv();
-  const response = await fetch(`${viteApiBaseUrl}${path}`, {
+  const apiBaseUrl = resolveApiBaseUrl(getWebEnv().viteApiBaseUrl);
+  const response = await fetch(`${apiBaseUrl}${path}`, {
     headers: {
       Accept: "text/csv,application/octet-stream,*/*",
       Authorization: `Bearer ${options.accessToken}`,

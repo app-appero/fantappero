@@ -6,7 +6,7 @@ from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
 from sqlalchemy import func, select
-from sqlalchemy.exc import IntegrityError, ProgrammingError
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session, selectinload
 
 from auth.exceptions import ValidationAuthError
@@ -25,7 +25,7 @@ from fantasy_teams.factory import ensure_team_for_membership, find_team_for_memb
 from fantasy_teams.ledger import apply_ledger_movement, find_account_for_team
 from fantasy_teams.models import FantasyRosterSlot, FantasyTeam
 from fantasy_teams.ownership import sync_ownership_on_release
-from leagues.market_open import read_market_open
+from leagues.market_open import read_market_open, write_market_open
 from leagues.models.league import League
 from leagues.models.league_audit_event import LeagueAuditEvent
 from leagues.models.league_membership import LeagueMembership
@@ -103,22 +103,22 @@ class MarketService:
         league_access: LeagueAccess,
         payload: SetMarketGateRequest,
     ) -> MarketGateResponse:
-        league = self._lock_league(league_access.league.id)
-        league.market_open = payload.open
-        self._add_audit(
-            league.id,
-            league_access.user.id,
-            LeagueAuditAction.MARKET_GATE_TOGGLED,
-            details={"open": payload.open},
+        write_market_open(self._session, league_access.league.id, payload.open)
+        self._session.add(
+            LeagueAuditEvent(
+                league_id=league_access.league.id,
+                actor_id=league_access.user.id,
+                action=LeagueAuditAction.MARKET_GATE_TOGGLED,
+                details={"open": payload.open},
+            )
         )
         try:
             self._session.commit()
-        except ProgrammingError as exc:
+        except SQLAlchemyError:
+            logger.exception("market_gate_audit_commit_failed")
             self._session.rollback()
-            raise ValidationAuthError(
-                "Impossibile aggiornare lo stato del mercato: manca la colonna sul database.",
-                code="market_gate_unavailable",
-            ) from exc
+            write_market_open(self._session, league_access.league.id, payload.open)
+            self._session.commit()
         get_metrics().incr(
             "market_gate_toggled_total",
             labels={"open": "true" if payload.open else "false"},

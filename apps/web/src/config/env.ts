@@ -46,3 +46,41 @@ export function getWebEnv(): WebEnv {
 export function resetWebEnvCache(): void {
   cachedEnv = null;
 }
+
+function isLoopbackHostname(hostname: string): boolean {
+  return hostname === "localhost" || hostname === "127.0.0.1" || hostname === "[::1]" || hostname === "::1";
+}
+
+/**
+ * The browser must not call loopback when the UI is served from another host
+ * (LAN IP, Railway preview, …): that hits the *user's* machine and shows
+ * "Connessione non disponibile verso http://127.0.0.1:8001".
+ * Same-origin lets the Vite/nginx proxy forward to the real API.
+ */
+export function resolveApiBaseUrl(
+  configured: string,
+  pageHref: string | undefined = typeof window === "undefined" ? undefined : window.location.href,
+): string {
+  if (!pageHref) {
+    return configured;
+  }
+  let configuredHost: string;
+  try {
+    configuredHost = new URL(configured).hostname;
+  } catch {
+    return configured;
+  }
+  if (!isLoopbackHostname(configuredHost)) {
+    return configured;
+  }
+  let pageUrl: URL;
+  try {
+    pageUrl = new URL(pageHref);
+  } catch {
+    return configured;
+  }
+  if (isLoopbackHostname(pageUrl.hostname)) {
+    return configured;
+  }
+  return pageUrl.origin;
+}

@@ -4,7 +4,7 @@ import type {
   DeleteAccountRequest,
   PrivacyMessageResponse,
 } from "@fantappero/contracts";
-import { getWebEnv } from "../config/env";
+import { getWebEnv, resolveApiBaseUrl } from "../config/env";
 import { ApiError, apiRequest } from "./client";
 
 export function exportAccountData(accessToken: string): Promise<AccountDataExport> {
@@ -22,8 +22,8 @@ export function deleteAccount(
 }
 
 async function downloadJson<T>(path: string, accessToken: string): Promise<T> {
-  const { viteApiBaseUrl } = getWebEnv();
-  const response = await fetch(`${viteApiBaseUrl}${path}`, {
+  const apiBaseUrl = resolveApiBaseUrl(getWebEnv().viteApiBaseUrl);
+  const response = await fetch(`${apiBaseUrl}${path}`, {
     method: "GET",
     headers: {
       Accept: "application/json",

@@ -1,5 +1,5 @@
 import { createApiClient, ApiError } from "@fantappero/api-client";
-import { getWebEnv } from "../config/env";
+import { getWebEnv, resolveApiBaseUrl } from "../config/env";
 
 export { ApiError };
 
@@ -10,7 +10,7 @@ type UploadOptions = {
 };
 
 const client = createApiClient<File>({
-  resolveBaseUrl: () => getWebEnv().viteApiBaseUrl,
+  resolveBaseUrl: () => resolveApiBaseUrl(getWebEnv().viteApiBaseUrl),
   buildUploadValue: (file) => file,
   defaultErrorMessage: () => "Si è verificato un errore.",
 });

@@ -1,4 +1,4 @@
-import { getWebEnv } from "../config/env";
+import { getWebEnv, resolveApiBaseUrl } from "../config/env";
 
 export function resolveAvatarUrl(avatarUrl: string | null): string | null {
   if (!avatarUrl) {
@@ -7,5 +7,5 @@ export function resolveAvatarUrl(avatarUrl: string | null): string | null {
   if (avatarUrl.startsWith("http://") || avatarUrl.startsWith("https://")) {
     return avatarUrl;
   }
-  return `${getWebEnv().viteApiBaseUrl}${avatarUrl}`;
+  return `${resolveApiBaseUrl(getWebEnv().viteApiBaseUrl)}${avatarUrl}`;
 }
