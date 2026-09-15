@@ -6,6 +6,7 @@ import {
   useId,
   useRef,
 } from "react";
+import { createPortal } from "react-dom";
 import { classNames } from "../../utils/classNames.js";
 
 export type NavDrawerProps = {
@@ -40,7 +41,6 @@ export function NavDrawer({
   className,
 }: NavDrawerProps) {
   const titleId = useId();
-  const panelRef = useRef<HTMLElement>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
   const previouslyFocused = useRef<HTMLElement | null>(null);
 
@@ -60,14 +60,14 @@ export function NavDrawer({
     }
 
     previouslyFocused.current = document.activeElement as HTMLElement | null;
-    closeRef.current?.focus();
+    closeRef.current?.focus({ preventScroll: true });
 
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
 
     return () => {
       document.body.style.overflow = previousOverflow;
-      previouslyFocused.current?.focus();
+      previouslyFocused.current?.focus({ preventScroll: true });
     };
   }, [open]);
 
@@ -75,7 +75,7 @@ export function NavDrawer({
     return null;
   }
 
-  return (
+  const drawer = (
     <div
       className={classNames("fa-nav-drawer", className)}
       data-testid="nav-drawer"
@@ -89,7 +89,6 @@ export function NavDrawer({
         data-testid="nav-drawer-backdrop"
       />
       <aside
-        ref={panelRef}
         id="nav-drawer-panel"
         className="fa-nav-drawer__panel"
         role="dialog"
@@ -123,4 +122,10 @@ export function NavDrawer({
       </aside>
     </div>
   );
+
+  if (typeof document === "undefined") {
+    return drawer;
+  }
+
+  return createPortal(drawer, document.body);
 }
