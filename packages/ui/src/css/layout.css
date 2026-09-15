@@ -230,6 +230,14 @@
   text-decoration: underline;
 }
 
+button.fa-app-header__league-action {
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  font: inherit;
+}
+
 .fa-app-header__league-action-sep {
   font-size: var(--fa-text-sm);
   color: var(--fa-color-foreground-subtle);

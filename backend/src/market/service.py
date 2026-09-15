@@ -6,7 +6,7 @@ from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
 from sqlalchemy import func, select
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.exc import IntegrityError, ProgrammingError
 from sqlalchemy.orm import Session, selectinload
 
 from auth.exceptions import ValidationAuthError
@@ -25,6 +25,7 @@ from fantasy_teams.factory import ensure_team_for_membership, find_team_for_memb
 from fantasy_teams.ledger import apply_ledger_movement, find_account_for_team
 from fantasy_teams.models import FantasyRosterSlot, FantasyTeam
 from fantasy_teams.ownership import sync_ownership_on_release
+from leagues.market_open import read_market_open
 from leagues.models.league import League
 from leagues.models.league_audit_event import LeagueAuditEvent
 from leagues.models.league_membership import LeagueMembership
@@ -93,10 +94,9 @@ class MarketService:
         self._session = session
 
     def get_gate(self, league_access: LeagueAccess) -> MarketGateResponse:
-        league = self._session.get(League, league_access.league.id)
-        if league is None:
-            raise ValidationAuthError("Lega non trovata.", code="league_not_found")
-        return MarketGateResponse(marketOpen=league.market_open)
+        return MarketGateResponse(
+            marketOpen=read_market_open(self._session, league_access.league.id),
+        )
 
     def set_gate(
         self,
@@ -111,12 +111,19 @@ class MarketService:
             LeagueAuditAction.MARKET_GATE_TOGGLED,
             details={"open": payload.open},
         )
-        self._session.commit()
+        try:
+            self._session.commit()
+        except ProgrammingError as exc:
+            self._session.rollback()
+            raise ValidationAuthError(
+                "Impossibile aggiornare lo stato del mercato: manca la colonna sul database.",
+                code="market_gate_unavailable",
+            ) from exc
         get_metrics().incr(
             "market_gate_toggled_total",
             labels={"open": "true" if payload.open else "false"},
         )
-        return MarketGateResponse(marketOpen=league.market_open)
+        return MarketGateResponse(marketOpen=payload.open)
 
     # -- sessions ---------------------------------------------------------
 

@@ -38,11 +38,14 @@ class League(Base, UUIDPrimaryKeyMixin, TimestampMixin):
         server_default=text("'draft'"),
     )
     # Admin-controlled transfer window: rosa purchases and auctions. Trades ignore this.
+    # Deferred so ``session.get(League)`` does not SELECT this column: a missing
+    # migration must not 500 the membership list or every league-scoped request.
     market_open: Mapped[bool] = mapped_column(
         Boolean,
         nullable=False,
         server_default=text("true"),
         default=True,
+        deferred=True,
     )
 
     memberships: Mapped[list[LeagueMembership]] = relationship(

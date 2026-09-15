@@ -183,7 +183,7 @@ function DrawerNavLink({ onNavigate, ...props }: NavLinkAnchorProps & { onNaviga
 }
 
 export function AppLayout({ children }: { children: React.ReactNode }) {
-  const { user, leagues, leaguesError, activeLeagueId, setActiveLeagueId, can } = useAuth();
+  const { user, leagues, leaguesError, refreshLeagues, activeLeagueId, setActiveLeagueId, can } = useAuth();
   const location = useLocation();
   const { open: drawerOpen, close: closeDrawer, openDrawer } = useMobileNavDrawer();
   const { collapsed, toggle } = useCollapsedNavGroups();
@@ -281,9 +281,16 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                     Unisciti con codice
                   </Link>
                 </div>
-                {leaguesError && leagues.length === 0 ? (
-                  <p className="fa-field__hint" role="alert" data-testid="leagues-load-error">
-                    {leaguesError}
+                {leaguesError ? (
+                  <p className="fa-field__error" role="alert" data-testid="leagues-load-error">
+                    {leaguesError}{" "}
+                    <button
+                      type="button"
+                      className="fa-app-header__league-action"
+                      onClick={() => void refreshLeagues()}
+                    >
+                      Riprova
+                    </button>
                   </p>
                 ) : null}
               </div>

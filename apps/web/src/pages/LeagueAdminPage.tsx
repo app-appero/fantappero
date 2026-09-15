@@ -21,6 +21,7 @@ import { fetchLeagueAdminPanel, updateLeagueRules } from "../api/leagues";
 import { getApiErrorMessage, useAuth } from "../auth/AuthContext";
 import { ManagerDirectory } from "../components/ManagerDirectory";
 import { loadStoredSession } from "../auth/sessionStorage";
+import { NoLeagueSelectedPanel } from "../components/NoLeagueSelectedPanel";
 import { useLocation } from "../router/simpleRouter";
 import { parseWireframeStateFromSearch } from "../wireframes/useWireframeState";
 import { LeagueDeletePanel } from "./LeagueDeletePanel";
@@ -413,11 +414,9 @@ export function LeagueAdminPage() {
       ) : null}
 
       {!loading && !loadError && !rules ? (
-        <UiStatePanel
-          state="empty"
-          title="Nessuna lega selezionata"
-          message="Seleziona una lega e imposta il regolamento prima dell'avvio."
+        <NoLeagueSelectedPanel
           testId="league-admin-empty"
+          emptyMessage="Seleziona una lega e imposta il regolamento prima dell'avvio."
         />
       ) : null}
 

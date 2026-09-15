@@ -21,6 +21,7 @@ import {
 import { getApiErrorMessage, useAuth } from "../auth/AuthContext";
 import { leagueStateLabel } from "../leagues/leagueLabels";
 import { loadStoredSession } from "../auth/sessionStorage";
+import { NoLeagueSelectedPanel } from "../components/NoLeagueSelectedPanel";
 import { Link, useLocation } from "../router/simpleRouter";
 import { parseWireframeStateFromSearch } from "../wireframes/useWireframeState";
 
@@ -237,11 +238,9 @@ export function LeagueHomePage() {
       ) : null}
 
       {!loading && !loadError && !league ? (
-        <UiStatePanel
-          state="empty"
-          title="Nessuna lega selezionata"
-          message="Scegli una lega dal selettore in alto, creane una o unisciti con un codice invito."
+        <NoLeagueSelectedPanel
           testId="league-home-empty"
+          emptyMessage="Scegli una lega dal selettore in alto, creane una o unisciti con un codice invito."
         />
       ) : null}
 

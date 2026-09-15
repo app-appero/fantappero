@@ -6,7 +6,6 @@ from decimal import Decimal
 from uuid import UUID
 
 from sqlalchemy import func, select
-from sqlalchemy.exc import ProgrammingError
 from sqlalchemy.orm import Session, selectinload
 
 from auth.exceptions import ValidationAuthError
@@ -36,6 +35,7 @@ from fantasy_turns.validators import (
 )
 from leagues.calendar_service import league_has_confirmed_calendar
 from leagues.models.competition import Competition
+from leagues.market_open import read_market_open, read_market_open_map
 from leagues.models.league import League
 from leagues.models.league_audit_event import LeagueAuditEvent
 from leagues.models.league_membership import LeagueMembership
@@ -235,7 +235,7 @@ class LeagueService:
             .where(LeagueMembership.user_id == user_id)
             .order_by(LeagueMembership.created_at.asc())
         ).all()
-        flags = self._market_open_by_ids([row.league_id for row in rows])
+        flags = read_market_open_map(self._session, [row.league_id for row in rows])
         return [
             LeagueSummaryResponse(
                 id=str(row.league_id),
@@ -246,18 +246,6 @@ class LeagueService:
             )
             for row in rows
         ]
-
-    def _market_open_by_ids(self, league_ids: list[UUID]) -> dict[UUID, bool]:
-        if not league_ids:
-            return {}
-        try:
-            flag_rows = self._session.execute(
-                select(League.id, League.market_open).where(League.id.in_(league_ids))
-            ).all()
-        except ProgrammingError:
-            self._session.rollback()
-            return {}
-        return {row.id: bool(row.market_open) for row in flag_rows}
 
     def get_league_detail(self, league_access: LeagueAccess) -> LeagueDetailResponse:
         league = self._load_league_with_competitions(league_access.league.id)
@@ -655,7 +643,7 @@ class LeagueService:
             seasonYear=league.season_year,
             state=league.state.value,
             viewerRole=viewer_role,
-            marketOpen=league.market_open,
+            marketOpen=read_market_open(self._session, league.id),
             competitions=[self._to_competition_summary(row) for row in competitions],
             rules=self._to_rules_response(league.rules) if league.rules is not None else None,
         )
