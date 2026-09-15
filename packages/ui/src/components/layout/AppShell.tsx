@@ -5,6 +5,8 @@ export type AppShellProps = HTMLAttributes<HTMLDivElement> & {
   header?: ReactNode;
   sidebar?: ReactNode;
   bottomNav?: ReactNode;
+  /** Overlay menus such as the mobile nav drawer. */
+  overlay?: ReactNode;
   skipLink?: ReactNode;
   children: ReactNode;
   /** app (member) or admin (global operator panel). */
@@ -15,6 +17,7 @@ export function AppShell({
   header,
   sidebar,
   bottomNav,
+  overlay,
   skipLink,
   children,
   surface = "app",
@@ -45,6 +48,7 @@ export function AppShell({
           {bottomNav}
         </div>
       ) : null}
+      {overlay}
     </div>
   );
 }

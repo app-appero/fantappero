@@ -56,9 +56,11 @@ describe("App responsive shell (EPUI-05)", () => {
     expect(html).not.toContain('data-testid="app-shell"');
   });
 
-  it("includes responsive shell structure for mobile and desktop nav", () => {
+  it("includes responsive shell structure for desktop sidebar and mobile menu", () => {
     const html = renderShellAt("/rosa", "?persona=admin&stato=success");
     expect(html).toContain('data-testid="sidebar-nav"');
-    expect(html).toContain('data-testid="bottom-nav"');
+    expect(html).toContain('data-testid="app-menu-button"');
+    expect(html).toContain("Apri menu");
+    expect(html).not.toContain('data-testid="bottom-nav"');
   });
 });

@@ -28,11 +28,12 @@ function sidebarMarkup(html: string): string {
 }
 
 describe("App navigation shell (EPUI-03)", () => {
-  it("renders member app layout with sidebar and bottom nav on /turni", () => {
+  it("renders member app layout with sidebar and mobile menu button on /turni", () => {
     const html = renderAt("/turni");
     expect(html).toContain('data-testid="app-shell"');
     expect(html).toContain('data-testid="sidebar-nav"');
-    expect(html).toContain('data-testid="bottom-nav"');
+    expect(html).toContain('data-testid="app-menu-button"');
+    expect(html).not.toContain('data-testid="bottom-nav"');
     expect(html).toContain("Turni");
   });
 
@@ -127,19 +128,16 @@ describe("App navigation shell (EPUI-03)", () => {
     expect(html).toContain('aria-label="FantApperò, home"');
   });
 
-  it("uses compact labels in the bottom nav instead of clipping long names", () => {
+  it("keeps full destination names in the sidebar used by the mobile drawer", () => {
     const html = renderAt("/leghe", "?persona=admin&stato=success");
-    const start = html.indexOf('data-testid="bottom-nav"');
-    expect(start).toBeGreaterThan(-1);
-    const end = html.indexOf("</nav>", start);
-    const bottom = html.slice(start, end);
-    expect(bottom).toContain(">Fanta</span>");
-    expect(bottom).toContain(">Form.</span>");
-    expect(bottom).toContain(">Class.</span>");
-    expect(bottom).toContain(">Merc.</span>");
-    expect(bottom).not.toContain(">Fantallenatori</span>");
-    expect(bottom).toContain('aria-label="Fantallenatori"');
-    expect(bottom).toContain('aria-label="Formazione"');
+    const sidebar = sidebarMarkup(html);
+    expect(sidebar).toContain(">Fantallenatori</span>");
+    expect(sidebar).toContain(">Formazione</span>");
+    expect(sidebar).toContain(">Classifica</span>");
+    expect(sidebar).toContain(">Mercato</span>");
+    expect(html).toContain('data-testid="app-menu-button"');
+    expect(html).not.toContain('data-testid="bottom-nav"');
+    expect(html).not.toContain('data-testid="nav-drawer"');
   });
 
   it("includes asta as a tab inside the movimento giocatori hub", () => {

@@ -15,10 +15,11 @@ Il pannello admin usa trattamento visivo distinto (bordo warning, header dedicat
 
 | Componente | Uso |
 | --- | --- |
-| `AppShell` | Contenitore root con header, sidebar, main, bottom nav |
-| `AppHeader` | Brand, selettore lega, azioni utente |
-| `SidebarNav` | Navigazione desktop (≥768px) |
-| `BottomNav` | Navigazione mobile (<768px) |
+| `AppShell` | Contenitore root con header, sidebar, main, overlay drawer |
+| `AppHeader` | Brand, selettore lega, azioni utente, hamburger mobile |
+| `SidebarNav` | Navigazione desktop (≥768px) e contenuto del drawer mobile |
+| `NavDrawer` | Menu laterale mobile (<768px), come l'app nativa |
+| `BottomNav` | Componente conservato, non più montato nella shell web |
 | `PageContainer` | Titolo, breadcrumb slot, corpo pagina |
 | `Breadcrumb` | Percorso gerarchico |
 | `LeagueSelector` | Select lega attiva |
@@ -63,7 +64,7 @@ Regole:
 - Il toggle è un `<button>` con `aria-expanded`/`aria-controls` sul web e `accessibilityState={{ expanded }}` su mobile; il gruppo si evidenzia quando contiene la voce attiva.
 - Nessun path, deep link o permesso è stato modificato dal raggruppamento.
 
-**Bottom nav web (<768px):** resta piatta — una barra non annida sottomenu. Usa le etichette compatte di `NAV_SHORT_LABELS` («Leghe», «Admin lega»); sidebar e drawer usano quelle estese.
+**Menu mobile web (<768px):** drawer laterale (`NavDrawer`) aperto dall'hamburger in header, come l'app nativa. Stesso catalogo e etichette estese della sidebar (`NAV_LABELS`: «Fantallenatori», «Formazione»). La bottom nav non è più montata.
 
 **Deep link amministrativo:** sul web `/lega/amministrazione` è protetto da `RequirePermissions required={["league:admin"]}` (`apps/web/src/routes.tsx`) che rende `UiStatePanel state="forbidden"`. Su mobile la protezione equivalente è dentro `LeagueAdminScreen` (`can(["league:admin"])` → pannello forbidden). L'app mobile **non ha oggi una configurazione `linking`/URL scheme**: non esistono deep link URL, quindi la superficie verificabile è la navigazione programmatica alla route `LeagueAdmin`. Introdurre uno schema di deep link è una decisione fuori dallo scope di EP13-P01.
 
@@ -90,7 +91,7 @@ Stati wireframe: `?stato=loading|empty|error|success|forbidden` — vedi [`wiref
 
 ## Mobile
 
-Navigazione **solo drawer**: `apps/mobile/src/navigation/AppTabNavigator.tsx` monta un `Tab.Navigator` con `tabBar={() => null}`, usato come router interno; la bottom tab bar non è visibile. Il menu è `AppDrawer` con catalogo `MOBILE_DRAWER_NAV_ITEMS` e gruppo `MOBILE_NAV_GROUPS`, stack admin separato e stesso modello permessi del web. Vedi [`shell-mobile.md`](./shell-mobile.md).
+Navigazione **solo drawer** su mobile (web e app): `apps/mobile/src/navigation/AppTabNavigator.tsx` monta un `Tab.Navigator` con `tabBar={() => null}`; il web sotto i 768px usa `NavDrawer` nello stesso pattern (hamburger in header, pannello da sinistra). Il catalogo è `MOBILE_DRAWER_NAV_ITEMS` / `APP_NAV_ITEMS`. Vedi [`shell-mobile.md`](./shell-mobile.md).
 
 ## Verifica locale
 

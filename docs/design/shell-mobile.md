@@ -25,7 +25,7 @@ Dipendenze: [EPUI-01](./visual-identity.md), [EPUI-03](./navigation.md), [EPUI-0
 
 ## Menu membro (drawer)
 
-La navigazione è **solo drawer**: `AppTabNavigator` monta `Tab.Navigator` con `tabBar={() => null}` e lo usa come router interno; la bottom tab bar non è visibile. Voci allineate alla web (`APP_NAV_ITEMS` ↔ `MOBILE_DRAWER_NAV_ITEMS`), filtrate con `hasPermissions`:
+La navigazione è **solo drawer**: `AppTabNavigator` monta `Tab.Navigator` con `tabBar={() => null}` e lo usa come router interno; la bottom tab bar non è visibile. Il browser mobile usa lo stesso pattern (`NavDrawer` in `apps/web`). Voci allineate alla web (`APP_NAV_ITEMS` ↔ `MOBILE_DRAWER_NAV_ITEMS`), filtrate con `hasPermissions`:
 
 - **Gruppo «Lega»** (espandibile, `MOBILE_NAV_GROUPS`): Le mie leghe · Home lega · Amministrazione lega
 - **Destinazioni indipendenti:** Turni · Fantallenatori · Inviti · Classifica · Rosa · Formazione · Asta · Svincolati · Mercato · Profilo

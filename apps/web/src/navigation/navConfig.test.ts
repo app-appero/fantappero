@@ -5,7 +5,6 @@ import {
   APP_NAV_GROUPS,
   APP_NAV_ITEMS,
   NAV_LABELS,
-  NAV_SHORT_LABELS,
   filterNavItems,
 } from "./navConfig";
 
@@ -87,11 +86,10 @@ describe("hub a tab: Lega e Movimento giocatori (EP13-P01)", () => {
     expect(NAV_LABELS["market-hub"]).toBe("Mercato");
   });
 
-  it("abbrevia le voci lunghe nella bottom nav", () => {
-    expect(NAV_SHORT_LABELS["manager-directory"]).toBe("Fanta");
-    expect(NAV_SHORT_LABELS.formation).toBe("Form.");
-    expect(NAV_SHORT_LABELS.standings).toBe("Class.");
-    expect(NAV_SHORT_LABELS["admin-leagues"]).toBe("Leghe");
+  it("usa le etichette estese anche sulle voci lunghe", () => {
+    expect(NAV_LABELS["manager-directory"]).toBe("Fantallenatori");
+    expect(NAV_LABELS.formation).toBe("Formazione");
+    expect(NAV_LABELS.standings).toBe("Classifica");
   });
 
   it("punta ai path canonici degli hub", () => {
