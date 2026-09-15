@@ -5,6 +5,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -36,9 +37,14 @@ export function MarketGateProvider({ children }: { children: ReactNode }) {
   const [toggling, setToggling] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const lastLeagueIdRef = useRef(activeLeagueId);
   useEffect(() => {
+    if (lastLeagueIdRef.current === activeLeagueId) {
+      return;
+    }
+    lastLeagueIdRef.current = activeLeagueId;
     setMarketOpen(isMarketOpen(activeLeague));
-  }, [activeLeague]);
+  }, [activeLeague, activeLeagueId]);
 
   useEffect(() => {
     if (isDemoMode || !activeLeagueId) {

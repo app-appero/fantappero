@@ -97,10 +97,22 @@ export function AuthProvider({ children }: AuthProviderProps) {
     return loadStoredSession() !== null;
   });
   const [leaguesState, setLeaguesState] = useState<LeagueSummary[]>([]);
+  const [demoLeaguePatches, setDemoLeaguePatches] = useState<Record<string, Partial<LeagueSummary>>>(
+    {},
+  );
   const [activeLeagueId, setActiveLeagueIdState] = useState<string | null>(() =>
     isDemoMode ? resolveInitialLeagueId(searchParams, demoLeagues) : loadStoredActiveLeagueId(),
   );
-  const leagues = isDemoMode ? demoLeagues : leaguesState;
+  const leagues = useMemo(() => {
+    const base = isDemoMode ? demoLeagues : leaguesState;
+    if (!isDemoMode) {
+      return base;
+    }
+    return base.map((row) => {
+      const patch = demoLeaguePatches[row.id];
+      return patch ? { ...row, ...patch } : row;
+    });
+  }, [demoLeaguePatches, demoLeagues, isDemoMode, leaguesState]);
 
   useEffect(() => {
     if (isDemoMode) {
@@ -287,11 +299,18 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   const patchLeague = useCallback(
     (leagueId: string, patch: Partial<LeagueSummary>) => {
+      if (isDemoMode) {
+        setDemoLeaguePatches((current) => ({
+          ...current,
+          [leagueId]: { ...current[leagueId], ...patch },
+        }));
+        return;
+      }
       setLeaguesState((current) =>
         current.map((row) => (row.id === leagueId ? { ...row, ...patch } : row)),
       );
     },
-    [],
+    [isDemoMode],
   );
 
   const unregisterLeague = useCallback(

@@ -5,9 +5,12 @@ import { AuctionPage } from "./AuctionPage";
 
 /** Asta: buste chiuse e live come sotto-schede della stessa sezione (EP08-01/02/09). */
 export function AuctionHubPage() {
-  const { pathname } = useLocation();
+  const { pathname, search } = useLocation();
   const navigate = useNavigate();
   const activeSubTab = pathname === "/asta-live" ? "live" : "buste";
+  const persona = new URLSearchParams(search).get("persona");
+  const withPersona = (path: string) =>
+    persona ? `${path}?persona=${encodeURIComponent(persona)}` : path;
 
   return (
     <PageContainer
@@ -17,7 +20,7 @@ export function AuctionHubPage() {
     >
       <Tabs
         value={activeSubTab}
-        onValueChange={(value) => navigate(value === "live" ? "/asta-live" : "/asta")}
+        onValueChange={(value) => navigate(withPersona(value === "live" ? "/asta-live" : "/asta"))}
         aria-label="Modalità asta"
       >
         <TabList>

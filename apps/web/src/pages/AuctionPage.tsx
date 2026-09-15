@@ -336,7 +336,9 @@ export function AuctionPage() {
           <WireframeSection label="Gestione sessione (admin)" testId="wireframe-region-auction-admin">
             {isDemoMode ? (
               <div className="fa-ds-showcase__row">
-                <Button variant="primary">Apri asta</Button>
+                <Button variant="primary" disabled={!marketOpen}>
+                  Apri asta
+                </Button>
                 <Button variant="secondary">Chiudi asta</Button>
               </div>
             ) : null}
@@ -466,7 +468,7 @@ export function AuctionPage() {
         ) : null}
 
         <WireframeSection label="Offerta busta chiusa" testId="wireframe-region-auction-bid">
-          {!isDemoMode && (!marketOpen || flow.currentSession?.status !== "open") ? (
+          {!marketOpen || (!isDemoMode && flow.currentSession?.status !== "open") ? (
             <UiStatePanel
               state="empty"
               title={marketOpen ? "Asta non aperta" : "Mercato chiuso"}

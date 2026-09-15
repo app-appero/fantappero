@@ -1,5 +1,5 @@
 import { isMarketOpen } from "@fantappero/contracts";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { fetchMarketGate, setMarketGate } from "../api/market";
 import { getApiErrorMessage, useAuthSession } from "../session/DemoSessionContext";
 
@@ -9,10 +9,15 @@ export function useMarketGate() {
   const [marketOpen, setMarketOpen] = useState(() => isMarketOpen(activeLeague));
   const [toggling, setToggling] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const lastLeagueIdRef = useRef(activeLeagueId);
 
   useEffect(() => {
+    if (lastLeagueIdRef.current === activeLeagueId) {
+      return;
+    }
+    lastLeagueIdRef.current = activeLeagueId;
     setMarketOpen(isMarketOpen(activeLeague));
-  }, [activeLeague]);
+  }, [activeLeague, activeLeagueId]);
 
   useEffect(() => {
     if (!accessToken || !activeLeagueId) {
