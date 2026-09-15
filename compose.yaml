@@ -9,7 +9,11 @@
 name: fantappero
 
 services:
+  # Opt-in when developing against a local DB. Dev default points DATABASE_URL
+  # at the remote Postgres (see infra/local/.env). Enable with:
+  #   docker compose --profile local-db up -d postgres
   postgres:
+    profiles: ["local-db", "backup", "tools"]
     image: postgres:16-alpine
     container_name: fantappero-postgres
     restart: unless-stopped
@@ -217,8 +221,8 @@ services:
       - path: infra/local/.env
         required: false
     environment:
-      # Always use in-compose hostnames — ignore host .env DATABASE_URL (127.0.0.1).
-      DATABASE_URL: postgresql://${POSTGRES_USER:-fantappero}:${POSTGRES_PASSWORD:-fantappero_local_dev_only}@postgres:5432/${POSTGRES_DB:-fantappero}
+      # From --env-file (infra/local/.env points at remote Postgres in this machine's setup).
+      DATABASE_URL: ${DATABASE_URL}
       TEST_DATABASE_URL: postgresql://${POSTGRES_USER:-fantappero}:${POSTGRES_PASSWORD:-fantappero_local_dev_only}@postgres-test:5432/fantappero_test
       REDIS_URL: redis://redis:6379/0
       CELERY_BROKER_URL: redis://redis:6379/0
@@ -235,8 +239,6 @@ services:
     volumes:
       - fantappero_avatar_data:/data/avatars
     depends_on:
-      postgres:
-        condition: service_healthy
       redis:
         condition: service_healthy
       mailpit:
@@ -271,8 +273,7 @@ services:
       - path: infra/local/.env
         required: false
     environment:
-      # Always use in-compose hostnames — ignore host .env DATABASE_URL (127.0.0.1).
-      DATABASE_URL: postgresql://${POSTGRES_USER:-fantappero}:${POSTGRES_PASSWORD:-fantappero_local_dev_only}@postgres:5432/${POSTGRES_DB:-fantappero}
+      DATABASE_URL: ${DATABASE_URL}
       REDIS_URL: redis://redis:6379/0
       CELERY_BROKER_URL: redis://redis:6379/0
       CELERY_RESULT_BACKEND: redis://redis:6379/1
@@ -284,8 +285,6 @@ services:
       FANTASY_TURNS_AUTO_GENERATE_INTERVAL_SECONDS: ${FANTASY_TURNS_AUTO_GENERATE_INTERVAL_SECONDS:-3600}
       FANTASY_TURNS_HORIZON_DAYS: ${FANTASY_TURNS_HORIZON_DAYS:-14}
     depends_on:
-      postgres:
-        condition: service_healthy
       redis:
         condition: service_healthy
       mailpit:
@@ -321,7 +320,7 @@ services:
       - path: infra/local/.env
         required: false
     environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER:-fantappero}:${POSTGRES_PASSWORD:-fantappero_local_dev_only}@postgres:5432/${POSTGRES_DB:-fantappero}
+      DATABASE_URL: ${DATABASE_URL}
       REDIS_URL: redis://redis:6379/0
       CELERY_BROKER_URL: redis://redis:6379/0
       CELERY_RESULT_BACKEND: redis://redis:6379/1
@@ -329,8 +328,6 @@ services:
       FANTASY_TURNS_AUTO_GENERATE_INTERVAL_SECONDS: ${FANTASY_TURNS_AUTO_GENERATE_INTERVAL_SECONDS:-3600}
       FANTASY_TURNS_HORIZON_DAYS: ${FANTASY_TURNS_HORIZON_DAYS:-14}
     depends_on:
-      postgres:
-        condition: service_healthy
       redis:
         condition: service_healthy
       worker:

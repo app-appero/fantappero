@@ -9,7 +9,8 @@ if [[ -f infra/local/.env ]]; then
   ENV_FILE="infra/local/.env"
 fi
 
-ESSENTIAL=(postgres redis api worker web)
+# Postgres is optional (profile local-db); default stack uses remote DATABASE_URL.
+ESSENTIAL=(redis api worker web)
 TIMEOUT_SEC="${HEALTH_TIMEOUT_SEC:-180}"
 SLEEP_SEC=3
 deadline=$((SECONDS + TIMEOUT_SEC))

@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Start essential local stack (postgres, redis, api, worker, web).
+# Start essential local stack (redis, api, worker, web; Postgres via remote DATABASE_URL).
+# Optional local Postgres: docker compose --profile local-db up -d postgres
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$ROOT"
