@@ -78,6 +78,14 @@ export function IconUser(props: IconProps) {
   );
 }
 
+export function IconMenu(props: IconProps) {
+  return (
+    <IconBase width={24} height={24} {...props}>
+      <path d="M3 6h18M3 12h18M3 18h18" />
+    </IconBase>
+  );
+}
+
 export function IconBell(props: IconProps) {
   return (
     <IconBase {...props}>

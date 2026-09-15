@@ -2,11 +2,12 @@ import {
   AppHeader,
   AppShell,
   Badge,
-  BottomNav,
   BrandLogo,
   LeagueSelector,
   LockCountdown,
+  NavDrawer,
   SidebarNav,
+  type NavLinkAnchorProps,
 } from "@fantappero/ui";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { Link, useLocation } from "../router/simpleRouter";
@@ -19,19 +20,19 @@ import { useLockCountdown } from "../matchday/useLockCountdown";
 import {
   ADMIN_NAV_ITEMS,
   APP_NAV_ITEMS,
-  NAV_SHORT_LABELS,
   filterNavItems,
   resolveNavGroups,
 } from "../navigation/navConfig";
 import {
   IconCart,
   IconLayout,
+  IconMenu,
   IconShield,
   IconTrophy,
   IconUser,
   IconUsers,
 } from "../navigation/NavIcons";
-import { RouterBottomNavLink, RouterNavLinkAdapter } from "../navigation/RouterNavLink";
+import { RouterNavLinkAdapter } from "../navigation/RouterNavLink";
 import { NotificationCenter } from "../notifications/NotificationCenter";
 import { SkipLink } from "./SkipLink";
 
@@ -125,9 +126,66 @@ function usePendingInviteCount(enabled: boolean): number {
   return count;
 }
 
+function useMobileNavDrawer() {
+  const [open, setOpen] = useState(false);
+  const location = useLocation();
+
+  useEffect(() => {
+    setOpen(false);
+  }, [location.pathname]);
+
+  useEffect(() => {
+    if (typeof window.matchMedia !== "function") {
+      return;
+    }
+    const mq = window.matchMedia("(min-width: 768px)");
+    const onChange = () => {
+      if (mq.matches) {
+        setOpen(false);
+      }
+    };
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
+  }, []);
+
+  const close = useCallback(() => setOpen(false), []);
+  const openDrawer = useCallback(() => setOpen(true), []);
+
+  return { open, close, openDrawer };
+}
+
+function MenuButton({ open, onOpen }: { open: boolean; onOpen: () => void }) {
+  return (
+    <button
+      type="button"
+      className="fa-app-header__menu-button"
+      aria-label="Apri menu"
+      aria-expanded={open}
+      aria-controls="nav-drawer-panel"
+      data-testid="app-menu-button"
+      onClick={onOpen}
+    >
+      <IconMenu />
+    </button>
+  );
+}
+
+function DrawerNavLink({ onNavigate, ...props }: NavLinkAnchorProps & { onNavigate: () => void }) {
+  return (
+    <RouterNavLinkAdapter
+      {...props}
+      onClick={(event) => {
+        props.onClick?.(event);
+        onNavigate();
+      }}
+    />
+  );
+}
+
 export function AppLayout({ children }: { children: React.ReactNode }) {
   const { user, leagues, activeLeagueId, setActiveLeagueId, can } = useAuth();
   const location = useLocation();
+  const { open: drawerOpen, close: closeDrawer, openDrawer } = useMobileNavDrawer();
   const { collapsed, toggle } = useCollapsedNavGroups();
   const pendingInvites = usePendingInviteCount(can(["league:view"]));
   const resolvedItems = filterNavItems(APP_NAV_ITEMS, can, location.pathname);
@@ -143,16 +201,14 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
         ? `${pendingInvites} inviti in attesa di risposta`
         : undefined,
   }));
-  // La bottom nav resta piatta: una barra non annida sottomenu.
-  const bottomNavItems = navItems.map((item) => ({
-    ...item,
-    label: NAV_SHORT_LABELS[item.id] ?? item.label,
-    ariaLabel: item.label,
-  }));
   const navGroups = resolveNavGroups();
   const expandedGroupIds = navGroups
     .filter((group) => !collapsed.includes(group.id))
     .map((group) => group.id);
+  const renderDrawerLink = useCallback(
+    (props: NavLinkAnchorProps) => <DrawerNavLink {...props} onNavigate={closeDrawer} />,
+    [closeDrawer],
+  );
 
   const canSeeLeagueContext = can(["league:view"]);
   const activeLeagueSummary = leagues.find(
@@ -169,6 +225,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
       skipLink={<SkipLink />}
       header={
         <AppHeader
+          menuSlot={<MenuButton open={drawerOpen} onOpen={openDrawer} />}
           brand={
             <Link to="/leghe" aria-label="FantApperò, home">
               <BrandLogo variant="full" size="sm" />
@@ -230,7 +287,11 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           actionsSlot={
             <>
               {can(["global:operate"]) ? (
-                <Link to="/admin" className="fa-link-muted" data-testid="admin-panel-link">
+                <Link
+                  to="/admin"
+                  className="fa-link-muted fa-app-header__desktop-only"
+                  data-testid="admin-panel-link"
+                >
                   Pannello globale
                 </Link>
               ) : null}
@@ -253,12 +314,41 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           ariaLabel="Navigazione lega"
         />
       }
-      bottomNav={
-        <BottomNav
-          items={bottomNavItems}
-          linkComponent={RouterBottomNavLink}
-          ariaLabel="Navigazione mobile lega"
-        />
+      overlay={
+        <NavDrawer
+          open={drawerOpen}
+          onClose={closeDrawer}
+          brand={
+            <Link to="/leghe" aria-label="FantApperò, home" onClick={closeDrawer}>
+              <BrandLogo variant="full" size="sm" />
+            </Link>
+          }
+          userDisplayName={user?.displayName ?? "Utente"}
+          footer={
+            <div className="fa-nav-drawer__logout" data-testid="nav-drawer-logout">
+              <LogoutButton />
+            </div>
+          }
+        >
+          <SidebarNav
+            items={navItems}
+            groups={navGroups}
+            expandedGroupIds={expandedGroupIds}
+            onToggleGroup={toggle}
+            linkComponent={renderDrawerLink}
+            ariaLabel="Navigazione lega"
+          />
+          {can(["global:operate"]) ? (
+            <Link
+              to="/admin"
+              className="fa-sidebar-nav__link fa-nav-drawer__extra"
+              data-testid="admin-panel-link-drawer"
+              onClick={closeDrawer}
+            >
+              Pannello globale
+            </Link>
+          ) : null}
+        </NavDrawer>
       }
     >
       {children}
@@ -269,6 +359,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
 export function AdminLayout({ children }: { children: React.ReactNode }) {
   const { user, can } = useAuth();
   const location = useLocation();
+  const { open: drawerOpen, close: closeDrawer, openDrawer } = useMobileNavDrawer();
   const navItems = filterNavItems(ADMIN_NAV_ITEMS, can, location.pathname).map((item) => ({
     id: item.id,
     label: item.label,
@@ -276,11 +367,10 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
     active: item.active,
     icon: <IconShield />,
   }));
-  const bottomNavItems = navItems.map((item) => ({
-    ...item,
-    label: NAV_SHORT_LABELS[item.id] ?? item.label,
-    ariaLabel: item.label,
-  }));
+  const renderDrawerLink = useCallback(
+    (props: NavLinkAnchorProps) => <DrawerNavLink {...props} onNavigate={closeDrawer} />,
+    [closeDrawer],
+  );
 
   return (
     <AppShell
@@ -289,6 +379,7 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
       header={
         <AppHeader
           variant="admin"
+          menuSlot={<MenuButton open={drawerOpen} onOpen={openDrawer} />}
           brand={
             <Link to="/admin" className="fa-admin-brand">
               FantApperò — Operazioni
@@ -296,7 +387,7 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
           }
           actionsSlot={
             <>
-              <Link to="/leghe" className="fa-link-muted">
+              <Link to="/leghe" className="fa-link-muted fa-app-header__desktop-only">
                 Torna all&apos;app
               </Link>
               <span className="fa-user-chip fa-user-chip--admin" data-testid="admin-user-display">
@@ -314,12 +405,35 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
           ariaLabel="Navigazione operatore globale"
         />
       }
-      bottomNav={
-        <BottomNav
-          items={bottomNavItems}
-          linkComponent={RouterBottomNavLink}
-          ariaLabel="Navigazione mobile operatore"
-        />
+      overlay={
+        <NavDrawer
+          open={drawerOpen}
+          onClose={closeDrawer}
+          brand={
+            <Link to="/admin" className="fa-admin-brand" onClick={closeDrawer}>
+              FantApperò — Operazioni
+            </Link>
+          }
+          userDisplayName={user?.displayName ?? "Operatore"}
+          footer={
+            <div className="fa-nav-drawer__logout" data-testid="nav-drawer-logout">
+              <LogoutButton />
+            </div>
+          }
+        >
+          <SidebarNav
+            items={navItems}
+            linkComponent={renderDrawerLink}
+            ariaLabel="Navigazione operatore globale"
+          />
+          <Link
+            to="/leghe"
+            className="fa-sidebar-nav__link fa-nav-drawer__extra"
+            onClick={closeDrawer}
+          >
+            Torna all&apos;app
+          </Link>
+        </NavDrawer>
       }
     >
       {children}

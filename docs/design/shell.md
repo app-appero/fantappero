@@ -19,7 +19,8 @@ Dipendenze: [EPUI-02](./components.md), [EPUI-03](./navigation.md), [EPUI-04](./
 
 | Superficie | `data-surface` | Layout |
 | --- | --- | --- |
-| App membro | `app` | Sidebar + bottom nav |
+| App membro | `app` | Sidebar desktop + drawer laterale mobile |
+| Operatore globale | `admin` | Shell distinta (warning bar), stesso pattern nav |
 | Operatore globale | `admin` | Shell distinta (warning bar) |
 | Autenticazione | `auth` | Senza shell (full-page form) |
 
@@ -31,7 +32,7 @@ Vedi [`navigation.md`](./navigation.md) per permessi e path. Gli stati UI (`?sta
 
 ## Responsività
 
-- Breakpoint nav: **768px** — sidebar desktop, bottom nav mobile
+- Breakpoint nav: **768px** — sidebar desktop, drawer laterale mobile (hamburger in header)
 - Viewport minimo testato: **360px**
 - `overflow-x: clip` sul body per evitare scroll orizzontale
 - Padding ridotto su viewport stretti (`≤767px`)

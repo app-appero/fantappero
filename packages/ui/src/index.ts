@@ -72,6 +72,9 @@ export type {
 export { BottomNav } from "./components/layout/BottomNav.js";
 export type { BottomNavProps } from "./components/layout/BottomNav.js";
 
+export { NavDrawer } from "./components/layout/NavDrawer.js";
+export type { NavDrawerProps } from "./components/layout/NavDrawer.js";
+
 export { PageContainer } from "./components/layout/PageContainer.js";
 export type { PageContainerProps } from "./components/layout/PageContainer.js";
 

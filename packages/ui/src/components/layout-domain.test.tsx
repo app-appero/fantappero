@@ -16,6 +16,7 @@ import {
   LockCountdown,
   MatchCard,
   MatchTimeline,
+  NavDrawer,
   PageContainer,
   PlayerCard,
   ResultCard,
@@ -62,14 +63,53 @@ describe("EPUI-03 layout components", () => {
   it("renders app header slots used by the compact mobile chrome", () => {
     const html = renderToStaticMarkup(
       createElement(AppHeader, {
+        menuSlot: createElement("button", { type: "button" }, "Menu"),
         brand: "FantApperò",
         contextSlot: createElement("span", null, "Lega"),
         actionsSlot: createElement("span", null, "Esci"),
       }),
     );
+    expect(html).toContain("fa-app-header__menu");
     expect(html).toContain("fa-app-header__brand");
     expect(html).toContain("fa-app-header__context");
     expect(html).toContain("fa-app-header__actions");
+  });
+
+  it("renders the mobile nav drawer only when open", () => {
+    const closed = renderToStaticMarkup(
+      createElement(
+        NavDrawer,
+        { open: false, onClose: () => undefined, brand: "FantApperò", userDisplayName: "Ada" },
+        createElement(SidebarNav, {
+          items: [{ id: "a", label: "Turni", href: "/turni", active: true }],
+        }),
+      ),
+    );
+    expect(closed).toBe("");
+
+    const open = renderToStaticMarkup(
+      createElement(
+        NavDrawer,
+        {
+          open: true,
+          onClose: () => undefined,
+          brand: "FantApperò",
+          userDisplayName: "Ada",
+          closeLabel: "Chiudi",
+          footer: createElement("button", { type: "button" }, "Esci"),
+        },
+        createElement(SidebarNav, {
+          items: [{ id: "a", label: "Turni", href: "/turni", active: true }],
+        }),
+      ),
+    );
+    expect(open).toContain('data-testid="nav-drawer"');
+    expect(open).toContain('data-testid="nav-drawer-panel"');
+    expect(open).toContain('data-testid="nav-drawer-close"');
+    expect(open).toContain("Ada");
+    expect(open).toContain("Turni");
+    expect(open).toContain("Esci");
+    expect(open).toContain("Chiudi");
   });
 
   it("applies admin visual treatment on global operator shell", () => {

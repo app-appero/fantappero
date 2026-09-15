@@ -2,6 +2,8 @@ import { type HTMLAttributes, type ReactNode } from "react";
 import { classNames } from "../../utils/classNames.js";
 
 export type AppHeaderProps = HTMLAttributes<HTMLElement> & {
+  /** Hamburger / menu trigger, shown on mobile web like the native app. */
+  menuSlot?: ReactNode;
   brand?: ReactNode;
   /** League selector or context switcher slot. */
   contextSlot?: ReactNode;
@@ -12,6 +14,7 @@ export type AppHeaderProps = HTMLAttributes<HTMLElement> & {
 };
 
 export function AppHeader({
+  menuSlot,
   brand,
   contextSlot,
   actionsSlot,
@@ -30,6 +33,7 @@ export function AppHeader({
       data-testid="app-header"
       {...rest}
     >
+      {menuSlot ? <div className="fa-app-header__menu">{menuSlot}</div> : null}
       <div className="fa-app-header__brand">{brand}</div>
       {contextSlot ? <div className="fa-app-header__context">{contextSlot}</div> : null}
       {actionsSlot ? <div className="fa-app-header__actions">{actionsSlot}</div> : null}
