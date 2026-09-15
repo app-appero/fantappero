@@ -430,7 +430,7 @@ export function LeagueCalendarPanel({
         <Button
           type="button"
           variant="secondary"
-          disabled={working !== null || !calendar || calendar.status === "confirmed"}
+          disabled={working !== null || !calendar}
           onClick={() => void onConfirm()}
           data-testid="league-calendar-confirm"
         >

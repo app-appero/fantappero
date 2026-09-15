@@ -127,5 +127,8 @@ export function NavDrawer({
     return drawer;
   }
 
+  // Portal to body: the app shell uses `isolation: isolate` and
+  // `.fa-surface-pitch > * { position: relative }`, which would otherwise
+  // keep the overlay in document flow instead of covering the viewport.
   return createPortal(drawer, document.body);
 }
