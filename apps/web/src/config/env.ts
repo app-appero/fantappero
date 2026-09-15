@@ -53,9 +53,7 @@ function isLoopbackHostname(hostname: string): boolean {
 
 /**
  * The browser must not call loopback when the UI is served from another host
- * (LAN IP, Railway preview, …): that hits the *user's* machine and shows
- * "Connessione non disponibile verso http://127.0.0.1:8001".
- * Same-origin lets the Vite/nginx proxy forward to the real API.
+ * (LAN IP, Railway preview, …): that would hit the user's own machine.
  */
 export function resolveApiBaseUrl(
   configured: string,

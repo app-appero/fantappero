@@ -1,7 +1,7 @@
-import { createApiClient, ApiError } from "@fantappero/api-client";
-import { getWebEnv, resolveApiBaseUrl } from "../config/env";
+import { createApiClient, ApiError, getApiErrorMessage } from "@fantappero/api-client";
+import { getWebEnv, resolveApiBaseUrl, WebEnvError } from "../config/env";
 
-export { ApiError };
+export { ApiError, getApiErrorMessage };
 
 type UploadOptions = {
   accessToken: string;
@@ -9,8 +9,19 @@ type UploadOptions = {
   fieldName?: string;
 };
 
+function resolveBaseUrl(): string {
+  try {
+    return resolveApiBaseUrl(getWebEnv().viteApiBaseUrl);
+  } catch (error) {
+    if (error instanceof WebEnvError) {
+      throw new ApiError("Servizio non disponibile. Riprova tra poco.", 0, "missing_api_base_url");
+    }
+    throw error;
+  }
+}
+
 const client = createApiClient<File>({
-  resolveBaseUrl: () => resolveApiBaseUrl(getWebEnv().viteApiBaseUrl),
+  resolveBaseUrl,
   buildUploadValue: (file) => file,
   defaultErrorMessage: () => "Si è verificato un errore.",
 });

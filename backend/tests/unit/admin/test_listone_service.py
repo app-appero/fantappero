@@ -28,6 +28,8 @@ def test_platform_refresh_maps_missing_provider_key(monkeypatch: pytest.MonkeyPa
     with pytest.raises(ValidationAuthError) as exc:
         refresh_platform_listone(_FakeSession(), season_year=2026)  # type: ignore[arg-type]
     assert exc.value.code == "provider_key_missing"
+    assert "API_FOOTBALL" not in exc.value.message
+    assert "backend" not in exc.value.message.lower()
 
 
 def test_platform_refresh_syncs_catalog_then_roster_listone(

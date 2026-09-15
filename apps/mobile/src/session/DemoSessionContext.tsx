@@ -16,7 +16,7 @@ import {
   type ReactNode,
 } from "react";
 import * as authApi from "../api/auth";
-import { ApiError } from "../api/client";
+import { ApiError, getApiErrorMessage } from "../api/client";
 import { fetchMyLeagues } from "../api/leagues";
 import { buildPermissionContext } from "./demoSession";
 import {
@@ -368,12 +368,4 @@ export function useDemoSession(): AuthSessionContextValue {
   return useAuthSession();
 }
 
-export function getApiErrorMessage(error: unknown, fallback: string): string {
-  if (error instanceof ApiError) {
-    return error.message;
-  }
-  if (error instanceof Error && error.message.trim()) {
-    return error.message;
-  }
-  return fallback;
-}
+export { getApiErrorMessage } from "../api/client";

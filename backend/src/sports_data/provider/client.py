@@ -18,6 +18,8 @@ from sports_data.provider.envelope import (
     parse_rate_limit_headers,
 )
 from sports_data.provider.errors import (
+    PROVIDER_RATE_LIMITED_USER_MESSAGE,
+    PROVIDER_UNAVAILABLE_USER_MESSAGE,
     ProviderAuthError,
     ProviderConfigError,
     ProviderHttpError,
@@ -73,9 +75,7 @@ class ApiFootballClient:
         rate_limiter: MinuteRateLimiter | None = None,
     ) -> None:
         if not api_key or not str(api_key).strip():
-            raise ProviderConfigError(
-                "Chiave provider assente: impostare API_FOOTBALL_KEY (solo backend)",
-            )
+            raise ProviderConfigError(PROVIDER_UNAVAILABLE_USER_MESSAGE)
         self._api_key = str(api_key).strip()
         self._base_url = base_url.rstrip("/")
         self._timeout = timeout_seconds
@@ -278,7 +278,7 @@ class ApiFootballClient:
                     rate_limit_pauses += 1
                     continue
                 raise ProviderRateLimitError(
-                    "Quota API-Football esaurita o rate limit attivo dopo pause ripetute.",
+                    PROVIDER_RATE_LIMITED_USER_MESSAGE,
                     endpoint=endpoint,
                     remaining=rate_limit.remaining,
                 )

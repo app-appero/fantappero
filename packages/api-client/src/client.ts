@@ -96,19 +96,38 @@ function extractErrorMessage(
   return messages.defaultErrorMessage(status);
 }
 
+/**
+ * Messages shown in the UI must not mention backend setup (migrations, env vars,
+ * URLs, HTTP status codes, SQL). Prefer the caller fallback when the payload
+ * still contains those internals.
+ */
+const BACKEND_OPS_LEAK =
+  /alembic|migrazione|api_football|vite_api|expo_public|database_url|column |http \d{3}|127\.0\.0\.1|upgrade head|ambiente backend|porta 8001/i;
+
+export function getApiErrorMessage(error: unknown, fallback: string): string {
+  if (!(error instanceof ApiError)) {
+    return fallback;
+  }
+  const message = error.message.trim();
+  if (!message || BACKEND_OPS_LEAK.test(message)) {
+    return fallback;
+  }
+  return message;
+}
+
 export function createApiClient<TFile = unknown>(config: ApiClientConfig<TFile>) {
   const isDev = config.isDev ?? (() => false);
   const messages: ResolvedMessages = {
     networkErrorMessage:
       config.networkErrorMessage ??
-      ((baseUrl: string) => `Connessione non disponibile verso ${baseUrl}.`),
+      ((_baseUrl: string) => "Connessione non disponibile. Riprova tra poco."),
     invalidResponseMessage:
       config.invalidResponseMessage ??
-      ((status: number) => `Risposta non valida dall'API (HTTP ${status}).`),
+      ((_status: number) => "Risposta non valida. Riprova tra poco."),
     notFoundMessage: config.notFoundMessage,
     defaultErrorMessage:
       config.defaultErrorMessage ??
-      ((status: number) => `Si è verificato un errore (HTTP ${status}).`),
+      ((_status: number) => "Si è verificato un errore. Riprova tra poco."),
   };
 
   async function performFetch(url: string, baseUrl: string, init: RequestInit): Promise<Response> {

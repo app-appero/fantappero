@@ -9,7 +9,12 @@ import pytest
 from sqlalchemy.exc import ProgrammingError
 
 from auth.exceptions import ValidationAuthError
-from leagues.market_open import read_market_open, read_market_open_map, write_market_open
+from leagues.market_open import (
+    MARKET_GATE_UNAVAILABLE_MESSAGE,
+    read_market_open,
+    read_market_open_map,
+    write_market_open,
+)
 
 
 def test_read_market_open_defaults_when_column_is_missing() -> None:
@@ -40,4 +45,7 @@ def test_write_market_open_raises_when_column_is_missing() -> None:
     with pytest.raises(ValidationAuthError) as exc:
         write_market_open(session, uuid4(), False)
     assert exc.value.code == "market_gate_unavailable"
+    assert exc.value.message == MARKET_GATE_UNAVAILABLE_MESSAGE
+    assert "alembic" not in exc.value.message.lower()
+    assert "migrazione" not in exc.value.message.lower()
     session.rollback.assert_called_once()

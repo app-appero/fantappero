@@ -9,7 +9,10 @@ from app.worker import celery_app
 from config.settings import get_api_settings
 from database.session import create_engine_from_url, create_session_factory, session_scope
 from sports_data.provider.client import build_client_from_settings
-from sports_data.provider.errors import ProviderConfigError
+from sports_data.provider.errors import (
+    PROVIDER_UNAVAILABLE_USER_MESSAGE,
+    ProviderConfigError,
+)
 from sports_data.quality.models import SportsDataSyncRetry
 from sports_data.quality.retry import QualityRetryError, complete_retry, run_retry
 from sports_data.quality.scan import scan_quality
@@ -56,7 +59,7 @@ def retry_fixture_sync_task(retry_id: str) -> dict[str, object]:
                     row,
                     error=QualityRetryError(
                         "provider_unavailable",
-                        "Chiave provider assente: impossibile rilanciare la sync",
+                        PROVIDER_UNAVAILABLE_USER_MESSAGE,
                     ),
                 )
             return {

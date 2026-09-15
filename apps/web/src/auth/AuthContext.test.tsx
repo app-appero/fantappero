@@ -168,6 +168,7 @@ describe("AuthContext membership cache", () => {
 
     const snapshot = container.querySelector('[data-testid="leagues-snapshot"]');
     expect(snapshot?.textContent).toContain("Lega di test");
-    expect(snapshot?.getAttribute("data-error")).toContain("market_open");
+    expect(snapshot?.getAttribute("data-error")).toBe("Impossibile caricare le tue leghe.");
+    expect(snapshot?.getAttribute("data-error")).not.toMatch(/market_open|column|alembic/i);
   });
 });

@@ -48,6 +48,8 @@ def test_refresh_maps_missing_provider_key(monkeypatch: pytest.MonkeyPatch) -> N
     with pytest.raises(ValidationAuthError) as exc:
         service.refresh_from_provider(_access())
     assert exc.value.code == "provider_key_missing"
+    assert "API_FOOTBALL" not in exc.value.message
+    assert "backend" not in exc.value.message.lower()
 
 
 def test_refresh_always_syncs_catalog_then_roster_listone(

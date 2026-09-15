@@ -16,7 +16,7 @@ import {
   type ReactNode,
 } from "react";
 import * as authApi from "../api/auth";
-import { ApiError } from "../api/client";
+import { getApiErrorMessage } from "../api/client";
 import { fetchMyLeagues } from "../api/leagues";
 import { useSearchParams } from "../router/simpleRouter";
 import {
@@ -449,12 +449,4 @@ export function useAuth(): AuthContextValue {
   return context;
 }
 
-export function getApiErrorMessage(error: unknown, fallback: string): string {
-  if (error instanceof ApiError) {
-    return error.message;
-  }
-  if (error instanceof Error && error.message.trim()) {
-    return error.message;
-  }
-  return fallback;
-}
+export { getApiErrorMessage } from "../api/client";

@@ -1,4 +1,4 @@
-export { ApiError, createApiClient } from "./client.js";
+export { ApiError, createApiClient, getApiErrorMessage } from "./client.js";
 export type {
   ApiClientConfig,
   ApiRequestOptions,

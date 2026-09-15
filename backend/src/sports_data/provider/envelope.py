@@ -4,7 +4,11 @@ from __future__ import annotations
 
 from typing import Any
 
-from sports_data.provider.errors import ProviderRateLimitError, ProviderResponseError
+from sports_data.provider.errors import (
+    PROVIDER_RATE_LIMITED_USER_MESSAGE,
+    ProviderRateLimitError,
+    ProviderResponseError,
+)
 from sports_data.provider.types import ProviderEnvelope, ProviderPaging, ProviderRateLimit
 
 
@@ -134,7 +138,7 @@ def parse_envelope(
     if raise_on_errors and envelope.has_errors:
         if errors_indicate_rate_limit(errors):
             raise ProviderRateLimitError(
-                "Quota API-Football esaurita o rate limit attivo. Riprova tra circa un minuto.",
+                PROVIDER_RATE_LIMITED_USER_MESSAGE,
                 endpoint=resolved_endpoint,
             )
         raise ProviderResponseError(

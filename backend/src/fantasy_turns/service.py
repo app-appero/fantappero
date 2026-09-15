@@ -24,11 +24,6 @@ from database.enums import (
     LeagueState,
 )
 from fantasy_lineups.models import EffectiveLineup, LineupSubmission
-from fantasy_turns.live_view import (
-    PROVIDER_FEED_LABELS,
-    FixtureFreshness,
-    fixture_feed_state,
-)
 from fantasy_turns.coverage import (
     RosteredPlayer,
     clubs_playing_between,
@@ -36,6 +31,11 @@ from fantasy_turns.coverage import (
     coverage_threshold_for,
     load_league_rosters,
     window_is_valid,
+)
+from fantasy_turns.live_view import (
+    PROVIDER_FEED_LABELS,
+    FixtureFreshness,
+    fixture_feed_state,
 )
 from fantasy_turns.models import FantasyRound, FantasyRoundFixture
 from fantasy_turns.round_calculation_service import calculate_league_round
@@ -82,9 +82,8 @@ from observability.context import get_correlation_id
 from observability.logging import get_logger
 from observability.metrics import get_metrics
 from sports_data.catalog.models import Club, SportSeason
-from sports_data.fixtures.models import Fixture
+from sports_data.fixtures.models import Fixture, OfficialLineup
 from sports_data.fixtures.models import Fixture as _FixtureModel  # noqa: F401
-from sports_data.fixtures.models import OfficialLineup
 from sports_data.fixtures.sync import (
     FixtureDetailBatch,
     FixtureSyncCounters,
@@ -93,7 +92,7 @@ from sports_data.fixtures.sync import (
     sync_mvp_fixtures_with_client,
 )
 from sports_data.provider.client import ApiFootballClient, build_client_from_settings
-from sports_data.provider.errors import ProviderConfigError
+from sports_data.provider.errors import PROVIDER_UNAVAILABLE_USER_MESSAGE, ProviderConfigError
 
 logger = get_logger(__name__)
 _ = (User, Club)
@@ -1588,8 +1587,7 @@ class FantasyTurnService:
                 client = build_client_from_settings(get_api_settings())
             except ProviderConfigError as exc:
                 raise ValidationAuthError(
-                    "Chiave API-Football assente sul server. "
-                    "Imposta API_FOOTBALL_KEY nell'ambiente backend.",
+                    PROVIDER_UNAVAILABLE_USER_MESSAGE,
                     code="provider_key_missing",
                 ) from exc
         return sync_mvp_fixtures_with_client(
@@ -1642,8 +1640,7 @@ class FantasyTurnService:
                 client = build_client_from_settings(get_api_settings())
             except ProviderConfigError as exc:
                 raise ValidationAuthError(
-                    "Chiave API-Football assente sul server. "
-                    "Imposta API_FOOTBALL_KEY nell'ambiente backend.",
+                    PROVIDER_UNAVAILABLE_USER_MESSAGE,
                     code="provider_key_missing",
                 ) from exc
 

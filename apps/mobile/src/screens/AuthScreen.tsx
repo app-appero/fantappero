@@ -16,7 +16,7 @@ function resolveApiBaseUrlForDisplay(): string {
   try {
     return loadMobileEnv().expoPublicApiBaseUrl;
   } catch {
-    return "(EXPO_PUBLIC_API_BASE_URL mancante)";
+    return "Servizio non disponibile";
   }
 }
 

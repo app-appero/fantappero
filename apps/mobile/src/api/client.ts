@@ -1,7 +1,7 @@
-import { createApiClient, ApiError } from "@fantappero/api-client";
+import { createApiClient, ApiError, getApiErrorMessage } from "@fantappero/api-client";
 import { loadMobileEnv, MobileEnvError } from "../config/env";
 
-export { ApiError };
+export { ApiError, getApiErrorMessage };
 
 type UploadFile = { uri: string; name: string; type?: string };
 
@@ -17,7 +17,7 @@ function resolveApiBaseUrl(): string {
   } catch (error) {
     if (error instanceof MobileEnvError) {
       throw new ApiError(
-        "URL API non configurato. Imposta EXPO_PUBLIC_API_BASE_URL.",
+        "Servizio non disponibile. Riprova tra poco.",
         0,
         "missing_api_base_url",
       );
@@ -35,12 +35,9 @@ const client = createApiClient<UploadFile>({
       name: file.name,
       type: file.type ?? "text/csv",
     }) as unknown as Blob,
-  networkErrorMessage: (baseUrl) =>
-    `Connessione non disponibile verso ${baseUrl}. Verifica rete e EXPO_PUBLIC_API_BASE_URL.`,
-  invalidResponseMessage: (status) =>
-    `Risposta non valida dall'API (HTTP ${status}). Controlla EXPO_PUBLIC_API_BASE_URL.`,
-  notFoundMessage: (status) =>
-    `Endpoint non trovato (${status}). Controlla EXPO_PUBLIC_API_BASE_URL (API su porta 8001).`,
+  networkErrorMessage: () => "Connessione non disponibile. Riprova tra poco.",
+  invalidResponseMessage: () => "Risposta non valida. Riprova tra poco.",
+  notFoundMessage: () => "Risorsa non trovata. Riprova tra poco.",
 });
 
 export const apiRequest = client.apiRequest;

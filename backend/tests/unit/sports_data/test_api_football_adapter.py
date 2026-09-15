@@ -133,7 +133,7 @@ def test_parse_envelope_raises_rate_limit_from_body_errors() -> None:
             },
             endpoint="/players/squads",
         )
-    assert "Quota API-Football" in str(exc.value)
+    assert "Troppe richieste" in str(exc.value)
     assert exc.value.endpoint == "/players/squads"
 
 

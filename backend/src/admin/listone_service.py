@@ -46,6 +46,9 @@ from sports_data.listone.models import RoleAssignment
 from sports_data.provider.client import ApiFootballClient, build_client_from_settings
 from sports_data.provider.constants import PROVIDER_NAME
 from sports_data.provider.errors import (
+    PROVIDER_CATALOG_NOT_READY_USER_MESSAGE,
+    PROVIDER_RATE_LIMITED_USER_MESSAGE,
+    PROVIDER_UNAVAILABLE_USER_MESSAGE,
     ProviderAuthError,
     ProviderConfigError,
     ProviderError,
@@ -99,8 +102,7 @@ def refresh_platform_listone(
                     client = build_client_from_settings(get_api_settings())
                 except ProviderConfigError as exc:
                     raise ValidationAuthError(
-                        "Chiave API-Football assente sul server. "
-                        "Imposta API_FOOTBALL_KEY nell'ambiente backend.",
+                        PROVIDER_UNAVAILABLE_USER_MESSAGE,
                         code="provider_key_missing",
                     ) from exc
 
@@ -108,8 +110,7 @@ def refresh_platform_listone(
             sync_mvp_catalog_with_client(session, client)
             if _count_clubs_for_season(session, season_year) == 0:
                 raise ValidationAuthError(
-                    "Catalogo club non disponibile dopo il sync. "
-                    "Verifica la stagione e la copertura provider.",
+                    PROVIDER_CATALOG_NOT_READY_USER_MESSAGE,
                     code="catalog_not_ready",
                 )
             report(12, "catalog", "Catalogo aggiornato. Avvio sync rose…")
@@ -164,14 +165,13 @@ def refresh_platform_listone(
         except ProviderRateLimitError as exc:
             status = "error"
             raise ValidationAuthError(
-                "Quota API-Football esaurita o rate limit attivo. "
-                "Il sync MVP chiama molte richieste: attendi circa un minuto e riprova.",
+                PROVIDER_RATE_LIMITED_USER_MESSAGE,
                 code="provider_rate_limited",
             ) from exc
         except ProviderAuthError as exc:
             status = "error"
             raise ValidationAuthError(
-                "Autenticazione provider rifiutata. Verifica API_FOOTBALL_KEY.",
+                PROVIDER_UNAVAILABLE_USER_MESSAGE,
                 code="provider_auth_failed",
             ) from exc
         except ProviderError as exc:

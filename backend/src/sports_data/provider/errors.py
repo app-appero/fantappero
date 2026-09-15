@@ -2,6 +2,11 @@
 
 from __future__ import annotations
 
+# User-facing copy: never mention env vars, keys, or backend setup steps.
+PROVIDER_UNAVAILABLE_USER_MESSAGE = "Servizio dati sportivi non disponibile. Riprova tra poco."
+PROVIDER_RATE_LIMITED_USER_MESSAGE = "Troppe richieste. Riprova tra poco."
+PROVIDER_CATALOG_NOT_READY_USER_MESSAGE = "Catalogo club non disponibile. Riprova tra poco."
+
 
 class ProviderError(Exception):
     """Base error for Sport Data provider I/O."""

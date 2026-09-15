@@ -19,10 +19,7 @@ from auth.exceptions import ValidationAuthError
 from leagues.models.league import League
 
 MARKET_GATE_UNAVAILABLE_CODE = "market_gate_unavailable"
-MARKET_GATE_UNAVAILABLE_MESSAGE = (
-    "Impossibile aggiornare lo stato del mercato. "
-    "Esegui la migrazione del database (alembic upgrade head)."
-)
+MARKET_GATE_UNAVAILABLE_MESSAGE = "Impossibile aggiornare lo stato del mercato. Riprova tra poco."
 
 
 def read_market_open(session: Session, league_id: UUID, *, default: bool = True) -> bool:

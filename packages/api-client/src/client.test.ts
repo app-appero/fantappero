@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { after, before, describe, it } from "node:test";
 
-import { ApiError, createApiClient } from "./client.ts";
+import { ApiError, createApiClient, getApiErrorMessage } from "./client.ts";
 
 type FetchCall = { url: string; init: RequestInit | undefined };
 
@@ -116,6 +116,8 @@ describe("createApiClient", () => {
       await assert.rejects(apiRequest("/x"), (error: unknown) => {
         assert.ok(error instanceof ApiError);
         assert.equal(error.code, "network_error");
+        assert.equal(error.message, "Connessione non disponibile. Riprova tra poco.");
+        assert.equal(error.message.includes("https://api.example.test"), false);
         return true;
       });
     } finally {
@@ -160,5 +162,41 @@ describe("createApiClient", () => {
       console.error = originalError;
       stub.restore();
     }
+  });
+});
+
+describe("getApiErrorMessage", () => {
+  it("uses the ApiError message when it is user-facing", () => {
+    const error = new ApiError("Mercato chiuso.", 400, "market_closed");
+    assert.equal(getApiErrorMessage(error, "Riprova."), "Mercato chiuso.");
+  });
+
+  it("hides backend setup instructions still present in an ApiError", () => {
+    const error = new ApiError(
+      "Impossibile aggiornare lo stato del mercato. Esegui la migrazione del database (alembic upgrade head).",
+      400,
+      "market_gate_unavailable",
+    );
+    assert.equal(
+      getApiErrorMessage(error, "Impossibile aggiornare lo stato del mercato."),
+      "Impossibile aggiornare lo stato del mercato.",
+    );
+  });
+
+  it("does not surface raw Error messages such as SQL or env vars", () => {
+    assert.equal(
+      getApiErrorMessage(
+        new Error("column leagues.market_open does not exist"),
+        "Impossibile caricare le tue leghe.",
+      ),
+      "Impossibile caricare le tue leghe.",
+    );
+    assert.equal(
+      getApiErrorMessage(
+        new Error("Missing required environment variable: VITE_API_BASE_URL"),
+        "Servizio non disponibile.",
+      ),
+      "Servizio non disponibile.",
+    );
   });
 });

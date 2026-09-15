@@ -10,7 +10,10 @@ from sqlalchemy.orm import Session
 from auth.models.user import User
 from config.settings.loader import get_api_settings
 from sports_data.provider.client import build_client_from_settings
-from sports_data.provider.errors import ProviderConfigError
+from sports_data.provider.errors import (
+    PROVIDER_UNAVAILABLE_USER_MESSAGE,
+    ProviderConfigError,
+)
 from sports_data.quality.models import SportsDataQualityIssue, SportsDataSyncRetry
 from sports_data.quality.retry import (
     QualityRetryError,
@@ -150,7 +153,7 @@ class SportsDataQualityService:
                 row,
                 error=QualityRetryError(
                     "provider_unavailable",
-                    "Chiave provider assente: impossibile rilanciare la sync",
+                    PROVIDER_UNAVAILABLE_USER_MESSAGE,
                 ),
             )
         self._session.flush()

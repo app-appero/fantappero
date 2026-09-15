@@ -11,7 +11,13 @@ from fantasy_turns.calendar_refresh_progress import CalendarRefreshProgress, sav
 from fantasy_turns.service import FantasyTurnService
 from leagues.models.league import League
 from observability.logging import get_logger
-from sports_data.provider.errors import ProviderAuthError, ProviderError, ProviderRateLimitError
+from sports_data.provider.errors import (
+    PROVIDER_RATE_LIMITED_USER_MESSAGE,
+    PROVIDER_UNAVAILABLE_USER_MESSAGE,
+    ProviderAuthError,
+    ProviderError,
+    ProviderRateLimitError,
+)
 
 logger = get_logger(__name__)
 
@@ -276,7 +282,7 @@ def refresh_full_calendar_task(*, job_id: str, league_id: str, actor_id: str | N
                 status="failed",
                 percent=0,
                 stage="failed",
-                message="Quota API-Football esaurita o rate limit attivo. Riprova tra poco.",
+                message=PROVIDER_RATE_LIMITED_USER_MESSAGE,
                 error_code="provider_rate_limited",
             )
         )
@@ -289,7 +295,7 @@ def refresh_full_calendar_task(*, job_id: str, league_id: str, actor_id: str | N
                 status="failed",
                 percent=0,
                 stage="failed",
-                message="Autenticazione provider rifiutata. Verifica API_FOOTBALL_KEY.",
+                message=PROVIDER_UNAVAILABLE_USER_MESSAGE,
                 error_code="provider_auth_failed",
             )
         )
