@@ -292,7 +292,19 @@ def reconcile_fixture_kickoff_lock(
         )
         started = status in STARTED_FIXTURE_STATUSES
         if published_elapsed or current_elapsed or started:
-            latched = observed or current or now_utc
+            # Latch at the earliest instant that actually elapsed, not just the
+            # first non-null candidate: an earlier reschedule (e.g. anticipated
+            # kickoff) must latch at the new, earlier time rather than the stale
+            # originally published one.
+            elapsed_candidates = [
+                candidate
+                for candidate, has_elapsed in (
+                    (observed, published_elapsed),
+                    (current, current_elapsed),
+                )
+                if has_elapsed and candidate is not None
+            ]
+            latched = min(elapsed_candidates) if elapsed_candidates else (current or observed or now_utc)
             just_latched = True
 
     new_observed = current if current is not None else observed

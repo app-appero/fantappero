@@ -292,6 +292,34 @@ def test_reconcile_fixture_kickoff_lock_latches_after_elapsed_not_before() -> No
     assert already.just_latched is False
 
 
+def test_reconcile_fixture_kickoff_lock_anticipated_kickoff() -> None:
+    """A kickoff moved earlier must latch at the new time, not the stale one."""
+    rome = ZoneInfo("Europe/Rome")
+    original = datetime(2026, 8, 15, 20, 45, tzinfo=rome)
+    anticipated = datetime(2026, 8, 15, 18, 30, tzinfo=rome)
+    before_new = datetime(2026, 8, 15, 16, 0, tzinfo=rome)
+    between = datetime(2026, 8, 15, 19, 0, tzinfo=rome)
+
+    pre = reconcile_fixture_kickoff_lock(
+        now=before_new,
+        current_kickoff_at=anticipated,
+        status_short="NS",
+        observed_kickoff_at=original,
+        lock_latched_at=None,
+    )
+    assert pre.lock_latched_at is None
+
+    post = reconcile_fixture_kickoff_lock(
+        now=between,
+        current_kickoff_at=anticipated,
+        status_short="NS",
+        observed_kickoff_at=original,
+        lock_latched_at=None,
+    )
+    assert post.lock_latched_at == anticipated.astimezone(UTC)
+    assert post.just_latched is True
+
+
 def test_reconcile_fixture_kickoff_lock_time_shift_without_pst() -> None:
     rome = ZoneInfo("Europe/Rome")
     original = datetime(2026, 8, 15, 18, 0, tzinfo=rome)
