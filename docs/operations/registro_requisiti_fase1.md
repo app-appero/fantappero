@@ -222,5 +222,14 @@ Su richiesta dell'utente di affrontare le domande aperte una per una, a partire 
 - Trovati **10 ingressi reali in recupero del secondo tempo** nel corpus; in tutti i casi il provider riporta `minutes: 1` — mai 0, mai proporzionale al recupero realmente giocato. Risposta empirica e concreta alla domanda originale.
 - Confermato che la regola già in codice gestisce correttamente questo caso (non si fida della sola soglia minuti per chi entra in recupero, richiede un evento rilevante).
 - **OQ-07 chiusa** in `docs/data/api_football_open_questions.md`. `EP07-02` → `IMPLEMENTED_VERIFIED`.
-- Non risolto (nessun caso nel corpus): giocatori convocati in panchina ma mai entrati — se compaiono o meno nel payload stats resta da verificare quando sarà disponibile un caso reale.
-- **Prossima in ordine tra le domande rimaste**: OQ-08 (coverage e completezza stats sui 5 campionati).
+- Alla scrittura di questa nota risultava non risolto il caso "giocatori convocati in panchina ma mai entrati" — **risolto poco dopo durante OQ-08** (vedi sotto): compaiono sì nel payload stats, con `games.minutes`/`games.rating` null e `games.substitute: true`.
+
+### B4 (continua) — OQ-08 chiusa parzialmente con prova reale (24/09/2026)
+
+- Calcolata una tabella % null reale (non stimata) sui campi che la formula v1 bonus/malus consuma oggi, su 694 entry giocatore-partita del corpus, tutti e 5 i campionati: `goals.total` 91-94% null, `goals.assists` 57-98%, `penalty.saved` 93-95%, `cards.red`/`cards.yellow`/`penalty.missed` ~0%, `games.minutes`/`games.rating` 8-22%.
+- **Verificato che gli alti tassi di null sui campi di conteggio non sono un problema**: il provider usa `null` per "zero occorrenze" (la maggior parte dei giocatori non segna/assiste/para un rigore), e `fantasy_ratings/input.py::_as_int` già tratta `None` come 0 correttamente.
+- **`goals.conceded` (nullo 0-43% a seconda della lega) non è nemmeno usato dal codice**: la porta inviolata viene calcolata da `mapping.py::team_goals_conceded` leggendo il punteggio reale della fixture, non il campo grezzo per-giocatore — il problema di coverage era quindi già aggirato dal design, non solo tollerato.
+- **Unico null "vero" trovato**: `games.minutes`/`games.rating`, ed è sempre e solo per convocati in panchina mai entrati (`games.substitute: true`) — verificato senza eccezioni su tutto il corpus. Questo chiude anche il dubbio residuo lasciato aperto da OQ-07.
+- Test aggiunti: `backend/tests/unit/fantasy_ratings/test_real_corpus_coverage.py` (4 test, tutti sui payload reali).
+- **OQ-08 chiusa parzialmente** in `docs/data/api_football_open_questions.md`: chiusa per i campi già usati dalla formula v1, resta aperta la lista completa di campi (saves, shots, passes, tackles, duels, fouls) per la futura Rating Beta, che dipende dalla decisione di prodotto OQ-09.
+- **Prossima in ordine tra le domande rimaste**: OQ-09 (calibrazione Rating Beta) — ma il documento stesso dice esplicitamente di non inventare i pesi qui: è una decisione del team, non un'indagine di codice. Da confermare con l'utente come procedere.
