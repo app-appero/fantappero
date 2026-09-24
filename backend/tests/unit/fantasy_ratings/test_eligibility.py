@@ -123,3 +123,60 @@ def test_threshold_target_rejects_both() -> None:
     with pytest.raises(FantasyRatingError) as error:
         validate_threshold_target(league_id=uuid4(), minutes_threshold=15)
     assert error.value.code == "minutes_threshold_ambiguous"
+
+
+# --------------------------------------------------------------------------
+# OQ-07 (docs/data/api_football_open_questions.md): validazione contro il
+# corpus reale api-football, non solo payload sintetici come sopra.
+# --------------------------------------------------------------------------
+
+import json
+from pathlib import Path
+
+_DATASET = Path(__file__).resolve().parents[3] / "tests" / "fixtures" / "api_football"
+
+
+def _real_stoppage_substitutions() -> list[tuple[Path, int]]:
+    """(match_dir, incoming_player_id) per ogni sub reale entrata al 90+."""
+    found: list[tuple[Path, int]] = []
+    for events_path in sorted(_DATASET.glob("matches/*/*/fixtures_events.json")):
+        payload = json.loads(events_path.read_text(encoding="utf-8"))
+        for player_id in stoppage_entry_player_ids_from_payload(payload):
+            found.append((events_path.parent, player_id))
+    return found
+
+
+def test_stoppage_entry_detection_matches_real_corpus_payloads() -> None:
+    """OQ-07: verifica su partite reali, non solo sui dizionari sintetici sopra."""
+    matches = _real_stoppage_substitutions()
+    assert matches, "il corpus offline dovrebbe contenere almeno un ingresso al 90+"
+
+
+def test_real_stoppage_entrants_get_a_small_nonzero_minutes_value() -> None:
+    """OQ-07: risposta empirica a 'Subentrati al 90+ hanno minutes > 0?'.
+
+    Sul corpus reale il provider assegna un valore minimo positivo (tipicamente
+    1), mai 0 e mai proporzionale al recupero effettivamente giocato: la
+    soglia minuti da sola classificherebbe questi ingressi come non eleggibili,
+    che è la ragione per cui evaluate_eligibility richiede anche
+    has_relevant_event/entered_in_stoppage invece di fidarsi solo di `minutes`.
+    """
+    matches = _real_stoppage_substitutions()
+    checked = 0
+    for match_dir, player_id in matches:
+        players_payload = json.loads(
+            (match_dir / "fixtures_players.json").read_text(encoding="utf-8")
+        )
+        for team_block in players_payload.get("response", []):
+            for entry in team_block.get("players", []):
+                if entry.get("player", {}).get("id") != player_id:
+                    continue
+                minutes = entry.get("statistics", [{}])[0].get("games", {}).get("minutes")
+                if minutes is None:
+                    continue
+                checked += 1
+                assert 0 < minutes <= 5, (
+                    f"{match_dir.name}/{player_id}: minutes={minutes} fuori dal range atteso "
+                    "per un ingresso al 90+ (valore minimo positivo, non proporzionale)"
+                )
+    assert checked > 0, "nessun ingresso al 90+ aveva un valore minutes tracciabile nel corpus"

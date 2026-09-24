@@ -114,6 +114,7 @@ Per le OQ che restano genuinamente aperte (OQ-08, OQ-09, OQ-10, OQ-11, OQ-12, OQ
 | Impatto | Soglia 15'; FR-SCO-01; FR-SUB-01; “senza voto” |
 | Evidenza richiesta EP00-02 | Titolare 90, sub 10, sub recupero, non sceso in campo |
 | Criterio chiusura | Regola deterministica minuti + eventi rilevanti sotto soglia |
+| Esito B4 (24/09/2026) | **Chiuso** — validato su payload reali del corpus offline (10 ingressi in recupero del secondo tempo trovati su tutte le 20 fixture, `matches/*/fixtures_events.json`+`fixtures_players.json`). Risposta empirica: `minutes` **è sempre 1** per un ingresso al 90+, mai 0 e mai proporzionale al recupero realmente giocato — quindi la sola soglia minuti classificherebbe erroneamente questi casi come "senza voto" se non ci fosse una regola dedicata. `fantasy_ratings/eligibility.py` gestisce già correttamente il caso (`is_second_half_stoppage` + `stoppage_entry_player_ids_from_payload`, poi `evaluate_eligibility` richiede un evento rilevante per chi entra in recupero, indipendentemente da `minutes`). Test aggiunto: `backend/tests/unit/fantasy_ratings/test_eligibility.py::test_real_stoppage_entrants_get_a_small_nonzero_minutes_value`. Non ancora verificato: giocatori in panchina mai entrati (se compaiono o meno nel payload stats) — nessun caso di questo tipo trovato nel corpus attuale. |
 
 ### OQ-08 — Coverage e completezza stats sui 5 campionati
 
