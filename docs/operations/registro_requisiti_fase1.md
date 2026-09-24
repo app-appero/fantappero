@@ -45,12 +45,12 @@ Durante l'analisi del piano di chiusura in questa stessa sessione sono state rac
 
 | Stato preliminare | Righe | Significato pratico |
 |---|---:|---|
-| `EVIDENCE_TEMPLATE` | 73 | Codice presumibilmente presente, manca prova manuale/test verificata da una persona |
+| `EVIDENCE_TEMPLATE` | 70 | Codice presumibilmente presente, manca prova manuale/test verificata da una persona |
 | `MVP_REMEDIATION` | 13 | Gap confermato direttamente in questa sessione (E2E non bloccante, pacchetto EP13 non iniziato) |
-| `IMPLEMENTED_VERIFIED` | 5 | Verificate con lettura di codice + test esistenti durante il Blocco B1 (EP04-07, EP06-03, EP06-05, EP06-06, EP06-07) |
+| `IMPLEMENTED_VERIFIED` | 8 | Verificate con lettura di codice + test esistenti durante il Blocco B (B1: EP04-07, EP06-03, EP06-05, EP06-06, EP06-07; B2: EP07-05, EP07-07, EP13-P02) |
 | `PHASE2_BACKLOG` | 1 | Dichiarata Fase 2 dalla fonte stessa (`EP13-F01`, discovery club/formazione personale) |
 
-Aggiornamento 24/09/2026 (Blocco B1): 5 righe sono passate da `EVIDENCE_TEMPLATE` a `IMPLEMENTED_VERIFIED` dopo lettura diretta del codice e dei test esistenti — non è più una fotografia puramente automatica, è iniziata la verifica con prova richiesta da EP13-02/B1.
+Aggiornamento 24/09/2026 (Blocco B1+B2): 8 righe sono passate da `EVIDENCE_TEMPLATE` a `IMPLEMENTED_VERIFIED` dopo lettura diretta del codice e dei test esistenti — non è più una fotografia puramente automatica, è in corso la verifica con prova richiesta da EP13-02.
 
 ## 5. Registro
 
@@ -95,9 +95,9 @@ Aggiornamento 24/09/2026 (Blocco B1): 5 righe sono passate da `EVIDENCE_TEMPLATE
 | EP07-02 | M3 — Ready | Must | Soglia minuti e senza voto | EP07, Backend, Database, QA | afd3815 M2 + M3-1 (commit di milestone, non granulare per questa card) | MEDIA (commit di milestone, non per card) | EVIDENCE_TEMPLATE |
 | EP07-03 | M3 — Ready | Must | Bonus e malus | EP07, Backend, Database, QA | ff1aee2 EP07-03: bonus e malus del voto statistico (fantavoto) | ALTA (commit dedicato) | EVIDENCE_TEMPLATE |
 | EP07-04 | M3 — Ready | Must | Sostituzioni e formazione effettiva | EP07, Backend, Database, QA | 7024a9f EP07-04: sostituzioni automatiche e formazione effettiva (FR-SUB-01) | ALTA (commit dedicato) | EVIDENCE_TEMPLATE |
-| EP07-05 | M3 — Ready | Must | Punteggio, fasce gol e scontro diretto | EP07, Backend, Database, QA | 463407b EP07-05: punteggio squadra e scontro diretto (FR-SCO-03) | ALTA (commit dedicato) | EVIDENCE_TEMPLATE |
+| EP07-05 | M3 — Ready | Must | Punteggio, fasce gol e scontro diretto | EP07, Backend, Database, QA | VERIFICATO B2 (24/09/2026): backend persiste due grandezze distinte per slot H2H (`homeScore`/`awayScore` = Punti, somma fantavoti undici effettivi; `homeFantasyGoals`/`awayFantasyGoals` = Gol fantasy, conversione a soglie in `docs/api/league_scoring.md`). Client (web e mobile, stesso pacchetto `@fantappero/contracts/h2hScore.ts`) mostra le due righe etichettate separatamente ("Punti"/"Gol fantasy"), mai un numero anonimo tra parentesi — copre esplicitamente l'esempio del piano (72,5 (2) – 68 (1) da evitare). | ALTA (lettura codice condiviso web+mobile) | IMPLEMENTED_VERIFIED |
 | EP07-06 | M3 — Ready | Must | Classifica e criteri di parità | EP07, Backend, Database, QA | 47e852c, f424dd8 EP07-06: classifica e criteri di parita, collegata | ALTA (commit dedicato) | EVIDENCE_TEMPLATE |
-| EP07-07 | M3 — Ready | Must | Correzioni, ricalcolo e omologazione | EP07, Backend, Database, QA | 7e88a19 EP07-07: omologazione turno e correzioni (FR-OMO-01) | ALTA (commit dedicato) | EVIDENCE_TEMPLATE |
+| EP07-07 | M3 — Ready | Must | Correzioni, ricalcolo e omologazione | EP07, Backend, Database, QA | VERIFICATO B2 (24/09/2026): `fantasy_turns/homologation_service.py` (FR-OMO-01) — un turno omologato non cambia più per nuove versioni della formula; solo una correzione esplicita con permesso, motivo e traccia in audit (`LeagueAuditEvent`, azioni `FANTASY_ROUND_HOMOLOGATED`/`FANTASY_ROUND_CORRECTION_APPLIED`) può riaprirlo per ricalcolo. Test: unit `test_homologation.py`, integrazione `test_round_calculation_service.py`, `test_scoring_service.py`, `test_homologation_notifications.py`. | ALTA (lettura codice + test esistenti) | IMPLEMENTED_VERIFIED |
 | EP08-01 | M3 — Ready | Must | Sessione asta a buste | EP08, Backend, Frontend, Database, QA | f36d69f, 033d298 EP08-01: sessione asta a buste, collegata a API reali | ALTA (commit dedicato) | EVIDENCE_TEMPLATE |
 | EP08-02 | M3 — Ready | Must | Risoluzione buste e parità | EP08, Backend, Frontend, Database, QA | 044d870, 033d298 EP08-02: risoluzione buste e parita | ALTA (commit dedicato) | EVIDENCE_TEMPLATE |
 | EP08-03 | M3 — Ready | Must | Svincolati con giocatore da tagliare | EP08, Backend, Frontend, Database, QA | 52ccb4c, 5a7c84a EP08-03: svincolati con giocatore da tagliare | ALTA (commit dedicato) | EVIDENCE_TEMPLATE |
@@ -129,7 +129,7 @@ Aggiornamento 24/09/2026 (Blocco B1): 5 righe sono passate da `EVIDENCE_TEMPLATE
 | EP12-06 | M5 — Ready | Must | Runbook e supporto pilot | EP12, QA, Backend, Frontend, Infrastructure | 71be8a9 EP12-06: pilot incident runbooks | ALTA (commit dedicato) | EVIDENCE_TEMPLATE |
 | EP12-07 | M5 — Ready | Must | Pilot e gate Beta chiusa | EP12, QA, Backend, Frontend, Infrastructure | a616930 EP12-07: closed beta pilot gate package | ALTA (commit dedicato) | EVIDENCE_TEMPLATE |
 | EP13-P01 | PRE-M5.1 — Ready | - | Navigazione gerarchica “Lega” su web e mobile | UX, Web, Mobile, Autorizzazioni | Nessun commit con codice dedicato. Possibili commit correlati non taggati da verificare: 1079614, a9af666, 892c191, 69612dd, 2a70cf2, 87a8914, fef455d | BASSA (nessun commit dedicato) | EVIDENCE_TEMPLATE |
-| EP13-P02 | PRE-M5.1 — Ready | - | Magic Points e Score espliciti nei turni fantallenatori | Turni, H2H, Scoring, Web, Mobile | Nessun commit con codice dedicato. Possibili commit correlati non taggati da verificare: 1079614, a9af666, 892c191, 69612dd, 2a70cf2, 87a8914, fef455d | BASSA (nessun commit dedicato) | EVIDENCE_TEMPLATE |
+| EP13-P02 | PRE-M5.1 — Ready | - | Magic Points e Score espliciti nei turni fantallenatori | Turni, H2H, Scoring, Web, Mobile | VERIFICATO B2 (24/09/2026), CORREZIONE alla stima automatica: implementata, nonostante nessun commit dedicato individuato in git log. `packages/contracts/src/h2hScore.ts` cita esplicitamente "EP13-P02" nel proprio docstring e implementa "Punti"/"Gol fantasy" come righe etichettate separate, riusate identiche da `apps/web/src/pages/MatchdayH2HPanel.tsx` e `apps/mobile/src/screens/matchday/MatchdayH2HPanel.tsx`. Conferma che la cronologia squashata nasconde lavoro reale anche per le card Pre-M5.1, non solo per M1/M2. | ALTA (codice condiviso con riferimento esplicito al codice card) | IMPLEMENTED_VERIFIED |
 | EP13-P03 | PRE-M5.1 — Ready | - | Calendario H2H adattivo sui turni europei eleggibili | Calendario, Turni, H2H, Backend, Web, Mobile | Nessun commit con codice dedicato. Possibili commit correlati non taggati da verificare: 1079614, a9af666, 892c191, 69612dd, 2a70cf2, 87a8914, fef455d | BASSA (nessun commit dedicato) | EVIDENCE_TEMPLATE |
 | EP13-P04 | PRE-M5.1 — Ready | - | Turni europei live con risultati, formazioni ed eventi | Live, Provider, Turni, Web, Mobile, Observability | Nessun commit con codice dedicato. Possibili commit correlati non taggati da verificare: 1079614, a9af666, 892c191, 69612dd, 2a70cf2, 87a8914, fef455d | BASSA (nessun commit dedicato) | EVIDENCE_TEMPLATE |
 | EP13-P05 | PRE-M5.1 — Ready | - | Formazione automatica dei fantallenatori IA | IA, Formazioni, Provider, Fairness, Backend, Mobile | Nessun commit con codice dedicato. Possibili commit correlati non taggati da verificare: 1079614, a9af666, 892c191, 69612dd, 2a70cf2, 87a8914, fef455d | BASSA (nessun commit dedicato) | EVIDENCE_TEMPLATE |
@@ -175,3 +175,16 @@ Verificato lo scenario guida del piano (partita spostata da 20:45 a 18:30, un ut
 - **EP06-06 (formazione precedente e bozze)**: catena di fallback esplicita e testata (bozza rivalidata → formazione turno precedente rivalidata → vuota/0 punti), applicata solo a turno concluso per non togliere tempo utile al fantallenatore.
 - Righe registro aggiornate: `EP04-07`, `EP06-05`, `EP06-06` → `IMPLEMENTED_VERIFIED`.
 - **Blocco B1 così completato** per tutti i 7 punti elencati dal piano (pannello qualità dati, mosse tattiche, recupero formazione precedente, bozze, rinvii/cambi orario, lock individuale, rifiuto server-side — quest'ultimo confermato di riflesso dalle eccezioni osservate in tutti i punti sopra).
+
+### B2 — Flusso risultati reale (24/09/2026)
+
+Verificato lo stato del tab "Risultati" (Matchday H2H), che una documentazione E2E precedente descriveva come statico/seed-driven:
+
+- **Dati reali, non statici**: `apps/web/src/pages/MatchdayPage.tsx` chiama API autenticate reali (`fetchH2HCalendar`, `fetchFantasyTurn`, `fetchFantasyTurns`), nessun dato hardcoded.
+- **Distinzione Punti/Gol fantasy esplicita**: `packages/contracts/src/h2hScore.ts` (condiviso web+mobile) persiste e mostra due grandezze separate ed etichettate ("Punti" = somma fantavoti; "Gol fantasy" = conversione a soglie), mai un numero anonimo tra parentesi — copre esattamente l'esempio del piano da evitare (`72,5 (2) – 68 (1)`).
+- **Tre stati distinti**: per-scontro `pending`/`provisional`/`final` (`H2HResultStatus`); a livello di turno `homologationStatus` separato (es. `homologated`), coerente con "provvisorio, finale e omologato" richiesto dal piano.
+- **Correzioni auditate**: `homologation_service.py` — un turno omologato non cambia per nuove versioni della formula; solo una correzione esplicita (permesso, motivo, `LeagueAuditEvent`) può riaprirlo per ricalcolo.
+- **Parità web/mobile confermata**: stesso modulo contratti riusato identico da `apps/mobile/src/screens/matchday/MatchdayH2HPanel.tsx`.
+- **Scoperta rilevante**: `EP13-P02` (Pre-M5.1, "Magic Points e Score espliciti") risulta implementata nonostante nessun commit dedicato trovato in git log — la stima automatica di confidenza BASSA per le card Pre-M5.1 era troppo pessimista. Da ripetere il controllo puntuale per le altre 6 card Pre-M5.1 prima di darle per non fatte.
+- Righe registro aggiornate: `EP07-05`, `EP07-07`, `EP13-P02` → `IMPLEMENTED_VERIFIED`.
+- **Non ancora verificato in B2**: comportamento preciso del ricalcolo dopo una correzione tardiva del provider dati (il meccanismo di audit esiste, ma non è stato ancora provato un caso reale end-to-end di correzione post-omologazione).
