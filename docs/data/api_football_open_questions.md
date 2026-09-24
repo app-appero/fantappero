@@ -10,6 +10,16 @@
 
 Questo registro elenca **solo** ciò che la documentazione pubblica e i requisiti di prodotto non chiudono. Ogni voce va verificata su JSON reali dei cinque campionati.
 
+### Nota B4 (24/09/2026) — stato reale del corpus di evidenza
+
+Il corpus offline (`backend/tests/fixtures/api_football/manifest.json`, creato 2026-07-27) copre 20 fixture reali sui 5 campionati richiesti, con casi rari già taggati (`clean_sheet`, `own_goal`, `penalty_missed/saved/scored`, `red_card`, `substitution`) — è materiale sufficiente per chiudere diverse OQ P0 con evidenza reale, non sintetica. Due limiti concreti trovati leggendo il manifest:
+
+1. **Endpoint mai acquisiti in questo corpus**: `/injuries`, `/predictions`, `/standings` (`endpoints_not_reperito` nel manifest). Senza questi dati **OQ-11 e OQ-14 non sono chiudibili** con il corpus attuale — serve una nuova acquisizione con chiave provider reale, che non può essere fatta da un'analisi di solo codice.
+2. **Casi rari cercati ma non trovati**: `post_match_correction`, `postponement`. Le regole di codice per questi scenari esistono e sono testate con dati sintetici (vedi Blocco B1/B3), ma **manca ancora una prova su un payload reale del provider**.
+3. **Il corpus non è collegato ai test delle regole di dominio**: `backend/tests/test_sports_dataset.py` valida solo l'integrità del corpus (checksum, conteggio fixture/leghe, assenza di segreti) — nessun test fa girare `fantasy_ratings/bonus.py` o `fantasy_ratings/eligibility.py` sui payload reali per produrre l'evidenza "Pass/Fail" richiesta dalla checklist EP00-02. Il materiale grezzo c'è, il collaudo descritto nella checklist sotto non risulta ancora eseguito/tracciato.
+
+Per le OQ che restano genuinamente aperte (OQ-08, OQ-09, OQ-10, OQ-11, OQ-12, OQ-13, OQ-14) non sono state inventate risposte: OQ-09 in particolare è esplicitamente una decisione di prodotto ("non inventare pesi qui" nel testo originale) che richiede il team, non un'analisi di codice.
+
 ## Legenda priorità
 
 | Priorità | Significato |
@@ -192,6 +202,7 @@ Questo registro elenca **solo** ciò che la documentazione pubblica e i requisit
 | Impatto | Sync bootstrap |
 | Evidenza richiesta EP00-02 | Call `/leagues?id=&season=`; salvare solo metadati coverage |
 | Criterio chiusura | Config piattaforma versionata |
+| Esito B4 (24/09/2026) | **Parziale** — ID leghe confermati: `MVP_LEAGUE_IDS = (39, 140, 135, 78, 61)` in `backend/src/sports_data/provider/constants.py`, config versionata e unica, riusata coerentemente da `catalog/sync.py`, `fixtures/sync.py`, `roster/sync.py`, `scheduler/runner.py`. `season` corrente resta invece per-lega (`league.season_year`), non una costante piattaforma: nessuna evidenza trovata su verifica del delay di popolazione fixture a inizio stagione. |
 
 ---
 

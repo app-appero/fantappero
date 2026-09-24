@@ -201,3 +201,15 @@ Su richiesta esplicita, questa verifica è stata condotta **senza modificare alc
 - **Terza conferma della stessa scoperta di B2**: anche `EP13-P03` (Pre-M5.1) risulta implementata pur senza commit dedicato in git log — tre card Pre-M5.1 su tre controllate finora erano tutte in realtà già fatte. La confidenza BASSA automatica assegnata all'intero gruppo Pre-M5.1 nella bozza iniziale era sistematicamente troppo pessimista; le 4 card Pre-M5.1 rimanenti (P01, P04, P06, P07) vanno ricontrollate prima di darle per non fatte.
 - Righe registro aggiornate: `EP03-06`, `EP13-P03` → `IMPLEMENTED_VERIFIED`.
 - **Non verificato in B3** (fuori dallo scope di sola lettura richiesto, o non controllato): comportamento con fixture sospese durante il turno (solo il caso "cancellate" è coperto da test), sincronizzazione con partite realmente rinviate su un turno già in corso.
+
+### B4 — Domande aperte sui dati API-Football (24/09/2026)
+
+A differenza di B1-B3, qui non si tratta di verificare codice esistente ma di valutare decisioni normative ancora aperte (9 domande, `docs/data/api_football_open_questions.md`, OQ-07…OQ-15). Non ho inventato risposte: ho verificato cosa esiste davvero come base per chiuderle.
+
+- **Corpus di evidenza reale già presente**: `backend/tests/fixtures/api_football/manifest.json` (creato 2026-07-27) — 20 fixture FT reali sui 5 campionati richiesti (39/140/135/78/61), con casi rari già taggati (`clean_sheet`, `own_goal`, `penalty_missed/saved/scored`, `red_card`, `substitution`). È il materiale grezzo che la checklist EP00-02 richiede.
+- **Due endpoint mai acquisiti**: `/injuries`, `/predictions`, `/standings` — senza questi dati **OQ-11 e OQ-14 non sono chiudibili** con il corpus attuale; serve una nuova acquisizione con chiave provider reale (fuori portata di un'analisi di solo codice).
+- **Due casi rari cercati ma non trovati nel corpus**: `post_match_correction`, `postponement` — le regole esistono e sono testate con dati sintetici (B1/B3), ma manca ancora una prova su payload reale.
+- **Gap più rilevante trovato**: il corpus non è collegato ai test delle regole di dominio. `test_sports_dataset.py` valida solo integrità/checksum del corpus, nessun test fa girare `fantasy_ratings/bonus.py`/`eligibility.py` sui payload reali per produrre l'evidenza Pass/Fail richiesta da EP00-02. Il materiale c'è, il collaudo descritto nella checklist non risulta eseguito.
+- **OQ-15 (ID leghe/season) parzialmente chiudibile subito**: `MVP_LEAGUE_IDS = (39, 140, 135, 78, 61)` è una config versionata unica, riusata coerentemente in tutto `sports_data/`. La parte su `season` corrente resta invece per-lega, non una costante piattaforma — nessuna evidenza su verifica del delay di popolazione fixture a inizio stagione.
+- Aggiornato `docs/data/api_football_open_questions.md` con nota di stato ed esito parziale OQ-15.
+- **Deliberatamente non chiuse**: OQ-08, OQ-09, OQ-10, OQ-11, OQ-12, OQ-13, OQ-14. OQ-09 in particolare è esplicitamente una decisione di prodotto ("non inventare pesi qui" nel testo originale del documento), non qualcosa che un'analisi di codice possa risolvere da sola.
