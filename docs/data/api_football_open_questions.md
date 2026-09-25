@@ -161,6 +161,7 @@ Per le OQ che restano genuinamente aperte (OQ-08, OQ-09, OQ-10, OQ-11, OQ-12, OQ
 | Impatto | Esclusione 6 d’ufficio; IA |
 | Evidenza richiesta EP00-02 | Campione injuries per league; decisione su `/sidelined` |
 | Criterio chiusura | Enum interno; niente parsing NLP di `reason` |
+| Esito B4 (25/09/2026) | **Bloccata, non chiudibile da qui.** L'endpoint `/injuries` non viene mai chiamato dal codice: gli unici riferimenti sono in `provider/constants.py` (elenco statico) e `provider/mapping.py::coverage_injuries` (solo il flag booleano di copertura dichiarato dalla lega, non i dati reali). L'unico segnale di disponibilità realmente sincronizzato è `Athlete.injured` (`roster/models.py`), un booleano grezzo dal campo `player.injured` — esattamente il segnale che `docs/data/api_football_requirement_matrix.md` (riga 112) segnala già come "non affidabile da solo". Nessun enum Injury/Suspension, nessun campo `reason`, nessuna integrazione `/sidelined`. Il corpus offline non aiuta: `/injuries` non è mai stato scaricato (vedi nota generale B4 a inizio file). Per chiudere davvero serve una nuova acquisizione dati con chiave provider reale — fuori dalla portata di un'analisi di solo codice. |
 
 ### OQ-12 — Transfer Loan / temporanei / uscita dai 5 campionati
 

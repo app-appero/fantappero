@@ -242,4 +242,14 @@ Su richiesta dell'utente di affrontare le domande aperte una per una, a partire 
 - **Zona non coperta**: la formazione automatica IA (EP13-P05) usa la lineup ufficiale per decidere chi schierare pre-partita, e ha un percorso "incompleto" già previsto per i dati parziali — ma non ho verificato la qualità di quel fallback nel caso specifico di lineup presente-ma-sbagliata come quello trovato nel corpus (solo per lineup del tutto assente).
 - **Non risolvibile da qui**: nessuna policy booleana esplicita "was_called_up" nel codice; il tempo medio di pubblicazione della lineup prima del calcio d'inizio per campionato richiede dati di monitoraggio in produzione su partite live, non ricavabile da un corpus statico post-partita.
 - Aggiornato `docs/data/api_football_open_questions.md` (OQ-10, esito parziale). Nessuna riga di registro EP aggiornata: la card più vicina (EP04-06 scheduler) non è stata verificata nel suo complesso, solo questo aspetto specifico.
-- **Prossima in ordine**: OQ-11 (infortuni vs squalifiche) — attenzione: richiede dati `/injuries` mai acquisiti nel corpus (vedi nota generale B4), quindi probabilmente non chiudibile senza una nuova raccolta dati reale.
+- **Parte IA (fallback su lineup presente-ma-sbagliata) messa in coda** su richiesta esplicita.
+
+### B4 (continua) — OQ-11 bloccata, confermato il gap (25/09/2026)
+
+- **Confermato con certezza (non solo sospetto)**: `/injuries` non è mai chiamato dal codice. Unici riferimenti: un elenco statico in `provider/constants.py` e un flag di sola copertura dichiarata (non dati reali) in `provider/mapping.py`.
+- **L'unico segnale realmente sincronizzato** è `Athlete.injured`, un booleano grezzo — lo stesso che la documentazione interna già segnala come "non affidabile da solo".
+- Nessun enum Injury/Suspension, nessun campo `reason`, nessuna integrazione `/sidelined`.
+- Il corpus offline non aiuta: `/injuries` non è mai stato scaricato in nessuna delle 20 fixture.
+- **OQ-11 non è chiudibile da un'analisi di solo codice**: serve una nuova raccolta dati con chiave provider reale, oppure una decisione esplicita del team su come trattare il solo booleano `injured` come rischio accettato nel frattempo.
+- Aggiornato `docs/data/api_football_open_questions.md` (OQ-11, bloccata). Nessuna riga di registro EP toccata: non c'è nulla da verificare come "fatto", il gap è reale e confermato.
+- **Prossima in ordine**: OQ-12 (trasferimenti/uscita dai 5 campionati).
