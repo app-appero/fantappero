@@ -286,3 +286,14 @@ Elenco esplicito, separato dal log cronologico, così non si perde tra le date.
 3. **Nessuna decisione presa** su quale di questi collegare per primo, né su come l'utente/admin dovrebbe vedere l'informazione (badge in UI? avviso admin? esclusione automatica?).
 
 **Perché non l'ho fatto insieme al resto**: collegarlo alla selezione IA o al lock formazione tocca aree del codice più delicate (vedi la cautela già espressa per il Blocco B3 sul calendario) — meglio deciderlo esplicitamente insieme piuttosto che infilarlo di riflesso dentro il lavoro di OQ-11.
+
+### B4 (continua) — OQ-12: regole già decise e implementate, manca solo la visibilità admin (25/09/2026)
+
+Solo indagine, nessuna modifica al codice.
+
+- **La regola "auto vs coda admin" richiesta dal criterio di chiusura esiste già**: `roster/validators.py::transfer_requires_admin_review` marca Loan/N/A come non affidabili, con un commento nel codice che cita esplicitamente OQ-12 — decisione presa in passato, mai marcata come chiusa nel documento.
+- **Rilevamento uscita dai 5 campionati corretto per costruzione**: ogni trasferimento disattiva la membership d'origine; se il club di destinazione non è uno dei 5 campionati censiti, semplicemente non esiste nel catalogo — nessun controllo esplicito necessario.
+- **`/players/squads` senza `season`**: confermato non essere un limite, è il comportamento per design dell'endpoint (squadra attuale del provider).
+- **Gap reale trovato**: `Transfer.requires_admin_review` viene scritto ma **non è mai letto da nessuna API o UI admin** — la "coda" esiste solo come flag silenzioso nel database. Esiste anche un motivo di svincolo dedicato con rimborso 100% (`MarketReleaseReason.LEAGUE_EXIT`), ma va scelto manualmente da chi fa lo svincolo, senza alcun collegamento al rilevamento automatico dei trasferimenti — stesso pattern "azione finale umana" già visto per OQ-11, corretto per design, ma qui manca anche solo il segnale visibile all'admin.
+- **OQ-12 chiusa parzialmente** in `docs/data/api_football_open_questions.md`. Nessuna riga di registro EP modificata (la funzionalità di sync trasferimenti è più ampia di questo singolo aspetto).
+- **Non implementato** (in attesa di conferma): un endpoint/coda admin che esponga i trasferimenti con `requires_admin_review=true` ancora da valutare.
