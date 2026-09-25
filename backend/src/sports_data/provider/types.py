@@ -207,3 +207,17 @@ class MappedTransfer:
     to_club_provider_id: int | None
     transfer_type: str
     provider_key: str
+
+
+@dataclass(frozen=True)
+class MappedPlayerAvailability:
+    """Single ``/injuries`` entry (OQ-11) — presence-only, never a green light."""
+
+    athlete_provider_id: int
+    club_provider_id: int | None
+    fixture_provider_id: int | None
+    competition_provider_id: int
+    season_year: int
+    status_type_raw: str
+    reason_raw: str
+    provider_key: str

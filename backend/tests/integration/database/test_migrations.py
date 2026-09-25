@@ -107,17 +107,10 @@ def test_upgrade_from_empty_database(clean_db: str) -> None:
                 .scalars()
                 .all()
             )
-            # Head aggiornata da EP13-P02 (b4d7e2f9c118, Fantapunti in
-            # classifica), EP13-P03 (c5e8a1f3d229, mappatura giornata →
-            # finestra europea), EP13-P05 (d6f9a3b1c247, tracciabilità
-            # formazione automatica IA), EP13-P04 live fix (a1c4f6e9b382,
-            # venue/arbitro/logo squadra/allenatore), EP13-P04-quinquies
-            # (c7f2a4d6e831, foto giocatore dal provider) ed
-            # EP-turni-copertura (d8e3b5f7c962, soglia copertura formazione),
-            # EP-turni-automazione (e2f5a8c1b374, margine di preavviso del
-            # lock) ed EP-turni-calcolo (b4d8e19a5f36, provenienza formazione
-            # sintetizzata dal motore di calcolo turno).
-            assert version == "b4d8e19a5f36"
+            # Head aggiornata da 2fb4800de433 (player_availabilities da
+            # /injuries, OQ-11) — aggiornare questa costante ad ogni nuova
+            # migrazione in coda.
+            assert version == "2fb4800de433"
         assert named_statuses == ["pending", "accepted", "declined", "revoked", "expired"]
         assert calendar_statuses == ["draft", "confirmed"]
         assert fantasy_roles == ["P", "D", "C", "A"]

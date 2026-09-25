@@ -19,6 +19,7 @@ from sports_data.provider.types import (
     MappedLineupEntry,
     MappedMatchEvent,
     MappedOfficialLineup,
+    MappedPlayerAvailability,
     MappedPlayerMatchStat,
     MappedSeason,
     MappedSquadMembership,
@@ -678,4 +679,49 @@ def map_transfers(envelope: ProviderEnvelope) -> list[MappedTransfer]:
                     provider_key=provider_key,
                 )
             )
+    return out
+
+
+def map_player_availabilities(
+    envelope: ProviderEnvelope,
+    *,
+    competition_provider_id: int,
+    season_year: int,
+) -> list[MappedPlayerAvailability]:
+    """Map ``/injuries`` response rows (OQ-11).
+
+    Un record per riga: presenza confermata di indisponibilità legata a una
+    fixture. Righe senza ``player.id`` o senza ``reason`` non sono
+    utilizzabili e vengono scartate, non forzate a un default.
+    """
+    out: list[MappedPlayerAvailability] = []
+    for row in envelope.response:
+        if not isinstance(row, dict):
+            continue
+        player = row.get("player") if isinstance(row.get("player"), dict) else {}
+        athlete_provider_id = _as_optional_int(player.get("id"))
+        reason = player.get("reason")
+        status_type = player.get("type")
+        if athlete_provider_id is None or not isinstance(reason, str) or not reason.strip():
+            continue
+        team = row.get("team") if isinstance(row.get("team"), dict) else {}
+        club_provider_id = _as_optional_int(team.get("id"))
+        fixture = row.get("fixture") if isinstance(row.get("fixture"), dict) else {}
+        fixture_provider_id = _as_optional_int(fixture.get("id"))
+        provider_key = (
+            f"{athlete_provider_id}:{fixture_provider_id}:{competition_provider_id}:"
+            f"{season_year}"
+        )
+        out.append(
+            MappedPlayerAvailability(
+                athlete_provider_id=athlete_provider_id,
+                club_provider_id=club_provider_id,
+                fixture_provider_id=fixture_provider_id,
+                competition_provider_id=competition_provider_id,
+                season_year=season_year,
+                status_type_raw=str(status_type) if status_type is not None else "",
+                reason_raw=reason.strip(),
+                provider_key=provider_key,
+            )
+        )
     return out

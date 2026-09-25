@@ -434,6 +434,20 @@ class Permission(str, enum.Enum):
     GLOBAL_OPERATE = "global:operate"
 
 
+class PlayerAvailabilityCategory(str, enum.Enum):
+    """Classificazione interna del campo ``reason`` di ``/injuries`` (OQ-11).
+
+    Il provider non distingue Injury/Suspension nel campo ``type`` (solo
+    "Missing Fixture" / "Questionable"): la categoria va derivata dal
+    ``reason`` testuale tramite una tabella fissa, mai con parsing NLP.
+    """
+
+    INJURY = "injury"
+    SUSPENSION = "suspension"
+    ILLNESS = "illness"
+    OTHER = "other"
+
+
 def league_member_role_to_league_role(role: LeagueMemberRole) -> LeagueRole:
     if role == LeagueMemberRole.OWNER:
         return LeagueRole.LEAGUE_ADMIN

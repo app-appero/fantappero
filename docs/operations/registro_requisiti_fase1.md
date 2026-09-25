@@ -252,4 +252,17 @@ Su richiesta dell'utente di affrontare le domande aperte una per una, a partire 
 - Il corpus offline non aiuta: `/injuries` non è mai stato scaricato in nessuna delle 20 fixture.
 - **OQ-11 non è chiudibile da un'analisi di solo codice**: serve una nuova raccolta dati con chiave provider reale, oppure una decisione esplicita del team su come trattare il solo booleano `injured` come rischio accettato nel frattempo.
 - Aggiornato `docs/data/api_football_open_questions.md` (OQ-11, bloccata). Nessuna riga di registro EP toccata: non c'è nulla da verificare come "fatto", il gap è reale e confermato.
+
+### B4 (continua) — OQ-11: chiamate reali, gap riprodotto, funzionalità implementata (25/09/2026)
+
+Su richiesta esplicita dell'utente, che ha confermato l'esistenza di una chiave API-Football reale già configurata in locale: sbloccata l'indagine con chiamate vere, poi implementata la funzionalità mancante.
+
+- **Chiamata reale a `/injuries`** (Premier League 2024, 3168 voci): confermato che `type` ha solo due valori (`Missing Fixture`, `Questionable`), non Injury/Suspension come presupposto dalla domanda originale. `reason` è un insieme chiuso di 41 valori osservati, non testo libero.
+- **Test mirato su richiesta dell'utente** (Lazio, stagione 2026, confronto con una fonte di riferimento nota): 4 giocatori su 5 trovati, **1 mancante del tutto** (Filipe Bordon) — confermato anche cercandolo per ID diretto su due stagioni, zero risultati. Riproduce concretamente il sospetto dell'utente su un bug reale del provider.
+- **Decisa e implementata la policy conseguente**: l'assenza di un record non deve mai essere letta come "disponibile" — solo come "sconosciuto".
+- **Nuova funzionalità realizzata** (non solo documentazione): modulo `backend/src/sports_data/availability/` (`models.py`, `classify.py`, `sync.py`), enum `PlayerAvailabilityCategory` in `database/enums.py`, migrazione Alembic `2fb4800de433` (verificata up/down/drift-check su database isolato via Docker), test unit (`test_availability_classify.py`) e integrazione (`test_availability_sync.py`).
+- **Deliberatamente non collegato** a `fantasy_ratings/eligibility.py` o alla selezione formazione IA — la sincronizzazione e la lettura sicura (`is_confirmed_unavailable`) sono pronte, il collegamento ai consumatori resta un passo successivo esplicito, per non allargare lo scope di questa card.
+- Corretto anche un piccolo problema trovato per strada: `backend/tests/integration/database/test_migrations.py` aveva l'head Alembic atteso hardcoded (rotto da ogni nuova migrazione) — aggiornato alla nuova head.
+- **Nota metodologica**: durante la verifica trovato un test pre-esistente e rotto indipendentemente da questo lavoro (`test_a_league_without_rosters_generates_no_turns`, fantasy_turns) — confermato con `git stash` che fallisce anche sulla baseline precedente, non è una regressione introdotta qui. Segnalato, non corretto (fuori scope OQ-11).
+- **OQ-11 chiusa** in `docs/data/api_football_open_questions.md`.
 - **Prossima in ordine**: OQ-12 (trasferimenti/uscita dai 5 campionati).

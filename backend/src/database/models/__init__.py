@@ -43,6 +43,7 @@ from market.live_models import (
 )
 from market.models import MarketBid, MarketSession, TradeProposal
 from notifications.models import Notification, NotificationPreference
+from sports_data.availability.models import PlayerAvailability
 from sports_data.catalog.models import Club, CompetitionSeasonClub, SportSeason
 from sports_data.fixtures.models import (
     Fixture,
@@ -99,6 +100,7 @@ __all__ = [
     "NotificationPreference",
     "OfficialLineup",
     "OfficialLineupEntry",
+    "PlayerAvailability",
     "PlayerMatchRating",
     "PlayerMatchStat",
     "PrivacyAuditEvent",
