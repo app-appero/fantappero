@@ -232,4 +232,14 @@ Su richiesta dell'utente di affrontare le domande aperte una per una, a partire 
 - **Unico null "vero" trovato**: `games.minutes`/`games.rating`, ed è sempre e solo per convocati in panchina mai entrati (`games.substitute: true`) — verificato senza eccezioni su tutto il corpus. Questo chiude anche il dubbio residuo lasciato aperto da OQ-07.
 - Test aggiunti: `backend/tests/unit/fantasy_ratings/test_real_corpus_coverage.py` (4 test, tutti sui payload reali).
 - **OQ-08 chiusa parzialmente** in `docs/data/api_football_open_questions.md`: chiusa per i campi già usati dalla formula v1, resta aperta la lista completa di campi (saves, shots, passes, tackles, duels, fouls) per la futura Rating Beta, che dipende dalla decisione di prodotto OQ-09.
-- **Prossima in ordine tra le domande rimaste**: OQ-09 (calibrazione Rating Beta) — ma il documento stesso dice esplicitamente di non inventare i pesi qui: è una decisione del team, non un'indagine di codice. Da confermare con l'utente come procedere.
+- **OQ-08 (parte residua) e OQ-09 messe in coda su richiesta esplicita** — da riprendere più avanti, non abbandonate.
+
+### B4 (continua) — OQ-10 chiusa parzialmente (25/09/2026)
+
+- **Caso reale trovato nel corpus**: fixture 37834, giocatore 68091 — ha giocato 90 minuti interi (rating reale 6.9) ma è **assente dalla lineup ufficiale** di quella partita. Conferma diretta e concreta che "presente nelle stats ma non nella lineup" è un caso reale, non teorico.
+- **Buona notizia**: lo scoring non dipende affatto dalla lineup ufficiale — legge direttamente l'endpoint statistiche giocatore — quindi questo tipo di lacuna non tocca il fantavoto.
+- **L'eccezione admin richiesta dal criterio di chiusura esiste già**, ma solo per l'assenza *totale* di lineup su una partita conclusa: il pannello qualità dati (verificato in B1) la segnala come warning.
+- **Zona non coperta**: la formazione automatica IA (EP13-P05) usa la lineup ufficiale per decidere chi schierare pre-partita, e ha un percorso "incompleto" già previsto per i dati parziali — ma non ho verificato la qualità di quel fallback nel caso specifico di lineup presente-ma-sbagliata come quello trovato nel corpus (solo per lineup del tutto assente).
+- **Non risolvibile da qui**: nessuna policy booleana esplicita "was_called_up" nel codice; il tempo medio di pubblicazione della lineup prima del calcio d'inizio per campionato richiede dati di monitoraggio in produzione su partite live, non ricavabile da un corpus statico post-partita.
+- Aggiornato `docs/data/api_football_open_questions.md` (OQ-10, esito parziale). Nessuna riga di registro EP aggiornata: la card più vicina (EP04-06 scheduler) non è stata verificata nel suo complesso, solo questo aspetto specifico.
+- **Prossima in ordine**: OQ-11 (infortuni vs squalifiche) — attenzione: richiede dati `/injuries` mai acquisiti nel corpus (vedi nota generale B4), quindi probabilmente non chiudibile senza una nuova raccolta dati reale.
