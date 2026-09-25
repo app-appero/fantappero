@@ -319,4 +319,11 @@ Solo indagine, nessuna modifica al codice — la regola era già corretta.
 - **Le tre domande hanno risposta concreta dal codice**: (1) non serve arrivare a 90 minuti, basta l'eleggibilità al voto (soglia configurabile); (2) vale per i subentrati, e — comportamento intenzionale coerente con le regole standard del fantacalcio italiano — più portieri della stessa partita possono condividere la porta inviolata se la squadra chiude senza subire; (3) durante una sospensione il bonus può essere calcolato ma resta sempre provvisorio: il turno non viene mai omologato finché la partita non risulta davvero conclusa (`FT`/`AET`/`PEN`).
 - **Gap minore, non bloccante**: il caso "due portieri, stessa porta inviolata" non ha un test dedicato — verificato leggendo il codice, non con una prova automatica.
 - **OQ-13 chiusa** in `docs/data/api_football_open_questions.md`. `EP07-03` → `IMPLEMENTED_VERIFIED`.
-- **Prossima in ordine**: OQ-14 (predictions/standings come segnale IA) — probabile ripetizione del pattern OQ-11: endpoint mai acquisiti nel corpus, servirà una chiamata reale.
+### B4 (continua) — OQ-14: chiamate reali fatte, funzionalità non ancora decisa (25/09/2026)
+
+- **Chiamate reali** a `/predictions` e `/standings` (chiave già configurata): **copertura 100%** su un campione di 17 fixture reali sui 5 campionati (prossimo turno) — entrambi gli endpoint rispondono sempre con dati veri, non solo occasionalmente.
+- `/predictions` include probabilità %, previsione vincitore, consiglio testuale; il campo `under_over` è risultato `null` nel campione — da trattare come opzionale.
+- **Conferma del gap**: zero righe di codice in `ai_assistant/` consumano questi due endpoint. La policy "mai verità di scoring, solo segnale" è già scritta nella documentazione ma senza alcuna implementazione.
+- **Non implementato**: manca ancora una decisione su quali campi esporre allo staff IA e come strutturare lo snapshot richiesto dal criterio di chiusura — a differenza di OQ-11/OQ-12, qui la decisione di scope non è stata ancora presa.
+- **OQ-14 chiusa parzialmente** in `docs/data/api_football_open_questions.md` (dati reali verificati, funzionalità da costruire in sospeso).
+- **Prossima in ordine tra le domande rimaste**: nessuna — OQ-14 era l'ultima delle nuove. Restano solo le 4 messe in coda (OQ-08 residuo, OQ-09, OQ-10 residuo, OQ-15 residuo).
