@@ -1,4 +1,10 @@
-"""Eleggibilità al voto: soglia minuti configurabile e casi senza voto (EP07-02)."""
+"""Eleggibilità al voto: soglia minuti configurabile e casi senza voto (EP07-02).
+
+Non tiene conto di infortuni/squalifiche pre-partita: quel segnale esiste in
+``sports_data.availability`` (OQ-11) ma non è ancora collegato qui — vedi
+``docs/operations/registro_requisiti_fase1.md``, sezione 8, per cosa manca
+e perché non è stato agganciato insieme al resto.
+"""
 
 from __future__ import annotations
 

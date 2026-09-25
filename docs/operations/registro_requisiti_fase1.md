@@ -266,3 +266,23 @@ Su richiesta esplicita dell'utente, che ha confermato l'esistenza di una chiave 
 - **Nota metodologica**: durante la verifica trovato un test pre-esistente e rotto indipendentemente da questo lavoro (`test_a_league_without_rosters_generates_no_turns`, fantasy_turns) — confermato con `git stash` che fallisce anche sulla baseline precedente, non è una regressione introdotta qui. Segnalato, non corretto (fuori scope OQ-11).
 - **OQ-11 chiusa** in `docs/data/api_football_open_questions.md`.
 - **Prossima in ordine**: OQ-12 (trasferimenti/uscita dai 5 campionati).
+
+## 8. Lavoro pronto ma non ancora collegato (follow-up da riprendere)
+
+Elenco esplicito, separato dal log cronologico, così non si perde tra le date.
+
+### Sync disponibilità giocatori (OQ-11) — manca il collegamento ai consumatori
+
+**Cosa esiste già**, pronto all'uso: `backend/src/sports_data/availability/`
+- `sync.py::sync_player_availabilities` — sincronizza `/injuries` in modo idempotente
+- `sync.py::is_confirmed_unavailable(session, athlete_provider_id=..., competition_provider_id=..., season_year=...)` — ritorna il record se esiste, altrimenti `None` (= "sconosciuto", mai "disponibile")
+
+**Cosa manca** perché serva davvero a qualcosa:
+1. **Un job schedulato** che chiami `sync_player_availabilities` periodicamente (oggi va invocato manualmente/a mano — non è collegato a `sports_data/scheduler/`).
+2. **Un punto di consumo reale**. Candidati più probabili, da valutare insieme prima di implementare:
+   - `fantasy_lineups/eligibility.py` — per segnalare a un fantallenatore che un giocatore schierato risulta infortunato/squalificato secondo il provider;
+   - `fantasy_lineups/ai_service.py` (formazione automatica IA, EP13-P05) — per escludere automaticamente giocatori con indisponibilità confermata dalla selezione IA;
+   - il pannello qualità dati (`sports_data/quality/`) — per segnalarlo come informazione, non come blocco automatico.
+3. **Nessuna decisione presa** su quale di questi collegare per primo, né su come l'utente/admin dovrebbe vedere l'informazione (badge in UI? avviso admin? esclusione automatica?).
+
+**Perché non l'ho fatto insieme al resto**: collegarlo alla selezione IA o al lock formazione tocca aree del codice più delicate (vedi la cautela già espressa per il Blocco B3 sul calendario) — meglio deciderlo esplicitamente insieme piuttosto che infilarlo di riflesso dentro il lavoro di OQ-11.

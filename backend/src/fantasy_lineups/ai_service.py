@@ -3,6 +3,11 @@
 Implementa ADR-0005. Scrive **esclusivamente** su squadre la cui membership ha
 ``user_type == UserType.AI``: una formazione di un utente manuale non viene
 mai toccata, nemmeno se vuota.
+
+Non esclude giocatori con indisponibilità confermata da ``/injuries``: quel
+segnale esiste in ``sports_data.availability`` (OQ-11) ma non è ancora
+collegato qui — vedi ``docs/operations/registro_requisiti_fase1.md``,
+sezione 8, per cosa manca e perché non è stato agganciato insieme al resto.
 """
 
 from __future__ import annotations
