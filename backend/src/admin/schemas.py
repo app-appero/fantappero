@@ -197,3 +197,30 @@ class AdminListoneRefreshProgressResponse(ApiModel):
     message: str
     error_code: str | None = Field(default=None, alias="errorCode")
     result: AdminListoneRefreshResultResponse | None = None
+
+
+class AdminPendingTransferResponse(ApiModel):
+    """Trasferimento Loan/N.D. in attesa di conferma amministrativa (OQ-12)."""
+
+    id: str
+    athlete_id: str = Field(alias="athleteId")
+    athlete_name: str = Field(alias="athleteName")
+    transfer_date: str = Field(alias="transferDate")
+    from_club_name: str | None = Field(default=None, alias="fromClubName")
+    to_club_name: str | None = Field(default=None, alias="toClubName")
+    transfer_type: str = Field(alias="transferType")
+    created_at: datetime = Field(alias="createdAt")
+
+
+class PaginatedAdminPendingTransfersResponse(ApiModel):
+    items: list[AdminPendingTransferResponse]
+    page: int
+    page_size: int = Field(alias="pageSize")
+    total: int
+    total_pages: int = Field(alias="totalPages")
+
+
+class AdminTransferReviewedResponse(ApiModel):
+    id: str
+    reviewed_at: datetime = Field(alias="reviewedAt")
+    reviewed_by_user_id: str = Field(alias="reviewedByUserId")

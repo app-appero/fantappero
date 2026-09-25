@@ -15,11 +15,14 @@ from admin.schemas import (
     AdminListoneRefreshJobResponse,
     AdminListoneRefreshProgressResponse,
     AdminOverviewResponse,
+    AdminTransferReviewedResponse,
     AdminUserResponse,
     PaginatedAdminLeaguesResponse,
+    PaginatedAdminPendingTransfersResponse,
     PaginatedAdminUsersResponse,
 )
 from admin.service import AdminService
+from admin.transfers_service import AdminTransfersService
 from auth.dependencies import get_db_session
 from auth.exceptions import ValidationAuthError
 from auth.models.user import User
@@ -45,8 +48,15 @@ def get_admin_listone_service(
     return AdminListoneService(session, settings)
 
 
+def get_admin_transfers_service(session: Session = Depends(get_db_session)) -> AdminTransfersService:
+    return AdminTransfersService(session)
+
+
+_NOT_FOUND_CODES = frozenset({"admin_user_not_found", "admin_transfer_not_found"})
+
+
 def _error_response(exc: AdminError) -> JSONResponse:
-    status_code = 404 if exc.code == "admin_user_not_found" else 409
+    status_code = 404 if exc.code in _NOT_FOUND_CODES else 409
     return JSONResponse(status_code=status_code, content={"message": exc.message, "code": exc.code})
 
 
@@ -105,6 +115,29 @@ def list_leagues(
     service: AdminService = Depends(get_admin_service),
 ) -> PaginatedAdminLeaguesResponse:
     return service.list_leagues(query=query, page=page)
+
+
+@router.get("/transfers/pending-review", response_model=PaginatedAdminPendingTransfersResponse)
+def list_pending_transfers(
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=50, ge=1, le=200, alias="pageSize"),
+    _operator: User = Depends(require_permissions(Permission.GLOBAL_OPERATE)),
+    service: AdminTransfersService = Depends(get_admin_transfers_service),
+) -> PaginatedAdminPendingTransfersResponse:
+    """Trasferimenti Loan/N.D. non chiudibili in automatico (OQ-12)."""
+    return service.list_pending_review(page=page, page_size=page_size)
+
+
+@router.post("/transfers/{transfer_id}/review", response_model=AdminTransferReviewedResponse)
+def review_transfer(
+    transfer_id: UUID,
+    operator: User = Depends(require_permissions(Permission.GLOBAL_OPERATE)),
+    service: AdminTransfersService = Depends(get_admin_transfers_service),
+) -> AdminTransferReviewedResponse | JSONResponse:
+    try:
+        return service.mark_reviewed(actor=operator, transfer_id=transfer_id)
+    except AdminError as exc:
+        return _error_response(exc)
 
 
 @router.get("/listone", response_model=list[AdminListoneEntryResponse])

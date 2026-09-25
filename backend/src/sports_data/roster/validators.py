@@ -7,7 +7,12 @@ _TRANSFER_TYPES_REQUIRING_REVIEW = frozenset({"loan", "n/a"})
 
 
 def transfer_requires_admin_review(transfer_type: str | None) -> bool:
-    """Return True when transfer type needs manual review before market actions."""
+    """Return True when transfer type needs manual review before market actions.
+
+    Chi legge questo flag: `admin/transfers_service.py` lo espone in una coda
+    admin (`GET /admin/transfers/pending-review`) — prima di quella card non
+    era letto da nessuna parte.
+    """
     if not transfer_type or not transfer_type.strip():
         return True
     return transfer_type.strip().lower() in _TRANSFER_TYPES_REQUIRING_REVIEW

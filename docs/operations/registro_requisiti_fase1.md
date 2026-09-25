@@ -297,3 +297,15 @@ Solo indagine, nessuna modifica al codice.
 - **Gap reale trovato**: `Transfer.requires_admin_review` viene scritto ma **non è mai letto da nessuna API o UI admin** — la "coda" esiste solo come flag silenzioso nel database. Esiste anche un motivo di svincolo dedicato con rimborso 100% (`MarketReleaseReason.LEAGUE_EXIT`), ma va scelto manualmente da chi fa lo svincolo, senza alcun collegamento al rilevamento automatico dei trasferimenti — stesso pattern "azione finale umana" già visto per OQ-11, corretto per design, ma qui manca anche solo il segnale visibile all'admin.
 - **OQ-12 chiusa parzialmente** in `docs/data/api_football_open_questions.md`. Nessuna riga di registro EP modificata (la funzionalità di sync trasferimenti è più ampia di questo singolo aspetto).
 - **Non implementato** (in attesa di conferma): un endpoint/coda admin che esponga i trasferimenti con `requires_admin_review=true` ancora da valutare.
+
+### B4 (continua) — OQ-12: costruita la coda admin (25/09/2026)
+
+Su richiesta esplicita, implementata la visibilità mancante trovata sopra.
+
+- **Nuovo**: `admin/transfers_service.py` (`AdminTransfersService.list_pending_review`, `.mark_reviewed`), due endpoint in `admin/router.py` (`GET /admin/transfers/pending-review`, `POST /admin/transfers/{id}/review`), entrambi dietro `Permission.GLOBAL_OPERATE`.
+- **Colonne aggiunte a `Transfer`**: `reviewed_at`, `reviewed_by_user_id` — migrazione `37c365bf2399`, verificata up/down/drift-check su database isolato (stesso metodo usato per OQ-11).
+- **Trovato e corretto un errore nel primo tentativo di migrazione**: `LeagueAuditAction` è un enum nativo PostgreSQL, aggiungere un valore Python non basta — serve `ALTER TYPE ... ADD VALUE` esplicito nella migrazione (il primo giro di test l'ha fatto fallire subito, corretto prima di procedere).
+- **Nuova azione di audit**: `ROSTER_TRANSFER_REVIEWED`, registrata su ogni conferma admin con `league_id=None` (evento di piattaforma, non di lega — stesso pattern di `PLATFORM_OPERATOR_PROMOTED`).
+- Test: `backend/tests/integration/authorization/test_admin_transfers.py` (5 casi: autenticazione richiesta, accesso negato a non-operatori, comparsa/sparizione dalla coda dopo revisione, doppia revisione rifiutata, ID sconosciuto → 404).
+- **Deliberatamente non collegato** al credito 100% (`MarketReleaseReason.LEAGUE_EXIT`): la coda rende visibile *quali* trasferimenti aspettano una decisione, ma l'eventuale svincolo con rimborso resta un'azione separata e manuale — stessa cautela già applicata a OQ-11 (mai automatizzare l'ultimo passo senza una decisione esplicita a parte).
+- **OQ-12 ora chiusa per intero** in `docs/data/api_football_open_questions.md`.

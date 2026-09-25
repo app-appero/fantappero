@@ -153,6 +153,7 @@ class LeagueAuditAction(str, enum.Enum):
     MARKET_GATE_TOGGLED = "market_gate_toggled"
     PLATFORM_OPERATOR_PROMOTED = "platform_operator_promoted"
     PLATFORM_OPERATOR_REVOKED = "platform_operator_revoked"
+    ROSTER_TRANSFER_REVIEWED = "roster_transfer_reviewed"
 
 
 class FantasyTurnStatus(str, enum.Enum):

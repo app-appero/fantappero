@@ -107,10 +107,10 @@ def test_upgrade_from_empty_database(clean_db: str) -> None:
                 .scalars()
                 .all()
             )
-            # Head aggiornata da 2fb4800de433 (player_availabilities da
-            # /injuries, OQ-11) — aggiornare questa costante ad ogni nuova
+            # Head aggiornata da 37c365bf2399 (review admin trasferimenti
+            # Loan/N.D., OQ-12) — aggiornare questa costante ad ogni nuova
             # migrazione in coda.
-            assert version == "2fb4800de433"
+            assert version == "37c365bf2399"
         assert named_statuses == ["pending", "accepted", "declined", "revoked", "expired"]
         assert calendar_statuses == ["draft", "confirmed"]
         assert fantasy_roles == ["P", "D", "C", "A"]

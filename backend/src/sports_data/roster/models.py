@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime
 from typing import TYPE_CHECKING
 from uuid import UUID
 
@@ -10,8 +10,10 @@ from sqlalchemy import Boolean, Date, ForeignKey, Integer, String, UniqueConstra
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from database.base import Base, TimestampMixin, UUIDPrimaryKeyMixin
+from database.types import UTCDateTime
 
 if TYPE_CHECKING:
+    from auth.models.user import User
     from sports_data.catalog.models import Club, SportSeason
 
 
@@ -109,9 +111,16 @@ class Transfer(Base, UUIDPrimaryKeyMixin, TimestampMixin):
         Boolean,
         nullable=False,
         server_default=text("false"),
+        index=True,
     )
     provider_key: Mapped[str] = mapped_column(String(128), nullable=False)
+    reviewed_at: Mapped[datetime | None] = mapped_column(UTCDateTime(), nullable=True)
+    reviewed_by_user_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+    )
 
     athlete: Mapped[Athlete] = relationship(back_populates="transfers")
     from_club: Mapped[Club | None] = relationship(foreign_keys=[from_club_id])
     to_club: Mapped[Club | None] = relationship(foreign_keys=[to_club_id])
+    reviewed_by: Mapped[User | None] = relationship(foreign_keys=[reviewed_by_user_id])

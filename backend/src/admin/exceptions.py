@@ -23,3 +23,16 @@ class LastOperatorRevokeError(AdminError):
             "Non puoi revocare l'ultimo operatore rimasto sulla piattaforma.",
             code="last_operator",
         )
+
+
+class AdminTransferNotFoundError(AdminError):
+    def __init__(self) -> None:
+        super().__init__("Trasferimento non trovato.", code="admin_transfer_not_found")
+
+
+class AdminTransferAlreadyReviewedError(AdminError):
+    def __init__(self) -> None:
+        super().__init__(
+            "Questo trasferimento è già stato revisionato.",
+            code="admin_transfer_already_reviewed",
+        )
