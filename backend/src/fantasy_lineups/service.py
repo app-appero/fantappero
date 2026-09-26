@@ -252,11 +252,15 @@ class FantasyLineupService:
         roster_ids = [str(row.athlete_id) for row in roster]
 
         # Chi è bloccato e con quale ruolo è stato schierato va saputo *prima*
-        # di validare il modulo (vedi `_validation_roles`).
+        # di validare il modulo (vedi `_validation_roles`). `for_update=True`
+        # blocca le righe fixture coinvolte fino al commit finale, così un
+        # kickoff/stato aggiornato in concorrenza non può intrufolarsi tra
+        # questa lettura e il salvataggio (vedi EP12 B5).
         kickoffs = self._athlete_kickoffs(
             round_id=fantasy_round.id,
             season_year=league_access.league.season_year,
             athlete_ids=[row.athlete_id for row in roster],
+            for_update=True,
         )
         lock_margin = self._lineup_lock_margin_for_league(league_access.league.id)
         locked_ids = [
@@ -1084,6 +1088,7 @@ class FantasyLineupService:
         round_id: UUID,
         season_year: int,
         athlete_ids: list[UUID],
+        for_update: bool = False,
     ) -> dict[UUID, _KickoffRef]:
         if not athlete_ids:
             return {}
@@ -1095,9 +1100,23 @@ class FantasyLineupService:
                 FantasyRoundFixture.excluded_at.is_(None),
             )
         ).all()
+        locked_fixtures_by_id: dict[UUID, Fixture] = {}
+        if for_update:
+            fixture_ids = {link.fixture_id for link in links if link.fixture_id is not None}
+            if fixture_ids:
+                # Blocca le righe delle partite coinvolte finché la richiesta non
+                # fa commit: un aggiornamento concorrente del kickoff/stato (es.
+                # lo scheduler dati sportivi) deve attendere questa transazione
+                # invece di intrufolarsi tra la lettura e il salvataggio.
+                locked = self._session.scalars(
+                    select(Fixture).where(Fixture.id.in_(fixture_ids)).with_for_update()
+                ).all()
+                locked_fixtures_by_id = {fixture.id: fixture for fixture in locked}
         fixture_by_club: dict[UUID, tuple[Fixture, FantasyRoundFixture]] = {}
         for link in links:
-            fixture = link.fixture
+            fixture = (
+                locked_fixtures_by_id.get(link.fixture_id) if for_update else link.fixture
+            )
             if fixture is None:
                 continue
             for club_id in (fixture.home_club_id, fixture.away_club_id):

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
@@ -18,6 +19,7 @@ from fantasy_teams.models import CreditAccount, FantasyRosterSlot
 from leagues.models.competition import Competition
 from leagues.models.league_membership import LeagueMembership
 from mail.capture import get_captured_emails
+from market.models import TradeProposal
 from sports_data.listone.models import RoleAssignment
 from sports_data.roster.models import Athlete
 
@@ -313,3 +315,75 @@ def test_max_active_trade_proposals_per_team_is_enforced(
     )
     assert over_limit.status_code == 400
     assert over_limit.json()["code"] == "trade_active_limit_reached"
+
+
+def test_concurrent_admin_approve_and_reject_only_one_transition_wins(
+    client: TestClient,
+    db_session: Session,
+    competition_ids: list[str],
+) -> None:
+    """B5: due decisioni amministrative concorrenti (approva/rifiuta) sulla
+    stessa proposta in attesa di approvazione devono risolversi in una sola
+    transizione valida. Stesso meccanismo di lock di riga già provato per
+    accetta/rifiuta del destinatario in test_trade_decision.py
+    (`_lock_pending_approval_proposal` usa lo stesso pattern di
+    `_lock_actionable_proposal_as_recipient`) — qui lo verifichiamo
+    direttamente sul percorso amministrativo, non per parentela di codice.
+    """
+    admin_token, admin_id = _register_and_login(client, "approve.race.admin@example.com")
+    member_token, member_id = _register_and_login(client, "approve.race.member@example.com")
+    league_id = _create_league(client, admin_token, competition_ids, "Lega Corsa Approvazione")
+    _add_member(db_session, league_id, member_id)
+    recipient_athlete = _seed_athlete(db_session, 9703, "Destinatario Corsa Admin")
+    recipient_team_id = _own_athlete_at_slot(client, league_id, member_token, 0, recipient_athlete)
+    _set_league_rules(client, league_id, admin_token, require_trade_approval=True)
+
+    proposal = client.post(
+        f"/leagues/{league_id}/mercato/scambi/proposte",
+        headers={"Authorization": f"Bearer {admin_token}"},
+        json={
+            "recipientTeamId": recipient_team_id,
+            "offeredCredits": 15,
+            "requestedAthleteIds": [str(recipient_athlete.id)],
+            "expiresAt": _future_iso(),
+        },
+    ).json()
+    client.post(
+        f"/leagues/{league_id}/mercato/scambi/proposte/{proposal['id']}/accetta",
+        headers={"Authorization": f"Bearer {member_token}"},
+    )
+
+    def _approve(_index: int) -> int:
+        response = client.post(
+            f"/leagues/{league_id}/mercato/scambi/proposte/{proposal['id']}"
+            "/amministrazione/approva",
+            headers={"Authorization": f"Bearer {admin_token}"},
+        )
+        return response.status_code
+
+    def _reject(_index: int) -> int:
+        response = client.post(
+            f"/leagues/{league_id}/mercato/scambi/proposte/{proposal['id']}"
+            "/amministrazione/rifiuta",
+            headers={"Authorization": f"Bearer {admin_token}"},
+        )
+        return response.status_code
+
+    with ThreadPoolExecutor(max_workers=4) as pool:
+        futures = [
+            pool.submit(_approve, 0),
+            pool.submit(_reject, 1),
+            pool.submit(_approve, 2),
+            pool.submit(_reject, 3),
+        ]
+        statuses = [future.result() for future in futures]
+
+    assert statuses.count(200) == 1
+    assert statuses.count(400) == 3
+
+    db_session.expire_all()
+    row = db_session.scalar(
+        select(TradeProposal).where(TradeProposal.id == UUID(proposal["id"]))
+    )
+    assert row is not None
+    assert row.status.value in {"executed", "rejected_by_admin"}

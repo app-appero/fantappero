@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
@@ -297,3 +298,70 @@ def test_waiver_bid_lost_when_release_athlete_no_longer_owned(
     )
     assert slot is not None
     assert slot.athlete_id is None  # untouched by the failed waiver, still empty from the release
+
+
+def test_concurrent_waiver_resolve_calls_swap_exactly_once(
+    client: TestClient,
+    db_session: Session,
+    competition_ids: list[str],
+) -> None:
+    """B5: risolvere una sessione svincoli condivide lo stesso metodo/lock
+    dell'asta (`resolve_session`: lock su MarketSession + `.with_for_update()`
+    sulle offerte), già provato in test_auction_resolution.py per l'asta. Qui
+    lo verifichiamo direttamente sul ramo svincoli, che in più scambia uno
+    slot occupato invece di limitarsi ad assegnarne uno libero — non basta
+    la parentela di codice come prova.
+    """
+    admin_token, admin_id = _register_and_login(client, "waiver.conc.admin@example.com")
+    league_id = _create_league(client, admin_token, competition_ids, "Lega Concorrenza Svincoli")
+    free_agent = _seed_athlete(db_session, 9309, "Concorrente Svincolato", role=FantasyRole.D)
+    owned = _seed_athlete(db_session, 9310, "Concorrente Posseduto", role=FantasyRole.D)
+    team_id = _own_first_athlete_on_roster(client, db_session, league_id, admin_token, owned)
+
+    session_id = _create_open_waiver_session(client, admin_token, league_id)
+    bid = client.put(
+        f"/leagues/{league_id}/mercato/svincoli/sessioni/{session_id}/offerte/{free_agent.id}",
+        headers={"Authorization": f"Bearer {admin_token}"},
+        json={"amountCredits": 70, "releaseAthleteId": str(owned.id)},
+    )
+    assert bid.status_code == 200
+    client.post(
+        f"/leagues/{league_id}/mercato/svincoli/sessioni/{session_id}/chiudi",
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+
+    def _resolve(_index: int) -> int:
+        response = client.post(
+            f"/leagues/{league_id}/mercato/svincoli/sessioni/{session_id}/risolvi",
+            headers={"Authorization": f"Bearer {admin_token}"},
+        )
+        return response.status_code
+
+    with ThreadPoolExecutor(max_workers=4) as pool:
+        statuses = list(pool.map(_resolve, range(4)))
+
+    assert all(status == 200 for status in statuses)
+
+    slot = db_session.scalar(
+        select(FantasyRosterSlot).where(
+            FantasyRosterSlot.fantasy_team_id == UUID(team_id),
+            FantasyRosterSlot.slot_index == 0,
+        )
+    )
+    assert slot is not None
+    assert slot.athlete_id == free_agent.id
+    assert slot.purchase_credits == 70
+
+    account = db_session.scalar(
+        select(CreditAccount).where(CreditAccount.fantasy_team_id == UUID(team_id))
+    )
+    assert account is not None
+    assert account.balance == 1000 - 70  # addebitato una sola volta, non una per thread
+
+    ledger_entries = db_session.scalars(
+        select(CreditLedgerEntry).where(
+            CreditLedgerEntry.account_id == account.id,
+            CreditLedgerEntry.reason == CreditLedgerReason.MARKET_WAIVER_ACQUISITION,
+        )
+    ).all()
+    assert len(ledger_entries) == 1

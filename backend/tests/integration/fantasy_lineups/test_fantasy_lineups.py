@@ -1351,6 +1351,101 @@ def test_postponement_before_kickoff_keeps_player_editable(
     assert allowed.json()["tacticalMovesUsed"] == 0
 
 
+def test_athlete_kickoffs_for_update_locks_the_fixture_row_until_commit(
+    client: TestClient,
+    db_session: Session,
+    db_url: str,
+    competition_ids: list[str],
+) -> None:
+    """B5: il caso reale non è tra due save, è un kickoff che cambia mentre UN
+    save è già in corso. `save_my_lineup` ora legge lo stato della partita con
+    `_athlete_kickoffs(..., for_update=True)`, che blocca a riga la fixture
+    coinvolta finché la richiesta non fa commit: un aggiornamento concorrente
+    (es. lo scheduler dati sportivi) non può più intrufolarsi tra la lettura e
+    il salvataggio, deve semplicemente attendere.
+
+    Verifichiamo il meccanismo di blocco direttamente a livello di database:
+    più affidabile che orchestrare due thread reali contro un'API HTTP, e
+    prova la stessa cosa — che il lock di riga è davvero preso e mantenuto.
+    """
+    from sqlalchemy import text
+    from sqlalchemy.exc import OperationalError
+
+    from fantasy_lineups.service import FantasyLineupService
+
+    token, _ = _register_and_login(client, "lineup.race.kickoff@example.com")
+    league_id = _create_league(client, token, competition_ids, "Lega Corsa Kickoff")
+    client.get(f"/leagues/{league_id}/rosa", headers={"Authorization": f"Bearer {token}"})
+    grouped = _seed_roster_athletes(db_session, id_offset=3_400_000)
+    athletes = _fill_validated_roster(db_session, league_id, grouped)
+
+    fantasy_round, clubs = _create_open_round(
+        db_session,
+        league_id,
+        cutoff=datetime.now(UTC) + timedelta(hours=2),
+        id_offset=3_410_000,
+        competition_ids=competition_ids,
+    )
+    bench_gk = grouped["P"][1]
+    _set_athlete_club(db_session, bench_gk, clubs[0])
+
+    payload = _lineup_payload(athletes, "4-3-3")
+    saved = client.put(
+        f"/leagues/{league_id}/turni/{fantasy_round.id}/formazione",
+        headers={"Authorization": f"Bearer {token}"},
+        json=payload,
+    )
+    assert saved.status_code == 200
+
+    fixtures = _round_fixtures(db_session, fantasy_round.id)
+    bench_gk_fixture_id = next(
+        item.id for item in fixtures if item.home_club_id == clubs[0].id
+    )
+
+    # Sessione "salvataggio": legge lo stato della partita con for_update=True
+    # e NON fa commit subito — imita il salvataggio rimasto a metà, con il
+    # lock ancora in mano.
+    service = FantasyLineupService(db_session)
+    service._athlete_kickoffs(
+        round_id=fantasy_round.id,
+        season_year=2026,
+        athlete_ids=[bench_gk.id],
+        for_update=True,
+    )
+
+    # Sessione "scheduler concorrente": prova a segnare la partita come
+    # iniziata mentre il salvataggio è ancora aperto. Con un lock_timeout
+    # breve, deve fallire per contesa — non riuscire silenziosamente.
+    writer_engine = create_engine_for_url(db_url)
+    writer_session = create_session_factory(writer_engine)()
+    try:
+        writer_session.execute(text("SET lock_timeout = '300ms'"))
+        fixture = writer_session.get(Fixture, bench_gk_fixture_id)
+        assert fixture is not None
+        fixture.status_short = "1H"
+        with pytest.raises(OperationalError):
+            writer_session.commit()
+        writer_session.rollback()
+
+        # Il "salvataggio" finisce e rilascia il lock.
+        db_session.commit()
+
+        # Ora la stessa scrittura concorrente deve poter procedere: non è un
+        # deadlock permanente, solo una serializzazione corretta.
+        fixture = writer_session.get(Fixture, bench_gk_fixture_id)
+        assert fixture is not None
+        fixture.status_short = "1H"
+        writer_session.commit()
+    finally:
+        writer_session.close()
+        writer_engine.dispose()
+
+    db_session.expire_all()
+    persisted = db_session.get(Fixture, bench_gk_fixture_id)
+    assert persisted is not None
+    assert persisted.status_short == "1H"
+
+
 def test_concurrent_identical_lineup_saves_produce_single_revision(
     client: TestClient,
     db_session: Session,
