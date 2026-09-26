@@ -1,0 +1,30 @@
+appId: com.fantappero.mobile
+---
+# Passo 4: creazione di una lega privata, così i passi successivi (rosa,
+# formazione, turni, mercato) hanno una lega attiva su cui operare.
+# Env attese: TEST_LEAGUE_NAME.
+#
+# NOTA: dopo il login un utente senza leghe potrebbe vedere una schermata
+# "nessuna lega" invece della Home lega — in entrambi i casi il link "Crea
+# lega" è sempre visibile in header (AppHeader, sempre renderizzato quando
+# onCreateLeaguePress è passato), quindi il tapOn qui sotto dovrebbe
+# funzionare indipendentemente dallo stato iniziale.
+
+- tapOn:
+    id: "header-create-league-link"
+- assertVisible:
+    id: "screen-create-league"
+
+- tapOn:
+    id: "create-league-name"
+- inputText: ${TEST_LEAGUE_NAME}
+
+# Seleziona tutti i campionati del catalogo (il form richiede un minimo di 3).
+- tapOn:
+    id: "create-league-select-all"
+
+- tapOn:
+    id: "create-league-submit"
+- assertVisible:
+    id: "screen-league-home"
+    timeout: 15000

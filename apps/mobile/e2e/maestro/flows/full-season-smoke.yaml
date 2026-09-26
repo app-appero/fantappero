@@ -1,0 +1,42 @@
+appId: com.fantappero.mobile
+---
+# Flow orchestratore — richiama in ordine i 5 sotto-flow che coprono i 13 passi
+# richiesti dal criterio di chiusura C2. Vedi ../README.md per prerequisiti,
+# stato (bozza mai eseguita) e note da verificare al primo giro.
+#
+# Le variabili di test sono generate qui con un timestamp per poter
+# rieseguire il flow più volte senza collisioni su un'email già registrata.
+
+- evalScript: ${output.testRunId = Date.now()}
+- evalScript: ${output.testEmail = 'e2e+' + output.testRunId + '@example.test'}
+- evalScript: ${output.testDisplayName = 'E2E Runner ' + output.testRunId}
+- evalScript: ${output.testPassword = 'Maestro!' + output.testRunId}
+- evalScript: ${output.testLeagueName = 'Lega E2E ' + output.testRunId}
+
+- runFlow:
+    file: steps/01-register-and-verify.yaml
+    env:
+      TEST_EMAIL: ${output.testEmail}
+      TEST_DISPLAY_NAME: ${output.testDisplayName}
+      TEST_PASSWORD: ${output.testPassword}
+      MAILPIT_BASE_URL: ${MAILPIT_BASE_URL}
+
+- runFlow:
+    file: steps/02-login.yaml
+    env:
+      TEST_EMAIL: ${output.testEmail}
+      TEST_PASSWORD: ${output.testPassword}
+
+- runFlow:
+    file: steps/03-create-league.yaml
+    env:
+      TEST_LEAGUE_NAME: ${output.testLeagueName}
+
+- runFlow:
+    file: steps/04-roster-formation-matchday-market.yaml
+
+- runFlow:
+    file: steps/05-logout-relogin-restart.yaml
+    env:
+      TEST_EMAIL: ${output.testEmail}
+      TEST_PASSWORD: ${output.testPassword}

@@ -1,0 +1,56 @@
+appId: com.fantappero.mobile
+---
+# Passi 1-2: registrazione nuovo utente + verifica email.
+# Env attese (passate dal flow orchestratore): TEST_EMAIL, TEST_DISPLAY_NAME,
+# TEST_PASSWORD, MAILPIT_BASE_URL.
+
+- launchApp:
+    clearState: true
+- assertVisible:
+    id: "screen-auth"
+- tapOn:
+    id: "auth-register-link"
+- assertVisible:
+    id: "screen-auth-register"
+
+- tapOn:
+    id: "auth-register-display-name"
+- inputText: ${TEST_DISPLAY_NAME}
+- tapOn:
+    id: "auth-register-email"
+- inputText: ${TEST_EMAIL}
+- tapOn:
+    id: "auth-register-password"
+- inputText: ${TEST_PASSWORD}
+- tapOn:
+    id: "auth-register-confirm-password"
+- inputText: ${TEST_PASSWORD}
+- tapOn:
+    id: "auth-register-submit"
+- assertVisible:
+    id: "auth-register-success"
+
+- tapOn:
+    id: "auth-register-verify-link"
+- assertVisible:
+    id: "screen-auth-verify-email"
+
+# NOTA: sintassi runScript/http/output non ancora verificata contro la
+# versione installata di Maestro CLI — vedi README.md.
+- runScript:
+    file: ../../scripts/fetchVerificationToken.js
+    env:
+      MAESTRO_TEST_EMAIL: ${TEST_EMAIL}
+      MAESTRO_MAILPIT_BASE_URL: ${MAILPIT_BASE_URL}
+
+- tapOn:
+    id: "auth-verify-email-token"
+- inputText: ${output.verificationToken}
+- tapOn:
+    id: "auth-verify-email-submit"
+- assertVisible:
+    id: "auth-verify-email-success"
+- tapOn:
+    id: "auth-verify-email-back-login"
+- assertVisible:
+    id: "screen-auth"

@@ -1,0 +1,40 @@
+appId: com.fantappero.mobile
+---
+# Passi 9-13: logout, login di nuovo, chiusura completa dell'app e riavvio —
+# la parte che prova davvero la persistenza della sessione (C2), non solo la
+# navigazione interna. Env attese: TEST_EMAIL, TEST_PASSWORD.
+
+# --- Passo 9: logout ---
+- tapOn:
+    id: "logout-button"
+- assertVisible:
+    id: "screen-auth"
+    timeout: 10000
+
+# --- Passo 10: login di nuovo ---
+- tapOn:
+    id: "auth-email"
+- inputText: ${TEST_EMAIL}
+- tapOn:
+    id: "auth-password"
+- inputText: ${TEST_PASSWORD}
+- tapOn:
+    id: "auth-login-submit"
+- assertNotVisible:
+    id: "screen-auth"
+    timeout: 15000
+
+# --- Passi 11-12: chiusura completa dell'app e riavvio ---
+# `stopApp` termina il processo (non solo lo mette in background): un
+# semplice `resumeApp`/background-foreground non basta a provare la
+# persistenza, va davvero terminato e rilanciato.
+- stopApp
+- launchApp:
+    clearState: false
+
+# --- Passo 13: la sessione è ancora attiva dopo il riavvio completo ---
+# Se sessionStorage.ts fosse ancora in memoria (bug pre-C2), qui l'app
+# tornerebbe alla schermata di login invece di restare autenticata.
+- assertNotVisible:
+    id: "screen-auth"
+    timeout: 15000

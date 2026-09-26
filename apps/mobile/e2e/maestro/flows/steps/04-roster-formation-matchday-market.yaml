@@ -1,0 +1,49 @@
+appId: com.fantappero.mobile
+---
+# Passi 5-8: rosa, formazione, turno/risultato, mercato.
+# Nessuna env attesa — opera sulla lega appena creata e attiva dal passo precedente.
+
+# --- Passo 5: rosa ---
+- tapOn:
+    id: "league-home-roster-link"
+- assertVisible:
+    id: "screen-roster"
+
+# --- Passo 6: formazione ---
+- tapOn:
+    id: "league-home-formation-link"
+# NOTA: FormationScreen non passa un testID al PageContainer (a differenza di
+# Rosa/Turni/Mercato), quindi qui si verifica il titolo mostrato invece di un
+# id — confermare a runtime che non ci siano altre schermate con lo stesso
+# titolo "Formazione" visibili contemporaneamente.
+- assertVisible:
+    text: "Formazione"
+# NOTA IMPORTANTE (non verificata): questo passo assume che, su una lega
+# appena creata, esista già una formazione proposta valida da salvare subito
+# (`formation-save` visibile e attivo). Se invece compare lo stato
+# "formation-empty" (nessuna formazione impostata) o servono scelte manuali
+# prima di poter salvare, questo passo va esteso — da controllare al primo
+# giro sull'emulatore prima di considerarlo affidabile.
+- tapOn:
+    id: "formation-save"
+- assertVisible:
+    id: "formation-success"
+    timeout: 10000
+
+# --- Passo 7: turno / risultato ---
+- tapOn:
+    id: "league-home-matchday-link"
+- assertVisible:
+    id: "screen-matchday"
+# NOTA: su una lega appena creata potrebbe non esserci ancora un turno con
+# risultato reale (dipende dai dati sportivi sincronizzati in ambiente di
+# test) — qui ci si limita a verificare che la schermata si apra con
+# l'elenco turni o lo stato vuoto, senza assumere un risultato specifico.
+- assertVisible:
+    id: "matchday-turn-list|matchday-empty"
+
+# --- Passo 8: mercato (tab "Scambi") ---
+- tapOn:
+    id: "market-hub-tabs-Market"
+- assertVisible:
+    id: "screen-market"

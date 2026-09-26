@@ -1,0 +1,18 @@
+appId: com.fantappero.mobile
+---
+# Passo 3: login con l'utente appena registrato e verificato.
+# Env attese: TEST_EMAIL, TEST_PASSWORD.
+
+- assertVisible:
+    id: "screen-auth"
+- tapOn:
+    id: "auth-email"
+- inputText: ${TEST_EMAIL}
+- tapOn:
+    id: "auth-password"
+- inputText: ${TEST_PASSWORD}
+- tapOn:
+    id: "auth-login-submit"
+- assertNotVisible:
+    id: "screen-auth"
+    timeout: 15000
