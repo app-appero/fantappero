@@ -5,6 +5,7 @@ import { AuthScreen } from "../screens/AuthScreen";
 import { AuthForgotPasswordScreen } from "../screens/AuthForgotPasswordScreen";
 import { AuthRegisterScreen } from "../screens/AuthRegisterScreen";
 import { AuthResetPasswordScreen } from "../screens/AuthResetPasswordScreen";
+import { AuthVerifyEmailScreen } from "../screens/AuthVerifyEmailScreen";
 import { CreateLeagueScreen } from "../screens/CreateLeagueScreen";
 import { JoinLeagueScreen } from "../screens/JoinLeagueScreen";
 import { LeagueAdminScreen } from "../screens/LeagueAdminScreen";
@@ -73,6 +74,11 @@ export function RootNavigator() {
             name="AuthResetPassword"
             component={AuthResetPasswordScreen}
             options={{ title: "Reimposta password", headerShown: false }}
+          />
+          <Stack.Screen
+            name="AuthVerifyEmail"
+            component={AuthVerifyEmailScreen}
+            options={{ title: "Verifica email", headerShown: false }}
           />
         </>
       ) : (

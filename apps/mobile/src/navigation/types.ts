@@ -56,6 +56,7 @@ export type RootStackParamList = {
   AuthRegister: undefined;
   AuthForgotPassword: undefined;
   AuthResetPassword: { token?: string } | undefined;
+  AuthVerifyEmail: { token?: string } | undefined;
   CreateLeague: CreateLeagueParams | undefined;
   LeagueHome: LeagueHomeParams | undefined;
   LeagueAdmin: LeagueAdminParams | undefined;

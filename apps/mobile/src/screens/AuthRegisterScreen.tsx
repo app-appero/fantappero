@@ -62,6 +62,14 @@ export function AuthRegisterScreen() {
             />
             <Pressable
               accessibilityRole="button"
+              onPress={() => navigation.navigate("AuthVerifyEmail")}
+              style={styles.linkRow}
+              testID="auth-register-verify-link"
+            >
+              <Text style={styles.link}>Ho un codice di verifica</Text>
+            </Pressable>
+            <Pressable
+              accessibilityRole="button"
               onPress={() => navigation.navigate("Auth")}
               style={styles.linkRow}
               testID="auth-register-back-login"

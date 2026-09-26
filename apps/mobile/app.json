@@ -28,7 +28,8 @@
         {
           "photosPermission": "Consenti l'accesso alle foto per impostare l'avatar del profilo."
         }
-      ]
+      ],
+      "expo-secure-store"
     ]
   }
 }
