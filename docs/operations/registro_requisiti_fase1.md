@@ -39,18 +39,21 @@ Durante l'analisi del piano di chiusura in questa stessa sessione sono state rac
 
 - **EP12-01 (Suite end-to-end critica):** il job CI `e2e-critical-flow` è marcato `informative` in `.github/workflows/ci.yml`, quindi non blocca il merge; copre solo 2 flussi (`critical-flow-states`, `registration-to-league`), solo web/Playwright; non esiste alcun E2E mobile. Per questo è classificata `MVP_REMEDIATION` e non `EVIDENCE_TEMPLATE`.
 - **EP13-01…EP13-12 (pacchetto M5.1):** nessun commit trovato in git log — confermano che il piano di chiusura Fase 1 (questo stesso documento e i blocchi B–G) non è ancora stato eseguito. Classificate `MVP_REMEDIATION` perché rappresentano lavoro di chiusura non ancora iniziato, non semplice mancanza di prova.
+- **EP12-02 (Test proprietà e concorrenza):** dei 4 scenari di concorrenza critici del piano, 3 (waiver, approvazione admin trade, omologazione/ricalcolo) sono risultati protetti dal lock già esistente; il quarto (kickoff che cambia durante il salvataggio della formazione) aveva invece una vera finestra di corsa, riprodotta con un test dedicato e corretta in `fantasy_lineups/service.py` — unico caso in questo blocco con un bug reale, non solo una verifica.
 - **9 domande aperte su dati reali API-Football** (`docs/data/api_football_open_questions.md`, OQ-07…OQ-15: minuti/recupero, copertura 5 campionati, calibrazione Rating Beta, lineup ufficiali, infortuni/squalifiche, trasferimenti, porta inviolata, predictions IA, ID season/leghe) restano senza `Esito` nel documento sorgente. Toccano soprattutto le card `EP04-01`, `EP04-02`, `EP04-03`, `EP04-05` e, per la porta inviolata, `EP07-03`. Non sono card a sé stanti nel registro Trello, quindi non hanno una riga propria: vanno aggiunte come voci "decisione normativa non trasformata in card" nel registro definitivo, come richiesto esplicitamente da EP13-02.
 
 ## 4. Conteggio stati preliminari (92 righe)
 
 | Stato preliminare | Righe | Significato pratico |
 |---|---:|---|
-| `EVIDENCE_TEMPLATE` | 67 | Codice presumibilmente presente, manca prova manuale/test verificata da una persona |
+| `EVIDENCE_TEMPLATE` | 66 | Codice presumibilmente presente, manca prova manuale/test verificata da una persona |
 | `MVP_REMEDIATION` | 13 | Gap confermato direttamente in questa sessione (E2E non bloccante, pacchetto EP13 non iniziato) |
-| `IMPLEMENTED_VERIFIED` | 12 | Verificate con lettura di codice + test esistenti durante il Blocco B (B1: EP04-07, EP06-03, EP06-05, EP06-06, EP06-07; B2: EP07-05, EP07-07, EP13-P02; B3: EP03-06, EP13-P03; B4: EP07-02, EP07-03) |
+| `IMPLEMENTED_VERIFIED` | 13 | Verificate con lettura di codice + test esistenti/aggiunti durante il Blocco B (B1: EP04-07, EP06-03, EP06-05, EP06-06, EP06-07; B2: EP07-05, EP07-07, EP13-P02; B3: EP03-06, EP13-P03; B4: EP07-02, EP07-03; B5: EP12-02) |
 | `PHASE2_BACKLOG` | 1 | Dichiarata Fase 2 dalla fonte stessa (`EP13-F01`, discovery club/formazione personale) |
 
 Aggiornamento 24/09/2026 (Blocco B1+B2+B3): 10 righe sono passate da `EVIDENCE_TEMPLATE` a `IMPLEMENTED_VERIFIED` dopo lettura diretta del codice e dei test esistenti — non è più una fotografia puramente automatica, è in corso la verifica con prova richiesta da EP13-02. Nota: per B3 la verifica è stata **volutamente limitata alla sola lettura**, su richiesta esplicita — nessuna modifica al codice del calendario/turni europei, area su cui è già stato investito lavoro significativo di messa a punto.
+
+Aggiornamento 26/09/2026 (Blocco B5): EP12-02 passa da `EVIDENCE_TEMPLATE` a `IMPLEMENTED_VERIFIED` dopo aver testato direttamente i 4 scenari di concorrenza critici del piano — a differenza degli altri blocchi, qui è emerso un bug reale (non solo una verifica), corretto con conferma esplicita dell'utente prima di toccare il codice.
 
 ## 5. Registro
 
@@ -122,7 +125,7 @@ Aggiornamento 24/09/2026 (Blocco B1+B2+B3): 10 righe sono passate da `EVIDENCE_T
 | EP11-04 | M4 — Ready | Should | Pannello operatore | EP11, Backend, Frontend, Infrastructure | 2bcd19d, a857344 EP11-04: pannello operatore, gate reale amministrativo | ALTA (commit dedicato) | EVIDENCE_TEMPLATE |
 | EP11-05 | M4 — Ready | Should | Lega Pro essenziale | EP11, Backend, Frontend, Infrastructure | 2bcd19d EP11-03..05: vedi EP11-03 (commit unico) | ALTA (commit dedicato) | EVIDENCE_TEMPLATE |
 | EP12-01 | M5 — Ready | Must | Suite end-to-end critica | EP12, QA, Backend, Frontend, Infrastructure | b2f0a9a EP12-01: suite E2E critica Playwright piu seed scenario. VERIFICATO in questa sessione: `.github/workflows/ci.yml` marca il job `e2e-critical-flow` come "informative", NON obbligatorio per il merge; copre solo 2 flussi (`critical-flow-states`, `registration-to-league`), solo web/Playwright; nessun E2E mobile esiste. | ALTA (verifica diretta CI + codice) | MVP_REMEDIATION |
-| EP12-02 | M5 — Ready | Must | Test proprietà e concorrenza | EP12, QA, Backend, Frontend, Infrastructure | e33444d EP12-02: test di proprieta e concorrenza ledger formazioni | ALTA (commit dedicato) | EVIDENCE_TEMPLATE |
+| EP12-02 | M5 — Ready | Must | Test proprietà e concorrenza | EP12, QA, Backend, Frontend, Infrastructure | e33444d EP12-02: test di proprieta e concorrenza ledger formazioni. VERIFICATO in questa sessione (Blocco B5) sui 4 scenari critici: waiver e approvazione admin trade confermati protetti dal lock già esistente con test diretti aggiunti; omologazione/ricalcolo già testata; salvataggio formazione durante un aggiornamento kickoff concorrente aveva invece una vera finestra di corsa (nessun lock condiviso tra `fixtures` e il salvataggio) — bug reale trovato con un test dedicato e corretto in `fantasy_lineups/service.py` (lettura della partita ora `for_update=True`, stesso pattern già in uso nel file). | ALTA (verifica diretta + bug reale trovato e corretto) | IMPLEMENTED_VERIFIED |
 | EP12-03 | M5 — Ready | Must | Performance e capacità | EP12, QA, Backend, Frontend, Infrastructure | 21d280e EP12-03: performance capacity baseline | ALTA (commit dedicato) | EVIDENCE_TEMPLATE |
 | EP12-04 | M5 — Ready | Must | Security review | EP12, QA, Backend, Frontend, Infrastructure | bef6875, d34b372 EP12-04: security review CORS DoS dipendenze secret | ALTA (commit dedicato) | EVIDENCE_TEMPLATE |
 | EP12-05 | M5 — Ready | Must | Backup e disaster recovery | EP12, QA, Backend, Frontend, Infrastructure | d6a61eb EP12-05: backup e disaster recovery | ALTA (commit dedicato) | EVIDENCE_TEMPLATE |
@@ -327,3 +330,55 @@ Solo indagine, nessuna modifica al codice — la regola era già corretta.
 - **Non implementato**: manca ancora una decisione su quali campi esporre allo staff IA e come strutturare lo snapshot richiesto dal criterio di chiusura — a differenza di OQ-11/OQ-12, qui la decisione di scope non è stata ancora presa.
 - **OQ-14 chiusa parzialmente** in `docs/data/api_football_open_questions.md` (dati reali verificati, funzionalità da costruire in sospeso).
 - **Prossima in ordine tra le domande rimaste**: nessuna — OQ-14 era l'ultima delle nuove. Restano solo le 4 messe in coda (OQ-08 residuo, OQ-09, OQ-10 residuo, OQ-15 residuo).
+
+### B5 — Test di concorrenza sui 4 scenari critici (26/09/2026)
+
+Il piano (EP12-02) chiedeva prove dirette di concorrenza su market/formazioni, non solo l'esistenza di un test generico. Verificati singolarmente i 4 scenari citati dal criterio di chiusura.
+
+- **Kickoff che cambia durante il salvataggio della formazione — BUG REALE TROVATO E CORRETTO.** `save_my_lineup` (`fantasy_lineups/service.py`) leggeva lo stato delle partite una sola volta (`_athlete_kickoffs`) e non lo rileggeva mai prima del commit finale: un aggiornamento concorrente (es. lo scheduler dati sportivi che segna "partita iniziata") poteva intrufolarsi in quella finestra e far passare un salvataggio che avrebbe dovuto essere respinto. Riprodotto con un test che inietta l'aggiornamento concorrente in un punto preciso (non affidato al caso): il salvataggio *non* rifiutava la promozione di un portiere la cui partita era già iniziata.
+  - **Corretto su indicazione esplicita dell'utente** (area sensibile, consultazione richiesta prima di ogni modifica): la lettura dello stato delle partite ora blocca a riga (`for_update=True`) le partite coinvolte fino al commit — stesso meccanismo già in uso nello stesso file per il turno e per la formazione salvata. Un aggiornamento concorrente deve aspettare che il salvataggio finisca, non può più intrufolarsi a metà.
+  - Il test originale (iniezione sincrona nello stesso thread) sarebbe rimasto in stallo con il lock vero; riscritto per provare direttamente il blocco a livello di database: apre il "salvataggio" senza chiuderlo, tenta una scrittura concorrente con timeout breve e verifica che venga respinta per riga occupata finché il salvataggio non chiude, e che poi vada a buon fine (nessuno stallo permanente).
+  - Verificato che i 15 test esistenti del modulo formazioni (incluso quello con 6 salvataggi paralleli) continuano a passare dopo la modifica.
+- **Waiver — verificato, nessun bug.** `resolve_session` (svincoli e asta condividono lo stesso metodo e lo stesso lock su sessione + offerte) era già testato per l'asta ma non per il ramo svincoli, che in più scambia uno slot occupato invece di limitarne uno libero. Aggiunto un test dedicato: 4 risoluzioni concorrenti della stessa sessione svincoli producono uno scambio e un solo addebito, mai duplicati.
+- **Approvazione admin di una trade — verificato, nessun bug.** Stesso pattern di lock già testato per accetta/rifiuta del destinatario (`_lock_pending_approval_proposal` come `_lock_actionable_proposal_as_recipient`), ma mai provato sul percorso amministrativo. Aggiunto un test dedicato: 4 decisioni concorrenti (approva/rifiuta) sulla stessa proposta producono una sola transizione valida, le altre tre respinte.
+- **Omologazione/ricalcolo punteggi** — già coperta da test di concorrenza diretti esistenti, nessuna azione necessaria.
+- **EP12-02 → `IMPLEMENTED_VERIFIED`** in questo registro (era `EVIDENCE_TEMPLATE`).
+
+## 9. Log di verifica — Blocco C
+
+### C1 — Matrice di parità web/mobile sui 17 flussi minimi (26/09/2026)
+
+Censimento diretto del codice (non prova su dispositivo reale) per ciascuno dei 17 flussi del piano. Documento completo: `docs/operations/matrice_parita_web_mobile.md`.
+
+- **11 flussi su 17 sono equivalenti** tra web e mobile: stessi endpoint, stessi permessi, stessa gestione degli stati (loading/empty/error/success/forbidden). Il flusso formazione/lock (11) è il meglio allineato perché la logica di blocco è condivisa dalle due app tramite `@fantappero/contracts`, non solo simile per caso.
+- **Trovato un disallineamento di prodotto concreto, non solo tecnico**: `ADR-0006` (07/09/2026) aveva nascosto sul web la tab "Svincolati", la sezione "Svincolo volontario" e lo "Storico mercato" separato nel mercato, rinominando la tab residua da "Mercato" a "Scambi" — decisione mai propagata al mobile, dove tutti e tre erano ancora visibili e attivi.
+- **Altri 4 gap trovati, tutti trasversali a più flussi**: sessione mobile non persistente oltre la chiusura dell'app (logout forzato ad ogni riavvio); nessun deep link funzionante sul mobile (link di reset password/invito/join-lega inutilizzabili, solo inserimento manuale); nessuna schermata di completamento verifica email sul mobile (la funzione API esiste, nessuno la chiama); nessun test end-to-end reale sul mobile (nessun Detox/Maestro, solo test banali) — quest'ultimo è esattamente il gap che il criterio C2 del piano chiede di colmare.
+- **Non ancora fatto**: la "prova su dispositivo reale" richiesta dal piano per ciascun flusso — il censimento è solo a livello di codice sorgente. **Rimandata di proposito** (decisione dell'utente, 26/09/2026): si completa prima l'analisi da codice su tutti i 17 flussi, la verifica fisica si affronta più avanti insieme al resto del Blocco C.
+
+### C1 (continua) — Completate le colonne mancanti: campi, azioni, messaggi, accessibilità (26/09/2026)
+
+Il primo giro aveva coperto endpoint/permessi/stati/test. Aggiunte le 4 colonne restanti richieste da C1 per tutti i 17 flussi, censimento diretto del codice.
+
+- **Contenuto informativo (campi/azioni/messaggi) sorprendentemente allineato**: per quasi tutti i flussi il testo dei messaggi mostrati all'utente coincide quasi parola per parola tra web e mobile — non solo la logica, anche la formulazione.
+- **Trovato un nono problema, trasversale**: accessibilità disomogenea su entrambe le piattaforme, più debole nelle schermate amministrative. Sul web mancano `aria-live` sui messaggi di esito delle azioni admin (uno screen reader non li annuncia automaticamente); sul mobile la maggior parte dei controlli nelle schermate admin ha solo `testID`, senza `accessibilityLabel`/`accessibilityRole` propri — l'unica eccezione è il checkbox di conferma eliminazione lega. Non è un gap di parità (il problema è simile sulle due piattaforme), ma è un difetto reale, non solo teorico.
+- **Il flusso matchup H2H (13) è risultato il meglio curato per accessibilità su entrambe le piattaforme**: usa lo stesso helper condiviso per costruire le etichette assistive, quindi il comportamento è identico per costruzione, non per somiglianza casuale — stesso principio già osservato per la logica di lock in formazione (flusso 11).
+- **Documento aggiornato**: `docs/operations/matrice_parita_web_mobile.md` ora contiene tutte le 9 colonne richieste da C1 tranne la prova su dispositivo reale (rimandata).
+
+### C1 (continua) — Applicata ADR-0006 anche al mobile (26/09/2026)
+
+Corretto il disallineamento più rilevante trovato sopra, su richiesta esplicita dell'utente.
+
+- **`apps/mobile/src/navigation/marketHubTabs.ts`**: aggiunto `SHOW_WAIVER_TAB = false` (stesso nome/pattern del flag web in `MarketHubPage.tsx`), tab "Svincolati" filtrata dalla lista condivisa `MARKET_HUB_TABS` (usata da tutte e 4 le schermate mercato/rosa/asta/svincoli tramite lo stesso screen-tabs strip); tab residua rinominata da "Mercato" a "Scambi".
+- **`apps/mobile/src/screens/MarketScreen.tsx`**: aggiunti `SHOW_VOLUNTARY_RELEASE = false` e `SHOW_MARKET_HISTORY = false` (stessi nomi del flag web in `MarketPage.tsx`), sezioni "Svincolo volontario" e "Storico mercato" nascoste con lo stesso pattern condizionale.
+- **Nulla è stato cancellato**: schermata `WaiverScreen`, componenti `MarketReleaseSection`/`MarketHistorySection`, endpoint e stato restano nel codice — stessa filosofia di ADR-0006 ("riportare a `true` il flag per riattivare", nessuna migrazione o modifica backend necessaria).
+- **Verificato**: `pnpm run typecheck` pulito, tutti i 31 test mobile esistenti passano invariati (nessun test copriva le sezioni nascoste, quindi nessun test da marcare `.skip` come fatto sul web).
+- **Aggiornata la matrice** (`matrice_parita_web_mobile.md`): il flusso 10 (asta/mercato) passa da "Gap" a coerente con il web; restano aperti i 4 gap trasversali elencati sopra, da confermare uno per uno con l'utente prima di intervenire.
+
+### C2 — Prerequisiti risolti prima del test E2E mobile (26/09/2026)
+
+Il flusso E2E richiesto dal piano (registrazione → verifica email → login → lega → rosa → formazione → risultato → mercato → **logout/login con sessione conservata**) non era eseguibile: due dei suoi passaggi erano rotti sul mobile (problemi #2 e #4 di C1). Su decisione esplicita dell'utente, risolti prima di costruire il test.
+
+- **Problema #2 risolto**: `apps/mobile/src/session/sessionStorage.ts` usava una `Map` in memoria — chiusura completa dell'app = logout forzato sempre. Sostituita con `expo-secure-store` (Keychain iOS / Keystore Android), con fallback a `localStorage` solo per `expo start --web` (uso di sviluppo, la web app reale resta `apps/web`). Interfaccia pubblica invariata, nessun altro file da toccare.
+- **Problema #4 risolto**: aggiunta `AuthVerifyEmailScreen` (stesso pattern già usato da `AuthResetPasswordScreen`: campo per incollare il codice a mano, dato che i deep link restano non funzionanti — problema #3, non ancora affrontato), raggiungibile dal messaggio di successo della registrazione ("Ho un codice di verifica").
+- **Verificato**: `pnpm run typecheck` pulito, tutti i 31 test mobile esistenti passano.
+- **Prossimo passo**: costruire ed eseguire il test E2E vero con Maestro su emulatore Android (SDK già presente sulla macchina, nessun AVD ancora configurato). Delegato a un ambiente cloud su richiesta dell'utente, per non occupare risorse locali e sfruttare l'accelerazione hardware Linux (KVM) per l'emulatore.
