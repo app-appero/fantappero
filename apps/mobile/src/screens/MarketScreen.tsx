@@ -34,7 +34,16 @@ import { MarketReleaseSection } from "./market/MarketReleaseSection";
 import { MarketTradeCreateForm } from "./market/MarketTradeCreateForm";
 import { MarketTradeList } from "./market/MarketTradeList";
 
-/** Mercato: svincolo volontario + proposte di scambio tra squadre (EP08-04/05/06/07/08). */
+const SHOW_VOLUNTARY_RELEASE = false;
+const SHOW_MARKET_HISTORY = false;
+
+/**
+ * Scambi (ex "Mercato"): proposte di scambio tra squadre (EP08-05/06/07).
+ *
+ * Svincolo volontario e storico mercato sono nascosti (`SHOW_VOLUNTARY_RELEASE`,
+ * `SHOW_MARKET_HISTORY`) — stessa decisione applicata al web, mai propagata al
+ * mobile fino ad ora (ADR-0006). Stato, handler ed endpoint restano nel codice.
+ */
 export function MarketScreen() {
   const navigation = useNavigation<NavigationProp<AppTabParamList>>();
   const { can, accessToken, activeLeagueId } = useAuthSession();
@@ -318,7 +327,7 @@ export function MarketScreen() {
         />
       ) : null}
 
-      {!loading && !loadError && activeLeagueId ? (
+      {SHOW_VOLUNTARY_RELEASE && !loading && !loadError && activeLeagueId ? (
         <MarketReleaseSection
           ownedSlots={ownedSlots}
           balance={balance}
@@ -383,7 +392,9 @@ export function MarketScreen() {
         />
       ) : null}
 
-      {activeLeagueId ? <MarketHistorySection history={history} teams={teams} /> : null}
+      {SHOW_MARKET_HISTORY && activeLeagueId ? (
+        <MarketHistorySection history={history} teams={teams} />
+      ) : null}
     </PageContainer>
   );
 }
