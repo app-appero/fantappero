@@ -436,3 +436,16 @@ Rieseguiti tutti gli scenari esistenti (smoke, steady, spike/recovery, 3 benchma
 - **File toccati**: `tools/performance/live_polling.js` (nuovo), `infra/scripts/run_performance_test.sh` (aggiunti i due scenari alla modalità `full`), `docs/operations/performance_capacity.md` (budget dei due nuovi scenari).
 
 **Blocco D3 chiuso.** Prossimo: D4 (rivalidare la sicurezza) — segnalato esplicitamente in D1 per via del nuovo storage sicuro della sessione mobile (`expo-secure-store`), che tocca proprio la superficie "gestione credenziali" tipicamente in scope di una security review.
+
+### D4 — Sicurezza rivalidata, perimetro completo (27/09/2026)
+
+Rieseguiti tutti gli audit di agosto (dipendenze Python/JS, SAST, secret scan) più la riverifica dal vivo di CORS/rate-limit/guardia Range/upload/privacy, più la revisione della superficie mai vista da agosto (pannello operatore turni, asta live, storage sessione mobile) e il test dinamico di bypass autorizzazione (suite IDOR + test dedicati pannello operatore/asta live). Dettaglio completo in `docs/operations/beta_readiness/ep12-04_security_review.md`, sezione "D4".
+
+- **Nessuna regressione** su nulla di quanto già corretto ad agosto.
+- **Superficie nuova (pannello operatore turni, asta live, storage sessione mobile) verificata senza problemi**: permessi corretti su ogni endpoint, test dedicati verdi, token mobile sempre su Keychain/Keystore nativo.
+- **2 finding nuovi, entrambi con decisione esplicita**:
+  1. **Segreto reale (`API_FOOTBALL_KEY`) rimasto nella cronologia Git**, anche se il file attuale è pulito — quando la review di agosto documentò la scoperta, il valore vero finì per errore anche nel testo del documento stesso, poi redatto solo in una revisione successiva (la cronologia conserva entrambe le versioni). **Rotazione della chiave su API-Football rimandata su decisione esplicita dell'utente** — non priorità immediata, resta un'azione aperta prima del pilota reale (Blocco G).
+  2. **CVE Starlette su limiti form-data** (ignorati per corpi url-encoded): tocca solo 2 endpoint autenticati (upload avatar, import CSV rosa). **Rischio accettato per la Beta su decisione esplicita** — esiste un fix a basso rischio (guardia globale sulla dimensione del corpo, stesso pattern già usato per l'header Range) se si vorrà chiuderlo più avanti.
+- Le altre 4 nuove CVE Starlette pubblicate da agosto **non si applicano**: verificato nel codice che non usiamo mai i pattern coinvolti (nessun uso di `request.url.path`/`.hostname`, nessuna classe `HTTPEndpoint`, immagine Docker Linux non Windows).
+
+**Blocco D4 chiuso — nessun finding Critico/Alto aperto.** Con D1-D4 completi, l'intero Blocco D del piano di chiusura è chiuso. Prossimo: Blocchi E (ambiente pilot), F (governance/privacy/supporto), G (pilota reale) — non ancora iniziati, guidati principalmente da decisioni reali dell'utente (infrastruttura, dominio, distribuzione ai tester).

@@ -23,6 +23,13 @@ card (vedi #5 e #6 sotto) — **nessun finding Alto resta aperto**. Il finding M
 residuo (#7, header di sicurezza HTTP) è stato **accettato come rischio per la Beta**
 su decisione esplicita del responsabile della card (stessa sessione di chiusura dei
 finding Alti) — vedi dettaglio sotto. La breve riapertura sul finding #19 è ora chiusa.
+**Aggiornamento D4 (27/09/2026)**: rivalidazione completa richiesta dal Blocco D prima
+del pilota, oltre un mese dopo la chiusura precedente. Nessuna regressione sui controlli
+già chiusi (CORS, guardia Range, rate limit, upload, privacy). 2 nuovi finding: un
+segreto reale rimasto nella cronologia Git (#20, **rotazione rimandata su decisione
+esplicita** — non priorità immediata) e una CVE Starlette recente su limiti form-data
+(#21, **rischio accettato per la Beta** su decisione esplicita). Dettaglio in fondo al
+documento, sezione "D4".
 
 ### Riepilogo finding
 
@@ -47,6 +54,8 @@ finding Alti) — vedi dettaglio sotto. La breve riapertura sul finding #19 è o
 | 17 | Privacy/GDPR (`auth/privacy_service.py`) | — | Coperto da test esistenti, verificati verdi |
 | 18 | Redazione log PII/segreti | — | Verificato agganciato globalmente, nessun finding |
 | 19 | Trust incondizionato di `X-Forwarded-For` nel rate limit login | Media | **Corretto — peer ASGI trusted-only + test dinamico** |
+| 20 | Valore reale di `API_FOOTBALL_KEY` rimasto in 4 commit della cronologia Git (fix #1 aveva pulito solo il file corrente) | Media (segreto recuperabile dalla storia, non dal codice attuale) | **Aperto — rotazione rimandata su decisione esplicita** |
+| 21 | Starlette: limiti `max_fields`/`max_part_size` su `request.form()` ignorati per corpi `application/x-www-form-urlencoded` (PYSEC-2026-249) | Bassa-Media (solo 2 endpoint autenticati: upload avatar, import CSV rosa; limiti comunque non configurati oggi) | **Rischio accettato per la Beta** |
 
 ### 1. Dependency audit — Python (`pip-audit`)
 
@@ -563,3 +572,143 @@ responsabile ed evidenze.
 - La review manuale OWASP richiede giudizio umano su alcuni finding (es. accettazione
   rischio); questo documento definisce il processo, non sostituisce la decisione del
   responsabile della card.
+
+## D4 — Rivalidazione prima del pilota (27/09/2026)
+
+Perimetro completo su richiesta esplicita: audit dipendenze aggiornato, SAST, secret
+scan sulla storia, riverifica dal vivo di CORS/rate-limit/upload/Range-guard, più
+revisione della superficie nuova non vista dalla chiusura di agosto (pannello operatore
+turni e asta live, aggiunti il 31/08 e il 7/09; storage sessione mobile).
+
+### 1. Dependency audit — Python (`pip-audit`)
+
+Stessi 3 pacchetti di agosto (pip, pytest, starlette), ma starlette ha accumulato **5
+nuove CVE** pubblicate dopo la chiusura precedente (oltre a quella già mitigata sul
+`Range` header). Verificate una per una contro il codice reale, non solo l'elenco:
+
+- **BadHost / path validation (PYSEC-2026-161, PYSEC-2026-248)**: richiedono che
+  l'app usi `request.url.path`/`.hostname`/`.netloc` per controlli di sicurezza.
+  Grep mirato su `backend/src`: **nessun uso**, in nessun file. Non applicabile.
+- **HTTPEndpoint method-name bypass (PYSEC-2026-2280)**: richiede l'uso della classe
+  `HTTPEndpoint` di Starlette. **Non usata**: tutto il routing passa per i decoratori
+  FastAPI (`@router.get/post/...`). Non applicabile.
+- **StaticFiles SSRF via UNC path (PYSEC-2026-2281)**: **solo Windows**. L'immagine di
+  produzione (`infra/local/Dockerfile`) è `python:3.12-slim-bookworm`, Linux. Non
+  applicabile al deployment reale (resterebbe teoricamente valido solo se qualcuno
+  eseguisse l'API nativamente su Windows, mai il caso qui).
+- **Form parsing limits bypass su urlencoded (PYSEC-2026-249, CVSS 7.5)**: l'unica
+  potenzialmente rilevante. `max_fields`/`max_part_size` proteggono `multipart/
+  form-data` ma vengono ignorati per `application/x-www-form-urlencoded`. Verificato
+  che l'app **non usa mai `Form(...)`** (grep su `backend/src`, solo `File(...)`/
+  `UploadFile` in 2 endpoint: `POST /me/avatar`, `POST /{league_id}/.../import-csv/
+  anteprima`), entrambi dietro autenticazione + permesso (`PROFILE_VIEW`,
+  `LEAGUE_ADMIN`) — non l'endpoint pubblico non autenticato ipotizzato
+  dall'advisory generica. Impatto pratico ridotto a un utente già autenticato che
+  manda un corpo enorme a uno di questi 2 endpoint per consumare CPU/memoria durante
+  il parsing. **Finding #21, rischio accettato per la Beta su decisione esplicita**
+  del responsabile della card — opzione di fix disponibile e a basso rischio (guardia
+  globale sulla dimensione del corpo, stesso pattern della mitigazione Range già in
+  produzione) se si vorrà chiuderlo prima di un pilota più ampio.
+- pip/pytest: stessa situazione di agosto, nessun cambiamento (build-time/dev-only).
+
+### 2. Dependency audit — JS/TS (`pnpm audit`)
+
+32 vulnerabilità (8 moderate, 24 high; erano 24 in agosto) — stessa categoria di
+allora: quasi tutte transitive sotto `apps/mobile`/Expo (nuova: `@xmldom/xmldom`,
+13 finding, usata da `@expo/plist` per il parsing di `Info.plist` **solo in fase di
+build**, mai nel bundle spedito) o dev-tooling già noto (Playwright, js-yaml,
+image-size). Due dirette meritano nota:
+
+- **vitest 3.2.7 → richiede 4.1.11** (path traversal via `@vitest/mocker`, solo se il
+  server UI di Vitest è esposto — mai il caso in CI/produzione): stesso limite di
+  agosto, il fix richiede un bump major con rischio di rottura della config test, non
+  "a basso rischio". Lasciato aperto, stessa decisione.
+- **`decode-uri-component` (nuova, moderata)**: transitiva via `query-string` sotto
+  `@react-navigation` (parsing URL per i deep link). Il mobile non ha ancora deep link
+  funzionanti (problema #3 della matrice di parità, non affrontato), quindi il
+  percorso che userebbe questo parser non è raggiungibile oggi. Non pinnata
+  direttamente da noi, nessuna azione.
+
+### 3. SAST — `bandit`
+
+0 medium/high (**invariato** da agosto). I finding Bassi sono saliti da 48 a 81 —
+proporzionale alla crescita del codice (stesse due categorie di sempre: `assert` su
+invarianti interne dopo query DB, un `try/except/pass` intenzionale e commentato),
+nessuna nuova categoria comparsa. Nessuna azione.
+
+### 4. Secret scanning
+
+Stessa procedura di agosto (`gitleaks` sulla storia tracciata, 139 commit). **Nuovo
+finding reale**: il valore vero di `API_FOOTBALL_KEY` — quello che il fix di agosto
+aveva rimosso dal file corrente — è rimasto **scritto per intero nel documento di
+questa stessa review** (`ep12-04_security_review.md`, righe allora 169/178) mentre
+descriveva la scoperta, poi redatto a `<redacted>` in una revisione successiva del
+documento. La cronologia Git conserva però entrambe le versioni: chiunque cloni il
+repository può recuperare il valore reale con `git log -p` o consultando i vecchi
+commit (`bef68759`, `c6be3a89`), anche se `HEAD` oggi è pulito su entrambi i file.
+**Finding #20** — l'azione che conta è **ruotare la chiave su API-Football**
+(invalidare il valore vecchio, generarne uno nuovo), non necessariamente riscrivere
+la storia Git (operazione distruttiva, force-push, richiede coordinamento con
+chiunque altro lavori sul repository). **Rotazione rimandata su decisione esplicita
+del responsabile della card** — non priorità immediata; resta un'azione aperta da
+fare prima del pilota reale (Blocco G), non necessariamente ora.
+
+Confermati nuovamente veri anche i 2 falsi positivi già noti (fixture di test in
+`test_redaction.py`, valori dichiaratamente finti).
+
+### 5. Superficie nuova non vista da agosto
+
+**Pannello operatore turni** (`backend/src/admin/turni_router.py`, aggiunto 31/08):
+ogni singolo endpoint richiede `Permission.GLOBAL_OPERATE` (verificato riga per riga,
+nessuna eccezione). Suite dedicata (`tests/integration/admin/test_turni_router.py`,
+`tests/integration/authorization/test_admin_panel.py`) verde, incluso il test che
+verifica esplicitamente il rifiuto per un utente non operatore.
+
+**Asta live** (`backend/src/market/live_router.py`, aggiunto 07/09): pattern a due
+livelli — permesso di lega a livello di router (`MARKET_VIEW` per azioni di membro
+come "fai un rilancio", `MARKET_MANAGE` per creare/configurare una sessione,
+`require_live_session_operator` per avviare/terminare/aggiudicare forzatamente) più
+enforcement fine a livello di servizio (proprietà della squadra, turno di nomina).
+Verificato con `tests/integration/market/test_live_auction_*.py`:
+`test_operator_actions_forbidden_for_plain_member_but_raise_allowed` conferma 403 per
+un membro su un'azione da operatore; `test_swap_actions_forbidden_for_non_winning_team`
+conferma che una squadra non può risolvere lo scambio di un'altra. Nessun problema
+trovato in nessuna delle due aree.
+
+**Storage sessione mobile** (`apps/mobile/src/session/sessionStorage.ts`,
+`expo-secure-store`, C2 di questa stessa chiusura Fase 1): i token veri passano
+sempre da Keychain (iOS) / Keystore (Android) via `expo-secure-store` — mai in testo
+semplice su disco. L'unico fallback meno sicuro (`localStorage`) è attivo solo su
+`Platform.OS === "web"`, cioè solo `expo start --web` per sviluppo: la build reale
+(`expo export --platform ios --platform android`) non include mai la piattaforma
+web, quindi questo percorso non è mai raggiungibile in un binario distribuito a un
+tester. Nessun problema trovato.
+
+### 6. Riverifica dal vivo — nessuna regressione
+
+Contro lo stack Docker reale sul commit attuale:
+
+- CORS: `OPTIONS /auth/me` con `Origin` ostile → `Access-Control-Allow-Origin: *`
+  letterale, nessun `Access-Control-Allow-Credentials` — invariato.
+- Guardia Range: header malevolo (~2000 range) → `400` prima di raggiungere
+  `StaticFiles`; range legittimo corto → passa normalmente (`404`, file inesistente,
+  non bloccato) — invariato.
+- Rate limit login: 6 tentativi con `X-Forwarded-For` diverso ad ogni richiesta →
+  `429` al sesto comunque (il limiter ignora l'header, come da fix di agosto) —
+  invariato.
+- Header di sicurezza HTTP: ancora assenti, come da rischio accettato #7 — nessun
+  cambiamento, nessuna nuova azione.
+- Upload avatar e privacy/export: codice invariato dalla chiusura di agosto (nessun
+  commit li tocca), suite `test_profile_idor.py`/`test_privacy_idor.py` verde sul
+  commit attuale.
+- Pannelli demo/operatore: già verificato in dettaglio dal criterio C3 di questa
+  stessa chiusura Fase 1 (27/09/2026) — la modalità demo web è esclusa dalla build di
+  produzione a livello di bundle, il mobile non ha alcuna modalità demo raggiungibile.
+  Non ripetuto qui, vedi `registro_requisiti_fase1.md`, sezione C3.
+
+### Esito D4
+
+**Nessun finding Critico/Alto aperto** (stesso stato di agosto). 2 finding nuovi,
+entrambi con decisione esplicita del responsabile della card: #20 (segreto in
+cronologia, rotazione rimandata) e #21 (limiti form-data, rischio accettato per la
+Beta). Nessuna regressione su alcun controllo precedentemente chiuso.
