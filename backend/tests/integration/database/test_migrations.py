@@ -10,6 +10,7 @@ from tests.integration.database.helpers import (
     alembic_check,
     autogenerate_has_ops,
     create_engine_for_url,
+    downgrade_one,
     reset_to_base,
     table_exists,
     upgrade_head,
@@ -149,6 +150,58 @@ def test_alembic_check_detects_no_drift_after_upgrade(clean_db: str) -> None:
 def test_autogenerate_produces_no_unexpected_ops(clean_db: str) -> None:
     upgrade_head(clean_db)
     assert autogenerate_has_ops(clean_db) is False
+
+
+def test_last_migration_applies_cleanly_to_a_populated_database(clean_db: str) -> None:
+    """D2: le migrazioni erano provate solo su database vuoto (nessuna riga).
+
+    Qui si arriva a un passo dalla testa, si popola il database con dati
+    realistici (utenti, leghe, rose validate, formazioni, risultati — lo
+    stesso seed usato per le prove di carico EP12-03, non dati sintetici
+    minimi), poi si applica l'ultima migrazione sopra quei dati reali. Un
+    ALTER che si comporta bene su una tabella vuota può comunque fallire (o
+    corrompere righe) quando la tabella contiene già dati — è esattamente il
+    tipo di problema mai stato messo alla prova fino ad ora.
+    """
+    from sqlalchemy.orm import Session as OrmSession
+
+    from database.session import create_session_factory
+    from devtools.seed_performance_scenario import seed
+
+    upgrade_head(clean_db)
+    downgrade_one(clean_db)
+
+    engine = create_engine_for_url(clean_db)
+    try:
+        session = create_session_factory(engine)()
+        try:
+            manifest = seed(session, user_count=2, password="MigrationTest!123")
+        finally:
+            session.close()
+        assert len(manifest["users"]) == 2
+        with engine.connect() as conn:
+            user_count_before = conn.execute(text("SELECT count(*) FROM users")).scalar_one()
+            league_count_before = conn.execute(text("SELECT count(*) FROM leagues")).scalar_one()
+    finally:
+        engine.dispose()
+
+    upgrade_head(clean_db)
+
+    engine = create_engine_for_url(clean_db)
+    try:
+        with engine.connect() as conn:
+            user_count_after = conn.execute(text("SELECT count(*) FROM users")).scalar_one()
+            league_count_after = conn.execute(text("SELECT count(*) FROM leagues")).scalar_one()
+        # I dati inseriti prima dell'ultima migrazione devono sopravvivere
+        # intatti — confronto relativo, non un numero assoluto: alcune
+        # migrazioni inseriscono righe di bootstrap (es. operatore
+        # piattaforma), quindi il totale assoluto non è stabile nel tempo.
+        assert user_count_after == user_count_before
+        assert league_count_after == league_count_before
+    finally:
+        engine.dispose()
+    check = alembic_check(clean_db)
+    assert check.returncode == 0, check.stderr
 
 
 def test_utc_timestamps_and_constraints(migrated_engine) -> None:

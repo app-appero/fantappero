@@ -64,6 +64,12 @@ def alembic_check(url: str) -> subprocess.CompletedProcess[str]:
     return run_alembic("check", env={"DATABASE_URL": url})
 
 
+def downgrade_one(url: str) -> None:
+    result = run_alembic("downgrade", "-1", env={"DATABASE_URL": url})
+    if result.returncode != 0:
+        pytest.fail(f"alembic downgrade -1 failed:\n{result.stdout}\n{result.stderr}")
+
+
 def create_engine_for_url(url: str) -> Engine:
     from database.session import normalize_database_url
 

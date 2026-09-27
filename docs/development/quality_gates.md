@@ -17,7 +17,7 @@ Workflow: [`.github/workflows/ci.yml`](../../.github/workflows/ci.yml)
 | `js-test` | **Obbligatorio** — test workspace JS | `make test-js` |
 | `js-build` | **Obbligatorio** — packages + web + mobile (Blocco D2, 27/09/2026: la build mobile ora esegue davvero `expo export`, non più un duplicato del typecheck — verifica il bundle Metro reale, non solo i tipi) | `make build` |
 | `ci-success` | **Obbligatorio** — aggregato (branch protection) | `make quality` |
-| `migrations` | **Obbligatorio** — Alembic upgrade, drift check, integration DB tests | `make migrate && make migrate-check` (richiede `DATABASE_URL`) |
+| `migrations` | **Obbligatorio** — Alembic upgrade, drift check, integration DB tests (Blocco D2, 27/09/2026: include anche l'ultima migrazione applicata sopra un database *popolato* con dati realistici, non solo su database vuoto) | `make migrate && make migrate-check` (richiede `DATABASE_URL`) |
 | `ep00-extra-tests` | **Informativo** — suite tools/experiments | vedi sotto |
 | `performance-smoke` | **Informativo** — stack isolato + seed + Celery + k6 smoke EP12-03 | `PERF_USER_COUNT=1 make performance-smoke` |
 | `python-typecheck` | **Informativo** — mypy su `backend/src` (Blocco D2: 300 errori preesistenti al 27/09/2026, mai corretti — non ancora un gate bloccante) | `make typecheck-python` |
@@ -133,6 +133,15 @@ Alembic è configurato in `backend/alembic.ini`. ADR: [`ADR-0004`](../adr/ADR-00
 - senza `DATABASE_URL` valida solo layout (utile in locale senza Docker).
 
 Il job CI `migrations` è **obbligatorio**: Postgres effimero, `upgrade head`, drift check, pytest integration.
+
+`test_last_migration_applies_cleanly_to_a_populated_database` (Blocco D2, 27/09/2026)
+prova qualcosa che prima non era mai stato provato: arriva a un passo dalla testa,
+popola il database con lo stesso seed usato per le prove di carico EP12-03 (utenti,
+leghe, rose validate, formazioni, risultati — dati realistici, non righe minime
+sintetiche), poi applica l'ultima migrazione sopra quei dati. Un `ALTER` innocuo su
+una tabella vuota può comunque fallire — o peggio, corrompere silenziosamente righe
+esistenti — su una tabella popolata; l'unica prova precedente (database vuoto) non
+lo avrebbe mai potuto rilevare.
 
 Test DB integration (skip senza `DATABASE_URL`):
 
