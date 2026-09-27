@@ -8,7 +8,7 @@
 
 ```yaml
 release: fase1-rc0                     # rc0 = bozza pre-D2/D3/D4, non ancora la candidata finale
-commit: b327f1fa5744ca7fe1acfbc7d56d6dabc5476d00
+commit: 97a3d2d86aacae07a023e849ebec07465bb9c261  # aggiornato dopo D2 (27/09/2026) — solo CI/test, nessun codice applicativo
 branch: claude/fase1-chiusura
 tag: (nessuno — non è mai stato creato un tag Git in questo repository)
 freeze_date: 2026-09-27
@@ -60,12 +60,23 @@ Nessuno di questi tre punti blocca il lavoro di D2/D3/D4 in sé (si può testare
 | Evidenza | Data | Stato |
 |---|---|---|
 | Test E2E web (Playwright, `apps/e2e`) | in corso, CI `e2e-critical-flow` | **Aggiornato 27/09/2026 (D2)**: riparte da sola su ogni PR/push a main/dev (prima era agganciata a un branch `claude/M5` ormai inesistente, non partiva più). Resta informativa per i merge quotidiani (rischio di instabilità browser+Compose), ma il suo esito va controllato prima di dichiarare una candidata pronta per il pilota |
-| Test E2E mobile (Maestro) | 27/09/2026 | **Nuova**, appena creata ed eseguita con successo in questo Blocco C2 — non esisteva prima di questa sessione |
+| Test E2E mobile (Maestro) | 27/09/2026 | **Nuova**, appena creata ed eseguita con successo in questo Blocco C2. **Decisione D2 (27/09/2026)**: resta uno strumento manuale, non collegato a GitHub Actions — un job che avvia un emulatore Android costerebbe 15-25+ minuti di "minuti Actions" ad ogni esecuzione, sproporzionato per un controllo da fare solo prima del pilota. Comandi esatti in `apps/mobile/e2e/maestro/README.md` |
 | Performance/capacità (EP12-03) | 2026-08-21 | **Da rifare** (D3) — il piano stesso lo segnala esplicitamente: "le prove di agosto appartengono a una versione precedente", e da allora sono cambiati backend (fix B5, rotte turni) e mobile (persistenza sessione, ADR-0006) |
 | Security review (EP12-04) | 2026-08-21, aggiornata su un punto | **Da rifare** (D4) — stessa ragione: oltre un mese di modifiche non riviste, incluso il nuovo storage sicuro della sessione mobile (`expo-secure-store`) che tocca proprio la superficie "gestione credenziali" tipicamente in scope di una security review |
 | Matrice di parità web/mobile (C1) | 26/09/2026 | Valida, appena fatta |
 | Registro requisiti completo | 26-27/09/2026 | Valido, aggiornato in continuo in questa sessione |
 
-## 5. Prossimo passo
+## 5. Checklist manuale prima di dichiarare una candidata pronta per il pilota
 
-Procedere con **D2** (rendere bloccanti i gate oggi solo informativi) usando questo stesso commit come riferimento. Se D2 non richiede modifiche al codice, si passa a D3/D4 sullo stesso commit; se le richiede, questo manifest va aggiornato con il nuovo commit prima di rieseguire D3/D4 (altrimenti si rieseguono controlli su una versione già superata).
+Due controlli restano volutamente **non automatici** (per non gravare sui minuti CI di ogni PR) — vanno eseguiti a mano una volta, sull'ultimo commit, prima di dichiarare una versione pronta per il Blocco G:
+
+- [ ] **E2E critico web**: verificare che l'ultima esecuzione del job `e2e-critical-flow` su questo commit sia verde (gira da sola su push a `main`/`dev`, altrimenti avviarla a mano da GitHub Actions).
+- [ ] **E2E critico mobile**: eseguire a mano `apps/mobile/e2e/maestro/flows/full-season-smoke.yaml` (comandi in `apps/mobile/e2e/maestro/README.md`) su questo commit.
+
+Se uno dei due fallisce, la release non va candidata al pilota finché il problema non è corretto o il rischio non è accettato esplicitamente (per iscritto, in questo file).
+
+## 6. Prossimo passo
+
+D2 completato (27/09/2026) — 5 gap chiusi sui gate oggi solo informativi/mancanti: type-check Python (informativo, 300 errori preesistenti), build mobile reale (non più un duplicato del typecheck), migrazione su database popolato, E2E web riportato a funzionare automaticamente, E2E mobile lasciato manuale per scelta esplicita (vedi §4). Dettaglio completo in `docs/operations/registro_requisiti_fase1.md`.
+
+Procedere con **D3** (rieseguire performance e capacità) e **D4** (rivalidare la sicurezza) sullo stesso commit di riferimento — nessuna modifica al codice applicativo è stata fatta in D2, solo alla pipeline CI/test, quindi non serve aggiornare il commit nel manifest.
