@@ -476,15 +476,19 @@ jobs:
   # (build + 5 services + browser automation) is far slower than the rest of
   # the required gates, and the risk section of
   # docs/operations/beta_readiness/ep12-01_suite_e2e.md flags this explicitly.
-  # Gated to manual runs and to PRs/pushes on the `claude/M5` pre-release
-  # branch, so it never slows down ordinary main/dev pushes or PRs.
+  # Runs on the same triggers as the rest of the pipeline (manual dispatch,
+  # any PR, push to main/dev) — informative so it never blocks an ordinary
+  # merge, but its result must be checked before declaring a release
+  # candidate ready for pilot (Blocco D1/D2, 27/09/2026). Was previously
+  # gated to a `claude/M5` branch that no longer exists, so it silently
+  # never ran except by hand.
   # ---------------------------------------------------------------------------
   e2e-critical-flow:
     name: E2E critical flow (EP12-01, informative)
     if: >-
       github.event_name == 'workflow_dispatch' ||
-      github.ref == 'refs/heads/claude/M5' ||
-      github.head_ref == 'claude/M5'
+      github.event_name == 'pull_request' ||
+      (github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev'))
     runs-on: ubuntu-latest
     timeout-minutes: 30
     continue-on-error: true
