@@ -2,8 +2,32 @@ appId: com.fantappero.mobile
 ---
 # Passi 5-8: rosa, formazione, turno/risultato, mercato.
 # Nessuna env attesa — opera sulla lega appena creata e attiva dal passo precedente.
+#
+# CORRETTO nel dry run (26/09/2026): la bozza originale usava i link diretti
+# di LeagueHomeScreen (`league-home-formation-link`, `league-home-matchday-link`)
+# per ogni passo, ma quei link esistono solo su LeagueHomeScreen — dopo il
+# primo salto (Rosa) quella schermata non è più visibile, quindi i tap
+# successivi avrebbero fallito. Da qui in poi si passa da una sezione
+# all'altra con il menu laterale (`app-menu-button` + `app-drawer-item-*`),
+# sempre disponibile una volta dentro Rosa/Formazione/Turni/Mercato.
 
-# --- Passo 5: rosa ---
+# CORRETTO nel dry run (26/09/2026): dopo la creazione lega l'app apre
+# l'Amministrazione lega, non la Home lega — bisogna prima passare dalla tab
+# "Home lega" di quella schermata.
+- tapOn:
+    id: "league-hub-tabs-league-home"
+- assertVisible:
+    id: "screen-league-home"
+
+# --- Passo 5: rosa (primo salto da LeagueHomeScreen, valido una sola volta) ---
+# CORRETTO nel dry run (26/09/2026): il link esiste sempre nel codice (sotto
+# "Prossime fasi"), semplicemente è fuori dallo schermo visibile finché non
+# si scorre — non è nascosto dallo stato della lega come sembrava all'inizio.
+- scrollUntilVisible:
+    element:
+      id: "league-home-roster-link"
+    direction: DOWN
+    timeout: 10000
 - tapOn:
     id: "league-home-roster-link"
 - assertVisible:
@@ -11,30 +35,37 @@ appId: com.fantappero.mobile
 
 # --- Passo 6: formazione ---
 - tapOn:
-    id: "league-home-formation-link"
-# NOTA: FormationScreen non passa un testID al PageContainer (a differenza di
-# Rosa/Turni/Mercato), quindi qui si verifica il titolo mostrato invece di un
-# id — confermare a runtime che non ci siano altre schermate con lo stesso
-# titolo "Formazione" visibili contemporaneamente.
-- assertVisible:
-    text: "Formazione"
-# NOTA IMPORTANTE (non verificata): questo passo assume che, su una lega
-# appena creata, esista già una formazione proposta valida da salvare subito
-# (`formation-save` visibile e attivo). Se invece compare lo stato
-# "formation-empty" (nessuna formazione impostata) o servono scelte manuali
-# prima di poter salvare, questo passo va esteso — da controllare al primo
-# giro sull'emulatore prima di considerarlo affidabile.
+    id: "app-menu-button"
 - tapOn:
-    id: "formation-save"
-- assertVisible:
-    id: "formation-success"
+    id: "app-drawer-item-formation"
+# NOTA IMPORTANTE (non verificata dal vivo): una lega appena creata ha un solo
+# membro (chi la crea) e una rosa vuota — non esiste un modo a un tap per
+# popolarla dal mobile (l'azione admin "Assegna rosa random (IA)" compare solo
+# se in lega c'è già una squadra gestita da IA, non per la propria squadra
+# umana; il resto — asta, assegnazione manuale di ~25 slot uno a uno — è
+# troppo pesante per uno smoke test). Per questo lo step non prova a salvare
+# una formazione: si limita a verificare che la schermata arrivi in uno stato
+# noto e non-crash (editor con modulo, oppure uno dei vuoti già previsti dal
+# codice). Popolare davvero la rosa è un possibile passo successivo, da
+# discutere separatamente (probabilmente via seed diretto sul DB di test,
+# come già fanno i fixture pytest del backend, non via UI).
+- extendedWaitUntil:
+    visible:
+      id: "formation-module|formation-empty|formation-no-league"
     timeout: 10000
 
 # --- Passo 7: turno / risultato ---
 - tapOn:
-    id: "league-home-matchday-link"
+    id: "app-menu-button"
+- tapOn:
+    id: "app-drawer-item-matchday"
 - assertVisible:
     id: "screen-matchday"
+# CORRETTO nel dry run (26/09/2026): la schermata apre di default sulla tab
+# "Calendario fantallenatori" (H2H), non "Turni europei" — bisogna cambiare
+# tab esplicitamente per raggiungere gli id verificati qui sotto.
+- tapOn:
+    id: "matchday-tab-europei"
 # NOTA: su una lega appena creata potrebbe non esserci ancora un turno con
 # risultato reale (dipende dai dati sportivi sincronizzati in ambiente di
 # test) — qui ci si limita a verificare che la schermata si apra con
@@ -43,6 +74,12 @@ appId: com.fantappero.mobile
     id: "matchday-turn-list|matchday-empty"
 
 # --- Passo 8: mercato (tab "Scambi") ---
+- tapOn:
+    id: "app-menu-button"
+- tapOn:
+    id: "app-drawer-item-market-hub"
+- assertVisible:
+    id: "screen-roster"
 - tapOn:
     id: "market-hub-tabs-Market"
 - assertVisible:

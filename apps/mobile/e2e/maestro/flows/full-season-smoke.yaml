@@ -8,7 +8,12 @@ appId: com.fantappero.mobile
 # rieseguire il flow più volte senza collisioni su un'email già registrata.
 
 - evalScript: ${output.testRunId = Date.now()}
-- evalScript: ${output.testEmail = 'e2e+' + output.testRunId + '@example.test'}
+# CORRETTO nel dry run (26/09/2026): il backend rifiuta come non valido
+# qualunque indirizzo sul dominio riservato `.test` ("special-use or
+# reserved name"), quindi la registrazione falliva sempre. Allineato allo
+# stesso dominio già usato con successo dalla suite Playwright esistente
+# (apps/e2e/tests/*.spec.ts): `@example.com`.
+- evalScript: ${output.testEmail = 'e2e+' + output.testRunId + '@example.com'}
 - evalScript: ${output.testDisplayName = 'E2E Runner ' + output.testRunId}
 - evalScript: ${output.testPassword = 'Maestro!' + output.testRunId}
 - evalScript: ${output.testLeagueName = 'Lega E2E ' + output.testRunId}

@@ -3,13 +3,12 @@
 // (waitForVerificationLink), adattata per estrarre solo il token e per
 // l'ambiente JS di Maestro invece che Node/Playwright.
 //
-// NOTA (non ancora verificato contro l'installazione reale di Maestro):
-// questo script assume che l'ambiente `runScript` esponga un oggetto globale
-// `http` con `http.get(url)` che restituisce `{ ok, body }` (`body` già
-// parsato se JSON, o stringa altrimenti) e un oggetto `output` su cui
-// scrivere variabili leggibili dal flow YAML come `${output.<chiave>}`. La
-// sintassi esatta va confermata contro la versione di Maestro CLI installata
-// prima del primo giro di prova.
+// VERIFICATO nel dry run (26/09/2026) su Maestro 2.10.0: `http.get(url)`
+// restituisce `{ ok, status, body }` dove `body` è la stringa grezza della
+// risposta (JSON compreso) — va sempre passata a `JSON.parse`, non è già un
+// oggetto. Prima di questo fix lo script cercava `.messages` direttamente
+// su una stringa (sempre `undefined`), quindi non trovava mai nulla anche
+// con l'email realmente arrivata in Mailpit.
 
 const email = MAESTRO_TEST_EMAIL;
 const mailpitBaseUrl = MAESTRO_MAILPIT_BASE_URL || "http://10.0.2.2:8025";
@@ -17,8 +16,8 @@ const mailpitBaseUrl = MAESTRO_MAILPIT_BASE_URL || "http://10.0.2.2:8025";
 const verificationLinkPattern = /https?:\/\/\S+\/accedi\/verifica\?token=([^\s&"]+)/;
 
 function findLatestMessageId(recipientEmail) {
-  const list = http.get(`${mailpitBaseUrl}/api/v1/messages?limit=50`);
-  const messages = (list.body && list.body.messages) || [];
+  const list = JSON.parse(http.get(`${mailpitBaseUrl}/api/v1/messages?limit=50`).body);
+  const messages = list.messages || [];
   const matches = messages
     .filter((message) =>
       (message.To || []).some(
@@ -30,8 +29,8 @@ function findLatestMessageId(recipientEmail) {
 }
 
 function extractTokenFromMessage(messageId) {
-  const detail = http.get(`${mailpitBaseUrl}/api/v1/message/${messageId}`);
-  const body = (detail.body && (detail.body.Text || detail.body.HTML)) || "";
+  const detail = JSON.parse(http.get(`${mailpitBaseUrl}/api/v1/message/${messageId}`).body);
+  const body = detail.Text || detail.HTML || "";
   const match = body.match(verificationLinkPattern);
   return match ? match[1] : null;
 }

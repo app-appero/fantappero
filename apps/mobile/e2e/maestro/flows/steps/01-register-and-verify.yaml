@@ -22,9 +22,14 @@ appId: com.fantappero.mobile
 - tapOn:
     id: "auth-register-password"
 - inputText: ${TEST_PASSWORD}
+# CORRETTO nel dry run (26/09/2026): dopo aver scritto la password la
+# tastiera copre il campo "Conferma password" sottostante, Maestro non lo
+# trova più nella gerarchia visibile finché la tastiera non si chiude.
+- hideKeyboard
 - tapOn:
     id: "auth-register-confirm-password"
 - inputText: ${TEST_PASSWORD}
+- hideKeyboard
 - tapOn:
     id: "auth-register-submit"
 - assertVisible:

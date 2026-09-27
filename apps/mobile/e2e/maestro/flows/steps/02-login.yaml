@@ -11,8 +11,12 @@ appId: com.fantappero.mobile
 - tapOn:
     id: "auth-password"
 - inputText: ${TEST_PASSWORD}
+# CORRETTO nel dry run (26/09/2026): stesso problema del form di
+# registrazione — la tastiera copre "Accedi" finché non si chiude.
+- hideKeyboard
 - tapOn:
     id: "auth-login-submit"
-- assertNotVisible:
-    id: "screen-auth"
+- extendedWaitUntil:
+    notVisible:
+      id: "screen-auth"
     timeout: 15000

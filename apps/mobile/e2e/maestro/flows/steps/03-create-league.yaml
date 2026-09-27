@@ -18,6 +18,9 @@ appId: com.fantappero.mobile
 - tapOn:
     id: "create-league-name"
 - inputText: ${TEST_LEAGUE_NAME}
+# CORRETTO nel dry run (26/09/2026): stesso problema visto nei form auth —
+# la tastiera può coprire i controlli sottostanti finché non si chiude.
+- hideKeyboard
 
 # Seleziona tutti i campionati del catalogo (il form richiede un minimo di 3).
 - tapOn:
@@ -25,6 +28,10 @@ appId: com.fantappero.mobile
 
 - tapOn:
     id: "create-league-submit"
-- assertVisible:
-    id: "screen-league-home"
+# CORRETTO nel dry run (26/09/2026): dopo la creazione l'app porta
+# all'Amministrazione lega (come sul web, non alla Home lega — bisogna
+# configurare la lega prima di poterla usare).
+- extendedWaitUntil:
+    visible:
+      id: "screen-league-admin"
     timeout: 15000
