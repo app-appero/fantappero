@@ -57,6 +57,23 @@ def list_fantasy_turns(
     return service.list_turns(league_access)
 
 
+@router.get(
+    "/{league_id}/turni/da-aggiornare",
+    response_model=list[PendingFixtureResponse],
+)
+def list_pending_fixtures(
+    league_access: LeagueAccess = Depends(require_league_permissions(Permission.MATCHDAY_VIEW)),
+    service: FantasyTurnService = Depends(get_fantasy_turn_service),
+) -> list[PendingFixtureResponse]:
+    """Fixture note ma senza data/ora dal provider: non appartengono ancora a nessun turno."""
+    return service.list_pending_fixtures(league_access)
+
+
+# NOTA: questa rotta generica va dichiarata dopo quelle con segmenti letterali
+# sotto /turni/ (es. "da-aggiornare" sopra) — FastAPI controlla le rotte
+# nell'ordine di dichiarazione, e {round_id} intercetterebbe altrimenti
+# qualunque segmento letterale, fallendo il parsing UUID (bug reale trovato
+# e corretto il 26/09/2026 durante il dry run del test E2E mobile C2).
 @router.get("/{league_id}/turni/{round_id}", response_model=FantasyTurnDetailResponse)
 def get_fantasy_turn(
     round_id: UUID,
@@ -112,18 +129,6 @@ def ensure_fantasy_turns(
         )
     except AuthError as exc:
         return _error_response(exc)
-
-
-@router.get(
-    "/{league_id}/turni/da-aggiornare",
-    response_model=list[PendingFixtureResponse],
-)
-def list_pending_fixtures(
-    league_access: LeagueAccess = Depends(require_league_permissions(Permission.MATCHDAY_VIEW)),
-    service: FantasyTurnService = Depends(get_fantasy_turn_service),
-) -> list[PendingFixtureResponse]:
-    """Fixture note ma senza data/ora dal provider: non appartengono ancora a nessun turno."""
-    return service.list_pending_fixtures(league_access)
 
 
 @router.post(
