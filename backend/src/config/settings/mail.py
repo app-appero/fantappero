@@ -13,6 +13,7 @@ class MailSettingsMixin:
     smtp_user: str | None = Field(default=None, validation_alias="SMTP_USER")
     smtp_password: SecretStr | None = Field(default=None, validation_alias="SMTP_PASSWORD")
     smtp_use_tls: bool = Field(default=False, validation_alias="SMTP_USE_TLS")
+    resend_api_key: SecretStr | None = Field(default=None, validation_alias="RESEND_API_KEY")
     mail_from: str = Field(default="noreply@fantappero.local", validation_alias="MAIL_FROM")
     mail_from_name: str = Field(default="FantApperò", validation_alias="MAIL_FROM_NAME")
     web_app_base_url: str = Field(
@@ -38,3 +39,8 @@ class MailSettingsMixin:
         if self.smtp_password is None:
             return None
         return self.smtp_password.get_secret_value()
+
+    def resolved_resend_api_key(self) -> str | None:
+        if self.resend_api_key is None:
+            return None
+        return self.resend_api_key.get_secret_value()
