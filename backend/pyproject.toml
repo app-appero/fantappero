@@ -24,6 +24,7 @@ dev = [
     "pytest==8.4.1",
     "ruff==0.12.4",
     "hypothesis==6.140.3",
+    "mypy==2.3.1",
 ]
 
 [build-system]
@@ -37,6 +38,14 @@ where = ["src"]
 pythonpath = ["src"]
 testpaths = ["tests"]
 addopts = "-q --import-mode=importlib"
+
+[tool.mypy]
+# Informativo (Blocco D2, 27/09/2026): 300 errori preesistenti in 47 file su
+# 306 al momento dell'introduzione — mai controllato prima. Non ancora un
+# gate bloccante, vedi .github/workflows/ci.yml (python-typecheck) e
+# docs/development/quality_gates.md.
+mypy_path = "src"
+ignore_missing_imports = true
 
 [tool.ruff]
 target-version = "py312"

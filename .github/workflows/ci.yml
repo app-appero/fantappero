@@ -342,6 +342,38 @@ jobs:
         run: pnpm audit
 
   # ---------------------------------------------------------------------------
+  # Informative — Python type-check (Blocco D2, 27/09/2026)
+  #
+  # First-ever run found 300 errors across 47 of 306 source files — code that
+  # has never been type-checked before, not a regression from one PR. Blocking
+  # ci-success on that would stop every merge today for pre-existing issues
+  # unrelated to the change being reviewed. Kept informative until the
+  # backlog is worked down; same reasoning as dependency-audit above.
+  # ---------------------------------------------------------------------------
+  python-typecheck:
+    name: Python type-check (mypy, informative)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    continue-on-error: true
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/pyproject.toml
+
+      - name: Install backend (dev)
+        run: python -m pip install -e "./backend[dev]"
+
+      - name: mypy
+        working-directory: backend
+        run: python -m mypy src
+
+  # ---------------------------------------------------------------------------
   # Aggregate required status (use this as the single branch-protection check)
   # ---------------------------------------------------------------------------
   ci-success:

@@ -20,6 +20,7 @@ Workflow: [`.github/workflows/ci.yml`](../../.github/workflows/ci.yml)
 | `migrations` | **Obbligatorio** — Alembic upgrade, drift check, integration DB tests | `make migrate && make migrate-check` (richiede `DATABASE_URL`) |
 | `ep00-extra-tests` | **Informativo** — suite tools/experiments | vedi sotto |
 | `performance-smoke` | **Informativo** — stack isolato + seed + Celery + k6 smoke EP12-03 | `PERF_USER_COUNT=1 make performance-smoke` |
+| `python-typecheck` | **Informativo** — mypy su `backend/src` (Blocco D2: 300 errori preesistenti al 27/09/2026, mai corretti — non ancora un gate bloccante) | `make typecheck-python` |
 
 In branch protection su GitHub, richiedere il check **`CI success`** (job `ci-success`).
 I job informativi non devono essere required.
@@ -45,6 +46,7 @@ Gate singoli:
 make lint              # ruff check src tests + pnpm lint
 make format            # ruff format --check src tests
 make typecheck         # pnpm typecheck
+make typecheck-python  # mypy su backend/src (informativo, non in `make quality`)
 make test              # pytest backend + pnpm test
 make build             # packages + web + mobile
 make check-migrations  # layout + single head; drift se DATABASE_URL è impostato
@@ -59,6 +61,7 @@ cd backend && python -m ruff check src tests
 cd backend && python -m ruff format --check src tests
 pnpm lint
 pnpm typecheck
+cd backend && python -m mypy src   # informativo, non in `make quality`
 cd backend && python -m pytest
 pnpm test
 pnpm run build:packages && pnpm run build:web && pnpm --filter @fantappero/mobile build

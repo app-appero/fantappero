@@ -14,7 +14,7 @@ BASH ?= bash
 	up up-tools down logs health reset-local smoke-local \
 	backup backup-service backup-logs dr-restore-test \
 	performance-smoke performance-test \
-	test test-api test-js lint format typecheck build \
+	test test-api test-js lint format typecheck typecheck-python build \
 	check-migrations migrate migrate-down migrate-check quality smoke help
 
 help:
@@ -22,7 +22,8 @@ help:
 	@echo "         backup | backup-service | backup-logs | dr-restore-test |"
 	@echo "         performance-smoke | performance-test |"
 	@echo "         dev-api | dev-web | dev-mobile | test | lint | format | typecheck |"
-	@echo "         build | migrate | migrate-check | check-migrations | quality | smoke"
+	@echo "         typecheck-python (informativo) | build | migrate | migrate-check |"
+	@echo "         check-migrations | quality | smoke"
 
 setup: setup-js setup-py
 
@@ -108,6 +109,9 @@ format:
 
 typecheck:
 	pnpm typecheck
+
+typecheck-python:
+	cd backend && python -m mypy src
 
 build:
 	pnpm run build:packages
