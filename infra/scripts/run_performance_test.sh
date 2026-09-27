@@ -28,9 +28,13 @@ rm -f \
   "$result_dir/smoke-summary.json" \
   "$result_dir/steady-summary.json" \
   "$result_dir/spike-summary.json" \
+  "$result_dir/live-summary.json" \
+  "$result_dir/mobile_polling-summary.json" \
   "$result_dir/smoke-resources.tsv" \
   "$result_dir/steady-resources.tsv" \
   "$result_dir/spike-resources.tsv" \
+  "$result_dir/live-resources.tsv" \
+  "$result_dir/mobile_polling-resources.tsv" \
   "$result_dir/api-metrics.prom" \
   "$result_dir/postgres-summary.json" \
   "$result_dir/redis-queue-depth.txt" \
@@ -118,11 +122,12 @@ sample_resources() {
 
 run_k6() {
   test_type="$1"
+  script="${2:-critical_flow.js}"
   sample_resources >"$result_dir/${test_type}-resources.tsv" &
   sampler_pid=$!
   set +e
   "${compose[@]}" run --rm -e PERF_TEST_TYPE="$test_type" \
-    k6 run /scripts/critical_flow.js
+    k6 run "/scripts/$script"
   k6_status=$?
   set -e
   kill "$sampler_pid" >/dev/null 2>&1 || true
@@ -135,6 +140,12 @@ run_k6 smoke
 if [[ "$mode" == "full" ]]; then
   run_k6 steady
   run_k6 spike
+  # Blocco D3 (27/09/2026): scenari "live" (pochi utenti che seguono da
+  # vicino una partita) e "mobile con polling" (molti client con schermate
+  # aperte in background) — stesso script, VU diversi, vedi
+  # tools/performance/live_polling.js per i limiti dichiarati.
+  run_k6 live live_polling.js
+  run_k6 mobile_polling live_polling.js
 fi
 
 "${compose[@]}" exec -T api-perf curl -fsS http://127.0.0.1:8001/metrics \

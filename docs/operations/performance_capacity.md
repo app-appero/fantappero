@@ -84,6 +84,21 @@ Per spike a 60 VU: errori <2%, check >98%, throughput >40 req/s, p95 globale <5.
 ms; login <1.000 ms, endpoint leggeri <5.000 ms, rosa/formazione <8.000 ms. Nella
 finestra recovery: errori <1% e p95 <1.500 ms.
 
+**Live e mobile con polling (Blocco D3, 27/09/2026)**: `tools/performance/live_polling.js`
+simula le schermate che restano aperte e si aggiornano da sole (turno, dettaglio
+partita, calendario H2H, scontro diretto), con gli stessi intervalli di polling reali
+del client (15s turno/H2H, incluso nello stesso ciclo per semplicità). Due varianti,
+stesso ciclo, VU diversi:
+
+- live (5 VU, utenti che seguono da vicino una partita): errori <1%, check >99%,
+  p95 per endpoint <1.500 ms;
+- mobile_polling (50 VU, molti client in background): stessi gate del caso live.
+
+Limite dichiarato: misura la reattività dell'API sotto carico di polling, non la
+latenza end-to-end "dato normalizzato → visibile al client" (richiederebbe orchestrare
+un aggiornamento reale dal provider sincronizzato col polling, fuori portata di un
+load test k6) — vedi commento in testa allo script.
+
 Non allentare i gate dopo un fallimento. Archiviare il risultato, indagare la causa e
 ripetere con identica configurazione. Qualunque cambio di topologia o dataset richiede
 una nuova baseline chiaramente etichettata.

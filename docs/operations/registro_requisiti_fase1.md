@@ -422,3 +422,17 @@ Confrontato il piano con `.github/workflows/ci.yml` riga per riga. Già a posto:
 **Nota di processo aggiunta al manifest D1**: prima di dichiarare una candidata pronta per il pilota, controllare a mano che l'ultima esecuzione dell'E2E web sia verde ed eseguire l'E2E mobile una volta sullo stesso commit — i due controlli non automatici restano comunque un passaggio obbligato del processo, solo non della pipeline.
 
 **Blocco D2 chiuso.** Nessuna modifica al codice applicativo (solo CI, test, configurazione) — il commit di riferimento nel manifest D1 è stato aggiornato di conseguenza. Prossimo: D3 (performance) e D4 (sicurezza).
+
+### D3 — Performance e capacità rieseguite (27/09/2026)
+
+Rieseguiti tutti gli scenari esistenti (smoke, steady, spike/recovery, 3 benchmark Celery) sul commit attuale, dopo oltre un mese di modifiche non ancora misurate (fix B5, rotte turni, persistenza sessione mobile, ADR-0006 mobile). Aggiunti due scenari nuovi richiesti dal piano e finora mancanti: "live" (pochi utenti che seguono da vicino una partita) e "mobile con polling" (molti client con schermate aperte in background) — `tools/performance/live_polling.js`, stessi endpoint e stessi intervalli di polling reali del client (`useLive*Polling.ts`). Budget ratificati in `docs/operations/performance_capacity.md`.
+
+- **Tutti gli scenari esistenti confermati entro budget** sul commit attuale: smoke, steady (133 req/s, 0% errori), spike a 60 VU (139 req/s, 0% errori, p95=598ms), i 3 benchmark Celery (ping/dominio/poll-live-disabilitato).
+- **2 bug trovati e corretti nel nuovo test, non nell'app**, durante la costruzione degli scenari live/mobile_polling — entrambi assunzioni sbagliate sulla forma delle risposte, non problemi del backend:
+  1. Il controllo su `GET /leagues/{id}/turni/{round_id}` cercava un campo `roundId` che non esiste nella risposta (`FantasyTurnDetailResponse` usa `id`) — falliva su ogni singola chiamata. Corretto il nome del campo nel test.
+  2. Il controllo su `GET /leagues/{id}/calendario/h2h` assumeva sempre una lista `rounds`, ma l'endpoint risponde legittimamente `null` quando il calendario H2H della lega non è ancora confermato — caso reale, non un errore (le leghe seminate per i test di carico non generano/confermano un calendario). Il test ora accetta `null` come risposta valida. **Limite dichiarato in conseguenza**: senza calendario confermato non esiste mai uno `slotId`, quindi questi due scenari non arrivano mai a interrogare l'endpoint "scontro diretto" sotto carico — misurano solo turno/partita/calendario, non lo scontro H2H vero e proprio. Annotato nello script e in `performance_capacity.md`.
+  3. Nessuna modifica al codice applicativo in questo punto — solo al test e alla sua documentazione.
+- **Esito finale, tutti gli scenari entro i budget ratificati**: `live` (5 VU) — 300 richieste, 0% errori, p95=75ms; `mobile_polling` (50 VU) — 2.460 richieste, 0% errori, p95=507ms, entrambi sotto la soglia p95<1.500ms per endpoint e check>99%.
+- **File toccati**: `tools/performance/live_polling.js` (nuovo), `infra/scripts/run_performance_test.sh` (aggiunti i due scenari alla modalità `full`), `docs/operations/performance_capacity.md` (budget dei due nuovi scenari).
+
+**Blocco D3 chiuso.** Prossimo: D4 (rivalidare la sicurezza) — segnalato esplicitamente in D1 per via del nuovo storage sicuro della sessione mobile (`expo-secure-store`), che tocca proprio la superficie "gestione credenziali" tipicamente in scope di una security review.
