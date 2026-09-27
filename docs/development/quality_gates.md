@@ -15,7 +15,7 @@ Workflow: [`.github/workflows/ci.yml`](../../.github/workflows/ci.yml)
 | `js-lint` | **Obbligatorio** — `tsc` via `pnpm lint` | `pnpm lint` |
 | `js-typecheck` | **Obbligatorio** — `pnpm typecheck` | `make typecheck` |
 | `js-test` | **Obbligatorio** — test workspace JS | `make test-js` |
-| `js-build` | **Obbligatorio** — packages + web + mobile | `make build` |
+| `js-build` | **Obbligatorio** — packages + web + mobile (Blocco D2, 27/09/2026: la build mobile ora esegue davvero `expo export`, non più un duplicato del typecheck — verifica il bundle Metro reale, non solo i tipi) | `make build` |
 | `ci-success` | **Obbligatorio** — aggregato (branch protection) | `make quality` |
 | `migrations` | **Obbligatorio** — Alembic upgrade, drift check, integration DB tests | `make migrate && make migrate-check` (richiede `DATABASE_URL`) |
 | `ep00-extra-tests` | **Informativo** — suite tools/experiments | vedi sotto |

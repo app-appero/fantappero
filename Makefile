@@ -135,4 +135,4 @@ quality: lint format typecheck test build check-migrations
 	@echo "Quality gates passed (lint, format, typecheck, test, build, migrations)."
 
 smoke: test build
-	@echo "Smoke checks passed (API tests + JS tests + package/web/mobile type builds)."
+	@echo "Smoke checks passed (API tests + JS tests + package/web builds + mobile Metro export)."
