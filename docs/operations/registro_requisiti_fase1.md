@@ -537,3 +537,13 @@ Su decisione esplicita dell'utente, applicato il fix a basso rischio già propos
 - **Nessuna regressione**: `tests/integration/auth/test_profile.py` (include l'upload avatar reale, sotto soglia) verde; `ruff check`/`ruff format --check` puliti su tutti i file toccati.
 
 **Blocco D interamente chiuso** — nessun punto in coda residuo (con D1-D4 già chiusi in precedenza, e ora anche i 2 finding rimasti aperti da D4).
+
+### Blocco E — Dominio e TLS chiusi con il dominio gratuito Railway (28/09/2026)
+
+Su decisione esplicita dell'utente, niente dominio proprio acquistato — usato il dominio gratuito di Railway, con nome coerente con quello di dev (`fantappero-web-dev.up.railway.app` → `fantappero-web-pilot.up.railway.app`). TLS gestito automaticamente da Railway, nessuna configurazione manuale necessaria.
+
+- Rinominato il dominio auto-generato del servizio `web` in pilota (`railway domain update`), aggiornato `WEB_APP_BASE_URL` sul servizio `api` di conseguenza.
+- **Bug reale trovato e corretto**: `apps/web/vite.config.ts` aveva `allowedHosts` con solo il dominio di dev in lista fissa — qualunque altro dominio (incluso quello del pilota) veniva respinto dal server Vite con `403 Blocked request`, mai notato prima perché nessuna verifica precedente aveva aperto il sito nel browser (solo chiamate dirette alle API). Aggiunto il dominio del pilota alla lista; verificato dal vivo con `curl -i`, ora risponde `200 OK`.
+- **Effetto collaterale incontrato di nuovo**: sia il cambio del dominio sia il cambio di `WEB_APP_BASE_URL` hanno fatto ripartire `api` dal branch `main` (stesso bug già noto — rimuovere i trigger automatici non impedisce che un redeploy per cambio variabile ripeschi comunque dalla sorgente Git configurata). Recuperato ricaricando manualmente il codice del branch; la causa di fondo resta il branch `main` non allineato, non ancora risolta.
+
+**Punto chiuso.** Restano 4 punti in coda nel Blocco E: distribuzione mobile controllata, logging/allarmi, verifica dominio su Resend, backup/restore reale (bloccato dal piano Railway).

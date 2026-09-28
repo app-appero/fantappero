@@ -28,7 +28,7 @@ export default defineConfig({
     port: 5174,
     strictPort: true,
     host: true,
-    allowedHosts: ["fantappero-web-dev.up.railway.app"],
+    allowedHosts: ["fantappero-web-dev.up.railway.app", "fantappero-web-pilot.up.railway.app"],
     proxy: Object.fromEntries(
       API_PROXY_PREFIXES.map((prefix) => [
         prefix,
