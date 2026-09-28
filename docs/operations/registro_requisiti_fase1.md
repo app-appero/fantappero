@@ -506,3 +506,21 @@ Il meccanismo di backup/restore già costruito in una sessione precedente (`post
 - **Non verificato**: non è stato quindi possibile dimostrare un vero backup+restore riuscito sull'ambiente reale (solo l'archiviazione continua risulta attiva, non un ripristino provato con misura del tempo impiegato, come richiede il piano).
 
 **Messo in coda su richiesta esplicita dell'utente** — da riprendere più avanti: verificare il piano Railway (probabile causa del blocco), eventualmente generare la chiave SSH, e completare un vero drill di ripristino sul pilota prima di invitare tester veri (prerequisito G2).
+
+## 13. Ripasso punti in coda (28/09/2026)
+
+Su richiesta dell'utente, ripresi in ordine i punti rimasti in sospeso da tutta la sessione, uno alla volta.
+
+### Blocco B — OQ-08 (residuo) e OQ-09 spostati in Fase 2
+
+Decisione esplicita dell'utente: entrambi spostati nel backlog Fase 2 in `docs/data/api_football_open_questions.md`. Motivo: l'intenzione è addestrare un modello ML sui dati storici per il futuro "Rating Beta", non scegliere pesi a mano in una formula v2 statica — lavoro di data science fuori scope per la chiusura Fase 1. La formula v1 attuale (bonus/malus) resta invariata e non è toccata da questa decisione.
+
+### Blocco B — OQ-10 (residuo) chiuso
+
+Policy `was_called_up` decisa su conferma esplicita dell'utente: le statistiche reali vincono sulla lista formazione ufficiale (un giocatore con minuti/voto reali conta come convocato anche se assente dalla lineup). Nessuna modifica al codice necessaria (verificato: nessun riferimento esistente al concetto in `backend/src`). Timing pre-kickoff confermato dall'utente (15-30 minuti prima), chiude anche quella parte senza bisogno di monitoraggio dal vivo. Raccolta un'idea nuova non in scope qui (servizio "probabili formazioni", provider diverso) — spostata nel backlog Fase 2.
+
+### Blocco B — OQ-15 (residuo) spostato in Fase 2
+
+Decisione esplicita dell'utente. Non misurabile sui dati statici disponibili (richiede osservare dal vivo un vero cambio di stagione). Rischio pratico basso per il primo pilota (leghe create su stagione già avviata, non a ridosso dell'apertura) — da riverificare solo se il caso limite si presenta davvero.
+
+**Tutti e 4 i punti in coda del Blocco B sono ora chiusi** (2 spostati in Fase 2 come lavoro futuro di ML — OQ-08/OQ-09 —, 1 chiuso con una policy scritta — OQ-10 —, 1 spostato in Fase 2 come rischio a bassa probabilità — OQ-15). Nessuna modifica al codice applicativo in nessuno dei quattro.
