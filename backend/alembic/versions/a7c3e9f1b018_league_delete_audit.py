@@ -58,7 +58,19 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    op.execute("DELETE FROM league_audit_events WHERE action::text = 'league_deleted';")
+    # Every migration after this one that adds a new `league_audit_action`
+    # value (there have been several) makes the enum-recreation below fail
+    # if any row actually uses that value: native Postgres enums can't drop
+    # values, so recreating the type with the older, smaller list requires
+    # any row outside that list to be gone first — not just the one value
+    # ('league_deleted') this migration itself introduced. Found live when a
+    # full `downgrade base` hit a row with a much newer action
+    # ('market_gate_toggled') and crashed here instead of at the specific
+    # migration that added it.
+    previous_actions_sql = "', '".join(_PREVIOUS_AUDIT_ACTIONS)
+    op.execute(
+        f"DELETE FROM league_audit_events WHERE action::text NOT IN ('{previous_actions_sql}');"
+    )
     op.execute("DELETE FROM league_audit_events WHERE league_id IS NULL")
     op.drop_constraint(
         op.f("fk_league_audit_events_league_id_leagues"),
