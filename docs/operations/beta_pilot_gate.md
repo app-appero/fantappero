@@ -13,13 +13,13 @@ osservati.
 
 | Ruolo | Responsabilità | Separazione minima | Stato iniziale |
 | --- | --- | --- | --- |
-| Decision owner | ratifica protocollo/soglie e firma GO o NO-GO | non può sostituire da solo il privacy contact su questioni privacy | da assegnare |
-| Pilot coordinator | selezione, onboarding, calendario, registro e report | non autocertifica evidenze tecniche | da assegnare |
-| Incident coordinator + backup | triage e comunicazioni secondo EP12-06 | almeno due nominativi | da assegnare |
-| Platform owner + backup | deploy, osservabilità, backup e cutover DR | doppia approvazione per restore/switch | da assegnare |
-| Security owner | classifica e chiude/accetta i finding | approva gli incidenti security | da assegnare |
-| Privacy contact | approva informativa, consenso/acknowledgement e retention | decisione umana, non automatizzata | da assegnare |
-| League admin pilot | conferma composizione lega e checkpoint di flusso | uno per lega | da selezionare |
+| Decision owner | ratifica protocollo/soglie e firma GO o NO-GO | non può sostituire da solo il privacy contact su questioni privacy | Rosario Trotta — trottarosario@gmail.com |
+| Pilot coordinator | selezione, onboarding, calendario, registro e report | non autocertifica evidenze tecniche | Rosario Trotta — trottarosario@gmail.com |
+| Incident coordinator + backup | triage e comunicazioni secondo EP12-06 | almeno due nominativi (**non soddisfatta**: nessun backup, rischio accettato esplicitamente dal decision owner il 28/09/2026 per un pilota gestito da una sola persona) | Rosario Trotta — trottarosario@gmail.com (unico) |
+| Platform owner + backup | deploy, osservabilità, backup e cutover DR | doppia approvazione per restore/switch (**non soddisfatta**: nessun backup, rischio accettato esplicitamente dal decision owner il 28/09/2026 per un pilota gestito da una sola persona) | Rosario Trotta — trottarosario@gmail.com (unico) |
+| Security owner | classifica e chiude/accetta i finding | approva gli incidenti security | Rosario Trotta — trottarosario@gmail.com |
+| Privacy contact | approva informativa, consenso/acknowledgement e retention | decisione umana, non automatizzata | Rosario Trotta — trottarosario@gmail.com |
+| League admin pilot | conferma composizione lega e checkpoint di flusso | uno per lega | da selezionare (una persona per ciascuna lega pilota, quando saranno formate) |
 
 Prima dell'onboarding il team deve inoltre scegliere e annotare, in un archivio ad
 accesso ristretto e non nel repository:

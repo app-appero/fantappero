@@ -449,3 +449,50 @@ Rieseguiti tutti gli audit di agosto (dipendenze Python/JS, SAST, secret scan) p
 - Le altre 4 nuove CVE Starlette pubblicate da agosto **non si applicano**: verificato nel codice che non usiamo mai i pattern coinvolti (nessun uso di `request.url.path`/`.hostname`, nessuna classe `HTTPEndpoint`, immagine Docker Linux non Windows).
 
 **Blocco D4 chiuso — nessun finding Critico/Alto aperto.** Con D1-D4 completi, l'intero Blocco D del piano di chiusura è chiuso. Prossimo: Blocchi E (ambiente pilot), F (governance/privacy/supporto), G (pilota reale) — non ancora iniziati, guidati principalmente da decisioni reali dell'utente (infrastruttura, dominio, distribuzione ai tester).
+
+## 11. Log di verifica — Blocco E
+
+### E1 — Ambiente pilota su Railway: creato, parzialmente completo (27-28/09/2026)
+
+Su Railway esisteva già un ambiente "dev" con tutti i servizi (api, worker, beat, web, Postgres, Redis) — non un vero ambiente pilota separato come richiede il piano. Creato un nuovo ambiente **"pilota"** (`railway environment new pilota --duplicate dev`), che clona la topologia dei servizi ma non i dati.
+
+- **Database dedicato e vuoto**: verificato che Postgres/Redis del pilota sono istanze nuove (volumi a 0 byte alla creazione), non condivise con dev (che ha invece 96 utenti/76 leghe/20.537 atleti reali). Migrato allo schema più recente.
+- **Segreti copiati per sbaglio da dev, corretti**: `JWT_SECRET_KEY` (era il placeholder di sviluppo, ora un segreto nuovo generato apposta) e `WEB_APP_BASE_URL` (puntava al sito di dev, ora corretto).
+- **`API_FOOTBALL_KEY` lasciata invariata (stessa di dev)** — decisione esplicita dell'utente, nonostante sia la stessa chiave del finding D4 sul segreto rimasto nella cronologia Git.
+- **Email transazionali reali**: Resend collegato. Trovato che Railway blocca il traffico SMTP in uscita (porta 587, verificato confrontando raggiungibilità locale vs da dentro Railway) — aggiunto un trasporto HTTP alternativo in `backend/src/mail/transport.py` (usa l'API di Resend se `RESEND_API_KEY` è impostata, altrimenti SMTP come prima, nessun impatto su Mailpit in dev/test). Verificato end-to-end contro l'ambiente pilota reale: l'invio funziona quando Resend accetta il destinatario (modalità sandbox dell'account, limita i destinatari finché non si verifica un dominio proprio — non un bug).
+- **Storage avatar persistente**: volume Railway collegato su `/data/avatars` (stesso percorso già atteso dal codice, nessuna modifica applicativa necessaria).
+- **Trigger di deploy automatico rimossi per il pilota** (4 trigger cancellati: api, worker, beat, web) — su richiesta esplicita dell'utente, dopo aver verificato che il pilota aveva ereditato dagli stessi identici trigger di dev (qualunque push su `main` avrebbe fatto ripartire entrambi gli ambienti insieme). Da ora il pilota avanza solo con un deploy manuale esplicito.
+- **Bug scoperto e capito durante il lavoro** (non applicativo, di processo): qualunque cambio di configurazione Railway (variabile, volume) rilancia un deploy che ripesca il codice dal branch `main` configurato come sorgente — non l'ultima versione caricata manualmente. Il servizio `api` è arrivato brevemente in stato `FAILED` per questo motivo (il `main` attuale non ha ancora le migrazioni di questa sessione). Recuperato ricaricando il codice; la causa di fondo (branch `main` non allineato al lavoro di chiusura Fase 1) resta aperta, vedi sotto.
+
+**Messi in coda su richiesta esplicita dell'utente** — da riprendere più avanti, non abbandonati:
+- **Dominio e TLS**: nessun dominio ancora registrato/collegato; il pilota gira solo sull'URL gratuito `*.up.railway.app`.
+- **Distribuzione mobile controllata** (TestFlight/Play Console): l'utente non ha ancora nessuno dei due account sviluppatore.
+- **Logging centralizzato e allarmi**: non affrontati.
+- **Verifica di un dominio su Resend**: finché non è fatta, le email reali possono arrivare solo all'indirizzo dell'account Resend stesso, non a indirizzi arbitrari (limite della modalità sandbox, non del codice).
+- **Branch `main` disallineato**: il piano di chiusura Fase 1 vive interamente su `claude/fase1-chiusura`, mai mergiato — finché resta così, ogni redeploy Railway non esplicitamente manuale rischia di far ripartire i servizi dal codice vecchio. Il merge in main (o un cambio temporaneo della sorgente Git dei servizi) resta una decisione dell'utente, proposta ma non ancora presa.
+
+Blocco E non ancora chiuso: il criterio del piano ("l'ambiente pilot può essere ripristinato, monitorato e supportato senza dipendere dal computer di sviluppo") richiede ancora dominio, logging/allarmi e backup/disaster-recovery testato (E2, non ancora affrontato) prima di poter dichiarare il blocco completo. Prossimo passo lasciato alla decisione dell'utente.
+
+## 12. Log di verifica — Blocco F
+
+### F1 — Primi ruoli assegnati (28/09/2026)
+
+Il pacchetto F1-F3 esisteva già da una sessione precedente (`docs/operations/beta_pilot_gate.md`, `docs/operations/pilot_support_process.md`, EP12-06/EP12-07) con tutti i ruoli segnati "da assegnare". Su decisione esplicita dell'utente, assegnati 5 dei 7 ruoli a **Rosario Trotta — trottarosario@gmail.com** (decision owner, pilot coordinator, security owner, privacy contact, e primario di incident coordinator/platform owner).
+
+- **Backup di incident coordinator e platform owner: chiuso su decisione esplicita dell'utente (28/09/2026)** — nessun sostituto, rischio accettato per un pilota gestito da una sola persona. Annotato esplicitamente in entrambi i documenti (non lasciato come "da assegnare" dimenticato: se Rosario non è raggiungibile durante un incidente, non c'è oggi un secondo referente in grado di intervenire — rischio noto e accettato, non nascosto).
+- **League admin pilot**: resta "da selezionare", una persona per ciascuna lega pilota — non assegnabile finché le leghe non sono formate (Blocco G).
+- **F2 (testo informativa privacy)**: non affrontato, resta deliberatamente non scritto da un agente — richiede la stesura/approvazione del privacy contact (ora identificato, vedi sopra).
+- **F3 (canali, orari, archivio ticket, comando di cutover DR)**: non ancora affrontato.
+
+Aggiornati i due documenti sorgente (`beta_pilot_gate.md` §1, `pilot_support_process.md` tabella "Decisioni obbligatorie").
+
+### F2 e F3 — Chiusi (28/09/2026)
+
+Su richiesta esplicita dell'utente ("chiudiamo F"), preparate proposte concrete per entrambi, minimali e adatte a un pilota piccolo gestito da una sola persona (non un lancio commerciale) — l'utente le ha approvate.
+
+- **F2**: creato `docs/operations/pilot_privacy_notice.md` — testo completo da mostrare ai tester prima dell'iscrizione (dati raccolti, finalità, retention, come esportare/cancellare l'account — basato sui veri endpoint `/profile/me/export` e `/profile/me/delete` già documentati in `docs/api/privacy.md`, nessun dettaglio inventato), più le due decisioni collegate: minorenni esclusi dal primo pilota, archivio richieste = casella email del privacy contact. Il documento resta esplicitamente etichettato come bozza in attesa di lettura/approvazione finale della persona reale (che coincide con chi ha appena dato l'ok in chat), non un'informativa legale professionale.
+- **F3**: confermati in `pilot_support_process.md` i valori proposti (canale, orari, archivio ticket) con scelte pragmatiche da singola persona.
+
+**Un solo punto resta genuinamente aperto, non chiudibile con una decisione**: il comando/procedura di cutover per il disaster recovery non è mai stato provato sull'ambiente Railway reale (solo un drill locale su dataset ridotto in una sessione precedente). Non è una scelta da ratificare — è lavoro tecnico non fatto, appartiene al Blocco E2 del piano (mai iniziato in questa sessione). Va completato prima di invitare tester veri (criterio G2), anche se non blocca la chiusura formale del Blocco F in sé.
+
+**Blocco F chiuso** secondo il proprio criterio di completamento del piano ("ruoli, privacy, canali e soglie sono approvati da persone reali e non lasciati come placeholder"): tutti i placeholder sono stati sostituiti da decisioni reali, esplicite, di una persona reale — compresi i rischi accettati (nessun backup) dichiarati apertamente, non nascosti. Resta l'azione tecnica E2 sopra descritta come prerequisito reale prima del Blocco G, non come parte del criterio F stesso.

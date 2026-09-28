@@ -1,22 +1,22 @@
 # Processo di supporto Beta pilot
 
 Processo EP12-06 per ricezione, triage, comunicazione e chiusura dei problemi delle leghe
-pilota. Ruoli e valori temporali sotto sono **proposte operative da confermare**: non sono
-un impegno pubblico finché il team non compila la checklist finale.
+pilota. Confermato il 28/09/2026 per un pilota piccolo gestito da una sola persona
+(Rosario Trotta); resta un solo punto bloccante, vedi ultima riga della tabella.
 
 ## Decisioni obbligatorie prima dell'onboarding
 
 | Decisione | Proposta Beta | Stato |
 | --- | --- | --- |
-| Canale partecipanti | un indirizzo email o form condiviso, non DM personali | da confermare |
-| Canale urgenze interne | un unico canale del team con reperibile nominato | da confermare |
-| Copertura | giorni feriali 09:00–18:00 Europe/Rome; P0 fuori fascia via escalation | da confermare |
-| Coordinatore incidente primario/backup | due persone nominate | da assegnare |
-| Platform owner primario/backup | due persone con accesso a deploy, secret e backup | da assegnare |
-| Archivio ticket/evidenze | sistema con accesso ristretto e retention definita | da scegliere |
-| Comando cutover DR | scheda specifica del deployment pilot | mancante/bloccante per il go-live |
+| Canale partecipanti | un indirizzo email o form condiviso, non DM personali | **Confermato**: trottarosario@gmail.com |
+| Canale urgenze interne | un unico canale del team con reperibile nominato | **Confermato**: nessun team interno separato per un pilota di una persona — stesso indirizzo email, nessuna reperibilità H24 garantita |
+| Copertura | giorni feriali 09:00–18:00 Europe/Rome; P0 fuori fascia via escalation | **Confermato come obiettivo, non garanzia**: senza backup (vedi F1) i P0 fuori orario restano a discrezione/disponibilità del responsabile unico |
+| Coordinatore incidente primario/backup | due persone nominate | Rosario Trotta — trottarosario@gmail.com (unico, nessun backup — rischio accettato il 28/09/2026) |
+| Platform owner primario/backup | due persone con accesso a deploy, secret e backup | Rosario Trotta — trottarosario@gmail.com (unico, nessun backup — rischio accettato il 28/09/2026) |
+| Archivio ticket/evidenze | sistema con accesso ristretto e retention definita | **Confermato**: la casella email personale del privacy contact, vedi `pilot_privacy_notice.md` |
+| Comando cutover DR | scheda specifica del deployment pilot | **Ancora bloccante** — non è una decisione ma un lavoro tecnico non fatto: il ripristino del backup non è mai stato provato sull'ambiente Railway reale (solo un drill locale su dataset ridotto, vedi Blocco E2 del piano). Da fare prima di invitare tester veri. |
 
-EP12-07 non deve avviare leghe reali finché queste righe non sono risolte. Nessun canale
+EP12-07 non deve avviare leghe reali finché l'ultima riga non è risolta. Nessun canale
 specifico viene inventato nel repository perché non esiste una integrazione supporto.
 
 ## Severità e obiettivi interni proposti
