@@ -547,3 +547,10 @@ Su decisione esplicita dell'utente, niente dominio proprio acquistato — usato 
 - **Effetto collaterale incontrato di nuovo**: sia il cambio del dominio sia il cambio di `WEB_APP_BASE_URL` hanno fatto ripartire `api` dal branch `main` (stesso bug già noto — rimuovere i trigger automatici non impedisce che un redeploy per cambio variabile ripeschi comunque dalla sorgente Git configurata). Recuperato ricaricando manualmente il codice del branch; la causa di fondo resta il branch `main` non allineato, non ancora risolta.
 
 **Punto chiuso.** Restano 4 punti in coda nel Blocco E: distribuzione mobile controllata, logging/allarmi, verifica dominio su Resend, backup/restore reale (bloccato dal piano Railway).
+
+### Blocco E — Distribuzione mobile: Android per Fase 1, iOS rimandato a Fase 2 (28/09/2026)
+
+Decisione esplicita dell'utente. Spiegato che, per un pilota piccolo, Android non richiede necessariamente i 25$ di Google Play Console: un file `.apk` costruito via EAS Build può essere condiviso direttamente con i tester (side-load, nessun account richiesto), mentre iOS non ha una scorciatoia gratuita reale — serve comunque l'account Apple Developer (99$/anno) o TestFlight.
+
+- **Android**: resta in coda — l'utente chiederà un `.apk` quando servirà davvero (non prima). Nessuna azione da fare ora.
+- **iOS**: spostato esplicitamente nel backlog Fase 2 — nessun account Apple Developer aperto, il primo pilota (Blocco G) partirà solo con tester Android (o via browser web, sempre disponibile a tutti).
