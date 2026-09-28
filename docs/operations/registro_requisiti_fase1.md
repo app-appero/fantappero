@@ -568,3 +568,24 @@ L'utente ha provato di persona il flusso di registrazione sul pilota (prima volt
 3. **Su schermo stretto (mobile web), un utente senza leghe non aveva alcun modo di crearne una o unirsi** — i link "Crea lega"/"Unisciti con codice" nell'intestazione erano nascosti del tutto sotto i 767px di larghezza (`display: none` in `packages/ui/src/css/layout.css`), probabilmente pensati per essere spostati altrove (es. il menu ad hamburger) ma quello spostamento non è mai stato fatto — lasciando un vicolo cieco reale per qualunque nuovo utente su mobile. Corretto: i link restano visibili e vanno a capo se necessario, invece di sparire.
 
 Tutti e 3 i fix distribuiti manualmente sul pilota e verificati dal vivo dall'utente durante la sessione stessa. Nessun test automatico esisteva per nessuno dei tre casi prima di oggi — il primo trovato dalla verifica manuale del sito vero, non da un test scritto in anticipo.
+
+### Blocco E — Tentativo di verifica dominio su Resend con `globetrotta.it`, abbandonato (28/09/2026)
+
+L'utente possiede un dominio personale (`globetrotta.it`, gestito su Aruba, non dedicato a FantApperò) e ha proposto di usarlo solo per le email del pilota. Registrato un sottodominio dedicato (`fantappero.globetrotta.it`) su Resend per non toccare la posta esistente del dominio principale.
+
+- **DKIM (TXT) e SPF (TXT) verificati con successo** — record aggiunti su Aruba, confermati propagati con un controllo DNS diretto (non solo tramite Resend).
+- **Bloccato sul record MX**: il pannello "Gestione DNS" di Aruba per domini con posta attiva (`Dominio con email`) **non offre MX tra i tipi di record disponibili** nell'interfaccia base — probabilmente una scelta deliberata di Aruba per evitare che un cliente rompa la propria posta esistente per errore. Confermato con una query DNS diretta: il record MX richiesto da Resend semplicemente non esiste.
+- **Verificato che cambiare dominio (usare `globetrotta.it` direttamente invece del sottodominio) non avrebbe risolto nulla**: Resend richiede comunque l'MX su un proprio sottodominio dedicato (`send.*`) indipendentemente dal dominio scelto — il limite è del pannello Aruba, non della scelta del sottodominio.
+- **Decisione dell'utente**: abbandonare questo tentativo, non contattare l'assistenza Aruba per ora — passerà a un dominio dedicato (provider ancora da scegliere) quando pronto. Ripulito il lato Resend (dominio parziale cancellato); l'utente ha ripulito i record aggiunti su Aruba.
+
+**Il punto "verifica dominio su Resend" spostato esplicitamente nel backlog Fase 2** su decisione dell'utente (28/09/2026) — valutata anche l'opzione di spostare il DNS di `globetrotta.it` su Cloudflare (gratuito, risolverebbe il limite MX di Aruba senza comprare un dominio nuovo), scartata per ora. La procedura da rifare quando si sceglierà un dominio dedicato è la stessa già documentata sopra (pochi minuti, non da reinventare).
+
+**Con questo si chiude anche l'ultimo punto in coda "attivo" del Blocco E** — resta solo il backup/restore reale (E2, bloccato dal piano Railway + chiave SSH, vedi sezione 11) prima del Blocco G.
+
+### Blocco E2 — Backup/restore reale spostato nel backlog Fase 2 (28/09/2026)
+
+Ripresa l'indagine sul blocco di `pitr backup create`/`schedule set`: l'errore preciso restituito da Railway è `OAUTH_INSUFFICIENT_GRANT` (permesso mancante sulla sessione collegata alla CLI, non necessariamente un limite di piano). Tentato un nuovo login per ottenere un permesso più ampio — 4 tentativi falliti (3 scaduti per timeout del callback browser, non raggiungibile da questo ambiente; 1 codice dispositivo scaduto perché l'utente non era al computer).
+
+**Decisione esplicita dell'utente**: il backup reale richiede comunque un cambio di piano Railway a pagamento — spostato l'intero punto nel backlog Fase 2, non insistere oltre con il login. Nota tecnica lasciata per quando si riprenderà: l'errore preciso è `OAUTH_INSUFFICIENT_GRANT`, non un rifiuto esplicito di piano — da verificare comunque, al momento di riprendere, se serva solo un nuovo login con permessi più ampi o se sia davvero necessario un piano superiore, prima di procedere all'eventuale upgrade.
+
+**Blocco E ora interamente chiuso o spostato in Fase 2** — nessun punto attivo residuo prima del Blocco G, a parte l'esecuzione del pilota vero stesso.
