@@ -1,9 +1,7 @@
 # Informativa privacy — pilota FantApperò
 
-**Stato: bozza, in attesa di approvazione del privacy contact.** Chiuderà F2 solo dopo
-che il privacy contact (oggi Rosario Trotta — trottarosario@gmail.com, vedi
-`beta_pilot_gate.md`) legge, eventualmente corregge e approva esplicitamente questo
-testo — un'automazione non può sostituire questo passo, può solo prepararlo.
+**Stato: approvato dal privacy contact (Rosario Trotta — trottarosario@gmail.com) il
+28/09/2026.** F2 chiuso.
 
 Testo minimale, pensato per un pilota piccolo tra conoscenti (non un lancio
 commerciale). Se il pilota crescerà o diventerà pubblico, questo testo andrà rivisto

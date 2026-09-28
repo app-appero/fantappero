@@ -589,3 +589,9 @@ Ripresa l'indagine sul blocco di `pitr backup create`/`schedule set`: l'errore p
 **Decisione esplicita dell'utente**: il backup reale richiede comunque un cambio di piano Railway a pagamento — spostato l'intero punto nel backlog Fase 2, non insistere oltre con il login. Nota tecnica lasciata per quando si riprenderà: l'errore preciso è `OAUTH_INSUFFICIENT_GRANT`, non un rifiuto esplicito di piano — da verificare comunque, al momento di riprendere, se serva solo un nuovo login con permessi più ampi o se sia davvero necessario un piano superiore, prima di procedere all'eventuale upgrade.
 
 **Blocco E ora interamente chiuso o spostato in Fase 2** — nessun punto attivo residuo prima del Blocco G, a parte l'esecuzione del pilota vero stesso.
+
+### Blocco F2 — Testo privacy approvato (28/09/2026)
+
+Il privacy contact (Rosario Trotta) ha letto e approvato esplicitamente il testo proposto in `docs/operations/pilot_privacy_notice.md`, senza richiedere modifiche. Aggiornato lo stato del documento da "bozza in attesa" ad "approvato". **Blocco F ora chiuso al 100%, nessun loose end residuo.**
+
+**Con questo, tutti i blocchi A-F del piano di chiusura Fase 1 sono chiusi (o esplicitamente spostati in Fase 2 dove pertinente). Resta solo il Blocco G — il pilota reale — mai iniziato, l'unico pezzo davvero mancante per dichiarare la Fase 1 completa.**
