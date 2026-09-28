@@ -1382,7 +1382,11 @@ button.fa-app-header__league-action {
   }
 
   .fa-app-header__league-actions {
-    display: none;
+    /* Was `display: none` — with no leagues yet, this was the *only* way to
+       create/join one, and hiding it left new mobile-web users with no path
+       forward at all (found live during the pilot's first real signup).
+       Wrap instead of hiding, so it still fits a narrow header row. */
+    flex-wrap: wrap;
   }
 
   .fa-league-selector {

@@ -1,5 +1,5 @@
 import { AuthFormLayout, BrandLogo, PageContainer, UiStatePanel } from "@fantappero/ui";
-import { type FormEvent, useEffect, useState } from "react";
+import { type FormEvent, useEffect, useRef, useState } from "react";
 import {
   forgotPassword,
   register as registerApi,
@@ -272,6 +272,26 @@ export function AuthVerifyEmailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  // The verification token is single-use: React's StrictMode double-invokes
+  // effects in development (mount → cleanup → mount again, without a real
+  // unmount), which would otherwise send the token twice and show the
+  // harmless-but-confusing second (already-used) failure instead of the real
+  // first success. `requestedRef` makes sure the request itself only ever
+  // fires once. `liveRef` tracks whether *some* instance of this effect is
+  // currently mounted — unlike a `cancelled` variable captured per effect
+  // invocation, it gets set back to `true` by the second (StrictMode) mount,
+  // so the first invocation's still-pending promise is correctly allowed to
+  // apply its result instead of being permanently silenced by the
+  // synthetic cleanup that ran in between.
+  const requestedRef = useRef(false);
+  const liveRef = useRef(true);
+
+  useEffect(() => {
+    liveRef.current = true;
+    return () => {
+      liveRef.current = false;
+    };
+  }, []);
 
   useEffect(() => {
     const token = new URLSearchParams(search).get("token") ?? "";
@@ -280,28 +300,27 @@ export function AuthVerifyEmailPage() {
       setLoading(false);
       return;
     }
+    if (requestedRef.current) {
+      return;
+    }
+    requestedRef.current = true;
 
-    let cancelled = false;
     verifyEmail({ token })
       .then((response) => {
-        if (!cancelled) {
+        if (liveRef.current) {
           setSuccessMessage(response.message);
         }
       })
       .catch((verifyError) => {
-        if (!cancelled) {
+        if (liveRef.current) {
           setError(getApiErrorMessage(verifyError, "Verifica email non riuscita."));
         }
       })
       .finally(() => {
-        if (!cancelled) {
+        if (liveRef.current) {
           setLoading(false);
         }
       });
-
-    return () => {
-      cancelled = true;
-    };
   }, [search]);
 
   if (loading) {

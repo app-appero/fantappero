@@ -554,3 +554,17 @@ Decisione esplicita dell'utente. Spiegato che, per un pilota piccolo, Android no
 
 - **Android**: resta in coda — l'utente chiederà un `.apk` quando servirà davvero (non prima). Nessuna azione da fare ora.
 - **iOS**: spostato esplicitamente nel backlog Fase 2 — nessun account Apple Developer aperto, il primo pilota (Blocco G) partirà solo con tester Android (o via browser web, sempre disponibile a tutti).
+
+### Blocco E — Logging centralizzato e allarmi spostati in Fase 2 (28/09/2026)
+
+Decisione esplicita dell'utente: per ora si resta solo sugli strumenti già inclusi in Railway (`railway logs`, stato dei servizi) — nessuna integrazione aggiuntiva (Grafana Cloud, UptimeRobot) per il primo pilota. Nessun allarme automatico attivo: eventuali problemi vanno controllati a mano finché questo punto non verrà ripreso.
+
+### Blocco E — 3 bug reali trovati e corretti durante la prima prova vera del pilota (28/09/2026)
+
+L'utente ha provato di persona il flusso di registrazione sul pilota (prima volta con dati reali, non un test automatico). Trovati e corretti sul momento:
+
+1. **`VITE_API_BASE_URL` del servizio `web` puntava all'API di dev**, non a quella del pilota — copiato per sbaglio dalla clonazione dell'ambiente, mai notato prima (nessuna verifica precedente aveva aperto il sito vero nel browser). La prima registrazione dell'utente è finita nel database di dev invece che in quello del pilota, spiegando perché "l'email non arrivava" — in realtà l'account veniva creato nell'ambiente sbagliato. Corretto puntando `web` all'API del pilota.
+2. **Verifica email: la pagina mandava la richiesta di conferma due volte** (dovuto al doppio invocamento degli effect di React in modalità sviluppo — `StrictMode`), consumando il codice monouso alla prima chiamata (riuscita, `200`) e mostrando poi l'esito della seconda chiamata duplicata (fallita, `400`, codice già usato) — l'utente vedeva "Verifica non riuscita" nonostante l'account fosse già verificato per davvero. Corretto in `apps/web/src/pages/auth/AuthPages.tsx`: la richiesta ora parte una sola volta per sessione della pagina, indipendentemente da quante volte l'effetto viene rieseguito. Aggiunto test dedicato (`AuthVerifyEmailPage.test.tsx`) che riproduce esplicitamente il doppio invocamento di StrictMode.
+3. **Su schermo stretto (mobile web), un utente senza leghe non aveva alcun modo di crearne una o unirsi** — i link "Crea lega"/"Unisciti con codice" nell'intestazione erano nascosti del tutto sotto i 767px di larghezza (`display: none` in `packages/ui/src/css/layout.css`), probabilmente pensati per essere spostati altrove (es. il menu ad hamburger) ma quello spostamento non è mai stato fatto — lasciando un vicolo cieco reale per qualunque nuovo utente su mobile. Corretto: i link restano visibili e vanno a capo se necessario, invece di sparire.
+
+Tutti e 3 i fix distribuiti manualmente sul pilota e verificati dal vivo dall'utente durante la sessione stessa. Nessun test automatico esisteva per nessuno dei tre casi prima di oggi — il primo trovato dalla verifica manuale del sito vero, non da un test scritto in anticipo.
