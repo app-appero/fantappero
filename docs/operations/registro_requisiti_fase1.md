@@ -496,3 +496,13 @@ Su richiesta esplicita dell'utente ("chiudiamo F"), preparate proposte concrete 
 **Un solo punto resta genuinamente aperto, non chiudibile con una decisione**: il comando/procedura di cutover per il disaster recovery non è mai stato provato sull'ambiente Railway reale (solo un drill locale su dataset ridotto in una sessione precedente). Non è una scelta da ratificare — è lavoro tecnico non fatto, appartiene al Blocco E2 del piano (mai iniziato in questa sessione). Va completato prima di invitare tester veri (criterio G2), anche se non blocca la chiusura formale del Blocco F in sé.
 
 **Blocco F chiuso** secondo il proprio criterio di completamento del piano ("ruoli, privacy, canali e soglie sono approvati da persone reali e non lasciati come placeholder"): tutti i placeholder sono stati sostituiti da decisioni reali, esplicite, di una persona reale — compresi i rischi accettati (nessun backup) dichiarati apertamente, non nascosti. Resta l'azione tecnica E2 sopra descritta come prerequisito reale prima del Blocco G, non come parte del criterio F stesso.
+
+### E2 — Tentato backup/restore reale su Railway, bloccato a metà (28/09/2026)
+
+Il meccanismo di backup/restore già costruito in una sessione precedente (`postgres-backup`, `dr_restore_drill.sh`) è pensato per lo stack Docker Compose locale — non esiste su Railway. Trovata un'alternativa migliore: Railway offre un vero point-in-time recovery (PITR) nativo per Postgres, più adatto di un pg_dump fatto in casa.
+
+- **Abilitato PITR** sul Postgres del pilota (`railway postgres pitr enable`): confermato `enabled: true`, `bucketWired: true` (l'archiviazione continua è attiva e collegata al suo storage).
+- **Bloccato**: creare un backup manuale di prova (`pitr backup create`) e impostare uno schedule (`pitr schedule set`) falliscono entrambi con "non hai accesso a questa risorsa" — verosimilmente un limite del piano Railway attuale (le funzioni di snapshot/schedule spesso richiedono un piano a pagamento). Un controllo separato (`pitr status` campo `live`) richiede anche una chiave SSH locale non presente — generarla è stata esplicitamente rimandata su richiesta dell'utente.
+- **Non verificato**: non è stato quindi possibile dimostrare un vero backup+restore riuscito sull'ambiente reale (solo l'archiviazione continua risulta attiva, non un ripristino provato con misura del tempo impiegato, come richiede il piano).
+
+**Messo in coda su richiesta esplicita dell'utente** — da riprendere più avanti: verificare il piano Railway (probabile causa del blocco), eventualmente generare la chiave SSH, e completare un vero drill di ripristino sul pilota prima di invitare tester veri (prerequisito G2).
