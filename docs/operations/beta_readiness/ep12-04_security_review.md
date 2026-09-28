@@ -26,10 +26,10 @@ finding Alti) — vedi dettaglio sotto. La breve riapertura sul finding #19 è o
 **Aggiornamento D4 (27/09/2026)**: rivalidazione completa richiesta dal Blocco D prima
 del pilota, oltre un mese dopo la chiusura precedente. Nessuna regressione sui controlli
 già chiusi (CORS, guardia Range, rate limit, upload, privacy). 2 nuovi finding: un
-segreto reale rimasto nella cronologia Git (#20, **rotazione rimandata su decisione
-esplicita** — non priorità immediata) e una CVE Starlette recente su limiti form-data
-(#21, **rischio accettato per la Beta** su decisione esplicita). Dettaglio in fondo al
-documento, sezione "D4".
+segreto reale rimasto nella cronologia Git (#20, **rischio accettato in via definitiva
+su decisione esplicita**, 28/09/2026) e una CVE Starlette recente su limiti form-data
+(#21, **corretto il 28/09/2026** con una guardia globale sulla dimensione del corpo).
+Dettaglio in fondo al documento, sezione "D4".
 
 ### Riepilogo finding
 
@@ -54,8 +54,8 @@ documento, sezione "D4".
 | 17 | Privacy/GDPR (`auth/privacy_service.py`) | — | Coperto da test esistenti, verificati verdi |
 | 18 | Redazione log PII/segreti | — | Verificato agganciato globalmente, nessun finding |
 | 19 | Trust incondizionato di `X-Forwarded-For` nel rate limit login | Media | **Corretto — peer ASGI trusted-only + test dinamico** |
-| 20 | Valore reale di `API_FOOTBALL_KEY` rimasto in 4 commit della cronologia Git (fix #1 aveva pulito solo il file corrente) | Media (segreto recuperabile dalla storia, non dal codice attuale) | **Aperto — rotazione rimandata su decisione esplicita** |
-| 21 | Starlette: limiti `max_fields`/`max_part_size` su `request.form()` ignorati per corpi `application/x-www-form-urlencoded` (PYSEC-2026-249) | Bassa-Media (solo 2 endpoint autenticati: upload avatar, import CSV rosa; limiti comunque non configurati oggi) | **Rischio accettato per la Beta** |
+| 20 | Valore reale di `API_FOOTBALL_KEY` rimasto in 4 commit della cronologia Git (fix #1 aveva pulito solo il file corrente) | Media (segreto recuperabile dalla storia, non dal codice attuale) | **Rischio accettato in via definitiva su decisione esplicita (28/09/2026)** |
+| 21 | Starlette: limiti `max_fields`/`max_part_size` su `request.form()` ignorati per corpi `application/x-www-form-urlencoded` (PYSEC-2026-249) | Bassa-Media (solo 2 endpoint autenticati: upload avatar, import CSV rosa; limiti comunque non configurati oggi) | **Corretto — guardia globale sulla dimensione del corpo (413) + test dedicati** |
 
 ### 1. Dependency audit — Python (`pip-audit`)
 
@@ -605,10 +605,18 @@ nuove CVE** pubblicate dopo la chiusura precedente (oltre a quella già mitigata
   `LEAGUE_ADMIN`) — non l'endpoint pubblico non autenticato ipotizzato
   dall'advisory generica. Impatto pratico ridotto a un utente già autenticato che
   manda un corpo enorme a uno di questi 2 endpoint per consumare CPU/memoria durante
-  il parsing. **Finding #21, rischio accettato per la Beta su decisione esplicita**
-  del responsabile della card — opzione di fix disponibile e a basso rischio (guardia
-  globale sulla dimensione del corpo, stesso pattern della mitigazione Range già in
-  produzione) se si vorrà chiuderlo prima di un pilota più ampio.
+  il parsing. **Finding #21 — corretto (28/09/2026)**, su richiesta esplicita del
+  responsabile della card: `BodySizeGuardMiddleware`
+  (`backend/src/app/security_middleware.py`) rifiuta con `413` qualunque richiesta il
+  cui corpo superi 10 MiB, **prima** che raggiunga `request.form()` — sia sul
+  `Content-Length` dichiarato (rifiuto immediato, corpo mai letto) sia mentre il
+  corpo arriva in streaming (copre anche un corpo senza `Content-Length`
+  dichiarato, es. `Transfer-Encoding: chunked`). Stesso pattern della mitigazione
+  Range già in produzione. Verificato con 3 test dedicati
+  (`backend/tests/unit/app/test_security_middleware.py`: corpo piccolo passa,
+  `Content-Length` dichiarato oltre soglia rifiutato, corpo in streaming oltre
+  soglia rifiutato) e dal vivo con `curl`; nessuna regressione sull'upload avatar
+  reale (`tests/integration/auth/test_profile.py`, sotto soglia).
 - pip/pytest: stessa situazione di agosto, nessun cambiamento (build-time/dev-only).
 
 ### 2. Dependency audit — JS/TS (`pnpm audit`)
@@ -646,12 +654,13 @@ descriveva la scoperta, poi redatto a `<redacted>` in una revisione successiva d
 documento. La cronologia Git conserva però entrambe le versioni: chiunque cloni il
 repository può recuperare il valore reale con `git log -p` o consultando i vecchi
 commit (`bef68759`, `c6be3a89`), anche se `HEAD` oggi è pulito su entrambi i file.
-**Finding #20** — l'azione che conta è **ruotare la chiave su API-Football**
+**Finding #20** — l'azione che conterebbe è **ruotare la chiave su API-Football**
 (invalidare il valore vecchio, generarne uno nuovo), non necessariamente riscrivere
 la storia Git (operazione distruttiva, force-push, richiede coordinamento con
-chiunque altro lavori sul repository). **Rotazione rimandata su decisione esplicita
-del responsabile della card** — non priorità immediata; resta un'azione aperta da
-fare prima del pilota reale (Blocco G), non necessariamente ora.
+chiunque altro lavori sul repository). **Rischio accettato in via definitiva su
+decisione esplicita del responsabile della card (28/09/2026)** — non verrà ruotata;
+la chiave resta la stessa sia in dev sia nell'ambiente pilota (vedi Blocco E1 in
+`registro_requisiti_fase1.md`).
 
 Confermati nuovamente veri anche i 2 falsi positivi già noti (fixture di test in
 `test_redaction.py`, valori dichiaratamente finti).

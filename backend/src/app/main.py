@@ -15,7 +15,7 @@ from admin.turni_router import router as admin_turni_router
 from ai_assistant.router import feedback_router as ai_assistant_feedback_router
 from ai_assistant.router import router as ai_assistant_router
 from app.deps_health import aggregate_health
-from app.security_middleware import install_range_header_guard
+from app.security_middleware import install_body_size_guard, install_range_header_guard
 from auth.exceptions import AuthError
 from auth.profile_router import router as profile_router
 from auth.router import router as auth_router
@@ -65,6 +65,7 @@ app = FastAPI(
 )
 install_correlation_middleware(app)
 install_range_header_guard(app)
+install_body_size_guard(app)
 # EP12-04 security review: auth is Bearer-token-only (no Set-Cookie anywhere in
 # backend/src, verified by grep), so the browser never needs to send/receive
 # ambient credentials for this API. allow_credentials=False makes the wildcard

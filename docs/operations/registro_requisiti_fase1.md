@@ -444,7 +444,7 @@ Rieseguiti tutti gli audit di agosto (dipendenze Python/JS, SAST, secret scan) p
 - **Nessuna regressione** su nulla di quanto già corretto ad agosto.
 - **Superficie nuova (pannello operatore turni, asta live, storage sessione mobile) verificata senza problemi**: permessi corretti su ogni endpoint, test dedicati verdi, token mobile sempre su Keychain/Keystore nativo.
 - **2 finding nuovi, entrambi con decisione esplicita**:
-  1. **Segreto reale (`API_FOOTBALL_KEY`) rimasto nella cronologia Git**, anche se il file attuale è pulito — quando la review di agosto documentò la scoperta, il valore vero finì per errore anche nel testo del documento stesso, poi redatto solo in una revisione successiva (la cronologia conserva entrambe le versioni). **Rotazione della chiave su API-Football rimandata su decisione esplicita dell'utente** — non priorità immediata, resta un'azione aperta prima del pilota reale (Blocco G).
+  1. **Segreto reale (`API_FOOTBALL_KEY`) rimasto nella cronologia Git**, anche se il file attuale è pulito — quando la review di agosto documentò la scoperta, il valore vero finì per errore anche nel testo del documento stesso, poi redatto solo in una revisione successiva (la cronologia conserva entrambe le versioni). **Rischio accettato in via definitiva su decisione esplicita dell'utente (28/09/2026)** — non verrà ruotata.
   2. **CVE Starlette su limiti form-data** (ignorati per corpi url-encoded): tocca solo 2 endpoint autenticati (upload avatar, import CSV rosa). **Rischio accettato per la Beta su decisione esplicita** — esiste un fix a basso rischio (guardia globale sulla dimensione del corpo, stesso pattern già usato per l'header Range) se si vorrà chiuderlo più avanti.
 - Le altre 4 nuove CVE Starlette pubblicate da agosto **non si applicano**: verificato nel codice che non usiamo mai i pattern coinvolti (nessun uso di `request.url.path`/`.hostname`, nessuna classe `HTTPEndpoint`, immagine Docker Linux non Windows).
 
@@ -524,3 +524,16 @@ Policy `was_called_up` decisa su conferma esplicita dell'utente: le statistiche 
 Decisione esplicita dell'utente. Non misurabile sui dati statici disponibili (richiede osservare dal vivo un vero cambio di stagione). Rischio pratico basso per il primo pilota (leghe create su stagione già avviata, non a ridosso dell'apertura) — da riverificare solo se il caso limite si presenta davvero.
 
 **Tutti e 4 i punti in coda del Blocco B sono ora chiusi** (2 spostati in Fase 2 come lavoro futuro di ML — OQ-08/OQ-09 —, 1 chiuso con una policy scritta — OQ-10 —, 1 spostato in Fase 2 come rischio a bassa probabilità — OQ-15). Nessuna modifica al codice applicativo in nessuno dei quattro.
+
+### Blocco D — Rotazione `API_FOOTBALL_KEY` chiusa (28/09/2026)
+
+Su decisione esplicita dell'utente ("il primo puoi pure chiuderlo, non mi interessa"), il finding #20 della revisione di sicurezza passa da "rotazione rimandata" a **rischio accettato in via definitiva** — la chiave non verrà ruotata. Aggiornati `ep12-04_security_review.md` (tabella finding, testo del finding #20, riepilogo D4) e questo registro.
+
+### Blocco D — Guardia dimensione richieste applicata, finding #21 corretto (28/09/2026)
+
+Su decisione esplicita dell'utente, applicato il fix a basso rischio già proposto in D4: `BodySizeGuardMiddleware` (`backend/src/app/security_middleware.py`, registrato in `backend/src/app/main.py`) rifiuta con `413` qualunque richiesta HTTP il cui corpo superi 10 MiB, sia sul `Content-Length` dichiarato (rifiuto immediato) sia mentre il corpo arriva in streaming (copre anche un corpo senza `Content-Length`, es. chunked) — prima che raggiunga il parsing di `request.form()` (l'endpoint dell'avatar e quello di import CSV rosa, gli unici due che lo usano). Stesso schema della mitigazione già in produzione sull'header `Range`.
+
+- **3 test nuovi** in `backend/tests/unit/app/test_security_middleware.py` (corpo piccolo passa; `Content-Length` dichiarato oltre soglia rifiutato prima di leggere il corpo; corpo in streaming oltre soglia rifiutato). Verificato anche dal vivo con `curl`.
+- **Nessuna regressione**: `tests/integration/auth/test_profile.py` (include l'upload avatar reale, sotto soglia) verde; `ruff check`/`ruff format --check` puliti su tutti i file toccati.
+
+**Blocco D interamente chiuso** — nessun punto in coda residuo (con D1-D4 già chiusi in precedenza, e ora anche i 2 finding rimasti aperti da D4).

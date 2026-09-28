@@ -65,3 +65,80 @@ class RangeHeaderGuardMiddleware:
 def install_range_header_guard(app: Any) -> None:
     """Register the Range-header length guard on a FastAPI/Starlette app."""
     app.add_middleware(RangeHeaderGuardMiddleware)
+
+
+# Starlette's `request.form()` enforces `max_fields`/`max_part_size` for
+# multipart/form-data, but silently ignores them for
+# application/x-www-form-urlencoded (PYSEC-2026-249) — we don't configure
+# those limits at all today, so there's no false sense of protection either
+# way, but the underlying parsing cost still scales with body size. Reachable
+# only via the 2 endpoints that call `request.form()` (avatar upload, CSV
+# roster import — both behind auth + a real permission, not public), but a
+# global cap costs nothing for legitimate traffic and closes the same class
+# of "oversized body" concern regardless of which endpoint ends up parsing
+# form data in the future. 10 MiB is comfortably above the largest real
+# payload here (a 2 MiB avatar, or a CSV roster import) with room to spare.
+_MAX_BODY_BYTES = 10 * 1024 * 1024
+
+
+class _BodyTooLargeError(Exception):
+    pass
+
+
+class BodySizeGuardMiddleware:
+    """Reject requests whose body exceeds a fixed size, before any parsing."""
+
+    def __init__(self, app: ASGIApp) -> None:
+        self.app = app
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+
+        for name, value in scope.get("headers") or []:
+            if name == b"content-length":
+                try:
+                    declared_length = int(value)
+                except ValueError:
+                    declared_length = None
+                if declared_length is not None and declared_length > _MAX_BODY_BYTES:
+                    await _reject_body_too_large(send)
+                    return
+
+        received = 0
+
+        async def guarded_receive() -> Any:
+            nonlocal received
+            message = await receive()
+            if message["type"] == "http.request":
+                received += len(message.get("body") or b"")
+                if received > _MAX_BODY_BYTES:
+                    raise _BodyTooLargeError
+            return message
+
+        try:
+            await self.app(scope, guarded_receive, send)
+        except _BodyTooLargeError:
+            await _reject_body_too_large(send)
+
+
+async def _reject_body_too_large(send: Send) -> None:
+    await send(
+        {
+            "type": "http.response.start",
+            "status": 413,
+            "headers": [(b"content-type", b"text/plain; charset=utf-8")],
+        },
+    )
+    await send(
+        {
+            "type": "http.response.body",
+            "body": b"Request body too large.",
+        },
+    )
+
+
+def install_body_size_guard(app: Any) -> None:
+    """Register the request body size guard on a FastAPI/Starlette app."""
+    app.add_middleware(BodySizeGuardMiddleware)
