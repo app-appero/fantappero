@@ -6,12 +6,14 @@ import { MemoryRouter } from "../router/simpleRouter";
 const logoutMock = vi.fn().mockResolvedValue(undefined);
 const fetchMeMock = vi.fn();
 const fetchMyLeaguesMock = vi.fn();
+const loginWithGoogleMock = vi.fn();
 
 vi.mock("../api/auth", () => ({
   logout: (...args: unknown[]) => logoutMock(...args),
   fetchMe: (...args: unknown[]) => fetchMeMock(...args),
   refresh: vi.fn(),
   login: vi.fn(),
+  loginWithGoogle: (...args: unknown[]) => loginWithGoogleMock(...args),
   register: vi.fn(),
   forgotPassword: vi.fn(),
   resetPassword: vi.fn(),
@@ -98,6 +100,73 @@ describe("AuthContext logout (EP02-01)", () => {
 
     expect(logoutMock).toHaveBeenCalledWith({ refreshToken: "refresh-token" });
     expect(loadStoredSession()).toBeNull();
+  });
+});
+
+function CaptureLoginWithGoogle() {
+  const { loginWithGoogle } = useAuth();
+  useEffect(() => {
+    loginWithGoogleFn = loginWithGoogle;
+  }, [loginWithGoogle]);
+  return null;
+}
+
+let loginWithGoogleFn: ((idToken: string) => Promise<void>) | null = null;
+
+describe("AuthContext loginWithGoogle (EP02-01 Google extension)", () => {
+  let container: HTMLDivElement;
+  let root: Root;
+
+  beforeEach(() => {
+    container = document.createElement("div");
+    document.body.appendChild(container);
+    root = createRoot(container);
+    loginWithGoogleFn = null;
+    loginWithGoogleMock.mockReset();
+    fetchMyLeaguesMock.mockReset();
+    fetchMyLeaguesMock.mockResolvedValue([]);
+    clearStoredSession();
+  });
+
+  afterEach(() => {
+    act(() => {
+      root.unmount();
+    });
+    container.remove();
+    clearStoredSession();
+  });
+
+  it("stores the session returned by the Google login endpoint", async () => {
+    loginWithGoogleMock.mockResolvedValue({
+      accessToken: "google-access-token",
+      refreshToken: "google-refresh-token",
+      expiresIn: 900,
+      user: { id: "user-google-1", displayName: "Utente Google", globalRole: "member" },
+    });
+
+    await act(async () => {
+      root.render(
+        createElement(MemoryRouter, {
+          initialEntries: ["/accedi"],
+          children: createElement(AuthProvider, {
+            children: createElement(CaptureLoginWithGoogle),
+          }),
+        }),
+      );
+    });
+
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+
+    expect(loginWithGoogleFn).not.toBeNull();
+
+    await act(async () => {
+      await loginWithGoogleFn!("fake-id-token");
+    });
+
+    expect(loginWithGoogleMock).toHaveBeenCalledWith({ idToken: "fake-id-token" });
+    expect(loadStoredSession()?.user.displayName).toBe("Utente Google");
   });
 });
 

@@ -9,8 +9,10 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from auth import google_oauth
 from auth.exceptions import (
     EmailNotVerifiedError,
+    GoogleAuthError,
     InvalidCredentialsError,
     InvalidTokenError,
 )
@@ -137,6 +139,63 @@ class AuthService:
         tokens = self._create_session(user)
         self._session.commit()
         get_metrics().incr("auth_login_total", labels={"result": "success"})
+        return tokens
+
+    def login_with_google(
+        self,
+        *,
+        id_token: str,
+        client_ip: str,
+        user_agent: str | None,
+    ) -> AuthTokensResponse:
+        del user_agent
+        if self._rate_limiter is not None:
+            self._rate_limiter.check(
+                endpoint="google_login",
+                key=client_ip,
+                limit=self._settings.auth_rate_limit_google_login_per_minute,
+                window_seconds=60,
+            )
+
+        identity = google_oauth.verify_id_token(
+            id_token,
+            allowed_audiences=self._settings.resolved_google_client_ids(),
+        )
+        if not identity.email_verified:
+            get_metrics().incr("auth_google_login_total", labels={"result": "unverified"})
+            raise GoogleAuthError()
+
+        user = self._session.scalar(select(User).where(User.google_sub == identity.sub))
+        if user is None:
+            user = self._session.scalar(
+                select(User).where(User.email == identity.email, User.deleted_at.is_(None))
+            )
+            if user is not None:
+                user.google_sub = identity.sub
+                if not user.email_verified:
+                    user.email_verified_at = utc_now()
+            else:
+                user = User(
+                    email=identity.email,
+                    google_sub=identity.sub,
+                    email_verified_at=utc_now(),
+                    platform_role=PlatformRole.USER,
+                    user_type=UserType.HUMAN,
+                )
+                self._session.add(user)
+                self._session.flush()
+                user.profile = UserProfile(
+                    user_id=user.id,
+                    display_name=(identity.name or "")[:80] or None,
+                )
+
+        if user.user_type == UserType.AI or user.deleted_at is not None:
+            get_metrics().incr("auth_google_login_total", labels={"result": "failure"})
+            raise GoogleAuthError()
+
+        tokens = self._create_session(user)
+        self._session.commit()
+        get_metrics().incr("auth_google_login_total", labels={"result": "success"})
         return tokens
 
     def refresh(self, *, refresh_token: str) -> AuthTokensResponse:

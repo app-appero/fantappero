@@ -3,6 +3,7 @@ import { useNavigation } from "@react-navigation/core";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useState } from "react";
 import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { useGoogleAuth } from "../auth/useGoogleAuth";
 import { BrandLogo } from "../components/BrandLogo";
 import { UiStatePanel } from "../components/UiStatePanel";
 import { loadMobileEnv } from "../config/env";
@@ -23,12 +24,25 @@ function resolveApiBaseUrlForDisplay(): string {
 /** Login — allineato a web /accedi. */
 export function AuthScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
-  const { login } = useAuthSession();
+  const { login, loginWithGoogle } = useAuthSession();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [googleSubmitting, setGoogleSubmitting] = useState(false);
   const apiBaseUrl = resolveApiBaseUrlForDisplay();
+
+  const googleAuth = useGoogleAuth((idToken) => {
+    setError(null);
+    setGoogleSubmitting(true);
+    loginWithGoogle(idToken)
+      .catch((googleError: unknown) => {
+        setError(getApiErrorMessage(googleError, "Accesso con Google non riuscito."));
+      })
+      .finally(() => {
+        setGoogleSubmitting(false);
+      });
+  });
 
   async function onLogin() {
     setError(null);
@@ -109,6 +123,20 @@ export function AuthScreen() {
         >
           <Text style={styles.primaryLabel}>{submitting ? "Accesso…" : "Accedi"}</Text>
         </Pressable>
+        {googleAuth.available ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Continua con Google"
+            disabled={googleSubmitting}
+            onPress={() => void googleAuth.promptAsync()}
+            style={[styles.secondaryButton, googleSubmitting && styles.disabled]}
+            testID="auth-google-submit"
+          >
+            <Text style={styles.secondaryLabel}>
+              {googleSubmitting ? "Accesso…" : "Continua con Google"}
+            </Text>
+          </Pressable>
+        ) : null}
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Registrati"
@@ -170,6 +198,21 @@ export const authFormStyles = StyleSheet.create({
   },
   primaryLabel: {
     color: colors.accentContrast,
+    fontWeight: typography.fontWeight.semibold,
+    fontSize: typography.fontSize.md,
+  },
+  secondaryButton: {
+    marginTop: spacing.sm,
+    minHeight: 44,
+    paddingVertical: spacing.md,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  secondaryLabel: {
+    color: colors.foreground,
     fontWeight: typography.fontWeight.semibold,
     fontSize: typography.fontSize.md,
   },

@@ -20,6 +20,10 @@ class LoginRequest(ApiModel):
     password: str = Field(min_length=1, max_length=128)
 
 
+class GoogleLoginRequest(ApiModel):
+    id_token: str = Field(min_length=1, alias="idToken")
+
+
 class RefreshRequest(ApiModel):
     refresh_token: str = Field(min_length=1, alias="refreshToken")
 

@@ -7,7 +7,43 @@ import {
   verifyEmail,
 } from "../../api/auth";
 import { getApiErrorMessage, useAuth } from "../../auth/AuthContext";
+import { renderGoogleButton } from "../../auth/googleIdentity";
+import { getWebEnv } from "../../config/env";
 import { Link, useLocation, useNavigate } from "../../router/simpleRouter";
+
+/** "Continua con Google" — hidden when VITE_GOOGLE_CLIENT_ID is unset. */
+function GoogleSignInButton({ onError }: { onError: (message: string) => void }) {
+  const { loginWithGoogle } = useAuth();
+  const navigate = useNavigate();
+  const containerRef = useRef<HTMLDivElement>(null);
+  const { viteGoogleClientId } = getWebEnv();
+
+  useEffect(() => {
+    if (!viteGoogleClientId || !containerRef.current) {
+      return;
+    }
+    renderGoogleButton(containerRef.current, viteGoogleClientId, (idToken) => {
+      loginWithGoogle(idToken)
+        .then(() => navigate("/leghe"))
+        .catch((error: unknown) => {
+          onError(getApiErrorMessage(error, "Accesso con Google non riuscito."));
+        });
+    }).catch(() => {
+      onError("Impossibile caricare l'accesso con Google.");
+    });
+  }, [viteGoogleClientId, loginWithGoogle, navigate, onError]);
+
+  if (!viteGoogleClientId) {
+    return null;
+  }
+
+  return (
+    <div className="fa-auth-layout__google">
+      <p className="fa-auth-layout__divider">oppure</p>
+      <div ref={containerRef} data-testid="auth-google-button" />
+    </div>
+  );
+}
 
 export function AuthRegisterPage() {
   const [email, setEmail] = useState("");
@@ -53,29 +89,32 @@ export function AuthRegisterPage() {
             testId="auth-register-success"
           />
         ) : (
-          <AuthFormLayout
-            brand={<BrandLogo variant="full" size="lg" />}
-            title="Crea account"
-            submitLabel="Registrati"
-            showDisplayName
-            showConfirmPassword
-            email={email}
-            password={password}
-            confirmPassword={confirmPassword}
-            displayName={displayName}
-            onEmailChange={setEmail}
-            onPasswordChange={setPassword}
-            onConfirmPasswordChange={setConfirmPassword}
-            onDisplayNameChange={setDisplayName}
-            onSubmit={handleSubmit}
-            loading={loading}
-            error={error ?? undefined}
-            registerPrompt={
-              <p className="fa-auth-layout__register">
-                Hai già un account? <Link to="/accedi">Accedi</Link>
-              </p>
-            }
-          />
+          <>
+            <AuthFormLayout
+              brand={<BrandLogo variant="full" size="lg" />}
+              title="Crea account"
+              submitLabel="Registrati"
+              showDisplayName
+              showConfirmPassword
+              email={email}
+              password={password}
+              confirmPassword={confirmPassword}
+              displayName={displayName}
+              onEmailChange={setEmail}
+              onPasswordChange={setPassword}
+              onConfirmPasswordChange={setConfirmPassword}
+              onDisplayNameChange={setDisplayName}
+              onSubmit={handleSubmit}
+              loading={loading}
+              error={error ?? undefined}
+              registerPrompt={
+                <p className="fa-auth-layout__register">
+                  Hai già un account? <Link to="/accedi">Accedi</Link>
+                </p>
+              }
+            />
+            <GoogleSignInButton onError={setError} />
+          </>
         )}
         {successMessage ? (
           <p className="fa-auth-layout__register">
@@ -137,6 +176,7 @@ export function AuthLoginPage() {
             </p>
           }
         />
+        <GoogleSignInButton onError={setError} />
       </PageContainer>
     </div>
   );

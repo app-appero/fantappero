@@ -26,7 +26,8 @@ class User(Base, UUIDPrimaryKeyMixin, TimestampMixin, SoftDeleteMixin):
     __table_args__ = (Index("ix_users_email", "email"),)
 
     email: Mapped[str] = mapped_column(String(320), nullable=False, unique=True)
-    password_hash: Mapped[str] = mapped_column(Text, nullable=False)
+    password_hash: Mapped[str | None] = mapped_column(Text, nullable=True)
+    google_sub: Mapped[str | None] = mapped_column(String(255), nullable=True, unique=True)
     email_verified_at: Mapped[datetime | None] = mapped_column(UTCDateTime(), nullable=True)
     platform_role: Mapped[PlatformRole] = mapped_column(
         Enum(

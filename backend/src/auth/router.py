@@ -11,6 +11,7 @@ from auth.models.user import User
 from auth.schemas import (
     AuthTokensResponse,
     ForgotPasswordRequest,
+    GoogleLoginRequest,
     LoginRequest,
     MessageResponse,
     RefreshRequest,
@@ -28,7 +29,7 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 
 def _error_response(exc: AuthError) -> JSONResponse:
     status_code = status.HTTP_400_BAD_REQUEST
-    if exc.code == "invalid_credentials":
+    if exc.code in ("invalid_credentials", "google_auth_failed"):
         status_code = status.HTTP_401_UNAUTHORIZED
     elif exc.code == "email_not_verified":
         status_code = status.HTTP_403_FORBIDDEN
@@ -67,6 +68,22 @@ def login(
         return service.login(
             email=body.email,
             password=body.password,
+            client_ip=get_client_ip(request),
+            user_agent=request.headers.get("User-Agent"),
+        )
+    except AuthError as exc:
+        return _error_response(exc)
+
+
+@router.post("/google", response_model=AuthTokensResponse)
+def login_with_google(
+    body: GoogleLoginRequest,
+    request: Request,
+    service: AuthService = Depends(get_auth_service),
+) -> AuthTokensResponse | JSONResponse:
+    try:
+        return service.login_with_google(
+            id_token=body.id_token,
             client_ip=get_client_ip(request),
             user_agent=request.headers.get("User-Agent"),
         )

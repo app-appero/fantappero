@@ -53,6 +53,7 @@ export type AuthContextValue = {
   leaguesError: string | null;
   refreshLeagues: () => Promise<void>;
   login: (email: string, password: string) => Promise<void>;
+  loginWithGoogle: (idToken: string) => Promise<void>;
   logout: () => Promise<void>;
   applySession: (tokens: AuthTokensResponse) => void;
   updateDisplayName: (displayName: string) => void;
@@ -274,6 +275,25 @@ export function AuthProvider({ children }: AuthProviderProps) {
     [applyMemberships, applySession, isDemoMode],
   );
 
+  const loginWithGoogle = useCallback(
+    async (idToken: string) => {
+      const tokens = await authApi.loginWithGoogle({ idToken });
+      applySession(tokens);
+
+      if (isDemoMode) {
+        return;
+      }
+      setLeaguesState(loadStoredMyLeagues(tokens.user.id));
+      try {
+        const memberships = await fetchMyLeagues(tokens.accessToken);
+        applyMemberships(memberships, tokens.user.id);
+      } catch (cause) {
+        setLeaguesError(getApiErrorMessage(cause, "Impossibile caricare le tue leghe."));
+      }
+    },
+    [applyMemberships, applySession, isDemoMode],
+  );
+
   const refreshLeagues = useCallback(async () => {
     if (isDemoMode) {
       return;
@@ -411,6 +431,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       unregisterLeague,
       patchLeague,
       login,
+      loginWithGoogle,
       refreshLeagues,
       logout,
       applySession,
@@ -431,6 +452,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       unregisterLeague,
       patchLeague,
       login,
+      loginWithGoogle,
       refreshLeagues,
       logout,
       applySession,

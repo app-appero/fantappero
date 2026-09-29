@@ -41,6 +41,14 @@ class InvalidTokenError(AuthError):
         )
 
 
+class GoogleAuthError(AuthError):
+    def __init__(self) -> None:
+        super().__init__(
+            "Accesso con Google non riuscito. Riprova.",
+            code="google_auth_failed",
+        )
+
+
 class RateLimitExceededError(AuthError):
     def __init__(self) -> None:
         super().__init__(

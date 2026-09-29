@@ -5,6 +5,8 @@
 
 export type WebEnv = {
   viteApiBaseUrl: string;
+  /** Google OAuth Web Client ID. Empty string disables the "Continua con Google" button. */
+  viteGoogleClientId: string;
 };
 
 export class WebEnvError extends Error {
@@ -33,7 +35,11 @@ export function loadWebEnv(
   if (!text) {
     throw new WebEnvError("Missing required environment variable: VITE_API_BASE_URL");
   }
-  return { viteApiBaseUrl: parseUrl("VITE_API_BASE_URL", text) };
+  const googleClientId = source.VITE_GOOGLE_CLIENT_ID;
+  return {
+    viteApiBaseUrl: parseUrl("VITE_API_BASE_URL", text),
+    viteGoogleClientId: typeof googleClientId === "string" ? googleClientId.trim() : "",
+  };
 }
 
 export function getWebEnv(): WebEnv {

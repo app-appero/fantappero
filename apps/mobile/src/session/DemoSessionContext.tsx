@@ -47,6 +47,7 @@ export type AuthSessionContextValue = {
   unregisterLeague: (leagueId: string) => void;
   patchLeague: (leagueId: string, patch: Partial<LeagueSummary>) => void;
   login: (email: string, password: string) => Promise<void>;
+  loginWithGoogle: (idToken: string) => Promise<void>;
   logout: () => Promise<void>;
   applySession: (tokens: AuthTokensResponse) => Promise<void>;
   refreshMemberships: () => Promise<LeagueSummary[]>;
@@ -215,6 +216,28 @@ export function AuthSessionProvider({ children }: { children: ReactNode }) {
     [applySession],
   );
 
+  const loginWithGoogle = useCallback(
+    async (idToken: string) => {
+      const tokens = await authApi.loginWithGoogle({ idToken });
+      await applySession(tokens);
+      try {
+        const memberships = await fetchMyLeagues(tokens.accessToken);
+        const storedLeagueId = await loadStoredActiveLeagueId();
+        const nextLeagueId = resolvePreferredLeagueId(memberships, storedLeagueId);
+        setLeagues(memberships);
+        setActiveLeagueIdState(nextLeagueId);
+        if (nextLeagueId) {
+          await saveStoredActiveLeagueId(nextLeagueId);
+        } else {
+          await clearStoredActiveLeagueId();
+        }
+      } catch {
+        // Keep memberships already in memory.
+      }
+    },
+    [applySession],
+  );
+
   const logout = useCallback(async () => {
     const stored = getMemorySession() ?? (await loadStoredSession());
     await clearStoredSession();
@@ -324,6 +347,7 @@ export function AuthSessionProvider({ children }: { children: ReactNode }) {
       unregisterLeague,
       patchLeague,
       login,
+      loginWithGoogle,
       logout,
       applySession,
       refreshMemberships,
@@ -343,6 +367,7 @@ export function AuthSessionProvider({ children }: { children: ReactNode }) {
       unregisterLeague,
       patchLeague,
       login,
+      loginWithGoogle,
       logout,
       applySession,
       refreshMemberships,

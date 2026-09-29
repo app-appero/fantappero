@@ -44,6 +44,14 @@ class AuthSettingsMixin:
         default=3,
         validation_alias="AUTH_RATE_LIMIT_RESEND_VERIFICATION_PER_HOUR",
     )
+    auth_rate_limit_google_login_per_minute: int = Field(
+        default=10,
+        validation_alias="AUTH_RATE_LIMIT_GOOGLE_LOGIN_PER_MINUTE",
+    )
+    google_oauth_client_ids: str = Field(
+        default="",
+        validation_alias="GOOGLE_OAUTH_CLIENT_IDS",
+    )
 
     @field_validator(
         "jwt_access_token_expire_minutes",
@@ -54,6 +62,7 @@ class AuthSettingsMixin:
         "auth_rate_limit_register_per_hour",
         "auth_rate_limit_forgot_password_per_hour",
         "auth_rate_limit_resend_verification_per_hour",
+        "auth_rate_limit_google_login_per_minute",
         mode="before",
     )
     @classmethod
@@ -64,3 +73,6 @@ class AuthSettingsMixin:
 
     def resolved_jwt_secret(self) -> str:
         return self.jwt_secret_key.get_secret_value()
+
+    def resolved_google_client_ids(self) -> list[str]:
+        return [item.strip() for item in self.google_oauth_client_ids.split(",") if item.strip()]

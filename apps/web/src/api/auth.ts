@@ -2,6 +2,7 @@ import type {
   AuthMessageResponse,
   AuthTokensResponse,
   ForgotPasswordRequest,
+  GoogleLoginRequest,
   LoginRequest,
   RefreshRequest,
   RegisterRequest,
@@ -18,6 +19,10 @@ export function register(body: RegisterRequest): Promise<AuthMessageResponse> {
 
 export function login(body: LoginRequest): Promise<AuthTokensResponse> {
   return apiRequest<AuthTokensResponse>("/auth/login", { body });
+}
+
+export function loginWithGoogle(body: GoogleLoginRequest): Promise<AuthTokensResponse> {
+  return apiRequest<AuthTokensResponse>("/auth/google", { body });
 }
 
 export function refresh(body: RefreshRequest): Promise<AuthTokensResponse> {

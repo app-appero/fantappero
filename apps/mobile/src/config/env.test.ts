@@ -6,6 +6,18 @@ import { loadMobileEnv, MobileEnvError } from "./env.ts";
 test("loadMobileEnv accepts minimal valid configuration", () => {
   const env = loadMobileEnv({ EXPO_PUBLIC_API_BASE_URL: "http://127.0.0.1:8001" });
   assert.equal(env.expoPublicApiBaseUrl, "http://127.0.0.1:8001");
+  assert.equal(env.expoPublicGoogleClientIdWeb, "");
+  assert.equal(env.expoPublicGoogleClientIdAndroid, "");
+});
+
+test("loadMobileEnv reads Google client ids when configured", () => {
+  const env = loadMobileEnv({
+    EXPO_PUBLIC_API_BASE_URL: "http://127.0.0.1:8001",
+    EXPO_PUBLIC_GOOGLE_CLIENT_ID_WEB: "web-client-id",
+    EXPO_PUBLIC_GOOGLE_CLIENT_ID_ANDROID: "android-client-id",
+  });
+  assert.equal(env.expoPublicGoogleClientIdWeb, "web-client-id");
+  assert.equal(env.expoPublicGoogleClientIdAndroid, "android-client-id");
 });
 
 test("loadMobileEnv fails when EXPO_PUBLIC_API_BASE_URL is missing", () => {
