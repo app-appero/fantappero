@@ -40,7 +40,7 @@ function GoogleSignInButton({ onError }: { onError: (message: string) => void })
   return (
     <div className="fa-auth-layout__google">
       <p className="fa-auth-layout__divider">oppure</p>
-      <div ref={containerRef} data-testid="auth-google-button" />
+      <div ref={containerRef} className="fa-auth-layout__google-button" data-testid="auth-google-button" />
     </div>
   );
 }

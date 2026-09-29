@@ -66,11 +66,15 @@ export async function renderGoogleButton(
     client_id: clientId,
     callback: (response) => onIdToken(response.credential),
   });
+  // Match the surrounding form's width instead of Google's default intrinsic
+  // size, capped at GIS's documented maximum (400px).
+  const measuredWidth = Math.min(container.offsetWidth || 0, 400);
   accountsId.renderButton(container, {
     type: "standard",
     theme: "outline",
     size: "large",
     text: "continue_with",
     shape: "rectangular",
+    ...(measuredWidth > 0 ? { width: measuredWidth } : {}),
   });
 }
