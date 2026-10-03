@@ -876,6 +876,15 @@ button.fa-link-muted,
   .fa-admin-users__item {
     flex-direction: column;
     align-items: stretch;
+    gap: var(--fa-space-sm);
+    padding: var(--fa-space-sm);
+  }
+
+  .fa-admin-users__identity {
+    /* In un flex container a colonna, il valore base (1 1 14rem) si
+       trasforma in un'altezza minima e la riga si allunga per riempire
+       lo spazio verticale residuo della card. */
+    flex: none;
   }
 
   .fa-admin-users__role {
