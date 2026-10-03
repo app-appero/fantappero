@@ -181,6 +181,10 @@ class PendingInviteCountResponse(ApiModel):
 class FantasyCoachDirectoryItem(ApiModel):
     user_id: str = Field(alias="userId")
     display_name: str = Field(alias="displayName")
+    # Visibile solo a chi amministra la lega (perimetro già protetto da
+    # `league:admin`): serve a distinguere account diversi con lo stesso nome
+    # mostrato (EP13-P06bis).
+    email: str
     avatar_url: str | None = Field(default=None, alias="avatarUrl")
     user_type: Literal["human", "ai"] = Field(alias="userType")
     available_for_invites: bool = Field(alias="availableForInvites")
@@ -211,6 +215,7 @@ class FantasyCoachProfileResponse(ApiModel):
 
     user_id: str = Field(alias="userId")
     display_name: str = Field(alias="displayName")
+    email: str
     avatar_url: str | None = Field(default=None, alias="avatarUrl")
     user_type: Literal["human", "ai"] = Field(alias="userType")
     available_for_invites: bool = Field(alias="availableForInvites")

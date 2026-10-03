@@ -24,6 +24,7 @@ export const DEMO_MANAGERS: FantasyCoachDirectoryItem[] = [
   {
     userId: "manager-lucia",
     displayName: "Lucia Bianchi",
+    email: "lucia.bianchi@example.com",
     avatarUrl: demoAvatar("manager-lucia"),
     userType: "human",
     availableForInvites: true,
@@ -36,6 +37,7 @@ export const DEMO_MANAGERS: FantasyCoachDirectoryItem[] = [
   {
     userId: "manager-paolo",
     displayName: "Paolo Verdi",
+    email: "paolo.verdi@example.com",
     avatarUrl: null,
     userType: "human",
     availableForInvites: false,
@@ -48,6 +50,7 @@ export const DEMO_MANAGERS: FantasyCoachDirectoryItem[] = [
   {
     userId: "manager-ai",
     displayName: "Allenatore IA 01",
+    email: "ia-01@example.com",
     avatarUrl: demoAvatar("manager-ai"),
     userType: "ai",
     availableForInvites: true,
@@ -60,6 +63,7 @@ export const DEMO_MANAGERS: FantasyCoachDirectoryItem[] = [
   {
     userId: "manager-ai-02",
     displayName: "Allenatore IA 02",
+    email: "ia-02@example.com",
     avatarUrl: demoAvatar("manager-ai-02"),
     userType: "ai",
     availableForInvites: true,
@@ -72,6 +76,7 @@ export const DEMO_MANAGERS: FantasyCoachDirectoryItem[] = [
   {
     userId: "manager-ai-03",
     displayName: "Allenatore IA 03",
+    email: "ia-03@example.com",
     avatarUrl: demoAvatar("manager-ai-03"),
     userType: "ai",
     availableForInvites: false,
@@ -84,6 +89,7 @@ export const DEMO_MANAGERS: FantasyCoachDirectoryItem[] = [
   {
     userId: "manager-ai-04",
     displayName: "Allenatore IA 04",
+    email: "ia-04@example.com",
     avatarUrl: null,
     userType: "ai",
     availableForInvites: true,
@@ -96,6 +102,7 @@ export const DEMO_MANAGERS: FantasyCoachDirectoryItem[] = [
   {
     userId: "manager-ai-05",
     displayName: "Allenatore IA 05",
+    email: "ia-05@example.com",
     avatarUrl: demoAvatar("manager-ai-05"),
     userType: "ai",
     availableForInvites: true,
@@ -108,6 +115,7 @@ export const DEMO_MANAGERS: FantasyCoachDirectoryItem[] = [
   {
     userId: "manager-ai-06",
     displayName: "Allenatore IA 06",
+    email: "ia-06@example.com",
     avatarUrl: demoAvatar("manager-ai-06"),
     userType: "ai",
     availableForInvites: true,
@@ -120,6 +128,7 @@ export const DEMO_MANAGERS: FantasyCoachDirectoryItem[] = [
   {
     userId: "manager-ai-07",
     displayName: "Allenatore IA 07",
+    email: "ia-07@example.com",
     avatarUrl: demoAvatar("manager-ai-07"),
     userType: "ai",
     availableForInvites: true,
@@ -132,6 +141,7 @@ export const DEMO_MANAGERS: FantasyCoachDirectoryItem[] = [
   {
     userId: "manager-ai-08",
     displayName: "Allenatore IA 08",
+    email: "ia-08@example.com",
     avatarUrl: demoAvatar("manager-ai-08"),
     userType: "ai",
     availableForInvites: true,
@@ -144,6 +154,7 @@ export const DEMO_MANAGERS: FantasyCoachDirectoryItem[] = [
   {
     userId: "manager-ai-09",
     displayName: "Allenatore IA 09",
+    email: "ia-09@example.com",
     avatarUrl: demoAvatar("manager-ai-09"),
     userType: "ai",
     availableForInvites: false,
@@ -255,6 +266,9 @@ export function CoachProfilePanel({
           <h3 id="coach-profile-title" className="fa-coach-profile__title">
             {profile.displayName}
           </h3>
+          <p className="fa-coach-profile__email" data-testid="coach-profile-email">
+            {profile.email}
+          </p>
           <div className="fa-coach-profile__meta">
             <Badge variant={profile.userType === "ai" ? "accent" : "neutral"}>
               {userTypeLabel(profile.userType)}
@@ -638,6 +652,12 @@ export function ManagerDirectory({
                     data-testid={`manager-open-${manager.userId}`}
                   >
                     <span className="fa-manager-directory__name">{manager.displayName}</span>
+                    <span
+                      className="fa-manager-directory__email"
+                      data-testid={`manager-email-${manager.userId}`}
+                    >
+                      {manager.email}
+                    </span>
                     <span className="fa-manager-directory__badges">
                       <Badge variant={manager.userType === "ai" ? "accent" : "neutral"}>
                         {userTypeLabel(manager.userType)}

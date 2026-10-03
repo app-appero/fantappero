@@ -8,6 +8,7 @@ function profile(overrides: Partial<FantasyCoachProfile> = {}): FantasyCoachProf
   return {
     userId: "coach-1",
     displayName: "Lucia Bianchi",
+    email: "lucia.bianchi@example.com",
     avatarUrl: null,
     userType: "human",
     availableForInvites: true,

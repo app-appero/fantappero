@@ -31,12 +31,12 @@ export type StoredSession = {
 };
 
 export function loadStoredSession(): StoredSession | null {
-  if (typeof sessionStorage === "undefined") {
+  if (typeof localStorage === "undefined") {
     return null;
   }
-  const accessToken = sessionStorage.getItem(ACCESS_TOKEN_KEY);
-  const refreshToken = sessionStorage.getItem(REFRESH_TOKEN_KEY);
-  const userRaw = sessionStorage.getItem(USER_KEY);
+  const accessToken = localStorage.getItem(ACCESS_TOKEN_KEY);
+  const refreshToken = localStorage.getItem(REFRESH_TOKEN_KEY);
+  const userRaw = localStorage.getItem(USER_KEY);
   if (!accessToken || !refreshToken || !userRaw) {
     return null;
   }
@@ -53,39 +53,39 @@ export function loadStoredSession(): StoredSession | null {
 }
 
 export function saveStoredSession(session: StoredSession): void {
-  sessionStorage.setItem(ACCESS_TOKEN_KEY, session.accessToken);
-  sessionStorage.setItem(REFRESH_TOKEN_KEY, session.refreshToken);
-  sessionStorage.setItem(USER_KEY, JSON.stringify(session.user));
+  localStorage.setItem(ACCESS_TOKEN_KEY, session.accessToken);
+  localStorage.setItem(REFRESH_TOKEN_KEY, session.refreshToken);
+  localStorage.setItem(USER_KEY, JSON.stringify(session.user));
 }
 
 export function clearStoredSession(): void {
-  sessionStorage.removeItem(ACCESS_TOKEN_KEY);
-  sessionStorage.removeItem(REFRESH_TOKEN_KEY);
-  sessionStorage.removeItem(USER_KEY);
-  sessionStorage.removeItem(ACTIVE_LEAGUE_ID_KEY);
-  sessionStorage.removeItem(MY_LEAGUES_KEY);
+  localStorage.removeItem(ACCESS_TOKEN_KEY);
+  localStorage.removeItem(REFRESH_TOKEN_KEY);
+  localStorage.removeItem(USER_KEY);
+  localStorage.removeItem(ACTIVE_LEAGUE_ID_KEY);
+  localStorage.removeItem(MY_LEAGUES_KEY);
 }
 
 export function loadStoredActiveLeagueId(): string | null {
-  if (typeof sessionStorage === "undefined") {
+  if (typeof localStorage === "undefined") {
     return null;
   }
-  return sessionStorage.getItem(ACTIVE_LEAGUE_ID_KEY);
+  return localStorage.getItem(ACTIVE_LEAGUE_ID_KEY);
 }
 
 export function saveStoredActiveLeagueId(leagueId: string): void {
-  sessionStorage.setItem(ACTIVE_LEAGUE_ID_KEY, leagueId);
+  localStorage.setItem(ACTIVE_LEAGUE_ID_KEY, leagueId);
 }
 
 export function clearStoredActiveLeagueId(): void {
-  sessionStorage.removeItem(ACTIVE_LEAGUE_ID_KEY);
+  localStorage.removeItem(ACTIVE_LEAGUE_ID_KEY);
 }
 
 export function loadStoredMyLeagues(userId: string | null): LeagueSummary[] {
-  if (!userId || typeof sessionStorage === "undefined") {
+  if (!userId || typeof localStorage === "undefined") {
     return [];
   }
-  const raw = sessionStorage.getItem(MY_LEAGUES_KEY);
+  const raw = localStorage.getItem(MY_LEAGUES_KEY);
   if (!raw) {
     return [];
   }
@@ -96,18 +96,18 @@ export function loadStoredMyLeagues(userId: string | null): LeagueSummary[] {
     }
     return parsed.leagues.filter(isLeagueSummary);
   } catch {
-    sessionStorage.removeItem(MY_LEAGUES_KEY);
+    localStorage.removeItem(MY_LEAGUES_KEY);
     return [];
   }
 }
 
 export function saveStoredMyLeagues(userId: string, leagues: readonly LeagueSummary[]): void {
-  sessionStorage.setItem(
+  localStorage.setItem(
     MY_LEAGUES_KEY,
     JSON.stringify({ userId, leagues: [...leagues] } satisfies StoredMyLeagues),
   );
 }
 
 export function clearStoredMyLeagues(): void {
-  sessionStorage.removeItem(MY_LEAGUES_KEY);
+  localStorage.removeItem(MY_LEAGUES_KEY);
 }

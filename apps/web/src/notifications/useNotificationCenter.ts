@@ -1,5 +1,5 @@
 import type { NotificationItem } from "@fantappero/contracts";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   fetchNotifications,
   markAllNotificationsRead,
@@ -9,13 +9,18 @@ import { getApiErrorMessage } from "../auth/AuthContext";
 import { loadStoredSession } from "../auth/sessionStorage";
 
 const PAGE_SIZE = 20;
+/** Intervallo di polling per il popup toast su nuove notifiche (EP13-P07). */
+const POLL_INTERVAL_MS = 20000;
 
 /** In-app notification center: list, unread count, read state (EP09-01). */
-export function useNotificationCenter() {
+export function useNotificationCenter(onNewNotifications?: (items: NotificationItem[]) => void) {
   const [items, setItems] = useState<NotificationItem[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
+  // null finché non è arrivato il primo risultato: evita di mostrare un
+  // toast per ogni notifica non letta già esistente al primo caricamento.
+  const knownIdsRef = useRef<Set<string> | null>(null);
 
   const load = useCallback(async () => {
     const stored = loadStoredSession();
@@ -27,6 +32,15 @@ export function useNotificationCenter() {
     setLoadError(null);
     try {
       const result = await fetchNotifications(stored.accessToken, { pageSize: PAGE_SIZE });
+      if (knownIdsRef.current) {
+        const freshUnread = result.items.filter(
+          (item) => !item.read && !knownIdsRef.current?.has(item.id),
+        );
+        if (freshUnread.length > 0) {
+          onNewNotifications?.(freshUnread);
+        }
+      }
+      knownIdsRef.current = new Set(result.items.map((item) => item.id));
       setItems(result.items);
       setUnreadCount(result.unreadCount);
     } catch (error) {
@@ -34,10 +48,15 @@ export function useNotificationCenter() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [onNewNotifications]);
 
   useEffect(() => {
     void load();
+  }, [load]);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => void load(), POLL_INTERVAL_MS);
+    return () => window.clearInterval(timer);
   }, [load]);
 
   const markRead = useCallback(async (notificationId: string) => {

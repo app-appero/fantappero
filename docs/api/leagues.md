@@ -421,10 +421,16 @@ distinguere «non esiste» da «non visibile».
 
 | Esposto | Non esposto |
 | --- | --- |
-| Nome visualizzato, avatar, tipo (Manuale/IA) | Email, budget, rose, formazioni |
+| Nome visualizzato, avatar, tipo (Manuale/IA) | Budget, rose, formazioni |
+| Email (solo a chi amministra la lega, `league:admin`) | — |
 | Anzianità in forma `MM/AAAA` | Data esatta di iscrizione |
 | Numero di leghe **concluse**, miglior piazzamento | **Nomi delle leghe** |
 | Per piazzamento: stagione, posizione, partecipanti, partite, punti | Id delle leghe, avversari |
+
+L'email serve solo a distinguere account diversi che condividono lo stesso
+nome mostrato (capita nel pilota, tra conoscenti): resta dietro al perimetro
+amministrativo già descritto sopra, non compare mai nelle viste rivolte ai
+membri di lega.
 
 Il nome della lega non compare mai: un amministratore non deve poter dedurre a
 quali leghe private altrui una persona partecipa. Il numero di partecipanti

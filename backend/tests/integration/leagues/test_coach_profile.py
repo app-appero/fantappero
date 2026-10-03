@@ -238,10 +238,11 @@ def test_profile_returns_placements_without_revealing_league_names(
     # visibili nel dettaglio profilo, non solo lo storico posizioni.
     assert placement["fantasyPoints"] == 612.5
 
-    # Nessun nome di lega, nessuna email, da nessuna parte nel payload.
+    # Nessun nome di lega nel payload; l'email c'è, visibile solo a chi
+    # amministra la lega (EP13-P06bis).
     serialized = response.text
     assert league.name not in serialized
-    assert coach.email not in serialized
+    assert body["email"] == coach.email
     assert "leagueId" not in serialized
 
 

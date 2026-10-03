@@ -81,6 +81,24 @@ def _render_sistema_invito_lega(params: NotificationParams) -> NotificationConte
     )
 
 
+@register_template("sistema.invito_lega_esito", 1)
+def _render_sistema_invito_lega_esito(params: NotificationParams) -> NotificationContent:
+    """Esito di un invito nominativo per chi l'ha inviato (EP13-P07)."""
+    league_name = params.get("league_name", "una lega")
+    coach_name = params.get("coach_name", "Il fantallenatore invitato")
+    if params.get("outcome") == "accepted":
+        return NotificationContent(
+            title="Invito accettato",
+            body=f"{coach_name} ha accettato l'invito a «{league_name}».",
+            deep_link="/fantallenatori",
+        )
+    return NotificationContent(
+        title="Invito rifiutato",
+        body=f"{coach_name} ha rifiutato l'invito a «{league_name}».",
+        deep_link="/fantallenatori",
+    )
+
+
 @register_template("formazione.scadenza_turno", 1)
 def _render_formazione_scadenza_turno(params: NotificationParams) -> NotificationContent:
     round_number = params.get("round_number")

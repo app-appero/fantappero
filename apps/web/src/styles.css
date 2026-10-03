@@ -431,6 +431,12 @@ button.fa-link-muted,
   transition: color var(--fa-duration-fast) var(--fa-easing-standard);
 }
 
+.fa-manager-directory__email {
+  display: block;
+  font-size: var(--fa-text-sm);
+  color: var(--fa-color-foreground-muted);
+}
+
 .fa-manager-directory__identity:hover .fa-manager-directory__name {
   color: var(--fa-color-accent);
 }
@@ -491,6 +497,12 @@ button.fa-link-muted,
   margin: 0 0 var(--fa-space-xs);
   font-size: var(--fa-text-xl);
   font-weight: 600;
+}
+
+.fa-coach-profile__email {
+  margin: 0 0 var(--fa-space-xs);
+  font-size: var(--fa-text-sm);
+  color: var(--fa-color-foreground-muted);
 }
 
 .fa-coach-profile__meta {

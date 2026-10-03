@@ -1,5 +1,6 @@
 import type { NotificationItem } from "@fantappero/contracts";
-import { useEffect, useRef, useState } from "react";
+import { useToast } from "@fantappero/ui";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "../router/simpleRouter";
 import { IconBell } from "../navigation/NavIcons";
 import { useNotificationCenter } from "./useNotificationCenter";
@@ -27,8 +28,22 @@ export function NotificationCenter() {
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
+  const { push: pushToast } = useToast();
+  const handleNewNotifications = useCallback(
+    (newItems: NotificationItem[]) => {
+      for (const item of newItems) {
+        pushToast({
+          id: `notification-${item.id}`,
+          title: item.title,
+          message: item.body,
+          variant: "info",
+        });
+      }
+    },
+    [pushToast],
+  );
   const { items, unreadCount, loading, loadError, reload, markRead, markAllRead } =
-    useNotificationCenter();
+    useNotificationCenter(handleNewNotifications);
 
   useEffect(() => {
     if (!open) {

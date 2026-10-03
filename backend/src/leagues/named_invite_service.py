@@ -123,6 +123,7 @@ class NamedLeagueInviteService:
             FantasyCoachDirectoryItem(
                 userId=str(user.id),
                 displayName=profile.display_name or "",
+                email=user.email,
                 avatarUrl=profile.avatar_url,
                 userType=user.user_type.value,
                 availableForInvites=(
@@ -158,8 +159,11 @@ class NamedLeagueInviteService:
         Reso accessibile a qualunque utente verificato diverso dal chiamante
         (candidati da invitare così come membri già in questa lega, es. dal
         click su un nome in Classifica): l'endpoint resta protetto da
-        `Permission.LEAGUE_ADMIN` sulla lega indicata. Restituisce solo fatti
-        derivati da leghe concluse — mai email, budget, rose o nomi di lega.
+        `Permission.LEAGUE_ADMIN` sulla lega indicata. Lo storico restituisce
+        solo fatti derivati da leghe concluse — mai budget, rose o nomi di
+        lega; l'email è inclusa ed è visibile solo a chi amministra la lega,
+        per distinguere account diversi con lo stesso nome mostrato
+        (EP13-P06bis).
         """
         self._check_rate_limit("coach_directory", league_access)
         now = datetime.now(UTC)
@@ -198,6 +202,7 @@ class NamedLeagueInviteService:
         return FantasyCoachProfileResponse(
             userId=str(user.id),
             displayName=profile.display_name or "",
+            email=user.email,
             avatarUrl=profile.avatar_url,
             userType=user.user_type.value,
             availableForInvites=(user.user_type == UserType.AI or profile.available_for_invites),
@@ -534,6 +539,23 @@ class NamedLeagueInviteService:
         invite.status = desired
         invite.responded_at = now
         self._add_audit(league.id, user.id, audit_action, invite)
+        coach_name = (
+            user.profile.display_name
+            if user.profile is not None and user.profile.display_name
+            else "Il fantallenatore invitato"
+        )
+        NotificationService(self._session).create_notification(
+            user_id=invite.created_by_id,
+            category=NotificationCategory.SISTEMA,
+            template_key="sistema.invito_lega_esito",
+            template_version=1,
+            params={
+                "league_name": league.name,
+                "coach_name": coach_name,
+                "outcome": "accepted" if action == "accept" else "declined",
+            },
+            dedup_key=f"named_invite_response:{invite.id}",
+        )
         self._session.commit()
         get_metrics().incr(
             f"named_invite_{'accepted' if action == 'accept' else 'declined'}_total",

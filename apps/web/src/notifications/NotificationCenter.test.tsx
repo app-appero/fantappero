@@ -15,6 +15,7 @@ vi.mock("../api/notifications", () => ({
   updateNotificationPreference: vi.fn(),
 }));
 
+import { ToastProvider } from "@fantappero/ui";
 import { saveStoredSession, clearStoredSession } from "../auth/sessionStorage";
 import { MemoryRouter } from "../router/simpleRouter";
 import { NotificationCenter } from "./NotificationCenter";
@@ -79,7 +80,7 @@ describe("NotificationCenter (EP09-01)", () => {
       root.render(
         createElement(MemoryRouter, {
           initialEntries: ["/leghe"],
-          children: createElement(NotificationCenter),
+          children: createElement(ToastProvider, { children: createElement(NotificationCenter) }),
         }),
       );
     });

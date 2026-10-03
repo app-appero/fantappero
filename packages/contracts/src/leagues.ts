@@ -320,6 +320,8 @@ export type NamedLeagueInviteStatus =
 export interface FantasyCoachDirectoryItem {
   userId: string;
   displayName: string;
+  /** Visibile solo a chi amministra la lega (EP13-P06bis). */
+  email: string;
   avatarUrl: string | null;
   userType: import("./profile.js").UserType;
   availableForInvites: boolean;
@@ -346,6 +348,8 @@ export interface CoachPlacement {
 export interface FantasyCoachProfile {
   userId: string;
   displayName: string;
+  /** Visibile solo a chi amministra la lega (EP13-P06bis). */
+  email: string;
   avatarUrl: string | null;
   userType: import("./profile.js").UserType;
   availableForInvites: boolean;
