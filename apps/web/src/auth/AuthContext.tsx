@@ -1,5 +1,6 @@
 import {
   hasPermissions,
+  type AdminImpersonateResult,
   type AuthTokensResponse,
   type LeagueSummary,
   type Permission,
@@ -26,14 +27,18 @@ import {
   resolveInitialLeagueId,
 } from "./demoSession";
 import {
+  clearImpersonatorSession,
   clearStoredActiveLeagueId,
   clearStoredSession,
+  loadImpersonatorSession,
   loadStoredActiveLeagueId,
   loadStoredMyLeagues,
   loadStoredSession,
+  saveImpersonatorSession,
   saveStoredActiveLeagueId,
   saveStoredMyLeagues,
   saveStoredSession,
+  type StoredSession,
 } from "./sessionStorage";
 
 export type AuthContextValue = {
@@ -57,6 +62,10 @@ export type AuthContextValue = {
   logout: () => Promise<void>;
   applySession: (tokens: AuthTokensResponse) => void;
   updateDisplayName: (displayName: string) => void;
+  /** Sessione di supporto: true mentre si impersona un altro utente (EP11-impersonation). */
+  isImpersonating: boolean;
+  startImpersonation: (result: AdminImpersonateResult) => Promise<void>;
+  stopImpersonation: () => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -105,6 +114,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
     isDemoMode ? [] : loadStoredMyLeagues(loadStoredSession()?.user.id ?? null),
   );
   const [leaguesError, setLeaguesError] = useState<string | null>(null);
+  const [impersonatorSession, setImpersonatorSession] = useState<StoredSession | null>(() =>
+    isDemoMode ? null : loadImpersonatorSession(),
+  );
   const [demoLeaguePatches, setDemoLeaguePatches] = useState<Record<string, Partial<LeagueSummary>>>(
     {},
   );
@@ -192,6 +204,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
           setUser(null);
           setLeaguesState([]);
           setActiveLeagueIdState(null);
+          setImpersonatorSession(null);
           setLoading(false);
           return;
         }
@@ -240,6 +253,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
       user: tokens.user,
     });
     setUser(tokens.user);
+    // Un login vero e proprio non è mai una ripresa di impersonificazione:
+    // scarta un'eventuale sessione operatore rimasta accantonata (es. dopo
+    // una scadenza del token impersonato senza aver premuto "Torna al tuo
+    // account").
+    clearImpersonatorSession();
+    setImpersonatorSession(null);
   }, []);
 
   const updateDisplayName = useCallback((displayName: string) => {
@@ -318,6 +337,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     setLeaguesState([]);
     setLeaguesError(null);
     setActiveLeagueIdState(null);
+    setImpersonatorSession(null);
     if (stored?.refreshToken) {
       try {
         await authApi.logout({ refreshToken: stored.refreshToken });
@@ -326,6 +346,54 @@ export function AuthProvider({ children }: AuthProviderProps) {
       }
     }
   }, []);
+
+  const startImpersonation = useCallback(
+    async (result: AdminImpersonateResult) => {
+      const operatorSession = loadStoredSession();
+      if (operatorSession) {
+        saveImpersonatorSession(operatorSession);
+        setImpersonatorSession(operatorSession);
+      }
+      // Nessun refresh token di proposito: la sessione impersonata scade da
+      // sola, non si rinnova (EP11-impersonation).
+      saveStoredSession({ accessToken: result.accessToken, refreshToken: "", user: result.user });
+      setUser(result.user);
+      setLeaguesError(null);
+      if (isDemoMode) {
+        return;
+      }
+      setLeaguesState(loadStoredMyLeagues(result.user.id));
+      try {
+        const memberships = await fetchMyLeagues(result.accessToken);
+        applyMemberships(memberships, result.user.id);
+      } catch (cause) {
+        setLeaguesError(getApiErrorMessage(cause, "Impossibile caricare le tue leghe."));
+      }
+    },
+    [applyMemberships, isDemoMode],
+  );
+
+  const stopImpersonation = useCallback(async () => {
+    const operatorSession = loadImpersonatorSession();
+    if (!operatorSession) {
+      return;
+    }
+    clearImpersonatorSession();
+    setImpersonatorSession(null);
+    saveStoredSession(operatorSession);
+    setUser(operatorSession.user);
+    setLeaguesError(null);
+    if (isDemoMode) {
+      return;
+    }
+    setLeaguesState(loadStoredMyLeagues(operatorSession.user.id));
+    try {
+      const memberships = await fetchMyLeagues(operatorSession.accessToken);
+      applyMemberships(memberships, operatorSession.user.id);
+    } catch (cause) {
+      setLeaguesError(getApiErrorMessage(cause, "Impossibile caricare le tue leghe."));
+    }
+  }, [applyMemberships, isDemoMode]);
 
   const setActiveLeagueId = useCallback((leagueId: string) => {
     setActiveLeagueIdState(leagueId);
@@ -436,6 +504,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
       logout,
       applySession,
       updateDisplayName,
+      isImpersonating: impersonatorSession !== null,
+      startImpersonation,
+      stopImpersonation,
     }),
     [
       user,
@@ -457,6 +528,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
       logout,
       applySession,
       updateDisplayName,
+      impersonatorSession,
+      startImpersonation,
+      stopImpersonation,
     ],
   );
 

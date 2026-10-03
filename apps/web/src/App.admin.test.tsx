@@ -43,8 +43,10 @@ vi.mock("./api/admin", () => ({
     fetchActiveAdminListoneRefreshMock(...args),
   promoteOperator: vi.fn(),
   revokeOperator: vi.fn(),
+  impersonateUser: vi.fn(),
 }));
 
+import { ToastProvider } from "@fantappero/ui";
 import { ListoneRefreshProvider } from "./admin/ListoneRefreshContext";
 import { AuthProvider } from "./auth/AuthContext";
 import { clearStoredSession, saveStoredSession } from "./auth/sessionStorage";
@@ -88,9 +90,11 @@ async function renderAppAt(
     root.render(
       createElement(MemoryRouter, {
         initialEntries: [path],
-        children: createElement(AuthProvider, {
-          children: createElement(ListoneRefreshProvider, {
-            children: createElement(AppRoutes),
+        children: createElement(ToastProvider, {
+          children: createElement(AuthProvider, {
+            children: createElement(ListoneRefreshProvider, {
+              children: createElement(AppRoutes),
+            }),
           }),
         }),
       }),

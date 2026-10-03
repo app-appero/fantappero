@@ -5,6 +5,10 @@ const REFRESH_TOKEN_KEY = "fantappero.refreshToken";
 const USER_KEY = "fantappero.sessionUser";
 const ACTIVE_LEAGUE_ID_KEY = "fantappero.activeLeagueId";
 const MY_LEAGUES_KEY = "fantappero.myLeagues";
+// Sessione dell'operatore messa da parte mentre impersona un altro utente a
+// scopo di assistenza: permette di tornare al proprio account senza rifare
+// login (EP11-impersonation).
+const IMPERSONATOR_SESSION_KEY = "fantappero.impersonatorSession";
 
 type StoredMyLeagues = {
   userId: string;
@@ -37,7 +41,10 @@ export function loadStoredSession(): StoredSession | null {
   const accessToken = localStorage.getItem(ACCESS_TOKEN_KEY);
   const refreshToken = localStorage.getItem(REFRESH_TOKEN_KEY);
   const userRaw = localStorage.getItem(USER_KEY);
-  if (!accessToken || !refreshToken || !userRaw) {
+  // `refreshToken` può essere stringa vuota per una sessione di
+  // impersonificazione (nessun refresh token emesso di proposito): solo
+  // `null` (chiave assente) indica che non c'è una sessione salvata.
+  if (!accessToken || refreshToken === null || !userRaw) {
     return null;
   }
   try {
@@ -64,6 +71,35 @@ export function clearStoredSession(): void {
   localStorage.removeItem(USER_KEY);
   localStorage.removeItem(ACTIVE_LEAGUE_ID_KEY);
   localStorage.removeItem(MY_LEAGUES_KEY);
+  // Un logout o una sessione non più valida chiude anche un'eventuale
+  // impersonificazione in corso: non deve restare un account "in pausa" da
+  // ripristinare dopo un login successivo non correlato.
+  localStorage.removeItem(IMPERSONATOR_SESSION_KEY);
+}
+
+/** Sessione dell'operatore accantonata mentre impersona un altro utente, `null` se non in corso. */
+export function loadImpersonatorSession(): StoredSession | null {
+  if (typeof localStorage === "undefined") {
+    return null;
+  }
+  const raw = localStorage.getItem(IMPERSONATOR_SESSION_KEY);
+  if (!raw) {
+    return null;
+  }
+  try {
+    return JSON.parse(raw) as StoredSession;
+  } catch {
+    localStorage.removeItem(IMPERSONATOR_SESSION_KEY);
+    return null;
+  }
+}
+
+export function saveImpersonatorSession(session: StoredSession): void {
+  localStorage.setItem(IMPERSONATOR_SESSION_KEY, JSON.stringify(session));
+}
+
+export function clearImpersonatorSession(): void {
+  localStorage.removeItem(IMPERSONATOR_SESSION_KEY);
 }
 
 export function loadStoredActiveLeagueId(): string | null {

@@ -340,6 +340,7 @@ export type {
   AdminHistoricalRepairJob,
   AdminHistoricalRepairProgress,
   AdminHistoricalRepairResult,
+  AdminImpersonateResult,
   AdminLeague,
   AdminLeagueTurnStatus,
   AdminListoneEntry,

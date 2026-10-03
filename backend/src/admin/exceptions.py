@@ -25,6 +25,19 @@ class LastOperatorRevokeError(AdminError):
         )
 
 
+class CannotImpersonateSelfError(AdminError):
+    def __init__(self) -> None:
+        super().__init__("Non puoi impersonare te stesso.", code="cannot_impersonate_self")
+
+
+class CannotImpersonateOperatorError(AdminError):
+    def __init__(self) -> None:
+        super().__init__(
+            "Non puoi impersonare un altro operatore.",
+            code="cannot_impersonate_operator",
+        )
+
+
 class AdminTransferNotFoundError(AdminError):
     def __init__(self) -> None:
         super().__init__("Trasferimento non trovato.", code="admin_transfer_not_found")

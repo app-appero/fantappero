@@ -1,5 +1,5 @@
 import type { NotificationItem } from "@fantappero/contracts";
-import { useToast } from "@fantappero/ui";
+import { useOptionalToast } from "@fantappero/ui";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "../router/simpleRouter";
 import { IconBell } from "../navigation/NavIcons";
@@ -28,11 +28,13 @@ export function NotificationCenter() {
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
-  const { push: pushToast } = useToast();
+  // `null` fuori da un ToastProvider (es. test di pagine isolate): il popup
+  // in basso a destra resta solo un'aggiunta facoltativa alla campanella.
+  const toast = useOptionalToast();
   const handleNewNotifications = useCallback(
     (newItems: NotificationItem[]) => {
       for (const item of newItems) {
-        pushToast({
+        toast?.push({
           id: `notification-${item.id}`,
           title: item.title,
           message: item.body,
@@ -40,7 +42,7 @@ export function NotificationCenter() {
         });
       }
     },
-    [pushToast],
+    [toast],
   );
   const { items, unreadCount, loading, loadError, reload, markRead, markAllRead } =
     useNotificationCenter(handleNewNotifications);

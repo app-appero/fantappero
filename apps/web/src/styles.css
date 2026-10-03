@@ -425,6 +425,23 @@ button.fa-link-muted,
   box-shadow: var(--fa-shadow-focus);
 }
 
+.fa-impersonation-banner {
+  position: sticky;
+  top: 0;
+  z-index: var(--fa-z-toast);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: var(--fa-space-md);
+  padding: var(--fa-space-sm) var(--fa-space-md);
+  background: var(--fa-color-warning);
+  color: var(--fa-pitch-900);
+  font-size: var(--fa-text-sm);
+  font-weight: 600;
+  text-align: center;
+}
+
 .fa-manager-directory__name {
   font-weight: 600;
   color: var(--fa-color-foreground);

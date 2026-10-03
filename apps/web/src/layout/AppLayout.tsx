@@ -34,6 +34,7 @@ import {
 } from "../navigation/NavIcons";
 import { RouterNavLinkAdapter } from "../navigation/RouterNavLink";
 import { NotificationCenter } from "../notifications/NotificationCenter";
+import { ImpersonationBanner } from "../auth/ImpersonationBanner";
 import { SkipLink } from "./SkipLink";
 
 const APP_ICONS: Record<string, ReactNode> = {
@@ -58,7 +59,9 @@ function readCollapsedGroups(): string[] {
   try {
     const raw = window.sessionStorage.getItem(COLLAPSED_GROUPS_STORAGE_KEY);
     const parsed: unknown = raw ? JSON.parse(raw) : null;
-    return Array.isArray(parsed) ? parsed.filter((id): id is string => typeof id === "string") : [];
+    return Array.isArray(parsed)
+      ? parsed.filter((id): id is string => typeof id === "string")
+      : [];
   } catch {
     return [];
   }
@@ -73,7 +76,10 @@ function useCollapsedNavGroups() {
         ? current.filter((id) => id !== groupId)
         : [...current, groupId];
       try {
-        window.sessionStorage.setItem(COLLAPSED_GROUPS_STORAGE_KEY, JSON.stringify(next));
+        window.sessionStorage.setItem(
+          COLLAPSED_GROUPS_STORAGE_KEY,
+          JSON.stringify(next),
+        );
       } catch {
         // sessionStorage non disponibile: lo stato resta valido in memoria.
       }
@@ -170,7 +176,10 @@ function MenuButton({ open, onOpen }: { open: boolean; onOpen: () => void }) {
   );
 }
 
-function DrawerNavLink({ onNavigate, ...props }: NavLinkAnchorProps & { onNavigate: () => void }) {
+function DrawerNavLink({
+  onNavigate,
+  ...props
+}: NavLinkAnchorProps & { onNavigate: () => void }) {
   return (
     <RouterNavLinkAdapter
       {...props}
@@ -183,9 +192,22 @@ function DrawerNavLink({ onNavigate, ...props }: NavLinkAnchorProps & { onNaviga
 }
 
 export function AppLayout({ children }: { children: React.ReactNode }) {
-  const { user, leagues, leaguesError, refreshLeagues, activeLeagueId, setActiveLeagueId, can } = useAuth();
+  const {
+    user,
+    leagues,
+    leaguesError,
+    refreshLeagues,
+    activeLeagueId,
+    setActiveLeagueId,
+    can,
+    isImpersonating,
+  } = useAuth();
   const location = useLocation();
-  const { open: drawerOpen, close: closeDrawer, openDrawer } = useMobileNavDrawer();
+  const {
+    open: drawerOpen,
+    close: closeDrawer,
+    openDrawer,
+  } = useMobileNavDrawer();
   const { collapsed, toggle } = useCollapsedNavGroups();
   const pendingInvites = usePendingInviteCount(can(["league:view"]));
   const resolvedItems = filterNavItems(APP_NAV_ITEMS, can, location.pathname);
@@ -206,7 +228,9 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     .filter((group) => !collapsed.includes(group.id))
     .map((group) => group.id);
   const renderDrawerLink = useCallback(
-    (props: NavLinkAnchorProps) => <DrawerNavLink {...props} onNavigate={closeDrawer} />,
+    (props: NavLinkAnchorProps) => (
+      <DrawerNavLink {...props} onNavigate={closeDrawer} />
+    ),
     [closeDrawer],
   );
 
@@ -215,172 +239,202 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     (league) => league.id === (activeLeagueId ?? leagues[0]?.id),
   );
   const { countdown, refetch: refetchCountdown } = useLockCountdown(
-    canSeeLeagueContext && leagues.length > 0 ? activeLeagueId ?? leagues[0]?.id ?? null : null,
+    canSeeLeagueContext && leagues.length > 0
+      ? (activeLeagueId ?? leagues[0]?.id ?? null)
+      : null,
   );
 
   return (
-    <AppShell
-      surface="app"
-      className="fa-surface-pitch fa-surface-pitch--subtle"
-      skipLink={<SkipLink />}
-      header={
-        <AppHeader
-          menuSlot={<MenuButton open={drawerOpen} onOpen={openDrawer} />}
-          brand={
-            <Link to="/leghe" aria-label="FantApperò, home">
-              <BrandLogo variant="full" size="sm" />
-            </Link>
-          }
-          contextSlot={
-            canSeeLeagueContext ? (
-              <div className="fa-app-header__league-context">
-                {leagues.length > 0 ? (
-                  <LeagueSelector
-                    label="Lega attiva"
-                    leagues={leagues.map((league) => ({
-                      value: league.id,
-                      label: league.name,
-                    }))}
-                    value={activeLeagueId ?? leagues[0]?.id ?? ""}
-                    onChange={setActiveLeagueId}
-                    placeholder="Seleziona lega"
-                    accessory={
-                      <>
-                        {activeLeagueSummary ? (
-                          <Badge variant="neutral" data-testid="active-league-status">
-                            {leagueStateLabel(activeLeagueSummary.state)}
-                          </Badge>
-                        ) : null}
-                        {countdown ? (
-                          <LockCountdown
-                            state={countdown.state}
-                            nextLockAt={countdown.nextLockAt}
-                            onExpire={refetchCountdown}
-                          />
-                        ) : null}
-                      </>
-                    }
-                  />
-                ) : null}
-                <div className="fa-app-header__league-actions">
-                  <Link
-                    to="/leghe/crea"
-                    className="fa-app-header__league-action"
-                    data-testid="header-create-league-link"
-                  >
-                    Crea lega
-                  </Link>
-                  <span className="fa-app-header__league-action-sep" aria-hidden="true">
-                    o
-                  </span>
-                  <Link
-                    to="/leghe/invito"
-                    className="fa-app-header__league-action"
-                    data-testid="header-join-league-link"
-                  >
-                    Unisciti con codice
-                  </Link>
-                </div>
-                {leaguesError ? (
-                  <p className="fa-field__error" role="alert" data-testid="leagues-load-error">
-                    {leaguesError}{" "}
-                    <button
-                      type="button"
+    <>
+      {isImpersonating ? <ImpersonationBanner /> : null}
+      <AppShell
+        surface="app"
+        className="fa-surface-pitch fa-surface-pitch--subtle"
+        skipLink={<SkipLink />}
+        header={
+          <AppHeader
+            menuSlot={<MenuButton open={drawerOpen} onOpen={openDrawer} />}
+            brand={
+              <Link to="/leghe" aria-label="FantApperò, home">
+                <BrandLogo variant="full" size="sm" />
+              </Link>
+            }
+            contextSlot={
+              canSeeLeagueContext ? (
+                <div className="fa-app-header__league-context">
+                  {leagues.length > 0 ? (
+                    <LeagueSelector
+                      label="Lega attiva"
+                      leagues={leagues.map((league) => ({
+                        value: league.id,
+                        label: league.name,
+                      }))}
+                      value={activeLeagueId ?? leagues[0]?.id ?? ""}
+                      onChange={setActiveLeagueId}
+                      placeholder="Seleziona lega"
+                      accessory={
+                        <>
+                          {activeLeagueSummary ? (
+                            <Badge
+                              variant="neutral"
+                              data-testid="active-league-status"
+                            >
+                              {leagueStateLabel(activeLeagueSummary.state)}
+                            </Badge>
+                          ) : null}
+                          {countdown ? (
+                            <LockCountdown
+                              state={countdown.state}
+                              nextLockAt={countdown.nextLockAt}
+                              onExpire={refetchCountdown}
+                            />
+                          ) : null}
+                        </>
+                      }
+                    />
+                  ) : null}
+                  <div className="fa-app-header__league-actions">
+                    <Link
+                      to="/leghe/crea"
                       className="fa-app-header__league-action"
-                      onClick={() => void refreshLeagues()}
+                      data-testid="header-create-league-link"
                     >
-                      Riprova
-                    </button>
-                  </p>
+                      Crea lega
+                    </Link>
+                    <span
+                      className="fa-app-header__league-action-sep"
+                      aria-hidden="true"
+                    >
+                      o
+                    </span>
+                    <Link
+                      to="/leghe/invito"
+                      className="fa-app-header__league-action"
+                      data-testid="header-join-league-link"
+                    >
+                      Unisciti con codice
+                    </Link>
+                  </div>
+                  {leaguesError ? (
+                    <p
+                      className="fa-field__error"
+                      role="alert"
+                      data-testid="leagues-load-error"
+                    >
+                      {leaguesError}{" "}
+                      <button
+                        type="button"
+                        className="fa-app-header__league-action"
+                        onClick={() => void refreshLeagues()}
+                      >
+                        Riprova
+                      </button>
+                    </p>
+                  ) : null}
+                </div>
+              ) : null
+            }
+            actionsSlot={
+              <>
+                {can(["global:operate"]) ? (
+                  <Link
+                    to="/admin"
+                    className="fa-link-muted fa-app-header__desktop-only"
+                    data-testid="admin-panel-link"
+                  >
+                    Pannello globale
+                  </Link>
                 ) : null}
-              </div>
-            ) : null
-          }
-          actionsSlot={
-            <>
-              {can(["global:operate"]) ? (
-                <Link
-                  to="/admin"
-                  className="fa-link-muted fa-app-header__desktop-only"
-                  data-testid="admin-panel-link"
-                >
-                  Pannello globale
-                </Link>
-              ) : null}
-              <NotificationCenter />
-              <span className="fa-user-chip" data-testid="user-display">
-                {user?.displayName ?? "Utente"}
-              </span>
-              <LogoutButton />
-            </>
-          }
-        />
-      }
-      sidebar={
-        <SidebarNav
-          items={navItems}
-          groups={navGroups}
-          expandedGroupIds={expandedGroupIds}
-          onToggleGroup={toggle}
-          linkComponent={RouterNavLinkAdapter}
-          ariaLabel="Navigazione lega"
-        />
-      }
-      overlay={
-        <NavDrawer
-          open={drawerOpen}
-          onClose={closeDrawer}
-          brand={
-            <Link to="/leghe" aria-label="FantApperò, home" onClick={closeDrawer}>
-              <BrandLogo variant="full" size="sm" />
-            </Link>
-          }
-          userDisplayName={user?.displayName ?? "Utente"}
-          footer={
-            <div className="fa-nav-drawer__logout" data-testid="nav-drawer-logout">
-              <LogoutButton />
-            </div>
-          }
-        >
+                <NotificationCenter />
+                <span className="fa-user-chip" data-testid="user-display">
+                  {user?.displayName ?? "Utente"}
+                </span>
+                <LogoutButton />
+              </>
+            }
+          />
+        }
+        sidebar={
           <SidebarNav
             items={navItems}
             groups={navGroups}
             expandedGroupIds={expandedGroupIds}
             onToggleGroup={toggle}
-            linkComponent={renderDrawerLink}
+            linkComponent={RouterNavLinkAdapter}
             ariaLabel="Navigazione lega"
           />
-          {can(["global:operate"]) ? (
-            <Link
-              to="/admin"
-              className="fa-sidebar-nav__link fa-nav-drawer__extra"
-              data-testid="admin-panel-link-drawer"
-              onClick={closeDrawer}
-            >
-              Pannello globale
-            </Link>
-          ) : null}
-        </NavDrawer>
-      }
-    >
-      {children}
-    </AppShell>
+        }
+        overlay={
+          <NavDrawer
+            open={drawerOpen}
+            onClose={closeDrawer}
+            brand={
+              <Link
+                to="/leghe"
+                aria-label="FantApperò, home"
+                onClick={closeDrawer}
+              >
+                <BrandLogo variant="full" size="sm" />
+              </Link>
+            }
+            userDisplayName={user?.displayName ?? "Utente"}
+            footer={
+              <div
+                className="fa-nav-drawer__logout"
+                data-testid="nav-drawer-logout"
+              >
+                <LogoutButton />
+              </div>
+            }
+          >
+            <SidebarNav
+              items={navItems}
+              groups={navGroups}
+              expandedGroupIds={expandedGroupIds}
+              onToggleGroup={toggle}
+              linkComponent={renderDrawerLink}
+              ariaLabel="Navigazione lega"
+            />
+            {can(["global:operate"]) ? (
+              <Link
+                to="/admin"
+                className="fa-sidebar-nav__link fa-nav-drawer__extra"
+                data-testid="admin-panel-link-drawer"
+                onClick={closeDrawer}
+              >
+                Pannello globale
+              </Link>
+            ) : null}
+          </NavDrawer>
+        }
+      >
+        {children}
+      </AppShell>
+    </>
   );
 }
 
 export function AdminLayout({ children }: { children: React.ReactNode }) {
   const { user, can } = useAuth();
   const location = useLocation();
-  const { open: drawerOpen, close: closeDrawer, openDrawer } = useMobileNavDrawer();
-  const navItems = filterNavItems(ADMIN_NAV_ITEMS, can, location.pathname).map((item) => ({
-    id: item.id,
-    label: item.label,
-    href: item.path,
-    active: item.active,
-    icon: <IconShield />,
-  }));
+  const {
+    open: drawerOpen,
+    close: closeDrawer,
+    openDrawer,
+  } = useMobileNavDrawer();
+  const navItems = filterNavItems(ADMIN_NAV_ITEMS, can, location.pathname).map(
+    (item) => ({
+      id: item.id,
+      label: item.label,
+      href: item.path,
+      active: item.active,
+      icon: <IconShield />,
+    }),
+  );
   const renderDrawerLink = useCallback(
-    (props: NavLinkAnchorProps) => <DrawerNavLink {...props} onNavigate={closeDrawer} />,
+    (props: NavLinkAnchorProps) => (
+      <DrawerNavLink {...props} onNavigate={closeDrawer} />
+    ),
     [closeDrawer],
   );
 
@@ -399,10 +453,16 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
           }
           actionsSlot={
             <>
-              <Link to="/leghe" className="fa-link-muted fa-app-header__desktop-only">
+              <Link
+                to="/leghe"
+                className="fa-link-muted fa-app-header__desktop-only"
+              >
                 Torna all&apos;app
               </Link>
-              <span className="fa-user-chip fa-user-chip--admin" data-testid="admin-user-display">
+              <span
+                className="fa-user-chip fa-user-chip--admin"
+                data-testid="admin-user-display"
+              >
                 {user?.displayName ?? "Operatore"}
               </span>
               <LogoutButton />
@@ -428,7 +488,10 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
           }
           userDisplayName={user?.displayName ?? "Operatore"}
           footer={
-            <div className="fa-nav-drawer__logout" data-testid="nav-drawer-logout">
+            <div
+              className="fa-nav-drawer__logout"
+              data-testid="nav-drawer-logout"
+            >
               <LogoutButton />
             </div>
           }

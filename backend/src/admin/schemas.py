@@ -7,7 +7,7 @@ from typing import Literal
 
 from pydantic import Field
 
-from auth.schemas import ApiModel
+from auth.schemas import ApiModel, SessionUserResponse
 from database.enums import LeagueState, PlatformRole
 
 
@@ -26,6 +26,15 @@ class AdminUserResponse(ApiModel):
     display_name: str = Field(alias="displayName")
     platform_role: PlatformRole = Field(alias="platformRole")
     created_at: datetime = Field(alias="createdAt")
+
+
+class AdminImpersonateResponse(ApiModel):
+    """Token di accesso a scadenza breve per debug di supporto (no refresh token:
+    la sessione impersonata non si rinnova, scade da sola in pochi minuti)."""
+
+    access_token: str = Field(alias="accessToken")
+    expires_in: int = Field(alias="expiresIn")
+    user: SessionUserResponse
 
 
 class PaginatedAdminUsersResponse(ApiModel):

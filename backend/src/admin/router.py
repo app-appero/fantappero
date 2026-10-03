@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 from admin.exceptions import AdminError
 from admin.listone_service import AdminListoneService
 from admin.schemas import (
+    AdminImpersonateResponse,
     AdminListoneEntryResponse,
     AdminListoneRefreshJobResponse,
     AdminListoneRefreshProgressResponse,
@@ -103,6 +104,18 @@ def revoke_user(
 ) -> AdminUserResponse | JSONResponse:
     try:
         return service.revoke_operator(actor=operator, target_user_id=user_id)
+    except AdminError as exc:
+        return _error_response(exc)
+
+
+@router.post("/users/{user_id}/impersonate", response_model=AdminImpersonateResponse)
+def impersonate_user(
+    user_id: UUID,
+    operator: User = Depends(require_permissions(Permission.GLOBAL_OPERATE)),
+    service: AdminService = Depends(get_admin_service),
+) -> AdminImpersonateResponse | JSONResponse:
+    try:
+        return service.impersonate(actor=operator, target_user_id=user_id)
     except AdminError as exc:
         return _error_response(exc)
 

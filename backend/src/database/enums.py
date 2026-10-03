@@ -154,6 +154,7 @@ class LeagueAuditAction(str, enum.Enum):
     PLATFORM_OPERATOR_PROMOTED = "platform_operator_promoted"
     PLATFORM_OPERATOR_REVOKED = "platform_operator_revoked"
     ROSTER_TRANSFER_REVIEWED = "roster_transfer_reviewed"
+    USER_IMPERSONATION_STARTED = "user_impersonation_started"
 
 
 class FantasyTurnStatus(str, enum.Enum):

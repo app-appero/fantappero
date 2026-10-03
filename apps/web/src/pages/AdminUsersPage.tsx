@@ -1,14 +1,17 @@
 import type { AdminUser, PaginatedAdminUsers } from "@fantappero/contracts";
 import { Breadcrumb, Button, Input, Modal, PageContainer, UiStatePanel } from "@fantappero/ui";
 import { useCallback, useEffect, useState } from "react";
-import { fetchAdminUsers, promoteOperator, revokeOperator } from "../api/admin";
+import { fetchAdminUsers, impersonateUser, promoteOperator, revokeOperator } from "../api/admin";
 import { ApiError } from "../api/client";
-import { getApiErrorMessage } from "../auth/AuthContext";
+import { getApiErrorMessage, useAuth } from "../auth/AuthContext";
 import { loadStoredSession } from "../auth/sessionStorage";
+import { useNavigate } from "../router/simpleRouter";
 
-type PendingAction = { user: AdminUser; kind: "promote" | "revoke" };
+type PendingAction = { user: AdminUser; kind: "promote" | "revoke" | "impersonate" };
 
 export function AdminUsersPage() {
+  const { startImpersonation } = useAuth();
+  const navigate = useNavigate();
   const [query, setQuery] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
   const [page, setPage] = useState(1);
@@ -73,6 +76,12 @@ export function AdminUsersPage() {
     setError(null);
     setSuccess(null);
     try {
+      if (pending.kind === "impersonate") {
+        const result = await impersonateUser(session.accessToken, pending.user.id);
+        await startImpersonation(result);
+        navigate("/leghe");
+        return;
+      }
       const updated =
         pending.kind === "promote"
           ? await promoteOperator(session.accessToken, pending.user.id)
@@ -93,6 +102,10 @@ export function AdminUsersPage() {
     } catch (actionError) {
       if (actionError instanceof ApiError && actionError.code === "last_operator") {
         setError("Non puoi revocare l'ultimo operatore rimasto sulla piattaforma.");
+      } else if (actionError instanceof ApiError && actionError.code === "cannot_impersonate_operator") {
+        setError("Non puoi impersonare un altro operatore.");
+      } else if (actionError instanceof ApiError && actionError.code === "cannot_impersonate_self") {
+        setError("Non puoi impersonare te stesso.");
       } else if (actionError instanceof ApiError && actionError.status === 403) {
         setError("Non hai i permessi per modificare questo utente.");
       } else {
@@ -171,16 +184,28 @@ export function AdminUsersPage() {
                   Revoca operator
                 </Button>
               ) : (
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="primary"
-                  loading={workingId === row.id}
-                  onClick={() => setPending({ user: row, kind: "promote" })}
-                  data-testid={`admin-user-promote-${row.id}`}
-                >
-                  Promuovi a operator
-                </Button>
+                <>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    loading={workingId === row.id}
+                    onClick={() => setPending({ user: row, kind: "impersonate" })}
+                    data-testid={`admin-user-impersonate-${row.id}`}
+                  >
+                    Impersona
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="primary"
+                    loading={workingId === row.id}
+                    onClick={() => setPending({ user: row, kind: "promote" })}
+                    data-testid={`admin-user-promote-${row.id}`}
+                  >
+                    Promuovi a operator
+                  </Button>
+                </>
               )}
             </li>
           ))}
@@ -190,7 +215,13 @@ export function AdminUsersPage() {
       <Modal
         open={pending !== null}
         onClose={() => setPending(null)}
-        title={pending?.kind === "promote" ? "Promuovi a operator" : "Revoca operator"}
+        title={
+          pending?.kind === "promote"
+            ? "Promuovi a operator"
+            : pending?.kind === "impersonate"
+              ? "Impersona utente"
+              : "Revoca operator"
+        }
         footer={
           <>
             <Button type="button" variant="ghost" onClick={() => setPending(null)}>
@@ -210,7 +241,9 @@ export function AdminUsersPage() {
         <p>
           {pending?.kind === "promote"
             ? `Confermi di voler promuovere ${pending.user.displayName} a operatore globale? Otterrà accesso al pannello /admin.`
-            : `Confermi di voler revocare il ruolo di operatore a ${pending?.user.displayName}?`}
+            : pending?.kind === "impersonate"
+              ? `Accederai come ${pending.user.displayName} per qualche minuto, a scopo di assistenza. L'operazione viene registrata nell'audit log.`
+              : `Confermi di voler revocare il ruolo di operatore a ${pending?.user.displayName}?`}
         </p>
       </Modal>
     </PageContainer>

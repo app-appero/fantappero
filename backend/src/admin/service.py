@@ -8,8 +8,14 @@ from uuid import UUID
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
 
-from admin.exceptions import AdminUserNotFoundError, LastOperatorRevokeError
+from admin.exceptions import (
+    AdminUserNotFoundError,
+    CannotImpersonateOperatorError,
+    CannotImpersonateSelfError,
+    LastOperatorRevokeError,
+)
 from admin.schemas import (
+    AdminImpersonateResponse,
     AdminLeagueResponse,
     AdminOverviewResponse,
     AdminUserResponse,
@@ -18,8 +24,15 @@ from admin.schemas import (
 )
 from auth.models.user import User
 from auth.models.user_profile import UserProfile
+from auth.schemas import SessionUserResponse
+from auth.security import create_access_token
 from config.settings.api import ApiSettings
-from database.enums import LeagueAuditAction, LeagueMemberRole, PlatformRole
+from database.enums import (
+    LeagueAuditAction,
+    LeagueMemberRole,
+    PlatformRole,
+    platform_role_to_global_role,
+)
 from leagues.models.league import League
 from leagues.models.league_audit_event import LeagueAuditEvent
 from leagues.models.league_membership import LeagueMembership
@@ -165,6 +178,55 @@ class AdminService:
                 },
             )
         return _to_user_response(user)
+
+    def impersonate(self, *, actor: User, target_user_id: UUID) -> AdminImpersonateResponse:
+        """Issue a short-lived, access-only token for ``target_user_id`` (support tool).
+
+        No refresh token is issued and no `AuthSession` row is created: the
+        impersonated session expires on its own after
+        `jwt_access_token_expire_minutes`, exactly like a normal access token,
+        and cannot be silently renewed. Restricted to non-operator targets so an
+        operator can't use this to act as another operator. Every start is
+        audited (`league_id=None`, same pattern as promote/revoke) — there is no
+        "end" event since the token simply expires.
+        """
+        user = self._get_user_or_raise(target_user_id)
+        if user.id == actor.id:
+            raise CannotImpersonateSelfError()
+        if user.platform_role == PlatformRole.OPERATOR:
+            raise CannotImpersonateOperatorError()
+
+        access_token, expires_in = create_access_token(
+            user_id=user.id,
+            secret=self._settings.resolved_jwt_secret(),
+            expire_minutes=self._settings.jwt_access_token_expire_minutes,
+        )
+        self._session.add(
+            LeagueAuditEvent(
+                league_id=None,
+                actor_id=actor.id,
+                action=LeagueAuditAction.USER_IMPERSONATION_STARTED,
+                details={"targetUserId": str(user.id)},
+            )
+        )
+        self._session.flush()
+        _logger.info(
+            "admin user impersonation started",
+            extra={
+                "event": "admin_user_impersonation_started",
+                "actor_id": str(actor.id),
+                "target_user_id": str(user.id),
+            },
+        )
+        return AdminImpersonateResponse(
+            accessToken=access_token,
+            expiresIn=expires_in,
+            user=SessionUserResponse(
+                id=str(user.id),
+                displayName=user.display_name,
+                globalRole=platform_role_to_global_role(user.platform_role).value,
+            ),
+        )
 
     def list_leagues(
         self, *, query: str | None, page: int, page_size: int = PAGE_SIZE

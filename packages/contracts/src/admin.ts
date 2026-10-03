@@ -1,8 +1,16 @@
 /** Admin panel contracts — platform operator only (EP11-04a / EP11-04b). */
 
+import type { SessionUser } from "./auth.js";
 import type { FantasyRole } from "./leagues.js";
 
 export type PlatformRole = "user" | "operator";
+
+/** Short-lived, access-only session for support impersonation — no refresh token. */
+export interface AdminImpersonateResult {
+  accessToken: string;
+  expiresIn: number;
+  user: SessionUser;
+}
 
 export interface AdminOverview {
   operatorId: string;

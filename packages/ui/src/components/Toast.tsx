@@ -36,6 +36,13 @@ export function useToast(): ToastContextValue {
   return context;
 }
 
+/** Like `useToast`, but `null` outside a `ToastProvider` instead of throwing —
+ * for components that enhance with toasts when available without requiring
+ * the provider in every render tree (e.g. isolated page tests). */
+export function useOptionalToast(): ToastContextValue | null {
+  return useContext(ToastContext);
+}
+
 export type ToastProviderProps = {
   children: ReactNode;
   dismissLabel?: string;
