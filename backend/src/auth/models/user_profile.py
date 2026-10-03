@@ -62,7 +62,7 @@ class UserProfile(Base, TimestampMixin):
     available_for_invites: Mapped[bool] = mapped_column(
         Boolean,
         nullable=False,
-        server_default=text("false"),
+        server_default=text("true"),
     )
     policy_consent_at: Mapped[object | None] = mapped_column(UTCDateTime(), nullable=True)
     policy_version: Mapped[str | None] = mapped_column(String(32), nullable=True)

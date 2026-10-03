@@ -590,6 +590,33 @@ Ripresa l'indagine sul blocco di `pitr backup create`/`schedule set`: l'errore p
 
 **Blocco E ora interamente chiuso o spostato in Fase 2** — nessun punto attivo residuo prima del Blocco G, a parte l'esecuzione del pilota vero stesso.
 
+### Blocco E2 — Riaperto: primo vero tentativo di restore drill su Railway, fallito per spazio disco (01/10/2026)
+
+Ripresa l'indagine sull'errore `OAUTH_INSUFFICIENT_GRANT` del 28/09: confermato che riguarda solo i "volume backup" (`pitr backup create`/`schedule set`, uno snapshot copy-on-write dell'intero volume disco, funzione separata dal PITR), non il PITR stesso. Verificato con `railway postgres pitr status --live` che il PITR è **sano e operativo**: `archiverHealthy: true`, `backupSetCount: 4`, ultimo backup del giorno stesso — smentisce quanto scritto il 28/09 ("non verificato se non con SSH"), la probe live ora funziona senza configurazione aggiuntiva.
+
+**Eseguito un vero restore drill** (non solo verifica di stato): `railway postgres pitr restore --service Postgres --at <timestamp del backup più recente>`, creato un servizio gemello temporaneo (`postgres-drill-ep12-e2`) senza toccare il Postgres del pilota, che non si è mai fermato. Il deploy del gemello è riuscito (container avviato), ma **il recovery interno è fallito**: `[FileWriteError] unable to write '.../pg_wal/RECOVERYXLOG': [28] No space left on device`, DB mai arrivato a uno stato consultabile.
+
+**Causa identificata**: Railway imposta `archive_timeout=60` sul PITR (confermato con `SHOW archive_timeout` sul Postgres live) — ogni 60 secondi, anche a database fermo, Postgres forza la chiusura di un segmento WAL e lo archivia per intero (16MB), riempiendo di zeri la parte inutilizzata. In ~3,3 giorni dall'abilitazione (28/09 05:01) questo ha fatto avanzare il puntatore WAL di ~73GB "logici" (confermato dai numeri di segmento `walMin`/`walMax` dello status). Durante un restore, pgBackRest deve scaricare e **decomprimere** ogni segmento per rigiocarlo: tornano quindi a piena dimensione sul disco del servizio di ripristino, anche se quasi tutto è riempimento vuoto. Il volume del gemello (5GB, uguale al volume sorgente) si è esaurito prima di completare il replay.
+
+**Correzione di una stima sbagliata fatta durante l'indagine**: inizialmente calcolato (erroneamente) un costo di ~40$/mese per questo comportamento, ignorando che tutto il traffico verso il bucket PITR è compresso (zstd) prima di uscire dal servizio — gli zeri di riempimento si comprimono quasi a zero. Verificato con le metriche reali del servizio (`NETWORK_TX_GB` su 72h): traffico reale ~128MB in 3 giorni, non 70GB. **Il costo del PITR così com'è è trascurabile** (centesimi/mese), coerente con quanto visibile nel bucket (pochi MB, non GB). Il problema del restore fallito è quindi solo di spazio temporaneo su disco durante il replay, non di costo.
+
+**Decisione dell'utente**: non aumentare il volume adesso. Servizio di test e volume orfano (`postgres-drill-ep12-e2`, `postgres-restored`) eliminati, nessun impatto sul pilota.
+
+**Stato reale di E2**: PITR attivo, archiviazione continua verificata sana, costo non bloccante. **Il restore rimane non dimostrato** — il criterio del piano ("prova di restore su ambiente isolato" con RTO misurato) non è ancora soddisfatto. Prossimo passo quando si riprenderà: ripetere il drill con il volume del servizio di restore ingrandito (consigliato ≥20GB, solo per la finestra del restore — costo trascurabile perché Railway fattura sui byte realmente occupati, non sulla capacità riservata) rispetto al volume sorgente, per assorbire il rigonfiamento temporaneo del replay WAL.
+
+### Blocco E — Riaperto: verifica dominio Resend è un blocker reale di Fase 1, non rimandabile a Fase 2 (02/10/2026)
+
+Durante un controllo collaterale su Mailpit (deployato in `pilota` ma inutilizzato: il task `mail.send_message` instrada via Mailpit solo se `FANTAPPERO_ENV=test`, mentre `pilota` ha `FANTAPPERO_ENV=development` con `RESEND_API_KEY` reale impostata sul `worker` — quindi le email prendono sempre la via Resend, mai Mailpit. **Mailpit rimosso dall'ambiente `pilota`**, nessun impatto: non riceveva nulla).
+
+Controllando la configurazione reale del `worker` è emerso che `MAIL_FROM=onboarding@resend.dev` — il mittente sandbox di default, conseguenza diretta della verifica dominio abbandonata il 28/09 (vedi sopra, "Tentativo di verifica dominio su Resend... abbandonato"). Verificato con due chiamate dirette all'API Resend (con conferma esplicita dell'utente, usando indirizzi di test sicuri, nessuna persona reale coinvolta):
+
+- invio a `delivered@resend.dev` (indirizzo di test ufficiale Resend): **riuscito** — la chiave API e il mittente funzionano.
+- invio a un indirizzo reale di terzi (dominio pubblico mailinator, nessun destinatario reale coinvolto): **rifiutato con HTTP 403**, messaggio esplicito di Resend: *"You can only send testing emails to your own email address (trottarosario@gmail.com). To send emails to other recipients, please verify a domain..."*
+
+**Conclusione verificata, non supposta**: oggi, con questa configurazione, **nessun utente del pilota diverso dal titolare dell'account Resend può ricevere email reali** (verifica registrazione, inviti lega, reset password). Qualunque utente reale che provi a registrarsi resterebbe bloccato al primo passo per mancata ricezione dell'email di conferma.
+
+**Questo declassa la decisione del 28/09** ("verifica dominio Resend rimandata a Fase 2 su scelta dell'utente") da rimandabile a **blocker reale per il Blocco G**: il pilota con leghe/utenti reali non può partire finché non esiste un dominio verificato su Resend (sottodominio dedicato, stesso percorso già documentato e quasi completato il 28/09 — bloccato solo dal limite del pannello DNS Aruba sul record MX, non dalla procedura Resend in sé). Riportato in testa alla coda del Blocco E come prerequisito tecnico del Blocco G, non più un nice-to-have posticipabile.
+
 ### Blocco F2 — Testo privacy approvato (28/09/2026)
 
 Il privacy contact (Rosario Trotta) ha letto e approvato esplicitamente il testo proposto in `docs/operations/pilot_privacy_notice.md`, senza richiedere modifiche. Aggiornato lo stato del documento da "bozza in attesa" ad "approvato". **Blocco F ora chiuso al 100%, nessun loose end residuo.**
