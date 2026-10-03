@@ -74,6 +74,17 @@ describe("filterNavItems", () => {
     expect(memberItems).toHaveLength(0);
     expect(operatorItems.length).toBeGreaterThan(0);
   });
+
+  it("marks only Utenti active on /admin/utenti, not also Pannello", () => {
+    const items = filterNavItems(ADMIN_NAV_ITEMS, canFactory(operatorContext), "/admin/utenti");
+    expect(items.find((item) => item.id === "admin-users")?.active).toBe(true);
+    expect(items.find((item) => item.id === "admin-home")?.active).toBe(false);
+  });
+
+  it("marks Pannello active only on the exact /admin path", () => {
+    const items = filterNavItems(ADMIN_NAV_ITEMS, canFactory(operatorContext), "/admin");
+    expect(items.find((item) => item.id === "admin-home")?.active).toBe(true);
+  });
 });
 
 describe("hub a tab: Lega e Movimento giocatori (EP13-P01)", () => {

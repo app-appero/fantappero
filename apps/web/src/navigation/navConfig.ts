@@ -147,6 +147,12 @@ function isNavItemActive(item: NavItemDefinition, pathname: string): boolean {
       (path) => pathname === path || pathname.startsWith(`${path}/`),
     );
   }
+  if (item.id === "admin-home") {
+    // "/admin" è anche il prefisso di ogni altra pagina del pannello
+    // operatore (/admin/utenti, /admin/leghe, ...): con il match a prefisso
+    // "Pannello" restava sempre acceso insieme alla voce davvero attiva.
+    return pathname === item.path;
+  }
   return pathname === item.path || pathname.startsWith(`${item.path}/`);
 }
 

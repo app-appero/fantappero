@@ -1,10 +1,14 @@
 import { defineConfig } from "vitest/config";
 import react from "@vitejs/plugin-react";
 
+// Niente "/admin": è anche il prefisso delle pagine SPA del pannello operatore
+// (/admin, /admin/utenti, /admin/leghe, ...). Il client chiama comunque l'API
+// con l'URL assoluto di VITE_API_BASE_URL, non con path relativi — questo
+// proxy serve solo da comodità di dev per gli altri prefissi; su "/admin"
+// intercettava anche i reload diretti delle pagine SPA, mandandole in 500.
 const API_PROXY_PREFIXES = [
   "/auth",
   "/profile",
-  "/admin",
   "/leagues",
   "/notifications",
   "/billing",
