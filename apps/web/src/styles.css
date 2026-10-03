@@ -428,7 +428,11 @@ button.fa-link-muted,
 .fa-impersonation-banner {
   position: sticky;
   top: 0;
-  z-index: var(--fa-z-toast);
+  /* Non --fa-z-toast (500): è più alto del drawer di navigazione mobile
+     (--fa-z-modal, 400), quindi il banner restava sopra il drawer invece di
+     finire coperto da lui come il resto dell'header. --fa-z-sticky (200) lo
+     allinea all'header, di cui è l'estensione visiva. */
+  z-index: var(--fa-z-sticky);
   display: flex;
   flex-wrap: wrap;
   align-items: center;
