@@ -1,5 +1,5 @@
 import type { AdminUser, PaginatedAdminUsers } from "@fantappero/contracts";
-import { Breadcrumb, Button, Input, Modal, PageContainer, UiStatePanel } from "@fantappero/ui";
+import { Badge, Breadcrumb, Button, Input, Modal, PageContainer, UiStatePanel } from "@fantappero/ui";
 import { useCallback, useEffect, useState } from "react";
 import { fetchAdminUsers, impersonateUser, promoteOperator, revokeOperator } from "../api/admin";
 import { ApiError } from "../api/client";
@@ -171,42 +171,49 @@ export function AdminUsersPage() {
                 <strong>{row.displayName}</strong>
                 <small>{row.email}</small>
               </span>
-              <span>{row.platformRole === "operator" ? "Operatore" : "Utente"}</span>
-              {row.platformRole === "operator" ? (
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="secondary"
-                  loading={workingId === row.id}
-                  onClick={() => setPending({ user: row, kind: "revoke" })}
-                  data-testid={`admin-user-revoke-${row.id}`}
-                >
-                  Revoca operator
-                </Button>
-              ) : (
-                <>
+              <Badge
+                variant={row.platformRole === "operator" ? "accent" : "neutral"}
+                className="fa-admin-users__role"
+              >
+                {row.platformRole === "operator" ? "Operatore" : "Utente"}
+              </Badge>
+              <span className="fa-admin-users__actions">
+                {row.platformRole === "operator" ? (
                   <Button
                     type="button"
                     size="sm"
-                    variant="ghost"
+                    variant="secondary"
                     loading={workingId === row.id}
-                    onClick={() => setPending({ user: row, kind: "impersonate" })}
-                    data-testid={`admin-user-impersonate-${row.id}`}
+                    onClick={() => setPending({ user: row, kind: "revoke" })}
+                    data-testid={`admin-user-revoke-${row.id}`}
                   >
-                    Impersona
+                    Revoca operator
                   </Button>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="primary"
-                    loading={workingId === row.id}
-                    onClick={() => setPending({ user: row, kind: "promote" })}
-                    data-testid={`admin-user-promote-${row.id}`}
-                  >
-                    Promuovi a operator
-                  </Button>
-                </>
-              )}
+                ) : (
+                  <>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      loading={workingId === row.id}
+                      onClick={() => setPending({ user: row, kind: "impersonate" })}
+                      data-testid={`admin-user-impersonate-${row.id}`}
+                    >
+                      Impersona
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="primary"
+                      loading={workingId === row.id}
+                      onClick={() => setPending({ user: row, kind: "promote" })}
+                      data-testid={`admin-user-promote-${row.id}`}
+                    >
+                      Promuovi a operator
+                    </Button>
+                  </>
+                )}
+              </span>
             </li>
           ))}
         </ul>
