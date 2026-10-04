@@ -1281,8 +1281,12 @@ button.fa-link-muted,
   position: absolute;
   top: calc(100% + var(--fa-space-xs));
   right: 0;
-  z-index: 20;
-  width: 20rem;
+  z-index: var(--fa-z-dropdown);
+  /* Larga 20rem fissa, ancorata al bordo destro della sola campanella (non
+     dell'header): su schermi stretti il bordo sinistro del pannello finiva
+     a decine di px dal bordo dello schermo, lasciando scoperta una striscia
+     di contenuto di pagina dietro — che sembrava "sovrapposto" al pannello. */
+  width: min(20rem, calc(100vw - 2 * var(--fa-space-md)));
   max-height: 24rem;
   overflow-y: auto;
   background-color: var(--fa-color-background);
