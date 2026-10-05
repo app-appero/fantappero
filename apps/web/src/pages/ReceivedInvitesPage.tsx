@@ -9,6 +9,7 @@ import {
 import { ApiError } from "../api/client";
 import { getApiErrorMessage, useAuth } from "../auth/AuthContext";
 import { loadStoredSession } from "../auth/sessionStorage";
+import { notifyPendingInvitesChanged } from "../layout/usePendingInviteCount";
 import { useLocation } from "../router/simpleRouter";
 
 const DEMO_INVITES: NamedLeagueInvite[] = [
@@ -104,6 +105,7 @@ export function ReceivedInvitesPage() {
       }
       setInvites((current) => current.filter((row) => row.id !== invite.id));
       setSuccess(action === "accept" ? `Sei entrato in ${invite.leagueName} (demo).` : "Invito rifiutato (demo).");
+      notifyPendingInvitesChanged();
       return;
     }
     const session = loadStoredSession();
@@ -122,6 +124,7 @@ export function ReceivedInvitesPage() {
         setSuccess("Invito rifiutato.");
       }
       setInvites((current) => current.filter((row) => row.id !== invite.id));
+      notifyPendingInvitesChanged();
     } catch (actionFailure) {
       setError(actionError(actionFailure));
     } finally {
