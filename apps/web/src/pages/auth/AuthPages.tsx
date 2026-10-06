@@ -194,17 +194,32 @@ export function AuthLoginPage() {
   );
 }
 
+/** Shown after Google returns a credential, when the app did not open by itself. */
+export function GoogleAppHandoffLink({ href }: { href: string }) {
+  return (
+    <div className="fa-auth-layout__google">
+      <p>L'app dovrebbe aprirsi. Se resti qui, tocca il pulsante.</p>
+      <a className="fa-btn fa-btn--primary" href={href} style={{ textDecoration: "none" }}>
+        Apri FantApperò
+      </a>
+    </div>
+  );
+}
+
 /** Mobile handoff: Google button on this origin, then return the ID token to the app. */
 export function AuthGoogleAppPage() {
   const { search } = useLocation();
   const returnTo = googleAppReturnUrl(new URLSearchParams(search).get("return"));
   const [error, setError] = useState<string | null>(null);
+  const [handoffUrl, setHandoffUrl] = useState<string | null>(null);
   const handoff = useCallback(
     (idToken: string) => {
       if (!returnTo) {
         return;
       }
-      window.location.replace(googleAppHandoffUrl(returnTo, idToken));
+      const next = googleAppHandoffUrl(returnTo, idToken);
+      setHandoffUrl(next);
+      window.location.replace(next);
     },
     [returnTo],
   );
@@ -218,7 +233,11 @@ export function AuthGoogleAppPage() {
             {error ? (
               <UiStatePanel state="error" title="Accesso non riuscito" message={error} />
             ) : null}
-            <GoogleSignInButton onError={setError} onCredential={handoff} />
+            {handoffUrl ? (
+              <GoogleAppHandoffLink href={handoffUrl} />
+            ) : (
+              <GoogleSignInButton onError={setError} onCredential={handoff} />
+            )}
           </>
         ) : (
           <UiStatePanel

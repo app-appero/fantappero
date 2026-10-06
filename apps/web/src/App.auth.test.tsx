@@ -2,6 +2,7 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import { AuthProvider } from "./auth/AuthContext";
+import { GoogleAppHandoffLink } from "./pages/auth/AuthPages";
 import { AppRoutes } from "./routes";
 import { MemoryRouter } from "./router/simpleRouter";
 
@@ -41,6 +42,22 @@ describe("EP02-01 auth pages", () => {
     const html = renderAuth("/accedi/google-app");
     expect(html).toContain("Collegamento non valido");
     expect(html).not.toContain('data-testid="app-shell"');
+  });
+
+  it("renders the mobile google handoff for an app return url", () => {
+    const html = renderAuth("/accedi/google-app?return=fantappero%3A%2F%2Fgoogle-auth");
+    expect(html).toContain("Continua con Google per tornare all&#x27;app.");
+    expect(html).not.toContain("Collegamento non valido");
+  });
+
+  it("offers a link back to the app after the Google credential", () => {
+    const html = renderToStaticMarkup(
+      createElement(GoogleAppHandoffLink, {
+        href: "fantappero://google-auth?id_token=header.payload.sig",
+      }),
+    );
+    expect(html).toContain("Apri FantApperò");
+    expect(html).toContain('href="fantappero://google-auth?id_token=header.payload.sig"');
   });
 
   it("renders register form at /accedi/registrati", () => {

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { readGoogleIdToken } from "./googleAppHandoff.ts";
+import { claimGoogleIdToken, readGoogleIdToken, releaseGoogleIdToken } from "./googleAppHandoff.ts";
 
 test("readGoogleIdToken reads the handoff query", () => {
   assert.equal(
@@ -13,4 +13,14 @@ test("readGoogleIdToken reads the handoff query", () => {
 test("readGoogleIdToken ignores a return without a token", () => {
   assert.equal(readGoogleIdToken("fantappero://google-auth"), null);
   assert.equal(readGoogleIdToken("not a url"), null);
+});
+
+test("claimGoogleIdToken keeps a single in-flight token and allows a retry", () => {
+  const claim = { token: null };
+  const url = "exp://10.0.0.2:8081/--/google-auth?id_token=header.payload.sig";
+  assert.equal(claimGoogleIdToken(url, claim), "header.payload.sig");
+  assert.equal(claimGoogleIdToken(url, claim), null);
+  assert.equal(claimGoogleIdToken(null, claim), null);
+  releaseGoogleIdToken("header.payload.sig", claim);
+  assert.equal(claimGoogleIdToken(url, claim), "header.payload.sig");
 });

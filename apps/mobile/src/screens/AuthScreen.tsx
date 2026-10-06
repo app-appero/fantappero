@@ -24,7 +24,7 @@ export function AuthScreen() {
   const googleAuth = useGoogleAuth((idToken) => {
     setError(null);
     setGoogleSubmitting(true);
-    loginWithGoogle(idToken)
+    return loginWithGoogle(idToken)
       .catch((googleError: unknown) => {
         setError(getApiErrorMessage(googleError, "Accesso con Google non riuscito."));
       })
