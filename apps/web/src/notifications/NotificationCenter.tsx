@@ -1,7 +1,8 @@
 import type { NotificationItem } from "@fantappero/contracts";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type MouseEvent as ReactMouseEvent } from "react";
 import { useNavigate } from "../router/simpleRouter";
 import { IconBell } from "../navigation/NavIcons";
+import { resolveNotificationDestination } from "./notificationDestination";
 import { useNotificationCenter } from "./useNotificationCenter";
 
 const CATEGORY_LABELS: Record<NotificationItem["category"], string> = {
@@ -34,7 +35,7 @@ export function NotificationCenter() {
     if (!open) {
       return;
     }
-    void reload();
+    void reload("refresh");
 
     function handlePointerDown(event: MouseEvent) {
       if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
@@ -55,14 +56,29 @@ export function NotificationCenter() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
-  async function handleItemClick(item: NotificationItem) {
+  function openNotification(item: NotificationItem) {
+    const destination = resolveNotificationDestination(item);
     if (!item.read) {
-      await markRead(item.id);
+      void markRead(item.id);
     }
     setOpen(false);
-    if (item.deepLink) {
-      navigate(item.deepLink);
+    if (destination) {
+      navigate(destination);
     }
+  }
+
+  function handleItemClick(event: ReactMouseEvent<HTMLAnchorElement>, item: NotificationItem) {
+    const modified =
+      event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey;
+    if (modified) {
+      if (!item.read) {
+        void markRead(item.id);
+      }
+      setOpen(false);
+      return;
+    }
+    event.preventDefault();
+    openNotification(item);
   }
 
   return (
@@ -112,14 +128,11 @@ export function NotificationCenter() {
             </p>
           ) : (
             <ul className="fa-notification-center__list">
-              {items.map((item) => (
-                <li key={item.id}>
-                  <button
-                    type="button"
-                    className={`fa-notification-center__item${item.read ? "" : " fa-notification-center__item--unread"}`}
-                    onClick={() => void handleItemClick(item)}
-                    data-testid={`notification-item-${item.id}`}
-                  >
+              {items.map((item) => {
+                const destination = resolveNotificationDestination(item);
+                const className = `fa-notification-center__item${item.read ? "" : " fa-notification-center__item--unread"}`;
+                const content = (
+                  <>
                     <span className="fa-notification-center__item-category">
                       {CATEGORY_LABELS[item.category]}
                     </span>
@@ -128,9 +141,32 @@ export function NotificationCenter() {
                     <span className="fa-notification-center__item-time">
                       {formatTimestamp(item.createdAt)}
                     </span>
-                  </button>
-                </li>
-              ))}
+                  </>
+                );
+                return (
+                  <li key={item.id}>
+                    {destination ? (
+                      <a
+                        href={destination}
+                        className={className}
+                        onClick={(event) => handleItemClick(event, item)}
+                        data-testid={`notification-item-${item.id}`}
+                      >
+                        {content}
+                      </a>
+                    ) : (
+                      <button
+                        type="button"
+                        className={className}
+                        onClick={() => openNotification(item)}
+                        data-testid={`notification-item-${item.id}`}
+                      >
+                        {content}
+                      </button>
+                    )}
+                  </li>
+                );
+              })}
             </ul>
           )}
         </div>

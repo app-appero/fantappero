@@ -16,8 +16,9 @@ vi.mock("../api/notifications", () => ({
 }));
 
 import { saveStoredSession, clearStoredSession } from "../auth/sessionStorage";
-import { MemoryRouter } from "../router/simpleRouter";
+import { BrowserRouter, MemoryRouter } from "../router/simpleRouter";
 import { NotificationCenter } from "./NotificationCenter";
+import { resetLocalNotificationReads } from "./useNotificationCenter";
 
 const ITEM: NotificationItem = {
   id: "notif-1",
@@ -72,6 +73,8 @@ describe("NotificationCenter (EP09-01)", () => {
     });
     container.remove();
     clearStoredSession();
+    resetLocalNotificationReads();
+    window.history.pushState(null, "", "/");
   });
 
   async function renderCenter() {
@@ -138,12 +141,83 @@ describe("NotificationCenter (EP09-01)", () => {
     ) as HTMLElement;
     expect(item).not.toBeNull();
     await act(async () => {
-      item.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      item.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
     });
     await flushAsync();
 
     expect(markNotificationReadMock).toHaveBeenCalledWith("token-123", ITEM.id);
     expect(container.querySelector('[data-testid="notification-panel"]')).toBeNull();
+    expect(container.querySelector('[data-testid="notification-unread-badge"]')).toBeNull();
+  });
+
+  it("opens the invite page and keeps the bell badge off after a stale reload", async () => {
+    window.history.pushState(null, "", "/leghe");
+    const invite: NotificationItem = {
+      ...ITEM,
+      id: "invite-notif",
+      title: "Nuovo invito a una lega",
+      body: "Rosario ti ha invitato a «Lega Demo».",
+      deepLink: "/inviti",
+    };
+    fetchNotificationsMock.mockResolvedValue(listWith([invite]));
+    markNotificationReadMock.mockResolvedValue({
+      ...invite,
+      read: true,
+      readAt: "2026-10-03T12:17:00Z",
+    });
+
+    await act(async () => {
+      root.render(createElement(BrowserRouter, { children: createElement(NotificationCenter) }));
+    });
+    await flushAsync();
+    expect(container.querySelector('[data-testid="notification-unread-badge"]')?.textContent).toBe(
+      "1",
+    );
+
+    let resolveStale: (value: NotificationList) => void = () => {};
+    const stale = new Promise<NotificationList>((resolve) => {
+      resolveStale = resolve;
+    });
+    fetchNotificationsMock.mockImplementationOnce(() => stale);
+
+    const trigger = container.querySelector('[data-testid="notification-bell"]') as HTMLElement;
+    await act(async () => {
+      trigger.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
+
+    const item = container.querySelector(
+      `[data-testid="notification-item-${invite.id}"]`,
+    ) as HTMLAnchorElement;
+    expect(item.getAttribute("href")).toBe("/inviti");
+    await act(async () => {
+      item.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
+    });
+    await flushAsync();
+
+    expect(window.location.pathname).toBe("/inviti");
+    expect(markNotificationReadMock).toHaveBeenCalledWith("token-123", invite.id);
+    expect(container.querySelector('[data-testid="notification-unread-badge"]')).toBeNull();
+
+    await act(async () => {
+      resolveStale(listWith([invite]));
+      await stale;
+    });
+    await flushAsync();
+
+    expect(container.querySelector('[data-testid="notification-unread-badge"]')).toBeNull();
+
+    await act(async () => {
+      root.unmount();
+    });
+    root = createRoot(container);
+    fetchNotificationsMock.mockResolvedValue(listWith([invite]));
+    await act(async () => {
+      root.render(createElement(BrowserRouter, { children: createElement(NotificationCenter) }));
+    });
+    await flushAsync();
+
+    expect(window.location.pathname).toBe("/inviti");
+    expect(container.querySelector('[data-testid="notification-unread-badge"]')).toBeNull();
   });
 
   it("mark-all-read clears the unread badge", async () => {
