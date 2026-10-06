@@ -6,20 +6,11 @@ import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { useGoogleAuth } from "../auth/useGoogleAuth";
 import { BrandLogo } from "../components/BrandLogo";
 import { UiStatePanel } from "../components/UiStatePanel";
-import { loadMobileEnv } from "../config/env";
 import { PageContainer } from "../layout/PageContainer";
 import type { RootStackParamList } from "../navigation/types";
 import { getApiErrorMessage, useAuthSession } from "../session/DemoSessionContext";
 
 const { colors, spacing, typography, radius } = theme;
-
-function resolveApiBaseUrlForDisplay(): string {
-  try {
-    return loadMobileEnv().expoPublicApiBaseUrl;
-  } catch {
-    return "Servizio non disponibile";
-  }
-}
 
 /** Login — allineato a web /accedi. */
 export function AuthScreen() {
@@ -30,8 +21,6 @@ export function AuthScreen() {
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [googleSubmitting, setGoogleSubmitting] = useState(false);
-  const apiBaseUrl = resolveApiBaseUrlForDisplay();
-
   const googleAuth = useGoogleAuth((idToken) => {
     setError(null);
     setGoogleSubmitting(true);
@@ -67,11 +56,6 @@ export function AuthScreen() {
           <BrandLogo variant="full" size="lg" />
         </View>
         <Text style={styles.lead}>Accedi con il tuo account FantApperò.</Text>
-        {__DEV__ ? (
-          <Text style={styles.devHint} testID="auth-api-base-url">
-            API: {apiBaseUrl}
-          </Text>
-        ) : null}
         {error ? (
           <UiStatePanel
             state="error"
@@ -128,7 +112,11 @@ export function AuthScreen() {
             accessibilityRole="button"
             accessibilityLabel="Continua con Google"
             disabled={googleSubmitting}
-            onPress={() => void googleAuth.promptAsync()}
+            onPress={() => {
+              void googleAuth.promptAsync().catch((googleError: unknown) => {
+                setError(getApiErrorMessage(googleError, "Accesso con Google non riuscito."));
+              });
+            }}
             style={[styles.secondaryButton, googleSubmitting && styles.disabled]}
             testID="auth-google-submit"
           >
@@ -165,11 +153,6 @@ export const authFormStyles = StyleSheet.create({
     color: colors.foregroundMuted,
     fontSize: typography.fontSize.sm,
     marginBottom: spacing.md,
-  },
-  devHint: {
-    color: colors.foregroundMuted,
-    fontSize: typography.fontSize.xs,
-    marginBottom: spacing.sm,
   },
   label: {
     marginTop: spacing.sm,

@@ -1,58 +1,45 @@
-import * as Google from "expo-auth-session/providers/google";
-import { useEffect } from "react";
-import { Platform } from "react-native";
+import * as Linking from "expo-linking";
+import * as WebBrowser from "expo-web-browser";
+import { useCallback } from "react";
 import { loadMobileEnv } from "../config/env";
+import { readGoogleIdToken } from "./googleAppHandoff";
 
 export type GoogleAuthState = {
-  /** False when no Google Web Client ID is configured — hide the button. */
+  /** False when the web client id or the site that hosts the Google button is missing. */
   available: boolean;
   promptAsync: () => Promise<void>;
 };
 
-/**
- * Expo's Google hook throws on Android when `androidClientId` is missing.
- * The ids in `.env` are optional, so a placeholder keeps the hook mounted
- * and the button stays hidden until both client ids are set.
- */
-const UNCONFIGURED_GOOGLE_CLIENT_ID = "unconfigured";
+WebBrowser.maybeCompleteAuthSession();
 
 /**
- * Wraps expo-auth-session's Google provider (deprecated upstream in favor of
- * native Sign-In modules, but still shipped and sufficient for the Fase 1
- * web+Android pilot without adding a native dependency).
+ * Opens the website's Google button and receives the ID token through the app
+ * scheme. The website origin is already allowed by Google; Expo Go cannot use
+ * a custom redirect on the web client id.
  */
 export function useGoogleAuth(onIdToken: (idToken: string) => void): GoogleAuthState {
   const env = loadMobileEnv();
-  const webClientId = env.expoPublicGoogleClientIdWeb;
-  const androidClientId = env.expoPublicGoogleClientIdAndroid;
-  const configured =
-    Boolean(webClientId) && (Platform.OS !== "android" || Boolean(androidClientId));
-  const [request, response, promptAsync] = Google.useIdTokenAuthRequest({
-    webClientId: webClientId || UNCONFIGURED_GOOGLE_CLIENT_ID,
-    androidClientId: androidClientId || UNCONFIGURED_GOOGLE_CLIENT_ID,
-    iosClientId: UNCONFIGURED_GOOGLE_CLIENT_ID,
-  });
+  const clientId = env.expoPublicGoogleClientIdWeb;
+  const webBaseUrl = env.expoPublicWebBaseUrl;
+  const available = Boolean(clientId && webBaseUrl);
 
-  useEffect(() => {
-    if (!configured) {
+  const promptAsync = useCallback(async () => {
+    if (!clientId || !webBaseUrl) {
       return;
     }
-    if (response?.type === "success" && response.params.id_token) {
-      onIdToken(response.params.id_token);
+    const returnUrl = Linking.createURL("google-auth");
+    const start = new URL("/accedi/google-app", webBaseUrl);
+    start.searchParams.set("return", returnUrl);
+    const result = await WebBrowser.openAuthSessionAsync(start.toString(), returnUrl);
+    if (result.type !== "success") {
+      return;
     }
-  }, [configured, response, onIdToken]);
+    const idToken = readGoogleIdToken(result.url);
+    if (!idToken) {
+      throw new Error("Accesso con Google non riuscito.");
+    }
+    onIdToken(idToken);
+  }, [clientId, onIdToken, webBaseUrl]);
 
-  if (!configured) {
-    return {
-      available: false,
-      promptAsync: async () => {},
-    };
-  }
-
-  return {
-    available: request !== null,
-    promptAsync: async () => {
-      await promptAsync();
-    },
-  };
+  return { available, promptAsync };
 }

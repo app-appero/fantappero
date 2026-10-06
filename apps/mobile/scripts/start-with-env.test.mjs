@@ -9,9 +9,11 @@ import { resolveMobileProfile } from "./start-with-env.mjs";
 
 const appRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
 
-test("pilota points at the Railway pilot API", () => {
+test("pilota points at the Railway pilot API and the public Google client", () => {
   const resolved = resolveMobileProfile(appRoot, "pilota");
   assert.equal(resolved.apiUrl, "https://api-pilota.up.railway.app");
+  assert.equal(resolved.env.EXPO_PUBLIC_WEB_BASE_URL, "https://fantappero-web-pilot.up.railway.app");
+  assert.match(resolved.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID_WEB, /\.apps\.googleusercontent\.com$/);
 });
 
 test("dev points at the Railway dev API", () => {

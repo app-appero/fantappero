@@ -10,8 +10,8 @@
  *  - `resolveBaseUrl`: how to read the API base URL (Vite env on web, Expo
  *    public env on mobile). May throw — the error propagates unchanged to
  *    the `apiRequest`/`apiUpload` caller.
- *  - `isDev`: gates diagnostic `console.error` calls (e.g. React Native's
- *    `__DEV__` global on mobile; web opts out by leaving this unset).
+ *  - `isDev`: gates diagnostic logs. They use `console.log` so React Native's
+ *    LogBox does not cover the screen; the UI already shows the same failure.
  *  - `buildUploadValue`: converts a platform file reference (a DOM `File` on
  *    web, `{ uri, name, type }` on mobile) into a value `FormData.append`
  *    accepts.
@@ -138,7 +138,7 @@ export function createApiClient<TFile = unknown>(config: ApiClientConfig<TFile>)
         throw error;
       }
       if (isDev()) {
-        console.error("[api] network error", { url, error });
+        console.log("[api] network error", { url, error });
       }
       throw new ApiError(messages.networkErrorMessage(baseUrl), 0, "network_error");
     }
@@ -149,7 +149,7 @@ export function createApiClient<TFile = unknown>(config: ApiClientConfig<TFile>)
       return (await response.json()) as FastApiErrorBody | T;
     } catch (parseError) {
       if (isDev()) {
-        console.error("[api] non-JSON response", { url, status: response.status, parseError });
+        console.log("[api] non-JSON response", { url, status: response.status, parseError });
       }
       throw new ApiError(
         messages.invalidResponseMessage(response.status),
@@ -162,7 +162,7 @@ export function createApiClient<TFile = unknown>(config: ApiClientConfig<TFile>)
   function raiseRequestFailed(url: string, response: Response, payload: FastApiErrorBody): never {
     const message = extractErrorMessage(payload, response.status, messages);
     if (isDev()) {
-      console.error("[api] request failed", {
+      console.log("[api] request failed", {
         url,
         status: response.status,
         code: payload.code,

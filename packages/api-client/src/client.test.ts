@@ -145,9 +145,9 @@ describe("createApiClient", () => {
 
   it("invokes isDev-gated diagnostics only when isDev() returns true", async () => {
     const stub = installFetchStub(() => jsonResponse(500, {}));
-    const originalError = console.error;
+    const originalLog = console.log;
     let logCount = 0;
-    console.error = () => {
+    console.log = () => {
       logCount += 1;
     };
     try {
@@ -159,7 +159,7 @@ describe("createApiClient", () => {
       await assert.rejects(apiRequest("/x"));
       assert.ok(logCount > 0);
     } finally {
-      console.error = originalError;
+      console.log = originalLog;
       stub.restore();
     }
   });

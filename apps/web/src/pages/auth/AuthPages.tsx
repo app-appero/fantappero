@@ -1,5 +1,5 @@
 import { AuthFormLayout, BrandLogo, PageContainer, UiStatePanel } from "@fantappero/ui";
-import { type FormEvent, useEffect, useRef, useState } from "react";
+import { type FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import {
   forgotPassword,
   register as registerApi,
@@ -7,12 +7,20 @@ import {
   verifyEmail,
 } from "../../api/auth";
 import { getApiErrorMessage, useAuth } from "../../auth/AuthContext";
+import { googleAppHandoffUrl, googleAppReturnUrl } from "../../auth/googleAppReturn";
 import { renderGoogleButton } from "../../auth/googleIdentity";
 import { getWebEnv } from "../../config/env";
 import { Link, useLocation, useNavigate } from "../../router/simpleRouter";
 
 /** "Continua con Google" — hidden when VITE_GOOGLE_CLIENT_ID is unset. */
-function GoogleSignInButton({ onError }: { onError: (message: string) => void }) {
+function GoogleSignInButton({
+  onError,
+  onCredential,
+}: {
+  onError: (message: string) => void;
+  /** When set, the token is handed to the caller instead of starting a web session. */
+  onCredential?: (idToken: string) => void;
+}) {
   const { loginWithGoogle } = useAuth();
   const navigate = useNavigate();
   const containerRef = useRef<HTMLDivElement>(null);
@@ -23,6 +31,10 @@ function GoogleSignInButton({ onError }: { onError: (message: string) => void })
       return;
     }
     renderGoogleButton(containerRef.current, viteGoogleClientId, (idToken) => {
+      if (onCredential) {
+        onCredential(idToken);
+        return;
+      }
       loginWithGoogle(idToken)
         .then(() => navigate("/leghe"))
         .catch((error: unknown) => {
@@ -31,7 +43,7 @@ function GoogleSignInButton({ onError }: { onError: (message: string) => void })
     }).catch(() => {
       onError("Impossibile caricare l'accesso con Google.");
     });
-  }, [viteGoogleClientId, loginWithGoogle, navigate, onError]);
+  }, [viteGoogleClientId, loginWithGoogle, navigate, onError, onCredential]);
 
   if (!viteGoogleClientId) {
     return null;
@@ -177,6 +189,44 @@ export function AuthLoginPage() {
           }
         />
         <GoogleSignInButton onError={setError} />
+      </PageContainer>
+    </div>
+  );
+}
+
+/** Mobile handoff: Google button on this origin, then return the ID token to the app. */
+export function AuthGoogleAppPage() {
+  const { search } = useLocation();
+  const returnTo = googleAppReturnUrl(new URLSearchParams(search).get("return"));
+  const [error, setError] = useState<string | null>(null);
+  const handoff = useCallback(
+    (idToken: string) => {
+      if (!returnTo) {
+        return;
+      }
+      window.location.replace(googleAppHandoffUrl(returnTo, idToken));
+    },
+    [returnTo],
+  );
+
+  return (
+    <div className="fa-auth-page fa-surface-pitch">
+      <PageContainer title="Accedi">
+        {returnTo ? (
+          <>
+            <p>Continua con Google per tornare all'app.</p>
+            {error ? (
+              <UiStatePanel state="error" title="Accesso non riuscito" message={error} />
+            ) : null}
+            <GoogleSignInButton onError={setError} onCredential={handoff} />
+          </>
+        ) : (
+          <UiStatePanel
+            state="error"
+            title="Collegamento non valido"
+            message="Apri di nuovo «Continua con Google» dall'app."
+          />
+        )}
       </PageContainer>
     </div>
   );

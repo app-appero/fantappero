@@ -8,6 +8,7 @@ import {
   AdminTurniPage,
   AdminUsersPage,
   AuthForgotPasswordPage,
+  AuthGoogleAppPage,
   AuthLoginPage,
   AuthRegisterPage,
   AuthResetPasswordPage,
@@ -54,6 +55,10 @@ export function AppRoutes() {
 
   if (pathname === "/accedi") {
     return <AuthLoginPage />;
+  }
+
+  if (pathname === "/accedi/google-app") {
+    return <AuthGoogleAppPage />;
   }
 
   if (pathname === "/accedi/registrati") {

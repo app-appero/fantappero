@@ -8,6 +8,7 @@ test("loadMobileEnv accepts minimal valid configuration", () => {
   assert.equal(env.expoPublicApiBaseUrl, "http://127.0.0.1:8001");
   assert.equal(env.expoPublicGoogleClientIdWeb, "");
   assert.equal(env.expoPublicGoogleClientIdAndroid, "");
+  assert.equal(env.expoPublicWebBaseUrl, "");
 });
 
 test("loadMobileEnv reads Google client ids when configured", () => {
@@ -15,9 +16,11 @@ test("loadMobileEnv reads Google client ids when configured", () => {
     EXPO_PUBLIC_API_BASE_URL: "http://127.0.0.1:8001",
     EXPO_PUBLIC_GOOGLE_CLIENT_ID_WEB: "web-client-id",
     EXPO_PUBLIC_GOOGLE_CLIENT_ID_ANDROID: "android-client-id",
+    EXPO_PUBLIC_WEB_BASE_URL: "https://fantappero-web-pilot.up.railway.app",
   });
   assert.equal(env.expoPublicGoogleClientIdWeb, "web-client-id");
   assert.equal(env.expoPublicGoogleClientIdAndroid, "android-client-id");
+  assert.equal(env.expoPublicWebBaseUrl, "https://fantappero-web-pilot.up.railway.app");
 });
 
 test("loadMobileEnv fails when EXPO_PUBLIC_API_BASE_URL is missing", () => {

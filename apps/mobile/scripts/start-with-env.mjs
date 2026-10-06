@@ -5,9 +5,10 @@ import { fileURLToPath } from "node:url";
 
 export const MOBILE_PROFILES = ["locale", "dev", "pilota", "prod"];
 
-const GOOGLE_KEYS = [
+const PROFILE_KEYS = [
   "EXPO_PUBLIC_GOOGLE_CLIENT_ID_WEB",
   "EXPO_PUBLIC_GOOGLE_CLIENT_ID_ANDROID",
+  "EXPO_PUBLIC_WEB_BASE_URL",
 ];
 
 export function parseEnvFile(path) {
@@ -53,7 +54,7 @@ export function resolveMobileProfile(appRoot, profile) {
     );
   }
   const env = { EXPO_PUBLIC_API_BASE_URL: apiUrl };
-  for (const key of GOOGLE_KEYS) {
+  for (const key of PROFILE_KEYS) {
     const value = (localVars[key] || profileVars[key] || "").trim();
     if (value) {
       env[key] = value;

@@ -13,6 +13,7 @@ export type AppRouteDefinition = {
 
 export const APP_ROUTE_DEFINITIONS: readonly AppRouteDefinition[] = [
   { id: "auth-login", path: "/accedi", layout: "none" },
+  { id: "auth-google-app", path: "/accedi/google-app", layout: "none" },
   { id: "auth-register", path: "/accedi/registrati", layout: "none" },
   { id: "auth-forgot", path: "/accedi/recupera", layout: "none" },
   { id: "auth-reset", path: "/accedi/reimposta-password", layout: "none" },

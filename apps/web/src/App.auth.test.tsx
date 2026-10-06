@@ -37,6 +37,12 @@ describe("EP02-01 auth pages", () => {
     expect(html).not.toContain('data-testid="app-shell"');
   });
 
+  it("rejects a google handoff without an app return url", () => {
+    const html = renderAuth("/accedi/google-app");
+    expect(html).toContain("Collegamento non valido");
+    expect(html).not.toContain('data-testid="app-shell"');
+  });
+
   it("renders register form at /accedi/registrati", () => {
     const html = renderAuth("/accedi/registrati");
     expect(html).toContain("Crea account");

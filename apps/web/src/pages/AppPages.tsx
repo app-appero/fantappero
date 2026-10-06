@@ -1,5 +1,6 @@
 export {
   AuthForgotPasswordPage,
+  AuthGoogleAppPage,
   AuthLoginPage,
   AuthRegisterPage,
   AuthResetPasswordPage,
