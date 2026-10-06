@@ -1,4 +1,4 @@
-import type { NotificationItem } from "@fantappero/contracts";
+import type { NotificationItem, NotificationList } from "@fantappero/contracts";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   fetchNotifications,
@@ -12,6 +12,47 @@ const PAGE_SIZE = 20;
 /** Intervallo di polling per il popup toast su nuove notifiche (EP13-P07). */
 const POLL_INTERVAL_MS = 20000;
 
+/**
+ * Letture già confermate in questa scheda.
+ *
+ * Il centro notifiche si rimonta a ogni cambio pagina: una GET partita prima
+ * del POST «letta» non deve riaccendere il badge.
+ */
+const locallyReadIds = new Set<string>();
+const readListeners = new Set<() => void>();
+
+function notifyReadListeners(): void {
+  for (const listener of readListeners) {
+    listener();
+  }
+}
+
+export function resetLocalNotificationReads(): void {
+  locallyReadIds.clear();
+}
+
+function applyLocalReads(result: NotificationList): {
+  items: NotificationItem[];
+  unreadCount: number;
+} {
+  let hiddenUnread = 0;
+  const items = result.items.map((item) => {
+    if (item.read) {
+      locallyReadIds.delete(item.id);
+      return item;
+    }
+    if (locallyReadIds.has(item.id)) {
+      hiddenUnread += 1;
+      return { ...item, read: true };
+    }
+    return item;
+  });
+  return {
+    items,
+    unreadCount: Math.max(0, result.unreadCount - hiddenUnread),
+  };
+}
+
 /** In-app notification center: list, unread count, read state (EP09-01). */
 export function useNotificationCenter(onNewNotifications?: (items: NotificationItem[]) => void) {
   const [items, setItems] = useState<NotificationItem[]>([]);
@@ -21,17 +62,30 @@ export function useNotificationCenter(onNewNotifications?: (items: NotificationI
   // null finché non è arrivato il primo risultato: evita di mostrare un
   // toast per ogni notifica non letta già esistente al primo caricamento.
   const knownIdsRef = useRef<Set<string> | null>(null);
+  const requestSeq = useRef(0);
+  const itemsRef = useRef(items);
+  itemsRef.current = items;
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (mode: "initial" | "refresh" = "initial") => {
+    const requestId = ++requestSeq.current;
     const stored = loadStoredSession();
     if (!stored?.accessToken) {
+      if (requestId !== requestSeq.current) {
+        return;
+      }
       setLoadError("Sessione non disponibile. Accedi di nuovo.");
+      setLoading(false);
       return;
     }
-    setLoading(true);
+    if (mode === "initial") {
+      setLoading(true);
+    }
     setLoadError(null);
     try {
       const result = await fetchNotifications(stored.accessToken, { pageSize: PAGE_SIZE });
+      if (requestId !== requestSeq.current) {
+        return;
+      }
       if (knownIdsRef.current) {
         const freshUnread = result.items.filter(
           (item) => !item.read && !knownIdsRef.current?.has(item.id),
@@ -41,21 +95,37 @@ export function useNotificationCenter(onNewNotifications?: (items: NotificationI
         }
       }
       knownIdsRef.current = new Set(result.items.map((item) => item.id));
-      setItems(result.items);
-      setUnreadCount(result.unreadCount);
+      const reconciled = applyLocalReads(result);
+      setItems(reconciled.items);
+      setUnreadCount(reconciled.unreadCount);
     } catch (error) {
+      if (requestId !== requestSeq.current) {
+        return;
+      }
       setLoadError(getApiErrorMessage(error, "Impossibile caricare le notifiche."));
     } finally {
-      setLoading(false);
+      if (requestId === requestSeq.current) {
+        setLoading(false);
+      }
     }
   }, [onNewNotifications]);
 
   useEffect(() => {
-    void load();
+    void load("initial");
   }, [load]);
 
   useEffect(() => {
-    const timer = window.setInterval(() => void load(), POLL_INTERVAL_MS);
+    const refresh = () => {
+      void load("refresh");
+    };
+    readListeners.add(refresh);
+    return () => {
+      readListeners.delete(refresh);
+    };
+  }, [load]);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => void load("refresh"), POLL_INTERVAL_MS);
     return () => window.clearInterval(timer);
   }, [load]);
 
@@ -64,12 +134,32 @@ export function useNotificationCenter(onNewNotifications?: (items: NotificationI
     if (!stored?.accessToken) {
       return;
     }
+    const target = itemsRef.current.find((item) => item.id === notificationId);
+    const wasUnread = Boolean(target && !target.read && !locallyReadIds.has(notificationId));
+    locallyReadIds.add(notificationId);
+    requestSeq.current += 1;
+    setLoading(false);
+    if (wasUnread) {
+      setItems((current) =>
+        current.map((item) => (item.id === notificationId ? { ...item, read: true } : item)),
+      );
+      setUnreadCount((current) => Math.max(0, current - 1));
+    }
     try {
       const updated = await markNotificationRead(stored.accessToken, notificationId);
       setItems((current) => current.map((item) => (item.id === updated.id ? updated : item)));
-      setUnreadCount((current) => Math.max(0, current - 1));
     } catch (error) {
+      locallyReadIds.delete(notificationId);
+      if (wasUnread) {
+        setItems((current) =>
+          current.map((item) =>
+            item.id === notificationId ? { ...item, read: false } : item,
+          ),
+        );
+        setUnreadCount((current) => current + 1);
+      }
       setLoadError(getApiErrorMessage(error, "Impossibile aggiornare la notifica."));
+      notifyReadListeners();
     }
   }, []);
 
@@ -78,11 +168,26 @@ export function useNotificationCenter(onNewNotifications?: (items: NotificationI
     if (!stored?.accessToken) {
       return;
     }
+    const snapshot = itemsRef.current;
+    for (const item of snapshot) {
+      if (!item.read) {
+        locallyReadIds.add(item.id);
+      }
+    }
+    requestSeq.current += 1;
+    setLoading(false);
+    setItems((current) => current.map((item) => ({ ...item, read: true })));
+    setUnreadCount(0);
     try {
       await markAllNotificationsRead(stored.accessToken);
-      setItems((current) => current.map((item) => ({ ...item, read: true })));
-      setUnreadCount(0);
     } catch (error) {
+      for (const item of snapshot) {
+        if (!item.read) {
+          locallyReadIds.delete(item.id);
+        }
+      }
+      setItems(snapshot);
+      setUnreadCount(snapshot.filter((item) => !item.read).length);
       setLoadError(getApiErrorMessage(error, "Impossibile aggiornare le notifiche."));
     }
   }, []);
