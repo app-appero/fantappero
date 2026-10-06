@@ -5,7 +5,6 @@
     "version": "0.0.0",
     "orientation": "portrait",
     "userInterfaceStyle": "dark",
-    "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.fantappero.mobile",
@@ -29,7 +28,8 @@
           "photosPermission": "Consenti l'accesso alle foto per impostare l'avatar del profilo."
         }
       ],
-      "expo-secure-store"
+      "expo-secure-store",
+      "expo-status-bar"
     ]
   }
 }

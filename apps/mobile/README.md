@@ -4,7 +4,7 @@ App React Native (Expo) per FantApperò.
 
 ## Stack
 
-Expo 54, React Navigation 7, tipi da `@fantappero/contracts`, token theme da `@fantappero/ui/theme`.
+Expo 57, React Navigation 7, tipi da `@fantappero/contracts`, token theme da `@fantappero/ui/theme`.
 
 ## Boundaries
 
