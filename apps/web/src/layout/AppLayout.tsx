@@ -13,10 +13,9 @@ import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { Link, useLocation } from "../router/simpleRouter";
 import { useAuth } from "../auth/AuthContext";
 import { LogoutButton } from "../auth/LogoutButton";
-import { fetchPendingInviteCount } from "../api/managerInvites";
 import { leagueStateLabel } from "../leagues/leagueLabels";
-import { loadStoredSession } from "../auth/sessionStorage";
 import { useLockCountdown } from "../matchday/useLockCountdown";
+import { usePendingInviteCount } from "./usePendingInviteCount";
 import {
   ADMIN_NAV_ITEMS,
   APP_NAV_ITEMS,
@@ -88,48 +87,6 @@ function useCollapsedNavGroups() {
   }, []);
 
   return { collapsed, toggle };
-}
-
-/**
- * Conteggio inviti pendenti per il badge (EP13-P07).
- *
- * Nessun polling: il dato cambia raramente e si aggiorna quando la finestra
- * torna in primo piano, coerentemente con la sospensione a schermata inattiva
- * introdotta in EP13-P04.
- */
-function usePendingInviteCount(enabled: boolean): number {
-  const [count, setCount] = useState(0);
-
-  const refresh = useCallback(async () => {
-    if (!enabled) {
-      setCount(0);
-      return;
-    }
-    const stored = loadStoredSession();
-    if (!stored?.accessToken) {
-      setCount(0);
-      return;
-    }
-    try {
-      const result = await fetchPendingInviteCount(stored.accessToken);
-      setCount(result.pendingInviteCount);
-    } catch {
-      // Il badge è accessorio: un errore non deve rompere la navigazione.
-      setCount(0);
-    }
-  }, [enabled]);
-
-  useEffect(() => {
-    void refresh();
-    if (typeof window === "undefined") {
-      return;
-    }
-    const onFocus = () => void refresh();
-    window.addEventListener("focus", onFocus);
-    return () => window.removeEventListener("focus", onFocus);
-  }, [refresh]);
-
-  return count;
 }
 
 function useMobileNavDrawer() {

@@ -12,6 +12,7 @@ import {
 import { UiStatePanel } from "../components/UiStatePanel";
 import { useScreenData } from "../hooks/useScreenData";
 import { PageContainer } from "../layout/PageContainer";
+import { notifyPendingInvitesChanged } from "../navigation/pendingInviteEvents";
 import type { RootStackParamList } from "../navigation/types";
 import { getApiErrorMessage, useAuthSession } from "../session/DemoSessionContext";
 
@@ -76,6 +77,7 @@ export function ReceivedInvitesScreen() {
     try {
       const responded = await acceptReceivedNamedInvite(accessToken, invite.id);
       setInvites((current) => current.filter((row) => row.id !== invite.id));
+      notifyPendingInvitesChanged();
       registerLeague({
         id: responded.leagueId,
         name: responded.leagueName,
@@ -106,6 +108,7 @@ export function ReceivedInvitesScreen() {
     try {
       await declineReceivedNamedInvite(accessToken, invite.id);
       setInvites((current) => current.filter((row) => row.id !== invite.id));
+      notifyPendingInvitesChanged();
       setFeedback(`Hai rifiutato l’invito a ${invite.leagueName}.`);
     } catch (declineError) {
       setError(getApiErrorMessage(declineError, "Impossibile aggiornare l'invito."));

@@ -1,13 +1,14 @@
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { useNavigation, useNavigationState } from "@react-navigation/core";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { theme } from "@fantappero/ui/theme";
 import { AppDrawer } from "../components/AppDrawer";
 import { LockCountdown } from "../components/LockCountdown";
 import { fetchPendingInviteCount } from "../api/managerInvites";
+import { subscribePendingInvitesChanged } from "./pendingInviteEvents";
 import { AppHeader } from "../layout/AppHeader";
 import { leagueStateLabel } from "../leagues/leagueLabels";
 import { useLockCountdown } from "../matchday/useLockCountdown";
@@ -104,18 +105,26 @@ function AppTabShell({
   // Stato aperto/chiuso conservato per la sessione: tutti i gruppi partono aperti.
   const [collapsedGroups, setCollapsedGroups] = useState<readonly string[]>([]);
   const [pendingInvites, setPendingInvites] = useState(0);
+  const pendingRequest = useRef(0);
 
-  // Nessun polling: si aggiorna all'apertura del drawer e dopo ogni azione
-  // sugli inviti (EP13-P07).
+  // Nessun polling: si aggiorna all'apertura, all'apertura del drawer e dopo
+  // ogni azione sugli inviti (EP13-P07).
   const refreshPendingInvites = useCallback(async () => {
+    const requestId = ++pendingRequest.current;
     if (!accessToken) {
       setPendingInvites(0);
       return;
     }
     try {
       const result = await fetchPendingInviteCount(accessToken);
+      if (requestId !== pendingRequest.current) {
+        return;
+      }
       setPendingInvites(result.pendingInviteCount);
     } catch {
+      if (requestId !== pendingRequest.current) {
+        return;
+      }
       // Il badge è accessorio: un errore non deve rompere la navigazione.
       setPendingInvites(0);
     }
@@ -123,6 +132,9 @@ function AppTabShell({
 
   useEffect(() => {
     void refreshPendingInvites();
+    return subscribePendingInvitesChanged(() => {
+      void refreshPendingInvites();
+    });
   }, [refreshPendingInvites]);
 
   const { countdown, refetch: refetchCountdown } = useLockCountdown(
