@@ -1,7 +1,7 @@
 import type { AdminListoneEntry, FantasyRole } from "@fantappero/contracts";
 import { theme } from "@fantappero/ui/theme";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Pressable, Text, TextInput, View } from "react-native";
+import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { useListoneRefresh } from "../../admin/ListoneRefreshContext";
 import { fetchAdminListone } from "../../api/admin";
 import { ApiError } from "../../api/client";
@@ -180,8 +180,8 @@ export function AdminListoneScreen() {
       onRefresh={onRefresh}
     >
       <View style={styles.section} testID="admin-listone-card">
-        <View style={styles.rowActions}>
-          <View style={{ flex: 1, minWidth: 120 }}>
+        <View style={seasonStyles.row}>
+          <View style={seasonStyles.field}>
             <Text style={styles.meta}>Stagione</Text>
             <TextInput
               style={styles.input}
@@ -192,7 +192,7 @@ export function AdminListoneScreen() {
             />
           </View>
           <Pressable
-            style={[styles.button, refreshingListone && styles.disabled]}
+            style={[styles.button, seasonStyles.button, refreshingListone && styles.disabled]}
             disabled={refreshingListone}
             onPress={() => void onRefreshListone()}
             testID="admin-listone-refresh"
@@ -349,3 +349,21 @@ export function AdminListoneScreen() {
     </PageContainer>
   );
 }
+
+const seasonStyles = StyleSheet.create({
+  row: {
+    flexDirection: "row",
+    alignItems: "flex-end",
+    gap: theme.spacing.sm,
+  },
+  field: {
+    width: 88,
+    flexGrow: 0,
+    flexShrink: 0,
+    gap: theme.spacing.xs,
+  },
+  button: {
+    flexGrow: 0,
+    flexShrink: 1,
+  },
+});

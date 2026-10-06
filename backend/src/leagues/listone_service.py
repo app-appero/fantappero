@@ -180,14 +180,12 @@ class LeagueListoneService:
                 report(12, "catalog", "Catalogo aggiornato. Avvio sync rose…")
 
                 def roster_progress(done: int, total: int, label: str) -> None:
-                    # Map roster work to 12% → 90%
+                    # Fetch uses 12–55. Persist ("Salvataggio …") uses 55–90.
                     ratio = done / total if total else 1.0
-                    percent = 12 + int(ratio * 78)
-                    report(
-                        percent,
-                        "roster",
-                        f"Rosa {done}/{total}: {label}",
-                    )
+                    if label.startswith("Salvataggio"):
+                        report(55 + int(ratio * 35), "roster", label)
+                        return
+                    report(12 + int(ratio * 43), "roster", f"Rosa {done}/{total}: {label}")
 
                 roster_result = sync_mvp_roster_with_client(
                     self._session,
@@ -196,9 +194,15 @@ class LeagueListoneService:
                     on_progress=roster_progress,
                 )
                 report(92, "listone", "Generazione listone ufficiale…")
+
+                def listone_progress(done: int, total: int) -> None:
+                    ratio = done / total if total else 1.0
+                    report(92 + int(ratio * 7), "listone", f"Generazione listone {done}/{total}")
+
                 listone_result = generate_official_listone(
                     self._session,
                     season_year=league.season_year,
+                    on_progress=listone_progress,
                 )
                 refreshed_at = datetime.now(UTC)
                 counters = LeagueListoneRefreshCounters(

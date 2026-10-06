@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Sequence
+from contextvars import ContextVar, Token
 from dataclasses import dataclass, field
 from datetime import UTC, date, datetime
 from typing import Any
@@ -82,6 +83,7 @@ class SquadBatch:
     club_provider_id: int
     competition_provider_id: int
     season_year: int
+    label: str = ""
 
 
 @dataclass(frozen=True)
@@ -91,6 +93,30 @@ class PlayersBatch:
     envelope: ProviderEnvelope
     club_provider_id: int
     season_year: int
+    label: str = ""
+
+
+@dataclass
+class _RosterLookupCache:
+    """Request-scoped indexes so roster persist does not re-query every row.
+
+    Clubs are few and stay as ORM instances. Transfer keys and transfer-out
+    pairs are scalars: loading every Transfer row into the identity map would
+    make each later flush walk tens of thousands of objects.
+    """
+
+    clubs: dict[int, Club | None] = field(default_factory=dict)
+    athletes: dict[int, Athlete] = field(default_factory=dict)
+    competitions: dict[int, Competition | None] = field(default_factory=dict)
+    seasons: dict[tuple[int, int], SportSeason | None] = field(default_factory=dict)
+    transfer_keys: set[str] = field(default_factory=set)
+    transfer_outs: set[tuple[UUID, UUID]] = field(default_factory=set)
+
+
+_roster_cache: ContextVar[_RosterLookupCache | None] = ContextVar(
+    "roster_lookup_cache",
+    default=None,
+)
 
 
 def _touch_updated_at(row: Any) -> None:
@@ -98,12 +124,32 @@ def _touch_updated_at(row: Any) -> None:
         row.updated_at = datetime.now(UTC)
 
 
+def _load_roster_lookup_cache(session: Session) -> _RosterLookupCache:
+    cache = _RosterLookupCache()
+    for club in session.scalars(select(Club)).all():
+        cache.clubs[club.provider_id] = club
+    cache.transfer_keys.update(session.scalars(select(Transfer.provider_key)).all())
+    for athlete_id, from_club_id in session.execute(
+        select(Transfer.athlete_id, Transfer.from_club_id).where(
+            Transfer.from_club_id.is_not(None),
+        ),
+    ):
+        cache.transfer_outs.add((athlete_id, from_club_id))
+    return cache
+
+
 def _resolve_club(session: Session, provider_id: int | None) -> Club | None:
     if provider_id is None:
         return None
-    return session.execute(
+    cache = _roster_cache.get()
+    if cache is not None and provider_id in cache.clubs:
+        return cache.clubs[provider_id]
+    row = session.execute(
         select(Club).where(Club.provider_id == provider_id),
     ).scalar_one_or_none()
+    if cache is not None:
+        cache.clubs[provider_id] = row
+    return row
 
 
 def _resolve_sport_season(
@@ -112,17 +158,33 @@ def _resolve_sport_season(
     competition_provider_id: int,
     season_year: int,
 ) -> SportSeason | None:
-    competition = session.execute(
-        select(Competition).where(Competition.provider_id == competition_provider_id),
-    ).scalar_one_or_none()
+    cache = _roster_cache.get()
+    key = (competition_provider_id, season_year)
+    if cache is not None and key in cache.seasons:
+        return cache.seasons[key]
+
+    competition: Competition | None
+    if cache is not None and competition_provider_id in cache.competitions:
+        competition = cache.competitions[competition_provider_id]
+    else:
+        competition = session.execute(
+            select(Competition).where(Competition.provider_id == competition_provider_id),
+        ).scalar_one_or_none()
+        if cache is not None:
+            cache.competitions[competition_provider_id] = competition
     if competition is None:
+        if cache is not None:
+            cache.seasons[key] = None
         return None
-    return session.execute(
+    season = session.execute(
         select(SportSeason).where(
             SportSeason.competition_id == competition.id,
             SportSeason.year == season_year,
         ),
     ).scalar_one_or_none()
+    if cache is not None:
+        cache.seasons[key] = season
+    return season
 
 
 def upsert_athlete(
@@ -130,9 +192,13 @@ def upsert_athlete(
     mapped: MappedAthlete,
     counters: RosterSyncCounters,
 ) -> Athlete:
-    row = session.execute(
-        select(Athlete).where(Athlete.provider_id == mapped.provider_id),
-    ).scalar_one_or_none()
+    cache = _roster_cache.get()
+    if cache is not None and mapped.provider_id in cache.athletes:
+        row: Athlete | None = cache.athletes[mapped.provider_id]
+    else:
+        row = session.execute(
+            select(Athlete).where(Athlete.provider_id == mapped.provider_id),
+        ).scalar_one_or_none()
     if row is None:
         row = Athlete(
             provider_id=mapped.provider_id,
@@ -149,8 +215,12 @@ def upsert_athlete(
         )
         session.add(row)
         session.flush()
+        if cache is not None:
+            cache.athletes[mapped.provider_id] = row
         counters.incr_entity("athletes", "created")
         return row
+    if cache is not None:
+        cache.athletes[mapped.provider_id] = row
 
     fields = {
         "canonical_name": mapped.canonical_name,
@@ -200,6 +270,9 @@ def _athlete_has_transfer_out(
     athlete_id: UUID,
     club_id: UUID,
 ) -> bool:
+    cache = _roster_cache.get()
+    if cache is not None:
+        return (athlete_id, club_id) in cache.transfer_outs
     return (
         session.execute(
             select(Transfer.id).where(
@@ -329,10 +402,19 @@ def upsert_transfer(
     mapped: MappedTransfer,
     counters: RosterSyncCounters,
 ) -> Transfer | None:
+    cache = _roster_cache.get()
+    if cache is not None and mapped.provider_key in cache.transfer_keys:
+        counters.incr_entity("transfers", "unchanged")
+        return None
+
     existing = session.execute(
         select(Transfer).where(Transfer.provider_key == mapped.provider_key),
     ).scalar_one_or_none()
     if existing is not None:
+        if cache is not None:
+            cache.transfer_keys.add(mapped.provider_key)
+            if existing.from_club_id is not None:
+                cache.transfer_outs.add((existing.athlete_id, existing.from_club_id))
         counters.incr_entity("transfers", "unchanged")
         return existing
 
@@ -396,6 +478,10 @@ def upsert_transfer(
     )
     session.add(row)
     session.flush()
+    if cache is not None:
+        cache.transfer_keys.add(mapped.provider_key)
+        if row.from_club_id is not None:
+            cache.transfer_outs.add((row.athlete_id, row.from_club_id))
     counters.incr_entity("transfers", "created")
 
     _apply_transfer_membership_effects(
@@ -583,44 +669,33 @@ def sync_roster(
     transfers_envelopes: Sequence[ProviderEnvelope] | None = None,
     league_ids: Sequence[int] = MVP_LEAGUE_IDS,
     store_snapshots: bool = True,
+    on_progress: Callable[[int, int, str], None] | None = None,
 ) -> RosterSyncResult:
-    """Atomic roster unit of work: squads, players, then transfers."""
+    """Atomic roster unit of work: players, then transfers, then squads.
+
+    Transfers are stored before squads because squad membership uses transfer-out
+    history to decide ``is_active``. ``on_progress`` reports each persisted batch
+    so a refresh does not sit on the last fetched club while this write runs.
+    """
     metrics = get_metrics()
-    labels = {"provider": PROVIDER_NAME}
+    metric_labels = {"provider": PROVIDER_NAME}
     counters = RosterSyncCounters()
     result = RosterSyncResult(counters=counters)
+    cache_token: Token[_RosterLookupCache | None] | None = None
     try:
-        with Timer(metrics, ROSTER_SYNC_DURATION_SECONDS, labels=labels):
-            for batch in players_batches or ():
-                sync_players_for_club(
-                    session,
-                    batch.envelope,
-                    club_provider_id=batch.club_provider_id,
-                    season_year=batch.season_year,
-                    league_ids=league_ids,
-                    store_snapshots=store_snapshots,
-                    counters=counters,
-                )
-            for envelope in transfers_envelopes or ():
-                sync_transfers(
-                    session,
-                    envelope,
-                    store_snapshots=store_snapshots,
-                    counters=counters,
-                )
-            for batch in squad_batches or ():
-                if batch.competition_provider_id not in frozenset(league_ids):
-                    continue
-                sync_squads_for_club(
-                    session,
-                    batch.envelope,
-                    club_provider_id=batch.club_provider_id,
-                    competition_provider_id=batch.competition_provider_id,
-                    season_year=batch.season_year,
-                    store_snapshots=store_snapshots,
-                    counters=counters,
-                )
-        metrics.incr(ROSTER_SYNC_RUNS_TOTAL, labels={**labels, "status": "ok"})
+        cache_token = _roster_cache.set(_load_roster_lookup_cache(session))
+        with Timer(metrics, ROSTER_SYNC_DURATION_SECONDS, labels=metric_labels):
+            _persist_roster_batches(
+                session,
+                squad_batches=squad_batches,
+                players_batches=players_batches,
+                transfers_envelopes=transfers_envelopes,
+                league_ids=league_ids,
+                store_snapshots=store_snapshots,
+                counters=counters,
+                on_progress=on_progress,
+            )
+        metrics.incr(ROSTER_SYNC_RUNS_TOTAL, labels={**metric_labels, "status": "ok"})
         logger.info(
             "roster_sync_ok",
             extra={
@@ -631,10 +706,73 @@ def sync_roster(
             },
         )
     except Exception:
-        metrics.incr(ROSTER_SYNC_RUNS_TOTAL, labels={**labels, "status": "error"})
+        metrics.incr(ROSTER_SYNC_RUNS_TOTAL, labels={**metric_labels, "status": "error"})
         logger.exception("roster_sync_failed", extra={"provider": PROVIDER_NAME})
         raise
+    finally:
+        if cache_token is not None:
+            _roster_cache.reset(cache_token)
     return result
+
+
+def _persist_roster_batches(
+    session: Session,
+    *,
+    squad_batches: Sequence[SquadBatch] | None,
+    players_batches: Sequence[PlayersBatch] | None,
+    transfers_envelopes: Sequence[ProviderEnvelope] | None,
+    league_ids: Sequence[int],
+    store_snapshots: bool,
+    counters: RosterSyncCounters,
+    on_progress: Callable[[int, int, str], None] | None,
+) -> None:
+    allowed = frozenset(league_ids)
+    players = list(players_batches or ())
+    transfers = list(transfers_envelopes or ())
+    squads = [batch for batch in squad_batches or () if batch.competition_provider_id in allowed]
+    total = len(players) + len(transfers) + len(squads)
+    done = 0
+    if on_progress is not None and total:
+        on_progress(0, total, "Salvataggio rose…")
+
+    def tick(label: str) -> None:
+        nonlocal done
+        done += 1
+        if on_progress is not None and total:
+            on_progress(done, total, label)
+
+    for index, batch in enumerate(players, start=1):
+        sync_players_for_club(
+            session,
+            batch.envelope,
+            club_provider_id=batch.club_provider_id,
+            season_year=batch.season_year,
+            league_ids=league_ids,
+            store_snapshots=store_snapshots,
+            counters=counters,
+        )
+        name = batch.label or str(batch.club_provider_id)
+        tick(f"Salvataggio rosa {index}/{len(players)}: {name}")
+    for index, envelope in enumerate(transfers, start=1):
+        sync_transfers(
+            session,
+            envelope,
+            store_snapshots=store_snapshots,
+            counters=counters,
+        )
+        tick(f"Salvataggio trasferimenti {index}/{len(transfers)}")
+    for index, batch in enumerate(squads, start=1):
+        sync_squads_for_club(
+            session,
+            batch.envelope,
+            club_provider_id=batch.club_provider_id,
+            competition_provider_id=batch.competition_provider_id,
+            season_year=batch.season_year,
+            store_snapshots=store_snapshots,
+            counters=counters,
+        )
+        name = batch.label or str(batch.club_provider_id)
+        tick(f"Salvataggio formazioni {index}/{len(squads)}: {name}")
 
 
 def sync_mvp_roster_with_client(
@@ -702,6 +840,7 @@ def sync_mvp_roster_with_client(
                 club_provider_id=club.provider_id,
                 competition_provider_id=competition.provider_id,
                 season_year=sport_season.year,
+                label=club.name,
             ),
         )
         players = client.get(
@@ -713,6 +852,7 @@ def sync_mvp_roster_with_client(
                 envelope=players,
                 club_provider_id=club.provider_id,
                 season_year=sport_season.year,
+                label=club.name,
             ),
         )
         transfers = client.get("/transfers", {"team": club.provider_id})
@@ -728,4 +868,5 @@ def sync_mvp_roster_with_client(
         transfers_envelopes=transfer_envelopes,
         league_ids=league_ids,
         store_snapshots=store_snapshots,
+        on_progress=on_progress,
     )

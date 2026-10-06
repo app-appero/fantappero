@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any
@@ -150,7 +151,12 @@ def _upsert_assignment(
     return row
 
 
-def generate_official_listone(session: Session, *, season_year: int) -> ListoneGenerateResult:
+def generate_official_listone(
+    session: Session,
+    *,
+    season_year: int,
+    on_progress: Callable[[int, int], None] | None = None,
+) -> ListoneGenerateResult:
     """Build/refresh official role assignments from active squad memberships."""
     counters = ListoneGenerateCounters()
     metrics = get_metrics()
@@ -164,8 +170,10 @@ def generate_official_listone(session: Session, *, season_year: int) -> ListoneG
             memberships = _active_memberships_for_season(session, season_year)
             by_athlete = _pick_membership_per_athlete(memberships)
             kept_athlete_ids = set(by_athlete.keys())
+            assignments = list(by_athlete.items())
+            assignment_total = len(assignments)
 
-            for athlete_id, membership in by_athlete.items():
+            for index, (athlete_id, membership) in enumerate(assignments, start=1):
                 _upsert_assignment(
                     session,
                     athlete_id=athlete_id,
@@ -173,6 +181,8 @@ def generate_official_listone(session: Session, *, season_year: int) -> ListoneG
                     membership=membership,
                     counters=counters,
                 )
+                if on_progress is not None and (index == assignment_total or index % 100 == 0):
+                    on_progress(index, assignment_total)
 
             stale_stmt = select(RoleAssignment).where(RoleAssignment.season_year == season_year)
             if kept_athlete_ids:

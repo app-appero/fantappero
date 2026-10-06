@@ -116,9 +116,14 @@ def refresh_platform_listone(
             report(12, "catalog", "Catalogo aggiornato. Avvio sync rose…")
 
             def roster_progress(done: int, total: int, label: str) -> None:
+                # Fetch uses 12–55. Persist ("Salvataggio …") uses 55–90.
+                # The old 12–90 map left the bar on the last club (90%) for the
+                # whole database write that follows the HTTP loop.
                 ratio = done / total if total else 1.0
-                percent = 12 + int(ratio * 78)
-                report(percent, "roster", f"Rosa {done}/{total}: {label}")
+                if label.startswith("Salvataggio"):
+                    report(55 + int(ratio * 35), "roster", label)
+                    return
+                report(12 + int(ratio * 43), "roster", f"Rosa {done}/{total}: {label}")
 
             roster_result = sync_mvp_roster_with_client(
                 session,
@@ -127,7 +132,16 @@ def refresh_platform_listone(
                 on_progress=roster_progress,
             )
             report(92, "listone", "Generazione listone ufficiale…")
-            listone_result = generate_official_listone(session, season_year=season_year)
+
+            def listone_progress(done: int, total: int) -> None:
+                ratio = done / total if total else 1.0
+                report(92 + int(ratio * 7), "listone", f"Generazione listone {done}/{total}")
+
+            listone_result = generate_official_listone(
+                session,
+                season_year=season_year,
+                on_progress=listone_progress,
+            )
             refreshed_at = datetime.now(UTC)
             counters = AdminListoneRefreshCounters(
                 athletesCreated=roster_result.counters.athletes_created,

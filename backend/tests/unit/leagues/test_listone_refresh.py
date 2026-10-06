@@ -110,6 +110,43 @@ def test_refresh_always_syncs_catalog_then_roster_listone(
     assert progress[-1] == (100, "completed")
 
 
+def test_refresh_advances_while_rosters_are_saved(monkeypatch: pytest.MonkeyPatch) -> None:
+    service = LeagueListoneService(_FakeSession())  # type: ignore[arg-type]
+    client = SimpleNamespace(close=lambda: None)
+    progress: list[tuple[int, str, str]] = []
+    monkeypatch.setattr(LeagueListoneService, "_count_clubs_for_season", lambda self, year: 12)
+    monkeypatch.setattr(
+        "leagues.listone_service.sync_mvp_catalog_with_client",
+        lambda *_a, **_k: None,
+    )
+
+    def fake_roster(*_a, **kwargs):
+        on_progress = kwargs["on_progress"]
+        on_progress(96, 96, "Le Mans")
+        on_progress(2, 2, "Salvataggio rosa 2/2: Le Mans")
+        return RosterSyncResult(counters=RosterSyncCounters())
+
+    monkeypatch.setattr("leagues.listone_service.sync_mvp_roster_with_client", fake_roster)
+    monkeypatch.setattr(
+        "leagues.listone_service.generate_official_listone",
+        lambda *_a, **_k: ListoneGenerateResult(
+            season_year=2026,
+            mapping_version="v1.0.0",
+            counters=ListoneGenerateCounters(created=1),
+        ),
+    )
+
+    service.refresh_from_provider(
+        _access(),
+        client=client,  # type: ignore[arg-type]
+        on_progress=lambda percent, stage, message: progress.append((percent, stage, message)),
+    )
+    roster = [(percent, message) for percent, stage, message in progress if stage == "roster"]
+    assert roster[0] == (55, "Rosa 96/96: Le Mans")
+    assert roster[-1] == (90, "Salvataggio rosa 2/2: Le Mans")
+    assert progress[-1][:2] == (100, "completed")
+
+
 def test_refresh_maps_rate_limit(monkeypatch: pytest.MonkeyPatch) -> None:
     service = LeagueListoneService(_FakeSession())  # type: ignore[arg-type]
     client = SimpleNamespace(close=lambda: None)

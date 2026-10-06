@@ -243,6 +243,7 @@ describe("Admin panel identity gate (EP11-04a)", () => {
     const { html, unmount } = await renderAppAt("/admin/listone", OPERATOR);
     expect(html).toContain('data-surface="admin"');
     expect(html).toContain('data-testid="admin-listone-refresh"');
+    expect(html).toContain('class="fa-admin-listone__header"');
     expect(html).toContain("Giocatore Esempio");
     expect(html).not.toContain('data-testid="route-forbidden"');
     unmount();

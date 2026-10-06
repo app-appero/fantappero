@@ -827,6 +827,23 @@ a.fa-member-list__identity:focus-visible {
   color: var(--fa-color-foreground-muted);
 }
 
+.fa-admin-listone__header {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--fa-space-sm);
+}
+
+.fa-admin-listone__header .fa-field {
+  flex: 0 0 6.5rem;
+  width: 6.5rem;
+  margin: 0;
+}
+
+.fa-admin-listone__header .fa-btn {
+  flex: 0 1 auto;
+  min-width: 0;
+}
+
 .fa-admin-listone__search {
   margin-bottom: var(--fa-space-md);
   max-width: 24rem;
