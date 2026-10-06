@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from typing import NoReturn
 from uuid import UUID
 
@@ -15,6 +16,7 @@ from database.enums import (
     LeagueAuditAction,
     LeagueCalendarStatus,
     LeagueMemberRole,
+    NamedInviteStatus,
     league_member_role_to_league_role,
 )
 from leagues.models.league import League
@@ -22,6 +24,7 @@ from leagues.models.league_audit_event import LeagueAuditEvent
 from leagues.models.league_calendar import LeagueCalendar
 from leagues.models.league_membership import LeagueMembership
 from leagues.models.league_rules import LeagueRules
+from leagues.models.named_league_invite import NamedLeagueInvite
 from leagues.schemas import LeagueMemberResponse
 from leagues.validators import (
     MIN_PARTICIPANTS,
@@ -40,9 +43,17 @@ class LeagueMembershipService:
     def __init__(self, session: Session) -> None:
         self._session = session
 
-    def list(self, league_access: LeagueAccess) -> list[LeagueMemberResponse]:
+    def list(
+        self,
+        league_access: LeagueAccess,
+        *,
+        include_email: bool = False,
+    ) -> list[LeagueMemberResponse]:
         memberships = self._load_memberships(league_access.league.id)
-        return [self._to_response(membership) for membership in memberships]
+        return [
+            self._to_response(membership, include_email=include_email)
+            for membership in memberships
+        ]
 
     def remove(
         self,
@@ -69,9 +80,10 @@ class LeagueMembershipService:
             )
             raise
 
-        response = self._to_response(membership)
+        response = self._to_response(membership, include_email=True)
         self._session.delete(membership)
         self._session.flush()
+        self._release_accepted_named_invites(league.id, target_user_id)
 
         remaining = (
             self._session.scalar(
@@ -127,7 +139,7 @@ class LeagueMembershipService:
             )
         if target.id == owner.id:
             get_metrics().incr("league_admin_transferred_total", labels={"result": "noop"})
-            return self._to_response(target)
+            return self._to_response(target, include_email=True)
 
         try:
             validate_admin_transfer_target(target.role)
@@ -148,7 +160,7 @@ class LeagueMembershipService:
         self._session.commit()
         get_metrics().incr("league_admin_transferred_total", labels={"result": "success"})
         logger.info("league_admin_transferred", extra={"result": "success"})
-        return self._to_response(target)
+        return self._to_response(target, include_email=True)
 
     def _sync_participant_count_after_removal(
         self,
@@ -183,6 +195,26 @@ class LeagueMembershipService:
                 },
             )
         )
+
+    def _release_accepted_named_invites(self, league_id: UUID, user_id: UUID) -> None:
+        """Un accepted rimasto dopo l'uscita teneva il fantallenatore su «Aggiunto».
+
+        Il vincolo di tabella vuole `responded_at` solo per accepted/declined e
+        `revoked_at` solo per revoked: la riga torna revocata e la directory
+        può proporre di nuovo «Invita».
+        """
+        now = datetime.now(UTC)
+        invites = self._session.scalars(
+            select(NamedLeagueInvite).where(
+                NamedLeagueInvite.league_id == league_id,
+                NamedLeagueInvite.recipient_id == user_id,
+                NamedLeagueInvite.status == NamedInviteStatus.ACCEPTED,
+            )
+        ).all()
+        for invite in invites:
+            invite.status = NamedInviteStatus.REVOKED
+            invite.responded_at = None
+            invite.revoked_at = now
 
     def _invalidate_stale_draft_calendar(self, league_id: UUID) -> None:
         """Cancella l'anteprima H2H: i partecipanti sono cambiati, va rigenerata."""
@@ -261,13 +293,18 @@ class LeagueMembershipService:
         )
 
     @staticmethod
-    def _to_response(membership: LeagueMembership) -> LeagueMemberResponse:
+    def _to_response(
+        membership: LeagueMembership,
+        *,
+        include_email: bool = False,
+    ) -> LeagueMemberResponse:
         return LeagueMemberResponse(
             userId=str(membership.user_id),
             displayName=membership.user.display_name,
             userType=membership.user.user_type.value,
             role=league_member_role_to_league_role(membership.role).value,
             joinedAt=membership.created_at,
+            email=membership.user.email if include_email else None,
         )
 
     @staticmethod

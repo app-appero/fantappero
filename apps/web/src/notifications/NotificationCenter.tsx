@@ -1,6 +1,8 @@
 import type { NotificationItem } from "@fantappero/contracts";
 import { useOptionalToast } from "@fantappero/ui";
-import { useCallback, useEffect, useRef, useState, type MouseEvent as ReactMouseEvent } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type MouseEvent as ReactMouseEvent } from "react";
+import { createPortal } from "react-dom";
+import { notifyReceivedInvitesChanged } from "../layout/receivedInviteEvents";
 import { useNavigate } from "../router/simpleRouter";
 import { IconBell } from "../navigation/NavIcons";
 import { resolveNotificationDestination } from "./notificationDestination";
@@ -27,7 +29,9 @@ function formatTimestamp(value: string): string {
 /** Bell + panel for the in-app notification center (EP09-01). */
 export function NotificationCenter() {
   const [open, setOpen] = useState(false);
+  const [panelBox, setPanelBox] = useState<{ top: number; right: number } | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
   // `null` fuori da un ToastProvider (es. test di pagine isolate): il popup
   // in basso a destra resta solo un'aggiunta facoltativa alla campanella.
@@ -48,6 +52,30 @@ export function NotificationCenter() {
   const { items, unreadCount, loading, loadError, reload, markRead, markAllRead } =
     useNotificationCenter(handleNewNotifications);
 
+  useLayoutEffect(() => {
+    if (!open) {
+      return;
+    }
+    function place() {
+      const trigger = containerRef.current?.querySelector(".fa-notification-center__trigger");
+      if (!(trigger instanceof HTMLElement)) {
+        return;
+      }
+      const rect = trigger.getBoundingClientRect();
+      setPanelBox({
+        top: rect.bottom + 4,
+        right: Math.max(16, window.innerWidth - rect.right),
+      });
+    }
+    place();
+    window.addEventListener("resize", place);
+    window.addEventListener("scroll", place, true);
+    return () => {
+      window.removeEventListener("resize", place);
+      window.removeEventListener("scroll", place, true);
+    };
+  }, [open]);
+
   useEffect(() => {
     if (!open) {
       return;
@@ -55,9 +83,11 @@ export function NotificationCenter() {
     void reload("refresh");
 
     function handlePointerDown(event: MouseEvent) {
-      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
-        setOpen(false);
+      const target = event.target as Node;
+      if (containerRef.current?.contains(target) || panelRef.current?.contains(target)) {
+        return;
       }
+      setOpen(false);
     }
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape") {
@@ -80,6 +110,9 @@ export function NotificationCenter() {
     }
     setOpen(false);
     if (destination) {
+      if (destination === "/inviti" || destination.startsWith("/inviti?")) {
+        notifyReceivedInvitesChanged();
+      }
       navigate(destination);
     }
   }
@@ -116,8 +149,14 @@ export function NotificationCenter() {
           </span>
         ) : null}
       </button>
-      {open ? (
-        <div className="fa-notification-center__panel" data-testid="notification-panel">
+      {open
+        ? createPortal(
+            <div
+              ref={panelRef}
+              className="fa-notification-center__panel"
+              style={panelBox ? { top: panelBox.top, right: panelBox.right } : { top: 0, right: 16 }}
+              data-testid="notification-panel"
+            >
           <div className="fa-notification-center__header">
             <span>Notifiche</span>
             {unreadCount > 0 ? (
@@ -185,9 +224,11 @@ export function NotificationCenter() {
                 );
               })}
             </ul>
-          )}
-        </div>
-      ) : null}
+            )}
+            </div>,
+            document.body,
+          )
+        : null}
     </div>
   );
 }

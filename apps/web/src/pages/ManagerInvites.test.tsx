@@ -1,7 +1,11 @@
-import { createElement } from "react";
+import type { FantasyCoachDirectoryItem } from "@fantappero/contracts";
+import { act, createElement } from "react";
+import { createRoot, type Root } from "react-dom/client";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
+import { fetchManagerDirectory } from "../api/managerInvites";
 import { AuthProvider } from "../auth/AuthContext";
+import { clearStoredSession, saveStoredSession } from "../auth/sessionStorage";
 import { ManagerDirectory } from "../components/ManagerDirectory";
 import { MemoryRouter } from "../router/simpleRouter";
 import { AppRoutes } from "../routes";
@@ -106,6 +110,74 @@ describe("directory fantallenatori", () => {
     expect(html).toContain('data-testid="manager-directory-list"');
     expect(html).not.toContain("Directory non disponibile");
     expect(html).toContain("Invita");
+  });
+
+  it("tiene invitabile chi risulta accettato ma non è più in lega e ricarica senza refresh", async () => {
+    const accepted: FantasyCoachDirectoryItem = {
+      userId: "user-accepted",
+      displayName: "Rosario Trotta",
+      email: "appero.app@gmail.com",
+      avatarUrl: null,
+      userType: "human",
+      availableForInvites: true,
+      namedInviteStatus: "accepted",
+      memberSince: "10/2026",
+      concludedLeagues: 0,
+      bestPosition: null,
+      historySummary: "Nessuna lega conclusa",
+    };
+    vi.mocked(fetchManagerDirectory).mockResolvedValue({
+      items: [accepted],
+      page: 1,
+      pageSize: 12,
+      total: 1,
+      totalPages: 1,
+    });
+    saveStoredSession({
+      accessToken: "token-admin",
+      refreshToken: "refresh-admin",
+      user: { id: "admin-1", displayName: "Admin", globalRole: "member" },
+    });
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+    const root: Root = createRoot(host);
+    function renderDirectoryTree(reloadToken: number) {
+      root.render(
+        createElement(MemoryRouter, {
+          initialEntries: ["/lega/amministrazione"],
+          children: createElement(ManagerDirectory, {
+            leagueId: "league-1",
+            isDemoMode: false,
+            reloadToken,
+          }),
+        }),
+      );
+    }
+    await act(async () => {
+      renderDirectoryTree(0);
+    });
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    const button = host.querySelector('[data-testid="manager-invite-user-accepted"]');
+    expect(button?.textContent).toBe("Invita");
+    expect(button?.hasAttribute("disabled")).toBe(false);
+    expect(host.textContent).not.toContain("Aggiunto");
+    expect(host.textContent).toContain("appero.app@gmail.com");
+
+    await act(async () => {
+      renderDirectoryTree(1);
+    });
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    expect(vi.mocked(fetchManagerDirectory).mock.calls.length).toBeGreaterThanOrEqual(2);
+
+    act(() => {
+      root.unmount();
+    });
+    host.remove();
+    clearStoredSession();
   });
 });
 

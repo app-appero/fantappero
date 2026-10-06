@@ -158,6 +158,13 @@
   z-index: var(--fa-z-sticky);
 }
 
+/* `.fa-surface-pitch > *` ha specificità più alta di `.fa-app-header` e
+   azzerava lo z-index a 1, allo stesso livello del contenuto: il menu della
+   campanella finiva sotto le card della pagina. */
+.fa-surface-pitch > .fa-app-header {
+  z-index: var(--fa-z-sticky);
+}
+
 .fa-app-header--admin {
   background: linear-gradient(
     180deg,

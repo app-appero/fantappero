@@ -105,6 +105,16 @@ def test_list_members_requires_admin(
     assert response.status_code == 200
     assert {row["userId"] for row in response.json()} == {str(owner_id), str(member_id)}
     assert {row["role"] for row in response.json()} == {"league_admin", "member"}
+    assert {row["email"] for row in response.json()} == {
+        "members.owner@example.com",
+        "members.member@example.com",
+    }
+    public = client.get(
+        f"/leagues/{league_id}/partecipanti",
+        headers={"Authorization": f"Bearer {member_token}"},
+    )
+    assert public.status_code == 200
+    assert all(row["email"] is None for row in public.json())
     assert forbidden.status_code == 403
     assert forbidden.json()["code"] == "forbidden"
 

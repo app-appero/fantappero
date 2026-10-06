@@ -107,7 +107,8 @@ describe("NotificationCenter (EP09-01)", () => {
     });
     await flushAsync();
 
-    const panel = container.querySelector('[data-testid="notification-panel"]');
+    const panel = document.querySelector('[data-testid="notification-panel"]');
+    expect(panel?.parentElement).toBe(document.body);
     expect(panel?.querySelector('[data-testid="notification-empty"]')).not.toBeNull();
     expect(panel?.textContent).toContain("Nessuna notifica");
   });
@@ -122,7 +123,7 @@ describe("NotificationCenter (EP09-01)", () => {
     });
     await flushAsync();
 
-    const panel = container.querySelector('[data-testid="notification-panel"]');
+    const panel = document.querySelector('[data-testid="notification-panel"]');
     expect(panel?.querySelector('[data-testid="notification-error"]')).not.toBeNull();
   });
 
@@ -137,7 +138,7 @@ describe("NotificationCenter (EP09-01)", () => {
     });
     await flushAsync();
 
-    const item = container.querySelector(
+    const item = document.querySelector(
       `[data-testid="notification-item-${ITEM.id}"]`,
     ) as HTMLElement;
     expect(item).not.toBeNull();
@@ -147,7 +148,7 @@ describe("NotificationCenter (EP09-01)", () => {
     await flushAsync();
 
     expect(markNotificationReadMock).toHaveBeenCalledWith("token-123", ITEM.id);
-    expect(container.querySelector('[data-testid="notification-panel"]')).toBeNull();
+    expect(document.querySelector('[data-testid="notification-panel"]')).toBeNull();
     expect(container.querySelector('[data-testid="notification-unread-badge"]')).toBeNull();
   });
 
@@ -186,7 +187,7 @@ describe("NotificationCenter (EP09-01)", () => {
       trigger.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     });
 
-    const item = container.querySelector(
+    const item = document.querySelector(
       `[data-testid="notification-item-${invite.id}"]`,
     ) as HTMLAnchorElement;
     expect(item.getAttribute("href")).toBe("/inviti");
@@ -232,7 +233,7 @@ describe("NotificationCenter (EP09-01)", () => {
     });
     await flushAsync();
 
-    const markAll = container.querySelector(
+    const markAll = document.querySelector(
       '[data-testid="notification-mark-all-read"]',
     ) as HTMLElement;
     await act(async () => {

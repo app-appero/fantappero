@@ -8,13 +8,15 @@ import {
   removeLeagueMember,
   transferLeagueAdmin,
 } from "../api/leagues";
-import { getApiErrorMessage } from "../auth/AuthContext";
+import { getApiErrorMessage, useAuth } from "../auth/AuthContext";
 import { loadStoredSession } from "../auth/sessionStorage";
+import { Link } from "../router/simpleRouter";
 
 const DEMO_MEMBERS: LeagueMember[] = [
   {
     userId: "demo-admin",
     displayName: "Marco",
+    email: "marco@example.com",
     userType: "human",
     role: "league_admin",
     joinedAt: "2026-08-01T10:00:00Z",
@@ -22,6 +24,7 @@ const DEMO_MEMBERS: LeagueMember[] = [
   {
     userId: "demo-member-1",
     displayName: "Giulia",
+    email: "giulia@example.com",
     userType: "human",
     role: "member",
     joinedAt: "2026-08-02T10:00:00Z",
@@ -29,6 +32,7 @@ const DEMO_MEMBERS: LeagueMember[] = [
   {
     userId: "demo-member-2",
     displayName: "Allenatore IA 01",
+    email: "ia-01@example.com",
     userType: "ai",
     role: "member",
     joinedAt: "2026-08-03T10:00:00Z",
@@ -58,6 +62,7 @@ export function LeagueMembersPanel({
   onMembersLoaded,
   onMembersChanged,
 }: LeagueMembersPanelProps) {
+  const { user } = useAuth();
   const demoState = new URLSearchParams(search).get("partecipanti");
   const [members, setMembers] = useState<LeagueMember[]>(
     isDemoMode && demoState !== "empty" ? DEMO_MEMBERS : [],
@@ -163,6 +168,7 @@ export function LeagueMembersPanel({
       setMembers(next);
       onMembersLoadedRef.current?.(next.length);
       setSuccess(`${target.displayName} è stato rimosso dalla lega.`);
+      onMembersChanged?.();
       return;
     }
     const session = loadStoredSession();
@@ -286,13 +292,43 @@ export function LeagueMembersPanel({
       ) : null}
       {!loading && !error && members.length > 0 ? (
         <ul className="fa-member-list" data-testid="league-members-list">
-          {members.map((member) => (
-            <li key={member.userId} className="fa-member-list__item">
-              <span>
+          {members.map((member) => {
+            const roleLabel = `${member.role === "league_admin" ? "Amministratore" : "Partecipante"}${member.userType === "ai" ? " · IA" : ""}`;
+            const params = new URLSearchParams(search);
+            if (leagueId) params.set("league", leagueId);
+            const qs = params.toString();
+            const profileHref =
+              user && member.userId === user.id
+                ? null
+                : `/fantallenatori/${member.userId}${qs ? `?${qs}` : ""}`;
+            const identity = (
+              <>
                 <strong>{member.displayName}</strong>
-                {` · ${member.role === "league_admin" ? "Amministratore" : "Partecipante"}`}
-                {member.userType === "ai" ? " · IA" : ""}
-              </span>
+                {member.email ? (
+                  <span
+                    className="fa-member-list__email"
+                    data-testid={`league-member-email-${member.userId}`}
+                  >
+                    {member.email}
+                  </span>
+                ) : null}
+                <span>{`· ${roleLabel}`}</span>
+              </>
+            );
+            return (
+            <li key={member.userId} className="fa-member-list__item">
+              {profileHref ? (
+                <Link
+                  to={profileHref}
+                  className="fa-member-list__identity"
+                  aria-label={`Apri il profilo di ${member.displayName}`}
+                  data-testid={`league-member-open-${member.userId}`}
+                >
+                  {identity}
+                </Link>
+              ) : (
+                <span className="fa-member-list__identity">{identity}</span>
+              )}
               {member.role === "member" ? (
                 <span className="fa-ds-showcase__row">
                   {member.userType === "ai" ? (
@@ -331,7 +367,8 @@ export function LeagueMembersPanel({
                 </span>
               ) : null}
             </li>
-          ))}
+            );
+          })}
         </ul>
       ) : null}
       {success ? (

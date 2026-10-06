@@ -136,6 +136,8 @@ class LeagueMemberResponse(ApiModel):
     user_type: Literal["human", "ai"] = Field(alias="userType")
     role: Literal["member", "league_admin"]
     joined_at: datetime = Field(alias="joinedAt")
+    # Valorizzata solo dagli endpoint di amministrazione lega.
+    email: str | None = None
 
 
 class CreateLeagueInviteRequest(ApiModel):

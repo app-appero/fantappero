@@ -725,6 +725,7 @@ export function LeagueAdminPage() {
                       compact
                       memberCount={memberCount}
                       participantCount={rules.participantCount}
+                      reloadToken={membersReloadToken}
                       onMembershipChanged={refreshAfterMembershipChange}
                     />
                   </>

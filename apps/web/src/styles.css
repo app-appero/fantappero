@@ -156,6 +156,39 @@ button.fa-link-muted,
   background: var(--fa-color-background-elevated);
 }
 
+.fa-member-list__identity {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.2rem 0.55rem;
+  min-width: 0;
+  color: inherit;
+  text-decoration: none;
+  border-radius: var(--fa-radius-sm);
+}
+
+a.fa-member-list__identity:hover strong {
+  color: var(--fa-color-accent);
+}
+
+a.fa-member-list__identity:focus-visible {
+  outline: none;
+  box-shadow: var(--fa-shadow-focus);
+}
+
+.fa-member-list__email {
+  color: var(--fa-color-foreground-muted);
+  font-size: var(--fa-text-sm);
+  overflow-wrap: anywhere;
+}
+
+.fa-invite-create-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--fa-space-sm);
+}
+
 .fa-app-header__brand a {
   color: inherit;
   text-decoration: none;
@@ -1278,21 +1311,15 @@ button.fa-link-muted,
 }
 
 .fa-notification-center__panel {
-  position: absolute;
-  top: calc(100% + var(--fa-space-xs));
-  right: 0;
-  z-index: var(--fa-z-dropdown);
-  /* Larga 20rem fissa, ancorata al bordo destro della sola campanella (non
-     dell'header): su schermi stretti il bordo sinistro del pannello finiva
-     a decine di px dal bordo dello schermo, lasciando scoperta una striscia
-     di contenuto di pagina dietro — che sembrava "sovrapposto" al pannello. */
+  position: fixed;
+  z-index: var(--fa-z-overlay);
   width: min(20rem, calc(100vw - 2 * var(--fa-space-md)));
-  max-height: 24rem;
+  max-height: min(24rem, calc(100vh - 5rem));
   overflow-y: auto;
   background-color: var(--fa-color-background);
   border: 1px solid var(--fa-color-border);
   border-radius: var(--fa-radius-md);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.28);
 }
 
 .fa-notification-center__header {

@@ -45,6 +45,17 @@ from observability.context import get_correlation_id
 from observability.metrics import get_metrics
 
 
+def directory_invite_status(status: NamedInviteStatus | None) -> str | None:
+    """Stato mostrato in directory.
+
+    La query esclude i membri attuali: un invito `accepted` rimasto dopo una
+    rimozione non deve più comparire come «Aggiunto».
+    """
+    if status is None or status == NamedInviteStatus.ACCEPTED:
+        return None
+    return status.value
+
+
 class NamedLeagueInviteService:
     def __init__(
         self,
@@ -129,7 +140,7 @@ class NamedLeagueInviteService:
                 availableForInvites=(
                     user.user_type == UserType.AI or profile.available_for_invites
                 ),
-                namedInviteStatus=invite_status.value if invite_status is not None else None,
+                namedInviteStatus=directory_invite_status(invite_status),
                 memberSince=seniority_label(user.created_at, now=now),
                 concludedLeagues=histories[user.id].concluded_leagues,
                 bestPosition=histories[user.id].best_position,

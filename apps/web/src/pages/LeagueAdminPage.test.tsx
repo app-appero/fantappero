@@ -162,6 +162,16 @@ describe("EP03-02 league admin page", () => {
 
 
 
+  it("mostra email, profilo e il bottone invito allineato alla durata", () => {
+    const html = renderRoute("/lega/amministrazione?persona=admin&stato=success&partecipanti");
+    expect(html).toContain('data-testid="league-member-email-demo-member-1"');
+    expect(html).toContain("giulia@example.com");
+    expect(html).toContain('data-testid="league-member-open-demo-member-1"');
+    expect(html).toContain('href="/fantallenatori/demo-member-1');
+    expect(html).toContain("fa-invite-create-row");
+    expect(html).toContain('data-testid="league-invite-create"');
+  });
+
   it("keeps invite CTAs behind the locked Invitati tab until configuration is saved", () => {
     const html = renderRoute("/lega/amministrazione?persona=admin");
     expect(html).toContain('id="tab-invitati"');

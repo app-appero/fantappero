@@ -253,6 +253,8 @@ export interface LeagueMember {
   userType: import("./profile.js").UserType;
   role: "member" | "league_admin";
   joinedAt: string;
+  /** Solo sulla lista amministrativa: distingue omonimi. Assente sul roster pubblico. */
+  email?: string | null;
 }
 
 /** Classifica lega persistita (EP07-06 / FR-CLS-01). */

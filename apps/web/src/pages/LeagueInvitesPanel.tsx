@@ -167,7 +167,7 @@ export function LeagueInvitesPanel({
         <strong>link</strong> oppure il <strong>codice</strong> — entrambi consentono
         l&apos;ingresso da &quot;Unisciti con codice&quot;.
       </p>
-      <div className="fa-ds-showcase__row">
+      <div className="fa-invite-create-row">
         <Select
           label="Durata invito"
           name="invite-expiry"

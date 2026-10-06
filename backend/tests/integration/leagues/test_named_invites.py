@@ -315,6 +315,70 @@ def test_named_capacity_and_concurrent_accept(
     )
 
 
+def test_removed_member_is_invitable_again_and_sees_the_new_invite(
+    client: TestClient,
+    competition_ids: list[str],
+) -> None:
+    owner_token, _ = _register_and_login(client, "reinvite.owner@example.com")
+    recipient_token, recipient_id = _register_and_login(
+        client,
+        "reinvite.recipient@example.com",
+        display_name="Rosario Rimosso",
+    )
+    league_id = _create_league(client, owner_token, competition_ids, "Lega Reinvito")
+    _set_available(client, recipient_token, True)
+    created = client.post(
+        f"/leagues/{league_id}/amministrazione/inviti-nominativi",
+        headers={"Authorization": f"Bearer {owner_token}"},
+        json={"recipientUserId": str(recipient_id)},
+    )
+    assert created.status_code == 201
+    accept = client.post(
+        f"/leagues/inviti-ricevuti/{created.json()['id']}/accetta",
+        headers={"Authorization": f"Bearer {recipient_token}"},
+    )
+    assert accept.status_code == 200
+
+    removed = client.delete(
+        f"/leagues/{league_id}/amministrazione/partecipanti/{recipient_id}",
+        headers={"Authorization": f"Bearer {owner_token}"},
+    )
+    assert removed.status_code == 200
+
+    directory = client.get(
+        f"/leagues/{league_id}/amministrazione/fantallenatori",
+        headers={"Authorization": f"Bearer {owner_token}"},
+        params={"search": "Rosario Rimosso"},
+    )
+    assert directory.status_code == 200
+    rows = [row for row in directory.json()["items"] if row["userId"] == str(recipient_id)]
+    assert len(rows) == 1
+    assert rows[0]["namedInviteStatus"] == "revoked"
+    assert rows[0]["email"] == "reinvite.recipient@example.com"
+
+    inbox = client.get(
+        "/leagues/inviti-ricevuti",
+        headers={"Authorization": f"Bearer {recipient_token}"},
+    )
+    assert inbox.status_code == 200
+    assert inbox.json() == []
+
+    again = client.post(
+        f"/leagues/{league_id}/amministrazione/inviti-nominativi",
+        headers={"Authorization": f"Bearer {owner_token}"},
+        json={"recipientUserId": str(recipient_id)},
+    )
+    assert again.status_code == 201
+    assert again.json()["status"] == "pending"
+
+    inbox_after = client.get(
+        "/leagues/inviti-ricevuti",
+        headers={"Authorization": f"Bearer {recipient_token}"},
+    )
+    assert inbox_after.status_code == 200
+    assert [row["id"] for row in inbox_after.json()] == [again.json()["id"]]
+
+
 def test_ai_availability_endpoint_is_immutable(
     client: TestClient,
     db_session: Session,

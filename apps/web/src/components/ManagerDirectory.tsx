@@ -221,6 +221,8 @@ type ManagerDirectoryProps = {
   memberCount?: number | null;
   /** Capienza regolamento (`participantCount`). */
   participantCount?: number | null;
+  /** Incrementato dopo un ingresso o una rimozione, per ricaricare senza refresh. */
+  reloadToken?: number;
   /** Ricarica iscritti e prerequisiti dopo un ingresso in lega o a capienza piena. */
   onMembershipChanged?: () => void;
 };
@@ -337,6 +339,7 @@ export function ManagerDirectory({
   compact = false,
   memberCount = null,
   participantCount = null,
+  reloadToken = 0,
   onMembershipChanged,
 }: ManagerDirectoryProps) {
   const demoState = new URLSearchParams(search).get("directory");
@@ -444,7 +447,7 @@ export function ManagerDirectory({
     } finally {
       setLoading(false);
     }
-  }, [availableFilter, debouncedQuery, demoState, isDemoMode, leagueId, page, userType]);
+  }, [availableFilter, debouncedQuery, demoState, isDemoMode, leagueId, page, reloadToken, userType]);
 
   useEffect(() => {
     void load();
@@ -637,7 +640,8 @@ export function ManagerDirectory({
             {result.items.map((manager) => {
               const unavailable = !manager.availableForInvites;
               const alreadyInvited = manager.namedInviteStatus === "pending";
-              const accepted = manager.namedInviteStatus === "accepted";
+              // Un accepted in directory è residuo: la persona non è più membro
+              // (altrimenti la query la escluderebbe) e deve poter essere reinvitata.
               return (
                 <li key={manager.userId} className="fa-manager-directory__item">
                   <CoachAvatar
@@ -680,19 +684,13 @@ export function ManagerDirectory({
                     <Button
                       type="button"
                       size="sm"
-                      variant={unavailable || alreadyInvited || accepted ? "secondary" : "primary"}
-                      disabled={unavailable || alreadyInvited || accepted || leagueFull}
+                      variant={unavailable || alreadyInvited ? "secondary" : "primary"}
+                      disabled={unavailable || alreadyInvited || leagueFull}
                       loading={workingId === manager.userId}
                       onClick={() => void onInvite(manager)}
                       data-testid={`manager-invite-${manager.userId}`}
                     >
-                      {unavailable
-                        ? "Indisponibile"
-                        : accepted
-                          ? "Aggiunto"
-                          : alreadyInvited
-                            ? "Già invitato"
-                            : "Invita"}
+                      {unavailable ? "Indisponibile" : alreadyInvited ? "Già invitato" : "Invita"}
                     </Button>
                   ) : (
                     <span className="fa-manager-directory__status">

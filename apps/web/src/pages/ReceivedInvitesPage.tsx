@@ -9,6 +9,7 @@ import {
 import { ApiError } from "../api/client";
 import { getApiErrorMessage, useAuth } from "../auth/AuthContext";
 import { loadStoredSession } from "../auth/sessionStorage";
+import { subscribeReceivedInvitesChanged } from "../layout/receivedInviteEvents";
 import { notifyPendingInvitesChanged } from "../layout/usePendingInviteCount";
 import { useLocation } from "../router/simpleRouter";
 
@@ -56,8 +57,10 @@ export function ReceivedInvitesPage() {
   const [success, setSuccess] = useState<string | null>(null);
   const [workingId, setWorkingId] = useState<string | null>(null);
 
-  const load = useCallback(async () => {
-    setSuccess(null);
+  const load = useCallback(async (options?: { preserveSuccess?: boolean }) => {
+    if (!options?.preserveSuccess) {
+      setSuccess(null);
+    }
     if (isDemoMode) {
       setLoading(demoState === "loading");
       if (demoState === "error" || demoState === "forbidden") {
@@ -93,6 +96,20 @@ export function ReceivedInvitesPage() {
 
   useEffect(() => {
     void load();
+  }, [load]);
+
+  useEffect(() => {
+    return subscribeReceivedInvitesChanged(() => {
+      void load({ preserveSuccess: true });
+    });
+  }, [load]);
+
+  useEffect(() => {
+    function onFocus() {
+      void load({ preserveSuccess: true });
+    }
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
   }, [load]);
 
   async function act(invite: NamedLeagueInvite, action: "accept" | "decline") {

@@ -574,7 +574,7 @@ def list_league_members(
     service: LeagueMembershipService = Depends(get_league_membership_service),
 ) -> list[LeagueMemberResponse]:
     """List current league participants for league administration."""
-    return service.list(league_access)
+    return service.list(league_access, include_email=True)
 
 
 @router.post(
