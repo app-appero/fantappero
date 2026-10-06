@@ -38,19 +38,27 @@ Copia codice/link: sheet nativa `Share` (senza dipendenza clipboard extra).
 
 | Comando | Descrizione |
 | --- | --- |
-| `pnpm --filter @fantappero/mobile start` | Dev server Expo (LAN) |
+| `pnpm dev:mobile:locale` | Expo tunnel, API locale `http://127.0.0.1:8001` |
+| `pnpm dev:mobile:dev` | Expo tunnel, API Railway dev |
+| `pnpm dev:mobile:pilota` | Expo tunnel, API Railway pilota |
+| `pnpm dev:mobile:prod` | Expo tunnel, API di produzione (l'URL non c'è ancora) |
 | `pnpm --filter @fantappero/mobile test` | Test unitari |
 | `pnpm --filter @fantappero/mobile typecheck` | Typecheck TypeScript |
 | `pnpm --filter @fantappero/mobile build` | Verifica build (`tsc --noEmit`) |
+
+I profili stanno in `apps/mobile/env/` (`locale.env`, `dev.env`, `pilota.env`, `prod.env`). Sono URL pubblici, senza segreti. Il comando stampa l'API scelta e la scrive nel bundle: per cambiarla bisogna riavviare. `apps/mobile/.env` resta un fallback del comando `start` (LAN, senza profilo).
+
+Dal telefono, per l'API locale, `127.0.0.1` non raggiunge il PC. In `apps/mobile/.env.local` (gitignored) metti `EXPO_PUBLIC_API_BASE_URL=http://<IP-LAN>:8001`: vale solo per `dev:mobile:locale`. Dev, pilota e prod ignorano quell'override e usano l'URL del profilo.
 
 ## Auth
 
 All’avvio: schermata **Accedi** (come web `/accedi`). Nessuna modalità demo.
 Logout → torna ad Accedi.
 
-Per **device fisico** (Expo Go): in `apps/mobile/.env` usa l’IP LAN del PC
-(`http://192.168.x.x:8001`), non `127.0.0.1`. Poi riavvia Expo.
-Apri l’app scansionando il QR con Expo Go (stessa Wi‑Fi). Il tasto `a` richiede
+Per **device fisico** (Expo Go) contro l'API sul PC: `pnpm dev:mobile:locale` e,
+in `apps/mobile/.env.local`, l'IP LAN del PC (`http://192.168.x.x:8001`).
+Per dev o pilota: `pnpm dev:mobile:dev` oppure `pnpm dev:mobile:pilota`.
+Apri l'app scansionando il QR con Expo Go. Il tasto `a` richiede
 emulatore/device Android con USB debugging.
 
 Documentazione shell: [`docs/design/shell-mobile.md`](../../docs/design/shell-mobile.md).

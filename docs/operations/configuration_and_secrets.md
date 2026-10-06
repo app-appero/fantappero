@@ -9,7 +9,7 @@ FantApperò separates **environment-specific values** from code. Secrets never b
 | **API** (`backend`) | Platform / backend team | Root `.env`, secret manager at deploy time | `config.settings.api.ApiSettings` |
 | **Worker** (`backend`) | Platform / backend team | Same as API (shared `.env` in dev) | `config.settings.worker.WorkerSettings` |
 | **Web** (`apps/web`) | Frontend team | `apps/web/.env` — **public vars only** | `apps/web/src/config/env.ts` |
-| **Mobile** (`apps/mobile`) | Mobile team | `apps/mobile/.env` — **public vars only** | `apps/mobile/src/config/env.ts` |
+| **Mobile** (`apps/mobile`) | Mobile team | `apps/mobile/env/*.env` (committed public profiles) and `apps/mobile/.env` / `.env.local` (gitignored) | `apps/mobile/src/config/env.ts` |
 | **Compose (local)** | Developer machine | `infra/local/.env` (optional override) | Documented in [local_environment.md](../development/local_environment.md) |
 
 **Rule:** Provider keys (`API_FOOTBALL_KEY`, etc.) are **backend-only**. Web and mobile must never read or bundle them.
@@ -34,6 +34,7 @@ config/settings/             # Per-component templates (no real secrets)
 infra/local/.env.example     # Docker Compose defaults
 apps/web/.env.example        # VITE_* public URLs
 apps/mobile/.env.example     # EXPO_PUBLIC_* public URLs
+apps/mobile/env/             # locale, dev, pilota, prod public API origins
 backend/src/config/settings/ # Typed Python schemas + redaction
 ```
 
@@ -77,7 +78,7 @@ All `.env` files are gitignored. Only `*.env.example` files are committed.
 | Variable | Required | Secret | Description |
 | --- | --- | --- | --- |
 | `VITE_API_BASE_URL` | Yes (when using API) | No | Web API origin |
-| `EXPO_PUBLIC_API_BASE_URL` | Yes (when using API) | No | Mobile API origin |
+| `EXPO_PUBLIC_API_BASE_URL` | Yes (when using API) | No | Mobile API origin. `pnpm dev:mobile:locale`, `dev:mobile:dev`, `dev:mobile:pilota`, `dev:mobile:prod` load `apps/mobile/env/<profile>.env`. `prod` stays empty until a public origin exists. |
 
 Client variables are embedded in the bundle — use only non-sensitive URLs.
 
