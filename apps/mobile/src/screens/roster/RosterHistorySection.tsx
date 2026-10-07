@@ -1,4 +1,5 @@
 import type {
+  CreditLedgerList,
   RosterOwnershipHistory,
   RosterTurnSnapshotDetail,
   RosterTurnSnapshotSummary,
@@ -6,6 +7,7 @@ import type {
 import { theme } from "@fantappero/ui/theme";
 import { Pressable, Text, TextInput, View } from "react-native";
 import { UiStatePanel } from "../../components/UiStatePanel";
+import { formatLedgerEntry, LEDGER_PAGE_SIZE } from "./rosterHelpers";
 import { rosterStyles as styles } from "./rosterStyles";
 
 const { spacing } = theme;
@@ -23,6 +25,13 @@ export function RosterHistorySection({
   onCreateSnapshot,
   snapshotMessage,
   snapshotError,
+  hasLedger,
+  pagedLedgerEntries,
+  ledgerEntriesCount,
+  safeLedgerPage,
+  ledgerPageCount,
+  onLedgerPagePrev,
+  onLedgerPageNext,
 }: {
   historyLoading: boolean;
   historyError: string | null;
@@ -36,9 +45,61 @@ export function RosterHistorySection({
   onCreateSnapshot: () => void | Promise<void>;
   snapshotMessage: string | null;
   snapshotError: string | null;
+  hasLedger: boolean;
+  pagedLedgerEntries: CreditLedgerList["entries"];
+  ledgerEntriesCount: number;
+  safeLedgerPage: number;
+  ledgerPageCount: number;
+  onLedgerPagePrev: () => void;
+  onLedgerPageNext: () => void;
 }) {
   return (
     <View testID="roster-history">
+      <View style={{ marginBottom: spacing.md }}>
+        <Text style={styles.summary}>Movimenti crediti</Text>
+        {hasLedger ? (
+          <View testID="roster-credits-ledger">
+            {pagedLedgerEntries.map((entry) => (
+              <Text key={entry.id} style={styles.meta}>
+                {formatLedgerEntry(entry)}
+              </Text>
+            ))}
+            {ledgerEntriesCount > LEDGER_PAGE_SIZE ? (
+              <View style={styles.pagination}>
+                <Pressable
+                  style={[styles.ghostButton, safeLedgerPage <= 0 && styles.disabled]}
+                  disabled={safeLedgerPage <= 0}
+                  testID="roster-credits-ledger-prev"
+                  onPress={onLedgerPagePrev}
+                >
+                  <Text style={styles.ghostButtonLabel}>Precedenti</Text>
+                </Pressable>
+                <Text style={styles.meta} testID="roster-credits-ledger-page">
+                  {safeLedgerPage + 1}/{ledgerPageCount}
+                </Text>
+                <Pressable
+                  style={[
+                    styles.ghostButton,
+                    safeLedgerPage >= ledgerPageCount - 1 && styles.disabled,
+                  ]}
+                  disabled={safeLedgerPage >= ledgerPageCount - 1}
+                  testID="roster-credits-ledger-next"
+                  onPress={onLedgerPageNext}
+                >
+                  <Text style={styles.ghostButtonLabel}>Successivi</Text>
+                </Pressable>
+              </View>
+            ) : null}
+          </View>
+        ) : (
+          <UiStatePanel
+            state="empty"
+            title="Nessun movimento"
+            message="Il ledger crediti non contiene ancora movimenti."
+            testID="roster-credits-empty"
+          />
+        )}
+      </View>
       {historyLoading ? (
         <UiStatePanel
           state="loading"
