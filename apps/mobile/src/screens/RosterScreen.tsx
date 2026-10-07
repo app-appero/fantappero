@@ -99,7 +99,6 @@ export function RosterScreen() {
   const [listone, setListone] = useState<LeagueListoneEntry[]>([]);
   const [occupancy, setOccupancy] = useState<RosterOccupancyEntry[]>([]);
   const [listoneQuery, setListoneQuery] = useState("");
-  const [purchaseCredits, setPurchaseCredits] = useState("1");
   const [adminBusy, setAdminBusy] = useState(false);
   const [adminMessage, setAdminMessage] = useState<string | null>(null);
   const [adminError, setAdminError] = useState<string | null>(null);
@@ -138,17 +137,6 @@ export function RosterScreen() {
     (ownerTeamId: string) => isAdmin || ownerTeamId === team?.id,
     [isAdmin, team?.id],
   );
-  const filteredListone = useMemo(() => {
-    const normalized = listoneQuery.trim().toLocaleLowerCase("it-IT");
-    if (!normalized) {
-      return listone;
-    }
-    return listone.filter((entry) => {
-      const haystack = `${entry.canonicalName} ${entry.clubName ?? ""}`.toLocaleLowerCase("it-IT");
-      return haystack.includes(normalized);
-    });
-  }, [listone, listoneQuery]);
-
   const applyTeamUpdate = useCallback((updated: FantasyTeam) => {
     setTeamDetails((current) =>
       current.some((row) => row.id === updated.id)
@@ -557,7 +545,7 @@ export function RosterScreen() {
     })();
   };
 
-  const onAssignAthlete = async (athleteId: string) => {
+  const onAssignAthlete = async (athleteId: string, creditsInput: number) => {
     setAdminMessage(null);
     setAdminError(null);
     if (!activeLeagueId || !accessToken || !targetTeamId || !targetTeam) {
@@ -573,7 +561,7 @@ export function RosterScreen() {
       setAdminError("Il calciatore appartiene già a una squadra di questa lega.");
       return;
     }
-    const credits = Number.parseInt(purchaseCredits, 10);
+    const credits = creditsInput;
     if (!Number.isFinite(credits) || credits < 1) {
       setAdminError("Inserisci crediti acquisto validi (minimo 1).");
       return;
@@ -592,6 +580,40 @@ export function RosterScreen() {
       setAdminMessage(`Assegnato a slot ${emptySlot.slotIndex + 1}.`);
     } catch (error) {
       setAdminError(getApiErrorMessage(error, "Impossibile assegnare il calciatore."));
+    } finally {
+      setAdminBusy(false);
+    }
+  };
+
+  const onUpdatePurchaseCredits = async (
+    slotIndex: number,
+    athleteId: string,
+    purchaseCredits: number,
+  ) => {
+    setAdminMessage(null);
+    setAdminError(null);
+    if (!activeLeagueId || !accessToken || !targetTeamId || !targetTeam) {
+      setAdminError("Sessione o squadra non disponibile.");
+      return;
+    }
+    if (!Number.isFinite(purchaseCredits) || purchaseCredits < 0) {
+      setAdminError("Inserisci un prezzo di acquisto valido (minimo 0).");
+      return;
+    }
+    setAdminBusy(true);
+    try {
+      const updated = await assignRosterSlot(
+        accessToken,
+        activeLeagueId,
+        targetTeamId,
+        slotIndex,
+        { athleteId, purchaseCredits },
+      );
+      applyTeamUpdate(updated);
+      await refreshViewedCredits();
+      setAdminMessage(`Prezzo di acquisto aggiornato a ${purchaseCredits} crediti.`);
+    } catch (error) {
+      setAdminError(getApiErrorMessage(error, "Impossibile aggiornare il prezzo di acquisto."));
     } finally {
       setAdminBusy(false);
     }
@@ -731,6 +753,15 @@ export function RosterScreen() {
           onCreateSnapshot={onCreateSnapshot}
           snapshotMessage={snapshotMessage}
           snapshotError={snapshotError}
+          hasLedger={hasLedger}
+          pagedLedgerEntries={pagedLedgerEntries}
+          ledgerEntriesCount={ledgerEntriesNewestFirst.length}
+          safeLedgerPage={safeLedgerPage}
+          ledgerPageCount={ledgerPageCount}
+          onLedgerPagePrev={() => setLedgerPage((page) => Math.max(0, page - 1))}
+          onLedgerPageNext={() =>
+            setLedgerPage((page) => Math.min(ledgerPageCount - 1, page + 1))
+          }
         />
       ) : null}
 
@@ -792,15 +823,6 @@ export function RosterScreen() {
           onAdminAdjust={onAdminAdjust}
           adjustMessage={adjustMessage}
           adjustError={adjustError}
-          hasLedger={hasLedger}
-          pagedLedgerEntries={pagedLedgerEntries}
-          ledgerEntriesCount={ledgerEntriesNewestFirst.length}
-          safeLedgerPage={safeLedgerPage}
-          ledgerPageCount={ledgerPageCount}
-          onLedgerPagePrev={() => setLedgerPage((page) => Math.max(0, page - 1))}
-          onLedgerPageNext={() =>
-            setLedgerPage((page) => Math.min(ledgerPageCount - 1, page + 1))
-          }
         />
       ) : null}
 
@@ -846,6 +868,7 @@ export function RosterScreen() {
           canEdit={canEdit}
           adminBusy={adminBusy || !marketOpen}
           onReleaseAthlete={onReleaseAthlete}
+          onUpdatePurchaseCredits={onUpdatePurchaseCredits}
         />
       ) : null}
 
@@ -855,12 +878,9 @@ export function RosterScreen() {
           leagueTeams={leagueTeams}
           targetTeam={targetTeam}
           emptySlotsCount={emptySlots.length}
-          purchaseCredits={purchaseCredits}
-          onPurchaseCreditsChange={setPurchaseCredits}
           listone={listone}
           listoneQuery={listoneQuery}
           onListoneQueryChange={setListoneQuery}
-          filteredListone={filteredListone}
           ownership={ownership}
           canReleaseAthlete={canReleaseAthlete}
           adminBusy={adminBusy || !marketOpen}

@@ -1,28 +1,184 @@
-import type { FantasyTeam, FantasyTeamSummary, LeagueListoneEntry } from "@fantappero/contracts";
+import type {
+  FantasyRole,
+  FantasyTeam,
+  FantasyTeamSummary,
+  LeagueListoneEntry,
+} from "@fantappero/contracts";
+import { useEffect, useState } from "react";
 import { Pressable, Text, TextInput, View } from "react-native";
 import { UiStatePanel } from "../../components/UiStatePanel";
-import { ROLE_LABEL, roleBadgeColors, type AthleteOwnership } from "./rosterHelpers";
+import {
+  filterListone,
+  LISTONE_PAGE_SIZE,
+  ROLE_LABEL,
+  ROLE_TABS,
+  roleBadgeColors,
+  type AthleteOwnership,
+  type RoleTab,
+} from "./rosterHelpers";
 import { rosterStyles as styles } from "./rosterStyles";
 
-// The listone can hold several hundred players. This screen scrolls inside a
-// plain ScrollView (PageContainer), so a virtualized list isn't an option
-// here; rendering every row as a native View at once is what was crashing
-// the app on real devices (OOM) even though it looked fine in a browser
-// preview. Cap the rendered rows and push the user toward the search box
-// instead.
-const LISTONE_RENDER_LIMIT = 40;
+function ListoneAssignRow({
+  entry,
+  owner,
+  canAssign,
+  canRelease,
+  adminBusy,
+  onReleaseAthlete,
+  onAssignAthlete,
+}: {
+  entry: LeagueListoneEntry;
+  owner: AthleteOwnership | undefined;
+  canAssign: boolean;
+  canRelease: boolean;
+  adminBusy: boolean;
+  onReleaseAthlete: (athleteId: string) => void | Promise<void>;
+  onAssignAthlete: (athleteId: string, purchaseCredits: number) => void | Promise<void>;
+}) {
+  const [draft, setDraft] = useState("1");
+  const parsed = Number.parseInt(draft, 10);
+  const isValid = Number.isFinite(parsed) && parsed >= 1;
+  const roleColors = roleBadgeColors(entry.effectiveRole);
+
+  return (
+    <View style={styles.card}>
+      <View style={styles.row}>
+        <View style={[styles.roleBadge, roleColors]}>
+          <Text style={[styles.roleBadgeText, { color: roleColors.color }]}>
+            {entry.effectiveRole}
+          </Text>
+        </View>
+        <Text style={styles.cardTitle}>{entry.canonicalName}</Text>
+      </View>
+      <Text style={styles.meta}>
+        {ROLE_LABEL[entry.effectiveRole]}
+        {entry.clubName ? ` · ${entry.clubName}` : ""}
+      </Text>
+      <Text style={owner ? styles.statusOwned : styles.statusFree}>
+        {owner ? `In rosa: ${owner.teamName}` : "Libero"}
+      </Text>
+      <View style={styles.priceRow}>
+        <Text style={styles.inlineLabel}>Crediti</Text>
+        {!owner ? (
+          <TextInput
+            style={styles.priceInput}
+            value={draft}
+            onChangeText={setDraft}
+            keyboardType="numeric"
+            editable={!adminBusy && canAssign}
+            accessibilityLabel={`Prezzo acquisto ${entry.canonicalName}`}
+            testID={`roster-admin-listone-price-${entry.athleteId}`}
+          />
+        ) : (
+          <Text style={styles.inlineLabel}>—</Text>
+        )}
+        {owner && canRelease ? (
+          <Pressable
+            style={[styles.compactButton, adminBusy && styles.disabled]}
+            disabled={adminBusy}
+            testID={`roster-admin-release-${entry.athleteId}`}
+            onPress={() => void onReleaseAthlete(entry.athleteId)}
+          >
+            <Text style={styles.buttonLabel}>Rimuovi</Text>
+          </Pressable>
+        ) : !owner ? (
+          <Pressable
+            style={[styles.compactButton, (adminBusy || !canAssign || !isValid) && styles.disabled]}
+            disabled={adminBusy || !canAssign || !isValid}
+            testID={`roster-admin-assign-${entry.athleteId}`}
+            onPress={() => void onAssignAthlete(entry.athleteId, parsed)}
+          >
+            <Text style={styles.buttonLabel}>Assegna</Text>
+          </Pressable>
+        ) : null}
+      </View>
+    </View>
+  );
+}
+
+function ListoneTable({
+  tabValue,
+  rows,
+  ownership,
+  canReleaseAthlete,
+  emptySlotsCount,
+  adminBusy,
+  onReleaseAthlete,
+  onAssignAthlete,
+}: {
+  tabValue: RoleTab;
+  rows: LeagueListoneEntry[];
+  ownership: Map<string, AthleteOwnership>;
+  canReleaseAthlete: (ownerTeamId: string) => boolean;
+  emptySlotsCount: number;
+  adminBusy: boolean;
+  onReleaseAthlete: (athleteId: string) => void | Promise<void>;
+  onAssignAthlete: (athleteId: string, purchaseCredits: number) => void | Promise<void>;
+}) {
+  const [page, setPage] = useState(0);
+  const rowsKey = rows.map((row) => row.athleteId).join("|");
+  useEffect(() => {
+    setPage(0);
+  }, [rowsKey]);
+  const pageCount = Math.max(1, Math.ceil(rows.length / LISTONE_PAGE_SIZE));
+  const safePage = Math.min(page, pageCount - 1);
+  const pagedRows = rows.slice(
+    safePage * LISTONE_PAGE_SIZE,
+    safePage * LISTONE_PAGE_SIZE + LISTONE_PAGE_SIZE,
+  );
+
+  return (
+    <View testID={`roster-admin-listone-table-${tabValue}`}>
+      {pagedRows.map((entry) => {
+        const owner = ownership.get(entry.athleteId);
+        const canAssign = !owner && emptySlotsCount > 0;
+        const canRelease = owner ? canReleaseAthlete(owner.teamId) : false;
+        return (
+          <ListoneAssignRow
+            key={entry.athleteId}
+            entry={entry}
+            owner={owner}
+            canAssign={canAssign}
+            canRelease={canRelease}
+            adminBusy={adminBusy}
+            onReleaseAthlete={onReleaseAthlete}
+            onAssignAthlete={onAssignAthlete}
+          />
+        );
+      })}
+      {pageCount > 1 ? (
+        <View style={styles.pagination} testID={`roster-admin-listone-pagination-${tabValue}`}>
+          <Pressable
+            style={[styles.ghostButton, safePage === 0 && styles.disabled]}
+            disabled={safePage === 0}
+            onPress={() => setPage((current) => Math.max(0, current - 1))}
+          >
+            <Text style={styles.ghostButtonLabel}>Precedente</Text>
+          </Pressable>
+          <Text style={styles.meta}>
+            Pagina {safePage + 1} di {pageCount} · {rows.length} calciatori
+          </Text>
+          <Pressable
+            style={[styles.ghostButton, safePage >= pageCount - 1 && styles.disabled]}
+            disabled={safePage >= pageCount - 1}
+            onPress={() => setPage((current) => Math.min(pageCount - 1, current + 1))}
+          >
+            <Text style={styles.ghostButtonLabel}>Successiva</Text>
+          </Pressable>
+        </View>
+      ) : null}
+    </View>
+  );
+}
 
 export function RosterAdminManualCard({
   isAdmin,
   leagueTeams,
   targetTeam,
   emptySlotsCount,
-  purchaseCredits,
-  onPurchaseCreditsChange,
   listone,
   listoneQuery,
   onListoneQueryChange,
-  filteredListone,
   ownership,
   canReleaseAthlete,
   adminBusy,
@@ -35,25 +191,27 @@ export function RosterAdminManualCard({
   leagueTeams: FantasyTeamSummary[];
   targetTeam: FantasyTeam | null;
   emptySlotsCount: number;
-  purchaseCredits: string;
-  onPurchaseCreditsChange: (value: string) => void;
   listone: LeagueListoneEntry[];
   listoneQuery: string;
   onListoneQueryChange: (value: string) => void;
-  filteredListone: LeagueListoneEntry[];
   ownership: Map<string, AthleteOwnership>;
   canReleaseAthlete: (ownerTeamId: string) => boolean;
   adminBusy: boolean;
   onReleaseAthlete: (athleteId: string) => void | Promise<void>;
-  onAssignAthlete: (athleteId: string) => void | Promise<void>;
+  onAssignAthlete: (athleteId: string, purchaseCredits: number) => void | Promise<void>;
   adminMessage: string | null;
   adminError: string | null;
 }) {
+  const [roleTab, setRoleTab] = useState<RoleTab>("all");
+
   return (
     <View style={styles.adjust} testID="roster-admin-manual">
-      <View style={styles.headerRow}>
-        <Text style={styles.summary}>Inserimento manuale rose</Text>
-      </View>
+      <Text style={styles.summary}>Inserimento manuale rose</Text>
+      <Text style={styles.subtitle}>
+        {isAdmin
+          ? "Assegna o rimuovi calciatori dal listone sulla squadra target selezionata sopra."
+          : "Assegna o rimuovi calciatori dal listone sulla tua rosa."}
+      </Text>
       {isAdmin && leagueTeams.length === 0 ? (
         <UiStatePanel
           state="empty"
@@ -72,97 +230,10 @@ export function RosterAdminManualCard({
         <>
           {targetTeam ? (
             <Text style={styles.meta} testID="roster-admin-team-summary">
-              {targetTeam.name}: {targetTeam.filledSlots}/{targetTeam.rosterSize} ·{" "}
+              {targetTeam.name}: {targetTeam.filledSlots}/{targetTeam.rosterSize} slot ·{" "}
               {emptySlotsCount} liberi
             </Text>
           ) : null}
-
-          <Text style={styles.meta}>Crediti acquisto</Text>
-          <TextInput
-            style={styles.input}
-            value={purchaseCredits}
-            onChangeText={onPurchaseCreditsChange}
-            keyboardType="numeric"
-            testID="roster-purchase-credits"
-          />
-
-          {listone.length === 0 ? (
-            <UiStatePanel
-              state="empty"
-              title="Listone vuoto"
-              message="Il listone ufficiale non è ancora disponibile. Verrà popolato dagli operatori della piattaforma."
-              testID="roster-admin-listone-empty"
-            />
-          ) : (
-            <View testID="roster-admin-listone-table-all">
-              <TextInput
-                style={styles.input}
-                value={listoneQuery}
-                onChangeText={onListoneQueryChange}
-                placeholder="Cerca per nome o club…"
-                autoCapitalize="none"
-                autoCorrect={false}
-                testID="roster-admin-listone-search"
-              />
-              {filteredListone.length > LISTONE_RENDER_LIMIT ? (
-                <Text style={styles.meta} testID="roster-admin-listone-truncated">
-                  Mostrati i primi {LISTONE_RENDER_LIMIT} di {filteredListone.length} risultati.
-                  Affina la ricerca per restringere l'elenco.
-                </Text>
-              ) : null}
-              {filteredListone.length === 0 ? (
-                <UiStatePanel
-                  state="empty"
-                  title="Nessun calciatore"
-                  message="Nessun risultato per la ricerca corrente."
-                  testID="roster-admin-listone-search-empty"
-                />
-              ) : (
-                filteredListone.slice(0, LISTONE_RENDER_LIMIT).map((entry) => {
-                  const owner = ownership.get(entry.athleteId);
-                  const canAssign = !owner && emptySlotsCount > 0;
-                  const canRelease = owner ? canReleaseAthlete(owner.teamId) : false;
-                  const roleColors = roleBadgeColors(entry.effectiveRole);
-                  return (
-                    <View key={entry.athleteId} style={styles.card}>
-                      <View style={styles.row}>
-                        <View style={[styles.roleBadge, roleColors]}>
-                          <Text style={[styles.roleBadgeText, { color: roleColors.color }]}>
-                            {entry.effectiveRole}
-                          </Text>
-                        </View>
-                        <Text style={styles.cardTitle}>{entry.canonicalName}</Text>
-                      </View>
-                      <Text style={styles.meta}>
-                        {ROLE_LABEL[entry.effectiveRole]}
-                        {entry.clubName ? ` · ${entry.clubName}` : ""}
-                        {owner ? ` · In rosa: ${owner.teamName}` : " · Libero"}
-                      </Text>
-                      {owner && canRelease ? (
-                        <Pressable
-                          style={[styles.button, adminBusy && styles.disabled]}
-                          disabled={adminBusy}
-                          testID={`roster-admin-release-${entry.athleteId}`}
-                          onPress={() => void onReleaseAthlete(entry.athleteId)}
-                        >
-                          <Text style={styles.buttonLabel}>Rimuovi</Text>
-                        </Pressable>
-                      ) : !owner ? (
-                        <Pressable
-                          style={[styles.button, (adminBusy || !canAssign) && styles.disabled]}
-                          disabled={adminBusy || !canAssign}
-                          testID={`roster-admin-assign-${entry.athleteId}`}
-                          onPress={() => void onAssignAthlete(entry.athleteId)}
-                        >
-                          <Text style={styles.buttonLabel}>Assegna</Text>
-                        </Pressable>
-                      ) : null}
-                    </View>
-                  );
-                })
-              )}
-            </View>
-          )}
 
           {adminMessage ? (
             <Text style={styles.ok} testID="roster-admin-ok">
@@ -174,6 +245,83 @@ export function RosterAdminManualCard({
               {adminError}
             </Text>
           ) : null}
+
+          {listone.length === 0 ? (
+            <UiStatePanel
+              state="empty"
+              title="Listone vuoto"
+              message="Il listone ufficiale non è ancora disponibile. Verrà popolato dagli operatori della piattaforma."
+              testID="roster-admin-listone-empty"
+            />
+          ) : (
+            <View>
+              <Text style={styles.fieldLabel}>Cerca calciatore</Text>
+              <TextInput
+                style={styles.input}
+                value={listoneQuery}
+                onChangeText={onListoneQueryChange}
+                placeholder="Nome o club…"
+                autoCapitalize="none"
+                autoCorrect={false}
+                testID="roster-admin-listone-search"
+              />
+              <View style={styles.chipRow} accessibilityRole="tablist">
+                {ROLE_TABS.map((tab) => {
+                  const selected = tab.value === roleTab;
+                  return (
+                    <Pressable
+                      key={tab.value}
+                      style={[styles.chip, selected && styles.chipSelected]}
+                      accessibilityRole="tab"
+                      accessibilityState={{ selected }}
+                      testID={`roster-admin-listone-tab-${tab.value}`}
+                      onPress={() => setRoleTab(tab.value)}
+                    >
+                      <Text style={[styles.chipLabel, selected && styles.chipLabelSelected]}>
+                        {tab.label}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+              {ROLE_TABS.map((tab) => {
+                if (tab.value !== roleTab) {
+                  return null;
+                }
+                const rows = filterListone(listone, tab.value, listoneQuery);
+                if (rows.length === 0) {
+                  return (
+                    <UiStatePanel
+                      key={tab.value}
+                      state="empty"
+                      title="Nessun calciatore"
+                      message={
+                        listoneQuery.trim()
+                          ? "Nessun risultato per la ricerca corrente."
+                          : tab.value === "all"
+                            ? "Il listone è vuoto."
+                            : `Nessun ${ROLE_LABEL[tab.value as FantasyRole].toLowerCase()} nel listone.`
+                      }
+                      testID={`roster-admin-listone-empty-${tab.value}`}
+                    />
+                  );
+                }
+                return (
+                  <ListoneTable
+                    key={tab.value}
+                    tabValue={tab.value}
+                    rows={rows}
+                    ownership={ownership}
+                    canReleaseAthlete={canReleaseAthlete}
+                    emptySlotsCount={emptySlotsCount}
+                    adminBusy={adminBusy}
+                    onReleaseAthlete={onReleaseAthlete}
+                    onAssignAthlete={onAssignAthlete}
+                  />
+                );
+              })}
+            </View>
+          )}
         </>
       )}
     </View>

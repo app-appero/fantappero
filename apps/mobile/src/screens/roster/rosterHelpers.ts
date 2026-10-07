@@ -7,6 +7,15 @@ import type {
 } from "@fantappero/contracts";
 import { theme } from "@fantappero/ui/theme";
 
+export {
+  filterByTab,
+  filterListone,
+  LISTONE_PAGE_SIZE,
+  ROLE_TABS,
+  ROSTER_PAGE_SIZE,
+  type RoleTab,
+} from "./listoneFilter";
+
 const { colors } = theme;
 
 export type AthleteOwnership = {
@@ -61,6 +70,13 @@ export function formatLedgerDate(iso: string): string {
     hour: "2-digit",
     minute: "2-digit",
   });
+}
+
+export function formatLedgerEntry(entry: CreditLedgerList["entries"][number]): string {
+  const sign = entry.amount > 0 ? "+" : "";
+  const note = entry.note?.trim();
+  const detail = note ? ` — ${note}` : "";
+  return `${formatLedgerDate(entry.createdAt)} · ${reasonLabel(entry.reason)}${detail}: ${sign}${entry.amount} → saldo ${entry.balanceAfter}`;
 }
 
 export function sortLedgerNewestFirst(entries: CreditLedgerList["entries"]) {

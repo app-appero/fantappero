@@ -1,7 +1,5 @@
-import type { CreditAccount, CreditLedgerList, FantasyTeamSummary } from "@fantappero/contracts";
+import type { CreditAccount, FantasyTeamSummary } from "@fantappero/contracts";
 import { Pressable, Text, TextInput, View } from "react-native";
-import { UiStatePanel } from "../../components/UiStatePanel";
-import { formatLedgerDate, LEDGER_PAGE_SIZE, reasonLabel } from "./rosterHelpers";
 import { rosterStyles as styles } from "./rosterStyles";
 
 export function RosterCreditsPanel({
@@ -20,13 +18,6 @@ export function RosterCreditsPanel({
   onAdminAdjust,
   adjustMessage,
   adjustError,
-  hasLedger,
-  pagedLedgerEntries,
-  ledgerEntriesCount,
-  safeLedgerPage,
-  ledgerPageCount,
-  onLedgerPagePrev,
-  onLedgerPageNext,
 }: {
   isAdmin: boolean;
   leagueTeams: FantasyTeamSummary[];
@@ -43,13 +34,6 @@ export function RosterCreditsPanel({
   onAdminAdjust: () => void | Promise<void>;
   adjustMessage: string | null;
   adjustError: string | null;
-  hasLedger: boolean;
-  pagedLedgerEntries: CreditLedgerList["entries"];
-  ledgerEntriesCount: number;
-  safeLedgerPage: number;
-  ledgerPageCount: number;
-  onLedgerPagePrev: () => void;
-  onLedgerPageNext: () => void;
 }) {
   return (
     <View style={styles.credits} testID="roster-credits">
@@ -117,50 +101,6 @@ export function RosterCreditsPanel({
           ) : null}
         </View>
       ) : null}
-      {hasLedger ? (
-        <View testID="roster-credits-ledger">
-          {pagedLedgerEntries.map((entry) => {
-            const note = entry.note?.trim();
-            return (
-              <Text key={entry.id} style={styles.meta}>
-                {formatLedgerDate(entry.createdAt)} · {reasonLabel(entry.reason)}
-                {note ? ` — ${note}` : ""}: {entry.amount > 0 ? "+" : ""}
-                {entry.amount} → {entry.balanceAfter}
-              </Text>
-            );
-          })}
-          {ledgerEntriesCount > LEDGER_PAGE_SIZE ? (
-            <View style={styles.chipRow}>
-              <Pressable
-                style={[styles.chip, safeLedgerPage <= 0 && styles.disabled]}
-                disabled={safeLedgerPage <= 0}
-                testID="roster-credits-ledger-prev"
-                onPress={onLedgerPagePrev}
-              >
-                <Text style={styles.chipLabel}>Precedenti</Text>
-              </Pressable>
-              <Text style={styles.meta} testID="roster-credits-ledger-page">
-                {safeLedgerPage + 1}/{ledgerPageCount}
-              </Text>
-              <Pressable
-                style={[styles.chip, safeLedgerPage >= ledgerPageCount - 1 && styles.disabled]}
-                disabled={safeLedgerPage >= ledgerPageCount - 1}
-                testID="roster-credits-ledger-next"
-                onPress={onLedgerPageNext}
-              >
-                <Text style={styles.chipLabel}>Successivi</Text>
-              </Pressable>
-            </View>
-          ) : null}
-        </View>
-      ) : (
-        <UiStatePanel
-          state="empty"
-          title="Nessun movimento"
-          message="Il ledger crediti non contiene ancora movimenti."
-          testID="roster-credits-empty"
-        />
-      )}
     </View>
   );
 }
