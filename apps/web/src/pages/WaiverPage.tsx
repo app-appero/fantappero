@@ -17,6 +17,7 @@ import {
   WireframeSection,
 } from "@fantappero/ui";
 import { type FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { AthleteName } from "../athletes/AthleteCard";
 import {
   closeWaiverSession,
   createWaiverSession,
@@ -314,7 +315,7 @@ export function WaiverPage() {
                       <ul>
                         {flow.resolution.outcomes.map((outcome) => (
                           <li key={outcome.athleteId}>
-                            {outcome.athleteName}:{" "}
+                            <AthleteName athleteId={outcome.athleteId}>{outcome.athleteName}</AthleteName>:{" "}
                             {outcome.outcome === "assigned"
                               ? `assegnato per ${outcome.amountCredits} crediti`
                               : outcome.outcome === "tiebreak"
@@ -434,8 +435,20 @@ export function WaiverPage() {
                   <TableBody>
                     {flow.myBids.map((bid) => (
                       <TableRow key={bid.id}>
-                        <TableCell>{athleteNameById.get(bid.athleteId) ?? bid.athleteName}</TableCell>
-                        <TableCell>{bid.releaseAthleteName ?? "—"}</TableCell>
+                        <TableCell>
+                          <AthleteName athleteId={bid.athleteId}>
+                            {athleteNameById.get(bid.athleteId) ?? bid.athleteName}
+                          </AthleteName>
+                        </TableCell>
+                        <TableCell>
+                          {bid.releaseAthleteId ? (
+                            <AthleteName athleteId={bid.releaseAthleteId}>
+                              {bid.releaseAthleteName ?? "Calciatore"}
+                            </AthleteName>
+                          ) : (
+                            "—"
+                          )}
+                        </TableCell>
                         <TableCell>{bid.amountCredits} crediti</TableCell>
                         <TableCell>
                           <Badge variant={bid.status === "submitted" ? "success" : "neutral"}>

@@ -1,7 +1,7 @@
 import { lazyStyles } from "../../theme/lazyStyles";
 import type { MatchBadge, PitchPosition } from "@fantappero/contracts";
 import { theme } from "@fantappero/ui/theme";
-import { Image, StyleSheet, Text, View } from "react-native";
+import { Image, Pressable, StyleSheet, Text, View } from "react-native";
 import { EventBadges } from "./EventBadges";
 import { RoleBadge } from "./RoleBadge";
 
@@ -18,6 +18,8 @@ export type PitchPlayer = {
   scoreLabel?: string | null;
   /** Foto dal provider, quando disponibile; altrimenti resta il cerchio con il numero. */
   photoUrl?: string | null;
+  /** Id interno del calciatore, quando il pallino deve aprire la scheda. */
+  athleteId?: string | null;
 };
 
 export type PitchViewProps = {
@@ -25,6 +27,8 @@ export type PitchViewProps = {
   players: readonly PitchPlayer[];
   positions: readonly PitchPosition[];
   testID?: string;
+  /** Apre la scheda del calciatore toccando il pallino, se `athleteId` è presente. */
+  onAthletePress?: (athleteId: string) => void;
 };
 
 function abbreviateName(name: string): string {
@@ -43,7 +47,7 @@ function abbreviateName(name: string): string {
  * (`layoutFromGrid`/`layoutFromModule` di `packages/contracts`), rese qui
  * con `View` bordate invece di CSS — nessun asset, nessuna nuova dipendenza.
  */
-export function PitchView({ title, players, positions, testID }: PitchViewProps) {
+export function PitchView({ title, players, positions, testID, onAthletePress }: PitchViewProps) {
   const positionById = new Map(positions.map((position) => [position.id, position]));
   return (
     <View style={styles.wrap} testID={testID ?? "pitch-view"}>
@@ -67,34 +71,62 @@ export function PitchView({ title, players, positions, testID }: PitchViewProps)
               ]}
               testID={`pitch-player-${player.id}`}
             >
-              <View style={styles.badgesRow}>
-                <EventBadges badges={player.badges ?? []} size={11} />
-              </View>
-              <View style={styles.card}>
-                {player.photoUrl ? (
-                  <Image source={{ uri: player.photoUrl }} style={styles.photo} />
-                ) : player.shirtNumber != null ? (
-                  <Text style={styles.number}>{player.shirtNumber}</Text>
-                ) : null}
-                {player.photoUrl && player.shirtNumber != null ? (
-                  <View style={styles.numberBadge}>
-                    <Text style={styles.numberBadgeText}>{player.shirtNumber}</Text>
-                  </View>
-                ) : null}
-                <View style={styles.roleBadgeWrap}>
-                  <RoleBadge code={player.role} />
-                </View>
-              </View>
-              <Text style={styles.name} numberOfLines={1}>
-                {abbreviateName(player.name)}
-              </Text>
-              {player.scoreLabel ? <Text style={styles.score}>{player.scoreLabel}</Text> : null}
+              <PitchPlayerBody player={player} onAthletePress={onAthletePress} />
             </View>
           );
         })}
       </View>
     </View>
   );
+}
+
+function PitchPlayerBody({
+  player,
+  onAthletePress,
+}: {
+  player: PitchPlayer;
+  onAthletePress?: (athleteId: string) => void;
+}) {
+  const content = (
+    <>
+      <View style={styles.badgesRow}>
+        <EventBadges badges={player.badges ?? []} size={11} />
+      </View>
+      <View style={styles.card}>
+        {player.photoUrl ? (
+          <Image source={{ uri: player.photoUrl }} style={styles.photo} />
+        ) : player.shirtNumber != null ? (
+          <Text style={styles.number}>{player.shirtNumber}</Text>
+        ) : null}
+        {player.photoUrl && player.shirtNumber != null ? (
+          <View style={styles.numberBadge}>
+            <Text style={styles.numberBadgeText}>{player.shirtNumber}</Text>
+          </View>
+        ) : null}
+        <View style={styles.roleBadgeWrap}>
+          <RoleBadge code={player.role} />
+        </View>
+      </View>
+      <Text style={styles.name} numberOfLines={1}>
+        {abbreviateName(player.name)}
+      </Text>
+      {player.scoreLabel ? <Text style={styles.score}>{player.scoreLabel}</Text> : null}
+    </>
+  );
+  if (player.athleteId && onAthletePress) {
+    const athleteId = player.athleteId;
+    return (
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={`Apri scheda di ${player.name}`}
+        onPress={() => onAthletePress(athleteId)}
+        style={styles.player}
+      >
+        {content}
+      </Pressable>
+    );
+  }
+  return <View style={styles.player}>{content}</View>;
 }
 
 const styles = lazyStyles(() => StyleSheet.create({
@@ -156,6 +188,11 @@ const styles = lazyStyles(() => StyleSheet.create({
     transform: [{ translateX: -30 }, { translateY: -28 }],
     width: 60,
     alignItems: "center",
+    gap: 1,
+  },
+  player: {
+    alignItems: "center",
+    width: "100%",
     gap: 1,
   },
   badgesRow: {

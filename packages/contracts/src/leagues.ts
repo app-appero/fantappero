@@ -613,6 +613,55 @@ export interface LeagueListoneEntry {
   override: LeagueListoneOverride | null;
 }
 
+/** Stagione di rosa reale già salvata dal provider. */
+export interface AthleteCardSeason {
+  clubName: string;
+  seasonYear: number;
+  shirtNumber: number | null;
+  positionRaw: string | null;
+  isActive: boolean;
+}
+
+/** Trasferimento già salvato dal provider. */
+export interface AthleteCardTransfer {
+  transferDate: string;
+  fromClubName: string | null;
+  toClubName: string | null;
+  transferType: string;
+}
+
+/** Chi ha il calciatore in rosa nella lega corrente. */
+export interface AthleteCardAssignment {
+  fantasyTeamId: string;
+  teamName: string;
+  slotIndex: number;
+  purchaseCredits: number | null;
+}
+
+/** Scheda calciatore: anagrafica provider e associazione di lega. */
+export interface AthleteCard {
+  athleteId: string;
+  providerId: number;
+  canonicalName: string;
+  firstName: string | null;
+  lastName: string | null;
+  nationality: string | null;
+  birthDate: string | null;
+  age: number | null;
+  height: string | null;
+  weight: string | null;
+  injured: boolean | null;
+  photoUrl: string | null;
+  clubName: string | null;
+  shirtNumber: number | null;
+  role: string | null;
+  effectiveRole: string | null;
+  providerPositionRaw: string | null;
+  assignment: AthleteCardAssignment | null;
+  seasons: AthleteCardSeason[];
+  transfers: AthleteCardTransfer[];
+}
+
 export interface LeagueListoneRefreshCounters {
   athletesCreated: number;
   athletesUpdated: number;

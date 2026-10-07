@@ -15,6 +15,7 @@ import { useRoute, type RouteProp } from "@react-navigation/core";
 import { useCallback, useState, type ReactNode } from "react";
 import { Image, StyleSheet, Text, View } from "react-native";
 import { fetchFixtureLiveDetail } from "../api/leagues";
+import { AthleteName, useAthleteCard } from "../athletes/AthleteCard";
 import { MatchTimeline, type TimelineEntry } from "../components/match/MatchTimeline";
 import { PitchView } from "../components/match/PitchView";
 import { RoleBadge } from "../components/match/RoleBadge";
@@ -85,6 +86,7 @@ function pitchPlayerId(player: FixtureLineupPlayer): string {
 function toPitchPlayers(players: readonly FixtureLineupPlayer[], badgesByAthlete: Map<string, MatchBadge[]>) {
   return players.map((player) => ({
     id: pitchPlayerId(player),
+    athleteId: player.athleteId,
     shirtNumber: player.shirtNumber,
     name: player.name,
     role: player.position,
@@ -125,10 +127,14 @@ function BenchList({ players, events, side }: { players: readonly FixtureLineupP
       {players.map((player) => (
         <View key={pitchPlayerId(player)} style={styles.playerRow} testID={`fixture-bench-player-${pitchPlayerId(player)}`}>
           <RoleBadge code={player.position} />
-          <Text style={styles.body}>
-            {player.shirtNumber !== null ? `${player.shirtNumber}. ` : ""}
-            {player.name} — <Text style={styles.benchStatus}>{benchStatusLabel(player, events)}</Text>
-          </Text>
+          <View style={styles.eventLine}>
+            <Text style={styles.body}>{player.shirtNumber !== null ? `${player.shirtNumber}. ` : ""}</Text>
+            <AthleteName athleteId={player.athleteId} style={styles.body}>
+              {player.name}
+            </AthleteName>
+            <Text style={styles.body}> — </Text>
+            <Text style={styles.benchStatus}>{benchStatusLabel(player, events)}</Text>
+          </View>
         </View>
       ))}
     </View>
@@ -144,6 +150,7 @@ function LineupBlock({
   events: readonly FixtureTimelineEvent[];
   side: string;
 }) {
+  const athleteCard = useAthleteCard();
   if (lineup === null) {
     return (
       <View style={styles.section} testID={`fixture-lineup-${side}`}>
@@ -172,6 +179,7 @@ function LineupBlock({
         players={toPitchPlayers(lineup.starters, badgesByAthlete)}
         positions={positions}
         testID={`fixture-pitch-${side}`}
+        onAthletePress={athleteCard?.open}
       />
       <Text style={styles.subheading}>Panchina</Text>
       <BenchList players={lineup.bench} events={events} side={side} />
@@ -201,48 +209,109 @@ function eventVisual(event: FixtureTimelineEvent): { icon: ReactNode; headline: 
     if (isOwnGoal) {
       return {
         icon: <MaterialCommunityIcons name="soccer" size={16} color={colors.danger} />,
-        headline: `${event.athleteName ?? "?"} (autogol)`,
+        headline: (
+          <View style={styles.eventLine}>
+            <AthleteName athleteId={event.athleteId} style={styles.eventName}>
+              {event.athleteName ?? "?"}
+            </AthleteName>
+            <Text style={styles.eventName}> (autogol)</Text>
+          </View>
+        ),
       };
     }
     const isMissed = event.scoringKind === "penalty_missed" || detailText.includes("missed");
     if (isMissed) {
       return {
         icon: <MaterialCommunityIcons name="close-circle" size={16} color={colors.danger} />,
-        headline: `${event.athleteName ?? "?"} — rigore sbagliato`,
+        headline: (
+          <View style={styles.eventLine}>
+            <AthleteName athleteId={event.athleteId} style={styles.eventName}>
+              {event.athleteName ?? "?"}
+            </AthleteName>
+            <Text style={styles.eventName}> — rigore sbagliato</Text>
+          </View>
+        ),
       };
     }
     const isPenalty = event.scoringKind === "penalty_scored" || detailText.includes("penalty");
     return {
       icon: <MaterialCommunityIcons name="soccer" size={16} color="#fff" />,
-      headline: `${event.athleteName ?? "?"}${isPenalty ? " (rigore)" : ""}`,
-      detail: event.relatedAthleteName ? `Assist: ${event.relatedAthleteName}` : undefined,
+      headline: (
+        <View style={styles.eventLine}>
+          <AthleteName athleteId={event.athleteId} style={styles.eventName}>
+            {event.athleteName ?? "?"}
+          </AthleteName>
+          {isPenalty ? <Text style={styles.eventName}> (rigore)</Text> : null}
+        </View>
+      ),
+      detail: event.relatedAthleteName ? (
+        <View style={styles.eventLine}>
+          <Text style={styles.eventDetail}>Assist: </Text>
+          <AthleteName athleteId={event.relatedAthleteId} style={styles.eventDetail}>
+            {event.relatedAthleteName}
+          </AthleteName>
+        </View>
+      ) : undefined,
     };
   }
   if (event.scoringKind === "penalty_saved" || type === "penalty_saved") {
     return {
       icon: <MaterialCommunityIcons name="hand-back-right" size={16} color="#fff" />,
-      headline: `Rigore parato${event.athleteName ? ` — ${event.athleteName}` : ""}`,
+      headline: (
+        <View style={styles.eventLine}>
+          <Text style={styles.eventName}>Rigore parato</Text>
+          {event.athleteName ? (
+            <>
+              <Text style={styles.eventName}> — </Text>
+              <AthleteName athleteId={event.athleteId} style={styles.eventName}>
+                {event.athleteName}
+              </AthleteName>
+            </>
+          ) : null}
+        </View>
+      ),
     };
   }
   if (type === "card") {
     const isRed = detailText.includes("red");
     return {
       icon: <MaterialCommunityIcons name="card" size={16} color={isRed ? colors.danger : colors.warning} />,
-      headline: event.athleteName ?? "?",
+      headline: (
+        <AthleteName athleteId={event.athleteId} style={styles.eventName}>
+          {event.athleteName ?? "?"}
+        </AthleteName>
+      ),
     };
   }
   if (type === "subst") {
     return {
       icon: <MaterialCommunityIcons name="arrow-down-bold-box" size={16} color={colors.danger} />,
-      headline: event.athleteName ?? "?",
-      detail: event.relatedAthleteName ? `↑ ${event.relatedAthleteName}` : undefined,
+      headline: (
+        <AthleteName athleteId={event.athleteId} style={styles.eventName}>
+          {event.athleteName ?? "?"}
+        </AthleteName>
+      ),
+      detail: event.relatedAthleteName ? (
+        <View style={styles.eventLine}>
+          <Text style={styles.eventDetail}>↑ </Text>
+          <AthleteName athleteId={event.relatedAthleteId} style={styles.eventDetail}>
+            {event.relatedAthleteName}
+          </AthleteName>
+        </View>
+      ) : undefined,
     };
   }
   if (type === "var") {
     return {
       icon: <MaterialCommunityIcons name="alert-decagram" size={16} color="#fff" />,
       headline: `VAR — ${event.eventDetail ?? "Revisione"}`,
-      detail: event.athleteName ?? undefined,
+      detail: event.athleteId ? (
+        <AthleteName athleteId={event.athleteId} style={styles.eventDetail}>
+          {event.athleteName ?? "?"}
+        </AthleteName>
+      ) : (
+        event.athleteName ?? undefined
+      ),
     };
   }
   return { icon: undefined, headline: `${event.eventType}${event.eventDetail ? ` (${event.eventDetail})` : ""}` };
@@ -492,6 +561,20 @@ const styles = lazyStyles(() => StyleSheet.create({
   body: {
     color: colors.foreground,
     fontSize: typography.fontSize.sm,
+  },
+  eventLine: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    alignItems: "center",
+  },
+  eventName: {
+    color: colors.foreground,
+    fontWeight: "600",
+    fontSize: typography.fontSize.sm,
+  },
+  eventDetail: {
+    color: colors.foregroundMuted,
+    fontSize: typography.fontSize.xs,
   },
   benchStatus: {
     fontStyle: "italic",

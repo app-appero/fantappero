@@ -10,6 +10,7 @@ import {
 import { lazyStyles } from "../../theme/lazyStyles";
 import { theme } from "@fantappero/ui/theme";
 import { StyleSheet, Text, View } from "react-native";
+import { AthleteName } from "../../athletes/AthleteCard";
 
 const { colors, typography } = theme;
 
@@ -57,7 +58,9 @@ export function LiveAuctionTable({
         <View style={styles.center}>
           {currentLot ? (
             <>
-              <Text style={styles.athlete}>{currentLot.athleteName}</Text>
+              <AthleteName athleteId={currentLot.athleteId} style={styles.athlete} numberOfLines={2}>
+                {currentLot.athleteName}
+              </AthleteName>
               <Text style={styles.amount}>{currentLot.currentAmountCredits} crediti</Text>
               {secondsRemaining !== null ? (
                 <Text style={styles.countdown} testID="auction-live-table-countdown">

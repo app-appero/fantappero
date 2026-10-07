@@ -11,6 +11,7 @@ import {
   TableRow,
 } from "@fantappero/ui";
 import { useEffect, useState } from "react";
+import { AthleteName } from "../../athletes/AthleteCard";
 import {
   compositionStatusLabel,
   compositionStatusVariant,
@@ -134,7 +135,9 @@ function RosterRoleTable({
             <TableBody>
               {pagedSlots.map((slot) => (
                 <TableRow key={slot.id}>
-                  <TableCell>{slot.athleteName ?? "Calciatore"}</TableCell>
+                  <TableCell>
+                    <AthleteName athleteId={slot.athleteId}>{slot.athleteName ?? "Calciatore"}</AthleteName>
+                  </TableCell>
                   <TableCell>{slot.clubName ?? "—"}</TableCell>
                   <TableCell>
                     <PurchaseCreditsCell

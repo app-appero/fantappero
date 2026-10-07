@@ -29,6 +29,7 @@ import {
   YellowCardIcon,
 } from "@fantappero/ui";
 import { type ReactNode, useCallback, useEffect, useState } from "react";
+import { AthleteName, useAthleteCard } from "../athletes/AthleteCard";
 import { fetchFixtureLiveDetail } from "../api/leagues";
 import { getApiErrorMessage, useAuth } from "../auth/AuthContext";
 import { loadStoredSession } from "../auth/sessionStorage";
@@ -91,6 +92,7 @@ function pitchPlayerId(player: FixtureLineupPlayer): string {
 function toPitchPlayers(players: readonly FixtureLineupPlayer[], badgesByAthlete: Map<string, MatchBadge[]>) {
   return players.map((player) => ({
     id: pitchPlayerId(player),
+    athleteId: player.athleteId,
     shirtNumber: player.shirtNumber,
     name: player.name,
     role: player.position,
@@ -131,7 +133,8 @@ function BenchList({ players, events, side }: { players: readonly FixtureLineupP
       {players.map((player) => (
         <li key={pitchPlayerId(player)} data-testid={`fixture-bench-player-${pitchPlayerId(player)}`}>
           <RoleBadge code={player.position} /> {player.shirtNumber !== null ? `${player.shirtNumber}. ` : ""}
-          {player.name} — <em>{benchStatusLabel(player, events)}</em>
+          <AthleteName athleteId={player.athleteId}>{player.name}</AthleteName> —{" "}
+          <em>{benchStatusLabel(player, events)}</em>
         </li>
       ))}
     </ul>
@@ -147,6 +150,7 @@ function LineupBlock({
   events: readonly FixtureTimelineEvent[];
   side: string;
 }) {
+  const athleteCard = useAthleteCard();
   if (lineup === null) {
     return (
       <section data-testid={`fixture-lineup-${side}`}>
@@ -175,6 +179,7 @@ function LineupBlock({
         players={toPitchPlayers(lineup.starters, badgesByAthlete)}
         positions={positions}
         pitchAriaLabel={`Titolari ${lineup.clubName}`}
+        onAthletePress={athleteCard?.open}
       />
       <h4>Panchina</h4>
       <BenchList players={lineup.bench} events={events} side={side} />
@@ -202,19 +207,39 @@ function eventVisual(event: FixtureTimelineEvent): { icon: ReactNode; headline: 
 
   if (type === "goal") {
     if (isOwnGoal) {
-      return { icon: <OwnGoalIcon />, headline: <>{event.athleteName ?? "?"} (autogol)</> };
+      return {
+        icon: <OwnGoalIcon />,
+        headline: (
+          <>
+            <AthleteName athleteId={event.athleteId}>{event.athleteName ?? "?"}</AthleteName> (autogol)
+          </>
+        ),
+      };
     }
     const isMissed = event.scoringKind === "penalty_missed" || detailText.includes("missed");
     if (isMissed) {
-      return { icon: <PenaltyMissedIcon />, headline: <>{event.athleteName ?? "?"} — rigore sbagliato</> };
+      return {
+        icon: <PenaltyMissedIcon />,
+        headline: (
+          <>
+            <AthleteName athleteId={event.athleteId}>{event.athleteName ?? "?"}</AthleteName> — rigore sbagliato
+          </>
+        ),
+      };
     }
     const isPenalty = event.scoringKind === "penalty_scored" || detailText.includes("penalty");
     return {
       icon: isPenalty ? <PenaltyIcon /> : <GoalIcon />,
-      headline: <>{event.athleteName ?? "?"}{isPenalty ? " (rigore)" : ""}</>,
+      headline: (
+        <>
+          <AthleteName athleteId={event.athleteId}>{event.athleteName ?? "?"}</AthleteName>
+          {isPenalty ? " (rigore)" : ""}
+        </>
+      ),
       detail: event.relatedAthleteName ? (
         <>
-          <AssistIcon size={12} /> Assist: {event.relatedAthleteName}
+          <AssistIcon size={12} /> Assist:{" "}
+          <AthleteName athleteId={event.relatedAthleteId}>{event.relatedAthleteName}</AthleteName>
         </>
       ) : undefined,
     };
@@ -222,20 +247,34 @@ function eventVisual(event: FixtureTimelineEvent): { icon: ReactNode; headline: 
   if (event.scoringKind === "penalty_saved" || type === "penalty_saved") {
     return {
       icon: <PenaltyIcon />,
-      headline: <>Rigore parato{event.athleteName ? ` — ${event.athleteName}` : ""}</>,
+      headline: (
+        <>
+          Rigore parato
+          {event.athleteName ? (
+            <>
+              {" — "}
+              <AthleteName athleteId={event.athleteId}>{event.athleteName}</AthleteName>
+            </>
+          ) : null}
+        </>
+      ),
     };
   }
   if (type === "card") {
     const isRed = detailText.includes("red");
-    return { icon: isRed ? <RedCardIcon /> : <YellowCardIcon />, headline: <>{event.athleteName ?? "?"}</> };
+    return {
+      icon: isRed ? <RedCardIcon /> : <YellowCardIcon />,
+      headline: <AthleteName athleteId={event.athleteId}>{event.athleteName ?? "?"}</AthleteName>,
+    };
   }
   if (type === "subst") {
     return {
       icon: <SubstitutionOutIcon />,
-      headline: <>{event.athleteName ?? "?"}</>,
+      headline: <AthleteName athleteId={event.athleteId}>{event.athleteName ?? "?"}</AthleteName>,
       detail: event.relatedAthleteName ? (
         <>
-          <SubstitutionInIcon size={12} /> {event.relatedAthleteName}
+          <SubstitutionInIcon size={12} />{" "}
+          <AthleteName athleteId={event.relatedAthleteId}>{event.relatedAthleteName}</AthleteName>
         </>
       ) : undefined,
     };
@@ -244,7 +283,11 @@ function eventVisual(event: FixtureTimelineEvent): { icon: ReactNode; headline: 
     return {
       icon: <VarIcon />,
       headline: <>VAR — {event.eventDetail ?? "Revisione"}</>,
-      detail: event.athleteName ?? undefined,
+      detail: event.athleteId ? (
+        <AthleteName athleteId={event.athleteId}>{event.athleteName ?? "?"}</AthleteName>
+      ) : (
+        event.athleteName ?? undefined
+      ),
     };
   }
   return { icon: undefined, headline: <>{event.eventType}{event.eventDetail ? ` (${event.eventDetail})` : ""}</> };

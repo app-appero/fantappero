@@ -3,6 +3,7 @@ import { AppTextInput as TextInput } from "../../components/AppTextInput";
 import { StatusBadge } from "../../components/StatusBadge";
 import { UiStatePanel } from "../../components/UiStatePanel";
 import type { MarketSessionFlow } from "../../market/useMarketSessionFlow";
+import { AthleteName } from "../../athletes/AthleteCard";
 import { SESSION_STATUS_COLOR, SESSION_STATUS_LABEL } from "../../market/marketLabels";
 import { marketUiStyles as styles } from "../../market/marketUiStyles";
 
@@ -126,14 +127,19 @@ export function AuctionAdminPanel({
           ) : (
             <View style={styles.outcomeList}>
               {flow.resolution.outcomes.map((outcome) => (
-                <Text key={outcome.athleteId} style={styles.meta}>
-                  {outcome.athleteName}:{" "}
-                  {outcome.outcome === "assigned"
-                    ? `assegnato per ${outcome.amountCredits} crediti`
-                    : outcome.outcome === "tiebreak"
-                      ? "spareggio aperto (parità)"
-                      : "non assegnato"}
-                </Text>
+                <View key={outcome.athleteId} style={{ flexDirection: "row", flexWrap: "wrap" }}>
+                  <AthleteName athleteId={outcome.athleteId} style={styles.meta}>
+                    {outcome.athleteName}
+                  </AthleteName>
+                  <Text style={styles.meta}>
+                    :{" "}
+                    {outcome.outcome === "assigned"
+                      ? `assegnato per ${outcome.amountCredits} crediti`
+                      : outcome.outcome === "tiebreak"
+                        ? "spareggio aperto (parità)"
+                        : "non assegnato"}
+                  </Text>
+                </View>
               ))}
             </View>
           )}

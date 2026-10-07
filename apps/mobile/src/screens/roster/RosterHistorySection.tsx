@@ -8,6 +8,7 @@ import { theme } from "@fantappero/ui/theme";
 import { Pressable, Text, View } from "react-native";
 import { AppTextInput as TextInput } from "../../components/AppTextInput";
 import { UiStatePanel } from "../../components/UiStatePanel";
+import { AthleteName } from "../../athletes/AthleteCard";
 import { formatLedgerEntry, LEDGER_PAGE_SIZE } from "./rosterHelpers";
 import { rosterStyles as styles } from "./rosterStyles";
 
@@ -129,10 +130,16 @@ export function RosterHistorySection({
         <View testID="roster-history-success">
           <Text style={styles.summary}>Intervalli di possesso</Text>
           {history.intervals.map((row) => (
-            <Text key={row.id} style={styles.meta}>
-              {row.athleteName ?? row.athleteId} · slot {row.slotIndex + 1} ·{" "}
-              {row.purchaseCredits} cr · {row.releasedAt ? "chiuso" : "in rosa"} · {row.source}
-            </Text>
+            <View key={row.id} style={{ flexDirection: "row", flexWrap: "wrap" }}>
+              <AthleteName athleteId={row.athleteId} style={styles.meta}>
+                {row.athleteName ?? row.athleteId}
+              </AthleteName>
+              <Text style={styles.meta}>
+                {" "}
+                · slot {row.slotIndex + 1} · {row.purchaseCredits} cr · {row.releasedAt ? "chiuso" : "in rosa"} ·{" "}
+                {row.source}
+              </Text>
+            </View>
           ))}
         </View>
       ) : null}
@@ -181,12 +188,16 @@ export function RosterHistorySection({
               Turno {snapshotDetail.roundNumber} · {snapshotDetail.entryCount} assegnazioni
             </Text>
             {snapshotDetail.entries.map((entry) => (
-              <Text
+              <View
                 key={`${entry.fantasyTeamId}-${entry.slotIndex}-${entry.athleteId}`}
-                style={styles.meta}
+                style={{ flexDirection: "row", flexWrap: "wrap" }}
               >
-                {entry.teamName}: {entry.athleteName ?? entry.athleteId} ({entry.role ?? "—"})
-              </Text>
+                <Text style={styles.meta}>{entry.teamName}: </Text>
+                <AthleteName athleteId={entry.athleteId} style={styles.meta}>
+                  {entry.athleteName ?? entry.athleteId}
+                </AthleteName>
+                <Text style={styles.meta}> ({entry.role ?? "—"})</Text>
+              </View>
             ))}
             {snapshots.length > 0 ? (
               <Text style={styles.meta}>

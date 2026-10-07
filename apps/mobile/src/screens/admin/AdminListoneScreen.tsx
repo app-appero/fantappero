@@ -10,6 +10,7 @@ import { ApiError } from "../../api/client";
 import { adminUiStyles as styles } from "../../admin/adminUiStyles";
 import { StatusBadge } from "../../components/StatusBadge";
 import { UiStatePanel } from "../../components/UiStatePanel";
+import { AthleteName } from "../../athletes/AthleteCard";
 import { PageContainer } from "../../layout/PageContainer";
 import { getApiErrorMessage, useAuthSession } from "../../session/DemoSessionContext";
 
@@ -306,7 +307,9 @@ export function AdminListoneScreen() {
                 {pagedEntries.map((entry) => (
                   <View key={entry.athleteId} style={styles.listRow}>
                     <View style={styles.identityRow}>
-                      <Text style={styles.name}>{entry.canonicalName}</Text>
+                      <AthleteName athleteId={entry.athleteId} style={styles.name} numberOfLines={1}>
+                        {entry.canonicalName}
+                      </AthleteName>
                       <StatusBadge
                         label={entry.officialRole}
                         color={roleBadgeColor(entry.officialRole)}

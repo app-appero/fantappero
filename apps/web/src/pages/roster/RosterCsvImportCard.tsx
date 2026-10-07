@@ -13,6 +13,7 @@ import {
   UiStatePanel,
 } from "@fantappero/ui";
 import type { RefObject } from "react";
+import { AthleteName } from "../../athletes/AthleteCard";
 
 export function RosterCsvImportCard({
   csvBusy,
@@ -117,7 +118,9 @@ export function RosterCsvImportCard({
                   <TableRow key={row.rowNumber}>
                     <TableCell>{row.rowNumber}</TableCell>
                     <TableCell>{row.fantasyTeamName ?? row.squadra}</TableCell>
-                    <TableCell>{row.athleteName ?? row.nome ?? "—"}</TableCell>
+                    <TableCell>
+                      <AthleteName athleteId={row.athleteId}>{row.athleteName ?? row.nome ?? "—"}</AthleteName>
+                    </TableCell>
                     <TableCell>{row.crediti ?? "—"}</TableCell>
                     <TableCell>{row.status}</TableCell>
                     <TableCell>

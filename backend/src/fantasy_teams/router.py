@@ -13,9 +13,11 @@ from auth.exceptions import AuthError
 from authorization.context import LeagueAccess
 from authorization.dependencies import require_league_permissions
 from database.enums import Permission
+from fantasy_teams.athlete_card import get_athlete_card
 from fantasy_teams.schemas import (
     AdminCreditMovementRequest,
     AssignRosterSlotRequest,
+    AthleteCardResponse,
     CreateRosterTurnSnapshotRequest,
     CreditAccountResponse,
     CreditLedgerListResponse,
@@ -82,6 +84,30 @@ def list_roster_occupancy(
 ) -> list[RosterOccupancyEntryResponse]:
     """Return league-wide athlete occupancy for manual roster editing."""
     return service.list_roster_occupancy(league_access)
+
+
+@router.get(
+    "/{league_id}/calciatori/{athlete_id}",
+    response_model=AthleteCardResponse,
+)
+def get_league_athlete_card(
+    athlete_id: UUID,
+    league_access: LeagueAccess = Depends(require_league_permissions(Permission.ROSTER_VIEW)),
+    session: Session = Depends(get_db_session),
+) -> AthleteCardResponse | JSONResponse:
+    """Scheda del calciatore: dati provider già salvati e associazione nella lega."""
+    try:
+        return get_athlete_card(session, league_access, athlete_id)
+    except AuthError as exc:
+        status_code = (
+            status.HTTP_404_NOT_FOUND
+            if exc.code == "athlete_not_found"
+            else status.HTTP_400_BAD_REQUEST
+        )
+        return JSONResponse(
+            status_code=status_code,
+            content={"message": exc.message, "code": exc.code},
+        )
 
 
 @router.get(

@@ -412,6 +412,104 @@ textarea::placeholder,
   border-top: 1px solid var(--fa-color-border);
 }
 
+.fa-athlete-card-dialog {
+  width: min(100%, 36rem);
+}
+
+.fa-athlete-name {
+  appearance: none;
+  background: none;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  font: inherit;
+  color: inherit;
+  text-align: inherit;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.fa-athlete-name:hover {
+  color: var(--fa-color-accent);
+}
+
+button.fa-pitch-player {
+  appearance: none;
+  background: none;
+  border: 0;
+  padding: 0;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.fa-athlete-card__hero {
+  display: flex;
+  gap: var(--fa-space-md);
+  align-items: center;
+}
+
+.fa-athlete-card__photo {
+  width: 4.5rem;
+  height: 4.5rem;
+  border-radius: 50%;
+  object-fit: cover;
+  background: var(--fa-color-background-subtle);
+  flex-shrink: 0;
+}
+
+.fa-athlete-card__photo--empty {
+  display: grid;
+  place-items: center;
+  font-weight: 700;
+  color: var(--fa-color-foreground-muted);
+}
+
+.fa-athlete-card__club {
+  margin: 0.15rem 0 0;
+  color: var(--fa-color-foreground-muted);
+}
+
+.fa-athlete-card__facts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--fa-space-sm) var(--fa-space-md);
+  margin: var(--fa-space-md) 0 0;
+}
+
+.fa-athlete-card__fact {
+  margin: 0;
+}
+
+.fa-athlete-card__fact dt {
+  font-size: var(--fa-text-xs);
+  color: var(--fa-color-foreground-muted);
+}
+
+.fa-athlete-card__fact dd {
+  margin: 0;
+}
+
+.fa-athlete-card__section {
+  margin-top: var(--fa-space-md);
+}
+
+.fa-athlete-card__section h3 {
+  margin: 0 0 var(--fa-space-xs);
+  font-size: var(--fa-text-sm);
+}
+
+.fa-athlete-card__list {
+  margin: 0;
+  padding-left: 1.1rem;
+}
+
+.fa-athlete-card__muted {
+  margin: 0;
+  color: var(--fa-color-foreground-muted);
+}
+
 /* ── Toast ──────────────────────────────────────────────────────────── */
 
 .fa-toast-region {

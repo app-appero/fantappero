@@ -26,6 +26,7 @@ import {
 import { theme } from "@fantappero/ui/theme";
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { AthleteName } from "../athletes/AthleteCard";
 import {
   fetchFantasyTurns,
   fetchMyLineup,
@@ -795,43 +796,51 @@ export function FormationScreen() {
               ) : null}
               <View style={styles.row}>
                 {optionsForSlot(index, role).map((player) => (
-                  <Pressable
+                  <View
                     key={player.athleteId}
                     style={[
                       styles.chip,
+                      styles.chipWithName,
                       displayStarters[index] === player.athleteId ? styles.chipActive : null,
                     ]}
-                    disabled={!context.modificationAllowed || !canEdit}
-                    onPress={() => {
-                      // Chi occupa lo slot ha già la partita iniziata: non si tocca più.
-                      if (currentId && currentId !== player.athleteId && playerLocked(currentId)) {
-                        setActionError(KICKOFF_LOCK_MESSAGE);
-                        return;
-                      }
-                      if (playerLocked(player.athleteId) && player.athleteId !== currentId) {
-                        setActionError(KICKOFF_LOCK_MESSAGE);
-                        return;
-                      }
-                      const nextStarters = [...starterIds];
-                      nextStarters[index] = player.athleteId;
-                      setStarterIds(nextStarters);
-                      setBenchIds(
-                        orderedBenchFromRoster(
-                          roster.map((row) => row.athleteId),
-                          nextStarters,
-                          benchIds,
-                        ),
-                      );
-                      setActionError(null);
-                      setActionMessage(null);
-                    }}
                   >
-                    <Text style={styles.chipLabel}>
+                    <AthleteName athleteId={player.athleteId} style={styles.chipLabel}>
                       {player.athleteName}
-                      {playerLocked(player.athleteId) ? " (bloccato)" : ""}
-                      {playerScoreLabel(player.athleteId) ? ` · ${playerScoreLabel(player.athleteId)}` : ""}
-                    </Text>
-                  </Pressable>
+                    </AthleteName>
+                    <Pressable
+                      disabled={!context.modificationAllowed || !canEdit}
+                      accessibilityLabel={`Schiera ${player.athleteName}`}
+                      onPress={() => {
+                        // Chi occupa lo slot ha già la partita iniziata: non si tocca più.
+                        if (currentId && currentId !== player.athleteId && playerLocked(currentId)) {
+                          setActionError(KICKOFF_LOCK_MESSAGE);
+                          return;
+                        }
+                        if (playerLocked(player.athleteId) && player.athleteId !== currentId) {
+                          setActionError(KICKOFF_LOCK_MESSAGE);
+                          return;
+                        }
+                        const nextStarters = [...starterIds];
+                        nextStarters[index] = player.athleteId;
+                        setStarterIds(nextStarters);
+                        setBenchIds(
+                          orderedBenchFromRoster(
+                            roster.map((row) => row.athleteId),
+                            nextStarters,
+                            benchIds,
+                          ),
+                        );
+                        setActionError(null);
+                        setActionMessage(null);
+                      }}
+                    >
+                      <Text style={styles.chipLabel}>
+                        {displayStarters[index] === player.athleteId ? " ●" : " ○"}
+                        {playerLocked(player.athleteId) ? " bloccato" : ""}
+                        {playerScoreLabel(player.athleteId) ? ` · ${playerScoreLabel(player.athleteId)}` : ""}
+                      </Text>
+                    </Pressable>
+                  </View>
                 ))}
               </View>
             </View>
@@ -877,8 +886,10 @@ export function FormationScreen() {
                         {role}
                       </Text>
                     </View>
-                    <Text style={styles.body}>
+                    <AthleteName athleteId={id} style={styles.body}>
                       {name}
+                    </AthleteName>
+                    <Text style={styles.body}>
                       {playerLocked(id) ? " — bloccato" : ""}
                       {playerScoreLabel(id) ? ` · ${playerScoreLabel(id)}` : ""}
                     </Text>
@@ -1004,6 +1015,11 @@ const styles = lazyStyles(() => StyleSheet.create({
     borderRadius: radius.md,
     paddingHorizontal: spacing.sm,
     paddingVertical: spacing.xs,
+  },
+  chipWithName: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.xs,
   },
   chipActive: {
     borderColor: colors.accent,

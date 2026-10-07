@@ -1,6 +1,7 @@
 import type { LeagueListoneEntry, LeagueSummary } from "@fantappero/contracts";
 import { useMemo } from "react";
 import { Pressable, ScrollView, Text, View } from "react-native";
+import { AthleteName } from "../../athletes/AthleteCard";
 import { UiStatePanel } from "../../components/UiStatePanel";
 import { marketUiStyles as styles } from "../../market/marketUiStyles";
 import { filterByTab, roleBadgeColors, ROLE_LABEL, ROLE_TABS, type RoleTab } from "./auctionListoneHelpers";
@@ -122,7 +123,9 @@ export function AuctionListone({
                           {entry.effectiveRole}
                         </Text>
                       </View>
-                      <Text style={styles.name}>{entry.canonicalName}</Text>
+                      <AthleteName athleteId={entry.athleteId} style={styles.name} numberOfLines={2}>
+                        {entry.canonicalName}
+                      </AthleteName>
                     </View>
                     <Text style={styles.meta}>
                       {ROLE_LABEL[entry.effectiveRole]} · {entry.clubName ?? "—"}

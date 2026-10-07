@@ -7,6 +7,7 @@ import {
   liveSeatGlow,
   resolveLiveSeatCue,
 } from "@fantappero/contracts";
+import { AthleteName } from "../../athletes/AthleteCard";
 
 function seatPosition(index: number, total: number): { left: string; top: string } {
   const angle = (index / total) * 2 * Math.PI - Math.PI / 2;
@@ -55,7 +56,9 @@ export function LiveAuctionTable({
         <div className="fa-live-auction-table__center">
           {currentLot ? (
             <>
-              <p className="fa-live-auction-table__athlete">{currentLot.athleteName}</p>
+              <p className="fa-live-auction-table__athlete">
+                <AthleteName athleteId={currentLot.athleteId}>{currentLot.athleteName}</AthleteName>
+              </p>
               <p className="fa-live-auction-table__amount">{currentLot.currentAmountCredits} crediti</p>
               {secondsRemaining !== null ? (
                 <p className="fa-live-auction-table__countdown">{secondsRemaining}s</p>

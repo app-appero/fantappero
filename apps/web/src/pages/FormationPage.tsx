@@ -43,6 +43,7 @@ import {
   useToast,
   type PitchPlayer,
 } from "@fantappero/ui";
+import { AthleteName, useAthleteCard } from "../athletes/AthleteCard";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   fetchFantasyTurns,
@@ -372,7 +373,7 @@ function BenchOrderRow({
       </span>
       <span className="fa-bench-order__player">
         <Badge variant={roleBadgeVariant(role)}>{role ?? "?"}</Badge>
-        {name}
+        <AthleteName athleteId={athleteId}>{name}</AthleteName>
         {locked ? " — bloccato" : ""}
         {scoreLabel ? (
           <strong
@@ -394,6 +395,7 @@ function BenchOrderRow({
 /** Formazione: copia precedente, bozza e tre mosse tattiche (EP06-05 / EP06-06). */
 export function FormationPage() {
   const { isDemoMode, activeLeagueId, can } = useAuth();
+  const athleteCard = useAthleteCard();
   const { search } = useLocation();
   const demoState = isDemoMode ? parseWireframeStateFromSearch(search) : null;
   const canView = can(["roster:view"]);
@@ -1001,6 +1003,7 @@ export function FormationPage() {
     const athleteId = displayStarters[index] ?? "";
     return {
       id: `starter-${index}`,
+      athleteId: athleteId || null,
       name: athleteId ? playerName(roster, athleteId) : "Libero",
       role,
       photoUrl: athleteId ? playerPhotoUrl(roster, athleteId) : null,
@@ -1303,6 +1306,7 @@ export function FormationPage() {
               pitchAriaLabel="Formazione titolare"
               players={pitchPlayers}
               positions={pitchPositions}
+              onAthletePress={athleteCard?.open}
             />
           </div>
 

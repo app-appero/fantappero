@@ -1,7 +1,7 @@
 import { lazyStyles } from "../../theme/lazyStyles";
 import { theme } from "@fantappero/ui/theme";
 import { type ReactNode } from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { StyleSheet, Text, View, type TextStyle } from "react-native";
 
 const { colors, spacing, typography, radius } = theme;
 
@@ -35,6 +35,13 @@ export type MatchTimelineProps = {
  * Timeline verticale casa/ospite con minuto al centro, porting mobile di
  * `packages/ui`'s `MatchTimeline` (EP13-P04-quater §9/§10/§12).
  */
+function TimelineCopy({ children, style }: { children: ReactNode; style: TextStyle }) {
+  if (typeof children === "string" || typeof children === "number") {
+    return <Text style={style}>{children}</Text>;
+  }
+  return <View style={styles.headlineWrap}>{children}</View>;
+}
+
 export function MatchTimeline({ entries, homeLabel, awayLabel, emptyMessage, testID }: MatchTimelineProps) {
   if (entries.length === 0) {
     return (
@@ -61,10 +68,10 @@ export function MatchTimeline({ entries, homeLabel, awayLabel, emptyMessage, tes
               {entry.side === "home" ? (
                 <View style={styles.contentInnerHome}>
                   <View style={styles.contentRowHome}>
-                    <Text style={styles.headline}>{entry.headline}</Text>
+                    <TimelineCopy style={styles.headline}>{entry.headline}</TimelineCopy>
                     {entry.icon}
                   </View>
-                  {entry.detail ? <Text style={styles.detailHome}>{entry.detail}</Text> : null}
+                  {entry.detail ? <TimelineCopy style={styles.detailHome}>{entry.detail}</TimelineCopy> : null}
                 </View>
               ) : null}
             </View>
@@ -76,9 +83,9 @@ export function MatchTimeline({ entries, homeLabel, awayLabel, emptyMessage, tes
                 <View style={styles.contentInner}>
                   <View style={styles.contentRow}>
                     {entry.icon}
-                    <Text style={styles.headline}>{entry.headline}</Text>
+                    <TimelineCopy style={styles.headline}>{entry.headline}</TimelineCopy>
                   </View>
-                  {entry.detail ? <Text style={styles.detail}>{entry.detail}</Text> : null}
+                  {entry.detail ? <TimelineCopy style={styles.detail}>{entry.detail}</TimelineCopy> : null}
                 </View>
               ) : null}
             </View>
@@ -157,6 +164,12 @@ const styles = lazyStyles(() => StyleSheet.create({
     color: colors.foreground,
     fontWeight: "600",
     fontSize: typography.fontSize.sm,
+  },
+  headlineWrap: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    alignItems: "center",
+    flexShrink: 1,
   },
   detail: {
     color: colors.foregroundMuted,

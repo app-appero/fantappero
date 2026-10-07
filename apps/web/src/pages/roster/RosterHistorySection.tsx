@@ -17,6 +17,7 @@ import {
   TableRow,
   UiStatePanel,
 } from "@fantappero/ui";
+import { AthleteName } from "../../athletes/AthleteCard";
 import { formatLedgerEntry, LEDGER_PAGE_SIZE, roleLabel } from "./rosterHelpers";
 
 export function RosterHistorySection({
@@ -161,7 +162,9 @@ export function RosterHistorySection({
               <TableBody>
                 {history.intervals.map((row) => (
                   <TableRow key={row.id}>
-                    <TableCell>{row.athleteName ?? row.athleteId}</TableCell>
+                    <TableCell>
+                      <AthleteName athleteId={row.athleteId}>{row.athleteName ?? row.athleteId}</AthleteName>
+                    </TableCell>
                     <TableCell>{row.slotIndex + 1}</TableCell>
                     <TableCell>{row.purchaseCredits}</TableCell>
                     <TableCell>{new Date(row.acquiredAt).toLocaleString("it-IT")}</TableCell>
@@ -264,7 +267,11 @@ export function RosterHistorySection({
                   {snapshotDetail.entries.map((entry) => (
                     <TableRow key={`${entry.fantasyTeamId}-${entry.slotIndex}-${entry.athleteId}`}>
                       <TableCell>{entry.teamName}</TableCell>
-                      <TableCell>{entry.athleteName ?? entry.athleteId}</TableCell>
+                      <TableCell>
+                        <AthleteName athleteId={entry.athleteId}>
+                          {entry.athleteName ?? entry.athleteId}
+                        </AthleteName>
+                      </TableCell>
                       <TableCell>{roleLabel(entry.role)}</TableCell>
                       <TableCell>{entry.purchaseCredits}</TableCell>
                       <TableCell>{entry.slotIndex + 1}</TableCell>

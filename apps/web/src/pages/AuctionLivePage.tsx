@@ -43,6 +43,7 @@ import {
   resolveLiveAuctionSwap,
   startLiveAuctionSession,
 } from "../api/marketLive";
+import { AthleteName } from "../athletes/AthleteCard";
 import { getApiErrorMessage, useAuth } from "../auth/AuthContext";
 import { useMarketGate } from "../market/MarketGateContext";
 import { loadStoredSession } from "../auth/sessionStorage";
@@ -542,7 +543,7 @@ export function AuctionLivePage() {
                             checked={queueAthleteIds.includes(entry.athleteId)}
                             onChange={() => toggleQueueAthlete(entry.athleteId)}
                           />{" "}
-                          {entry.canonicalName}
+                          <AthleteName athleteId={entry.athleteId}>{entry.canonicalName}</AthleteName>
                           {owned ? " (assegnato)" : ""}
                         </label>
                       );
@@ -670,7 +671,12 @@ export function AuctionLivePage() {
 
               {currentLot ? (
                 <Card data-testid="auction-live-current-lot">
-                  <CardHeader title={`Lotto: ${currentLot.athleteName}`} />
+                  <CardHeader>
+                    <h3 className="fa-card__title">
+                      Lotto:{" "}
+                      <AthleteName athleteId={currentLot.athleteId}>{currentLot.athleteName}</AthleteName>
+                    </h3>
+                  </CardHeader>
                   <CardBody>
                     <p>
                       Prezzo attuale: <strong>{currentLot.currentAmountCredits}</strong> crediti
@@ -723,7 +729,8 @@ export function AuctionLivePage() {
                   <ul>
                     {lotHistory.map((lot) => (
                       <li key={lot.id}>
-                        {lot.athleteName}: {LOT_STATUS_LABEL[lot.status]}
+                        <AthleteName athleteId={lot.athleteId}>{lot.athleteName}</AthleteName>:{" "}
+                        {LOT_STATUS_LABEL[lot.status]}
                         {lot.status === "sold" ? ` (${lot.currentLeaderTeamName} · ${lot.currentAmountCredits} crediti)` : null}
                       </li>
                     ))}
@@ -744,7 +751,11 @@ export function AuctionLivePage() {
         {pendingSwap ? (
           <div data-testid="auction-live-swap-modal">
             <p>
-              Hai aggiudicato <strong>{pendingSwap.athleteName}</strong> per{" "}
+              Hai aggiudicato{" "}
+              <strong>
+                <AthleteName athleteId={pendingSwap.athleteId}>{pendingSwap.athleteName}</AthleteName>
+              </strong>{" "}
+              per{" "}
               {pendingSwap.amountCredits} crediti, ma la tua rosa di {pendingSwap.roleLabel} è al
               completo. Scegli chi scambiare, oppure rinuncia al giocatore.
             </p>
@@ -755,7 +766,8 @@ export function AuctionLivePage() {
               {pendingSwap.candidates.map((candidate) => (
                 <li key={candidate.athleteId} className="fa-ds-showcase__row">
                   <span>
-                    {candidate.athleteName} ({candidate.purchaseCredits} crediti)
+                    <AthleteName athleteId={candidate.athleteId}>{candidate.athleteName}</AthleteName> (
+                    {candidate.purchaseCredits} crediti)
                   </span>
                   <Button
                     variant="primary"

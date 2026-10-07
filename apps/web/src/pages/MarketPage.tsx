@@ -28,6 +28,7 @@ import {
   fetchRosterOccupancy,
   fetchTeamPlayersForTrade,
 } from "../api/leagues";
+import { AthleteName } from "../athletes/AthleteCard";
 import { getApiErrorMessage, useAuth } from "../auth/AuthContext";
 import { loadStoredSession } from "../auth/sessionStorage";
 import { useMarketHistory } from "../market/useMarketHistory";
@@ -579,7 +580,7 @@ export function MarketPage() {
                                 )
                               }
                             />
-                            <span>{slot.athleteName}</span>
+                            <AthleteName athleteId={slot.athleteId}>{slot.athleteName}</AthleteName>
                           </label>
                         ))}
                       </div>
@@ -659,7 +660,7 @@ export function MarketPage() {
                                 )
                               }
                             />
-                            <span>{athlete.athleteName}</span>
+                            <AthleteName athleteId={athlete.athleteId}>{athlete.athleteName}</AthleteName>
                           </label>
                         ))}
                       </div>
@@ -784,11 +785,27 @@ export function MarketPage() {
                         </Badge>
                       </p>
                       <p>
-                        Offerti: {proposal.offeredAthletes.map((a) => a.name).join(", ") || "—"}
+                        Offerti:{" "}
+                        {proposal.offeredAthletes.length === 0
+                          ? "—"
+                          : proposal.offeredAthletes.map((athlete, index) => (
+                              <span key={athlete.id}>
+                                {index > 0 ? ", " : null}
+                                <AthleteName athleteId={athlete.id}>{athlete.name}</AthleteName>
+                              </span>
+                            ))}
                         {proposal.offeredCredits > 0 ? ` + ${proposal.offeredCredits} crediti` : ""}
                       </p>
                       <p>
-                        Richiesti: {proposal.requestedAthletes.map((a) => a.name).join(", ") || "—"}
+                        Richiesti:{" "}
+                        {proposal.requestedAthletes.length === 0
+                          ? "—"
+                          : proposal.requestedAthletes.map((athlete, index) => (
+                              <span key={athlete.id}>
+                                {index > 0 ? ", " : null}
+                                <AthleteName athleteId={athlete.id}>{athlete.name}</AthleteName>
+                              </span>
+                            ))}
                         {proposal.requestedCredits > 0 ? ` + ${proposal.requestedCredits} crediti` : ""}
                       </p>
                       <p>
@@ -881,7 +898,7 @@ export function MarketPage() {
                                           )
                                         }
                                       />
-                                      <span>{slot.athleteName}</span>
+                                      <AthleteName athleteId={slot.athleteId}>{slot.athleteName}</AthleteName>
                                     </label>
                                   ))}
                                 </div>
@@ -904,11 +921,11 @@ export function MarketPage() {
                                             )
                                           }
                                         />
-                                        <span>
+                                        <AthleteName athleteId={entry.athleteId}>
                                           {entry.athleteName ??
                                             athleteNameById.get(entry.athleteId) ??
                                             "Giocatore"}
-                                        </span>
+                                        </AthleteName>
                                       </label>
                                     ))}
                                 </div>

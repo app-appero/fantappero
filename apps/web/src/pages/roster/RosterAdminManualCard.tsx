@@ -23,6 +23,7 @@ import {
   Tabs,
   UiStatePanel,
 } from "@fantappero/ui";
+import { AthleteName } from "../../athletes/AthleteCard";
 import { useEffect, useState } from "react";
 import {
   LISTONE_PAGE_SIZE,
@@ -57,7 +58,9 @@ function ListoneAssignRow({
 
   return (
     <TableRow>
-      <TableCell>{entry.canonicalName}</TableCell>
+      <TableCell>
+        <AthleteName athleteId={entry.athleteId}>{entry.canonicalName}</AthleteName>
+      </TableCell>
       <TableCell>
         <Badge variant={roleBadgeVariant(entry.effectiveRole)}>{entry.effectiveRole}</Badge>{" "}
         {ROLE_LABEL[entry.effectiveRole]}

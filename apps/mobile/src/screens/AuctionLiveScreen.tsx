@@ -11,6 +11,7 @@ import type {
 import { computeMinimumNextBid } from "@fantappero/contracts";
 import { useCallback, useMemo, useState } from "react";
 import { Modal, Pressable, ScrollView, Text, View } from "react-native";
+import { AthleteName } from "../athletes/AthleteCard";
 import { AppTextInput as TextInput } from "../components/AppTextInput";
 import {
   fetchFantasyTeams,
@@ -439,17 +440,26 @@ export function AuctionLiveScreen() {
                   const owned = ownedAthleteIds.has(entry.athleteId);
                   const active = queueAthleteIds.includes(entry.athleteId);
                   return (
-                    <Pressable
+                    <View
                       key={entry.athleteId}
-                      disabled={owned}
-                      style={[styles.chip, active && styles.chipActive, owned && styles.disabled]}
-                      onPress={() => toggleQueueAthlete(entry.athleteId)}
+                      style={[styles.chip, { flexDirection: "row", alignItems: "center" }, active && styles.chipActive, owned && styles.disabled]}
                     >
-                      <Text style={[styles.chipLabel, active && styles.chipLabelActive]}>
+                      <AthleteName
+                        athleteId={entry.athleteId}
+                        style={[styles.chipLabel, active && styles.chipLabelActive]}
+                      >
                         {entry.canonicalName}
-                        {owned ? " (assegnato)" : ""}
-                      </Text>
-                    </Pressable>
+                      </AthleteName>
+                      <Pressable
+                        disabled={owned}
+                        onPress={() => toggleQueueAthlete(entry.athleteId)}
+                        accessibilityLabel={owned ? `${entry.canonicalName} già assegnato` : `Chiama ${entry.canonicalName}`}
+                      >
+                        <Text style={[styles.chipLabel, active && styles.chipLabelActive]}>
+                          {owned ? " (assegnato)" : active ? " ✓" : " +"}
+                        </Text>
+                      </Pressable>
+                    </View>
                   );
                 })}
               </View>
@@ -580,7 +590,9 @@ export function AuctionLiveScreen() {
 
           {currentLot ? (
             <View style={styles.section} testID="auction-live-current-lot">
-              <Text style={styles.sectionTitle}>{currentLot.athleteName}</Text>
+              <AthleteName athleteId={currentLot.athleteId} style={styles.sectionTitle} numberOfLines={2}>
+                {currentLot.athleteName}
+              </AthleteName>
               <Text style={styles.meta}>
                 Prezzo attuale: {currentLot.currentAmountCredits} crediti
                 {currentLot.currentLeaderTeamName ? ` · in testa: ${currentLot.currentLeaderTeamName}` : " · nessun rilancio"}
@@ -629,10 +641,15 @@ export function AuctionLiveScreen() {
             <View testID="auction-live-history">
               <Text style={styles.sectionTitle}>Storico lotti</Text>
               {lotHistory.map((lot) => (
-                <Text key={lot.id} style={styles.meta}>
-                  {lot.athleteName}: {LIVE_LOT_STATUS_LABEL[lot.status]}
-                  {lot.status === "sold" ? ` (${lot.currentLeaderTeamName} · ${lot.currentAmountCredits} crediti)` : null}
-                </Text>
+                <View key={lot.id} style={{ flexDirection: "row", flexWrap: "wrap" }}>
+                  <AthleteName athleteId={lot.athleteId} style={styles.meta}>
+                    {lot.athleteName}
+                  </AthleteName>
+                  <Text style={styles.meta}>
+                    : {LIVE_LOT_STATUS_LABEL[lot.status]}
+                    {lot.status === "sold" ? ` (${lot.currentLeaderTeamName} · ${lot.currentAmountCredits} crediti)` : ""}
+                  </Text>
+                </View>
               ))}
             </View>
           ) : null}
@@ -651,17 +668,26 @@ export function AuctionLiveScreen() {
             {pendingSwap ? (
               <ScrollView>
                 <Text style={styles.sectionTitle}>Rosa al completo</Text>
-                <Text style={styles.meta}>
-                  Hai aggiudicato {pendingSwap.athleteName} per {pendingSwap.amountCredits} crediti,
-                  ma la tua rosa di {pendingSwap.roleLabel} è al completo. Scegli chi scambiare,
-                  oppure rinuncia al giocatore.
-                </Text>
+                <View style={{ flexDirection: "row", flexWrap: "wrap" }}>
+                  <Text style={styles.meta}>Hai aggiudicato </Text>
+                  <AthleteName athleteId={pendingSwap.athleteId} style={styles.meta}>
+                    {pendingSwap.athleteName}
+                  </AthleteName>
+                  <Text style={styles.meta}>
+                    {" "}
+                    per {pendingSwap.amountCredits} crediti, ma la tua rosa di {pendingSwap.roleLabel} è al
+                    completo. Scegli chi scambiare, oppure rinuncia al giocatore.
+                  </Text>
+                </View>
                 {swapError ? <Text style={styles.error} testID="auction-live-swap-error">{swapError}</Text> : null}
                 {pendingSwap.candidates.map((candidate) => (
                   <View key={candidate.athleteId} style={styles.rowActions}>
-                    <Text style={styles.meta}>
-                      {candidate.athleteName} ({candidate.purchaseCredits} crediti)
-                    </Text>
+                    <View style={{ flexDirection: "row", flexWrap: "wrap", flex: 1 }}>
+                      <AthleteName athleteId={candidate.athleteId} style={styles.meta}>
+                        {candidate.athleteName}
+                      </AthleteName>
+                      <Text style={styles.meta}> ({candidate.purchaseCredits} crediti)</Text>
+                    </View>
                     <Pressable
                       style={[styles.button, swapBusy && styles.disabled]}
                       disabled={swapBusy}

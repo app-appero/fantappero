@@ -264,3 +264,50 @@ class RosterTurnSnapshotDetailResponse(ApiModel):
     actor_id: str | None = Field(default=None, alias="actorId")
     created: bool = False
     entries: list[RosterTurnSnapshotEntryResponse] = Field(default_factory=list)
+
+
+class AthleteCardSeasonResponse(ApiModel):
+    club_name: str = Field(alias="clubName")
+    season_year: int = Field(alias="seasonYear")
+    shirt_number: int | None = Field(default=None, alias="shirtNumber")
+    position_raw: str | None = Field(default=None, alias="positionRaw")
+    is_active: bool = Field(alias="isActive")
+
+
+class AthleteCardTransferResponse(ApiModel):
+    transfer_date: str = Field(alias="transferDate")
+    from_club_name: str | None = Field(default=None, alias="fromClubName")
+    to_club_name: str | None = Field(default=None, alias="toClubName")
+    transfer_type: str = Field(alias="transferType")
+
+
+class AthleteCardAssignmentResponse(ApiModel):
+    fantasy_team_id: str = Field(alias="fantasyTeamId")
+    team_name: str = Field(alias="teamName")
+    slot_index: int = Field(alias="slotIndex")
+    purchase_credits: int | None = Field(default=None, alias="purchaseCredits")
+
+
+class AthleteCardResponse(ApiModel):
+    """Scheda calciatore: anagrafica provider, stagioni, trasferimenti e rosa di lega."""
+
+    athlete_id: str = Field(alias="athleteId")
+    provider_id: int = Field(alias="providerId")
+    canonical_name: str = Field(alias="canonicalName")
+    first_name: str | None = Field(default=None, alias="firstName")
+    last_name: str | None = Field(default=None, alias="lastName")
+    nationality: str | None = None
+    birth_date: str | None = Field(default=None, alias="birthDate")
+    age: int | None = None
+    height: str | None = None
+    weight: str | None = None
+    injured: bool | None = None
+    photo_url: str | None = Field(default=None, alias="photoUrl")
+    club_name: str | None = Field(default=None, alias="clubName")
+    shirt_number: int | None = Field(default=None, alias="shirtNumber")
+    role: str | None = None
+    effective_role: str | None = Field(default=None, alias="effectiveRole")
+    provider_position_raw: str | None = Field(default=None, alias="providerPositionRaw")
+    assignment: AthleteCardAssignmentResponse | None = None
+    seasons: list[AthleteCardSeasonResponse] = Field(default_factory=list)
+    transfers: list[AthleteCardTransferResponse] = Field(default_factory=list)

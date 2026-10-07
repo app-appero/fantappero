@@ -9,6 +9,7 @@ import {
   ROSTER_PAGE_SIZE,
   roleBadgeColors,
 } from "./rosterHelpers";
+import { AthleteName } from "../../athletes/AthleteCard";
 import { RosterActionBadge } from "./RosterActionBadge";
 import { rosterStyles as styles } from "./rosterStyles";
 
@@ -130,9 +131,14 @@ function RosterRoleSection({
             </View>
             {pagedSlots.map((slot) => (
               <View key={slot.id} style={styles.playerRow}>
-                <Text style={[styles.playerName, styles.playerNameCell]} numberOfLines={1}>
+                <AthleteName
+                  athleteId={slot.athleteId}
+                  style={styles.playerName}
+                  containerStyle={styles.playerNameCell}
+                  numberOfLines={1}
+                >
                   {slot.athleteName ?? "Calciatore"}
-                </Text>
+                </AthleteName>
                 <Text style={[styles.playerClub, styles.playerClubCell]} numberOfLines={1}>
                   {slot.clubName ?? "—"}
                 </Text>

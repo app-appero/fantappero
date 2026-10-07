@@ -1,6 +1,7 @@
 import type { FantasyRosterSlot, FantasyTeamSummary, RosterOccupancyEntry } from "@fantappero/contracts";
 import { useState } from "react";
 import { Pressable, Text, View } from "react-native";
+import { AthleteName } from "../../athletes/AthleteCard";
 import { AppTextInput as TextInput } from "../../components/AppTextInput";
 import { StatusBadge } from "../../components/StatusBadge";
 import { UiStatePanel } from "../../components/UiStatePanel";
@@ -135,14 +136,42 @@ export function MarketTradeList({
                     textColor={statusColor.text}
                   />
                 </View>
-                <Text style={styles.meta}>
-                  Offerti: {proposal.offeredAthletes.map((a) => a.name).join(", ") || "—"}
-                  {proposal.offeredCredits > 0 ? ` + ${proposal.offeredCredits} crediti` : ""}
-                </Text>
-                <Text style={styles.meta}>
-                  Richiesti: {proposal.requestedAthletes.map((a) => a.name).join(", ") || "—"}
-                  {proposal.requestedCredits > 0 ? ` + ${proposal.requestedCredits} crediti` : ""}
-                </Text>
+                <View style={{ flexDirection: "row", flexWrap: "wrap" }}>
+                  <Text style={styles.meta}>Offerti: </Text>
+                  {proposal.offeredAthletes.length === 0 ? (
+                    <Text style={styles.meta}>—</Text>
+                  ) : (
+                    proposal.offeredAthletes.map((athlete, index) => (
+                      <View key={athlete.id} style={{ flexDirection: "row" }}>
+                        {index > 0 ? <Text style={styles.meta}>, </Text> : null}
+                        <AthleteName athleteId={athlete.id} style={styles.meta}>
+                          {athlete.name}
+                        </AthleteName>
+                      </View>
+                    ))
+                  )}
+                  {proposal.offeredCredits > 0 ? (
+                    <Text style={styles.meta}>{` + ${proposal.offeredCredits} crediti`}</Text>
+                  ) : null}
+                </View>
+                <View style={{ flexDirection: "row", flexWrap: "wrap" }}>
+                  <Text style={styles.meta}>Richiesti: </Text>
+                  {proposal.requestedAthletes.length === 0 ? (
+                    <Text style={styles.meta}>—</Text>
+                  ) : (
+                    proposal.requestedAthletes.map((athlete, index) => (
+                      <View key={athlete.id} style={{ flexDirection: "row" }}>
+                        {index > 0 ? <Text style={styles.meta}>, </Text> : null}
+                        <AthleteName athleteId={athlete.id} style={styles.meta}>
+                          {athlete.name}
+                        </AthleteName>
+                      </View>
+                    ))
+                  )}
+                  {proposal.requestedCredits > 0 ? (
+                    <Text style={styles.meta}>{` + ${proposal.requestedCredits} crediti`}</Text>
+                  ) : null}
+                </View>
 
                 {proposal.status === "proposed" && isProposer ? (
                   <Pressable
@@ -223,7 +252,9 @@ export function MarketTradeList({
                             )
                           }
                         >
-                          <Text style={styles.optionLabel}>{slot.athleteName ?? "Giocatore"}</Text>
+                          <AthleteName athleteId={slot.athleteId} style={styles.optionLabel}>
+                            {slot.athleteName ?? "Giocatore"}
+                          </AthleteName>
                           <Text style={styles.meta}>{checked ? "☑" : "☐"}</Text>
                         </Pressable>
                       );
@@ -242,9 +273,9 @@ export function MarketTradeList({
                               setCounterRequestedAthleteIds((prev) => toggleId(prev, entry.athleteId))
                             }
                           >
-                            <Text style={styles.optionLabel}>
+                            <AthleteName athleteId={entry.athleteId} style={styles.optionLabel}>
                               {entry.athleteName ?? athleteNameById.get(entry.athleteId) ?? "Giocatore"}
-                            </Text>
+                            </AthleteName>
                             <Text style={styles.meta}>{checked ? "☑" : "☐"}</Text>
                           </Pressable>
                         );

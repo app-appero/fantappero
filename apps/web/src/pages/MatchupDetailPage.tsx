@@ -18,6 +18,7 @@ import {
   type PitchPlayer,
 } from "@fantappero/ui";
 import { useCallback, useEffect, useState } from "react";
+import { AthleteName, useAthleteCard } from "../athletes/AthleteCard";
 import { fetchH2HMatchup } from "../api/leagues";
 import { getApiErrorMessage, useAuth } from "../auth/AuthContext";
 import { loadStoredSession } from "../auth/sessionStorage";
@@ -122,6 +123,7 @@ function playerScoreLabel(player: H2HPlayerScore): string | null {
 function toFantasyPitchPlayers(players: readonly H2HPlayerScore[]): PitchPlayer[] {
   return players.map((player) => ({
     id: player.athleteId,
+    athleteId: player.athleteId,
     name: player.name,
     role: player.role,
     badges: fantasyBadgesFromBonusMalus(player.bonusMalus ?? []),
@@ -131,6 +133,7 @@ function toFantasyPitchPlayers(players: readonly H2HPlayerScore[]): PitchPlayer[
 }
 
 function SideBlock({ side, title }: { side: H2HSideLineup; title: string }) {
+  const athleteCard = useAthleteCard();
   const teamLabel = side.teamName ?? side.displayName;
   return (
     <section data-testid={`matchup-side-${title}`}>
@@ -162,6 +165,7 @@ function SideBlock({ side, title }: { side: H2HSideLineup; title: string }) {
           <FootballPitch
             title={`Titolari — ${teamLabel}`}
             players={toFantasyPitchPlayers(side.starters)}
+            onAthletePress={athleteCard?.open}
             positions={layoutFromModule(
               side.starters,
               side.module,
@@ -179,7 +183,10 @@ function SideBlock({ side, title }: { side: H2HSideLineup; title: string }) {
                   const scoreLabel = playerScoreLabel(player);
                   return (
                     <li key={player.athleteId} data-testid={`matchup-bench-player-${player.athleteId}`}>
-                      <strong>{player.name}</strong> ({player.role}) ·{" "}
+                      <strong>
+                        <AthleteName athleteId={player.athleteId}>{player.name}</AthleteName>
+                      </strong>{" "}
+                      ({player.role}) ·{" "}
                       {player.realTeamName ?? "Squadra reale non associata"}
                       {scoreLabel ? (
                         <>

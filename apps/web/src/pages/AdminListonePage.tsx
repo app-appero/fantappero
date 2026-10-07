@@ -20,6 +20,7 @@ import {
   Tabs,
   UiStatePanel,
 } from "@fantappero/ui";
+import { AthleteName } from "../athletes/AthleteCard";
 import { useCallback, useEffect, useState } from "react";
 import { useListoneRefresh } from "../admin/ListoneRefreshContext";
 import { fetchAdminListone } from "../api/admin";
@@ -103,7 +104,9 @@ function AdminListoneTable({ tabValue, rows }: { tabValue: RoleTab; rows: AdminL
         <TableBody>
           {pagedRows.map((entry) => (
             <TableRow key={entry.athleteId}>
-              <TableCell>{entry.canonicalName}</TableCell>
+              <TableCell>
+                <AthleteName athleteId={entry.athleteId}>{entry.canonicalName}</AthleteName>
+              </TableCell>
               <TableCell>
                 <Badge variant={roleBadgeVariant(entry.officialRole)}>
                   {entry.officialRole}

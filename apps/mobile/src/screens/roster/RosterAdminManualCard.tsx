@@ -7,6 +7,7 @@ import type {
 import { useEffect, useState } from "react";
 import { Pressable, Text, View } from "react-native";
 import { AppTextInput as TextInput } from "../../components/AppTextInput";
+import { AthleteName } from "../../athletes/AthleteCard";
 import { UiStatePanel } from "../../components/UiStatePanel";
 import {
   filterListone,
@@ -49,9 +50,14 @@ function ListoneAssignRow({
           {entry.effectiveRole}
         </Text>
       </View>
-      <Text style={[styles.playerName, styles.listoneNameCell]} numberOfLines={1}>
+      <AthleteName
+        athleteId={entry.athleteId}
+        style={styles.playerName}
+        containerStyle={styles.listoneNameCell}
+        numberOfLines={1}
+      >
         {entry.canonicalName}
-      </Text>
+      </AthleteName>
       <Text style={[styles.playerClub, styles.listoneClubCell]} numberOfLines={1}>
         {entry.clubName ?? "—"}
       </Text>

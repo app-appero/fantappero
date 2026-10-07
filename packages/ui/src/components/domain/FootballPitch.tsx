@@ -15,6 +15,8 @@ export type PitchPlayer = {
   scoreLabel?: string | null;
   /** Foto dal provider, quando disponibile; altrimenti resta il cerchio con il numero. */
   photoUrl?: string | null;
+  /** Id interno del calciatore, quando il pallino deve aprire la scheda. */
+  athleteId?: string | null;
 };
 
 export type FootballPitchProps = HTMLAttributes<HTMLDivElement> & {
@@ -22,6 +24,8 @@ export type FootballPitchProps = HTMLAttributes<HTMLDivElement> & {
   players: readonly PitchPlayer[];
   positions: readonly PitchPosition[];
   pitchAriaLabel?: string;
+  /** Apre la scheda del calciatore toccando il pallino, se `athleteId` è presente. */
+  onAthletePress?: (athleteId: string) => void;
 };
 
 function abbreviateName(name: string): string {
@@ -34,9 +38,9 @@ function abbreviateName(name: string): string {
   return `${initials.join(" ")} ${last}`;
 }
 
-function PlayerPill({ player }: { player: PitchPlayer }) {
+function PlayerPillBody({ player }: { player: PitchPlayer }) {
   return (
-    <div className="fa-pitch-player" data-testid={`pitch-player-${player.id}`}>
+    <>
       <div className="fa-pitch-player__badges">
         <EventBadges badges={player.badges ?? []} size={12} />
       </div>
@@ -55,6 +59,38 @@ function PlayerPill({ player }: { player: PitchPlayer }) {
       {player.scoreLabel ? (
         <span className="fa-pitch-player__score">{player.scoreLabel}</span>
       ) : null}
+    </>
+  );
+}
+
+function PlayerPill({
+  player,
+  onAthletePress,
+}: {
+  player: PitchPlayer;
+  onAthletePress?: (athleteId: string) => void;
+}) {
+  if (player.athleteId && onAthletePress) {
+    const athleteId = player.athleteId;
+    return (
+      <button
+        type="button"
+        className="fa-pitch-player"
+        data-testid={`pitch-player-${player.id}`}
+        aria-label={`Apri scheda di ${player.name}`}
+        onClick={(event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          onAthletePress(athleteId);
+        }}
+      >
+        <PlayerPillBody player={player} />
+      </button>
+    );
+  }
+  return (
+    <div className="fa-pitch-player" data-testid={`pitch-player-${player.id}`}>
+      <PlayerPillBody player={player} />
     </div>
   );
 }
@@ -71,6 +107,7 @@ export function FootballPitch({
   players,
   positions,
   pitchAriaLabel,
+  onAthletePress,
   className,
   ...rest
 }: FootballPitchProps) {
@@ -95,7 +132,7 @@ export function FootballPitch({
               className="fa-pitch__slot"
               style={{ left: `${position.xPercent}%`, top: `${position.yPercent}%` }}
             >
-              <PlayerPill player={player} />
+              <PlayerPill player={player} onAthletePress={onAthletePress} />
             </div>
           );
         })}

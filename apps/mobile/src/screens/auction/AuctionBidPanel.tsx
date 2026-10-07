@@ -4,6 +4,7 @@ import { AppTextInput as TextInput } from "../../components/AppTextInput";
 import { OptionPicker, type OptionPickerOption } from "../../components/OptionPicker";
 import { StatusBadge } from "../../components/StatusBadge";
 import { UiStatePanel } from "../../components/UiStatePanel";
+import { AthleteName } from "../../athletes/AthleteCard";
 import { BID_STATUS_LABEL } from "../../market/marketLabels";
 import { marketUiStyles as styles } from "../../market/marketUiStyles";
 import type { MarketSessionFlow } from "../../market/useMarketSessionFlow";
@@ -114,7 +115,9 @@ export function AuctionBidPanel({
         <View testID={`${testIdPrefix}-my-bids-table`}>
           {flow.myBids.map((bid) => (
             <View key={bid.id} style={styles.tableRow}>
-              <Text style={styles.tableCell}>{athleteNameById.get(bid.athleteId) ?? bid.athleteName}</Text>
+              <AthleteName athleteId={bid.athleteId} style={styles.tableCell} numberOfLines={2}>
+                {athleteNameById.get(bid.athleteId) ?? bid.athleteName}
+              </AthleteName>
               <Text style={styles.tableCell}>{bid.amountCredits} crediti</Text>
               <StatusBadge
                 label={BID_STATUS_LABEL[bid.status]}

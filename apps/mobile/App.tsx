@@ -3,6 +3,7 @@ import { NavigationContainer } from "@react-navigation/native";
 import { StatusBar } from "expo-status-bar";
 import { View } from "react-native";
 import { GlobalListoneRefreshBar, ListoneRefreshProvider } from "./src/admin/ListoneRefreshContext";
+import { AthleteCardProvider } from "./src/athletes/AthleteCard";
 import { AppErrorBoundary } from "./src/errors/AppErrorBoundary";
 import { RootNavigator } from "./src/navigation/RootNavigator";
 import { DemoSessionProvider } from "./src/session/DemoSessionContext";
@@ -15,6 +16,7 @@ function ThemedShell() {
   const { scheme } = useAppTheme();
   return (
     <DemoSessionProvider>
+      <AthleteCardProvider>
       <ListoneRefreshProvider>
         <View style={{ flex: 1, backgroundColor: colors.background }}>
           <NavigationContainer theme={buildNavigationTheme()}>
@@ -26,6 +28,7 @@ function ThemedShell() {
           <GlobalListoneRefreshBar />
         </View>
       </ListoneRefreshProvider>
+      </AthleteCardProvider>
     </DemoSessionProvider>
   );
 }

@@ -1,5 +1,6 @@
 import type { FantasyRosterSlot, TeamRosterPlayer } from "@fantappero/contracts";
 import { Pressable, Text, View } from "react-native";
+import { AthleteName } from "../../athletes/AthleteCard";
 import { AppTextInput as TextInput } from "../../components/AppTextInput";
 import { OptionPicker, type OptionPickerOption } from "../../components/OptionPicker";
 import { UiStatePanel } from "../../components/UiStatePanel";
@@ -7,12 +8,14 @@ import { marketUiStyles as styles } from "../../market/marketUiStyles";
 
 function AthleteCheckRow({
   label,
+  athleteId,
   checked,
   onToggle,
   disabled = false,
   testID,
 }: {
   label: string;
+  athleteId?: string | null;
   checked: boolean;
   onToggle: () => void;
   disabled?: boolean;
@@ -26,7 +29,9 @@ function AthleteCheckRow({
       accessibilityState={{ disabled, checked }}
       testID={testID}
     >
-      <Text style={styles.optionLabel}>{label}</Text>
+      <AthleteName athleteId={athleteId} style={styles.optionLabel}>
+        {label}
+      </AthleteName>
       <Text style={styles.meta}>{checked ? "☑" : "☐"}</Text>
     </Pressable>
   );
@@ -108,6 +113,7 @@ export function MarketTradeCreateForm({
               <AthleteCheckRow
                 key={slot.id}
                 label={slot.athleteName ?? "Giocatore"}
+                athleteId={slot.athleteId}
                 checked={offeredAthleteIds.includes(slot.athleteId as string)}
                 onToggle={() => onToggleOffered(slot.athleteId as string)}
                 testID={`market-trade-offered-${slot.athleteId}`}
@@ -155,6 +161,7 @@ export function MarketTradeCreateForm({
                 <AthleteCheckRow
                   key={athlete.athleteId}
                   label={athlete.athleteName}
+                  athleteId={athlete.athleteId}
                   checked={requestedAthleteIds.includes(athlete.athleteId)}
                   disabled={!canPropose}
                   onToggle={() => onToggleRequested(athlete.athleteId)}

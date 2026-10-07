@@ -26,6 +26,7 @@ import {
   WireframeSection,
 } from "@fantappero/ui";
 import { type FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { AthleteName } from "../athletes/AthleteCard";
 import {
   closeAuctionSession,
   createAuctionSession,
@@ -416,7 +417,7 @@ export function AuctionPage() {
                   <ul>
                     {flow.resolution.outcomes.map((outcome) => (
                       <li key={outcome.athleteId}>
-                        {outcome.athleteName}:{" "}
+                        <AthleteName athleteId={outcome.athleteId}>{outcome.athleteName}</AthleteName>:{" "}
                         {outcome.outcome === "assigned"
                           ? `assegnato per ${outcome.amountCredits} crediti`
                           : outcome.outcome === "tiebreak"
@@ -525,7 +526,11 @@ export function AuctionPage() {
               <TableBody>
                 {flow.myBids.map((bid) => (
                   <TableRow key={bid.id}>
-                    <TableCell>{athleteNameById.get(bid.athleteId) ?? bid.athleteName}</TableCell>
+                    <TableCell>
+                      <AthleteName athleteId={bid.athleteId}>
+                        {athleteNameById.get(bid.athleteId) ?? bid.athleteName}
+                      </AthleteName>
+                    </TableCell>
                     <TableCell>{bid.amountCredits} crediti</TableCell>
                     <TableCell>
                       <Badge variant={bid.status === "submitted" ? "success" : "neutral"}>
@@ -638,7 +643,9 @@ export function AuctionPage() {
                         <TableBody>
                           {visibleEntries.map((entry) => (
                             <TableRow key={entry.athleteId}>
-                              <TableCell>{entry.canonicalName}</TableCell>
+                              <TableCell>
+                                <AthleteName athleteId={entry.athleteId}>{entry.canonicalName}</AthleteName>
+                              </TableCell>
                               <TableCell>
                                 <Badge variant={roleBadgeVariant(entry.effectiveRole)}>
                                   {entry.effectiveRole}

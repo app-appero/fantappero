@@ -165,7 +165,8 @@ describe("FixtureDetailBody (EP13-P04-quater)", () => {
     expect(html).toContain("fa-timeline__row--home");
     expect(html).toContain("12&#x27;");
     expect(html).toContain("Marco Rossi");
-    expect(html).toContain("Assist: Luca Bianchi");
+    expect(html).toContain("Assist:");
+    expect(html).toContain("Luca Bianchi");
   });
 
   it("collega il badge gol al giocatore in formazione, per id e non per nome", () => {

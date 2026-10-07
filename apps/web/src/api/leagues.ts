@@ -47,6 +47,7 @@ import type {
   LeagueDetail,
   LeagueInvite,
   LeagueLifecycle,
+  AthleteCard,
   LeagueListoneEntry,
   LeagueListoneRefreshJob,
   LeagueListoneRefreshProgress,
@@ -358,6 +359,14 @@ export async function refreshLeagueListone(
 
 export function fetchMyFantasyTeam(accessToken: string, leagueId: string): Promise<FantasyTeam> {
   return apiRequest<FantasyTeam>(`/leagues/${leagueId}/rosa`, { accessToken });
+}
+
+export function fetchAthleteCard(
+  accessToken: string,
+  leagueId: string,
+  athleteId: string,
+): Promise<AthleteCard> {
+  return apiRequest<AthleteCard>(`/leagues/${leagueId}/calciatori/${athleteId}`, { accessToken });
 }
 
 export function fetchFantasyTeams(

@@ -14,6 +14,7 @@ import { useNavigation, useRoute, type RouteProp } from "@react-navigation/core"
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useCallback, useEffect, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
+import { AthleteName, useAthleteCard } from "../athletes/AthleteCard";
 import { fetchH2HMatchup } from "../api/leagues";
 import { PitchView } from "../components/match/PitchView";
 import { StatusBadge } from "../components/StatusBadge";
@@ -37,6 +38,7 @@ function playerScoreLabel(player: H2HPlayerScore): string | null {
 function toFantasyPitchPlayers(players: readonly H2HPlayerScore[]) {
   return players.map((player) => ({
     id: player.athleteId,
+    athleteId: player.athleteId,
     name: player.name,
     role: player.role,
     badges: fantasyBadgesFromBonusMalus(player.bonusMalus ?? []),
@@ -49,13 +51,21 @@ function BenchRow({ player }: { player: H2HPlayerScore }) {
   const scoreLabel = playerScoreLabel(player);
   return (
     <View style={styles.playerScore} testID={`matchup-bench-player-${player.athleteId}`}>
-      <Text style={styles.body}>
-        <Text style={styles.playerName}>{player.name}</Text> ({player.role}) ·{" "}
-        {player.realTeamName ?? "Squadra reale non associata"}
+      <View style={styles.benchLine}>
+        <AthleteName athleteId={player.athleteId} style={styles.playerName}>
+          {player.name}
+        </AthleteName>
+        <Text style={styles.body}>
+          {" "}
+          ({player.role}) · {player.realTeamName ?? "Squadra reale non associata"}
+        </Text>
         {scoreLabel ? (
-          <Text testID={`matchup-bench-player-score-${player.athleteId}`}> · {scoreLabel}</Text>
+          <Text style={styles.body} testID={`matchup-bench-player-score-${player.athleteId}`}>
+            {" "}
+            · {scoreLabel}
+          </Text>
         ) : null}
-      </Text>
+      </View>
     </View>
   );
 }
@@ -74,6 +84,7 @@ function outcomeLabel(outcome: "home" | "away" | "draw" | null): string {
 }
 
 function SideBlock({ side, title }: { side: H2HSideLineup; title: string }) {
+  const athleteCard = useAthleteCard();
   const teamLabel = side.teamName ?? side.displayName;
   return (
     <View style={styles.side} testID={`matchup-side-${title}`}>
@@ -110,6 +121,7 @@ function SideBlock({ side, title }: { side: H2HSideLineup; title: string }) {
               (player) => side.starters.indexOf(player),
             )}
             testID={`matchup-pitch-${title}`}
+            onAthletePress={athleteCard?.open}
           />
           {side.bench.length > 0 ? (
             <>
@@ -359,6 +371,12 @@ const styles = lazyStyles(() => StyleSheet.create({
   },
   playerName: {
     fontWeight: "700",
+    color: colors.foreground,
+  },
+  benchLine: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    alignItems: "center",
   },
   meta: {
     color: colors.foregroundMuted,
