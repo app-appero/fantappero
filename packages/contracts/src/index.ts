@@ -300,7 +300,21 @@ export type {
   TradeStatus,
 } from "./market.js";
 
-export { computeMinimumNextBid, secondsRemaining, shouldTriggerSoftClose } from "./liveAuction.js";
+export {
+  LIVE_SEAT_CALL_COLOR,
+  LIVE_SEAT_LEAD_COLOR,
+  LIVE_SEAT_LEGEND,
+  LIVE_SEAT_ME_COLOR,
+  computeMinimumNextBid,
+  liveSeatCueColor,
+  liveSeatCueLabel,
+  liveSeatGlow,
+  resolveLiveLotCallerTeamId,
+  resolveLiveSeatCue,
+  secondsRemaining,
+  shouldTriggerSoftClose,
+} from "./liveAuction.js";
+export type { LiveSeatCue, LiveSeatLot, LiveTurnSeat } from "./liveAuction.js";
 
 export type {
   BreadcrumbItem,

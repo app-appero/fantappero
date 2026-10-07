@@ -13,6 +13,7 @@ from tests.integration.database.helpers import create_engine_for_url
 
 from database.enums import LeagueMemberRole
 from database.session import create_session_factory
+from fantasy_teams.models import FantasyTeam
 from leagues.models.competition import Competition
 from leagues.models.league_membership import LeagueMembership
 from mail.capture import get_captured_emails
@@ -114,6 +115,49 @@ def test_standings_are_computed_on_first_read_with_all_teams_at_zero(
     )
     assert again.status_code == 200
     assert len(again.json()) == 2
+
+
+def test_standings_include_teams_created_after_the_first_snapshot(
+    client: TestClient,
+    db_session: Session,
+    competition_ids: list[str],
+) -> None:
+    """Una squadra nata dopo il primo calcolo (invito, asta) deve comparire
+    alla lettura successiva, a zero punti, senza aspettare la prossima giornata.
+    """
+    owner_token, _ = _register_and_login(client, "standings.late.owner@example.com")
+    _member_token, member_id = _register_and_login(client, "standings.late.member@example.com")
+    league_id = _create_league(client, owner_token, competition_ids, "Lega Classifica Incompleta")
+
+    first = client.get(
+        f"/leagues/{league_id}/classifica",
+        headers={"Authorization": f"Bearer {owner_token}"},
+    )
+    assert first.status_code == 200
+    assert len(first.json()) == 1
+
+    membership = _add_member(db_session, league_id, member_id)
+    db_session.add(
+        FantasyTeam(
+            league_id=UUID(league_id),
+            membership_id=membership.id,
+            name="Nuovo Arrivo",
+        )
+    )
+    db_session.commit()
+
+    again = client.get(
+        f"/leagues/{league_id}/classifica",
+        headers={"Authorization": f"Bearer {owner_token}"},
+    )
+    assert again.status_code == 200
+    rows = again.json()
+    assert len(rows) == 2
+    nuovo = next(row for row in rows if row["teamName"] == "Nuovo Arrivo")
+    assert nuovo["played"] == 0
+    assert nuovo["points"] == 0
+    assert nuovo["managerUserId"] == str(member_id)
+    assert {row["position"] for row in rows} == {1, 2}
 
 
 def test_standings_endpoint_shows_solo_owner_team_at_zero_before_any_invite(

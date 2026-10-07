@@ -468,7 +468,18 @@ export function AuctionLivePage() {
           title="Non disponibile in demo"
           message="L'asta a rilanci richiede una sessione reale collegata alla lega. Sotto, un'anteprima solo visiva del tavolo (dati inventati)."
         />
-        <LiveAuctionTable teams={DEMO_TABLE_TEAMS} currentLot={DEMO_TABLE_LOT} secondsRemaining={18} />
+        <LiveAuctionTable
+          teams={DEMO_TABLE_TEAMS}
+          currentLot={DEMO_TABLE_LOT}
+          secondsRemaining={18}
+          myTeamId="d1"
+          nominationMode="turn_based"
+          turnOrder={DEMO_TABLE_TEAMS.map((team, index) => ({
+            fantasyTeamId: team.id,
+            fantasyTeamName: team.name,
+            position: index,
+          }))}
+        />
       </div>
     );
   }
@@ -594,7 +605,10 @@ export function AuctionLivePage() {
                   teams={teams}
                   currentLot={currentLot}
                   secondsRemaining={secondsRemaining}
-                  currentTurnTeamId={currentLot === null ? currentTurnTeamId : null}
+                  currentTurnTeamId={currentTurnTeamId}
+                  myTeamId={myTeam?.id ?? null}
+                  nominationMode={currentSession.nominationMode}
+                  turnOrder={currentSession.turnOrder}
                 />
               ) : null}
 
@@ -605,7 +619,7 @@ export function AuctionLivePage() {
               ) : null}
 
               {canNominate && currentSession.status === "open" && !currentLot ? (
-                <div className="fa-ds-showcase__row" data-testid="auction-live-nominate">
+                <div className="fa-auction-live-nominate" data-testid="auction-live-nominate">
                   {needsExplicitAthlete ? (
                     <Select
                       label="Calciatore da chiamare"
@@ -665,7 +679,7 @@ export function AuctionLivePage() {
                     {secondsRemaining !== null ? <p data-testid="auction-live-countdown">Tempo residuo: {secondsRemaining}s</p> : null}
                     <p>Budget residuo: {balance !== null ? `${balance} crediti` : "—"}</p>
 
-                    <div className="fa-ds-showcase__row">
+                    <div className="fa-auction-live-actions" data-testid="auction-live-lot-actions">
                       <Button
                         variant="primary"
                         disabled={raiseBusy || minimumNextBid === null || !marketOpen}
@@ -674,22 +688,21 @@ export function AuctionLivePage() {
                       >
                         Rilancia a {minimumNextBid ?? "—"}
                       </Button>
+                      {isOperator ? (
+                        <>
+                          <Button variant="primary" disabled={actionBusy || !currentLot.currentLeaderTeamId} onClick={handleForceSell}>
+                            Aggiudica
+                          </Button>
+                          <Button variant="secondary" disabled={actionBusy} onClick={handlePass}>
+                            Salta
+                          </Button>
+                          <Button variant="secondary" disabled={actionBusy || !!currentLot.currentLeaderTeamId} onClick={handleCancel}>
+                            Annulla
+                          </Button>
+                        </>
+                      ) : null}
                     </div>
                     {raiseError ? <UiStatePanel state="error" title="Rilancio non riuscito" message={raiseError} testId="auction-live-raise-error" /> : null}
-
-                    {isOperator ? (
-                      <div className="fa-ds-showcase__row">
-                        <Button variant="primary" disabled={actionBusy || !currentLot.currentLeaderTeamId} onClick={handleForceSell}>
-                          Aggiudica
-                        </Button>
-                        <Button variant="secondary" disabled={actionBusy} onClick={handlePass}>
-                          Salta
-                        </Button>
-                        <Button variant="secondary" disabled={actionBusy || !!currentLot.currentLeaderTeamId} onClick={handleCancel}>
-                          Annulla
-                        </Button>
-                      </div>
-                    ) : null}
 
                     {recentRaises.length > 0 ? (
                       <ul data-testid="auction-live-recent-raises">

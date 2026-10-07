@@ -663,19 +663,23 @@ def get_league_standings(
 ) -> list[LeagueStandingResponse]:
     """Classifica persistita (EP07-06), ordinata per posizione.
 
-    Se non è mai stata calcolata (nessun risultato di giornata ancora
-    finalizzato), la calcola al volo: ogni squadra iscritta parte da 0,
-    invece di mostrare una classifica vuota prima della prima giornata.
+    La ricalcola quando la tabella salvata non elenca esattamente le
+    squadre iscritte: prima lettura, oppure un fantallenatore entrato
+    dopo l'ultimo calcolo (invito, asta a turno). Ogni squadra senza
+    incontri parte da 0. I punti già assegnati restano, perché il
+    ricalcolo riparte dai risultati H2H e non li somma due volte.
     """
     league_id = league_access.league.id
+    teams = list(
+        session.scalars(select(FantasyTeam).where(FantasyTeam.league_id == league_id)).all()
+    )
     rows = list_league_standings(session, league_id=league_id)
-    if not rows:
+    stored_team_ids = {row.fantasy_team_id for row in rows}
+    enrolled_team_ids = {team.id for team in teams}
+    if stored_team_ids != enrolled_team_ids:
         compute_league_standings(session, league_id=league_id)
         session.commit()
         rows = list_league_standings(session, league_id=league_id)
-    teams = session.scalars(
-        select(FantasyTeam).where(FantasyTeam.league_id == league_id)
-    ).all()
     team_names = {team.id: team.name for team in teams}
     membership_owners = dict(
         session.execute(

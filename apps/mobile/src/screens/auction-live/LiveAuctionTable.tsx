@@ -1,4 +1,12 @@
-import type { FantasyTeamSummary, LiveLot } from "@fantappero/contracts";
+import type { FantasyTeamSummary, LiveLot, LiveTurnOrderEntry, MarketLiveNominationMode } from "@fantappero/contracts";
+import {
+  LIVE_SEAT_LEGEND,
+  LIVE_SEAT_ME_COLOR,
+  liveSeatCueColor,
+  liveSeatCueLabel,
+  liveSeatGlow,
+  resolveLiveSeatCue,
+} from "@fantappero/contracts";
 import { theme } from "@fantappero/ui/theme";
 import { StyleSheet, Text, View } from "react-native";
 
@@ -17,19 +25,26 @@ function seatPosition(index: number, total: number): { left: `${number}%`; top: 
 /**
  * Mobile port of `apps/web/src/pages/auction-live/LiveAuctionTable.tsx`: le
  * squadre della lega "sedute" intorno a un tavolo ovale, con il lotto
- * corrente al centro.
+ * corrente al centro. Stesse tre luci del web: blu = tu, oro = tocca
+ * chiamare o ha chiamato, rosa = in testa al rilancio.
  */
 export function LiveAuctionTable({
   teams,
   currentLot,
   secondsRemaining,
   currentTurnTeamId = null,
+  myTeamId = null,
+  nominationMode = null,
+  turnOrder = [],
 }: {
   teams: readonly FantasyTeamSummary[];
   currentLot: LiveLot | null;
   secondsRemaining: number | null;
-  /** Modalità "a turno": id della squadra a cui tocca chiamare (null altrimenti). */
+  /** Modalità "a turno": id della squadra a cui tocca chiamare il prossimo lotto. */
   currentTurnTeamId?: string | null;
+  myTeamId?: string | null;
+  nominationMode?: MarketLiveNominationMode | null;
+  turnOrder?: readonly LiveTurnOrderEntry[];
 }) {
   if (teams.length === 0) {
     return null;
@@ -55,8 +70,17 @@ export function LiveAuctionTable({
         </View>
         {teams.map((team, index) => {
           const position = seatPosition(index, teams.length);
-          const isLeader = currentLot?.currentLeaderTeamId === team.id;
-          const isOnTurn = !isLeader && currentTurnTeamId === team.id;
+          const isMe = myTeamId === team.id;
+          const cue = resolveLiveSeatCue({
+            teamId: team.id,
+            currentTurnTeamId,
+            currentLot,
+            nominationMode,
+            turnOrder,
+          });
+          const cueColor = liveSeatCueColor(cue);
+          const cueLabel = liveSeatCueLabel(cue, isMe);
+          const nameColor = cueColor ?? (isMe ? LIVE_SEAT_ME_COLOR : "#fff");
           return (
             <View
               key={team.id}
@@ -66,18 +90,34 @@ export function LiveAuctionTable({
               <View
                 style={[
                   styles.avatar,
-                  isLeader && styles.avatarLeading,
-                  isOnTurn && styles.avatarOnTurn,
+                  {
+                    borderColor: cueColor ?? (isMe ? LIVE_SEAT_ME_COLOR : "rgba(255,255,255,0.35)"),
+                    boxShadow: liveSeatGlow(cue, isMe),
+                  },
                 ]}
               >
                 <Text style={styles.avatarLabel}>{team.name.charAt(0).toUpperCase()}</Text>
               </View>
-              <Text style={[styles.seatName, isLeader && styles.seatNameLeading]} numberOfLines={1}>
+              <Text style={[styles.seatName, { color: nameColor }]} numberOfLines={1}>
                 {team.name}
               </Text>
+              {isMe ? <Text style={styles.you}>Tu</Text> : null}
+              {cueLabel ? (
+                <Text style={[styles.cue, { color: cueColor ?? nameColor }]} numberOfLines={1}>
+                  {cueLabel}
+                </Text>
+              ) : null}
             </View>
           );
         })}
+      </View>
+      <View style={styles.legend} testID="auction-live-seat-legend">
+        {LIVE_SEAT_LEGEND.map((item) => (
+          <View key={item.id} style={styles.legendItem}>
+            <View style={[styles.legendSwatch, { backgroundColor: item.color }]} />
+            <Text style={styles.legendLabel}>{item.label}</Text>
+          </View>
+        ))}
       </View>
     </View>
   );
@@ -87,6 +127,7 @@ const styles = StyleSheet.create({
   wrap: {
     alignItems: "center",
     paddingVertical: 8,
+    gap: 10,
   },
   surface: {
     position: "relative",
@@ -130,9 +171,9 @@ const styles = StyleSheet.create({
   seat: {
     position: "absolute",
     alignItems: "center",
-    width: 72,
-    marginLeft: -36,
-    marginTop: -28,
+    width: 84,
+    marginLeft: -42,
+    marginTop: -34,
   },
   avatar: {
     width: 40,
@@ -144,13 +185,6 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: "rgba(255,255,255,0.35)",
   },
-  avatarLeading: {
-    borderColor: colors.accent,
-  },
-  avatarOnTurn: {
-    borderColor: "#fff",
-    borderStyle: "dashed",
-  },
   avatarLabel: {
     color: colors.foreground,
     fontWeight: typography.fontWeight.bold,
@@ -160,9 +194,37 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: "#fff",
     textAlign: "center",
+    fontWeight: typography.fontWeight.semibold,
   },
-  seatNameLeading: {
-    color: colors.accent,
+  you: {
+    fontSize: 10,
     fontWeight: typography.fontWeight.bold,
+    color: LIVE_SEAT_ME_COLOR,
+    textTransform: "uppercase",
+  },
+  cue: {
+    fontSize: 10,
+    fontWeight: typography.fontWeight.semibold,
+    textAlign: "center",
+  },
+  legend: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "center",
+    gap: 12,
+  },
+  legendItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  legendSwatch: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+  },
+  legendLabel: {
+    color: colors.foregroundMuted,
+    fontSize: 11,
   },
 });

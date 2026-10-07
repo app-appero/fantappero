@@ -510,7 +510,10 @@ export function AuctionLiveScreen() {
               teams={teams}
               currentLot={currentLot}
               secondsRemaining={secondsRemaining}
-              currentTurnTeamId={currentLot === null ? currentTurnTeamId : null}
+              currentTurnTeamId={currentTurnTeamId}
+              myTeamId={myTeam?.id ?? null}
+              nominationMode={currentSession.nominationMode}
+              turnOrder={currentSession.turnOrder}
             />
           ) : null}
 
@@ -526,17 +529,19 @@ export function AuctionLiveScreen() {
           ) : null}
 
           {canNominate && currentSession.status === "open" && !currentLot ? (
-            <View style={styles.field} testID="auction-live-nominate">
+            <View style={styles.nominateRow} testID="auction-live-nominate">
               {needsExplicitAthlete ? (
-                <OptionPicker
-                  label="Calciatore da chiamare"
-                  options={playerOptions}
-                  value={manualAthleteId}
-                  onChange={setManualAthleteId}
-                  placeholder="Scegli un giocatore…"
-                  searchable
-                  testID="auction-live-manual-athlete"
-                />
+                <View style={styles.nominateField}>
+                  <OptionPicker
+                    label="Calciatore da chiamare"
+                    options={playerOptions}
+                    value={manualAthleteId}
+                    onChange={setManualAthleteId}
+                    placeholder="Scegli un giocatore…"
+                    searchable
+                    testID="auction-live-manual-athlete"
+                  />
+                </View>
               ) : null}
               <Pressable
                 style={[styles.button, (actionBusy || !marketOpen || (needsExplicitAthlete && !manualAthleteId)) && styles.disabled]}
@@ -582,29 +587,30 @@ export function AuctionLiveScreen() {
               {secondsRemaining !== null ? <Text style={styles.meta} testID="auction-live-countdown">Tempo residuo: {secondsRemaining}s</Text> : null}
               <Text style={styles.meta}>Budget residuo: {balance !== null ? `${balance} crediti` : "—"}</Text>
 
-              <Pressable
-                style={[styles.button, (raiseBusy || minimumNextBid === null || !marketOpen) && styles.disabled]}
-                disabled={raiseBusy || minimumNextBid === null || !marketOpen}
-                onPress={() => minimumNextBid !== null && handleRaise(minimumNextBid)}
-                testID="auction-live-raise-min"
-              >
-                <Text style={styles.buttonLabel}>Rilancia a {minimumNextBid ?? "—"}</Text>
-              </Pressable>
+              <View style={styles.lotActions} testID="auction-live-lot-actions">
+                <Pressable
+                  style={[styles.button, (raiseBusy || minimumNextBid === null || !marketOpen) && styles.disabled]}
+                  disabled={raiseBusy || minimumNextBid === null || !marketOpen}
+                  onPress={() => minimumNextBid !== null && handleRaise(minimumNextBid)}
+                  testID="auction-live-raise-min"
+                >
+                  <Text style={styles.buttonLabel}>Rilancia a {minimumNextBid ?? "—"}</Text>
+                </Pressable>
+                {isOperator ? (
+                  <>
+                    <Pressable style={[styles.button, (actionBusy || !currentLot.currentLeaderTeamId) && styles.disabled]} disabled={actionBusy || !currentLot.currentLeaderTeamId} onPress={handleForceSell} testID="auction-live-force-sell">
+                      <Text style={styles.buttonLabel}>Aggiudica</Text>
+                    </Pressable>
+                    <Pressable style={[styles.secondaryButton, actionBusy && styles.disabled]} disabled={actionBusy} onPress={handlePass} testID="auction-live-pass">
+                      <Text style={styles.secondaryButtonLabel}>Salta</Text>
+                    </Pressable>
+                    <Pressable style={[styles.secondaryButton, (actionBusy || !!currentLot.currentLeaderTeamId) && styles.disabled]} disabled={actionBusy || !!currentLot.currentLeaderTeamId} onPress={handleCancel} testID="auction-live-cancel">
+                      <Text style={styles.secondaryButtonLabel}>Annulla</Text>
+                    </Pressable>
+                  </>
+                ) : null}
+              </View>
               {raiseError ? <Text style={styles.error} testID="auction-live-raise-error">{raiseError}</Text> : null}
-
-              {isOperator ? (
-                <View style={styles.rowActions}>
-                  <Pressable style={[styles.button, (actionBusy || !currentLot.currentLeaderTeamId) && styles.disabled]} disabled={actionBusy || !currentLot.currentLeaderTeamId} onPress={handleForceSell} testID="auction-live-force-sell">
-                    <Text style={styles.buttonLabel}>Aggiudica</Text>
-                  </Pressable>
-                  <Pressable style={[styles.secondaryButton, actionBusy && styles.disabled]} disabled={actionBusy} onPress={handlePass} testID="auction-live-pass">
-                    <Text style={styles.secondaryButtonLabel}>Salta</Text>
-                  </Pressable>
-                  <Pressable style={[styles.secondaryButton, (actionBusy || !!currentLot.currentLeaderTeamId) && styles.disabled]} disabled={actionBusy || !!currentLot.currentLeaderTeamId} onPress={handleCancel} testID="auction-live-cancel">
-                    <Text style={styles.secondaryButtonLabel}>Annulla</Text>
-                  </Pressable>
-                </View>
-              ) : null}
 
               {recentRaises.length > 0 ? (
                 <View testID="auction-live-recent-raises">

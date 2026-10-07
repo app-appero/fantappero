@@ -20,6 +20,24 @@ export const marketUiStyles = StyleSheet.create({
     gap: spacing.sm,
     flexWrap: "wrap",
   },
+  nominateRow: {
+    flexDirection: "row",
+    alignItems: "flex-end",
+    flexWrap: "wrap",
+    gap: spacing.md,
+  },
+  nominateField: {
+    flexGrow: 1,
+    flexBasis: 180,
+    minWidth: 180,
+  },
+  lotActions: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    alignItems: "center",
+    gap: spacing.md,
+    marginTop: spacing.sm,
+  },
   meta: {
     color: colors.foregroundMuted,
     fontSize: typography.fontSize.sm,
