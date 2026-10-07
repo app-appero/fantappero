@@ -192,6 +192,9 @@ class FantasyCoachDirectoryItem(ApiModel):
     available_for_invites: bool = Field(alias="availableForInvites")
     # True se è già iscritto a questa lega: resta in elenco, ma l'invito è disabilitato.
     in_league: bool = Field(alias="inLeague")
+    # Allineato all'elenco utenti del pannello: anche account non verificati e l'admin stesso.
+    email_verified: bool = Field(alias="emailVerified")
+    is_self: bool = Field(alias="isSelf")
     named_invite_status: Literal["pending", "accepted", "declined", "revoked", "expired"] | None = (
         Field(default=None, alias="namedInviteStatus")
     )

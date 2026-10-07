@@ -172,6 +172,36 @@ def test_directory_pagination_filters_and_excludes_members(
     assert hidden[0]["availableForInvites"] is False
     assert hidden[0]["inLeague"] is True
 
+    owner_rows = client.get(
+        f"/leagues/{league_id}/amministrazione/fantallenatori",
+        headers={"Authorization": f"Bearer {owner_token}"},
+        params={"search": "Owner Dir"},
+    )
+    assert owner_rows.status_code == 200
+    assert any(row["isSelf"] is True for row in owner_rows.json()["items"])
+
+    from auth.security import hash_password
+
+    unverified = User(
+        email="dir.unverified@example.com",
+        password_hash=hash_password("Password123!"),
+        platform_role=PlatformRole.USER,
+        user_type=UserType.HUMAN,
+        email_verified_at=None,
+    )
+    db_session.add(unverified)
+    db_session.commit()
+    by_email = client.get(
+        f"/leagues/{league_id}/amministrazione/fantallenatori",
+        headers={"Authorization": f"Bearer {owner_token}"},
+        params={"search": "dir.unverified@example.com"},
+    )
+    assert by_email.status_code == 200
+    matched = [row for row in by_email.json()["items"] if row["email"] == "dir.unverified@example.com"]
+    assert len(matched) == 1
+    assert matched[0]["emailVerified"] is False
+    assert matched[0]["inLeague"] is False
+
 
 def test_named_invite_rejects_unavailable_duplicate_and_member(
     client: TestClient,

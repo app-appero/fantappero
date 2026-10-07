@@ -2,13 +2,13 @@ import type { AdminUser, PaginatedAdminUsers } from "@fantappero/contracts";
 import { useNavigation } from "@react-navigation/core";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useCallback, useEffect, useState } from "react";
-import { Pressable, Text, TextInput, View } from "react-native";
+import { Modal, Pressable, Text, TextInput, View } from "react-native";
 import { fetchAdminUsers, impersonateUser, promoteOperator, revokeOperator } from "../../api/admin";
 import { ApiError } from "../../api/client";
 import { adminUiStyles as styles } from "../../admin/adminUiStyles";
 import { UiStatePanel } from "../../components/UiStatePanel";
 import { PageContainer } from "../../layout/PageContainer";
-import { openAdminScreen } from "../../navigation/adminEntry";
+import { leaveAdminForApp } from "../../navigation/adminEntry";
 import type { RootStackParamList } from "../../navigation/types";
 import { getApiErrorMessage, useAuthSession } from "../../session/DemoSessionContext";
 
@@ -99,7 +99,8 @@ export function AdminUsersScreen() {
       if (pending.kind === "impersonate") {
         const result = await impersonateUser(accessToken, pending.user.id);
         await startImpersonation(result);
-        openAdminScreen("AdminUsers");
+        setPending(null);
+        leaveAdminForApp();
         navigation.getParent()?.navigate("MainTabs");
         return;
       }
@@ -257,40 +258,49 @@ export function AdminUsersScreen() {
         </View>
       ) : null}
 
-      {pending ? (
-        <View style={styles.confirmBox} testID="admin-user-confirm-box">
-          <Text style={styles.sectionTitle}>
-            {pending.kind === "promote"
-              ? "Promuovi a operator"
-              : pending.kind === "impersonate"
-                ? "Impersona utente"
-                : "Revoca operator"}
-          </Text>
-          <Text style={styles.meta}>
-            {pending.kind === "promote"
-              ? `Confermi di voler promuovere ${pending.user.displayName} a operatore globale? Otterrà accesso al pannello /admin.`
-              : pending.kind === "impersonate"
-                ? `Accederai come ${pending.user.displayName} per qualche minuto, a scopo di assistenza. L'operazione viene registrata nell'audit log.`
-                : `Confermi di voler revocare il ruolo di operatore a ${pending.user.displayName}?`}
-          </Text>
-          <View style={styles.rowActions}>
-            <Pressable
-              style={styles.secondaryButton}
-              onPress={() => setPending(null)}
-              testID="admin-user-confirm-cancel"
-            >
-              <Text style={styles.secondaryButtonLabel}>Annulla</Text>
-            </Pressable>
-            <Pressable
-              style={styles.button}
-              onPress={() => void confirmAction()}
-              testID="admin-user-confirm"
-            >
-              <Text style={styles.buttonLabel}>Conferma</Text>
-            </Pressable>
-          </View>
+      <Modal
+        visible={pending !== null}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setPending(null)}
+      >
+        <View style={styles.confirmOverlay}>
+          {pending ? (
+            <View style={styles.confirmBox} testID="admin-user-confirm-box">
+              <Text style={styles.sectionTitle}>
+                {pending.kind === "promote"
+                  ? "Promuovi a operator"
+                  : pending.kind === "impersonate"
+                    ? "Impersona utente"
+                    : "Revoca operator"}
+              </Text>
+              <Text style={styles.meta}>
+                {pending.kind === "promote"
+                  ? `Confermi di voler promuovere ${pending.user.displayName} a operatore globale? Otterrà accesso al pannello /admin.`
+                  : pending.kind === "impersonate"
+                    ? `Accederai come ${pending.user.displayName} per qualche minuto, a scopo di assistenza.`
+                    : `Confermi di voler revocare il ruolo di operatore a ${pending.user.displayName}?`}
+              </Text>
+              <View style={styles.rowActions}>
+                <Pressable
+                  style={styles.secondaryButton}
+                  onPress={() => setPending(null)}
+                  testID="admin-user-confirm-cancel"
+                >
+                  <Text style={styles.secondaryButtonLabel}>Annulla</Text>
+                </Pressable>
+                <Pressable
+                  style={styles.button}
+                  onPress={() => void confirmAction()}
+                  testID="admin-user-confirm"
+                >
+                  <Text style={styles.buttonLabel}>Conferma</Text>
+                </Pressable>
+              </View>
+            </View>
+          ) : null}
         </View>
-      ) : null}
+      </Modal>
     </PageContainer>
   );
 }

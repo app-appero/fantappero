@@ -1,7 +1,7 @@
 import { useFocusEffect, useNavigation, useNavigationState } from "@react-navigation/core";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { theme } from "@fantappero/ui/theme";
@@ -14,7 +14,7 @@ import { AdminListoneScreen } from "../screens/admin/AdminListoneScreen";
 import { AdminTurniScreen } from "../screens/admin/AdminTurniScreen";
 import { AdminUsersScreen } from "../screens/admin/AdminUsersScreen";
 import { useAuthSession } from "../session/DemoSessionContext";
-import { consumePendingAdminScreen } from "./adminEntry";
+import { consumePendingAdminScreen, openAdminScreen, registerLeaveAdmin } from "./adminEntry";
 import { filterMobileNavItems, MOBILE_ADMIN_NAV_ITEMS } from "./navConfig";
 import type { AdminStackParamList, RootStackParamList } from "./types";
 import { sceneBackgroundStyle } from "../theme/navigationTheme";
@@ -74,6 +74,13 @@ export function AdminNavigator() {
       openPendingScreen();
     }, [openPendingScreen]),
   );
+
+  useEffect(() => {
+    return registerLeaveAdmin(() => {
+      openAdminScreen("AdminUsers");
+      rootNavigation.navigate("MainTabs");
+    });
+  }, [rootNavigation]);
 
   function rememberStack(navigation: NativeStackNavigationProp<AdminStackParamList>) {
     stackNavigation.current = navigation;

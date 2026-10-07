@@ -463,7 +463,7 @@ export function ManagerDirectory({
   async function onInvite(manager: FantasyCoachDirectoryItem) {
     setInviteError(null);
     setSuccess(null);
-    if (manager.inLeague) {
+    if (manager.isSelf || manager.inLeague || manager.emailVerified === false) {
       return;
     }
     if (!manager.availableForInvites) {
@@ -549,7 +549,7 @@ export function ManagerDirectory({
 
       <div className="fa-manager-directory__filters">
         <Input
-          label="Cerca per nome"
+          label="Cerca per nome o email"
           name="manager-query"
           value={query}
           onChange={(event) => setQuery(event.target.value)}
@@ -644,7 +644,10 @@ export function ManagerDirectory({
               const unavailable = !manager.availableForInvites;
               const alreadyInvited = manager.namedInviteStatus === "pending";
               const inLeague = manager.inLeague === true;
-              const inviteBlocked = inLeague || unavailable || alreadyInvited || leagueFull;
+              const isSelf = manager.isSelf === true;
+              const unverified = manager.emailVerified === false;
+              const inviteBlocked =
+                isSelf || inLeague || unverified || unavailable || alreadyInvited || leagueFull;
               return (
                 <li key={manager.userId} className="fa-manager-directory__item">
                   <CoachAvatar
@@ -693,13 +696,17 @@ export function ManagerDirectory({
                       onClick={() => void onInvite(manager)}
                       data-testid={`manager-invite-${manager.userId}`}
                     >
-                      {inLeague
-                        ? "Già in lega"
-                        : unavailable
-                          ? "Indisponibile"
-                          : alreadyInvited
-                            ? "Già invitato"
-                            : "Invita"}
+                      {isSelf
+                        ? "Sei tu"
+                        : inLeague
+                          ? "Già in lega"
+                          : unverified
+                            ? "Non verificato"
+                            : unavailable
+                              ? "Indisponibile"
+                              : alreadyInvited
+                                ? "Già invitato"
+                                : "Invita"}
                     </Button>
                   ) : (
                     <span className="fa-manager-directory__status">

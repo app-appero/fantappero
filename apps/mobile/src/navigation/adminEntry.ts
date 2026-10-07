@@ -12,3 +12,19 @@ export function consumePendingAdminScreen(): keyof AdminStackParamList | null {
   pendingAdminScreen = null;
   return screen;
 }
+
+let leaveAdmin: (() => void) | null = null;
+
+/** Il pannello registra come tornare all'app dopo un'impersonificazione. */
+export function registerLeaveAdmin(leave: () => void): () => void {
+  leaveAdmin = leave;
+  return () => {
+    if (leaveAdmin === leave) {
+      leaveAdmin = null;
+    }
+  };
+}
+
+export function leaveAdminForApp(): void {
+  leaveAdmin?.();
+}
