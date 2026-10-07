@@ -6,6 +6,8 @@ const ACCESS_TOKEN_KEY = "fantappero.accessToken";
 const REFRESH_TOKEN_KEY = "fantappero.refreshToken";
 const USER_KEY = "fantappero.sessionUser";
 const ACTIVE_LEAGUE_ID_KEY = "fantappero.activeLeagueId";
+// Sessione dell'operatore messa da parte mentre impersona un altro utente.
+const IMPERSONATOR_SESSION_KEY = "fantappero.impersonatorSession";
 
 export type StoredSession = {
   accessToken: string;
@@ -63,7 +65,9 @@ export async function loadStoredSession(): Promise<StoredSession | null> {
     getItem(REFRESH_TOKEN_KEY),
     getItem(USER_KEY),
   ]);
-  if (!accessToken || !refreshToken || !userRaw) {
+  // `refreshToken` può essere stringa vuota durante un'impersonificazione:
+  // solo l'assenza della chiave indica che non c'è una sessione salvata.
+  if (!accessToken || refreshToken === null || !userRaw) {
     return memorySession;
   }
   try {
@@ -95,8 +99,30 @@ export async function clearStoredSession(): Promise<void> {
     deleteItem(REFRESH_TOKEN_KEY),
     deleteItem(USER_KEY),
     deleteItem(ACTIVE_LEAGUE_ID_KEY),
+    deleteItem(IMPERSONATOR_SESSION_KEY),
   ]);
   memorySession = null;
+}
+
+export async function loadImpersonatorSession(): Promise<StoredSession | null> {
+  const raw = await getItem(IMPERSONATOR_SESSION_KEY);
+  if (!raw) {
+    return null;
+  }
+  try {
+    return JSON.parse(raw) as StoredSession;
+  } catch {
+    await deleteItem(IMPERSONATOR_SESSION_KEY);
+    return null;
+  }
+}
+
+export async function saveImpersonatorSession(session: StoredSession): Promise<void> {
+  await setItem(IMPERSONATOR_SESSION_KEY, JSON.stringify(session));
+}
+
+export async function clearImpersonatorSession(): Promise<void> {
+  await deleteItem(IMPERSONATOR_SESSION_KEY);
 }
 
 export async function loadStoredActiveLeagueId(): Promise<string | null> {

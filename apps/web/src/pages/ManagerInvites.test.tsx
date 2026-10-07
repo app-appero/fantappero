@@ -179,6 +179,60 @@ describe("directory fantallenatori", () => {
     host.remove();
     clearStoredSession();
   });
+
+  it("disabilita l'invito per chi è già in lega", async () => {
+    const member: FantasyCoachDirectoryItem = {
+      userId: "user-member",
+      displayName: "Già Iscritto",
+      email: "iscritto@example.com",
+      avatarUrl: null,
+      userType: "human",
+      availableForInvites: false,
+      inLeague: true,
+      namedInviteStatus: null,
+      memberSince: "10/2026",
+      concludedLeagues: 0,
+      bestPosition: null,
+      historySummary: "Nessuna lega conclusa",
+    };
+    vi.mocked(fetchManagerDirectory).mockResolvedValue({
+      items: [member],
+      page: 1,
+      pageSize: 12,
+      total: 1,
+      totalPages: 1,
+    });
+    saveStoredSession({
+      accessToken: "token-admin",
+      refreshToken: "refresh-admin",
+      user: { id: "admin-1", displayName: "Admin", globalRole: "member" },
+    });
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+    const root: Root = createRoot(host);
+    await act(async () => {
+      root.render(
+        createElement(MemoryRouter, {
+          initialEntries: ["/lega/amministrazione"],
+          children: createElement(ManagerDirectory, {
+            leagueId: "league-1",
+            isDemoMode: false,
+          }),
+        }),
+      );
+    });
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    const button = host.querySelector('[data-testid="manager-invite-user-member"]');
+    expect(button?.textContent).toBe("Già in lega");
+    expect(button?.hasAttribute("disabled")).toBe(true);
+    act(() => {
+      root.unmount();
+    });
+    host.remove();
+    clearStoredSession();
+  });
 });
 
 describe("inviti nominativi ricevuti", () => {

@@ -1,5 +1,6 @@
 import {
   hasPermissions,
+  type AdminImpersonateResult,
   type AuthTokensResponse,
   type LeagueSummary,
   type Permission,
@@ -20,11 +21,14 @@ import { ApiError, getApiErrorMessage } from "../api/client";
 import { fetchMyLeagues } from "../api/leagues";
 import { buildPermissionContext } from "./demoSession";
 import {
+  clearImpersonatorSession,
   clearStoredActiveLeagueId,
   clearStoredSession,
   getMemorySession,
+  loadImpersonatorSession,
   loadStoredActiveLeagueId,
   loadStoredSession,
+  saveImpersonatorSession,
   saveStoredActiveLeagueId,
   saveStoredSession,
   setMemorySession,
@@ -49,6 +53,9 @@ export type AuthSessionContextValue = {
   login: (email: string, password: string) => Promise<void>;
   loginWithGoogle: (idToken: string) => Promise<void>;
   logout: () => Promise<void>;
+  isImpersonating: boolean;
+  startImpersonation: (result: AdminImpersonateResult) => Promise<void>;
+  stopImpersonation: () => Promise<void>;
   applySession: (tokens: AuthTokensResponse) => Promise<void>;
   refreshMemberships: () => Promise<LeagueSummary[]>;
 };
@@ -71,6 +78,7 @@ export function AuthSessionProvider({ children }: { children: ReactNode }) {
   const [leagues, setLeagues] = useState<LeagueSummary[]>([]);
   const [activeLeagueId, setActiveLeagueIdState] = useState<string | null>(null);
   const [accessToken, setAccessToken] = useState<string | null>(null);
+  const [impersonator, setImpersonator] = useState<StoredSession | null>(null);
 
   const clearToLoggedOut = useCallback(() => {
     setAccessToken(null);
@@ -78,6 +86,7 @@ export function AuthSessionProvider({ children }: { children: ReactNode }) {
     setUser(null);
     setLeagues([]);
     setActiveLeagueIdState(null);
+    setImpersonator(null);
     setLoading(false);
   }, []);
 
@@ -105,26 +114,46 @@ export function AuthSessionProvider({ children }: { children: ReactNode }) {
         session = { ...session, user: me };
         await persistSession(session);
       } catch {
-        try {
-          const refreshed = await authApi.refresh({ refreshToken: session.refreshToken });
-          session = {
-            accessToken: refreshed.accessToken,
-            refreshToken: refreshed.refreshToken,
-            user: refreshed.user,
-          };
-          await persistSession(session);
-        } catch {
-          await clearStoredSession();
-          setMemorySession(null);
-          if (!cancelled) {
-            clearToLoggedOut();
+        if (!session.refreshToken) {
+          const operator = await loadImpersonatorSession();
+          if (!operator) {
+            await clearStoredSession();
+            setMemorySession(null);
+            if (!cancelled) {
+              clearToLoggedOut();
+            }
+            return;
           }
-          return;
+          await clearImpersonatorSession();
+          session = operator;
+          await persistSession(session);
+        } else {
+          try {
+            const refreshed = await authApi.refresh({ refreshToken: session.refreshToken });
+            session = {
+              accessToken: refreshed.accessToken,
+              refreshToken: refreshed.refreshToken,
+              user: refreshed.user,
+            };
+            await persistSession(session);
+          } catch {
+            await clearStoredSession();
+            setMemorySession(null);
+            if (!cancelled) {
+              clearToLoggedOut();
+            }
+            return;
+          }
         }
       }
 
       if (cancelled) {
         return;
+      }
+
+      const paused = await loadImpersonatorSession();
+      if (!cancelled) {
+        setImpersonator(paused);
       }
 
       try {
@@ -238,6 +267,58 @@ export function AuthSessionProvider({ children }: { children: ReactNode }) {
     [applySession],
   );
 
+  const replaceMemberships = useCallback(async (token: string) => {
+    const memberships = await fetchMyLeagues(token);
+    setLeagues(memberships);
+    const storedLeagueId = await loadStoredActiveLeagueId();
+    const nextLeagueId = resolvePreferredLeagueId(memberships, storedLeagueId);
+    setActiveLeagueIdState(nextLeagueId);
+    if (nextLeagueId) {
+      await saveStoredActiveLeagueId(nextLeagueId);
+    } else {
+      await clearStoredActiveLeagueId();
+    }
+  }, []);
+
+  const startImpersonation = useCallback(
+    async (result: AdminImpersonateResult) => {
+      const operator = getMemorySession() ?? (await loadStoredSession());
+      const alreadyPaused = await loadImpersonatorSession();
+      if (!alreadyPaused && operator?.refreshToken) {
+        await saveImpersonatorSession(operator);
+        setImpersonator(operator);
+      }
+      await persistSession({
+        accessToken: result.accessToken,
+        refreshToken: "",
+        user: result.user,
+      });
+      try {
+        await replaceMemberships(result.accessToken);
+      } catch {
+        setLeagues([]);
+        setActiveLeagueIdState(null);
+      }
+    },
+    [persistSession, replaceMemberships],
+  );
+
+  const stopImpersonation = useCallback(async () => {
+    const operator = (await loadImpersonatorSession()) ?? impersonator;
+    if (!operator) {
+      return;
+    }
+    await clearImpersonatorSession();
+    setImpersonator(null);
+    await persistSession(operator);
+    try {
+      await replaceMemberships(operator.accessToken);
+    } catch {
+      setLeagues([]);
+      setActiveLeagueIdState(null);
+    }
+  }, [impersonator, persistSession, replaceMemberships]);
+
   const logout = useCallback(async () => {
     const stored = getMemorySession() ?? (await loadStoredSession());
     await clearStoredSession();
@@ -349,6 +430,9 @@ export function AuthSessionProvider({ children }: { children: ReactNode }) {
       login,
       loginWithGoogle,
       logout,
+      isImpersonating: impersonator !== null,
+      startImpersonation,
+      stopImpersonation,
       applySession,
       refreshMemberships,
     }),
@@ -369,6 +453,9 @@ export function AuthSessionProvider({ children }: { children: ReactNode }) {
       login,
       loginWithGoogle,
       logout,
+      impersonator,
+      startImpersonation,
+      stopImpersonation,
       applySession,
       refreshMemberships,
     ],

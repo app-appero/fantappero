@@ -327,6 +327,11 @@ export interface FantasyCoachDirectoryItem {
   avatarUrl: string | null;
   userType: import("./profile.js").UserType;
   availableForInvites: boolean;
+  /** Iscritto a questa lega: resta in elenco, l'invito è disabilitato. */
+  inLeague?: boolean;
+  /** Assente sulle fixture demo: in API è sempre presente. */
+  emailVerified?: boolean;
+  isSelf?: boolean;
   namedInviteStatus: NamedLeagueInviteStatus | null;
   /** Anzianità in forma `MM/AAAA`; `null` se sconosciuta (EP13-P06). */
   memberSince: string | null;

@@ -3,7 +3,7 @@ import { theme } from "@fantappero/ui/theme";
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useCallback, useEffect, useState } from "react";
-import { Image, Pressable, StyleSheet, Text, View } from "react-native";
+import { Image, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { ApiError } from "../api/client";
 import { createNamedLeagueInvite, fetchManagerDirectory } from "../api/managerInvites";
 import type { RootStackParamList } from "../navigation/types";
@@ -50,6 +50,8 @@ export function CoachDirectoryPanel({
 }: CoachDirectoryPanelProps) {
   const { accessToken, can } = useAuthSession();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const [query, setQuery] = useState("");
+  const [debouncedQuery, setDebouncedQuery] = useState("");
   const [items, setItems] = useState<FantasyCoachDirectoryItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -57,7 +59,12 @@ export function CoachDirectoryPanel({
   const [success, setSuccess] = useState<string | null>(null);
   const [workingId, setWorkingId] = useState<string | null>(null);
   const [capacityReached, setCapacityReached] = useState(false);
-  const leagueFull = capacityReached || memberCount >= capacity;
+  const leagueFull = capacity > 0 && (capacityReached || memberCount >= capacity);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedQuery(query.trim()), 300);
+    return () => clearTimeout(timer);
+  }, [query]);
 
   const load = useCallback(
     async (options?: { silent?: boolean }) => {
@@ -82,8 +89,22 @@ export function CoachDirectoryPanel({
       }
       setLoadError(null);
       try {
-        const page = await fetchManagerDirectory(accessToken, leagueId, { pageSize: 20 });
-        setItems(page.items);
+        const first = await fetchManagerDirectory(accessToken, leagueId, {
+          query: debouncedQuery || undefined,
+          page: 1,
+          pageSize: 50,
+        });
+        const collected = [...first.items];
+        const lastPage = Math.min(first.totalPages, 10);
+        for (let page = 2; page <= lastPage; page += 1) {
+          const next = await fetchManagerDirectory(accessToken, leagueId, {
+            query: debouncedQuery || undefined,
+            page,
+            pageSize: 50,
+          });
+          collected.push(...next.items);
+        }
+        setItems(collected);
       } catch (directoryError) {
         if (directoryError instanceof ApiError && directoryError.status === 403) {
           setLoadError("Non hai i permessi per consultare la directory.");
@@ -95,7 +116,7 @@ export function CoachDirectoryPanel({
         setLoading(false);
       }
     },
-    [accessToken, can, leagueId],
+    [accessToken, can, debouncedQuery, leagueId],
   );
 
   useFocusEffect(
@@ -127,6 +148,9 @@ export function CoachDirectoryPanel({
   async function onInvite(manager: FantasyCoachDirectoryItem) {
     setInviteError(null);
     setSuccess(null);
+    if (manager.isSelf || manager.inLeague || manager.emailVerified === false) {
+      return;
+    }
     if (!manager.availableForInvites) {
       setInviteError("Questo fantallenatore non accetta inviti.");
       return;
@@ -166,43 +190,50 @@ export function CoachDirectoryPanel({
     }
   }
 
-  if (loading) {
-    return (
-      <UiStatePanel
-        state="loading"
-        title="Caricamento directory"
-        message="Recupero dei fantallenatori disponibili…"
-        testID={`${testIDPrefix}-loading`}
-      />
-    );
-  }
-
-  if (loadError && items.length === 0) {
-    return (
-      <View style={styles.section}>
-        <UiStatePanel
-          state="error"
-          title="Directory non disponibile"
-          message={loadError}
-          testID={`${testIDPrefix}-error`}
-        />
-        <Pressable
-          accessibilityRole="button"
-          onPress={() => void load()}
-          style={styles.retry}
-          testID={`${testIDPrefix}-retry`}
-        >
-          <Text style={styles.retryLabel}>Ricarica</Text>
-        </Pressable>
-      </View>
-    );
-  }
-
   return (
-    <View style={styles.section} testID={`${testIDPrefix}-success`}>
+    <View style={styles.section} testID={loadError ? undefined : `${testIDPrefix}-success`}>
+      <TextInput
+        value={query}
+        onChangeText={setQuery}
+        placeholder="Cerca per nome o email"
+        placeholderTextColor={colors.foregroundMuted}
+        autoCapitalize="none"
+        autoCorrect={false}
+        style={styles.search}
+        testID={`${testIDPrefix}-search`}
+      />
       <Text style={styles.hint}>
-        Fantallenatori disponibili agli inviti. Posti {memberCount}/{capacity}.
+        Tutti i fantallenatori della piattaforma, non solo quelli di questa lega.
+        {capacity > 0 ? ` Posti ${memberCount}/${capacity}.` : ""}
       </Text>
+      {loading ? (
+        <UiStatePanel
+          state="loading"
+          title="Caricamento directory"
+          message="Recupero di tutti i fantallenatori…"
+          testID={`${testIDPrefix}-loading`}
+        />
+      ) : null}
+      {!loading && loadError && items.length === 0 ? (
+        <View>
+          <UiStatePanel
+            state="error"
+            title="Directory non disponibile"
+            message={loadError}
+            testID={`${testIDPrefix}-error`}
+          />
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => void load()}
+            style={styles.retry}
+            testID={`${testIDPrefix}-retry`}
+          >
+            <Text style={styles.retryLabel}>Ricarica</Text>
+          </Pressable>
+        </View>
+      ) : null}
+      {!loading && !(loadError && items.length === 0) ? (
+        <>
       {success ? (
         <UiStatePanel
           state="success"
@@ -230,14 +261,36 @@ export function CoachDirectoryPanel({
       {items.length === 0 ? (
         <UiStatePanel
           state="empty"
-          title="Directory vuota"
-          message="Nessun fantallenatore ha attivato la disponibilità."
+          title="Nessun fantallenatore trovato"
+          message="Nessun fantallenatore corrisponde alla ricerca."
           testID={`${testIDPrefix}-empty`}
         />
       ) : (
         items.map((coach) => {
           const pending = coach.namedInviteStatus === "pending";
           const unavailable = !coach.availableForInvites;
+          const inLeague = coach.inLeague === true;
+          const isSelf = coach.isSelf === true;
+          const unverified = coach.emailVerified === false;
+          const inviteBlocked =
+            isSelf ||
+            pending ||
+            unavailable ||
+            unverified ||
+            inLeague ||
+            leagueFull ||
+            workingId === coach.userId;
+          const inviteLabel = isSelf
+            ? "Sei tu"
+            : inLeague
+              ? "Già in lega"
+              : unverified
+                ? "Non verificato"
+                : unavailable
+                  ? "Indisponibile"
+                  : pending
+                    ? "Già invitato"
+                    : "Invita";
           return (
             <View key={coach.userId} style={styles.card}>
               <CoachAvatar name={coach.displayName} avatarUrl={coach.avatarUrl} />
@@ -249,9 +302,18 @@ export function CoachDirectoryPanel({
                 testID={`${testIDPrefix}-open-${coach.userId}`}
               >
                 <Text style={styles.name}>{coach.displayName}</Text>
+                <Text style={styles.status}>{coach.email}</Text>
                 <Text style={styles.status}>
                   {coach.userType === "ai" ? "IA" : "Manuale"} ·{" "}
-                  {coach.availableForInvites ? "Disponibile" : "Non disponibile"}
+                  {isSelf
+                    ? "Sei tu"
+                    : inLeague
+                      ? "Già in lega"
+                      : unverified
+                        ? "Email non verificata"
+                        : coach.availableForInvites
+                          ? "Disponibile"
+                          : "Non disponibile"}
                   {coach.memberSince ? ` · dal ${coach.memberSince}` : ""}
                 </Text>
                 <Text style={styles.status} testID={`${testIDPrefix}-history-${coach.userId}`}>
@@ -260,23 +322,19 @@ export function CoachDirectoryPanel({
               </Pressable>
               <Pressable
                 accessibilityRole="button"
-                disabled={pending || unavailable || leagueFull || workingId === coach.userId}
+                disabled={inviteBlocked}
                 onPress={() => void onInvite(coach)}
-                style={[
-                  styles.button,
-                  (pending || unavailable || leagueFull || workingId === coach.userId) &&
-                    styles.buttonDisabled,
-                ]}
+                style={[styles.button, inviteBlocked && styles.buttonDisabled]}
                 testID={`${testIDPrefix}-invite-${coach.userId}`}
               >
-                <Text style={styles.buttonLabel}>
-                  {unavailable ? "Indisponibile" : pending ? "Già invitato" : "Invita"}
-                </Text>
+                <Text style={styles.buttonLabel}>{inviteLabel}</Text>
               </Pressable>
             </View>
           );
         })
       )}
+        </>
+      ) : null}
     </View>
   );
 }
@@ -288,6 +346,15 @@ const styles = StyleSheet.create({
   hint: {
     color: colors.foregroundMuted,
     fontSize: typography.fontSize.sm,
+  },
+  search: {
+    minHeight: 44,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.md,
+    color: colors.foreground,
+    backgroundColor: colors.background,
   },
   card: {
     padding: spacing.md,

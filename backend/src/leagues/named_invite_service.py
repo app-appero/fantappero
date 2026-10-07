@@ -48,8 +48,8 @@ from observability.metrics import get_metrics
 def directory_invite_status(status: NamedInviteStatus | None) -> str | None:
     """Stato mostrato in directory.
 
-    La query esclude i membri attuali: un invito `accepted` rimasto dopo una
-    rimozione non deve più comparire come «Aggiunto».
+    Un invito `accepted` non resta «Aggiunto»: chi è ancora in lega è marcato
+    `inLeague`, chi è uscito può ricevere un nuovo invito.
     """
     if status is None or status == NamedInviteStatus.ACCEPTED:
         return None
@@ -89,33 +89,43 @@ class NamedLeagueInviteService:
             .correlate(User)
             .scalar_subquery()
         )
-        member_ids = select(LeagueMembership.user_id).where(
-            LeagueMembership.league_id == league_access.league.id
+        in_league = (
+            select(LeagueMembership.user_id)
+            .where(
+                LeagueMembership.league_id == league_access.league.id,
+                LeagueMembership.user_id == User.id,
+            )
+            .correlate(User)
+            .exists()
         )
         effective_available = or_(
             User.user_type == UserType.AI,
             UserProfile.available_for_invites.is_(True),
         )
-        conditions = [
-            User.deleted_at.is_(None),
-            User.email_verified_at.is_not(None),
-            User.id != league_access.user.id,
-            User.id.not_in(member_ids),
-            UserProfile.display_name.is_not(None),
-            UserProfile.display_name != "",
-        ]
+        conditions = [User.deleted_at.is_(None)]
         if search:
             escaped = search.strip().replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
             if escaped:
-                conditions.append(UserProfile.display_name.ilike(f"%{escaped}%", escape="\\"))
+                pattern = f"%{escaped}%"
+                conditions.append(
+                    or_(
+                        User.email.ilike(pattern, escape="\\"),
+                        UserProfile.display_name.ilike(pattern, escape="\\"),
+                    )
+                )
         if user_type is not None:
             conditions.append(User.user_type == user_type)
         if available is not None:
             conditions.append(effective_available if available else ~effective_available)
 
         base = (
-            select(User, UserProfile, latest_status.label("invite_status"))
-            .join(UserProfile, UserProfile.user_id == User.id)
+            select(
+                User,
+                UserProfile,
+                latest_status.label("invite_status"),
+                in_league.label("in_league"),
+            )
+            .outerjoin(UserProfile, UserProfile.user_id == User.id)
             .where(*conditions)
         )
         total = (
@@ -123,30 +133,38 @@ class NamedLeagueInviteService:
             or 0
         )
         rows = self._session.execute(
-            base.order_by(UserProfile.display_name.asc(), User.id.asc())
+            base.order_by(func.coalesce(UserProfile.display_name, User.email).asc(), User.id.asc())
             .offset((page - 1) * page_size)
             .limit(page_size)
         ).all()
         # Storico della sola pagina corrente, in una query: la card vieta
         # esplicitamente l'N+1 sulla preview.
-        histories = load_histories(self._session, user_ids=[user.id for user, _, _ in rows])
+        histories = load_histories(self._session, user_ids=[user.id for user, _, _, _ in rows])
         items = [
             FantasyCoachDirectoryItem(
                 userId=str(user.id),
-                displayName=profile.display_name or "",
+                displayName=(
+                    profile.display_name
+                    if profile is not None and profile.display_name
+                    else (user.email.split("@", 1)[0] or user.email)
+                ),
                 email=user.email,
-                avatarUrl=profile.avatar_url,
+                avatarUrl=profile.avatar_url if profile is not None else None,
                 userType=user.user_type.value,
                 availableForInvites=(
-                    user.user_type == UserType.AI or profile.available_for_invites
+                    user.user_type == UserType.AI
+                    or (profile is not None and profile.available_for_invites)
                 ),
+                inLeague=bool(is_member),
+                emailVerified=user.email_verified_at is not None,
+                isSelf=user.id == league_access.user.id,
                 namedInviteStatus=directory_invite_status(invite_status),
                 memberSince=seniority_label(user.created_at, now=now),
                 concludedLeagues=histories[user.id].concluded_leagues,
                 bestPosition=histories[user.id].best_position,
                 historySummary=summary_line(histories[user.id]),
             )
-            for user, profile, invite_status in rows
+            for user, profile, invite_status, is_member in rows
         ]
         get_metrics().incr("coach_directory_viewed_total", labels={"result": "success"})
         return FantasyCoachDirectoryResponse(

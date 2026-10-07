@@ -76,7 +76,9 @@ export function AppHeader({
           {isAdmin ? (
             <View style={styles.adminBrand}>
               <BrandLogo variant="mark" size="md" />
-              <Text style={styles.brandAdmin}>Operazioni</Text>
+              <Text style={styles.brandAdmin} numberOfLines={1}>
+                Operazioni
+              </Text>
             </View>
           ) : (
             <BrandLogo variant="full" size="md" />
@@ -195,23 +197,28 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: spacing.xs,
+    flexShrink: 1,
+    minWidth: 0,
   },
   brandAdmin: {
     color: colors.warning,
     fontSize: typography.fontSize.md,
     fontWeight: typography.fontWeight.semibold,
+    flexShrink: 1,
   },
   actions: {
     flexDirection: "row",
     alignItems: "center",
-    flexShrink: 0,
+    flexShrink: 1,
+    flexGrow: 0,
+    minWidth: 0,
     gap: spacing.xs,
-    maxWidth: "42%",
   },
   linkButton: {
     minHeight: 44,
     justifyContent: "center",
     paddingHorizontal: spacing.xs,
+    flexShrink: 0,
   },
   linkText: {
     color: colors.accent,
@@ -219,7 +226,9 @@ const styles = StyleSheet.create({
     fontWeight: typography.fontWeight.semibold,
   },
   userChip: {
-    maxWidth: 96,
+    flexShrink: 1,
+    minWidth: 0,
+    maxWidth: 112,
     paddingHorizontal: spacing.sm,
     paddingVertical: spacing.xs,
     borderRadius: radius.md,

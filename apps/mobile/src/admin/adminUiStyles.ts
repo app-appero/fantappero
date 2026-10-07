@@ -157,4 +157,10 @@ export const adminUiStyles = StyleSheet.create({
     gap: spacing.sm,
     backgroundColor: colors.backgroundElevated,
   },
+  confirmOverlay: {
+    flex: 1,
+    justifyContent: "center",
+    padding: spacing.lg,
+    backgroundColor: "rgba(0,0,0,0.55)",
+  },
 });
