@@ -156,7 +156,21 @@ def test_directory_pagination_filters_and_excludes_members(
         params={"search": "Zio Manuale"},
     )
     assert after_join.status_code == 200
-    assert all(row["userId"] != str(human_id) for row in after_join.json()["items"])
+    joined = [row for row in after_join.json()["items"] if row["userId"] == str(human_id)]
+    assert len(joined) == 1
+    assert joined[0]["inLeague"] is True
+
+    _set_available(client, human_token, False)
+    unavailable = client.get(
+        f"/leagues/{league_id}/amministrazione/fantallenatori",
+        headers={"Authorization": f"Bearer {owner_token}"},
+        params={"search": "Zio Manuale"},
+    )
+    assert unavailable.status_code == 200
+    hidden = [row for row in unavailable.json()["items"] if row["userId"] == str(human_id)]
+    assert len(hidden) == 1
+    assert hidden[0]["availableForInvites"] is False
+    assert hidden[0]["inLeague"] is True
 
 
 def test_named_invite_rejects_unavailable_duplicate_and_member(

@@ -1,18 +1,23 @@
 import type { AdminUser, PaginatedAdminUsers } from "@fantappero/contracts";
+import { useNavigation } from "@react-navigation/core";
+import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useCallback, useEffect, useState } from "react";
 import { Pressable, Text, TextInput, View } from "react-native";
-import { fetchAdminUsers, promoteOperator, revokeOperator } from "../../api/admin";
+import { fetchAdminUsers, impersonateUser, promoteOperator, revokeOperator } from "../../api/admin";
 import { ApiError } from "../../api/client";
 import { adminUiStyles as styles } from "../../admin/adminUiStyles";
 import { UiStatePanel } from "../../components/UiStatePanel";
 import { PageContainer } from "../../layout/PageContainer";
+import { openAdminScreen } from "../../navigation/adminEntry";
+import type { RootStackParamList } from "../../navigation/types";
 import { getApiErrorMessage, useAuthSession } from "../../session/DemoSessionContext";
 
-type PendingAction = { user: AdminUser; kind: "promote" | "revoke" };
+type PendingAction = { user: AdminUser; kind: "promote" | "revoke" | "impersonate" };
 
 /** Elenco utenti + promuovi/revoca operatore — mobile port of `apps/web/src/pages/AdminUsersPage.tsx` (EP11-04b). */
 export function AdminUsersScreen() {
-  const { accessToken } = useAuthSession();
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const { accessToken, startImpersonation } = useAuthSession();
 
   const [query, setQuery] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
@@ -91,6 +96,13 @@ export function AdminUsersScreen() {
     setError(null);
     setSuccess(null);
     try {
+      if (pending.kind === "impersonate") {
+        const result = await impersonateUser(accessToken, pending.user.id);
+        await startImpersonation(result);
+        openAdminScreen("AdminUsers");
+        navigation.getParent()?.navigate("MainTabs");
+        return;
+      }
       const updated =
         pending.kind === "promote"
           ? await promoteOperator(accessToken, pending.user.id)
@@ -111,6 +123,10 @@ export function AdminUsersScreen() {
     } catch (actionError) {
       if (actionError instanceof ApiError && actionError.code === "last_operator") {
         setError("Non puoi revocare l'ultimo operatore rimasto sulla piattaforma.");
+      } else if (actionError instanceof ApiError && actionError.code === "cannot_impersonate_operator") {
+        setError("Non puoi impersonare un altro operatore.");
+      } else if (actionError instanceof ApiError && actionError.code === "cannot_impersonate_self") {
+        setError("Non puoi impersonare te stesso.");
       } else if (actionError instanceof ApiError && actionError.status === 403) {
         setError("Non hai i permessi per modificare questo utente.");
       } else {
@@ -194,14 +210,24 @@ export function AdminUsersScreen() {
                   <Text style={styles.secondaryButtonLabel}>Revoca operator</Text>
                 </Pressable>
               ) : (
-                <Pressable
-                  style={[styles.button, workingId === row.id && styles.disabled]}
-                  disabled={workingId === row.id}
-                  onPress={() => setPending({ user: row, kind: "promote" })}
-                  testID={`admin-user-promote-${row.id}`}
-                >
-                  <Text style={styles.buttonLabel}>Promuovi a operator</Text>
-                </Pressable>
+                <>
+                  <Pressable
+                    style={[styles.secondaryButton, workingId === row.id && styles.disabled]}
+                    disabled={workingId === row.id}
+                    onPress={() => setPending({ user: row, kind: "impersonate" })}
+                    testID={`admin-user-impersonate-${row.id}`}
+                  >
+                    <Text style={styles.secondaryButtonLabel}>Impersona</Text>
+                  </Pressable>
+                  <Pressable
+                    style={[styles.button, workingId === row.id && styles.disabled]}
+                    disabled={workingId === row.id}
+                    onPress={() => setPending({ user: row, kind: "promote" })}
+                    testID={`admin-user-promote-${row.id}`}
+                  >
+                    <Text style={styles.buttonLabel}>Promuovi a operator</Text>
+                  </Pressable>
+                </>
               )}
             </View>
           ))}
@@ -234,12 +260,18 @@ export function AdminUsersScreen() {
       {pending ? (
         <View style={styles.confirmBox} testID="admin-user-confirm-box">
           <Text style={styles.sectionTitle}>
-            {pending.kind === "promote" ? "Promuovi a operator" : "Revoca operator"}
+            {pending.kind === "promote"
+              ? "Promuovi a operator"
+              : pending.kind === "impersonate"
+                ? "Impersona utente"
+                : "Revoca operator"}
           </Text>
           <Text style={styles.meta}>
             {pending.kind === "promote"
               ? `Confermi di voler promuovere ${pending.user.displayName} a operatore globale? Otterrà accesso al pannello /admin.`
-              : `Confermi di voler revocare il ruolo di operatore a ${pending.user.displayName}?`}
+              : pending.kind === "impersonate"
+                ? `Accederai come ${pending.user.displayName} per qualche minuto, a scopo di assistenza. L'operazione viene registrata nell'audit log.`
+                : `Confermi di voler revocare il ruolo di operatore a ${pending.user.displayName}?`}
           </Text>
           <View style={styles.rowActions}>
             <Pressable

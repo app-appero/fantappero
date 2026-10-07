@@ -34,6 +34,8 @@ export type AppDrawerProps = {
   onClose: () => void;
   onNavigate: (item: ResolvedMobileNavItem) => void;
   onAdminPanelPress?: () => void;
+  /** Nel pannello operazioni: torna all'app, come il drawer del sito. */
+  onBackToAppPress?: () => void;
   onLogout: () => void;
 };
 
@@ -51,6 +53,7 @@ export function AppDrawer({
   onClose,
   onNavigate,
   onAdminPanelPress,
+  onBackToAppPress,
   onLogout,
 }: AppDrawerProps) {
   const insets = useSafeAreaInsets();
@@ -218,6 +221,18 @@ export function AppDrawer({
               >
                 <NavIcon id="admin-home" color={colors.accent} size={20} />
                 <Text style={styles.rowLabel}>Pannello globale</Text>
+              </Pressable>
+            ) : null}
+            {onBackToAppPress ? (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Torna all'app"
+                onPress={onBackToAppPress}
+                style={styles.row}
+                testID="app-drawer-item-back-to-app"
+              >
+                <NavIcon id="league-hub" color={colors.accent} size={20} />
+                <Text style={styles.rowLabel}>Torna all'app</Text>
               </Pressable>
             ) : null}
           </ScrollView>

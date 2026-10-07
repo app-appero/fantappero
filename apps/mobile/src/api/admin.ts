@@ -6,6 +6,7 @@ import type {
   AdminHistoricalRepairJob,
   AdminHistoricalRepairProgress,
   AdminHistoricalRepairResult,
+  AdminImpersonateResult,
   AdminLeagueTurnStatus,
   AdminListoneEntry,
   AdminListoneRefreshJob,
@@ -49,6 +50,16 @@ export function promoteOperator(accessToken: string, userId: string): Promise<Ad
 
 export function revokeOperator(accessToken: string, userId: string): Promise<AdminUser> {
   return apiRequest<AdminUser>(`/admin/users/${userId}/revoke`, {
+    accessToken,
+    method: "POST",
+  });
+}
+
+export function impersonateUser(
+  accessToken: string,
+  userId: string,
+): Promise<AdminImpersonateResult> {
+  return apiRequest<AdminImpersonateResult>(`/admin/users/${userId}/impersonate`, {
     accessToken,
     method: "POST",
   });

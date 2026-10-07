@@ -57,7 +57,7 @@ export function CoachDirectoryPanel({
   const [success, setSuccess] = useState<string | null>(null);
   const [workingId, setWorkingId] = useState<string | null>(null);
   const [capacityReached, setCapacityReached] = useState(false);
-  const leagueFull = capacityReached || memberCount >= capacity;
+  const leagueFull = capacity > 0 && (capacityReached || memberCount >= capacity);
 
   const load = useCallback(
     async (options?: { silent?: boolean }) => {
@@ -82,7 +82,7 @@ export function CoachDirectoryPanel({
       }
       setLoadError(null);
       try {
-        const page = await fetchManagerDirectory(accessToken, leagueId, { pageSize: 20 });
+        const page = await fetchManagerDirectory(accessToken, leagueId, { pageSize: 50 });
         setItems(page.items);
       } catch (directoryError) {
         if (directoryError instanceof ApiError && directoryError.status === 403) {
@@ -127,6 +127,9 @@ export function CoachDirectoryPanel({
   async function onInvite(manager: FantasyCoachDirectoryItem) {
     setInviteError(null);
     setSuccess(null);
+    if (manager.inLeague) {
+      return;
+    }
     if (!manager.availableForInvites) {
       setInviteError("Questo fantallenatore non accetta inviti.");
       return;
@@ -201,7 +204,8 @@ export function CoachDirectoryPanel({
   return (
     <View style={styles.section} testID={`${testIDPrefix}-success`}>
       <Text style={styles.hint}>
-        Fantallenatori disponibili agli inviti. Posti {memberCount}/{capacity}.
+        Tutti i fantallenatori, anche chi non è disponibile o è già in lega.
+        {capacity > 0 ? ` Posti ${memberCount}/${capacity}.` : ""}
       </Text>
       {success ? (
         <UiStatePanel
@@ -230,14 +234,17 @@ export function CoachDirectoryPanel({
       {items.length === 0 ? (
         <UiStatePanel
           state="empty"
-          title="Directory vuota"
-          message="Nessun fantallenatore ha attivato la disponibilità."
+          title="Nessun fantallenatore trovato"
+          message="Nessun fantallenatore corrisponde alla ricerca."
           testID={`${testIDPrefix}-empty`}
         />
       ) : (
         items.map((coach) => {
           const pending = coach.namedInviteStatus === "pending";
           const unavailable = !coach.availableForInvites;
+          const inLeague = coach.inLeague === true;
+          const inviteBlocked =
+            pending || unavailable || inLeague || leagueFull || workingId === coach.userId;
           return (
             <View key={coach.userId} style={styles.card}>
               <CoachAvatar name={coach.displayName} avatarUrl={coach.avatarUrl} />
@@ -251,7 +258,11 @@ export function CoachDirectoryPanel({
                 <Text style={styles.name}>{coach.displayName}</Text>
                 <Text style={styles.status}>
                   {coach.userType === "ai" ? "IA" : "Manuale"} ·{" "}
-                  {coach.availableForInvites ? "Disponibile" : "Non disponibile"}
+                  {inLeague
+                    ? "Già in lega"
+                    : coach.availableForInvites
+                      ? "Disponibile"
+                      : "Non disponibile"}
                   {coach.memberSince ? ` · dal ${coach.memberSince}` : ""}
                 </Text>
                 <Text style={styles.status} testID={`${testIDPrefix}-history-${coach.userId}`}>
@@ -260,17 +271,19 @@ export function CoachDirectoryPanel({
               </Pressable>
               <Pressable
                 accessibilityRole="button"
-                disabled={pending || unavailable || leagueFull || workingId === coach.userId}
+                disabled={inviteBlocked}
                 onPress={() => void onInvite(coach)}
-                style={[
-                  styles.button,
-                  (pending || unavailable || leagueFull || workingId === coach.userId) &&
-                    styles.buttonDisabled,
-                ]}
+                style={[styles.button, inviteBlocked && styles.buttonDisabled]}
                 testID={`${testIDPrefix}-invite-${coach.userId}`}
               >
                 <Text style={styles.buttonLabel}>
-                  {unavailable ? "Indisponibile" : pending ? "Già invitato" : "Invita"}
+                  {inLeague
+                    ? "Già in lega"
+                    : unavailable
+                      ? "Indisponibile"
+                      : pending
+                        ? "Già invitato"
+                        : "Invita"}
                 </Text>
               </Pressable>
             </View>

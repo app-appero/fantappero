@@ -6,6 +6,8 @@ import { StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { theme } from "@fantappero/ui/theme";
 import { AppDrawer } from "../components/AppDrawer";
+import { ImpersonationBanner } from "../components/ImpersonationBanner";
+import { openAdminScreen } from "./adminEntry";
 import { LockCountdown } from "../components/LockCountdown";
 import { fetchPendingInviteCount } from "../api/managerInvites";
 import { subscribePendingInvitesChanged } from "./pendingInviteEvents";
@@ -99,8 +101,17 @@ function AppTabShell({
 }) {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
-  const { user, leagues, activeLeagueId, setActiveLeagueId, can, logout, accessToken } =
-    useAuthSession();
+  const {
+    user,
+    leagues,
+    activeLeagueId,
+    setActiveLeagueId,
+    can,
+    logout,
+    accessToken,
+    isImpersonating,
+    stopImpersonation,
+  } = useAuthSession();
   const [drawerOpen, setDrawerOpen] = useState(false);
   // Stato aperto/chiuso conservato per la sessione: tutti i gruppi partono aperti.
   const [collapsedGroups, setCollapsedGroups] = useState<readonly string[]>([]);
@@ -199,6 +210,16 @@ function AppTabShell({
 
   return (
     <View style={[styles.shell, { paddingTop: insets.top }]}>
+      {isImpersonating ? (
+        <ImpersonationBanner
+          displayName={user?.displayName ?? "un utente"}
+          onExit={async () => {
+            await stopImpersonation();
+            openAdminScreen("AdminUsers");
+            navigation.navigate("AdminPanel");
+          }}
+        />
+      ) : null}
       <AppHeader
         userDisplayName={user?.displayName ?? "Ospite"}
         showMenuButton

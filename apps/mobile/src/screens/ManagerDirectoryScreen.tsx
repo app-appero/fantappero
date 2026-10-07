@@ -1,6 +1,7 @@
 import { theme } from "@fantappero/ui/theme";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { StyleSheet, View } from "react-native";
+import { fetchLeagueAdminPanel, fetchLeagueMembers } from "../api/leagues";
 import { CoachDirectoryPanel } from "../components/CoachDirectoryPanel";
 import { UiStatePanel } from "../components/UiStatePanel";
 import { PageContainer } from "../layout/PageContainer";
@@ -10,9 +11,38 @@ const { spacing } = theme;
 
 /** Directory fantallenatori dedicata — allineata a web /fantallenatori. */
 export function ManagerDirectoryScreen() {
-  const { can, activeLeagueId } = useAuthSession();
+  const { can, activeLeagueId, accessToken } = useAuthSession();
   const [reloadToken, setReloadToken] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
+  const [memberCount, setMemberCount] = useState(0);
+  const [capacity, setCapacity] = useState(0);
+
+  useEffect(() => {
+    if (!accessToken || !activeLeagueId) {
+      return;
+    }
+    let cancelled = false;
+    void Promise.all([
+      fetchLeagueAdminPanel(accessToken, activeLeagueId),
+      fetchLeagueMembers(accessToken, activeLeagueId),
+    ])
+      .then(([panel, members]) => {
+        if (cancelled) {
+          return;
+        }
+        setCapacity(panel.rules.participantCount);
+        setMemberCount(members.length);
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setCapacity(0);
+          setMemberCount(0);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [accessToken, activeLeagueId, reloadToken]);
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
@@ -59,8 +89,8 @@ export function ManagerDirectoryScreen() {
       <View style={styles.body}>
         <CoachDirectoryPanel
           leagueId={activeLeagueId}
-          memberCount={0}
-          capacity={10}
+          memberCount={memberCount}
+          capacity={capacity}
           testIDPrefix="manager-directory"
           reloadToken={reloadToken}
           onReloadSettled={onReloadSettled}

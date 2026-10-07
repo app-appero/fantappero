@@ -190,6 +190,8 @@ class FantasyCoachDirectoryItem(ApiModel):
     avatar_url: str | None = Field(default=None, alias="avatarUrl")
     user_type: Literal["human", "ai"] = Field(alias="userType")
     available_for_invites: bool = Field(alias="availableForInvites")
+    # True se è già iscritto a questa lega: resta in elenco, ma l'invito è disabilitato.
+    in_league: bool = Field(alias="inLeague")
     named_invite_status: Literal["pending", "accepted", "declined", "revoked", "expired"] | None = (
         Field(default=None, alias="namedInviteStatus")
     )

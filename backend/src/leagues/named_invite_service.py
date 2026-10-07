@@ -48,8 +48,8 @@ from observability.metrics import get_metrics
 def directory_invite_status(status: NamedInviteStatus | None) -> str | None:
     """Stato mostrato in directory.
 
-    La query esclude i membri attuali: un invito `accepted` rimasto dopo una
-    rimozione non deve più comparire come «Aggiunto».
+    Un invito `accepted` non resta «Aggiunto»: chi è ancora in lega è marcato
+    `inLeague`, chi è uscito può ricevere un nuovo invito.
     """
     if status is None or status == NamedInviteStatus.ACCEPTED:
         return None
@@ -89,8 +89,14 @@ class NamedLeagueInviteService:
             .correlate(User)
             .scalar_subquery()
         )
-        member_ids = select(LeagueMembership.user_id).where(
-            LeagueMembership.league_id == league_access.league.id
+        in_league = (
+            select(LeagueMembership.user_id)
+            .where(
+                LeagueMembership.league_id == league_access.league.id,
+                LeagueMembership.user_id == User.id,
+            )
+            .correlate(User)
+            .exists()
         )
         effective_available = or_(
             User.user_type == UserType.AI,
@@ -100,7 +106,6 @@ class NamedLeagueInviteService:
             User.deleted_at.is_(None),
             User.email_verified_at.is_not(None),
             User.id != league_access.user.id,
-            User.id.not_in(member_ids),
             UserProfile.display_name.is_not(None),
             UserProfile.display_name != "",
         ]
@@ -114,7 +119,12 @@ class NamedLeagueInviteService:
             conditions.append(effective_available if available else ~effective_available)
 
         base = (
-            select(User, UserProfile, latest_status.label("invite_status"))
+            select(
+                User,
+                UserProfile,
+                latest_status.label("invite_status"),
+                in_league.label("in_league"),
+            )
             .join(UserProfile, UserProfile.user_id == User.id)
             .where(*conditions)
         )
@@ -129,7 +139,7 @@ class NamedLeagueInviteService:
         ).all()
         # Storico della sola pagina corrente, in una query: la card vieta
         # esplicitamente l'N+1 sulla preview.
-        histories = load_histories(self._session, user_ids=[user.id for user, _, _ in rows])
+        histories = load_histories(self._session, user_ids=[user.id for user, _, _, _ in rows])
         items = [
             FantasyCoachDirectoryItem(
                 userId=str(user.id),
@@ -140,13 +150,14 @@ class NamedLeagueInviteService:
                 availableForInvites=(
                     user.user_type == UserType.AI or profile.available_for_invites
                 ),
+                inLeague=bool(is_member),
                 namedInviteStatus=directory_invite_status(invite_status),
                 memberSince=seniority_label(user.created_at, now=now),
                 concludedLeagues=histories[user.id].concluded_leagues,
                 bestPosition=histories[user.id].best_position,
                 historySummary=summary_line(histories[user.id]),
             )
-            for user, profile, invite_status in rows
+            for user, profile, invite_status, is_member in rows
         ]
         get_metrics().incr("coach_directory_viewed_total", labels={"result": "success"})
         return FantasyCoachDirectoryResponse(

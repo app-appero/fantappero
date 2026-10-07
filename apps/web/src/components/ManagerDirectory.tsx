@@ -463,6 +463,9 @@ export function ManagerDirectory({
   async function onInvite(manager: FantasyCoachDirectoryItem) {
     setInviteError(null);
     setSuccess(null);
+    if (manager.inLeague) {
+      return;
+    }
     if (!manager.availableForInvites) {
       setInviteError("Questo fantallenatore non accetta inviti.");
       return;
@@ -640,8 +643,8 @@ export function ManagerDirectory({
             {result.items.map((manager) => {
               const unavailable = !manager.availableForInvites;
               const alreadyInvited = manager.namedInviteStatus === "pending";
-              // Un accepted in directory è residuo: la persona non è più membro
-              // (altrimenti la query la escluderebbe) e deve poter essere reinvitata.
+              const inLeague = manager.inLeague === true;
+              const inviteBlocked = inLeague || unavailable || alreadyInvited || leagueFull;
               return (
                 <li key={manager.userId} className="fa-manager-directory__item">
                   <CoachAvatar
@@ -684,13 +687,19 @@ export function ManagerDirectory({
                     <Button
                       type="button"
                       size="sm"
-                      variant={unavailable || alreadyInvited ? "secondary" : "primary"}
-                      disabled={unavailable || alreadyInvited || leagueFull}
+                      variant={inviteBlocked ? "secondary" : "primary"}
+                      disabled={inviteBlocked}
                       loading={workingId === manager.userId}
                       onClick={() => void onInvite(manager)}
                       data-testid={`manager-invite-${manager.userId}`}
                     >
-                      {unavailable ? "Indisponibile" : alreadyInvited ? "Già invitato" : "Invita"}
+                      {inLeague
+                        ? "Già in lega"
+                        : unavailable
+                          ? "Indisponibile"
+                          : alreadyInvited
+                            ? "Già invitato"
+                            : "Invita"}
                     </Button>
                   ) : (
                     <span className="fa-manager-directory__status">
