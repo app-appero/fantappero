@@ -67,10 +67,25 @@ function appRootFromHere() {
   return join(dirname(fileURLToPath(import.meta.url)), "..");
 }
 
+// Expo's shared ngrok account rejects new agents with ERR_NGROK_108, and
+// @expo/ngrok then crashes on a missing response body. The websocket tunnel
+// (the same one Expo uses outside ngrok) only accepts local port 8081.
+export function expoLaunchSpec() {
+  return {
+    command: "pnpm",
+    args: ["exec", "expo", "start", "--tunnel", "--port", "8081", "-c"],
+    env: {
+      EXPO_FORCE_WEBCONTAINER_ENV: "1",
+      EXPO_UNSTABLE_HEADLESS: "0",
+    },
+  };
+}
+
 function runExpo(appRoot, env) {
-  const child = spawn("pnpm", ["exec", "expo", "start", "--tunnel", "-c"], {
+  const launch = expoLaunchSpec();
+  const child = spawn(launch.command, launch.args, {
     cwd: appRoot,
-    env: { ...process.env, ...env },
+    env: { ...process.env, ...env, ...launch.env },
     stdio: "inherit",
   });
   child.on("exit", (code, signal) => {
@@ -96,6 +111,7 @@ if (isDirectRun) {
     process.exit(1);
   }
   console.log(`FantApperò mobile · ${resolved.profile} · ${resolved.apiUrl}`);
+  console.log("Tunnel Expo attivo: il QR punta a boltexpo.dev e si apre da Expo Go su qualsiasi rete.");
   if (process.argv.includes("--print")) {
     process.exit(0);
   }

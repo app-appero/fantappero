@@ -5,7 +5,7 @@ import { dirname, join } from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 
-import { resolveMobileProfile } from "./start-with-env.mjs";
+import { expoLaunchSpec, resolveMobileProfile } from "./start-with-env.mjs";
 
 const appRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -44,6 +44,13 @@ test("locale accepts a LAN override from .env.local", () => {
   const resolved = resolveMobileProfile(root, "locale");
   assert.equal(resolved.apiUrl, "http://192.168.1.20:8001");
   assert.equal(resolved.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID_WEB, "web-id");
+});
+
+test("expo starts on the websocket tunnel instead of the shared ngrok account", () => {
+  const launch = expoLaunchSpec();
+  assert.deepEqual(launch.args, ["exec", "expo", "start", "--tunnel", "--port", "8081", "-c"]);
+  assert.equal(launch.env.EXPO_FORCE_WEBCONTAINER_ENV, "1");
+  assert.equal(launch.env.EXPO_UNSTABLE_HEADLESS, "0");
 });
 
 test("pilota keeps the Railway URL even if .env.local has a LAN address", () => {
