@@ -6,6 +6,7 @@ import type {
   TradeStatus,
 } from "@fantappero/contracts";
 import { theme } from "@fantappero/ui/theme";
+import { livePairMap } from "../theme/liveColors";
 
 const { colors } = theme;
 
@@ -20,12 +21,12 @@ export const SESSION_STATUS_LABEL: Record<MarketSessionStatus, string> = {
 
 export type BadgeColorPair = { background: string; text: string };
 
-export const SESSION_STATUS_COLOR: Record<MarketSessionStatus, BadgeColorPair> = {
+export const SESSION_STATUS_COLOR = livePairMap<MarketSessionStatus>(() => ({
   scheduled: { background: colors.backgroundElevated, text: colors.foreground },
   open: { background: colors.success, text: colors.accentContrast },
   closed: { background: colors.warning, text: colors.background },
   resolved: { background: colors.accent, text: colors.accentContrast },
-};
+}));
 
 export const BID_STATUS_LABEL: Record<MarketBidStatus, string> = {
   submitted: "Inviata",
@@ -47,7 +48,7 @@ export const TRADE_STATUS_LABEL: Record<TradeStatus, string> = {
   rejected_by_admin: "Rifiutata dall'amministratore",
 };
 
-export const TRADE_STATUS_COLOR: Record<TradeStatus, BadgeColorPair> = {
+export const TRADE_STATUS_COLOR = livePairMap<TradeStatus>(() => ({
   proposed: { background: colors.accent, text: colors.accentContrast },
   cancelled: { background: colors.backgroundElevated, text: colors.foreground },
   expired: { background: colors.backgroundElevated, text: colors.foreground },
@@ -57,7 +58,7 @@ export const TRADE_STATUS_COLOR: Record<TradeStatus, BadgeColorPair> = {
   pending_approval: { background: colors.warning, text: colors.background },
   executed: { background: colors.success, text: colors.accentContrast },
   rejected_by_admin: { background: colors.danger, text: colors.accentContrast },
-};
+}));
 
 export const RELEASE_REASON_OPTIONS: Array<{ value: MarketReleaseReason; label: string }> = [
   { value: "voluntary", label: "Svincolo volontario" },

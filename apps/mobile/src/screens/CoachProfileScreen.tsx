@@ -1,3 +1,4 @@
+import { lazyStyles } from "../theme/lazyStyles";
 import { formatFantasyPoints } from "@fantappero/contracts";
 import type { FantasyCoachProfile } from "@fantappero/contracts";
 import { theme } from "@fantappero/ui/theme";
@@ -150,7 +151,7 @@ export function CoachProfileScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = lazyStyles(() => StyleSheet.create({
   card: {
     gap: spacing.sm,
   },
@@ -239,4 +240,4 @@ const styles = StyleSheet.create({
     color: colors.foreground,
     fontWeight: typography.fontWeight.semibold,
   },
-});
+}));

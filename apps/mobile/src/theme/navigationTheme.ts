@@ -1,22 +1,27 @@
-import { DarkTheme, type Theme } from "@react-navigation/native";
-import { theme } from "@fantappero/ui/theme";
+import { DarkTheme, DefaultTheme, type Theme } from "@react-navigation/native";
+import { getActiveColorScheme, theme } from "@fantappero/ui/theme";
 
 const { colors } = theme;
 
-/** React Navigation theme aligned with EPUI-01 tokens (dark pitch surface). */
-export const appNavigationTheme: Theme = {
-  ...DarkTheme,
-  colors: {
-    ...DarkTheme.colors,
-    primary: colors.accent,
-    background: colors.background,
-    card: colors.background,
-    text: colors.foreground,
-    border: colors.border,
-    notification: colors.accent,
-  },
-};
+/** React Navigation theme aligned with the active color scheme. */
+export function buildNavigationTheme(): Theme {
+  const base = getActiveColorScheme() === "light" ? DefaultTheme : DarkTheme;
+  return {
+    ...base,
+    colors: {
+      ...base.colors,
+      primary: colors.accent,
+      background: colors.background,
+      card: colors.background,
+      text: colors.foreground,
+      border: colors.border,
+      notification: colors.accent,
+    },
+  };
+}
 
-export const sceneBackgroundStyle = {
-  backgroundColor: colors.background,
-} as const;
+export function buildSceneBackgroundStyle() {
+  return {
+    backgroundColor: colors.background,
+  };
+}

@@ -1,3 +1,4 @@
+import { lazyStyles } from "../../theme/lazyStyles";
 import type { FantasyTeamSummary, LiveLot } from "@fantappero/contracts";
 import { theme } from "@fantappero/ui/theme";
 import { StyleSheet, Text, View } from "react-native";
@@ -83,7 +84,7 @@ export function LiveAuctionTable({
   );
 }
 
-const styles = StyleSheet.create({
+const styles = lazyStyles(() => StyleSheet.create({
   wrap: {
     alignItems: "center",
     paddingVertical: 8,
@@ -165,4 +166,4 @@ const styles = StyleSheet.create({
     color: colors.accent,
     fontWeight: typography.fontWeight.bold,
   },
-});
+}));

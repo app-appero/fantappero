@@ -1,9 +1,10 @@
+import { lazyStyles } from "../theme/lazyStyles";
 import { theme } from "@fantappero/ui/theme";
 import { StyleSheet } from "react-native";
 
 const { colors, spacing, typography, radius } = theme;
 
-export const marketUiStyles = StyleSheet.create({
+export const marketUiStyles = lazyStyles(() => StyleSheet.create({
   section: {
     padding: spacing.md,
     borderRadius: radius.md,
@@ -219,4 +220,4 @@ export const marketUiStyles = StyleSheet.create({
     fontSize: typography.fontSize.sm,
     color: colors.foregroundMuted,
   },
-});
+}));

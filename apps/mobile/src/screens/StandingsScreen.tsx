@@ -1,3 +1,4 @@
+import { lazyStyles } from "../theme/lazyStyles";
 import type { LeagueStanding } from "@fantappero/contracts";
 import { formatFantasyPoints } from "@fantappero/contracts";
 import { theme } from "@fantappero/ui/theme";
@@ -227,7 +228,7 @@ function StandingsTableBlock({
   );
 }
 
-const styles = StyleSheet.create({
+const styles = lazyStyles(() => StyleSheet.create({
   meta: {
     color: colors.foregroundMuted,
     fontSize: typography.fontSize.sm,
@@ -314,4 +315,4 @@ const styles = StyleSheet.create({
     fontSize: typography.fontSize.xs,
     fontWeight: typography.fontWeight.semibold,
   },
-});
+}));

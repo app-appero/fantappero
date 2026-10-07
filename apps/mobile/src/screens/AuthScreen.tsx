@@ -1,8 +1,10 @@
+import { lazyStyles } from "../theme/lazyStyles";
 import { theme } from "@fantappero/ui/theme";
 import { useNavigation } from "@react-navigation/core";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useState } from "react";
-import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
+import { AppTextInput as TextInput } from "../components/AppTextInput";
 import { useGoogleAuth } from "../auth/useGoogleAuth";
 import { BrandLogo } from "../components/BrandLogo";
 import { UiStatePanel } from "../components/UiStatePanel";
@@ -141,7 +143,7 @@ export function AuthScreen() {
   );
 }
 
-export const authFormStyles = StyleSheet.create({
+export const authFormStyles = lazyStyles(() => StyleSheet.create({
   root: {
     flex: 1,
     backgroundColor: colors.background,
@@ -216,6 +218,6 @@ export const authFormStyles = StyleSheet.create({
   disabled: {
     opacity: 0.6,
   },
-});
+}));
 
 const styles = authFormStyles;

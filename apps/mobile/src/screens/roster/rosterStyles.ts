@@ -1,9 +1,10 @@
+import { lazyStyles } from "../../theme/lazyStyles";
 import { theme } from "@fantappero/ui/theme";
 import { StyleSheet } from "react-native";
 
 const { colors, spacing, typography, radius } = theme;
 
-export const rosterStyles = StyleSheet.create({
+export const rosterStyles = lazyStyles(() => StyleSheet.create({
   summary: {
     fontSize: typography.fontSize.md,
     color: colors.foreground,
@@ -242,4 +243,4 @@ export const rosterStyles = StyleSheet.create({
     color: colors.danger,
     marginTop: spacing.sm,
   },
-});
+}));

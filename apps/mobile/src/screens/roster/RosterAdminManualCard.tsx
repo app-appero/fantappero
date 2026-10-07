@@ -5,7 +5,8 @@ import type {
   LeagueListoneEntry,
 } from "@fantappero/contracts";
 import { useEffect, useState } from "react";
-import { Pressable, Text, TextInput, View } from "react-native";
+import { Pressable, Text, View } from "react-native";
+import { AppTextInput as TextInput } from "../../components/AppTextInput";
 import { UiStatePanel } from "../../components/UiStatePanel";
 import {
   filterListone,

@@ -1,3 +1,4 @@
+import { lazyStyles } from "../theme/lazyStyles";
 import { getWireframeScreen, type WireframeScreenId } from "@fantappero/contracts";
 import { useNavigation } from "@react-navigation/core";
 import { Pressable, StyleSheet, Text, View } from "react-native";
@@ -136,7 +137,7 @@ export function WireframePlaceholderScreen({
   );
 }
 
-const styles = StyleSheet.create({
+const styles = lazyStyles(() => StyleSheet.create({
   cta: {
     marginTop: spacing.md,
     alignSelf: "flex-start",
@@ -205,4 +206,4 @@ const styles = StyleSheet.create({
     color: colors.accent,
     fontWeight: typography.fontWeight.semibold,
   },
-});
+}));

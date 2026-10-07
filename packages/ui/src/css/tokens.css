@@ -123,9 +123,45 @@
   --fa-color-input-border-hover: var(--fa-color-border-strong);
   --fa-color-input-border-focus: var(--fa-electric-400);
   --fa-color-input-border-error: var(--fa-danger-500);
-  --fa-color-input-placeholder: var(--fa-slate-500);
+  --fa-color-input-placeholder: #ffffff;
   --fa-color-disabled-bg: var(--fa-pitch-700);
   --fa-color-disabled-fg: var(--fa-slate-500);
+}
+
+:root {
+  color-scheme: dark;
+}
+
+[data-color-scheme="light"] {
+  color-scheme: light;
+  --fa-pitch-950: #f7f4ee;
+  --fa-pitch-900: #f4f1ea;
+  --fa-pitch-800: #faf8f4;
+  --fa-pitch-700: #ffffff;
+  --fa-pitch-600: #e7e2d8;
+  --fa-pitch-500: #cfc8bb;
+  --fa-ivory-50: #0a0e14;
+  --fa-ivory-100: #0f1419;
+  --fa-ivory-200: #1c2736;
+  --fa-slate-300: #3d4a5c;
+  --fa-slate-400: #5c6578;
+  --fa-slate-500: #3d4a5c;
+  --fa-color-background: #faf8f4;
+  --fa-color-background-subtle: #f4f1ea;
+  --fa-color-background-elevated: #ffffff;
+  --fa-color-background-gradient-stop: #e8e4db;
+  --fa-color-foreground: #0a0e14;
+  --fa-color-foreground-muted: #3d4a5c;
+  --fa-color-foreground-subtle: #5c6578;
+  --fa-color-border: #d9d3c7;
+  --fa-color-border-strong: #b7b0a2;
+  --fa-color-input-bg: #ffffff;
+  --fa-color-input-placeholder: #3d4a5c;
+  --fa-color-disabled-bg: #e7e2d8;
+  --fa-color-disabled-fg: #5c6578;
+  --fa-shadow-sm: 0 1px 2px rgba(15, 20, 25, 0.08);
+  --fa-shadow-md: 0 4px 12px rgba(15, 20, 25, 0.1);
+  --fa-shadow-lg: 0 12px 32px rgba(15, 20, 25, 0.12);
 }
 
 /** Admin panel shares the same tokens; density is applied via utility class. */

@@ -1,3 +1,4 @@
+import { lazyStyles } from "../theme/lazyStyles";
 import type {
   AiLineupRun,
   FantasyModule,
@@ -966,7 +967,7 @@ export function FormationScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = lazyStyles(() => StyleSheet.create({
   content: {
     gap: spacing.sm,
     paddingBottom: spacing.xl,
@@ -1074,4 +1075,4 @@ const styles = StyleSheet.create({
     fontSize: typography.fontSize.sm,
     fontWeight: "600",
   },
-});
+}));

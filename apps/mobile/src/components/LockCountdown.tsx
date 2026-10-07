@@ -1,3 +1,4 @@
+import { lazyStyles } from "../theme/lazyStyles";
 import {
   computeCountdown,
   formatCountdown,
@@ -79,7 +80,7 @@ export function LockCountdown({
   );
 }
 
-const styles = StyleSheet.create({
+const styles = lazyStyles(() => StyleSheet.create({
   wrapper: {
     flexDirection: "row",
     alignItems: "baseline",
@@ -99,4 +100,4 @@ const styles = StyleSheet.create({
     fontSize: typography.fontSize.sm,
     fontWeight: typography.fontWeight.semibold,
   },
-});
+}));

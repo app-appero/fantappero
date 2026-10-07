@@ -1,9 +1,11 @@
+import { lazyStyles } from "../theme/lazyStyles";
 import type { AcceptedLeagueInvite } from "@fantappero/contracts";
 import { theme } from "@fantappero/ui/theme";
 import { useNavigation, useRoute, type RouteProp } from "@react-navigation/core";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useState } from "react";
-import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
+import { AppTextInput as TextInput } from "../components/AppTextInput";
 import { acceptLeagueInvite } from "../api/leagues";
 import { UiStatePanel } from "../components/UiStatePanel";
 import { PageContainer } from "../layout/PageContainer";
@@ -158,7 +160,7 @@ export function JoinLeagueScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = lazyStyles(() => StyleSheet.create({
   hint: {
     color: colors.foregroundMuted,
     fontSize: typography.fontSize.sm,
@@ -195,4 +197,4 @@ const styles = StyleSheet.create({
     fontSize: typography.fontSize.md,
     fontWeight: typography.fontWeight.semibold,
   },
-});
+}));

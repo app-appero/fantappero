@@ -1,3 +1,4 @@
+import { lazyStyles } from "../theme/lazyStyles";
 import { theme } from "@fantappero/ui/theme";
 import {
   RefreshControl,
@@ -57,7 +58,7 @@ export function PageContainer({
   );
 }
 
-const styles = StyleSheet.create({
+const styles = lazyStyles(() => StyleSheet.create({
   scroll: {
     flex: 1,
     backgroundColor: colors.background,
@@ -77,4 +78,4 @@ const styles = StyleSheet.create({
   body: {
     gap: spacing.md,
   },
-});
+}));

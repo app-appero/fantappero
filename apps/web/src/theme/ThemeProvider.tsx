@@ -1,5 +1,10 @@
 import { createContext, useContext, useEffect, useMemo, type ReactNode } from "react";
 import { useLocation } from "../router/simpleRouter";
+import {
+  applyDocumentColorScheme,
+  readThemePreference,
+  subscribeThemePreference,
+} from "./colorScheme";
 
 /** Supported visual themes — extensible for future i18n / light mode. */
 export type AppThemeId = "fantappero";
@@ -43,6 +48,27 @@ export function ThemeProvider({ children, themeId = "fantappero" }: ThemeProvide
   useEffect(() => {
     applyDocumentTheme(themeId, surface);
   }, [themeId, surface]);
+
+  useEffect(() => {
+    applyDocumentColorScheme(readThemePreference());
+    const unsubscribe = subscribeThemePreference(() => {
+      applyDocumentColorScheme(readThemePreference());
+    });
+    if (typeof window.matchMedia !== "function") {
+      return unsubscribe;
+    }
+    const media = window.matchMedia("(prefers-color-scheme: light)");
+    const onChange = () => {
+      if (readThemePreference() === "system") {
+        applyDocumentColorScheme("system");
+      }
+    };
+    media.addEventListener("change", onChange);
+    return () => {
+      media.removeEventListener("change", onChange);
+      unsubscribe();
+    };
+  }, []);
 
   const value = useMemo<ThemeContextValue>(() => ({ themeId, surface }), [themeId, surface]);
 

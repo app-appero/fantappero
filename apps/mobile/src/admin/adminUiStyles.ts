@@ -1,10 +1,11 @@
+import { lazyStyles } from "../theme/lazyStyles";
 import { theme } from "@fantappero/ui/theme";
 import { StyleSheet } from "react-native";
 
 const { colors, spacing, typography, radius } = theme;
 
 /** Shared styles for the global operator panel screens (mobile port of apps/web admin pages). */
-export const adminUiStyles = StyleSheet.create({
+export const adminUiStyles = lazyStyles(() => StyleSheet.create({
   section: {
     padding: spacing.md,
     borderRadius: radius.md,
@@ -163,4 +164,4 @@ export const adminUiStyles = StyleSheet.create({
     padding: spacing.lg,
     backgroundColor: "rgba(0,0,0,0.55)",
   },
-});
+}));

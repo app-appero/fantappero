@@ -1,3 +1,4 @@
+import { lazyStyles } from "../theme/lazyStyles";
 import Feather from "@expo/vector-icons/Feather";
 import { StyleSheet, Text, View, type ViewProps } from "react-native";
 import { theme } from "@fantappero/ui/theme";
@@ -52,7 +53,7 @@ export function BrandLogo({ variant = "full", size = "md", style, testID, ...res
   );
 }
 
-const styles = StyleSheet.create({
+const styles = lazyStyles(() => StyleSheet.create({
   root: {
     flexDirection: "row",
     alignItems: "center",
@@ -68,4 +69,4 @@ const styles = StyleSheet.create({
     fontWeight: typography.fontWeight.semibold,
     flexShrink: 1,
   },
-});
+}));

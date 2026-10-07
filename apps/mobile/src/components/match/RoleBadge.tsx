@@ -1,3 +1,4 @@
+import { lazyStyles } from "../../theme/lazyStyles";
 import { pitchRoleFullLabel, resolvePitchRole, type PitchRole } from "@fantappero/contracts";
 import { theme } from "@fantappero/ui/theme";
 import { StyleSheet, Text, View } from "react-native";
@@ -35,7 +36,7 @@ export function RoleBadge({ code, testID }: RoleBadgeProps) {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = lazyStyles(() => StyleSheet.create({
   badge: {
     paddingHorizontal: 6,
     paddingVertical: 1,
@@ -47,4 +48,4 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: "700",
   },
-});
+}));

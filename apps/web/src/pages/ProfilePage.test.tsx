@@ -47,6 +47,13 @@ describe("EP02-02 profile page", () => {
     expect(html).toContain('data-testid="profile-form"');
     expect(html).toContain("Nome visualizzato");
     expect(html).toContain("Fuso orario");
+    expect(html).toContain('data-testid="profile-theme"');
+    expect(html).toContain('data-testid="profile-theme-light"');
+    expect(html).toContain('data-testid="profile-theme-dark"');
+    expect(html).toContain('data-testid="profile-theme-system"');
+    expect(html).toContain("Chiaro");
+    expect(html).toContain("Scuro");
+    expect(html).toContain("Sistema");
     expect(html).toContain('data-testid="profile-notifications-email"');
   });
 

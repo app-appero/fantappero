@@ -165,8 +165,18 @@
     box-shadow var(--fa-duration-fast) var(--fa-easing-standard);
 }
 
+input::placeholder,
+textarea::placeholder,
 .fa-input::placeholder {
   color: var(--fa-color-input-placeholder);
+  opacity: 1;
+}
+
+[data-color-scheme="light"] .fa-btn--primary,
+[data-color-scheme="light"] .fa-btn--danger,
+[data-color-scheme="light"] .fa-btn--primary.fa-btn--loading .fa-btn__spinner,
+[data-color-scheme="light"] .fa-btn--danger.fa-btn--loading .fa-btn__spinner {
+  color: #faf8f4;
 }
 
 .fa-input:hover:not(:disabled):not([aria-invalid="true"]),

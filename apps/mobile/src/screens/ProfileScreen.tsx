@@ -1,3 +1,4 @@
+import { lazyStyles } from "../theme/lazyStyles";
 import {
   DELETE_ACCOUNT_CONFIRMATION_PHRASE,
   PROFILE_LANGUAGE_OPTIONS,
@@ -7,7 +8,8 @@ import {
 import { theme } from "@fantappero/ui/theme";
 import * as ImagePicker from "expo-image-picker";
 import { useCallback, useState } from "react";
-import { Image, Pressable, Share, StyleSheet, Switch, Text, TextInput, View } from "react-native";
+import { Image, Pressable, Share, StyleSheet, Switch, Text, View } from "react-native";
+import { AppTextInput as TextInput } from "../components/AppTextInput";
 import { deleteAccount, exportAccountData } from "../api/privacy";
 import {
   fetchProfile,
@@ -21,6 +23,8 @@ import { UiStatePanel } from "../components/UiStatePanel";
 import { useScreenData } from "../hooks/useScreenData";
 import { PageContainer } from "../layout/PageContainer";
 import { getApiErrorMessage, useAuthSession } from "../session/DemoSessionContext";
+import { useAppTheme } from "../theme/AppTheme";
+import { THEME_OPTIONS } from "../theme/themePreference";
 import { resolveAvatarUrl } from "../utils/avatar";
 
 const { colors, spacing, typography, radius } = theme;
@@ -38,6 +42,31 @@ function parseQuietHour(value: string): number | null | undefined {
     return undefined;
   }
   return parsed;
+}
+
+function ThemePreferenceSection() {
+  const { preference, setPreference } = useAppTheme();
+  return (
+    <View style={styles.section} testID="profile-theme-section">
+      <Text style={styles.sectionTitle}>Aspetto</Text>
+      <Text style={styles.label}>Tema</Text>
+      <Text style={styles.hint}>Chiaro, scuro oppure lo stesso del sistema.</Text>
+      <View style={styles.timezoneList}>
+        {THEME_OPTIONS.map((option) => (
+          <Pressable
+            key={option.value}
+            accessibilityRole="button"
+            accessibilityState={{ selected: preference === option.value }}
+            onPress={() => setPreference(option.value)}
+            style={[styles.timezoneOption, preference === option.value && styles.timezoneSelected]}
+            testID={`profile-theme-${option.value}`}
+          >
+            <Text style={styles.timezoneLabel}>{option.label}</Text>
+          </Pressable>
+        ))}
+      </View>
+    </View>
+  );
 }
 
 /** Profilo utente — preferenze e privacy via API (EP02-02). */
@@ -322,6 +351,7 @@ export function ProfileScreen() {
           message={loadError ?? "Profilo non trovato."}
           testID="profile-load-error"
         />
+        <ThemePreferenceSection />
         <Pressable accessibilityRole="button" onPress={() => void loadProfile()} style={styles.secondaryButton}>
           <Text style={styles.secondaryButtonLabel}>Ricarica</Text>
         </Pressable>
@@ -348,6 +378,8 @@ export function ProfileScreen() {
       {formError ? (
         <UiStatePanel state="error" title="Errore" message={formError} testID="profile-error" />
       ) : null}
+
+      <ThemePreferenceSection />
 
       <View style={styles.section} testID="profile-avatar-section">
         <Text style={styles.sectionTitle}>Avatar</Text>
@@ -583,7 +615,7 @@ export function ProfileScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = lazyStyles(() => StyleSheet.create({
   section: {
     gap: spacing.sm,
     marginBottom: spacing.lg,
@@ -719,4 +751,4 @@ const styles = StyleSheet.create({
   disabled: {
     opacity: 0.6,
   },
-});
+}));

@@ -1,7 +1,9 @@
+import { lazyStyles } from "../../theme/lazyStyles";
 import type { AdminListoneEntry, FantasyRole } from "@fantappero/contracts";
 import { theme } from "@fantappero/ui/theme";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
+import { AppTextInput as TextInput } from "../../components/AppTextInput";
 import { useListoneRefresh } from "../../admin/ListoneRefreshContext";
 import { fetchAdminListone } from "../../api/admin";
 import { ApiError } from "../../api/client";
@@ -350,7 +352,7 @@ export function AdminListoneScreen() {
   );
 }
 
-const seasonStyles = StyleSheet.create({
+const seasonStyles = lazyStyles(() => StyleSheet.create({
   row: {
     flexDirection: "row",
     alignItems: "flex-end",
@@ -366,4 +368,4 @@ const seasonStyles = StyleSheet.create({
     flexGrow: 0,
     flexShrink: 1,
   },
-});
+}));

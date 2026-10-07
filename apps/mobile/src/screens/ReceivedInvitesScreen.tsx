@@ -1,3 +1,4 @@
+import { lazyStyles } from "../theme/lazyStyles";
 import type { NamedLeagueInvite } from "@fantappero/contracts";
 import { theme } from "@fantappero/ui/theme";
 import { useNavigation } from "@react-navigation/core";
@@ -193,7 +194,7 @@ export function ReceivedInvitesScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = lazyStyles(() => StyleSheet.create({
   hint: {
     color: colors.foregroundMuted,
     fontSize: typography.fontSize.sm,
@@ -243,4 +244,4 @@ const styles = StyleSheet.create({
     color: colors.foreground,
     fontWeight: typography.fontWeight.semibold,
   },
-});
+}));

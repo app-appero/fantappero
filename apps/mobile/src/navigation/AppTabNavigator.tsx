@@ -1,3 +1,4 @@
+import { lazyStyles } from "../theme/lazyStyles";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { useNavigation, useNavigationState } from "@react-navigation/core";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
@@ -30,7 +31,7 @@ import {
   type ResolvedMobileNavItem,
 } from "./navConfig";
 import type { AppTabParamList, RootStackParamList } from "./types";
-import { sceneBackgroundStyle } from "../theme/navigationTheme";
+import { buildSceneBackgroundStyle } from "../theme/navigationTheme";
 
 const Tab = createBottomTabNavigator<AppTabParamList>();
 const { colors, spacing, typography, radius } = theme;
@@ -299,7 +300,7 @@ export function AppTabNavigator() {
         tabBar={() => null}
         screenOptions={{
           headerShown: false,
-          sceneStyle: sceneBackgroundStyle,
+          sceneStyle: buildSceneBackgroundStyle(),
         }}
       >
         {TAB_SCREEN_NAMES.map((routeName) => {
@@ -316,7 +317,7 @@ export function AppTabNavigator() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = lazyStyles(() => StyleSheet.create({
   shell: {
     flex: 1,
     backgroundColor: colors.background,
@@ -342,4 +343,4 @@ const styles = StyleSheet.create({
     fontSize: typography.fontSize.xs,
     fontWeight: typography.fontWeight.semibold,
   },
-});
+}));

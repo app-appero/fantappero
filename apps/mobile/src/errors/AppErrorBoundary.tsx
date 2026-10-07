@@ -1,3 +1,4 @@
+import { lazyStyles } from "../theme/lazyStyles";
 import { Component, type ErrorInfo, type ReactNode } from "react";
 import { StyleSheet, View } from "react-native";
 import { theme } from "@fantappero/ui/theme";
@@ -43,11 +44,11 @@ export class AppErrorBoundary extends Component<AppErrorBoundaryProps, AppErrorB
   }
 }
 
-const styles = StyleSheet.create({
+const styles = lazyStyles(() => StyleSheet.create({
   container: {
     flex: 1,
     justifyContent: "center",
     padding: theme.spacing.xl,
     backgroundColor: colors.background,
   },
-});
+}));

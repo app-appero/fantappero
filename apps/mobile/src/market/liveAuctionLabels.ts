@@ -1,6 +1,6 @@
 import type { MarketLiveLotStatus, MarketLiveNominationMode, MarketSessionStatus } from "@fantappero/contracts";
 import { theme } from "@fantappero/ui/theme";
-import type { BadgeColorPair } from "./marketLabels";
+import { livePairMap } from "../theme/liveColors";
 
 const { colors } = theme;
 
@@ -13,12 +13,12 @@ export const LIVE_SESSION_STATUS_LABEL: Record<MarketSessionStatus, string> = {
   resolved: "Terminata",
 };
 
-export const LIVE_SESSION_STATUS_COLOR: Record<MarketSessionStatus, BadgeColorPair> = {
+export const LIVE_SESSION_STATUS_COLOR = livePairMap<MarketSessionStatus>(() => ({
   scheduled: { background: colors.backgroundElevated, text: colors.foreground },
   open: { background: colors.success, text: colors.accentContrast },
   closed: { background: colors.warning, text: colors.background },
   resolved: { background: colors.accent, text: colors.accentContrast },
-};
+}));
 
 export const LIVE_LOT_STATUS_LABEL: Record<MarketLiveLotStatus, string> = {
   open: "In corso",

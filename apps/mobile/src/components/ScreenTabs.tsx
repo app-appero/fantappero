@@ -1,3 +1,4 @@
+import { lazyStyles } from "../theme/lazyStyles";
 import { theme } from "@fantappero/ui/theme";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
@@ -48,7 +49,7 @@ export function ScreenTabs({
   );
 }
 
-const styles = StyleSheet.create({
+const styles = lazyStyles(() => StyleSheet.create({
   row: {
     flexDirection: "row",
     flexWrap: "wrap",
@@ -75,4 +76,4 @@ const styles = StyleSheet.create({
     color: colors.accentContrast,
     fontWeight: typography.fontWeight.semibold,
   },
-});
+}));
