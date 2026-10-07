@@ -1,7 +1,8 @@
 import { lazyStyles } from "../theme/lazyStyles";
+import Feather from "@expo/vector-icons/Feather";
 import { theme } from "@fantappero/ui/theme";
-import type { ReactNode } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { useState } from "react";
+import { Modal, Pressable, StyleSheet, Text, View } from "react-native";
 import { BrandLogo } from "../components/BrandLogo";
 import { LeagueSelector } from "../components/LeagueSelector";
 import { NavIcon } from "../navigation/NavIcons";
@@ -15,13 +16,13 @@ export type AppHeaderProps = {
   leagues?: readonly { value: string; label: string }[];
   activeLeagueId?: string | null;
   onLeagueChange?: (leagueId: string) => void;
-  /** Rendered next to the league selector's label, e.g. lo stato lega + un lock countdown. */
-  leagueSelectorAccessory?: ReactNode;
-  /** Crea lega / Unisciti con codice — sempre visibili in header (EP13-P01). */
+  /** Crea lega / Unisciti con codice — il + dell'header apre il modale (EP13-P01). */
   onCreateLeaguePress?: () => void;
   onJoinLeaguePress?: () => void;
   onBrandPress?: () => void;
   onBackToAppPress?: () => void;
+  /** Apre il profilo al posto del nome utente (solo surface app). */
+  onProfilePress?: () => void;
   /** Apre il drawer laterale (solo surface app). */
   onMenuPress?: () => void;
   showMenuButton?: boolean;
@@ -36,10 +37,10 @@ export function AppHeader({
   leagues = [],
   activeLeagueId,
   onLeagueChange,
-  leagueSelectorAccessory,
   onCreateLeaguePress,
   onJoinLeaguePress,
   onBrandPress,
+  onProfilePress,
   onBackToAppPress,
   onMenuPress,
   showMenuButton = false,
@@ -47,10 +48,17 @@ export function AppHeader({
   showLogout = false,
 }: AppHeaderProps) {
   const isAdmin = surface === "admin";
+  const [leagueMenuOpen, setLeagueMenuOpen] = useState(false);
+  const canAddLeague = Boolean(onCreateLeaguePress || onJoinLeaguePress);
+
+  function openLeagueAction(action: (() => void) | undefined) {
+    setLeagueMenuOpen(false);
+    action?.();
+  }
 
   return (
     <View
-      style={[styles.header, isAdmin && styles.headerAdmin]}
+      style={[styles.header, isAdmin ? styles.headerAdmin : styles.headerApp]}
       accessibilityRole="header"
       testID={isAdmin ? "admin-header" : "app-header"}
     >
@@ -71,7 +79,7 @@ export function AppHeader({
           accessibilityRole="button"
           accessibilityLabel={isAdmin ? "FantApperò operazioni" : "FantApperò, home"}
           onPress={onBrandPress}
-          style={styles.brandButton}
+          style={[styles.brandButton, !isAdmin && styles.brandButtonApp]}
           testID="app-brand-button"
         >
           {isAdmin ? (
@@ -82,10 +90,48 @@ export function AppHeader({
               </Text>
             </View>
           ) : (
-            <BrandLogo variant="full" size="md" />
+            <BrandLogo variant="mark" size="md" />
           )}
         </Pressable>
 
+        {!isAdmin && onProfilePress ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={`Profilo di ${userDisplayName}`}
+            onPress={onProfilePress}
+            style={styles.profileButton}
+            testID="header-profile-button"
+          >
+            <NavIcon id="profile" color={colors.foreground} size={20} />
+          </Pressable>
+        ) : null}
+
+        {!isAdmin && (showLeagueSelector || canAddLeague) ? (
+          <View style={styles.leagueInline}>
+            {showLeagueSelector && activeLeagueId && onLeagueChange && leagues.length > 0 ? (
+              <LeagueSelector
+                label="Lega"
+                showLabel={false}
+                leagues={leagues}
+                value={activeLeagueId}
+                onChange={onLeagueChange}
+              />
+            ) : null}
+            {canAddLeague ? (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Crea o unisciti a una lega"
+                onPress={() => setLeagueMenuOpen(true)}
+                style={styles.addLeagueButton}
+                testID="header-add-league"
+              >
+                <Feather name="plus" size={22} color={colors.accent} />
+              </Pressable>
+            ) : null}
+          </View>
+        ) : null}
+
+        {isAdmin ? (
         <View style={styles.actions}>
           {isAdmin && onBackToAppPress ? (
             <Pressable
@@ -119,46 +165,55 @@ export function AppHeader({
             </Pressable>
           ) : null}
         </View>
+        ) : null}
       </View>
-      {!isAdmin && (showLeagueSelector || onCreateLeaguePress || onJoinLeaguePress) ? (
-        <View style={styles.leagueRow}>
-          {showLeagueSelector && activeLeagueId && onLeagueChange && leagues.length > 0 ? (
-            <LeagueSelector
-              label="Lega attiva"
-              leagues={leagues}
-              value={activeLeagueId}
-              onChange={onLeagueChange}
-              accessory={leagueSelectorAccessory}
-            />
-          ) : null}
-          {onCreateLeaguePress || onJoinLeaguePress ? (
-            <View style={styles.leagueActions}>
-              {onCreateLeaguePress ? (
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel="Crea lega"
-                  onPress={onCreateLeaguePress}
-                  style={styles.linkButton}
-                  testID="header-create-league-link"
-                >
-                  <Text style={styles.linkText}>Crea lega</Text>
-                </Pressable>
-              ) : null}
-              {onJoinLeaguePress ? (
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel="Unisciti con codice"
-                  onPress={onJoinLeaguePress}
-                  style={styles.linkButton}
-                  testID="header-join-league-link"
-                >
-                  <Text style={styles.linkText}>Unisciti con codice</Text>
-                </Pressable>
-              ) : null}
-            </View>
-          ) : null}
-        </View>
-      ) : null}
+      <Modal
+        visible={!isAdmin && leagueMenuOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setLeagueMenuOpen(false)}
+      >
+        <Pressable style={styles.modalBackdrop} onPress={() => setLeagueMenuOpen(false)}>
+          <Pressable
+            style={styles.modalCard}
+            onPress={() => undefined}
+            testID="header-league-menu"
+          >
+            <Text style={styles.modalTitle}>Lega</Text>
+            <Text style={styles.modalHint}>Crea una lega nuova oppure entra con un codice invito.</Text>
+            {onCreateLeaguePress ? (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Crea lega"
+                onPress={() => openLeagueAction(onCreateLeaguePress)}
+                style={styles.modalPrimary}
+                testID="header-create-league-link"
+              >
+                <Text style={styles.modalPrimaryLabel}>Crea lega</Text>
+              </Pressable>
+            ) : null}
+            {onJoinLeaguePress ? (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Unisciti con codice"
+                onPress={() => openLeagueAction(onJoinLeaguePress)}
+                style={styles.modalSecondary}
+                testID="header-join-league-link"
+              >
+                <Text style={styles.modalSecondaryLabel}>Unisciti con codice</Text>
+              </Pressable>
+            ) : null}
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Annulla"
+              onPress={() => setLeagueMenuOpen(false)}
+              style={styles.modalSecondary}
+            >
+              <Text style={styles.modalSecondaryLabel}>Annulla</Text>
+            </Pressable>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </View>
   );
 }
@@ -172,9 +227,91 @@ const styles = lazyStyles(() => StyleSheet.create({
     backgroundColor: colors.backgroundElevated,
     gap: spacing.sm,
   },
+  headerApp: {
+    paddingVertical: spacing.xs,
+  },
   headerAdmin: {
     borderBottomColor: colors.warning,
     borderBottomWidth: 2,
+  },
+  profileButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.backgroundSubtle,
+    borderWidth: 1,
+    borderColor: colors.border,
+    flexShrink: 0,
+  },
+  leagueInline: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "flex-end",
+    gap: spacing.xs,
+    minWidth: 0,
+  },
+  addLeagueButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0,
+  },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.55)",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: spacing.lg,
+  },
+  modalCard: {
+    width: "100%",
+    maxWidth: 360,
+    borderRadius: radius.lg,
+    backgroundColor: colors.backgroundElevated,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: spacing.lg,
+    gap: spacing.sm,
+  },
+  modalTitle: {
+    color: colors.foreground,
+    fontSize: typography.fontSize.lg,
+    fontWeight: typography.fontWeight.semibold,
+  },
+  modalHint: {
+    color: colors.foregroundMuted,
+    fontSize: typography.fontSize.sm,
+    marginBottom: spacing.xs,
+  },
+  modalPrimary: {
+    minHeight: 44,
+    borderRadius: radius.md,
+    backgroundColor: colors.accent,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: spacing.md,
+  },
+  modalPrimaryLabel: {
+    color: colors.accentContrast,
+    fontWeight: typography.fontWeight.semibold,
+  },
+  modalSecondary: {
+    minHeight: 44,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: spacing.md,
+  },
+  modalSecondaryLabel: {
+    color: colors.foreground,
+    fontWeight: typography.fontWeight.semibold,
   },
   topRow: {
     flexDirection: "row",
@@ -193,6 +330,9 @@ const styles = lazyStyles(() => StyleSheet.create({
     flexShrink: 1,
     minWidth: 0,
     justifyContent: "center",
+  },
+  brandButtonApp: {
+    flexGrow: 0,
   },
   adminBrand: {
     flexDirection: "row",

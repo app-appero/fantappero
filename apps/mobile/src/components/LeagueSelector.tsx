@@ -17,6 +17,8 @@ export type LeagueSelectorProps = {
   onChange: (value: string) => void;
   placeholder?: string;
   testID?: string;
+  /** Nasconde l'etichetta sopra i chip: in header resta solo il nome della lega. */
+  showLabel?: boolean;
   /** Rendered once next to the label, e.g. a lock countdown for the active league. */
   accessory?: ReactNode;
 };
@@ -29,6 +31,7 @@ export function LeagueSelector({
   onChange,
   placeholder = "Seleziona lega",
   testID = "league-selector",
+  showLabel = true,
   accessory,
 }: LeagueSelectorProps) {
   if (leagues.length === 0) {
@@ -37,12 +40,16 @@ export function LeagueSelector({
 
   return (
     <View style={styles.wrapper} testID={testID}>
-      <View style={styles.labelRow}>
-        <Text style={styles.label} accessibilityRole="text">
-          {label}
-        </Text>
-        {accessory}
-      </View>
+      {showLabel || accessory ? (
+        <View style={styles.labelRow}>
+          {showLabel ? (
+            <Text style={styles.label} accessibilityRole="text">
+              {label}
+            </Text>
+          ) : null}
+          {accessory}
+        </View>
+      ) : null}
       <View style={styles.options} accessibilityRole="radiogroup" accessibilityLabel={label}>
         {leagues.map((league) => {
           const selected = league.value === value;
@@ -56,7 +63,10 @@ export function LeagueSelector({
               style={[styles.chip, selected && styles.chipSelected]}
               testID={`${testID}-${league.value}`}
             >
-              <Text style={[styles.chipLabel, selected && styles.chipLabelSelected]}>
+              <Text
+                style={[styles.chipLabel, selected && styles.chipLabelSelected]}
+                numberOfLines={1}
+              >
                 {league.label}
               </Text>
             </Pressable>
@@ -87,6 +97,7 @@ const styles = lazyStyles(() => StyleSheet.create({
     gap: spacing.xs,
   },
   chip: {
+    maxWidth: 168,
     paddingHorizontal: spacing.sm,
     paddingVertical: spacing.xs,
     borderRadius: radius.md,

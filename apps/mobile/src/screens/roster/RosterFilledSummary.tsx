@@ -17,11 +17,13 @@ function PurchaseCreditsCell({
   slot,
   canEdit,
   busy,
+  compact = false,
   onUpdatePurchaseCredits,
 }: {
   slot: RosterSlot;
   canEdit: boolean;
   busy: boolean;
+  compact?: boolean;
   onUpdatePurchaseCredits?: (
     slotIndex: number,
     athleteId: string,
@@ -44,9 +46,9 @@ function PurchaseCreditsCell({
   const athleteId = slot.athleteId;
 
   return (
-    <View style={styles.priceRow}>
+    <View style={compact ? styles.priceRowCompact : styles.priceRow}>
       <TextInput
-        style={styles.priceInput}
+        style={compact ? styles.priceInputCompact : styles.priceInput}
         value={draft}
         onChangeText={setDraft}
         keyboardType="numeric"
@@ -117,30 +119,47 @@ function RosterRoleSection({
         <Text style={styles.meta}>Nessun giocatore in questo ruolo.</Text>
       ) : (
         <>
-          {pagedSlots.map((slot) => (
-            <View key={slot.id} style={styles.card}>
-              <Text style={styles.cardTitle}>{slot.athleteName ?? "Calciatore"}</Text>
-              <Text style={styles.meta}>Club: {slot.clubName ?? "—"}</Text>
-              <Text style={styles.fieldLabel}>Crediti acquisto</Text>
-              <PurchaseCreditsCell
-                slot={slot}
-                canEdit={canEdit}
-                busy={adminBusy}
-                onUpdatePurchaseCredits={onUpdatePurchaseCredits}
-              />
-              <Text style={styles.meta}>Slot {slot.slotIndex + 1}</Text>
-              {canEdit && slot.athleteId ? (
-                <Pressable
-                  style={[styles.compactButton, adminBusy && styles.disabled]}
-                  disabled={adminBusy}
-                  testID={`roster-admin-release-${slot.athleteId}`}
-                  onPress={() => void onReleaseAthlete(slot.athleteId!)}
-                >
-                  <Text style={styles.buttonLabel}>Rimuovi</Text>
-                </Pressable>
-              ) : null}
+          <View style={styles.playerTable}>
+            <View style={styles.playerHeaderRow}>
+              <Text style={[styles.playerHeaderCell, styles.playerNameCell]}>Calciatore</Text>
+              <Text style={[styles.playerHeaderCell, styles.playerClubCell]}>Club</Text>
+              <Text style={[styles.playerHeaderCell, styles.playerCreditsCell]}>Crediti</Text>
+              <Text style={[styles.playerHeaderCell, styles.playerSlotCell]}>Slot</Text>
+              {canEdit ? <Text style={[styles.playerHeaderCell, styles.playerActionCell]}> </Text> : null}
             </View>
-          ))}
+            {pagedSlots.map((slot) => (
+              <View key={slot.id} style={styles.playerRow}>
+                <Text style={[styles.playerName, styles.playerNameCell]} numberOfLines={1}>
+                  {slot.athleteName ?? "Calciatore"}
+                </Text>
+                <Text style={[styles.playerClub, styles.playerClubCell]} numberOfLines={1}>
+                  {slot.clubName ?? "—"}
+                </Text>
+                <View style={styles.playerCreditsCell}>
+                  <PurchaseCreditsCell
+                    slot={slot}
+                    canEdit={canEdit}
+                    busy={adminBusy}
+                    compact
+                    onUpdatePurchaseCredits={onUpdatePurchaseCredits}
+                  />
+                </View>
+                <Text style={[styles.playerClub, styles.playerSlotCell]}>{slot.slotIndex + 1}</Text>
+                {canEdit && slot.athleteId ? (
+                  <Pressable
+                    style={[styles.rowRemoveButton, adminBusy && styles.disabled]}
+                    disabled={adminBusy}
+                    testID={`roster-admin-release-${slot.athleteId}`}
+                    onPress={() => void onReleaseAthlete(slot.athleteId!)}
+                  >
+                    <Text style={styles.rowRemoveLabel}>Rimuovi</Text>
+                  </Pressable>
+                ) : canEdit ? (
+                  <View style={styles.playerActionCell} />
+                ) : null}
+              </View>
+            ))}
+          </View>
           {pageCount > 1 ? (
             <View style={styles.pagination} testID={`${testId}-pagination`}>
               <Pressable

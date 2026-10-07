@@ -3,18 +3,15 @@ import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { useNavigation, useNavigationState } from "@react-navigation/core";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { theme } from "@fantappero/ui/theme";
 import { AppDrawer } from "../components/AppDrawer";
 import { ImpersonationBanner } from "../components/ImpersonationBanner";
 import { openAdminScreen } from "./adminEntry";
-import { LockCountdown } from "../components/LockCountdown";
 import { fetchPendingInviteCount } from "../api/managerInvites";
 import { subscribePendingInvitesChanged } from "./pendingInviteEvents";
 import { AppHeader } from "../layout/AppHeader";
-import { leagueStateLabel } from "../leagues/leagueLabels";
-import { useLockCountdown } from "../matchday/useLockCountdown";
 import { AuctionHubScreen } from "../screens/AuctionHubScreen";
 import { FormationScreen } from "../screens/FormationScreen";
 import { MarketScreen } from "../screens/MarketScreen";
@@ -34,7 +31,7 @@ import type { AppTabParamList, RootStackParamList } from "./types";
 import { buildSceneBackgroundStyle } from "../theme/navigationTheme";
 
 const Tab = createBottomTabNavigator<AppTabParamList>();
-const { colors, spacing, typography, radius } = theme;
+const { colors } = theme;
 
 /** Drawer id → tab di destinazione quando l'id non è una sua stack route. */
 const TAB_ROUTE_MAP: Partial<Record<string, keyof AppTabParamList>> = {
@@ -149,15 +146,6 @@ function AppTabShell({
     });
   }, [refreshPendingInvites]);
 
-  const { countdown, refetch: refetchCountdown } = useLockCountdown(
-    accessToken,
-    leagues.length > 0 ? activeLeagueId : null,
-  );
-
-  const activeLeagueSummary = leagues.find(
-    (league) => league.id === (activeLeagueId ?? leagues[0]?.id),
-  );
-
   const activeRouteName = useNavigationState((state) => {
     const route = state.routes[state.index];
     if (!route) {
@@ -229,29 +217,10 @@ function AppTabShell({
           void refreshPendingInvites();
           setDrawerOpen(true);
         }}
-        showLogout
-        onLogoutPress={() => void handleLogout()}
+        onProfilePress={() => navigation.navigate("MainTabs", { screen: "Profile" })}
         showLeagueSelector={leagues.length > 0}
         leagues={leagues.map((league) => ({ value: league.id, label: league.name }))}
         activeLeagueId={activeLeagueId}
-        leagueSelectorAccessory={
-          <View style={styles.selectorAccessory}>
-            {activeLeagueSummary ? (
-              <View style={styles.statusBadge}>
-                <Text style={styles.statusBadgeLabel}>
-                  {leagueStateLabel(activeLeagueSummary.state)}
-                </Text>
-              </View>
-            ) : null}
-            {countdown ? (
-              <LockCountdown
-                state={countdown.state}
-                nextLockAt={countdown.nextLockAt}
-                onExpire={refetchCountdown}
-              />
-            ) : null}
-          </View>
-        }
         onLeagueChange={(leagueId) => {
           setActiveLeagueId(leagueId);
           navigation.navigate("LeagueHome", { leagueId });
@@ -324,23 +293,5 @@ const styles = lazyStyles(() => StyleSheet.create({
   },
   content: {
     flex: 1,
-  },
-  selectorAccessory: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.sm,
-  },
-  statusBadge: {
-    backgroundColor: colors.backgroundSubtle,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.sm,
-    paddingHorizontal: spacing.xs,
-    paddingVertical: 2,
-  },
-  statusBadgeLabel: {
-    color: colors.foreground,
-    fontSize: typography.fontSize.xs,
-    fontWeight: typography.fontWeight.semibold,
   },
 }));
