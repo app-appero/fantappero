@@ -246,7 +246,7 @@ export const rosterStyles = lazyStyles(() => StyleSheet.create({
     textAlign: "center",
   },
   playerActionCell: {
-    width: 72,
+    width: 28,
     flexShrink: 0,
   },
   listoneRoleCell: {
@@ -282,20 +282,19 @@ export const rosterStyles = lazyStyles(() => StyleSheet.create({
     fontSize: typography.fontSize.xs,
     color: colors.foregroundMuted,
   },
-  rowRemoveButton: {
-    width: 72,
-    minHeight: 32,
-    borderRadius: radius.sm,
-    backgroundColor: colors.accent,
+  rowActionBadge: {
+    width: 28,
+    height: 28,
+    borderRadius: radius.pill,
     alignItems: "center",
     justifyContent: "center",
-    paddingHorizontal: spacing.xs,
     flexShrink: 0,
   },
-  rowRemoveLabel: {
-    color: colors.accentContrast,
-    fontSize: typography.fontSize.xs,
-    fontWeight: typography.fontWeight.semibold,
+  rowActionAssign: {
+    backgroundColor: colors.accent,
+  },
+  rowActionRelease: {
+    backgroundColor: colors.danger,
   },
   priceInput: {
     width: 88,

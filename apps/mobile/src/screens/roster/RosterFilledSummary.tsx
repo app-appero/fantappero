@@ -9,6 +9,7 @@ import {
   ROSTER_PAGE_SIZE,
   roleBadgeColors,
 } from "./rosterHelpers";
+import { RosterActionBadge } from "./RosterActionBadge";
 import { rosterStyles as styles } from "./rosterStyles";
 
 type RosterSlot = FantasyTeam["slots"][number];
@@ -146,14 +147,13 @@ function RosterRoleSection({
                 </View>
                 <Text style={[styles.playerClub, styles.playerSlotCell]}>{slot.slotIndex + 1}</Text>
                 {canEdit && slot.athleteId ? (
-                  <Pressable
-                    style={[styles.rowRemoveButton, adminBusy && styles.disabled]}
+                  <RosterActionBadge
+                    action="release"
                     disabled={adminBusy}
                     testID={`roster-admin-release-${slot.athleteId}`}
+                    accessibilityLabel={`Rimuovi ${slot.athleteName ?? "calciatore"}`}
                     onPress={() => void onReleaseAthlete(slot.athleteId!)}
-                  >
-                    <Text style={styles.rowRemoveLabel}>Rimuovi</Text>
-                  </Pressable>
+                  />
                 ) : canEdit ? (
                   <View style={styles.playerActionCell} />
                 ) : null}

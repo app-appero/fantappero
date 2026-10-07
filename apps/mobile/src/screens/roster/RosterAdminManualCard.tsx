@@ -17,6 +17,7 @@ import {
   type AthleteOwnership,
   type RoleTab,
 } from "./rosterHelpers";
+import { RosterActionBadge } from "./RosterActionBadge";
 import { rosterStyles as styles } from "./rosterStyles";
 
 function ListoneAssignRow({
@@ -80,23 +81,21 @@ function ListoneAssignRow({
         )}
       </View>
       {owner && canRelease ? (
-        <Pressable
-          style={[styles.rowRemoveButton, adminBusy && styles.disabled]}
+        <RosterActionBadge
+          action="release"
           disabled={adminBusy}
           testID={`roster-admin-release-${entry.athleteId}`}
+          accessibilityLabel={`Rimuovi ${entry.canonicalName}`}
           onPress={() => void onReleaseAthlete(entry.athleteId)}
-        >
-          <Text style={styles.rowRemoveLabel}>Rimuovi</Text>
-        </Pressable>
+        />
       ) : !owner ? (
-        <Pressable
-          style={[styles.rowRemoveButton, (adminBusy || !canAssign || !isValid) && styles.disabled]}
+        <RosterActionBadge
+          action="assign"
           disabled={adminBusy || !canAssign || !isValid}
           testID={`roster-admin-assign-${entry.athleteId}`}
+          accessibilityLabel={`Assegna ${entry.canonicalName}`}
           onPress={() => void onAssignAthlete(entry.athleteId, parsed)}
-        >
-          <Text style={styles.rowRemoveLabel}>Assegna</Text>
-        </Pressable>
+        />
       ) : (
         <View style={styles.playerActionCell} />
       )}
