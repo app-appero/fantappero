@@ -249,6 +249,30 @@ export const rosterStyles = lazyStyles(() => StyleSheet.create({
     width: 72,
     flexShrink: 0,
   },
+  listoneRoleCell: {
+    width: 28,
+    flexShrink: 0,
+  },
+  listoneNameCell: {
+    flex: 1.2,
+    minWidth: 0,
+  },
+  listoneClubCell: {
+    flex: 0.8,
+    minWidth: 0,
+  },
+  listoneStatusCell: {
+    flex: 1.1,
+    minWidth: 0,
+  },
+  listoneStatusFree: {
+    fontSize: typography.fontSize.xs,
+    color: colors.success,
+  },
+  listoneStatusOwned: {
+    fontSize: typography.fontSize.xs,
+    color: colors.warning,
+  },
   playerName: {
     fontSize: typography.fontSize.sm,
     fontWeight: typography.fontWeight.semibold,
