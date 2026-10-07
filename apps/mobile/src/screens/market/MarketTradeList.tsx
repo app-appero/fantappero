@@ -1,6 +1,7 @@
 import type { FantasyRosterSlot, FantasyTeamSummary, RosterOccupancyEntry } from "@fantappero/contracts";
 import { useState } from "react";
-import { Pressable, Text, TextInput, View } from "react-native";
+import { Pressable, Text, View } from "react-native";
+import { AppTextInput as TextInput } from "../../components/AppTextInput";
 import { StatusBadge } from "../../components/StatusBadge";
 import { UiStatePanel } from "../../components/UiStatePanel";
 import { TRADE_STATUS_COLOR, TRADE_STATUS_LABEL } from "../../market/marketLabels";

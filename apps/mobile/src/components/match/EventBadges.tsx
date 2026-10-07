@@ -1,3 +1,4 @@
+import { lazyStyles } from "../../theme/lazyStyles";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import type { MatchBadge, MatchBadgeKind } from "@fantappero/contracts";
 import { theme } from "@fantappero/ui/theme";
@@ -46,7 +47,7 @@ export function EventBadges({ badges, size = 14, testID }: EventBadgesProps) {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = lazyStyles(() => StyleSheet.create({
   row: {
     flexDirection: "row",
     alignItems: "center",
@@ -62,4 +63,4 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     marginLeft: 1,
   },
-});
+}));

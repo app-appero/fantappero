@@ -1,3 +1,4 @@
+import { lazyStyles } from "../theme/lazyStyles";
 import { useFocusEffect, useNavigation, useNavigationState } from "@react-navigation/core";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
@@ -17,7 +18,7 @@ import { useAuthSession } from "../session/DemoSessionContext";
 import { consumePendingAdminScreen, openAdminScreen, registerLeaveAdmin } from "./adminEntry";
 import { filterMobileNavItems, MOBILE_ADMIN_NAV_ITEMS } from "./navConfig";
 import type { AdminStackParamList, RootStackParamList } from "./types";
-import { sceneBackgroundStyle } from "../theme/navigationTheme";
+import { buildSceneBackgroundStyle } from "../theme/navigationTheme";
 
 const Stack = createNativeStackNavigator<AdminStackParamList>();
 const { colors } = theme;
@@ -111,7 +112,7 @@ export function AdminNavigator() {
         onLogoutPress={() => void logout()}
       />
       <View style={styles.content}>
-        <Stack.Navigator screenOptions={{ headerShown: false, contentStyle: sceneBackgroundStyle }}>
+        <Stack.Navigator screenOptions={{ headerShown: false, contentStyle: buildSceneBackgroundStyle() }}>
           <Stack.Screen name="AdminHome">
             {({ navigation }) => {
               rememberStack(navigation);
@@ -170,7 +171,7 @@ export function AdminNavigator() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = lazyStyles(() => StyleSheet.create({
   shell: {
     flex: 1,
     backgroundColor: colors.background,
@@ -178,4 +179,4 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
   },
-});
+}));

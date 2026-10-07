@@ -1,6 +1,7 @@
 import type { PaginatedAdminLeagues } from "@fantappero/contracts";
 import { useCallback, useEffect, useState } from "react";
-import { Pressable, Text, TextInput, View } from "react-native";
+import { Pressable, Text, View } from "react-native";
+import { AppTextInput as TextInput } from "../../components/AppTextInput";
 import { fetchAdminLeagues } from "../../api/admin";
 import { ApiError } from "../../api/client";
 import { adminUiStyles as styles } from "../../admin/adminUiStyles";

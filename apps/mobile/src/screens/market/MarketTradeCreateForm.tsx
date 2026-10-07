@@ -1,5 +1,6 @@
 import type { FantasyRosterSlot, TeamRosterPlayer } from "@fantappero/contracts";
-import { Pressable, Text, TextInput, View } from "react-native";
+import { Pressable, Text, View } from "react-native";
+import { AppTextInput as TextInput } from "../../components/AppTextInput";
 import { OptionPicker, type OptionPickerOption } from "../../components/OptionPicker";
 import { UiStatePanel } from "../../components/UiStatePanel";
 import { marketUiStyles as styles } from "../../market/marketUiStyles";

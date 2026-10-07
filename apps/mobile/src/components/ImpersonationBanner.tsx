@@ -1,3 +1,4 @@
+import { lazyStyles } from "../theme/lazyStyles";
 import { theme } from "@fantappero/ui/theme";
 import { useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
@@ -35,7 +36,7 @@ export function ImpersonationBanner({
   );
 }
 
-const styles = StyleSheet.create({
+const styles = lazyStyles(() => StyleSheet.create({
   banner: {
     gap: spacing.sm,
     paddingHorizontal: spacing.md,
@@ -66,4 +67,4 @@ const styles = StyleSheet.create({
   disabled: {
     opacity: 0.6,
   },
-});
+}));

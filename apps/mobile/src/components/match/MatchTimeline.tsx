@@ -1,3 +1,4 @@
+import { lazyStyles } from "../../theme/lazyStyles";
 import { theme } from "@fantappero/ui/theme";
 import { type ReactNode } from "react";
 import { StyleSheet, Text, View } from "react-native";
@@ -88,7 +89,7 @@ export function MatchTimeline({ entries, homeLabel, awayLabel, emptyMessage, tes
   );
 }
 
-const styles = StyleSheet.create({
+const styles = lazyStyles(() => StyleSheet.create({
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -170,4 +171,4 @@ const styles = StyleSheet.create({
   empty: {
     color: colors.foregroundMuted,
   },
-});
+}));

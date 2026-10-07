@@ -5,7 +5,8 @@ import type {
   RosterTurnSnapshotSummary,
 } from "@fantappero/contracts";
 import { theme } from "@fantappero/ui/theme";
-import { Pressable, Text, TextInput, View } from "react-native";
+import { Pressable, Text, View } from "react-native";
+import { AppTextInput as TextInput } from "../../components/AppTextInput";
 import { UiStatePanel } from "../../components/UiStatePanel";
 import { formatLedgerEntry, LEDGER_PAGE_SIZE } from "./rosterHelpers";
 import { rosterStyles as styles } from "./rosterStyles";

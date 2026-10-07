@@ -1,3 +1,4 @@
+import { lazyStyles } from "../theme/lazyStyles";
 import type {
   CreatedLeagueInvite,
   LeagueCalendar,
@@ -12,7 +13,8 @@ import { theme } from "@fantappero/ui/theme";
 import { useNavigation, useRoute, type RouteProp } from "@react-navigation/core";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useCallback, useEffect, useState } from "react";
-import { Pressable, StyleSheet, Switch, Text, TextInput, View } from "react-native";
+import { Pressable, StyleSheet, Switch, Text, View } from "react-native";
+import { AppTextInput as TextInput } from "../components/AppTextInput";
 import { ApiError } from "../api/client";
 import {
   confirmLeagueCalendar,
@@ -809,7 +811,7 @@ export function LeagueAdminScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = lazyStyles(() => StyleSheet.create({
   content: {
     gap: spacing.sm,
   },
@@ -949,4 +951,4 @@ const styles = StyleSheet.create({
   disabled: {
     opacity: 0.5,
   },
-});
+}));

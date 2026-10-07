@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
-import { Pressable, Text, TextInput, View } from "react-native";
+import { Pressable, Text, View } from "react-native";
+import { AppTextInput as TextInput } from "../../components/AppTextInput";
 import { OptionPicker, type OptionPickerOption } from "../../components/OptionPicker";
 import { StatusBadge } from "../../components/StatusBadge";
 import { UiStatePanel } from "../../components/UiStatePanel";

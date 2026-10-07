@@ -1,3 +1,4 @@
+import { lazyStyles } from "../theme/lazyStyles";
 import type {
   LeagueCalendar,
   LeagueDetail,
@@ -265,7 +266,7 @@ export function LeagueHomeScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = lazyStyles(() => StyleSheet.create({
   content: {
     gap: spacing.sm,
   },
@@ -324,4 +325,4 @@ const styles = StyleSheet.create({
   disabled: {
     opacity: 0.5,
   },
-});
+}));

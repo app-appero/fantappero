@@ -28,6 +28,8 @@ import { deleteAccount, exportAccountData } from "../api/privacy";
 import { getApiErrorMessage, useAuth } from "../auth/AuthContext";
 import { loadStoredSession } from "../auth/sessionStorage";
 import { resolveAvatarUrl } from "../utils/avatar";
+import { writeThemePreference } from "../theme/colorScheme";
+import { useThemePreference } from "../theme/useThemePreference";
 
 const DEMO_PROFILE: UserProfile = {
   email: "demo@fantappero.local",
@@ -45,6 +47,12 @@ const DEMO_PROFILE: UserProfile = {
   userType: "human",
   availableForInvites: true,
 };
+
+const THEME_OPTIONS = [
+  { value: "light", label: "Chiaro" },
+  { value: "dark", label: "Scuro" },
+  { value: "system", label: "Sistema" },
+] as const;
 
 function profileInviteAvailability(profile: UserProfile): boolean {
   return profile.availableForInvites;
@@ -76,6 +84,7 @@ export function ProfilePage() {
   const [privacyError, setPrivacyError] = useState<string | null>(null);
   const [privacySuccess, setPrivacySuccess] = useState<string | null>(null);
 
+  const themePreference = useThemePreference();
   const [displayName, setDisplayName] = useState(demoProfile?.displayName ?? "");
   const [language, setLanguage] = useState(demoProfile?.language ?? "it");
   const [timezone, setTimezone] = useState(demoProfile?.timezone ?? "Europe/Rome");
@@ -504,6 +513,23 @@ export function ProfilePage() {
                 onChange={(event) => setLanguage(event.target.value)}
                 disabled={saving}
               />
+              <fieldset className="fa-profile-notifications" data-testid="profile-theme">
+                <legend className="fa-field__label">Tema</legend>
+                <p className="fa-field__hint">Chiaro, scuro oppure lo stesso del sistema.</p>
+                {THEME_OPTIONS.map((option) => (
+                  <label key={option.value} className="fa-profile-checkbox">
+                    <input
+                      type="radio"
+                      name="color-scheme"
+                      value={option.value}
+                      checked={themePreference === option.value}
+                      onChange={() => writeThemePreference(option.value)}
+                      data-testid={`profile-theme-${option.value}`}
+                    />
+                    {option.label}
+                  </label>
+                ))}
+              </fieldset>
               <Select
                 label="Fuso orario"
                 name="timezone"

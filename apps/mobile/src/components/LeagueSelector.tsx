@@ -1,3 +1,4 @@
+import { lazyStyles } from "../theme/lazyStyles";
 import type { ReactNode } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { theme } from "@fantappero/ui/theme";
@@ -66,7 +67,7 @@ export function LeagueSelector({
   );
 }
 
-const styles = StyleSheet.create({
+const styles = lazyStyles(() => StyleSheet.create({
   wrapper: {
     flexShrink: 1,
   },
@@ -105,4 +106,4 @@ const styles = StyleSheet.create({
     color: colors.accent,
     fontWeight: typography.fontWeight.semibold,
   },
-});
+}));

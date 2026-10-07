@@ -1,3 +1,4 @@
+import { lazyStyles } from "../theme/lazyStyles";
 import { theme } from "@fantappero/ui/theme";
 import { StyleSheet, Text, View } from "react-native";
 
@@ -30,7 +31,7 @@ export function ProgressBar({
   );
 }
 
-const styles = StyleSheet.create({
+const styles = lazyStyles(() => StyleSheet.create({
   track: {
     position: "relative",
     width: "100%",
@@ -54,4 +55,4 @@ const styles = StyleSheet.create({
     color: colors.foreground,
     paddingHorizontal: spacing.sm,
   },
-});
+}));

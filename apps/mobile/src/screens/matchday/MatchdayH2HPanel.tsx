@@ -1,3 +1,4 @@
+import { lazyStyles } from "../../theme/lazyStyles";
 import type { H2HCalendar, H2HCalendarMatchup, H2HCalendarRound } from "@fantappero/contracts";
 import {
   H2H_GOALS_LABEL,
@@ -322,7 +323,7 @@ export function MatchdayH2HPanel({
   );
 }
 
-const styles = StyleSheet.create({
+const styles = lazyStyles(() => StyleSheet.create({
   stack: {
     gap: spacing.md,
   },
@@ -446,4 +447,4 @@ const styles = StyleSheet.create({
   secondaryLabel: {
     color: colors.foreground,
   },
-});
+}));

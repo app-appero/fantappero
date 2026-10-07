@@ -1,3 +1,4 @@
+import { lazyStyles } from "../theme/lazyStyles";
 import type { H2HMatchupDetail, H2HPlayerScore, H2HSideLineup } from "@fantappero/contracts";
 import {
   H2H_GOALS_LABEL,
@@ -306,7 +307,7 @@ export function MatchupDetailScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = lazyStyles(() => StyleSheet.create({
   scoreBox: {
     gap: spacing.xs,
     borderWidth: 1,
@@ -402,4 +403,4 @@ const styles = StyleSheet.create({
   secondaryLabel: {
     color: colors.foreground,
   },
-});
+}));

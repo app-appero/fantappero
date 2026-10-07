@@ -1,3 +1,4 @@
+import { lazyStyles } from "../../theme/lazyStyles";
 import type { MatchBadge, PitchPosition } from "@fantappero/contracts";
 import { theme } from "@fantappero/ui/theme";
 import { Image, StyleSheet, Text, View } from "react-native";
@@ -96,7 +97,7 @@ export function PitchView({ title, players, positions, testID }: PitchViewProps)
   );
 }
 
-const styles = StyleSheet.create({
+const styles = lazyStyles(() => StyleSheet.create({
   wrap: {
     flex: 1,
     minWidth: 240,
@@ -215,4 +216,4 @@ const styles = StyleSheet.create({
     borderRadius: radius.sm,
     paddingHorizontal: 3,
   },
-});
+}));

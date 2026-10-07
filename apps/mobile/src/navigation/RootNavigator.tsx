@@ -1,3 +1,4 @@
+import { lazyStyles } from "../theme/lazyStyles";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
 import { theme } from "@fantappero/ui/theme";
@@ -17,7 +18,7 @@ import { MatchupDetailScreen } from "../screens/MatchupDetailScreen";
 import { NotificationsScreen } from "../screens/NotificationsScreen";
 import { ReceivedInvitesScreen } from "../screens/ReceivedInvitesScreen";
 import { useAuthSession } from "../session/DemoSessionContext";
-import { sceneBackgroundStyle } from "../theme/navigationTheme";
+import { buildSceneBackgroundStyle } from "../theme/navigationTheme";
 import { AdminNavigator } from "./AdminNavigator";
 import { AppTabNavigator } from "./AppTabNavigator";
 import type { RootStackParamList } from "./types";
@@ -50,7 +51,7 @@ export function RootNavigator() {
         headerStyle: { backgroundColor: colors.backgroundElevated },
         headerTintColor: colors.foreground,
         headerTitleStyle: { color: colors.foreground },
-        contentStyle: sceneBackgroundStyle,
+        contentStyle: buildSceneBackgroundStyle(),
       }}
     >
       {!isAuthenticated ? (
@@ -149,7 +150,7 @@ export function RootNavigator() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = lazyStyles(() => StyleSheet.create({
   loadingRoot: {
     flex: 1,
     backgroundColor: colors.background,
@@ -168,4 +169,4 @@ const styles = StyleSheet.create({
     fontSize: typography.fontSize.sm,
     textAlign: "center",
   },
-});
+}));

@@ -10,7 +10,8 @@ import type {
 } from "@fantappero/contracts";
 import { computeMinimumNextBid } from "@fantappero/contracts";
 import { useCallback, useMemo, useState } from "react";
-import { Modal, Pressable, ScrollView, Text, TextInput, View } from "react-native";
+import { Modal, Pressable, ScrollView, Text, View } from "react-native";
+import { AppTextInput as TextInput } from "../components/AppTextInput";
 import {
   fetchFantasyTeams,
   fetchLeagueListone,

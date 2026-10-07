@@ -1,7 +1,8 @@
 import type { AdminLeagueTurnStatus } from "@fantappero/contracts";
 import { theme } from "@fantappero/ui/theme";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Pressable, Text, TextInput, View } from "react-native";
+import { Pressable, Text, View } from "react-native";
+import { AppTextInput as TextInput } from "../../components/AppTextInput";
 import {
   calculateCurrentRoundsAllLeagues,
   fetchAdminLeagueTurnStatus,

@@ -1,6 +1,8 @@
+import { lazyStyles } from "../theme/lazyStyles";
 import type { WireframeUiState } from "@fantappero/contracts";
 import { StyleSheet, Text, View } from "react-native";
 import { theme } from "@fantappero/ui/theme";
+import { liveStringMap } from "../theme/liveColors";
 
 const { colors, spacing, typography, radius } = theme;
 
@@ -11,13 +13,13 @@ export type UiStatePanelProps = {
   testID?: string;
 };
 
-const stateAccent: Record<WireframeUiState, string> = {
+const stateAccent = liveStringMap<WireframeUiState>(() => ({
   loading: colors.accent,
   empty: colors.foregroundMuted,
   error: colors.danger,
   success: colors.success,
   forbidden: colors.warning,
-};
+}));
 
 /** Presentational panel for standard UI states on React Native (EPUI-06). */
 export function UiStatePanel({ state, title, message, testID }: UiStatePanelProps) {
@@ -38,7 +40,7 @@ export function UiStatePanel({ state, title, message, testID }: UiStatePanelProp
   );
 }
 
-const styles = StyleSheet.create({
+const styles = lazyStyles(() => StyleSheet.create({
   panel: {
     padding: spacing.md,
     borderWidth: 1,
@@ -57,4 +59,4 @@ const styles = StyleSheet.create({
     fontSize: typography.fontSize.sm,
     lineHeight: typography.fontSize.sm * typography.lineHeight.normal,
   },
-});
+}));

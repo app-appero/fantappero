@@ -1,9 +1,11 @@
+import { lazyStyles } from "../theme/lazyStyles";
 import type { FantasyCoachDirectoryItem } from "@fantappero/contracts";
 import { theme } from "@fantappero/ui/theme";
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useCallback, useEffect, useState } from "react";
-import { Image, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { Image, Pressable, StyleSheet, Text, View } from "react-native";
+import { AppTextInput as TextInput } from "./AppTextInput";
 import { ApiError } from "../api/client";
 import { createNamedLeagueInvite, fetchManagerDirectory } from "../api/managerInvites";
 import type { RootStackParamList } from "../navigation/types";
@@ -339,7 +341,7 @@ export function CoachDirectoryPanel({
   );
 }
 
-const styles = StyleSheet.create({
+const styles = lazyStyles(() => StyleSheet.create({
   section: {
     gap: spacing.sm,
   },
@@ -418,4 +420,4 @@ const styles = StyleSheet.create({
     fontWeight: typography.fontWeight.semibold,
     color: colors.background,
   },
-});
+}));

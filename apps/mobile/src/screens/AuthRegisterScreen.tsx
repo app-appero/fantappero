@@ -1,7 +1,8 @@
 import { useNavigation } from "@react-navigation/core";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useState } from "react";
-import { Pressable, Text, TextInput, View } from "react-native";
+import { Pressable, Text, View } from "react-native";
+import { AppTextInput as TextInput } from "../components/AppTextInput";
 import { register as registerApi } from "../api/auth";
 import { BrandLogo } from "../components/BrandLogo";
 import { UiStatePanel } from "../components/UiStatePanel";

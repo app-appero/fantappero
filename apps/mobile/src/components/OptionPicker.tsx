@@ -1,6 +1,8 @@
+import { lazyStyles } from "../theme/lazyStyles";
 import { theme } from "@fantappero/ui/theme";
 import { useState } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { AppTextInput as TextInput } from "./AppTextInput";
 
 const { colors, spacing, typography, radius } = theme;
 
@@ -124,7 +126,7 @@ export function OptionPicker({
   );
 }
 
-const styles = StyleSheet.create({
+const styles = lazyStyles(() => StyleSheet.create({
   field: {
     gap: spacing.xs,
   },
@@ -205,4 +207,4 @@ const styles = StyleSheet.create({
   optionLabelDisabled: {
     color: colors.foregroundMuted,
   },
-});
+}));

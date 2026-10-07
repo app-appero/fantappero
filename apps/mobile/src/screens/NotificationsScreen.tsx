@@ -1,3 +1,4 @@
+import { lazyStyles } from "../theme/lazyStyles";
 import type { NotificationItem } from "@fantappero/contracts";
 import { theme } from "@fantappero/ui/theme";
 import { useNavigation, type NavigationProp } from "@react-navigation/core";
@@ -191,7 +192,7 @@ export function NotificationsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = lazyStyles(() => StyleSheet.create({
   stack: {
     gap: spacing.sm,
   },
@@ -246,4 +247,4 @@ const styles = StyleSheet.create({
     color: colors.foreground,
     fontSize: typography.fontSize.sm,
   },
-});
+}));

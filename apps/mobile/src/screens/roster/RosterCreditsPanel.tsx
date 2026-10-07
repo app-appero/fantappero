@@ -1,5 +1,6 @@
 import type { CreditAccount, FantasyTeamSummary } from "@fantappero/contracts";
-import { Pressable, Text, TextInput, View } from "react-native";
+import { Pressable, Text, View } from "react-native";
+import { AppTextInput as TextInput } from "../../components/AppTextInput";
 import { rosterStyles as styles } from "./rosterStyles";
 
 export function RosterCreditsPanel({

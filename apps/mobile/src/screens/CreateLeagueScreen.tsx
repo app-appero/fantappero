@@ -1,9 +1,11 @@
+import { lazyStyles } from "../theme/lazyStyles";
 import type { CompetitionSummary } from "@fantappero/contracts";
 import { theme } from "@fantappero/ui/theme";
 import { useNavigation } from "@react-navigation/core";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useCallback, useMemo, useState } from "react";
-import { Pressable, StyleSheet, Switch, Text, TextInput, View } from "react-native";
+import { Pressable, StyleSheet, Switch, Text, View } from "react-native";
+import { AppTextInput as TextInput } from "../components/AppTextInput";
 import { createLeague, fetchCompetitions } from "../api/leagues";
 import { UiStatePanel } from "../components/UiStatePanel";
 import { useScreenData } from "../hooks/useScreenData";
@@ -241,7 +243,7 @@ export function CreateLeagueScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = lazyStyles(() => StyleSheet.create({
   section: {
     gap: spacing.sm,
   },
@@ -347,4 +349,4 @@ const styles = StyleSheet.create({
   disabled: {
     opacity: 0.6,
   },
-});
+}));

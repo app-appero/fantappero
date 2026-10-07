@@ -1,3 +1,4 @@
+import { lazyStyles } from "../theme/lazyStyles";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import type {
   FixtureLineup,
@@ -9,6 +10,7 @@ import type {
 } from "@fantappero/contracts";
 import { layoutFromGrid, mapFixtureMatchStatus, realMatchBadgesByAthlete } from "@fantappero/contracts";
 import { theme } from "@fantappero/ui/theme";
+import { liveStringMap } from "../theme/liveColors";
 import { useRoute, type RouteProp } from "@react-navigation/core";
 import { useCallback, useState, type ReactNode } from "react";
 import { Image, StyleSheet, Text, View } from "react-native";
@@ -48,13 +50,13 @@ const STATUS_LABELS: Record<string, string> = {
   WO: "Walkover",
 };
 
-const FEED_COLORS: Record<ProviderFeedState, string> = {
+const FEED_COLORS = liveStringMap<ProviderFeedState>(() => ({
   fresh: colors.success,
   delayed: colors.warning,
   stale: colors.warning,
   degraded: colors.warning,
   unavailable: colors.foregroundMuted,
-};
+}));
 
 function statusLabel(statusShort: string, statusElapsed: number | null): string {
   const base = STATUS_LABELS[statusShort.toUpperCase()] ?? statusShort;
@@ -453,7 +455,7 @@ export function FixtureDetailScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = lazyStyles(() => StyleSheet.create({
   stack: {
     gap: spacing.md,
   },
@@ -510,4 +512,4 @@ const styles = StyleSheet.create({
     height: 24,
     resizeMode: "contain",
   },
-});
+}));

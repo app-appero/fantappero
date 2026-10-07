@@ -1,3 +1,4 @@
+import { lazyStyles } from "../theme/lazyStyles";
 import { theme } from "@fantappero/ui/theme";
 import { useEffect, useMemo, useRef } from "react";
 import {
@@ -252,7 +253,7 @@ export function AppDrawer({
   );
 }
 
-const styles = StyleSheet.create({
+const styles = lazyStyles(() => StyleSheet.create({
   root: {
     flex: 1,
     flexDirection: "row",
@@ -385,4 +386,4 @@ const styles = StyleSheet.create({
     fontWeight: typography.fontWeight.semibold,
     fontSize: typography.fontSize.md,
   },
-});
+}));

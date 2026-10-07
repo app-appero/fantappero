@@ -1,3 +1,4 @@
+import { lazyStyles } from "../theme/lazyStyles";
 import type {
   FantasyTurnDetail,
   FantasyTurnSummary,
@@ -11,6 +12,7 @@ import {
   resolveTurnDisplayStates,
 } from "@fantappero/contracts";
 import { theme } from "@fantappero/ui/theme";
+import { liveStringMap } from "../theme/liveColors";
 import { useNavigation, type NavigationProp } from "@react-navigation/core";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
@@ -46,12 +48,12 @@ const MATCH_STATUS_LABEL: Record<string, string> = {
   postponed: "Rinviata",
 };
 
-const MATCH_STATUS_COLOR: Record<string, string> = {
+const MATCH_STATUS_COLOR = liveStringMap<string>(() => ({
   scheduled: colors.foregroundMuted,
   live: colors.accent,
   finished: colors.success,
   postponed: colors.warning,
-};
+}));
 
 /** Etichetta di stato per la riga lista: include il minuto quando la partita è live. */
 function matchRowStatusLabel(statusShort: string, statusElapsed: number | null): string {
@@ -445,7 +447,7 @@ export function MatchdayScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = lazyStyles(() => StyleSheet.create({
   stack: {
     gap: spacing.md,
   },
@@ -530,4 +532,4 @@ const styles = StyleSheet.create({
   success: {
     color: colors.foreground,
   },
-});
+}));

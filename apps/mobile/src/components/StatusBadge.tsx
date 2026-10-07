@@ -1,3 +1,4 @@
+import { lazyStyles } from "../theme/lazyStyles";
 import { theme } from "@fantappero/ui/theme";
 import { StyleSheet, Text, View } from "react-native";
 
@@ -21,7 +22,7 @@ export function StatusBadge({
   );
 }
 
-const styles = StyleSheet.create({
+const styles = lazyStyles(() => StyleSheet.create({
   badge: {
     alignSelf: "flex-start",
     paddingHorizontal: spacing.sm,
@@ -32,4 +33,4 @@ const styles = StyleSheet.create({
     fontSize: typography.fontSize.sm,
     fontWeight: typography.fontWeight.semibold,
   },
-});
+}));
