@@ -9,15 +9,23 @@ function AthleteCheckRow({
   label,
   checked,
   onToggle,
+  disabled = false,
   testID,
 }: {
   label: string;
   checked: boolean;
   onToggle: () => void;
+  disabled?: boolean;
   testID?: string;
 }) {
   return (
-    <Pressable style={styles.optionRow} onPress={onToggle} testID={testID}>
+    <Pressable
+      style={[styles.optionRow, disabled && styles.disabled]}
+      onPress={onToggle}
+      disabled={disabled}
+      accessibilityState={{ disabled, checked }}
+      testID={testID}
+    >
       <Text style={styles.optionLabel}>{label}</Text>
       <Text style={styles.meta}>{checked ? "☑" : "☐"}</Text>
     </Pressable>
@@ -70,9 +78,18 @@ export function MarketTradeCreateForm({
   creating: boolean;
   onSubmit: () => void;
 }) {
+  const canPropose = ownedSlots.length > 0;
   return (
     <View style={styles.section} testID="market-trade-form-section">
       <Text style={styles.sectionTitle}>Nuova proposta di scambio</Text>
+      {canPropose ? null : (
+        <UiStatePanel
+          state="empty"
+          title="Nessun calciatore in rosa"
+          message="Assegna almeno un calciatore alla rosa per proporre uno scambio."
+          testID="market-trade-empty-roster"
+        />
+      )}
       <View style={styles.field} testID="market-trade-create-form">
         <OptionPicker
           label="Squadra destinataria"
@@ -80,14 +97,13 @@ export function MarketTradeCreateForm({
           value={recipientTeamId}
           onChange={onRecipientTeamIdChange}
           placeholder="Scegli una squadra…"
+          disabled={!canPropose}
           testID="market-trade-recipient"
         />
 
         <Text style={styles.fieldLabel}>Giocatori offerti (dalla tua rosa)</Text>
         <View testID="market-trade-offered-athletes">
-          {ownedSlots.length === 0 ? (
-            <Text style={styles.meta}>Nessun giocatore in rosa da offrire.</Text>
-          ) : (
+          {canPropose ? (
             ownedSlots.map((slot) => (
               <AthleteCheckRow
                 key={slot.id}
@@ -97,6 +113,8 @@ export function MarketTradeCreateForm({
                 testID={`market-trade-offered-${slot.athleteId}`}
               />
             ))
+          ) : (
+            <Text style={styles.meta}>Nessun giocatore in rosa da offrire.</Text>
           )}
         </View>
 
@@ -138,6 +156,7 @@ export function MarketTradeCreateForm({
                   key={athlete.athleteId}
                   label={athlete.athleteName}
                   checked={requestedAthleteIds.includes(athlete.athleteId)}
+                  disabled={!canPropose}
                   onToggle={() => onToggleRequested(athlete.athleteId)}
                   testID={`market-trade-requested-${athlete.athleteId}`}
                 />
@@ -147,28 +166,31 @@ export function MarketTradeCreateForm({
 
         <Text style={styles.fieldLabel}>Crediti offerti</Text>
         <TextInput
-          style={styles.input}
+          style={[styles.input, !canPropose && styles.disabled]}
           value={offeredCredits}
           onChangeText={onOfferedCreditsChange}
           keyboardType="numeric"
+          editable={canPropose}
           testID="market-trade-offered-credits"
         />
         <Text style={styles.fieldLabel}>Crediti richiesti</Text>
         <TextInput
-          style={styles.input}
+          style={[styles.input, !canPropose && styles.disabled]}
           value={requestedCredits}
           onChangeText={onRequestedCreditsChange}
           keyboardType="numeric"
+          editable={canPropose}
           testID="market-trade-requested-credits"
         />
         <Text style={styles.fieldLabel}>Scadenza (AAAA-MM-GG HH:MM)</Text>
         <TextInput
-          style={styles.input}
+          style={[styles.input, !canPropose && styles.disabled]}
           value={expiresAt}
           onChangeText={onExpiresAtChange}
           placeholder="2026-09-01 00:00"
           autoCapitalize="none"
           autoCorrect={false}
+          editable={canPropose}
           testID="market-trade-expires-at"
         />
 
@@ -179,8 +201,8 @@ export function MarketTradeCreateForm({
         ) : null}
 
         <Pressable
-          style={[styles.button, (creating || !recipientTeamId) && styles.disabled]}
-          disabled={creating || !recipientTeamId}
+          style={[styles.button, (creating || !recipientTeamId || !canPropose) && styles.disabled]}
+          disabled={creating || !recipientTeamId || !canPropose}
           onPress={onSubmit}
           testID="market-trade-create-submit"
         >

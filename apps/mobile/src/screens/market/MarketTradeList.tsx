@@ -174,8 +174,11 @@ export function MarketTradeList({
                       <Text style={styles.secondaryButtonLabel}>Rifiuta</Text>
                     </Pressable>
                     <Pressable
-                      style={[styles.secondaryButton, pending && styles.disabled]}
-                      disabled={pending}
+                      style={[
+                        styles.secondaryButton,
+                        (pending || ownedSlots.length === 0) && styles.disabled,
+                      ]}
+                      disabled={pending || ownedSlots.length === 0}
                       onPress={() => startCounter(proposal.id)}
                       testID={`market-trade-counter-start-${proposal.id}`}
                     >

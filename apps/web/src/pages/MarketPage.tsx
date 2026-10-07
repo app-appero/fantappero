@@ -339,7 +339,7 @@ export function MarketPage() {
 
   function handleCreateProposal(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!recipientTeamId || (hasExpiry && !expiresAt)) {
+    if (ownedSlots.length === 0 || !recipientTeamId || (hasExpiry && !expiresAt)) {
       return;
     }
     void trade
@@ -551,6 +551,14 @@ export function MarketPage() {
 
         {!loading && !loadError && !isDemoMode && activeLeagueId ? (
           <WireframeSection label="Nuova proposta di scambio" testId="market-trade-form-section">
+            {ownedSlots.length === 0 ? (
+              <UiStatePanel
+                state="empty"
+                title="Nessun calciatore in rosa"
+                message="Assegna almeno un calciatore alla rosa per proporre uno scambio."
+                testId="market-trade-empty-roster"
+              />
+            ) : null}
             <form data-testid="market-trade-create-form" onSubmit={handleCreateProposal}>
               <div className="fa-trade-columns">
                 <div className="fa-trade-columns__left">
@@ -592,6 +600,7 @@ export function MarketPage() {
                       setRequestedAthleteIds([]);
                       void loadRecipientRoster(nextId);
                     }}
+                    disabled={ownedSlots.length === 0}
                     required
                   />
 
@@ -643,6 +652,7 @@ export function MarketPage() {
                             <input
                               type="checkbox"
                               checked={requestedAthleteIds.includes(athlete.athleteId)}
+                              disabled={ownedSlots.length === 0}
                               onChange={() =>
                                 setRequestedAthleteIds((prev) =>
                                   toggleAthleteId(prev, athlete.athleteId),
@@ -664,6 +674,7 @@ export function MarketPage() {
                 type="number"
                 min={0}
                 value={offeredCredits}
+                disabled={ownedSlots.length === 0}
                 onChange={(event) => setOfferedCredits(event.target.value)}
               />
               <Input
@@ -672,6 +683,7 @@ export function MarketPage() {
                 type="number"
                 min={0}
                 value={requestedCredits}
+                disabled={ownedSlots.length === 0}
                 onChange={(event) => setRequestedCredits(event.target.value)}
               />
               <label>
@@ -679,6 +691,7 @@ export function MarketPage() {
                   type="checkbox"
                   name="trade-has-expires-at"
                   checked={hasExpiry}
+                  disabled={ownedSlots.length === 0}
                   onChange={(event) => {
                     setHasExpiry(event.target.checked);
                     if (!event.target.checked) {
@@ -694,6 +707,7 @@ export function MarketPage() {
                   name="trade-expires-at"
                   type="datetime-local"
                   value={expiresAt}
+                  disabled={ownedSlots.length === 0}
                   onChange={(event) => setExpiresAt(event.target.value)}
                   required
                 />
@@ -710,7 +724,7 @@ export function MarketPage() {
                 />
               ) : null}
 
-              <Button type="submit" variant="primary" disabled={trade.creating}>
+              <Button type="submit" variant="primary" disabled={trade.creating || ownedSlots.length === 0}>
                 {trade.creating ? "Invio…" : "Proponi scambio"}
               </Button>
             </form>
@@ -815,7 +829,7 @@ export function MarketPage() {
                           <Button
                             variant="secondary"
                             size="sm"
-                            disabled={pending}
+                            disabled={pending || ownedSlots.length === 0}
                             onClick={() => startCounter(proposal.id)}
                           >
                             Controproponi

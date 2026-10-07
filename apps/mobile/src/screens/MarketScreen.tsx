@@ -259,7 +259,7 @@ export function MarketScreen() {
   }
 
   function handleCreateProposal() {
-    if (!recipientTeamId || !expiresAt.trim()) {
+    if (ownedSlots.length === 0 || !recipientTeamId || !expiresAt.trim()) {
       return;
     }
     const parsed = new Date(expiresAt.trim().replace(" ", "T"));
