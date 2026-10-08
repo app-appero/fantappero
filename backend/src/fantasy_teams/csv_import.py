@@ -192,6 +192,59 @@ def normalize_athlete_name(name: str) -> str:
     return re.sub(r"\s+", " ", name.strip().casefold())
 
 
+_INITIAL_CANONICAL = re.compile(r"^[^\W\d_]\.\s+(.+)$", re.UNICODE)
+
+
+def surname_lookup_keys(canonical_name: str, last_name: str | None = None) -> set[str]:
+    """Keys that mean 'this athlete' when the file has only a surname."""
+    keys: set[str] = set()
+    if last_name and last_name.strip():
+        keys.add(normalize_athlete_name(last_name))
+    stripped = canonical_name.strip()
+    initial = _INITIAL_CANONICAL.fullmatch(stripped)
+    if initial:
+        keys.add(normalize_athlete_name(initial.group(1)))
+    elif not keys:
+        parts = stripped.split()
+        if len(parts) >= 2:
+            keys.add(normalize_athlete_name(parts[-1]))
+    keys.discard("")
+    return keys
+
+
+def like_literal(value: str) -> str:
+    return value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+
+
+def select_name_matches[T](
+    nome: str,
+    *,
+    by_exact: dict[str, list[T]],
+    by_surname: dict[str, list[T]],
+) -> tuple[list[T], str]:
+    """Match the written name. ``exact`` wins over a surname-only hit."""
+    key = normalize_athlete_name(nome)
+    exact = _unique_by_identity(by_exact.get(key, []))
+    if exact:
+        return exact, "exact"
+    surnames = _unique_by_identity(by_surname.get(key, []))
+    if surnames:
+        return surnames, "surname"
+    return [], "none"
+
+
+def _unique_by_identity[T](rows: list[T]) -> list[T]:
+    seen: set[object] = set()
+    unique: list[T] = []
+    for row in rows:
+        identity = getattr(row, "id", id(row))
+        if identity in seen:
+            continue
+        seen.add(identity)
+        unique.append(row)
+    return unique
+
+
 def preview_row_to_dict(row: PreviewRow) -> dict[str, object]:
     return {
         "rowNumber": row.row_number,

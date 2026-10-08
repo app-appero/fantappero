@@ -59,7 +59,8 @@ export function RosterCsvImportCard({
         </Pressable>
       </View>
       <Text style={styles.meta}>
-        Solo nome e crediti della squadra selezionata. Un calciatore non trovato non cambia la rosa.
+        Nome del listone oppure solo il cognome, maiuscole indifferenti. Se non si trova, la riga
+        non cambia la rosa.
       </Text>
       {csvPreview ? (
         <Text style={styles.meta} testID="roster-excel-preview">

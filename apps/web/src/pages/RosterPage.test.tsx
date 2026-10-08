@@ -138,6 +138,7 @@ describe("EP05-01/02/03 roster, credits and manual assignment", () => {
     expect(html).toContain('data-testid="roster-excel-import"');
     expect(html).toContain("Esporta rosa");
     expect(html).toContain("Calciatore e Crediti");
+    expect(html).toContain("solo il cognome");
     expect(html).toContain("Importa Excel");
     expect(html).not.toContain('data-testid="roster-listone-refresh"');
   });

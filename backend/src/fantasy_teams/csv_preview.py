@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections import defaultdict
 from uuid import UUID
 
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session, selectinload
 
 from fantasy_teams.csv_import import (
@@ -13,8 +13,11 @@ from fantasy_teams.csv_import import (
     ParsedCsvRow,
     PreviewRow,
     PreviewRowIssue,
+    like_literal,
     normalize_athlete_name,
     normalize_team_key,
+    select_name_matches,
+    surname_lookup_keys,
 )
 from fantasy_teams.factory import resolve_roster_size
 from fantasy_teams.ledger import find_account_for_team
@@ -79,12 +82,26 @@ def build_preview_rows(
 
     names = {normalize_athlete_name(row.nome) for row in parsed_rows if row.nome}
     athletes_by_name: dict[str, list[Athlete]] = defaultdict(list)
+    athletes_by_surname: dict[str, list[Athlete]] = defaultdict(list)
     if names:
         lowered = list(names)
-        for athlete in session.scalars(
-            select(Athlete).where(func.lower(Athlete.canonical_name).in_(lowered))
-        ).all():
+        surname_patterns = [
+            func.lower(Athlete.canonical_name).like(f"%. {like_literal(name)}", escape="\\")
+            for name in lowered
+        ]
+        matched_athletes = session.scalars(
+            select(Athlete).where(
+                or_(
+                    func.lower(Athlete.canonical_name).in_(lowered),
+                    func.lower(Athlete.last_name).in_(lowered),
+                    *surname_patterns,
+                )
+            )
+        ).all()
+        for athlete in matched_athletes:
             athletes_by_name[normalize_athlete_name(athlete.canonical_name)].append(athlete)
+            for surname_key in surname_lookup_keys(athlete.canonical_name, athlete.last_name):
+                athletes_by_surname[surname_key].append(athlete)
 
     seen_athletes: dict[UUID, int] = {}
     claimed_slots: dict[UUID, list[int]] = {
@@ -110,6 +127,7 @@ def build_preview_rows(
             season_year=season_year,
             athletes_by_provider=athletes_by_provider,
             athletes_by_name=athletes_by_name,
+            athletes_by_surname=athletes_by_surname,
             competition_ids=competition_ids,
         )
 
@@ -278,6 +296,7 @@ def _resolve_athlete(
     season_year: int,
     athletes_by_provider: dict[int, Athlete],
     athletes_by_name: dict[str, list[Athlete]],
+    athletes_by_surname: dict[str, list[Athlete]],
     competition_ids: set[UUID] | None = None,
 ) -> Athlete | None:
     if row.provider_id is not None:
@@ -316,7 +335,11 @@ def _resolve_athlete(
     if not row.nome:
         return None
 
-    matches = athletes_by_name.get(normalize_athlete_name(row.nome), [])
+    matches, match_mode = select_name_matches(
+        row.nome,
+        by_exact=athletes_by_name,
+        by_surname=athletes_by_surname,
+    )
     if not matches:
         row.issues.append(
             PreviewRowIssue(
@@ -346,6 +369,14 @@ def _resolve_athlete(
         return None
 
     athlete = matches[0]
+    if match_mode == "surname":
+        row.issues.append(
+            PreviewRowIssue(
+                code="matched_by_surname",
+                message=f"Riconosciuto come «{athlete.canonical_name}» dal cognome.",
+                severity="warning",
+            )
+        )
     _warn_if_not_on_listone(
         session,
         row,

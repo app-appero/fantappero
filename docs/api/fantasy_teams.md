@@ -105,7 +105,9 @@ placeholder: verificano rose e conti reali.
 
 Colonne: `squadra,provider_id,nome,crediti`.
 
-Matching: `provider_id` prioritario; `nome` solo se univoco; ambiguità → status `ambiguous` + candidati
+Matching: `provider_id` prioritario; altrimenti il nome del listone, oppure solo il cognome se è
+univoco. Il confronto è in minuscolo (`casefold`): maiuscole e minuscole sono equivalenti.
+Ambiguità → status `ambiguous` + candidati
 (risolvibili in conferma via `resolutions: [{rowNumber, athleteId}]`).
 
 Vincoli server (stessi dell’inserimento manuale): esclusività lega, crediti ≥ 0, saldo non negativo,
@@ -119,9 +121,10 @@ Conferma: un solo evento audit `fantasy_roster_csv_imported`; nessuna scrittura 
 - Sezione **Storico**: intervalli di possesso e snapshot per turno; admin può creare snapshot.
 - **Rose Excel (admin):** su web e app, modello, export e import `.xlsx` della squadra selezionata.
   Colonne del file: `Calciatore`, `Crediti`. Niente nome squadra e niente `provider_id`.
-  Il nome deve coincidere in modo esatto (maiuscole ignorate) con un solo calciatore: se non si
-  trova, o è ambiguo, la riga resta in anteprima come ignorata e non scrive nulla. Il CSV resta
-  accettato dall’anteprima con le colonne `squadra,provider_id,nome,crediti`.
+  Il nome può essere quello del listone (`L. Martinez`) oppure solo il cognome (`Martinez`).
+  Maiuscole e minuscole non contano. Se non si trova, o il cognome corrisponde a più calciatori,
+  la riga resta in anteprima come ignorata e non scrive nulla. Il CSV resta accettato
+  dall’anteprima con le colonne `squadra,provider_id,nome,crediti`.
 
 ## Metriche e audit
 

@@ -11,9 +11,12 @@ from fantasy_teams.csv_import import (
     PreviewRow,
     PreviewRowIssue,
     apply_resolutions,
+    normalize_athlete_name,
     normalize_header,
     parse_roster_csv,
+    select_name_matches,
     sha256_hex,
+    surname_lookup_keys,
 )
 
 
@@ -54,6 +57,65 @@ def test_parse_marks_invalid_numeric_fields() -> None:
     assert rows[0].crediti is None
     assert rows[0].raw["_provider_id_invalid"] == "abc"
     assert rows[0].raw["_crediti_invalid"] == "x"
+
+
+def test_name_match_accepts_listone_label_or_surname_ignoring_case() -> None:
+    class Player:
+        def __init__(self, player_id: str, canonical: str, last: str | None) -> None:
+            self.id = player_id
+            self.canonical_name = canonical
+            self.last_name = last
+
+    lautaro = Player("a1", "L. Martinez", "Martinez")
+    barella = Player("a2", "N. Barella", "Barella")
+    other = Player("a3", "A. Martinez", "Martinez")
+    by_exact = {
+        normalize_athlete_name(lautaro.canonical_name): [lautaro],
+        normalize_athlete_name(barella.canonical_name): [barella],
+        normalize_athlete_name(other.canonical_name): [other],
+    }
+    by_surname: dict[str, list[Player]] = {}
+    for player in (lautaro, barella, other):
+        for key in surname_lookup_keys(player.canonical_name, player.last_name):
+            by_surname.setdefault(key, []).append(player)
+
+    exact, exact_mode = select_name_matches(
+        "l. MARTINEZ",
+        by_exact=by_exact,
+        by_surname=by_surname,
+    )
+    assert exact_mode == "exact"
+    assert exact == [lautaro]
+
+    surname, surname_mode = select_name_matches(
+        "barella",
+        by_exact=by_exact,
+        by_surname=by_surname,
+    )
+    assert surname_mode == "surname"
+    assert surname == [barella]
+
+    ambiguous, ambiguous_mode = select_name_matches(
+        "MARTINEZ",
+        by_exact=by_exact,
+        by_surname=by_surname,
+    )
+    assert ambiguous_mode == "surname"
+    assert {player.id for player in ambiguous} == {"a1", "a3"}
+
+    missing, missing_mode = select_name_matches(
+        "sconosciuto",
+        by_exact=by_exact,
+        by_surname=by_surname,
+    )
+    assert missing_mode == "none"
+    assert missing == []
+
+
+def test_surname_keys_cover_initial_form_and_full_name() -> None:
+    assert surname_lookup_keys("L. Martinez", "Martinez") == {"martinez"}
+    assert surname_lookup_keys("K. De Bruyne", "De Bruyne") == {"de bruyne"}
+    assert surname_lookup_keys("Lautaro Martinez", None) == {"martinez"}
 
 
 def test_sha256_stable() -> None:

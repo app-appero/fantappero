@@ -114,8 +114,9 @@ export function RosterCsvImportCard({
           </Button>
         </div>
         <p className="fa-roster-excel__hint">
-          Il file ha solo Calciatore e Crediti, per la squadra selezionata. Se un nome non è nel
-          listone, quella riga non cambia la rosa.
+          Il file ha solo Calciatore e Crediti, per la squadra selezionata. Vale il nome del
+          listone oppure solo il cognome; maiuscole e minuscole non contano. Se non si trova, o
+          il cognome è di più calciatori, quella riga non cambia la rosa.
         </p>
         {csvMessage ? (
           <UiStatePanel state="success" title="Rose Excel" message={csvMessage} testId="roster-excel-ok" />
