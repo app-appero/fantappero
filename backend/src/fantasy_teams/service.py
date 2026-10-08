@@ -45,6 +45,7 @@ from fantasy_teams.csv_preview import (
     build_preview_rows,
     count_preview_issues,
     recompute_slot_assignments,
+    skip_unmatched_excel_rows,
 )
 from fantasy_teams.factory import (
     ensure_team_for_membership,
@@ -115,9 +116,9 @@ from fantasy_teams.validators import (
 )
 from fantasy_teams.xlsx_roster import (
     is_xlsx,
+    parse_roster_xlsx,
     rows_to_xlsx_bytes,
     template_xlsx_bytes,
-    xlsx_to_csv_bytes,
 )
 from leagues.models.league import League
 from leagues.models.league_audit_event import LeagueAuditEvent
@@ -1134,28 +1135,24 @@ class FantasyTeamService:
     def download_xlsx_template(self) -> bytes:
         return template_xlsx_bytes()
 
-    def export_roster_xlsx(self, league_access: LeagueAccess) -> bytes:
-        """Current assigned players, one row per slot, ready to re-import."""
-        teams = self._session.scalars(
+    def export_roster_xlsx(self, league_access: LeagueAccess, team_id: UUID) -> bytes:
+        """Assigned players of one fantasy team: name and current credits only."""
+        team = self._session.scalars(
             select(FantasyTeam)
-            .where(FantasyTeam.league_id == league_access.league.id)
+            .where(
+                FantasyTeam.id == team_id,
+                FantasyTeam.league_id == league_access.league.id,
+            )
             .options(selectinload(FantasyTeam.slots).selectinload(FantasyRosterSlot.athlete))
-            .order_by(FantasyTeam.name.asc())
-        ).all()
-        rows: list[tuple[str, int, str, int]] = []
-        for team in teams:
-            for slot in sorted(team.slots, key=lambda item: item.slot_index):
-                athlete = slot.athlete
-                if athlete is None:
-                    continue
-                rows.append(
-                    (
-                        team.name,
-                        athlete.provider_id,
-                        athlete.canonical_name,
-                        slot.purchase_credits or 0,
-                    )
-                )
+        ).first()
+        if team is None:
+            raise ValidationAuthError("Squadra non trovata.", code="fantasy_team_not_found")
+        rows: list[tuple[str, int]] = []
+        for slot in sorted(team.slots, key=lambda item: item.slot_index):
+            athlete = slot.athlete
+            if athlete is None:
+                continue
+            rows.append((athlete.canonical_name, slot.purchase_credits or 0))
         return rows_to_xlsx_bytes(rows)
 
     def preview_csv_import(
@@ -1164,10 +1161,28 @@ class FantasyTeamService:
         *,
         data: bytes,
         filename: str | None,
+        team_id: UUID | None = None,
     ) -> RosterImportPreviewResponse:
         league = self._lock_league(league_access.league.id)
         file_sha = sha256_hex(data)
-        parsed = parse_roster_csv(xlsx_to_csv_bytes(data) if is_xlsx(data) else data)
+        excel = is_xlsx(data)
+        if excel:
+            if team_id is None:
+                raise ValidationAuthError(
+                    "Seleziona la squadra prima di importare il file Excel.",
+                    code="team_required",
+                )
+            team = self._session.scalars(
+                select(FantasyTeam).where(
+                    FantasyTeam.id == team_id,
+                    FantasyTeam.league_id == league.id,
+                )
+            ).first()
+            if team is None:
+                raise ValidationAuthError("Squadra non trovata.", code="fantasy_team_not_found")
+            parsed = parse_roster_xlsx(data, team_name=team.name)
+        else:
+            parsed = parse_roster_csv(data)
         rows = build_preview_rows(
             self._session,
             league_id=league.id,
@@ -1175,6 +1190,8 @@ class FantasyTeamService:
             parsed_rows=parsed,
             competition_ids={competition.id for competition in league.competitions},
         )
+        if excel:
+            skip_unmatched_excel_rows(rows)
         error_count, warning_count = count_preview_issues(rows)
         payload = {
             "rows": [preview_row_to_dict(row) for row in rows],
@@ -1474,10 +1491,13 @@ class FantasyTeamService:
     def _to_import_preview(self, session: RosterImportSession) -> RosterImportPreviewResponse:
         rows_payload = session.preview_payload.get("rows") or []
         rows: list[RosterImportRowResponse] = []
+        ok_rows = 0
         if isinstance(rows_payload, list):
             for item in rows_payload:
                 if not isinstance(item, dict):
                     continue
+                if str(item.get("status") or "") == "ok":
+                    ok_rows += 1
                 rows.append(
                     RosterImportRowResponse(
                         rowNumber=int(item.get("rowNumber") or 0),
@@ -1516,7 +1536,11 @@ class FantasyTeamService:
             status=session.status.value,
             fileSha256=session.file_sha256,
             originalFilename=session.original_filename,
-            canConfirm=session.status == RosterImportStatus.DRAFT and session.error_count == 0,
+            canConfirm=(
+                session.status == RosterImportStatus.DRAFT
+                and session.error_count == 0
+                and ok_rows > 0
+            ),
             rowCount=session.row_count,
             errorCount=session.error_count,
             warningCount=session.warning_count,

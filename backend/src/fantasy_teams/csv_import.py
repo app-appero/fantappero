@@ -67,7 +67,7 @@ class PreviewRow:
     provider_id: int | None
     nome: str
     crediti: int | None
-    status: str  # ok | error | ambiguous
+    status: str  # ok | error | ambiguous | skipped
     fantasy_team_id: str | None = None
     fantasy_team_name: str | None = None
     athlete_id: str | None = None

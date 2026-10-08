@@ -505,13 +505,17 @@ export function RosterScreen() {
       setCsvError("Sessione o lega non disponibile.");
       return;
     }
+    if (!adminTeamId) {
+      setCsvError("Seleziona la squadra da esportare.");
+      return;
+    }
     setCsvBusy(true);
     try {
-      const buffer = await downloadRosterExcelExport(accessToken, activeLeagueId);
+      const buffer = await downloadRosterExcelExport(accessToken, activeLeagueId, adminTeamId);
       await shareExcel(buffer, "fantappero-rose.xlsx");
-      setCsvMessage("Rose esportate in Excel.");
+      setCsvMessage("Rosa esportata in Excel.");
     } catch (error) {
-      setCsvError(getApiErrorMessage(error, "Impossibile esportare le rose."));
+      setCsvError(getApiErrorMessage(error, "Impossibile esportare la rosa."));
     } finally {
       setCsvBusy(false);
     }
@@ -523,6 +527,10 @@ export function RosterScreen() {
     setCsvPreview(null);
     if (!activeLeagueId || !accessToken) {
       setCsvError("Sessione o lega non disponibile.");
+      return;
+    }
+    if (!adminTeamId) {
+      setCsvError("Seleziona la squadra da importare.");
       return;
     }
     try {
@@ -540,11 +548,17 @@ export function RosterScreen() {
       }
       const asset = picked.assets[0];
       setCsvBusy(true);
-      const preview = await previewRosterCsvImport(accessToken, activeLeagueId, {
-        uri: asset.uri,
-        name: asset.name || "rose.xlsx",
-        type: asset.mimeType || "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-      });
+      const preview = await previewRosterCsvImport(
+        accessToken,
+        activeLeagueId,
+        {
+          uri: asset.uri,
+          name: asset.name || "rose.xlsx",
+          type:
+            asset.mimeType || "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        },
+        adminTeamId,
+      );
       setCsvPreview(preview);
       if (preview.errorCount > 0) {
         setCsvError("Anteprima con errori: correggi il file Excel.");

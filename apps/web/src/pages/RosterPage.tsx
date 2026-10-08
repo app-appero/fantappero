@@ -792,10 +792,7 @@ export function RosterPage() {
     setCsvError(null);
     setCsvMessage(null);
     if (isDemoMode) {
-      downloadBlob(
-        buildRosterXlsx([["Squadra Esempio", 12345, "Nome Calciatore", 10]]),
-        ROSTER_XLSX_TEMPLATE_NAME,
-      );
+      downloadBlob(buildRosterXlsx([["Nome Calciatore", 10]]), ROSTER_XLSX_TEMPLATE_NAME);
       setCsvMessage("Modello Excel scaricato (demo).");
       return;
     }
@@ -820,22 +817,20 @@ export function RosterPage() {
   const onDownloadRosterExport = async () => {
     setCsvError(null);
     setCsvMessage(null);
+    if (!adminTeamId) {
+      setCsvError("Seleziona la squadra da esportare.");
+      return;
+    }
     if (isDemoMode) {
-      const rows = [DEMO_TEAM, DEMO_TEAM_B].flatMap((team) =>
-        team.slots
-          .filter((slot) => slot.athleteName)
-          .map(
-            (slot, index) =>
-              [
-                team.name,
-                index + 1,
-                slot.athleteName ?? "",
-                slot.purchaseCredits ?? 0,
-              ] as [string, number, string, number],
-          ),
-      );
+      const source =
+        teamDetails.find((row) => row.id === adminTeamId) ?? adminTeam ?? DEMO_TEAM;
+      const rows = source.slots
+        .filter((slot) => slot.athleteName)
+        .map(
+          (slot) => [slot.athleteName ?? "", slot.purchaseCredits ?? 0] as [string, number],
+        );
       downloadBlob(buildRosterXlsx(rows), ROSTER_XLSX_EXPORT_NAME);
-      setCsvMessage("Rose esportate in Excel (demo).");
+      setCsvMessage("Rosa esportata in Excel (demo).");
       return;
     }
     if (!activeLeagueId) {
@@ -848,11 +843,15 @@ export function RosterPage() {
       return;
     }
     try {
-      const blob = await downloadRosterExcelExport(stored.accessToken, activeLeagueId);
+      const blob = await downloadRosterExcelExport(
+        stored.accessToken,
+        activeLeagueId,
+        adminTeamId,
+      );
       downloadBlob(blob, ROSTER_XLSX_EXPORT_NAME);
-      setCsvMessage("Rose esportate in Excel.");
+      setCsvMessage("Rosa esportata in Excel.");
     } catch (error) {
-      setCsvError(getApiErrorMessage(error, "Impossibile esportare le rose."));
+      setCsvError(getApiErrorMessage(error, "Impossibile esportare la rosa."));
     }
   };
 
@@ -903,6 +902,10 @@ export function RosterPage() {
       setCsvError("Seleziona una lega.");
       return;
     }
+    if (!adminTeamId) {
+      setCsvError("Seleziona la squadra da importare.");
+      return;
+    }
     const stored = loadStoredSession();
     if (!stored?.accessToken) {
       setCsvError("Sessione non disponibile. Accedi di nuovo.");
@@ -914,6 +917,7 @@ export function RosterPage() {
         stored.accessToken,
         activeLeagueId,
         file,
+        adminTeamId,
       );
       setCsvPreview(preview);
       if (preview.errorCount > 0) {
@@ -979,10 +983,16 @@ export function RosterPage() {
 
   const csvCanConfirm =
     !!csvPreview &&
+    csvPreview.rows.some(
+      (row) =>
+        row.status === "ok" ||
+        (row.status === "ambiguous" && Boolean(csvResolutions[row.rowNumber])),
+    ) &&
     (csvPreview.canConfirm ||
       csvPreview.rows.every(
         (row) =>
           row.status === "ok" ||
+          row.status === "skipped" ||
           (row.status === "ambiguous" && Boolean(csvResolutions[row.rowNumber])),
       ));
 

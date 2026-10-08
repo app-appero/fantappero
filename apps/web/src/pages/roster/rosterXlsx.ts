@@ -2,7 +2,7 @@
 
 const XLSX_MIME = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 
-export type RosterXlsxRow = [string, number | string, string, number | string];
+export type RosterXlsxRow = [string, number | string];
 
 const CRC_TABLE = new Uint32Array(256);
 for (let index = 0; index < 256; index += 1) {
@@ -95,7 +95,7 @@ function columnName(index: number): string {
 export function buildRosterXlsx(rows: RosterXlsxRow[]): Blob {
   const encoder = new TextEncoder();
   const body = [
-    `<row r="1">${["squadra", "provider_id", "nome", "crediti"]
+    `<row r="1">${["Calciatore", "Crediti"]
       .map((header, index) => cell(`${columnName(index)}1`, header))
       .join("")}</row>`,
     ...rows.map((row, rowIndex) => {
@@ -137,7 +137,7 @@ export function buildRosterXlsx(rows: RosterXlsxRow[]): Blob {
       data: encoder.encode(
         `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>` +
           `<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">` +
-          `<sheets><sheet name="Rose" sheetId="1" r:id="rId1"/></sheets></workbook>`,
+          `<sheets><sheet name="Rosa" sheetId="1" r:id="rId1"/></sheets></workbook>`,
       ),
     },
     {

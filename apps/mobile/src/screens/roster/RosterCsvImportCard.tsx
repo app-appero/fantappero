@@ -58,6 +58,9 @@ export function RosterCsvImportCard({
           <Text style={styles.creditsButtonLabel}>Conferma</Text>
         </Pressable>
       </View>
+      <Text style={styles.meta}>
+        Solo nome e crediti della squadra selezionata. Un calciatore non trovato non cambia la rosa.
+      </Text>
       {csvPreview ? (
         <Text style={styles.meta} testID="roster-excel-preview">
           Anteprima: {csvPreview.rowCount} righe · errori {csvPreview.errorCount} · avvisi{" "}

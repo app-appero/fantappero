@@ -15,6 +15,22 @@ import {
 import type { RefObject } from "react";
 import { AthleteName } from "../../athletes/AthleteCard";
 
+function excelRowStatusLabel(status: string): string {
+  if (status === "skipped") {
+    return "ignorato";
+  }
+  if (status === "ok") {
+    return "pronto";
+  }
+  if (status === "error") {
+    return "errore";
+  }
+  if (status === "ambiguous") {
+    return "ambiguo";
+  }
+  return status;
+}
+
 export function RosterCsvImportCard({
   csvBusy,
   onDownloadCsvTemplate,
@@ -65,7 +81,7 @@ export function RosterCsvImportCard({
             onClick={() => void onDownloadRosterExport()}
             data-testid="roster-excel-export"
           >
-            Esporta rose
+            Esporta rosa
           </Button>
           <Button
             type="button"
@@ -97,6 +113,10 @@ export function RosterCsvImportCard({
             Conferma import
           </Button>
         </div>
+        <p className="fa-roster-excel__hint">
+          Il file ha solo Calciatore e Crediti, per la squadra selezionata. Se un nome non è nel
+          listone, quella riga non cambia la rosa.
+        </p>
         {csvMessage ? (
           <UiStatePanel state="success" title="Rose Excel" message={csvMessage} testId="roster-excel-ok" />
         ) : null}
@@ -129,7 +149,7 @@ export function RosterCsvImportCard({
                       <AthleteName athleteId={row.athleteId}>{row.athleteName ?? row.nome ?? "—"}</AthleteName>
                     </TableCell>
                     <TableCell>{row.crediti ?? "—"}</TableCell>
-                    <TableCell>{row.status}</TableCell>
+                    <TableCell>{excelRowStatusLabel(row.status)}</TableCell>
                     <TableCell>
                       {row.issues.map((issue) => issue.message).join(" · ") || "—"}
                       {row.status === "ambiguous" ? (

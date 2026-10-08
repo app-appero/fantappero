@@ -326,11 +326,15 @@ def assign_random_ai_roster(
 
 @router.get("/{league_id}/amministrazione/rose/excel")
 def export_roster_excel(
+    team_id: UUID = Query(alias="teamId"),
     league_access: LeagueAccess = Depends(require_league_permissions(Permission.LEAGUE_ADMIN)),
     service: FantasyTeamService = Depends(get_fantasy_team_service),
 ) -> Response:
-    """Download every assigned player as an Excel file the admin can re-import."""
-    content = service.export_roster_xlsx(league_access)
+    """Download one team's players as Calciatore + Crediti."""
+    try:
+        content = service.export_roster_xlsx(league_access, team_id)
+    except AuthError as exc:
+        return _error_response(exc)
     return Response(
         content=content,
         media_type=XLSX_MEDIA_TYPE,
@@ -378,6 +382,7 @@ def download_roster_csv_template(
 )
 async def preview_roster_csv_import(
     file: UploadFile = File(...),
+    team_id: UUID | None = Query(default=None, alias="teamId"),
     league_access: LeagueAccess = Depends(require_league_permissions(Permission.LEAGUE_ADMIN)),
     service: FantasyTeamService = Depends(get_fantasy_team_service),
 ) -> RosterImportPreviewResponse | JSONResponse:
@@ -388,6 +393,7 @@ async def preview_roster_csv_import(
             league_access,
             data=data,
             filename=file.filename,
+            team_id=team_id,
         )
     except AuthError as exc:
         return _error_response(exc)

@@ -136,7 +136,8 @@ describe("EP05-01/02/03 roster, credits and manual assignment", () => {
     expect(html).toContain('data-testid="market-gate-switch"');
     expect(html).toContain('data-testid="market-gate-info"');
     expect(html).toContain('data-testid="roster-excel-import"');
-    expect(html).toContain("Esporta rose");
+    expect(html).toContain("Esporta rosa");
+    expect(html).toContain("Calciatore e Crediti");
     expect(html).toContain("Importa Excel");
     expect(html).not.toContain('data-testid="roster-listone-refresh"');
   });
@@ -153,7 +154,7 @@ describe("EP05-01/02/03 roster, credits and manual assignment", () => {
     expect(html).not.toContain('data-testid="roster-admin-credits"');
     expect(html).not.toContain('data-testid="roster-admin-team"');
     expect(html).not.toContain('data-testid="roster-excel-import"');
-    expect(html).not.toContain("Esporta rose");
+    expect(html).not.toContain("Esporta rosa");
     expect(html).not.toContain("Assicura squadre partecipanti");
     expect(html).not.toContain("Aggiusta crediti");
     expect(html).toContain('data-testid="market-gate-bar"');

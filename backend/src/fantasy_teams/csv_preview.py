@@ -380,6 +380,35 @@ def _warn_if_not_on_listone(
         )
 
 
+_UNMATCHED_ATHLETE_CODES = frozenset(
+    {"athlete_not_found", "ambiguous_athlete_name", "missing_athlete_key"}
+)
+
+
+def skip_unmatched_excel_rows(rows: list[PreviewRow]) -> None:
+    """Leave the roster unchanged when Excel cannot name exactly one athlete."""
+    for row in rows:
+        if row.athlete_id is not None or row.fantasy_team_id is None:
+            continue
+        unmatched = [issue for issue in row.issues if issue.code in _UNMATCHED_ATHLETE_CODES]
+        if row.status != "ambiguous" and not unmatched:
+            continue
+        if row.status == "ambiguous" or any(
+            issue.code == "ambiguous_athlete_name" for issue in unmatched
+        ):
+            code = "ambiguous_athlete_name"
+            message = "Nome non univoco: riga ignorata. Aggiungi il calciatore a mano."
+        else:
+            code = "athlete_not_found"
+            message = "Calciatore non trovato: riga ignorata. Aggiungilo a mano se serve."
+        row.status = "skipped"
+        row.slot_index = None
+        row.athlete_id = None
+        row.athlete_name = None
+        row.candidates = []
+        row.issues = [PreviewRowIssue(code=code, message=message, severity="warning")]
+
+
 def count_preview_issues(rows: list[PreviewRow]) -> tuple[int, int]:
     errors = sum(
         1
@@ -428,6 +457,8 @@ def recompute_slot_assignments(
             for issue in row.issues
             if issue.code not in {"roster_full", "insufficient_credits"}
         ]
+        if row.status == "skipped":
+            continue
         if row.status == "ambiguous" or any(issue.severity == "error" for issue in row.issues):
             if any(issue.severity == "error" for issue in row.issues):
                 row.status = "error"

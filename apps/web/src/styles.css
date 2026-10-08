@@ -754,6 +754,12 @@ a.fa-member-list__identity:focus-visible {
   gap: 0.5rem;
 }
 
+.fa-roster-excel__hint {
+  margin: 0.5rem 0 0;
+  color: var(--fa-color-foreground-muted);
+  font-size: 0.85rem;
+}
+
 .fa-roster-excel__preview {
   margin-top: 0.75rem;
 }

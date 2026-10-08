@@ -507,8 +507,13 @@ export function downloadRosterExcelTemplate(accessToken: string, leagueId: strin
   });
 }
 
-export function downloadRosterExcelExport(accessToken: string, leagueId: string): Promise<Blob> {
-  return apiRequestBlob(`/leagues/${leagueId}/amministrazione/rose/excel`, {
+export function downloadRosterExcelExport(
+  accessToken: string,
+  leagueId: string,
+  teamId: string,
+): Promise<Blob> {
+  const params = new URLSearchParams({ teamId });
+  return apiRequestBlob(`/leagues/${leagueId}/amministrazione/rose/excel?${params}`, {
     accessToken,
   });
 }
@@ -517,9 +522,11 @@ export function previewRosterCsvImport(
   accessToken: string,
   leagueId: string,
   file: File,
+  teamId: string,
 ): Promise<RosterImportPreview> {
+  const params = new URLSearchParams({ teamId });
   return apiUpload<RosterImportPreview>(
-    `/leagues/${leagueId}/amministrazione/import-csv/anteprima`,
+    `/leagues/${leagueId}/amministrazione/import-csv/anteprima?${params}`,
     { accessToken, file },
   );
 }
