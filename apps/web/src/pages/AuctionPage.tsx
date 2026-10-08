@@ -649,9 +649,6 @@ export function AuctionPage() {
                             <TableHeaderCell className="fa-roster-col fa-roster-col--name">
                               <RosterColLabel full="Calciatore" short="Nome" />
                             </TableHeaderCell>
-                            <TableHeaderCell className="fa-roster-col fa-roster-col--role">
-                              <RosterColLabel full="Ruolo" short="" />
-                            </TableHeaderCell>
                             <TableHeaderCell className="fa-roster-col fa-roster-col--club">Club</TableHeaderCell>
                             <TableHeaderCell className="fa-auction-col--extra">Posizione provider</TableHeaderCell>
                             <TableHeaderCell className="fa-auction-col--extra">Note</TableHeaderCell>
@@ -665,23 +662,16 @@ export function AuctionPage() {
                                   <Badge
                                     className="fa-auction-player__role"
                                     variant={roleBadgeVariant(entry.effectiveRole)}
-                                    aria-hidden="true"
                                   >
                                     {entry.effectiveRole}
                                   </Badge>
-                                  <AthleteName className="fa-auction-player__name" athleteId={entry.athleteId}>
-                                    {entry.canonicalName}
-                                  </AthleteName>
                                   <span className="fa-auction-player__role-name">
                                     {ROLE_LABEL[entry.effectiveRole]}
                                   </span>
+                                  <AthleteName className="fa-auction-player__name" athleteId={entry.athleteId}>
+                                    {entry.canonicalName}
+                                  </AthleteName>
                                 </span>
-                              </TableCell>
-                              <TableCell className="fa-roster-col fa-roster-col--role">
-                                <Badge variant={roleBadgeVariant(entry.effectiveRole)}>
-                                  {entry.effectiveRole}
-                                </Badge>
-                                <span className="fa-roster-role-label"> {ROLE_LABEL[entry.effectiveRole]}</span>
                               </TableCell>
                               <TableCell className="fa-roster-col fa-roster-col--club">{entry.clubName ?? "—"}</TableCell>
                               <TableCell className="fa-auction-col--extra">{entry.providerPositionRaw ?? "—"}</TableCell>
