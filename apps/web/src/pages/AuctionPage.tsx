@@ -661,7 +661,21 @@ export function AuctionPage() {
                           {visibleEntries.map((entry) => (
                             <TableRow key={entry.athleteId}>
                               <TableCell className="fa-roster-col fa-roster-col--name">
-                                <AthleteName athleteId={entry.athleteId}>{entry.canonicalName}</AthleteName>
+                                <span className="fa-auction-player">
+                                  <Badge
+                                    className="fa-auction-player__role"
+                                    variant={roleBadgeVariant(entry.effectiveRole)}
+                                    aria-hidden="true"
+                                  >
+                                    {entry.effectiveRole}
+                                  </Badge>
+                                  <AthleteName className="fa-auction-player__name" athleteId={entry.athleteId}>
+                                    {entry.canonicalName}
+                                  </AthleteName>
+                                  <span className="fa-auction-player__role-name">
+                                    {ROLE_LABEL[entry.effectiveRole]}
+                                  </span>
+                                </span>
                               </TableCell>
                               <TableCell className="fa-roster-col fa-roster-col--role">
                                 <Badge variant={roleBadgeVariant(entry.effectiveRole)}>
