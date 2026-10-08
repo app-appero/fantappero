@@ -25,6 +25,7 @@ import {
 } from "@fantappero/ui";
 import { AthleteName } from "../../athletes/AthleteCard";
 import { useEffect, useState } from "react";
+import { RosterActionButton, RosterColLabel } from "./RosterActionButton";
 import {
   LISTONE_PAGE_SIZE,
   ROLE_LABEL,
@@ -58,24 +59,27 @@ function ListoneAssignRow({
 
   return (
     <TableRow>
-      <TableCell>
+      <TableCell className="fa-roster-col fa-roster-col--name">
         <AthleteName athleteId={entry.athleteId}>{entry.canonicalName}</AthleteName>
       </TableCell>
-      <TableCell>
-        <Badge variant={roleBadgeVariant(entry.effectiveRole)}>{entry.effectiveRole}</Badge>{" "}
-        {ROLE_LABEL[entry.effectiveRole]}
+      <TableCell className="fa-roster-col fa-roster-col--role">
+        <Badge variant={roleBadgeVariant(entry.effectiveRole)}>{entry.effectiveRole}</Badge>
+        <span className="fa-roster-role-label"> {ROLE_LABEL[entry.effectiveRole]}</span>
       </TableCell>
-      <TableCell>{entry.clubName ?? "—"}</TableCell>
-      <TableCell>
+      <TableCell className="fa-roster-col fa-roster-col--club">{entry.clubName ?? "—"}</TableCell>
+      <TableCell className="fa-roster-col fa-roster-col--status">
         {owner ? (
-          <Badge variant="warning">In rosa: {owner.teamName}</Badge>
+          <Badge variant="warning">
+            <RosterColLabel full={`In rosa: ${owner.teamName}`} short={owner.teamName} />
+          </Badge>
         ) : (
           <Badge variant="success">Libero</Badge>
         )}
       </TableCell>
-      <TableCell>
+      <TableCell className="fa-roster-col fa-roster-col--price">
         {!owner ? (
           <Input
+            className="fa-roster-price-input"
             type="number"
             min={1}
             aria-label={`Prezzo acquisto ${entry.canonicalName}`}
@@ -88,27 +92,23 @@ function ListoneAssignRow({
           "—"
         )}
       </TableCell>
-      <TableCell>
+      <TableCell className="fa-roster-col fa-roster-col--action">
         {owner && canRelease ? (
-          <Button
-            type="button"
-            variant="secondary"
+          <RosterActionButton
+            action="release"
             disabled={adminBusy}
-            data-testid={`roster-admin-release-${entry.athleteId}`}
+            testId={`roster-admin-release-${entry.athleteId}`}
+            label={`Rimuovi ${entry.canonicalName}`}
             onClick={() => void onReleaseAthlete(entry.athleteId)}
-          >
-            Rimuovi
-          </Button>
+          />
         ) : !owner ? (
-          <Button
-            type="button"
-            variant="secondary"
+          <RosterActionButton
+            action="assign"
             disabled={adminBusy || !canAssign || !isValid}
-            data-testid={`roster-admin-assign-${entry.athleteId}`}
+            testId={`roster-admin-assign-${entry.athleteId}`}
+            label={`Assegna ${entry.canonicalName}`}
             onClick={() => void onAssignAthlete(entry.athleteId, parsed)}
-          >
-            Assegna
-          </Button>
+          />
         ) : null}
       </TableCell>
     </TableRow>
@@ -147,15 +147,23 @@ function ListoneTable({
 
   return (
     <>
-      <Table compact data-testid={`roster-admin-listone-table-${tabValue}`}>
+      <Table compact className="fa-roster-table fa-roster-table--listone" data-testid={`roster-admin-listone-table-${tabValue}`}>
         <TableHead>
           <TableRow>
-            <TableHeaderCell>Calciatore</TableHeaderCell>
-            <TableHeaderCell>Ruolo</TableHeaderCell>
-            <TableHeaderCell>Club</TableHeaderCell>
-            <TableHeaderCell>Stato</TableHeaderCell>
-            <TableHeaderCell>Prezzo acquisto</TableHeaderCell>
-            <TableHeaderCell>Azione</TableHeaderCell>
+            <TableHeaderCell className="fa-roster-col fa-roster-col--name">
+              <RosterColLabel full="Calciatore" short="Nome" />
+            </TableHeaderCell>
+            <TableHeaderCell className="fa-roster-col fa-roster-col--role">
+              <RosterColLabel full="Ruolo" short="" />
+            </TableHeaderCell>
+            <TableHeaderCell className="fa-roster-col fa-roster-col--club">Club</TableHeaderCell>
+            <TableHeaderCell className="fa-roster-col fa-roster-col--status">Stato</TableHeaderCell>
+            <TableHeaderCell className="fa-roster-col fa-roster-col--price">
+              <RosterColLabel full="Prezzo acquisto" short="Cr" />
+            </TableHeaderCell>
+            <TableHeaderCell className="fa-roster-col fa-roster-col--action">
+              <RosterColLabel full="Azione" short="" />
+            </TableHeaderCell>
           </TableRow>
         </TableHead>
         <TableBody>

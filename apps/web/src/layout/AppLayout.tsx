@@ -9,7 +9,7 @@ import {
   SidebarNav,
   type NavLinkAnchorProps,
 } from "@fantappero/ui";
-import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { Link, useLocation } from "../router/simpleRouter";
 import { useAuth } from "../auth/AuthContext";
 import { LogoutButton } from "../auth/LogoutButton";
@@ -133,6 +133,82 @@ function MenuButton({ open, onOpen }: { open: boolean; onOpen: () => void }) {
   );
 }
 
+/** Su schermi stretti il + apre crea/unisciti; i link restano nel DOM anche da chiuso. */
+function HeaderLeagueActions() {
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const { pathname } = useLocation();
+
+  useEffect(() => {
+    setOpen(false);
+  }, [pathname]);
+
+  useEffect(() => {
+    if (!open) return;
+    function onPointerDown(event: PointerEvent) {
+      if (!rootRef.current?.contains(event.target as Node)) {
+        setOpen(false);
+      }
+    }
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") setOpen(false);
+    }
+    document.addEventListener("pointerdown", onPointerDown);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", onPointerDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [open]);
+
+  return (
+    <div className="fa-app-header__league-actions" ref={rootRef}>
+      <button
+        type="button"
+        className="fa-app-header__add-league"
+        aria-label="Crea o unisciti a una lega"
+        aria-expanded={open}
+        aria-controls="header-league-menu"
+        data-testid="header-add-league"
+        onClick={() => setOpen((value) => !value)}
+      >
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <path d="M12 5v14M5 12h14" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+        </svg>
+      </button>
+      <div
+        id="header-league-menu"
+        className={
+          open
+            ? "fa-app-header__league-menu is-open"
+            : "fa-app-header__league-menu"
+        }
+        data-testid="header-league-menu"
+      >
+        <Link
+          to="/leghe/crea"
+          className="fa-app-header__league-action"
+          data-testid="header-create-league-link"
+          onClick={() => setOpen(false)}
+        >
+          Crea lega
+        </Link>
+        <span className="fa-app-header__league-action-sep" aria-hidden="true">
+          o
+        </span>
+        <Link
+          to="/leghe/invito"
+          className="fa-app-header__league-action"
+          data-testid="header-join-league-link"
+          onClick={() => setOpen(false)}
+        >
+          Unisciti con codice
+        </Link>
+      </div>
+    </div>
+  );
+}
+
 function DrawerNavLink({
   onNavigate,
   ...props
@@ -250,28 +326,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                       }
                     />
                   ) : null}
-                  <div className="fa-app-header__league-actions">
-                    <Link
-                      to="/leghe/crea"
-                      className="fa-app-header__league-action"
-                      data-testid="header-create-league-link"
-                    >
-                      Crea lega
-                    </Link>
-                    <span
-                      className="fa-app-header__league-action-sep"
-                      aria-hidden="true"
-                    >
-                      o
-                    </span>
-                    <Link
-                      to="/leghe/invito"
-                      className="fa-app-header__league-action"
-                      data-testid="header-join-league-link"
-                    >
-                      Unisciti con codice
-                    </Link>
-                  </div>
+                  <HeaderLeagueActions />
                   {leaguesError ? (
                     <p
                       className="fa-field__error"

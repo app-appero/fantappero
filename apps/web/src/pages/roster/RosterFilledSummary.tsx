@@ -12,6 +12,7 @@ import {
 } from "@fantappero/ui";
 import { useEffect, useState } from "react";
 import { AthleteName } from "../../athletes/AthleteCard";
+import { RosterActionButton, RosterColLabel } from "./RosterActionButton";
 import {
   compositionStatusLabel,
   compositionStatusVariant,
@@ -122,24 +123,34 @@ function RosterRoleTable({
         <p className="fa-roster-role-section__empty">Nessun giocatore in questo ruolo.</p>
       ) : (
         <>
-          <Table compact>
+          <Table compact className="fa-roster-table fa-roster-table--rosa">
             <TableHead>
               <TableRow>
-                <TableHeaderCell>Calciatore</TableHeaderCell>
-                <TableHeaderCell>Club</TableHeaderCell>
-                <TableHeaderCell>Crediti acquisto</TableHeaderCell>
-                <TableHeaderCell>Slot</TableHeaderCell>
-                {canEdit ? <TableHeaderCell>Azione</TableHeaderCell> : null}
+                <TableHeaderCell className="fa-roster-col fa-roster-col--name">
+                  <RosterColLabel full="Calciatore" short="Nome" />
+                </TableHeaderCell>
+                <TableHeaderCell className="fa-roster-col fa-roster-col--club">Club</TableHeaderCell>
+                <TableHeaderCell className="fa-roster-col fa-roster-col--credits">
+                  <RosterColLabel full="Crediti acquisto" short="Cr" />
+                </TableHeaderCell>
+                <TableHeaderCell className="fa-roster-col fa-roster-col--slot">
+                  <RosterColLabel full="Slot" short="#" />
+                </TableHeaderCell>
+                {canEdit ? (
+                  <TableHeaderCell className="fa-roster-col fa-roster-col--action">
+                    <RosterColLabel full="Azione" short="" />
+                  </TableHeaderCell>
+                ) : null}
               </TableRow>
             </TableHead>
             <TableBody>
               {pagedSlots.map((slot) => (
                 <TableRow key={slot.id}>
-                  <TableCell>
+                  <TableCell className="fa-roster-col fa-roster-col--name">
                     <AthleteName athleteId={slot.athleteId}>{slot.athleteName ?? "Calciatore"}</AthleteName>
                   </TableCell>
-                  <TableCell>{slot.clubName ?? "—"}</TableCell>
-                  <TableCell>
+                  <TableCell className="fa-roster-col fa-roster-col--club">{slot.clubName ?? "—"}</TableCell>
+                  <TableCell className="fa-roster-col fa-roster-col--credits">
                     <PurchaseCreditsCell
                       slot={slot}
                       canEdit={canEdit}
@@ -147,19 +158,17 @@ function RosterRoleTable({
                       onUpdatePurchaseCredits={onUpdatePurchaseCredits}
                     />
                   </TableCell>
-                  <TableCell>{slot.slotIndex + 1}</TableCell>
+                  <TableCell className="fa-roster-col fa-roster-col--slot">{slot.slotIndex + 1}</TableCell>
                   {canEdit ? (
-                    <TableCell>
+                    <TableCell className="fa-roster-col fa-roster-col--action">
                       {slot.athleteId ? (
-                        <Button
-                          type="button"
-                          variant="secondary"
+                        <RosterActionButton
+                          action="release"
                           disabled={adminBusy}
-                          data-testid={`roster-admin-release-${slot.athleteId}`}
+                          testId={`roster-admin-release-${slot.athleteId}`}
+                          label={`Rimuovi ${slot.athleteName ?? "calciatore"}`}
                           onClick={() => void onReleaseAthlete(slot.athleteId!)}
-                        >
-                          Rimuovi
-                        </Button>
+                        />
                       ) : null}
                     </TableCell>
                   ) : null}

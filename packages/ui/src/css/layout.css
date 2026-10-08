@@ -225,6 +225,33 @@
   white-space: nowrap;
 }
 
+.fa-app-header__add-league {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: var(--fa-radius-md);
+  background: transparent;
+  color: var(--fa-color-accent);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.fa-app-header__add-league:focus-visible {
+  outline: none;
+  box-shadow: var(--fa-shadow-focus);
+}
+
+.fa-app-header__league-menu {
+  display: flex;
+  align-items: center;
+  gap: var(--fa-space-sm);
+}
+
 .fa-app-header__league-action {
   font-size: var(--fa-text-sm);
   font-weight: 700;
@@ -1342,21 +1369,29 @@ button.fa-app-header__league-action {
 @media (max-width: 767px) {
   .fa-app-header {
     display: grid;
-    grid-template-columns: auto minmax(0, 1fr) auto;
-    grid-template-areas:
-      "menu brand actions"
-      "context context context";
+    grid-template-columns: auto auto minmax(0, 1fr) auto;
+    grid-template-areas: "menu brand context actions";
     align-items: center;
-    gap: var(--fa-space-xs) var(--fa-space-sm);
+    gap: 0.2rem 0.35rem;
     min-height: 0;
-    padding: var(--fa-space-xs) var(--fa-space-sm);
-    padding-top: calc(var(--fa-space-xs) + env(safe-area-inset-top, 0px));
+    padding: 0.2rem var(--fa-space-sm);
+    padding-top: calc(0.2rem + env(safe-area-inset-top, 0px));
   }
 
   .fa-app-header__menu {
     display: flex;
     grid-area: menu;
     align-items: center;
+  }
+
+  .fa-app-header__menu-button {
+    width: 2rem;
+    height: 2rem;
+  }
+
+  .fa-app-header__menu-button svg {
+    width: 1.25rem;
+    height: 1.25rem;
   }
 
   .fa-app-header__desktop-only {
@@ -1368,10 +1403,19 @@ button.fa-app-header__league-action {
     min-width: 0;
   }
 
+  .fa-app-header__brand .fa-brand-logo__wordmark {
+    display: none;
+  }
+
+  .fa-app-header__brand .fa-brand-logo {
+    gap: 0;
+  }
+
   .fa-app-header__actions {
     grid-area: actions;
     margin-left: 0;
-    gap: var(--fa-space-xs);
+    gap: 0.15rem;
+    flex-shrink: 0;
   }
 
   .fa-app-header__context {
@@ -1379,33 +1423,79 @@ button.fa-app-header__league-action {
     min-width: 0;
     max-width: none;
     flex: 1 1 auto;
-    width: 100%;
+    width: auto;
   }
 
   .fa-app-header__league-context {
-    flex-direction: column;
-    align-items: stretch;
-    gap: var(--fa-space-xs);
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.2rem;
+    min-width: 0;
+  }
+
+  .fa-app-header__league-context > .fa-field__error {
+    flex-basis: 100%;
   }
 
   .fa-app-header__league-actions {
-    /* Was `display: none` — with no leagues yet, this was the *only* way to
-       create/join one, and hiding it left new mobile-web users with no path
-       forward at all (found live during the pilot's first real signup).
-       Wrap instead of hiding, so it still fits a narrow header row. */
-    flex-wrap: wrap;
+    position: relative;
+    flex: 0 0 auto;
+  }
+
+  /* Il testo "Crea lega / Unisciti" resta nel DOM (i test e gli screen reader
+     lo trovano). A vista, su telefono, lo apre il + sulla stessa riga. */
+  .fa-app-header__add-league {
+    display: inline-flex;
+  }
+
+  .fa-app-header__league-menu {
+    display: none;
+    position: absolute;
+    top: calc(100% + 0.25rem);
+    right: 0;
+    z-index: var(--fa-z-dropdown);
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.15rem;
+    min-width: 12rem;
+    padding: var(--fa-space-sm);
+    background-color: var(--fa-color-background-elevated);
+    border: 1px solid var(--fa-color-border);
+    border-radius: var(--fa-radius-md);
+    box-shadow: var(--fa-shadow-md);
+  }
+
+  .fa-app-header__league-menu.is-open {
+    display: flex;
+  }
+
+  .fa-app-header__league-menu .fa-app-header__league-action-sep {
+    display: none;
+  }
+
+  .fa-app-header__league-menu .fa-app-header__league-action {
+    padding: 0.35rem 0.15rem;
   }
 
   .fa-league-selector {
     min-width: 0;
-    width: 100%;
+    width: auto;
+    flex: 1 1 auto;
+  }
+
+  .fa-app-header .fa-field {
+    min-width: 0;
+  }
+
+  .fa-app-header .fa-select {
+    min-height: 2rem;
+    padding: 0 1.35rem 0 0.4rem;
+    font-size: var(--fa-text-xs);
+    text-overflow: ellipsis;
   }
 
   .fa-league-selector__accessory {
-    margin-top: 0;
-  }
-
-  .fa-league-selector__accessory .fa-badge {
     display: none;
   }
 
@@ -1418,7 +1508,22 @@ button.fa-app-header__league-action {
   }
 
   .fa-page-container__title {
-    font-size: var(--fa-text-lg);
+    font-size: var(--fa-text-md);
+  }
+
+  .fa-card__header,
+  .fa-card__body,
+  .fa-card__footer {
+    padding: var(--fa-space-sm);
+  }
+
+  .fa-card__title {
+    font-size: var(--fa-text-md);
+  }
+
+  .fa-tab {
+    padding: var(--fa-space-xs) var(--fa-space-sm);
+    font-size: var(--fa-text-xs);
   }
 
   .fa-breadcrumb__list {
