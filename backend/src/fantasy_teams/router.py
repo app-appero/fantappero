@@ -345,7 +345,7 @@ def download_roster_csv_template(
     formato: str = Query(default="csv"),
     league_access: LeagueAccess = Depends(require_league_permissions(Permission.LEAGUE_ADMIN)),
     service: FantasyTeamService = Depends(get_fantasy_team_service),
-) -> Response | JSONResponse:
+) -> Response:
     """Download the official roster template. ``formato=xlsx`` is the admin default."""
     _ = league_access
     if formato == "xlsx":
@@ -357,9 +357,10 @@ def download_roster_csv_template(
             },
         )
     if formato != "csv":
-        return JSONResponse(
+        return Response(
+            content='{"detail":"Formato non supportato. Usa csv o xlsx."}',
+            media_type="application/json",
             status_code=422,
-            content={"detail": "Formato non supportato. Usa csv o xlsx."},
         )
     content = service.download_csv_template()
     return Response(
