@@ -1066,6 +1066,35 @@ a.fa-member-list__identity:focus-visible {
     white-space: nowrap;
   }
 
+  .fa-auction-col--extra {
+    display: none;
+  }
+
+  .fa-auction-listone-card .fa-tablist {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+  }
+
+  .fa-auction-listone-card .fa-tab {
+    flex: 0 0 auto;
+    white-space: nowrap;
+  }
+
+  .fa-auction-bids-table .fa-roster-col--credits {
+    width: 2.4rem;
+  }
+
+  .fa-auction-bids-table .fa-roster-col--action {
+    width: 3.6rem;
+    overflow: hidden;
+  }
+
+  .fa-auction-bids-table .fa-btn {
+    min-height: 1.65rem;
+    padding: 0 0.35rem;
+    font-size: 0.68rem;
+  }
+
   [data-color-scheme="light"] .fa-roster-action--assign,
   [data-color-scheme="light"] .fa-roster-action--release {
     color: #faf8f4;

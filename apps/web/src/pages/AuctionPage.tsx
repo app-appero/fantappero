@@ -27,6 +27,7 @@ import {
 } from "@fantappero/ui";
 import { type FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { AthleteName } from "../athletes/AthleteCard";
+import { RosterColLabel } from "./roster/RosterActionButton";
 import {
   closeAuctionSession,
   createAuctionSession,
@@ -514,30 +515,38 @@ export function AuctionPage() {
           ) : null}
 
           {!isDemoMode && flow.myBids.length > 0 ? (
-            <Table compact data-testid="auction-my-bids-table">
+            <Table compact className="fa-roster-table fa-auction-bids-table" data-testid="auction-my-bids-table">
               <TableHead>
                 <TableRow>
-                  <TableHeaderCell>Giocatore</TableHeaderCell>
-                  <TableHeaderCell>Offerta</TableHeaderCell>
-                  <TableHeaderCell>Stato</TableHeaderCell>
-                  <TableHeaderCell>Azioni</TableHeaderCell>
+                  <TableHeaderCell className="fa-roster-col fa-roster-col--name">
+                    <RosterColLabel full="Giocatore" short="Nome" />
+                  </TableHeaderCell>
+                  <TableHeaderCell className="fa-roster-col fa-roster-col--credits">
+                    <RosterColLabel full="Offerta" short="Cr" />
+                  </TableHeaderCell>
+                  <TableHeaderCell className="fa-roster-col fa-roster-col--status">Stato</TableHeaderCell>
+                  <TableHeaderCell className="fa-roster-col fa-roster-col--action">
+                    <RosterColLabel full="Azioni" short="" />
+                  </TableHeaderCell>
                 </TableRow>
               </TableHead>
               <TableBody>
                 {flow.myBids.map((bid) => (
                   <TableRow key={bid.id}>
-                    <TableCell>
+                    <TableCell className="fa-roster-col fa-roster-col--name">
                       <AthleteName athleteId={bid.athleteId}>
                         {athleteNameById.get(bid.athleteId) ?? bid.athleteName}
                       </AthleteName>
                     </TableCell>
-                    <TableCell>{bid.amountCredits} crediti</TableCell>
-                    <TableCell>
+                    <TableCell className="fa-roster-col fa-roster-col--credits">
+                      <RosterColLabel full={`${bid.amountCredits} crediti`} short={String(bid.amountCredits)} />
+                    </TableCell>
+                    <TableCell className="fa-roster-col fa-roster-col--status">
                       <Badge variant={bid.status === "submitted" ? "success" : "neutral"}>
                         {BID_STATUS_LABEL[bid.status]}
                       </Badge>
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="fa-roster-col fa-roster-col--action">
                       {bid.status === "submitted" ? (
                         <Button
                           variant="secondary"
@@ -557,7 +566,7 @@ export function AuctionPage() {
           ) : null}
         </WireframeSection>
 
-        <Card data-testid="auction-listone-card">
+        <Card className="fa-auction-listone-card" data-testid="auction-listone-card">
           <CardHeader>
             <div className="fa-auction-listone__header">
               <div>
@@ -630,31 +639,39 @@ export function AuctionPage() {
                         testId={`auction-listone-empty-${tab.value}`}
                       />
                     ) : (
-                      <Table compact data-testid={`auction-listone-table-${tab.value}`}>
+                      <Table
+                        compact
+                        className="fa-roster-table fa-auction-listone-table"
+                        data-testid={`auction-listone-table-${tab.value}`}
+                      >
                         <TableHead>
                           <TableRow>
-                            <TableHeaderCell>Calciatore</TableHeaderCell>
-                            <TableHeaderCell>Ruolo</TableHeaderCell>
-                            <TableHeaderCell>Club</TableHeaderCell>
-                            <TableHeaderCell>Posizione provider</TableHeaderCell>
-                            <TableHeaderCell>Note</TableHeaderCell>
+                            <TableHeaderCell className="fa-roster-col fa-roster-col--name">
+                              <RosterColLabel full="Calciatore" short="Nome" />
+                            </TableHeaderCell>
+                            <TableHeaderCell className="fa-roster-col fa-roster-col--role">
+                              <RosterColLabel full="Ruolo" short="" />
+                            </TableHeaderCell>
+                            <TableHeaderCell className="fa-roster-col fa-roster-col--club">Club</TableHeaderCell>
+                            <TableHeaderCell className="fa-auction-col--extra">Posizione provider</TableHeaderCell>
+                            <TableHeaderCell className="fa-auction-col--extra">Note</TableHeaderCell>
                           </TableRow>
                         </TableHead>
                         <TableBody>
                           {visibleEntries.map((entry) => (
                             <TableRow key={entry.athleteId}>
-                              <TableCell>
+                              <TableCell className="fa-roster-col fa-roster-col--name">
                                 <AthleteName athleteId={entry.athleteId}>{entry.canonicalName}</AthleteName>
                               </TableCell>
-                              <TableCell>
+                              <TableCell className="fa-roster-col fa-roster-col--role">
                                 <Badge variant={roleBadgeVariant(entry.effectiveRole)}>
                                   {entry.effectiveRole}
-                                </Badge>{" "}
-                                {ROLE_LABEL[entry.effectiveRole]}
+                                </Badge>
+                                <span className="fa-roster-role-label"> {ROLE_LABEL[entry.effectiveRole]}</span>
                               </TableCell>
-                              <TableCell>{entry.clubName ?? "—"}</TableCell>
-                              <TableCell>{entry.providerPositionRaw ?? "—"}</TableCell>
-                              <TableCell>
+                              <TableCell className="fa-roster-col fa-roster-col--club">{entry.clubName ?? "—"}</TableCell>
+                              <TableCell className="fa-auction-col--extra">{entry.providerPositionRaw ?? "—"}</TableCell>
+                              <TableCell className="fa-auction-col--extra">
                                 {entry.override ? (
                                   <Badge variant="warning">
                                     {entry.override.pending
