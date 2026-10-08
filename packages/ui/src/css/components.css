@@ -1043,22 +1043,26 @@ button.fa-pitch-player {
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: var(--fa-space-md);
+  gap: var(--fa-space-sm) var(--fa-space-md);
   margin-bottom: var(--fa-space-md);
-  padding: var(--fa-space-md);
+  padding: var(--fa-space-sm) var(--fa-space-md);
   border: 1px solid var(--fa-color-border);
   border-radius: var(--fa-radius-md);
   background-color: var(--fa-color-background-elevated);
 }
 
-.fa-market-gate__copy {
+.fa-market-gate__main {
   display: flex;
   flex-direction: column;
   gap: var(--fa-space-xs);
   min-width: 0;
+  flex: 1 1 auto;
 }
 
 .fa-market-gate__title {
+  display: flex;
+  align-items: center;
+  gap: var(--fa-space-xs);
   margin: 0;
   font-size: var(--fa-text-sm);
   font-weight: 600;
@@ -1069,6 +1073,86 @@ button.fa-pitch-player {
   margin: 0;
   font-size: var(--fa-text-sm);
   color: var(--fa-color-foreground-muted);
+}
+
+.fa-market-gate__info {
+  display: none;
+  position: relative;
+}
+
+.fa-info-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.25rem;
+  height: 1.25rem;
+  padding: 0;
+  border: 1px solid var(--fa-color-border);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--fa-color-foreground-muted);
+  font-size: 0.75rem;
+  font-style: italic;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.fa-market-gate__popover {
+  position: absolute;
+  z-index: 30;
+  top: calc(100% + 0.35rem);
+  left: 0;
+  width: min(18rem, 70vw);
+  padding: var(--fa-space-sm);
+  border: 1px solid var(--fa-color-border);
+  border-radius: var(--fa-radius-md);
+  background: var(--fa-color-background-elevated);
+  color: var(--fa-color-foreground);
+  font-size: var(--fa-text-sm);
+  font-style: normal;
+  font-weight: 400;
+  line-height: var(--fa-leading-normal);
+  box-shadow: var(--fa-shadow-md, 0 8px 24px rgb(0 0 0 / 18%));
+}
+
+.fa-market-gate__error {
+  flex: 1 0 100%;
+  margin: 0;
+  font-size: var(--fa-text-sm);
+  color: var(--fa-color-danger, var(--fa-danger-600));
+}
+
+@media (max-width: 767px) {
+  .fa-market-gate {
+    flex-wrap: wrap;
+    gap: 0.35rem 0.5rem;
+    margin-bottom: 0.5rem;
+    padding: 0.35rem 0.6rem;
+  }
+
+  .fa-market-gate__main {
+    flex-direction: row;
+    align-items: center;
+    min-width: 0;
+  }
+
+  .fa-market-gate__title {
+    min-width: 0;
+    white-space: nowrap;
+  }
+
+  .fa-market-gate__hint {
+    display: none;
+  }
+
+  .fa-market-gate__info {
+    display: inline-flex;
+  }
+
+  .fa-market-gate .fa-switch__status {
+    display: none;
+  }
 }
 
 .fa-sr-only {

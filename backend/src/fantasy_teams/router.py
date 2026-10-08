@@ -36,6 +36,7 @@ from fantasy_teams.schemas import (
     TeamRosterPlayerResponse,
 )
 from fantasy_teams.service import FantasyTeamService
+from fantasy_teams.xlsx_roster import XLSX_EXPORT_FILENAME, XLSX_MEDIA_TYPE, XLSX_TEMPLATE_FILENAME
 
 router = APIRouter(prefix="/leagues", tags=["fantasy-teams"])
 
@@ -323,13 +324,43 @@ def assign_random_ai_roster(
         return _error_response(exc)
 
 
-@router.get("/{league_id}/amministrazione/import-csv/modello")
-def download_roster_csv_template(
+@router.get("/{league_id}/amministrazione/rose/excel")
+def export_roster_excel(
     league_access: LeagueAccess = Depends(require_league_permissions(Permission.LEAGUE_ADMIN)),
     service: FantasyTeamService = Depends(get_fantasy_team_service),
 ) -> Response:
-    """Download the official CSV template for roster import (EP05-04)."""
+    """Download every assigned player as an Excel file the admin can re-import."""
+    content = service.export_roster_xlsx(league_access)
+    return Response(
+        content=content,
+        media_type=XLSX_MEDIA_TYPE,
+        headers={
+            "Content-Disposition": f'attachment; filename="{XLSX_EXPORT_FILENAME}"',
+        },
+    )
+
+
+@router.get("/{league_id}/amministrazione/import-csv/modello")
+def download_roster_csv_template(
+    formato: str = Query(default="csv"),
+    league_access: LeagueAccess = Depends(require_league_permissions(Permission.LEAGUE_ADMIN)),
+    service: FantasyTeamService = Depends(get_fantasy_team_service),
+) -> Response | JSONResponse:
+    """Download the official roster template. ``formato=xlsx`` is the admin default."""
     _ = league_access
+    if formato == "xlsx":
+        return Response(
+            content=service.download_xlsx_template(),
+            media_type=XLSX_MEDIA_TYPE,
+            headers={
+                "Content-Disposition": f'attachment; filename="{XLSX_TEMPLATE_FILENAME}"',
+            },
+        )
+    if formato != "csv":
+        return JSONResponse(
+            status_code=422,
+            content={"detail": "Formato non supportato. Usa csv o xlsx."},
+        )
     content = service.download_csv_template()
     return Response(
         content=content,
@@ -349,7 +380,7 @@ async def preview_roster_csv_import(
     league_access: LeagueAccess = Depends(require_league_permissions(Permission.LEAGUE_ADMIN)),
     service: FantasyTeamService = Depends(get_fantasy_team_service),
 ) -> RosterImportPreviewResponse | JSONResponse:
-    """Parse and validate a CSV without writing roster/credits (EP05-04)."""
+    """Parse and validate a CSV or Excel file without writing roster/credits (EP05-04)."""
     try:
         data = await file.read()
         return service.preview_csv_import(

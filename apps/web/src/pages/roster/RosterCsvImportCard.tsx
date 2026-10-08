@@ -18,6 +18,7 @@ import { AthleteName } from "../../athletes/AthleteCard";
 export function RosterCsvImportCard({
   csvBusy,
   onDownloadCsvTemplate,
+  onDownloadRosterExport,
   csvFileInputRef,
   onCsvFileSelected,
   csvCanConfirm,
@@ -30,6 +31,7 @@ export function RosterCsvImportCard({
 }: {
   csvBusy: boolean;
   onDownloadCsvTemplate: () => void | Promise<void>;
+  onDownloadRosterExport: () => void | Promise<void>;
   csvFileInputRef: RefObject<HTMLInputElement | null>;
   onCsvFileSelected: (file: File | null) => void | Promise<void>;
   csvCanConfirm: boolean;
@@ -41,40 +43,45 @@ export function RosterCsvImportCard({
   onCsvResolutionChange: (rowNumber: number, athleteId: string) => void;
 }) {
   return (
-    <Card style={{ marginTop: "1rem" }} data-testid="roster-csv-import">
+    <Card className="fa-roster-excel" data-testid="roster-excel-import">
       <CardHeader>
-        <h2 className="fa-auction-listone__title">Import CSV rose</h2>
+        <h2 className="fa-auction-listone__title">Rose Excel</h2>
       </CardHeader>
       <CardBody>
-        <p>
-          Scarica il modello, carica il file per l&apos;anteprima e conferma solo senza
-          errori bloccanti. Nessuna scrittura avviene prima della conferma.
-        </p>
-        <div style={{ display: "flex", flexWrap: "wrap", gap: "0.75rem", marginTop: "0.75rem" }}>
+        <div className="fa-roster-excel__actions">
           <Button
             type="button"
             variant="secondary"
             disabled={csvBusy}
             onClick={() => void onDownloadCsvTemplate()}
-            data-testid="roster-csv-download"
+            data-testid="roster-excel-template"
           >
-            Scarica modello CSV
+            Scarica modello
+          </Button>
+          <Button
+            type="button"
+            variant="secondary"
+            disabled={csvBusy}
+            onClick={() => void onDownloadRosterExport()}
+            data-testid="roster-excel-export"
+          >
+            Esporta rose
           </Button>
           <Button
             type="button"
             variant="secondary"
             disabled={csvBusy}
             onClick={() => csvFileInputRef.current?.click()}
-            data-testid="roster-csv-upload"
+            data-testid="roster-excel-upload"
           >
-            {csvBusy ? "Elaborazione…" : "Carica CSV"}
+            {csvBusy ? "Elaborazione…" : "Importa Excel"}
           </Button>
           <input
             ref={csvFileInputRef}
             type="file"
-            accept=".csv,text/csv"
+            accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             hidden
-            data-testid="roster-csv-file"
+            data-testid="roster-excel-file"
             onChange={(event) => {
               const file = event.target.files?.[0] ?? null;
               event.target.value = "";
@@ -85,22 +92,22 @@ export function RosterCsvImportCard({
             type="button"
             disabled={csvBusy || !csvCanConfirm}
             onClick={() => void onConfirmCsvImport()}
-            data-testid="roster-csv-confirm"
+            data-testid="roster-excel-confirm"
           >
             Conferma import
           </Button>
         </div>
         {csvMessage ? (
-          <UiStatePanel state="success" title="Import CSV" message={csvMessage} testId="roster-csv-ok" />
+          <UiStatePanel state="success" title="Rose Excel" message={csvMessage} testId="roster-excel-ok" />
         ) : null}
         {csvError ? (
-          <UiStatePanel state="error" title="Import CSV" message={csvError} testId="roster-csv-error" />
+          <UiStatePanel state="error" title="Rose Excel" message={csvError} testId="roster-excel-error" />
         ) : null}
         {csvPreview ? (
-          <div style={{ marginTop: "1rem" }} data-testid="roster-csv-preview">
+          <div className="fa-roster-excel__preview" data-testid="roster-excel-preview">
             <p>
-              Anteprima: {csvPreview.rowCount} righe · errori {csvPreview.errorCount} ·
-              avvisi {csvPreview.warningCount}
+              Anteprima: {csvPreview.rowCount} righe · errori {csvPreview.errorCount} · avvisi{" "}
+              {csvPreview.warningCount}
             </p>
             <Table>
               <TableHead>
@@ -128,7 +135,7 @@ export function RosterCsvImportCard({
                       {row.status === "ambiguous" ? (
                         <select
                           aria-label={`Risolvi riga ${row.rowNumber}`}
-                          data-testid={`roster-csv-resolve-${row.rowNumber}`}
+                          data-testid={`roster-excel-resolve-${row.rowNumber}`}
                           value={csvResolutions[row.rowNumber] ?? ""}
                           onChange={(event) =>
                             onCsvResolutionChange(row.rowNumber, event.target.value)

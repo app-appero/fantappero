@@ -216,23 +216,58 @@ export const marketUiStyles = lazyStyles(() => StyleSheet.create({
     gap: spacing.sm,
   },
   gateBar: {
-    padding: spacing.md,
+    paddingVertical: spacing.xs,
+    paddingHorizontal: spacing.sm,
     borderRadius: radius.md,
     backgroundColor: colors.backgroundElevated,
-    gap: spacing.sm,
+    gap: spacing.xs,
     marginBottom: spacing.sm,
   },
   gateRow: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
-    gap: spacing.sm,
+    gap: spacing.xs,
+    minHeight: 36,
   },
   gateTitle: {
-    fontSize: typography.fontSize.md,
+    fontSize: typography.fontSize.sm,
     fontWeight: typography.fontWeight.semibold,
     color: colors.foreground,
+  },
+  gateStatus: {
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 2,
+  },
+  gateStatusOpen: {
+    borderColor: colors.success,
+  },
+  gateStatusClosed: {
+    borderColor: colors.warning,
+  },
+  gateStatusLabel: {
+    fontSize: typography.fontSize.xs,
+    fontWeight: typography.fontWeight.semibold,
+    color: colors.foreground,
+  },
+  gateSpacer: {
     flex: 1,
+  },
+  gateInfo: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  gateInfoLabel: {
+    fontSize: typography.fontSize.sm,
+    fontStyle: "italic",
+    fontWeight: typography.fontWeight.semibold,
+    color: colors.foregroundMuted,
   },
   gateHint: {
     fontSize: typography.fontSize.sm,

@@ -169,7 +169,7 @@ Per ciascun flusso: pagina/schermata, endpoint, permessi, stati gestiti, campi m
 - **Verdetto:** Gap (UX), stessa causa del punto 2 — la sola persistenza cambia, non l'interazione.
 
 ### 9. Rosa e crediti
-- **Web:** `RosterPage` + sottocomponenti — famiglia estesa di endpoint rosa/crediti/CSV/storico. Permessi `roster:view`/`roster:edit`/`league:admin`. Import CSV implementato ma nascosto (`SHOW_ROSTER_CSV_IMPORT = false`).
+- **Web:** `RosterPage` + sottocomponenti — famiglia estesa di endpoint rosa/crediti/CSV/storico. Permessi `roster:view`/`roster:edit`/`league:admin`. Import/export Excel rose visibile agli admin (`roster-excel-import`).
   - Campi: riepilogo composizione per ruolo, tabelle rosa (calciatore/club/crediti/slot), pannello crediti/aggiustamento, listone admin, storico (intervalli possesso, ledger, snapshot per turno).
   - Azioni: assegna/rimuovi calciatore, modifica prezzo, aggiusta crediti, assicura squadre, rosa random IA, snapshot turno, (import CSV se riattivato).
   - Messaggi: validazioni puntuali per ogni azione (es. "Nessuno slot libero…", "Inserisci crediti acquisto validi (minimo 1)."), conferme con dettaglio numerico (es. `Movimento registrato. Nuovo saldo: {n} crediti.`).

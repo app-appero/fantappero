@@ -95,8 +95,9 @@ placeholder: verificano rose e conti reali.
 | `GET` | `/leagues/{id}/amministrazione/squadre/{teamId}/crediti` | `league:admin` — saldo + ledger di una squadra |
 | `PUT` | `/leagues/{id}/amministrazione/squadre/{teamId}/slot/{slotIndex}` | `roster:edit` — assegna calciatore (`athleteId`, `purchaseCredits`); solo propria squadra se non admin |
 | `DELETE` | `/leagues/{id}/amministrazione/squadre/{teamId}/slot/{slotIndex}` | `roster:edit` — libera slot (+ rimborso); solo propria squadra se non admin |
-| `GET` | `/leagues/{id}/amministrazione/import-csv/modello` | `league:admin` — template CSV ufficiale |
-| `POST` | `/leagues/{id}/amministrazione/import-csv/anteprima` | `league:admin` — upload multipart, anteprima senza write |
+| `GET` | `/leagues/{id}/amministrazione/import-csv/modello` | `league:admin` — modello. `?formato=xlsx` (default admin) oppure `csv` |
+| `GET` | `/leagues/{id}/amministrazione/rose/excel` | `league:admin` — export rose assegnate in `.xlsx` |
+| `POST` | `/leagues/{id}/amministrazione/import-csv/anteprima` | `league:admin` — upload CSV o `.xlsx`, anteprima senza write |
 | `POST` | `/leagues/{id}/amministrazione/import-csv/anteprima-testo` | `league:admin` — stesso flusso con testo JSON (`csvText`) |
 | `POST` | `/leagues/{id}/amministrazione/import-csv/{importId}/conferma` | `league:admin` — applica atomico; idempotente se già confirmed |
 
@@ -116,9 +117,9 @@ Conferma: un solo evento audit `fantasy_roster_csv_imported`; nessuna scrittura 
 
 - Web `/rosa` e Mobile tab Rosa: inserimento manuale, crediti, composizione P/D/C/A, «Assicura squadre».
 - Sezione **Storico**: intervalli di possesso e snapshot per turno; admin può creare snapshot.
-- **Import CSV (EP05-04):** API e codice UI presenti; pannello **temporaneamente nascosto**
-  (`SHOW_ROSTER_CSV_IMPORT = false` in `RosterPage` / `RosterScreen`). Riattivare da lì quando
-  il flusso (es. esporre `providerId` in listone) sarà chiarito.
+- **Rose Excel (admin):** su web e app, modello, export e import `.xlsx` (stesse colonne
+  `squadra,provider_id,nome,crediti`). L’export include `provider_id` così il file si può reimportare.
+  Il CSV resta accettato dall’anteprima.
 
 ## Metriche e audit
 

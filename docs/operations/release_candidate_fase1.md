@@ -31,12 +31,12 @@ feature_flags:
     SHOW_WAIVER_TAB: false             # apps/web/src/pages/MarketHubPage.tsx
     SHOW_VOLUNTARY_RELEASE: false      # apps/web/src/pages/MarketPage.tsx
     SHOW_MARKET_HISTORY: false         # apps/web/src/pages/MarketPage.tsx
-    SHOW_ROSTER_CSV_IMPORT: false      # apps/web/src/pages/RosterPage.tsx
+    # Rose Excel admin attive (modello, export, import .xlsx) in RosterPage
   mobile:
     SHOW_WAIVER_TAB: false             # apps/mobile/src/navigation/marketHubTabs.ts
     SHOW_VOLUNTARY_RELEASE: false      # apps/mobile/src/screens/MarketScreen.tsx
     SHOW_MARKET_HISTORY: false         # apps/mobile/src/screens/MarketScreen.tsx
-    SHOW_ROSTER_CSV_IMPORT: false      # apps/mobile/src/screens/RosterScreen.tsx
+    # Rose Excel admin attive in RosterScreen
   # I 4 flag sono ora allineati identicamente su entrambe le piattaforme
   # (corretto il 26/09/2026, Blocco C1 — vedi registro_requisiti_fase1.md).
 ```

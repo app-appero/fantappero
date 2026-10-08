@@ -699,27 +699,63 @@ a.fa-member-list__identity:focus-visible {
   white-space: nowrap;
 }
 
-.fa-roster-adjust-card {
-  width: 100%;
+.fa-roster-credits-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.75rem;
 }
 
-.fa-roster-adjust-card .fa-card__body {
+.fa-roster-credits-bar .fa-field {
+  margin: 0;
+  min-width: 9rem;
+  flex: 1 1 9rem;
+  max-width: 16rem;
+}
+
+.fa-roster-credits-bar__balance {
+  margin: 0;
+  white-space: nowrap;
+  font-size: var(--fa-text-sm);
+}
+
+.fa-roster-adjust {
+  position: relative;
+}
+
+.fa-roster-adjust__popover {
+  position: absolute;
+  z-index: 30;
+  top: calc(100% + 0.35rem);
+  right: 0;
+  display: grid;
+  gap: 0.5rem;
+  width: min(16rem, calc(100vw - 2rem));
+  padding: 0.75rem;
+  border: 1px solid var(--fa-color-border);
+  border-radius: var(--fa-radius-md);
+  background: var(--fa-color-background-elevated);
+  box-shadow: 0 8px 24px rgb(0 0 0 / 18%);
+}
+
+.fa-roster-adjust__popover .fa-field {
+  margin: 0;
+  min-width: 0;
+  max-width: none;
+}
+
+.fa-roster-excel .fa-card__body {
   padding: var(--fa-space-sm) var(--fa-space-md);
 }
 
-.fa-roster-adjust-card__row {
+.fa-roster-excel__actions {
   display: flex;
   flex-wrap: wrap;
-  align-items: flex-end;
-  gap: var(--fa-space-sm);
+  gap: 0.5rem;
 }
 
-.fa-roster-adjust-card__row .fa-field {
-  margin: 0;
-}
-
-.fa-roster-adjust-card [data-testid="roster-adjust-amount"] {
-  width: 6rem;
+.fa-roster-excel__preview {
+  margin-top: 0.75rem;
 }
 
 .fa-roster-role-tables {

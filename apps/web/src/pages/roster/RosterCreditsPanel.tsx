@@ -1,5 +1,6 @@
 import type { FantasyTeamSummary, CreditAccount } from "@fantappero/contracts";
-import { Button, Card, CardBody, Input, Select } from "@fantappero/ui";
+import { Button, Input, Select } from "@fantappero/ui";
+import { useState } from "react";
 
 export function RosterCreditsPanel({
   isAdmin,
@@ -34,56 +35,65 @@ export function RosterCreditsPanel({
   adjustMessage: string | null;
   adjustError: string | null;
 }) {
+  const [open, setOpen] = useState(false);
+
   return (
-    <Card data-testid="roster-credits" className="fa-roster-adjust-card">
-      <CardBody>
-        <div className="fa-roster-target-header__row">
-          {isAdmin && leagueTeams.length > 0 ? (
-            <Select
-              label="Squadra"
-              name="roster-admin-team"
-              data-testid="roster-admin-team"
-              value={adminTeamId}
-              onChange={(event) => onSelectAdminTeam(event.target.value)}
-              disabled={adminBusy || adjusting}
-              options={leagueTeams.map((row) => ({
-                value: row.id,
-                label: `${row.name}${row.userType === "ai" ? " (IA)" : ""} (${row.filledSlots}/${row.rosterSize})`,
-              }))}
-            />
+    <div className="fa-roster-credits-bar" data-testid="roster-credits">
+      {isAdmin && leagueTeams.length > 0 ? (
+        <Select
+          aria-label="Squadra"
+          name="roster-admin-team"
+          data-testid="roster-admin-team"
+          value={adminTeamId}
+          onChange={(event) => onSelectAdminTeam(event.target.value)}
+          disabled={adminBusy || adjusting}
+          options={leagueTeams.map((row) => ({
+            value: row.id,
+            label: `${row.name}${row.userType === "ai" ? " (IA)" : ""}`,
+          }))}
+        />
+      ) : null}
+      <p data-testid="roster-credits-balance" className="fa-roster-credits-bar__balance">
+        Crediti residui: <strong>{credits?.balance ?? "—"}</strong>
+      </p>
+      {isAdmin ? (
+        <div className="fa-roster-adjust" data-testid="roster-admin-credits">
+          <Button
+            type="button"
+            variant="secondary"
+            aria-expanded={open}
+            onClick={() => setOpen((current) => !current)}
+          >
+            Aggiusta crediti
+          </Button>
+          {open ? (
+            <div className="fa-roster-adjust__popover" role="dialog" aria-label="Aggiusta crediti">
+              <Input
+                label="Importo"
+                type="number"
+                data-testid="roster-adjust-amount"
+                value={adjustAmount}
+                onChange={(event) => onAdjustAmountChange(event.target.value)}
+              />
+              <Input
+                label="Nota"
+                data-testid="roster-adjust-note"
+                value={adjustNote}
+                onChange={(event) => onAdjustNoteChange(event.target.value)}
+              />
+              <Button
+                type="button"
+                disabled={adjusting || !hasAdjustTarget}
+                onClick={() => void onAdminAdjust()}
+              >
+                {adjusting ? "Registrazione…" : "Registra"}
+              </Button>
+              {adjustMessage ? <p data-testid="roster-adjust-ok">{adjustMessage}</p> : null}
+              {adjustError ? <p data-testid="roster-adjust-error">{adjustError}</p> : null}
+            </div>
           ) : null}
-          <p data-testid="roster-credits-balance" className="fa-roster-target-header__credits">
-            Crediti residui: <strong>{credits?.balance ?? "—"}</strong>
-          </p>
         </div>
-        {isAdmin ? (
-          <div className="fa-roster-adjust-card__row" data-testid="roster-admin-credits">
-            <Input
-              label="Importo"
-              type="number"
-              data-testid="roster-adjust-amount"
-              value={adjustAmount}
-              onChange={(event) => onAdjustAmountChange(event.target.value)}
-            />
-            <Input
-              label="Nota"
-              data-testid="roster-adjust-note"
-              value={adjustNote}
-              onChange={(event) => onAdjustNoteChange(event.target.value)}
-            />
-            <Button
-              type="button"
-              variant="secondary"
-              disabled={adjusting || !hasAdjustTarget}
-              onClick={() => void onAdminAdjust()}
-            >
-              {adjusting ? "Registrazione…" : "Aggiusta crediti"}
-            </Button>
-          </div>
-        ) : null}
-        {isAdmin && adjustMessage ? <p data-testid="roster-adjust-ok">{adjustMessage}</p> : null}
-        {isAdmin && adjustError ? <p data-testid="roster-adjust-error">{adjustError}</p> : null}
-      </CardBody>
-    </Card>
+      ) : null}
+    </div>
   );
 }

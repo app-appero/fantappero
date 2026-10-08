@@ -59,7 +59,8 @@ import type {
   TransitionLeagueStateRequest,
   UpdateLeagueRulesRequest,
 } from "@fantappero/contracts";
-import { apiRequest, apiUpload } from "./client";
+import { loadMobileEnv } from "../config/env";
+import { ApiError, apiRequest, apiUpload } from "./client";
 
 export function fetchCompetitions(accessToken: string): Promise<CompetitionSummary[]> {
   return apiRequest<CompetitionSummary[]>("/leagues/competitions", { accessToken });
@@ -492,6 +493,37 @@ export function postAdminCreditMovement(
     accessToken,
     body,
   });
+}
+
+export function downloadRosterExcelTemplate(
+  accessToken: string,
+  leagueId: string,
+): Promise<ArrayBuffer> {
+  return downloadLeagueFile(
+    accessToken,
+    `/leagues/${leagueId}/amministrazione/import-csv/modello?formato=xlsx`,
+  );
+}
+
+export function downloadRosterExcelExport(
+  accessToken: string,
+  leagueId: string,
+): Promise<ArrayBuffer> {
+  return downloadLeagueFile(accessToken, `/leagues/${leagueId}/amministrazione/rose/excel`);
+}
+
+async function downloadLeagueFile(accessToken: string, path: string): Promise<ArrayBuffer> {
+  const baseUrl = loadMobileEnv().expoPublicApiBaseUrl;
+  const response = await fetch(`${baseUrl}${path}`, {
+    headers: {
+      Accept: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/octet-stream,*/*",
+      Authorization: `Bearer ${accessToken}`,
+    },
+  });
+  if (!response.ok) {
+    throw new ApiError("Download Excel non riuscito.", response.status, "download_failed");
+  }
+  return response.arrayBuffer();
 }
 
 export function previewRosterCsvImport(

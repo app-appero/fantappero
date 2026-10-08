@@ -113,6 +113,12 @@ from fantasy_teams.validators import (
     validate_purchase_credits,
     validate_slot_index,
 )
+from fantasy_teams.xlsx_roster import (
+    is_xlsx,
+    rows_to_xlsx_bytes,
+    template_xlsx_bytes,
+    xlsx_to_csv_bytes,
+)
 from leagues.models.league import League
 from leagues.models.league_audit_event import LeagueAuditEvent
 from leagues.models.league_membership import LeagueMembership
@@ -1125,6 +1131,33 @@ class FantasyTeamService:
     def download_csv_template(self) -> bytes:
         return csv_template_bytes()
 
+    def download_xlsx_template(self) -> bytes:
+        return template_xlsx_bytes()
+
+    def export_roster_xlsx(self, league_access: LeagueAccess) -> bytes:
+        """Current assigned players, one row per slot, ready to re-import."""
+        teams = self._session.scalars(
+            select(FantasyTeam)
+            .where(FantasyTeam.league_id == league_access.league.id)
+            .options(selectinload(FantasyTeam.slots).selectinload(FantasyRosterSlot.athlete))
+            .order_by(FantasyTeam.name.asc())
+        ).all()
+        rows: list[tuple[str, int, str, int]] = []
+        for team in teams:
+            for slot in sorted(team.slots, key=lambda item: item.slot_index):
+                athlete = slot.athlete
+                if athlete is None:
+                    continue
+                rows.append(
+                    (
+                        team.name,
+                        athlete.provider_id,
+                        athlete.canonical_name,
+                        slot.purchase_credits or 0,
+                    )
+                )
+        return rows_to_xlsx_bytes(rows)
+
     def preview_csv_import(
         self,
         league_access: LeagueAccess,
@@ -1133,7 +1166,8 @@ class FantasyTeamService:
         filename: str | None,
     ) -> RosterImportPreviewResponse:
         league = self._lock_league(league_access.league.id)
-        parsed = parse_roster_csv(data)
+        file_sha = sha256_hex(data)
+        parsed = parse_roster_csv(xlsx_to_csv_bytes(data) if is_xlsx(data) else data)
         rows = build_preview_rows(
             self._session,
             league_id=league.id,
@@ -1149,7 +1183,7 @@ class FantasyTeamService:
             league_id=league.id,
             actor_id=league_access.user.id,
             status=RosterImportStatus.DRAFT,
-            file_sha256=sha256_hex(data),
+            file_sha256=file_sha,
             original_filename=(filename or "")[:255] or None,
             preview_payload=payload,
             row_count=len(rows),

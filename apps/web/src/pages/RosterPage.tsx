@@ -18,7 +18,8 @@ import {
   assignRosterSlot,
   confirmRosterCsvImport,
   createRosterTurnSnapshot,
-  downloadRosterCsvTemplate,
+  downloadRosterExcelExport,
+  downloadRosterExcelTemplate,
   ensureFantasyTeams,
   fetchFantasyTeamCreditsForAdmin,
   fetchFantasyTeamForAdmin,
@@ -74,11 +75,12 @@ import {
 } from "./roster/rosterHelpers";
 import { RosterHistorySection } from "./roster/RosterHistorySection";
 import { RosterSectionTabs } from "./roster/RosterSectionTabs";
-
-/** Rosa fantasy, ledger crediti e inserimento manuale admin (EP05-01/02/03).
- * EP05-04 CSV import UI is implemented but temporarily hidden (`SHOW_ROSTER_CSV_IMPORT`).
- */
-const SHOW_ROSTER_CSV_IMPORT = false;
+import {
+  buildRosterXlsx,
+  downloadBlob,
+  ROSTER_XLSX_EXPORT_NAME,
+  ROSTER_XLSX_TEMPLATE_NAME,
+} from "./roster/rosterXlsx";
 
 export function RosterPage() {
   const { isDemoMode, activeLeagueId, activeLeague, can } = useAuth();
@@ -790,17 +792,11 @@ export function RosterPage() {
     setCsvError(null);
     setCsvMessage(null);
     if (isDemoMode) {
-      const blob = new Blob(
-        ["squadra,provider_id,nome,crediti\nSquadra Esempio,12345,Nome Calciatore,10\n"],
-        { type: "text/csv;charset=utf-8" },
+      downloadBlob(
+        buildRosterXlsx([["Squadra Esempio", 12345, "Nome Calciatore", 10]]),
+        ROSTER_XLSX_TEMPLATE_NAME,
       );
-      const url = URL.createObjectURL(blob);
-      const anchor = document.createElement("a");
-      anchor.href = url;
-      anchor.download = "fantappero-import-rosa.csv";
-      anchor.click();
-      URL.revokeObjectURL(url);
-      setCsvMessage("Modello CSV scaricato (demo).");
+      setCsvMessage("Modello Excel scaricato (demo).");
       return;
     }
     if (!activeLeagueId) {
@@ -813,16 +809,50 @@ export function RosterPage() {
       return;
     }
     try {
-      const blob = await downloadRosterCsvTemplate(stored.accessToken, activeLeagueId);
-      const url = URL.createObjectURL(blob);
-      const anchor = document.createElement("a");
-      anchor.href = url;
-      anchor.download = "fantappero-import-rosa.csv";
-      anchor.click();
-      URL.revokeObjectURL(url);
-      setCsvMessage("Modello CSV scaricato.");
+      const blob = await downloadRosterExcelTemplate(stored.accessToken, activeLeagueId);
+      downloadBlob(blob, ROSTER_XLSX_TEMPLATE_NAME);
+      setCsvMessage("Modello Excel scaricato.");
     } catch (error) {
-      setCsvError(getApiErrorMessage(error, "Impossibile scaricare il modello CSV."));
+      setCsvError(getApiErrorMessage(error, "Impossibile scaricare il modello Excel."));
+    }
+  };
+
+  const onDownloadRosterExport = async () => {
+    setCsvError(null);
+    setCsvMessage(null);
+    if (isDemoMode) {
+      const rows = [DEMO_TEAM, DEMO_TEAM_B].flatMap((team) =>
+        team.slots
+          .filter((slot) => slot.athleteName)
+          .map(
+            (slot, index) =>
+              [
+                team.name,
+                index + 1,
+                slot.athleteName ?? "",
+                slot.purchaseCredits ?? 0,
+              ] as [string, number, string, number],
+          ),
+      );
+      downloadBlob(buildRosterXlsx(rows), ROSTER_XLSX_EXPORT_NAME);
+      setCsvMessage("Rose esportate in Excel (demo).");
+      return;
+    }
+    if (!activeLeagueId) {
+      setCsvError("Seleziona una lega.");
+      return;
+    }
+    const stored = loadStoredSession();
+    if (!stored?.accessToken) {
+      setCsvError("Sessione non disponibile. Accedi di nuovo.");
+      return;
+    }
+    try {
+      const blob = await downloadRosterExcelExport(stored.accessToken, activeLeagueId);
+      downloadBlob(blob, ROSTER_XLSX_EXPORT_NAME);
+      setCsvMessage("Rose esportate in Excel.");
+    } catch (error) {
+      setCsvError(getApiErrorMessage(error, "Impossibile esportare le rose."));
     }
   };
 
@@ -890,7 +920,7 @@ export function RosterPage() {
         setCsvError("Anteprima con errori: correggi il file o risolvi le ambiguità.");
       }
     } catch (error) {
-      setCsvError(getApiErrorMessage(error, "Impossibile elaborare il CSV."));
+      setCsvError(getApiErrorMessage(error, "Impossibile elaborare il file Excel."));
     } finally {
       setCsvBusy(false);
     }
@@ -900,13 +930,13 @@ export function RosterPage() {
     setCsvError(null);
     setCsvMessage(null);
     if (!csvPreview) {
-      setCsvError("Carica prima un file CSV.");
+      setCsvError("Importa prima un file Excel.");
       return;
     }
     if (isDemoMode) {
       setCsvBusy(true);
       window.setTimeout(() => {
-        setCsvMessage("Import CSV confermato (demo).");
+        setCsvMessage("Import Excel confermato (demo).");
         setCsvPreview(null);
         setCsvBusy(false);
       }, 200);
@@ -941,7 +971,7 @@ export function RosterPage() {
       await loadRoster();
       await loadEditContext(adminTeamId || undefined);
     } catch (error) {
-      setCsvError(getApiErrorMessage(error, "Impossibile confermare l'import CSV."));
+      setCsvError(getApiErrorMessage(error, "Impossibile confermare l'import Excel."));
     } finally {
       setCsvBusy(false);
     }
@@ -1421,26 +1451,25 @@ export function RosterPage() {
 
       {isAdmin && !showForbidden && !loading ? (
         <>
-          {SHOW_ROSTER_CSV_IMPORT ? (
-            <RosterCsvImportCard
-              csvBusy={csvBusy}
-              onDownloadCsvTemplate={onDownloadCsvTemplate}
-              csvFileInputRef={csvFileInputRef}
-              onCsvFileSelected={onCsvFileSelected}
-              csvCanConfirm={csvCanConfirm}
-              onConfirmCsvImport={onConfirmCsvImport}
-              csvMessage={csvMessage}
-              csvError={csvError}
-              csvPreview={csvPreview}
-              csvResolutions={csvResolutions}
-              onCsvResolutionChange={(rowNumber, athleteId) =>
-                setCsvResolutions((current) => ({
-                  ...current,
-                  [rowNumber]: athleteId,
-                }))
-              }
-            />
-          ) : null}
+          <RosterCsvImportCard
+            csvBusy={csvBusy}
+            onDownloadCsvTemplate={onDownloadCsvTemplate}
+            onDownloadRosterExport={onDownloadRosterExport}
+            csvFileInputRef={csvFileInputRef}
+            onCsvFileSelected={onCsvFileSelected}
+            csvCanConfirm={csvCanConfirm}
+            onConfirmCsvImport={onConfirmCsvImport}
+            csvMessage={csvMessage}
+            csvError={csvError}
+            csvPreview={csvPreview}
+            csvResolutions={csvResolutions}
+            onCsvResolutionChange={(rowNumber, athleteId) =>
+              setCsvResolutions((current) => ({
+                ...current,
+                [rowNumber]: athleteId,
+              }))
+            }
+          />
 
           <RosterAdminToolsPanel
             ensuring={ensuring}

@@ -58,7 +58,46 @@ export const rosterStyles = lazyStyles(() => StyleSheet.create({
     color: colors.muted,
   },
   credits: {
-    marginBottom: spacing.md,
+    marginBottom: spacing.sm,
+    gap: spacing.xs,
+  },
+  creditsRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+  },
+  creditsBalance: {
+    flex: 1,
+    fontSize: typography.fontSize.sm,
+    color: colors.foreground,
+  },
+  creditsButton: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    backgroundColor: colors.background,
+  },
+  creditsButtonLabel: {
+    fontSize: typography.fontSize.sm,
+    fontWeight: typography.fontWeight.semibold,
+    color: colors.foreground,
+  },
+  adjustBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.45)",
+    justifyContent: "flex-end",
+  },
+  adjustBackdropTap: {
+    flex: 1,
+  },
+  adjustSheet: {
+    backgroundColor: colors.backgroundElevated,
+    borderTopLeftRadius: radius.lg,
+    borderTopRightRadius: radius.lg,
+    padding: spacing.md,
+    gap: spacing.xs,
   },
   inlineAdjust: {
     marginBottom: spacing.sm,
@@ -115,6 +154,11 @@ export const rosterStyles = lazyStyles(() => StyleSheet.create({
     gap: spacing.xs,
     marginBottom: spacing.sm,
   },
+  chipRowNowrap: {
+    flexWrap: "nowrap",
+    marginBottom: 0,
+    paddingBottom: spacing.xs,
+  },
   chip: {
     borderWidth: 1,
     borderColor: colors.border,
@@ -149,6 +193,20 @@ export const rosterStyles = lazyStyles(() => StyleSheet.create({
   csvInput: {
     minHeight: 120,
     textAlignVertical: "top",
+  },
+  excelCard: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    padding: spacing.sm,
+    marginBottom: spacing.sm,
+    backgroundColor: colors.background,
+    gap: spacing.xs,
+  },
+  excelActions: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: spacing.xs,
   },
   button: {
     marginTop: spacing.sm,

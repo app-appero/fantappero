@@ -501,6 +501,18 @@ export function downloadRosterCsvTemplate(accessToken: string, leagueId: string)
   });
 }
 
+export function downloadRosterExcelTemplate(accessToken: string, leagueId: string): Promise<Blob> {
+  return apiRequestBlob(`/leagues/${leagueId}/amministrazione/import-csv/modello?formato=xlsx`, {
+    accessToken,
+  });
+}
+
+export function downloadRosterExcelExport(accessToken: string, leagueId: string): Promise<Blob> {
+  return apiRequestBlob(`/leagues/${leagueId}/amministrazione/rose/excel`, {
+    accessToken,
+  });
+}
+
 export function previewRosterCsvImport(
   accessToken: string,
   leagueId: string,
@@ -880,12 +892,12 @@ async function apiRequestBlob(
   const apiBaseUrl = resolveApiBaseUrl(getWebEnv().viteApiBaseUrl);
   const response = await fetch(`${apiBaseUrl}${path}`, {
     headers: {
-      Accept: "text/csv,application/octet-stream,*/*",
+      Accept: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv,application/octet-stream,*/*",
       Authorization: `Bearer ${options.accessToken}`,
     },
   });
   if (!response.ok) {
-    throw new ApiError("Download modello CSV non riuscito.", response.status, "download_failed");
+    throw new ApiError("Download Excel non riuscito.", response.status, "download_failed");
   }
   return response.blob();
 }

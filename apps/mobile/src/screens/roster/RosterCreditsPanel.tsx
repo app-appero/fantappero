@@ -1,5 +1,6 @@
 import type { CreditAccount, FantasyTeamSummary } from "@fantappero/contracts";
-import { Pressable, Text, View } from "react-native";
+import { useState } from "react";
+import { Modal, Pressable, ScrollView, Text, View } from "react-native";
 import { AppTextInput as TextInput } from "../../components/AppTextInput";
 import { rosterStyles as styles } from "./rosterStyles";
 
@@ -36,72 +37,98 @@ export function RosterCreditsPanel({
   adjustMessage: string | null;
   adjustError: string | null;
 }) {
+  const [open, setOpen] = useState(false);
+
   return (
     <View style={styles.credits} testID="roster-credits">
       {isAdmin && leagueTeams.length > 0 ? (
-        <>
-          <Text style={styles.summary}>Squadra target</Text>
-          <View style={styles.chipRow} testID="roster-admin-team">
-            {leagueTeams.map((row) => {
-              const selected = row.id === adminTeamId;
-              return (
-                <Pressable
-                  key={row.id}
-                  style={[styles.chip, selected && styles.chipSelected]}
-                  disabled={adminBusy || adjusting}
-                  onPress={() => onSelectAdminTeam(row.id)}
-                >
-                  <Text style={[styles.chipLabel, selected && styles.chipLabelSelected]}>
-                    {row.name} ({row.filledSlots}/{row.rosterSize})
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </View>
-        </>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={[styles.chipRow, styles.chipRowNowrap]}
+          testID="roster-admin-team"
+        >
+          {leagueTeams.map((row) => {
+            const selected = row.id === adminTeamId;
+            return (
+              <Pressable
+                key={row.id}
+                style={[styles.chip, selected && styles.chipSelected]}
+                disabled={adminBusy || adjusting}
+                onPress={() => onSelectAdminTeam(row.id)}
+              >
+                <Text style={[styles.chipLabel, selected && styles.chipLabelSelected]} numberOfLines={1}>
+                  {row.name}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </ScrollView>
       ) : null}
-      <Text style={styles.summary} testID="roster-credits-balance">
-        Crediti residui: {credits?.balance ?? "—"}
-        {credits ? ` (v${credits.version})` : ""}
-      </Text>
-      {isAdmin ? (
-        <View style={styles.inlineAdjust} testID="roster-admin-credits">
-          <TextInput
-            style={styles.input}
-            value={adjustAmount}
-            onChangeText={onAdjustAmountChange}
-            keyboardType="numeric"
-            placeholder="Importo"
-            testID="roster-adjust-amount"
-          />
-          <TextInput
-            style={styles.input}
-            value={adjustNote}
-            onChangeText={onAdjustNoteChange}
-            placeholder="Nota"
-            testID="roster-adjust-note"
-          />
+      <View style={styles.creditsRow}>
+        <Text style={styles.creditsBalance} testID="roster-credits-balance" numberOfLines={1}>
+          Crediti residui: {credits?.balance ?? "—"}
+        </Text>
+        {isAdmin ? (
           <Pressable
-            style={[styles.button, (adjusting || !hasAdjustTarget) && styles.disabled]}
-            disabled={adjusting || !hasAdjustTarget}
-            onPress={() => void onAdminAdjust()}
+            style={styles.creditsButton}
+            onPress={() => setOpen(true)}
+            testID="roster-admin-credits"
           >
-            <Text style={styles.buttonLabel}>
-              {adjusting ? "Registrazione…" : "Aggiusta crediti"}
-            </Text>
+            <Text style={styles.creditsButtonLabel}>Aggiusta crediti</Text>
           </Pressable>
-          {adjustMessage ? (
-            <Text style={styles.ok} testID="roster-adjust-ok">
-              {adjustMessage}
-            </Text>
-          ) : null}
-          {adjustError ? (
-            <Text style={styles.error} testID="roster-adjust-error">
-              {adjustError}
-            </Text>
-          ) : null}
+        ) : null}
+      </View>
+      <Modal
+        visible={open}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setOpen(false)}
+      >
+        <View style={styles.adjustBackdrop}>
+          <Pressable style={styles.adjustBackdropTap} onPress={() => setOpen(false)} />
+          <View style={styles.adjustSheet} testID="roster-adjust-sheet">
+            <Text style={styles.cardTitle}>Aggiusta crediti</Text>
+            <TextInput
+              style={styles.input}
+              value={adjustAmount}
+              onChangeText={onAdjustAmountChange}
+              keyboardType="numeric"
+              placeholder="Importo"
+              testID="roster-adjust-amount"
+            />
+            <TextInput
+              style={styles.input}
+              value={adjustNote}
+              onChangeText={onAdjustNoteChange}
+              placeholder="Nota"
+              testID="roster-adjust-note"
+            />
+            <Pressable
+              style={[styles.button, (adjusting || !hasAdjustTarget) && styles.disabled]}
+              disabled={adjusting || !hasAdjustTarget}
+              onPress={() => void onAdminAdjust()}
+            >
+              <Text style={styles.buttonLabel}>
+                {adjusting ? "Registrazione…" : "Registra"}
+              </Text>
+            </Pressable>
+            {adjustMessage ? (
+              <Text style={styles.ok} testID="roster-adjust-ok">
+                {adjustMessage}
+              </Text>
+            ) : null}
+            {adjustError ? (
+              <Text style={styles.error} testID="roster-adjust-error">
+                {adjustError}
+              </Text>
+            ) : null}
+            <Pressable style={styles.creditsButton} onPress={() => setOpen(false)}>
+              <Text style={styles.creditsButtonLabel}>Chiudi</Text>
+            </Pressable>
+          </View>
         </View>
-      ) : null}
+      </Modal>
     </View>
   );
 }

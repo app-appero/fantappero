@@ -19,6 +19,8 @@ import {
   assignRosterSlot,
   confirmRosterCsvImport,
   createRosterTurnSnapshot,
+  downloadRosterExcelExport,
+  downloadRosterExcelTemplate,
   ensureFantasyTeams,
   fetchFantasyTeamCreditsForAdmin,
   fetchFantasyTeamForAdmin,
@@ -33,7 +35,7 @@ import {
   fetchRosterTurnSnapshots,
   fetchTeamRosterHistoryForAdmin,
   postAdminCreditMovement,
-  previewRosterCsvImportText,
+  previewRosterCsvImport,
   releaseRosterSlot,
 } from "../api/leagues";
 import { ScreenTabs } from "../components/ScreenTabs";
@@ -62,10 +64,7 @@ import { RosterHistorySection } from "./roster/RosterHistorySection";
 import { RosterSectionTabs } from "./roster/RosterSectionTabs";
 import { rosterStyles as styles } from "./roster/rosterStyles";
 
-/** Rosa fantasy, ledger crediti e inserimento manuale admin (EP05-01/02/03).
- * EP05-04 CSV import UI is implemented but temporarily hidden (`SHOW_ROSTER_CSV_IMPORT`).
- */
-const SHOW_ROSTER_CSV_IMPORT = false;
+/** Rosa fantasy, ledger crediti, inserimento manuale e import Excel admin. */
 
 export function RosterScreen() {
   const navigation = useNavigation<NavigationProp<AppTabParamList>>();
@@ -103,9 +102,6 @@ export function RosterScreen() {
   const [adminMessage, setAdminMessage] = useState<string | null>(null);
   const [adminError, setAdminError] = useState<string | null>(null);
   const [ledgerPage, setLedgerPage] = useState(0);
-  const [csvText, setCsvText] = useState(
-    "squadra,provider_id,nome,crediti\n",
-  );
   const [csvPreview, setCsvPreview] = useState<RosterImportPreview | null>(null);
   const [csvBusy, setCsvBusy] = useState(false);
   const [csvMessage, setCsvMessage] = useState<string | null>(null);
@@ -462,7 +458,66 @@ export function RosterScreen() {
     }
   };
 
-  const onPreviewCsvText = async () => {
+  const shareExcel = async (buffer: ArrayBuffer, filename: string) => {
+    const FileSystem = await import("expo-file-system");
+    const Sharing = await import("expo-sharing");
+    const file = new FileSystem.File(FileSystem.Paths.cache, filename);
+    if (file.exists) {
+      file.delete();
+    }
+    file.create();
+    file.write(new Uint8Array(buffer));
+    const canShare = await Sharing.isAvailableAsync();
+    if (!canShare) {
+      setCsvMessage(`File pronto: ${filename}`);
+      return;
+    }
+    await Sharing.shareAsync(file.uri, {
+      mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      UTI: "org.openxmlformats.spreadsheetml.sheet",
+      dialogTitle: filename,
+    });
+  };
+
+  const onDownloadExcelTemplate = async () => {
+    setCsvError(null);
+    setCsvMessage(null);
+    if (!activeLeagueId || !accessToken) {
+      setCsvError("Sessione o lega non disponibile.");
+      return;
+    }
+    setCsvBusy(true);
+    try {
+      const buffer = await downloadRosterExcelTemplate(accessToken, activeLeagueId);
+      await shareExcel(buffer, "fantappero-import-rosa.xlsx");
+      setCsvMessage("Modello Excel pronto.");
+    } catch (error) {
+      setCsvError(getApiErrorMessage(error, "Impossibile scaricare il modello Excel."));
+    } finally {
+      setCsvBusy(false);
+    }
+  };
+
+  const onExportRosters = async () => {
+    setCsvError(null);
+    setCsvMessage(null);
+    if (!activeLeagueId || !accessToken) {
+      setCsvError("Sessione o lega non disponibile.");
+      return;
+    }
+    setCsvBusy(true);
+    try {
+      const buffer = await downloadRosterExcelExport(accessToken, activeLeagueId);
+      await shareExcel(buffer, "fantappero-rose.xlsx");
+      setCsvMessage("Rose esportate in Excel.");
+    } catch (error) {
+      setCsvError(getApiErrorMessage(error, "Impossibile esportare le rose."));
+    } finally {
+      setCsvBusy(false);
+    }
+  };
+
+  const onPickExcel = async () => {
     setCsvError(null);
     setCsvMessage(null);
     setCsvPreview(null);
@@ -470,19 +525,32 @@ export function RosterScreen() {
       setCsvError("Sessione o lega non disponibile.");
       return;
     }
-    setCsvBusy(true);
     try {
-      const preview = await previewRosterCsvImportText(
-        accessToken,
-        activeLeagueId,
-        csvText,
-      );
+      const DocumentPicker = await import("expo-document-picker");
+      const picked = await DocumentPicker.getDocumentAsync({
+        type: [
+          "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+          "application/vnd.ms-excel",
+        ],
+        copyToCacheDirectory: true,
+        multiple: false,
+      });
+      if (picked.canceled || !picked.assets[0]) {
+        return;
+      }
+      const asset = picked.assets[0];
+      setCsvBusy(true);
+      const preview = await previewRosterCsvImport(accessToken, activeLeagueId, {
+        uri: asset.uri,
+        name: asset.name || "rose.xlsx",
+        type: asset.mimeType || "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      });
       setCsvPreview(preview);
       if (preview.errorCount > 0) {
-        setCsvError("Anteprima con errori: correggi il testo CSV.");
+        setCsvError("Anteprima con errori: correggi il file Excel.");
       }
     } catch (error) {
-      setCsvError(getApiErrorMessage(error, "Impossibile elaborare il CSV."));
+      setCsvError(getApiErrorMessage(error, "Impossibile elaborare il file Excel."));
     } finally {
       setCsvBusy(false);
     }
@@ -492,7 +560,7 @@ export function RosterScreen() {
     setCsvError(null);
     setCsvMessage(null);
     if (!csvPreview || !activeLeagueId || !accessToken) {
-      setCsvError("Genera prima un'anteprima valida.");
+      setCsvError("Importa prima un file Excel.");
       return;
     }
     setCsvBusy(true);
@@ -510,7 +578,7 @@ export function RosterScreen() {
       await loadRoster({ silent: true });
       await loadEditContext(adminTeamId || undefined);
     } catch (error) {
-      setCsvError(getApiErrorMessage(error, "Impossibile confermare l'import CSV."));
+      setCsvError(getApiErrorMessage(error, "Impossibile confermare l'import Excel."));
     } finally {
       setCsvBusy(false);
     }
@@ -828,18 +896,16 @@ export function RosterScreen() {
 
       {isAdmin && canView && !loading ? (
         <>
-          {SHOW_ROSTER_CSV_IMPORT ? (
-            <RosterCsvImportCard
-              csvText={csvText}
-              onCsvTextChange={setCsvText}
-              csvBusy={csvBusy}
-              onPreviewCsvText={onPreviewCsvText}
-              csvPreview={csvPreview}
-              onConfirmCsvImport={onConfirmCsvImport}
-              csvMessage={csvMessage}
-              csvError={csvError}
-            />
-          ) : null}
+          <RosterCsvImportCard
+            csvBusy={csvBusy}
+            onDownloadTemplate={onDownloadExcelTemplate}
+            onExportRosters={onExportRosters}
+            onPickExcel={onPickExcel}
+            csvPreview={csvPreview}
+            onConfirmCsvImport={onConfirmCsvImport}
+            csvMessage={csvMessage}
+            csvError={csvError}
+          />
 
           <RosterAdminToolsPanel
             ensuring={ensuring}

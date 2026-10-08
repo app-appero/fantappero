@@ -1,73 +1,76 @@
 import type { RosterImportPreview } from "@fantappero/contracts";
 import { Pressable, Text, View } from "react-native";
-import { AppTextInput as TextInput } from "../../components/AppTextInput";
 import { rosterStyles as styles } from "./rosterStyles";
 
 export function RosterCsvImportCard({
-  csvText,
-  onCsvTextChange,
   csvBusy,
-  onPreviewCsvText,
+  onDownloadTemplate,
+  onExportRosters,
+  onPickExcel,
   csvPreview,
   onConfirmCsvImport,
   csvMessage,
   csvError,
 }: {
-  csvText: string;
-  onCsvTextChange: (value: string) => void;
   csvBusy: boolean;
-  onPreviewCsvText: () => void | Promise<void>;
+  onDownloadTemplate: () => void | Promise<void>;
+  onExportRosters: () => void | Promise<void>;
+  onPickExcel: () => void | Promise<void>;
   csvPreview: RosterImportPreview | null;
   onConfirmCsvImport: () => void | Promise<void>;
   csvMessage: string | null;
   csvError: string | null;
 }) {
   return (
-    <View style={styles.card} testID="roster-csv-import">
-      <Text style={styles.cardTitle}>Import CSV rose</Text>
-      <Text style={styles.meta}>
-        Incolla il CSV (colonne squadra,provider_id,nome,crediti), genera anteprima e conferma
-        solo senza errori.
-      </Text>
-      <TextInput
-        style={[styles.input, styles.csvInput]}
-        multiline
-        value={csvText}
-        onChangeText={onCsvTextChange}
-        editable={!csvBusy}
-        testID="roster-csv-text"
-        autoCapitalize="none"
-        autoCorrect={false}
-      />
-      <Pressable
-        style={[styles.button, csvBusy && styles.disabled]}
-        disabled={csvBusy}
-        onPress={() => void onPreviewCsvText()}
-        testID="roster-csv-preview-btn"
-      >
-        <Text style={styles.buttonLabel}>{csvBusy ? "Elaborazione…" : "Anteprima CSV"}</Text>
-      </Pressable>
-      <Pressable
-        style={[styles.button, (csvBusy || !csvPreview?.canConfirm) && styles.disabled]}
-        disabled={csvBusy || !csvPreview?.canConfirm}
-        onPress={() => void onConfirmCsvImport()}
-        testID="roster-csv-confirm"
-      >
-        <Text style={styles.buttonLabel}>Conferma import</Text>
-      </Pressable>
+    <View style={styles.excelCard} testID="roster-excel-import">
+      <Text style={styles.cardTitle}>Rose Excel</Text>
+      <View style={styles.excelActions}>
+        <Pressable
+          style={[styles.creditsButton, csvBusy && styles.disabled]}
+          disabled={csvBusy}
+          onPress={() => void onDownloadTemplate()}
+          testID="roster-excel-template"
+        >
+          <Text style={styles.creditsButtonLabel}>Modello</Text>
+        </Pressable>
+        <Pressable
+          style={[styles.creditsButton, csvBusy && styles.disabled]}
+          disabled={csvBusy}
+          onPress={() => void onExportRosters()}
+          testID="roster-excel-export"
+        >
+          <Text style={styles.creditsButtonLabel}>Esporta</Text>
+        </Pressable>
+        <Pressable
+          style={[styles.creditsButton, csvBusy && styles.disabled]}
+          disabled={csvBusy}
+          onPress={() => void onPickExcel()}
+          testID="roster-excel-upload"
+        >
+          <Text style={styles.creditsButtonLabel}>{csvBusy ? "…" : "Importa"}</Text>
+        </Pressable>
+        <Pressable
+          style={[styles.creditsButton, (csvBusy || !csvPreview?.canConfirm) && styles.disabled]}
+          disabled={csvBusy || !csvPreview?.canConfirm}
+          onPress={() => void onConfirmCsvImport()}
+          testID="roster-excel-confirm"
+        >
+          <Text style={styles.creditsButtonLabel}>Conferma</Text>
+        </Pressable>
+      </View>
       {csvPreview ? (
-        <Text style={styles.meta} testID="roster-csv-preview">
+        <Text style={styles.meta} testID="roster-excel-preview">
           Anteprima: {csvPreview.rowCount} righe · errori {csvPreview.errorCount} · avvisi{" "}
           {csvPreview.warningCount}
         </Text>
       ) : null}
       {csvMessage ? (
-        <Text style={styles.ok} testID="roster-csv-ok">
+        <Text style={styles.ok} testID="roster-excel-ok">
           {csvMessage}
         </Text>
       ) : null}
       {csvError ? (
-        <Text style={styles.error} testID="roster-csv-error">
+        <Text style={styles.error} testID="roster-excel-error">
           {csvError}
         </Text>
       ) : null}
