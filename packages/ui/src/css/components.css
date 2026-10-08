@@ -1039,6 +1039,7 @@ button.fa-pitch-player {
 }
 
 .fa-market-gate {
+  position: relative;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -1077,7 +1078,6 @@ button.fa-pitch-player {
 
 .fa-market-gate__info {
   display: none;
-  position: relative;
 }
 
 .fa-info-badge {
@@ -1101,9 +1101,11 @@ button.fa-pitch-player {
 .fa-market-gate__popover {
   position: absolute;
   z-index: 30;
-  top: calc(100% + 0.35rem);
-  left: 0;
-  width: min(18rem, 70vw);
+  top: calc(100% + 0.25rem);
+  left: 0.5rem;
+  right: 0.5rem;
+  width: auto;
+  white-space: normal;
   padding: var(--fa-space-sm);
   border: 1px solid var(--fa-color-border);
   border-radius: var(--fa-radius-md);

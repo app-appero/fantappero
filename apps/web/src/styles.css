@@ -758,6 +758,13 @@ a.fa-member-list__identity:focus-visible {
   margin-top: 0.75rem;
 }
 
+@media (max-width: 767px) {
+  .fa-roster-adjust__popover {
+    left: 0;
+    right: auto;
+  }
+}
+
 .fa-roster-role-tables {
   display: grid;
   gap: var(--fa-space-lg);
