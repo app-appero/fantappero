@@ -122,6 +122,7 @@ function ListoneTable({
   canReleaseAthlete,
   emptySlotsCount,
   adminBusy,
+  listoneQuery,
   onReleaseAthlete,
   onAssignAthlete,
 }: {
@@ -131,13 +132,14 @@ function ListoneTable({
   canReleaseAthlete: (ownerTeamId: string) => boolean;
   emptySlotsCount: number;
   adminBusy: boolean;
+  listoneQuery: string;
   onReleaseAthlete: (athleteId: string) => void | Promise<void>;
   onAssignAthlete: (athleteId: string, purchaseCredits: number) => void | Promise<void>;
 }) {
   const [page, setPage] = useState(0);
   useEffect(() => {
     setPage(0);
-  }, [rows]);
+  }, [listoneQuery, tabValue]);
   const pageCount = Math.max(1, Math.ceil(rows.length / LISTONE_PAGE_SIZE));
   const safePage = Math.min(page, pageCount - 1);
   const pagedRows = rows.slice(
@@ -373,6 +375,7 @@ export function RosterAdminManualCard({
                             canReleaseAthlete={canReleaseAthlete}
                             emptySlotsCount={emptySlotsCount}
                             adminBusy={adminBusy}
+                            listoneQuery={listoneQuery}
                             onReleaseAthlete={onReleaseAthlete}
                             onAssignAthlete={onAssignAthlete}
                           />

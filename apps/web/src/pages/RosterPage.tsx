@@ -1109,6 +1109,11 @@ export function RosterPage() {
       setAdminError("Sessione non disponibile. Accedi di nuovo.");
       return;
     }
+    const athlete = listone.find((entry) => entry.athleteId === athleteId);
+    const previousTeam = targetTeam;
+    applyTeamUpdate(
+      teamWithAssignedAthlete(previousTeam, emptySlot.slotIndex, athlete, athleteId, credits),
+    );
     setAdminBusy(true);
     try {
       const updated = await assignRosterSlot(
@@ -1127,6 +1132,7 @@ export function RosterPage() {
         }.`,
       );
     } catch (error) {
+      applyTeamUpdate(previousTeam);
       setAdminError(getApiErrorMessage(error, "Impossibile assegnare il calciatore."));
     } finally {
       setAdminBusy(false);
@@ -1256,6 +1262,13 @@ export function RosterPage() {
       setAdminError("Sessione non disponibile. Accedi di nuovo.");
       return;
     }
+    const previousTeam =
+      teamDetails.find((row) => row.id === owner.teamId) ??
+      (team?.id === owner.teamId ? team : null) ??
+      (adminTeam?.id === owner.teamId ? adminTeam : null);
+    if (previousTeam) {
+      applyTeamUpdate(teamWithReleasedAthlete(previousTeam, owner.slotIndex));
+    }
     setAdminBusy(true);
     try {
       const updated = await releaseRosterSlot(
@@ -1268,6 +1281,9 @@ export function RosterPage() {
       await refreshViewedCredits(stored.accessToken, activeLeagueId);
       setAdminMessage(`Rimosso da ${owner.teamName}.`);
     } catch (error) {
+      if (previousTeam) {
+        applyTeamUpdate(previousTeam);
+      }
       setAdminError(getApiErrorMessage(error, "Impossibile liberare lo slot."));
     } finally {
       setAdminBusy(false);
@@ -1540,4 +1556,50 @@ export function RosterPage() {
       ) : null}
     </PageContainer>
   );
+}
+
+function teamWithAssignedAthlete(
+  team: FantasyTeam,
+  slotIndex: number,
+  athlete: LeagueListoneEntry | undefined,
+  athleteId: string,
+  purchaseCredits: number,
+): FantasyTeam {
+  const updated: FantasyTeam = {
+    ...team,
+    slots: team.slots.map((slot) =>
+      slot.slotIndex === slotIndex
+        ? {
+            ...slot,
+            athleteId,
+            athleteName: athlete?.canonicalName ?? "Calciatore",
+            clubName: athlete?.clubName ?? null,
+            role: athlete?.effectiveRole ?? null,
+            purchaseCredits,
+          }
+        : slot,
+    ),
+  };
+  updated.filledSlots = updated.slots.filter((slot) => slot.athleteId).length;
+  return updated;
+}
+
+function teamWithReleasedAthlete(team: FantasyTeam, slotIndex: number): FantasyTeam {
+  const updated: FantasyTeam = {
+    ...team,
+    slots: team.slots.map((slot) =>
+      slot.slotIndex === slotIndex
+        ? {
+            ...slot,
+            athleteId: null,
+            athleteName: null,
+            clubName: null,
+            role: null,
+            purchaseCredits: null,
+          }
+        : slot,
+    ),
+  };
+  updated.filledSlots = updated.slots.filter((slot) => slot.athleteId).length;
+  return updated;
 }
