@@ -148,6 +148,37 @@ export const rosterStyles = lazyStyles(() => StyleSheet.create({
   adjust: {
     marginTop: spacing.md,
   },
+  freeToggle: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.xs,
+    marginTop: spacing.xs,
+    marginBottom: spacing.sm,
+  },
+  freeBox: {
+    width: 18,
+    height: 18,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 4,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.background,
+  },
+  freeBoxOn: {
+    borderColor: colors.accent,
+    backgroundColor: colors.accent,
+  },
+  freeMark: {
+    color: colors.accentContrast,
+    fontSize: 12,
+    lineHeight: 14,
+    fontWeight: typography.fontWeight.semibold,
+  },
+  freeLabel: {
+    color: colors.foreground,
+    fontSize: typography.fontSize.sm,
+  },
   chipRow: {
     flexDirection: "row",
     flexWrap: "wrap",

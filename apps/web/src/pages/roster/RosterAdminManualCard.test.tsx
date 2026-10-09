@@ -114,4 +114,62 @@ describe("listone pagination stays on the clicked page", () => {
     expect(container.textContent).toContain("Rosa demo");
     expect(container.textContent).toContain("Calciatore 20");
   });
+
+  it("hides owned players until a search asks for them", () => {
+    function FilterHarness() {
+      const [query, setQuery] = useState("");
+      const ownership = new Map<string, AthleteOwnership>([
+        ["athlete-0", { teamId: DEMO_TEAM.id, teamName: DEMO_TEAM.name, slotIndex: 0 }],
+      ]);
+      return createElement(RosterAdminManualCard, {
+        isAdmin: true,
+        adminLoadError: null,
+        leagueTeams: DEMO_TEAMS,
+        targetTeam: DEMO_TEAM,
+        emptySlotsCount: 10,
+        adminMessage: null,
+        adminError: null,
+        listone: entries.slice(0, 3),
+        listoneQuery: query,
+        onListoneQueryChange: setQuery,
+        roleTab: "all",
+        onRoleTabChange: () => undefined,
+        ownership,
+        canReleaseAthlete: () => true,
+        adminBusy: false,
+        onReleaseAthlete: () => undefined,
+        onAssignAthlete: () => undefined,
+      });
+    }
+
+    container = document.createElement("div");
+    document.body.appendChild(container);
+    root = createRoot(container);
+    act(() => {
+      root?.render(createElement(FilterHarness));
+    });
+    expect(container.textContent).toContain("Calciatore 0");
+    expect(container.textContent).toContain("Calciatore 1");
+
+    const checkbox = container.querySelector(
+      '[data-testid="roster-listone-only-free"]',
+    ) as HTMLInputElement;
+    act(() => {
+      checkbox.click();
+    });
+    expect(container.textContent).not.toContain("Calciatore 0");
+    expect(container.textContent).toContain("Calciatore 1");
+
+    const search = container.querySelector(
+      '[data-testid="roster-admin-listone-search"]',
+    ) as HTMLInputElement;
+    act(() => {
+      const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
+      setter?.call(search, "Calciatore 0");
+      search.dispatchEvent(new Event("input", { bubbles: true }));
+      search.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+    expect(container.textContent).toContain("Calciatore 0");
+    expect(container.textContent).not.toContain("Calciatore 1");
+  });
 });

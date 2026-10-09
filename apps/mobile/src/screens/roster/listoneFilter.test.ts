@@ -49,4 +49,16 @@ describe("filterListone", () => {
     );
     assert.deepEqual(filterListone(listone, "P", "venezia"), []);
   });
+
+  it("hides owned players only when the free filter is on and the search is empty", () => {
+    const owned = new Set(["2"]);
+    assert.deepEqual(
+      filterListone(listone, "all", "", true, owned).map((row) => row.athleteId),
+      ["1", "3"],
+    );
+    assert.deepEqual(
+      filterListone(listone, "A", "adams", true, owned).map((row) => row.athleteId),
+      ["2"],
+    );
+  });
 });

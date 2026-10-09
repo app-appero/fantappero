@@ -123,6 +123,7 @@ function ListoneTable({
   emptySlotsCount,
   adminBusy,
   listoneQuery,
+  onlyFree,
   onReleaseAthlete,
   onAssignAthlete,
 }: {
@@ -133,13 +134,15 @@ function ListoneTable({
   emptySlotsCount: number;
   adminBusy: boolean;
   listoneQuery: string;
+  onlyFree: boolean;
   onReleaseAthlete: (athleteId: string) => void | Promise<void>;
   onAssignAthlete: (athleteId: string, purchaseCredits: number) => void | Promise<void>;
 }) {
   const [page, setPage] = useState(0);
+  const availabilityKey = listoneQuery.trim() ? "search" : onlyFree ? "free" : "all";
   useEffect(() => {
     setPage(0);
-  }, [listoneQuery, tabValue]);
+  }, [listoneQuery, tabValue, availabilityKey]);
   const pageCount = Math.max(1, Math.ceil(rows.length / LISTONE_PAGE_SIZE));
   const safePage = Math.min(page, pageCount - 1);
   const pagedRows = rows.slice(
@@ -255,6 +258,8 @@ export function RosterAdminManualCard({
   onReleaseAthlete: (athleteId: string) => void | Promise<void>;
   onAssignAthlete: (athleteId: string, purchaseCredits: number) => void | Promise<void>;
 }) {
+  const [onlyFree, setOnlyFree] = useState(false);
+  const ownedAthleteIds = new Set(ownership.keys());
   return (
     <Card data-testid="roster-admin-manual">
       <CardHeader>
@@ -328,7 +333,7 @@ export function RosterAdminManualCard({
               />
             ) : (
               <>
-                <div className="fa-roster-listone__search" style={{ marginBottom: "0.75rem" }}>
+                <div className="fa-roster-listone__search">
                   <Input
                     label="Cerca calciatore"
                     name="roster-listone-query"
@@ -337,6 +342,15 @@ export function RosterAdminManualCard({
                     onChange={(event) => onListoneQueryChange(event.target.value)}
                     data-testid="roster-admin-listone-search"
                   />
+                  <label className="fa-roster-listone__free">
+                    <input
+                      type="checkbox"
+                      checked={onlyFree}
+                      onChange={(event) => setOnlyFree(event.target.checked)}
+                      data-testid="roster-listone-only-free"
+                    />
+                    Solo disponibili
+                  </label>
                 </div>
                 <Tabs
                   value={roleTab}
@@ -351,7 +365,13 @@ export function RosterAdminManualCard({
                     ))}
                   </TabList>
                   {ROLE_TABS.map((tab) => {
-                    const rows = filterListone(listone, tab.value, listoneQuery);
+                    const rows = filterListone(
+                      listone,
+                      tab.value,
+                      listoneQuery,
+                      onlyFree,
+                      ownedAthleteIds,
+                    );
                     return (
                       <TabPanel key={tab.value} value={tab.value}>
                         {rows.length === 0 ? (
@@ -361,9 +381,11 @@ export function RosterAdminManualCard({
                             message={
                               listoneQuery.trim()
                                 ? "Nessun risultato per la ricerca corrente."
-                                : tab.value === "all"
-                                  ? "Il listone è vuoto."
-                                  : `Nessun ${ROLE_LABEL[tab.value as FantasyRole].toLowerCase()} nel listone.`
+                                : onlyFree
+                                  ? "Nessun calciatore libero."
+                                  : tab.value === "all"
+                                    ? "Il listone è vuoto."
+                                    : `Nessun ${ROLE_LABEL[tab.value as FantasyRole].toLowerCase()} nel listone.`
                             }
                             testId={`roster-admin-listone-empty-${tab.value}`}
                           />
@@ -376,6 +398,7 @@ export function RosterAdminManualCard({
                             emptySlotsCount={emptySlotsCount}
                             adminBusy={adminBusy}
                             listoneQuery={listoneQuery}
+                            onlyFree={onlyFree}
                             onReleaseAthlete={onReleaseAthlete}
                             onAssignAthlete={onAssignAthlete}
                           />

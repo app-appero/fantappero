@@ -24,9 +24,15 @@ export function filterListone(
   entries: LeagueListoneEntry[],
   tab: RoleTab,
   query: string,
+  onlyFree = false,
+  ownedAthleteIds?: ReadonlySet<string>,
 ): LeagueListoneEntry[] {
   const normalized = query.trim().toLocaleLowerCase("it-IT");
+  const hideOwned = onlyFree && normalized.length === 0;
   return filterByTab(entries, tab).filter((entry) => {
+    if (hideOwned && ownedAthleteIds?.has(entry.athleteId)) {
+      return false;
+    }
     if (!normalized) {
       return true;
     }

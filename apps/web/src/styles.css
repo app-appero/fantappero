@@ -744,6 +744,25 @@ a.fa-member-list__identity:focus-visible {
   max-width: none;
 }
 
+.fa-roster-listone__search {
+  margin-bottom: 0.75rem;
+}
+
+.fa-roster-listone__free {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin: 0.35rem 0 0;
+  font-size: 0.9rem;
+}
+
+.fa-roster-listone__free input {
+  width: 1.05rem;
+  height: 1.05rem;
+  margin: 0;
+  accent-color: var(--fa-color-accent);
+}
+
 .fa-roster-excel .fa-card__body {
   padding: var(--fa-space-sm) var(--fa-space-md);
 }
