@@ -102,8 +102,6 @@ export function AdminUsersPage() {
     } catch (actionError) {
       if (actionError instanceof ApiError && actionError.code === "last_operator") {
         setError("Non puoi revocare l'ultimo operatore rimasto sulla piattaforma.");
-      } else if (actionError instanceof ApiError && actionError.code === "cannot_impersonate_operator") {
-        setError("Non puoi impersonare un altro operatore.");
       } else if (actionError instanceof ApiError && actionError.code === "cannot_impersonate_self") {
         setError("Non puoi impersonare te stesso.");
       } else if (actionError instanceof ApiError && actionError.status === 403) {
@@ -178,6 +176,16 @@ export function AdminUsersPage() {
                 {row.platformRole === "operator" ? "Operatore" : "Utente"}
               </Badge>
               <span className="fa-admin-users__actions">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  loading={workingId === row.id}
+                  onClick={() => setPending({ user: row, kind: "impersonate" })}
+                  data-testid={`admin-user-impersonate-${row.id}`}
+                >
+                  Impersona
+                </Button>
                 {row.platformRole === "operator" ? (
                   <Button
                     type="button"
@@ -190,28 +198,16 @@ export function AdminUsersPage() {
                     Revoca operator
                   </Button>
                 ) : (
-                  <>
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="ghost"
-                      loading={workingId === row.id}
-                      onClick={() => setPending({ user: row, kind: "impersonate" })}
-                      data-testid={`admin-user-impersonate-${row.id}`}
-                    >
-                      Impersona
-                    </Button>
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="primary"
-                      loading={workingId === row.id}
-                      onClick={() => setPending({ user: row, kind: "promote" })}
-                      data-testid={`admin-user-promote-${row.id}`}
-                    >
-                      Promuovi a operator
-                    </Button>
-                  </>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="primary"
+                    loading={workingId === row.id}
+                    onClick={() => setPending({ user: row, kind: "promote" })}
+                    data-testid={`admin-user-promote-${row.id}`}
+                  >
+                    Promuovi a operator
+                  </Button>
                 )}
               </span>
             </li>

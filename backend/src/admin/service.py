@@ -10,7 +10,6 @@ from sqlalchemy.orm import Session, selectinload
 
 from admin.exceptions import (
     AdminUserNotFoundError,
-    CannotImpersonateOperatorError,
     CannotImpersonateSelfError,
     LastOperatorRevokeError,
 )
@@ -185,16 +184,15 @@ class AdminService:
         No refresh token is issued and no `AuthSession` row is created: the
         impersonated session expires on its own after
         `jwt_access_token_expire_minutes`, exactly like a normal access token,
-        and cannot be silently renewed. Restricted to non-operator targets so an
-        operator can't use this to act as another operator. Every start is
-        audited (`league_id=None`, same pattern as promote/revoke) — there is no
-        "end" event since the token simply expires.
+        and cannot be silently renewed. Operators can target other operators
+        too (EP-operatore-test) — only impersonating yourself is blocked.
+        Every start is audited (`league_id=None`, same pattern as
+        promote/revoke) — there is no "end" event since the token simply
+        expires.
         """
         user = self._get_user_or_raise(target_user_id)
         if user.id == actor.id:
             raise CannotImpersonateSelfError()
-        if user.platform_role == PlatformRole.OPERATOR:
-            raise CannotImpersonateOperatorError()
 
         access_token, expires_in = create_access_token(
             user_id=user.id,

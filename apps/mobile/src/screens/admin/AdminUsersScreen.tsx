@@ -125,8 +125,6 @@ export function AdminUsersScreen() {
     } catch (actionError) {
       if (actionError instanceof ApiError && actionError.code === "last_operator") {
         setError("Non puoi revocare l'ultimo operatore rimasto sulla piattaforma.");
-      } else if (actionError instanceof ApiError && actionError.code === "cannot_impersonate_operator") {
-        setError("Non puoi impersonare un altro operatore.");
       } else if (actionError instanceof ApiError && actionError.code === "cannot_impersonate_self") {
         setError("Non puoi impersonare te stesso.");
       } else if (actionError instanceof ApiError && actionError.status === 403) {
@@ -202,6 +200,14 @@ export function AdminUsersScreen() {
                   {row.platformRole === "operator" ? "Operatore" : "Utente"}
                 </Text>
               </View>
+              <Pressable
+                style={[styles.secondaryButton, workingId === row.id && styles.disabled]}
+                disabled={workingId === row.id}
+                onPress={() => setPending({ user: row, kind: "impersonate" })}
+                testID={`admin-user-impersonate-${row.id}`}
+              >
+                <Text style={styles.secondaryButtonLabel}>Impersona</Text>
+              </Pressable>
               {row.platformRole === "operator" ? (
                 <Pressable
                   style={[styles.secondaryButton, workingId === row.id && styles.disabled]}
@@ -212,24 +218,14 @@ export function AdminUsersScreen() {
                   <Text style={styles.secondaryButtonLabel}>Revoca operator</Text>
                 </Pressable>
               ) : (
-                <>
-                  <Pressable
-                    style={[styles.secondaryButton, workingId === row.id && styles.disabled]}
-                    disabled={workingId === row.id}
-                    onPress={() => setPending({ user: row, kind: "impersonate" })}
-                    testID={`admin-user-impersonate-${row.id}`}
-                  >
-                    <Text style={styles.secondaryButtonLabel}>Impersona</Text>
-                  </Pressable>
-                  <Pressable
-                    style={[styles.button, workingId === row.id && styles.disabled]}
-                    disabled={workingId === row.id}
-                    onPress={() => setPending({ user: row, kind: "promote" })}
-                    testID={`admin-user-promote-${row.id}`}
-                  >
-                    <Text style={styles.buttonLabel}>Promuovi a operator</Text>
-                  </Pressable>
-                </>
+                <Pressable
+                  style={[styles.button, workingId === row.id && styles.disabled]}
+                  disabled={workingId === row.id}
+                  onPress={() => setPending({ user: row, kind: "promote" })}
+                  testID={`admin-user-promote-${row.id}`}
+                >
+                  <Text style={styles.buttonLabel}>Promuovi a operator</Text>
+                </Pressable>
               )}
             </View>
           ))}
