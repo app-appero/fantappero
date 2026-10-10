@@ -36,8 +36,10 @@ import {
   saveLineupDraft,
   saveMyLineup,
 } from "../api/leagues";
+import { LockCountdown } from "../components/LockCountdown";
 import { UiStatePanel } from "../components/UiStatePanel";
 import { PageContainer } from "../layout/PageContainer";
+import { useLockCountdown } from "../matchday/useLockCountdown";
 import { getApiErrorMessage, useAuthSession } from "../session/DemoSessionContext";
 
 const { colors, spacing, typography, radius } = theme;
@@ -171,6 +173,7 @@ export function FormationScreen() {
   const canView = can(["roster:view"]);
   const canEdit = can(["roster:edit"]);
   const isAdmin = can(["league:admin"]);
+  const { countdown, refetch: refetchCountdown } = useLockCountdown(accessToken, activeLeagueId);
 
   const [turns, setTurns] = useState<FantasyTurnSummary[]>([]);
   const [selectedRoundId, setSelectedRoundId] = useState("");
@@ -640,6 +643,14 @@ export function FormationScreen() {
         <Text style={styles.meta} testID="formation-cutoff">
           Turno {context.roundNumber} — cutoff {formatDateTime(context.cutoffAt)}
         </Text>
+        {countdown && countdown.roundId === context.roundId ? (
+          <LockCountdown
+            state={countdown.state}
+            nextLockAt={countdown.nextLockAt}
+            onExpire={refetchCountdown}
+            testID="formation-lock-countdown"
+          />
+        ) : null}
         <Text style={styles.meta} testID="formation-lock-hint">
           {context.modificationAllowed
             ? "I calciatori la cui partita è già iniziata restano bloccati anche se l'orario viene rinviato; gli altri restano modificabili."

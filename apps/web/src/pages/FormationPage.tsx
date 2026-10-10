@@ -36,6 +36,7 @@ import {
   CardBody,
   CardHeader,
   FootballPitch,
+  LockCountdown,
   PageContainer,
   Select,
   UiStatePanel,
@@ -55,6 +56,7 @@ import {
 } from "../api/leagues";
 import { getApiErrorMessage, useAuth } from "../auth/AuthContext";
 import { loadStoredSession } from "../auth/sessionStorage";
+import { useLockCountdown } from "../matchday/useLockCountdown";
 import { useLocation } from "../router/simpleRouter";
 import { parseWireframeStateFromSearch } from "../wireframes/useWireframeState";
 
@@ -401,6 +403,9 @@ export function FormationPage() {
   const canView = can(["roster:view"]);
   const canEdit = can(["roster:edit"]);
   const { push: pushToast } = useToast();
+  const { countdown, refetch: refetchCountdown } = useLockCountdown(
+    !isDemoMode ? activeLeagueId : null,
+  );
 
   const [turns, setTurns] = useState<FantasyTurnSummary[]>(() =>
     isDemoMode && demoState === "success" ? DEMO_TURNS : [],
@@ -1159,6 +1164,14 @@ export function FormationPage() {
                 Cutoff (primo kickoff): {formatDateTime(context.cutoffAt)} — lock progressivo per
                 calciatore
               </p>
+              {countdown && countdown.roundId === context.roundId ? (
+                <LockCountdown
+                  state={countdown.state}
+                  nextLockAt={countdown.nextLockAt}
+                  onExpire={refetchCountdown}
+                  data-testid="formation-lock-countdown"
+                />
+              ) : null}
               <p data-testid="formation-lock-hint">
                 {context.modificationAllowed
                   ? "I calciatori la cui partita è già iniziata restano bloccati anche se l'orario viene rinviato; gli altri restano modificabili."

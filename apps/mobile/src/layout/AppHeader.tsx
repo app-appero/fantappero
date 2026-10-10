@@ -5,6 +5,8 @@ import { useState } from "react";
 import { Modal, Pressable, StyleSheet, Text, View } from "react-native";
 import { BrandLogo } from "../components/BrandLogo";
 import { LeagueSelector } from "../components/LeagueSelector";
+import { LockCountdown } from "../components/LockCountdown";
+import { useLockCountdown } from "../matchday/useLockCountdown";
 import { NavIcon } from "../navigation/NavIcons";
 
 const { colors, spacing, typography, radius } = theme;
@@ -15,6 +17,8 @@ export type AppHeaderProps = {
   showLeagueSelector?: boolean;
   leagues?: readonly { value: string; label: string }[];
   activeLeagueId?: string | null;
+  /** Serve alla hook del conto alla rovescia lock formazione (solo surface app). */
+  accessToken?: string | null;
   onLeagueChange?: (leagueId: string) => void;
   /** Crea lega / Unisciti con codice — il + dell'header apre il modale (EP13-P01). */
   onCreateLeaguePress?: () => void;
@@ -36,6 +40,7 @@ export function AppHeader({
   showLeagueSelector = false,
   leagues = [],
   activeLeagueId,
+  accessToken,
   onLeagueChange,
   onCreateLeaguePress,
   onJoinLeaguePress,
@@ -50,6 +55,10 @@ export function AppHeader({
   const isAdmin = surface === "admin";
   const [leagueMenuOpen, setLeagueMenuOpen] = useState(false);
   const canAddLeague = Boolean(onCreateLeaguePress || onJoinLeaguePress);
+  const { countdown, refetch: refetchCountdown } = useLockCountdown(
+    accessToken ?? null,
+    !isAdmin && showLeagueSelector && activeLeagueId ? activeLeagueId : null,
+  );
 
   function openLeagueAction(action: (() => void) | undefined) {
     setLeagueMenuOpen(false);
@@ -115,6 +124,14 @@ export function AppHeader({
                 leagues={leagues}
                 value={activeLeagueId}
                 onChange={onLeagueChange}
+              />
+            ) : null}
+            {countdown ? (
+              <LockCountdown
+                state={countdown.state}
+                nextLockAt={countdown.nextLockAt}
+                onExpire={refetchCountdown}
+                testID="header-lock-countdown"
               />
             ) : null}
             {canAddLeague ? (

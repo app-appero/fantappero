@@ -10,12 +10,14 @@ from sqlalchemy import delete, select
 from sqlalchemy.orm import Session, selectinload
 
 from auth.exceptions import ValidationAuthError
-from authorization.context import LeagueAccess
+from authorization.context import LeagueAccess, PermissionContext
+from authorization.permissions import has_permissions
 from database.enums import (
     FantasyRole,
     FantasyTurnStatus,
     LeagueAuditAction,
     LineupSlotKind,
+    Permission,
     RosterCompositionStatus,
     TacticalMoveStatus,
 )
@@ -105,6 +107,16 @@ class FantasyLineupService:
     def __init__(self, session: Session) -> None:
         self._session = session
 
+    def _actor_bypasses_kickoff_lock(self, league_access: LeagueAccess) -> bool:
+        """Operatori piattaforma restano sempre liberi dal lock per-calciatore
+        (EP-operatore-test): utile soprattutto in fase di test, per non
+        restare bloccati da una partita già iniziata come un coach normale.
+        Non tocca il gate a livello di turno (resta chiuso su SCHEDULED/SKIPPED)
+        né il requisito di avere una propria squadra nella lega.
+        """
+        context = PermissionContext.for_user(league_access.user, league_access=league_access)
+        return has_permissions(context, (Permission.GLOBAL_OPERATE,))
+
     def get_my_lineup(
         self,
         league_access: LeagueAccess,
@@ -132,7 +144,7 @@ class FantasyLineupService:
         roster = self._roster_rows(league_access.league.season_year, team)
         submission = self._load_submission(fantasy_round.id, team.id)
         return self._to_context(
-            league_id=league_access.league.id,
+            league_access=league_access,
             fantasy_round=fantasy_round,
             roster=roster,
             submission=submission,
@@ -263,11 +275,15 @@ class FantasyLineupService:
             for_update=True,
         )
         lock_margin = self._lineup_lock_margin_for_league(league_access.league.id)
-        locked_ids = [
-            str(row.athlete_id)
-            for row in roster
-            if self._is_row_locked(row.athlete_id, kickoffs, now, lock_margin)
-        ]
+        locked_ids = (
+            []
+            if self._actor_bypasses_kickoff_lock(league_access)
+            else [
+                str(row.athlete_id)
+                for row in roster
+                if self._is_row_locked(row.athlete_id, kickoffs, now, lock_margin)
+            ]
+        )
         submission = self._load_submission(fantasy_round.id, team.id, for_update=True)
 
         roles_by_id = self._validation_roles(
@@ -337,7 +353,7 @@ class FantasyLineupService:
             bench_ids=self._bench_order_from_submission(submission),
         ):
             return self._to_context(
-                league_id=league_access.league.id,
+                league_access=league_access,
                 fantasy_round=fantasy_round,
                 roster=roster,
                 submission=submission,
@@ -445,7 +461,7 @@ class FantasyLineupService:
 
         submission = self._load_submission(fantasy_round.id, team.id)
         return self._to_context(
-            league_id=league_access.league.id,
+            league_access=league_access,
             fantasy_round=fantasy_round,
             roster=roster,
             submission=submission,
@@ -501,11 +517,15 @@ class FantasyLineupService:
             athlete_ids=[row.athlete_id for row in roster],
         )
         lock_margin = self._lineup_lock_margin_for_league(league_access.league.id)
-        locked_ids = [
-            str(row.athlete_id)
-            for row in roster
-            if self._is_row_locked(row.athlete_id, kickoffs, now, lock_margin)
-        ]
+        locked_ids = (
+            []
+            if self._actor_bypasses_kickoff_lock(league_access)
+            else [
+                str(row.athlete_id)
+                for row in roster
+                if self._is_row_locked(row.athlete_id, kickoffs, now, lock_margin)
+            ]
+        )
         submission = self._load_submission(fantasy_round.id, team.id, for_update=True)
         copied = copy_previous_lineup(
             previous_module=previous.module.value,
@@ -552,7 +572,7 @@ class FantasyLineupService:
         get_metrics().incr("fantasy_lineup_copied_total", labels={"result": "success"})
         logger.info("fantasy_lineup_copied", extra={"result": "success"})
         return self._to_context(
-            league_id=league_access.league.id,
+            league_access=league_access,
             fantasy_round=fantasy_round,
             roster=roster,
             submission=self._load_submission(fantasy_round.id, team.id),
@@ -627,11 +647,15 @@ class FantasyLineupService:
             athlete_ids=[row.athlete_id for row in roster],
         )
         lock_margin = self._lineup_lock_margin_for_league(league_access.league.id)
-        locked_ids = {
-            row.athlete_id
-            for row in roster
-            if self._is_row_locked(row.athlete_id, kickoffs, now, lock_margin)
-        }
+        locked_ids = (
+            set()
+            if self._actor_bypasses_kickoff_lock(league_access)
+            else {
+                row.athlete_id
+                for row in roster
+                if self._is_row_locked(row.athlete_id, kickoffs, now, lock_margin)
+            }
+        )
 
         if not locked_ids:
             plan = compute_best_lineup_for_team(
@@ -702,7 +726,7 @@ class FantasyLineupService:
         get_metrics().incr("fantasy_lineup_best_applied_total", labels={"result": "success"})
         logger.info("fantasy_lineup_best_applied", extra={"result": "success"})
         return self._to_context(
-            league_id=league_access.league.id,
+            league_access=league_access,
             fantasy_round=fantasy_round,
             roster=roster,
             submission=self._load_submission(fantasy_round.id, team.id),
@@ -756,11 +780,15 @@ class FantasyLineupService:
             athlete_ids=[row.athlete_id for row in roster],
         )
         lock_margin = self._lineup_lock_margin_for_league(league_access.league.id)
-        locked_ids = [
-            str(row.athlete_id)
-            for row in roster
-            if self._is_row_locked(row.athlete_id, kickoffs, now, lock_margin)
-        ]
+        locked_ids = (
+            []
+            if self._actor_bypasses_kickoff_lock(league_access)
+            else [
+                str(row.athlete_id)
+                for row in roster
+                if self._is_row_locked(row.athlete_id, kickoffs, now, lock_margin)
+            ]
+        )
         submission = self._load_submission(fantasy_round.id, team.id, for_update=True)
 
         roles_by_uuid = self._validation_roles(
@@ -847,7 +875,7 @@ class FantasyLineupService:
         get_metrics().incr("fantasy_lineup_draft_saved_total", labels={"result": "success"})
         logger.info("fantasy_lineup_draft_saved", extra={"result": "success"})
         return self._to_context(
-            league_id=league_access.league.id,
+            league_access=league_access,
             fantasy_round=fantasy_round,
             roster=roster,
             submission=self._load_submission(fantasy_round.id, team.id),
@@ -948,7 +976,7 @@ class FantasyLineupService:
     def _to_context(
         self,
         *,
-        league_id: UUID,
+        league_access: LeagueAccess,
         fantasy_round: FantasyRound,
         roster: list[_RosterRow],
         submission: LineupSubmission | None,
@@ -956,6 +984,7 @@ class FantasyLineupService:
         season_year: int,
         fantasy_team_id: UUID,
     ) -> LineupContextResponse:
+        league_id = league_access.league.id
         effective = derive_effective_status(
             fantasy_round.status,
             now=now,
@@ -972,8 +1001,11 @@ class FantasyLineupService:
             league_id=league_id,
         )
         lock_margin = self._lineup_lock_margin_for_league(league_id)
+        operator_bypass = self._actor_bypasses_kickoff_lock(league_access)
         locked_flags = {
-            row.athlete_id: self._is_row_locked(row.athlete_id, kickoffs, now, lock_margin)
+            row.athlete_id: (
+                False if operator_bypass else self._is_row_locked(row.athlete_id, kickoffs, now, lock_margin)
+            )
             for row in roster
         }
         any_unlocked = any(not locked for locked in locked_flags.values()) if roster else True

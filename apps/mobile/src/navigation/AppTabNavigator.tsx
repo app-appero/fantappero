@@ -221,6 +221,7 @@ function AppTabShell({
         showLeagueSelector={leagues.length > 0}
         leagues={leagues.map((league) => ({ value: league.id, label: league.name }))}
         activeLeagueId={activeLeagueId}
+        accessToken={accessToken}
         onLeagueChange={(leagueId) => {
           setActiveLeagueId(leagueId);
           navigation.navigate("LeagueHome", { leagueId });
