@@ -69,7 +69,7 @@ from fantasy_lineups.validators import (
 )
 from fantasy_teams.composition_service import resolve_effective_athlete_roles
 from fantasy_teams.factory import ensure_team_for_membership, find_team_for_membership
-from fantasy_teams.models import FantasyTeam
+from fantasy_teams.models import FantasyRosterSlot, FantasyTeam
 from fantasy_turns.models import FantasyRound, FantasyRoundFixture
 from fantasy_turns.rules import derive_effective_status
 from fantasy_turns.service import FantasyTurnService
@@ -121,6 +121,7 @@ class FantasyLineupService:
         self,
         league_access: LeagueAccess,
         round_id: UUID,
+        target_team_id: UUID | None = None,
     ) -> LineupContextResponse:
         now = datetime.now(UTC)
         fantasy_round = self._load_round(league_access.league.id, round_id)
@@ -130,17 +131,7 @@ class FantasyLineupService:
             actor_id=league_access.user.id,
             commit=True,
         )
-        membership = self._require_membership(league_access)
-        team, created = ensure_team_for_membership(
-            self._session,
-            membership,
-            name=self._default_team_name(league_access),
-            actor_id=league_access.user.id,
-        )
-        if created:
-            self._session.commit()
-        team = find_team_for_membership(self._session, membership.id, with_slots=True)
-        assert team is not None
+        team = self._resolve_lineup_team(league_access, target_team_id, ensure_created=True)
         roster = self._roster_rows(league_access.league.season_year, team)
         submission = self._load_submission(fantasy_round.id, team.id)
         return self._to_context(
@@ -223,6 +214,7 @@ class FantasyLineupService:
         league_access: LeagueAccess,
         round_id: UUID,
         payload: SaveLineupRequest,
+        target_team_id: UUID | None = None,
     ) -> LineupContextResponse:
         now = datetime.now(UTC)
         module_code = validate_module_code(payload.module)
@@ -245,10 +237,7 @@ class FantasyLineupService:
             commit=False,
         )
 
-        membership = self._require_membership(league_access)
-        self._lock_team_for_membership(league_access.league.id, membership.id)
-        team = find_team_for_membership(self._session, membership.id, with_slots=True)
-        assert team is not None
+        team = self._resolve_lineup_team(league_access, target_team_id, for_update=True)
 
         if team.composition_status != RosterCompositionStatus.VALIDATED:
             get_metrics().incr(
@@ -474,6 +463,7 @@ class FantasyLineupService:
         self,
         league_access: LeagueAccess,
         round_id: UUID,
+        target_team_id: UUID | None = None,
     ) -> LineupContextResponse:
         now = datetime.now(UTC)
         fantasy_round = self._load_round(league_access.league.id, round_id, for_update=True)
@@ -489,10 +479,7 @@ class FantasyLineupService:
             commit=False,
         )
 
-        membership = self._require_membership(league_access)
-        self._lock_team_for_membership(league_access.league.id, membership.id)
-        team = find_team_for_membership(self._session, membership.id, with_slots=True)
-        assert team is not None
+        team = self._resolve_lineup_team(league_access, target_team_id, for_update=True)
         try:
             self._require_validated_roster(team)
         except ValidationAuthError as exc:
@@ -585,6 +572,7 @@ class FantasyLineupService:
         self,
         league_access: LeagueAccess,
         round_id: UUID,
+        target_team_id: UUID | None = None,
     ) -> LineupContextResponse:
         """Precompila la bozza con la stessa formula ``ai_lineup_v1`` delle squadre IA.
 
@@ -618,10 +606,7 @@ class FantasyLineupService:
             commit=False,
         )
 
-        membership = self._require_membership(league_access)
-        self._lock_team_for_membership(league_access.league.id, membership.id)
-        team = find_team_for_membership(self._session, membership.id, with_slots=True)
-        assert team is not None
+        team = self._resolve_lineup_team(league_access, target_team_id, for_update=True)
         try:
             self._require_validated_roster(team)
         except ValidationAuthError as exc:
@@ -740,6 +725,7 @@ class FantasyLineupService:
         league_access: LeagueAccess,
         round_id: UUID,
         payload: SaveLineupDraftRequest,
+        target_team_id: UUID | None = None,
     ) -> LineupContextResponse:
         now = datetime.now(UTC)
         module_code = validate_module_code(payload.module)
@@ -759,10 +745,7 @@ class FantasyLineupService:
             commit=False,
         )
 
-        membership = self._require_membership(league_access)
-        self._lock_team_for_membership(league_access.league.id, membership.id)
-        team = find_team_for_membership(self._session, membership.id, with_slots=True)
-        assert team is not None
+        team = self._resolve_lineup_team(league_access, target_team_id, for_update=True)
         try:
             self._require_validated_roster(team)
         except ValidationAuthError as exc:
@@ -1557,6 +1540,61 @@ class FantasyLineupService:
         ).first()
         if team is None:
             raise ValidationAuthError("Squadra non trovata.", code="fantasy_team_not_found")
+        return team
+
+    def _resolve_lineup_team(
+        self,
+        league_access: LeagueAccess,
+        target_team_id: UUID | None,
+        *,
+        for_update: bool = False,
+        ensure_created: bool = False,
+    ) -> FantasyTeam:
+        """Team this request operates on (EP-operatore-test).
+
+        Normally the caller's own team (optionally created lazily on first
+        access, like before). An operator (`GLOBAL_OPERATE`) can instead
+        target any team already in the league via `target_team_id` — to set
+        up or fix a coach's lineup on their behalf, e.g. in test. Operators
+        never get a team auto-created this way: the target must already
+        exist, same as a normal coach who hasn't opened the roster yet.
+        """
+        if target_team_id is not None:
+            if not self._actor_bypasses_kickoff_lock(league_access):
+                raise ValidationAuthError(
+                    "Solo un operatore può gestire la formazione di un altro fantallenatore.",
+                    code="operator_required",
+                )
+            query = select(FantasyTeam).where(
+                FantasyTeam.id == target_team_id,
+                FantasyTeam.league_id == league_access.league.id,
+            )
+            if for_update:
+                query = query.with_for_update()
+            query = query.options(
+                selectinload(FantasyTeam.slots).selectinload(FantasyRosterSlot.athlete)
+            )
+            team = self._session.scalars(query).first()
+            if team is None:
+                raise ValidationAuthError("Squadra non trovata in questa lega.", code="fantasy_team_not_found")
+            return team
+
+        membership = self._require_membership(league_access)
+        if ensure_created:
+            team, created = ensure_team_for_membership(
+                self._session,
+                membership,
+                name=self._default_team_name(league_access),
+                actor_id=league_access.user.id,
+            )
+            if created:
+                self._session.commit()
+        team = (
+            self._lock_team_for_membership(league_access.league.id, membership.id)
+            if for_update
+            else find_team_for_membership(self._session, membership.id, with_slots=True)
+        )
+        assert team is not None
         return team
 
     def _default_team_name(self, league_access: LeagueAccess) -> str:

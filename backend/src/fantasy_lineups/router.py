@@ -61,12 +61,13 @@ def get_fantasy_lineup_service(
 )
 def get_my_lineup(
     round_id: UUID,
+    team_id: UUID | None = None,
     league_access: LeagueAccess = Depends(require_league_permissions(Permission.ROSTER_VIEW)),
     service: FantasyLineupService = Depends(get_fantasy_lineup_service),
 ) -> LineupContextResponse | JSONResponse:
-    """Formazione del chiamante per il turno (moduli, rosa, lock per kickoff)."""
+    """Formazione del chiamante (o, per un operatore, di ``team_id``) per il turno."""
     try:
-        return service.get_my_lineup(league_access, round_id)
+        return service.get_my_lineup(league_access, round_id, team_id)
     except AuthError as exc:
         return _error_response(exc)
 
@@ -98,12 +99,13 @@ def get_my_lock_countdown(
 def save_my_lineup(
     round_id: UUID,
     body: SaveLineupRequest,
+    team_id: UUID | None = None,
     league_access: LeagueAccess = Depends(require_league_permissions(Permission.ROSTER_EDIT)),
     service: FantasyLineupService = Depends(get_fantasy_lineup_service),
 ) -> LineupContextResponse | JSONResponse:
-    """Salva la formazione se modulo, panchina e lock per-calciatore sono validi."""
+    """Salva la formazione (del chiamante, o per un operatore quella di ``team_id``)."""
     try:
-        return service.save_my_lineup(league_access, round_id, body)
+        return service.save_my_lineup(league_access, round_id, body, team_id)
     except AuthError as exc:
         return _error_response(exc)
 
@@ -114,12 +116,13 @@ def save_my_lineup(
 )
 def copy_previous_lineup_to_draft(
     round_id: UUID,
+    team_id: UUID | None = None,
     league_access: LeagueAccess = Depends(require_league_permissions(Permission.ROSTER_EDIT)),
     service: FantasyLineupService = Depends(get_fantasy_lineup_service),
 ) -> LineupContextResponse | JSONResponse:
     """Copia la formazione precedente in bozza, rivalidata su rosa e lock correnti."""
     try:
-        return service.copy_previous_to_draft(league_access, round_id)
+        return service.copy_previous_to_draft(league_access, round_id, team_id)
     except AuthError as exc:
         return _error_response(exc)
 
@@ -130,12 +133,13 @@ def copy_previous_lineup_to_draft(
 )
 def apply_best_lineup(
     round_id: UUID,
+    team_id: UUID | None = None,
     league_access: LeagueAccess = Depends(require_league_permissions(Permission.ROSTER_EDIT)),
     service: FantasyLineupService = Depends(get_fantasy_lineup_service),
 ) -> LineupContextResponse | JSONResponse:
     """Precompila la bozza con la stessa formula ``ai_lineup_v1`` delle squadre IA."""
     try:
-        return service.apply_best_lineup(league_access, round_id)
+        return service.apply_best_lineup(league_access, round_id, team_id)
     except AuthError as exc:
         return _error_response(exc)
 
@@ -147,12 +151,13 @@ def apply_best_lineup(
 def save_my_lineup_draft(
     round_id: UUID,
     body: SaveLineupDraftRequest,
+    team_id: UUID | None = None,
     league_access: LeagueAccess = Depends(require_league_permissions(Permission.ROSTER_EDIT)),
     service: FantasyLineupService = Depends(get_fantasy_lineup_service),
 ) -> LineupContextResponse | JSONResponse:
     """Salva una bozza incompleta senza confermare né consumare mosse tattiche."""
     try:
-        return service.save_my_draft(league_access, round_id, body)
+        return service.save_my_draft(league_access, round_id, body, team_id)
     except AuthError as exc:
         return _error_response(exc)
 

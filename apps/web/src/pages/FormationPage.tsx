@@ -1,5 +1,6 @@
 import type {
   FantasyModule,
+  FantasyTeamSummary,
   FantasyTurnSummary,
   LineupContext,
   LineupRole,
@@ -47,6 +48,7 @@ import {
 import { AthleteName, useAthleteCard } from "../athletes/AthleteCard";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
+  fetchFantasyTeams,
   fetchFantasyTurns,
   fetchMyLineup,
   applyBestLineup,
@@ -402,6 +404,7 @@ export function FormationPage() {
   const demoState = isDemoMode ? parseWireframeStateFromSearch(search) : null;
   const canView = can(["roster:view"]);
   const canEdit = can(["roster:edit"]);
+  const isOperator = can(["global:operate"]);
   const { push: pushToast } = useToast();
   const { countdown, refetch: refetchCountdown } = useLockCountdown(
     !isDemoMode ? activeLeagueId : null,
@@ -410,6 +413,9 @@ export function FormationPage() {
   const [turns, setTurns] = useState<FantasyTurnSummary[]>(() =>
     isDemoMode && demoState === "success" ? DEMO_TURNS : [],
   );
+  const [teams, setTeams] = useState<FantasyTeamSummary[]>([]);
+  /** Vuoto = la propria formazione. Un operatore può schierare al posto di un altro fantallenatore (EP-operatore-test). */
+  const [targetTeamId, setTargetTeamId] = useState("");
   const [selectedRoundId, setSelectedRoundId] = useState(() =>
     isDemoMode && demoState === "success" ? DEMO_CONTEXT.roundId : "",
   );
@@ -569,6 +575,7 @@ export function FormationPage() {
     }
     setLoading(true);
     setLoadError(null);
+    setTargetTeamId("");
     try {
       const list = await fetchFantasyTurns(session.accessToken, activeLeagueId);
       setTurns(list);
@@ -597,6 +604,32 @@ export function FormationPage() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  useEffect(() => {
+    if (isDemoMode || !isOperator || !activeLeagueId) {
+      setTeams([]);
+      return;
+    }
+    const session = loadStoredSession();
+    if (!session?.accessToken) {
+      return;
+    }
+    let cancelled = false;
+    void fetchFantasyTeams(session.accessToken, activeLeagueId)
+      .then((list) => {
+        if (!cancelled) {
+          setTeams(list);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setTeams([]);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [activeLeagueId, isDemoMode, isOperator]);
 
   /** Stato "come salvato sul server": bozza se c'è, altrimenti formazione confermata. */
   function savedEditorState(detail: LineupContext | null): {
@@ -651,12 +684,47 @@ export function FormationPage() {
     }
     setBusy(true);
     try {
-      const detail = await fetchMyLineup(session.accessToken, activeLeagueId, roundId);
+      const detail = await fetchMyLineup(
+        session.accessToken,
+        activeLeagueId,
+        roundId,
+        targetTeamId || undefined,
+      );
       setContext(detail);
       applyContext(detail);
     } catch (error) {
       pushToast({
         title: getApiErrorMessage(error, "Formazione del turno non disponibile."),
+        variant: "danger",
+      });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  /** Operatore: cambia la squadra per cui schierare, a parità di turno (EP-operatore-test). */
+  async function selectTeam(teamId: string) {
+    setTargetTeamId(teamId);
+    if (isDemoMode) {
+      return;
+    }
+    const session = loadStoredSession();
+    if (!session?.accessToken || !activeLeagueId || !selectedRoundId) {
+      return;
+    }
+    setBusy(true);
+    try {
+      const detail = await fetchMyLineup(
+        session.accessToken,
+        activeLeagueId,
+        selectedRoundId,
+        teamId || undefined,
+      );
+      setContext(detail);
+      applyContext(detail);
+    } catch (error) {
+      pushToast({
+        title: getApiErrorMessage(error, "Formazione della squadra selezionata non disponibile."),
         variant: "danger",
       });
     } finally {
@@ -798,11 +866,17 @@ export function FormationPage() {
     }
     setBusy(true);
     try {
-      const detail = await saveMyLineup(session.accessToken, activeLeagueId, selectedRoundId, {
-        module: moduleCode,
-        starterAthleteIds: displayStarters,
-        benchAthleteIds: displayBench,
-      });
+      const detail = await saveMyLineup(
+        session.accessToken,
+        activeLeagueId,
+        selectedRoundId,
+        {
+          module: moduleCode,
+          starterAthleteIds: displayStarters,
+          benchAthleteIds: displayBench,
+        },
+        targetTeamId || undefined,
+      );
       setContext(detail);
       applyContext(detail);
       pushToast({ title: "Formazione salvata.", variant: "success" });
@@ -869,6 +943,7 @@ export function FormationPage() {
         session.accessToken,
         activeLeagueId,
         selectedRoundId,
+        targetTeamId || undefined,
       );
       setContext(detail);
       applyContext(detail);
@@ -911,7 +986,12 @@ export function FormationPage() {
     }
     setBusy(true);
     try {
-      const detail = await applyBestLineup(session.accessToken, activeLeagueId, selectedRoundId);
+      const detail = await applyBestLineup(
+        session.accessToken,
+        activeLeagueId,
+        selectedRoundId,
+        targetTeamId || undefined,
+      );
       setContext(detail);
       applyContext(detail);
       pushToast({ title: "Formazione migliore applicata in bozza.", variant: "success" });
@@ -983,11 +1063,17 @@ export function FormationPage() {
     }
     setBusy(true);
     try {
-      const detail = await saveLineupDraft(session.accessToken, activeLeagueId, selectedRoundId, {
-        module: moduleCode,
-        starterAthleteIds: displayStarters,
-        benchAthleteIds: displayBench,
-      });
+      const detail = await saveLineupDraft(
+        session.accessToken,
+        activeLeagueId,
+        selectedRoundId,
+        {
+          module: moduleCode,
+          starterAthleteIds: displayStarters,
+          benchAthleteIds: displayBench,
+        },
+        targetTeamId || undefined,
+      );
       setContext(detail);
       applyContext(detail);
       pushToast({
@@ -1141,6 +1227,23 @@ export function FormationPage() {
                   ))}
                 </select>
               </label>
+              {isOperator && teams.length > 0 ? (
+                <label>
+                  Schiera per
+                  <select
+                    value={targetTeamId}
+                    onChange={(event) => void selectTeam(event.target.value)}
+                    data-testid="formation-team-selector"
+                  >
+                    <option value="">La mia squadra</option>
+                    {teams.map((team) => (
+                      <option key={team.id} value={team.id}>
+                        {team.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              ) : null}
               {context.lineup?.systemGeneratedAi ? (
                 <p data-testid="formation-ai-badge">
                   <Badge variant="accent">Gestita automaticamente</Badge>{" "}

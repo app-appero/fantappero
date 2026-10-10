@@ -2,6 +2,7 @@ import { lazyStyles } from "../theme/lazyStyles";
 import type {
   AiLineupRun,
   FantasyModule,
+  FantasyTeamSummary,
   FantasyTurnSummary,
   LineupContext,
   LineupRole,
@@ -28,6 +29,7 @@ import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { AthleteName } from "../athletes/AthleteCard";
 import {
+  fetchFantasyTeams,
   fetchFantasyTurns,
   fetchMyLineup,
   applyBestLineup,
@@ -173,10 +175,14 @@ export function FormationScreen() {
   const canView = can(["roster:view"]);
   const canEdit = can(["roster:edit"]);
   const isAdmin = can(["league:admin"]);
+  const isOperator = can(["global:operate"]);
   const { countdown, refetch: refetchCountdown } = useLockCountdown(accessToken, activeLeagueId);
 
   const [turns, setTurns] = useState<FantasyTurnSummary[]>([]);
   const [selectedRoundId, setSelectedRoundId] = useState("");
+  const [teams, setTeams] = useState<FantasyTeamSummary[]>([]);
+  /** Vuoto = la propria formazione. Un operatore può schierare al posto di un altro fantallenatore (EP-operatore-test). */
+  const [targetTeamId, setTargetTeamId] = useState("");
   const [context, setContext] = useState<LineupContext | null>(null);
   const [moduleCode, setModuleCode] = useState<FantasyModule>("4-3-3");
   const [starterIds, setStarterIds] = useState<string[]>(starterTemplate("4-3-3").map(() => ""));
@@ -208,6 +214,7 @@ export function FormationScreen() {
     }
     setLoading(true);
     setLoadError(null);
+    setTargetTeamId("");
     try {
       const list = await fetchFantasyTurns(accessToken, activeLeagueId);
       setTurns(list);
@@ -236,6 +243,53 @@ export function FormationScreen() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  useEffect(() => {
+    if (!isOperator || !activeLeagueId || !accessToken) {
+      setTeams([]);
+      return;
+    }
+    let cancelled = false;
+    void fetchFantasyTeams(accessToken, activeLeagueId)
+      .then((list) => {
+        if (!cancelled) {
+          setTeams(list);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setTeams([]);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [accessToken, activeLeagueId, isOperator]);
+
+  /** Operatore: cambia la squadra per cui schierare, a parità di turno (EP-operatore-test). */
+  async function selectTeam(teamId: string) {
+    setTargetTeamId(teamId);
+    if (!accessToken || !activeLeagueId || !selectedRoundId) {
+      return;
+    }
+    setLoading(true);
+    try {
+      const detail = await fetchMyLineup(
+        accessToken,
+        activeLeagueId,
+        selectedRoundId,
+        teamId || undefined,
+      );
+      setContext(detail);
+      applyEditor(detail);
+    } catch (error) {
+      setLoadError(
+        getApiErrorMessage(error, "Formazione della squadra selezionata non disponibile."),
+      );
+    } finally {
+      setLoading(false);
+    }
+  }
 
   function applyEditor(detail: LineupContext) {
     const draft = detail.draft;
@@ -434,11 +488,17 @@ export function FormationScreen() {
     }
     setBusy(true);
     try {
-      const detail = await saveMyLineup(accessToken, activeLeagueId, selectedRoundId, {
-        module: moduleCode,
-        starterAthleteIds: displayStarters,
-        benchAthleteIds: displayBench,
-      });
+      const detail = await saveMyLineup(
+        accessToken,
+        activeLeagueId,
+        selectedRoundId,
+        {
+          module: moduleCode,
+          starterAthleteIds: displayStarters,
+          benchAthleteIds: displayBench,
+        },
+        targetTeamId || undefined,
+      );
       setContext(detail);
       applyEditor(detail);
       setActionMessage("Formazione salvata.");
@@ -457,7 +517,12 @@ export function FormationScreen() {
     }
     setBusy(true);
     try {
-      const detail = await copyPreviousLineupToDraft(accessToken, activeLeagueId, selectedRoundId);
+      const detail = await copyPreviousLineupToDraft(
+        accessToken,
+        activeLeagueId,
+        selectedRoundId,
+        targetTeamId || undefined,
+      );
       setContext(detail);
       applyEditor(detail);
       setActionMessage(
@@ -480,7 +545,12 @@ export function FormationScreen() {
     }
     setBusy(true);
     try {
-      const detail = await applyBestLineup(accessToken, activeLeagueId, selectedRoundId);
+      const detail = await applyBestLineup(
+        accessToken,
+        activeLeagueId,
+        selectedRoundId,
+        targetTeamId || undefined,
+      );
       setContext(detail);
       applyEditor(detail);
       setActionMessage("Formazione migliore applicata in bozza.");
@@ -536,11 +606,17 @@ export function FormationScreen() {
     }
     setBusy(true);
     try {
-      const detail = await saveLineupDraft(accessToken, activeLeagueId, selectedRoundId, {
-        module: moduleCode,
-        starterAthleteIds: displayStarters,
-        benchAthleteIds: displayBench,
-      });
+      const detail = await saveLineupDraft(
+        accessToken,
+        activeLeagueId,
+        selectedRoundId,
+        {
+          module: moduleCode,
+          starterAthleteIds: displayStarters,
+          benchAthleteIds: displayBench,
+        },
+        targetTeamId || undefined,
+      );
       setContext(detail);
       applyEditor(detail);
       setActionMessage("Bozza salvata. Conferma la formazione quando è completa.");
@@ -622,6 +698,34 @@ export function FormationScreen() {
   return (
     <PageContainer title="Formazione">
       <ScrollView contentContainerStyle={styles.content}>
+        {isOperator && teams.length > 0 ? (
+          <View>
+            <Text style={styles.label}>Schiera per</Text>
+            <View style={styles.row}>
+              <Pressable
+                accessibilityRole="button"
+                disabled={busy || loading}
+                onPress={() => void selectTeam("")}
+                style={[styles.chip, targetTeamId === "" ? styles.chipActive : null]}
+                testID="formation-team-self"
+              >
+                <Text style={styles.chipLabel}>La mia squadra</Text>
+              </Pressable>
+              {teams.map((team) => (
+                <Pressable
+                  key={team.id}
+                  accessibilityRole="button"
+                  disabled={busy || loading}
+                  onPress={() => void selectTeam(team.id)}
+                  style={[styles.chip, targetTeamId === team.id ? styles.chipActive : null]}
+                  testID={`formation-team-${team.id}`}
+                >
+                  <Text style={styles.chipLabel}>{team.name}</Text>
+                </Pressable>
+              ))}
+            </View>
+          </View>
+        ) : null}
         {context.lineup?.systemGeneratedAi ? (
           <Text style={styles.meta} testID="formation-ai-badge">
             Gestita automaticamente — formazione scelta dall'automazione IA

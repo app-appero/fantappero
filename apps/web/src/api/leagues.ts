@@ -829,8 +829,10 @@ export function fetchMyLineup(
   accessToken: string,
   leagueId: string,
   roundId: string,
+  teamId?: string,
 ): Promise<LineupContext> {
-  return apiRequest<LineupContext>(`/leagues/${leagueId}/turni/${roundId}/formazione`, {
+  const query = teamId ? `?teamId=${teamId}` : "";
+  return apiRequest<LineupContext>(`/leagues/${leagueId}/turni/${roundId}/formazione${query}`, {
     accessToken,
   });
 }
@@ -849,8 +851,10 @@ export function saveMyLineup(
   leagueId: string,
   roundId: string,
   body: SaveLineupRequest,
+  teamId?: string,
 ): Promise<LineupContext> {
-  return apiRequest<LineupContext>(`/leagues/${leagueId}/turni/${roundId}/formazione`, {
+  const query = teamId ? `?teamId=${teamId}` : "";
+  return apiRequest<LineupContext>(`/leagues/${leagueId}/turni/${roundId}/formazione${query}`, {
     method: "PUT",
     accessToken,
     body,
@@ -861,22 +865,32 @@ export function copyPreviousLineupToDraft(
   accessToken: string,
   leagueId: string,
   roundId: string,
+  teamId?: string,
 ): Promise<LineupContext> {
-  return apiRequest<LineupContext>(`/leagues/${leagueId}/turni/${roundId}/formazione/copia`, {
-    method: "POST",
-    accessToken,
-  });
+  const query = teamId ? `?teamId=${teamId}` : "";
+  return apiRequest<LineupContext>(
+    `/leagues/${leagueId}/turni/${roundId}/formazione/copia${query}`,
+    {
+      method: "POST",
+      accessToken,
+    },
+  );
 }
 
 export function applyBestLineup(
   accessToken: string,
   leagueId: string,
   roundId: string,
+  teamId?: string,
 ): Promise<LineupContext> {
-  return apiRequest<LineupContext>(`/leagues/${leagueId}/turni/${roundId}/formazione/migliore`, {
-    method: "POST",
-    accessToken,
-  });
+  const query = teamId ? `?teamId=${teamId}` : "";
+  return apiRequest<LineupContext>(
+    `/leagues/${leagueId}/turni/${roundId}/formazione/migliore${query}`,
+    {
+      method: "POST",
+      accessToken,
+    },
+  );
 }
 
 export function saveLineupDraft(
@@ -884,12 +898,17 @@ export function saveLineupDraft(
   leagueId: string,
   roundId: string,
   body: SaveLineupDraftRequest,
+  teamId?: string,
 ): Promise<LineupContext> {
-  return apiRequest<LineupContext>(`/leagues/${leagueId}/turni/${roundId}/formazione/bozza`, {
-    method: "PUT",
-    accessToken,
-    body,
-  });
+  const query = teamId ? `?teamId=${teamId}` : "";
+  return apiRequest<LineupContext>(
+    `/leagues/${leagueId}/turni/${roundId}/formazione/bozza${query}`,
+    {
+      method: "PUT",
+      accessToken,
+      body,
+    },
+  );
 }
 
 async function apiRequestBlob(
