@@ -161,6 +161,31 @@ export interface AdminCalendarSyncProgress {
   result?: AdminCalendarSyncResult | null;
 }
 
+export interface AdminSeasonImportJob {
+  jobId: string;
+  status: string;
+  message: string;
+}
+
+/** Esito di "Importa calendario stagione" (catalogo + fixture, tutte le MVP). */
+export interface AdminSeasonImportResult {
+  seasonsCreated: number;
+  seasonsUpdated: number;
+  competitionsUpdated: number;
+  fixturesCreated: number;
+  fixturesUpdated: number;
+}
+
+export interface AdminSeasonImportProgress {
+  jobId: string;
+  status: "queued" | "running" | "completed" | "failed" | string;
+  percent: number;
+  stage: string;
+  message: string;
+  errorCode?: string | null;
+  result?: AdminSeasonImportResult | null;
+}
+
 /** Esito di "Calcola giornata corrente" massivo (tutte le leghe attive). */
 export interface AdminRoundCalculationResult {
   roundsConsidered: number;

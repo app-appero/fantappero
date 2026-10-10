@@ -21,6 +21,7 @@ import {
   calculateCurrentRoundsAllLeagues,
   fetchAdminLeagueTurnStatus,
   generateAllAiLineups,
+  importSeasonCalendar,
   repairHistoricalRounds,
   syncAllLeagueTurns,
   syncCalendarForAllLeagues,
@@ -43,6 +44,11 @@ const COMMAND_LEGEND: { label: string; description: string }[] = [
     label: "Genera calendario",
     description:
       "Sincronizza partite, date e Turni Europei con il provider e riallinea il calendario della lega.",
+  },
+  {
+    label: "Importa calendario stagione",
+    description:
+      "Importa catalogo e calendario fixture ufficiali per tutti i campionati, indipendentemente dalle leghe esistenti. Da usare a inizio stagione (il giro automatico periodico lo fa comunque da solo, questo è l'override immediato).",
   },
   {
     label: "Genera formazioni IA",
@@ -131,6 +137,14 @@ export function AdminTurniPage() {
   } | null>(null);
   const [calendarResult, setCalendarResult] = useState<string | null>(null);
   const [calendarError, setCalendarError] = useState<string | null>(null);
+
+  const [importingSeason, setImportingSeason] = useState(false);
+  const [seasonImportProgress, setSeasonImportProgress] = useState<{
+    percent: number;
+    message: string;
+  } | null>(null);
+  const [seasonImportResult, setSeasonImportResult] = useState<string | null>(null);
+  const [seasonImportError, setSeasonImportError] = useState<string | null>(null);
 
   const [calculatingRounds, setCalculatingRounds] = useState(false);
   const [calculateResult, setCalculateResult] = useState<string | null>(null);
@@ -247,6 +261,33 @@ export function AdminTurniPage() {
     } finally {
       setSyncingCalendar(false);
       setCalendarProgress(null);
+    }
+  }
+
+  async function onImportSeason() {
+    const session = loadStoredSession();
+    if (!session?.accessToken) {
+      return;
+    }
+    setImportingSeason(true);
+    setSeasonImportError(null);
+    setSeasonImportResult(null);
+    setSeasonImportProgress({ percent: 0, message: "Avvio in corso…" });
+    try {
+      const result = await importSeasonCalendar(session.accessToken, {
+        onProgress: (progress) =>
+          setSeasonImportProgress({ percent: progress.percent, message: progress.message }),
+      });
+      setSeasonImportResult(
+        `Stagioni create: ${result.seasonsCreated}, aggiornate: ${result.seasonsUpdated}. ` +
+          `Fixture nuove: ${result.fixturesCreated}, aggiornate: ${result.fixturesUpdated}.`,
+      );
+      await load();
+    } catch (error) {
+      setSeasonImportError(getApiErrorMessage(error, "Importazione calendario stagione non riuscita."));
+    } finally {
+      setImportingSeason(false);
+      setSeasonImportProgress(null);
     }
   }
 
@@ -428,6 +469,16 @@ export function AdminTurniPage() {
             <Button
               type="button"
               variant="secondary"
+              loading={importingSeason}
+              disabled={importingSeason}
+              onClick={() => void onImportSeason()}
+              data-testid="admin-turni-season-import"
+            >
+              Importa calendario stagione
+            </Button>
+            <Button
+              type="button"
+              variant="secondary"
               loading={generatingLineups}
               disabled={generatingLineups}
               onClick={() => void onGenerateLineups()}
@@ -490,6 +541,35 @@ export function AdminTurniPage() {
               title="Aggiornamento non riuscito"
               message={calendarError}
               testId="admin-turni-calendar-sync-all-error"
+            />
+          ) : null}
+
+          {importingSeason ? (
+            <UiStatePanel
+              state="loading"
+              title="Importazione calendario stagione in corso"
+              message={
+                seasonImportProgress
+                  ? `${seasonImportProgress.message} (${seasonImportProgress.percent}%)`
+                  : "Avvio in corso…"
+              }
+              testId="admin-turni-season-import-progress"
+            />
+          ) : null}
+          {!importingSeason && seasonImportResult ? (
+            <UiStatePanel
+              state="success"
+              title="Calendario stagione importato"
+              message={seasonImportResult}
+              testId="admin-turni-season-import-success"
+            />
+          ) : null}
+          {!importingSeason && seasonImportError ? (
+            <UiStatePanel
+              state="error"
+              title="Importazione non riuscita"
+              message={seasonImportError}
+              testId="admin-turni-season-import-error"
             />
           ) : null}
 

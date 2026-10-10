@@ -9,12 +9,14 @@ from config.settings.fantasy_turns_settings import FantasyTurnsSettingsMixin
 from config.settings.mail import MailSettingsMixin
 from config.settings.notifications_settings import NotificationsSettingsMixin
 from config.settings.scheduler_settings import SportsSchedulerSettingsMixin
+from config.settings.sports_data_sync_settings import SportsDataSyncSettingsMixin
 
 
 class WorkerSettings(
     BaseAppSettings,
     MailSettingsMixin,
     SportsSchedulerSettingsMixin,
+    SportsDataSyncSettingsMixin,
     FantasyTurnsSettingsMixin,
     NotificationsSettingsMixin,
 ):

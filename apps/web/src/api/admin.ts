@@ -13,6 +13,9 @@ import type {
   AdminListoneRefreshProgress,
   AdminOverview,
   AdminRoundCalculationResult,
+  AdminSeasonImportJob,
+  AdminSeasonImportProgress,
+  AdminSeasonImportResult,
   AdminTurniSyncResult,
   AdminUser,
   PaginatedAdminLeagues,
@@ -180,6 +183,55 @@ export async function syncCalendarForAllLeagues(
       throw new Error(
         progress.message ||
           "Aggiornamento calendario massivo non riuscito (controlla quota API-Football / worker).",
+      );
+    }
+    await new Promise((resolve) => {
+      window.setTimeout(resolve, pollIntervalMs);
+    });
+  }
+}
+
+export function startSeasonImport(accessToken: string): Promise<AdminSeasonImportJob> {
+  return apiRequest<AdminSeasonImportJob>("/admin/calendario/importa-stagione", {
+    accessToken,
+    method: "POST",
+  });
+}
+
+export function fetchSeasonImportProgress(
+  accessToken: string,
+  jobId: string,
+): Promise<AdminSeasonImportProgress> {
+  return apiRequest<AdminSeasonImportProgress>(`/admin/calendario/importa-stagione/${jobId}`, {
+    accessToken,
+  });
+}
+
+export async function importSeasonCalendar(
+  accessToken: string,
+  options?: {
+    onProgress?: (progress: AdminSeasonImportProgress) => void;
+    pollIntervalMs?: number;
+  },
+): Promise<AdminSeasonImportResult> {
+  const started = await startSeasonImport(accessToken);
+  if (!started.jobId) {
+    throw new Error("Importazione avviata ma senza jobId. Ricarica la pagina e riprova.");
+  }
+  const pollIntervalMs = options?.pollIntervalMs ?? 800;
+  for (;;) {
+    const progress = await fetchSeasonImportProgress(accessToken, started.jobId);
+    options?.onProgress?.(progress);
+    if (progress.status === "completed") {
+      if (!progress.result) {
+        throw new Error("Importazione completata senza risultato.");
+      }
+      return progress.result;
+    }
+    if (progress.status === "failed") {
+      throw new Error(
+        progress.message ||
+          "Importazione calendario stagione non riuscita (controlla quota API-Football / worker).",
       );
     }
     await new Promise((resolve) => {

@@ -23,6 +23,9 @@ from admin.schemas import (
     AdminHistoricalRepairResultResponse,
     AdminLeagueTurnStatusResponse,
     AdminRoundCalculationResultResponse,
+    AdminSeasonImportJobResponse,
+    AdminSeasonImportProgressResponse,
+    AdminSeasonImportResultResponse,
     AdminTurniSyncResultResponse,
 )
 from admin.turni_service import list_league_turn_status
@@ -136,6 +139,73 @@ def get_calendar_sync_all_leagues_progress(
     if progress.result is not None:
         result = AdminCalendarSyncResultResponse.model_validate(progress.result)
     return AdminCalendarSyncProgressResponse(
+        jobId=progress.job_id,
+        status=progress.status,
+        percent=progress.percent,
+        stage=progress.stage,
+        message=progress.message,
+        errorCode=progress.error_code,
+        result=result,
+    )
+
+
+@router.post("/calendario/importa-stagione", response_model=AdminSeasonImportJobResponse)
+def start_season_import(
+    operator: User = Depends(require_permissions(Permission.GLOBAL_OPERATE)),
+) -> AdminSeasonImportJobResponse:
+    """Importa subito catalogo + calendario fixture per tutti i campionati MVP.
+
+    Indipendente da qualunque lega: pensato per l'inizio stagione, prima
+    ancora che esista una lega — così creazione lega e "Genera calendario"
+    trovano sempre i dati già pronti nel DB invece di chiamare il provider
+    inline. Stessa coppia di sync che gira già in automatico via cron
+    (`sports_data.sync_mvp_catalog` / `sync_mvp_fixtures`), qui come
+    override manuale puntuale.
+    """
+    from sports_data.season_import_tasks import PLATFORM_SCOPE, import_season_task
+
+    job_id = new_job_id()
+    save_progress(
+        CalendarRefreshProgress(
+            job_id=job_id,
+            league_id=PLATFORM_SCOPE,
+            status="queued",
+            percent=0,
+            stage="queued",
+            message="Importazione calendario stagione in coda…",
+        )
+    )
+    import_season_task.delay(job_id=job_id, actor_id=str(operator.id))
+    return AdminSeasonImportJobResponse(
+        jobId=job_id,
+        status="queued",
+        message="Importazione calendario stagione avviata.",
+    )
+
+
+@router.get(
+    "/calendario/importa-stagione/{job_id}",
+    response_model=AdminSeasonImportProgressResponse,
+)
+def get_season_import_progress(
+    job_id: str,
+    _operator: User = Depends(require_permissions(Permission.GLOBAL_OPERATE)),
+) -> AdminSeasonImportProgressResponse | JSONResponse:
+    from sports_data.season_import_tasks import PLATFORM_SCOPE
+
+    progress = load_progress(job_id)
+    if progress is None or progress.league_id != PLATFORM_SCOPE:
+        return JSONResponse(
+            status_code=404,
+            content={
+                "message": "Job di importazione non trovato.",
+                "code": "season_import_job_not_found",
+            },
+        )
+    result = None
+    if progress.result is not None:
+        result = AdminSeasonImportResultResponse.model_validate(progress.result)
+    return AdminSeasonImportProgressResponse(
         jobId=progress.job_id,
         status=progress.status,
         percent=progress.percent,

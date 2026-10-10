@@ -11,6 +11,7 @@ from notifications.schedule import notifications_beat_schedule
 from observability.celery_signals import register_celery_observability
 from observability.error_tracking import configure_error_tracking
 from observability.logging import configure_logging
+from sports_data.schedule import sports_data_beat_schedule
 from sports_data.scheduler.policy import beat_schedule_entries
 
 _worker_settings = validate_worker_settings()
@@ -48,6 +49,14 @@ _beat_schedule.update(
     notifications_beat_schedule(
         enabled=_worker_settings.notifications_lineup_reminder_enabled,
         interval_seconds=_worker_settings.notifications_lineup_reminder_interval_seconds,
+    )
+)
+_beat_schedule.update(
+    sports_data_beat_schedule(
+        catalog_enabled=_worker_settings.sports_data_catalog_sync_enabled,
+        catalog_interval_seconds=_worker_settings.sports_data_catalog_sync_interval_seconds,
+        fixtures_enabled=_worker_settings.sports_data_fixtures_sync_enabled,
+        fixtures_interval_seconds=_worker_settings.sports_data_fixtures_sync_interval_seconds,
     )
 )
 
@@ -88,3 +97,4 @@ import sports_data.listone.tasks  # noqa: E402, F401
 import sports_data.quality.tasks  # noqa: E402, F401
 import sports_data.roster.tasks  # noqa: E402, F401
 import sports_data.scheduler.tasks  # noqa: E402, F401
+import sports_data.season_import_tasks  # noqa: E402, F401

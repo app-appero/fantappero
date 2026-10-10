@@ -120,6 +120,32 @@ class AdminCalendarSyncProgressResponse(ApiModel):
     result: AdminCalendarSyncResultResponse | None = None
 
 
+class AdminSeasonImportJobResponse(ApiModel):
+    job_id: str = Field(alias="jobId")
+    status: str
+    message: str
+
+
+class AdminSeasonImportResultResponse(ApiModel):
+    """Esito di "Importa calendario stagione" (catalogo + fixture, tutte le MVP)."""
+
+    seasons_created: int = Field(alias="seasonsCreated")
+    seasons_updated: int = Field(alias="seasonsUpdated")
+    competitions_updated: int = Field(alias="competitionsUpdated")
+    fixtures_created: int = Field(alias="fixturesCreated")
+    fixtures_updated: int = Field(alias="fixturesUpdated")
+
+
+class AdminSeasonImportProgressResponse(ApiModel):
+    job_id: str = Field(alias="jobId")
+    status: str
+    percent: int
+    stage: str
+    message: str
+    error_code: str | None = Field(default=None, alias="errorCode")
+    result: AdminSeasonImportResultResponse | None = None
+
+
 class AdminRoundCalculationResultResponse(ApiModel):
     """Esito di `process_live_fantasy_rounds` innescato a mano (EP-turni-calcolo)."""
 
