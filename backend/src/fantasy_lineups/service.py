@@ -108,11 +108,13 @@ class FantasyLineupService:
         self._session = session
 
     def _actor_bypasses_kickoff_lock(self, league_access: LeagueAccess) -> bool:
-        """Operatori piattaforma restano sempre liberi dal lock per-calciatore
-        (EP-operatore-test): utile soprattutto in fase di test, per non
-        restare bloccati da una partita già iniziata come un coach normale.
-        Non tocca il gate a livello di turno (resta chiuso su SCHEDULED/SKIPPED)
-        né il requisito di avere una propria squadra nella lega.
+        """Operatori piattaforma restano sempre liberi dal lock formazione
+        (EP-operatore-test): sia il lock per-calciatore a partita iniziata,
+        sia il gate a livello di turno (SCHEDULED/SKIPPED) — utile
+        soprattutto in fase di test, quando un turno non è ancora aperto
+        (o non verrà mai disputato) ma serve comunque poter schierare per
+        verificare il resto del flusso. Non tocca il requisito di avere
+        (o, per `target_team_id`, scegliere) una squadra nella lega.
         """
         context = PermissionContext.for_user(league_access.user, league_access=league_access)
         return has_permissions(context, (Permission.GLOBAL_OPERATE,))
@@ -222,14 +224,15 @@ class FantasyLineupService:
         bench_ids = validate_athlete_id_list(payload.bench_athlete_ids)
 
         fantasy_round = self._load_round(league_access.league.id, round_id, for_update=True)
-        try:
-            assert_lineup_modification_allowed(stored=fantasy_round.status)
-        except ValidationAuthError as exc:
-            get_metrics().incr(
-                "fantasy_lineup_saved_total",
-                labels={"result": exc.code},
-            )
-            raise
+        if not self._actor_bypasses_kickoff_lock(league_access):
+            try:
+                assert_lineup_modification_allowed(stored=fantasy_round.status)
+            except ValidationAuthError as exc:
+                get_metrics().incr(
+                    "fantasy_lineup_saved_total",
+                    labels={"result": exc.code},
+                )
+                raise
         self._sync_round_kickoffs(
             fantasy_round,
             now=now,
@@ -467,11 +470,12 @@ class FantasyLineupService:
     ) -> LineupContextResponse:
         now = datetime.now(UTC)
         fantasy_round = self._load_round(league_access.league.id, round_id, for_update=True)
-        try:
-            assert_lineup_modification_allowed(stored=fantasy_round.status)
-        except ValidationAuthError as exc:
-            get_metrics().incr("fantasy_lineup_copied_total", labels={"result": exc.code})
-            raise
+        if not self._actor_bypasses_kickoff_lock(league_access):
+            try:
+                assert_lineup_modification_allowed(stored=fantasy_round.status)
+            except ValidationAuthError as exc:
+                get_metrics().incr("fantasy_lineup_copied_total", labels={"result": exc.code})
+                raise
         self._sync_round_kickoffs(
             fantasy_round,
             now=now,
@@ -591,14 +595,15 @@ class FantasyLineupService:
         """
         now = datetime.now(UTC)
         fantasy_round = self._load_round(league_access.league.id, round_id, for_update=True)
-        try:
-            assert_lineup_modification_allowed(stored=fantasy_round.status)
-        except ValidationAuthError as exc:
-            get_metrics().incr(
-                "fantasy_lineup_best_applied_total",
-                labels={"result": exc.code},
-            )
-            raise
+        if not self._actor_bypasses_kickoff_lock(league_access):
+            try:
+                assert_lineup_modification_allowed(stored=fantasy_round.status)
+            except ValidationAuthError as exc:
+                get_metrics().incr(
+                    "fantasy_lineup_best_applied_total",
+                    labels={"result": exc.code},
+                )
+                raise
         self._sync_round_kickoffs(
             fantasy_round,
             now=now,
@@ -733,11 +738,12 @@ class FantasyLineupService:
         bench_ids = parse_optional_athlete_ids(payload.bench_athlete_ids)
 
         fantasy_round = self._load_round(league_access.league.id, round_id, for_update=True)
-        try:
-            assert_lineup_modification_allowed(stored=fantasy_round.status)
-        except ValidationAuthError as exc:
-            get_metrics().incr("fantasy_lineup_draft_saved_total", labels={"result": exc.code})
-            raise
+        if not self._actor_bypasses_kickoff_lock(league_access):
+            try:
+                assert_lineup_modification_allowed(stored=fantasy_round.status)
+            except ValidationAuthError as exc:
+                get_metrics().incr("fantasy_lineup_draft_saved_total", labels={"result": exc.code})
+                raise
         self._sync_round_kickoffs(
             fantasy_round,
             now=now,
@@ -992,7 +998,9 @@ class FantasyLineupService:
             for row in roster
         }
         any_unlocked = any(not locked for locked in locked_flags.values()) if roster else True
-        turn_editable = is_lineup_modification_allowed(stored=fantasy_round.status)
+        turn_editable = operator_bypass or is_lineup_modification_allowed(
+            stored=fantasy_round.status
+        )
         issues: list[LineupIssueResponse] = []
         saved: SavedLineupResponse | None = None
         if submission is not None:
