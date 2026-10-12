@@ -871,6 +871,18 @@ button.fa-pitch-player {
   justify-content: center;
 }
 
+/* Il bottone Google è un iframe: ritagliato a pillola e con colore-scheme chiaro
+   per togliere il riquadro bianco che compare sul tema scuro. */
+.fa-auth-layout__google-button > div,
+.fa-auth-layout__google-button iframe {
+  border-radius: var(--fa-radius-pill);
+  color-scheme: light;
+}
+
+.fa-auth-layout__google-button > div {
+  overflow: hidden;
+}
+
 .fa-auth-page {
   min-height: 100vh;
   display: flex;
