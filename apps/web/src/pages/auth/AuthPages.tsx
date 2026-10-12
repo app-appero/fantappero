@@ -30,19 +30,30 @@ function GoogleSignInButton({
     if (!viteGoogleClientId || !containerRef.current) {
       return;
     }
-    renderGoogleButton(containerRef.current, viteGoogleClientId, (idToken) => {
-      if (onCredential) {
-        onCredential(idToken);
-        return;
-      }
-      loginWithGoogle(idToken)
-        .then(() => navigate("/leghe"))
-        .catch((error: unknown) => {
-          onError(getApiErrorMessage(error, "Accesso con Google non riuscito."));
-        });
-    }).catch(() => {
-      onError("Impossibile caricare l'accesso con Google.");
+    const container = containerRef.current;
+    const render = () => {
+      renderGoogleButton(container, viteGoogleClientId, (idToken) => {
+        if (onCredential) {
+          onCredential(idToken);
+          return;
+        }
+        loginWithGoogle(idToken)
+          .then(() => navigate("/leghe"))
+          .catch((error: unknown) => {
+            onError(getApiErrorMessage(error, "Accesso con Google non riuscito."));
+          });
+      }).catch(() => {
+        onError("Impossibile caricare l'accesso con Google.");
+      });
+    };
+    render();
+    // Il bottone è un iframe di Google: al cambio tema va ridisegnato con il tema giusto.
+    const observer = new MutationObserver(render);
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ["data-color-scheme"],
     });
+    return () => observer.disconnect();
   }, [viteGoogleClientId, loginWithGoogle, navigate, onError, onCredential]);
 
   if (!viteGoogleClientId) {
