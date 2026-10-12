@@ -360,7 +360,7 @@ const styles = lazyStyles(() => StyleSheet.create({
     backgroundColor: colors.backgroundElevated,
   },
   primaryButton: {
-    borderRadius: radius.md,
+    borderRadius: radius.pill,
     padding: spacing.sm,
     alignItems: "center",
     backgroundColor: colors.accent,
@@ -440,7 +440,7 @@ const styles = lazyStyles(() => StyleSheet.create({
   secondaryButton: {
     borderWidth: 1,
     borderColor: colors.border,
-    borderRadius: radius.md,
+    borderRadius: radius.pill,
     padding: spacing.sm,
     alignItems: "center",
   },

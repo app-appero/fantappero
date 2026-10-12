@@ -54,7 +54,7 @@ const styles = lazyStyles(() => StyleSheet.create({
     minHeight: 40,
     justifyContent: "center",
     paddingHorizontal: spacing.md,
-    borderRadius: radius.md,
+    borderRadius: radius.pill,
     backgroundColor: colors.background,
     borderWidth: 1,
     borderColor: colors.border,

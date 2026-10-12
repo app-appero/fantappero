@@ -376,7 +376,7 @@ const styles = lazyStyles(() => StyleSheet.create({
     minHeight: 48,
     borderWidth: 1,
     borderColor: colors.border,
-    borderRadius: radius.md,
+    borderRadius: radius.pill,
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: colors.background,

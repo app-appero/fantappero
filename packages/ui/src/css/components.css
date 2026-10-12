@@ -1174,3 +1174,153 @@ button.fa-pitch-player {
   white-space: nowrap;
   border: 0;
 }
+
+/* ── Restyle "Arena notturna": superfici in vetro, pillole, gradienti ───── */
+
+.fa-card {
+  background-color: color-mix(in srgb, var(--fa-color-foreground) 5%, transparent);
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
+}
+
+[data-color-scheme="light"] .fa-card {
+  background-color: var(--fa-color-background-elevated);
+}
+
+.fa-btn--secondary {
+  background-color: transparent;
+  border-color: color-mix(in srgb, var(--fa-color-foreground) 22%, transparent);
+  color: var(--fa-color-foreground);
+}
+
+.fa-btn--secondary:hover:not(:disabled):not([aria-disabled="true"]) {
+  background-color: color-mix(in srgb, var(--fa-color-foreground) 8%, transparent);
+  border-color: color-mix(in srgb, var(--fa-color-foreground) 40%, transparent);
+}
+
+.fa-btn--danger {
+  box-shadow: 0 10px 30px rgba(224, 49, 49, 0.3);
+}
+
+.fa-input:focus,
+.fa-select:focus {
+  outline: none;
+  border-color: var(--fa-color-input-border-focus);
+  box-shadow: var(--fa-shadow-focus);
+}
+
+.fa-select {
+  cursor: pointer;
+  background-position: right var(--fa-space-md) center;
+  padding-right: calc(var(--fa-space-md) + 1.75rem);
+}
+
+.fa-badge {
+  border-radius: var(--fa-radius-pill);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+/* Tab: gruppo a pillola, voce attiva con gradiente */
+.fa-tablist {
+  display: inline-flex;
+  align-self: flex-start;
+  max-width: 100%;
+  gap: var(--fa-space-xs);
+  padding: var(--fa-space-xs);
+  border: 1px solid var(--fa-color-border);
+  border-radius: var(--fa-radius-pill);
+  background-color: color-mix(in srgb, var(--fa-color-foreground) 5%, transparent);
+}
+
+.fa-tab {
+  min-height: 2.5rem;
+  padding: 0 var(--fa-space-lg);
+  border: none;
+  border-radius: var(--fa-radius-pill);
+  font-weight: 600;
+}
+
+.fa-tab:focus-visible {
+  border-radius: var(--fa-radius-pill);
+}
+
+.fa-tab[aria-selected="true"] {
+  background-color: var(--fa-color-accent);
+  background-image: var(--fa-gradient-accent);
+  color: var(--fa-color-accent-contrast);
+  border-bottom-color: transparent;
+  box-shadow: var(--fa-glow-accent);
+}
+
+/* Tabelle */
+.fa-table-wrap {
+  border-radius: var(--fa-radius-xl);
+  background-color: color-mix(in srgb, var(--fa-color-foreground) 4%, transparent);
+}
+
+[data-color-scheme="light"] .fa-table-wrap {
+  background-color: var(--fa-color-background-elevated);
+}
+
+.fa-table th {
+  background-color: transparent;
+  letter-spacing: 0.12em;
+  font-weight: 600;
+}
+
+.fa-table th,
+.fa-table td {
+  padding: var(--fa-space-md);
+}
+
+.fa-table tbody tr:hover {
+  background-color: color-mix(in srgb, var(--fa-color-accent) 10%, transparent);
+}
+
+/* Modali, toast, menu a comparsa */
+.fa-modal__backdrop {
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+}
+
+.fa-modal__dialog {
+  border-radius: calc(var(--fa-radius-xl) + 4px);
+}
+
+.fa-toast {
+  border-radius: var(--fa-radius-lg);
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
+}
+
+/* Barre di avanzamento e interruttori */
+.fa-progress-bar {
+  border-radius: var(--fa-radius-pill);
+}
+
+.fa-progress-bar__fill {
+  border-radius: var(--fa-radius-pill);
+  background-image: linear-gradient(90deg, var(--fa-electric-400), var(--fa-electric-600));
+}
+
+.fa-switch__control--on {
+  background-image: var(--fa-gradient-accent);
+}
+
+/* Skeleton ed empty state */
+.fa-skeleton {
+  border-radius: var(--fa-radius-md);
+}
+
+.fa-empty-state {
+  border-radius: var(--fa-radius-xl);
+}
+
+.fa-btn--primary:disabled,
+.fa-btn--primary[aria-disabled="true"],
+.fa-btn--danger:disabled,
+.fa-btn--danger[aria-disabled="true"] {
+  box-shadow: none;
+}

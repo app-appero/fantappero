@@ -143,7 +143,7 @@ const styles = lazyStyles(() => StyleSheet.create({
     alignSelf: "flex-start",
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
-    borderRadius: radius.md,
+    borderRadius: radius.pill,
     backgroundColor: colors.accent,
   },
   ctaLabel: {
@@ -156,7 +156,7 @@ const styles = lazyStyles(() => StyleSheet.create({
     alignSelf: "flex-start",
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
-    borderRadius: radius.md,
+    borderRadius: radius.pill,
     borderWidth: 1,
     borderColor: colors.border,
   },
@@ -189,7 +189,7 @@ const styles = lazyStyles(() => StyleSheet.create({
   stateChip: {
     paddingHorizontal: spacing.sm,
     paddingVertical: spacing.xs,
-    borderRadius: radius.md,
+    borderRadius: radius.pill,
     borderWidth: 1,
     borderColor: colors.border,
   },
