@@ -51,6 +51,11 @@ function loadGisScript(): Promise<void> {
   return scriptLoadPromise;
 }
 
+/** Tema del bottone Google coerente con il tema dell'app: nero sul scuro, bordato sul chiaro. */
+export function googleButtonTheme(): "filled_black" | "outline" {
+  return document.documentElement.dataset.colorScheme === "light" ? "outline" : "filled_black";
+}
+
 /** Loads GIS, then renders the official Google button into `container` with the given callback. */
 export async function renderGoogleButton(
   container: HTMLElement,
@@ -69,12 +74,13 @@ export async function renderGoogleButton(
   // Match the surrounding form's width instead of Google's default intrinsic
   // size, capped at GIS's documented maximum (400px).
   const measuredWidth = Math.min(container.offsetWidth || 0, 400);
+  container.replaceChildren();
   accountsId.renderButton(container, {
     type: "standard",
-    theme: "outline",
+    theme: googleButtonTheme(),
     size: "large",
     text: "continue_with",
-    shape: "rectangular",
+    shape: "pill",
     ...(measuredWidth > 0 ? { width: measuredWidth } : {}),
   });
 }
