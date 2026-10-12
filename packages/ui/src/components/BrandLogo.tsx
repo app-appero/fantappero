@@ -9,7 +9,7 @@ export type BrandLogoProps = HTMLAttributes<HTMLDivElement> & {
   size?: BrandLogoSize;
 };
 
-/** Simbolo: "F" in corsa con il pallone, su quadrato con gradiente azzurro. */
+/** Simbolo: "F" in corsa con il pallone, su quadrato con gradiente azzurro-menta. */
 function BrandMark({ className }: { className?: string }) {
   const gradientId = `fa-brand-gradient-${useId().replace(/:/g, "")}`;
   return (
@@ -30,18 +30,17 @@ function BrandMark({ className }: { className?: string }) {
           y2="64"
           gradientUnits="userSpaceOnUse"
         >
-          <stop offset="0" stopColor="#9cd0ff" />
-          <stop offset="0.5" stopColor="#6aa8ff" />
-          <stop offset="1" stopColor="#4c86ff" />
+          <stop offset="0" stopColor="#5aa2ff" />
+          <stop offset="1" stopColor="#3ddc97" />
         </linearGradient>
       </defs>
       <rect width="64" height="64" rx="18" fill={`url(#${gradientId})`} />
       <path
         d="M16 50L22.1 14H48.5L47.1 22H28.8L27.4 30H40.6L39.4 37H26.2L24 50Z"
-        fill="#0a1530"
+        fill="#06121f"
       />
-      <circle cx="47" cy="44" r="5" stroke="#0a1530" strokeWidth="3" />
-      <circle cx="47" cy="44" r="1.6" fill="#0a1530" />
+      <circle cx="47" cy="44" r="5" stroke="#06121f" strokeWidth="3" />
+      <circle cx="47" cy="44" r="1.6" fill="#06121f" />
     </svg>
   );
 }

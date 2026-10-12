@@ -232,7 +232,7 @@ const styles = lazyStyles(() => StyleSheet.create({
     alignSelf: "flex-start",
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
-    borderRadius: radius.md,
+    borderRadius: radius.pill,
     borderWidth: 1,
     borderColor: colors.border,
   },

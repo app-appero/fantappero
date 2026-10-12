@@ -56,12 +56,12 @@
   background:
     radial-gradient(
       900px 520px at 0% 0%,
-      color-mix(in srgb, var(--fa-electric-500) 16%, transparent),
+      color-mix(in srgb, var(--fa-color-accent) 16%, transparent),
       transparent 60%
     ),
     radial-gradient(
       900px 640px at 100% 100%,
-      color-mix(in srgb, var(--fa-electric-600) 18%, transparent),
+      color-mix(in srgb, var(--fa-color-accent-secondary) 14%, transparent),
       transparent 60%
     ),
     var(--fa-color-background);
@@ -1077,8 +1077,8 @@ button.fa-app-header__league-action {
   width: 100%;
   aspect-ratio: 3 / 4;
   background:
-    radial-gradient(70% 60% at 50% 50%, color-mix(in srgb, var(--fa-electric-600) 22%, transparent), transparent 70%),
-    repeating-linear-gradient(180deg, #1b3a7a 0, #1b3a7a 12.5%, #173268 12.5%, #173268 25%);
+    radial-gradient(70% 60% at 50% 50%, color-mix(in srgb, var(--fa-color-accent) 14%, transparent), transparent 70%),
+    repeating-linear-gradient(180deg, var(--fa-color-field) 0, var(--fa-color-field) 12.5%, var(--fa-color-field-alt) 12.5%, var(--fa-color-field-alt) 25%);
   border: 1px solid rgba(255, 255, 255, 0.25);
   border-radius: var(--fa-radius-xl);
   overflow: hidden;
@@ -1560,4 +1560,37 @@ button.fa-app-header__league-action {
     min-width: 0;
     max-width: 100%;
   }
+}
+
+/* ── Restyle "Arena notturna": header e sidebar traslucidi ──────────────── */
+
+.fa-app-header {
+  background-color: color-mix(in srgb, var(--fa-color-background) 78%, transparent);
+  -webkit-backdrop-filter: blur(16px);
+  backdrop-filter: blur(16px);
+}
+
+.fa-app-shell__sidebar {
+  background-color: color-mix(in srgb, var(--fa-color-foreground) 3%, transparent);
+  padding: var(--fa-space-lg) var(--fa-space-md);
+}
+
+.fa-app-shell__bottom-nav {
+  background-color: color-mix(in srgb, var(--fa-color-background-elevated) 92%, transparent);
+  -webkit-backdrop-filter: blur(16px);
+  backdrop-filter: blur(16px);
+}
+
+.fa-bottom-nav__link {
+  border-radius: var(--fa-radius-pill);
+}
+
+.fa-bottom-nav__link--active {
+  background-image: var(--fa-gradient-accent);
+  color: var(--fa-color-accent-contrast);
+}
+
+.fa-app-header__league-menu {
+  border-radius: var(--fa-radius-xl);
+  box-shadow: var(--fa-shadow-lg);
 }

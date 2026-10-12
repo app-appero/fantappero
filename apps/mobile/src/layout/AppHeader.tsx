@@ -389,7 +389,7 @@ const styles = lazyStyles(() => StyleSheet.create({
     maxWidth: 112,
     paddingHorizontal: spacing.sm,
     paddingVertical: spacing.xs,
-    borderRadius: radius.md,
+    borderRadius: radius.pill,
     backgroundColor: colors.backgroundSubtle,
     borderWidth: 1,
     borderColor: colors.border,

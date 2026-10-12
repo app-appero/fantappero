@@ -74,7 +74,7 @@ export const rosterStyles = lazyStyles(() => StyleSheet.create({
   creditsButton: {
     borderWidth: 1,
     borderColor: colors.border,
-    borderRadius: radius.md,
+    borderRadius: radius.pill,
     paddingHorizontal: spacing.sm,
     paddingVertical: spacing.xs,
     backgroundColor: colors.background,
@@ -193,7 +193,7 @@ export const rosterStyles = lazyStyles(() => StyleSheet.create({
   chip: {
     borderWidth: 1,
     borderColor: colors.border,
-    borderRadius: radius.md,
+    borderRadius: radius.pill,
     paddingHorizontal: spacing.sm,
     paddingVertical: spacing.xs,
     backgroundColor: colors.background,
@@ -242,7 +242,7 @@ export const rosterStyles = lazyStyles(() => StyleSheet.create({
   button: {
     marginTop: spacing.sm,
     backgroundColor: colors.accent,
-    borderRadius: radius.md,
+    borderRadius: radius.pill,
     paddingVertical: spacing.sm,
     paddingHorizontal: spacing.md,
     alignItems: "center",
@@ -288,7 +288,7 @@ export const rosterStyles = lazyStyles(() => StyleSheet.create({
   playerTable: {
     borderWidth: 1,
     borderColor: colors.border,
-    borderRadius: radius.md,
+    borderRadius: radius.xl,
     overflow: "hidden",
     backgroundColor: colors.background,
   },
@@ -399,7 +399,7 @@ export const rosterStyles = lazyStyles(() => StyleSheet.create({
   },
   compactButton: {
     backgroundColor: colors.accent,
-    borderRadius: radius.md,
+    borderRadius: radius.pill,
     paddingVertical: spacing.xs,
     paddingHorizontal: spacing.md,
     alignItems: "center",
@@ -409,7 +409,7 @@ export const rosterStyles = lazyStyles(() => StyleSheet.create({
   ghostButton: {
     borderWidth: 1,
     borderColor: colors.border,
-    borderRadius: radius.md,
+    borderRadius: radius.pill,
     paddingVertical: spacing.xs,
     paddingHorizontal: spacing.md,
     alignItems: "center",

@@ -238,7 +238,7 @@ const styles = lazyStyles(() => StyleSheet.create({
   },
   button: {
     backgroundColor: colors.accent,
-    borderRadius: radius.md,
+    borderRadius: radius.pill,
     padding: spacing.sm,
     alignItems: "center",
     marginTop: spacing.sm,
@@ -250,7 +250,7 @@ const styles = lazyStyles(() => StyleSheet.create({
   table: {
     borderWidth: 1,
     borderColor: colors.border,
-    borderRadius: radius.md,
+    borderRadius: radius.xl,
     overflow: "hidden",
   },
   row: {
