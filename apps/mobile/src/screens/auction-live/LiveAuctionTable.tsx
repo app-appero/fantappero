@@ -139,7 +139,7 @@ const styles = lazyStyles(() => StyleSheet.create({
     maxWidth: 420,
     aspectRatio: 16 / 11,
     borderRadius: 999,
-    backgroundColor: "#1b3a7a",
+    backgroundColor: colors.field,
     borderWidth: 6,
     borderColor: colors.border,
     alignItems: "center",

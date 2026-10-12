@@ -16,7 +16,7 @@
     "android": {
       "package": "com.fantappero.mobile",
       "adaptiveIcon": {
-        "backgroundColor": "#13213f"
+        "backgroundColor": "#0a0f22"
       }
     },
     "web": {

@@ -15,6 +15,8 @@ export type AppColors = {
   accentHover: string;
   accentMuted: string;
   accentContrast: string;
+  /** Secondo colore di marca (menta), in coppia con l'accento azzurro. */
+  accentSecondary: string;
   border: string;
   borderStrong: string;
   success: string;
@@ -28,6 +30,8 @@ export type AppColors = {
   ok: string;
   /** Placeholder degli input. Scuro: bianco. Chiaro: grigio scuro, leggibile sul fondo chiaro. */
   inputPlaceholder: string;
+  /** Campo da gioco (pitch, tavolo asta). */
+  field: string;
 };
 
 export const darkColors: AppColors = {
@@ -42,6 +46,7 @@ export const darkColors: AppColors = {
   accentHover: palette.electric400,
   accentMuted: palette.electric300,
   accentContrast: palette.navy900,
+  accentSecondary: palette.mint500,
   border: palette.pitch600,
   borderStrong: palette.pitch500,
   success: palette.success500,
@@ -54,6 +59,7 @@ export const darkColors: AppColors = {
   muted: palette.slate300,
   ok: palette.success500,
   inputPlaceholder: "#ffffff",
+  field: palette.field800,
 };
 
 export const lightColors: AppColors = {
@@ -61,15 +67,16 @@ export const lightColors: AppColors = {
   backgroundSubtle: palette.cloud100,
   backgroundElevated: "#ffffff",
   backgroundGradientStop: palette.cloud200,
-  foreground: palette.pitch900,
-  foregroundMuted: palette.pitch500,
+  foreground: "#0b162b",
+  foregroundMuted: "#4f5c78",
   foregroundSubtle: palette.slate500,
   accent: palette.cobalt600,
   accentHover: palette.cobalt700,
-  accentMuted: palette.electric600,
+  accentMuted: palette.cobalt700,
   accentContrast: "#ffffff",
-  border: "#d3dcf0",
-  borderStrong: "#aab8da",
+  accentSecondary: palette.mint600,
+  border: "#d3dde4",
+  borderStrong: "#a9b8c4",
   success: palette.success600,
   successMuted: palette.success500,
   warning: palette.warning600,
@@ -77,9 +84,10 @@ export const lightColors: AppColors = {
   danger: palette.danger600,
   dangerMuted: palette.danger500,
   focusRing: palette.cobalt700,
-  muted: palette.pitch500,
+  muted: "#4f5c78",
   ok: palette.success600,
-  inputPlaceholder: palette.pitch500,
+  inputPlaceholder: "#4f5c78",
+  field: palette.fieldLight800,
 };
 
 export function resolveColorScheme(

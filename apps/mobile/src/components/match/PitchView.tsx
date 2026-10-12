@@ -143,7 +143,7 @@ const styles = lazyStyles(() => StyleSheet.create({
   pitch: {
     width: "100%",
     aspectRatio: 3 / 4,
-    backgroundColor: "#1b3a7a",
+    backgroundColor: colors.field,
     borderRadius: radius.lg,
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.25)",
