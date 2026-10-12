@@ -268,7 +268,7 @@ textarea::placeholder,
 }
 
 .fa-badge--accent {
-  background-color: var(--fa-electric-600);
+  background-color: var(--fa-color-accent);
   color: var(--fa-color-accent-contrast);
 }
 
@@ -1302,7 +1302,7 @@ button.fa-pitch-player {
 
 .fa-progress-bar__fill {
   border-radius: var(--fa-radius-pill);
-  background-image: linear-gradient(90deg, var(--fa-electric-400), var(--fa-electric-600));
+  background-image: var(--fa-gradient-accent);
 }
 
 .fa-switch__control--on {

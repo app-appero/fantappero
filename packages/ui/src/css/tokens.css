@@ -5,33 +5,38 @@
 :root,
 [data-theme="fantappero"] {
   /* Palette */
-  --fa-pitch-950: #0c1730;
-  --fa-pitch-900: #101c38;
-  --fa-pitch-800: #13213f;
-  --fa-pitch-700: #1c2d54;
-  --fa-pitch-600: #2b3f6e;
-  --fa-pitch-500: #4a6199;
+  --fa-pitch-950: #060913;
+  --fa-pitch-900: #080c1c;
+  --fa-pitch-800: #0a0f22;
+  --fa-pitch-700: #141a36;
+  --fa-pitch-600: #262e52;
+  --fa-pitch-500: #3c4775;
 
   --fa-ivory-50: #f7f9ff;
-  --fa-ivory-100: #f5f6fa;
-  --fa-ivory-200: #e4e9f5;
+  --fa-ivory-100: #f4f6ff;
+  --fa-ivory-200: #e2e8f5;
 
-  --fa-slate-300: #b4bfdd;
-  --fa-slate-400: #98a5c9;
-  --fa-slate-500: #5d6a8f;
+  --fa-slate-300: #a5b0d6;
+  --fa-slate-400: #8c97c0;
+  --fa-slate-500: #58648a;
 
-  --fa-electric-600: #4c86ff;
-  --fa-electric-500: #6aa8ff;
-  --fa-electric-400: #8cc4ff;
-  --fa-electric-300: #b5d6ff;
+  --fa-electric-600: #2f63f0;
+  --fa-electric-500: #5aa2ff;
+  --fa-electric-400: #8dbbff;
+  --fa-electric-300: #bbd6ff;
 
-  --fa-cobalt-700: #1f43b8;
-  --fa-cobalt-600: #2b57e0;
-  --fa-navy-900: #0a1530;
+  --fa-cobalt-700: #1749b8;
+  --fa-cobalt-600: #1f5ee6;
 
-  --fa-success-600: #17707c;
-  --fa-success-500: #38c9d8;
-  --fa-success-400: #6fe0ea;
+  --fa-mint-600: #0b8a6b;
+  --fa-mint-500: #3ddc97;
+  --fa-mint-400: #7be8b8;
+
+  --fa-navy-900: #06121f;
+
+  --fa-success-600: #0b8a6b;
+  --fa-success-500: #3ddc97;
+  --fa-success-400: #7be8b8;
 
   --fa-warning-600: #b8860b;
   --fa-warning-500: #e6a700;
@@ -55,9 +60,12 @@
   --fa-color-accent-hover: var(--fa-electric-400);
   --fa-color-accent-muted: var(--fa-electric-300);
   --fa-color-accent-contrast: var(--fa-navy-900);
-  --fa-gradient-accent: linear-gradient(135deg, var(--fa-electric-400), var(--fa-electric-600));
-  --fa-gradient-accent-text: linear-gradient(135deg, #e3eeff, var(--fa-electric-400));
-  --fa-glow-accent: 0 10px 30px rgba(76, 134, 255, 0.4);
+  --fa-color-accent-secondary: var(--fa-mint-500);
+  --fa-gradient-accent: linear-gradient(135deg, var(--fa-electric-500), var(--fa-mint-500));
+  --fa-gradient-accent-text: linear-gradient(135deg, #e8f4ff, var(--fa-mint-400));
+  --fa-glow-accent: 0 10px 30px rgba(90, 162, 255, 0.34);
+  --fa-color-field: #14213f;
+  --fa-color-field-alt: #101a36;
 
   --fa-color-border: var(--fa-pitch-600);
   --fa-color-border-strong: var(--fa-pitch-500);
@@ -102,7 +110,7 @@
   --fa-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.35);
   --fa-shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4);
   --fa-shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.45);
-  --fa-shadow-focus: 0 0 0 3px rgba(181, 214, 255, 0.45);
+  --fa-shadow-focus: 0 0 0 3px rgba(187, 214, 255, 0.45);
 
   /* Motion */
   --fa-duration-fast: 150ms;
@@ -143,42 +151,45 @@
 
 [data-color-scheme="light"] {
   color-scheme: light;
-  --fa-pitch-950: #eef2fb;
-  --fa-pitch-900: #e9eefa;
-  --fa-pitch-800: #f4f7fd;
+  --fa-pitch-950: #e8eef2;
+  --fa-pitch-900: #e8eef2;
+  --fa-pitch-800: #f2f6f8;
   --fa-pitch-700: #ffffff;
-  --fa-pitch-600: #dbe3f5;
-  --fa-pitch-500: #b9c6e6;
-  --fa-ivory-50: #0a1530;
-  --fa-ivory-100: #101c38;
+  --fa-pitch-600: #dce5eb;
+  --fa-pitch-500: #b9c6d1;
+  --fa-ivory-50: #06121f;
+  --fa-ivory-100: #0b162b;
   --fa-ivory-200: #1c2d54;
-  --fa-slate-300: #4a6199;
-  --fa-slate-400: #5d6a8f;
-  --fa-slate-500: #4a6199;
-  --fa-color-background: #f4f7fd;
-  --fa-color-background-subtle: #e9eefa;
+  --fa-slate-300: #4f5c78;
+  --fa-slate-400: #58648a;
+  --fa-slate-500: #4f5c78;
+  --fa-color-background: #f2f6f8;
+  --fa-color-background-subtle: #e8eef2;
   --fa-color-background-elevated: #ffffff;
-  --fa-color-background-gradient-stop: #dde6f8;
-  --fa-color-foreground: #101c38;
-  --fa-color-foreground-muted: #4a6199;
-  --fa-color-foreground-subtle: #5d6a8f;
+  --fa-color-background-gradient-stop: #dce5eb;
+  --fa-color-foreground: #0b162b;
+  --fa-color-foreground-muted: #4f5c78;
+  --fa-color-foreground-subtle: #58648a;
   --fa-color-accent: var(--fa-cobalt-600);
   --fa-color-accent-hover: var(--fa-cobalt-700);
-  --fa-color-accent-muted: var(--fa-electric-600);
+  --fa-color-accent-muted: var(--fa-cobalt-700);
   --fa-color-accent-contrast: #ffffff;
+  --fa-color-accent-secondary: var(--fa-mint-600);
   --fa-color-focus-ring: var(--fa-cobalt-700);
-  --fa-gradient-accent: linear-gradient(135deg, #3a6cf0, var(--fa-cobalt-700));
-  --fa-gradient-accent-text: linear-gradient(135deg, var(--fa-cobalt-600), var(--fa-cobalt-700));
-  --fa-glow-accent: 0 10px 30px rgba(43, 87, 224, 0.28);
-  --fa-color-border: #d3dcf0;
-  --fa-color-border-strong: #aab8da;
+  --fa-gradient-accent: linear-gradient(135deg, var(--fa-cobalt-600), var(--fa-mint-600));
+  --fa-gradient-accent-text: linear-gradient(135deg, var(--fa-cobalt-600), var(--fa-mint-600));
+  --fa-glow-accent: 0 10px 30px rgba(31, 94, 230, 0.26);
+  --fa-color-field: #1f4fb8;
+  --fa-color-field-alt: #1a45a5;
+  --fa-color-border: #d3dde4;
+  --fa-color-border-strong: #a9b8c4;
   --fa-color-input-bg: #ffffff;
-  --fa-color-input-placeholder: #4a6199;
-  --fa-color-disabled-bg: #dbe3f5;
-  --fa-color-disabled-fg: #5d6a8f;
-  --fa-shadow-sm: 0 1px 2px rgba(16, 28, 56, 0.08);
-  --fa-shadow-md: 0 4px 12px rgba(16, 28, 56, 0.1);
-  --fa-shadow-lg: 0 12px 32px rgba(16, 28, 56, 0.12);
+  --fa-color-input-placeholder: #4f5c78;
+  --fa-color-disabled-bg: #dce5eb;
+  --fa-color-disabled-fg: #58648a;
+  --fa-shadow-sm: 0 1px 2px rgba(11, 22, 43, 0.08);
+  --fa-shadow-md: 0 4px 12px rgba(11, 22, 43, 0.1);
+  --fa-shadow-lg: 0 12px 32px rgba(11, 22, 43, 0.12);
 }
 
 /** Admin panel shares the same tokens; density is applied via utility class. */
