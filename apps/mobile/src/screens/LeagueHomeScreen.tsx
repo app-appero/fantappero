@@ -302,7 +302,7 @@ const styles = lazyStyles(() => StyleSheet.create({
     marginTop: spacing.sm,
     minHeight: 44,
     paddingVertical: spacing.sm,
-    borderRadius: radius.md,
+    borderRadius: radius.pill,
     borderWidth: 1,
     borderColor: colors.accent,
     alignItems: "center",

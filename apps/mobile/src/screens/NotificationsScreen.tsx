@@ -239,7 +239,7 @@ const styles = lazyStyles(() => StyleSheet.create({
   secondaryButton: {
     borderWidth: 1,
     borderColor: colors.border,
-    borderRadius: radius.md,
+    borderRadius: radius.pill,
     paddingHorizontal: spacing.sm,
     paddingVertical: spacing.xs,
   },

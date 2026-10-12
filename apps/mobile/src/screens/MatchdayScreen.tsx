@@ -470,7 +470,7 @@ const styles = lazyStyles(() => StyleSheet.create({
   chip: {
     borderWidth: 1,
     borderColor: colors.border,
-    borderRadius: radius.md,
+    borderRadius: radius.pill,
     padding: spacing.sm,
   },
   chipRow: {
@@ -486,7 +486,7 @@ const styles = lazyStyles(() => StyleSheet.create({
   },
   button: {
     backgroundColor: colors.accent,
-    borderRadius: radius.md,
+    borderRadius: radius.pill,
     padding: spacing.sm,
     alignItems: "center",
   },
@@ -500,7 +500,7 @@ const styles = lazyStyles(() => StyleSheet.create({
   secondaryButton: {
     borderWidth: 1,
     borderColor: colors.border,
-    borderRadius: radius.md,
+    borderRadius: radius.pill,
     padding: spacing.sm,
     alignItems: "center",
   },
@@ -514,7 +514,7 @@ const styles = lazyStyles(() => StyleSheet.create({
     gap: spacing.sm,
   },
   ghostButton: {
-    borderRadius: radius.md,
+    borderRadius: radius.pill,
     paddingHorizontal: spacing.sm,
     paddingVertical: 4,
   },

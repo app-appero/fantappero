@@ -384,7 +384,7 @@ const styles = lazyStyles(() => StyleSheet.create({
   button: {
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
-    borderRadius: radius.md,
+    borderRadius: radius.pill,
     backgroundColor: colors.accent,
   },
   buttonDisabled: {
