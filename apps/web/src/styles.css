@@ -1123,7 +1123,7 @@ a.fa-member-list__identity:focus-visible {
   .fa-roster-action--assign {
     background-color: var(--fa-color-accent);
     border-color: transparent;
-    color: var(--fa-ivory-50);
+    color: var(--fa-color-accent-contrast);
   }
 
   .fa-roster-action--release {
@@ -1209,7 +1209,7 @@ a.fa-member-list__identity:focus-visible {
 
   [data-color-scheme="light"] .fa-roster-action--assign,
   [data-color-scheme="light"] .fa-roster-action--release {
-    color: #faf8f4;
+    color: #ffffff;
   }
 }
 
@@ -1919,8 +1919,8 @@ a.fa-member-list__identity:focus-visible {
   width: min(100%, 40rem);
   aspect-ratio: 16 / 10;
   border-radius: 50%;
-  background: radial-gradient(ellipse at center, #164a2c 0%, #0d2f1e 70%, #0a2418 100%);
-  border: 6px solid #3a2416;
+  background: radial-gradient(ellipse at center, #1b3a7a 0%, #173268 70%, #101c38 100%);
+  border: 6px solid var(--fa-pitch-600);
   box-shadow:
     inset 0 0 0 2px rgba(255, 255, 255, 0.08),
     0 10px 30px rgba(0, 0, 0, 0.4);
@@ -2007,7 +2007,7 @@ a.fa-member-list__identity:focus-visible {
 }
 
 .fa-live-auction-table__you {
-  color: #5a8df2;
+  color: var(--fa-electric-400);
   letter-spacing: 0.04em;
   text-transform: uppercase;
 }
@@ -2194,3 +2194,24 @@ a.fa-member-list__identity:focus-visible {
 
 
 
+
+/* ── Identità visiva: titoli display in corsivo condensato ───────────── */
+
+h1,
+h2 {
+  font-family: var(--fa-font-display);
+  font-style: italic;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+  text-transform: uppercase;
+}
+
+h1 {
+  font-size: clamp(2.25rem, 4vw, 3.5rem);
+  line-height: 0.98;
+}
+
+h2 {
+  font-size: 1.75rem;
+  line-height: 1.05;
+}

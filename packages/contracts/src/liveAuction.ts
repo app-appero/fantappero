@@ -39,7 +39,7 @@ export function shouldTriggerSoftClose(
 }
 
 /** Colori dei posti al tavolo: distinti fra loro e dal piano verde. */
-export const LIVE_SEAT_ME_COLOR = "#5a8df2";
+export const LIVE_SEAT_ME_COLOR = "#8cc4ff";
 export const LIVE_SEAT_CALL_COLOR = "#f0c040";
 export const LIVE_SEAT_LEAD_COLOR = "#ff5c93";
 

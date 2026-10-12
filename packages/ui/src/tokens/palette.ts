@@ -1,29 +1,44 @@
 /** Raw palette — single source for hex values (no hardcoding in apps). */
 
 export const palette = {
-  pitch950: "#060910",
-  pitch900: "#0a0e14",
-  pitch800: "#0f1419",
-  pitch700: "#1c2736",
-  pitch600: "#2a3544",
-  pitch500: "#3d4a5c",
+  /** Blu notte: sfondi e superfici del tema scuro. */
+  pitch950: "#0c1730",
+  pitch900: "#101c38",
+  pitch800: "#13213f",
+  pitch700: "#1c2d54",
+  pitch600: "#2b3f6e",
+  pitch500: "#4a6199",
 
-  ivory50: "#faf8f4",
-  ivory100: "#f4f1ea",
-  ivory200: "#e8e4db",
+  ivory50: "#f7f9ff",
+  ivory100: "#f5f6fa",
+  ivory200: "#e4e9f5",
 
-  slate300: "#a3abbe",
-  slate400: "#8b93a7",
-  slate500: "#6b7389",
+  /** Grigi-blu per testo secondario. */
+  slate300: "#b4bfdd",
+  slate400: "#98a5c9",
+  slate500: "#5d6a8f",
 
-  electric600: "#1f57c9",
-  electric500: "#2f6fed",
-  electric400: "#5a8df2",
-  electric300: "#8fb0f7",
+  /** Azzurro cielo: colore di marca sul tema scuro. */
+  electric600: "#4c86ff",
+  electric500: "#6aa8ff",
+  electric400: "#8cc4ff",
+  electric300: "#b5d6ff",
 
-  success600: "#247a35",
-  success500: "#2f9e44",
-  success400: "#4cb564",
+  /** Cobalto: colore di marca sul tema chiaro (contrasto con testo bianco). */
+  cobalt700: "#1f43b8",
+  cobalt600: "#2b57e0",
+
+  /** Testo scuro da usare sopra l'azzurro cielo. */
+  navy900: "#0a1530",
+
+  /** Sfondi del tema chiaro (bianco freddo). */
+  cloud50: "#f4f7fd",
+  cloud100: "#e9eefa",
+  cloud200: "#dde6f8",
+
+  success600: "#17707c",
+  success500: "#38c9d8",
+  success400: "#6fe0ea",
 
   warning600: "#b8860b",
   warning500: "#e6a700",
@@ -33,7 +48,7 @@ export const palette = {
   danger500: "#e03131",
   danger400: "#f06565",
 
-  focusRing: "#8fb0f7",
+  focusRing: "#b5d6ff",
 } as const;
 
 export type PaletteToken = keyof typeof palette;

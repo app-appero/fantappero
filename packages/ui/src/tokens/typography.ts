@@ -1,8 +1,9 @@
-/** Typography — IBM Plex (SIL Open Font License). */
+/** Typography — Barlow / Barlow Condensed (SIL Open Font License). */
 
 export const typography = {
   fontFamily: {
-    sans: '"IBM Plex Sans", "Segoe UI", system-ui, sans-serif',
+    sans: '"Barlow", "Segoe UI", system-ui, sans-serif',
+    display: '"Barlow Condensed", "Barlow", system-ui, sans-serif',
     mono: '"IBM Plex Mono", "Consolas", monospace',
   },
   fontWeight: {

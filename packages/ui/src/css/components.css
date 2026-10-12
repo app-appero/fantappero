@@ -10,13 +10,13 @@
   align-items: center;
   justify-content: center;
   gap: var(--fa-space-sm);
-  min-height: 2.5rem;
-  padding: 0 var(--fa-space-md);
+  min-height: 2.75rem;
+  padding: 0 var(--fa-space-lg);
   border: 1px solid transparent;
-  border-radius: var(--fa-radius-md);
+  border-radius: var(--fa-radius-pill);
   font-family: inherit;
   font-size: var(--fa-text-sm);
-  font-weight: 500;
+  font-weight: 600;
   line-height: var(--fa-leading-normal);
   cursor: pointer;
   transition:
@@ -42,11 +42,14 @@
 
 .fa-btn--primary {
   background-color: var(--fa-color-accent);
-  color: var(--fa-ivory-50);
+  background-image: var(--fa-gradient-accent);
+  color: var(--fa-color-accent-contrast);
+  box-shadow: var(--fa-glow-accent);
 }
 
 .fa-btn--primary:hover:not(:disabled):not([aria-disabled="true"]) {
   background-color: var(--fa-color-accent-hover);
+  filter: brightness(1.07);
 }
 
 .fa-btn--secondary {
@@ -106,7 +109,10 @@
   animation: fa-spin var(--fa-duration-normal) linear infinite;
 }
 
-.fa-btn--primary.fa-btn--loading .fa-btn__spinner,
+.fa-btn--primary.fa-btn--loading .fa-btn__spinner {
+  color: var(--fa-color-accent-contrast);
+}
+
 .fa-btn--danger.fa-btn--loading .fa-btn__spinner {
   color: var(--fa-ivory-50);
 }
@@ -151,10 +157,10 @@
 .fa-input,
 .fa-select {
   width: 100%;
-  min-height: 2.5rem;
+  min-height: 2.75rem;
   padding: var(--fa-space-sm) var(--fa-space-md);
   border: 1px solid var(--fa-color-input-border);
-  border-radius: var(--fa-radius-md);
+  border-radius: var(--fa-radius-lg);
   background-color: var(--fa-color-input-bg);
   color: var(--fa-color-foreground);
   font-family: inherit;
@@ -172,11 +178,9 @@ textarea::placeholder,
   opacity: 1;
 }
 
-[data-color-scheme="light"] .fa-btn--primary,
 [data-color-scheme="light"] .fa-btn--danger,
-[data-color-scheme="light"] .fa-btn--primary.fa-btn--loading .fa-btn__spinner,
 [data-color-scheme="light"] .fa-btn--danger.fa-btn--loading .fa-btn__spinner {
-  color: #faf8f4;
+  color: #ffffff;
 }
 
 .fa-input:hover:not(:disabled):not([aria-invalid="true"]),
@@ -219,7 +223,7 @@ textarea::placeholder,
 
 .fa-card {
   border: 1px solid var(--fa-color-border);
-  border-radius: var(--fa-radius-lg);
+  border-radius: var(--fa-radius-xl);
   background-color: var(--fa-color-background-elevated);
   box-shadow: var(--fa-shadow-sm);
 }
@@ -265,7 +269,7 @@ textarea::placeholder,
 
 .fa-badge--accent {
   background-color: var(--fa-electric-600);
-  color: var(--fa-ivory-50);
+  color: var(--fa-color-accent-contrast);
 }
 
 .fa-badge--success {
@@ -885,35 +889,37 @@ button.fa-pitch-player {
 }
 
 .fa-brand-logo__mark {
-  width: 2rem;
-  height: 2rem;
+  width: 2.25rem;
+  height: 2.25rem;
   flex-shrink: 0;
-  color: var(--fa-color-accent);
 }
 
 .fa-brand-logo--sm .fa-brand-logo__mark {
-  width: 1.5rem;
-  height: 1.5rem;
+  width: 1.75rem;
+  height: 1.75rem;
 }
 
 .fa-brand-logo--lg .fa-brand-logo__mark {
-  width: 2.75rem;
-  height: 2.75rem;
+  width: 3rem;
+  height: 3rem;
 }
 
 .fa-brand-logo__wordmark {
-  font-size: var(--fa-text-lg);
-  font-weight: 600;
-  letter-spacing: -0.01em;
-  line-height: var(--fa-leading-tight);
+  font-family: var(--fa-font-display);
+  font-size: 1.6rem;
+  font-style: italic;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+  line-height: 1;
+  text-transform: uppercase;
 }
 
 .fa-brand-logo--sm .fa-brand-logo__wordmark {
-  font-size: var(--fa-text-md);
+  font-size: 1.3rem;
 }
 
 .fa-brand-logo--lg .fa-brand-logo__wordmark {
-  font-size: var(--fa-text-xl);
+  font-size: 2.2rem;
 }
 
 .fa-auction-panel__budget {

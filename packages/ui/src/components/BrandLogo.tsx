@@ -1,4 +1,4 @@
-import { type HTMLAttributes } from "react";
+import { useId, type HTMLAttributes } from "react";
 import { classNames } from "../utils/classNames.js";
 
 export type BrandLogoVariant = "mark" | "full";
@@ -9,39 +9,39 @@ export type BrandLogoProps = HTMLAttributes<HTMLDivElement> & {
   size?: BrandLogoSize;
 };
 
+/** Simbolo: "F" in corsa con il pallone, su quadrato con gradiente azzurro. */
 function BrandMark({ className }: { className?: string }) {
+  const gradientId = `fa-brand-gradient-${useId().replace(/:/g, "")}`;
   return (
     <svg
       className={className}
-      viewBox="0 0 32 32"
+      viewBox="0 0 64 64"
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
       aria-hidden="true"
       focusable="false"
     >
+      <defs>
+        <linearGradient
+          id={gradientId}
+          x1="0"
+          y1="0"
+          x2="64"
+          y2="64"
+          gradientUnits="userSpaceOnUse"
+        >
+          <stop offset="0" stopColor="#9cd0ff" />
+          <stop offset="0.5" stopColor="#6aa8ff" />
+          <stop offset="1" stopColor="#4c86ff" />
+        </linearGradient>
+      </defs>
+      <rect width="64" height="64" rx="18" fill={`url(#${gradientId})`} />
       <path
-        d="M16 3.5 26.5 8.5v9.2c0 5.2-4.2 9.8-10.5 11.8C9.7 27.5 5.5 22.9 5.5 17.7V8.5L16 3.5z"
-        stroke="currentColor"
-        strokeWidth="1.5"
-        strokeLinejoin="round"
+        d="M16 50L22.1 14H48.5L47.1 22H28.8L27.4 30H40.6L39.4 37H26.2L24 50Z"
+        fill="#0a1530"
       />
-      <line
-        x1="16"
-        y1="11"
-        x2="16"
-        y2="22"
-        stroke="currentColor"
-        strokeWidth="0.75"
-        opacity="0.35"
-      />
-      <circle cx="16" cy="16.5" r="4.25" stroke="currentColor" strokeWidth="1" opacity="0.55" />
-      <path
-        d="M12.5 11.5h7.5M12.5 11.5v10M12.5 16h4.5"
-        stroke="currentColor"
-        strokeWidth="1.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
+      <circle cx="47" cy="44" r="5" stroke="#0a1530" strokeWidth="3" />
+      <circle cx="47" cy="44" r="1.6" fill="#0a1530" />
     </svg>
   );
 }

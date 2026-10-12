@@ -53,18 +53,25 @@
   display: flex;
   flex-direction: column;
   min-height: 100vh;
-  background: radial-gradient(
-    circle at top left,
-    var(--fa-color-background-gradient-stop),
-    var(--fa-color-background)
-  );
+  background:
+    radial-gradient(
+      900px 520px at 0% 0%,
+      color-mix(in srgb, var(--fa-electric-500) 16%, transparent),
+      transparent 60%
+    ),
+    radial-gradient(
+      900px 640px at 100% 100%,
+      color-mix(in srgb, var(--fa-electric-600) 18%, transparent),
+      transparent 60%
+    ),
+    var(--fa-color-background);
 }
 
 .fa-app-shell.fa-surface-pitch {
   background-color: var(--fa-color-background);
   background-image: radial-gradient(
     ellipse 80% 50% at 50% -5%,
-    color-mix(in srgb, var(--fa-color-accent) 8%, var(--fa-color-background-gradient-stop)),
+    color-mix(in srgb, var(--fa-color-accent) 14%, var(--fa-color-background-gradient-stop)),
     var(--fa-color-background) 60%
   );
 }
@@ -312,8 +319,9 @@ button.fa-app-header__league-action {
   display: flex;
   align-items: center;
   gap: var(--fa-space-sm);
+  min-height: 2.75rem;
   padding: var(--fa-space-sm) var(--fa-space-md);
-  border-radius: var(--fa-radius-md);
+  border-radius: var(--fa-radius-lg);
   color: var(--fa-color-foreground-muted);
   text-decoration: none;
   font-size: var(--fa-text-sm);
@@ -333,9 +341,12 @@ button.fa-app-header__league-action {
   box-shadow: var(--fa-shadow-focus);
 }
 
-.fa-sidebar-nav__link--active {
-  background-color: color-mix(in srgb, var(--fa-color-accent) 18%, transparent);
-  color: var(--fa-color-accent);
+.fa-sidebar-nav__link--active,
+.fa-sidebar-nav__link--active:hover {
+  background-color: var(--fa-color-accent);
+  background-image: var(--fa-gradient-accent);
+  color: var(--fa-color-accent-contrast);
+  font-weight: 600;
 }
 
 .fa-sidebar-nav__icon {
@@ -758,9 +769,10 @@ button.fa-app-header__league-action {
 
 .fa-kpi-card__value {
   margin: 0;
-  font-family: var(--fa-font-mono);
-  font-size: var(--fa-text-2xl);
-  font-weight: 600;
+  font-family: var(--fa-font-display);
+  font-size: 3rem;
+  font-style: italic;
+  font-weight: 800;
   font-variant-numeric: tabular-nums;
   line-height: var(--fa-leading-tight);
 }
@@ -1064,9 +1076,11 @@ button.fa-app-header__league-action {
   position: relative;
   width: 100%;
   aspect-ratio: 3 / 4;
-  background: linear-gradient(180deg, #123c26 0%, #0d2f1e 100%);
+  background:
+    radial-gradient(70% 60% at 50% 50%, color-mix(in srgb, var(--fa-electric-600) 22%, transparent), transparent 70%),
+    repeating-linear-gradient(180deg, #1b3a7a 0, #1b3a7a 12.5%, #173268 12.5%, #173268 25%);
   border: 1px solid rgba(255, 255, 255, 0.25);
-  border-radius: var(--fa-radius-lg);
+  border-radius: var(--fa-radius-xl);
   overflow: hidden;
 }
 

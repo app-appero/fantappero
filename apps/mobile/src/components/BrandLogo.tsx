@@ -1,5 +1,4 @@
 import { lazyStyles } from "../theme/lazyStyles";
-import Feather from "@expo/vector-icons/Feather";
 import { StyleSheet, Text, View, type ViewProps } from "react-native";
 import { theme } from "@fantappero/ui/theme";
 
@@ -25,7 +24,7 @@ const WORDMARK_SIZES: Record<BrandLogoSize, number> = {
   lg: typography.fontSize.xl,
 };
 
-/** Brand mark + wordmark for mobile shell (Feather shield + wordmark, aligned with web identity). */
+/** Brand mark + wordmark for mobile shell ("F" in corsa con il pallone, allineato all'identità web). */
 export function BrandLogo({ variant = "full", size = "md", style, testID, ...rest }: BrandLogoProps) {
   const markSize = MARK_SIZES[size];
 
@@ -37,8 +36,29 @@ export function BrandLogo({ variant = "full", size = "md", style, testID, ...res
       testID={testID ?? "brand-logo"}
       {...rest}
     >
-      <View style={styles.markWrap}>
-        <Feather name="shield" size={markSize} color={colors.accent} />
+      <View
+        style={[
+          styles.mark,
+          { width: markSize, height: markSize, borderRadius: Math.round(markSize * 0.28) },
+        ]}
+      >
+        <Text
+          style={[styles.markLetter, { fontSize: Math.round(markSize * 0.66) }]}
+          allowFontScaling={false}
+        >
+          F
+        </Text>
+        <View
+          style={[
+            styles.markBall,
+            {
+              width: Math.round(markSize * 0.22),
+              height: Math.round(markSize * 0.22),
+              right: Math.round(markSize * 0.12),
+              bottom: Math.round(markSize * 0.12),
+            },
+          ]}
+        />
       </View>
       {variant === "full" ? (
         <Text
@@ -61,12 +81,30 @@ const styles = lazyStyles(() => StyleSheet.create({
     flexShrink: 1,
     minWidth: 0,
   },
-  markWrap: {
+  mark: {
     flexShrink: 0,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.accent,
+  },
+  markLetter: {
+    color: colors.accentContrast,
+    fontStyle: "italic",
+    fontWeight: "800",
+    includeFontPadding: false,
+  },
+  markBall: {
+    position: "absolute",
+    borderRadius: 999,
+    borderWidth: 1.5,
+    borderColor: colors.accentContrast,
   },
   wordmark: {
     color: colors.foreground,
-    fontWeight: typography.fontWeight.semibold,
+    fontStyle: "italic",
+    fontWeight: "800",
+    letterSpacing: 0.4,
+    textTransform: "uppercase",
     flexShrink: 1,
   },
 }));
