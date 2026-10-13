@@ -11,6 +11,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { OptionPicker } from "../../components/OptionPicker";
 import { StatusBadge } from "../../components/StatusBadge";
+import { TeamAvatar } from "../../components/TeamAvatar";
 import { UiStatePanel } from "../../components/UiStatePanel";
 
 const { colors, spacing, typography, radius } = theme;
@@ -107,7 +108,17 @@ function MatchupRow({
   if (matchup.isBye) {
     return (
       <View style={styles.matchup} testID={`h2h-matchup-${matchup.slotId}`}>
-        <Text style={styles.teamLine}>{homeName}</Text>
+        <View style={styles.matchupTeams}>
+          <View style={styles.team}>
+            <TeamAvatar name={homeName} />
+            <Text style={styles.teamLine} numberOfLines={2}>{homeName}</Text>
+          </View>
+          <Text style={styles.vs}>vs</Text>
+          <View style={styles.team}>
+            <TeamAvatar name="Riposo" />
+            <Text style={styles.teamLine}>Riposo</Text>
+          </View>
+        </View>
         <Text style={styles.body}>Riposo in questa giornata.</Text>
       </View>
     );
@@ -135,10 +146,24 @@ function MatchupRow({
       accessibilityRole="button"
       accessibilityLabel={h2hResultAriaLabel(display, homeName, awayName)}
     >
+      <View style={styles.matchupTeams}>
+        <View style={styles.team}>
+          <TeamAvatar name={homeName} />
+          <Text style={styles.teamLine} numberOfLines={2}>{homeName}</Text>
+        </View>
+        {display.goalsAvailable && matchup.result ? (
+          <Text style={styles.bigScore}>
+            {matchup.result.homeFantasyGoals} - {matchup.result.awayFantasyGoals}
+          </Text>
+        ) : (
+          <Text style={styles.vs}>vs</Text>
+        )}
+        <View style={styles.team}>
+          <TeamAvatar name={awayName} />
+          <Text style={styles.teamLine} numberOfLines={2}>{awayName}</Text>
+        </View>
+      </View>
       <View style={styles.matchupHeader}>
-        <Text style={styles.teamLine}>
-          {homeName} vs {awayName}
-        </Text>
         <StatusBadge
           label={statusLabel}
           color={statusColor}
@@ -386,10 +411,32 @@ const styles = lazyStyles(() => StyleSheet.create({
   matchup: {
     borderWidth: 1,
     borderColor: colors.border,
-    borderRadius: radius.md,
-    padding: spacing.sm,
-    gap: spacing.xs,
+    borderRadius: radius.xl,
+    padding: spacing.md,
+    gap: spacing.sm,
     backgroundColor: colors.backgroundElevated,
+  },
+  matchupTeams: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: spacing.sm,
+  },
+  team: {
+    flex: 1,
+    alignItems: "center",
+    gap: spacing.xs,
+    minWidth: 0,
+  },
+  bigScore: {
+    color: colors.foreground,
+    fontSize: 32,
+    fontStyle: "italic",
+    fontWeight: "800",
+  },
+  vs: {
+    color: colors.foregroundMuted,
+    fontWeight: "600",
   },
   matchupHeader: {
     flexDirection: "row",
@@ -402,6 +449,7 @@ const styles = lazyStyles(() => StyleSheet.create({
     fontSize: typography.fontSize.md,
     fontWeight: "600",
     flexShrink: 1,
+    textAlign: "center",
   },
   body: {
     color: colors.foregroundMuted,

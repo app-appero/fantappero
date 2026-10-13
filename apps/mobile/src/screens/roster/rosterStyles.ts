@@ -40,6 +40,11 @@ export const rosterStyles = lazyStyles(() => StyleSheet.create({
   roleSection: {
     marginBottom: spacing.md,
     gap: spacing.xs,
+    padding: spacing.md,
+    borderRadius: radius.xl,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.backgroundElevated,
   },
   roleSectionHeader: {
     flexDirection: "row",
@@ -68,7 +73,15 @@ export const rosterStyles = lazyStyles(() => StyleSheet.create({
   },
   creditsBalance: {
     flex: 1,
-    fontSize: typography.fontSize.sm,
+    padding: spacing.md,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.backgroundElevated,
+    overflow: "hidden",
+    fontSize: typography.fontSize.md,
+    fontWeight: "800",
+    fontStyle: "italic",
     color: colors.foreground,
   },
   creditsButton: {

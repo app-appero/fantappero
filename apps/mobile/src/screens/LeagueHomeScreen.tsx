@@ -15,6 +15,7 @@ import {
   fetchLeagueMembersPublic,
 } from "../api/leagues";
 import { ScreenTabs } from "../components/ScreenTabs";
+import { TeamAvatar } from "../components/TeamAvatar";
 import { UiStatePanel } from "../components/UiStatePanel";
 import { useScreenData } from "../hooks/useScreenData";
 import { PageContainer } from "../layout/PageContainer";
@@ -153,50 +154,51 @@ export function LeagueHomeScreen() {
 
       {!loading && !loadError && league ? (
         <View style={styles.content} testID="league-home-content">
-          <Text style={styles.heading}>Contesto</Text>
-          <Text style={styles.body}>Stato: {LEAGUE_STATE_LABELS[league.state]}</Text>
-          <Text style={styles.body}>
-            Ruolo:{" "}
-            {league.viewerRole === "league_admin" ? "Amministratore" : "Partecipante"}
-          </Text>
-          <Text style={styles.body}>Stagione: {league.seasonYear}</Text>
-          {isAdmin ? (
-            <Pressable
-              accessibilityRole="button"
-              onPress={() => navigation.navigate("LeagueAdmin", { leagueId: league.id })}
-              style={styles.secondaryButton}
-              testID="league-home-admin-link"
-            >
-              <Text style={styles.secondaryLabel}>Amministrazione lega</Text>
-            </Pressable>
-          ) : null}
-
-          <Text style={styles.heading}>Regolamento</Text>
-          {league.rules ? (
-            <View style={styles.card}>
-              <Text style={styles.cardTitle}>Preset {league.rules.presetName}</Text>
-              <Text style={styles.body}>
-                Partecipanti previsti: {league.rules.participantCount}
-              </Text>
-              <Text style={styles.body}>Crediti iniziali: {league.rules.totalCredits}</Text>
-              <Text style={styles.body}>
-                Rosa: {league.rules.roster.rosterSize} giocatori (
-                {league.rules.roster.goalkeepers}P-{league.rules.roster.defenders}D-
-                {league.rules.roster.midfielders}C-{league.rules.roster.forwards}A)
-              </Text>
-              <Text style={styles.body}>
-                Campionati:{" "}
-                {league.competitions.map((row) => row.name).join(", ") || "—"}
+          <View style={styles.hero}>
+            <View style={styles.chips}>
+              <Text style={[styles.chip, styles.chipState]}>{LEAGUE_STATE_LABELS[league.state]}</Text>
+              <Text style={styles.chip}>Stagione {league.seasonYear}</Text>
+              <Text style={styles.chip}>
+                {league.viewerRole === "league_admin" ? "Amministratore" : "Partecipante"}
               </Text>
             </View>
-          ) : (
-            <UiStatePanel
-              state="empty"
-              title="Regolamento non impostato"
-              message="L'amministratore deve ancora completare la configurazione."
-              testID="league-home-rules-empty"
-            />
-          )}
+            <Text style={styles.heroName}>{league.name}</Text>
+            <Pressable
+              accessibilityRole="button"
+              style={styles.primaryButton}
+              testID="league-home-formation-link"
+              onPress={() => navigation.navigate("MainTabs", { screen: "Formation" })}
+            >
+              <Text style={styles.primaryLabel}>Imposta la formazione</Text>
+            </Pressable>
+            {isAdmin ? (
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => navigation.navigate("LeagueAdmin", { leagueId: league.id })}
+                style={styles.secondaryButton}
+                testID="league-home-admin-link"
+              >
+                <Text style={styles.secondaryLabel}>Amministrazione lega</Text>
+              </Pressable>
+            ) : null}
+          </View>
+
+          {league.rules ? (
+            <View style={styles.stats}>
+              {[
+                ["Partecipanti", `${members.length}/${league.rules.participantCount}`, `${league.rules.participantMin}–${league.rules.participantMax} consentiti`],
+                ["Crediti", `${league.rules.totalCredits}`, "per squadra"],
+                ["Rosa", `${league.rules.roster.rosterSize}`, `${league.rules.roster.goalkeepers}P·${league.rules.roster.defenders}D·${league.rules.roster.midfielders}C·${league.rules.roster.forwards}A`],
+                ["Campionati", `${league.competitions.length}`, league.competitions.map((row) => row.name).join(" · ") || "—"],
+              ].map(([label, value, hint]) => (
+                <View key={label} style={styles.stat}>
+                  <Text style={styles.statLabel}>{label}</Text>
+                  <Text style={styles.statValue}>{value}</Text>
+                  <Text style={styles.statHint} numberOfLines={1}>{hint}</Text>
+                </View>
+              ))}
+            </View>
+          ) : null}
 
           <Text style={styles.heading}>Partecipanti</Text>
           {members.length === 0 ? (
@@ -207,14 +209,43 @@ export function LeagueHomeScreen() {
               testID="league-home-members-empty"
             />
           ) : (
-            <View style={styles.list} testID="league-home-members-list">
+            <View style={styles.card} testID="league-home-members-list">
               {members.map((member) => (
-                <Text key={member.userId} style={styles.body}>
-                  {member.displayName} ·{" "}
-                  {member.role === "league_admin" ? "Amministratore" : "Partecipante"}
-                </Text>
+                <View key={member.userId} style={styles.memberRow}>
+                  <TeamAvatar name={member.displayName} size={40} />
+                  <View style={styles.memberText}>
+                    <Text style={styles.memberName}>{member.displayName}</Text>
+                    <Text style={styles.body}>
+                      {member.role === "league_admin" ? "Amministratore" : "Partecipante"}
+                    </Text>
+                  </View>
+                </View>
               ))}
             </View>
+          )}
+
+          <Text style={styles.heading}>Regolamento</Text>
+          {league.rules ? (
+            <View style={styles.card}>
+              {[
+                ["Preset", league.rules.presetName],
+                ["Rimborso svincolo", `${league.rules.voluntaryReleaseRefundPercent}%`],
+                ["Lock formazione", `${league.rules.lineupLockMarginMinutes} min`],
+                ["Scambi", league.rules.options.allowTrades ? "Attivi" : "Disattivati"],
+              ].map(([label, value]) => (
+                <View key={label} style={styles.ruleRow}>
+                  <Text style={styles.body}>{label}</Text>
+                  <Text style={styles.ruleValue}>{value}</Text>
+                </View>
+              ))}
+            </View>
+          ) : (
+            <UiStatePanel
+              state="empty"
+              title="Regolamento non impostato"
+              message="L'amministratore deve ancora completare la configurazione."
+              testID="league-home-rules-empty"
+            />
           )}
 
           <Text style={styles.heading}>Calendario</Text>
@@ -247,14 +278,6 @@ export function LeagueHomeScreen() {
           <Pressable
             accessibilityRole="button"
             style={styles.ghostButton}
-            testID="league-home-formation-link"
-            onPress={() => navigation.navigate("MainTabs", { screen: "Formation" })}
-          >
-            <Text style={styles.ghostLabel}>Vai alla formazione</Text>
-          </Pressable>
-          <Pressable
-            accessibilityRole="button"
-            style={styles.ghostButton}
             testID="league-home-matchday-link"
             onPress={() => navigation.navigate("MainTabs", { screen: "Matchday" })}
           >
@@ -283,12 +306,110 @@ const styles = lazyStyles(() => StyleSheet.create({
     color: colors.foregroundMuted,
     fontSize: typography.fontSize.sm,
   },
+  hero: {
+    gap: spacing.md,
+    padding: spacing.lg,
+    borderRadius: radius.xl,
+    borderWidth: 1,
+    borderColor: colors.accentSecondary,
+    backgroundColor: colors.backgroundElevated,
+  },
+  chips: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: spacing.xs,
+  },
+  chip: {
+    overflow: "hidden",
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 4,
+    borderRadius: radius.pill,
+    backgroundColor: colors.background,
+    color: colors.foregroundMuted,
+    fontSize: typography.fontSize.xs,
+    fontWeight: typography.fontWeight.semibold,
+  },
+  chipState: {
+    color: colors.warning,
+  },
+  heroName: {
+    color: colors.foreground,
+    fontSize: 40,
+    fontStyle: "italic",
+    fontWeight: "800",
+    textTransform: "uppercase",
+    lineHeight: 42,
+  },
+  primaryButton: {
+    minHeight: 48,
+    borderRadius: radius.pill,
+    backgroundColor: colors.brand,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  primaryLabel: {
+    color: colors.onBrand,
+    fontWeight: typography.fontWeight.semibold,
+    fontSize: typography.fontSize.md,
+  },
+  stats: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: spacing.sm,
+  },
+  stat: {
+    flexBasis: "47%",
+    flexGrow: 1,
+    padding: spacing.md,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.backgroundElevated,
+  },
+  statLabel: {
+    color: colors.foregroundMuted,
+    fontSize: typography.fontSize.xs,
+    letterSpacing: 1.4,
+    textTransform: "uppercase",
+  },
+  statValue: {
+    color: colors.foreground,
+    fontSize: 30,
+    fontStyle: "italic",
+    fontWeight: "800",
+  },
+  statHint: {
+    color: colors.foregroundMuted,
+    fontSize: typography.fontSize.xs,
+  },
+  memberRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.md,
+    paddingVertical: spacing.xs,
+  },
+  memberText: {
+    flex: 1,
+  },
+  memberName: {
+    color: colors.foreground,
+    fontWeight: typography.fontWeight.semibold,
+  },
+  ruleRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    paddingVertical: spacing.xs,
+  },
+  ruleValue: {
+    color: colors.foreground,
+    fontWeight: typography.fontWeight.semibold,
+  },
   card: {
     gap: spacing.xs,
     padding: spacing.md,
     borderWidth: 1,
     borderColor: colors.border,
-    borderRadius: radius.md,
+    borderRadius: radius.xl,
     backgroundColor: colors.backgroundElevated,
   },
   cardTitle: {
