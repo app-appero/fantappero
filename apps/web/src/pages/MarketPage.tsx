@@ -771,21 +771,21 @@ export function MarketPage() {
             ) : null}
 
             {!trade.loading && !trade.loadError && trade.proposals.length > 0 ? (
-              <ul data-testid="market-trade-list">
+              <ul data-testid="market-trade-list" className="fa-trade-list">
                 {trade.proposals.map((proposal) => {
                   const isProposer = proposal.proposerTeamId === team?.id;
                   const isRecipient = proposal.recipientTeamId === team?.id;
                   const pending = trade.actionPendingId === proposal.id;
                   return (
-                    <li key={proposal.id} data-testid={`market-trade-proposal-${proposal.id}`}>
-                      <p>
+                    <li key={proposal.id} data-testid={`market-trade-proposal-${proposal.id}`} className="fa-trade-card">
+                      <p className="fa-trade-card__head">
                         {teamNameFor(proposal.proposerTeamId)} → {teamNameFor(proposal.recipientTeamId)}{" "}
                         <Badge variant={TRADE_STATUS_VARIANT[proposal.status] ?? "neutral"}>
                           {TRADE_STATUS_LABEL[proposal.status] ?? proposal.status}
                         </Badge>
                       </p>
-                      <p>
-                        Offerti:{" "}
+                      <p className="fa-trade-card__side">
+                        <span className="fa-trade-card__label">Offerti</span>{" "}
                         {proposal.offeredAthletes.length === 0
                           ? "—"
                           : proposal.offeredAthletes.map((athlete, index) => (
@@ -796,8 +796,8 @@ export function MarketPage() {
                             ))}
                         {proposal.offeredCredits > 0 ? ` + ${proposal.offeredCredits} crediti` : ""}
                       </p>
-                      <p>
-                        Richiesti:{" "}
+                      <p className="fa-trade-card__side">
+                        <span className="fa-trade-card__label">Richiesti</span>{" "}
                         {proposal.requestedAthletes.length === 0
                           ? "—"
                           : proposal.requestedAthletes.map((athlete, index) => (
@@ -808,7 +808,7 @@ export function MarketPage() {
                             ))}
                         {proposal.requestedCredits > 0 ? ` + ${proposal.requestedCredits} crediti` : ""}
                       </p>
-                      <p>
+                      <p className="fa-trade-card__expires">
                         {proposal.expiresAt
                           ? `Scade il ${new Date(proposal.expiresAt).toLocaleString("it-IT")}`
                           : "Nessuna scadenza"}

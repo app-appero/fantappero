@@ -2764,3 +2764,57 @@ h2 {
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+/* ── Scambi: proposte come card ───────────────────────────────────────── */
+
+.fa-trade-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(20rem, 1fr));
+  gap: var(--fa-space-md);
+  align-items: start;
+}
+
+.fa-trade-card {
+  display: grid;
+  gap: var(--fa-space-sm);
+  padding: var(--fa-space-lg);
+  border-radius: var(--fa-radius-xl);
+  background: var(--fa-color-background-elevated);
+  border: 1px solid var(--fa-color-border);
+}
+
+.fa-trade-card p {
+  margin: 0;
+}
+
+.fa-trade-card__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--fa-space-sm);
+  flex-wrap: wrap;
+  font-weight: 700;
+  font-size: 1.05rem;
+}
+
+.fa-trade-card__side {
+  padding: var(--fa-space-sm) var(--fa-space-md);
+  border-radius: var(--fa-radius-lg);
+  background: color-mix(in srgb, var(--fa-color-foreground) 5%, transparent);
+}
+
+.fa-trade-card__label {
+  display: block;
+  font-size: 0.72rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--fa-color-foreground-muted);
+}
+
+.fa-trade-card__expires {
+  font-size: 0.85rem;
+  color: var(--fa-color-foreground-muted);
+}

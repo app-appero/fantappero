@@ -212,11 +212,13 @@ export const marketUiStyles = lazyStyles(() => StyleSheet.create({
     flex: 1,
   },
   listRow: {
-    padding: spacing.md,
-    borderRadius: radius.md,
+    padding: spacing.lg,
+    borderRadius: radius.xl,
+    borderWidth: 1,
+    borderColor: colors.border,
     backgroundColor: colors.backgroundElevated,
     marginBottom: spacing.sm,
-    gap: 2,
+    gap: spacing.xs,
   },
   nameRow: {
     flexDirection: "row",
