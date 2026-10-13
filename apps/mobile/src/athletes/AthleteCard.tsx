@@ -23,6 +23,7 @@ import {
 import { fetchAthleteCard } from "../api/leagues";
 import { UiStatePanel } from "../components/UiStatePanel";
 import { getApiErrorMessage, useAuthSession } from "../session/DemoSessionContext";
+import { LinearGradient } from "expo-linear-gradient";
 import { lazyStyles } from "../theme/lazyStyles";
 
 const { colors, spacing, radius, typography } = theme;
@@ -285,6 +286,12 @@ export function AthleteCardProvider({ children }: { children: ReactNode }) {
       {children}
       <Modal visible={athleteId != null} transparent animationType="fade" onRequestClose={close}>
         <View style={styles.backdrop}>
+          <LinearGradient
+            colors={[...theme.foil]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.foilFrame}
+          >
           <View style={styles.sheet} testID="athlete-card-modal">
             <View style={styles.header}>
               <Text style={styles.title}>{card?.canonicalName ?? "Calciatore"}</Text>
@@ -312,6 +319,7 @@ export function AthleteCardProvider({ children }: { children: ReactNode }) {
               {!loading && !error && card ? <AthleteCardView card={card} /> : null}
             </ScrollView>
           </View>
+          </LinearGradient>
         </View>
       </Modal>
     </AthleteCardContext.Provider>
@@ -330,12 +338,16 @@ const styles = lazyStyles(() =>
       justifyContent: "center",
       padding: spacing.md,
     },
-    sheet: {
+    foilFrame: {
       maxHeight: "88%",
+      padding: 2,
+      borderRadius: radius.xl,
+    },
+    sheet: {
+      flexShrink: 1,
       backgroundColor: colors.backgroundElevated,
-      borderRadius: radius.lg,
-      borderWidth: 1,
-      borderColor: colors.border,
+      borderRadius: radius.xl - 2,
+      overflow: "hidden",
     },
     header: {
       flexDirection: "row",

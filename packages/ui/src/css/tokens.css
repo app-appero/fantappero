@@ -66,6 +66,12 @@
   --fa-glow-accent: 0 10px 30px rgba(90, 162, 255, 0.34);
   --fa-color-field: #14213f;
   --fa-color-field-alt: #101a36;
+  --fa-color-led: #ffb547;
+  --fa-color-led-label: #b98a3d;
+  --fa-color-led-panel: #04060e;
+  --fa-beam: rgba(255, 241, 201, 0.16);
+  --fa-foil: conic-gradient(from 210deg, #ff7ad9, #ffd66e, #7cf7c8, #6ec8ff, #b28cff, #ff7ad9);
+  --fa-foil-card: linear-gradient(160deg, #18204a, #0a0f24);
 
   --fa-color-border: var(--fa-pitch-600);
   --fa-color-border-strong: var(--fa-pitch-500);
@@ -78,6 +84,7 @@
   /* Typography */
   --fa-font-sans: "Barlow", "Segoe UI", system-ui, sans-serif;
   --fa-font-display: "Barlow Condensed", "Barlow", system-ui, sans-serif;
+  --fa-font-led: "DotGothic16", var(--fa-font-mono);
   --fa-font-mono: "IBM Plex Mono", "Consolas", monospace;
 
   --fa-text-xs: 0.75rem;
@@ -181,6 +188,7 @@
   --fa-glow-accent: 0 10px 30px rgba(31, 94, 230, 0.26);
   --fa-color-field: #1f4fb8;
   --fa-color-field-alt: #1a45a5;
+  --fa-beam: rgba(255, 241, 201, 0);
   --fa-color-border: #d3dde4;
   --fa-color-border-strong: #a9b8c4;
   --fa-color-input-bg: #ffffff;
