@@ -6,10 +6,7 @@ import type {
 import {
   Breadcrumb,
   Button,
-  Card,
-  CardBody,
-  CardHeader,
-  PageContainer,
+    PageContainer,
   UiStatePanel,
 } from "@fantappero/ui";
 import { useCallback, useEffect, useState } from "react";
@@ -204,7 +201,7 @@ export function LeagueHomePage() {
 
   return (
     <PageContainer
-      title={league?.name ?? "Home lega"}
+      title="Home lega"
       header={
         <Breadcrumb
           items={[
@@ -245,79 +242,134 @@ export function LeagueHomePage() {
       ) : null}
 
       {!loading && !loadError && league ? (
-        <div data-testid="league-home-content">
-          <section aria-labelledby="league-home-context-title">
-            <h2 id="league-home-context-title">Contesto</h2>
-            <p>
-              Stato: <strong>{leagueStateLabel(league.state)}</strong>
-            </p>
-            <p>
-              Ruolo:{" "}
-              <strong>
-                {league.viewerRole === "league_admin" ? "Amministratore" : "Partecipante"}
-              </strong>
-            </p>
-            <p>Stagione: {league.seasonYear}</p>
-            {isAdmin ? (
-              <Link to={`/lega/amministrazione?leagueId=${league.id}`}>
-                <Button variant="secondary" data-testid="league-home-admin-link">
-                  Amministrazione lega
-                </Button>
+        <div data-testid="league-home-content" className="fa-lhome">
+          <section className="fa-lhome__hero" aria-labelledby="league-home-context-title">
+            <div className="fa-lhome__hero-main">
+              <div className="fa-lhome__chips">
+                <span className="fa-lhome__chip fa-lhome__chip--state">
+                  {leagueStateLabel(league.state)}
+                </span>
+                <span className="fa-lhome__chip">Stagione {league.seasonYear}</span>
+                <span className="fa-lhome__chip">
+                  {league.viewerRole === "league_admin" ? "Amministratore" : "Partecipante"}
+                </span>
+              </div>
+              <h2 id="league-home-context-title" className="fa-lhome__name">
+                {league.name}
+              </h2>
+              {isAdmin ? (
+                <Link to={`/lega/amministrazione?leagueId=${league.id}`}>
+                  <Button variant="secondary" data-testid="league-home-admin-link">
+                    Amministrazione lega
+                  </Button>
+                </Link>
+              ) : null}
+            </div>
+            <div className="fa-lhome__next">
+              <span className="fa-lhome__label">Prossimo passo</span>
+              <strong className="fa-lhome__next-title">Imposta la formazione</strong>
+              <Link to="/formazione" className="fa-btn fa-btn--primary" data-testid="league-home-formation-link">
+                Vai alla formazione
               </Link>
-            ) : null}
+            </div>
           </section>
 
-          <section aria-labelledby="league-home-rules-title" style={{ marginTop: "1.5rem" }}>
-            <h2 id="league-home-rules-title">Regolamento</h2>
-            {league.rules ? (
-              <Card>
-                <CardHeader>Preset {league.rules.presetName}</CardHeader>
-                <CardBody>
-                  <p>Partecipanti previsti: {league.rules.participantCount}</p>
-                  <p>Crediti iniziali: {league.rules.totalCredits}</p>
-                  <p>
-                    Rosa: {league.rules.roster.rosterSize} giocatori (
-                    {league.rules.roster.goalkeepers}P-{league.rules.roster.defenders}D-
-                    {league.rules.roster.midfielders}C-{league.rules.roster.forwards}A)
-                  </p>
-                  <p>
-                    Campionati:{" "}
-                    {league.competitions.map((competition) => competition.name).join(", ") || "—"}
-                  </p>
-                </CardBody>
-              </Card>
-            ) : (
-              <UiStatePanel
-                state="empty"
-                title="Regolamento non impostato"
-                message="L'amministratore deve ancora completare la configurazione."
-                testId="league-home-rules-empty"
-              />
-            )}
-          </section>
+          {league.rules ? (
+            <div className="fa-lhome__stats">
+              <div className="fa-lhome__stat">
+                <span className="fa-lhome__label">Partecipanti</span>
+                <strong>
+                  {members.length}/{league.rules.participantCount}
+                </strong>
+                <small>
+                  {league.rules.participantMin}–{league.rules.participantMax} consentiti
+                </small>
+              </div>
+              <div className="fa-lhome__stat">
+                <span className="fa-lhome__label">Crediti</span>
+                <strong>{league.rules.totalCredits}</strong>
+                <small>per squadra</small>
+              </div>
+              <div className="fa-lhome__stat">
+                <span className="fa-lhome__label">Rosa</span>
+                <strong>{league.rules.roster.rosterSize}</strong>
+                <small>
+                  {league.rules.roster.goalkeepers}P·{league.rules.roster.defenders}D·
+                  {league.rules.roster.midfielders}C·{league.rules.roster.forwards}A
+                </small>
+              </div>
+              <div className="fa-lhome__stat">
+                <span className="fa-lhome__label">Campionati</span>
+                <strong>{league.competitions.length}</strong>
+                <small>{league.competitions.map((competition) => competition.name).join(" · ") || "—"}</small>
+              </div>
+            </div>
+          ) : null}
 
-          <section aria-labelledby="league-home-members-title" style={{ marginTop: "1.5rem" }}>
-            <h2 id="league-home-members-title">Partecipanti</h2>
-            {members.length === 0 ? (
-              <UiStatePanel
-                state="empty"
-                title="Nessun partecipante"
-                message="Non risultano iscritti in questa lega."
-                testId="league-home-members-empty"
-              />
-            ) : (
-              <ul className="fa-league-list" data-testid="league-home-members-list">
-                {members.map((member) => (
-                  <li key={member.userId} className="fa-league-list__item">
-                    <span>
-                      <strong>{member.displayName}</strong>
-                      {` · ${member.role === "league_admin" ? "Amministratore" : "Partecipante"}`}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </section>
+          <div className="fa-lhome__cols">
+            <section aria-labelledby="league-home-members-title" className="fa-lhome__card">
+              <h2 id="league-home-members-title">Partecipanti</h2>
+              {members.length === 0 ? (
+                <UiStatePanel
+                  state="empty"
+                  title="Nessun partecipante"
+                  message="Non risultano iscritti in questa lega."
+                  testId="league-home-members-empty"
+                />
+              ) : (
+                <ul className="fa-lhome__members" data-testid="league-home-members-list">
+                  {members.map((member) => (
+                    <li key={member.userId}>
+                      <span className="fa-lhome__avatar" aria-hidden="true">
+                        {member.displayName
+                          .split(/\s+/)
+                          .filter(Boolean)
+                          .map((part) => part.charAt(0))
+                          .slice(0, 2)
+                          .join("")
+                          .toUpperCase()}
+                      </span>
+                      <span>
+                        <strong>{member.displayName}</strong>
+                        <small>{member.role === "league_admin" ? "Amministratore" : "Partecipante"}</small>
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
+
+            <section aria-labelledby="league-home-rules-title" className="fa-lhome__card">
+              <h2 id="league-home-rules-title">Regolamento</h2>
+              {league.rules ? (
+                <dl className="fa-lhome__rules">
+                  <div>
+                    <dt>Preset</dt>
+                    <dd>{league.rules.presetName}</dd>
+                  </div>
+                  <div>
+                    <dt>Rimborso svincolo</dt>
+                    <dd>{league.rules.voluntaryReleaseRefundPercent}%</dd>
+                  </div>
+                  <div>
+                    <dt>Lock formazione</dt>
+                    <dd>{league.rules.lineupLockMarginMinutes} min</dd>
+                  </div>
+                  <div>
+                    <dt>Scambi</dt>
+                    <dd>{league.rules.options.allowTrades ? "Attivi" : "Disattivati"}</dd>
+                  </div>
+                </dl>
+              ) : (
+                <UiStatePanel
+                  state="empty"
+                  title="Regolamento non impostato"
+                  message="L'amministratore deve ancora completare la configurazione."
+                  testId="league-home-rules-empty"
+                />
+              )}
+            </section>
+          </div>
 
           <section aria-labelledby="league-home-calendar-title" style={{ marginTop: "1.5rem" }}>
             <h2 id="league-home-calendar-title">Calendario</h2>
@@ -345,9 +397,7 @@ export function LeagueHomePage() {
               <Link to="/rosa" data-testid="league-home-roster-link">
                 Vai alla rosa
               </Link>
-              <Link to="/formazione" data-testid="league-home-formation-link">
-                Vai alla formazione
-              </Link>
+              <Link to="/formazione">Vai alla formazione</Link>
               <Link to="/turni" data-testid="league-home-matchday-link">
                 Vai ai turni
               </Link>

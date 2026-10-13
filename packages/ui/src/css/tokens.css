@@ -71,8 +71,8 @@
   --fa-gradient-accent: linear-gradient(135deg, var(--fa-brand-600), var(--fa-violet-500));
   --fa-gradient-accent-text: linear-gradient(135deg, #e8f4ff, #c3b0ff);
   --fa-glow-accent: 0 10px 30px rgba(86, 80, 240, 0.42);
-  --fa-color-field: #14213f;
-  --fa-color-field-alt: #101a36;
+  --fa-color-field: #0f6b4f;
+  --fa-color-field-alt: #12795a;
 
   --fa-color-border: var(--fa-pitch-600);
   --fa-color-border-strong: var(--fa-pitch-500);
@@ -186,8 +186,8 @@
   --fa-gradient-accent: linear-gradient(135deg, var(--fa-cobalt-600), var(--fa-violet-600));
   --fa-gradient-accent-text: linear-gradient(135deg, var(--fa-cobalt-600), var(--fa-violet-600));
   --fa-glow-accent: 0 10px 30px rgba(86, 80, 240, 0.3);
-  --fa-color-field: #1f4fb8;
-  --fa-color-field-alt: #1a45a5;
+  --fa-color-field: #1f8a63;
+  --fa-color-field-alt: #1b7d5a;
   --fa-color-border: #d3dde4;
   --fa-color-border-strong: #a9b8c4;
   --fa-color-input-bg: #ffffff;

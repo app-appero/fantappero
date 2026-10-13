@@ -45,10 +45,10 @@ export const palette = {
   navy900: "#06121f",
 
   /** Campo da gioco. */
-  field800: "#14213f",
-  field700: "#101a36",
-  fieldLight800: "#1f4fb8",
-  fieldLight700: "#1a45a5",
+  field800: "#0f6b4f",
+  field700: "#12795a",
+  fieldLight800: "#1f8a63",
+  fieldLight700: "#1b7d5a",
 
   /** Sfondi del tema chiaro (bianco freddo). */
   cloud50: "#f2f6f8",
