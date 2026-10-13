@@ -2215,3 +2215,66 @@ h2 {
   font-size: 1.75rem;
   line-height: 1.05;
 }
+
+/* ── Formazione: titolari e panchina come card ────────────────────────── */
+
+.fa-formation-layout__editor,
+.fa-formation-layout__benches > div {
+  padding: var(--fa-space-lg);
+  border-radius: var(--fa-radius-xl);
+  background: var(--fa-color-background-elevated);
+  border: 1px solid var(--fa-color-border);
+}
+
+.fa-formation-layout__editor {
+  gap: var(--fa-space-sm);
+}
+
+.fa-formation-layout__section-title {
+  font-family: var(--fa-font-display, inherit);
+  font-style: italic;
+  font-weight: 800;
+  text-transform: uppercase;
+  font-size: 1.4rem;
+  line-height: 1.1;
+}
+
+.fa-starter-slot__label {
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.fa-starter-slot__trigger {
+  min-height: 2.5rem;
+}
+
+.fa-starter-slot__list {
+  padding: var(--fa-space-xs);
+  border-radius: var(--fa-radius-lg);
+  box-shadow: 0 18px 40px rgba(2, 6, 23, 0.35);
+}
+
+.fa-starter-slot__option {
+  border-radius: var(--fa-radius-md);
+}
+
+.fa-starter-slot__option:hover {
+  background: color-mix(in srgb, var(--fa-brand-500) 18%, var(--fa-color-input-bg));
+}
+
+.fa-starter-slot__option[aria-selected="true"] {
+  background: var(--fa-gradient-accent);
+  color: var(--fa-color-on-brand);
+  font-weight: 600;
+}
+
+.fa-bench-order__row {
+  padding: var(--fa-space-xs) var(--fa-space-sm);
+  border: 1px solid var(--fa-color-border);
+  border-radius: var(--fa-radius-lg);
+  background: color-mix(in srgb, var(--fa-color-foreground) 4%, transparent);
+}
+
+.fa-bench-order {
+  gap: var(--fa-space-sm);
+}
