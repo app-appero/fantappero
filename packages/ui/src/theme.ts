@@ -23,6 +23,9 @@ export {
   type ThemePreference,
 };
 
+/** Colori della cornice olografica ("figurina"), in ordine di giro. */
+export const foil = ["#ff7ad9", "#ffd66e", "#7cf7c8", "#6ec8ff", "#b28cff", "#ff7ad9"] as const;
+
 /** Combined theme object for React Native and programmatic consumers. */
 export const theme = {
   colors,
@@ -38,4 +41,5 @@ export const theme = {
   iconography,
   illustration,
   visualPrinciples,
+  foil,
 } as const;

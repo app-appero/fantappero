@@ -4,6 +4,7 @@ export const typography = {
   fontFamily: {
     sans: '"Barlow", "Segoe UI", system-ui, sans-serif',
     display: '"Barlow Condensed", "Barlow", system-ui, sans-serif',
+    led: '"DotGothic16", "IBM Plex Mono", monospace',
     mono: '"IBM Plex Mono", "Consolas", monospace',
   },
   fontWeight: {

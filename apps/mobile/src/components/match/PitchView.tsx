@@ -1,11 +1,13 @@
 import { lazyStyles } from "../../theme/lazyStyles";
 import type { MatchBadge, PitchPosition } from "@fantappero/contracts";
 import { theme } from "@fantappero/ui/theme";
+import { LinearGradient } from "expo-linear-gradient";
 import { Image, Pressable, StyleSheet, Text, View } from "react-native";
+import { fonts } from "../../theme/fonts";
 import { EventBadges } from "./EventBadges";
-import { RoleBadge } from "./RoleBadge";
+import { roleColor } from "./RoleBadge";
 
-const { colors, spacing, typography, radius } = theme;
+const { colors, spacing, typography, radius, foil } = theme;
 
 export type PitchPlayer = {
   id: string;
@@ -92,21 +94,23 @@ function PitchPlayerBody({
       <View style={styles.badgesRow}>
         <EventBadges badges={player.badges ?? []} size={11} />
       </View>
-      <View style={styles.card}>
-        {player.photoUrl ? (
-          <Image source={{ uri: player.photoUrl }} style={styles.photo} />
-        ) : player.shirtNumber != null ? (
-          <Text style={styles.number}>{player.shirtNumber}</Text>
-        ) : null}
-        {player.photoUrl && player.shirtNumber != null ? (
-          <View style={styles.numberBadge}>
-            <Text style={styles.numberBadgeText}>{player.shirtNumber}</Text>
+      <LinearGradient colors={[...foil]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.foilFrame}>
+        <View style={styles.card}>
+          {player.photoUrl ? (
+            <Image source={{ uri: player.photoUrl }} style={styles.photo} />
+          ) : player.shirtNumber != null ? (
+            <Text style={styles.number}>{player.shirtNumber}</Text>
+          ) : null}
+          {player.photoUrl && player.shirtNumber != null ? (
+            <View style={styles.numberBadge}>
+              <Text style={styles.numberBadgeText}>{player.shirtNumber}</Text>
+            </View>
+          ) : null}
+          <View style={[styles.roleStrip, { backgroundColor: roleColor(player.role) }]}>
+            <Text style={styles.roleStripText}>{player.role ?? "?"}</Text>
           </View>
-        ) : null}
-        <View style={styles.roleBadgeWrap}>
-          <RoleBadge code={player.role} />
         </View>
-      </View>
+      </LinearGradient>
       <Text style={styles.name} numberOfLines={1}>
         {abbreviateName(player.name)}
       </Text>
@@ -142,7 +146,7 @@ const styles = lazyStyles(() => StyleSheet.create({
   },
   pitch: {
     width: "100%",
-    aspectRatio: 3 / 4,
+    aspectRatio: 3 / 4.2,
     backgroundColor: colors.field,
     borderRadius: radius.lg,
     borderWidth: 1,
@@ -185,7 +189,7 @@ const styles = lazyStyles(() => StyleSheet.create({
   },
   slot: {
     position: "absolute",
-    transform: [{ translateX: -30 }, { translateY: -28 }],
+    transform: [{ translateX: -30 }, { translateY: -34 }],
     width: 60,
     alignItems: "center",
     gap: 1,
@@ -198,35 +202,50 @@ const styles = lazyStyles(() => StyleSheet.create({
   badgesRow: {
     minHeight: 12,
   },
+  foilFrame: {
+    padding: 2,
+    borderRadius: 10,
+  },
   card: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    backgroundColor: colors.backgroundElevated,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.35)",
+    width: 36,
+    height: 46,
+    borderRadius: 8,
+    backgroundColor: "#0a0f24",
+    overflow: "hidden",
     alignItems: "center",
-    justifyContent: "center",
+    justifyContent: "flex-end",
   },
   number: {
-    color: colors.foreground,
-    fontSize: 11,
+    color: "#f4f6ff",
+    fontFamily: fonts.display,
+    fontSize: 22,
+    lineHeight: 24,
+    paddingBottom: 2,
+  },
+  roleStrip: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    paddingVertical: 1,
+    alignItems: "center",
+  },
+  roleStripText: {
+    color: "#06121f",
+    fontSize: 10,
     fontWeight: "700",
   },
-  roleBadgeWrap: {
-    position: "absolute",
-    bottom: -6,
-    right: -6,
-  },
   photo: {
-    width: "100%",
-    height: "100%",
-    borderRadius: 15,
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
   },
   numberBadge: {
     position: "absolute",
-    top: -6,
-    left: -6,
+    bottom: 2,
+    left: 2,
     minWidth: 16,
     paddingHorizontal: 3,
     borderRadius: radius.pill,
@@ -242,7 +261,8 @@ const styles = lazyStyles(() => StyleSheet.create({
   },
   name: {
     color: "#fff",
-    fontSize: 9,
+    fontSize: 10,
+    fontWeight: "600",
     textAlign: "center",
   },
   score: {
