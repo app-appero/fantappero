@@ -619,10 +619,17 @@ const styles = lazyStyles(() => StyleSheet.create({
   section: {
     gap: spacing.sm,
     marginBottom: spacing.lg,
+    padding: spacing.lg,
+    borderRadius: radius.xl,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.backgroundElevated,
   },
   sectionTitle: {
-    fontSize: typography.fontSize.lg,
-    fontWeight: typography.fontWeight.semibold,
+    fontSize: typography.fontSize.xl,
+    fontStyle: "italic",
+    fontWeight: "800",
+    textTransform: "uppercase",
     color: colors.foreground,
   },
   label: {

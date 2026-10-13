@@ -2333,3 +2333,236 @@ h2 {
   max-width: 100%;
   overflow-x: auto;
 }
+
+/* ── Inviti ricevuti ─────────────────────────────────────────────────── */
+
+.fa-received-invites__item {
+  padding: var(--fa-space-lg);
+  border-radius: var(--fa-radius-xl);
+}
+
+.fa-received-invites__avatar {
+  flex: 0 0 auto;
+  width: 3.25rem;
+  height: 3.25rem;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: var(--fa-gradient-accent);
+  color: var(--fa-color-on-brand);
+  font-style: italic;
+  font-weight: 800;
+  font-size: 1.4rem;
+}
+
+.fa-received-invites__text {
+  flex: 1;
+  min-width: 10rem;
+}
+
+.fa-received-invites__text strong {
+  font-size: 1.15rem;
+}
+
+/* ── Profilo: due colonne, tema a pillole, interruttori ───────────────── */
+
+@media (min-width: 64rem) {
+  .fa-profile-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: start;
+  }
+
+  .fa-profile-grid > :nth-child(2) {
+    grid-row: span 2;
+  }
+}
+
+[data-testid="profile-theme"] {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 4px;
+  border-radius: var(--fa-radius-pill);
+  border: 1px solid var(--fa-color-border);
+  background: color-mix(in srgb, var(--fa-color-foreground) 5%, transparent);
+}
+
+[data-testid="profile-theme"] {
+  width: fit-content;
+}
+
+[data-testid="profile-theme"] legend,
+[data-testid="profile-theme"] .fa-field__hint {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+[data-testid="profile-theme"] .fa-profile-checkbox {
+  position: relative;
+  padding: 0.55rem 1.1rem;
+  border-radius: var(--fa-radius-pill);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+[data-testid="profile-theme"] .fa-profile-checkbox input {
+  position: absolute;
+  opacity: 0;
+  inset: 0;
+  cursor: pointer;
+}
+
+[data-testid="profile-theme"] .fa-profile-checkbox:has(input:checked) {
+  background: var(--fa-gradient-accent);
+  color: var(--fa-color-on-brand);
+}
+
+[data-testid="profile-theme"] .fa-profile-checkbox:has(input:focus-visible) {
+  box-shadow: var(--fa-shadow-focus);
+}
+
+.fa-profile-checkbox input[type="checkbox"] {
+  appearance: none;
+  -webkit-appearance: none;
+  flex: 0 0 auto;
+  width: 2.6rem;
+  height: 1.5rem;
+  border-radius: var(--fa-radius-pill);
+  background: color-mix(in srgb, var(--fa-color-foreground) 22%, transparent);
+  position: relative;
+  cursor: pointer;
+  transition: background-color var(--fa-duration-fast) var(--fa-easing-standard);
+}
+
+.fa-profile-checkbox input[type="checkbox"]::after {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 1.1rem;
+  height: 1.1rem;
+  border-radius: 50%;
+  background: #ffffff;
+  transition: transform var(--fa-duration-fast) var(--fa-easing-standard);
+}
+
+.fa-profile-checkbox input[type="checkbox"]:checked {
+  background: var(--fa-gradient-accent);
+}
+
+.fa-profile-checkbox input[type="checkbox"]:checked::after {
+  transform: translateX(1.1rem);
+}
+
+.fa-profile-checkbox input[type="checkbox"]:focus-visible {
+  box-shadow: var(--fa-shadow-focus);
+}
+
+/* ── Amministrazione lega ─────────────────────────────────────────────── */
+
+.fa-league-admin-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--fa-space-md) var(--fa-space-lg);
+  align-items: start;
+}
+
+.fa-league-admin-form > .fa-field-hint,
+.fa-league-admin-form > fieldset,
+.fa-league-admin-form > .fa-ds-showcase__row {
+  grid-column: 1 / -1;
+}
+
+.fa-league-admin-form > .fa-field-hint {
+  margin: calc(var(--fa-space-sm) * -1) 0 0;
+  color: var(--fa-color-foreground-muted);
+  font-size: 0.85rem;
+}
+
+.fa-league-admin-form fieldset {
+  margin: 0 !important;
+  padding: var(--fa-space-lg);
+  border: 1px solid var(--fa-color-border);
+  border-radius: var(--fa-radius-xl);
+  background: var(--fa-color-background-elevated);
+  display: grid;
+  gap: var(--fa-space-md);
+}
+
+.fa-league-admin-form legend {
+  padding: 0 var(--fa-space-sm);
+  font-style: italic;
+  font-weight: 800;
+  text-transform: uppercase;
+  font-size: 1.1rem;
+}
+
+.fa-league-admin-form fieldset label {
+  display: flex;
+  align-items: center;
+  gap: var(--fa-space-md);
+}
+
+.fa-league-admin-form input[type="checkbox"],
+.fa-league-delete input[type="checkbox"] {
+  appearance: none;
+  -webkit-appearance: none;
+  flex: 0 0 auto;
+  width: 2.6rem;
+  height: 1.5rem;
+  border-radius: var(--fa-radius-pill);
+  background: color-mix(in srgb, var(--fa-color-foreground) 22%, transparent);
+  position: relative;
+  cursor: pointer;
+  transition: background-color var(--fa-duration-fast) var(--fa-easing-standard);
+}
+
+.fa-league-admin-form input[type="checkbox"]::after,
+.fa-league-delete input[type="checkbox"]::after {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 1.1rem;
+  height: 1.1rem;
+  border-radius: 50%;
+  background: #ffffff;
+  transition: transform var(--fa-duration-fast) var(--fa-easing-standard);
+}
+
+.fa-league-admin-form input[type="checkbox"]:checked {
+  background: var(--fa-gradient-accent);
+}
+
+.fa-league-delete input[type="checkbox"]:checked {
+  background: var(--fa-color-danger);
+}
+
+.fa-league-admin-form input[type="checkbox"]:checked::after,
+.fa-league-delete input[type="checkbox"]:checked::after {
+  transform: translateX(1.1rem);
+}
+
+.fa-league-delete {
+  margin-top: var(--fa-space-xl);
+  padding: var(--fa-space-lg);
+  border-radius: var(--fa-radius-xl);
+  border: 1px solid color-mix(in srgb, var(--fa-color-danger) 55%, transparent);
+  background: color-mix(in srgb, var(--fa-color-danger) 7%, transparent);
+}
+
+.fa-league-delete label {
+  display: flex;
+  align-items: center;
+  gap: var(--fa-space-md);
+}
+
+@media (max-width: 767px) {
+  .fa-league-admin-form {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

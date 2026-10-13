@@ -10,6 +10,7 @@ import {
   declineReceivedNamedInvite,
   fetchReceivedNamedInvites,
 } from "../api/managerInvites";
+import { TeamAvatar } from "../components/TeamAvatar";
 import { UiStatePanel } from "../components/UiStatePanel";
 import { useScreenData } from "../hooks/useScreenData";
 import { PageContainer } from "../layout/PageContainer";
@@ -164,8 +165,13 @@ export function ReceivedInvitesScreen() {
         <View style={styles.list} testID="received-invites-list">
           {invites.map((invite) => (
             <View key={invite.id} style={styles.card}>
-              <Text style={styles.name}>{invite.leagueName}</Text>
-              <Text style={styles.hint}>Invito nominativo</Text>
+              <View style={styles.cardHead}>
+                <TeamAvatar name={invite.leagueName} size={48} />
+                <View style={styles.cardHeadText}>
+                  <Text style={styles.name}>{invite.leagueName}</Text>
+                  <Text style={styles.hint}>Invito nominativo</Text>
+                </View>
+              </View>
               <View style={styles.actions}>
                 <Pressable
                   accessibilityRole="button"
@@ -207,8 +213,16 @@ const styles = lazyStyles(() => StyleSheet.create({
     padding: spacing.md,
     borderWidth: 1,
     borderColor: colors.border,
-    borderRadius: radius.md,
+    borderRadius: radius.xl,
     backgroundColor: colors.backgroundElevated,
+  },
+  cardHead: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.md,
+  },
+  cardHeadText: {
+    flex: 1,
   },
   name: {
     color: colors.foreground,
