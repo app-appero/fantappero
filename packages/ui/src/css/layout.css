@@ -2174,3 +2174,10 @@ button.fa-app-header__league-action {
 .fa-match-card__context {
   letter-spacing: 0.14em;
 }
+
+.fa-login__hint {
+  margin: 0;
+  max-width: 28rem;
+  color: var(--fa-color-foreground-muted);
+  font-size: 1.1rem;
+}

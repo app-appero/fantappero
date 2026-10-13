@@ -1,5 +1,5 @@
 import { AuthFormLayout, BrandLogo, PageContainer, UiStatePanel } from "@fantappero/ui";
-import { type FormEvent, useCallback, useEffect, useRef, useState } from "react";
+import { type FormEvent, type ReactNode, useCallback, useEffect, useRef, useState } from "react";
 import {
   forgotPassword,
   register as registerApi,
@@ -66,6 +66,34 @@ function GoogleSignInButton({
     <div className="fa-auth-layout__google">
       <p className="fa-auth-layout__divider">oppure</p>
       <div ref={containerRef} className="fa-auth-layout__google-button" data-testid="auth-google-button" />
+    </div>
+  );
+}
+
+/** Layout a due colonne come login e registrazione: hero con titolo + pannello con il contenuto. */
+function AuthSplit({
+  title,
+  accent,
+  hint,
+  children,
+}: {
+  title: string;
+  accent: string;
+  hint?: string;
+  children: ReactNode;
+}) {
+  return (
+    <div className="fa-auth-page fa-login">
+      <section className="fa-login__hero">
+        <BrandLogo variant="full" size="lg" />
+        <div className="fa-login__greeting">
+          <h1 className="fa-login__title">
+            {title} <span className="fa-login__title-accent">{accent}</span>
+          </h1>
+          {hint ? <p className="fa-login__hint">{hint}</p> : null}
+        </div>
+      </section>
+      <section className="fa-login__panel">{children}</section>
     </div>
   );
 }
@@ -392,8 +420,7 @@ export function AuthForgotPasswordPage() {
   }
 
   return (
-    <div className="fa-auth-page fa-surface-pitch">
-      <PageContainer title="Recupera accesso">
+    <AuthSplit title="Recupera" accent="accesso" hint="Ti mandiamo un link per scegliere una nuova password.">
         {successMessage ? (
           <UiStatePanel
             state="success"
@@ -403,7 +430,8 @@ export function AuthForgotPasswordPage() {
           />
         ) : (
           <AuthFormLayout
-            brand={<BrandLogo variant="full" size="lg" />}
+            brand={null}
+            hideBrand
             title="Password dimenticata"
             submitLabel="Invia link di reset"
             showPassword={false}
@@ -419,8 +447,7 @@ export function AuthForgotPasswordPage() {
             }
           />
         )}
-      </PageContainer>
-    </div>
+    </AuthSplit>
   );
 }
 
@@ -456,8 +483,7 @@ export function AuthResetPasswordPage() {
   }
 
   return (
-    <div className="fa-auth-page fa-surface-pitch">
-      <PageContainer title="Reimposta password">
+    <AuthSplit title="Nuova" accent="password" hint="Scegline una sicura: la usi per accedere a FantApperò.">
         {successMessage ? (
           <>
             <UiStatePanel
@@ -472,7 +498,8 @@ export function AuthResetPasswordPage() {
           </>
         ) : (
           <AuthFormLayout
-            brand={<BrandLogo variant="full" size="lg" />}
+            brand={null}
+            hideBrand
             title="Scegli una nuova password"
             submitLabel="Salva password"
             showEmail={false}
@@ -491,8 +518,7 @@ export function AuthResetPasswordPage() {
             }
           />
         )}
-      </PageContainer>
-    </div>
+    </AuthSplit>
   );
 }
 
@@ -554,22 +580,19 @@ export function AuthVerifyEmailPage() {
 
   if (loading) {
     return (
-      <div className="fa-auth-page fa-surface-pitch">
-        <PageContainer title="Verifica email">
-          <UiStatePanel
-            state="loading"
-            title="Verifica in corso"
-            message="Stiamo confermando il tuo indirizzo email…"
-            testId="auth-verify-loading"
-          />
-        </PageContainer>
-      </div>
+      <AuthSplit title="Verifica" accent="email">
+        <UiStatePanel
+          state="loading"
+          title="Verifica in corso"
+          message="Stiamo confermando il tuo indirizzo email…"
+          testId="auth-verify-loading"
+        />
+      </AuthSplit>
     );
   }
 
   return (
-    <div className="fa-auth-page fa-surface-pitch">
-      <PageContainer title="Verifica email">
+    <AuthSplit title="Verifica" accent="email">
         {successMessage ? (
           <>
             <UiStatePanel
@@ -590,7 +613,6 @@ export function AuthVerifyEmailPage() {
             testId="auth-verify-error"
           />
         )}
-      </PageContainer>
-    </div>
+    </AuthSplit>
   );
 }
