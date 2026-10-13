@@ -2645,3 +2645,22 @@ h2 {
 .fa-live-auction-table__cue {
   color: #ffffff;
 }
+
+@media (max-width: 600px) {
+  .fa-live-auction-table__surface {
+    aspect-ratio: 1 / 1.05;
+  }
+
+  .fa-live-auction-table__center {
+    width: 52%;
+    padding: var(--fa-space-sm) var(--fa-space-md);
+  }
+
+  .fa-live-auction-table__athlete {
+    font-size: 1.05rem;
+  }
+
+  .fa-live-auction-table__amount {
+    font-size: 1.7rem;
+  }
+}
