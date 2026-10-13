@@ -237,14 +237,14 @@ const styles = lazyStyles(() => StyleSheet.create({
     gap: spacing.sm,
   },
   button: {
-    backgroundColor: colors.accent,
+    backgroundColor: colors.brand,
     borderRadius: radius.pill,
     padding: spacing.sm,
     alignItems: "center",
     marginTop: spacing.sm,
   },
   buttonLabel: {
-    color: colors.accentContrast,
+    color: colors.onBrand,
     fontWeight: "600",
   },
   table: {

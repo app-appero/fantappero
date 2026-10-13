@@ -85,10 +85,10 @@ const styles = lazyStyles(() => StyleSheet.create({
     flexShrink: 0,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: colors.accent,
+    backgroundColor: colors.brand,
   },
   markLetter: {
-    color: colors.accentContrast,
+    color: colors.onBrand,
     fontStyle: "italic",
     fontWeight: "800",
     includeFontPadding: false,
@@ -97,7 +97,7 @@ const styles = lazyStyles(() => StyleSheet.create({
     position: "absolute",
     borderRadius: 999,
     borderWidth: 1.5,
-    borderColor: colors.accentContrast,
+    borderColor: colors.onBrand,
   },
   wordmark: {
     color: colors.foreground,

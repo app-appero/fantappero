@@ -363,10 +363,10 @@ const styles = lazyStyles(() => StyleSheet.create({
     borderRadius: radius.pill,
     padding: spacing.sm,
     alignItems: "center",
-    backgroundColor: colors.accent,
+    backgroundColor: colors.brand,
   },
   primaryLabel: {
-    color: colors.accentContrast,
+    color: colors.onBrand,
     fontWeight: "700",
   },
   disabled: {

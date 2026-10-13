@@ -9,6 +9,8 @@ import {
 import { getApiErrorMessage, useAuth } from "../../auth/AuthContext";
 import { googleAppHandoffUrl, googleAppReturnUrl } from "../../auth/googleAppReturn";
 import { renderGoogleButton } from "../../auth/googleIdentity";
+import { clearLastUser, initialsOf, readLastUser, writeLastUser, type LastUser } from "../../auth/lastUser";
+import { loadStoredSession } from "../../auth/sessionStorage";
 import { getWebEnv } from "../../config/env";
 import { Link, useLocation, useNavigate } from "../../router/simpleRouter";
 
@@ -149,11 +151,19 @@ export function AuthRegisterPage() {
   );
 }
 
+const LOGIN_ROLES = [
+  { code: "P", label: "Portieri" },
+  { code: "D", label: "Difensori" },
+  { code: "C", label: "Centrocampisti" },
+  { code: "A", label: "Attaccanti" },
+] as const;
+
 export function AuthLoginPage() {
   const { login } = useAuth();
   const navigate = useNavigate();
   const { search } = useLocation();
-  const [email, setEmail] = useState("");
+  const [remembered, setRemembered] = useState<LastUser | null>(() => readLastUser());
+  const [email, setEmail] = useState(() => readLastUser()?.email ?? "");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -164,6 +174,10 @@ export function AuthLoginPage() {
     setLoading(true);
     try {
       await login(email, password);
+      const sessionUser = loadStoredSession()?.user;
+      if (sessionUser?.displayName && email.trim()) {
+        writeLastUser({ displayName: sessionUser.displayName, email: email.trim() });
+      }
       const params = new URLSearchParams(search);
       const returnTo = params.get("returnTo");
       navigate(returnTo ? decodeURIComponent(returnTo) : "/leghe");
@@ -174,13 +188,59 @@ export function AuthLoginPage() {
     }
   }
 
+  function switchAccount() {
+    clearLastUser();
+    setRemembered(null);
+    setEmail("");
+    setPassword("");
+    setError(null);
+  }
+
+  const firstName = remembered?.displayName.trim().split(/\s+/)[0] ?? "";
+
   return (
-    <div className="fa-auth-page fa-surface-pitch">
-      <PageContainer title="Accedi">
+    <div className="fa-auth-page fa-login" data-testid="login-page">
+      <section className="fa-login__hero">
+        <BrandLogo variant="full" size="lg" />
+        {remembered ? (
+          <div className="fa-login__greeting" data-testid="login-greeting">
+            <div className="fa-login__avatar" aria-hidden="true">
+              <div className="fa-login__avatar-kit">
+                <span className="fa-login__avatar-initials">{initialsOf(remembered.displayName)}</span>
+              </div>
+            </div>
+            <h1 className="fa-login__title">
+              Bentornato,
+              <br />
+              <span className="fa-login__title-accent">{firstName}</span>
+            </h1>
+          </div>
+        ) : (
+          <div className="fa-login__greeting">
+            <h1 className="fa-login__title">
+              Il fantacalcio che si{" "}
+              <span className="fa-login__title-accent">gioca davvero</span>
+            </h1>
+          </div>
+        )}
+        <ul className="fa-login__roles" aria-label="Ruoli">
+          {LOGIN_ROLES.map((role) => (
+            <li
+              key={role.code}
+              className={`fa-login__role fa-login__role--${role.code.toLowerCase()}`}
+              title={role.label}
+            >
+              {role.code}
+            </li>
+          ))}
+        </ul>
+      </section>
+      <section className="fa-login__panel">
         <AuthFormLayout
-          brand={<BrandLogo variant="full" size="lg" />}
-          title="Accedi al tuo account"
-          submitLabel="Accedi"
+          brand={null}
+          hideBrand
+          title="Accedi"
+          submitLabel={remembered ? `Accedi come ${firstName}` : "Accedi"}
           email={email}
           password={password}
           onEmailChange={setEmail}
@@ -188,6 +248,19 @@ export function AuthLoginPage() {
           onSubmit={handleSubmit}
           loading={loading}
           error={error ?? undefined}
+          emailSlot={
+            remembered ? (
+              <div className="fa-login__account" data-testid="login-remembered-account">
+                <div>
+                  <span className="fa-login__account-label">Account</span>
+                  <strong className="fa-login__account-email">{remembered.email}</strong>
+                </div>
+                <button type="button" className="fa-login__account-switch" onClick={switchAccount}>
+                  Cambia
+                </button>
+              </div>
+            ) : undefined
+          }
           forgotPasswordLink={
             <p className="fa-auth-layout__forgot">
               <Link to="/accedi/recupera">Password dimenticata?</Link>
@@ -195,12 +268,20 @@ export function AuthLoginPage() {
           }
           registerPrompt={
             <p className="fa-auth-layout__register">
+              {remembered ? (
+                <>
+                  <button type="button" className="fa-login__account-switch" onClick={switchAccount}>
+                    Non sei {firstName}? Cambia account
+                  </button>
+                  <br />
+                </>
+              ) : null}
               Non hai un account? <Link to="/accedi/registrati">Registrati</Link>
             </p>
           }
         />
         <GoogleSignInButton onError={setError} />
-      </PageContainer>
+      </section>
     </div>
   );
 }

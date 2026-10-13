@@ -241,7 +241,7 @@ export const rosterStyles = lazyStyles(() => StyleSheet.create({
   },
   button: {
     marginTop: spacing.sm,
-    backgroundColor: colors.accent,
+    backgroundColor: colors.brand,
     borderRadius: radius.pill,
     paddingVertical: spacing.sm,
     paddingHorizontal: spacing.md,
@@ -253,7 +253,7 @@ export const rosterStyles = lazyStyles(() => StyleSheet.create({
     opacity: 0.6,
   },
   buttonLabel: {
-    color: colors.accentContrast,
+    color: colors.onBrand,
     fontWeight: typography.fontWeight.semibold,
   },
   inlineLabel: {

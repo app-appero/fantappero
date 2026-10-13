@@ -224,11 +224,11 @@ const styles = lazyStyles(() => StyleSheet.create({
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
     borderRadius: radius.pill,
-    backgroundColor: colors.accent,
+    backgroundColor: colors.brand,
     justifyContent: "center",
   },
   primaryLabel: {
-    color: colors.accentContrast,
+    color: colors.onBrand,
     fontWeight: typography.fontWeight.semibold,
   },
   secondaryButton: {

@@ -28,6 +28,12 @@
   --fa-cobalt-700: #1749b8;
   --fa-cobalt-600: #1f5ee6;
 
+  --fa-brand-600: #3560f0;
+  --fa-brand-500: #4f5cf5;
+  --fa-violet-600: #6a3fe0;
+  --fa-violet-500: #7a4dff;
+  --fa-violet-400: #9b6bff;
+
   --fa-mint-600: #0b8a6b;
   --fa-mint-500: #3ddc97;
   --fa-mint-400: #7be8b8;
@@ -60,10 +66,11 @@
   --fa-color-accent-hover: var(--fa-electric-400);
   --fa-color-accent-muted: var(--fa-electric-300);
   --fa-color-accent-contrast: var(--fa-navy-900);
-  --fa-color-accent-secondary: var(--fa-mint-500);
-  --fa-gradient-accent: linear-gradient(135deg, var(--fa-electric-500), var(--fa-mint-500));
-  --fa-gradient-accent-text: linear-gradient(135deg, #e8f4ff, var(--fa-mint-400));
-  --fa-glow-accent: 0 10px 30px rgba(90, 162, 255, 0.34);
+  --fa-color-accent-secondary: var(--fa-violet-400);
+  --fa-color-on-brand: #ffffff;
+  --fa-gradient-accent: linear-gradient(135deg, var(--fa-brand-600), var(--fa-violet-500));
+  --fa-gradient-accent-text: linear-gradient(135deg, #e8f4ff, #c3b0ff);
+  --fa-glow-accent: 0 10px 30px rgba(86, 80, 240, 0.42);
   --fa-color-field: #14213f;
   --fa-color-field-alt: #101a36;
 
@@ -174,11 +181,11 @@
   --fa-color-accent-hover: var(--fa-cobalt-700);
   --fa-color-accent-muted: var(--fa-cobalt-700);
   --fa-color-accent-contrast: #ffffff;
-  --fa-color-accent-secondary: var(--fa-mint-600);
+  --fa-color-accent-secondary: var(--fa-violet-600);
   --fa-color-focus-ring: var(--fa-cobalt-700);
-  --fa-gradient-accent: linear-gradient(135deg, var(--fa-cobalt-600), var(--fa-mint-600));
-  --fa-gradient-accent-text: linear-gradient(135deg, var(--fa-cobalt-600), var(--fa-mint-600));
-  --fa-glow-accent: 0 10px 30px rgba(31, 94, 230, 0.26);
+  --fa-gradient-accent: linear-gradient(135deg, var(--fa-cobalt-600), var(--fa-violet-600));
+  --fa-gradient-accent-text: linear-gradient(135deg, var(--fa-cobalt-600), var(--fa-violet-600));
+  --fa-glow-accent: 0 10px 30px rgba(86, 80, 240, 0.3);
   --fa-color-field: #1f4fb8;
   --fa-color-field-alt: #1a45a5;
   --fa-color-border: #d3dde4;

@@ -28,7 +28,15 @@ export const palette = {
   cobalt700: "#1749b8",
   cobalt600: "#1f5ee6",
 
-  /** Menta: colore di marca secondario, in coppia con l'azzurro. */
+  /** Marca: blu → viola. Pulsanti principali e logo (testo bianco sopra). */
+  brand600: "#3560f0",
+  brand500: "#4f5cf5",
+  violet500: "#7a4dff",
+  violet600: "#6a3fe0",
+  violet400: "#9b6bff",
+  onBrand: "#ffffff",
+
+  /** Menta: solo per lo stato "successo" (non è un colore di marca). */
   mint600: "#0b8a6b",
   mint500: "#3ddc97",
   mint400: "#7be8b8",

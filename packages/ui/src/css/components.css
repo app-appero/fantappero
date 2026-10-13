@@ -43,7 +43,7 @@
 .fa-btn--primary {
   background-color: var(--fa-color-accent);
   background-image: var(--fa-gradient-accent);
-  color: var(--fa-color-accent-contrast);
+  color: var(--fa-color-on-brand);
   box-shadow: var(--fa-glow-accent);
 }
 
@@ -110,7 +110,7 @@
 }
 
 .fa-btn--primary.fa-btn--loading .fa-btn__spinner {
-  color: var(--fa-color-accent-contrast);
+  color: var(--fa-color-on-brand);
 }
 
 .fa-btn--danger.fa-btn--loading .fa-btn__spinner {
@@ -1261,7 +1261,7 @@ button.fa-pitch-player {
 .fa-tab[aria-selected="true"] {
   background-color: var(--fa-color-accent);
   background-image: var(--fa-gradient-accent);
-  color: var(--fa-color-accent-contrast);
+  color: var(--fa-color-on-brand);
   border-bottom-color: transparent;
   box-shadow: var(--fa-glow-accent);
 }

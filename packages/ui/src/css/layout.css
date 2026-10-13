@@ -345,7 +345,7 @@ button.fa-app-header__league-action {
 .fa-sidebar-nav__link--active:hover {
   background-color: var(--fa-color-accent);
   background-image: var(--fa-gradient-accent);
-  color: var(--fa-color-accent-contrast);
+  color: var(--fa-color-on-brand);
   font-weight: 600;
 }
 
@@ -1587,10 +1587,262 @@ button.fa-app-header__league-action {
 
 .fa-bottom-nav__link--active {
   background-image: var(--fa-gradient-accent);
-  color: var(--fa-color-accent-contrast);
+  color: var(--fa-color-on-brand);
 }
 
 .fa-app-header__league-menu {
   border-radius: var(--fa-radius-xl);
   box-shadow: var(--fa-shadow-lg);
+}
+
+/* ══ Accesso: "Bentornato" (hero + pannello) ══════════════════════════════ */
+
+.fa-login {
+  --fa-login-text-gradient: linear-gradient(135deg, #7fa8ff, #b58cff 55%, #ff8fb8);
+  min-height: 100vh;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
+  justify-content: stretch;
+  padding: 0;
+  background:
+    radial-gradient(800px 560px at 0% 0%, color-mix(in srgb, var(--fa-brand-600) 42%, transparent), transparent 60%),
+    radial-gradient(800px 620px at 100% 100%, color-mix(in srgb, var(--fa-violet-500) 34%, transparent), transparent 60%),
+    radial-gradient(520px 420px at 55% 15%, rgba(34, 211, 238, 0.12), transparent 60%),
+    var(--fa-color-background);
+}
+
+[data-color-scheme="light"] .fa-login {
+  --fa-login-text-gradient: linear-gradient(135deg, #2b57e0, #6a3fe0 55%, #d6336c);
+  background:
+    radial-gradient(800px 560px at 0% 0%, color-mix(in srgb, var(--fa-brand-600) 18%, transparent), transparent 60%),
+    radial-gradient(800px 620px at 100% 100%, color-mix(in srgb, var(--fa-violet-500) 16%, transparent), transparent 60%),
+    var(--fa-color-background);
+}
+
+.fa-login__hero {
+  flex: 1 1 34rem;
+  min-width: 0;
+  box-sizing: border-box;
+  padding: var(--fa-space-xl) 4rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: var(--fa-space-lg);
+}
+
+.fa-login__greeting {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--fa-space-lg);
+}
+
+.fa-login__avatar {
+  width: 10.5rem;
+  height: 10.5rem;
+  padding: 6px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #4c86ff, #b58cff, #ff8fb8);
+  box-shadow: 0 24px 60px rgba(124, 90, 255, 0.4);
+}
+
+.fa-login__avatar-kit {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  background: repeating-linear-gradient(90deg, #3d7bff 0 18px, #ffffff 18px 36px);
+  display: grid;
+  place-items: center;
+}
+
+.fa-login__avatar-initials {
+  width: 54%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: rgba(10, 15, 34, 0.88);
+  color: #ffffff;
+  display: grid;
+  place-items: center;
+  font-family: var(--fa-font-display);
+  font-size: 2.7rem;
+  font-style: italic;
+  font-weight: 800;
+}
+
+.fa-login__title {
+  margin: 0;
+  font-size: clamp(3rem, 7vw, 7rem);
+  line-height: 0.9;
+}
+
+.fa-login__title-accent {
+  background: var(--fa-login-text-gradient);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.fa-login__roles {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  gap: var(--fa-space-sm);
+}
+
+.fa-login__role {
+  width: 2.6rem;
+  height: 2.6rem;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  color: #11162b;
+  font-family: var(--fa-font-display);
+  font-size: 1.25rem;
+  font-style: italic;
+  font-weight: 800;
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.85);
+}
+
+.fa-login__role--p {
+  background: #ffd23f;
+}
+
+.fa-login__role--d {
+  background: #38bdf8;
+}
+
+.fa-login__role--c {
+  background: #b58cff;
+}
+
+.fa-login__role--a {
+  background: #ff6b8a;
+}
+
+.fa-login__panel {
+  flex: 0 1 35rem;
+  min-width: 0;
+  box-sizing: border-box;
+  padding: var(--fa-space-xl) 3.5rem var(--fa-space-xl) 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: var(--fa-space-md);
+}
+
+.fa-login__panel .fa-auth-layout {
+  max-width: 28.75rem;
+  width: 100%;
+  margin-inline: auto;
+}
+
+.fa-login__panel .fa-card {
+  border-radius: 2rem;
+}
+
+.fa-login__panel .fa-card__header {
+  font-family: var(--fa-font-display);
+  font-size: 1.9rem;
+  font-style: italic;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.fa-login__panel .fa-auth-layout__google {
+  max-width: 28.75rem;
+  width: 100%;
+}
+
+.fa-login__account {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--fa-space-md);
+  padding: var(--fa-space-sm) var(--fa-space-md);
+  border: 1px solid var(--fa-color-border);
+  border-radius: var(--fa-radius-lg);
+  background-color: color-mix(in srgb, var(--fa-color-background) 60%, transparent);
+}
+
+.fa-login__account-label {
+  display: block;
+  font-size: var(--fa-text-xs);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--fa-color-foreground-subtle);
+}
+
+.fa-login__account-email {
+  display: block;
+  overflow-wrap: anywhere;
+}
+
+.fa-login__account-switch {
+  min-height: 2.75rem;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--fa-color-accent);
+  font: inherit;
+  font-weight: 600;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+@media (max-width: 767px) {
+  .fa-login__hero {
+    flex-basis: auto;
+    padding: var(--fa-space-lg) var(--fa-space-md) var(--fa-space-md);
+    gap: var(--fa-space-md);
+  }
+
+  .fa-login__greeting {
+    flex-direction: row;
+    align-items: center;
+    gap: var(--fa-space-md);
+  }
+
+  .fa-login__avatar {
+    width: 4.75rem;
+    height: 4.75rem;
+    padding: 4px;
+    flex-shrink: 0;
+  }
+
+  .fa-login__avatar-initials {
+    font-size: 1.4rem;
+  }
+
+  .fa-login__title {
+    font-size: clamp(2.25rem, 11vw, 3.25rem);
+  }
+
+  .fa-login__roles {
+    display: none;
+  }
+
+  .fa-login__panel {
+    flex-basis: 100%;
+    padding: 0 var(--fa-space-md) var(--fa-space-lg);
+  }
+}
+
+.fa-login__panel .fa-card__body,
+.fa-login__panel .fa-card__footer {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fa-space-md);
+}
+
+.fa-login__panel .fa-card__footer .fa-btn {
+  width: 100%;
+  min-height: 3.5rem;
+  font-size: var(--fa-text-md);
+}
+
+.fa-login__panel .fa-auth-layout__forgot,
+.fa-login__panel .fa-auth-layout__register {
+  margin: 0;
 }

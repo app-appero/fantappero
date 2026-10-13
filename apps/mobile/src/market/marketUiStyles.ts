@@ -61,10 +61,10 @@ export const marketUiStyles = lazyStyles(() => StyleSheet.create({
     justifyContent: "center",
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
-    backgroundColor: colors.accent,
+    backgroundColor: colors.brand,
   },
   buttonLabel: {
-    color: colors.accentContrast,
+    color: colors.onBrand,
     fontWeight: typography.fontWeight.semibold,
   },
   secondaryButton: {
