@@ -2945,3 +2945,336 @@ h2 {
 .fa-notification-center__item-title {
   font-weight: 700;
 }
+
+/* ── Area operatore ───────────────────────────────────────────────────── */
+
+.fa-admin-overview {
+  display: grid;
+  gap: var(--fa-space-lg);
+}
+
+.fa-admin-overview__hero {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--fa-space-md);
+  flex-wrap: wrap;
+  padding: var(--fa-space-xl);
+  border-radius: var(--fa-radius-xl);
+  background: linear-gradient(135deg, rgba(53, 96, 240, 0.3), rgba(122, 77, 255, 0.22));
+  border: 1px solid rgba(155, 107, 255, 0.4);
+}
+
+.fa-admin-overview__label {
+  margin: 0;
+  font-size: 0.72rem;
+  font-weight: 400;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--fa-color-foreground-muted);
+}
+
+.fa-admin-overview__name {
+  margin: 0;
+  font-style: italic;
+  font-weight: 800;
+  text-transform: uppercase;
+  font-size: clamp(2rem, 5vw, 3.4rem);
+  line-height: 1;
+}
+
+.fa-admin-overview__env {
+  margin: 0;
+  padding: 0.35rem 0.9rem;
+  border-radius: var(--fa-radius-pill);
+  background: rgba(255, 210, 63, 0.16);
+}
+
+.fa-admin-overview__tiles {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--fa-space-md);
+}
+
+.fa-admin-overview__tiles li {
+  display: grid;
+  gap: 0.2rem;
+  padding: var(--fa-space-lg);
+  border-radius: var(--fa-radius-xl);
+  background: var(--fa-color-background-elevated);
+  border: 1px solid var(--fa-color-border);
+}
+
+.fa-admin-overview__tiles strong {
+  font-style: italic;
+  font-weight: 800;
+  font-size: 3rem;
+  line-height: 1.05;
+}
+
+.fa-admin-overview__links {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--fa-space-md);
+}
+
+.fa-admin-overview__links a {
+  display: grid;
+  gap: 0.15rem;
+  padding: var(--fa-space-lg);
+  border-radius: var(--fa-radius-xl);
+  background: var(--fa-color-background-elevated);
+  border: 1px solid var(--fa-color-border);
+  text-decoration: none;
+  color: inherit;
+}
+
+.fa-admin-overview__links a:hover {
+  border-color: rgba(155, 107, 255, 0.55);
+}
+
+.fa-admin-overview__links strong {
+  font-size: 1.1rem;
+}
+
+.fa-admin-overview__links span {
+  color: var(--fa-color-foreground-muted);
+  font-size: 0.9rem;
+}
+
+.fa-admin-leagues__list {
+  list-style: none;
+  margin: var(--fa-space-md) 0 0;
+  padding: 0;
+  display: grid;
+  gap: var(--fa-space-sm);
+}
+
+.fa-admin-leagues__item {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--fa-space-md);
+  padding: var(--fa-space-md) var(--fa-space-lg);
+  border-radius: var(--fa-radius-xl);
+  background: var(--fa-color-background-elevated);
+  border: 1px solid var(--fa-color-border);
+}
+
+.fa-admin-leagues__name {
+  flex: 1;
+  min-width: 10rem;
+  font-size: 1.1rem;
+}
+
+.fa-admin-leagues__state {
+  padding: 0.25rem 0.8rem;
+  border-radius: var(--fa-radius-pill);
+  background: color-mix(in srgb, var(--fa-color-foreground) 8%, transparent);
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.fa-admin-leagues__owner {
+  color: var(--fa-color-foreground-muted);
+}
+
+[data-testid="admin-turni-legend"] dl {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr));
+  gap: var(--fa-space-md);
+}
+
+[data-testid="admin-turni-legend"] dl > div {
+  padding: var(--fa-space-md) var(--fa-space-lg);
+  border-radius: var(--fa-radius-lg);
+  background: color-mix(in srgb, var(--fa-color-foreground) 4%, transparent);
+  border: 1px solid var(--fa-color-border);
+}
+
+[data-testid="admin-turni-legend"] dt {
+  margin-bottom: 0.25rem;
+}
+
+[data-testid="admin-turni-legend"] dd {
+  color: var(--fa-color-foreground-muted);
+  font-size: 0.9rem;
+}
+
+@media (max-width: 767px) {
+  .fa-admin-overview__tiles,
+  .fa-admin-overview__links {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* ── Profilo fantallenatore ───────────────────────────────────────────── */
+
+.fa-coach-profile {
+  display: grid;
+  gap: var(--fa-space-lg);
+}
+
+.fa-coach-profile__header {
+  padding: var(--fa-space-xl);
+  border-radius: var(--fa-radius-xl);
+  background: linear-gradient(135deg, rgba(53, 96, 240, 0.28), rgba(122, 77, 255, 0.2));
+  border: 1px solid rgba(155, 107, 255, 0.4);
+}
+
+.fa-coach-profile__title {
+  margin: 0;
+  font-style: italic;
+  font-weight: 800;
+  text-transform: uppercase;
+  font-size: clamp(2rem, 5vw, 3.2rem);
+  line-height: 1;
+}
+
+.fa-coach-profile__avatar {
+  width: 6rem;
+  height: 6rem;
+}
+
+.fa-coach-profile__tiles {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--fa-space-md);
+}
+
+.fa-coach-profile__tiles li {
+  display: grid;
+  gap: 0.2rem;
+  padding: var(--fa-space-lg);
+  border-radius: var(--fa-radius-xl);
+  background: var(--fa-color-background-elevated);
+  border: 1px solid var(--fa-color-border);
+}
+
+.fa-coach-profile__tiles span {
+  font-size: 0.72rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--fa-color-foreground-muted);
+}
+
+.fa-coach-profile__tiles strong {
+  font-style: italic;
+  font-weight: 800;
+  font-size: 2.4rem;
+  line-height: 1.05;
+}
+
+.fa-coach-profile .fa-table-wrap {
+  border-radius: var(--fa-radius-xl);
+}
+
+@media (max-width: 767px) {
+  .fa-coach-profile__tiles {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.fa-coach-profile {
+  max-width: 64rem;
+}
+
+/* ── Dettaglio scontro ────────────────────────────────────────────────── */
+
+[data-testid="matchup-detail"] > p:first-child {
+  display: flex;
+  align-items: center;
+  gap: var(--fa-space-sm);
+  flex-wrap: wrap;
+  color: var(--fa-color-foreground-muted);
+  font-weight: 600;
+}
+
+[data-testid="matchup-result-summary"] {
+  display: grid;
+  gap: var(--fa-space-sm);
+  justify-items: center;
+  text-align: center;
+  padding: var(--fa-space-xl);
+  border-radius: var(--fa-radius-xl);
+  background: linear-gradient(135deg, rgba(53, 96, 240, 0.28), rgba(122, 77, 255, 0.2));
+  border: 1px solid rgba(155, 107, 255, 0.4);
+}
+
+[data-testid="matchup-result-summary"] p {
+  margin: 0;
+}
+
+[data-testid="matchup-result-summary"] > p:first-child {
+  font-size: 1.4rem;
+}
+
+[data-testid="matchup-detail"] .fa-pitch-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--fa-space-lg);
+  align-items: start;
+}
+
+[data-testid="matchup-detail"] .fa-pitch-row > section {
+  padding: var(--fa-space-lg);
+  border-radius: var(--fa-radius-xl);
+  background: var(--fa-color-background-elevated);
+  border: 1px solid var(--fa-color-border);
+}
+
+[data-testid="matchup-detail"] .fa-pitch-row h2 {
+  margin-top: 0;
+  font-style: italic;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.fa-pitch-player__score {
+  color: #ffffff;
+  background: rgba(8, 12, 30, 0.78);
+  font-weight: 700;
+}
+
+@media (max-width: 767px) {
+  [data-testid="matchup-detail"] .fa-pitch-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* ── Entra in una lega ────────────────────────────────────────────────── */
+
+[data-testid="join-league-form"] {
+  display: grid;
+  gap: var(--fa-space-md);
+  max-width: 38rem;
+  padding: var(--fa-space-xl);
+  border-radius: var(--fa-radius-xl);
+  background: var(--fa-color-background-elevated);
+  border: 1px solid var(--fa-color-border);
+}
+
+[data-testid="join-league-form"] p {
+  margin: 0;
+  color: var(--fa-color-foreground-muted);
+}
+
+[data-testid="join-league-form"] input {
+  min-height: 3.5rem;
+  font-style: italic;
+  font-weight: 800;
+  font-size: 1.4rem;
+  letter-spacing: 0.25em;
+  border-color: rgba(155, 107, 255, 0.5);
+}
+
+[data-testid="join-league-form"] .fa-btn {
+  justify-self: stretch;
+  min-height: 3.25rem;
+}
