@@ -1,4 +1,3 @@
-import { fonts } from "../theme/fonts";
 import { lazyStyles } from "../theme/lazyStyles";
 import type { LeagueStanding } from "@fantappero/contracts";
 import { formatFantasyPoints } from "@fantappero/contracts";
@@ -215,7 +214,7 @@ function StandingsTableBlock({
             ) : null}
           </View>
           <Text style={[styles.cell, styles.statCell]}>{row.played}</Text>
-          <Text style={[styles.cell, styles.statCell, styles.pointsCell]}>{row.points}</Text>
+          <Text style={[styles.cell, styles.statCell]}>{row.points}</Text>
           <Text style={[styles.cell, styles.goalsCell]}>
             {row.fantasyGoalsFor}:{row.fantasyGoalsAgainst}
           </Text>
@@ -300,10 +299,6 @@ const styles = lazyStyles(() => StyleSheet.create({
   statCell: {
     width: 32,
     textAlign: "center",
-  },
-  pointsCell: {
-    fontFamily: fonts.led,
-    fontSize: typography.fontSize.md,
   },
   goalsCell: {
     width: 64,

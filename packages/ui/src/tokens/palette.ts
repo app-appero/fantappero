@@ -36,14 +36,6 @@ export const palette = {
   /** Testo scuro da usare sopra il gradiente azzurro-menta. */
   navy900: "#06121f",
 
-  /** Tabellone a LED: ambra su nero. */
-  led500: "#ffb547",
-  led700: "#b98a3d",
-  ledPanel: "#04060e",
-
-  /** Luce dei fari (coni dall'alto sul tema scuro). */
-  floodlight: "#fff1c9",
-
   /** Campo da gioco. */
   field800: "#14213f",
   field700: "#101a36",

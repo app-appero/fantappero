@@ -1,5 +1,3 @@
-import { Floodlights } from "../components/Floodlights";
-import { fonts } from "../theme/fonts";
 import { lazyStyles } from "../theme/lazyStyles";
 import { theme } from "@fantappero/ui/theme";
 import {
@@ -32,8 +30,6 @@ export function PageContainer({
   ...rest
 }: PageContainerProps) {
   return (
-    <View style={styles.root}>
-    <Floodlights />
     <ScrollView
       style={[styles.scroll, style]}
       contentContainerStyle={styles.content}
@@ -59,29 +55,24 @@ export function PageContainer({
       </Text>
       <View style={styles.body}>{children}</View>
     </ScrollView>
-    </View>
   );
 }
 
 const styles = lazyStyles(() => StyleSheet.create({
-  root: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
   scroll: {
     flex: 1,
+    backgroundColor: colors.background,
   },
   content: {
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.lg,
     paddingBottom: spacing.xl,
+    backgroundColor: colors.background,
   },
   title: {
     color: colors.foreground,
-    fontFamily: fonts.display,
-    fontSize: 38,
-    lineHeight: 40,
-    textTransform: "uppercase",
+    fontSize: typography.fontSize["2xl"],
+    fontWeight: typography.fontWeight.semibold,
     marginBottom: spacing.md,
   },
   body: {

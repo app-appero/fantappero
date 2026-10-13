@@ -32,12 +32,6 @@ export type AppColors = {
   inputPlaceholder: string;
   /** Campo da gioco (pitch, tavolo asta). */
   field: string;
-  /** Tabellone a LED: cifre, etichette e fondo del pannello. */
-  led: string;
-  ledLabel: string;
-  ledPanel: string;
-  /** Luce dei fari (trasparente sul tema chiaro). */
-  beam: string;
 };
 
 export const darkColors: AppColors = {
@@ -66,10 +60,6 @@ export const darkColors: AppColors = {
   ok: palette.success500,
   inputPlaceholder: "#ffffff",
   field: palette.field800,
-  led: palette.led500,
-  ledLabel: palette.led700,
-  ledPanel: palette.ledPanel,
-  beam: "rgba(255, 241, 201, 0.16)",
 };
 
 export const lightColors: AppColors = {
@@ -98,10 +88,6 @@ export const lightColors: AppColors = {
   ok: palette.success600,
   inputPlaceholder: "#4f5c78",
   field: palette.fieldLight800,
-  led: palette.led500,
-  ledLabel: palette.led700,
-  ledPanel: palette.ledPanel,
-  beam: "rgba(255, 241, 201, 0)",
 };
 
 export function resolveColorScheme(

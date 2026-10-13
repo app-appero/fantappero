@@ -12,12 +12,6 @@ const COLOR_BY_ROLE: Record<PitchRole, string> = {
   FWD: colors.danger,
 };
 
-/** Colore del ruolo (stesso del badge): usato anche dalla fascia delle figurine sul campo. */
-export function roleColor(code: string | null | undefined): string {
-  const role = resolvePitchRole(code);
-  return role ? COLOR_BY_ROLE[role] : colors.foregroundMuted;
-}
-
 export type RoleBadgeProps = {
   code: string | null | undefined;
   testID?: string;
