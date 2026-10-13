@@ -485,13 +485,13 @@ const styles = lazyStyles(() => StyleSheet.create({
     color: colors.foreground,
   },
   button: {
-    backgroundColor: colors.accent,
+    backgroundColor: colors.brand,
     borderRadius: radius.pill,
     padding: spacing.sm,
     alignItems: "center",
   },
   buttonLabel: {
-    color: colors.accentContrast,
+    color: colors.onBrand,
     fontWeight: "600",
   },
   disabled: {

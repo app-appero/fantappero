@@ -144,10 +144,10 @@ const styles = lazyStyles(() => StyleSheet.create({
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
     borderRadius: radius.pill,
-    backgroundColor: colors.accent,
+    backgroundColor: colors.brand,
   },
   ctaLabel: {
-    color: colors.accentContrast,
+    color: colors.onBrand,
     fontWeight: typography.fontWeight.semibold,
     fontSize: typography.fontSize.sm,
   },

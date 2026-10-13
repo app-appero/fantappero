@@ -29,6 +29,24 @@ const STATUS_VARIANTS = {
   needs_update: "warning",
 } as const;
 
+function TeamMark({ name, logoUrl }: { name: string; logoUrl?: string | null }) {
+  if (logoUrl) {
+    return <img className="fa-match-card__team-logo" src={logoUrl} alt="" aria-hidden="true" />;
+  }
+  const initials = name
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((part) => part.charAt(0))
+    .slice(0, 2)
+    .join("")
+    .toUpperCase();
+  return (
+    <span className="fa-match-card__avatar" aria-hidden="true">
+      {initials}
+    </span>
+  );
+}
+
 export function MatchCard({
   homeTeam,
   awayTeam,
@@ -48,10 +66,8 @@ export function MatchCard({
         {contextLabel ? <p className="fa-match-card__context">{contextLabel}</p> : null}
         <div className="fa-match-card__teams">
           <span className="fa-match-card__team">
-            {homeTeam}
-            {homeLogoUrl ? (
-              <img className="fa-match-card__team-logo" src={homeLogoUrl} alt="" aria-hidden="true" />
-            ) : null}
+            <TeamMark name={homeTeam} logoUrl={homeLogoUrl} />
+            <span className="fa-match-card__team-name">{homeTeam}</span>
           </span>
           {score ? (
             <span className="fa-match-card__score" data-testid="match-card-score">
@@ -63,10 +79,8 @@ export function MatchCard({
             </span>
           )}
           <span className="fa-match-card__team">
-            {awayLogoUrl ? (
-              <img className="fa-match-card__team-logo" src={awayLogoUrl} alt="" aria-hidden="true" />
-            ) : null}
-            {awayTeam}
+            <TeamMark name={awayTeam} logoUrl={awayLogoUrl} />
+            <span className="fa-match-card__team-name">{awayTeam}</span>
           </span>
         </div>
         <div className="fa-match-card__footer">

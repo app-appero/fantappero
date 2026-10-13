@@ -75,6 +75,7 @@ export function AuthResetPasswordScreen() {
           </>
         ) : (
           <>
+            <Text style={styles.heroTitleLeft}>Nuova password</Text>
             <Text style={styles.lead}>Scegli una nuova password per il tuo account.</Text>
             {error ? (
               <UiStatePanel

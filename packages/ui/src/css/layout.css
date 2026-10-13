@@ -345,7 +345,7 @@ button.fa-app-header__league-action {
 .fa-sidebar-nav__link--active:hover {
   background-color: var(--fa-color-accent);
   background-image: var(--fa-gradient-accent);
-  color: var(--fa-color-accent-contrast);
+  color: var(--fa-color-on-brand);
   font-weight: 600;
 }
 
@@ -1077,9 +1077,9 @@ button.fa-app-header__league-action {
   width: 100%;
   aspect-ratio: 3 / 4;
   background:
-    radial-gradient(70% 60% at 50% 50%, color-mix(in srgb, var(--fa-color-accent) 14%, transparent), transparent 70%),
     repeating-linear-gradient(180deg, var(--fa-color-field) 0, var(--fa-color-field) 12.5%, var(--fa-color-field-alt) 12.5%, var(--fa-color-field-alt) 25%);
-  border: 1px solid rgba(255, 255, 255, 0.25);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  box-shadow: 0 24px 60px rgba(2, 6, 23, 0.45);
   border-radius: var(--fa-radius-xl);
   overflow: hidden;
 }
@@ -1135,7 +1135,7 @@ button.fa-app-header__league-action {
   flex-direction: column;
   align-items: center;
   gap: 2px;
-  width: 4.2rem;
+  width: 5.8rem;
 }
 
 .fa-pitch-player__badges {
@@ -1149,14 +1149,16 @@ button.fa-app-header__league-action {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 2rem;
-  height: 2rem;
+  width: 2.5rem;
+  height: 2.5rem;
   border-radius: 50%;
-  background: var(--fa-color-background-elevated);
-  border: 1px solid rgba(255, 255, 255, 0.35);
+  background: #ffffff;
+  border: 3px solid rgba(255, 255, 255, 0.9);
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.35);
   font-size: var(--fa-text-xs);
-  font-weight: 700;
-  color: var(--fa-color-foreground);
+  font-weight: 800;
+  font-style: italic;
+  color: #0a0f22;
 }
 
 .fa-pitch-player__role {
@@ -1192,11 +1194,14 @@ button.fa-app-header__league-action {
 }
 
 .fa-pitch-player__name {
-  font-size: 0.62rem;
-  line-height: 1.15;
+  font-size: 0.7rem;
+  font-weight: 600;
+  line-height: 1.2;
   color: #fff;
   text-align: center;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+  padding: 1px 8px;
+  border-radius: var(--fa-radius-pill);
+  background: rgba(8, 12, 30, 0.78);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1587,7 +1592,7 @@ button.fa-app-header__league-action {
 
 .fa-bottom-nav__link--active {
   background-image: var(--fa-gradient-accent);
-  color: var(--fa-color-accent-contrast);
+  color: var(--fa-color-on-brand);
 }
 
 .fa-app-header__league-menu {
@@ -1595,248 +1600,584 @@ button.fa-app-header__league-action {
   box-shadow: var(--fa-shadow-lg);
 }
 
-/* ══ Notte di campionato: fari, tabellone a LED, figurine olografiche ══════ */
+/* ══ Accesso: "Bentornato" (hero + pannello) ══════════════════════════════ */
 
-@keyframes fa-shine {
-  0% {
-    transform: translateX(-70%);
-  }
-  55%,
-  100% {
-    transform: translateX(70%);
-  }
-}
-
-/* Fari: due coni di luce calda dagli angoli alti (solo tema scuro) */
-.fa-app-shell,
-.fa-auth-page {
-  --fa-beams:
-    conic-gradient(from 142deg at 8% -3%, transparent 0deg, var(--fa-beam) 11deg, transparent 22deg),
-    conic-gradient(from 198deg at 92% -3%, transparent 0deg, var(--fa-beam) 11deg, transparent 22deg);
-}
-
-.fa-app-shell {
+.fa-login {
+  --fa-login-text-gradient: linear-gradient(135deg, #7fa8ff, #b58cff 55%, #ff8fb8);
+  min-height: 100vh;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
+  justify-content: stretch;
+  padding: 0;
   background:
-    var(--fa-beams),
-    radial-gradient(
-      900px 520px at 0% 0%,
-      color-mix(in srgb, var(--fa-color-accent) 16%, transparent),
-      transparent 60%
-    ),
-    radial-gradient(
-      900px 640px at 100% 100%,
-      color-mix(in srgb, var(--fa-color-accent-secondary) 14%, transparent),
-      transparent 60%
-    ),
+    radial-gradient(800px 560px at 0% 0%, color-mix(in srgb, var(--fa-brand-600) 42%, transparent), transparent 60%),
+    radial-gradient(800px 620px at 100% 100%, color-mix(in srgb, var(--fa-violet-500) 34%, transparent), transparent 60%),
+    radial-gradient(520px 420px at 55% 15%, rgba(34, 211, 238, 0.12), transparent 60%),
     var(--fa-color-background);
 }
 
-.fa-app-shell.fa-surface-pitch {
-  background-image:
-    var(--fa-beams),
-    radial-gradient(
-      ellipse 80% 50% at 50% -5%,
-      color-mix(in srgb, var(--fa-color-accent) 14%, var(--fa-color-background-gradient-stop)),
-      var(--fa-color-background) 60%
-    );
-}
-
-.fa-auth-page {
-  background: var(--fa-beams);
-}
-
-.fa-pitch {
+[data-color-scheme="light"] .fa-login {
+  --fa-login-text-gradient: linear-gradient(135deg, #2b57e0, #6a3fe0 55%, #d6336c);
   background:
-    conic-gradient(from 142deg at 6% -3%, transparent 0deg, var(--fa-beam) 11deg, transparent 22deg),
-    conic-gradient(from 198deg at 94% -3%, transparent 0deg, var(--fa-beam) 11deg, transparent 22deg),
-    radial-gradient(70% 60% at 50% 50%, color-mix(in srgb, var(--fa-color-accent) 14%, transparent), transparent 70%),
-    repeating-linear-gradient(180deg, var(--fa-color-field) 0, var(--fa-color-field) 12.5%, var(--fa-color-field-alt) 12.5%, var(--fa-color-field-alt) 25%);
+    radial-gradient(800px 560px at 0% 0%, color-mix(in srgb, var(--fa-brand-600) 18%, transparent), transparent 60%),
+    radial-gradient(800px 620px at 100% 100%, color-mix(in srgb, var(--fa-violet-500) 16%, transparent), transparent 60%),
+    var(--fa-color-background);
 }
 
-/* Tabellone a LED: ambra su nero con punti spenti */
-.fa-lock-countdown {
-  align-items: center;
-  width: fit-content;
+.fa-login__hero {
+  flex: 1 1 34rem;
+  min-width: 0;
+  box-sizing: border-box;
+  padding: var(--fa-space-xl) 4rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: var(--fa-space-lg);
+}
+
+.fa-login__greeting {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--fa-space-lg);
+}
+
+.fa-login__avatar {
+  width: 10.5rem;
+  height: 10.5rem;
+  padding: 6px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #4c86ff, #b58cff, #ff8fb8);
+  box-shadow: 0 24px 60px rgba(124, 90, 255, 0.4);
+}
+
+.fa-login__avatar-kit {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  background: repeating-linear-gradient(90deg, #3d7bff 0 18px, #ffffff 18px 36px);
+  display: grid;
+  place-items: center;
+}
+
+.fa-login__avatar-initials {
+  width: 54%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: rgba(10, 15, 34, 0.88);
+  color: #ffffff;
+  display: grid;
+  place-items: center;
+  font-family: var(--fa-font-display);
+  font-size: 2.7rem;
+  font-style: italic;
+  font-weight: 800;
+}
+
+.fa-login__title {
+  margin: 0;
+  font-size: clamp(3rem, 7vw, 7rem);
+  line-height: 0.9;
+}
+
+.fa-login__title-accent {
+  background: var(--fa-login-text-gradient);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.fa-login__roles {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
   gap: var(--fa-space-sm);
-  padding: var(--fa-space-xs) var(--fa-space-md);
-  border: 1px solid color-mix(in srgb, var(--fa-color-led) 35%, transparent);
-  border-radius: var(--fa-radius-lg);
-  background-color: var(--fa-color-led-panel);
-  background-image: radial-gradient(color-mix(in srgb, var(--fa-color-led) 13%, transparent) 1px, transparent 1.5px);
-  background-size: 6px 6px;
-  box-shadow: inset 0 0 20px color-mix(in srgb, var(--fa-color-led) 8%, transparent);
 }
 
-.fa-lock-countdown__label {
+.fa-login__role {
+  width: 2.6rem;
+  height: 2.6rem;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  color: #11162b;
+  font-family: var(--fa-font-display);
+  font-size: 1.25rem;
+  font-style: italic;
+  font-weight: 800;
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.85);
+}
+
+.fa-login__role--p {
+  background: #ffd23f;
+}
+
+.fa-login__role--d {
+  background: #38bdf8;
+}
+
+.fa-login__role--c {
+  background: #b58cff;
+}
+
+.fa-login__role--a {
+  background: #ff6b8a;
+}
+
+.fa-login__panel {
+  flex: 0 1 35rem;
+  min-width: 0;
+  box-sizing: border-box;
+  padding: var(--fa-space-xl) 3.5rem var(--fa-space-xl) 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: var(--fa-space-md);
+}
+
+.fa-login__panel .fa-auth-layout {
+  max-width: 28.75rem;
+  width: 100%;
+  margin-inline: auto;
+}
+
+.fa-login__panel .fa-card {
+  border-radius: 2rem;
+}
+
+.fa-login__panel .fa-card__header {
+  font-family: var(--fa-font-display);
+  font-size: 1.9rem;
+  font-style: italic;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.fa-login__panel .fa-auth-layout__google {
+  max-width: 28.75rem;
+  width: 100%;
+}
+
+.fa-login__account {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--fa-space-md);
+  padding: var(--fa-space-sm) var(--fa-space-md);
+  border: 1px solid var(--fa-color-border);
+  border-radius: var(--fa-radius-lg);
+  background-color: color-mix(in srgb, var(--fa-color-background) 60%, transparent);
+}
+
+.fa-login__account-label {
+  display: block;
   font-size: var(--fa-text-xs);
   letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: var(--fa-color-led-label);
+  color: var(--fa-color-foreground-subtle);
 }
 
-.fa-lock-countdown__value {
-  font-family: var(--fa-font-led);
-  font-size: 1.6rem;
-  font-weight: 400;
-  line-height: 1;
-  color: var(--fa-color-led);
-  text-shadow: 0 0 12px color-mix(in srgb, var(--fa-color-led) 70%, transparent);
+.fa-login__account-email {
+  display: block;
+  overflow-wrap: anywhere;
 }
 
-.fa-lock-countdown--idle {
-  border-color: transparent;
+.fa-login__account-switch {
+  min-height: 2.75rem;
+  padding: 0;
+  border: 0;
   background: none;
-  box-shadow: none;
-  padding-inline: 0;
-}
-
-.fa-lock-countdown--idle .fa-lock-countdown__label {
-  letter-spacing: 0;
-  text-transform: none;
-  color: var(--fa-color-foreground-muted);
-}
-
-.fa-kpi-card__value {
-  font-family: var(--fa-font-led);
-  font-size: 2.6rem;
-  font-style: normal;
-  font-weight: 400;
-  color: var(--fa-color-led);
-  text-shadow: 0 0 14px color-mix(in srgb, var(--fa-color-led) 60%, transparent);
-}
-
-[data-color-scheme="light"] .fa-kpi-card__value {
-  color: color-mix(in srgb, var(--fa-color-led) 62%, #4a2f00);
-  text-shadow: none;
-}
-
-.fa-standings-row--current {
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--fa-color-accent) 45%, transparent);
-}
-
-/* Figurina olografica: cornice a spettro e riflesso che scorre */
-.fa-card.fa-player-card,
-[data-color-scheme="light"] .fa-card.fa-player-card {
-  position: relative;
-  overflow: hidden;
-  border: 2px solid transparent;
-  background: var(--fa-foil-card) padding-box, var(--fa-foil) border-box;
-  --fa-color-foreground: #f4f6ff;
-  --fa-color-foreground-muted: #b4bfdd;
-  color: #f4f6ff;
-  box-shadow: 0 18px 44px rgba(124, 90, 255, 0.28);
-}
-
-.fa-player-card::after,
-.fa-pitch-player__card::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(115deg, transparent 32%, rgba(255, 255, 255, 0.28) 46%, transparent 60%);
-  mix-blend-mode: screen;
-  pointer-events: none;
-  animation: fa-shine 4.5s ease-in-out infinite;
-}
-
-.fa-player-card__rating {
-  font-family: var(--fa-font-led);
-  font-size: 2rem;
-  font-weight: 400;
-  color: var(--fa-color-led);
-  text-shadow: 0 0 12px color-mix(in srgb, var(--fa-color-led) 60%, transparent);
-}
-
-.fa-player-card__name {
-  font-family: var(--fa-font-display);
-  font-size: 1.6rem;
-  font-style: italic;
-  font-weight: 800;
-  text-transform: uppercase;
-}
-
-/* Giocatori sul campo: mini figurine con fascia del ruolo */
-.fa-pitch-player {
-  width: 4.6rem;
-}
-
-.fa-pitch-player__card {
-  width: 2.8rem;
-  height: 3.5rem;
-  flex-direction: column;
-  justify-content: flex-end;
-  overflow: hidden;
-  border: 2px solid transparent;
-  border-radius: 0.7rem;
-  background: var(--fa-foil-card) padding-box, var(--fa-foil) border-box;
-  color: #f4f6ff;
-  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.45);
-}
-
-.fa-pitch-player__number {
-  position: relative;
-  padding-bottom: 0.15rem;
-  font-family: var(--fa-font-display);
-  font-size: 1.6rem;
-  font-style: italic;
-  font-weight: 800;
-  line-height: 1;
-}
-
-.fa-pitch-player__photo {
-  position: absolute;
-  inset: 0;
-  border-radius: 0;
-}
-
-.fa-pitch-player__role {
-  position: absolute;
-  inset: 0 0 auto 0;
-  bottom: auto;
-  right: 0;
-  padding: 1px 0;
-  border-radius: 0;
-  text-align: center;
-  font-size: 0.75rem;
-  line-height: 1.2;
-  z-index: 1;
-}
-
-.fa-pitch-player__number-badge {
-  top: auto;
-  bottom: 2px;
-  left: 2px;
-  z-index: 1;
-}
-
-.fa-pitch-player__name {
-  font-size: 0.75rem;
+  color: var(--fa-color-accent);
+  font: inherit;
   font-weight: 600;
+  text-decoration: underline;
+  cursor: pointer;
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .fa-player-card::after,
-  .fa-pitch-player__card::after {
-    animation: none;
+@media (max-width: 767px) {
+  .fa-login__hero {
+    flex-basis: auto;
+    padding: var(--fa-space-lg) var(--fa-space-md) var(--fa-space-md);
+    gap: var(--fa-space-md);
+  }
+
+  .fa-login__greeting {
+    flex-direction: row;
+    align-items: center;
+    gap: var(--fa-space-md);
+  }
+
+  .fa-login__avatar {
+    width: 4.75rem;
+    height: 4.75rem;
+    padding: 4px;
+    flex-shrink: 0;
+  }
+
+  .fa-login__avatar-initials {
+    font-size: 1.4rem;
+  }
+
+  .fa-login__title {
+    font-size: clamp(2.25rem, 11vw, 3.25rem);
+  }
+
+  .fa-login__roles {
+    display: none;
+  }
+
+  .fa-login__panel {
+    flex-basis: 100%;
+    padding: 0 var(--fa-space-md) var(--fa-space-lg);
   }
 }
 
-.fa-pitch {
-  aspect-ratio: 3 / 4.2;
+.fa-login__panel .fa-card__body,
+.fa-login__panel .fa-card__footer {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fa-space-md);
 }
 
-.fa-pitch-player__role {
-  color: var(--fa-navy-900);
-  font-weight: 700;
+.fa-login__panel .fa-card__footer .fa-btn {
+  width: 100%;
+  min-height: 3.5rem;
+  font-size: var(--fa-text-md);
 }
 
-.fa-badge--danger.fa-pitch-player__role {
-  color: #ffffff;
+.fa-login__panel .fa-auth-layout__forgot,
+.fa-login__panel .fa-auth-layout__register {
+  margin: 0;
 }
 
-[data-color-scheme="light"] .fa-pitch-player__role {
-  color: #ffffff;
+/* Registrazione: passi sotto il titolo (riusa il layout del login). */
+.fa-login__steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--fa-space-md);
 }
 
-[data-color-scheme="light"] .fa-badge--warning.fa-pitch-player__role {
-  color: #1a1204;
+.fa-login__step {
+  display: flex;
+  align-items: center;
+  gap: var(--fa-space-md);
+}
+
+.fa-login__step strong,
+.fa-login__step small {
+  display: block;
+}
+
+.fa-login__step small {
+  color: var(--fa-color-foreground-muted);
+  font-size: 0.875rem;
+}
+
+.fa-login__step-n {
+  flex: 0 0 auto;
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: var(--fa-gradient-accent);
+  color: var(--fa-color-on-brand);
+  font-style: italic;
+  font-weight: 800;
+  font-size: 1.25rem;
+}
+
+@media (max-width: 767px) {
+  .fa-login__steps {
+    display: none;
+  }
+}
+
+/* ── Home lega ───────────────────────────────────────────────────────── */
+
+.fa-lhome {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fa-space-lg);
+}
+
+.fa-lhome__hero {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: var(--fa-space-lg);
+  padding: var(--fa-space-xl);
+  border-radius: var(--fa-radius-xl);
+  background: linear-gradient(135deg, rgba(53, 96, 240, 0.34), rgba(122, 77, 255, 0.24));
+  border: 1px solid rgba(155, 107, 255, 0.38);
+}
+
+.fa-lhome__hero-main {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--fa-space-md);
+  min-width: 0;
+}
+
+.fa-lhome__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--fa-space-sm);
+}
+
+.fa-lhome__chip {
+  padding: 0.3rem 0.8rem;
+  border-radius: var(--fa-radius-pill);
+  background: rgba(255, 255, 255, 0.1);
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.fa-lhome__chip--state {
+  background: rgba(255, 210, 63, 0.2);
+  color: #b88a00;
+}
+
+[data-color-scheme="dark"] .fa-lhome__chip--state,
+:root:not([data-color-scheme]) .fa-lhome__chip--state {
+  color: #ffd23f;
+}
+
+.fa-lhome__name {
+  margin: 0;
+  font-style: italic;
+  font-weight: 800;
+  text-transform: uppercase;
+  font-size: clamp(2.5rem, 7vw, 5rem);
+  line-height: 0.92;
+  background: var(--fa-gradient-accent);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.fa-lhome__next {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fa-space-sm);
+  min-width: 15rem;
+  padding: var(--fa-space-lg);
+  border-radius: var(--fa-radius-lg);
+  background: color-mix(in srgb, var(--fa-color-background) 70%, transparent);
+  border: 1px solid var(--fa-color-border);
+}
+
+.fa-lhome__next-title {
+  font-size: 1.4rem;
+  line-height: 1.1;
+}
+
+.fa-lhome__next .fa-btn {
+  text-decoration: none;
+  justify-content: center;
+}
+
+.fa-lhome__label {
+  font-size: 0.72rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--fa-color-foreground-muted);
+}
+
+.fa-lhome__stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--fa-space-md);
+}
+
+.fa-lhome__stat,
+.fa-lhome__card {
+  padding: var(--fa-space-lg);
+  border-radius: var(--fa-radius-lg);
+  background: var(--fa-color-background-elevated);
+  border: 1px solid var(--fa-color-border);
+}
+
+.fa-lhome__stat {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+}
+
+.fa-lhome__stat strong {
+  font-style: italic;
+  font-weight: 800;
+  font-size: 2.4rem;
+  line-height: 1.05;
+}
+
+.fa-lhome__stat small,
+.fa-lhome__members small {
+  color: var(--fa-color-foreground-muted);
+  font-size: 0.85rem;
+}
+
+.fa-lhome__cols {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--fa-space-md);
+}
+
+.fa-lhome__card h2 {
+  margin: 0 0 var(--fa-space-sm);
+}
+
+.fa-lhome__members {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.fa-lhome__members li {
+  display: flex;
+  align-items: center;
+  gap: var(--fa-space-md);
+  padding: var(--fa-space-sm) 0;
+  border-top: 1px solid var(--fa-color-border);
+}
+
+.fa-lhome__members li > span:last-child {
+  display: flex;
+  flex-direction: column;
+}
+
+.fa-lhome__avatar {
+  flex: 0 0 auto;
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: var(--fa-gradient-accent);
+  color: var(--fa-color-on-brand);
+  font-style: italic;
+  font-weight: 800;
+}
+
+.fa-lhome__rules {
+  margin: 0;
+}
+
+.fa-lhome__rules div {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--fa-space-md);
+  padding: var(--fa-space-sm) 0;
+  border-top: 1px solid var(--fa-color-border);
+}
+
+.fa-lhome__rules dt {
+  color: var(--fa-color-foreground-muted);
+}
+
+.fa-lhome__rules dd {
+  margin: 0;
+  font-weight: 600;
+}
+
+@media (max-width: 767px) {
+  .fa-lhome__hero {
+    padding: var(--fa-space-lg);
+  }
+
+  .fa-lhome__stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .fa-lhome__stat strong {
+    font-size: 1.9rem;
+  }
+
+  .fa-lhome__cols {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .fa-lhome__next {
+    min-width: 0;
+    width: 100%;
+  }
+}
+
+/* ── Formazione: pannello turno ──────────────────────────────────────── */
+
+.fa-formation-layout__sidebar [data-testid="formation-cutoff"] {
+  margin: 0;
+  padding: var(--fa-space-sm) var(--fa-space-md);
+  border-radius: var(--fa-radius-md);
+  background: rgba(255, 210, 63, 0.12);
+  border: 1px solid rgba(255, 210, 63, 0.4);
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.fa-formation-layout__sidebar [data-testid="formation-lock-hint"],
+.fa-formation-layout__sidebar [data-testid="formation-previous-hint"],
+.fa-formation-layout__sidebar [data-testid="formation-previous-empty"] {
+  margin: var(--fa-space-sm) 0 0;
+  font-size: 0.85rem;
+  color: var(--fa-color-foreground-muted);
+}
+
+/* ── Match card: avatar sopra il nome, punteggio grande ───────────────── */
+
+.fa-match-card__team {
+  flex-direction: column;
+  gap: var(--fa-space-xs);
+  min-width: 0;
+}
+
+.fa-match-card__team-name {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.fa-match-card__team-logo {
+  width: 2.75rem;
+  height: 2.75rem;
+}
+
+.fa-match-card__avatar {
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: var(--fa-gradient-accent);
+  color: var(--fa-color-on-brand);
+  font-style: italic;
+  font-weight: 800;
+}
+
+.fa-match-card__score {
+  font-style: italic;
+  font-weight: 800;
+  font-size: 2.4rem;
+  line-height: 1;
+}
+
+.fa-match-card__vs {
+  font-weight: 600;
+}
+
+.fa-match-card__context {
+  letter-spacing: 0.14em;
+}
+
+.fa-login__hint {
+  margin: 0;
+  max-width: 28rem;
+  color: var(--fa-color-foreground-muted);
+  font-size: 1.1rem;
 }

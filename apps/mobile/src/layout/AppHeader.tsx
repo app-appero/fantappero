@@ -308,13 +308,13 @@ const styles = lazyStyles(() => StyleSheet.create({
   modalPrimary: {
     minHeight: 44,
     borderRadius: radius.md,
-    backgroundColor: colors.accent,
+    backgroundColor: colors.brand,
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: spacing.md,
   },
   modalPrimaryLabel: {
-    color: colors.accentContrast,
+    color: colors.onBrand,
     fontWeight: typography.fontWeight.semibold,
   },
   modalSecondary: {

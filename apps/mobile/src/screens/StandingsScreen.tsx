@@ -1,4 +1,3 @@
-import { fonts } from "../theme/fonts";
 import { lazyStyles } from "../theme/lazyStyles";
 import type { LeagueStanding } from "@fantappero/contracts";
 import { formatFantasyPoints } from "@fantappero/contracts";
@@ -8,6 +7,7 @@ import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useCallback, useMemo, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { fetchLeagueStandings, fetchMyFantasyTeam } from "../api/leagues";
+import { TeamAvatar } from "../components/TeamAvatar";
 import { UiStatePanel } from "../components/UiStatePanel";
 import { useScreenData } from "../hooks/useScreenData";
 import { PageContainer } from "../layout/PageContainer";
@@ -178,7 +178,38 @@ function StandingsTableBlock({
     [myTeamId, standings],
   );
 
+  const podium = rows.filter((row) => row.position <= 3).slice(0, 3);
+
   return (
+    <View style={styles.stack}>
+    {podium.length > 0 ? (
+      <View style={styles.podium} testID="standings-podium">
+        {podium.map((row) => (
+          <View
+            key={row.fantasyTeamId}
+            style={[styles.podiumCard, row.position === 1 ? styles.podiumFirst : null]}
+          >
+            <Text style={[styles.podiumRank, row.position === 1 ? styles.podiumRankFirst : null]}>
+              {row.position}°
+            </Text>
+            <TeamAvatar name={row.teamName} size={row.position === 1 ? 52 : 44} />
+            <View style={styles.podiumInfo}>
+              <Text style={styles.podiumName} numberOfLines={1}>
+                {row.teamName}
+                {row.isCurrentUser ? "  ·  Tu" : ""}
+              </Text>
+              <Text style={styles.meta}>
+                {row.played} gare · GF:GS {row.fantasyGoalsFor}:{row.fantasyGoalsAgainst}
+              </Text>
+            </View>
+            <Text style={styles.podiumPoints}>
+              {row.points}
+              <Text style={styles.podiumPointsUnit}> pt</Text>
+            </Text>
+          </View>
+        ))}
+      </View>
+    ) : null}
     <View style={styles.table} testID="standings-table">
       <View style={[styles.row, styles.headerRow]}>
         <Text style={[styles.cell, styles.posCell, styles.headerCell]}>Pos.</Text>
@@ -215,7 +246,7 @@ function StandingsTableBlock({
             ) : null}
           </View>
           <Text style={[styles.cell, styles.statCell]}>{row.played}</Text>
-          <Text style={[styles.cell, styles.statCell, styles.pointsCell]}>{row.points}</Text>
+          <Text style={[styles.cell, styles.statCell]}>{row.points}</Text>
           <Text style={[styles.cell, styles.goalsCell]}>
             {row.fantasyGoalsFor}:{row.fantasyGoalsAgainst}
           </Text>
@@ -225,6 +256,7 @@ function StandingsTableBlock({
           </Text>
         </View>
       ))}
+    </View>
     </View>
   );
 }
@@ -238,14 +270,60 @@ const styles = lazyStyles(() => StyleSheet.create({
     gap: spacing.sm,
   },
   button: {
-    backgroundColor: colors.accent,
+    backgroundColor: colors.brand,
     borderRadius: radius.pill,
     padding: spacing.sm,
     alignItems: "center",
     marginTop: spacing.sm,
   },
   buttonLabel: {
-    color: colors.accentContrast,
+    color: colors.onBrand,
+    fontWeight: "600",
+  },
+  podium: {
+    gap: spacing.sm,
+  },
+  podiumCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.md,
+    padding: spacing.md,
+    borderRadius: radius.xl,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.backgroundElevated,
+  },
+  podiumFirst: {
+    borderColor: colors.accentSecondary,
+    borderWidth: 2,
+  },
+  podiumRank: {
+    width: 40,
+    color: colors.foregroundMuted,
+    fontSize: typography.fontSize.xl,
+    fontStyle: "italic",
+    fontWeight: "800",
+  },
+  podiumRankFirst: {
+    color: "#ffd23f",
+  },
+  podiumInfo: {
+    flex: 1,
+    minWidth: 0,
+  },
+  podiumName: {
+    color: colors.foreground,
+    fontWeight: typography.fontWeight.semibold,
+  },
+  podiumPoints: {
+    color: colors.foreground,
+    fontSize: typography.fontSize.xl,
+    fontStyle: "italic",
+    fontWeight: "800",
+  },
+  podiumPointsUnit: {
+    color: colors.foregroundMuted,
+    fontSize: typography.fontSize.sm,
     fontWeight: "600",
   },
   table: {
@@ -267,7 +345,7 @@ const styles = lazyStyles(() => StyleSheet.create({
     backgroundColor: colors.backgroundElevated,
   },
   rowCurrent: {
-    backgroundColor: colors.backgroundElevated,
+    backgroundColor: "rgba(79, 92, 245, 0.22)",
   },
   cell: {
     color: colors.foreground,
@@ -301,22 +379,18 @@ const styles = lazyStyles(() => StyleSheet.create({
     width: 32,
     textAlign: "center",
   },
-  pointsCell: {
-    fontFamily: fonts.led,
-    fontSize: typography.fontSize.md,
-  },
   goalsCell: {
     width: 64,
     textAlign: "right",
   },
   badge: {
-    backgroundColor: colors.accent,
+    backgroundColor: colors.accentSecondary,
     borderRadius: radius.sm,
     paddingHorizontal: spacing.xs,
     paddingVertical: 2,
   },
   badgeLabel: {
-    color: colors.accentContrast,
+    color: colors.onBrand,
     fontSize: typography.fontSize.xs,
     fontWeight: typography.fontWeight.semibold,
   },

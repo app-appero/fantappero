@@ -8,7 +8,7 @@ const { colors, spacing, typography, radius } = theme;
 export const adminUiStyles = lazyStyles(() => StyleSheet.create({
   section: {
     padding: spacing.md,
-    borderRadius: radius.md,
+    borderRadius: radius.xl,
     backgroundColor: colors.backgroundElevated,
     gap: spacing.sm,
   },
@@ -24,7 +24,7 @@ export const adminUiStyles = lazyStyles(() => StyleSheet.create({
   input: {
     borderWidth: 1,
     borderColor: colors.border,
-    borderRadius: radius.md,
+    borderRadius: radius.xl,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
     color: colors.foreground,
@@ -38,10 +38,10 @@ export const adminUiStyles = lazyStyles(() => StyleSheet.create({
     justifyContent: "center",
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
-    backgroundColor: colors.accent,
+    backgroundColor: colors.brand,
   },
   buttonLabel: {
-    color: colors.accentContrast,
+    color: colors.onBrand,
     fontWeight: typography.fontWeight.semibold,
   },
   secondaryButton: {
@@ -70,7 +70,7 @@ export const adminUiStyles = lazyStyles(() => StyleSheet.create({
   linkCard: {
     borderWidth: 1,
     borderColor: colors.border,
-    borderRadius: radius.md,
+    borderRadius: radius.xl,
     padding: spacing.md,
     backgroundColor: colors.background,
     gap: 2,
@@ -86,7 +86,7 @@ export const adminUiStyles = lazyStyles(() => StyleSheet.create({
   },
   listRow: {
     padding: spacing.md,
-    borderRadius: radius.md,
+    borderRadius: radius.xl,
     backgroundColor: colors.background,
     borderWidth: 1,
     borderColor: colors.border,
@@ -153,7 +153,7 @@ export const adminUiStyles = lazyStyles(() => StyleSheet.create({
   confirmBox: {
     borderWidth: 1,
     borderColor: colors.warning,
-    borderRadius: radius.md,
+    borderRadius: radius.xl,
     padding: spacing.md,
     gap: spacing.sm,
     backgroundColor: colors.backgroundElevated,

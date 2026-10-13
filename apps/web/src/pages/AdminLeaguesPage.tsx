@@ -96,9 +96,9 @@ export function AdminLeaguesPage() {
         <ul className="fa-admin-leagues__list" data-testid="admin-leagues-list">
           {result.items.map((league) => (
             <li key={league.id} className="fa-admin-leagues__item">
-              <strong>{league.name}</strong>
-              <span>{league.state}</span>
-              <span>{league.ownerDisplayName ?? "—"}</span>
+              <strong className="fa-admin-leagues__name">{league.name}</strong>
+              <span className="fa-admin-leagues__state">{league.state}</span>
+              <span className="fa-admin-leagues__owner">Admin: {league.ownerDisplayName ?? "—"}</span>
             </li>
           ))}
         </ul>

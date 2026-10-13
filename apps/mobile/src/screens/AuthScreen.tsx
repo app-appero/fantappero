@@ -2,7 +2,7 @@ import { lazyStyles } from "../theme/lazyStyles";
 import { theme } from "@fantappero/ui/theme";
 import { useNavigation } from "@react-navigation/core";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { AppTextInput as TextInput } from "../components/AppTextInput";
 import { useGoogleAuth } from "../auth/useGoogleAuth";
@@ -11,6 +11,8 @@ import { UiStatePanel } from "../components/UiStatePanel";
 import { PageContainer } from "../layout/PageContainer";
 import type { RootStackParamList } from "../navigation/types";
 import { getApiErrorMessage, useAuthSession } from "../session/DemoSessionContext";
+import { clearLastUser, initialsOf, readLastUser, writeLastUser, type LastUser } from "../session/lastUser";
+import { getMemorySession } from "../session/sessionStorage";
 
 const { colors, spacing, typography, radius } = theme;
 
@@ -23,6 +25,24 @@ export function AuthScreen() {
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [googleSubmitting, setGoogleSubmitting] = useState(false);
+  const [remembered, setRemembered] = useState<LastUser | null>(null);
+  useEffect(() => {
+    void readLastUser().then((last) => {
+      if (last) {
+        setRemembered(last);
+        setEmail(last.email);
+      }
+    });
+  }, []);
+  const firstName = remembered?.displayName.trim().split(/\s+/)[0] ?? "";
+
+  function switchAccount() {
+    setRemembered(null);
+    setEmail("");
+    setPassword("");
+    setError(null);
+    void clearLastUser();
+  }
   const googleAuth = useGoogleAuth((idToken) => {
     setError(null);
     setGoogleSubmitting(true);
@@ -44,6 +64,10 @@ export function AuthScreen() {
     setSubmitting(true);
     try {
       await login(email.trim(), password);
+      const user = getMemorySession()?.user;
+      if (user?.displayName) {
+        void writeLastUser({ displayName: user.displayName, email: email.trim() });
+      }
     } catch (loginError) {
       setError(getApiErrorMessage(loginError, "Accesso non riuscito."));
     } finally {
@@ -57,7 +81,18 @@ export function AuthScreen() {
         <View style={styles.brand}>
           <BrandLogo variant="full" size="lg" />
         </View>
-        <Text style={styles.lead}>Accedi con il tuo account FantApperò.</Text>
+        {remembered ? (
+          <View style={styles.hero} testID="auth-welcome">
+            <View style={styles.avatarRing}>
+              <View style={styles.avatarInner}>
+                <Text style={styles.avatarText}>{initialsOf(remembered.displayName)}</Text>
+              </View>
+            </View>
+            <Text style={styles.heroTitle}>Bentornato, {firstName}</Text>
+          </View>
+        ) : (
+          <Text style={styles.lead}>Accedi con il tuo account FantApperò.</Text>
+        )}
         {error ? (
           <UiStatePanel
             state="error"
@@ -66,19 +101,33 @@ export function AuthScreen() {
             testID="auth-error"
           />
         ) : null}
-        <Text style={styles.label}>Email</Text>
-        <TextInput
-          value={email}
-          onChangeText={setEmail}
-          autoCapitalize="none"
-          autoCorrect={false}
-          keyboardType="email-address"
-          placeholder="tu@email.it"
-          placeholderTextColor={colors.foregroundMuted}
-          style={styles.input}
-          accessibilityLabel="Email"
-          testID="auth-email"
-        />
+        {remembered ? (
+          <View style={styles.accountRow} testID="auth-account">
+            <View style={styles.accountText}>
+              <Text style={styles.accountCaption}>Account</Text>
+              <Text style={styles.accountEmail} numberOfLines={1}>{remembered.email}</Text>
+            </View>
+            <Pressable accessibilityRole="button" accessibilityLabel="Cambia account" onPress={switchAccount} testID="auth-switch-account">
+              <Text style={styles.link}>Cambia</Text>
+            </Pressable>
+          </View>
+        ) : (
+          <>
+            <Text style={styles.label}>Email</Text>
+            <TextInput
+              value={email}
+              onChangeText={setEmail}
+              autoCapitalize="none"
+              autoCorrect={false}
+              keyboardType="email-address"
+              placeholder="tu@email.it"
+              placeholderTextColor={colors.foregroundMuted}
+              style={styles.input}
+              accessibilityLabel="Email"
+              testID="auth-email"
+            />
+          </>
+        )}
         <Text style={styles.label}>Password</Text>
         <TextInput
           value={password}
@@ -107,7 +156,7 @@ export function AuthScreen() {
           style={[styles.primaryButton, submitting && styles.disabled]}
           testID="auth-login-submit"
         >
-          <Text style={styles.primaryLabel}>{submitting ? "Accesso…" : "Accedi"}</Text>
+          <Text style={styles.primaryLabel}>{submitting ? "Accesso…" : remembered ? `Accedi come ${firstName}` : "Accedi"}</Text>
         </Pressable>
         {googleAuth.available ? (
           <Pressable
@@ -125,6 +174,11 @@ export function AuthScreen() {
             <Text style={styles.secondaryLabel}>
               {googleSubmitting ? "Accesso…" : "Continua con Google"}
             </Text>
+          </Pressable>
+        ) : null}
+        {remembered ? (
+          <Pressable accessibilityRole="button" accessibilityLabel={`Non sei ${firstName}? Cambia account`} onPress={switchAccount} style={styles.linkRow} testID="auth-not-you">
+            <Text style={styles.link}>Non sei {firstName}? Cambia account</Text>
           </Pressable>
         ) : null}
         <Pressable
@@ -177,12 +231,12 @@ export const authFormStyles = lazyStyles(() => StyleSheet.create({
     minHeight: 44,
     paddingVertical: spacing.md,
     borderRadius: radius.pill,
-    backgroundColor: colors.accent,
+    backgroundColor: colors.brand,
     alignItems: "center",
     justifyContent: "center",
   },
   primaryLabel: {
-    color: colors.accentContrast,
+    color: colors.onBrand,
     fontWeight: typography.fontWeight.semibold,
     fontSize: typography.fontSize.md,
   },
@@ -217,6 +271,74 @@ export const authFormStyles = lazyStyles(() => StyleSheet.create({
   },
   disabled: {
     opacity: 0.6,
+  },
+  hero: {
+    alignItems: "center",
+    gap: spacing.sm,
+    marginBottom: spacing.md,
+  },
+  avatarRing: {
+    width: 92,
+    height: 92,
+    borderRadius: 46,
+    padding: 4,
+    backgroundColor: colors.accentSecondary,
+  },
+  avatarInner: {
+    flex: 1,
+    borderRadius: 42,
+    backgroundColor: colors.brand,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  avatarText: {
+    color: colors.onBrand,
+    fontSize: 30,
+    fontStyle: "italic",
+    fontWeight: "800",
+  },
+  heroTitle: {
+    color: colors.foreground,
+    fontSize: typography.fontSize.xl,
+    fontStyle: "italic",
+    fontWeight: "800",
+    textTransform: "uppercase",
+    textAlign: "center",
+  },
+  heroTitleLeft: {
+    color: colors.foreground,
+    fontSize: typography.fontSize.xl,
+    fontStyle: "italic",
+    fontWeight: "800",
+    textTransform: "uppercase",
+    marginBottom: spacing.xs,
+  },
+  accountRow: {
+    marginTop: spacing.sm,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: spacing.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.backgroundElevated,
+  },
+  accountText: {
+    flex: 1,
+    minWidth: 0,
+  },
+  accountCaption: {
+    color: colors.foregroundMuted,
+    fontSize: 11,
+    letterSpacing: 1.4,
+    textTransform: "uppercase",
+  },
+  accountEmail: {
+    color: colors.foreground,
+    fontWeight: typography.fontWeight.semibold,
   },
 }));
 

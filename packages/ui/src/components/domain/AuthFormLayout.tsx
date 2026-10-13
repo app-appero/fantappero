@@ -20,6 +20,10 @@ export type AuthFormLayoutProps = {
   forgotPasswordLink?: ReactNode;
   registerPrompt?: ReactNode;
   showEmail?: boolean;
+  /** Sostituisce il campo email (es. account ricordato). */
+  emailSlot?: ReactNode;
+  /** Nasconde il logo sopra il modulo (quando lo mostra già la pagina). */
+  hideBrand?: boolean;
   showPassword?: boolean;
   showConfirmPassword?: boolean;
   showDisplayName?: boolean;
@@ -54,6 +58,8 @@ export function AuthFormLayout({
   registerPrompt,
   testId = "auth-form-layout",
   showEmail = true,
+  emailSlot,
+  hideBrand = false,
   showPassword = true,
   showConfirmPassword = false,
   showDisplayName = false,
@@ -79,7 +85,7 @@ export function AuthFormLayout({
 
   return (
     <form className="fa-auth-layout" data-testid={testId} onSubmit={onSubmit} noValidate>
-      <div className="fa-auth-layout__brand">{brand}</div>
+      {hideBrand ? null : <div className="fa-auth-layout__brand">{brand}</div>}
       <Card>
         <CardHeader>{title}</CardHeader>
         <CardBody>
@@ -101,7 +107,8 @@ export function AuthFormLayout({
               required
             />
           ) : null}
-          {showEmail ? (
+          {emailSlot ?? null}
+          {showEmail && !emailSlot ? (
             <Input
               label={emailLabel}
               placeholder={emailPlaceholder}

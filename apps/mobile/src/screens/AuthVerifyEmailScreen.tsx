@@ -67,6 +67,7 @@ export function AuthVerifyEmailScreen() {
           </>
         ) : (
           <>
+            <Text style={styles.heroTitleLeft}>Verifica email</Text>
             <Text style={styles.lead}>
               Incolla il codice di verifica ricevuto via email per completare la registrazione.
             </Text>

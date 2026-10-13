@@ -331,14 +331,14 @@ const styles = lazyStyles(() => StyleSheet.create({
   primaryButton: {
     marginTop: spacing.md,
     minHeight: 44,
-    backgroundColor: colors.accent,
+    backgroundColor: colors.brand,
     borderRadius: radius.pill,
     paddingVertical: spacing.md,
     alignItems: "center",
     justifyContent: "center",
   },
   primaryButtonLabel: {
-    color: colors.accentContrast,
+    color: colors.onBrand,
     fontWeight: typography.fontWeight.semibold,
     fontSize: typography.fontSize.md,
   },

@@ -71,6 +71,7 @@ export function AuthForgotPasswordScreen() {
           </>
         ) : (
           <>
+            <Text style={styles.heroTitleLeft}>Recupera accesso</Text>
             <Text style={styles.lead}>
               Inserisci l&apos;email dell&apos;account: ti invieremo un link per reimpostare la
               password.
