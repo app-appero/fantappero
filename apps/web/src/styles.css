@@ -3278,3 +3278,11 @@ h2 {
   justify-self: stretch;
   min-height: 3.25rem;
 }
+
+/* Classifica su schermi stretti: restano Pos., Squadra, G, Pt */
+@media (max-width: 767px) {
+  [data-testid="standings-table"] th:nth-child(n + 5),
+  [data-testid="standings-table"] td:nth-child(n + 5) {
+    display: none;
+  }
+}
