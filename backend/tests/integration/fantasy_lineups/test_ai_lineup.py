@@ -350,6 +350,55 @@ def test_operator_endpoint_is_authorized_audited_and_human_safe(
     assert audit.details["roundId"] == str(fantasy_round.id)
     assert audit.details["teamsHandled"] == 1
 
+
+def test_operator_team_id_query_loads_the_selected_coach_lineup(
+    client: TestClient,
+    db_session: Session,
+    scenario: dict[str, object],
+) -> None:
+    """`?teamId=` deve mostrare la rosa dell'allenatore scelto, non quella del chiamante."""
+    league = scenario["league"]
+    fantasy_round = scenario["round"]
+    fixture = scenario["fixture"]
+    ai_team = scenario["ai_team"]
+    human_team = scenario["human_team"]
+    athletes = scenario["athletes"]
+
+    now = datetime.now(UTC)
+    fantasy_round.window_start_at = now - timedelta(hours=1)
+    fantasy_round.window_end_at = now + timedelta(days=1)
+    fantasy_round.cutoff_at = now + timedelta(hours=2)
+    fixture.kickoff_at = now + timedelta(hours=3)
+    db_session.commit()
+
+    owner = human_team.membership.user
+    jwt_secret = os.environ.get("JWT_SECRET_KEY", "test_jwt_secret_for_pytest_only")
+    owner_token, _ = create_access_token(
+        user_id=owner.id,
+        secret=jwt_secret,
+        expire_minutes=15,
+    )
+    endpoint = f"/leagues/{league.id}/turni/{fantasy_round.id}/formazione"
+    headers = {"Authorization": f"Bearer {owner_token}"}
+
+    denied = client.get(endpoint, headers=headers, params={"teamId": str(ai_team.id)})
+    assert denied.status_code == 400
+    assert denied.json()["code"] == "operator_required"
+
+    owner.platform_role = PlatformRole.OPERATOR
+    db_session.commit()
+
+    own = client.get(endpoint, headers=headers)
+    assert own.status_code == 200
+    assert own.json()["roster"] == []
+
+    selected = client.get(endpoint, headers=headers, params={"teamId": str(ai_team.id)})
+    assert selected.status_code == 200
+    assert {row["athleteId"] for row in selected.json()["roster"]} == {
+        str(athlete.id) for athlete in athletes
+    }
+
+
 def test_decision_log_records_scores_and_exclusions(
     db_session: Session, scenario: dict[str, object]
 ) -> None:
