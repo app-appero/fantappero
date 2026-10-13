@@ -305,6 +305,14 @@ export const authFormStyles = lazyStyles(() => StyleSheet.create({
     textTransform: "uppercase",
     textAlign: "center",
   },
+  heroTitleLeft: {
+    color: colors.foreground,
+    fontSize: typography.fontSize.xl,
+    fontStyle: "italic",
+    fontWeight: "800",
+    textTransform: "uppercase",
+    marginBottom: spacing.xs,
+  },
   accountRow: {
     marginTop: spacing.sm,
     flexDirection: "row",

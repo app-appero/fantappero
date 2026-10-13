@@ -104,21 +104,48 @@ export function AuthRegisterPage() {
   }
 
   return (
-    <div className="fa-auth-page fa-surface-pitch">
-      <PageContainer title="Registrati">
+    <div className="fa-auth-page fa-login" data-testid="register-page">
+      <section className="fa-login__hero">
+        <BrandLogo variant="full" size="lg" />
+        <div className="fa-login__greeting">
+          <h1 className="fa-login__title">
+            Crea la tua <span className="fa-login__title-accent">squadra</span>
+          </h1>
+        </div>
+        <ol className="fa-login__steps" aria-label="Come funziona">
+          {REGISTER_STEPS.map((step, index) => (
+            <li key={step.title} className="fa-login__step">
+              <span className="fa-login__step-n" aria-hidden="true">
+                {index + 1}
+              </span>
+              <span>
+                <strong>{step.title}</strong>
+                <small>{step.detail}</small>
+              </span>
+            </li>
+          ))}
+        </ol>
+      </section>
+      <section className="fa-login__panel">
         {successMessage ? (
-          <UiStatePanel
-            state="success"
-            title="Controlla la tua email"
-            message={successMessage}
-            testId="auth-register-success"
-          />
+          <>
+            <UiStatePanel
+              state="success"
+              title="Controlla la tua email"
+              message={successMessage}
+              testId="auth-register-success"
+            />
+            <p className="fa-auth-layout__register">
+              <Link to="/accedi">Torna al login</Link>
+            </p>
+          </>
         ) : (
           <>
             <AuthFormLayout
-              brand={<BrandLogo variant="full" size="lg" />}
-              title="Crea account"
-              submitLabel="Registrati"
+              brand={null}
+              hideBrand
+              title="Registrati"
+              submitLabel="Crea account"
               showDisplayName
               showConfirmPassword
               email={email}
@@ -141,15 +168,16 @@ export function AuthRegisterPage() {
             <GoogleSignInButton onError={setError} />
           </>
         )}
-        {successMessage ? (
-          <p className="fa-auth-layout__register">
-            <Link to="/accedi">Torna al login</Link>
-          </p>
-        ) : null}
-      </PageContainer>
+      </section>
     </div>
   );
 }
+
+const REGISTER_STEPS = [
+  { title: "Crea l'account", detail: "Nome, email e password" },
+  { title: "Conferma l'email", detail: "Ti scriviamo un codice" },
+  { title: "Entra in lega", detail: "Crea la tua o usa un invito" },
+] as const;
 
 const LOGIN_ROLES = [
   { code: "P", label: "Portieri" },

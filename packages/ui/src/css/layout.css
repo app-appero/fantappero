@@ -1846,3 +1846,49 @@ button.fa-app-header__league-action {
 .fa-login__panel .fa-auth-layout__register {
   margin: 0;
 }
+
+/* Registrazione: passi sotto il titolo (riusa il layout del login). */
+.fa-login__steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--fa-space-md);
+}
+
+.fa-login__step {
+  display: flex;
+  align-items: center;
+  gap: var(--fa-space-md);
+}
+
+.fa-login__step strong,
+.fa-login__step small {
+  display: block;
+}
+
+.fa-login__step small {
+  color: var(--fa-color-foreground-muted);
+  font-size: 0.875rem;
+}
+
+.fa-login__step-n {
+  flex: 0 0 auto;
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: var(--fa-gradient-accent);
+  color: var(--fa-color-on-brand);
+  font-style: italic;
+  font-weight: 800;
+  font-size: 1.25rem;
+}
+
+@media (max-width: 767px) {
+  .fa-login__steps {
+    display: none;
+  }
+}
