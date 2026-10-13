@@ -66,7 +66,7 @@ export function OptionPicker({
         <Text style={selected ? styles.triggerValue : styles.triggerPlaceholder} numberOfLines={1}>
           {selected ? selected.label : placeholder}
         </Text>
-        <Text style={styles.triggerCaret}>{open ? "▲" : "▼"}</Text>
+        <Text style={styles.triggerCaret}>{open ? "⌃" : "⌄"}</Text>
       </Pressable>
       {open && !disabled ? (
         <View style={styles.menu} testID={testID ? `${testID}-menu` : undefined}>
@@ -112,7 +112,13 @@ export function OptionPicker({
                   }}
                   testID={testID ? `${testID}-option-${option.value}` : undefined}
                 >
-                  <Text style={[styles.optionLabel, option.disabled ? styles.optionLabelDisabled : null]}>
+                  <Text
+                    style={[
+                      styles.optionLabel,
+                      option.value === value ? styles.optionLabelActive : null,
+                      option.disabled ? styles.optionLabelDisabled : null,
+                    ]}
+                  >
                     {option.label}
                   </Text>
                 </Pressable>
@@ -138,10 +144,10 @@ const styles = lazyStyles(() => StyleSheet.create({
     minHeight: 44,
     borderWidth: 1,
     borderColor: colors.border,
-    borderRadius: radius.md,
+    borderRadius: radius.pill,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
-    backgroundColor: colors.background,
+    backgroundColor: colors.backgroundElevated,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
@@ -152,6 +158,7 @@ const styles = lazyStyles(() => StyleSheet.create({
   },
   triggerValue: {
     color: colors.foreground,
+    fontWeight: typography.fontWeight.semibold,
     flexShrink: 1,
   },
   triggerPlaceholder: {
@@ -159,13 +166,15 @@ const styles = lazyStyles(() => StyleSheet.create({
     flexShrink: 1,
   },
   triggerCaret: {
-    color: colors.foregroundMuted,
-    fontSize: typography.fontSize.sm,
+    color: colors.accent,
+    fontSize: typography.fontSize.lg,
+    fontWeight: typography.fontWeight.semibold,
+    lineHeight: typography.fontSize.lg,
   },
   menu: {
     borderWidth: 1,
     borderColor: colors.border,
-    borderRadius: radius.md,
+    borderRadius: radius.lg,
     backgroundColor: colors.backgroundElevated,
     marginTop: spacing.xs,
     padding: spacing.xs,
@@ -192,17 +201,22 @@ const styles = lazyStyles(() => StyleSheet.create({
   option: {
     paddingHorizontal: spacing.sm,
     paddingVertical: spacing.sm,
-    borderRadius: radius.sm,
+    borderRadius: radius.md,
   },
   optionActive: {
-    backgroundColor: colors.background,
+    backgroundColor: colors.brand,
   },
   optionDisabled: {
     opacity: 0.4,
   },
   optionLabel: {
     color: colors.foreground,
+    fontWeight: typography.fontWeight.medium,
     fontSize: typography.fontSize.sm,
+  },
+  optionLabelActive: {
+    color: colors.onBrand,
+    fontWeight: typography.fontWeight.semibold,
   },
   optionLabelDisabled: {
     color: colors.foregroundMuted,
