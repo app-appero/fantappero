@@ -1396,3 +1396,175 @@ select option,
   color: var(--fa-color-foreground);
   font-weight: 500;
 }
+
+/* ── Classifica: podio e riga "Tu" ───────────────────────────────────── */
+
+.fa-podium {
+  list-style: none;
+  margin: var(--fa-space-md) 0 var(--fa-space-lg);
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--fa-space-md);
+  align-items: end;
+}
+
+.fa-podium__card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--fa-space-sm);
+  padding: var(--fa-space-lg);
+  text-align: center;
+  border-radius: var(--fa-radius-xl);
+  background: var(--fa-color-background-elevated);
+  border: 1px solid var(--fa-color-border);
+}
+
+/* 2° a sinistra, 1° al centro, 3° a destra */
+.fa-podium__card--1 {
+  order: 2;
+  padding-block: calc(var(--fa-space-lg) + 0.75rem);
+  background: linear-gradient(160deg, rgba(53, 96, 240, 0.3), rgba(122, 77, 255, 0.24));
+  border-color: rgba(155, 107, 255, 0.45);
+}
+
+.fa-podium__card--2 {
+  order: 1;
+}
+
+.fa-podium__card--3 {
+  order: 3;
+}
+
+.fa-podium__rank {
+  font-style: italic;
+  font-weight: 800;
+  font-size: 2.6rem;
+  line-height: 1;
+}
+
+.fa-podium__card--1 .fa-podium__rank {
+  color: #ffd23f;
+  font-size: 3.4rem;
+}
+
+.fa-podium__card--2 .fa-podium__rank {
+  color: #aab4cf;
+}
+
+.fa-podium__card--3 .fa-podium__rank {
+  color: #e0a06a;
+}
+
+.fa-podium__avatar {
+  width: 3rem;
+  height: 3rem;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: var(--fa-gradient-accent);
+  color: var(--fa-color-on-brand);
+  font-style: italic;
+  font-weight: 800;
+}
+
+.fa-podium__card--1 .fa-podium__avatar {
+  width: 3.6rem;
+  height: 3.6rem;
+}
+
+.fa-podium__name {
+  font-weight: 600;
+  font-size: 1.05rem;
+}
+
+.fa-podium__me {
+  margin-left: var(--fa-space-xs);
+  padding: 0.1rem 0.5rem;
+  border-radius: var(--fa-radius-pill);
+  background: rgba(122, 77, 255, 0.25);
+  color: var(--fa-color-accent-secondary);
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+
+.fa-podium__meta {
+  color: var(--fa-color-foreground-muted);
+  font-size: 0.8rem;
+}
+
+.fa-podium__points {
+  font-style: italic;
+  font-weight: 800;
+  font-size: 2.2rem;
+  line-height: 1;
+}
+
+.fa-podium__points small {
+  font-size: 0.9rem;
+  color: var(--fa-color-foreground-muted);
+  font-weight: 600;
+}
+
+.fa-standings-row--current td {
+  background-color: color-mix(in srgb, var(--fa-brand-500) 18%, transparent);
+  font-weight: 600;
+}
+
+@media (max-width: 767px) {
+  .fa-podium {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .fa-podium__card {
+    flex-direction: row;
+    justify-content: flex-start;
+    text-align: left;
+    padding: var(--fa-space-md);
+  }
+
+  .fa-podium__card--1,
+  .fa-podium__card--2,
+  .fa-podium__card--3 {
+    order: 0;
+    padding-block: var(--fa-space-md);
+  }
+
+  .fa-podium__card--1 .fa-podium__rank,
+  .fa-podium__rank {
+    font-size: 2rem;
+  }
+
+  .fa-podium__name {
+    flex: 1;
+  }
+
+  .fa-podium__meta {
+    display: none;
+  }
+
+  .fa-podium__points {
+    font-size: 1.7rem;
+  }
+}
+
+/* Sezioni "wireframe": niente cornice tratteggiata, solo titoletto e contenuto */
+
+.fa-wireframe-section {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.fa-wireframe-section__label {
+  padding: 0 0 var(--fa-space-sm);
+  border-bottom: 0;
+  font-size: 0.75rem;
+  letter-spacing: 0.14em;
+  color: var(--fa-color-foreground-muted);
+}
+
+.fa-wireframe-section__body {
+  padding: 0;
+}

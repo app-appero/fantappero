@@ -97,6 +97,52 @@ function toTableRows(
   });
 }
 
+function initialsOf(name: string): string {
+  return name
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((part) => part.charAt(0))
+    .slice(0, 2)
+    .join("")
+    .toUpperCase();
+}
+
+/** Primi tre in evidenza: 2° · 1° · 3° su desktop, in colonna su mobile. */
+function StandingsPodium({ rows }: { rows: StandingsRow[] }) {
+  const top = rows.filter((row) => row.position <= 3).slice(0, 3);
+  if (top.length === 0) {
+    return null;
+  }
+  return (
+    <ol className="fa-podium" aria-label="Primi tre in classifica" data-testid="standings-podium">
+      {top.map((row) => (
+        <li
+          key={row.id}
+          className={`fa-podium__card fa-podium__card--${row.position}`}
+        >
+          <span className="fa-podium__rank">{row.position}°</span>
+          <span className="fa-podium__avatar" aria-hidden="true">
+            {initialsOf(row.teamName)}
+          </span>
+          <span className="fa-podium__name">
+            {row.teamName}
+            {row.highlightLabel ? (
+              <span className="fa-podium__me">{row.highlightLabel}</span>
+            ) : null}
+          </span>
+          <span className="fa-podium__meta">
+            {row.played} gare · GF:GS {row.goalsFor}:{row.goalsAgainst}
+          </span>
+          <strong className="fa-podium__points">
+            {row.points}
+            <small> pt</small>
+          </strong>
+        </li>
+      ))}
+    </ol>
+  );
+}
+
 function StandingsTableBlock({
   rows,
   testId = "standings-table",
@@ -244,10 +290,13 @@ export function StandingsPage() {
         <WireframePage
           screenId="standings"
           successContent={
-            <StandingsTableBlock
-              rows={rows}
-              onManagerClick={canViewCoachProfiles ? handleManagerClick : undefined}
-            />
+            <>
+              <StandingsPodium rows={rows} />
+              <StandingsTableBlock
+                rows={rows}
+                onManagerClick={canViewCoachProfiles ? handleManagerClick : undefined}
+              />
+            </>
           }
         />
       </PageContainer>
@@ -320,6 +369,7 @@ export function StandingsPage() {
               }).format(new Date(computedAt))}
             </p>
           ) : null}
+          <StandingsPodium rows={rows} />
           <StandingsTableBlock
             rows={rows}
             onManagerClick={canViewCoachProfiles ? handleManagerClick : undefined}

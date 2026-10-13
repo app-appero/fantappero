@@ -2129,3 +2129,48 @@ button.fa-app-header__league-action {
   font-size: 0.85rem;
   color: var(--fa-color-foreground-muted);
 }
+
+/* ── Match card: avatar sopra il nome, punteggio grande ───────────────── */
+
+.fa-match-card__team {
+  flex-direction: column;
+  gap: var(--fa-space-xs);
+  min-width: 0;
+}
+
+.fa-match-card__team-name {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.fa-match-card__team-logo {
+  width: 2.75rem;
+  height: 2.75rem;
+}
+
+.fa-match-card__avatar {
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: var(--fa-gradient-accent);
+  color: var(--fa-color-on-brand);
+  font-style: italic;
+  font-weight: 800;
+}
+
+.fa-match-card__score {
+  font-style: italic;
+  font-weight: 800;
+  font-size: 2.4rem;
+  line-height: 1;
+}
+
+.fa-match-card__vs {
+  font-weight: 600;
+}
+
+.fa-match-card__context {
+  letter-spacing: 0.14em;
+}

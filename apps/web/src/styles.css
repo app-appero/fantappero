@@ -2278,3 +2278,58 @@ h2 {
 .fa-bench-order {
   gap: var(--fa-space-sm);
 }
+
+/* ── Rosa: tessere riepilogo e gruppi per ruolo come card ─────────────── */
+
+.fa-roster-credits-bar__balance,
+[data-testid="roster-summary"] {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  margin: 0 var(--fa-space-sm) var(--fa-space-md) 0;
+  padding: var(--fa-space-md) var(--fa-space-lg);
+  min-width: 11rem;
+  border-radius: var(--fa-radius-lg);
+  background: var(--fa-color-background-elevated);
+  border: 1px solid var(--fa-color-border);
+  color: var(--fa-color-foreground-muted);
+  font-size: 0.8rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.fa-roster-credits-bar__balance strong {
+  color: var(--fa-color-foreground);
+  font-style: italic;
+  font-weight: 800;
+  font-size: 2rem;
+  letter-spacing: 0;
+  line-height: 1.05;
+}
+
+[data-testid="roster-composition"] p {
+  margin: 0 0 var(--fa-space-sm);
+}
+
+[data-testid="roster-composition-counts"] {
+  color: var(--fa-color-foreground-muted);
+  font-size: 0.9rem;
+}
+
+.fa-roster-role-tables > * {
+  padding: var(--fa-space-lg);
+  border-radius: var(--fa-radius-xl);
+  background: var(--fa-color-background-elevated);
+  border: 1px solid var(--fa-color-border);
+}
+
+.fa-roster-role-tables > * {
+  box-sizing: border-box;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.fa-roster-role-tables .fa-table-wrap {
+  max-width: 100%;
+  overflow-x: auto;
+}
