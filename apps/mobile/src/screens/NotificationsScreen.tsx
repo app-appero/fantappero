@@ -205,13 +205,14 @@ const styles = lazyStyles(() => StyleSheet.create({
   card: {
     borderWidth: 1,
     borderColor: colors.border,
-    borderRadius: radius.md,
-    padding: spacing.sm,
+    borderRadius: radius.xl,
+    padding: spacing.md,
     gap: spacing.xs,
     backgroundColor: colors.backgroundElevated,
   },
   cardUnread: {
-    borderColor: colors.accent,
+    borderColor: colors.accentSecondary,
+    borderWidth: 2,
   },
   category: {
     color: colors.foregroundMuted,

@@ -2818,3 +2818,130 @@ h2 {
   font-size: 0.85rem;
   color: var(--fa-color-foreground-muted);
 }
+
+/* ── Directory fantallenatori: griglia di card ────────────────────────── */
+
+.fa-manager-directory__list {
+  grid-template-columns: repeat(auto-fill, minmax(18rem, 1fr));
+  gap: var(--fa-space-md);
+  align-items: stretch;
+}
+
+.fa-manager-directory__list .fa-manager-directory__item {
+  flex-direction: column;
+  align-items: stretch;
+  padding: var(--fa-space-lg);
+  border-radius: var(--fa-radius-xl);
+}
+
+.fa-manager-directory__list .fa-manager-directory__item > .fa-btn,
+.fa-manager-directory__list .fa-manager-directory__status {
+  align-self: flex-start;
+  margin-top: auto;
+}
+
+.fa-manager-directory__avatar {
+  width: 3.25rem;
+  height: 3.25rem;
+  background: var(--fa-gradient-accent);
+  color: var(--fa-color-on-brand);
+  font-style: italic;
+  font-weight: 800;
+}
+
+.fa-manager-directory:not(.fa-manager-directory--compact) > .fa-manager-directory__title {
+  display: none;
+}
+
+.fa-manager-directory__filters {
+  padding: var(--fa-space-md);
+  border-radius: var(--fa-radius-xl);
+  background: var(--fa-color-background-elevated);
+  border: 1px solid var(--fa-color-border);
+}
+
+/* ── Crea lega: campionati come tessere selezionabili ─────────────────── */
+
+.fa-competition-picker {
+  border: 0;
+  padding: 0;
+  background: transparent;
+}
+
+.fa-competition-picker__list {
+  grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));
+  gap: var(--fa-space-sm);
+}
+
+.fa-competition-picker__option {
+  border-radius: var(--fa-radius-lg);
+  padding: var(--fa-space-md);
+}
+
+.fa-competition-picker__option--checked {
+  border-color: rgba(155, 107, 255, 0.65);
+  background: linear-gradient(135deg, rgba(53, 96, 240, 0.16), rgba(122, 77, 255, 0.12));
+}
+
+.fa-competition-picker__option input[type="checkbox"] {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 0.5rem;
+  border: 2px solid var(--fa-color-border-strong);
+  display: grid;
+  place-items: center;
+}
+
+.fa-competition-picker__option input[type="checkbox"]:checked {
+  background: var(--fa-gradient-accent);
+  border-color: transparent;
+}
+
+.fa-competition-picker__option input[type="checkbox"]:checked::after {
+  content: "✓";
+  color: var(--fa-color-on-brand);
+  font-size: 0.9rem;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.fa-create-league-page {
+  max-width: 52rem;
+}
+
+/* ── Notifiche: pannello con puntino non letto ───────────────────────── */
+
+.fa-notification-center__panel {
+  border-radius: var(--fa-radius-xl);
+  box-shadow: 0 24px 60px rgba(2, 6, 23, 0.35);
+}
+
+.fa-notification-center__header {
+  font-style: italic;
+  font-weight: 800;
+  text-transform: uppercase;
+  font-size: 1.25rem;
+}
+
+.fa-notification-center__item {
+  position: relative;
+  border-radius: var(--fa-radius-lg);
+}
+
+.fa-notification-center__item--unread::before {
+  content: "";
+  position: absolute;
+  top: 0.9rem;
+  right: 0.9rem;
+  width: 0.6rem;
+  height: 0.6rem;
+  border-radius: 50%;
+  background: var(--fa-violet-500);
+  box-shadow: 0 0 10px var(--fa-violet-500);
+}
+
+.fa-notification-center__item-title {
+  font-weight: 700;
+}
