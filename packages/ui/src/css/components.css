@@ -1568,3 +1568,28 @@ select option,
 .fa-wireframe-section__body {
   padding: 0;
 }
+
+/* Budget residuo come tessera (asta e svincoli) */
+
+.fa-auction-panel__budget {
+  flex-direction: column;
+  gap: 0.15rem;
+  padding: var(--fa-space-md) var(--fa-space-lg);
+  border-radius: var(--fa-radius-lg);
+  background: color-mix(in srgb, var(--fa-brand-500) 10%, transparent);
+  border: 1px solid color-mix(in srgb, var(--fa-brand-500) 35%, transparent);
+}
+
+.fa-auction-panel__budget-label {
+  font-size: 0.72rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.fa-auction-panel__budget strong,
+.fa-auction-panel__budget span:last-child {
+  font-style: italic;
+  font-weight: 800;
+  font-size: 1.8rem;
+  line-height: 1.05;
+}
