@@ -393,6 +393,7 @@ export function AuctionLivePage() {
 
   // -- rilancio (qualunque partecipante) ---------------------------------------
 
+  const [customBid, setCustomBid] = useState("");
   const [raiseBusy, setRaiseBusy] = useState(false);
   const [raiseError, setRaiseError] = useState<string | null>(null);
 
@@ -601,18 +602,22 @@ export function AuctionLivePage() {
                 </p>
               ) : null}
 
+              <div className="fa-auction-live-layout">
+                <div className="fa-auction-live-stage">
               {currentSession.status === "open" ? (
-                <LiveAuctionTable
-                  teams={teams}
-                  currentLot={currentLot}
-                  secondsRemaining={secondsRemaining}
-                  currentTurnTeamId={currentTurnTeamId}
-                  myTeamId={myTeam?.id ?? null}
-                  nominationMode={currentSession.nominationMode}
-                  turnOrder={currentSession.turnOrder}
-                />
-              ) : null}
+                    <LiveAuctionTable
+                      teams={teams}
+                      currentLot={currentLot}
+                      secondsRemaining={secondsRemaining}
+                      currentTurnTeamId={currentTurnTeamId}
+                      myTeamId={myTeam?.id ?? null}
+                      nominationMode={currentSession.nominationMode}
+                      turnOrder={currentSession.turnOrder}
+                    />
+                  ) : null}
 
+                </div>
+                <div className="fa-auction-live-side">
               {isOperator && currentSession.status === "scheduled" ? (
                 <Button variant="primary" disabled={actionBusy || !marketOpen} onClick={handleStart}>
                   Avvia sessione
@@ -670,29 +675,70 @@ export function AuctionLivePage() {
               {actionError ? <UiStatePanel state="error" title="Operazione non riuscita" message={actionError} testId="auction-live-action-error" /> : null}
 
               {currentLot ? (
-                <Card data-testid="auction-live-current-lot">
+                <Card data-testid="auction-live-current-lot" className="fa-auction-live-lot">
                   <CardHeader>
                     <h3 className="fa-card__title">
-                      Lotto:{" "}
-                      <AthleteName athleteId={currentLot.athleteId}>{currentLot.athleteName}</AthleteName>
+                      Il tuo rilancio · <AthleteName athleteId={currentLot.athleteId}>{currentLot.athleteName}</AthleteName>
                     </h3>
                   </CardHeader>
                   <CardBody>
-                    <p>
-                      Prezzo attuale: <strong>{currentLot.currentAmountCredits}</strong> crediti
-                      {currentLot.currentLeaderTeamName ? ` · in testa: ${currentLot.currentLeaderTeamName}` : " · nessun rilancio"}
-                    </p>
-                    {secondsRemaining !== null ? <p data-testid="auction-live-countdown">Tempo residuo: {secondsRemaining}s</p> : null}
-                    <p>Budget residuo: {balance !== null ? `${balance} crediti` : "—"}</p>
+                    <div className="fa-auction-live-lot__summary">
+                      <p>
+                        Prezzo attuale: <strong>{currentLot.currentAmountCredits}</strong> crediti
+                        {currentLot.currentLeaderTeamName ? ` · in testa: ${currentLot.currentLeaderTeamName}` : " · nessun rilancio"}
+                      </p>
+                      {secondsRemaining !== null ? <p data-testid="auction-live-countdown">Tempo residuo: {secondsRemaining}s</p> : null}
+                    </div>
+                    <div className="fa-auction-live-lot__budget">
+                      <span>Budget residuo</span>
+                      <strong>{balance !== null ? `${balance} cr` : "—"}</strong>
+                    </div>
+
+                    {minimumNextBid !== null ? (
+                      <div className="fa-auction-live-quick" data-testid="auction-live-quick-raises">
+                        {[1, 5, 10].map((step) => {
+                          const amount = Math.max(minimumNextBid, currentLot.currentAmountCredits + step);
+                          return (
+                            <Button
+                              key={step}
+                              variant="secondary"
+                              disabled={raiseBusy || !marketOpen}
+                              onClick={() => handleRaise(amount)}
+                              aria-label={`Rilancia a ${amount}`}
+                            >
+                              +{step}
+                            </Button>
+                          );
+                        })}
+                      </div>
+                    ) : null}
+
+                    <Input
+                      label="Offerta personalizzata"
+                      name="custom-bid"
+                      type="number"
+                      min={minimumNextBid ?? 1}
+                      placeholder={minimumNextBid !== null ? `Es. ${minimumNextBid + 5}` : ""}
+                      value={customBid}
+                      onChange={(e) => setCustomBid(e.target.value)}
+                    />
 
                     <div className="fa-auction-live-actions" data-testid="auction-live-lot-actions">
                       <Button
                         variant="primary"
                         disabled={raiseBusy || minimumNextBid === null || !marketOpen}
-                        onClick={() => minimumNextBid !== null && handleRaise(minimumNextBid)}
+                        onClick={() => {
+                          const custom = Number(customBid);
+                          if (customBid && Number.isFinite(custom) && custom > 0) {
+                            handleRaise(custom);
+                            setCustomBid("");
+                          } else if (minimumNextBid !== null) {
+                            handleRaise(minimumNextBid);
+                          }
+                        }}
                         data-testid="auction-live-raise-min"
                       >
-                        Rilancia a {minimumNextBid ?? "—"}
+                        {customBid ? `Rilancia a ${customBid}` : `Rilancia a ${minimumNextBid ?? "—"}`}
                       </Button>
                       {isOperator ? (
                         <>
@@ -711,10 +757,11 @@ export function AuctionLivePage() {
                     {raiseError ? <UiStatePanel state="error" title="Rilancio non riuscito" message={raiseError} testId="auction-live-raise-error" /> : null}
 
                     {recentRaises.length > 0 ? (
-                      <ul data-testid="auction-live-recent-raises">
+                      <ul data-testid="auction-live-recent-raises" className="fa-auction-live-raises">
                         {recentRaises.map((raise) => (
                           <li key={raise.id}>
-                            {raise.fantasyTeamName}: {raise.amountCredits} crediti
+                            <span>{raise.fantasyTeamName}</span>
+                            <strong>{raise.amountCredits} cr</strong>
                           </li>
                         ))}
                       </ul>
@@ -724,7 +771,7 @@ export function AuctionLivePage() {
               ) : null}
 
               {lotHistory.length > 0 ? (
-                <div data-testid="auction-live-history">
+                <div data-testid="auction-live-history" className="fa-auction-live-history">
                   <h3>Storico lotti</h3>
                   <ul>
                     {lotHistory.map((lot) => (
@@ -737,6 +784,8 @@ export function AuctionLivePage() {
                   </ul>
                 </div>
               ) : null}
+                </div>
+              </div>
             </WireframeSection>
           ) : null}
         </div>
