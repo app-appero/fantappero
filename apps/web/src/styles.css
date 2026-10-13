@@ -2566,3 +2566,82 @@ h2 {
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+/* ── Asta live: tavolo scuro con lotto in evidenza ────────────────────── */
+
+.fa-live-auction-table__surface {
+  background: radial-gradient(ellipse at center, #12795a 0%, #0f6b4f 60%, #0a3f31 100%);
+  border: 6px solid rgba(255, 255, 255, 0.14);
+  box-shadow:
+    inset 0 0 0 2px rgba(255, 255, 255, 0.08),
+    0 30px 70px rgba(2, 6, 23, 0.45);
+}
+
+.fa-live-auction-table__center {
+  box-sizing: border-box;
+  width: 48%;
+  padding: var(--fa-space-md) var(--fa-space-lg);
+  border-radius: var(--fa-radius-xl);
+  background: rgba(8, 12, 30, 0.74);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  color: #ffffff;
+}
+
+.fa-live-auction-table__center a,
+.fa-live-auction-table__center button {
+  color: #ffffff;
+}
+
+.fa-live-auction-table__athlete {
+  font-style: italic;
+  font-weight: 800;
+  text-transform: uppercase;
+  font-size: 1.4rem;
+  line-height: 1.05;
+}
+
+.fa-live-auction-table__amount {
+  font-style: italic;
+  font-weight: 800;
+  font-size: 2.4rem;
+  line-height: 1.05;
+  background: linear-gradient(135deg, #7fa8ff, #b58cff 55%, #ff8fb8);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.fa-live-auction-table__countdown,
+.fa-live-auction-table__waiting {
+  color: #c3cce6;
+}
+
+.fa-live-auction-table__avatar {
+  background: #ffffff;
+  color: #0a0f22;
+  border-width: 4px;
+  font-style: italic;
+  font-weight: 800;
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.4);
+}
+
+.fa-live-auction-table__seat-name {
+  padding: 2px 8px;
+  border-radius: var(--fa-radius-pill);
+  background: rgba(8, 12, 30, 0.8);
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-shadow: none;
+}
+
+.fa-live-auction-table__you,
+.fa-live-auction-table__cue {
+  padding: 1px 8px;
+  border-radius: var(--fa-radius-pill);
+  background: rgba(8, 12, 30, 0.8);
+  text-shadow: none;
+}
+
+.fa-live-auction-table__cue {
+  color: #ffffff;
+}
