@@ -589,7 +589,7 @@ export function AuctionLiveScreen() {
 
 
           {currentLot ? (
-            <View style={styles.section} testID="auction-live-current-lot">
+            <View style={styles.lotCard} testID="auction-live-current-lot">
               <AthleteName athleteId={currentLot.athleteId} style={styles.sectionTitle} numberOfLines={2}>
                 {currentLot.athleteName}
               </AthleteName>
@@ -598,7 +598,29 @@ export function AuctionLiveScreen() {
                 {currentLot.currentLeaderTeamName ? ` · in testa: ${currentLot.currentLeaderTeamName}` : " · nessun rilancio"}
               </Text>
               {secondsRemaining !== null ? <Text style={styles.meta} testID="auction-live-countdown">Tempo residuo: {secondsRemaining}s</Text> : null}
-              <Text style={styles.meta}>Budget residuo: {balance !== null ? `${balance} crediti` : "—"}</Text>
+              <View style={styles.budgetTile}>
+                <Text style={styles.meta}>Budget residuo</Text>
+                <Text style={styles.budgetValue}>{balance !== null ? `${balance} cr` : "—"}</Text>
+              </View>
+              {minimumNextBid !== null ? (
+                <View style={styles.quickRow} testID="auction-live-quick-raises">
+                  {[1, 5, 10].map((step) => {
+                    const amount = Math.max(minimumNextBid, currentLot.currentAmountCredits + step);
+                    return (
+                      <Pressable
+                        key={step}
+                        accessibilityRole="button"
+                        accessibilityLabel={`Rilancia a ${amount}`}
+                        disabled={raiseBusy || !marketOpen}
+                        onPress={() => handleRaise(amount)}
+                        style={[styles.quickButton, (raiseBusy || !marketOpen) && styles.disabled]}
+                      >
+                        <Text style={styles.quickLabel}>+{step}</Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              ) : null}
 
               <View style={styles.lotActions} testID="auction-live-lot-actions">
                 <Pressable
@@ -641,7 +663,7 @@ export function AuctionLiveScreen() {
             <View testID="auction-live-history">
               <Text style={styles.sectionTitle}>Storico lotti</Text>
               {lotHistory.map((lot) => (
-                <View key={lot.id} style={{ flexDirection: "row", flexWrap: "wrap" }}>
+                <View key={lot.id} style={styles.historyRow}>
                   <AthleteName athleteId={lot.athleteId} style={styles.meta}>
                     {lot.athleteName}
                   </AthleteName>

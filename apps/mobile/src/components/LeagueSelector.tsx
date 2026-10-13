@@ -106,15 +106,15 @@ const styles = lazyStyles(() => StyleSheet.create({
     backgroundColor: colors.backgroundSubtle,
   },
   chipSelected: {
-    borderColor: colors.accent,
-    backgroundColor: colors.backgroundElevated,
+    borderColor: colors.brand,
+    backgroundColor: colors.brand,
   },
   chipLabel: {
     color: colors.foregroundMuted,
     fontSize: typography.fontSize.xs,
   },
   chipLabelSelected: {
-    color: colors.accent,
+    color: colors.onBrand,
     fontWeight: typography.fontWeight.semibold,
   },
 }));

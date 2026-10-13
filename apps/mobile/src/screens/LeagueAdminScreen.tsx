@@ -863,12 +863,12 @@ const styles = lazyStyles(() => StyleSheet.create({
     minHeight: 44,
     padding: spacing.md,
     borderRadius: radius.pill,
-    backgroundColor: colors.accent,
+    backgroundColor: colors.brand,
     alignItems: "center",
     justifyContent: "center",
   },
   primaryLabel: {
-    color: colors.accentContrast,
+    color: colors.onBrand,
     fontWeight: typography.fontWeight.semibold,
   },
   secondaryButton: {

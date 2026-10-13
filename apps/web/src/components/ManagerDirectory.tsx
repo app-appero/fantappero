@@ -283,6 +283,21 @@ export function CoachProfilePanel({
         </div>
       </header>
 
+      <ul className="fa-coach-profile__tiles" aria-label="Riepilogo">
+        <li>
+          <span>Leghe concluse</span>
+          <strong>{profile.concludedLeagues}</strong>
+        </li>
+        <li>
+          <span>Miglior piazzamento</span>
+          <strong>{profile.bestPosition !== null ? `${profile.bestPosition}º` : "—"}</strong>
+        </li>
+        <li>
+          <span>Iscritto da</span>
+          <strong>{profile.memberSince ?? "—"}</strong>
+        </li>
+      </ul>
+
       <p className="fa-coach-profile__summary" data-testid="coach-profile-summary">
         {profile.historySummary}
       </p>

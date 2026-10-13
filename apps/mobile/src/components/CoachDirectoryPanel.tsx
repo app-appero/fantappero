@@ -362,7 +362,7 @@ const styles = lazyStyles(() => StyleSheet.create({
     padding: spacing.md,
     borderWidth: 1,
     borderColor: colors.border,
-    borderRadius: radius.md,
+    borderRadius: radius.xl,
     backgroundColor: colors.backgroundElevated,
     flexDirection: "row",
     alignItems: "center",
@@ -385,13 +385,13 @@ const styles = lazyStyles(() => StyleSheet.create({
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
     borderRadius: radius.pill,
-    backgroundColor: colors.accent,
+    backgroundColor: colors.brand,
   },
   buttonDisabled: {
     opacity: 0.55,
   },
   buttonLabel: {
-    color: colors.accentContrast,
+    color: colors.onBrand,
     fontWeight: typography.fontWeight.semibold,
   },
   retry: {
@@ -414,10 +414,13 @@ const styles = lazyStyles(() => StyleSheet.create({
     borderRadius: 20,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: colors.accentMuted,
+    backgroundColor: colors.brand,
+    borderWidth: 2,
+    borderColor: colors.accentSecondary,
   },
   avatarInitial: {
-    fontWeight: typography.fontWeight.semibold,
-    color: colors.background,
+    fontWeight: "800",
+    fontStyle: "italic",
+    color: colors.onBrand,
   },
 }));

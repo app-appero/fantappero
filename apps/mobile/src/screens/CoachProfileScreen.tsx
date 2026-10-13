@@ -159,6 +159,11 @@ const styles = lazyStyles(() => StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: spacing.md,
+    padding: spacing.lg,
+    borderRadius: radius.xl,
+    borderWidth: 2,
+    borderColor: colors.accentSecondary,
+    backgroundColor: colors.backgroundElevated,
   },
   avatarImage: {
     width: 56,
@@ -171,12 +176,15 @@ const styles = lazyStyles(() => StyleSheet.create({
     borderRadius: 28,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: colors.accentMuted,
+    backgroundColor: colors.brand,
+    borderWidth: 2,
+    borderColor: colors.accentSecondary,
   },
   avatarInitial: {
     fontSize: typography.fontSize.lg,
-    fontWeight: typography.fontWeight.semibold,
-    color: colors.background,
+    fontWeight: "800",
+    fontStyle: "italic",
+    color: colors.onBrand,
   },
   headerText: {
     flex: 1,
@@ -184,8 +192,10 @@ const styles = lazyStyles(() => StyleSheet.create({
   },
   name: {
     color: colors.foreground,
-    fontSize: typography.fontSize.lg,
-    fontWeight: typography.fontWeight.semibold,
+    fontSize: typography.fontSize.xl,
+    fontWeight: "800",
+    fontStyle: "italic",
+    textTransform: "uppercase",
   },
   badgeRow: {
     flexDirection: "row",

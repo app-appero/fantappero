@@ -80,7 +80,8 @@ export function AuthRegisterScreen() {
           </>
         ) : (
           <>
-            <Text style={styles.lead}>Crea il tuo account FantApperò.</Text>
+            <Text style={styles.heroTitleLeft}>Crea la tua squadra</Text>
+            <Text style={styles.lead}>Gratis, in meno di un minuto. Passo 1 di 3.</Text>
             {error ? (
               <UiStatePanel
                 state="error"
@@ -142,7 +143,7 @@ export function AuthRegisterScreen() {
               testID="auth-register-submit"
             >
               <Text style={styles.primaryLabel}>
-                {submitting ? "Registrazione…" : "Registrati"}
+                {submitting ? "Registrazione…" : "Crea account"}
               </Text>
             </Pressable>
             <Pressable
