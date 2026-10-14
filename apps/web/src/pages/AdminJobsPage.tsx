@@ -2,9 +2,6 @@ import type { SystemJob } from "@fantappero/contracts";
 import {
   Breadcrumb,
   Button,
-  Card,
-  CardBody,
-  CardHeader,
   Input,
   PageContainer,
   Select,
@@ -59,6 +56,36 @@ function formatBound(seconds: number): string {
   const { amount, unit } = splitInterval(seconds);
   const label = UNIT_OPTIONS.find((option) => option.value === unit)?.label ?? unit;
   return `${amount} ${label}`;
+}
+
+/** Quanto manca alla prossima partenza, in percentuale tra ultima e prossima esecuzione. */
+function progressPercent(job: SystemJob): number {
+  if (!job.enabled || !job.lastStartedAt || !job.nextRunAt) {
+    return 0;
+  }
+  const start = new Date(job.lastStartedAt).getTime();
+  const end = new Date(job.nextRunAt).getTime();
+  if (!(end > start)) {
+    return 0;
+  }
+  return Math.min(100, Math.max(0, Math.round(((Date.now() - start) / (end - start)) * 100)));
+}
+
+function formatTimeUntil(value: string | null): string {
+  if (!value) {
+    return "—";
+  }
+  const minutes = Math.round((new Date(value).getTime() - Date.now()) / 60000);
+  if (minutes <= 0) {
+    return "ora";
+  }
+  if (minutes < 60) {
+    return `${minutes} min`;
+  }
+  if (minutes < 1440) {
+    return `${Math.round(minutes / 60)} h`;
+  }
+  return `${Math.round(minutes / 1440)} g`;
 }
 
 export function AdminJobsPage() {
@@ -161,45 +188,98 @@ export function AdminJobsPage() {
         <Breadcrumb items={[{ label: "Operazioni", href: "/admin" }, { label: "Job automatici" }]} />
       }
     >
-      <Card data-testid="admin-jobs">
-        <CardHeader title="Cosa parte da solo" />
-        <CardBody>
-          <p>
-            Questi giri non aspettano un pulsante. Puoi spegnerli o cambiare ogni quanto
-            partono: il beat legge la modifica da solo, senza un nuovo deploy. La prossima
-            partenza è calcolata dall’ultima esecuzione più la frequenza.
-          </p>
-          {loading ? (
-            <UiStatePanel state="loading" title="Caricamento job" message="Lettura dello schedule…" testId="admin-jobs-loading" />
-          ) : null}
-          {loadError ? (
-            <UiStatePanel state="error" title="Job non disponibili" message={loadError} testId="admin-jobs-error" />
-          ) : null}
-          {rowError ? (
-            <UiStatePanel state="error" title="Modifica non salvata" message={rowError} testId="admin-jobs-row-error" />
-          ) : null}
+      <div className="fa-jobs" data-testid="admin-jobs">
+        <p className="fa-jobs__intro">
+          Questi giri non aspettano un pulsante. Puoi spegnerli o cambiare ogni quanto partono: il
+          beat legge la modifica da solo, senza un nuovo deploy. La prossima partenza è calcolata
+          dall’ultima esecuzione più la frequenza.
+        </p>
+        {loading ? (
+          <UiStatePanel state="loading" title="Caricamento job" message="Lettura dello schedule…" testId="admin-jobs-loading" />
+        ) : null}
+        {loadError ? (
+          <UiStatePanel state="error" title="Job non disponibili" message={loadError} testId="admin-jobs-error" />
+        ) : null}
+        {rowError ? (
+          <UiStatePanel state="error" title="Modifica non salvata" message={rowError} testId="admin-jobs-row-error" />
+        ) : null}
+        {!loading && !loadError && jobs.length > 0 ? (
+          <ul className="fa-jobs__tiles" aria-label="Riepilogo job">
+            <li>
+              <span>Attivi</span>
+              <strong>
+                {jobs.filter((job) => job.enabled).length} / {jobs.length}
+              </strong>
+              <small>{jobs.filter((job) => !job.enabled).length === 1 ? "1 spento" : `${jobs.filter((job) => !job.enabled).length} spenti`}</small>
+            </li>
+            {(() => {
+              const next = jobs
+                .filter((job) => job.enabled && job.nextRunAt)
+                .sort((x, y) => new Date(x.nextRunAt as string).getTime() - new Date(y.nextRunAt as string).getTime())[0];
+              return (
+                <li>
+                  <span>Prossimo giro</span>
+                  <strong>{next ? formatTimeUntil(next.nextRunAt) : "—"}</strong>
+                  <small>{next ? next.title : "Nessun job attivo"}</small>
+                </li>
+              );
+            })()}
+          </ul>
+        ) : null}
+        <div className="fa-jobs__grid">
           {!loading && !loadError
             ? jobs.map((job) => {
-                const draft = drafts[job.key] ?? splitInterval(job.intervalSeconds);
+                const fallback = splitInterval(job.intervalSeconds);
+                const draft = drafts[job.key] ?? { amount: String(fallback.amount), unit: fallback.unit };
                 const busy = rowBusy === job.key;
                 return (
-                  <article key={job.key} data-testid={`admin-job-${job.key}`} style={{ marginTop: 16 }}>
-                    <h3 style={{ marginBottom: 4 }}>{job.title}</h3>
-                    <p style={{ marginTop: 0 }}>{job.description}</p>
-                    <Switch
-                      checked={job.enabled}
-                      disabled={busy}
-                      onCheckedChange={(enabled) => void onToggle(job, enabled)}
-                      statusLabel={job.enabled ? "Attivo" : "Spento"}
-                      ariaLabel={`${job.title}: ${job.enabled ? "attivo" : "spento"}`}
-                      testId={`admin-job-enabled-${job.key}`}
-                    />
-                    <p>
-                      Ultima partenza: {formatDateTime(job.lastStartedAt)}
-                      {" · "}
-                      Prossima partenza: {job.enabled ? formatDateTime(job.nextRunAt) : "Spento"}
-                    </p>
-                    <div className="fa-ds-showcase__row">
+                  <article
+                    key={job.key}
+                    data-testid={`admin-job-${job.key}`}
+                    className={job.enabled ? "fa-job" : "fa-job fa-job--off"}
+                  >
+                    <header className="fa-job__head">
+                      <div>
+                        <h3 className="fa-job__title">
+                          {job.title}{" "}
+                          <span className={job.enabled ? "fa-job__chip fa-job__chip--on" : "fa-job__chip"}>
+                            {job.enabled ? "Attivo" : "Spento"}
+                          </span>
+                        </h3>
+                        <p className="fa-job__desc">{job.description}</p>
+                      </div>
+                      <Switch
+                        checked={job.enabled}
+                        disabled={busy}
+                        onCheckedChange={(enabled) => void onToggle(job, enabled)}
+                        statusLabel={job.enabled ? "Attivo" : "Spento"}
+                        ariaLabel={`${job.title}: ${job.enabled ? "attivo" : "spento"}`}
+                        testId={`admin-job-enabled-${job.key}`}
+                      />
+                    </header>
+                    <div className="fa-job__times">
+                      <div>
+                        <span>Ultima partenza</span>
+                        <strong>{formatDateTime(job.lastStartedAt)}</strong>
+                      </div>
+                      <div className={job.enabled ? "fa-job__next" : undefined}>
+                        <span>Prossima partenza</span>
+                        <strong>{job.enabled ? formatDateTime(job.nextRunAt) : "Spento"}</strong>
+                      </div>
+                    </div>
+                    {job.enabled ? (
+                      <div
+                        className="fa-job__bar"
+                        role="progressbar"
+                        aria-label="Tempo alla prossima partenza"
+                        aria-valuemin={0}
+                        aria-valuemax={100}
+                        aria-valuenow={progressPercent(job)}
+                      >
+                        <span style={{ width: `${progressPercent(job)}%` }} />
+                      </div>
+                    ) : null}
+                    <div className="fa-job__form">
                       <Input
                         label="Ogni"
                         name={`admin-job-amount-${job.key}`}
@@ -242,15 +322,15 @@ export function AdminJobsPage() {
                         Salva frequenza
                       </Button>
                     </div>
-                    <p className="fa-matchday-hint">
+                    <p className="fa-job__range">
                       Ammesso tra {formatBound(job.minIntervalSeconds)} e {formatBound(job.maxIntervalSeconds)}.
                     </p>
                   </article>
                 );
               })
             : null}
-        </CardBody>
-      </Card>
+        </div>
+      </div>
     </PageContainer>
   );
 }
