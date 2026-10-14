@@ -109,6 +109,8 @@ class TacticalMoveResponse(ApiModel):
 
 class LineupContextResponse(ApiModel):
     league_id: str = Field(alias="leagueId")
+    fantasy_team_id: str = Field(alias="fantasyTeamId")
+    team_name: str = Field(alias="teamName")
     round_id: str = Field(alias="roundId")
     round_number: int = Field(alias="roundNumber")
     kind: str

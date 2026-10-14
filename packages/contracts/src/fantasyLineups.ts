@@ -142,6 +142,9 @@ export interface TacticalMoveEvaluation {
 
 export interface LineupContext {
   leagueId: string;
+  /** Squadra a cui appartiene questa formazione. Assente solo nelle risposte vecchie. */
+  fantasyTeamId?: string;
+  teamName?: string;
   roundId: string;
   roundNumber: number;
   kind: string;

@@ -44,8 +44,18 @@ function parseUrl(name: string, value: string): string {
 }
 
 export function loadMobileEnv(
-  source: Record<string, string | undefined> = process.env as Record<string, string | undefined>,
+  overrides?: Record<string, string | undefined>,
 ): MobileEnv {
+  // Babel/Metro incorporano `process.env.EXPO_PUBLIC_*` solo quando compare
+  // testualmente così nel codice: un alias generico su `process.env` (com'era
+  // prima) non viene mai sostituito, quindi in release/Hermes risultava sempre
+  // vuoto. `overrides` serve solo ai test, per restare deterministici.
+  const source = overrides ?? {
+    EXPO_PUBLIC_API_BASE_URL: process.env.EXPO_PUBLIC_API_BASE_URL,
+    EXPO_PUBLIC_GOOGLE_CLIENT_ID_WEB: process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID_WEB,
+    EXPO_PUBLIC_GOOGLE_CLIENT_ID_ANDROID: process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID_ANDROID,
+    EXPO_PUBLIC_WEB_BASE_URL: process.env.EXPO_PUBLIC_WEB_BASE_URL,
+  };
   const text = source.EXPO_PUBLIC_API_BASE_URL?.trim() ?? "";
   if (!text) {
     throw new MobileEnvError(

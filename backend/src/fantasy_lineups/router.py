@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
+from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Query, status
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
@@ -41,6 +42,10 @@ from observability.context import get_correlation_id
 router = APIRouter(prefix="/leagues", tags=["fantasy-lineups"])
 effective_lineup_router = APIRouter(prefix="/fantasy-lineups", tags=["fantasy-lineups"])
 
+# Il client (web e mobile) manda `?teamId=`. Senza alias FastAPI legge solo
+# `team_id`, ignora il parametro e ricade sempre sulla squadra del chiamante.
+LineupTeamId = Annotated[UUID | None, Query(alias="teamId")]
+
 
 def _error_response(exc: AuthError) -> JSONResponse:
     return JSONResponse(
@@ -61,7 +66,7 @@ def get_fantasy_lineup_service(
 )
 def get_my_lineup(
     round_id: UUID,
-    team_id: UUID | None = None,
+    team_id: LineupTeamId = None,
     league_access: LeagueAccess = Depends(require_league_permissions(Permission.ROSTER_VIEW)),
     service: FantasyLineupService = Depends(get_fantasy_lineup_service),
 ) -> LineupContextResponse | JSONResponse:
@@ -99,7 +104,7 @@ def get_my_lock_countdown(
 def save_my_lineup(
     round_id: UUID,
     body: SaveLineupRequest,
-    team_id: UUID | None = None,
+    team_id: LineupTeamId = None,
     league_access: LeagueAccess = Depends(require_league_permissions(Permission.ROSTER_EDIT)),
     service: FantasyLineupService = Depends(get_fantasy_lineup_service),
 ) -> LineupContextResponse | JSONResponse:
@@ -116,7 +121,7 @@ def save_my_lineup(
 )
 def copy_previous_lineup_to_draft(
     round_id: UUID,
-    team_id: UUID | None = None,
+    team_id: LineupTeamId = None,
     league_access: LeagueAccess = Depends(require_league_permissions(Permission.ROSTER_EDIT)),
     service: FantasyLineupService = Depends(get_fantasy_lineup_service),
 ) -> LineupContextResponse | JSONResponse:
@@ -133,7 +138,7 @@ def copy_previous_lineup_to_draft(
 )
 def apply_best_lineup(
     round_id: UUID,
-    team_id: UUID | None = None,
+    team_id: LineupTeamId = None,
     league_access: LeagueAccess = Depends(require_league_permissions(Permission.ROSTER_EDIT)),
     service: FantasyLineupService = Depends(get_fantasy_lineup_service),
 ) -> LineupContextResponse | JSONResponse:
@@ -151,7 +156,7 @@ def apply_best_lineup(
 def save_my_lineup_draft(
     round_id: UUID,
     body: SaveLineupDraftRequest,
-    team_id: UUID | None = None,
+    team_id: LineupTeamId = None,
     league_access: LeagueAccess = Depends(require_league_permissions(Permission.ROSTER_EDIT)),
     service: FantasyLineupService = Depends(get_fantasy_lineup_service),
 ) -> LineupContextResponse | JSONResponse:

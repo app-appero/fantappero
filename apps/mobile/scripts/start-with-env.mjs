@@ -87,6 +87,7 @@ function runExpo(appRoot, env) {
     cwd: appRoot,
     env: { ...process.env, ...env, ...launch.env },
     stdio: "inherit",
+    shell: process.platform === "win32",
   });
   child.on("exit", (code, signal) => {
     if (signal) {
