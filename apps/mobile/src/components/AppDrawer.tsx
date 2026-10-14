@@ -106,7 +106,7 @@ export function AppDrawer({
         style={[styles.row, nested && styles.rowNested, active && styles.rowActive]}
         testID={`app-drawer-item-${item.id}`}
       >
-        <NavIcon id={item.id} color={active ? colors.accent : colors.foregroundMuted} size={20} />
+        <NavIcon id={item.id} color={active ? colors.onBrand : colors.foregroundMuted} size={20} />
         <Text style={[styles.rowLabel, active && styles.rowLabelActive]}>{item.label}</Text>
         {item.id === "received-invites" && pendingInviteCount > 0 ? (
           <Text
@@ -316,7 +316,7 @@ const styles = lazyStyles(() => StyleSheet.create({
     marginLeft: spacing.md,
   },
   rowActive: {
-    backgroundColor: colors.background,
+    backgroundColor: colors.brand,
   },
   rowLabel: {
     color: colors.foreground,
@@ -337,7 +337,7 @@ const styles = lazyStyles(() => StyleSheet.create({
     overflow: "hidden",
   },
   rowLabelActive: {
-    color: colors.accent,
+    color: colors.onBrand,
   },
   group: {
     gap: spacing.xs,

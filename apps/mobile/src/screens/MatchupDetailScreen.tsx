@@ -324,7 +324,7 @@ const styles = lazyStyles(() => StyleSheet.create({
     gap: spacing.xs,
     borderWidth: 1,
     borderColor: colors.border,
-    borderRadius: radius.md,
+    borderRadius: radius.xl,
     paddingHorizontal: spacing.sm,
     paddingVertical: spacing.xs,
   },
@@ -355,7 +355,7 @@ const styles = lazyStyles(() => StyleSheet.create({
   side: {
     borderWidth: 1,
     borderColor: colors.border,
-    borderRadius: radius.md,
+    borderRadius: radius.xl,
     padding: spacing.md,
     gap: spacing.xs,
     backgroundColor: colors.backgroundElevated,

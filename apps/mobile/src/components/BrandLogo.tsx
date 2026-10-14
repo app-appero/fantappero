@@ -1,4 +1,3 @@
-import { fonts } from "../theme/fonts";
 import { lazyStyles } from "../theme/lazyStyles";
 import { StyleSheet, Text, View, type ViewProps } from "react-native";
 import { theme } from "@fantappero/ui/theme";
@@ -86,22 +85,24 @@ const styles = lazyStyles(() => StyleSheet.create({
     flexShrink: 0,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: colors.accent,
+    backgroundColor: colors.brand,
   },
   markLetter: {
-    color: colors.accentContrast,
-    fontFamily: fonts.display,
+    color: colors.onBrand,
+    fontStyle: "italic",
+    fontWeight: "800",
     includeFontPadding: false,
   },
   markBall: {
     position: "absolute",
     borderRadius: 999,
     borderWidth: 1.5,
-    borderColor: colors.accentContrast,
+    borderColor: colors.onBrand,
   },
   wordmark: {
     color: colors.foreground,
-    fontFamily: fonts.display,
+    fontStyle: "italic",
+    fontWeight: "800",
     letterSpacing: 0.4,
     textTransform: "uppercase",
     flexShrink: 1,

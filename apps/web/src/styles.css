@@ -2215,3 +2215,1074 @@ h2 {
   font-size: 1.75rem;
   line-height: 1.05;
 }
+
+/* ── Formazione: titolari e panchina come card ────────────────────────── */
+
+.fa-formation-layout__editor,
+.fa-formation-layout__benches > div {
+  padding: var(--fa-space-lg);
+  border-radius: var(--fa-radius-xl);
+  background: var(--fa-color-background-elevated);
+  border: 1px solid var(--fa-color-border);
+}
+
+.fa-formation-layout__editor {
+  gap: var(--fa-space-sm);
+}
+
+.fa-formation-layout__section-title {
+  font-family: var(--fa-font-display, inherit);
+  font-style: italic;
+  font-weight: 800;
+  text-transform: uppercase;
+  font-size: 1.4rem;
+  line-height: 1.1;
+}
+
+.fa-starter-slot__label {
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.fa-starter-slot__trigger {
+  min-height: 2.5rem;
+}
+
+.fa-starter-slot__list {
+  padding: var(--fa-space-xs);
+  border-radius: var(--fa-radius-lg);
+  box-shadow: 0 18px 40px rgba(2, 6, 23, 0.35);
+}
+
+.fa-starter-slot__option {
+  border-radius: var(--fa-radius-md);
+}
+
+.fa-starter-slot__option:hover {
+  background: color-mix(in srgb, var(--fa-brand-500) 18%, var(--fa-color-input-bg));
+}
+
+.fa-starter-slot__option[aria-selected="true"] {
+  background: var(--fa-gradient-accent);
+  color: var(--fa-color-on-brand);
+  font-weight: 600;
+}
+
+.fa-bench-order__row {
+  padding: var(--fa-space-xs) var(--fa-space-sm);
+  border: 1px solid var(--fa-color-border);
+  border-radius: var(--fa-radius-lg);
+  background: color-mix(in srgb, var(--fa-color-foreground) 4%, transparent);
+}
+
+.fa-bench-order {
+  gap: var(--fa-space-sm);
+}
+
+/* ── Rosa: tessere riepilogo e gruppi per ruolo come card ─────────────── */
+
+.fa-roster-credits-bar__balance,
+[data-testid="roster-summary"] {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  margin: 0 var(--fa-space-sm) var(--fa-space-md) 0;
+  padding: var(--fa-space-md) var(--fa-space-lg);
+  min-width: 11rem;
+  border-radius: var(--fa-radius-lg);
+  background: var(--fa-color-background-elevated);
+  border: 1px solid var(--fa-color-border);
+  color: var(--fa-color-foreground-muted);
+  font-size: 0.8rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.fa-roster-credits-bar__balance strong {
+  color: var(--fa-color-foreground);
+  font-style: italic;
+  font-weight: 800;
+  font-size: 2rem;
+  letter-spacing: 0;
+  line-height: 1.05;
+}
+
+[data-testid="roster-composition"] p {
+  margin: 0 0 var(--fa-space-sm);
+}
+
+[data-testid="roster-composition-counts"] {
+  color: var(--fa-color-foreground-muted);
+  font-size: 0.9rem;
+}
+
+.fa-roster-role-tables > * {
+  padding: var(--fa-space-lg);
+  border-radius: var(--fa-radius-xl);
+  background: var(--fa-color-background-elevated);
+  border: 1px solid var(--fa-color-border);
+}
+
+.fa-roster-role-tables > * {
+  box-sizing: border-box;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.fa-roster-role-tables .fa-table-wrap {
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+/* ── Inviti ricevuti ─────────────────────────────────────────────────── */
+
+.fa-received-invites__item {
+  padding: var(--fa-space-lg);
+  border-radius: var(--fa-radius-xl);
+}
+
+.fa-received-invites__avatar {
+  flex: 0 0 auto;
+  width: 3.25rem;
+  height: 3.25rem;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: var(--fa-gradient-accent);
+  color: var(--fa-color-on-brand);
+  font-style: italic;
+  font-weight: 800;
+  font-size: 1.4rem;
+}
+
+.fa-received-invites__text {
+  flex: 1;
+  min-width: 10rem;
+}
+
+.fa-received-invites__text strong {
+  font-size: 1.15rem;
+}
+
+/* ── Profilo: due colonne, tema a pillole, interruttori ───────────────── */
+
+@media (min-width: 64rem) {
+  .fa-profile-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: start;
+  }
+
+  .fa-profile-grid > :nth-child(2) {
+    grid-row: span 2;
+  }
+}
+
+[data-testid="profile-theme"] {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 4px;
+  border-radius: var(--fa-radius-pill);
+  border: 1px solid var(--fa-color-border);
+  background: color-mix(in srgb, var(--fa-color-foreground) 5%, transparent);
+}
+
+[data-testid="profile-theme"] {
+  width: fit-content;
+}
+
+[data-testid="profile-theme"] legend,
+[data-testid="profile-theme"] .fa-field__hint {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+[data-testid="profile-theme"] .fa-profile-checkbox {
+  position: relative;
+  padding: 0.55rem 1.1rem;
+  border-radius: var(--fa-radius-pill);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+[data-testid="profile-theme"] .fa-profile-checkbox input {
+  position: absolute;
+  opacity: 0;
+  inset: 0;
+  cursor: pointer;
+}
+
+[data-testid="profile-theme"] .fa-profile-checkbox:has(input:checked) {
+  background: var(--fa-gradient-accent);
+  color: var(--fa-color-on-brand);
+}
+
+[data-testid="profile-theme"] .fa-profile-checkbox:has(input:focus-visible) {
+  box-shadow: var(--fa-shadow-focus);
+}
+
+.fa-profile-checkbox input[type="checkbox"] {
+  appearance: none;
+  -webkit-appearance: none;
+  flex: 0 0 auto;
+  width: 2.6rem;
+  height: 1.5rem;
+  border-radius: var(--fa-radius-pill);
+  background: color-mix(in srgb, var(--fa-color-foreground) 22%, transparent);
+  position: relative;
+  cursor: pointer;
+  transition: background-color var(--fa-duration-fast) var(--fa-easing-standard);
+}
+
+.fa-profile-checkbox input[type="checkbox"]::after {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 1.1rem;
+  height: 1.1rem;
+  border-radius: 50%;
+  background: #ffffff;
+  transition: transform var(--fa-duration-fast) var(--fa-easing-standard);
+}
+
+.fa-profile-checkbox input[type="checkbox"]:checked {
+  background: var(--fa-gradient-accent);
+}
+
+.fa-profile-checkbox input[type="checkbox"]:checked::after {
+  transform: translateX(1.1rem);
+}
+
+.fa-profile-checkbox input[type="checkbox"]:focus-visible {
+  box-shadow: var(--fa-shadow-focus);
+}
+
+/* ── Amministrazione lega ─────────────────────────────────────────────── */
+
+.fa-league-admin-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--fa-space-md) var(--fa-space-lg);
+  align-items: start;
+}
+
+.fa-league-admin-form > .fa-field-hint,
+.fa-league-admin-form > fieldset,
+.fa-league-admin-form > .fa-ds-showcase__row {
+  grid-column: 1 / -1;
+}
+
+.fa-league-admin-form > .fa-field-hint {
+  margin: calc(var(--fa-space-sm) * -1) 0 0;
+  color: var(--fa-color-foreground-muted);
+  font-size: 0.85rem;
+}
+
+.fa-league-admin-form fieldset {
+  margin: 0 !important;
+  padding: var(--fa-space-lg);
+  border: 1px solid var(--fa-color-border);
+  border-radius: var(--fa-radius-xl);
+  background: var(--fa-color-background-elevated);
+  display: grid;
+  gap: var(--fa-space-md);
+}
+
+.fa-league-admin-form legend {
+  padding: 0 var(--fa-space-sm);
+  font-style: italic;
+  font-weight: 800;
+  text-transform: uppercase;
+  font-size: 1.1rem;
+}
+
+.fa-league-admin-form fieldset label {
+  display: flex;
+  align-items: center;
+  gap: var(--fa-space-md);
+}
+
+.fa-league-admin-form input[type="checkbox"],
+.fa-league-delete input[type="checkbox"] {
+  appearance: none;
+  -webkit-appearance: none;
+  flex: 0 0 auto;
+  width: 2.6rem;
+  height: 1.5rem;
+  border-radius: var(--fa-radius-pill);
+  background: color-mix(in srgb, var(--fa-color-foreground) 22%, transparent);
+  position: relative;
+  cursor: pointer;
+  transition: background-color var(--fa-duration-fast) var(--fa-easing-standard);
+}
+
+.fa-league-admin-form input[type="checkbox"]::after,
+.fa-league-delete input[type="checkbox"]::after {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 1.1rem;
+  height: 1.1rem;
+  border-radius: 50%;
+  background: #ffffff;
+  transition: transform var(--fa-duration-fast) var(--fa-easing-standard);
+}
+
+.fa-league-admin-form input[type="checkbox"]:checked {
+  background: var(--fa-gradient-accent);
+}
+
+.fa-league-delete input[type="checkbox"]:checked {
+  background: var(--fa-color-danger);
+}
+
+.fa-league-admin-form input[type="checkbox"]:checked::after,
+.fa-league-delete input[type="checkbox"]:checked::after {
+  transform: translateX(1.1rem);
+}
+
+.fa-league-delete {
+  margin-top: var(--fa-space-xl);
+  padding: var(--fa-space-lg);
+  border-radius: var(--fa-radius-xl);
+  border: 1px solid color-mix(in srgb, var(--fa-color-danger) 55%, transparent);
+  background: color-mix(in srgb, var(--fa-color-danger) 7%, transparent);
+}
+
+.fa-league-delete label {
+  display: flex;
+  align-items: center;
+  gap: var(--fa-space-md);
+}
+
+@media (max-width: 767px) {
+  .fa-league-admin-form {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* ── Asta live: tavolo scuro con lotto in evidenza ────────────────────── */
+
+.fa-live-auction-table__surface {
+  background: radial-gradient(ellipse at center, #12795a 0%, #0f6b4f 60%, #0a3f31 100%);
+  border: 6px solid rgba(255, 255, 255, 0.14);
+  box-shadow:
+    inset 0 0 0 2px rgba(255, 255, 255, 0.08),
+    0 30px 70px rgba(2, 6, 23, 0.45);
+}
+
+.fa-live-auction-table__center {
+  box-sizing: border-box;
+  width: 48%;
+  padding: var(--fa-space-md) var(--fa-space-lg);
+  border-radius: var(--fa-radius-xl);
+  background: rgba(8, 12, 30, 0.74);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  color: #ffffff;
+}
+
+.fa-live-auction-table__center a,
+.fa-live-auction-table__center button {
+  color: #ffffff;
+}
+
+.fa-live-auction-table__athlete {
+  font-style: italic;
+  font-weight: 800;
+  text-transform: uppercase;
+  font-size: 1.4rem;
+  line-height: 1.05;
+}
+
+.fa-live-auction-table__amount {
+  font-style: italic;
+  font-weight: 800;
+  font-size: 2.4rem;
+  line-height: 1.05;
+  background: linear-gradient(135deg, #7fa8ff, #b58cff 55%, #ff8fb8);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.fa-live-auction-table__countdown,
+.fa-live-auction-table__waiting {
+  color: #c3cce6;
+}
+
+.fa-live-auction-table__avatar {
+  background: #ffffff;
+  color: #0a0f22;
+  border-width: 4px;
+  font-style: italic;
+  font-weight: 800;
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.4);
+}
+
+.fa-live-auction-table__seat-name {
+  padding: 2px 8px;
+  border-radius: var(--fa-radius-pill);
+  background: rgba(8, 12, 30, 0.8);
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-shadow: none;
+}
+
+.fa-live-auction-table__you,
+.fa-live-auction-table__cue {
+  padding: 1px 8px;
+  border-radius: var(--fa-radius-pill);
+  background: rgba(8, 12, 30, 0.8);
+  text-shadow: none;
+}
+
+.fa-live-auction-table__cue {
+  color: #ffffff;
+}
+
+@media (max-width: 600px) {
+  .fa-live-auction-table__surface {
+    aspect-ratio: 1 / 1.05;
+  }
+
+  .fa-live-auction-table__center {
+    width: 52%;
+    padding: var(--fa-space-sm) var(--fa-space-md);
+  }
+
+  .fa-live-auction-table__athlete {
+    font-size: 1.05rem;
+  }
+
+  .fa-live-auction-table__amount {
+    font-size: 1.7rem;
+  }
+}
+
+/* ── Asta live: tavolo a sinistra, pannelli a destra ──────────────────── */
+
+.fa-auction-live-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.5fr) minmax(18rem, 1fr);
+  gap: var(--fa-space-lg);
+  align-items: start;
+}
+
+.fa-auction-live-stage {
+  padding: var(--fa-space-lg) var(--fa-space-md);
+  border-radius: var(--fa-radius-xl);
+  background: var(--fa-color-background-elevated);
+  border: 1px solid var(--fa-color-border);
+}
+
+.fa-auction-live-side {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fa-space-lg);
+  min-width: 0;
+}
+
+.fa-auction-live-side > * {
+  margin: 0;
+}
+
+.fa-auction-live-lot__summary p {
+  margin: 0 0 var(--fa-space-xs);
+}
+
+.fa-auction-live-lot__budget {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin: var(--fa-space-md) 0;
+  padding: var(--fa-space-md) var(--fa-space-lg);
+  border-radius: var(--fa-radius-lg);
+  background: color-mix(in srgb, var(--fa-brand-500) 10%, transparent);
+  border: 1px solid color-mix(in srgb, var(--fa-brand-500) 35%, transparent);
+}
+
+.fa-auction-live-lot__budget span {
+  color: var(--fa-color-foreground-muted);
+}
+
+.fa-auction-live-lot__budget strong {
+  font-style: italic;
+  font-weight: 800;
+  font-size: 1.8rem;
+  line-height: 1;
+}
+
+.fa-auction-live-quick {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--fa-space-sm);
+  margin-bottom: var(--fa-space-md);
+}
+
+.fa-auction-live-quick .fa-btn {
+  font-weight: 700;
+}
+
+.fa-auction-live-raises,
+.fa-auction-live-history ul {
+  list-style: none;
+  margin: var(--fa-space-md) 0 0;
+  padding: 0;
+}
+
+.fa-auction-live-raises li,
+.fa-auction-live-history li {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--fa-space-md);
+  padding: var(--fa-space-sm) 0;
+  border-top: 1px solid var(--fa-color-border);
+}
+
+.fa-auction-live-history {
+  padding: var(--fa-space-lg);
+  border-radius: var(--fa-radius-xl);
+  background: var(--fa-color-background-elevated);
+  border: 1px solid var(--fa-color-border);
+}
+
+.fa-auction-live-history h3 {
+  margin: 0;
+  font-style: italic;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+@media (max-width: 64rem) {
+  .fa-auction-live-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* ── Scambi: proposte come card ───────────────────────────────────────── */
+
+.fa-trade-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(20rem, 1fr));
+  gap: var(--fa-space-md);
+  align-items: start;
+}
+
+.fa-trade-card {
+  display: grid;
+  gap: var(--fa-space-sm);
+  padding: var(--fa-space-lg);
+  border-radius: var(--fa-radius-xl);
+  background: var(--fa-color-background-elevated);
+  border: 1px solid var(--fa-color-border);
+}
+
+.fa-trade-card p {
+  margin: 0;
+}
+
+.fa-trade-card__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--fa-space-sm);
+  flex-wrap: wrap;
+  font-weight: 700;
+  font-size: 1.05rem;
+}
+
+.fa-trade-card__side {
+  padding: var(--fa-space-sm) var(--fa-space-md);
+  border-radius: var(--fa-radius-lg);
+  background: color-mix(in srgb, var(--fa-color-foreground) 5%, transparent);
+}
+
+.fa-trade-card__label {
+  display: block;
+  font-size: 0.72rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--fa-color-foreground-muted);
+}
+
+.fa-trade-card__expires {
+  font-size: 0.85rem;
+  color: var(--fa-color-foreground-muted);
+}
+
+/* ── Directory fantallenatori: griglia di card ────────────────────────── */
+
+.fa-manager-directory__list {
+  grid-template-columns: repeat(auto-fill, minmax(18rem, 1fr));
+  gap: var(--fa-space-md);
+  align-items: stretch;
+}
+
+.fa-manager-directory__list .fa-manager-directory__item {
+  flex-direction: column;
+  align-items: stretch;
+  padding: var(--fa-space-lg);
+  border-radius: var(--fa-radius-xl);
+}
+
+.fa-manager-directory__list .fa-manager-directory__item > .fa-btn,
+.fa-manager-directory__list .fa-manager-directory__status {
+  align-self: flex-start;
+  margin-top: auto;
+}
+
+.fa-manager-directory__avatar {
+  width: 3.25rem;
+  height: 3.25rem;
+  background: var(--fa-gradient-accent);
+  color: var(--fa-color-on-brand);
+  font-style: italic;
+  font-weight: 800;
+}
+
+.fa-manager-directory:not(.fa-manager-directory--compact) > .fa-manager-directory__title {
+  display: none;
+}
+
+.fa-manager-directory__filters {
+  padding: var(--fa-space-md);
+  border-radius: var(--fa-radius-xl);
+  background: var(--fa-color-background-elevated);
+  border: 1px solid var(--fa-color-border);
+}
+
+/* ── Crea lega: campionati come tessere selezionabili ─────────────────── */
+
+.fa-competition-picker {
+  border: 0;
+  padding: 0;
+  background: transparent;
+}
+
+.fa-competition-picker__list {
+  grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));
+  gap: var(--fa-space-sm);
+}
+
+.fa-competition-picker__option {
+  border-radius: var(--fa-radius-lg);
+  padding: var(--fa-space-md);
+}
+
+.fa-competition-picker__option--checked {
+  border-color: rgba(155, 107, 255, 0.65);
+  background: linear-gradient(135deg, rgba(53, 96, 240, 0.16), rgba(122, 77, 255, 0.12));
+}
+
+.fa-competition-picker__option input[type="checkbox"] {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 0.5rem;
+  border: 2px solid var(--fa-color-border-strong);
+  display: grid;
+  place-items: center;
+}
+
+.fa-competition-picker__option input[type="checkbox"]:checked {
+  background: var(--fa-gradient-accent);
+  border-color: transparent;
+}
+
+.fa-competition-picker__option input[type="checkbox"]:checked::after {
+  content: "✓";
+  color: var(--fa-color-on-brand);
+  font-size: 0.9rem;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.fa-create-league-page {
+  max-width: 52rem;
+}
+
+/* ── Notifiche: pannello con puntino non letto ───────────────────────── */
+
+.fa-notification-center__panel {
+  border-radius: var(--fa-radius-xl);
+  box-shadow: 0 24px 60px rgba(2, 6, 23, 0.35);
+}
+
+.fa-notification-center__header {
+  font-style: italic;
+  font-weight: 800;
+  text-transform: uppercase;
+  font-size: 1.25rem;
+}
+
+.fa-notification-center__item {
+  position: relative;
+  border-radius: var(--fa-radius-lg);
+}
+
+.fa-notification-center__item--unread::before {
+  content: "";
+  position: absolute;
+  top: 0.9rem;
+  right: 0.9rem;
+  width: 0.6rem;
+  height: 0.6rem;
+  border-radius: 50%;
+  background: var(--fa-violet-500);
+  box-shadow: 0 0 10px var(--fa-violet-500);
+}
+
+.fa-notification-center__item-title {
+  font-weight: 700;
+}
+
+/* ── Area operatore ───────────────────────────────────────────────────── */
+
+.fa-admin-overview {
+  display: grid;
+  gap: var(--fa-space-lg);
+}
+
+.fa-admin-overview__hero {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--fa-space-md);
+  flex-wrap: wrap;
+  padding: var(--fa-space-xl);
+  border-radius: var(--fa-radius-xl);
+  background: linear-gradient(135deg, rgba(53, 96, 240, 0.3), rgba(122, 77, 255, 0.22));
+  border: 1px solid rgba(155, 107, 255, 0.4);
+}
+
+.fa-admin-overview__label {
+  margin: 0;
+  font-size: 0.72rem;
+  font-weight: 400;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--fa-color-foreground-muted);
+}
+
+.fa-admin-overview__name {
+  margin: 0;
+  font-style: italic;
+  font-weight: 800;
+  text-transform: uppercase;
+  font-size: clamp(2rem, 5vw, 3.4rem);
+  line-height: 1;
+}
+
+.fa-admin-overview__env {
+  margin: 0;
+  padding: 0.35rem 0.9rem;
+  border-radius: var(--fa-radius-pill);
+  background: rgba(255, 210, 63, 0.16);
+}
+
+.fa-admin-overview__tiles {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--fa-space-md);
+}
+
+.fa-admin-overview__tiles li {
+  display: grid;
+  gap: 0.2rem;
+  padding: var(--fa-space-lg);
+  border-radius: var(--fa-radius-xl);
+  background: var(--fa-color-background-elevated);
+  border: 1px solid var(--fa-color-border);
+}
+
+.fa-admin-overview__tiles strong {
+  font-style: italic;
+  font-weight: 800;
+  font-size: 3rem;
+  line-height: 1.05;
+}
+
+.fa-admin-overview__links {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--fa-space-md);
+}
+
+.fa-admin-overview__links a {
+  display: grid;
+  gap: 0.15rem;
+  padding: var(--fa-space-lg);
+  border-radius: var(--fa-radius-xl);
+  background: var(--fa-color-background-elevated);
+  border: 1px solid var(--fa-color-border);
+  text-decoration: none;
+  color: inherit;
+}
+
+.fa-admin-overview__links a:hover {
+  border-color: rgba(155, 107, 255, 0.55);
+}
+
+.fa-admin-overview__links strong {
+  font-size: 1.1rem;
+}
+
+.fa-admin-overview__links span {
+  color: var(--fa-color-foreground-muted);
+  font-size: 0.9rem;
+}
+
+.fa-admin-leagues__list {
+  list-style: none;
+  margin: var(--fa-space-md) 0 0;
+  padding: 0;
+  display: grid;
+  gap: var(--fa-space-sm);
+}
+
+.fa-admin-leagues__item {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--fa-space-md);
+  padding: var(--fa-space-md) var(--fa-space-lg);
+  border-radius: var(--fa-radius-xl);
+  background: var(--fa-color-background-elevated);
+  border: 1px solid var(--fa-color-border);
+}
+
+.fa-admin-leagues__name {
+  flex: 1;
+  min-width: 10rem;
+  font-size: 1.1rem;
+}
+
+.fa-admin-leagues__state {
+  padding: 0.25rem 0.8rem;
+  border-radius: var(--fa-radius-pill);
+  background: color-mix(in srgb, var(--fa-color-foreground) 8%, transparent);
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.fa-admin-leagues__owner {
+  color: var(--fa-color-foreground-muted);
+}
+
+[data-testid="admin-turni-legend"] dl {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr));
+  gap: var(--fa-space-md);
+}
+
+[data-testid="admin-turni-legend"] dl > div {
+  padding: var(--fa-space-md) var(--fa-space-lg);
+  border-radius: var(--fa-radius-lg);
+  background: color-mix(in srgb, var(--fa-color-foreground) 4%, transparent);
+  border: 1px solid var(--fa-color-border);
+}
+
+[data-testid="admin-turni-legend"] dt {
+  margin-bottom: 0.25rem;
+}
+
+[data-testid="admin-turni-legend"] dd {
+  color: var(--fa-color-foreground-muted);
+  font-size: 0.9rem;
+}
+
+@media (max-width: 767px) {
+  .fa-admin-overview__tiles,
+  .fa-admin-overview__links {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* ── Profilo fantallenatore ───────────────────────────────────────────── */
+
+.fa-coach-profile {
+  display: grid;
+  gap: var(--fa-space-lg);
+}
+
+.fa-coach-profile__header {
+  padding: var(--fa-space-xl);
+  border-radius: var(--fa-radius-xl);
+  background: linear-gradient(135deg, rgba(53, 96, 240, 0.28), rgba(122, 77, 255, 0.2));
+  border: 1px solid rgba(155, 107, 255, 0.4);
+}
+
+.fa-coach-profile__title {
+  margin: 0;
+  font-style: italic;
+  font-weight: 800;
+  text-transform: uppercase;
+  font-size: clamp(2rem, 5vw, 3.2rem);
+  line-height: 1;
+}
+
+.fa-coach-profile__avatar {
+  width: 6rem;
+  height: 6rem;
+}
+
+.fa-coach-profile__tiles {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--fa-space-md);
+}
+
+.fa-coach-profile__tiles li {
+  display: grid;
+  gap: 0.2rem;
+  padding: var(--fa-space-lg);
+  border-radius: var(--fa-radius-xl);
+  background: var(--fa-color-background-elevated);
+  border: 1px solid var(--fa-color-border);
+}
+
+.fa-coach-profile__tiles span {
+  font-size: 0.72rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--fa-color-foreground-muted);
+}
+
+.fa-coach-profile__tiles strong {
+  font-style: italic;
+  font-weight: 800;
+  font-size: 2.4rem;
+  line-height: 1.05;
+}
+
+.fa-coach-profile .fa-table-wrap {
+  border-radius: var(--fa-radius-xl);
+}
+
+@media (max-width: 767px) {
+  .fa-coach-profile__tiles {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.fa-coach-profile {
+  max-width: 64rem;
+}
+
+/* ── Dettaglio scontro ────────────────────────────────────────────────── */
+
+[data-testid="matchup-detail"] > p:first-child {
+  display: flex;
+  align-items: center;
+  gap: var(--fa-space-sm);
+  flex-wrap: wrap;
+  color: var(--fa-color-foreground-muted);
+  font-weight: 600;
+}
+
+[data-testid="matchup-result-summary"] {
+  display: grid;
+  gap: var(--fa-space-sm);
+  justify-items: center;
+  text-align: center;
+  padding: var(--fa-space-xl);
+  border-radius: var(--fa-radius-xl);
+  background: linear-gradient(135deg, rgba(53, 96, 240, 0.28), rgba(122, 77, 255, 0.2));
+  border: 1px solid rgba(155, 107, 255, 0.4);
+}
+
+[data-testid="matchup-result-summary"] p {
+  margin: 0;
+}
+
+[data-testid="matchup-result-summary"] > p:first-child {
+  font-size: 1.4rem;
+}
+
+[data-testid="matchup-detail"] .fa-pitch-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--fa-space-lg);
+  align-items: start;
+}
+
+[data-testid="matchup-detail"] .fa-pitch-row > section {
+  padding: var(--fa-space-lg);
+  border-radius: var(--fa-radius-xl);
+  background: var(--fa-color-background-elevated);
+  border: 1px solid var(--fa-color-border);
+}
+
+[data-testid="matchup-detail"] .fa-pitch-row h2 {
+  margin-top: 0;
+  font-style: italic;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.fa-pitch-player__score {
+  color: #ffffff;
+  background: rgba(8, 12, 30, 0.78);
+  font-weight: 700;
+}
+
+@media (max-width: 767px) {
+  [data-testid="matchup-detail"] .fa-pitch-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* ── Entra in una lega ────────────────────────────────────────────────── */
+
+[data-testid="join-league-form"] {
+  display: grid;
+  gap: var(--fa-space-md);
+  max-width: 38rem;
+  padding: var(--fa-space-xl);
+  border-radius: var(--fa-radius-xl);
+  background: var(--fa-color-background-elevated);
+  border: 1px solid var(--fa-color-border);
+}
+
+[data-testid="join-league-form"] p {
+  margin: 0;
+  color: var(--fa-color-foreground-muted);
+}
+
+[data-testid="join-league-form"] input {
+  min-height: 3.5rem;
+  font-style: italic;
+  font-weight: 800;
+  font-size: 1.4rem;
+  letter-spacing: 0.25em;
+  border-color: rgba(155, 107, 255, 0.5);
+}
+
+[data-testid="join-league-form"] .fa-btn {
+  justify-self: stretch;
+  min-height: 3.25rem;
+}
+
+/* Classifica su schermi stretti: restano Pos., Squadra, G, Pt */
+@media (max-width: 767px) {
+  [data-testid="standings-table"] th:nth-child(n + 5),
+  [data-testid="standings-table"] td:nth-child(n + 5) {
+    display: none;
+  }
+}

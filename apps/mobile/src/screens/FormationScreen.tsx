@@ -1182,14 +1182,14 @@ const styles = lazyStyles(() => StyleSheet.create({
     fontSize: typography.fontSize.xs,
   },
   button: {
-    backgroundColor: colors.accent,
+    backgroundColor: colors.brand,
     borderRadius: radius.pill,
     padding: spacing.sm,
     alignItems: "center",
     marginTop: spacing.sm,
   },
   buttonLabel: {
-    color: colors.accentContrast,
+    color: colors.onBrand,
     fontWeight: "600",
   },
   buttonSecondary: {

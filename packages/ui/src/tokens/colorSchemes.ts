@@ -17,6 +17,9 @@ export type AppColors = {
   accentContrast: string;
   /** Secondo colore di marca (menta), in coppia con l'accento azzurro. */
   accentSecondary: string;
+  /** Fondo pieno dei pulsanti principali (blu → viola) e testo sopra. */
+  brand: string;
+  onBrand: string;
   border: string;
   borderStrong: string;
   success: string;
@@ -32,12 +35,6 @@ export type AppColors = {
   inputPlaceholder: string;
   /** Campo da gioco (pitch, tavolo asta). */
   field: string;
-  /** Tabellone a LED: cifre, etichette e fondo del pannello. */
-  led: string;
-  ledLabel: string;
-  ledPanel: string;
-  /** Luce dei fari (trasparente sul tema chiaro). */
-  beam: string;
 };
 
 export const darkColors: AppColors = {
@@ -52,7 +49,9 @@ export const darkColors: AppColors = {
   accentHover: palette.electric400,
   accentMuted: palette.electric300,
   accentContrast: palette.navy900,
-  accentSecondary: palette.mint500,
+  accentSecondary: palette.violet400,
+  brand: palette.brand500,
+  onBrand: palette.onBrand,
   border: palette.pitch600,
   borderStrong: palette.pitch500,
   success: palette.success500,
@@ -66,10 +65,6 @@ export const darkColors: AppColors = {
   ok: palette.success500,
   inputPlaceholder: "#ffffff",
   field: palette.field800,
-  led: palette.led500,
-  ledLabel: palette.led700,
-  ledPanel: palette.ledPanel,
-  beam: "rgba(255, 241, 201, 0.16)",
 };
 
 export const lightColors: AppColors = {
@@ -84,7 +79,9 @@ export const lightColors: AppColors = {
   accentHover: palette.cobalt700,
   accentMuted: palette.cobalt700,
   accentContrast: "#ffffff",
-  accentSecondary: palette.mint600,
+  accentSecondary: palette.violet600,
+  brand: palette.brand500,
+  onBrand: palette.onBrand,
   border: "#d3dde4",
   borderStrong: "#a9b8c4",
   success: palette.success600,
@@ -98,10 +95,6 @@ export const lightColors: AppColors = {
   ok: palette.success600,
   inputPlaceholder: "#4f5c78",
   field: palette.fieldLight800,
-  led: palette.led500,
-  ledLabel: palette.led700,
-  ledPanel: palette.ledPanel,
-  beam: "rgba(255, 241, 201, 0)",
 };
 
 export function resolveColorScheme(

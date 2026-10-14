@@ -1,4 +1,3 @@
-import { fonts } from "../theme/fonts";
 import { lazyStyles } from "../theme/lazyStyles";
 import {
   computeCountdown,
@@ -84,21 +83,12 @@ export function LockCountdown({
 const styles = lazyStyles(() => StyleSheet.create({
   wrapper: {
     flexDirection: "row",
-    alignItems: "center",
-    alignSelf: "flex-start",
-    gap: spacing.sm,
-    paddingVertical: spacing.xs,
-    paddingHorizontal: spacing.md,
-    borderRadius: theme.radius.lg,
-    borderWidth: 1,
-    borderColor: `${colors.led}59`,
-    backgroundColor: colors.ledPanel,
+    alignItems: "baseline",
+    gap: spacing.xs,
   },
   label: {
-    color: colors.ledLabel,
+    color: colors.foregroundSubtle,
     fontSize: typography.fontSize.xs,
-    letterSpacing: 1.4,
-    textTransform: "uppercase",
   },
   idleLabel: {
     color: colors.foregroundSubtle,
@@ -106,11 +96,8 @@ const styles = lazyStyles(() => StyleSheet.create({
     fontStyle: "italic",
   },
   value: {
-    color: colors.led,
-    fontFamily: fonts.led,
-    fontSize: 24,
-    textShadowColor: `${colors.led}b3`,
-    textShadowRadius: 10,
-    textShadowOffset: { width: 0, height: 0 },
+    color: colors.foreground,
+    fontSize: typography.fontSize.sm,
+    fontWeight: typography.fontWeight.semibold,
   },
 }));

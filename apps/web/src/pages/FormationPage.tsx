@@ -1293,36 +1293,27 @@ export function FormationPage() {
           <Card>
             <CardHeader title={`Turno ${context.roundNumber}`} />
             <CardBody>
-              <label>
-                Turno
-                <select
-                  value={selectedRoundId}
-                  onChange={(event) => void selectRound(event.target.value)}
-                  data-testid="formation-round"
-                >
-                  {turns.map((turn) => (
-                    <option key={turn.id} value={turn.id}>
-                      Turno {turn.number} ({turn.effectiveStatus === "open" ? "aperto" : turn.effectiveStatus})
-                    </option>
-                  ))}
-                </select>
-              </label>
+              <Select
+                label="Turno"
+                value={selectedRoundId}
+                onChange={(event) => void selectRound(event.target.value)}
+                data-testid="formation-round"
+                options={turns.map((turn) => ({
+                  value: turn.id,
+                  label: `Turno ${turn.number} (${turn.effectiveStatus === "open" ? "aperto" : turn.effectiveStatus})`,
+                }))}
+              />
               {isOperator && teams.length > 0 ? (
-                <label>
-                  Schiera per
-                  <select
-                    value={targetTeamId}
-                    onChange={(event) => void selectTeam(event.target.value)}
-                    data-testid="formation-team-selector"
-                  >
-                    <option value="">La mia squadra</option>
-                    {teams.map((team) => (
-                      <option key={team.id} value={team.id}>
-                        {team.name}
-                      </option>
-                    ))}
-                  </select>
-                </label>
+                <Select
+                  label="Schiera per"
+                  value={targetTeamId}
+                  onChange={(event) => void selectTeam(event.target.value)}
+                  data-testid="formation-team-selector"
+                  options={[
+                    { value: "", label: "La mia squadra" },
+                    ...teams.map((team) => ({ value: team.id, label: team.name })),
+                  ]}
+                />
               ) : null}
               {context.lineup?.systemGeneratedAi ? (
                 <p data-testid="formation-ai-badge">

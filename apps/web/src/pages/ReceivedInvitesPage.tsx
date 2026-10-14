@@ -169,11 +169,14 @@ export function ReceivedInvitesPage() {
         <ul className="fa-received-invites" data-testid="received-invites-list">
           {invites.map((invite) => (
             <li key={invite.id} className="fa-received-invites__item">
-              <div>
+              <span className="fa-received-invites__avatar" aria-hidden="true">
+                {invite.leagueName.charAt(0).toUpperCase()}
+              </span>
+              <div className="fa-received-invites__text">
                 <strong>{invite.leagueName}</strong>
                 <p>Invito nominativo per {invite.recipientDisplayName}</p>
               </div>
-              <div className="fa-ds-showcase__row">
+              <div className="fa-ds-showcase__row fa-received-invites__actions">
                 <Button type="button" size="sm" loading={workingId === invite.id} onClick={() => void act(invite, "accept")}>Accetta</Button>
                 <Button type="button" size="sm" variant="danger" disabled={workingId === invite.id} onClick={() => void act(invite, "decline")}>Rifiuta</Button>
               </div>

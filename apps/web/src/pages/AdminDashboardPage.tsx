@@ -5,6 +5,7 @@ import { fetchAdminOverview } from "../api/admin";
 import { ApiError } from "../api/client";
 import { getApiErrorMessage } from "../auth/AuthContext";
 import { loadStoredSession } from "../auth/sessionStorage";
+import { Link } from "../router/simpleRouter";
 
 export function AdminDashboardPage() {
   const [overview, setOverview] = useState<AdminOverview | null>(null);
@@ -61,22 +62,57 @@ export function AdminDashboardPage() {
       ) : null}
       {!loading && !error && overview ? (
         <div className="fa-admin-overview" data-testid="admin-dashboard-success">
-          <section aria-labelledby="admin-overview-identity">
-            <h2 id="admin-overview-identity">Identità operatore</h2>
-            <p data-testid="admin-overview-name">{overview.operatorDisplayName}</p>
-            <p>
+          <section className="fa-admin-overview__hero" aria-labelledby="admin-overview-identity">
+            <div>
+              <h2 id="admin-overview-identity" className="fa-admin-overview__label">
+                Identità operatore
+              </h2>
+              <p className="fa-admin-overview__name" data-testid="admin-overview-name">
+                {overview.operatorDisplayName}
+              </p>
+            </div>
+            <p className="fa-admin-overview__env">
               Ambiente:{" "}
               <strong data-testid="admin-overview-environment">{overview.environment}</strong>
             </p>
           </section>
           <section aria-labelledby="admin-overview-counts">
-            <h2 id="admin-overview-counts">Conteggi piattaforma</h2>
-            <ul>
-              <li>Utenti registrati: {overview.usersCount}</li>
-              <li>Operatori: {overview.operatorsCount}</li>
-              <li>Leghe: {overview.leaguesCount}</li>
+            <h2 id="admin-overview-counts" className="fa-sr-only">
+              Conteggi piattaforma
+            </h2>
+            <ul className="fa-admin-overview__tiles">
+              <li>
+                <span className="fa-admin-overview__label">Utenti registrati</span>
+                <strong>{overview.usersCount}</strong>
+              </li>
+              <li>
+                <span className="fa-admin-overview__label">Operatori</span>
+                <strong>{overview.operatorsCount}</strong>
+              </li>
+              <li>
+                <span className="fa-admin-overview__label">Leghe</span>
+                <strong>{overview.leaguesCount}</strong>
+              </li>
             </ul>
           </section>
+          <nav className="fa-admin-overview__links" aria-label="Sezioni operatore">
+            <Link to="/admin/utenti">
+              <strong>Utenti</strong>
+              <span>Promuovi, revoca, impersona</span>
+            </Link>
+            <Link to="/admin/leghe">
+              <strong>Leghe globali</strong>
+              <span>Tutte le leghe della piattaforma</span>
+            </Link>
+            <Link to="/admin/listone">
+              <strong>Listone</strong>
+              <span>Aggiorna il listone dal provider</span>
+            </Link>
+            <Link to="/admin/turni">
+              <strong>Turni</strong>
+              <span>Sincronizza, calcola, apri</span>
+            </Link>
+          </nav>
         </div>
       ) : null}
       {!loading && !error && !overview ? (
