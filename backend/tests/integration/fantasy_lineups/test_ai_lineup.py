@@ -391,9 +391,13 @@ def test_operator_team_id_query_loads_the_selected_coach_lineup(
     own = client.get(endpoint, headers=headers)
     assert own.status_code == 200
     assert own.json()["roster"] == []
+    assert own.json()["fantasyTeamId"] == str(human_team.id)
+    assert own.json()["teamName"] == "Umano FC"
 
     selected = client.get(endpoint, headers=headers, params={"teamId": str(ai_team.id)})
     assert selected.status_code == 200
+    assert selected.json()["fantasyTeamId"] == str(ai_team.id)
+    assert selected.json()["teamName"] == "IA FC"
     assert {row["athleteId"] for row in selected.json()["roster"]} == {
         str(athlete.id) for athlete in athletes
     }

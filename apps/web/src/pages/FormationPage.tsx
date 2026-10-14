@@ -46,7 +46,7 @@ import {
   type PitchPlayer,
 } from "@fantappero/ui";
 import { AthleteName, useAthleteCard } from "../athletes/AthleteCard";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   fetchFantasyTeams,
   fetchFantasyTurns,
@@ -416,6 +416,9 @@ export function FormationPage() {
   const [teams, setTeams] = useState<FantasyTeamSummary[]>([]);
   /** Vuoto = la propria formazione. Un operatore può schierare al posto di un altro fantallenatore (EP-operatore-test). */
   const [targetTeamId, setTargetTeamId] = useState("");
+  const targetTeamIdRef = useRef("");
+  /** Le risposte più vecchie (doppio mount in dev, cambio allenatore a caricamento ancora in corso) non devono riscrivere la formazione appena scelta. */
+  const lineupRequest = useRef(0);
   const [selectedRoundId, setSelectedRoundId] = useState(() =>
     isDemoMode && demoState === "success" ? DEMO_CONTEXT.roundId : "",
   );
@@ -573,11 +576,14 @@ export function FormationPage() {
       setLoadError("Sessione non disponibile. Accedi di nuovo.");
       return;
     }
+    const requestId = startLineupRequest();
     setLoading(true);
     setLoadError(null);
-    setTargetTeamId("");
     try {
       const list = await fetchFantasyTurns(session.accessToken, activeLeagueId);
+      if (!isCurrentLineupRequest(requestId)) {
+        return;
+      }
       setTurns(list);
       // Stesso turno di default di Turni (EP07-05): il primo non ancora
       // concluso, non un filtro proprio della pagina Formazione — altrimenti
@@ -589,17 +595,31 @@ export function FormationPage() {
         return;
       }
       setSelectedRoundId(preferred.id);
-      const detail = await fetchMyLineup(session.accessToken, activeLeagueId, preferred.id);
-      setContext(detail);
-      applyContext(detail);
+      const detail = await fetchMyLineup(
+        session.accessToken,
+        activeLeagueId,
+        preferred.id,
+        targetTeamIdRef.current || undefined,
+      );
+      commitLineup(requestId, detail);
     } catch (error) {
+      if (!isCurrentLineupRequest(requestId)) {
+        return;
+      }
       setLoadError(getApiErrorMessage(error, "Impossibile caricare la formazione."));
       setTurns([]);
       setContext(null);
     } finally {
-      setLoading(false);
+      if (isCurrentLineupRequest(requestId)) {
+        setLoading(false);
+      }
     }
   }, [activeLeagueId, demoState, isDemoMode]);
+
+  useEffect(() => {
+    targetTeamIdRef.current = "";
+    setTargetTeamId("");
+  }, [activeLeagueId]);
 
   useEffect(() => {
     void load();
@@ -630,6 +650,23 @@ export function FormationPage() {
       cancelled = true;
     };
   }, [activeLeagueId, isDemoMode, isOperator]);
+
+  function startLineupRequest(): number {
+    lineupRequest.current += 1;
+    return lineupRequest.current;
+  }
+
+  function isCurrentLineupRequest(requestId: number): boolean {
+    return lineupRequest.current === requestId;
+  }
+
+  function commitLineup(requestId: number, detail: LineupContext) {
+    if (!isCurrentLineupRequest(requestId)) {
+      return;
+    }
+    setContext(detail);
+    applyContext(detail);
+  }
 
   /** Stato "come salvato sul server": bozza se c'è, altrimenti formazione confermata. */
   function savedEditorState(detail: LineupContext | null): {
@@ -682,28 +719,34 @@ export function FormationPage() {
     if (!session?.accessToken || !activeLeagueId) {
       return;
     }
+    const requestId = startLineupRequest();
     setBusy(true);
     try {
       const detail = await fetchMyLineup(
         session.accessToken,
         activeLeagueId,
         roundId,
-        targetTeamId || undefined,
+        targetTeamIdRef.current || undefined,
       );
-      setContext(detail);
-      applyContext(detail);
+      commitLineup(requestId, detail);
     } catch (error) {
+      if (!isCurrentLineupRequest(requestId)) {
+        return;
+      }
       pushToast({
         title: getApiErrorMessage(error, "Formazione del turno non disponibile."),
         variant: "danger",
       });
     } finally {
-      setBusy(false);
+      if (isCurrentLineupRequest(requestId)) {
+        setBusy(false);
+      }
     }
   }
 
   /** Operatore: cambia la squadra per cui schierare, a parità di turno (EP-operatore-test). */
   async function selectTeam(teamId: string) {
+    targetTeamIdRef.current = teamId;
     setTargetTeamId(teamId);
     if (isDemoMode) {
       return;
@@ -712,6 +755,7 @@ export function FormationPage() {
     if (!session?.accessToken || !activeLeagueId || !selectedRoundId) {
       return;
     }
+    const requestId = startLineupRequest();
     setBusy(true);
     try {
       const detail = await fetchMyLineup(
@@ -720,15 +764,19 @@ export function FormationPage() {
         selectedRoundId,
         teamId || undefined,
       );
-      setContext(detail);
-      applyContext(detail);
+      commitLineup(requestId, detail);
     } catch (error) {
+      if (!isCurrentLineupRequest(requestId)) {
+        return;
+      }
       pushToast({
         title: getApiErrorMessage(error, "Formazione della squadra selezionata non disponibile."),
         variant: "danger",
       });
     } finally {
-      setBusy(false);
+      if (isCurrentLineupRequest(requestId)) {
+        setBusy(false);
+      }
     }
   }
 
@@ -864,6 +912,7 @@ export function FormationPage() {
     if (!session?.accessToken || !activeLeagueId || !selectedRoundId) {
       return;
     }
+    const requestId = startLineupRequest();
     setBusy(true);
     try {
       const detail = await saveMyLineup(
@@ -875,18 +924,25 @@ export function FormationPage() {
           starterAthleteIds: displayStarters,
           benchAthleteIds: displayBench,
         },
-        targetTeamId || undefined,
+        targetTeamIdRef.current || undefined,
       );
-      setContext(detail);
-      applyContext(detail);
+      if (!isCurrentLineupRequest(requestId)) {
+        return;
+      }
+      commitLineup(requestId, detail);
       pushToast({ title: "Formazione salvata.", variant: "success" });
     } catch (error) {
+      if (!isCurrentLineupRequest(requestId)) {
+        return;
+      }
       pushToast({
         title: getApiErrorMessage(error, "Salvataggio formazione non riuscito."),
         variant: "danger",
       });
     } finally {
-      setBusy(false);
+      if (isCurrentLineupRequest(requestId)) {
+        setBusy(false);
+      }
     }
   }
 
@@ -937,16 +993,19 @@ export function FormationPage() {
     if (!session?.accessToken || !activeLeagueId || !selectedRoundId) {
       return;
     }
+    const requestId = startLineupRequest();
     setBusy(true);
     try {
       const detail = await copyPreviousLineupToDraft(
         session.accessToken,
         activeLeagueId,
         selectedRoundId,
-        targetTeamId || undefined,
+        targetTeamIdRef.current || undefined,
       );
-      setContext(detail);
-      applyContext(detail);
+      if (!isCurrentLineupRequest(requestId)) {
+        return;
+      }
+      commitLineup(requestId, detail);
       pushToast({
         title:
           detail.copyIssues && detail.copyIssues.length > 0
@@ -955,12 +1014,17 @@ export function FormationPage() {
         variant: "success",
       });
     } catch (error) {
+      if (!isCurrentLineupRequest(requestId)) {
+        return;
+      }
       pushToast({
         title: getApiErrorMessage(error, "Copia della formazione precedente non riuscita."),
         variant: "danger",
       });
     } finally {
-      setBusy(false);
+      if (isCurrentLineupRequest(requestId)) {
+        setBusy(false);
+      }
     }
   }
 
@@ -984,24 +1048,32 @@ export function FormationPage() {
     if (!session?.accessToken || !activeLeagueId || !selectedRoundId) {
       return;
     }
+    const requestId = startLineupRequest();
     setBusy(true);
     try {
       const detail = await applyBestLineup(
         session.accessToken,
         activeLeagueId,
         selectedRoundId,
-        targetTeamId || undefined,
+        targetTeamIdRef.current || undefined,
       );
-      setContext(detail);
-      applyContext(detail);
+      if (!isCurrentLineupRequest(requestId)) {
+        return;
+      }
+      commitLineup(requestId, detail);
       pushToast({ title: "Formazione migliore applicata in bozza.", variant: "success" });
     } catch (error) {
+      if (!isCurrentLineupRequest(requestId)) {
+        return;
+      }
       pushToast({
         title: getApiErrorMessage(error, "Applicazione della formazione migliore non riuscita."),
         variant: "danger",
       });
     } finally {
-      setBusy(false);
+      if (isCurrentLineupRequest(requestId)) {
+        setBusy(false);
+      }
     }
   }
 
@@ -1061,6 +1133,7 @@ export function FormationPage() {
     if (!session?.accessToken || !activeLeagueId || !selectedRoundId) {
       return;
     }
+    const requestId = startLineupRequest();
     setBusy(true);
     try {
       const detail = await saveLineupDraft(
@@ -1072,21 +1145,28 @@ export function FormationPage() {
           starterAthleteIds: displayStarters,
           benchAthleteIds: displayBench,
         },
-        targetTeamId || undefined,
+        targetTeamIdRef.current || undefined,
       );
-      setContext(detail);
-      applyContext(detail);
+      if (!isCurrentLineupRequest(requestId)) {
+        return;
+      }
+      commitLineup(requestId, detail);
       pushToast({
         title: "Bozza salvata. Conferma la formazione quando è completa.",
         variant: "success",
       });
     } catch (error) {
+      if (!isCurrentLineupRequest(requestId)) {
+        return;
+      }
       pushToast({
         title: getApiErrorMessage(error, "Salvataggio bozza non riuscito."),
         variant: "danger",
       });
     } finally {
-      setBusy(false);
+      if (isCurrentLineupRequest(requestId)) {
+        setBusy(false);
+      }
     }
   }
 
@@ -1418,8 +1498,13 @@ export function FormationPage() {
           <div className="fa-formation-layout__pitch-row">
           <div className="fa-formation-layout__pitch">
             <FootballPitch
-              title={`Modulo ${moduleCode}`}
-              pitchAriaLabel="Formazione titolare"
+              key={context.fantasyTeamId ?? targetTeamId || "self"}
+              title={
+                context.teamName ? `Modulo ${moduleCode} — ${context.teamName}` : `Modulo ${moduleCode}`
+              }
+              pitchAriaLabel={
+                context.teamName ? `Formazione di ${context.teamName}` : "Formazione titolare"
+              }
               players={pitchPlayers}
               positions={pitchPositions}
               onAthletePress={athleteCard?.open}

@@ -1062,8 +1062,11 @@ class FantasyLineupService:
             and any_unlocked
             and (copy_preview is None or not copy_preview.blocked)
         )
+        loaded_team = self._session.get(FantasyTeam, fantasy_team_id)
         return LineupContextResponse(
             leagueId=str(league_id),
+            fantasyTeamId=str(fantasy_team_id),
+            teamName=loaded_team.name if loaded_team is not None else "",
             roundId=str(fantasy_round.id),
             roundNumber=fantasy_round.number,
             kind=fantasy_round.kind.value,

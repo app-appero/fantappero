@@ -25,7 +25,7 @@ import {
   starterTemplate,
 } from "@fantappero/contracts";
 import { theme } from "@fantappero/ui/theme";
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { AthleteName } from "../athletes/AthleteCard";
 import {
@@ -183,6 +183,8 @@ export function FormationScreen() {
   const [teams, setTeams] = useState<FantasyTeamSummary[]>([]);
   /** Vuoto = la propria formazione. Un operatore può schierare al posto di un altro fantallenatore (EP-operatore-test). */
   const [targetTeamId, setTargetTeamId] = useState("");
+  const targetTeamIdRef = useRef("");
+  const lineupRequest = useRef(0);
   const [context, setContext] = useState<LineupContext | null>(null);
   const [moduleCode, setModuleCode] = useState<FantasyModule>("4-3-3");
   const [starterIds, setStarterIds] = useState<string[]>(starterTemplate("4-3-3").map(() => ""));
@@ -212,11 +214,14 @@ export function FormationScreen() {
       setLoadError("Sessione non disponibile. Accedi di nuovo.");
       return;
     }
+    const requestId = (lineupRequest.current += 1);
     setLoading(true);
     setLoadError(null);
-    setTargetTeamId("");
     try {
       const list = await fetchFantasyTurns(accessToken, activeLeagueId);
+      if (lineupRequest.current !== requestId) {
+        return;
+      }
       setTurns(list);
       // Stesso turno di default di Turni (EP07-05): il primo non ancora
       // concluso, non una scelta propria di questa schermata — altrimenti le
@@ -228,17 +233,35 @@ export function FormationScreen() {
         return;
       }
       setSelectedRoundId(preferred.id);
-      const detail = await fetchMyLineup(accessToken, activeLeagueId, preferred.id);
+      const detail = await fetchMyLineup(
+        accessToken,
+        activeLeagueId,
+        preferred.id,
+        targetTeamIdRef.current || undefined,
+      );
+      if (lineupRequest.current !== requestId) {
+        return;
+      }
       setContext(detail);
       applyEditor(detail);
     } catch (error) {
+      if (lineupRequest.current !== requestId) {
+        return;
+      }
       setLoadError(getApiErrorMessage(error, "Impossibile caricare la formazione."));
       setTurns([]);
       setContext(null);
     } finally {
-      setLoading(false);
+      if (lineupRequest.current === requestId) {
+        setLoading(false);
+      }
     }
   }, [accessToken, activeLeagueId, canView]);
+
+  useEffect(() => {
+    targetTeamIdRef.current = "";
+    setTargetTeamId("");
+  }, [activeLeagueId]);
 
   useEffect(() => {
     void load();
@@ -268,11 +291,13 @@ export function FormationScreen() {
 
   /** Operatore: cambia la squadra per cui schierare, a parità di turno (EP-operatore-test). */
   async function selectTeam(teamId: string) {
+    targetTeamIdRef.current = teamId;
     setTargetTeamId(teamId);
     if (!accessToken || !activeLeagueId || !selectedRoundId) {
       return;
     }
-    setLoading(true);
+    const requestId = (lineupRequest.current += 1);
+    setBusy(true);
     try {
       const detail = await fetchMyLineup(
         accessToken,
@@ -280,14 +305,22 @@ export function FormationScreen() {
         selectedRoundId,
         teamId || undefined,
       );
+      if (lineupRequest.current !== requestId) {
+        return;
+      }
       setContext(detail);
       applyEditor(detail);
     } catch (error) {
+      if (lineupRequest.current !== requestId) {
+        return;
+      }
       setLoadError(
         getApiErrorMessage(error, "Formazione della squadra selezionata non disponibile."),
       );
     } finally {
-      setLoading(false);
+      if (lineupRequest.current === requestId) {
+        setBusy(false);
+      }
     }
   }
 
@@ -850,6 +883,11 @@ export function FormationScreen() {
           </View>
         ) : null}
 
+        {context.teamName ? (
+          <Text style={styles.label} testID="formation-team-name">
+            {context.teamName}
+          </Text>
+        ) : null}
         <Text style={styles.label}>Modulo</Text>
         <View style={styles.row} testID="formation-module">
           {APPROVED_MODULES.map((code) => (
