@@ -67,6 +67,7 @@ celery_app.conf.update(
     task_always_eager=_worker_settings.fantappero_env.value == "test",
     broker_connection_retry_on_startup=True,
     beat_schedule=_beat_schedule,
+    beat_scheduler="system_jobs.scheduler:SystemJobScheduler",
 )
 register_celery_observability(celery_app)
 

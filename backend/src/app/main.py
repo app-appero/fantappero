@@ -10,6 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 
+from admin.jobs_router import router as admin_jobs_router
 from admin.router import router as admin_router
 from admin.turni_router import router as admin_turni_router
 from ai_assistant.router import feedback_router as ai_assistant_feedback_router
@@ -85,6 +86,7 @@ app.include_router(auth_router)
 app.include_router(profile_router)
 app.include_router(admin_router)
 app.include_router(admin_turni_router)
+app.include_router(admin_jobs_router)
 app.include_router(leagues_router)
 app.include_router(scoring_router)
 app.include_router(fantasy_teams_router)

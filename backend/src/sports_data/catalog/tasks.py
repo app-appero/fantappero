@@ -16,7 +16,15 @@ from sports_data.provider.client import build_client_from_settings
 @celery_app.task(name="sports_data.sync_mvp_catalog")
 def sync_mvp_catalog_task() -> dict[str, int]:
     """Sync five MVP competitions, current seasons and clubs from API-Football."""
+    from system_jobs.service import allow_periodic
+
     settings = get_api_settings()
+    if not allow_periodic(
+        "sports-data-sync-catalog",
+        settings.sports_data_catalog_sync_enabled,
+    ):
+        return {}
+
     engine = create_engine_from_url(settings.database_url)
     factory = create_session_factory(engine)
     try:

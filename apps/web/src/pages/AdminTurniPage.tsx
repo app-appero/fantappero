@@ -22,6 +22,7 @@ import {
   fetchAdminLeagueTurnStatus,
   generateAllAiLineups,
   importSeasonCalendar,
+  recoverStaleResults,
   repairHistoricalRounds,
   syncAllLeagueTurns,
   syncCalendarForAllLeagues,
@@ -59,6 +60,11 @@ const COMMAND_LEGEND: { label: string; description: string }[] = [
     label: "Calcola giornata corrente",
     description:
       "Calcola punteggi, risultati e classifica della giornata corrente utilizzando le formazioni disponibili (con fallback per quelle mancanti).",
+  },
+  {
+    label: "Recupera risultati",
+    description:
+      "Forza il download di stati e statistiche delle partite già giocate rimaste «in programma», poi calcola e omologa i turni e apre il successivo se il cutoff non è passato.",
   },
   {
     label: "Ricalcola storico",
@@ -149,6 +155,14 @@ export function AdminTurniPage() {
   const [calculatingRounds, setCalculatingRounds] = useState(false);
   const [calculateResult, setCalculateResult] = useState<string | null>(null);
   const [calculateError, setCalculateError] = useState<string | null>(null);
+
+  const [recoveringResults, setRecoveringResults] = useState(false);
+  const [recoveryProgress, setRecoveryProgress] = useState<{
+    percent: number;
+    message: string;
+  } | null>(null);
+  const [recoveryResult, setRecoveryResult] = useState<string | null>(null);
+  const [recoveryError, setRecoveryError] = useState<string | null>(null);
 
   const [repairReason, setRepairReason] = useState("");
   const [repairingHistory, setRepairingHistory] = useState(false);
@@ -288,6 +302,34 @@ export function AdminTurniPage() {
     } finally {
       setImportingSeason(false);
       setSeasonImportProgress(null);
+    }
+  }
+
+  async function onRecoverResults() {
+    const session = loadStoredSession();
+    if (!session?.accessToken) {
+      return;
+    }
+    setRecoveringResults(true);
+    setRecoveryError(null);
+    setRecoveryResult(null);
+    setRecoveryProgress({ percent: 0, message: "Avvio in corso…" });
+    try {
+      const result = await recoverStaleResults(session.accessToken, {
+        onProgress: (progress) =>
+          setRecoveryProgress({ percent: progress.percent, message: progress.message }),
+      });
+      setRecoveryResult(
+        `Fixture nuove: ${result.fixturesCreated}, aggiornate: ${result.fixturesUpdated}. ` +
+          `Dettagli: ${result.detailsFetched}. Turni elaborati: ${result.roundsProcessed}, ` +
+          `omologati: ${result.roundsFinalized}.`,
+      );
+      await load();
+    } catch (error) {
+      setRecoveryError(getApiErrorMessage(error, "Recupero risultati non riuscito."));
+    } finally {
+      setRecoveringResults(false);
+      setRecoveryProgress(null);
     }
   }
 
@@ -496,6 +538,16 @@ export function AdminTurniPage() {
             >
               Calcola giornata corrente
             </Button>
+            <Button
+              type="button"
+              variant="secondary"
+              loading={recoveringResults}
+              disabled={recoveringResults}
+              onClick={() => void onRecoverResults()}
+              data-testid="admin-turni-recover-results"
+            >
+              Recupera risultati
+            </Button>
           </div>
 
           {turnsResult ? (
@@ -604,6 +656,35 @@ export function AdminTurniPage() {
               title="Calcolo non riuscito"
               message={calculateError}
               testId="admin-turni-calculate-all-error"
+            />
+          ) : null}
+
+          {recoveringResults ? (
+            <UiStatePanel
+              state="loading"
+              title="Recupero risultati in corso"
+              message={
+                recoveryProgress
+                  ? `${recoveryProgress.message} (${recoveryProgress.percent}%)`
+                  : "Avvio in corso…"
+              }
+              testId="admin-turni-recover-results-progress"
+            />
+          ) : null}
+          {!recoveringResults && recoveryResult ? (
+            <UiStatePanel
+              state="success"
+              title="Risultati recuperati"
+              message={recoveryResult}
+              testId="admin-turni-recover-results-success"
+            />
+          ) : null}
+          {!recoveringResults && recoveryError ? (
+            <UiStatePanel
+              state="error"
+              title="Recupero non riuscito"
+              message={recoveryError}
+              testId="admin-turni-recover-results-error"
             />
           ) : null}
         </CardBody>

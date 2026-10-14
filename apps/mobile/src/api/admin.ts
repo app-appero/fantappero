@@ -12,11 +12,16 @@ import type {
   AdminListoneRefreshJob,
   AdminListoneRefreshProgress,
   AdminOverview,
+  AdminResultRecoveryJob,
+  AdminResultRecoveryProgress,
+  AdminResultRecoveryResult,
   AdminRoundCalculationResult,
   AdminSeasonImportJob,
   AdminSeasonImportProgress,
   AdminSeasonImportResult,
   AdminTurniSyncResult,
+  SystemJob,
+  SystemJobUpdate,
   AdminUser,
   PaginatedAdminLeagues,
   PaginatedAdminUsers,
@@ -24,6 +29,22 @@ import type {
 import { apiRequest } from "./client";
 
 /** Mobile port of `apps/web/src/api/admin.ts` — global operator panel (EP11-04a/b). */
+
+export function fetchSystemJobs(accessToken: string): Promise<SystemJob[]> {
+  return apiRequest<SystemJob[]>("/admin/job", { accessToken });
+}
+
+export function updateSystemJob(
+  accessToken: string,
+  jobKey: string,
+  body: SystemJobUpdate,
+): Promise<SystemJob> {
+  return apiRequest<SystemJob>(`/admin/job/${jobKey}`, {
+    accessToken,
+    method: "PATCH",
+    body,
+  });
+}
 
 export function fetchAdminOverview(accessToken: string): Promise<AdminOverview> {
   return apiRequest<AdminOverview>("/admin/overview", { accessToken });
@@ -233,6 +254,52 @@ export async function importSeasonCalendar(
         progress.message ||
           "Importazione calendario stagione non riuscita (controlla quota API-Football / worker).",
       );
+    }
+    await new Promise((resolve) => {
+      setTimeout(resolve, pollIntervalMs);
+    });
+  }
+}
+
+export function startResultRecovery(accessToken: string): Promise<AdminResultRecoveryJob> {
+  return apiRequest<AdminResultRecoveryJob>("/admin/turni/recupera-risultati", {
+    accessToken,
+    method: "POST",
+  });
+}
+
+export function fetchResultRecoveryProgress(
+  accessToken: string,
+  jobId: string,
+): Promise<AdminResultRecoveryProgress> {
+  return apiRequest<AdminResultRecoveryProgress>(`/admin/turni/recupera-risultati/${jobId}`, {
+    accessToken,
+  });
+}
+
+export async function recoverStaleResults(
+  accessToken: string,
+  options?: {
+    onProgress?: (progress: AdminResultRecoveryProgress) => void;
+    pollIntervalMs?: number;
+  },
+): Promise<AdminResultRecoveryResult> {
+  const started = await startResultRecovery(accessToken);
+  if (!started.jobId) {
+    throw new Error("Recupero avviato ma senza jobId. Ricarica la pagina e riprova.");
+  }
+  const pollIntervalMs = options?.pollIntervalMs ?? 800;
+  for (;;) {
+    const progress = await fetchResultRecoveryProgress(accessToken, started.jobId);
+    options?.onProgress?.(progress);
+    if (progress.status === "completed") {
+      if (!progress.result) {
+        throw new Error("Recupero completato senza risultato.");
+      }
+      return progress.result;
+    }
+    if (progress.status === "failed") {
+      throw new Error(progress.message || "Recupero risultati non riuscito.");
     }
     await new Promise((resolve) => {
       setTimeout(resolve, pollIntervalMs);

@@ -186,6 +186,52 @@ export interface AdminSeasonImportProgress {
   result?: AdminSeasonImportResult | null;
 }
 
+export interface SystemJob {
+  key: string;
+  title: string;
+  description: string;
+  task: string;
+  enabled: boolean;
+  intervalSeconds: number;
+  minIntervalSeconds: number;
+  maxIntervalSeconds: number;
+  lastStartedAt: string | null;
+  nextRunAt: string | null;
+}
+
+export interface SystemJobUpdate {
+  enabled?: boolean;
+  intervalSeconds?: number;
+}
+
+export interface AdminResultRecoveryJob {
+  jobId: string;
+  status: string;
+  message: string;
+}
+
+/** Esito di "Recupera risultati": stati, statistiche e omologazione dei turni arretrati. */
+export interface AdminResultRecoveryResult {
+  fixturesCreated: number;
+  fixturesUpdated: number;
+  detailsFetched: number;
+  roundsConsidered: number;
+  roundsProcessed: number;
+  roundsFinalized: number;
+  fixturesScored: number;
+  errors: Array<Record<string, string>>;
+}
+
+export interface AdminResultRecoveryProgress {
+  jobId: string;
+  status: "queued" | "running" | "completed" | "failed" | string;
+  percent: number;
+  stage: string;
+  message: string;
+  errorCode?: string | null;
+  result?: AdminResultRecoveryResult | null;
+}
+
 /** Esito di "Calcola giornata corrente" massivo (tutte le leghe attive). */
 export interface AdminRoundCalculationResult {
   roundsConsidered: number;

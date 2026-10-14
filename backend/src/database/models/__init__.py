@@ -57,6 +57,7 @@ from sports_data.provider.models import ProviderSnapshot
 from sports_data.quality.models import SportsDataQualityIssue, SportsDataSyncRetry
 from sports_data.roster.models import Athlete, SquadMembership, Transfer
 from sports_data.scheduler.models import SportsPollRun
+from system_jobs.models import SystemJob
 
 __all__ = [
     "AiInteraction",
@@ -117,6 +118,7 @@ __all__ = [
     "SportsPollRun",
     "SubscriptionPayment",
     "SystemFlag",
+    "SystemJob",
     "TradeProposal",
     "Transfer",
     "User",

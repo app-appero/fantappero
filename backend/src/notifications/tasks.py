@@ -26,7 +26,9 @@ def send_lineup_reminders_task() -> dict[str, int]:
         enabled = api.notifications_lineup_reminder_enabled
         window_hours = api.notifications_lineup_reminder_window_hours
 
-    if not enabled:
+    from system_jobs.service import allow_periodic
+
+    if not allow_periodic("notifications-lineup-reminders", enabled):
         logger.info("notifications_lineup_reminder_skipped_disabled")
         return {"rounds_checked": 0, "rounds_with_pending_teams": 0, "reminders_sent": 0}
 

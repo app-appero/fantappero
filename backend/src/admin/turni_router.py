@@ -22,6 +22,9 @@ from admin.schemas import (
     AdminHistoricalRepairRequest,
     AdminHistoricalRepairResultResponse,
     AdminLeagueTurnStatusResponse,
+    AdminResultRecoveryJobResponse,
+    AdminResultRecoveryProgressResponse,
+    AdminResultRecoveryResultResponse,
     AdminRoundCalculationResultResponse,
     AdminSeasonImportJobResponse,
     AdminSeasonImportProgressResponse,
@@ -206,6 +209,68 @@ def get_season_import_progress(
     if progress.result is not None:
         result = AdminSeasonImportResultResponse.model_validate(progress.result)
     return AdminSeasonImportProgressResponse(
+        jobId=progress.job_id,
+        status=progress.status,
+        percent=progress.percent,
+        stage=progress.stage,
+        message=progress.message,
+        errorCode=progress.error_code,
+        result=result,
+    )
+
+
+@router.post("/turni/recupera-risultati", response_model=AdminResultRecoveryJobResponse)
+def start_stale_result_recovery(
+    operator: User = Depends(require_permissions(Permission.GLOBAL_OPERATE)),
+) -> AdminResultRecoveryJobResponse:
+    """Forza il recupero dei risultati arretrati e il calcolo dei turni.
+
+    Per la giornata rimasta «in programma» a partita già giocata: risincronizza
+    gli stati di tutti i campionati, scarica le statistiche mancanti, omologa
+    i turni pronti e apre il successivo se il cutoff non è passato.
+    """
+    from fantasy_turns.tasks import recover_stale_results_task
+
+    job_id = new_job_id()
+    save_progress(
+        CalendarRefreshProgress(
+            job_id=job_id,
+            league_id=_PLATFORM_SCOPE,
+            status="queued",
+            percent=0,
+            stage="queued",
+            message="Recupero risultati in coda…",
+        )
+    )
+    recover_stale_results_task.delay(job_id=job_id, actor_id=str(operator.id))
+    return AdminResultRecoveryJobResponse(
+        jobId=job_id,
+        status="queued",
+        message="Recupero risultati avviato.",
+    )
+
+
+@router.get(
+    "/turni/recupera-risultati/{job_id}",
+    response_model=AdminResultRecoveryProgressResponse,
+)
+def get_stale_result_recovery_progress(
+    job_id: str,
+    _operator: User = Depends(require_permissions(Permission.GLOBAL_OPERATE)),
+) -> AdminResultRecoveryProgressResponse | JSONResponse:
+    progress = load_progress(job_id)
+    if progress is None or progress.league_id != _PLATFORM_SCOPE:
+        return JSONResponse(
+            status_code=404,
+            content={
+                "message": "Job di recupero non trovato.",
+                "code": "result_recovery_job_not_found",
+            },
+        )
+    result = None
+    if progress.result is not None:
+        result = AdminResultRecoveryResultResponse.model_validate(progress.result)
+    return AdminResultRecoveryProgressResponse(
         jobId=progress.job_id,
         status=progress.status,
         percent=progress.percent,

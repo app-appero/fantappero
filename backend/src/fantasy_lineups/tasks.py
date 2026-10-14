@@ -20,7 +20,15 @@ logger = get_logger(__name__)
 @celery_app.task(name="fantasy_lineups.generate_ai")
 def generate_ai_lineups_task() -> dict[str, int]:
     """Schiera le squadre IA dei turni aperti di tutte le leghe attive."""
+    from system_jobs.service import allow_periodic
+
     settings = get_api_settings()
+    if not allow_periodic(
+        "fantasy-lineups-generate-ai",
+        settings.ai_lineups_auto_generate_enabled,
+    ):
+        return {"rounds": 0, "teamsUpdated": 0, "teamsSkipped": 0}
+
     engine = create_engine_from_url(settings.database_url)
     factory = create_session_factory(engine)
 

@@ -34,7 +34,9 @@ def ensure_upcoming_fantasy_turns_task() -> dict[str, int]:
         horizon = api.fantasy_turns_horizon_days
         enabled = api.fantasy_turns_auto_generate_enabled
 
-    if not enabled:
+    from system_jobs.service import allow_periodic
+
+    if not allow_periodic("fantasy-turns-ensure-upcoming", enabled):
         logger.info("fantasy_turns_ensure_skipped_disabled")
         return {
             "leagues": 0,
@@ -76,7 +78,9 @@ def refresh_full_calendar_active_leagues_task() -> dict[str, int]:
         api = get_api_settings()
         enabled = api.fantasy_turns_full_refresh_enabled
 
-    if not enabled:
+    from system_jobs.service import allow_periodic
+
+    if not allow_periodic("fantasy-turns-refresh-full-calendar", enabled):
         logger.info("fantasy_calendar_refresh_periodic_skipped_disabled")
         return {"leagues": 0, "refreshed": 0, "failed": 0}
 
@@ -323,6 +327,116 @@ def refresh_full_calendar_task(*, job_id: str, league_id: str, actor_id: str | N
                 stage="failed",
                 message="Aggiornamento calendario non riuscito.",
                 error_code="calendar_refresh_failed",
+            )
+        )
+        raise
+    finally:
+        engine.dispose()
+
+
+@celery_app.task(name="fantasy_turns.recover_stale_results")
+def recover_stale_results_task(*, job_id: str, actor_id: str | None) -> dict:
+    """Override operatore: risincronizza i risultati arretrati e calcola i turni.
+
+    Stessa catena che il polling dovrebbe chiudere da solo (calendario di
+    tutti i campionati, dettagli delle partite finite, omologazione), in un
+    colpo solo, per il caso in cui una giornata è rimasta «in programma».
+    """
+    from fantasy_turns.result_recovery import recover_stale_match_results
+    from sports_data.provider.client import build_client_from_settings
+
+    platform_scope = "platform"
+    settings = get_api_settings()
+    engine = create_engine_from_url(settings.database_url)
+    factory = create_session_factory(engine)
+
+    def publish(percent: int, stage: str, message: str, *, status: str = "running") -> None:
+        save_progress(
+            CalendarRefreshProgress(
+                job_id=job_id,
+                league_id=platform_scope,
+                status=status,
+                percent=percent,
+                stage=stage,
+                message=message,
+            )
+        )
+
+    try:
+        publish(5, "fixtures", "Recupero stati delle partite dal provider…")
+        with build_client_from_settings(settings) as client:
+            with session_scope(factory) as session:
+                publish(40, "details", "Recupero statistiche delle partite già finite…")
+                result = recover_stale_match_results(session, client)
+        message = (
+            f"Fixture nuove: {result['fixturesCreated']}, "
+            f"aggiornate: {result['fixturesUpdated']}. "
+            f"Dettagli recuperati: {result['detailsFetched']}. "
+            f"Turni elaborati: {result['roundsProcessed']}, "
+            f"omologati: {result['roundsFinalized']}."
+        )
+        save_progress(
+            CalendarRefreshProgress(
+                job_id=job_id,
+                league_id=platform_scope,
+                status="completed",
+                percent=100,
+                stage="completed",
+                message=message,
+                result=result,
+            )
+        )
+        logger.info("fantasy_results_recovered", extra={"job_id": job_id, "actor_id": actor_id})
+        return {"status": "completed", "job_id": job_id, "actor_id": actor_id}
+    except ProviderRateLimitError:
+        save_progress(
+            CalendarRefreshProgress(
+                job_id=job_id,
+                league_id=platform_scope,
+                status="failed",
+                percent=0,
+                stage="failed",
+                message=PROVIDER_RATE_LIMITED_USER_MESSAGE,
+                error_code="provider_rate_limited",
+            )
+        )
+        return {"status": "failed", "code": "provider_rate_limited"}
+    except ProviderAuthError:
+        save_progress(
+            CalendarRefreshProgress(
+                job_id=job_id,
+                league_id=platform_scope,
+                status="failed",
+                percent=0,
+                stage="failed",
+                message=PROVIDER_UNAVAILABLE_USER_MESSAGE,
+                error_code="provider_auth_failed",
+            )
+        )
+        return {"status": "failed", "code": "provider_auth_failed"}
+    except (ProviderError, ValidationAuthError):
+        save_progress(
+            CalendarRefreshProgress(
+                job_id=job_id,
+                league_id=platform_scope,
+                status="failed",
+                percent=0,
+                stage="failed",
+                message="Recupero risultati non riuscito dal provider sportivo.",
+                error_code="provider_sync_failed",
+            )
+        )
+        return {"status": "failed", "code": "provider_sync_failed"}
+    except Exception:
+        save_progress(
+            CalendarRefreshProgress(
+                job_id=job_id,
+                league_id=platform_scope,
+                status="failed",
+                percent=0,
+                stage="failed",
+                message="Recupero risultati non riuscito.",
+                error_code="result_recovery_failed",
             )
         )
         raise

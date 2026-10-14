@@ -75,6 +75,29 @@ def classify_fixture_window(
     return None
 
 
+def stale_result_rank(
+    status_short: str | None,
+    kickoff_at: datetime | None,
+    now: datetime,
+) -> int:
+    """Ordine di recupero: prima le partite già iniziate sulla carta ma ancora «non iniziate».
+
+    Senza questo ordine il tetto di partite per giro si riempie di risultati già
+    chiusi e una partita rimasta NS dopo il calcio d'inizio non viene mai
+    riscritta.
+    """
+    status = (status_short or "").strip().upper()
+    kickoff = _as_utc(kickoff_at)
+    clock = _as_utc(now) or now
+    if status in PRE_STATUSES and kickoff is not None and clock >= kickoff:
+        return 0
+    if status in LIVE_STATUSES:
+        return 1
+    if status in FINISHED_STATUSES:
+        return 2
+    return 3
+
+
 def _estimate_finished_at(kickoff: datetime | None, now: datetime) -> datetime:
     if kickoff is None:
         return now

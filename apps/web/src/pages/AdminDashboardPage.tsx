@@ -112,6 +112,10 @@ export function AdminDashboardPage() {
               <strong>Turni</strong>
               <span>Sincronizza, calcola, apri</span>
             </Link>
+            <Link to="/admin/job">
+              <strong>Job automatici</strong>
+              <span>Accendi, spegni, cambia la frequenza</span>
+            </Link>
           </nav>
         </div>
       ) : null}

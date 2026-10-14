@@ -22,7 +22,14 @@ def sync_mvp_fixtures_task(
     max_fixtures_per_league: int | None = None,
 ) -> dict[str, int]:
     """Sync calendar (+ optional events/lineups/stats) for MVP competitions."""
+    from system_jobs.service import allow_periodic
+
     settings = get_api_settings()
+    if not allow_periodic(
+        "sports-data-sync-fixtures",
+        settings.sports_data_fixtures_sync_enabled,
+    ):
+        return {}
     engine = create_engine_from_url(settings.database_url)
     factory = create_session_factory(engine)
     try:

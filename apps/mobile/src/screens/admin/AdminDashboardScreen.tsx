@@ -123,6 +123,16 @@ export function AdminDashboardScreen() {
         </Pressable>
         <Pressable
           style={styles.linkCard}
+          onPress={() => navigation.navigate("AdminJobs")}
+          testID="admin-dashboard-link-jobs"
+        >
+          <Text style={styles.linkCardTitle}>Job automatici</Text>
+          <Text style={styles.linkCardHint}>
+            Accendi, spegni e cambia la frequenza dei giri che partono da soli.
+          </Text>
+        </Pressable>
+        <Pressable
+          style={styles.linkCard}
           onPress={() => navigation.navigate("AdminTurni")}
           testID="admin-dashboard-link-turni"
         >
