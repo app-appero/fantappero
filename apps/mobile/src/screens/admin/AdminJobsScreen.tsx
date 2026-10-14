@@ -1,6 +1,8 @@
 import type { SystemJob } from "@fantappero/contracts";
 import { useCallback, useEffect, useState } from "react";
-import { Pressable, Text, View } from "react-native";
+import { Pressable, StyleSheet, Switch, Text, View } from "react-native";
+import { theme } from "@fantappero/ui/theme";
+import { lazyStyles } from "../../theme/lazyStyles";
 import { AppTextInput as TextInput } from "../../components/AppTextInput";
 import { fetchSystemJobs, updateSystemJob } from "../../api/admin";
 import { adminUiStyles as styles } from "../../admin/adminUiStyles";
@@ -48,6 +50,20 @@ function splitInterval(seconds: number): { amount: string; unit: IntervalUnit } 
     amount: String(Math.max(1, Math.round(seconds / UNIT_SECONDS.minutes))),
     unit: "minutes",
   };
+}
+
+const { colors, spacing, typography, radius } = theme;
+
+function progressPercent(job: SystemJob): number {
+  if (!job.enabled || !job.lastStartedAt || !job.nextRunAt) {
+    return 0;
+  }
+  const start = new Date(job.lastStartedAt).getTime();
+  const end = new Date(job.nextRunAt).getTime();
+  if (!(end > start)) {
+    return 0;
+  }
+  return Math.min(100, Math.max(0, Math.round(((Date.now() - start) / (end - start)) * 100)));
 }
 
 /** Job periodici — mobile port of `apps/web/src/pages/AdminJobsPage.tsx`. */
@@ -153,23 +169,49 @@ export function AdminJobsScreen() {
               const draft = drafts[job.key] ?? splitInterval(job.intervalSeconds);
               const busy = busyKey === job.key;
               return (
-                <View key={job.key} testID={`admin-job-${job.key}`}>
-                  <Text style={styles.name}>{job.title}</Text>
-                  <Text style={styles.meta}>{job.description}</Text>
-                  <Pressable
-                    style={[styles.secondaryButton, busy && styles.disabled]}
-                    disabled={busy}
-                    onPress={() => void onToggle(job)}
-                    testID={`admin-job-enabled-${job.key}`}
-                  >
-                    <Text style={styles.secondaryButtonLabel}>{job.enabled ? "Attivo" : "Spento"}</Text>
-                  </Pressable>
-                  <Text style={styles.meta}>
-                    Ultima partenza: {formatDateTime(job.lastStartedAt)}
-                  </Text>
-                  <Text style={styles.meta}>
-                    Prossima partenza: {job.enabled ? formatDateTime(job.nextRunAt) : "Spento"}
-                  </Text>
+                <View
+                  key={job.key}
+                  style={[local.card, !job.enabled && local.cardOff]}
+                  testID={`admin-job-${job.key}`}
+                >
+                  <View style={local.head}>
+                    <View style={local.headText}>
+                      <View style={local.titleRow}>
+                        <Text style={local.title}>{job.title}</Text>
+                        <Text style={[local.chip, job.enabled && local.chipOn]}>
+                          {job.enabled ? "Attivo" : "Spento"}
+                        </Text>
+                      </View>
+                      <Text style={styles.meta}>{job.description}</Text>
+                    </View>
+                    <Switch
+                      value={job.enabled}
+                      disabled={busy}
+                      onValueChange={() => void onToggle(job)}
+                      trackColor={{ true: colors.brand, false: colors.border }}
+                      thumbColor="#ffffff"
+                      accessibilityLabel={`${job.title}: ${job.enabled ? "attivo" : "spento"}`}
+                      testID={`admin-job-enabled-${job.key}`}
+                    />
+                  </View>
+                  <View style={local.times}>
+                    <View style={local.time}>
+                      <Text style={local.timeLabel}>Ultima partenza</Text>
+                      <Text style={local.timeValue}>{formatDateTime(job.lastStartedAt)}</Text>
+                    </View>
+                    <View style={local.time}>
+                      <Text style={local.timeLabel}>Prossima partenza</Text>
+                      <Text style={[local.timeValue, job.enabled && local.timeNext]}>
+                        {job.enabled ? formatDateTime(job.nextRunAt) : "Spento"}
+                      </Text>
+                    </View>
+                  </View>
+                  {job.enabled ? (
+                    <View style={local.bar}>
+                      <View style={[local.barFill, { width: `${progressPercent(job)}%` }]} />
+                    </View>
+                  ) : null}
+                  <Text style={local.timeLabel}>Ogni</Text>
                   <TextInput
                     style={styles.input}
                     keyboardType="number-pad"
@@ -212,3 +254,89 @@ export function AdminJobsScreen() {
     </PageContainer>
   );
 }
+
+const local = lazyStyles(() => StyleSheet.create({
+  card: {
+    gap: spacing.sm,
+    padding: spacing.lg,
+    borderRadius: radius.xl,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.backgroundElevated,
+    marginTop: spacing.sm,
+  },
+  cardOff: {
+    opacity: 0.8,
+  },
+  head: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: spacing.md,
+  },
+  headText: {
+    flex: 1,
+    gap: spacing.xs,
+  },
+  titleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    flexWrap: "wrap",
+    gap: spacing.sm,
+  },
+  title: {
+    color: colors.foreground,
+    fontSize: typography.fontSize.lg,
+    fontStyle: "italic",
+    fontWeight: "800",
+    textTransform: "uppercase",
+  },
+  chip: {
+    overflow: "hidden",
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 2,
+    borderRadius: radius.pill,
+    backgroundColor: colors.background,
+    color: colors.foregroundMuted,
+    fontSize: typography.fontSize.xs,
+    fontWeight: "600",
+  },
+  chipOn: {
+    color: colors.success,
+  },
+  times: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: spacing.sm,
+  },
+  time: {
+    flexGrow: 1,
+    flexBasis: 130,
+    padding: spacing.sm,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  timeLabel: {
+    color: colors.foregroundMuted,
+    fontSize: typography.fontSize.xs,
+    letterSpacing: 1.2,
+    textTransform: "uppercase",
+  },
+  timeValue: {
+    color: colors.foreground,
+    fontWeight: "600",
+  },
+  timeNext: {
+    color: colors.accent,
+  },
+  bar: {
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: colors.border,
+    overflow: "hidden",
+  },
+  barFill: {
+    height: "100%",
+    backgroundColor: colors.brand,
+  },
+}));
