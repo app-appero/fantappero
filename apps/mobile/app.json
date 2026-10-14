@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "FantAppero",
+    "name": "FantApperò",
     "slug": "fantappero",
     "scheme": "fantappero",
     "version": "0.0.0",
@@ -16,7 +16,9 @@
     "android": {
       "package": "com.fantappero.mobile",
       "adaptiveIcon": {
-        "backgroundColor": "#0a0f22"
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundImage": "./assets/adaptive-background.png",
+        "backgroundColor": "#2748D8"
       }
     },
     "web": {
@@ -31,6 +33,7 @@
       ],
       "expo-secure-store",
       "expo-status-bar"
-    ]
+    ],
+    "icon": "./assets/icon.png"
   }
 }

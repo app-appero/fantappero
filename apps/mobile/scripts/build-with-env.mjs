@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { rmSync } from "node:fs";
+import { copyFileSync, existsSync, rmSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { resolveMobileProfile } from "./start-with-env.mjs";
@@ -25,7 +25,7 @@ try {
   process.exit(1);
 }
 
-console.log(`FantAppero mobile · build APK ${variant} · ${resolved.profile} · ${resolved.apiUrl}`);
+console.log(`FantApperò mobile · build APK ${variant} · ${resolved.profile} · ${resolved.apiUrl}`);
 
 const androidDir = join(appRoot, "android");
 const gradlew = process.platform === "win32" ? ".\\gradlew.bat" : "./gradlew";
@@ -54,5 +54,16 @@ const result = spawnSync(gradlew, [task, "--no-daemon"], {
   stdio: "inherit",
   shell: process.platform === "win32",
 });
+
+if (result.status === 0) {
+  // Gradle produce app-<variante>.apk: ne lasciamo anche una copia con il nome dell'app.
+  const apkDir = join(androidDir, "app", "build", "outputs", "apk", variant);
+  const built = join(apkDir, `app-${variant}.apk`);
+  if (existsSync(built)) {
+    const named = join(apkDir, `FantApperò-${variant}.apk`);
+    copyFileSync(built, named);
+    console.log(`APK: ${named}`);
+  }
+}
 
 process.exit(result.status ?? 1);
