@@ -30,17 +30,21 @@ function BrandMark({ className }: { className?: string }) {
           y2="64"
           gradientUnits="userSpaceOnUse"
         >
-          <stop offset="0" stopColor="#4c86ff" />
-          <stop offset="1" stopColor="#8b5cf6" />
+          <stop offset="0" stopColor="#2748d8" />
+          <stop offset="1" stopColor="#6a3fe0" />
         </linearGradient>
       </defs>
-      <rect width="64" height="64" rx="18" fill={`url(#${gradientId})`} />
-      <path
-        d="M16 50L22.1 14H48.5L47.1 22H28.8L27.4 30H40.6L39.4 37H26.2L24 50Z"
-        fill="#ffffff"
-      />
-      <circle cx="47" cy="44" r="5" stroke="#ffffff" strokeWidth="3" />
-      <circle cx="47" cy="44" r="1.6" fill="#ffffff" />
+<rect width="64" height="64" rx="18" fill={`url(#${gradientId})`}/>
+      <g opacity=".18">
+        <rect x="0" width="8" height="64" fill="#ffffff"/>
+        <rect x="16" width="8" height="64" fill="#ffffff"/>
+        <rect x="32" width="8" height="64" fill="#ffffff"/>
+        <rect x="48" width="8" height="64" fill="#ffffff"/>
+      </g>
+      <path d="M14 52L20.6 12H49L47.5 20.5H29.2L27.8 28.5H41.8L40.6 35.5H26.6L24.2 52Z" fill="#ffffff"/>
+      <circle cx="47" cy="46" r="8.5" fill="#ffd23f"/>
+      <path d="M47 42.2L50.7 44.8L49.3 49.1H44.7L43.3 44.8Z" fill="#2748d8"/>
+      <path d="M45.5 33L53 27" stroke="#ffd23f" strokeWidth="3.6" strokeLinecap="round"/>
     </svg>
   );
 }
