@@ -54,7 +54,7 @@ describe("mobile navigation", () => {
       MOBILE_ADMIN_NAV_ITEMS,
       (required) => hasPermissions(operatorContext, required),
     );
-    assert.equal(operatorVisible.length, 5);
+    assert.equal(operatorVisible.length, 6);
     const memberVisible = filterMobileNavItems(
       MOBILE_ADMIN_NAV_ITEMS,
       (required) => hasPermissions(memberContext, required),
