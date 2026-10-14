@@ -3286,3 +3286,98 @@ h2 {
     display: none;
   }
 }
+
+/* ── Dettaglio partita: campi a tutta larghezza ───────────────────────── */
+
+[data-testid="fixture-detail"] {
+  max-width: none;
+}
+
+[data-testid="fixture-detail"] > p:first-child {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--fa-space-lg);
+  flex-wrap: wrap;
+  margin: 0;
+  padding: var(--fa-space-xl);
+  border-radius: var(--fa-radius-xl);
+  background: linear-gradient(135deg, rgba(53, 96, 240, 0.28), rgba(122, 77, 255, 0.2));
+  border: 1px solid rgba(155, 107, 255, 0.4);
+  font-size: clamp(1.1rem, 2.4vw, 1.8rem);
+}
+
+[data-testid="fixture-detail"] > p:first-child .fa-match-card__team-logo {
+  width: 3.5rem;
+  height: 3.5rem;
+}
+
+[data-testid="fixture-score"] {
+  font-style: italic;
+  font-weight: 800;
+  font-size: clamp(2rem, 5vw, 3.6rem);
+  line-height: 1;
+}
+
+[data-testid="fixture-detail"] .fa-pitch-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--fa-space-lg);
+  align-items: start;
+}
+
+[data-testid="fixture-detail"] .fa-pitch-row > section {
+  min-width: 0;
+  padding: var(--fa-space-lg);
+  border-radius: var(--fa-radius-xl);
+  background: var(--fa-color-background-elevated);
+  border: 1px solid var(--fa-color-border);
+}
+
+[data-testid="fixture-detail"] .fa-pitch-wrap {
+  width: 100%;
+  min-width: 0;
+  flex: none;
+}
+
+[data-testid="fixture-detail"] .fa-pitch {
+  aspect-ratio: 4 / 5;
+}
+
+[data-testid="fixture-detail"] .fa-pitch-wrap__title {
+  font-style: italic;
+  font-weight: 800;
+  text-transform: uppercase;
+  font-size: 1.3rem;
+}
+
+[data-testid="fixture-detail"] .fa-pitch-row h4 {
+  margin: var(--fa-space-lg) 0 var(--fa-space-sm);
+  font-style: italic;
+  font-weight: 800;
+  text-transform: uppercase;
+  font-size: 1.2rem;
+}
+
+[data-testid="fixture-bench-home"],
+[data-testid="fixture-bench-away"] {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr));
+  gap: var(--fa-space-xs) var(--fa-space-md);
+}
+
+[data-testid="fixture-bench-home"] li,
+[data-testid="fixture-bench-away"] li {
+  padding: var(--fa-space-xs) var(--fa-space-sm);
+  border-radius: var(--fa-radius-lg);
+  background: color-mix(in srgb, var(--fa-color-foreground) 4%, transparent);
+}
+
+@media (max-width: 767px) {
+  [data-testid="fixture-detail"] .fa-pitch-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
