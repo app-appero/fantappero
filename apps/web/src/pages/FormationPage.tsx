@@ -1489,7 +1489,7 @@ export function FormationPage() {
           <div className="fa-formation-layout__pitch-row">
           <div className="fa-formation-layout__pitch">
             <FootballPitch
-              key={context.fantasyTeamId ?? targetTeamId || "self"}
+              key={context.fantasyTeamId ?? (targetTeamId || "self")}
               title={
                 context.teamName ? `Modulo ${moduleCode} — ${context.teamName}` : `Modulo ${moduleCode}`
               }
