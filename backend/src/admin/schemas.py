@@ -146,6 +146,35 @@ class AdminSeasonImportProgressResponse(ApiModel):
     result: AdminSeasonImportResultResponse | None = None
 
 
+class AdminResultRecoveryJobResponse(ApiModel):
+    job_id: str = Field(alias="jobId")
+    status: str
+    message: str
+
+
+class AdminResultRecoveryResultResponse(ApiModel):
+    """Esito di `recover_stale_match_results` (risultati arretrati + calcolo)."""
+
+    fixtures_created: int = Field(alias="fixturesCreated")
+    fixtures_updated: int = Field(alias="fixturesUpdated")
+    details_fetched: int = Field(alias="detailsFetched")
+    rounds_considered: int = Field(alias="roundsConsidered")
+    rounds_processed: int = Field(alias="roundsProcessed")
+    rounds_finalized: int = Field(alias="roundsFinalized")
+    fixtures_scored: int = Field(alias="fixturesScored")
+    errors: list[dict[str, str]] = Field(default_factory=list)
+
+
+class AdminResultRecoveryProgressResponse(ApiModel):
+    job_id: str = Field(alias="jobId")
+    status: str
+    percent: int
+    stage: str
+    message: str
+    error_code: str | None = Field(default=None, alias="errorCode")
+    result: AdminResultRecoveryResultResponse | None = None
+
+
 class AdminRoundCalculationResultResponse(ApiModel):
     """Esito di `process_live_fantasy_rounds` innescato a mano (EP-turni-calcolo)."""
 

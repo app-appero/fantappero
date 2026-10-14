@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from typing import Any
@@ -35,7 +35,7 @@ from sports_data.scheduler.quota import (
     max_fixtures_for_mode,
     resolve_quota_mode,
 )
-from sports_data.scheduler.windows import PollWindow, classify_fixture_window
+from sports_data.scheduler.windows import PollWindow, classify_fixture_window, stale_result_rank
 
 logger = get_logger(__name__)
 
@@ -247,6 +247,9 @@ def run_poll_cycle(
             return result
 
         candidates = select_fixtures_for_window(session, window, now=clock, league_ids=league_ids)
+        candidates.sort(
+            key=lambda row: stale_result_rank(row.status_short, row.kickoff_at, clock)
+        )
         fixture_cap = max_fixtures_for_mode(policy.max_fixtures_per_run, mode)
         if fixture_cap is not None:
             candidates = candidates[:fixture_cap]
@@ -409,16 +412,16 @@ def _fetch_and_sync(
     else:
         target_ids = [f.provider_id for f in candidates]
         if allow_criticality(policy.fixtures_criticality, mode) and target_ids:
-            # Refresh status for known fixtures (no multi-id batch on provider).
-            # Prefer league season calendar refresh for post/late when candidates exist.
-            for league_id in league_ids:
-                season = _current_season_year(session, league_id)
-                if season is None:
-                    continue
-                env = client.get("/fixtures", {"league": league_id, "season": season})
+            # Lo stato arriva dal calendario di stagione. Va chiesto per ogni
+            # campionato: fermarsi al primo lascia Serie A, Liga e le altre
+            # «in programma» anche a partita finita.
+            seasons = {
+                league_id: _current_season_year(session, league_id) for league_id in league_ids
+            }
+            for params in competition_calendar_queries(league_ids, seasons):
+                env = client.get("/fixtures", params)
                 requests += 1
                 fixtures_envelopes.append(env)
-                break  # one calendar refresh is enough to update statuses; details follow
 
     cap = max_fixtures_for_mode(policy.max_fixtures_per_run, mode)
     if cap is not None:
@@ -506,6 +509,20 @@ def _fetch_pre_calendars(
             requests += 1
             envelopes.append(env)
     return envelopes, requests
+
+
+def competition_calendar_queries(
+    league_ids: Sequence[int],
+    season_by_league: Mapping[int, int | None],
+) -> list[dict[str, int]]:
+    """Una query calendario per ogni campionato che ha una stagione corrente."""
+    queries: list[dict[str, int]] = []
+    for league_id in league_ids:
+        season = season_by_league.get(league_id)
+        if season is None:
+            continue
+        queries.append({"league": league_id, "season": season})
+    return queries
 
 
 def _current_season_year(session: Session, league_provider_id: int) -> int | None:

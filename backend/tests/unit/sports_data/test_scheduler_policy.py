@@ -17,7 +17,9 @@ from sports_data.scheduler.quota import (
     max_fixtures_for_mode,
     resolve_quota_mode,
 )
-from sports_data.scheduler.windows import PollWindow, classify_fixture_window
+from sports_data.provider.constants import MVP_LEAGUE_IDS
+from sports_data.scheduler.runner import competition_calendar_queries
+from sports_data.scheduler.windows import PollWindow, classify_fixture_window, stale_result_rank
 
 
 def test_classify_pre_live_post_late() -> None:
@@ -64,6 +66,22 @@ def test_overdue_ns_treated_as_live() -> None:
     assert (
         classify_fixture_window(status_short="NS", kickoff_at=kickoff, now=now) == PollWindow.LIVE
     )
+
+
+def test_stale_not_started_ranks_ahead_of_finished() -> None:
+    now = datetime(2026, 10, 14, 12, 0, tzinfo=UTC)
+    overdue = stale_result_rank("NS", now - timedelta(days=3), now)
+    live = stale_result_rank("2H", now - timedelta(minutes=40), now)
+    finished = stale_result_rank("FT", now - timedelta(days=1), now)
+    upcoming = stale_result_rank("NS", now + timedelta(hours=5), now)
+    assert overdue < live < finished < upcoming
+
+
+def test_post_match_calendar_queries_cover_every_league() -> None:
+    seasons = {league_id: 2026 for league_id in MVP_LEAGUE_IDS}
+    queries = competition_calendar_queries(MVP_LEAGUE_IDS, seasons)
+    assert [query["league"] for query in queries] == list(MVP_LEAGUE_IDS)
+    assert all(query["season"] == 2026 for query in queries)
 
 
 def test_quota_mode_thresholds() -> None:

@@ -13,9 +13,19 @@ from sports_data.scheduler.locks import RedisJobLock
 from sports_data.scheduler.runner import PollCycleResult, run_poll_cycle
 from sports_data.scheduler.windows import PollWindow
 
+_WINDOW_JOB_KEY = {
+    PollWindow.LIVE: "sports-poll-live",
+    PollWindow.PRE_MATCH: "sports-poll-pre",
+    PollWindow.POST_MATCH: "sports-poll-post",
+    PollWindow.LATE_CORRECTIONS: "sports-poll-late",
+}
 
-def _scheduler_enabled(settings: object) -> bool:
-    return bool(getattr(settings, "sports_scheduler_enabled", False))
+
+def _scheduler_enabled(settings: object, window: PollWindow) -> bool:
+    from system_jobs.service import allow_periodic
+
+    env_enabled = bool(getattr(settings, "sports_scheduler_enabled", False))
+    return allow_periodic(_WINDOW_JOB_KEY[window], env_enabled)
 
 
 def _redis_url(settings: object) -> str:
@@ -28,7 +38,7 @@ def _run_window(window: PollWindow) -> dict[str, object]:
     engine = create_engine_from_url(settings.database_url)
     factory = create_session_factory(engine)
     lock = RedisJobLock(_redis_url(settings))
-    enabled = _scheduler_enabled(settings)
+    enabled = _scheduler_enabled(settings, window)
     try:
         if not enabled:
             with session_scope(factory) as session:
@@ -67,7 +77,8 @@ def _run_window(window: PollWindow) -> dict[str, object]:
                 )
                 pipeline = (
                     process_live_fantasy_rounds(session)
-                    if window in {PollWindow.LIVE, PollWindow.POST_MATCH}
+                    if window
+                    in {PollWindow.LIVE, PollWindow.POST_MATCH, PollWindow.LATE_CORRECTIONS}
                     else None
                 )
     finally:

@@ -12,6 +12,7 @@ import { AppHeader } from "../layout/AppHeader";
 import { AdminDashboardScreen } from "../screens/admin/AdminDashboardScreen";
 import { AdminLeaguesScreen } from "../screens/admin/AdminLeaguesScreen";
 import { AdminListoneScreen } from "../screens/admin/AdminListoneScreen";
+import { AdminJobsScreen } from "../screens/admin/AdminJobsScreen";
 import { AdminTurniScreen } from "../screens/admin/AdminTurniScreen";
 import { AdminUsersScreen } from "../screens/admin/AdminUsersScreen";
 import { useAuthSession } from "../session/DemoSessionContext";
@@ -29,6 +30,7 @@ const ADMIN_SCREEN_BY_ID: Record<string, keyof AdminStackParamList> = {
   "admin-users": "AdminUsers",
   "admin-listone": "AdminListone",
   "admin-turni": "AdminTurni",
+  "admin-jobs": "AdminJobs",
 };
 
 const ADMIN_NAV_ID_BY_ROUTE: Record<string, string> = {
@@ -37,6 +39,7 @@ const ADMIN_NAV_ID_BY_ROUTE: Record<string, string> = {
   AdminUsers: "admin-users",
   AdminListone: "admin-listone",
   AdminTurni: "admin-turni",
+  AdminJobs: "admin-jobs",
 };
 
 /**
@@ -141,6 +144,12 @@ export function AdminNavigator() {
             {({ navigation }) => {
               rememberStack(navigation);
               return <AdminTurniScreen />;
+            }}
+          </Stack.Screen>
+          <Stack.Screen name="AdminJobs">
+            {({ navigation }) => {
+              rememberStack(navigation);
+              return <AdminJobsScreen />;
             }}
           </Stack.Screen>
         </Stack.Navigator>
