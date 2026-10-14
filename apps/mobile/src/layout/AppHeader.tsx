@@ -126,14 +126,6 @@ export function AppHeader({
                 onChange={onLeagueChange}
               />
             ) : null}
-            {countdown ? (
-              <LockCountdown
-                state={countdown.state}
-                nextLockAt={countdown.nextLockAt}
-                onExpire={refetchCountdown}
-                testID="header-lock-countdown"
-              />
-            ) : null}
             {canAddLeague ? (
               <Pressable
                 accessibilityRole="button"
@@ -184,6 +176,17 @@ export function AppHeader({
         </View>
         ) : null}
       </View>
+      {countdown && !isAdmin ? (
+        <View style={styles.countdownStrip} testID="header-lock-strip">
+          <Feather name="lock" size={14} color={colors.accentSecondary} />
+          <LockCountdown
+            state={countdown.state}
+            nextLockAt={countdown.nextLockAt}
+            onExpire={refetchCountdown}
+            testID="header-lock-countdown"
+          />
+        </View>
+      ) : null}
       <Modal
         visible={!isAdmin && leagueMenuOpen}
         transparent
@@ -329,6 +332,20 @@ const styles = lazyStyles(() => StyleSheet.create({
   modalSecondaryLabel: {
     color: colors.foreground,
     fontWeight: typography.fontWeight.semibold,
+  },
+  countdownStrip: {
+    flexDirection: "row",
+    alignItems: "center",
+    alignSelf: "flex-start",
+    gap: spacing.xs,
+    marginTop: spacing.xs,
+    marginLeft: spacing.xs,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 4,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.backgroundElevated,
   },
   topRow: {
     flexDirection: "row",
