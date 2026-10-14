@@ -28,6 +28,18 @@ try {
 console.log(`FantApperò mobile · build APK ${variant} · ${resolved.profile} · ${resolved.apiUrl}`);
 
 const androidDir = join(appRoot, "android");
+
+// La cartella android/ è generata (non versionata): senza rigenerarla restano
+// nome e icona di una build precedente. `prebuild` (senza --clean) la aggiorna
+// da app.json (nome, icona, icona adattiva) prima di compilare.
+const prebuild = spawnSync("npx", ["expo", "prebuild", "--platform", "android", "--no-install"], {
+  cwd: appRoot,
+  stdio: "inherit",
+  shell: process.platform === "win32",
+});
+if (prebuild.status !== 0) {
+  process.exit(prebuild.status ?? 1);
+}
 const gradlew = process.platform === "win32" ? ".\\gradlew.bat" : "./gradlew";
 const task = variant === "release" ? "assembleRelease" : "assembleDebug";
 
