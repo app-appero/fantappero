@@ -51,9 +51,12 @@ export function AthleteName({
   style,
   containerStyle,
   numberOfLines,
+  plain,
 }: {
   athleteId?: string | null;
   children: string;
+  /** Senza sottolineatura né colore link: il nome resta toccabile ma si legge come testo. */
+  plain?: boolean;
   style?: StyleProp<TextStyle>;
   /** Layout della cella: applicato al Pressable, o al testo se la scheda non è disponibile. */
   containerStyle?: StyleProp<ViewStyle>;
@@ -74,7 +77,7 @@ export function AthleteName({
       accessibilityLabel={`Apri scheda di ${children}`}
       onPress={() => card.open(athleteId)}
     >
-      <Text style={[style, styles.link]} numberOfLines={numberOfLines}>
+      <Text style={[style, plain ? null : styles.link]} numberOfLines={numberOfLines}>
         {children}
       </Text>
     </Pressable>
