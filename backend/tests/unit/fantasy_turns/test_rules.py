@@ -21,6 +21,7 @@ from fantasy_turns.rules import (
     evaluate_threshold,
     full_season_turn_specs,
     is_modification_allowed,
+    is_unplayed_fixture_status,
     kickoff_counts_for_cutoff,
     midweek_window,
     reconcile_fixture_kickoff_lock,
@@ -342,3 +343,14 @@ def test_reconcile_fixture_kickoff_lock_time_shift_without_pst() -> None:
         now=after,
     )
     assert delayed == ensure_utc(original)
+
+
+def test_unplayed_fixture_status_is_postponed_or_not_played() -> None:
+    assert is_unplayed_fixture_status("PST")
+    assert is_unplayed_fixture_status("canc")
+    assert is_unplayed_fixture_status("ABD")
+    assert is_unplayed_fixture_status("AWD")
+    assert is_unplayed_fixture_status("WO")
+    assert not is_unplayed_fixture_status("NS")
+    assert not is_unplayed_fixture_status("FT")
+    assert not is_unplayed_fixture_status(None)

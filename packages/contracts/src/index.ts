@@ -161,6 +161,7 @@ export {
   deriveEffectiveStatus,
   isModificationAllowed,
   applyCutoffRecalculation,
+  isUnplayedFixtureStatus,
   kickoffCountsForCutoff,
   mapFixtureMatchStatus,
   reconcileFixtureKickoffLock,
@@ -170,6 +171,7 @@ export {
 export type {
   EnsureFantasyTurnsResponse,
   ExcludeFantasyTurnFixtureRequest,
+  FantasyTurnExclusionResult,
   FantasyCalendarRefreshJob,
   FantasyCalendarRefreshProgress,
   FantasyCalendarRefreshResult,

@@ -86,6 +86,10 @@ describe("Matchday page H2H + europei", () => {
     expect(html).toContain("Premier League");
     expect(html).toContain("Serie A");
     expect(html).toContain("Rinviata");
+    expect(html).toContain('data-testid="matchday-filter-unplayed"');
+    expect(html).toContain("Non disputate e rinviate (1)");
+    expect(html).toContain('data-testid="matchday-exclude-unplayed"');
+    expect(html).toContain("Escludi non disputate e rinviate");
   });
 
   it("shows H2H empty state", () => {

@@ -7,6 +7,7 @@ import type {
 } from "@fantappero/contracts";
 import {
   TURN_DISPLAY_LABEL,
+  isUnplayedFixtureStatus,
   mapFixtureMatchStatus,
   resolveDefaultEuropeanTurn,
   resolveTurnDisplayStates,
@@ -23,6 +24,7 @@ import {
 } from "react-native";
 import {
   excludeFantasyTurnFixture,
+  excludeUnplayedFantasyTurnFixtures,
   fetchFantasyTurn,
   fetchFantasyTurns,
   fetchH2HCalendar,
@@ -118,6 +120,9 @@ export function MatchdayScreen() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [actionMessage, setActionMessage] = useState<string | null>(null);
+  const [fixtureFilter, setFixtureFilter] = useState<"all" | "unplayed">("all");
+  const [competitionTab, setCompetitionTab] = useState("");
+  const [excluding, setExcluding] = useState(false);
   const [pendingFixtures, setPendingFixtures] = useState<PendingFixtureSummary[]>([]);
   const { countdown, refetch: refetchCountdown } = useLockCountdown(accessToken, activeLeagueId);
 
@@ -204,6 +209,27 @@ export function MatchdayScreen() {
     void loadTurns();
     void loadPendingFixtures();
   }, [loadH2H, loadTurns, loadPendingFixtures]);
+
+  async function excludeAndRecalculate(
+    request: () => ReturnType<typeof excludeFantasyTurnFixture>,
+  ) {
+    if (!accessToken || !activeLeagueId || !selected) {
+      return;
+    }
+    setExcluding(true);
+    setActionError(null);
+    setActionMessage("Esclusione in corso. Poi ricalcolo la giornata.");
+    try {
+      const result = await request();
+      setSelected(result.turn);
+      setActionMessage(result.message);
+      await loadTurns();
+    } catch (error) {
+      setActionError(getApiErrorMessage(error, "Esclusione non consentita."));
+    } finally {
+      setExcluding(false);
+    }
+  }
 
   if (!canView) {
     return (
@@ -351,88 +377,142 @@ export function MatchdayScreen() {
                 già usate restano consumate.
               </Text>
             ) : null}
-            {[...groupFixtures(selected.fixtures).entries()].map(([competition, fixtures]) => (
-              <View key={competition} style={styles.competition} testID={`matchday-competition-${competition}`}>
-                <Text style={styles.competitionTitle}>{competition}</Text>
-                {fixtures.map((fixture) => {
-                  const played = fixture.homeGoals !== null && fixture.awayGoals !== null;
-                  const mapped = mapFixtureMatchStatus(fixture.statusShort);
-                  return (
-                    <View key={fixture.id} style={styles.fixtureCard}>
-                      <Pressable
-                        accessibilityRole="button"
-                        accessibilityLabel={`${fixture.homeClubName} contro ${fixture.awayClubName}, dettaglio partita`}
-                        onPress={() =>
-                          navigation.navigate("FixtureDetail", {
-                            turnId: selected.id,
-                            fixtureId: fixture.fixtureId,
-                          })
-                        }
-                        testID={`matchday-fixture-link-${fixture.fixtureId}`}
-                      >
-                        <View style={styles.fixtureTeams}>
-                          <Text style={styles.fixtureTeam} numberOfLines={2}>
-                            {fixture.homeClubName}
-                          </Text>
-                          <Text style={styles.fixtureScore}>
-                            {played ? `${fixture.homeGoals} - ${fixture.awayGoals}` : "vs"}
-                          </Text>
-                          <Text style={[styles.fixtureTeam, styles.fixtureTeamAway]} numberOfLines={2}>
-                            {fixture.awayClubName}
-                          </Text>
-                        </View>
-                        <View style={styles.fixtureMeta}>
-                          <Text style={styles.hint}>
-                            {formatDateTime(fixture.kickoffAt)}
-                            {fixture.lockLatchedAt ? " · bloccata" : ""}
-                          </Text>
-                          <StatusBadge
-                            label={matchRowStatusLabel(fixture.statusShort, fixture.statusElapsed)}
-                            color={MATCH_STATUS_COLOR[mapped] ?? colors.foregroundMuted}
-                            textColor={colors.accentContrast}
-                            testID={`matchday-fixture-status-${fixture.fixtureId}`}
-                          />
-                        </View>
-                      </Pressable>
-                      <Text style={styles.hint} testID={`matchday-fixture-feed-${fixture.fixtureId}`}>
-                        {fixture.feedStateLabel}
-                        {fixture.updatedAt
-                          ? ` · aggiornata ${formatDateTime(fixture.updatedAt)}`
-                          : ""}
-                      </Text>
-                      {isAdmin && selected.modificationAllowed ? (
-                        <Pressable
-                          style={styles.ghostButton}
-                          disabled={busy}
-                          onPress={() => {
-                            if (!accessToken) {
-                              return;
-                            }
-                            setBusy(true);
-                            setActionError(null);
-                            void excludeFantasyTurnFixture(accessToken, activeLeagueId, selected.id, {
-                              fixtureId: fixture.fixtureId,
-                            })
-                              .then(async (detail) => {
-                                setSelected(detail);
-                                setActionMessage("Partita esclusa dal turno.");
-                                await loadTurns();
-                              })
-                              .catch((error) =>
-                                setActionError(getApiErrorMessage(error, "Esclusione non consentita.")),
-                              )
-                              .finally(() => setBusy(false));
-                          }}
-                          testID={`matchday-exclude-${fixture.fixtureId}`}
-                        >
-                          <Text style={styles.ghostLabel}>Escludi</Text>
-                        </Pressable>
-                      ) : null}
-                    </View>
-                  );
-                })}
+            <View style={styles.chipRow} testID="matchday-fixture-filters">
+              <Pressable
+                style={[styles.chip, fixtureFilter === "all" ? styles.chipActive : null]}
+                onPress={() => setFixtureFilter("all")}
+                testID="matchday-filter-all"
+              >
+                <Text style={styles.chipLabel}>Tutte</Text>
+              </Pressable>
+              <Pressable
+                style={[styles.chip, fixtureFilter === "unplayed" ? styles.chipActive : null]}
+                onPress={() => setFixtureFilter("unplayed")}
+                testID="matchday-filter-unplayed"
+              >
+                <Text style={styles.chipLabel}>
+                  Non disputate e rinviate ({selected.fixtures.filter((fixture) => isUnplayedFixtureStatus(fixture.statusShort)).length})
+                </Text>
+              </Pressable>
+            </View>
+            {isAdmin && selected.modificationAllowed ? (
+              <Pressable
+                style={[
+                  styles.button,
+                  selected.fixtures.every((fixture) => !isUnplayedFixtureStatus(fixture.statusShort)) || excluding
+                    ? styles.disabled
+                    : null,
+                ]}
+                disabled={
+                  excluding ||
+                  busy ||
+                  selected.fixtures.every((fixture) => !isUnplayedFixtureStatus(fixture.statusShort))
+                }
+                onPress={() =>
+                  void excludeAndRecalculate(() =>
+                    excludeUnplayedFantasyTurnFixtures(accessToken as string, activeLeagueId as string, selected.id),
+                  )
+                }
+                testID="matchday-exclude-unplayed"
+              >
+                <Text style={styles.buttonLabel}>
+                  {excluding ? "Esclusione e ricalcolo in corso…" : "Escludi non disputate e rinviate"}
+                </Text>
+              </Pressable>
+            ) : null}
+            {fixtureFilter === "all" ? (
+              <View style={styles.chipRow} testID="matchday-competition-tabs">
+                {[...groupFixtures(selected.fixtures).keys()].map((competition) => (
+                  <Pressable
+                    key={competition}
+                    style={[styles.chip, (competitionTab || [...groupFixtures(selected.fixtures).keys()][0]) === competition ? styles.chipActive : null]}
+                    onPress={() => setCompetitionTab(competition)}
+                    testID={`matchday-competition-tab-${competition}`}
+                  >
+                    <Text style={styles.chipLabel}>{competition}</Text>
+                  </Pressable>
+                ))}
               </View>
-            ))}
+            ) : null}
+            {(fixtureFilter === "unplayed"
+              ? selected.fixtures.filter((fixture) => isUnplayedFixtureStatus(fixture.statusShort))
+              : groupFixtures(selected.fixtures).get(
+                  competitionTab && groupFixtures(selected.fixtures).has(competitionTab)
+                    ? competitionTab
+                    : ([...groupFixtures(selected.fixtures).keys()][0] ?? ""),
+                ) ?? []
+            ).map((fixture) => {
+              const played = fixture.homeGoals !== null && fixture.awayGoals !== null;
+              const mapped = mapFixtureMatchStatus(fixture.statusShort);
+              return (
+                <View key={fixture.id} style={styles.fixtureCard}>
+                  {fixtureFilter === "unplayed" ? (
+                    <Text style={styles.hint}>{fixture.competitionName ?? "Altre competizioni"}</Text>
+                  ) : null}
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel={`${fixture.homeClubName} contro ${fixture.awayClubName}, dettaglio partita`}
+                    onPress={() =>
+                      navigation.navigate("FixtureDetail", {
+                        turnId: selected.id,
+                        fixtureId: fixture.fixtureId,
+                      })
+                    }
+                    testID={`matchday-fixture-link-${fixture.fixtureId}`}
+                  >
+                    <View style={styles.fixtureTeams}>
+                      <Text style={styles.fixtureTeam} numberOfLines={2}>
+                        {fixture.homeClubName}
+                      </Text>
+                      <Text style={styles.fixtureScore}>
+                        {played ? `${fixture.homeGoals} - ${fixture.awayGoals}` : "vs"}
+                      </Text>
+                      <Text style={[styles.fixtureTeam, styles.fixtureTeamAway]} numberOfLines={2}>
+                        {fixture.awayClubName}
+                      </Text>
+                    </View>
+                    <View style={styles.fixtureMeta}>
+                      <Text style={styles.hint}>
+                        {formatDateTime(fixture.kickoffAt)}
+                        {fixture.lockLatchedAt ? " · bloccata" : ""}
+                      </Text>
+                      <StatusBadge
+                        label={matchRowStatusLabel(fixture.statusShort, fixture.statusElapsed)}
+                        color={MATCH_STATUS_COLOR[mapped] ?? colors.foregroundMuted}
+                        textColor={colors.accentContrast}
+                        testID={`matchday-fixture-status-${fixture.fixtureId}`}
+                      />
+                    </View>
+                  </Pressable>
+                  <Text style={styles.hint} testID={`matchday-fixture-feed-${fixture.fixtureId}`}>
+                    {fixture.feedStateLabel}
+                    {fixture.updatedAt ? ` · aggiornata ${formatDateTime(fixture.updatedAt)}` : ""}
+                  </Text>
+                  {isAdmin && selected.modificationAllowed ? (
+                    <Pressable
+                      style={styles.ghostButton}
+                      disabled={busy || excluding}
+                      onPress={() =>
+                        void excludeAndRecalculate(() =>
+                          excludeFantasyTurnFixture(accessToken as string, activeLeagueId as string, selected.id, {
+                            fixtureId: fixture.fixtureId,
+                          }),
+                        )
+                      }
+                      testID={`matchday-exclude-${fixture.fixtureId}`}
+                    >
+                      <Text style={styles.ghostLabel}>Escludi</Text>
+                    </Pressable>
+                  ) : null}
+                </View>
+              );
+            })}
+            {fixtureFilter === "unplayed" &&
+            selected.fixtures.every((fixture) => !isUnplayedFixtureStatus(fixture.statusShort)) ? (
+              <Text style={styles.hint} testID="matchday-unplayed-empty">
+                Nessuna partita non disputata o rinviata in questo turno.
+              </Text>
+            ) : null}
           </View>
         ) : null}
 

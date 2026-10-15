@@ -23,6 +23,7 @@ from fantasy_turns.schemas import (
     FantasyCalendarRefreshProgressResponse,
     FantasyCalendarRefreshResultResponse,
     FantasyTurnDetailResponse,
+    FantasyTurnExclusionResponse,
     FantasyTurnPreviewResponse,
     FantasyTurnSummaryResponse,
     FixtureLiveDetailResponse,
@@ -251,17 +252,37 @@ def open_fantasy_turn(
 
 @router.post(
     "/{league_id}/turni/{round_id}/escludi-fixture",
-    response_model=FantasyTurnDetailResponse,
+    response_model=FantasyTurnExclusionResponse,
 )
 def exclude_fantasy_turn_fixture(
     round_id: UUID,
     body: ExcludeFantasyTurnFixtureRequest,
     league_access: LeagueAccess = Depends(require_league_permissions(Permission.LEAGUE_ADMIN)),
     service: FantasyTurnService = Depends(get_fantasy_turn_service),
-) -> FantasyTurnDetailResponse | JSONResponse:
-    """Esclude una partita dal turno (solo prima dell'apertura)."""
+) -> FantasyTurnExclusionResponse | JSONResponse:
+    """Esclude una partita dal turno e ricalcola la giornata.
+
+    Consentito finché il turno è ancora programmato. Il ricalcolo parte nello
+    stesso comando: l'amministratore di lega non ha «Calcola giornata».
+    """
     try:
         return service.exclude_fixture(league_access, round_id, body)
+    except AuthError as exc:
+        return _error_response(exc)
+
+
+@router.post(
+    "/{league_id}/turni/{round_id}/escludi-non-disputate",
+    response_model=FantasyTurnExclusionResponse,
+)
+def exclude_unplayed_fantasy_turn_fixtures(
+    round_id: UUID,
+    league_access: LeagueAccess = Depends(require_league_permissions(Permission.LEAGUE_ADMIN)),
+    service: FantasyTurnService = Depends(get_fantasy_turn_service),
+) -> FantasyTurnExclusionResponse | JSONResponse:
+    """Esclude tutte le partite rinviate o non disputate e ricalcola la giornata."""
+    try:
+        return service.exclude_unplayed_fixtures(league_access, round_id)
     except AuthError as exc:
         return _error_response(exc)
 
