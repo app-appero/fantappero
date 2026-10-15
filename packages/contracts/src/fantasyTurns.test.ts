@@ -6,6 +6,7 @@ import {
   computeCutoff,
   deriveEffectiveStatus,
   isModificationAllowed,
+  isUnplayedFixtureStatus,
   kickoffCountsForCutoff,
   labelFantasyTurnStatus,
   mapFixtureMatchStatus,
@@ -75,6 +76,14 @@ describe("fantasyTurns rules", () => {
       true,
     );
     assert.equal(mapFixtureMatchStatus("PST"), "postponed");
+    assert.equal(isUnplayedFixtureStatus("PST"), true);
+    assert.equal(isUnplayedFixtureStatus("canc"), true);
+    assert.equal(isUnplayedFixtureStatus("ABD"), true);
+    assert.equal(isUnplayedFixtureStatus("AWD"), true);
+    assert.equal(isUnplayedFixtureStatus("WO"), true);
+    assert.equal(isUnplayedFixtureStatus("NS"), false);
+    assert.equal(isUnplayedFixtureStatus("FT"), false);
+    assert.equal(isUnplayedFixtureStatus(null), false);
   });
 
   it("mapFixtureMatchStatus flags fixtures without a confirmed kickoff as needs_update", () => {

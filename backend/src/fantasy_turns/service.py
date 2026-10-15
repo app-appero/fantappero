@@ -52,6 +52,7 @@ from fantasy_turns.rules import (
     evaluate_threshold,
     full_season_turn_specs,
     is_modification_allowed,
+    is_unplayed_fixture_status,
     kickoff_counts_for_cutoff,
     reconcile_fixture_kickoff_lock,
     resolve_default_turn,
@@ -64,6 +65,7 @@ from fantasy_turns.schemas import (
     ExcludeFantasyTurnFixtureRequest,
     FantasyCalendarRefreshResultResponse,
     FantasyTurnDetailResponse,
+    FantasyTurnExclusionResponse,
     FantasyTurnFixtureResponse,
     FantasyTurnPreviewResponse,
     FantasyTurnSummaryResponse,
@@ -95,6 +97,27 @@ from sports_data.provider.client import ApiFootballClient, build_client_from_set
 from sports_data.provider.errors import PROVIDER_UNAVAILABLE_USER_MESSAGE, ProviderConfigError
 
 logger = get_logger(__name__)
+
+
+def _exclusion_message(
+    *,
+    excluded_count: int,
+    single: bool,
+    recalculated: bool,
+    result_final: bool,
+    homologated: bool,
+    error: str | None,
+) -> str:
+    subject = "Partita esclusa" if single else f"Escluse {excluded_count} partite"
+    if error:
+        return f"{subject}. Il ricalcolo non è riuscito: {error}"
+    if homologated:
+        return f"{subject}. Giornata ricalcolata e omologata: la classifica è aggiornata."
+    if result_final:
+        return f"{subject}. Giornata ricalcolata e chiusa."
+    if recalculated:
+        return f"{subject}. Giornata ricalcolata: il risultato resta provvisorio."
+    return f"{subject}."
 _ = (User, Club)
 
 #: Stati provider di una partita conclusa.
@@ -898,7 +921,7 @@ class FantasyTurnService:
         league_access: LeagueAccess,
         round_id: UUID,
         payload: ExcludeFantasyTurnFixtureRequest,
-    ) -> FantasyTurnDetailResponse:
+    ) -> FantasyTurnExclusionResponse:
         fantasy_round = self._load_round(league_access.league.id, round_id, for_update=True)
         now = datetime.now(UTC)
         assert_modification_allowed(
@@ -924,7 +947,14 @@ class FantasyTurnService:
                 "fantasy_turn_fixture_excluded_total",
                 labels={"result": "noop"},
             )
-            return self._to_detail(fantasy_round, now=now)
+            return FantasyTurnExclusionResponse(
+                turn=self._to_detail(fantasy_round, now=now),
+                excludedCount=0,
+                recalculated=False,
+                resultFinal=False,
+                homologated=False,
+                message="La partita è già esclusa dal turno.",
+            )
 
         link.excluded_at = now
         link.excluded_by_user_id = league_access.user.id
@@ -944,12 +974,148 @@ class FantasyTurnService:
                 "fixtureId": str(payload.fixture_id),
             },
         )
-        self._session.commit()
         get_metrics().incr(
             "fantasy_turn_fixture_excluded_total",
             labels={"result": "success"},
         )
-        return self.get_turn(league_access, round_id, reconcile_cutoff=False)
+        return self._commit_exclusion_and_recalculate(
+            league_access,
+            round_id,
+            excluded_count=1,
+            single=True,
+        )
+
+    def exclude_unplayed_fixtures(
+        self,
+        league_access: LeagueAccess,
+        round_id: UUID,
+    ) -> FantasyTurnExclusionResponse:
+        """Esclude in blocco le partite rinviate o non disputate e ricalcola."""
+        fantasy_round = self._load_round(league_access.league.id, round_id, for_update=True)
+        now = datetime.now(UTC)
+        assert_modification_allowed(
+            stored=fantasy_round.status,
+            now=now,
+            cutoff_at=fantasy_round.cutoff_at,
+        )
+        links = list(
+            self._session.scalars(
+                select(FantasyRoundFixture)
+                .where(
+                    FantasyRoundFixture.round_id == fantasy_round.id,
+                    FantasyRoundFixture.excluded_at.is_(None),
+                )
+                .with_for_update()
+            ).all()
+        )
+        statuses = self._fixture_statuses([link.fixture_id for link in links])
+        excluded_ids: list[str] = []
+        for link in links:
+            if not is_unplayed_fixture_status(statuses.get(link.fixture_id)):
+                continue
+            link.excluded_at = now
+            link.excluded_by_user_id = league_access.user.id
+            excluded_ids.append(str(link.fixture_id))
+        if not excluded_ids:
+            return FantasyTurnExclusionResponse(
+                turn=self.get_turn(league_access, round_id, reconcile_cutoff=False),
+                excludedCount=0,
+                recalculated=False,
+                resultFinal=False,
+                homologated=False,
+                message="Nessuna partita non disputata o rinviata da escludere.",
+            )
+        self._session.flush()
+        self._reconcile_cutoff(
+            fantasy_round,
+            now=now,
+            actor_id=league_access.user.id,
+            commit=False,
+        )
+        self._add_audit(
+            league_id=league_access.league.id,
+            actor_id=league_access.user.id,
+            action=LeagueAuditAction.FANTASY_TURN_FIXTURE_EXCLUDED,
+            details={
+                "roundId": str(fantasy_round.id),
+                "fixtureIds": excluded_ids,
+                "excludedCount": len(excluded_ids),
+            },
+        )
+        get_metrics().incr(
+            "fantasy_turn_fixture_excluded_total",
+            labels={"result": "bulk"},
+        )
+        return self._commit_exclusion_and_recalculate(
+            league_access,
+            round_id,
+            excluded_count=len(excluded_ids),
+            single=False,
+        )
+
+    def _fixture_statuses(self, fixture_ids: list[UUID]) -> dict[UUID, str | None]:
+        if not fixture_ids:
+            return {}
+        rows = self._session.execute(
+            select(Fixture.id, Fixture.status_short).where(Fixture.id.in_(fixture_ids))
+        ).all()
+        return {row.id: row.status_short for row in rows}
+
+    def _commit_exclusion_and_recalculate(
+        self,
+        league_access: LeagueAccess,
+        round_id: UUID,
+        *,
+        excluded_count: int,
+        single: bool,
+    ) -> FantasyTurnExclusionResponse:
+        """Persiste l'esclusione, poi ricalcola. Un ricalcolo fallito non la annulla."""
+        self._session.commit()
+        recalculated = False
+        result_final = False
+        homologated = False
+        error: str | None = None
+        try:
+            result = calculate_league_round(
+                self._session,
+                round_id=round_id,
+                league_id=league_access.league.id,
+                actor_id=league_access.user.id,
+                automatic=False,
+            )
+            self._session.commit()
+            recalculated = True
+            result_final = result.result_final
+            homologated = result.homologated
+        except ValidationAuthError as exc:
+            self._session.rollback()
+            error = exc.message
+            logger.info(
+                "fantasy_turn_exclusion_recalc_rejected",
+                extra={"round_id": str(round_id), "result": exc.code},
+            )
+        except Exception:
+            self._session.rollback()
+            error = "Ricalcolo della giornata non riuscito."
+            logger.exception(
+                "fantasy_turn_exclusion_recalc_failed",
+                extra={"round_id": str(round_id)},
+            )
+        return FantasyTurnExclusionResponse(
+            turn=self.get_turn(league_access, round_id, reconcile_cutoff=False),
+            excludedCount=excluded_count,
+            recalculated=recalculated,
+            resultFinal=result_final,
+            homologated=homologated,
+            message=_exclusion_message(
+                excluded_count=excluded_count,
+                single=single,
+                recalculated=recalculated,
+                result_final=result_final,
+                homologated=homologated,
+                error=error,
+            ),
+        )
 
     def recalculate_cutoff(
         self,

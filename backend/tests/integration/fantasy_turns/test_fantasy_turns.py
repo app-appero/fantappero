@@ -392,7 +392,10 @@ def test_exclude_before_open_and_reject_after_open(
         json={"fixtureId": fixture_id},
     )
     assert excluded.status_code == 200
-    assert excluded.json()["fixtureCount"] == created.json()["fixtureCount"] - 1
+    excluded_body = excluded.json()
+    assert excluded_body["excludedCount"] == 1
+    assert excluded_body["turn"]["fixtureCount"] == created.json()["fixtureCount"] - 1
+    assert "ricalcol" in excluded_body["message"].lower()
 
     _promote_to_operator(db_session, user_id)
     opened = client.post(

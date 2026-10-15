@@ -239,6 +239,16 @@ export interface ExcludeFantasyTurnFixtureRequest {
   fixtureId: string;
 }
 
+/** Esito di un'esclusione (singola o massiva) seguita dal ricalcolo della giornata. */
+export interface FantasyTurnExclusionResult {
+  turn: FantasyTurnDetail;
+  excludedCount: number;
+  recalculated: boolean;
+  resultFinal: boolean;
+  homologated: boolean;
+  message: string;
+}
+
 export type FantasyFixtureMatchStatus =
   | "scheduled"
   | "live"
@@ -401,6 +411,16 @@ export function reconcileFixtureKickoffLock(input: {
     lockLatchedAt: latchedMs == null ? null : new Date(latchedMs).toISOString(),
     justLatched,
   };
+}
+
+/**
+ * Partite che in questo turno non producono un risultato: rinviate (PST) o
+ * non disputate (cancellate, abbandonate, a tavolino). Le «in programma» (NS)
+ * restano fuori: sono ancora da giocare e non vanno escluse in blocco.
+ */
+export function isUnplayedFixtureStatus(statusShort: string | null | undefined): boolean {
+  const status = (statusShort ?? "").trim().toUpperCase();
+  return INACTIVE_FIXTURE_STATUSES.has(status);
 }
 
 export function mapFixtureMatchStatus(
