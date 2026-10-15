@@ -2,6 +2,24 @@
 
 export type FantasyTurnStatus = "scheduled" | "open" | "locked" | "skipped";
 
+/** Etichette mostrate all'utente. I valori API restano in inglese. */
+export const FANTASY_TURN_STATUS_LABEL: Record<FantasyTurnStatus, string> = {
+  scheduled: "Programmato",
+  open: "Aperto",
+  locked: "Chiuso",
+  skipped: "Non disputato",
+};
+
+export function labelFantasyTurnStatus(status: string | null | undefined): string {
+  if (status == null || status === "") {
+    return "";
+  }
+  if (status in FANTASY_TURN_STATUS_LABEL) {
+    return FANTASY_TURN_STATUS_LABEL[status as FantasyTurnStatus];
+  }
+  return status;
+}
+
 export type FantasyTurnKind = "weekend" | "midweek";
 
 export type FantasyRoundFixtureReason = "window" | "admin_include";

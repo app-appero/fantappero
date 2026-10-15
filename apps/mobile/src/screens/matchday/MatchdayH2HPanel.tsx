@@ -5,6 +5,7 @@ import {
   H2H_POINTS_LABEL,
   describeH2HResult,
   h2hResultAriaLabel,
+  labelFantasyTurnStatus,
 } from "@fantappero/contracts";
 import { theme } from "@fantappero/ui/theme";
 import { useEffect, useMemo, useState } from "react";
@@ -91,7 +92,7 @@ function roundStatusHint(round: H2HCalendarRound): string {
     return "Risultati provvisori / in attesa";
   }
   if (round.europeanTurnStatus) {
-    return `Turno europeo: ${round.europeanTurnStatus}`;
+    return `Turno europeo: ${labelFantasyTurnStatus(round.europeanTurnStatus)}`;
   }
   return "Giornata da disputare";
 }
