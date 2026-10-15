@@ -112,6 +112,8 @@ describe("MatchdayH2HPanel — Punti e Gol fantasy espliciti (EP13-P02)", () => 
     expect(text).not.toContain("0 – 0");
     expect(html).toContain("Risultato non ancora calcolato.");
     expect(html).toContain("In attesa");
+    expect(html).toContain("Turno europeo: Chiuso");
+    expect(html).not.toContain("Turno europeo: locked");
   });
 
   it("non inventa i gol mancanti quando solo i punti sono noti", () => {

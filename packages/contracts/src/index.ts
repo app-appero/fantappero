@@ -153,8 +153,10 @@ export {
 } from "./leagues.js";
 
 export {
+  FANTASY_TURN_STATUS_LABEL,
   TURN_DISPLAY_LABEL,
   aggregateTurnStatus,
+  labelFantasyTurnStatus,
   computeCutoff,
   deriveEffectiveStatus,
   isModificationAllowed,

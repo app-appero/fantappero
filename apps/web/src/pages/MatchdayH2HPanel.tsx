@@ -4,6 +4,7 @@ import {
   H2H_POINTS_LABEL,
   describeH2HResult,
   h2hResultAriaLabel,
+  labelFantasyTurnStatus,
 } from "@fantappero/contracts";
 import {
   Badge,
@@ -74,7 +75,7 @@ function roundStatusHint(round: H2HCalendarRound): string {
     return "Risultati provvisori / in attesa";
   }
   if (round.europeanTurnStatus) {
-    return `Turno europeo: ${round.europeanTurnStatus}`;
+    return `Turno europeo: ${labelFantasyTurnStatus(round.europeanTurnStatus)}`;
   }
   return "Giornata da disputare";
 }
