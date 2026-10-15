@@ -228,6 +228,7 @@ export {
   MAX_AUTOMATIC_SUBSTITUTIONS,
   MAX_TACTICAL_MOVES,
   approvedModuleCatalog,
+  blockingLineupSaveIssue,
   copyPreviousLineup,
   evaluateBenchOrderLock,
   evaluateLineup,
