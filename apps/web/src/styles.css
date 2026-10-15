@@ -1870,6 +1870,18 @@ a.fa-member-list__identity:focus-visible {
   font-size: var(--fa-text-xs);
 }
 
+.fa-matchday-fixture-tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--fa-space-sm);
+  align-items: center;
+}
+
+.fa-matchday-competitions-tabs .fa-tablist {
+  flex-wrap: nowrap;
+  overflow-x: auto;
+}
+
 .fa-matchday-competition {
   display: flex;
   flex-direction: column;

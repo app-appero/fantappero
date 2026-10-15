@@ -1,5 +1,6 @@
 import type {
   FantasyTurnDetail,
+  FantasyTurnExclusionResult,
   FantasyTurnFixture,
   FantasyTurnSummary,
   H2HCalendar,
@@ -7,6 +8,7 @@ import type {
 } from "@fantappero/contracts";
 import {
   TURN_DISPLAY_LABEL,
+  isUnplayedFixtureStatus,
   mapFixtureMatchStatus,
   resolveDefaultEuropeanTurn,
   resolveTurnDisplayStates,
@@ -27,10 +29,12 @@ import {
   TabPanel,
   Tabs,
   UiStatePanel,
+  useOptionalToast,
 } from "@fantappero/ui";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   excludeFantasyTurnFixture,
+  excludeUnplayedFantasyTurnFixtures,
   fetchFantasyTurn,
   fetchFantasyTurns,
   fetchH2HCalendar,
@@ -374,6 +378,10 @@ export function MatchdayPage() {
   });
   const [actionError, setActionError] = useState<string | null>(null);
   const [actionMessage, setActionMessage] = useState<string | null>(null);
+  const [fixtureFilter, setFixtureFilter] = useState<"all" | "unplayed">("all");
+  const [competitionTab, setCompetitionTab] = useState("");
+  const [excluding, setExcluding] = useState(false);
+  const toast = useOptionalToast();
 
   const isAdmin = can(["league:admin"]);
   const canView = can(["matchday:view"]);
@@ -564,37 +572,163 @@ export function MatchdayPage() {
     }
   }
 
-  async function runExclude(fixtureId: string) {
+  const competitionGroups = useMemo(
+    () => (selected ? groupFixturesByCompetition(selected.fixtures) : []),
+    [selected],
+  );
+  const unplayedFixtures = useMemo(
+    () =>
+      selected ? selected.fixtures.filter((fixture) => isUnplayedFixtureStatus(fixture.statusShort)) : [],
+    [selected],
+  );
+  const activeCompetition = competitionGroups.some(([name]) => name === competitionTab)
+    ? competitionTab
+    : (competitionGroups[0]?.[0] ?? "");
+
+  async function applyExclusion(
+    request: () => Promise<FantasyTurnExclusionResult>,
+    demoApply: () => void,
+    demoMessage: string,
+  ) {
     if (!selected) {
       return;
     }
+    if (!isDemoMode) {
+      const session = loadStoredSession();
+      if (!session?.accessToken || !activeLeagueId) {
+        return;
+      }
+    }
+    toast?.push({
+      title: "Esclusione in corso. Poi ricalcolo la giornata.",
+      variant: "info",
+    });
     if (isDemoMode) {
-      setSelected({
-        ...selected,
-        fixtureCount: Math.max(0, selected.fixtureCount - 1),
-        fixtures: selected.fixtures.filter((row) => row.fixtureId !== fixtureId),
-      });
-      setActionMessage("Partita esclusa (demo).");
+      demoApply();
+      setActionMessage(demoMessage);
+      toast?.push({ title: demoMessage, variant: "info" });
       return;
     }
-    const session = loadStoredSession();
-    if (!session?.accessToken || !activeLeagueId) {
-      return;
-    }
-    setBusy(true);
+    setExcluding(true);
     setActionError(null);
     try {
-      const detail = await excludeFantasyTurnFixture(session.accessToken, activeLeagueId, selected.id, {
-        fixtureId,
+      const result = await request();
+      setSelected(result.turn);
+      setActionMessage(result.message);
+      toast?.push({
+        title: result.message,
+        variant: result.homologated || result.resultFinal ? "success" : result.recalculated ? "info" : "warning",
       });
-      setSelected(detail);
-      setActionMessage("Partita esclusa dal turno.");
       await loadTurns();
     } catch (error) {
-      setActionError(getApiErrorMessage(error, "Esclusione non consentita."));
+      const message = getApiErrorMessage(error, "Esclusione non consentita.");
+      setActionError(message);
+      toast?.push({ title: message, variant: "danger" });
     } finally {
-      setBusy(false);
+      setExcluding(false);
     }
+  }
+
+  function runExclude(fixtureId: string) {
+    if (!selected) {
+      return;
+    }
+    const current = selected;
+    return applyExclusion(
+      () =>
+        excludeFantasyTurnFixture(loadStoredSession()?.accessToken ?? "", activeLeagueId ?? "", current.id, {
+          fixtureId,
+        }),
+      () => {
+        setSelected({
+          ...current,
+          fixtureCount: Math.max(0, current.fixtureCount - 1),
+          fixtures: current.fixtures.filter((row) => row.fixtureId !== fixtureId),
+        });
+      },
+      "Partita esclusa (demo). Il ricalcolo parte solo su una lega reale.",
+    );
+  }
+
+  function renderFixture(fixture: FantasyTurnFixture, showCompetition: boolean) {
+    if (!selected) {
+      return null;
+    }
+    return (
+      <div key={fixture.id} className="fa-matchday-fixture">
+        {showCompetition ? (
+          <p className="fa-matchday-hint">{fixture.competitionName ?? "Altre competizioni"}</p>
+        ) : null}
+        <Link
+          to={`/turni/${selected.id}/partite/${fixture.fixtureId}`}
+          className="fa-matchday-matchup-link"
+          data-testid={`matchday-fixture-link-${fixture.fixtureId}`}
+          aria-label={`${fixture.homeClubName} contro ${fixture.awayClubName}, dettaglio partita`}
+        >
+          <MatchCard
+            homeTeam={fixture.homeClubName}
+            awayTeam={fixture.awayClubName}
+            kickoffLabel={formatDateTime(fixture.kickoffAt)}
+            status={mapFixtureMatchStatus(fixture.statusShort, fixture.kickoffAt)}
+            statusLabel={matchCardStatusLabel(fixture)}
+            homeLogoUrl={fixture.homeClubLogoUrl}
+            awayLogoUrl={fixture.awayClubLogoUrl}
+            score={
+              fixture.homeGoals !== null && fixture.awayGoals !== null
+                ? { home: fixture.homeGoals, away: fixture.awayGoals }
+                : null
+            }
+          />
+        </Link>
+        <p className="fa-matchday-hint" data-testid={`matchday-fixture-feed-${fixture.fixtureId}`}>
+          {fixture.feedStateLabel}
+          {fixture.updatedAt ? ` · ultimo aggiornamento ${formatDateTime(fixture.updatedAt)}` : ""}
+        </p>
+        {fixture.lockLatchedAt ? (
+          <p className="fa-matchday-hint" data-testid={`matchday-lock-latched-${fixture.fixtureId}`}>
+            Bloccata: l'orario originale è già trascorso.
+          </p>
+        ) : null}
+        {isAdmin && selected.modificationAllowed ? (
+          <Button
+            type="button"
+            variant="ghost"
+            disabled={busy || excluding}
+            loading={excluding}
+            onClick={() => void runExclude(fixture.fixtureId)}
+            data-testid={`matchday-exclude-${fixture.fixtureId}`}
+          >
+            Escludi
+          </Button>
+        ) : null}
+      </div>
+    );
+  }
+
+  function runExcludeUnplayed() {
+    if (!selected) {
+      return;
+    }
+    const current = selected;
+    return applyExclusion(
+      () =>
+        excludeUnplayedFantasyTurnFixtures(
+          loadStoredSession()?.accessToken ?? "",
+          activeLeagueId ?? "",
+          current.id,
+        ),
+      () => {
+        const remaining = current.fixtures.filter(
+          (row) => !isUnplayedFixtureStatus(row.statusShort),
+        );
+        setSelected({
+          ...current,
+          fixtureCount: remaining.length,
+          fixtures: remaining,
+        });
+      },
+      "Partite non disputate e rinviate escluse (demo). Il ricalcolo parte solo su una lega reale.",
+    );
   }
 
   return (
@@ -751,74 +885,81 @@ export function MatchdayPage() {
                 ) : null}
                 {selected.skipReason ? <p>{selected.skipReason}</p> : null}
 
-                <div className="fa-matchday-competitions" data-testid="matchday-fixtures">
-                  {groupFixturesByCompetition(selected.fixtures).map(
-                    ([competitionName, fixtures]) => (
-                      <section
-                        key={competitionName}
-                        className="fa-matchday-competition"
-                        data-testid={`matchday-competition-${competitionName}`}
-                      >
-                        <h3 className="fa-matchday-competition__title">{competitionName}</h3>
-                        <div className="fa-matchday-competition__fixtures">
-                          {fixtures.map((fixture) => (
-                            <div key={fixture.id} className="fa-matchday-fixture">
-                              <Link
-                                to={`/turni/${selected.id}/partite/${fixture.fixtureId}`}
-                                className="fa-matchday-matchup-link"
-                                data-testid={`matchday-fixture-link-${fixture.fixtureId}`}
-                                aria-label={`${fixture.homeClubName} contro ${fixture.awayClubName}, dettaglio partita`}
-                              >
-                                <MatchCard
-                                  homeTeam={fixture.homeClubName}
-                                  awayTeam={fixture.awayClubName}
-                                  kickoffLabel={formatDateTime(fixture.kickoffAt)}
-                                  status={mapFixtureMatchStatus(fixture.statusShort, fixture.kickoffAt)}
-                                  statusLabel={matchCardStatusLabel(fixture)}
-                                  homeLogoUrl={fixture.homeClubLogoUrl}
-                                  awayLogoUrl={fixture.awayClubLogoUrl}
-                                  score={
-                                    fixture.homeGoals !== null && fixture.awayGoals !== null
-                                      ? { home: fixture.homeGoals, away: fixture.awayGoals }
-                                      : null
-                                  }
-                                />
-                              </Link>
-                              <p
-                                className="fa-matchday-hint"
-                                data-testid={`matchday-fixture-feed-${fixture.fixtureId}`}
-                              >
-                                {fixture.feedStateLabel}
-                                {fixture.updatedAt
-                                  ? ` · ultimo aggiornamento ${formatDateTime(fixture.updatedAt)}`
-                                  : ""}
-                              </p>
-                              {fixture.lockLatchedAt ? (
-                                <p
-                                  className="fa-matchday-hint"
-                                  data-testid={`matchday-lock-latched-${fixture.fixtureId}`}
-                                >
-                                  Bloccata: l'orario originale è già trascorso.
-                                </p>
-                              ) : null}
-                              {isAdmin && selected.modificationAllowed ? (
-                                <Button
-                                  type="button"
-                                  variant="ghost"
-                                  disabled={busy}
-                                  onClick={() => void runExclude(fixture.fixtureId)}
-                                  data-testid={`matchday-exclude-${fixture.fixtureId}`}
-                                >
-                                  Escludi
-                                </Button>
-                              ) : null}
-                            </div>
-                          ))}
-                        </div>
-                      </section>
-                    ),
-                  )}
+                <div className="fa-matchday-fixture-tools" data-testid="matchday-fixture-filters">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant={fixtureFilter === "all" ? "primary" : "secondary"}
+                    onClick={() => setFixtureFilter("all")}
+                    data-testid="matchday-filter-all"
+                  >
+                    Tutte
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant={fixtureFilter === "unplayed" ? "primary" : "secondary"}
+                    onClick={() => setFixtureFilter("unplayed")}
+                    data-testid="matchday-filter-unplayed"
+                  >
+                    Non disputate e rinviate ({unplayedFixtures.length})
+                  </Button>
+                  {isAdmin && selected.modificationAllowed ? (
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="secondary"
+                      disabled={busy || unplayedFixtures.length === 0}
+                      loading={excluding}
+                      onClick={() => void runExcludeUnplayed()}
+                      data-testid="matchday-exclude-unplayed"
+                    >
+                      Escludi non disputate e rinviate
+                    </Button>
+                  ) : null}
                 </div>
+                {excluding ? (
+                  <p className="fa-matchday-hint" data-testid="matchday-exclude-progress">
+                    Esclusione e ricalcolo in corso…
+                  </p>
+                ) : null}
+
+                {fixtureFilter === "unplayed" ? (
+                  <div className="fa-matchday-competition__fixtures" data-testid="matchday-unplayed-list">
+                    {unplayedFixtures.length === 0 ? (
+                      <p className="fa-matchday-hint" data-testid="matchday-unplayed-empty">
+                        Nessuna partita non disputata o rinviata in questo turno.
+                      </p>
+                    ) : (
+                      unplayedFixtures.map((fixture) => renderFixture(fixture, true))
+                    )}
+                  </div>
+                ) : (
+                  <Tabs
+                    value={activeCompetition}
+                    onValueChange={setCompetitionTab}
+                    aria-label="Campionati"
+                    className="fa-matchday-competitions-tabs"
+                  >
+                    <TabList>
+                      {competitionGroups.map(([competitionName]) => (
+                        <Tab key={competitionName} value={competitionName}>
+                          {competitionName}
+                        </Tab>
+                      ))}
+                    </TabList>
+                    {competitionGroups.map(([competitionName, fixtures]) => (
+                      <TabPanel key={competitionName} value={competitionName}>
+                        <div
+                          className="fa-matchday-competition__fixtures"
+                          data-testid={`matchday-competition-${competitionName}`}
+                        >
+                          {fixtures.map((fixture) => renderFixture(fixture, false))}
+                        </div>
+                      </TabPanel>
+                    ))}
+                  </Tabs>
+                )}
               </div>
             ) : null}
 

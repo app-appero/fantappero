@@ -216,6 +216,21 @@ class RoundHomologationResponse(ApiModel):
     formula_version: str | None = Field(default=None, alias="formulaVersion")
 
 
+class FantasyTurnExclusionResponse(ApiModel):
+    """Esclusione di una o più partite e ricalcolo della giornata che ne segue.
+
+    L'amministratore di lega non ha il comando operatore «Calcola giornata»:
+    l'esclusione (puntuale o massiva) avvia lei il ricalcolo.
+    """
+
+    turn: FantasyTurnDetailResponse
+    excluded_count: int = Field(alias="excludedCount")
+    recalculated: bool
+    result_final: bool = Field(alias="resultFinal")
+    homologated: bool
+    message: str
+
+
 class RoundCalculationResponse(ApiModel):
     """Esito di `calculate_league_round` (EP-turni-calcolo) — stessa forma sia dal
     pulsante per-lega sia (aggregata) dal pulsante massivo dell'operatore."""

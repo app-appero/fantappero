@@ -29,6 +29,7 @@ import type {
   FantasyCalendarRefreshProgress,
   FantasyCalendarRefreshResult,
   FantasyTurnDetail,
+  FantasyTurnExclusionResult,
   FantasyTurnPreview,
   FantasyTurnSummary,
   FixtureLiveDetail,
@@ -831,12 +832,29 @@ export function excludeFantasyTurnFixture(
   leagueId: string,
   roundId: string,
   body: ExcludeFantasyTurnFixtureRequest,
-): Promise<FantasyTurnDetail> {
-  return apiRequest<FantasyTurnDetail>(`/leagues/${leagueId}/turni/${roundId}/escludi-fixture`, {
-    method: "POST",
-    accessToken,
-    body,
-  });
+): Promise<FantasyTurnExclusionResult> {
+  return apiRequest<FantasyTurnExclusionResult>(
+    `/leagues/${leagueId}/turni/${roundId}/escludi-fixture`,
+    {
+      method: "POST",
+      accessToken,
+      body,
+    },
+  );
+}
+
+export function excludeUnplayedFantasyTurnFixtures(
+  accessToken: string,
+  leagueId: string,
+  roundId: string,
+): Promise<FantasyTurnExclusionResult> {
+  return apiRequest<FantasyTurnExclusionResult>(
+    `/leagues/${leagueId}/turni/${roundId}/escludi-non-disputate`,
+    {
+      method: "POST",
+      accessToken,
+    },
+  );
 }
 
 export function recalculateFantasyTurnCutoff(

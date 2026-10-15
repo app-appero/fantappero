@@ -22,6 +22,15 @@ STARTED_FIXTURE_STATUSES = frozenset(
     {"1H", "HT", "2H", "ET", "BT", "P", "LIVE", "INT", "SUSP", "FT", "AET", "PEN"}
 )
 INACTIVE_FIXTURE_STATUSES = frozenset({"PST", "CANC", "ABD", "AWD", "WO"})
+
+
+def is_unplayed_fixture_status(status_short: str | None) -> bool:
+    """Rinviata o non disputata: non produce un risultato in questo turno.
+
+    NS («in programma») resta esclusa da questo insieme: la partita è ancora
+    da giocare e non va tolta in blocco.
+    """
+    return (status_short or "").strip().upper() in INACTIVE_FIXTURE_STATUSES
 STANDARD_MIN_FIXTURES = 25
 MIN_FIXTURES_PER_ROUND = 10
 MAX_FIXTURES_PER_ROUND = 40
