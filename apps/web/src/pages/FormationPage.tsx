@@ -25,6 +25,7 @@ import {
   moveBenchToIndex,
   orderedBenchFromRoster,
   preserveLockedStarters,
+  labelFantasyTurnStatus,
   resolveDefaultEuropeanTurn,
   slotsFromLineupIds,
   starterTemplate,
@@ -1300,7 +1301,7 @@ export function FormationPage() {
                 data-testid="formation-round"
                 options={turns.map((turn) => ({
                   value: turn.id,
-                  label: `Turno ${turn.number} (${turn.effectiveStatus === "open" ? "aperto" : turn.effectiveStatus})`,
+                  label: `Turno ${turn.number} (${labelFantasyTurnStatus(turn.effectiveStatus)})`,
                 }))}
               />
               {isOperator && teams.length > 0 ? (

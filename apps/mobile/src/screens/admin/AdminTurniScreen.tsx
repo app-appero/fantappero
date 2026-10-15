@@ -1,4 +1,4 @@
-import type { AdminLeagueTurnStatus } from "@fantappero/contracts";
+import { labelFantasyTurnStatus, type AdminLeagueTurnStatus } from "@fantappero/contracts";
 import { theme } from "@fantappero/ui/theme";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Pressable, Text, View } from "react-native";
@@ -27,13 +27,6 @@ import { PageContainer } from "../../layout/PageContainer";
 import { getApiErrorMessage, useAuthSession } from "../../session/DemoSessionContext";
 
 const { colors } = theme;
-
-const ROUND_STATUS_LABEL: Record<string, string> = {
-  scheduled: "Programmato",
-  open: "Aperto",
-  locked: "Chiuso",
-  skipped: "Non disputato",
-};
 
 const HOMOLOGATION_LABEL: Record<string, string> = {
   provisional: "Provvisorio",
@@ -687,7 +680,7 @@ export function AdminTurniScreen() {
             <View style={styles.rowActions}>
               {league.currentRoundStatus ? (
                 <StatusBadge
-                  label={ROUND_STATUS_LABEL[league.currentRoundStatus] ?? league.currentRoundStatus}
+                  label={labelFantasyTurnStatus(league.currentRoundStatus)}
                   color={colors.foregroundMuted}
                   textColor={colors.accentContrast}
                 />

@@ -1,4 +1,4 @@
-import type { AdminLeagueTurnStatus } from "@fantappero/contracts";
+import { labelFantasyTurnStatus, type AdminLeagueTurnStatus } from "@fantappero/contracts";
 import {
   Badge,
   Breadcrumb,
@@ -81,13 +81,6 @@ const COMMAND_LEGEND: { label: string; description: string }[] = [
     description: "Ricalcola il cutoff del turno dagli orari reali delle partite aggiornati dal provider.",
   },
 ];
-
-const ROUND_STATUS_LABEL: Record<string, string> = {
-  scheduled: "Programmato",
-  open: "Aperto",
-  locked: "Chiuso",
-  skipped: "Non disputato",
-};
 
 const HOMOLOGATION_LABEL: Record<string, string> = {
   provisional: "Provvisorio",
@@ -831,7 +824,7 @@ export function AdminTurniPage() {
                     <TableCell>
                       {league.currentRoundStatus ? (
                         <Badge variant="neutral">
-                          {ROUND_STATUS_LABEL[league.currentRoundStatus] ?? league.currentRoundStatus}
+                          {labelFantasyTurnStatus(league.currentRoundStatus)}
                         </Badge>
                       ) : (
                         "—"

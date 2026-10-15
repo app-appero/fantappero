@@ -7,6 +7,7 @@ import {
   deriveEffectiveStatus,
   isModificationAllowed,
   kickoffCountsForCutoff,
+  labelFantasyTurnStatus,
   mapFixtureMatchStatus,
   reconcileFixtureKickoffLock,
   resolveDefaultEuropeanTurn,
@@ -33,6 +34,15 @@ describe("fantasyTurns rules", () => {
       "locked",
     );
     assert.equal(deriveEffectiveStatus("scheduled", "2026-08-15T20:00:00.000Z", cutoff), "scheduled");
+  });
+
+  it("labelFantasyTurnStatus traduce il ciclo di vita in italiano", () => {
+    assert.equal(labelFantasyTurnStatus("scheduled"), "Programmato");
+    assert.equal(labelFantasyTurnStatus("open"), "Aperto");
+    assert.equal(labelFantasyTurnStatus("locked"), "Chiuso");
+    assert.equal(labelFantasyTurnStatus("skipped"), "Non disputato");
+    assert.equal(labelFantasyTurnStatus(null), "");
+    assert.equal(labelFantasyTurnStatus("other"), "other");
   });
 
   it("isModificationAllowed only while scheduled", () => {
