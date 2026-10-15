@@ -38,6 +38,7 @@ import {
   saveLineupDraft,
   saveMyLineup,
 } from "../api/leagues";
+import { BottomSheet, FormationPitch, PlayerPickerSheet, roleRingColor, type Candidate, type PitchSlot } from "./formation/FormationParts";
 import { LockCountdown } from "../components/LockCountdown";
 import { UiStatePanel } from "../components/UiStatePanel";
 import { PageContainer } from "../layout/PageContainer";
@@ -45,13 +46,6 @@ import { useLockCountdown } from "../matchday/useLockCountdown";
 import { getApiErrorMessage, useAuthSession } from "../session/DemoSessionContext";
 
 const { colors, spacing, typography, radius } = theme;
-
-const ROLE_LABEL: Record<LineupRole, string> = {
-  P: "P",
-  D: "D",
-  C: "C",
-  A: "A",
-};
 
 /** Esito del calcolo automatico per squadra (EP13-P05). */
 const AI_OUTCOME_LABEL: Record<string, string> = {
@@ -63,22 +57,6 @@ const AI_OUTCOME_LABEL: Record<string, string> = {
   skipped_manual: "Formazione manuale esistente, non sovrascritta",
   incomplete: "Rosa insufficiente per il modulo",
 };
-
-function roleBadgeColors(role: string | null | undefined): { backgroundColor: string; color: string } {
-  if (role === "P") {
-    return { backgroundColor: colors.success, color: colors.accentContrast };
-  }
-  if (role === "D") {
-    return { backgroundColor: colors.warning, color: colors.background };
-  }
-  if (role === "C") {
-    return { backgroundColor: colors.accent, color: colors.accentContrast };
-  }
-  if (role === "A") {
-    return { backgroundColor: colors.danger, color: colors.accentContrast };
-  }
-  return { backgroundColor: colors.border, color: colors.foreground };
-}
 
 const KICKOFF_LOCK_MESSAGE =
   "Uno o più calciatori non sono più modificabili: la loro partita è già iniziata.";
@@ -104,69 +82,6 @@ function formatDateTime(value: string | null): string {
   } catch {
     return value;
   }
-}
-
-function BenchOrderPicker({
-  playerName,
-  index,
-  length,
-  disabled,
-  canMoveTo,
-  onMove,
-  testID,
-  children,
-}: {
-  playerName: string;
-  index: number;
-  length: number;
-  disabled: boolean;
-  canMoveTo: (target: number) => boolean;
-  onMove: (target: number) => void;
-  testID: string;
-  children: ReactNode;
-}) {
-  const [open, setOpen] = useState(false);
-  return (
-    <View>
-      <View style={styles.row}>
-        <Pressable
-          accessibilityLabel={`Ordine di ingresso di ${playerName}`}
-          accessibilityRole="button"
-          disabled={disabled}
-          onPress={() => setOpen((current) => !current)}
-          style={[styles.orderTrigger, disabled ? styles.disabled : null]}
-          testID={testID}
-        >
-          <Text style={styles.chipLabel}>{index + 1}°</Text>
-        </Pressable>
-        {children}
-      </View>
-      {open && !disabled ? (
-        <View style={styles.orderMenu}>
-          {Array.from({ length }, (_, target) => {
-            const allowed = canMoveTo(target);
-            return (
-              <Pressable
-                key={target}
-                disabled={!allowed}
-                style={[
-                  styles.chip,
-                  target === index ? styles.chipActive : null,
-                  !allowed ? styles.disabled : null,
-                ]}
-                onPress={() => {
-                  onMove(target);
-                  setOpen(false);
-                }}
-              >
-                <Text style={styles.chipLabel}>{target + 1}°</Text>
-              </Pressable>
-            );
-          })}
-        </View>
-      ) : null}
-    </View>
-  );
 }
 
 /** Formazione: copia precedente, bozza e tre mosse tattiche (EP06-05 / EP06-06). */
@@ -197,6 +112,9 @@ export function FormationScreen() {
   const [aiLineupRun, setAiLineupRun] = useState<AiLineupRun | null>(null);
   const [aiLineupBusy, setAiLineupBusy] = useState(false);
   const [aiLineupError, setAiLineupError] = useState<string | null>(null);
+  const [pickerIndex, setPickerIndex] = useState<number | null>(null);
+  const [toolsOpen, setToolsOpen] = useState(false);
+  const [showAllBench, setShowAllBench] = useState(false);
 
   const load = useCallback(async () => {
     if (!canView) {
@@ -728,59 +646,144 @@ export function FormationScreen() {
     );
   }
 
+  const filledCount = displayStarters.filter(Boolean).length;
+  const totalSlots = template.length;
+  const missing = totalSlots - filledCount;
+  const editable = context.modificationAllowed && canEdit;
+  const maxSubs = context.maxAutomaticSubstitutions ?? MAX_AUTOMATIC_SUBSTITUTIONS;
+
+  const pitchSlots: PitchSlot[] = template.map((role, index) => {
+    const athleteId = displayStarters[index] ?? "";
+    const row = roster.find((r) => r.athleteId === athleteId);
+    return {
+      index,
+      role,
+      athleteId,
+      name: row?.athleteName ?? null,
+      locked: athleteId ? playerLocked(athleteId) : false,
+      scoreLabel: athleteId ? playerScoreLabel(athleteId) : null,
+    };
+  });
+
+  function changeModule(code: FantasyModule) {
+    // Solo la bozza corrente come fonte, mai concatenata con
+    // `context.lineup.starters` — stesso motivo del calcolo di
+    // `reservedIds` più sopra.
+    const lockedIds = starterIds.filter((id) => id && playerLocked(id));
+    const preserved = preserveLockedStarters({
+      template: starterTemplate(code),
+      currentStarters: [...lockedIds, ...starterIds],
+      roster,
+      now: clock,
+    });
+    if (lockedIds.some((id) => id && !preserved.includes(id))) {
+      setActionError(KICKOFF_LOCK_MESSAGE);
+      return;
+    }
+    setModuleCode(code);
+    setStarterIds(preserved);
+    setBenchIds(
+      orderedBenchFromRoster(
+        roster.map((row) => row.athleteId),
+        preserved,
+        benchIds,
+      ),
+    );
+    setActionMessage(null);
+  }
+
+  function pickPlayer(index: number, athleteId: string) {
+    const currentId = displayStarters[index] ?? "";
+    if (athleteId === currentId) {
+      setPickerIndex(null);
+      return;
+    }
+    // Chi occupa lo slot ha già la partita iniziata: non si tocca più.
+    if (currentId && playerLocked(currentId)) {
+      setActionError(KICKOFF_LOCK_MESSAGE);
+      setPickerIndex(null);
+      return;
+    }
+    if (athleteId && playerLocked(athleteId)) {
+      setActionError(KICKOFF_LOCK_MESSAGE);
+      setPickerIndex(null);
+      return;
+    }
+    const nextStarters = [...starterIds];
+    while (nextStarters.length < totalSlots) {
+      nextStarters.push("");
+    }
+    const otherSlot = athleteId ? nextStarters.findIndex((id, i) => id === athleteId && i !== index) : -1;
+    if (otherSlot >= 0) {
+      // Già titolare altrove (stesso ruolo): i due si scambiano di posto.
+      nextStarters[otherSlot] = currentId;
+    }
+    nextStarters[index] = athleteId;
+    setStarterIds(nextStarters);
+    setBenchIds(
+      orderedBenchFromRoster(
+        roster.map((row) => row.athleteId),
+        nextStarters,
+        benchIds,
+      ),
+    );
+    setActionError(null);
+    setActionMessage(null);
+    setPickerIndex(null);
+  }
+
+  const pickerRole = pickerIndex != null ? template[pickerIndex] : null;
+  const candidates: Candidate[] =
+    pickerIndex != null && pickerRole
+      ? roster
+          .filter((row) => row.role === pickerRole)
+          .map((row) => {
+            const currentId = displayStarters[pickerIndex] ?? "";
+            const slotOf = displayStarters.indexOf(row.athleteId);
+            const benchPos = displayBench.indexOf(row.athleteId);
+            const isCurrent = row.athleteId === currentId;
+            let state: Candidate["state"] = "libero";
+            let stateLabel = "Libero";
+            if (isCurrent) {
+              state = "titolare";
+              stateLabel = "Schierato qui";
+            } else if (playerLocked(row.athleteId)) {
+              state = "bloccato";
+              stateLabel = "Bloccato · partita iniziata";
+            } else if (slotOf >= 0) {
+              state = "titolare";
+              stateLabel = `Schierato in ${pickerRole} ${slotOf + 1}`;
+            } else if (benchPos >= 0) {
+              state = "panchina";
+              stateLabel = `In panchina · ${benchPos + 1}°`;
+            }
+            return {
+              athleteId: row.athleteId,
+              name: row.athleteName,
+              state,
+              stateLabel,
+              scoreLabel: playerScoreLabel(row.athleteId),
+              current: isCurrent,
+            };
+          })
+      : [];
+
+  const benchVisible = showAllBench ? displayBench : displayBench.slice(0, maxSubs);
+  const toolDisabled = busy || !editable;
+
   return (
     <PageContainer title="Formazione">
-      <ScrollView contentContainerStyle={styles.content}>
-        {isOperator && teams.length > 0 ? (
-          <View>
-            <Text style={styles.sectionTitle}>Schiera per</Text>
-            <View style={styles.row}>
-              <Pressable
-                accessibilityRole="button"
-                disabled={busy || loading}
-                onPress={() => void selectTeam("")}
-                style={[styles.chip, targetTeamId === "" ? styles.chipActive : null]}
-                testID="formation-team-self"
-              >
-                <Text style={styles.chipLabel}>La mia squadra</Text>
-              </Pressable>
-              {teams.map((team) => (
-                <Pressable
-                  key={team.id}
-                  accessibilityRole="button"
-                  disabled={busy || loading}
-                  onPress={() => void selectTeam(team.id)}
-                  style={[styles.chip, targetTeamId === team.id ? styles.chipActive : null]}
-                  testID={`formation-team-${team.id}`}
-                >
-                  <Text style={styles.chipLabel}>{team.name}</Text>
-                </Pressable>
-              ))}
-            </View>
+      <View style={styles.content}>
+        <View style={styles.statusRow}>
+          <Text style={styles.turnTitle} testID="formation-cutoff">
+            Turno {context.roundNumber} · cutoff {formatDateTime(context.cutoffAt)}
+          </Text>
+          <View style={styles.movesChip}>
+            <Text style={styles.movesText} testID="formation-moves">
+              Mosse {movesUsed}/{maxMoves}
+            </Text>
           </View>
-        ) : null}
-        {context.lineup?.systemGeneratedAi ? (
-          <Text style={styles.meta} testID="formation-ai-badge">
-            Gestita automaticamente — formazione scelta dall'automazione IA
-            {context.lineup.aiDecidedAt
-              ? ` il ${formatDateTime(context.lineup.aiDecidedAt)}`
-              : ""}
-            {context.lineup.aiAlgorithmVersion
-              ? ` · ${context.lineup.aiAlgorithmVersion}`
-              : ""}
-            .
-          </Text>
-        ) : null}
-        {context.lineup?.autoResolutionSource ? (
-          <Text style={styles.meta} testID="formation-auto-resolution-badge">
-            Formazione applicata automaticamente —{" "}
-            {AUTO_RESOLUTION_MESSAGE[context.lineup.autoResolutionSource]}
-          </Text>
-        ) : null}
-        <View style={styles.infoCard}>
-        <Text style={styles.turnTitle} testID="formation-cutoff">
-          Turno {context.roundNumber} — cutoff {formatDateTime(context.cutoffAt)}
-        </Text>
+        </View>
         {countdown && countdown.roundId === context.roundId ? (
           <LockCountdown
             state={countdown.state}
@@ -789,31 +792,24 @@ export function FormationScreen() {
             testID="formation-lock-countdown"
           />
         ) : null}
-        <Text style={styles.meta} testID="formation-lock-hint">
-          {context.modificationAllowed
-            ? "I calciatori la cui partita è già iniziata restano bloccati anche se l'orario viene rinviato; gli altri restano modificabili."
-            : "Nessun calciatore è più modificabile."}
-        </Text>
-        <Text style={styles.meta} testID="formation-moves">
-          Mosse tattiche: {movesUsed}/{maxMoves} usate — ne restano {movesRemaining}.
-        </Text>
-        <Text style={styles.meta} testID="formation-moves-hint">
-          {tacticalEvaluation.wouldConsume
-            ? "Questo salvataggio consumerà 1 mossa tattica."
-            : "Questo salvataggio non consuma mosse."}{" "}
-          Le sostituzioni automatiche non consumano mosse.
-        </Text>
-        {context.previousLineup ? (
-          <Text style={styles.meta} testID="formation-previous-hint">
-            Formazione precedente: turno {context.previousLineup.roundNumber} (
-            {context.previousLineup.module}). La copia viene rivalidata su rosa e disponibilità
-            correnti.
+        {!context.modificationAllowed ? (
+          <Text style={styles.meta} testID="formation-lock-hint">
+            Nessun calciatore è più modificabile.
           </Text>
-        ) : (
-          <Text style={styles.meta} testID="formation-previous-empty">
-            Nessuna formazione precedente da copiare.
+        ) : null}
+        {context.lineup?.systemGeneratedAi ? (
+          <Text style={styles.meta} testID="formation-ai-badge">
+            Gestita automaticamente — formazione scelta dall'automazione IA
+            {context.lineup.aiDecidedAt ? ` il ${formatDateTime(context.lineup.aiDecidedAt)}` : ""}
+            {context.lineup.aiAlgorithmVersion ? ` · ${context.lineup.aiAlgorithmVersion}` : ""}.
           </Text>
-        )}
+        ) : null}
+        {context.lineup?.autoResolutionSource ? (
+          <Text style={styles.meta} testID="formation-auto-resolution-badge">
+            Formazione applicata automaticamente —{" "}
+            {AUTO_RESOLUTION_MESSAGE[context.lineup.autoResolutionSource]}
+          </Text>
+        ) : null}
         {context.draft ? (
           <Text style={styles.meta} testID="formation-draft-hint">
             Bozza salvata
@@ -823,312 +819,385 @@ export function FormationScreen() {
             .
           </Text>
         ) : null}
-        </View>
-        {actionError ? (
-          <Text style={[styles.error, styles.banner]} testID="formation-action-error">
-            {actionError}
-          </Text>
-        ) : null}
-
-        {isAdmin ? (
-          <View style={styles.aiSection} testID="formation-ai-admin">
-            <Text style={styles.label}>Formazioni IA</Text>
-            <Text style={styles.body}>
-              Genera automaticamente la formazione delle sole squadre controllate da un
-              fantallenatore IA per questo turno. Non tocca mai le formazioni schierate a mano
-              da un umano.
-            </Text>
-            <View style={styles.row}>
-              <Pressable
-                style={[styles.button, styles.buttonSecondary, aiLineupBusy ? styles.disabled : null]}
-                disabled={aiLineupBusy}
-                onPress={() => void runAiLineupsAction(true)}
-                testID="formation-ai-preview"
-              >
-                <Text style={styles.buttonSecondaryLabel}>Anteprima formazioni IA</Text>
-              </Pressable>
-              <Pressable
-                style={[styles.button, aiLineupBusy ? styles.disabled : null]}
-                disabled={aiLineupBusy}
-                onPress={() => void runAiLineupsAction(false)}
-                testID="formation-ai-regenerate"
-              >
-                <Text style={styles.buttonLabel}>Rigenera formazioni IA</Text>
-              </Pressable>
-            </View>
-            {aiLineupRun ? (
-              <View testID="formation-ai-result">
-                <Text style={styles.meta} testID="formation-ai-summary">
-                  {aiLineupRun.summary} · {aiLineupRun.algorithmVersion}
-                  {aiLineupRun.dryRun ? " (anteprima, non salvata)" : ""}
-                </Text>
-                {aiLineupRun.teams.map((team) => (
-                  <Text
-                    key={team.fantasyTeamId}
-                    style={styles.body}
-                    testID={`formation-ai-team-${team.fantasyTeamId}`}
-                  >
-                    {team.fantasyTeamName || team.fantasyTeamId} —{" "}
-                    {AI_OUTCOME_LABEL[team.outcome] ?? team.outcome}
-                    {team.starters > 0 ? ` · ${team.starters} titolari` : ""}
-                    {team.usedFallback ? " · fallback locale" : ""}
-                    {team.message ? ` · ${team.message}` : ""}
-                  </Text>
-                ))}
-              </View>
-            ) : null}
-            {aiLineupError ? (
-              <Text style={styles.error} testID="formation-ai-error">
-                {aiLineupError}
-              </Text>
-            ) : null}
-          </View>
-        ) : null}
-
         {context.teamName ? (
           <Text style={styles.teamName} testID="formation-team-name">
             {context.teamName}
           </Text>
         ) : null}
-        <Text style={styles.sectionTitle}>Modulo</Text>
-        <View style={styles.row} testID="formation-module">
+
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.modules}
+          testID="formation-module"
+        >
           {APPROVED_MODULES.map((code) => (
             <Pressable
               key={code}
-              style={[styles.chip, moduleCode === code ? styles.chipActive : null]}
-              disabled={!context.modificationAllowed || !canEdit}
-              onPress={() => {
-                // Solo la bozza corrente come fonte, mai concatenata con
-                // `context.lineup.starters` — stesso motivo del calcolo di
-                // `reservedIds` più sopra.
-                const lockedIds = starterIds.filter((id) => id && playerLocked(id));
-                const preserved = preserveLockedStarters({
-                  template: starterTemplate(code),
-                  currentStarters: [...lockedIds, ...starterIds],
-                  roster,
-                  now: clock,
-                });
-                if (lockedIds.some((id) => id && !preserved.includes(id))) {
-                  setActionError(KICKOFF_LOCK_MESSAGE);
-                  return;
-                }
-                setModuleCode(code);
-                setStarterIds(preserved);
-                setBenchIds(
-                  orderedBenchFromRoster(
-                    roster.map((row) => row.athleteId),
-                    preserved,
-                    benchIds,
-                  ),
-                );
-                setActionMessage(null);
-              }}
+              accessibilityRole="button"
+              disabled={!editable}
+              onPress={() => changeModule(code)}
+              style={[styles.pill, moduleCode === code ? styles.pillActive : null]}
             >
-              <Text style={styles.chipLabel}>{code}</Text>
+              <Text style={[styles.pillText, moduleCode === code ? styles.pillTextActive : null]}>{code}</Text>
             </Pressable>
           ))}
+        </ScrollView>
+
+        <View style={styles.progressHead}>
+          <Text style={styles.progressTitle}>
+            Titolari{" "}
+            <Text style={[styles.progressCount, missing === 0 ? styles.progressOk : null]}>
+              {filledCount}/{totalSlots}
+            </Text>
+          </Text>
+          <Text style={styles.meta}>
+            {missing === 0 ? "Formazione completa" : "Tocca un cerchio per scegliere"}
+          </Text>
+        </View>
+        <View style={styles.progressTrack}>
+          <View
+            style={[
+              styles.progressFill,
+              missing === 0 ? styles.progressFillOk : null,
+              { width: `${Math.round((filledCount / Math.max(totalSlots, 1)) * 100)}%` as `${number}%` },
+            ]}
+          />
         </View>
 
-        {template.map((role, index) => {
-          const currentId = displayStarters[index] ?? "";
-          const lockedSlot = playerLocked(currentId);
-          const roleColors = roleBadgeColors(role);
-          return (
-            <View key={`${moduleCode}-${index}`} style={styles.slotCard} testID={`formation-starter-${index}`}>
-              <View style={styles.slotHeader}>
-                <View style={[styles.roleBadge, roleColors]}>
-                  <Text style={[styles.roleBadgeText, { color: roleColors.color }]}>{role}</Text>
-                </View>
-                <Text style={styles.slotTitle}>
-                  {ROLE_LABEL[role]} {index + 1}
-                  {lockedSlot ? " (bloccato)" : ""}
+        {filledCount === 0 && editable ? (
+          <View style={styles.startCard} testID="formation-start-card">
+            <Text style={styles.startTitle}>Parti da una base</Text>
+            <Text style={styles.meta}>
+              Compila la formazione in un tocco, poi ritocca gli slot che vuoi cambiare.
+            </Text>
+            <View style={styles.row}>
+              <Pressable
+                accessibilityRole="button"
+                disabled={toolDisabled}
+                onPress={() => void applyBestFormation()}
+                style={[styles.startButton, styles.startButtonPrimary, toolDisabled ? styles.disabled : null]}
+                testID="formation-apply-best"
+              >
+                <Text style={styles.buttonLabel}>Formazione migliore</Text>
+              </Pressable>
+              <Pressable
+                accessibilityRole="button"
+                disabled={toolDisabled || !context.copyAvailable}
+                onPress={() => void copyFromPrevious()}
+                style={[
+                  styles.startButton,
+                  toolDisabled || !context.copyAvailable ? styles.disabled : null,
+                ]}
+                testID="formation-copy"
+              >
+                <Text style={styles.buttonSecondaryLabel}>
+                  {context.previousLineup ? `Copia turno ${context.previousLineup.roundNumber}` : "Copia precedente"}
                 </Text>
-              </View>
-              {lockedSlot ? (
-                <Text style={styles.error}>
-                  Partita già iniziata: sostituirlo con un altro calciatore viene rifiutato.
-                </Text>
-              ) : null}
-              <View style={styles.row}>
-                {optionsForSlot(index, role).map((player) => (
-                  <View
-                    key={player.athleteId}
-                    style={[
-                      styles.chip,
-                      styles.chipWithName,
-                      displayStarters[index] === player.athleteId ? styles.chipActive : null,
-                    ]}
-                  >
-                    <AthleteName plain athleteId={player.athleteId} style={styles.chipName}>
-                      {player.athleteName}
-                    </AthleteName>
-                    <Pressable
-                      disabled={!context.modificationAllowed || !canEdit}
-                      accessibilityLabel={`Schiera ${player.athleteName}`}
-                      onPress={() => {
-                        // Chi occupa lo slot ha già la partita iniziata: non si tocca più.
-                        if (currentId && currentId !== player.athleteId && playerLocked(currentId)) {
-                          setActionError(KICKOFF_LOCK_MESSAGE);
-                          return;
-                        }
-                        if (playerLocked(player.athleteId) && player.athleteId !== currentId) {
-                          setActionError(KICKOFF_LOCK_MESSAGE);
-                          return;
-                        }
-                        const nextStarters = [...starterIds];
-                        nextStarters[index] = player.athleteId;
-                        setStarterIds(nextStarters);
-                        setBenchIds(
-                          orderedBenchFromRoster(
-                            roster.map((row) => row.athleteId),
-                            nextStarters,
-                            benchIds,
-                          ),
-                        );
-                        setActionError(null);
-                        setActionMessage(null);
-                      }}
-                    >
-                      <Text style={styles.chipLabel}>
-                        {displayStarters[index] === player.athleteId ? " ●" : " ○"}
-                        {playerLocked(player.athleteId) ? " bloccato" : ""}
-                        {playerScoreLabel(player.athleteId) ? ` · ${playerScoreLabel(player.athleteId)}` : ""}
-                      </Text>
-                    </Pressable>
-                  </View>
-                ))}
-              </View>
+              </Pressable>
             </View>
-          );
-        })}
+          </View>
+        ) : null}
 
-        <Text style={styles.sectionTitle}>Panchina</Text>
-        <Text style={styles.meta} testID="formation-sub-hint">
-          Entrano al massimo {context.maxAutomaticSubstitutions ?? MAX_AUTOMATIC_SUBSTITUTIONS}{" "}
-          panchinari, nell'ordine di ingresso sotto e solo a parità di ruolo. Dal{" "}
-          {(context.maxAutomaticSubstitutions ?? MAX_AUTOMATIC_SUBSTITUTIONS) + 1}° in poi restano
-          fuori se i {context.maxAutomaticSubstitutions ?? MAX_AUTOMATIC_SUBSTITUTIONS} cambi sono già
-          stati usati.
-        </Text>
+        <FormationPitch
+          slots={pitchSlots}
+          selectedIndex={pickerIndex}
+          disabled={!editable && filledCount === 0}
+          onSlotPress={(index) => {
+            if (!editable) {
+              const id = displayStarters[index];
+              if (id) {
+                setActionError(null);
+              }
+              return;
+            }
+            setPickerIndex(index);
+          }}
+        />
+
+        <View style={styles.benchHead}>
+          <Text style={styles.sectionTitle}>Panchina</Text>
+          <Text style={styles.meta} testID="formation-sub-hint">
+            Entrano al massimo {maxSubs} panchinari, nell'ordine e solo a parità di ruolo. Usa le frecce per
+            cambiare l'ordine.
+          </Text>
+        </View>
         {displayBench.length === 0 ? (
-          <Text style={styles.body} testID="formation-bench-empty">
+          <Text style={styles.meta} testID="formation-bench-empty">
             Nessun panchinaro: tutti i calciatori sono titolari.
           </Text>
         ) : (
-          <View testID="formation-bench-order">
-            {displayBench.map((id, index) => {
-              const name = roster.find((row) => row.athleteId === id)?.athleteName ?? id;
-              const role = roster.find((row) => row.athleteId === id)?.role ?? "?";
-              const roleColors = roleBadgeColors(role);
-              const maxSubs = context.maxAutomaticSubstitutions ?? MAX_AUTOMATIC_SUBSTITUTIONS;
+          <View style={styles.benchList} testID="formation-bench-order">
+            {benchVisible.map((id, index) => {
+              const row = roster.find((r) => r.athleteId === id);
+              const name = row?.athleteName ?? id;
+              const role = row?.role ?? "?";
               const canEnter = index < maxSubs;
+              const locked = playerLocked(id);
+              const canUp = index > 0 && canMoveBenchTo(index, index - 1);
+              const canDown = index < displayBench.length - 1 && canMoveBenchTo(index, index + 1);
               return (
                 <View
                   key={id}
-                  style={[styles.benchRow, styles.slotCard, canEnter ? null : styles.benchOverflow]}
+                  style={[styles.benchRow, canEnter ? null : styles.benchOverflow]}
+                  testID={`formation-bench-${index}`}
                 >
-                  <BenchOrderPicker
-                    playerName={name}
-                    index={index}
-                    length={displayBench.length}
-                    disabled={!context.modificationAllowed || !canEdit}
-                    canMoveTo={(target) => canMoveBenchTo(index, target)}
-                    onMove={(target) => moveBenchTo(index, target)}
-                    testID={`formation-bench-position-${index}`}
-                  >
-                    <View style={[styles.roleBadge, roleColors]}>
-                      <Text style={[styles.roleBadgeText, { color: roleColors.color }]}>
-                        {role}
-                      </Text>
-                    </View>
+                  <Text style={styles.benchOrder}>{index + 1}°</Text>
+                  <View style={[styles.benchRole, { backgroundColor: roleRingColor(role) }]}>
+                    <Text style={styles.benchRoleText}>{role}</Text>
+                  </View>
+                  <View style={styles.benchBody}>
                     <AthleteName plain athleteId={id} style={styles.benchName}>
                       {name}
                     </AthleteName>
-                    <Text style={styles.body}>
-                      {playerLocked(id) ? " — bloccato" : ""}
+                    <Text style={styles.meta}>
+                      {locked ? "Bloccato · " : ""}
+                      {canEnter ? "può subentrare" : `oltre i ${maxSubs} cambi`}
                       {playerScoreLabel(id) ? ` · ${playerScoreLabel(id)}` : ""}
                     </Text>
-                  </BenchOrderPicker>
-                  <Text style={styles.meta}>
-                    {canEnter ? "può subentrare" : `oltre i ${maxSubs} cambi`}
-                  </Text>
+                  </View>
+                  <View style={styles.arrows}>
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel={`Sposta ${name} più in alto`}
+                      disabled={!editable || !canUp}
+                      onPress={() => moveBenchTo(index, index - 1)}
+                      style={[styles.arrow, !editable || !canUp ? styles.disabled : null]}
+                      testID={`formation-bench-position-${index}`}
+                    >
+                      <Text style={styles.arrowText}>▲</Text>
+                    </Pressable>
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel={`Sposta ${name} più in basso`}
+                      disabled={!editable || !canDown}
+                      onPress={() => moveBenchTo(index, index + 1)}
+                      style={[styles.arrow, !editable || !canDown ? styles.disabled : null]}
+                    >
+                      <Text style={styles.arrowText}>▼</Text>
+                    </Pressable>
+                  </View>
                 </View>
               );
             })}
+            {displayBench.length > maxSubs ? (
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => setShowAllBench((v) => !v)}
+                style={styles.moreBench}
+                testID="formation-bench-toggle"
+              >
+                <Text style={styles.meta}>
+                  {showAllBench
+                    ? "Nascondi gli altri"
+                    : `Altri ${displayBench.length - maxSubs} in rosa: restano fuori`}
+                </Text>
+                <Text style={styles.link}>{showAllBench ? "Nascondi" : "Mostra"}</Text>
+              </Pressable>
+            ) : null}
           </View>
         )}
 
-        {evaluation.issues.map((issue) => (
-          <Text key={`${issue.code}-${issue.message}`} style={[styles.error, styles.banner]}>
-            {issue.message}
+        {actionError ? (
+          <Text style={[styles.error, styles.banner]} testID="formation-action-error">
+            {actionError}
           </Text>
-        ))}
+        ) : null}
+        {evaluation.issues.length > 0 ? (
+          <View style={styles.banner}>
+            {evaluation.issues.map((issue) => (
+              <Text key={`${issue.code}-${issue.message}`} style={styles.error}>
+                • {issue.message}
+              </Text>
+            ))}
+          </View>
+        ) : null}
         {actionMessage ? (
           <Text style={[styles.ok, styles.bannerOk]} testID="formation-success">
             {actionMessage}
           </Text>
         ) : null}
 
-        <Pressable
-          style={[
-            styles.button,
-            styles.buttonSecondary,
-            busy || !context.modificationAllowed || !canEdit || !context.copyAvailable
-              ? styles.disabled
-              : null,
-          ]}
-          disabled={busy || !context.modificationAllowed || !canEdit || !context.copyAvailable}
-          onPress={() => void copyFromPrevious()}
-          testID="formation-copy"
-        >
-          <Text style={styles.buttonSecondaryLabel}>Copia formazione precedente</Text>
-        </Pressable>
-        <Pressable
-          style={[
-            styles.button,
-            styles.buttonSecondary,
-            busy || !context.modificationAllowed || !canEdit ? styles.disabled : null,
-          ]}
-          disabled={busy || !context.modificationAllowed || !canEdit}
-          onPress={() => void applyBestFormation()}
-          testID="formation-apply-best"
-        >
-          <Text style={styles.buttonSecondaryLabel}>Applica formazione migliore</Text>
-        </Pressable>
-        <Pressable
-          style={[
-            styles.button,
-            styles.buttonSecondary,
-            busy || !context.modificationAllowed || !canEdit ? styles.disabled : null,
-          ]}
-          disabled={busy || !context.modificationAllowed || !canEdit}
-          onPress={() => void saveDraft()}
-          testID="formation-draft"
-        >
-          <Text style={styles.buttonSecondaryLabel}>Salva bozza</Text>
-        </Pressable>
-        <Pressable
-          style={[
-            styles.button,
-            busy ||
-            !context.modificationAllowed ||
-            !canEdit ||
-            tacticalEvaluation.issues.length > 0
-              ? styles.disabled
-              : null,
-          ]}
-          disabled={
-            busy ||
-            !context.modificationAllowed ||
-            !canEdit ||
-            tacticalEvaluation.issues.length > 0
-          }
-          onPress={() => void save()}
-          testID="formation-save"
-        >
-          <Text style={styles.buttonLabel}>Salva formazione</Text>
-        </Pressable>
-      </ScrollView>
+        <View style={styles.actionBar}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Strumenti"
+            onPress={() => setToolsOpen(true)}
+            style={styles.moreButton}
+            testID="formation-tools"
+          >
+            <Text style={styles.moreText}>•••</Text>
+          </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            disabled={toolDisabled}
+            onPress={() => void saveDraft()}
+            style={[styles.draftButton, toolDisabled ? styles.disabled : null]}
+            testID="formation-draft"
+          >
+            <Text style={styles.buttonSecondaryLabel}>Bozza</Text>
+          </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            disabled={toolDisabled || missing > 0 || tacticalEvaluation.issues.length > 0}
+            onPress={() => void save()}
+            style={[
+              styles.saveButton,
+              toolDisabled || missing > 0 || tacticalEvaluation.issues.length > 0 ? styles.saveDisabled : null,
+            ]}
+            testID="formation-save"
+          >
+            <Text style={styles.buttonLabel}>
+              {missing > 0 ? `Mancano ${missing} titolari` : "Salva formazione"}
+            </Text>
+          </Pressable>
+        </View>
+      </View>
+
+      <PlayerPickerSheet
+        key={pickerIndex ?? "closed"}
+        visible={pickerIndex != null && pickerRole != null}
+        role={pickerRole ?? "P"}
+        slotNumber={(pickerIndex ?? 0) + 1}
+        moduleCode={moduleCode}
+        candidates={candidates}
+        hasCurrent={pickerIndex != null && Boolean(displayStarters[pickerIndex])}
+        onPick={(athleteId) => pickerIndex != null && pickPlayer(pickerIndex, athleteId)}
+        onClear={() => pickerIndex != null && pickPlayer(pickerIndex, "")}
+        onClose={() => setPickerIndex(null)}
+      />
+
+      <BottomSheet
+        visible={toolsOpen}
+        title="Strumenti"
+        onClose={() => setToolsOpen(false)}
+        testID="formation-tools-sheet"
+      >
+        <ScrollView contentContainerStyle={styles.toolsBody}>
+          {isOperator && teams.length > 0 ? (
+            <View style={styles.tool}>
+              <Text style={styles.toolTitle}>Schiera per un altro fantallenatore</Text>
+              <View style={styles.row}>
+                <Pressable
+                  accessibilityRole="button"
+                  disabled={busy || loading}
+                  onPress={() => void selectTeam("")}
+                  style={[styles.chip, targetTeamId === "" ? styles.chipActive : null]}
+                  testID="formation-team-self"
+                >
+                  <Text style={styles.chipLabel}>La mia squadra</Text>
+                </Pressable>
+                {teams.map((team) => (
+                  <Pressable
+                    key={team.id}
+                    accessibilityRole="button"
+                    disabled={busy || loading}
+                    onPress={() => void selectTeam(team.id)}
+                    style={[styles.chip, targetTeamId === team.id ? styles.chipActive : null]}
+                    testID={`formation-team-${team.id}`}
+                  >
+                    <Text style={styles.chipLabel}>{team.name}</Text>
+                  </Pressable>
+                ))}
+              </View>
+            </View>
+          ) : null}
+          <Pressable
+            accessibilityRole="button"
+            disabled={toolDisabled || !context.copyAvailable}
+            onPress={() => {
+              setToolsOpen(false);
+              void copyFromPrevious();
+            }}
+            style={[styles.tool, toolDisabled || !context.copyAvailable ? styles.disabled : null]}
+            testID="formation-copy-tool"
+          >
+            <Text style={styles.toolTitle}>Copia formazione precedente</Text>
+            <Text style={styles.meta} testID="formation-previous-hint">
+              {context.previousLineup
+                ? `Turno ${context.previousLineup.roundNumber} · ${context.previousLineup.module}. Viene rivalidata su rosa e disponibilità correnti.`
+                : "Nessuna formazione precedente da copiare."}
+            </Text>
+          </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            disabled={toolDisabled}
+            onPress={() => {
+              setToolsOpen(false);
+              void applyBestFormation();
+            }}
+            style={[styles.tool, toolDisabled ? styles.disabled : null]}
+            testID="formation-apply-best-tool"
+          >
+            <Text style={styles.toolTitle}>Applica formazione migliore</Text>
+            <Text style={styles.meta}>Sceglie i titolari con il punteggio atteso più alto.</Text>
+          </Pressable>
+          {isAdmin ? (
+            <View style={styles.tool} testID="formation-ai-admin">
+              <Text style={styles.toolTitle}>Formazioni IA</Text>
+              <Text style={styles.meta}>
+                Genera automaticamente la formazione delle sole squadre controllate da un fantallenatore IA
+                per questo turno. Non tocca mai le formazioni schierate a mano da un umano.
+              </Text>
+              <View style={styles.row}>
+                <Pressable
+                  style={[styles.startButton, aiLineupBusy ? styles.disabled : null]}
+                  disabled={aiLineupBusy}
+                  onPress={() => void runAiLineupsAction(true)}
+                  testID="formation-ai-preview"
+                >
+                  <Text style={styles.buttonSecondaryLabel}>Anteprima</Text>
+                </Pressable>
+                <Pressable
+                  style={[styles.startButton, styles.startButtonPrimary, aiLineupBusy ? styles.disabled : null]}
+                  disabled={aiLineupBusy}
+                  onPress={() => void runAiLineupsAction(false)}
+                  testID="formation-ai-regenerate"
+                >
+                  <Text style={styles.buttonLabel}>Rigenera</Text>
+                </Pressable>
+              </View>
+              {aiLineupRun ? (
+                <View testID="formation-ai-result">
+                  <Text style={styles.meta} testID="formation-ai-summary">
+                    {aiLineupRun.summary} · {aiLineupRun.algorithmVersion}
+                    {aiLineupRun.dryRun ? " (anteprima, non salvata)" : ""}
+                  </Text>
+                  {aiLineupRun.teams.map((team) => (
+                    <Text
+                      key={team.fantasyTeamId}
+                      style={styles.body}
+                      testID={`formation-ai-team-${team.fantasyTeamId}`}
+                    >
+                      {team.fantasyTeamName || team.fantasyTeamId} —{" "}
+                      {AI_OUTCOME_LABEL[team.outcome] ?? team.outcome}
+                      {team.starters > 0 ? ` · ${team.starters} titolari` : ""}
+                      {team.usedFallback ? " · fallback locale" : ""}
+                      {team.message ? ` · ${team.message}` : ""}
+                    </Text>
+                  ))}
+                </View>
+              ) : null}
+              {aiLineupError ? (
+                <Text style={styles.error} testID="formation-ai-error">
+                  {aiLineupError}
+                </Text>
+              ) : null}
+            </View>
+          ) : null}
+          <Text style={styles.meta} testID="formation-moves-hint">
+            {tacticalEvaluation.wouldConsume
+              ? "Questo salvataggio consumerà 1 mossa tattica."
+              : "Questo salvataggio non consuma mosse."}{" "}
+            Le sostituzioni automatiche non consumano mosse. Mosse tattiche: {movesUsed}/{maxMoves} usate — ne
+            restano {movesRemaining}.
+          </Text>
+          <Text style={styles.meta}>
+            I calciatori la cui partita è già iniziata restano bloccati anche se l'orario viene rinviato; gli
+            altri restano modificabili.
+          </Text>
+        </ScrollView>
+      </BottomSheet>
     </PageContainer>
   );
 }
@@ -1138,24 +1207,31 @@ const styles = lazyStyles(() => StyleSheet.create({
     gap: spacing.sm,
     paddingBottom: spacing.xl,
   },
-  aiSection: {
-    gap: spacing.xs,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.lg,
-    backgroundColor: colors.backgroundElevated,
-    padding: spacing.md,
-    marginTop: spacing.xs,
+  statusRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: spacing.sm,
   },
+  turnTitle: {
+    flex: 1,
+    color: colors.foreground,
+    fontSize: typography.fontSize.md,
+    fontWeight: "700",
+  },
+  movesChip: {
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    borderColor: colors.brand,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 2,
+  },
+  movesText: { color: colors.foreground, fontSize: typography.fontSize.sm, fontWeight: "600" },
   meta: {
     color: colors.foregroundMuted,
     fontSize: typography.fontSize.sm,
   },
-  label: {
-    color: colors.foreground,
-    fontWeight: "600",
-    marginTop: spacing.xs,
-  },
+  teamName: { color: colors.foregroundMuted, fontWeight: "600" },
   body: {
     color: colors.foreground,
     fontSize: typography.fontSize.md,
@@ -1165,6 +1241,108 @@ const styles = lazyStyles(() => StyleSheet.create({
     flexWrap: "wrap",
     gap: spacing.xs,
   },
+  modules: { gap: spacing.xs, paddingVertical: spacing.xs },
+  pill: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.pill,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    minHeight: 40,
+    justifyContent: "center",
+  },
+  pillActive: { backgroundColor: colors.brand, borderColor: colors.brand },
+  pillText: { color: colors.foreground, fontWeight: "600" },
+  pillTextActive: { color: colors.onBrand },
+  progressHead: {
+    flexDirection: "row",
+    alignItems: "baseline",
+    justifyContent: "space-between",
+  },
+  progressTitle: { color: colors.foreground, fontWeight: "600" },
+  progressCount: { fontSize: typography.fontSize.xl, fontStyle: "italic", fontWeight: "800" },
+  progressOk: { color: colors.success },
+  progressTrack: {
+    height: 6,
+    borderRadius: 999,
+    backgroundColor: colors.border,
+    overflow: "hidden",
+  },
+  progressFill: { height: 6, borderRadius: 999, backgroundColor: colors.brand },
+  progressFillOk: { backgroundColor: colors.success },
+  startCard: {
+    gap: spacing.xs,
+    borderWidth: 1,
+    borderColor: colors.brand,
+    borderRadius: radius.lg,
+    backgroundColor: colors.backgroundElevated,
+    padding: spacing.md,
+  },
+  startTitle: { color: colors.foreground, fontWeight: "700", fontSize: typography.fontSize.md },
+  startButton: {
+    flexGrow: 1,
+    flexBasis: 0,
+    minHeight: 44,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    borderColor: colors.border,
+    paddingHorizontal: spacing.sm,
+  },
+  startButtonPrimary: { backgroundColor: colors.brand, borderColor: colors.brand },
+  benchHead: { gap: 2, marginTop: spacing.sm },
+  sectionTitle: {
+    color: colors.foreground,
+    fontSize: typography.fontSize.xl,
+    fontStyle: "italic",
+    fontWeight: "800",
+    textTransform: "uppercase",
+  },
+  benchList: { gap: spacing.xs },
+  benchRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.lg,
+    backgroundColor: colors.backgroundElevated,
+    padding: spacing.sm,
+  },
+  benchOverflow: { opacity: 0.65 },
+  benchOrder: {
+    width: 30,
+    color: colors.accent,
+    fontSize: typography.fontSize.lg,
+    fontStyle: "italic",
+    fontWeight: "800",
+  },
+  benchRole: { width: 30, height: 30, borderRadius: 15, alignItems: "center", justifyContent: "center" },
+  benchRoleText: { color: "#11162B", fontWeight: "800", fontStyle: "italic" },
+  benchBody: { flex: 1, minWidth: 0 },
+  benchName: { color: colors.foreground, fontSize: typography.fontSize.md, fontWeight: "700" },
+  arrows: { gap: 4 },
+  arrow: {
+    minWidth: 40,
+    minHeight: 28,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  arrowText: { color: colors.accent, fontSize: 12 },
+  moreBench: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    padding: spacing.sm,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  link: { color: colors.accent, fontWeight: "600" },
   chip: {
     borderWidth: 1,
     borderColor: colors.border,
@@ -1172,79 +1350,26 @@ const styles = lazyStyles(() => StyleSheet.create({
     paddingHorizontal: spacing.sm,
     paddingVertical: spacing.xs,
   },
-  chipWithName: {
-    flexDirection: "row",
+  chipActive: { borderColor: colors.brand, borderWidth: 2 },
+  chipLabel: { color: colors.foreground, fontSize: typography.fontSize.sm },
+  button: {
+    backgroundColor: colors.brand,
+    borderRadius: radius.pill,
+    padding: spacing.sm,
     alignItems: "center",
-    gap: spacing.xs,
+    marginTop: spacing.sm,
   },
-  chipActive: {
-    borderColor: colors.brand,
-    borderWidth: 2,
-  },
-  chipLabel: {
-    color: colors.foreground,
-    fontSize: typography.fontSize.xs,
-  },
-  chipName: {
-    color: colors.foreground,
-    fontSize: typography.fontSize.sm,
-    fontWeight: "600",
-  },
-  benchName: {
-    color: colors.foreground,
-    fontSize: typography.fontSize.md,
-    fontWeight: "600",
-  },
-  infoCard: {
-    gap: spacing.xs,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.lg,
-    backgroundColor: colors.backgroundElevated,
-    padding: spacing.md,
-  },
-  turnTitle: {
-    color: colors.foreground,
-    fontSize: typography.fontSize.lg,
-    fontStyle: "italic",
-    fontWeight: "800",
-    textTransform: "uppercase",
-  },
-  sectionTitle: {
-    color: colors.foreground,
-    fontSize: typography.fontSize.xl,
-    fontStyle: "italic",
-    fontWeight: "800",
-    textTransform: "uppercase",
-    marginTop: spacing.md,
-  },
-  teamName: {
-    color: colors.foregroundMuted,
-    fontWeight: "600",
-  },
-  slotCard: {
-    gap: spacing.sm,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.lg,
-    backgroundColor: colors.backgroundElevated,
-    padding: spacing.md,
-  },
-  slotHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.sm,
-  },
-  slotTitle: {
-    color: colors.foreground,
-    fontWeight: "700",
-    fontSize: typography.fontSize.md,
-  },
+  buttonLabel: { color: colors.onBrand, fontWeight: "600" },
+  buttonSecondaryLabel: { color: colors.foreground, fontWeight: "600" },
+  disabled: { opacity: 0.5 },
+  error: { color: colors.danger },
+  ok: { color: colors.success },
   banner: {
     borderWidth: 1,
     borderColor: colors.danger,
     borderRadius: radius.md,
     padding: spacing.sm,
+    gap: 4,
     overflow: "hidden",
   },
   bannerOk: {
@@ -1254,68 +1379,52 @@ const styles = lazyStyles(() => StyleSheet.create({
     padding: spacing.sm,
     overflow: "hidden",
   },
-  button: {
-    backgroundColor: colors.brand,
-    borderRadius: radius.pill,
-    padding: spacing.sm,
+  actionBar: {
+    flexDirection: "row",
     alignItems: "center",
+    gap: spacing.xs,
+    padding: spacing.sm,
+    borderRadius: 26,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.backgroundElevated,
     marginTop: spacing.sm,
   },
-  buttonLabel: {
-    color: colors.onBrand,
-    fontWeight: "600",
-  },
-  buttonSecondary: {
-    backgroundColor: colors.background,
+  moreButton: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     borderWidth: 1,
     borderColor: colors.border,
-  },
-  buttonSecondaryLabel: {
-    color: colors.foreground,
-    fontWeight: "600",
-  },
-  disabled: {
-    opacity: 0.5,
-  },
-  error: {
-    color: colors.danger,
-  },
-  ok: {
-    color: colors.success,
-  },
-  benchRow: {
-    gap: spacing.xs,
-    marginBottom: spacing.sm,
-    padding: spacing.sm,
-  },
-  benchOverflow: {
-    opacity: 0.65,
-  },
-  orderTrigger: {
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.md,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs,
-    minWidth: 44,
-    alignItems: "center",
-  },
-  orderMenu: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: spacing.xs,
-    marginTop: spacing.xs,
-  },
-  roleBadge: {
-    minWidth: 28,
-    height: 28,
-    borderRadius: 14,
     alignItems: "center",
     justifyContent: "center",
-    paddingHorizontal: spacing.xs,
   },
-  roleBadgeText: {
-    fontSize: typography.fontSize.sm,
-    fontWeight: "600",
+  moreText: { color: colors.foreground, fontWeight: "800", letterSpacing: 1 },
+  draftButton: {
+    minHeight: 48,
+    paddingHorizontal: spacing.md,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: "center",
+    justifyContent: "center",
   },
+  saveButton: {
+    flex: 1,
+    minHeight: 48,
+    borderRadius: radius.pill,
+    backgroundColor: colors.brand,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  saveDisabled: { backgroundColor: colors.border },
+  toolsBody: { gap: spacing.sm, paddingBottom: spacing.md },
+  tool: {
+    gap: spacing.xs,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.lg,
+    padding: spacing.md,
+  },
+  toolTitle: { color: colors.foreground, fontWeight: "700", fontSize: typography.fontSize.md },
 }));
