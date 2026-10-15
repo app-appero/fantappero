@@ -479,6 +479,23 @@ export function evaluateProgressiveLock(input: {
   );
 }
 
+/**
+ * "Salva formazione" stops on a started match or on exhausted tactical moves
+ * for every user except the platform operator. The API already skips both
+ * gates for GLOBAL_OPERATE; clients must do the same or the button rejects
+ * the save before the request is sent.
+ */
+export function blockingLineupSaveIssue(input: {
+  isPlatformOperator: boolean;
+  lockIssues: readonly LineupIssue[];
+  tacticalIssues: readonly LineupIssue[];
+}): LineupIssue | null {
+  if (input.isPlatformOperator) {
+    return null;
+  }
+  return input.lockIssues[0] ?? input.tacticalIssues[0] ?? null;
+}
+
 export function slotsFromLineupIds(
   starterAthleteIds: readonly string[],
   benchAthleteIds: readonly string[],

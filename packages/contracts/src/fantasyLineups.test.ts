@@ -3,6 +3,7 @@ import { describe, it } from "node:test";
 import {
   APPROVED_MODULES,
   copyPreviousLineup,
+  blockingLineupSaveIssue,
   evaluateBenchOrderLock,
   evaluateLineup,
   evaluateProgressiveLock,
@@ -181,6 +182,39 @@ describe("fantasyLineups rules", () => {
       lockedAthleteIds: ["locked-a"],
     });
     assert.ok(firstSaveStarter.some((item) => item.code === "athlete_kickoff_locked"));
+  });
+
+  it("lets only the platform operator confirm a lineup after kickoff and with no tactical moves left", () => {
+    const lockIssues = evaluateProgressiveLock({
+      previousSlots: {},
+      proposedSlots: slotsFromLineupIds(["locked-a"], []),
+      lockedAthleteIds: ["locked-a"],
+    });
+    const tacticalIssues = [
+      { code: "tactical_moves_exhausted", message: "Mosse tattiche esaurite." },
+    ];
+    const member = blockingLineupSaveIssue({
+      isPlatformOperator: false,
+      lockIssues,
+      tacticalIssues,
+    });
+    assert.equal(member?.code, "athlete_kickoff_locked");
+    assert.equal(
+      blockingLineupSaveIssue({
+        isPlatformOperator: true,
+        lockIssues,
+        tacticalIssues,
+      }),
+      null,
+    );
+    assert.equal(
+      blockingLineupSaveIssue({
+        isPlatformOperator: false,
+        lockIssues: [],
+        tacticalIssues,
+      })?.code,
+      "tactical_moves_exhausted",
+    );
   });
 
   it("preserves locked starters when the module changes", () => {
