@@ -11,6 +11,7 @@ import {
   APPROVED_MODULES,
   MAX_AUTOMATIC_SUBSTITUTIONS,
   MAX_TACTICAL_MOVES,
+  blockingLineupSaveIssue,
   evaluateBenchOrderLock,
   evaluateLineup,
   evaluateProgressiveLock,
@@ -390,6 +391,12 @@ export function FormationScreen() {
   // salvataggio non ancora avvenuto — quella previsione resta nel solo
   // messaggio "consumerà 1 mossa tattica" mostrato altrove.
   const movesRemaining = context?.tacticalMovesRemaining ?? maxMoves - movesUsed;
+  const tacticalSaveBlocked =
+    blockingLineupSaveIssue({
+      isPlatformOperator: isOperator,
+      lockIssues: [],
+      tacticalIssues: tacticalEvaluation.issues,
+    }) != null;
 
   const optionsForSlot = useMemo(() => {
     return (index: number, role: LineupRole) => {
@@ -410,28 +417,30 @@ export function FormationScreen() {
       setActionError(evaluation.issues[0]?.message ?? "Formazione non valida.");
       return;
     }
+    // Lock a partita iniziata e mosse esaurite bloccano il salvataggio solo
+    // per chi non è operatore di piattaforma.
     const previousSlots = slotsFromLineupIds(
       context?.lineup?.starters.map((player) => player.athleteId) ?? [],
       context?.lineup?.bench.map((player) => player.athleteId) ?? [],
     );
-    const lockIssues = [
-      ...evaluateProgressiveLock({
-        previousSlots,
-        proposedSlots: slotsFromLineupIds(displayStarters, displayBench),
-        lockedAthleteIds,
-      }),
-      ...evaluateBenchOrderLock({
-        previousBench: context?.lineup?.bench.map((player) => player.athleteId) ?? [],
-        proposedBench: displayBench,
-        lockedAthleteIds,
-      }),
-    ];
-    if (lockIssues.length > 0) {
-      setActionError(lockIssues[0]?.message ?? "Modifica fuori tempo.");
-      return;
-    }
-    if (tacticalEvaluation.issues.length > 0) {
-      setActionError(tacticalEvaluation.issues[0]?.message ?? "Mosse tattiche esaurite.");
+    const saveBlock = blockingLineupSaveIssue({
+      isPlatformOperator: isOperator,
+      lockIssues: [
+        ...evaluateProgressiveLock({
+          previousSlots,
+          proposedSlots: slotsFromLineupIds(displayStarters, displayBench),
+          lockedAthleteIds,
+        }),
+        ...evaluateBenchOrderLock({
+          previousBench: context?.lineup?.bench.map((player) => player.athleteId) ?? [],
+          proposedBench: displayBench,
+          lockedAthleteIds,
+        }),
+      ],
+      tacticalIssues: tacticalEvaluation.issues,
+    });
+    if (saveBlock) {
+      setActionError(saveBlock.message || "Modifica fuori tempo.");
       return;
     }
     if (!accessToken || !activeLeagueId || !selectedRoundId) {
@@ -1039,11 +1048,11 @@ export function FormationScreen() {
           </Pressable>
           <Pressable
             accessibilityRole="button"
-            disabled={toolDisabled || missing > 0 || tacticalEvaluation.issues.length > 0}
+            disabled={toolDisabled || missing > 0 || tacticalSaveBlocked}
             onPress={() => void save()}
             style={[
               styles.saveButton,
-              toolDisabled || missing > 0 || tacticalEvaluation.issues.length > 0 ? styles.saveDisabled : null,
+              toolDisabled || missing > 0 || tacticalSaveBlocked ? styles.saveDisabled : null,
             ]}
             testID="formation-save"
           >
