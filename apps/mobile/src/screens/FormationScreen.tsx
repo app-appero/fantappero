@@ -733,7 +733,7 @@ export function FormationScreen() {
       <ScrollView contentContainerStyle={styles.content}>
         {isOperator && teams.length > 0 ? (
           <View>
-            <Text style={styles.label}>Schiera per</Text>
+            <Text style={styles.sectionTitle}>Schiera per</Text>
             <View style={styles.row}>
               <Pressable
                 accessibilityRole="button"
@@ -777,7 +777,8 @@ export function FormationScreen() {
             {AUTO_RESOLUTION_MESSAGE[context.lineup.autoResolutionSource]}
           </Text>
         ) : null}
-        <Text style={styles.meta} testID="formation-cutoff">
+        <View style={styles.infoCard}>
+        <Text style={styles.turnTitle} testID="formation-cutoff">
           Turno {context.roundNumber} — cutoff {formatDateTime(context.cutoffAt)}
         </Text>
         {countdown && countdown.roundId === context.roundId ? (
@@ -822,8 +823,9 @@ export function FormationScreen() {
             .
           </Text>
         ) : null}
+        </View>
         {actionError ? (
-          <Text style={styles.error} testID="formation-action-error">
+          <Text style={[styles.error, styles.banner]} testID="formation-action-error">
             {actionError}
           </Text>
         ) : null}
@@ -884,11 +886,11 @@ export function FormationScreen() {
         ) : null}
 
         {context.teamName ? (
-          <Text style={styles.label} testID="formation-team-name">
+          <Text style={styles.teamName} testID="formation-team-name">
             {context.teamName}
           </Text>
         ) : null}
-        <Text style={styles.label}>Modulo</Text>
+        <Text style={styles.sectionTitle}>Modulo</Text>
         <View style={styles.row} testID="formation-module">
           {APPROVED_MODULES.map((code) => (
             <Pressable
@@ -932,12 +934,12 @@ export function FormationScreen() {
           const lockedSlot = playerLocked(currentId);
           const roleColors = roleBadgeColors(role);
           return (
-            <View key={`${moduleCode}-${index}`} testID={`formation-starter-${index}`}>
-              <View style={styles.row}>
+            <View key={`${moduleCode}-${index}`} style={styles.slotCard} testID={`formation-starter-${index}`}>
+              <View style={styles.slotHeader}>
                 <View style={[styles.roleBadge, roleColors]}>
                   <Text style={[styles.roleBadgeText, { color: roleColors.color }]}>{role}</Text>
                 </View>
-                <Text style={styles.label}>
+                <Text style={styles.slotTitle}>
                   {ROLE_LABEL[role]} {index + 1}
                   {lockedSlot ? " (bloccato)" : ""}
                 </Text>
@@ -957,7 +959,7 @@ export function FormationScreen() {
                       displayStarters[index] === player.athleteId ? styles.chipActive : null,
                     ]}
                   >
-                    <AthleteName athleteId={player.athleteId} style={styles.chipLabel}>
+                    <AthleteName plain athleteId={player.athleteId} style={styles.chipName}>
                       {player.athleteName}
                     </AthleteName>
                     <Pressable
@@ -1000,8 +1002,8 @@ export function FormationScreen() {
           );
         })}
 
-        <Text style={styles.label}>Panchina</Text>
-        <Text style={styles.body} testID="formation-sub-hint">
+        <Text style={styles.sectionTitle}>Panchina</Text>
+        <Text style={styles.meta} testID="formation-sub-hint">
           Entrano al massimo {context.maxAutomaticSubstitutions ?? MAX_AUTOMATIC_SUBSTITUTIONS}{" "}
           panchinari, nell'ordine di ingresso sotto e solo a parità di ruolo. Dal{" "}
           {(context.maxAutomaticSubstitutions ?? MAX_AUTOMATIC_SUBSTITUTIONS) + 1}° in poi restano
@@ -1023,7 +1025,7 @@ export function FormationScreen() {
               return (
                 <View
                   key={id}
-                  style={[styles.benchRow, canEnter ? null : styles.benchOverflow]}
+                  style={[styles.benchRow, styles.slotCard, canEnter ? null : styles.benchOverflow]}
                 >
                   <BenchOrderPicker
                     playerName={name}
@@ -1039,7 +1041,7 @@ export function FormationScreen() {
                         {role}
                       </Text>
                     </View>
-                    <AthleteName athleteId={id} style={styles.body}>
+                    <AthleteName plain athleteId={id} style={styles.benchName}>
                       {name}
                     </AthleteName>
                     <Text style={styles.body}>
@@ -1057,12 +1059,12 @@ export function FormationScreen() {
         )}
 
         {evaluation.issues.map((issue) => (
-          <Text key={`${issue.code}-${issue.message}`} style={styles.error}>
+          <Text key={`${issue.code}-${issue.message}`} style={[styles.error, styles.banner]}>
             {issue.message}
           </Text>
         ))}
         {actionMessage ? (
-          <Text style={styles.ok} testID="formation-success">
+          <Text style={[styles.ok, styles.bannerOk]} testID="formation-success">
             {actionMessage}
           </Text>
         ) : null}
@@ -1140,8 +1142,9 @@ const styles = lazyStyles(() => StyleSheet.create({
     gap: spacing.xs,
     borderWidth: 1,
     borderColor: colors.border,
-    borderRadius: radius.md,
-    padding: spacing.sm,
+    borderRadius: radius.lg,
+    backgroundColor: colors.backgroundElevated,
+    padding: spacing.md,
     marginTop: spacing.xs,
   },
   meta: {
@@ -1175,11 +1178,81 @@ const styles = lazyStyles(() => StyleSheet.create({
     gap: spacing.xs,
   },
   chipActive: {
-    borderColor: colors.accent,
+    borderColor: colors.brand,
+    borderWidth: 2,
   },
   chipLabel: {
     color: colors.foreground,
     fontSize: typography.fontSize.xs,
+  },
+  chipName: {
+    color: colors.foreground,
+    fontSize: typography.fontSize.sm,
+    fontWeight: "600",
+  },
+  benchName: {
+    color: colors.foreground,
+    fontSize: typography.fontSize.md,
+    fontWeight: "600",
+  },
+  infoCard: {
+    gap: spacing.xs,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.lg,
+    backgroundColor: colors.backgroundElevated,
+    padding: spacing.md,
+  },
+  turnTitle: {
+    color: colors.foreground,
+    fontSize: typography.fontSize.lg,
+    fontStyle: "italic",
+    fontWeight: "800",
+    textTransform: "uppercase",
+  },
+  sectionTitle: {
+    color: colors.foreground,
+    fontSize: typography.fontSize.xl,
+    fontStyle: "italic",
+    fontWeight: "800",
+    textTransform: "uppercase",
+    marginTop: spacing.md,
+  },
+  teamName: {
+    color: colors.foregroundMuted,
+    fontWeight: "600",
+  },
+  slotCard: {
+    gap: spacing.sm,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.lg,
+    backgroundColor: colors.backgroundElevated,
+    padding: spacing.md,
+  },
+  slotHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+  },
+  slotTitle: {
+    color: colors.foreground,
+    fontWeight: "700",
+    fontSize: typography.fontSize.md,
+  },
+  banner: {
+    borderWidth: 1,
+    borderColor: colors.danger,
+    borderRadius: radius.md,
+    padding: spacing.sm,
+    overflow: "hidden",
+  },
+  bannerOk: {
+    borderWidth: 1,
+    borderColor: colors.success,
+    borderRadius: radius.md,
+    padding: spacing.sm,
+    overflow: "hidden",
   },
   button: {
     backgroundColor: colors.brand,
@@ -1213,6 +1286,7 @@ const styles = lazyStyles(() => StyleSheet.create({
   benchRow: {
     gap: spacing.xs,
     marginBottom: spacing.sm,
+    padding: spacing.sm,
   },
   benchOverflow: {
     opacity: 0.65,
@@ -1235,7 +1309,7 @@ const styles = lazyStyles(() => StyleSheet.create({
   roleBadge: {
     minWidth: 28,
     height: 28,
-    borderRadius: radius.sm,
+    borderRadius: 14,
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: spacing.xs,
