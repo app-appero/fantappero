@@ -1493,6 +1493,24 @@ a.fa-member-list__identity:focus-visible {
   opacity: 0.65;
 }
 
+.fa-bench-order__row--probable {
+  opacity: 1;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--fa-success-500) 16%, transparent);
+  box-shadow:
+    0 0 0 2px var(--fa-success-400),
+    0 0 14px color-mix(in srgb, var(--fa-success-500) 70%, transparent);
+}
+
+.fa-bench-order__lock {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--fa-color-foreground);
+  background: rgba(8, 12, 30, 0.72);
+  border-radius: var(--fa-radius-pill);
+  padding: 0 6px;
+}
+
 .fa-bench-order__player {
   display: inline-flex;
   flex-wrap: wrap;

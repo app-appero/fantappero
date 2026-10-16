@@ -20,6 +20,10 @@ import {
   evaluateTacticalMove,
   fantasyBadgesFromBonusMalus,
   formatFantasyPoints,
+  athleteLockAt,
+  computeCountdown,
+  earliestAthleteLockAt,
+  formatCountdown,
   isAthleteKickoffLocked,
   layoutFromModule,
   lineupSignature,
@@ -101,11 +105,35 @@ const DEMO_ROSTER: LineupRosterPlayer[] = [
   { athleteId: "c2", athleteName: "Koopmeiners", role: "C", slotIndex: 9, locked: false, kickoffAt: "2026-08-15T18:30:00.000Z" },
   { athleteId: "c3", athleteName: "McTominay", role: "C", slotIndex: 10, locked: false, kickoffAt: "2026-08-15T18:30:00.000Z" },
   { athleteId: "c4", athleteName: "Tonali", role: "C", slotIndex: 11, locked: false, kickoffAt: "2026-08-15T18:30:00.000Z" },
-  { athleteId: "a1", athleteName: "Martinez", role: "A", slotIndex: 12, locked: false, kickoffAt: "2026-08-15T18:30:00.000Z" },
+  {
+    athleteId: "a1",
+    athleteName: "Martinez",
+    role: "A",
+    slotIndex: 12,
+    locked: false,
+    kickoffAt: "2026-08-15T18:30:00.000Z",
+    probableHint: "starter",
+  },
   { athleteId: "a2", athleteName: "Lookman", role: "A", slotIndex: 13, locked: false, kickoffAt: "2026-08-15T18:30:00.000Z" },
   { athleteId: "a3", athleteName: "Leao", role: "A", slotIndex: 14, locked: false, kickoffAt: "2026-08-15T18:30:00.000Z" },
-  { athleteId: "a4", athleteName: "Vlahovic", role: "A", slotIndex: 15, locked: false, kickoffAt: "2026-08-15T18:30:00.000Z" },
-  { athleteId: "c5", athleteName: "Locatelli", role: "C", slotIndex: 16, locked: false, kickoffAt: "2026-08-15T18:30:00.000Z" },
+  {
+    athleteId: "a4",
+    athleteName: "Vlahovic",
+    role: "A",
+    slotIndex: 15,
+    locked: false,
+    kickoffAt: "2026-08-15T18:30:00.000Z",
+    probableHint: "starter",
+  },
+  {
+    athleteId: "c5",
+    athleteName: "Locatelli",
+    role: "C",
+    slotIndex: 16,
+    locked: false,
+    kickoffAt: "2026-08-15T18:30:00.000Z",
+    probableHint: "starter",
+  },
 ];
 
 const DEMO_STARTERS = ["p1", "d1", "d2", "d3", "d4", "c1", "c2", "c3", "a1", "a2", "a3"];
@@ -379,6 +407,8 @@ function BenchOrderRow({
   choices,
   onAssign,
   scoreLabel,
+  probable,
+  lockCountdown,
 }: {
   athleteId: string;
   index: number;
@@ -393,6 +423,8 @@ function BenchOrderRow({
   choices: Array<{ athleteId: string; name: string; role: LineupRole | null; disabled?: boolean }>;
   onAssign: (athleteId: string) => void;
   scoreLabel?: string | null;
+  probable?: boolean;
+  lockCountdown?: string | null;
 }) {
   const [pickerOpen, setPickerOpen] = useState(false);
   const [roleFilter, setRoleFilter] = useState<"tutti" | LineupRole>(role ?? "tutti");
@@ -403,7 +435,15 @@ function BenchOrderRow({
   return (
     <li
       key={athleteId}
-      className={canEnter ? "fa-bench-order__row" : "fa-bench-order__row fa-bench-order__row--overflow"}
+      className={
+        [
+          "fa-bench-order__row",
+          canEnter ? "" : "fa-bench-order__row--overflow",
+          probable ? "fa-bench-order__row--probable" : "",
+        ]
+          .filter(Boolean)
+          .join(" ")
+      }
     >
       <span className="fa-bench-order__position">
         <Select
@@ -419,6 +459,7 @@ function BenchOrderRow({
       <span className="fa-bench-order__player">
         <Badge variant={roleBadgeVariant(role)}>{role ?? "?"}</Badge>
         <AthleteName athleteId={athleteId}>{name}</AthleteName>
+        {lockCountdown ? <span className="fa-bench-order__lock">{lockCountdown}</span> : null}
         {locked ? " — bloccato" : ""}
         {scoreLabel ? (
           <strong
@@ -520,6 +561,13 @@ export function FormationPage() {
   const { countdown, refetch: refetchCountdown } = useLockCountdown(
     !isDemoMode ? activeLeagueId : null,
   );
+  const [lockNow, setLockNow] = useState(() =>
+    isDemoMode && demoState === "success" ? new Date(DEMO_CONTEXT.serverNow) : new Date(),
+  );
+  useEffect(() => {
+    const timer = window.setInterval(() => setLockNow(new Date()), 1000);
+    return () => window.clearInterval(timer);
+  }, []);
 
   const [turns, setTurns] = useState<FantasyTurnSummary[]>(() =>
     isDemoMode && demoState === "success" ? DEMO_TURNS : [],
@@ -1312,6 +1360,36 @@ export function FormationPage() {
     }
   }
 
+  const lockMargin = context?.lineupLockMarginMinutes ?? 0;
+  const placedForLock = [...displayStarters, ...displayBench].filter(Boolean);
+  const nextLockAt = earliestAthleteLockAt(
+    placedForLock
+      .map((id) => roster.find((row) => row.athleteId === id))
+      .filter((row): row is LineupRosterPlayer => row != null),
+    lockNow,
+    lockMargin,
+  );
+  const nextLockMs = nextLockAt ? new Date(nextLockAt).getTime() : null;
+  const lockLabel = (athleteId: string): string | null => {
+    const player = roster.find((row) => row.athleteId === athleteId);
+    if (!player || nextLockMs == null) {
+      return null;
+    }
+    const own = athleteLockAt(
+      lockNow,
+      player.kickoffAt,
+      player.fixtureStatus,
+      player.lockLatched,
+      lockMargin,
+    );
+    if (!own || new Date(own).getTime() !== nextLockMs) {
+      return null;
+    }
+    return formatCountdown(computeCountdown(own, lockNow)) || null;
+  };
+  const isProbableStarter = (athleteId: string) =>
+    roster.some((row) => row.athleteId === athleteId && row.probableHint === "starter");
+
   const pitchPlayers: PitchPlayer[] = template.map((role, index) => {
     const athleteId = displayStarters[index] ?? "";
     return {
@@ -1319,11 +1397,8 @@ export function FormationPage() {
       athleteId: athleteId || null,
       name: athleteId ? playerName(roster, athleteId) : "Libero",
       role,
-      probableStarter: athleteId
-        ? roster.some(
-            (row) => row.athleteId === athleteId && row.probableHint === "starter",
-          )
-        : false,
+      probableStarter: athleteId ? isProbableStarter(athleteId) : false,
+      lockCountdown: athleteId ? lockLabel(athleteId) : null,
       photoUrl: athleteId ? playerPhotoUrl(roster, athleteId) : null,
       scoreLabel: athleteId ? playerScoreLabel(roster, athleteId) : null,
       badges: athleteId ? playerBadges(roster, athleteId) : [],
@@ -1734,6 +1809,8 @@ export function FormationPage() {
                             choices={benchChoices}
                             onAssign={(athleteId) => assignBenchPlayer(index, athleteId)}
                             scoreLabel={playerScoreLabel(roster, athleteId)}
+                            probable={isProbableStarter(athleteId)}
+                            lockCountdown={lockLabel(athleteId)}
                           />
                         ) : null,
                       )}
@@ -1770,6 +1847,8 @@ export function FormationPage() {
                             choices={benchChoices}
                             onAssign={(athleteId) => assignBenchPlayer(index, athleteId)}
                             scoreLabel={playerScoreLabel(roster, athleteId)}
+                            probable={isProbableStarter(athleteId)}
+                            lockCountdown={lockLabel(athleteId)}
                           />
                         ) : null,
                       )}

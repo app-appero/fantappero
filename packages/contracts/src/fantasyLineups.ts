@@ -172,6 +172,8 @@ export interface LineupContext {
   copyAvailable?: boolean;
   copyIssues?: LineupIssue[];
   issues: LineupIssue[];
+  /** True se in lega c'è almeno un fantallenatore con utenza IA. */
+  leagueHasAiManager?: boolean;
 }
 
 export interface SaveLineupRequest {
@@ -448,6 +450,55 @@ export function isAthleteKickoffLocked(
     return false;
   }
   return ensureUtcMs(now) >= ensureUtcMs(kickoffAt) - marginMinutes * 60_000;
+}
+
+/** Istante di blocco ancora futuro del calciatore, oppure null se è già bloccato o senza orario. */
+export function athleteLockAt(
+  now: string | Date,
+  kickoffAt: string | Date | null | undefined,
+  statusShort?: string | null,
+  lockLatched?: boolean,
+  marginMinutes = 0,
+): string | null {
+  if (
+    !kickoffAt ||
+    isAthleteKickoffLocked(now, kickoffAt, statusShort, lockLatched, marginMinutes)
+  ) {
+    return null;
+  }
+  return new Date(ensureUtcMs(kickoffAt) - marginMinutes * 60_000).toISOString();
+}
+
+/** Il blocco più vicino tra i calciatori schierati (campo, panchina, tribuna). */
+export function earliestAthleteLockAt(
+  players: readonly {
+    kickoffAt?: string | Date | null;
+    fixtureStatus?: string | null;
+    lockLatched?: boolean;
+  }[],
+  now: string | Date,
+  marginMinutes = 0,
+): string | null {
+  let bestMs: number | null = null;
+  let bestIso: string | null = null;
+  for (const player of players) {
+    const iso = athleteLockAt(
+      now,
+      player.kickoffAt,
+      player.fixtureStatus,
+      player.lockLatched,
+      marginMinutes,
+    );
+    if (!iso) {
+      continue;
+    }
+    const ms = ensureUtcMs(iso);
+    if (bestMs == null || ms < bestMs) {
+      bestMs = ms;
+      bestIso = iso;
+    }
+  }
+  return bestIso;
 }
 
 export function evaluateProgressiveLock(input: {

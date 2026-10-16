@@ -10,6 +10,7 @@ from sqlalchemy import delete, select
 from sqlalchemy.orm import Session, selectinload
 
 from auth.exceptions import ValidationAuthError
+from auth.models.user import User
 from authorization.context import LeagueAccess, PermissionContext
 from authorization.permissions import has_permissions
 from database.enums import (
@@ -20,6 +21,7 @@ from database.enums import (
     Permission,
     RosterCompositionStatus,
     TacticalMoveStatus,
+    UserType,
 )
 from fantasy_lineups.ai_service import DEFAULT_MODULE
 from fantasy_lineups.best_lineup_service import (
@@ -1118,7 +1120,20 @@ class FantasyLineupService:
             copyAvailable=copy_available,
             copyIssues=copy_issues,
             issues=issues,
+            leagueHasAiManager=self._league_has_ai_manager(league_id),
         )
+
+    def _league_has_ai_manager(self, league_id: UUID) -> bool:
+        found = self._session.scalar(
+            select(LeagueMembership.id)
+            .join(User, User.id == LeagueMembership.user_id)
+            .where(
+                LeagueMembership.league_id == league_id,
+                User.user_type == UserType.AI,
+            )
+            .limit(1)
+        )
+        return found is not None
 
     def _athlete_kickoffs(
         self,

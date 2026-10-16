@@ -239,6 +239,8 @@ export {
   evaluateProgressiveLock,
   evaluateTacticalMove,
   isApprovedModule,
+  athleteLockAt,
+  earliestAthleteLockAt,
   isAthleteKickoffLocked,
   isLineupModificationAllowed,
   isTacticalWindowActive,
