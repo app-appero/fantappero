@@ -1339,21 +1339,26 @@ class FantasyLineupService:
             bench=bench,
         )
 
-    @staticmethod
     def _probable_hints(
         self,
         round_id: UUID,
         athlete_ids: list[UUID],
     ) -> dict[UUID, AthleteProbable]:
-        fixture_ids = list(
-            self._session.scalars(
-                select(FantasyRoundFixture.fixture_id).where(
-                    FantasyRoundFixture.round_id == round_id,
-                    FantasyRoundFixture.excluded_at.is_(None),
+        """Indizi opzionali. Un errore qui non deve impedire di aprire la formazione."""
+        try:
+            with self._session.begin_nested():
+                fixture_ids = list(
+                    self._session.scalars(
+                        select(FantasyRoundFixture.fixture_id).where(
+                            FantasyRoundFixture.round_id == round_id,
+                            FantasyRoundFixture.excluded_at.is_(None),
+                        )
+                    ).all()
                 )
-            ).all()
-        )
-        return hints_for_fixtures(self._session, fixture_ids, athlete_ids)
+                return hints_for_fixtures(self._session, fixture_ids, athlete_ids)
+        except Exception:
+            logger.warning("probable_lineup_hints_unavailable", exc_info=True)
+            return {}
 
     def _reject_newly_blocked_starters(
         self,

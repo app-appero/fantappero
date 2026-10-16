@@ -110,6 +110,7 @@ describe("EP06-06 formation page", () => {
   it("shows error state with retry", () => {
     const html = renderRoute("/formazione?persona=member&stato=error");
     expect(html).toContain('data-testid="formation-error"');
+    expect(html).toContain("Formazione non caricata");
     expect(html).toContain("Riprova");
   });
 
