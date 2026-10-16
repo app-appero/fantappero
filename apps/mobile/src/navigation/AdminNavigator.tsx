@@ -9,6 +9,7 @@ import { theme } from "@fantappero/ui/theme";
 import { AppDrawer } from "../components/AppDrawer";
 import { ImpersonationBanner } from "../components/ImpersonationBanner";
 import { AppHeader } from "../layout/AppHeader";
+import { LockCountdownBar } from "../layout/LockCountdownBar";
 import { AdminDashboardScreen } from "../screens/admin/AdminDashboardScreen";
 import { AdminLeaguesScreen } from "../screens/admin/AdminLeaguesScreen";
 import { AdminListoneScreen } from "../screens/admin/AdminListoneScreen";
@@ -114,6 +115,7 @@ export function AdminNavigator() {
         showLogout
         onLogoutPress={() => void logout()}
       />
+      <LockCountdownBar />
       <View style={styles.content}>
         <Stack.Navigator screenOptions={{ headerShown: false, contentStyle: buildSceneBackgroundStyle() }}>
           <Stack.Screen name="AdminHome">

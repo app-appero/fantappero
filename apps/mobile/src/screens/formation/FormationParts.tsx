@@ -150,6 +150,15 @@ const FILTERS: { id: Filter; label: string }[] = [
   { id: "panchina", label: "In panchina" },
 ];
 
+type RoleFilter = "tutti" | LineupRole;
+const ROLE_FILTERS: { id: RoleFilter; label: string; a11y: string }[] = [
+  { id: "tutti", label: "Tutti", a11y: "Tutti i ruoli" },
+  { id: "P", label: "P", a11y: "Portieri" },
+  { id: "D", label: "D", a11y: "Difensori" },
+  { id: "C", label: "C", a11y: "Centrocampisti" },
+  { id: "A", label: "A", a11y: "Attaccanti" },
+];
+
 export function BottomSheet({
   visible,
   title,
@@ -202,6 +211,7 @@ export function PlayerPickerSheet({
   onClose,
   title,
   subtitle,
+  showRoleTabs = false,
 }: {
   visible: boolean;
   role: LineupRole;
@@ -214,18 +224,22 @@ export function PlayerPickerSheet({
   onClose: () => void;
   title?: string;
   subtitle?: string;
+  /** Tab P/D/C/A: la panchina mescola i ruoli, gli slot titolari no. */
+  showRoleTabs?: boolean;
 }) {
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<Filter>("tutti");
+  const [roleFilter, setRoleFilter] = useState<RoleFilter>(showRoleTabs ? role : "tutti");
   const shown = useMemo(() => {
     const q = query.trim().toLowerCase();
     return candidates.filter((c) => {
       if (q && !c.name.toLowerCase().includes(q)) return false;
+      if (showRoleTabs && roleFilter !== "tutti" && c.role !== roleFilter) return false;
       if (filter === "tutti") return true;
       if (filter === "libero") return c.state === "libero";
       return c.state === filter;
     });
-  }, [candidates, query, filter]);
+  }, [candidates, query, filter, roleFilter, showRoleTabs]);
   return (
     <BottomSheet
       visible={visible}
@@ -248,6 +262,23 @@ export function PlayerPickerSheet({
         accessibilityLabel="Cerca nella rosa"
         testID="formation-picker-search"
       />
+      {showRoleTabs ? (
+        <View style={styles.filters} testID="formation-picker-roles">
+          {ROLE_FILTERS.map((tab) => (
+            <Pressable
+              key={tab.id}
+              accessibilityRole="button"
+              accessibilityLabel={tab.a11y}
+              accessibilityState={{ selected: roleFilter === tab.id }}
+              onPress={() => setRoleFilter(tab.id)}
+              style={[styles.filter, roleFilter === tab.id ? styles.filterActive : null]}
+              testID={`formation-picker-role-${tab.id}`}
+            >
+              <Text style={styles.filterText}>{tab.label}</Text>
+            </Pressable>
+          ))}
+        </View>
+      ) : null}
       <View style={styles.filters}>
         {FILTERS.map((f) => (
           <Pressable

@@ -6,6 +6,7 @@ import pytest
 
 from auth.exceptions import ValidationAuthError
 from auth.profile_validators import (
+    avatar_size_limit_label,
     detect_avatar_content_type,
     validate_avatar_upload,
     validate_language,
@@ -72,6 +73,11 @@ def test_validate_avatar_upload_rejects_empty() -> None:
 def test_validate_avatar_upload_rejects_oversized() -> None:
     with pytest.raises(ValidationAuthError, match="dimensione"):
         validate_avatar_upload(data=_MINIMAL_PNG, max_bytes=10)
+
+
+def test_avatar_size_limit_label_uses_configured_mebibytes() -> None:
+    assert avatar_size_limit_label(5 * 1024 * 1024) == "5 MB"
+    assert avatar_size_limit_label(10) == "10 byte"
 
 
 def test_detect_avatar_content_type_rejects_unknown() -> None:

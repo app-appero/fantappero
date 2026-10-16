@@ -17,6 +17,7 @@ import { FixtureDetailScreen } from "../screens/FixtureDetailScreen";
 import { MatchupDetailScreen } from "../screens/MatchupDetailScreen";
 import { NotificationsScreen } from "../screens/NotificationsScreen";
 import { ReceivedInvitesScreen } from "../screens/ReceivedInvitesScreen";
+import { withLockCountdown } from "../layout/LockCountdownBar";
 import { useAuthSession } from "../session/DemoSessionContext";
 import { buildSceneBackgroundStyle } from "../theme/navigationTheme";
 import { AdminNavigator } from "./AdminNavigator";
@@ -25,6 +26,17 @@ import type { RootStackParamList } from "./types";
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 const { colors, spacing, typography } = theme;
+
+const CreateLeagueWithCountdown = withLockCountdown(CreateLeagueScreen);
+const LeagueHomeWithCountdown = withLockCountdown(LeagueHomeScreen);
+const LeagueAdminWithCountdown = withLockCountdown(LeagueAdminScreen);
+const JoinLeagueWithCountdown = withLockCountdown(JoinLeagueScreen);
+const ReceivedInvitesWithCountdown = withLockCountdown(ReceivedInvitesScreen);
+const NotificationsWithCountdown = withLockCountdown(NotificationsScreen);
+const ManagerDirectoryWithCountdown = withLockCountdown(ManagerDirectoryScreen);
+const CoachProfileWithCountdown = withLockCountdown(CoachProfileScreen);
+const MatchupDetailWithCountdown = withLockCountdown(MatchupDetailScreen);
+const FixtureDetailWithCountdown = withLockCountdown(FixtureDetailScreen);
 
 function SessionLoadingScreen() {
   return (
@@ -91,52 +103,52 @@ export function RootNavigator() {
           />
           <Stack.Screen
             name="CreateLeague"
-            component={CreateLeagueScreen}
+            component={CreateLeagueWithCountdown}
             options={{ title: "Crea lega" }}
           />
           <Stack.Screen
             name="LeagueHome"
-            component={LeagueHomeScreen}
+            component={LeagueHomeWithCountdown}
             options={{ title: "Home lega" }}
           />
           <Stack.Screen
             name="LeagueAdmin"
-            component={LeagueAdminScreen}
+            component={LeagueAdminWithCountdown}
             options={{ title: "Admin lega" }}
           />
           <Stack.Screen
             name="JoinLeague"
-            component={JoinLeagueScreen}
+            component={JoinLeagueWithCountdown}
             options={{ title: "Entra in una lega" }}
           />
           <Stack.Screen
             name="ReceivedInvites"
-            component={ReceivedInvitesScreen}
+            component={ReceivedInvitesWithCountdown}
             options={{ title: "Inviti ricevuti" }}
           />
           <Stack.Screen
             name="Notifications"
-            component={NotificationsScreen}
+            component={NotificationsWithCountdown}
             options={{ title: "Notifiche" }}
           />
           <Stack.Screen
             name="ManagerDirectory"
-            component={ManagerDirectoryScreen}
+            component={ManagerDirectoryWithCountdown}
             options={{ title: "Fantallenatori" }}
           />
           <Stack.Screen
             name="CoachProfile"
-            component={CoachProfileScreen}
+            component={CoachProfileWithCountdown}
             options={{ title: "Profilo fantallenatore" }}
           />
           <Stack.Screen
             name="MatchupDetail"
-            component={MatchupDetailScreen}
+            component={MatchupDetailWithCountdown}
             options={{ title: "Scontro diretto" }}
           />
           <Stack.Screen
             name="FixtureDetail"
-            component={FixtureDetailScreen}
+            component={FixtureDetailWithCountdown}
             options={{ title: "Partita" }}
           />
           <Stack.Screen

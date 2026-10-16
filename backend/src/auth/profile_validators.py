@@ -84,12 +84,22 @@ def detect_avatar_content_type(data: bytes) -> str | None:
     return None
 
 
+def avatar_size_limit_label(max_bytes: int) -> str:
+    mebibyte = 1024 * 1024
+    if max_bytes > 0 and max_bytes % mebibyte == 0:
+        return f"{max_bytes // mebibyte} MB"
+    if max_bytes >= mebibyte:
+        return f"{max_bytes / mebibyte:.1f} MB"
+    return f"{max_bytes} byte"
+
+
 def validate_avatar_upload(*, data: bytes, max_bytes: int) -> tuple[str, str]:
     if not data:
         raise ValidationAuthError("Seleziona un'immagine da caricare.", code="invalid_avatar")
     if len(data) > max_bytes:
         raise ValidationAuthError(
-            "L'immagine supera la dimensione massima consentita (2 MB).",
+            "L'immagine supera la dimensione massima consentita "
+            f"({avatar_size_limit_label(max_bytes)}).",
             code="avatar_too_large",
         )
     content_type = detect_avatar_content_type(data)

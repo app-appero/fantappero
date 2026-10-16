@@ -995,8 +995,8 @@ export function FormationScreen() {
         <View style={styles.benchHead}>
           <Text style={styles.sectionTitle}>Panchina</Text>
           <Text style={styles.meta} testID="formation-sub-hint">
-            Entrano al massimo {maxSubs} panchinari, nell'ordine e solo a parità di ruolo. Tocca un posto
-            per scegliere chi inserire.
+            Entrano al massimo {maxSubs} panchinari, nell'ordine e solo a parità di ruolo. Tocca Cambia
+            per scegliere chi inserire: i tab filtrano per ruolo. Il nome apre la scheda.
           </Text>
         </View>
         {displayBench.length === 0 ? (
@@ -1011,12 +1011,8 @@ export function FormationScreen() {
               const role = row?.role ?? "?";
               const locked = playerLocked(id);
               return (
-                <Pressable
+                <View
                   key={id}
-                  accessibilityRole="button"
-                  accessibilityLabel={`${index + 1}° posto, ${name}. Tocca per cambiare`}
-                  disabled={!editable}
-                  onPress={() => setBenchPickerIndex(index)}
                   style={[styles.benchRow, benchPickerIndex === index ? styles.benchRowSelected : null]}
                   testID={`formation-bench-${index}`}
                 >
@@ -1034,7 +1030,18 @@ export function FormationScreen() {
                       {playerScoreLabel(id) ? ` · ${playerScoreLabel(id)}` : ""}
                     </Text>
                   </View>
-                </Pressable>
+                  {editable ? (
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel={`Cambia ${name}, ${index + 1}° in panchina`}
+                      onPress={() => setBenchPickerIndex(index)}
+                      style={styles.benchChange}
+                      testID={`formation-bench-change-${index}`}
+                    >
+                      <Text style={styles.benchChangeLabel}>Cambia</Text>
+                    </Pressable>
+                  ) : null}
+                </View>
               );
             })}
             {tribunaIds.length > 0 ? (
@@ -1162,6 +1169,7 @@ export function FormationScreen() {
         subtitle="Scegli chi inserire in questo posto"
         candidates={benchCandidates}
         hasCurrent={false}
+        showRoleTabs
         onPick={(athleteId) => benchPickerIndex != null && assignBenchPlayer(benchPickerIndex, athleteId)}
         onClear={() => setBenchPickerIndex(null)}
         onClose={() => setBenchPickerIndex(null)}
@@ -1441,6 +1449,21 @@ const styles = lazyStyles(() => StyleSheet.create({
   benchRoleText: { color: "#11162B", fontWeight: "800", fontStyle: "italic" },
   benchBody: { flex: 1, minWidth: 0 },
   benchName: { color: colors.foreground, fontSize: typography.fontSize.md, fontWeight: "700" },
+  benchChange: {
+    minHeight: 36,
+    paddingHorizontal: spacing.sm,
+    borderRadius: radius.pill,
+    borderWidth: 2,
+    borderColor: colors.accent,
+    backgroundColor: colors.brand,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  benchChangeLabel: {
+    color: colors.onBrand,
+    fontWeight: "800",
+    fontSize: typography.fontSize.sm,
+  },
   moreBench: {
     flexDirection: "row",
     justifyContent: "space-between",

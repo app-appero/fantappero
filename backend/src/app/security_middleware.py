@@ -77,7 +77,7 @@ def install_range_header_guard(app: Any) -> None:
 # global cap costs nothing for legitimate traffic and closes the same class
 # of "oversized body" concern regardless of which endpoint ends up parsing
 # form data in the future. 10 MiB is comfortably above the largest real
-# payload here (a 2 MiB avatar, or a CSV roster import) with room to spare.
+# payload here (a 5 MiB avatar, or a CSV roster import) with room to spare.
 _MAX_BODY_BYTES = 10 * 1024 * 1024
 
 

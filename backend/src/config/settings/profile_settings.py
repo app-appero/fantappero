@@ -14,9 +14,9 @@ class ProfileSettingsMixin:
         description="Local directory for uploaded avatar files.",
     )
     avatar_max_bytes: int = Field(
-        default=2_097_152,
+        default=5_242_880,
         validation_alias="AVATAR_MAX_BYTES",
-        description="Maximum avatar upload size in bytes (default 2 MiB).",
+        description="Maximum avatar upload size in bytes (default 5 MiB).",
     )
     profile_policy_version: str = Field(
         default="2026-01",

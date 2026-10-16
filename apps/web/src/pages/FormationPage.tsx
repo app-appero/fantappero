@@ -336,6 +336,14 @@ function StarterSlotField({
   );
 }
 
+const BENCH_ROLE_TABS: Array<{ id: "tutti" | LineupRole; label: string; a11y: string }> = [
+  { id: "tutti", label: "Tutti", a11y: "Tutti i ruoli" },
+  { id: "P", label: "P", a11y: "Portieri" },
+  { id: "D", label: "D", a11y: "Difensori" },
+  { id: "C", label: "C", a11y: "Centrocampisti" },
+  { id: "A", label: "A", a11y: "Attaccanti" },
+];
+
 function BenchOrderRow({
   athleteId,
   index,
@@ -361,32 +369,21 @@ function BenchOrderRow({
   disabled: boolean;
   options: Array<{ value: string; label: string; disabled: boolean }>;
   onMove: (target: number) => void;
-  choices: Array<{ athleteId: string; name: string }>;
+  choices: Array<{ athleteId: string; name: string; role: LineupRole | null }>;
   onAssign: (athleteId: string) => void;
   scoreLabel?: string | null;
 }) {
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [roleFilter, setRoleFilter] = useState<"tutti" | LineupRole>(role ?? "tutti");
+  const visibleChoices = choices.filter(
+    (choice) => roleFilter === "tutti" || choice.role === roleFilter,
+  );
+
   return (
     <li
       key={athleteId}
       className={canEnter ? "fa-bench-order__row" : "fa-bench-order__row fa-bench-order__row--overflow"}
     >
-      <label className="fa-bench-order__assign">
-        <span className="fa-visually-hidden">Calciatore al {index + 1}° posto</span>
-        <select
-          className="fa-select"
-          value={athleteId}
-          disabled={disabled}
-          aria-label={`Scegli chi inserire al ${index + 1}° posto di panchina`}
-          data-testid={`formation-bench-pick-${index}`}
-          onChange={(event) => onAssign(event.target.value)}
-        >
-          {choices.map((choice) => (
-            <option key={choice.athleteId} value={choice.athleteId}>
-              {choice.name}
-            </option>
-          ))}
-        </select>
-      </label>
       <span className="fa-bench-order__position">
         <Select
           className="fa-bench-order__select"
@@ -415,6 +412,72 @@ function BenchOrderRow({
           {canEnter ? "può subentrare" : `oltre i ${maxSubs} cambi`}
         </span>
       </span>
+      <div className="fa-bench-order__assign">
+        <button
+          type="button"
+          className="fa-bench-order__change"
+          disabled={disabled}
+          aria-expanded={pickerOpen}
+          aria-label={`Cambia ${name}, ${index + 1}° in panchina`}
+          data-testid={`formation-bench-change-${index}`}
+          onClick={() => {
+            setRoleFilter(role ?? "tutti");
+            setPickerOpen((open) => !open);
+          }}
+        >
+          Cambia
+        </button>
+      </div>
+      {pickerOpen && !disabled ? (
+        <div className="fa-bench-picker" data-testid={`formation-bench-picker-${index}`}>
+          <div className="fa-bench-picker__tabs" role="tablist" aria-label="Filtra per ruolo">
+            {BENCH_ROLE_TABS.map((tab) => (
+              <button
+                key={tab.id}
+                type="button"
+                role="tab"
+                aria-selected={roleFilter === tab.id}
+                aria-label={tab.a11y}
+                className={
+                  roleFilter === tab.id
+                    ? "fa-bench-picker__tab fa-bench-picker__tab--active"
+                    : "fa-bench-picker__tab"
+                }
+                data-testid={`formation-bench-role-${index}-${tab.id}`}
+                onClick={() => setRoleFilter(tab.id)}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+          <ul className="fa-bench-picker__list">
+            {visibleChoices.length === 0 ? (
+              <li className="fa-bench-picker__empty">Nessun calciatore con questo ruolo.</li>
+            ) : (
+              visibleChoices.map((choice) => (
+                <li key={choice.athleteId}>
+                  <button
+                    type="button"
+                    className={
+                      choice.athleteId === athleteId
+                        ? "fa-bench-picker__option fa-bench-picker__option--current"
+                        : "fa-bench-picker__option"
+                    }
+                    data-testid={`formation-bench-pick-${index}-${choice.athleteId}`}
+                    onClick={() => {
+                      setPickerOpen(false);
+                      onAssign(choice.athleteId);
+                    }}
+                  >
+                    <span className="fa-bench-picker__role">{choice.role ?? "?"}</span>
+                    {choice.name}
+                  </button>
+                </li>
+              ))
+            )}
+          </ul>
+        </div>
+      ) : null}
     </li>
   );
 }
@@ -1235,6 +1298,7 @@ export function FormationPage() {
   const benchChoices = displayBench.map((athleteId) => ({
     athleteId,
     name: playerName(roster, athleteId),
+    role: playerRole(roster, athleteId),
   }));
   const tribunaIds = displayBench.slice(maxSubs);
 
@@ -1582,6 +1646,10 @@ export function FormationPage() {
               Entrano al massimo {maxSubs} panchinari, nell&apos;ordine di ingresso sotto e solo a
               parità di ruolo (P con P, D con D, C con C, A con A). Dal {maxSubs + 1}° in poi restano
               fuori se i {maxSubs} cambi sono già stati usati.
+            </p>
+            <p className="fa-bench-touch-hint">
+              Tocca Cambia per sostituire il calciatore. I tab filtrano per ruolo; il nome apre la
+              scheda.
             </p>
             {displayBench.length === 0 ? (
               <p data-testid="formation-bench-empty">Nessun panchinaro: tutti i calciatori sono titolari.</p>
