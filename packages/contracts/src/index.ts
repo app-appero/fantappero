@@ -185,6 +185,8 @@ export type {
   FixtureLineupPlayer,
   FixtureLiveDetail,
   FixtureTimelineEvent,
+  FixtureUnavailablePlayer,
+  PredictedLineupSyncResult,
   PendingFixtureSummary,
   ProviderFeedState,
   FantasyTurnKind,

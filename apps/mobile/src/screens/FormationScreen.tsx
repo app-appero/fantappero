@@ -343,6 +343,24 @@ export function FormationScreen() {
       isAthleteKickoffLocked(clock, player.kickoffAt, player.fixtureStatus, player.lockLatched, lockMarginMinutes)
     );
   };
+  const playerBlocked = (athleteId: string) =>
+    roster.some((row) => row.athleteId === athleteId && row.selectionBlocked === true);
+  const probableSuffix = (athleteId: string) => {
+    const player = roster.find((row) => row.athleteId === athleteId);
+    if (!player) {
+      return "";
+    }
+    if (player.selectionBlocked || player.probableHint === "unavailable") {
+      return " · out";
+    }
+    if (player.probableHint === "starter") {
+      return " · prob.";
+    }
+    if (player.probableHint === "bench") {
+      return " · panch.";
+    }
+    return "";
+  };
   const playerScoreLabel = (athleteId: string): string | null => {
     const player = roster.find((row) => row.athleteId === athleteId);
     if (!player || player.fantasyScore == null) {
@@ -357,11 +375,16 @@ export function FormationScreen() {
   // anche in quello originale — duplicandolo in campo. Qui la formazione
   // mostrata è semplicemente la bozza, senza ri-collocazioni.
   const displayStarters = template.map((_, index) => starterIds[index] ?? "");
-  const displayBench = orderedBenchFromRoster(
+  const savedBench = context?.lineup?.bench.map((player) => player.athleteId) ?? [];
+  const orderedBench = orderedBenchFromRoster(
     roster.map((row) => row.athleteId),
     displayStarters,
     benchIds,
   );
+  const displayBench = [
+    ...orderedBench.filter((athleteId) => !(playerBlocked(athleteId) && !savedBench.includes(athleteId))),
+    ...orderedBench.filter((athleteId) => playerBlocked(athleteId) && !savedBench.includes(athleteId)),
+  ];
   const lockedAthleteIds = roster.filter((row) => playerLocked(row.athleteId)).map((row) => row.athleteId);
   const previousBenchIds =
     context?.lineup?.bench.map((player) => player.athleteId) ?? displayBench;
@@ -702,7 +725,7 @@ export function FormationScreen() {
       index,
       role,
       athleteId,
-      name: row?.athleteName ?? null,
+      name: row ? `${row.athleteName}${probableSuffix(athleteId)}` : null,
       locked: athleteId ? playerLocked(athleteId) : false,
       scoreLabel: athleteId ? playerScoreLabel(athleteId) : null,
     };
@@ -752,6 +775,11 @@ export function FormationScreen() {
       setPickerIndex(null);
       return;
     }
+    if (athleteId && playerBlocked(athleteId)) {
+      setActionError("Questo calciatore è indisponibile e non può essere schierato titolare.");
+      setPickerIndex(null);
+      return;
+    }
     const nextStarters = [...starterIds];
     while (nextStarters.length < totalSlots) {
       nextStarters.push("");
@@ -790,6 +818,9 @@ export function FormationScreen() {
             if (isCurrent) {
               state = "titolare";
               stateLabel = "Schierato qui";
+            } else if (row.selectionBlocked) {
+              state = "bloccato";
+              stateLabel = row.probableNote ?? "Indisponibile";
             } else if (playerLocked(row.athleteId)) {
               state = "bloccato";
               stateLabel = "Bloccato · partita iniziata";
@@ -799,6 +830,10 @@ export function FormationScreen() {
             } else if (benchPos >= 0) {
               state = "panchina";
               stateLabel = `In panchina · ${benchPos + 1}°`;
+            } else if (row.probableHint === "starter") {
+              stateLabel = "Titolare probabile";
+            } else if (row.probableHint === "bench") {
+              stateLabel = "Panchina probabile";
             }
             return {
               athleteId: row.athleteId,
@@ -826,6 +861,9 @@ export function FormationScreen() {
             if (isCurrent) {
               state = "panchina";
               stateLabel = "Schierato qui";
+            } else if (row.selectionBlocked) {
+              state = "bloccato";
+              stateLabel = row.probableNote ?? "Indisponibile";
             } else if (locked) {
               state = "bloccato";
               stateLabel = "Bloccato · partita iniziata";
@@ -833,7 +871,7 @@ export function FormationScreen() {
               state = "panchina";
               stateLabel = `In panchina · ${benchPos + 1}°`;
             } else {
-              stateLabel = "In tribuna";
+              stateLabel = row.probableHint === "bench" ? "Panchina probabile" : "In tribuna";
             }
             return {
               athleteId: row.athleteId,
@@ -1000,6 +1038,11 @@ export function FormationScreen() {
             setPickerIndex(index);
           }}
         />
+        {roster.some((row) => row.probableHint) ? (
+          <Text style={styles.meta} testID="formation-probable-hint">
+            I titolari probabili sono segnati nel campo. Gli indisponibili non si possono schierare.
+          </Text>
+        ) : null}
 
         <View style={styles.benchHead}>
           <Text style={styles.sectionTitle}>Panchina</Text>

@@ -53,6 +53,11 @@ from sports_data.fixtures.models import (
     PlayerMatchStat,
 )
 from sports_data.listone.models import LeagueRoleOverride, RoleAssignment
+from sports_data.predicted.models import (
+    FotmobFixtureLink,
+    PredictedLineupPlayer,
+    PredictedLineupSnapshot,
+)
 from sports_data.provider.models import ProviderSnapshot
 from sports_data.quality.models import SportsDataQualityIssue, SportsDataSyncRetry
 from sports_data.roster.models import Athlete, SquadMembership, Transfer
@@ -70,6 +75,7 @@ __all__ = [
     "CreditAccount",
     "CreditLedgerEntry",
     "FantasyRosterSlot",
+    "FotmobFixtureLink",
     "FantasyRound",
     "FantasyRoundFixture",
     "FantasyTeam",
@@ -102,6 +108,8 @@ __all__ = [
     "OfficialLineup",
     "OfficialLineupEntry",
     "PlayerAvailability",
+    "PredictedLineupPlayer",
+    "PredictedLineupSnapshot",
     "PlayerMatchRating",
     "PlayerMatchStat",
     "PrivacyAuditEvent",

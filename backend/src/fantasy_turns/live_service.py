@@ -30,8 +30,16 @@ from fantasy_turns.schemas import (
     FixtureLineupResponse,
     FixtureLiveDetailResponse,
     FixtureTimelineEventResponse,
+    FixtureUnavailablePlayerResponse,
 )
+from sports_data.catalog.models import Club
 from sports_data.fixtures.models import Fixture, MatchEvent, OfficialLineup
+from sports_data.predicted.read import (
+    PredictedView,
+    PredictedViewPlayer,
+    PredictedViewSide,
+    latest_predicted_view,
+)
 from sports_data.roster.models import Athlete
 
 
@@ -81,6 +89,14 @@ def get_fixture_live_detail(
         FixtureFreshness(status_short=fixture.status_short, updated_at=fixture.updated_at),
         now=now,
     )
+    predicted = latest_predicted_view(session, fixture.id)
+    home_lineup = _lineup_payload(session, fixture_id=fixture.id, club_id=fixture.home_club_id)
+    away_lineup = _lineup_payload(session, fixture_id=fixture.id, club_id=fixture.away_club_id)
+    if predicted is not None:
+        if home_lineup is None and predicted.home is not None:
+            home_lineup = _predicted_lineup_payload(predicted.home, fixture.home_club)
+        if away_lineup is None and predicted.away is not None:
+            away_lineup = _predicted_lineup_payload(predicted.away, fixture.away_club)
 
     return FixtureLiveDetailResponse(
         fixtureId=str(fixture.id),
@@ -105,8 +121,9 @@ def get_fixture_live_detail(
         updatedAt=fixture.updated_at,
         feedState=feed_state.value,
         feedStateLabel=PROVIDER_FEED_LABELS[feed_state],
-        homeLineup=_lineup_payload(session, fixture_id=fixture.id, club_id=fixture.home_club_id),
-        awayLineup=_lineup_payload(session, fixture_id=fixture.id, club_id=fixture.away_club_id),
+        homeLineup=home_lineup,
+        awayLineup=away_lineup,
+        unavailablePlayers=_unavailable_payload(predicted, fixture),
         events=_timeline_payload(session, fixture_id=fixture.id),
     )
 
@@ -162,7 +179,53 @@ def _lineup_payload(
         coachName=lineup.coach_name,
         starters=starters,
         bench=bench,
+        lineupKind="official",
     )
+
+
+def _predicted_player(row: PredictedViewPlayer) -> FixtureLineupPlayerResponse:
+    return FixtureLineupPlayerResponse(
+        athleteId=row.athlete_id,
+        name=row.name,
+        shirtNumber=row.shirt_number,
+        grid=row.grid,
+    )
+
+
+def _predicted_lineup_payload(side: PredictedViewSide, club: Club) -> FixtureLineupResponse:
+    return FixtureLineupResponse(
+        clubName=club.name,
+        clubLogoUrl=club.logo_url,
+        formation=side.formation,
+        coachName=side.coach_name,
+        starters=[_predicted_player(row) for row in side.starters],
+        bench=[_predicted_player(row) for row in side.bench],
+        lineupKind="predicted",
+        lineupNote=side.note,
+    )
+
+
+def _unavailable_payload(
+    predicted: PredictedView | None,
+    fixture: Fixture,
+) -> list[FixtureUnavailablePlayerResponse]:
+    if predicted is None:
+        return []
+    rows = []
+    for player in predicted.unavailable:
+        club_name = fixture.home_club.name if player.side == "home" else fixture.away_club.name
+        rows.append(
+            FixtureUnavailablePlayerResponse(
+                athleteId=player.athlete_id,
+                name=player.name,
+                clubName=club_name,
+                side=player.side,
+                kind=player.kind,
+                label=player.label,
+                blocksSelection=player.blocks_selection,
+            )
+        )
+    return rows
 
 
 def _timeline_payload(

@@ -141,6 +141,19 @@ function BenchList({ players, events, side }: { players: readonly FixtureLineupP
   );
 }
 
+function absenceLabel(kind: string | null, label: string | null): string {
+  const normalized = (kind ?? "").toLowerCase();
+  const kindLabel =
+    normalized === "injury"
+      ? "Infortunio"
+      : normalized === "suspension" || normalized === "suspended"
+        ? "Squalifica"
+        : normalized === "red" || normalized === "red_card" || normalized === "redcard"
+          ? "Espulsione"
+          : "Indisponibile";
+  return label ? `${kindLabel} · ${label}` : kindLabel;
+}
+
 function LineupBlock({
   lineup,
   events,
@@ -157,12 +170,13 @@ function LineupBlock({
         <UiStatePanel
           state="empty"
           title="Formazione non disponibile"
-          message="La formazione ufficiale non è ancora stata pubblicata per questa squadra."
+          message="Non c'è ancora né la formazione ufficiale né una formazione probabile per questa squadra."
           testId={`fixture-lineup-empty-${side}`}
         />
       </section>
     );
   }
+  const predicted = lineup.lineupKind === "predicted";
 
   const badgesByAthlete = realMatchBadgesByAthlete(events);
   const positions = layoutFromGrid(
@@ -172,16 +186,41 @@ function LineupBlock({
     .filter(Boolean)
     .join(" · ");
 
+  const placed = new Set(positions.map((position) => position.id));
+  const unplaced = lineup.starters.filter((player) => !placed.has(pitchPlayerId(player)));
+
   return (
     <section data-testid={`fixture-lineup-${side}`}>
-      <FootballPitch
-        title={title}
-        players={toPitchPlayers(lineup.starters, badgesByAthlete)}
-        positions={positions}
-        pitchAriaLabel={`Titolari ${lineup.clubName}`}
-        onAthletePress={athleteCard?.open}
-      />
-      <h4>Panchina</h4>
+      {predicted ? (
+        <p>
+          <Badge variant="accent" data-testid={`fixture-lineup-kind-${side}`}>
+            Formazione probabile
+          </Badge>
+          {lineup.lineupNote ? <span> {lineup.lineupNote}</span> : null}
+        </p>
+      ) : null}
+      {positions.length > 0 ? (
+        <FootballPitch
+          title={title}
+          players={toPitchPlayers(lineup.starters, badgesByAthlete)}
+          positions={positions}
+          pitchAriaLabel={`Titolari ${lineup.clubName}`}
+          onAthletePress={athleteCard?.open}
+        />
+      ) : (
+        <h3>{title}</h3>
+      )}
+      {unplaced.length > 0 ? (
+        <ul data-testid={`fixture-starters-list-${side}`}>
+          {unplaced.map((player) => (
+            <li key={pitchPlayerId(player)}>
+              {player.shirtNumber !== null ? `${player.shirtNumber}. ` : ""}
+              <AthleteName athleteId={player.athleteId}>{player.name}</AthleteName>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+      {lineup.bench.length > 0 ? <h4>Panchina</h4> : null}
       <BenchList players={lineup.bench} events={events} side={side} />
     </section>
   );
@@ -399,6 +438,20 @@ export function FixtureDetailBody({ detail }: { detail: FixtureLiveDetail }) {
         <LineupBlock lineup={detail.homeLineup} events={detail.events} side="home" />
         <LineupBlock lineup={detail.awayLineup} events={detail.events} side="away" />
       </div>
+
+      {(detail.unavailablePlayers ?? []).length > 0 ? (
+        <section aria-labelledby="fixture-unavailable-title" data-testid="fixture-unavailable">
+          <h3 id="fixture-unavailable-title">Indisponibili</h3>
+          <ul>
+            {(detail.unavailablePlayers ?? []).map((player) => (
+              <li key={`${player.side}-${player.athleteId ?? player.name}`}>
+                <AthleteName athleteId={player.athleteId}>{player.name}</AthleteName>
+                {player.clubName ? ` · ${player.clubName}` : ""} · {absenceLabel(player.kind, player.label)}
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
 
       <section aria-labelledby="fixture-timeline-title">
         <h3 id="fixture-timeline-title">Cronologia</h3>

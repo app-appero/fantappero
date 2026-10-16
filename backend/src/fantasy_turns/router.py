@@ -13,8 +13,12 @@ from auth.exceptions import AuthError
 from authorization.context import LeagueAccess
 from authorization.dependencies import require_league_permissions
 from database.enums import Permission
-from fantasy_turns.calendar_refresh_progress import load_progress, new_job_id, save_progress
-from fantasy_turns.calendar_refresh_progress import CalendarRefreshProgress
+from fantasy_turns.calendar_refresh_progress import (
+    CalendarRefreshProgress,
+    load_progress,
+    new_job_id,
+    save_progress,
+)
 from fantasy_turns.live_service import get_fixture_live_detail
 from fantasy_turns.schemas import (
     EnsureFantasyTurnsResponse,
@@ -29,6 +33,7 @@ from fantasy_turns.schemas import (
     FixtureLiveDetailResponse,
     GenerateFantasyTurnRequest,
     PendingFixtureResponse,
+    PredictedLineupSyncResponse,
     RoundCalculationResponse,
 )
 from fantasy_turns.service import FantasyTurnService
@@ -68,6 +73,30 @@ def list_pending_fixtures(
 ) -> list[PendingFixtureResponse]:
     """Fixture note ma senza data/ora dal provider: non appartengono ancora a nessun turno."""
     return service.list_pending_fixtures(league_access)
+
+
+@router.post(
+    "/{league_id}/turni/probabili-formazioni",
+    response_model=PredictedLineupSyncResponse,
+)
+def refresh_predicted_lineups(
+    league_access: LeagueAccess = Depends(require_league_permissions(Permission.LEAGUE_ADMIN)),
+) -> PredictedLineupSyncResponse:
+    """Aggiorna subito le formazioni probabili delle partite vicine di questa lega."""
+    from sports_data.predicted.tasks import run_predicted_lineup_sync
+
+    payload = run_predicted_lineup_sync(force=True, league_id=str(league_access.league.id))
+    return PredictedLineupSyncResponse(
+        fixturesConsidered=int(payload.get("fixtures_considered") or 0),
+        matchesLinked=int(payload.get("matches_linked") or 0),
+        snapshotsSaved=int(payload.get("snapshots_saved") or 0),
+        skippedRecent=int(payload.get("skipped_recent") or 0),
+        skippedUnmatched=int(payload.get("skipped_unmatched") or 0),
+        rejected=int(payload.get("rejected") or 0),
+        warnings=int(payload.get("warnings") or 0),
+        requestsMade=int(payload.get("requests_made") or 0),
+        message=payload.get("message") if isinstance(payload.get("message"), str) else None,
+    )
 
 
 # NOTA: questa rotta generica va dichiarata dopo quelle con segmenti letterali

@@ -57,6 +57,8 @@ _beat_schedule.update(
         catalog_interval_seconds=_worker_settings.sports_data_catalog_sync_interval_seconds,
         fixtures_enabled=_worker_settings.sports_data_fixtures_sync_enabled,
         fixtures_interval_seconds=_worker_settings.sports_data_fixtures_sync_interval_seconds,
+        predicted_lineups_enabled=_worker_settings.predicted_lineups_enabled,
+        predicted_lineups_interval_seconds=_worker_settings.predicted_lineups_interval_seconds,
     )
 )
 
@@ -95,6 +97,7 @@ import notifications.tasks  # noqa: E402, F401
 import sports_data.catalog.tasks  # noqa: E402, F401
 import sports_data.fixtures.tasks  # noqa: E402, F401
 import sports_data.listone.tasks  # noqa: E402, F401
+import sports_data.predicted.tasks  # noqa: E402, F401
 import sports_data.quality.tasks  # noqa: E402, F401
 import sports_data.roster.tasks  # noqa: E402, F401
 import sports_data.scheduler.tasks  # noqa: E402, F401

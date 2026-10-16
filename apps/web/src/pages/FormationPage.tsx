@@ -230,6 +230,27 @@ function playerScoreLabel(roster: LineupRosterPlayer[], athleteId: string): stri
   return player.fixtureStatusLabel === "LIVE" ? `${base} LIVE` : base;
 }
 
+function probableMark(roster: LineupRosterPlayer[], athleteId: string): string {
+  const player = roster.find((row) => row.athleteId === athleteId);
+  if (!player) {
+    return "";
+  }
+  if (player.selectionBlocked || player.probableHint === "unavailable") {
+    return " · indisponibile";
+  }
+  if (player.probableHint === "starter") {
+    return " · titolare probabile";
+  }
+  if (player.probableHint === "bench") {
+    return " · panchina probabile";
+  }
+  return "";
+}
+
+function playerBlocked(roster: LineupRosterPlayer[], athleteId: string): boolean {
+  return roster.some((row) => row.athleteId === athleteId && row.selectionBlocked === true);
+}
+
 function playerBadges(roster: LineupRosterPlayer[], athleteId: string) {
   const player = roster.find((row) => row.athleteId === athleteId);
   return fantasyBadgesFromBonusMalus(player?.bonusMalus ?? []);
@@ -369,7 +390,7 @@ function BenchOrderRow({
   disabled: boolean;
   options: Array<{ value: string; label: string; disabled: boolean }>;
   onMove: (target: number) => void;
-  choices: Array<{ athleteId: string; name: string; role: LineupRole | null }>;
+  choices: Array<{ athleteId: string; name: string; role: LineupRole | null; disabled?: boolean }>;
   onAssign: (athleteId: string) => void;
   scoreLabel?: string | null;
 }) {
@@ -463,8 +484,12 @@ function BenchOrderRow({
                         ? "fa-bench-picker__option fa-bench-picker__option--current"
                         : "fa-bench-picker__option"
                     }
+                    disabled={choice.disabled && choice.athleteId !== athleteId}
                     data-testid={`formation-bench-pick-${index}-${choice.athleteId}`}
                     onClick={() => {
+                      if (choice.disabled && choice.athleteId !== athleteId) {
+                        return;
+                      }
                       setPickerOpen(false);
                       onAssign(choice.athleteId);
                     }}
@@ -546,11 +571,20 @@ export function FormationPage() {
   // anche in quello originale — duplicandolo in campo. Qui la formazione
   // mostrata è semplicemente la bozza, senza ri-collocazioni.
   const displayStarters = template.map((_, index) => starterIds[index] ?? "");
-  const displayBench = orderedBenchFromRoster(
+  const savedBench = context?.lineup?.bench.map((player) => player.athleteId) ?? [];
+  const orderedBench = orderedBenchFromRoster(
     roster.map((row) => row.athleteId),
     displayStarters,
     benchIds,
   );
+  const displayBench = [
+    ...orderedBench.filter(
+      (athleteId) => !(playerBlocked(roster, athleteId) && !savedBench.includes(athleteId)),
+    ),
+    ...orderedBench.filter(
+      (athleteId) => playerBlocked(roster, athleteId) && !savedBench.includes(athleteId),
+    ),
+  ];
   const lockedAthleteIds = roster
     .filter((row) => playerLocked(roster, row.athleteId, clock, lockMarginMinutes))
     .map((row) => row.athleteId);
@@ -908,6 +942,10 @@ export function FormationPage() {
     // …e non si può far entrare ora chi è già sceso in campo altrove.
     if (playerLocked(roster, athleteId, clock, lockMarginMinutes) && athleteId !== currentId) {
       pushToast({ title: KICKOFF_LOCK_MESSAGE, variant: "danger" });
+      return;
+    }
+    if (playerBlocked(roster, athleteId) && athleteId !== currentId) {
+      pushToast({ title: "Questo calciatore è indisponibile e non può essere schierato titolare.", variant: "danger" });
       return;
     }
     const nextStarters = [...starterIds];
@@ -1279,7 +1317,7 @@ export function FormationPage() {
     return {
       id: `starter-${index}`,
       athleteId: athleteId || null,
-      name: athleteId ? playerName(roster, athleteId) : "Libero",
+      name: athleteId ? `${playerName(roster, athleteId)}${probableMark(roster, athleteId)}` : "Libero",
       role,
       photoUrl: athleteId ? playerPhotoUrl(roster, athleteId) : null,
       scoreLabel: athleteId ? playerScoreLabel(roster, athleteId) : null,
@@ -1297,8 +1335,9 @@ export function FormationPage() {
   const panchinaIds = displayBench.slice(0, maxSubs);
   const benchChoices = displayBench.map((athleteId) => ({
     athleteId,
-    name: playerName(roster, athleteId),
+    name: `${playerName(roster, athleteId)}${probableMark(roster, athleteId)}`,
     role: playerRole(roster, athleteId),
+    disabled: playerBlocked(roster, athleteId),
   }));
   const tribunaIds = displayBench.slice(maxSubs);
 
@@ -1319,12 +1358,18 @@ export function FormationPage() {
         if (row.role !== role || selected.has(row.athleteId)) {
           return false;
         }
+        if (row.selectionBlocked && row.athleteId !== currentId) {
+          return false;
+        }
         return true;
       })
       .map((row) => {
         const notes = [
           row.role && row.role !== role ? `ruolo ${row.role}, non compatibile` : null,
           playerLocked(roster, row.athleteId, clock, lockMarginMinutes) ? "bloccato" : null,
+          row.probableHint === "starter" ? "titolare probabile" : null,
+          row.probableHint === "bench" ? "panchina probabile" : null,
+          row.probableHint === "unavailable" ? row.probableNote ?? "indisponibile" : null,
         ].filter(Boolean);
         return {
           value: row.athleteId,
@@ -1609,6 +1654,11 @@ export function FormationPage() {
               positions={pitchPositions}
               onAthletePress={athleteCard?.open}
             />
+            {roster.some((row) => row.probableHint) ? (
+              <p data-testid="formation-probable-hint">
+                I titolari probabili sono segnati nel campo. Gli indisponibili non si possono schierare.
+              </p>
+            ) : null}
           </div>
 
           <div
@@ -1671,7 +1721,7 @@ export function FormationPage() {
                             index={index}
                             canEnter
                             maxSubs={maxSubs}
-                            name={playerName(roster, athleteId)}
+                            name={`${playerName(roster, athleteId)}${probableMark(roster, athleteId)}`}
                             role={playerRole(roster, athleteId)}
                             locked={playerLocked(roster, athleteId, clock, lockMarginMinutes)}
                             disabled={!context.modificationAllowed || !canEdit}
@@ -1707,7 +1757,7 @@ export function FormationPage() {
                             index={index}
                             canEnter={false}
                             maxSubs={maxSubs}
-                            name={playerName(roster, athleteId)}
+                            name={`${playerName(roster, athleteId)}${probableMark(roster, athleteId)}`}
                             role={playerRole(roster, athleteId)}
                             locked={playerLocked(roster, athleteId, clock, lockMarginMinutes)}
                             disabled={!context.modificationAllowed || !canEdit}

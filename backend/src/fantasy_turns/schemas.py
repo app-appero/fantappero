@@ -71,6 +71,18 @@ class FixtureLineupResponse(ApiModel):
     coach_name: str | None = Field(default=None, alias="coachName")
     starters: list[FixtureLineupPlayerResponse] = Field(default_factory=list)
     bench: list[FixtureLineupPlayerResponse] = Field(default_factory=list)
+    lineup_kind: Literal["official", "predicted"] | None = Field(default=None, alias="lineupKind")
+    lineup_note: str | None = Field(default=None, alias="lineupNote")
+
+
+class FixtureUnavailablePlayerResponse(ApiModel):
+    athlete_id: str | None = Field(default=None, alias="athleteId")
+    name: str
+    club_name: str | None = Field(default=None, alias="clubName")
+    side: str
+    kind: str | None = None
+    label: str | None = None
+    blocks_selection: bool = Field(default=False, alias="blocksSelection")
 
 
 class FixtureLiveDetailResponse(ApiModel):
@@ -100,7 +112,23 @@ class FixtureLiveDetailResponse(ApiModel):
     feed_state_label: str = Field(alias="feedStateLabel")
     home_lineup: FixtureLineupResponse | None = Field(default=None, alias="homeLineup")
     away_lineup: FixtureLineupResponse | None = Field(default=None, alias="awayLineup")
+    unavailable_players: list[FixtureUnavailablePlayerResponse] = Field(
+        default_factory=list,
+        alias="unavailablePlayers",
+    )
     events: list[FixtureTimelineEventResponse] = Field(default_factory=list)
+
+
+class PredictedLineupSyncResponse(ApiModel):
+    fixtures_considered: int = Field(alias="fixturesConsidered")
+    matches_linked: int = Field(alias="matchesLinked")
+    snapshots_saved: int = Field(alias="snapshotsSaved")
+    skipped_recent: int = Field(alias="skippedRecent")
+    skipped_unmatched: int = Field(alias="skippedUnmatched")
+    rejected: int
+    warnings: int
+    requests_made: int = Field(alias="requestsMade")
+    message: str | None = None
 
 
 class FantasyTurnSummaryResponse(ApiModel):
