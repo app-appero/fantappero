@@ -1317,8 +1317,13 @@ export function FormationPage() {
     return {
       id: `starter-${index}`,
       athleteId: athleteId || null,
-      name: athleteId ? `${playerName(roster, athleteId)}${probableMark(roster, athleteId)}` : "Libero",
+      name: athleteId ? playerName(roster, athleteId) : "Libero",
       role,
+      probableStarter: athleteId
+        ? roster.some(
+            (row) => row.athleteId === athleteId && row.probableHint === "starter",
+          )
+        : false,
       photoUrl: athleteId ? playerPhotoUrl(roster, athleteId) : null,
       scoreLabel: athleteId ? playerScoreLabel(roster, athleteId) : null,
       badges: athleteId ? playerBadges(roster, athleteId) : [],

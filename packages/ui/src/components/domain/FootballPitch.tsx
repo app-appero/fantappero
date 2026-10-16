@@ -17,6 +17,8 @@ export type PitchPlayer = {
   photoUrl?: string | null;
   /** Id interno del calciatore, quando il pallino deve aprire la scheda. */
   athleteId?: string | null;
+  /** Titolare probabile: anello e nome verde sul campo. */
+  probableStarter?: boolean;
 };
 
 export type FootballPitchProps = HTMLAttributes<HTMLDivElement> & {
@@ -70,12 +72,16 @@ function PlayerPill({
   player: PitchPlayer;
   onAthletePress?: (athleteId: string) => void;
 }) {
+  const className = classNames(
+    "fa-pitch-player",
+    player.probableStarter && "fa-pitch-player--probable",
+  );
   if (player.athleteId && onAthletePress) {
     const athleteId = player.athleteId;
     return (
       <button
         type="button"
-        className="fa-pitch-player"
+        className={className}
         data-testid={`pitch-player-${player.id}`}
         aria-label={`Apri scheda di ${player.name}`}
         onClick={(event) => {
@@ -89,7 +95,7 @@ function PlayerPill({
     );
   }
   return (
-    <div className="fa-pitch-player" data-testid={`pitch-player-${player.id}`}>
+    <div className={className} data-testid={`pitch-player-${player.id}`}>
       <PlayerPillBody player={player} />
     </div>
   );

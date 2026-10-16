@@ -308,6 +308,25 @@ describe("EP13-P04-quater match experience components", () => {
     expect(html).toContain("Svilar");
   });
 
+  it("marks a probable starter with a green pitch class", () => {
+    const html = renderToStaticMarkup(
+      createElement(FootballPitch, {
+        title: "Modulo 4-3-3",
+        players: [
+          { id: "a1", name: "Amine Gouiri", role: "A", probableStarter: true },
+          { id: "d1", name: "Angel Gomes", role: "C" },
+        ],
+        positions: [
+          { id: "a1", xPercent: 50, yPercent: 20 },
+          { id: "d1", xPercent: 50, yPercent: 50 },
+        ],
+      }),
+    );
+    expect(html).toContain('class="fa-pitch-player fa-pitch-player--probable" data-testid="pitch-player-a1"');
+    expect(html).toContain('class="fa-pitch-player" data-testid="pitch-player-d1"');
+    expect(html).not.toContain("titolare probabile");
+  });
+
   it("renders a vertical timeline with home/away sides and period markers", () => {
     const html = renderToStaticMarkup(
       createElement(MatchTimeline, {
