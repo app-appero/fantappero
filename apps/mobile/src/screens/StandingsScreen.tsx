@@ -90,6 +90,7 @@ export function StandingsScreen() {
       testID="screen-standings"
       refreshing={refreshing}
       onRefresh={onRefresh}
+      contentInsetHorizontal={spacing.sm}
     >
       <Text style={styles.meta}>
         {activeLeague ? `Lega: ${activeLeague.name}` : "Seleziona una lega dal selettore in alto."}
@@ -336,7 +337,7 @@ const styles = lazyStyles(() => StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.sm,
+    paddingHorizontal: spacing.xs,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
     gap: spacing.xs,

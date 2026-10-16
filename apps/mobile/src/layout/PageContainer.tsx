@@ -17,6 +17,11 @@ export type PageContainerProps = ViewProps & {
   /** Pull-to-refresh handler; se assente lo scroll non mostra il refresh. */
   onRefresh?: () => void | Promise<void>;
   refreshing?: boolean;
+  /**
+   * Padding orizzontale del contenuto. Default `spacing.lg`.
+   * La classifica lo abbassa per usare quasi tutta la larghezza dello schermo.
+   */
+  contentInsetHorizontal?: number;
 };
 
 /** Scrollable page body with title — mobile equivalent of web PageContainer. */
@@ -27,12 +32,13 @@ export function PageContainer({
   testID,
   onRefresh,
   refreshing = false,
+  contentInsetHorizontal = spacing.lg,
   ...rest
 }: PageContainerProps) {
   return (
     <ScrollView
       style={[styles.scroll, style]}
-      contentContainerStyle={styles.content}
+      contentContainerStyle={[styles.content, { paddingHorizontal: contentInsetHorizontal }]}
       testID={testID}
       keyboardShouldPersistTaps="handled"
       refreshControl={
@@ -64,7 +70,6 @@ const styles = lazyStyles(() => StyleSheet.create({
     backgroundColor: colors.background,
   },
   content: {
-    paddingHorizontal: spacing.lg,
     paddingVertical: spacing.lg,
     paddingBottom: spacing.xl,
     backgroundColor: colors.background,
