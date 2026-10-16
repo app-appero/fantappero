@@ -22,7 +22,7 @@ export function LockCountdownBar() {
   }
 
   return (
-    <View style={styles.bar}>
+    <View style={styles.bar} pointerEvents="box-none">
       <View style={styles.pill} testID="header-lock-strip">
         <Feather name="lock" size={14} color={colors.accentSecondary} />
         <LockCountdown
@@ -55,11 +55,12 @@ export function withLockCountdown<P extends object>(Screen: ComponentType<P>) {
 const styles = lazyStyles(() =>
   StyleSheet.create({
     bar: {
-      alignItems: "flex-end",
-      paddingHorizontal: spacing.md,
-      paddingTop: spacing.lg,
-      paddingBottom: spacing.sm,
-      backgroundColor: colors.background,
+      alignSelf: "center",
+      zIndex: 2,
+      height: 28,
+      marginTop: -14,
+      marginBottom: -14,
+      backgroundColor: "transparent",
     },
     pill: {
       flexDirection: "row",

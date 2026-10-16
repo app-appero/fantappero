@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import secrets
 from pathlib import Path
 from uuid import UUID
 
@@ -127,7 +128,10 @@ class ProfileService:
         target = storage_dir / filename
         target.write_bytes(data)
 
-        profile.avatar_url = f"/media/avatars/{filename}"
+        # Il path del file resta lo stesso: senza versione il browser e l'app
+        # continuano a mostrare la prima foto anche dopo una sostituzione.
+        version = secrets.token_hex(8)
+        profile.avatar_url = f"/media/avatars/{filename}?v={version}"
         self._session.commit()
         get_metrics().incr("profile_avatar_upload_total", labels={"result": "success"})
         return self._to_response(user, profile)

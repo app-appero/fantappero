@@ -113,7 +113,19 @@ def test_profile_avatar_upload_and_remove(client: TestClient, tmp_path, monkeypa
     assert upload.status_code == 200
     avatar_url = upload.json()["avatarUrl"]
     assert avatar_url.startswith("/media/avatars/")
+    assert "?v=" in avatar_url
     assert (avatar_dir / f"{session['user_id']}.png").is_file()
+
+    replaced = client.post(
+        "/profile/me/avatar",
+        headers=headers,
+        files={"file": ("avatar.png", BytesIO(_MINIMAL_PNG), "image/png")},
+    )
+    assert replaced.status_code == 200
+    replaced_url = replaced.json()["avatarUrl"]
+    assert replaced_url.startswith("/media/avatars/")
+    assert "?v=" in replaced_url
+    assert replaced_url != avatar_url
 
     removed = client.delete("/profile/me/avatar", headers=headers)
     assert removed.status_code == 200
