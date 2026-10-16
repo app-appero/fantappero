@@ -21,6 +21,7 @@ import {
   moveBenchToIndex,
   orderedBenchFromRoster,
   preserveLockedStarters,
+  labelFantasyTurnStatus,
   resolveDefaultEuropeanTurn,
   slotsFromLineupIds,
   starterTemplate,
@@ -41,6 +42,7 @@ import {
 } from "../api/leagues";
 import { BottomSheet, FormationPitch, PlayerPickerSheet, roleRingColor, type Candidate, type PitchSlot } from "./formation/FormationParts";
 import { LockCountdown } from "../components/LockCountdown";
+import { OptionPicker } from "../components/OptionPicker";
 import { UiStatePanel } from "../components/UiStatePanel";
 import { PageContainer } from "../layout/PageContainer";
 import { useLockCountdown } from "../matchday/useLockCountdown";
@@ -92,6 +94,7 @@ export function FormationScreen() {
   const canEdit = can(["roster:edit"]);
   const isAdmin = can(["league:admin"]);
   const isOperator = can(["global:operate"]);
+  const canChangeTurn = isAdmin || isOperator;
   const { countdown, refetch: refetchCountdown } = useLockCountdown(accessToken, activeLeagueId);
 
   const [turns, setTurns] = useState<FantasyTurnSummary[]>([]);
@@ -114,6 +117,7 @@ export function FormationScreen() {
   const [aiLineupBusy, setAiLineupBusy] = useState(false);
   const [aiLineupError, setAiLineupError] = useState<string | null>(null);
   const [pickerIndex, setPickerIndex] = useState<number | null>(null);
+  const [benchPickerIndex, setBenchPickerIndex] = useState<number | null>(null);
   const [toolsOpen, setToolsOpen] = useState(false);
   const [showAllBench, setShowAllBench] = useState(false);
 
@@ -207,6 +211,42 @@ export function FormationScreen() {
       cancelled = true;
     };
   }, [accessToken, activeLeagueId, isOperator]);
+
+  /** Admin e operatore: cambiano il turno dalla scheda Strumenti. */
+  async function selectRound(roundId: string) {
+    if (!accessToken || !activeLeagueId || roundId === selectedRoundId) {
+      setSelectedRoundId(roundId);
+      return;
+    }
+    const requestId = (lineupRequest.current += 1);
+    setSelectedRoundId(roundId);
+    setBusy(true);
+    setLoadError(null);
+    try {
+      const detail = await fetchMyLineup(
+        accessToken,
+        activeLeagueId,
+        roundId,
+        targetTeamIdRef.current || undefined,
+      );
+      if (lineupRequest.current !== requestId) {
+        return;
+      }
+      setContext(detail);
+      applyEditor(detail);
+      setBenchPickerIndex(null);
+      setPickerIndex(null);
+    } catch (error) {
+      if (lineupRequest.current !== requestId) {
+        return;
+      }
+      setLoadError(getApiErrorMessage(error, "Formazione del turno non disponibile."));
+    } finally {
+      if (lineupRequest.current === requestId) {
+        setBusy(false);
+      }
+    }
+  }
 
   /** Operatore: cambia la squadra per cui schierare, a parità di turno (EP-operatore-test). */
   async function selectTeam(teamId: string) {
@@ -326,26 +366,9 @@ export function FormationScreen() {
   const previousBenchIds =
     context?.lineup?.bench.map((player) => player.athleteId) ?? displayBench;
 
-  function canMoveBenchTo(fromIndex: number, toIndex: number): boolean {
+  function moveBenchTo(fromIndex: number, toIndex: number): boolean {
     if (fromIndex === toIndex) {
       return true;
-    }
-    const next = moveBenchToIndex(displayBench, fromIndex, toIndex);
-    if (next.join("\0") === displayBench.join("\0")) {
-      return false;
-    }
-    return (
-      evaluateBenchOrderLock({
-        previousBench: previousBenchIds,
-        proposedBench: next,
-        lockedAthleteIds,
-      }).length === 0
-    );
-  }
-
-  function moveBenchTo(fromIndex: number, toIndex: number) {
-    if (fromIndex === toIndex) {
-      return;
     }
     const next = moveBenchToIndex(displayBench, fromIndex, toIndex);
     const orderIssues = evaluateBenchOrderLock({
@@ -355,11 +378,22 @@ export function FormationScreen() {
     });
     if (orderIssues.length > 0) {
       setActionError(orderIssues[0]?.message ?? "Modifica fuori tempo.");
-      return;
+      return false;
     }
     setBenchIds(next);
     setActionError(null);
     setActionMessage(null);
+    return true;
+  }
+
+  function assignBenchPlayer(slotIndex: number, athleteId: string) {
+    const fromIndex = displayBench.indexOf(athleteId);
+    if (fromIndex < 0) {
+      return;
+    }
+    if (moveBenchTo(fromIndex, slotIndex)) {
+      setBenchPickerIndex(null);
+    }
   }
   const evaluation = evaluateLineup({
     module: moduleCode,
@@ -777,7 +811,41 @@ export function FormationScreen() {
           })
       : [];
 
-  const benchVisible = showAllBench ? displayBench : displayBench.slice(0, maxSubs);
+  const panchinaIds = displayBench.slice(0, maxSubs);
+  const tribunaIds = displayBench.slice(maxSubs);
+  const benchCandidates: Candidate[] =
+    benchPickerIndex != null
+      ? roster
+          .filter((row) => !displayStarters.includes(row.athleteId))
+          .map((row) => {
+            const benchPos = displayBench.indexOf(row.athleteId);
+            const isCurrent = benchPos === benchPickerIndex;
+            const locked = playerLocked(row.athleteId);
+            let state: Candidate["state"] = "libero";
+            let stateLabel = "Disponibile";
+            if (isCurrent) {
+              state = "panchina";
+              stateLabel = "Schierato qui";
+            } else if (locked) {
+              state = "bloccato";
+              stateLabel = "Bloccato · partita iniziata";
+            } else if (benchPos >= 0 && benchPos < maxSubs) {
+              state = "panchina";
+              stateLabel = `In panchina · ${benchPos + 1}°`;
+            } else {
+              stateLabel = "In tribuna";
+            }
+            return {
+              athleteId: row.athleteId,
+              name: row.athleteName,
+              role: row.role,
+              state,
+              stateLabel,
+              scoreLabel: playerScoreLabel(row.athleteId),
+              current: isCurrent,
+            };
+          })
+      : [];
   const toolDisabled = busy || !editable;
 
   return (
@@ -927,8 +995,8 @@ export function FormationScreen() {
         <View style={styles.benchHead}>
           <Text style={styles.sectionTitle}>Panchina</Text>
           <Text style={styles.meta} testID="formation-sub-hint">
-            Entrano al massimo {maxSubs} panchinari, nell'ordine e solo a parità di ruolo. Usa le frecce per
-            cambiare l'ordine.
+            Entrano al massimo {maxSubs} panchinari, nell'ordine e solo a parità di ruolo. Tocca un posto
+            per scegliere chi inserire.
           </Text>
         </View>
         {displayBench.length === 0 ? (
@@ -937,18 +1005,19 @@ export function FormationScreen() {
           </Text>
         ) : (
           <View style={styles.benchList} testID="formation-bench-order">
-            {benchVisible.map((id, index) => {
+            {panchinaIds.map((id, index) => {
               const row = roster.find((r) => r.athleteId === id);
               const name = row?.athleteName ?? id;
               const role = row?.role ?? "?";
-              const canEnter = index < maxSubs;
               const locked = playerLocked(id);
-              const canUp = index > 0 && canMoveBenchTo(index, index - 1);
-              const canDown = index < displayBench.length - 1 && canMoveBenchTo(index, index + 1);
               return (
-                <View
+                <Pressable
                   key={id}
-                  style={[styles.benchRow, canEnter ? null : styles.benchOverflow]}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${index + 1}° posto, ${name}. Tocca per cambiare`}
+                  disabled={!editable}
+                  onPress={() => setBenchPickerIndex(index)}
+                  style={[styles.benchRow, benchPickerIndex === index ? styles.benchRowSelected : null]}
                   testID={`formation-bench-${index}`}
                 >
                   <Text style={styles.benchOrder}>{index + 1}°</Text>
@@ -961,35 +1030,14 @@ export function FormationScreen() {
                     </AthleteName>
                     <Text style={styles.meta}>
                       {locked ? "Bloccato · " : ""}
-                      {canEnter ? "può subentrare" : `oltre i ${maxSubs} cambi`}
+                      può subentrare
                       {playerScoreLabel(id) ? ` · ${playerScoreLabel(id)}` : ""}
                     </Text>
                   </View>
-                  <View style={styles.arrows}>
-                    <Pressable
-                      accessibilityRole="button"
-                      accessibilityLabel={`Sposta ${name} più in alto`}
-                      disabled={!editable || !canUp}
-                      onPress={() => moveBenchTo(index, index - 1)}
-                      style={[styles.arrow, !editable || !canUp ? styles.disabled : null]}
-                      testID={`formation-bench-position-${index}`}
-                    >
-                      <Text style={styles.arrowText}>▲</Text>
-                    </Pressable>
-                    <Pressable
-                      accessibilityRole="button"
-                      accessibilityLabel={`Sposta ${name} più in basso`}
-                      disabled={!editable || !canDown}
-                      onPress={() => moveBenchTo(index, index + 1)}
-                      style={[styles.arrow, !editable || !canDown ? styles.disabled : null]}
-                    >
-                      <Text style={styles.arrowText}>▼</Text>
-                    </Pressable>
-                  </View>
-                </View>
+                </Pressable>
               );
             })}
-            {displayBench.length > maxSubs ? (
+            {tribunaIds.length > 0 ? (
               <Pressable
                 accessibilityRole="button"
                 onPress={() => setShowAllBench((v) => !v)}
@@ -998,12 +1046,38 @@ export function FormationScreen() {
               >
                 <Text style={styles.meta}>
                   {showAllBench
-                    ? "Nascondi gli altri"
-                    : `Altri ${displayBench.length - maxSubs} in rosa: restano fuori`}
+                    ? "Nascondi la tribuna"
+                    : `Altri ${tribunaIds.length} in tribuna: restano fuori`}
                 </Text>
                 <Text style={styles.link}>{showAllBench ? "Nascondi" : "Mostra"}</Text>
               </Pressable>
             ) : null}
+            {showAllBench
+              ? tribunaIds.map((id, offset) => {
+                  const index = maxSubs + offset;
+                  const row = roster.find((r) => r.athleteId === id);
+                  const name = row?.athleteName ?? id;
+                  const role = row?.role ?? "?";
+                  return (
+                    <View
+                      key={id}
+                      style={[styles.benchRow, styles.benchOverflow]}
+                      testID={`formation-bench-${index}`}
+                    >
+                      <Text style={styles.benchOrder}>{index + 1}°</Text>
+                      <View style={[styles.benchRole, { backgroundColor: roleRingColor(role) }]}>
+                        <Text style={styles.benchRoleText}>{role}</Text>
+                      </View>
+                      <View style={styles.benchBody}>
+                        <AthleteName plain athleteId={id} style={styles.benchName}>
+                          {name}
+                        </AthleteName>
+                        <Text style={styles.meta}>oltre i {maxSubs} cambi</Text>
+                      </View>
+                    </View>
+                  );
+                })
+              : null}
           </View>
         )}
 
@@ -1076,6 +1150,23 @@ export function FormationScreen() {
         onClose={() => setPickerIndex(null)}
       />
 
+      <PlayerPickerSheet
+        key={benchPickerIndex ?? "bench-closed"}
+        visible={benchPickerIndex != null}
+        role={
+          roster.find((row) => row.athleteId === panchinaIds[benchPickerIndex ?? -1])?.role ?? "C"
+        }
+        slotNumber={(benchPickerIndex ?? 0) + 1}
+        moduleCode={moduleCode}
+        title={`Panchina ${(benchPickerIndex ?? 0) + 1}°`}
+        subtitle="Scegli chi inserire in questo posto"
+        candidates={benchCandidates}
+        hasCurrent={false}
+        onPick={(athleteId) => benchPickerIndex != null && assignBenchPlayer(benchPickerIndex, athleteId)}
+        onClear={() => setBenchPickerIndex(null)}
+        onClose={() => setBenchPickerIndex(null)}
+      />
+
       <BottomSheet
         visible={toolsOpen}
         title="Strumenti"
@@ -1083,6 +1174,24 @@ export function FormationScreen() {
         testID="formation-tools-sheet"
       >
         <ScrollView contentContainerStyle={styles.toolsBody}>
+          {canChangeTurn && turns.length > 0 ? (
+            <View style={styles.tool} testID="formation-round-tool">
+              <Text style={styles.toolTitle}>Cambia turno</Text>
+              <OptionPicker
+                label="Turno"
+                options={turns.map((turn) => ({
+                  value: turn.id,
+                  label: `Turno ${turn.number} (${labelFantasyTurnStatus(turn.effectiveStatus)})`,
+                }))}
+                value={selectedRoundId}
+                onChange={(roundId) => {
+                  setToolsOpen(false);
+                  void selectRound(roundId);
+                }}
+                testID="formation-round"
+              />
+            </View>
+          ) : null}
           {isOperator && teams.length > 0 ? (
             <View style={styles.tool}>
               <Text style={styles.toolTitle}>Schiera per un altro fantallenatore</Text>
@@ -1320,6 +1429,7 @@ const styles = lazyStyles(() => StyleSheet.create({
     padding: spacing.sm,
   },
   benchOverflow: { opacity: 0.65 },
+  benchRowSelected: { borderColor: colors.accent },
   benchOrder: {
     width: 30,
     color: colors.accent,
@@ -1331,17 +1441,6 @@ const styles = lazyStyles(() => StyleSheet.create({
   benchRoleText: { color: "#11162B", fontWeight: "800", fontStyle: "italic" },
   benchBody: { flex: 1, minWidth: 0 },
   benchName: { color: colors.foreground, fontSize: typography.fontSize.md, fontWeight: "700" },
-  arrows: { gap: 4 },
-  arrow: {
-    minWidth: 40,
-    minHeight: 28,
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  arrowText: { color: colors.accent, fontSize: 12 },
   moreBench: {
     flexDirection: "row",
     justifyContent: "space-between",

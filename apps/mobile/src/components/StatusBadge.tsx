@@ -1,6 +1,6 @@
 import { lazyStyles } from "../theme/lazyStyles";
 import { theme } from "@fantappero/ui/theme";
-import { StyleSheet, Text, View } from "react-native";
+import { StyleSheet, Text, View, type StyleProp, type ViewStyle } from "react-native";
 
 const { spacing, typography, radius } = theme;
 
@@ -9,14 +9,16 @@ export function StatusBadge({
   color,
   textColor,
   testID,
+  style,
 }: {
   label: string;
   color: string;
   textColor: string;
   testID?: string;
+  style?: StyleProp<ViewStyle>;
 }) {
   return (
-    <View style={[styles.badge, { backgroundColor: color }]} testID={testID}>
+    <View style={[styles.badge, { backgroundColor: color }, style]} testID={testID}>
       <Text style={[styles.label, { color: textColor }]}>{label}</Text>
     </View>
   );

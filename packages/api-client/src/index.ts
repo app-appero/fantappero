@@ -3,5 +3,7 @@ export type {
   ApiClientConfig,
   ApiRequestOptions,
   FastApiErrorBody,
+  UnauthorizedRecovery,
+  UnauthorizedRecoveryInput,
   UploadOptions,
 } from "./client.js";

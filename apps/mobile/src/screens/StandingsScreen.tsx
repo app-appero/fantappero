@@ -90,7 +90,6 @@ export function StandingsScreen() {
       testID="screen-standings"
       refreshing={refreshing}
       onRefresh={onRefresh}
-      contentInsetHorizontal={spacing.sm}
     >
       <Text style={styles.meta}>
         {activeLeague ? `Lega: ${activeLeague.name}` : "Seleziona una lega dal selettore in alto."}
@@ -188,7 +187,11 @@ function StandingsTableBlock({
         {podium.map((row) => (
           <View
             key={row.fantasyTeamId}
-            style={[styles.podiumCard, row.position === 1 ? styles.podiumFirst : null]}
+            style={[
+              styles.podiumCard,
+              row.position === 1 ? styles.podiumFirst : null,
+              row.isCurrentUser ? styles.podiumCurrent : null,
+            ]}
           >
             <Text style={[styles.podiumRank, row.position === 1 ? styles.podiumRankFirst : null]}>
               {row.position}°
@@ -197,7 +200,6 @@ function StandingsTableBlock({
             <View style={styles.podiumInfo}>
               <Text style={styles.podiumName} numberOfLines={1}>
                 {row.teamName}
-                {row.isCurrentUser ? "  ·  Tu" : ""}
               </Text>
               <Text style={styles.meta}>
                 {row.played} gare · GF:GS {row.fantasyGoalsFor}:{row.fantasyGoalsAgainst}
@@ -240,11 +242,6 @@ function StandingsTableBlock({
             ) : (
               <Text style={styles.teamName}>{row.teamName}</Text>
             )}
-            {row.isCurrentUser ? (
-              <View style={styles.badge}>
-                <Text style={styles.badgeLabel}>Tu</Text>
-              </View>
-            ) : null}
           </View>
           <Text style={[styles.cell, styles.statCell]}>{row.played}</Text>
           <Text style={[styles.cell, styles.statCell]}>{row.points}</Text>
@@ -298,6 +295,9 @@ const styles = lazyStyles(() => StyleSheet.create({
     borderColor: colors.accentSecondary,
     borderWidth: 2,
   },
+  podiumCurrent: {
+    backgroundColor: "rgba(79, 92, 245, 0.22)",
+  },
   podiumRank: {
     width: 40,
     color: colors.foregroundMuted,
@@ -328,6 +328,7 @@ const styles = lazyStyles(() => StyleSheet.create({
     fontWeight: "600",
   },
   table: {
+    marginHorizontal: -(spacing.lg - spacing.sm),
     borderWidth: 1,
     borderColor: colors.border,
     borderRadius: radius.xl,
@@ -383,16 +384,5 @@ const styles = lazyStyles(() => StyleSheet.create({
   goalsCell: {
     width: 64,
     textAlign: "right",
-  },
-  badge: {
-    backgroundColor: colors.accentSecondary,
-    borderRadius: radius.sm,
-    paddingHorizontal: spacing.xs,
-    paddingVertical: 2,
-  },
-  badgeLabel: {
-    color: colors.onBrand,
-    fontSize: typography.fontSize.xs,
-    fontWeight: typography.fontWeight.semibold,
   },
 }));

@@ -1,7 +1,19 @@
-import { createApiClient, ApiError, getApiErrorMessage } from "@fantappero/api-client";
+import {
+  createApiClient,
+  ApiError,
+  getApiErrorMessage,
+  type UnauthorizedRecovery,
+} from "@fantappero/api-client";
 import { loadMobileEnv, MobileEnvError } from "../config/env";
 
 export { ApiError, getApiErrorMessage };
+
+let recoverUnauthorized: UnauthorizedRecovery | null = null;
+
+/** Registered by the session provider so a 401 renews the access token once. */
+export function setUnauthorizedRecovery(next: UnauthorizedRecovery | null): void {
+  recoverUnauthorized = next;
+}
 
 type UploadFile = { uri: string; name: string; type?: string };
 
@@ -29,6 +41,12 @@ function resolveApiBaseUrl(): string {
 const client = createApiClient<UploadFile>({
   resolveBaseUrl: resolveApiBaseUrl,
   isDev: () => __DEV__,
+  recoverUnauthorized: (input) => {
+    if (!recoverUnauthorized) {
+      throw input.error;
+    }
+    return recoverUnauthorized(input);
+  },
   buildUploadValue: (file) =>
     ({
       uri: file.uri,

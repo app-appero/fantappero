@@ -326,6 +326,7 @@ export function MatchdayH2HPanel({
               label={roundStatusHint(activeRound)}
               color={activeRound.homologationStatus === "homologated" ? colors.success : colors.warning}
               textColor={colors.accentContrast}
+              style={styles.roundBadge}
               testID="h2h-round-status"
             />
           </View>
@@ -404,10 +405,15 @@ const styles = lazyStyles(() => StyleSheet.create({
     justifyContent: "space-between",
     gap: spacing.sm,
   },
+  roundBadge: {
+    alignSelf: "center",
+    flexShrink: 1,
+  },
   heading: {
     color: colors.foreground,
     fontSize: typography.fontSize.xl,
     fontWeight: "700",
+    flexShrink: 1,
   },
   matchup: {
     borderWidth: 1,

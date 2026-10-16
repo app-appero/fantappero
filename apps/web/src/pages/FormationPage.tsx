@@ -347,6 +347,8 @@ function BenchOrderRow({
   disabled,
   options,
   onMove,
+  choices,
+  onAssign,
   scoreLabel,
 }: {
   athleteId: string;
@@ -359,6 +361,8 @@ function BenchOrderRow({
   disabled: boolean;
   options: Array<{ value: string; label: string; disabled: boolean }>;
   onMove: (target: number) => void;
+  choices: Array<{ athleteId: string; name: string }>;
+  onAssign: (athleteId: string) => void;
   scoreLabel?: string | null;
 }) {
   return (
@@ -366,6 +370,23 @@ function BenchOrderRow({
       key={athleteId}
       className={canEnter ? "fa-bench-order__row" : "fa-bench-order__row fa-bench-order__row--overflow"}
     >
+      <label className="fa-bench-order__assign">
+        <span className="fa-visually-hidden">Calciatore al {index + 1}° posto</span>
+        <select
+          className="fa-select"
+          value={athleteId}
+          disabled={disabled}
+          aria-label={`Scegli chi inserire al ${index + 1}° posto di panchina`}
+          data-testid={`formation-bench-pick-${index}`}
+          onChange={(event) => onAssign(event.target.value)}
+        >
+          {choices.map((choice) => (
+            <option key={choice.athleteId} value={choice.athleteId}>
+              {choice.name}
+            </option>
+          ))}
+        </select>
+      </label>
       <span className="fa-bench-order__position">
         <Select
           className="fa-bench-order__select"
@@ -842,6 +863,14 @@ export function FormationPage() {
     return context?.lineup?.bench.map((player) => player.athleteId) ?? displayBench;
   }
 
+  function assignBenchPlayer(slotIndex: number, athleteId: string) {
+    const fromIndex = displayBench.indexOf(athleteId);
+    if (fromIndex < 0) {
+      return;
+    }
+    moveBenchTo(fromIndex, slotIndex);
+  }
+
   function moveBenchTo(fromIndex: number, toIndex: number) {
     if (fromIndex === toIndex) {
       return;
@@ -1203,6 +1232,10 @@ export function FormationPage() {
   );
   const maxSubs = context?.maxAutomaticSubstitutions ?? MAX_AUTOMATIC_SUBSTITUTIONS;
   const panchinaIds = displayBench.slice(0, maxSubs);
+  const benchChoices = displayBench.map((athleteId) => ({
+    athleteId,
+    name: playerName(roster, athleteId),
+  }));
   const tribunaIds = displayBench.slice(maxSubs);
 
   const optionsForSlot = (index: number, role: LineupRole) => {
@@ -1580,6 +1613,8 @@ export function FormationPage() {
                               disabled: !canMoveBenchTo(index, target),
                             }))}
                             onMove={(target) => moveBenchTo(index, target)}
+                            choices={benchChoices}
+                            onAssign={(athleteId) => assignBenchPlayer(index, athleteId)}
                             scoreLabel={playerScoreLabel(roster, athleteId)}
                           />
                         ) : null,
@@ -1614,6 +1649,8 @@ export function FormationPage() {
                               disabled: !canMoveBenchTo(index, target),
                             }))}
                             onMove={(target) => moveBenchTo(index, target)}
+                            choices={benchChoices}
+                            onAssign={(athleteId) => assignBenchPlayer(index, athleteId)}
                             scoreLabel={playerScoreLabel(roster, athleteId)}
                           />
                         ) : null,

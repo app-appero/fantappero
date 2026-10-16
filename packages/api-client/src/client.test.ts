@@ -143,6 +143,82 @@ describe("createApiClient", () => {
     }
   });
 
+  it("retries an authenticated 401 once with the token from recoverUnauthorized", async () => {
+    let calls = 0;
+    const stub = installFetchStub((url, init) => {
+      calls += 1;
+      const headers = init?.headers as Record<string, string>;
+      if (url.endsWith("/leghe") && headers.Authorization === "Bearer expired") {
+        return jsonResponse(401, {
+          message: "Email o password non validi.",
+          code: "invalid_credentials",
+        });
+      }
+      return jsonResponse(200, { ok: true });
+    });
+    try {
+      const { apiRequest } = createApiClient({
+        resolveBaseUrl: () => "https://api.example.test",
+        buildUploadValue: (file: string) => file,
+        recoverUnauthorized: async () => "fresh-token",
+      });
+      const result = await apiRequest<{ ok: boolean }>("/leghe", { accessToken: "expired" });
+      assert.deepEqual(result, { ok: true });
+      assert.equal(calls, 2);
+      const retryHeaders = stub.calls[1]?.init?.headers as Record<string, string>;
+      assert.equal(retryHeaders.Authorization, "Bearer fresh-token");
+    } finally {
+      stub.restore();
+    }
+  });
+
+  it("does not refresh a failed login, and keeps the credentials message", async () => {
+    const stub = installFetchStub(() =>
+      jsonResponse(401, { message: "Email o password non validi.", code: "invalid_credentials" }),
+    );
+    let refreshed = 0;
+    try {
+      const { apiRequest } = createApiClient({
+        resolveBaseUrl: () => "https://api.example.test",
+        buildUploadValue: (file: string) => file,
+        recoverUnauthorized: async () => {
+          refreshed += 1;
+          return "fresh-token";
+        },
+      });
+      await assert.rejects(apiRequest("/auth/login", { body: { email: "a", password: "b" } }), (error: unknown) => {
+        assert.ok(error instanceof ApiError);
+        assert.equal(error.message, "Email o password non validi.");
+        return true;
+      });
+      assert.equal(refreshed, 0);
+      assert.equal(stub.calls.length, 1);
+    } finally {
+      stub.restore();
+    }
+  });
+
+  it("reports a dead session when refresh cannot produce a new token", async () => {
+    const stub = installFetchStub(() =>
+      jsonResponse(401, { message: "Email o password non validi.", code: "invalid_credentials" }),
+    );
+    try {
+      const { apiRequest } = createApiClient({
+        resolveBaseUrl: () => "https://api.example.test",
+        buildUploadValue: (file: string) => file,
+        recoverUnauthorized: async () => null,
+      });
+      await assert.rejects(apiRequest("/leghe", { accessToken: "expired" }), (error: unknown) => {
+        assert.ok(error instanceof ApiError);
+        assert.equal(error.code, "session_expired");
+        assert.equal(error.message, "Sessione scaduta. Accedi di nuovo.");
+        return true;
+      });
+    } finally {
+      stub.restore();
+    }
+  });
+
   it("invokes isDev-gated diagnostics only when isDev() returns true", async () => {
     const stub = installFetchStub(() => jsonResponse(500, {}));
     const originalLog = console.log;
