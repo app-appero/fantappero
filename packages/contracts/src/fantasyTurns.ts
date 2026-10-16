@@ -96,6 +96,19 @@ export interface FixtureLineup {
   coachName: string | null;
   starters: FixtureLineupPlayer[];
   bench: FixtureLineupPlayer[];
+  /** `official` = formazione ufficiale già salvata. `predicted` = probabile, non sostituisce l'ufficiale. */
+  lineupKind?: "official" | "predicted" | null;
+  lineupNote?: string | null;
+}
+
+export interface FixtureUnavailablePlayer {
+  athleteId: string | null;
+  name: string;
+  clubName: string | null;
+  side: "home" | "away" | string;
+  kind: string | null;
+  label: string | null;
+  blocksSelection: boolean;
 }
 
 /** Dettaglio partita live: risultato, formazioni ufficiali e cronologia. */
@@ -122,10 +135,23 @@ export interface FixtureLiveDetail {
   updatedAt: string | null;
   feedState: ProviderFeedState;
   feedStateLabel: string;
-  /** `null` quando la formazione ufficiale non è ancora pubblicata. */
+  /** `null` quando non c'è né la formazione ufficiale né una probabile utilizzabile. */
   homeLineup: FixtureLineup | null;
   awayLineup: FixtureLineup | null;
+  unavailablePlayers?: FixtureUnavailablePlayer[];
   events: FixtureTimelineEvent[];
+}
+
+export interface PredictedLineupSyncResult {
+  fixturesConsidered: number;
+  matchesLinked: number;
+  snapshotsSaved: number;
+  skippedRecent: number;
+  skippedUnmatched: number;
+  rejected: number;
+  warnings: number;
+  requestsMade: number;
+  message: string | null;
 }
 
 export interface FantasyTurnSummary {

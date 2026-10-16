@@ -70,6 +70,11 @@ export interface LineupRosterPlayer {
     contribution: number;
   }>;
   fixtureStatusLabel?: string | null;
+  /** Titolare o panchinaro nella formazione probabile, oppure indisponibile. */
+  probableHint?: "starter" | "bench" | "unavailable" | null;
+  probableNote?: string | null;
+  /** Non può essere aggiunto tra i titolari. Chi è già schierato resta finché non lo si toglie. */
+  selectionBlocked?: boolean;
 }
 
 /**

@@ -29,6 +29,7 @@ import {
   fetchFantasyTurns,
   fetchH2HCalendar,
   fetchPendingFixtures,
+  refreshPredictedLineups,
 } from "../api/leagues";
 import { OptionPicker } from "../components/OptionPicker";
 import { LockCountdown } from "../components/LockCountdown";
@@ -356,6 +357,33 @@ export function MatchdayScreen() {
               }}
               testID="matchday-turn-select"
             />
+            {isAdmin ? (
+              <Pressable
+                style={[styles.button, busy ? styles.disabled : null]}
+                disabled={busy}
+                testID="matchday-refresh-predicted"
+                onPress={() => {
+                  if (!accessToken || !activeLeagueId) {
+                    return;
+                  }
+                  setBusy(true);
+                  setActionError(null);
+                  void refreshPredictedLineups(accessToken, activeLeagueId)
+                    .then((result) => {
+                      setActionMessage(
+                        result.message ??
+                          `Formazioni probabili aggiornate: ${result.snapshotsSaved} salvate, ${result.skippedUnmatched} senza corrispondenza.`,
+                      );
+                    })
+                    .catch((error: unknown) => {
+                      setActionError(getApiErrorMessage(error, "Aggiornamento formazioni probabili non riuscito."));
+                    })
+                    .finally(() => setBusy(false));
+                }}
+              >
+                <Text style={styles.buttonLabel}>Aggiorna probabili</Text>
+              </Pressable>
+            ) : null}
           </View>
         )}
 

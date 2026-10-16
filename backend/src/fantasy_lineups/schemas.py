@@ -53,6 +53,12 @@ class LineupRosterPlayerResponse(ApiModel):
     malus_total: float = Field(default=0.0, alias="malusTotal")
     bonus_malus: list[dict[str, object]] = Field(default_factory=list, alias="bonusMalus")
     fixture_status_label: str | None = Field(default=None, alias="fixtureStatusLabel")
+    probable_hint: Literal["starter", "bench", "unavailable"] | None = Field(
+        default=None,
+        alias="probableHint",
+    )
+    probable_note: str | None = Field(default=None, alias="probableNote")
+    selection_blocked: bool = Field(default=False, alias="selectionBlocked")
 
 
 class LineupPlayerResponse(ApiModel):

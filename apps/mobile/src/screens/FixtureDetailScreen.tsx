@@ -141,6 +141,19 @@ function BenchList({ players, events, side }: { players: readonly FixtureLineupP
   );
 }
 
+function absenceLabel(kind: string | null, label: string | null): string {
+  const normalized = (kind ?? "").toLowerCase();
+  const kindLabel =
+    normalized === "injury"
+      ? "Infortunio"
+      : normalized === "suspension" || normalized === "suspended"
+        ? "Squalifica"
+        : normalized === "red" || normalized === "red_card" || normalized === "redcard"
+          ? "Espulsione"
+          : "Indisponibile";
+  return label ? `${kindLabel} · ${label}` : kindLabel;
+}
+
 function LineupBlock({
   lineup,
   events,
@@ -157,12 +170,13 @@ function LineupBlock({
         <UiStatePanel
           state="empty"
           title="Formazione non disponibile"
-          message="La formazione ufficiale non è ancora stata pubblicata per questa squadra."
+          message="Non c'è ancora né la formazione ufficiale né una formazione probabile per questa squadra."
           testID={`fixture-lineup-empty-${side}`}
         />
       </View>
     );
   }
+  const predicted = lineup.lineupKind === "predicted";
 
   const badgesByAthlete = realMatchBadgesByAthlete(events);
   const positions = layoutFromGrid(
@@ -172,16 +186,38 @@ function LineupBlock({
     .filter(Boolean)
     .join(" · ");
 
+  const placed = new Set(positions.map((position) => position.id));
+  const unplaced = lineup.starters.filter((player) => !placed.has(pitchPlayerId(player)));
+
   return (
     <View style={styles.section} testID={`fixture-lineup-${side}`}>
-      <PitchView
-        title={title}
-        players={toPitchPlayers(lineup.starters, badgesByAthlete)}
-        positions={positions}
-        testID={`fixture-pitch-${side}`}
-        onAthletePress={athleteCard?.open}
-      />
-      <Text style={styles.subheading}>Panchina</Text>
+      {predicted ? (
+        <StatusBadge
+          label="Formazione probabile"
+          color={colors.accent}
+          textColor={colors.accentContrast}
+          testID={`fixture-lineup-kind-${side}`}
+        />
+      ) : null}
+      {predicted && lineup.lineupNote ? <Text style={styles.body}>{lineup.lineupNote}</Text> : null}
+      {positions.length > 0 ? (
+        <PitchView
+          title={title}
+          players={toPitchPlayers(lineup.starters, badgesByAthlete)}
+          positions={positions}
+          testID={`fixture-pitch-${side}`}
+          onAthletePress={athleteCard?.open}
+        />
+      ) : (
+        <Text style={styles.subheading}>{title}</Text>
+      )}
+      {unplaced.map((player) => (
+        <Text key={pitchPlayerId(player)} style={styles.body}>
+          {player.shirtNumber !== null ? `${player.shirtNumber}. ` : ""}
+          {player.name}
+        </Text>
+      ))}
+      {lineup.bench.length > 0 ? <Text style={styles.subheading}>Panchina</Text> : null}
       <BenchList players={lineup.bench} events={events} side={side} />
     </View>
   );
@@ -500,6 +536,18 @@ export function FixtureDetailScreen() {
 
           <LineupBlock lineup={detail.homeLineup} events={detail.events} side="home" />
           <LineupBlock lineup={detail.awayLineup} events={detail.events} side="away" />
+
+          {(detail.unavailablePlayers ?? []).length > 0 ? (
+            <View style={styles.section} testID="fixture-unavailable">
+              <Text style={styles.heading}>Indisponibili</Text>
+              {(detail.unavailablePlayers ?? []).map((player) => (
+                <Text key={`${player.side}-${player.athleteId ?? player.name}`} style={styles.body}>
+                  {player.name}
+                  {player.clubName ? ` · ${player.clubName}` : ""} · {absenceLabel(player.kind, player.label)}
+                </Text>
+              ))}
+            </View>
+          ) : null}
 
           <View style={styles.section}>
             <Text style={styles.heading}>Cronologia</Text>

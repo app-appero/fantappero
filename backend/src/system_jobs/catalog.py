@@ -172,6 +172,21 @@ SYSTEM_JOBS: tuple[SystemJobSpec, ...] = (
         max_interval_seconds=604_800,
         kwargs={"include_details": False},
     ),
+    SystemJobSpec(
+        key="sports-predicted-lineups",
+        task="sports_data.sync_predicted_lineups",
+        title="Formazioni probabili",
+        description=(
+            "Una volta al giorno scarica le formazioni previste e gli "
+            "indisponibili delle partite non ancora iniziate. Non sostituisce "
+            "le formazioni ufficiali."
+        ),
+        enabled_attr="predicted_lineups_enabled",
+        interval_attr="predicted_lineups_interval_seconds",
+        default_interval_seconds=86_400,
+        min_interval_seconds=3600,
+        max_interval_seconds=604_800,
+    ),
 )
 
 SYSTEM_JOBS_BY_KEY: dict[str, SystemJobSpec] = {spec.key: spec for spec in SYSTEM_JOBS}

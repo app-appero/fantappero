@@ -14,6 +14,8 @@ def sports_data_beat_schedule(
     catalog_interval_seconds: int = 86_400,
     fixtures_enabled: bool,
     fixtures_interval_seconds: int = 259_200,
+    predicted_lineups_enabled: bool = True,
+    predicted_lineups_interval_seconds: int = 86_400,
 ) -> dict[str, dict]:
     schedule: dict[str, dict] = {}
     if catalog_enabled:
@@ -32,5 +34,11 @@ def sports_data_beat_schedule(
             "kwargs": {"include_details": False},
             "schedule": float(fixtures_interval_seconds),
             "options": {"expires": float(fixtures_interval_seconds)},
+        }
+    if predicted_lineups_enabled:
+        schedule["sports-predicted-lineups"] = {
+            "task": "sports_data.sync_predicted_lineups",
+            "schedule": float(predicted_lineups_interval_seconds),
+            "options": {"expires": float(predicted_lineups_interval_seconds)},
         }
     return schedule

@@ -82,6 +82,7 @@ from observability.metrics import get_metrics
 from sports_data.catalog.models import SportSeason
 from sports_data.fixtures.models import Fixture
 from sports_data.listone.models import RoleAssignment
+from sports_data.predicted.read import AthleteProbable, hints_for_fixtures
 from sports_data.roster.models import SquadMembership
 
 logger = get_logger(__name__)
@@ -277,6 +278,12 @@ class FantasyLineupService:
             ]
         )
         submission = self._load_submission(fantasy_round.id, team.id, for_update=True)
+        self._reject_newly_blocked_starters(
+            round_id=fantasy_round.id,
+            roster_ids=[row.athlete_id for row in roster],
+            starter_ids=starter_ids,
+            submission=submission,
+        )
 
         roles_by_id = self._validation_roles(
             roster=roster,
@@ -1063,6 +1070,10 @@ class FantasyLineupService:
             and (copy_preview is None or not copy_preview.blocked)
         )
         loaded_team = self._session.get(FantasyTeam, fantasy_team_id)
+        probable = self._probable_hints(
+            fantasy_round.id,
+            [row.athlete_id for row in roster],
+        )
         return LineupContextResponse(
             leagueId=str(league_id),
             fantasyTeamId=str(fantasy_team_id),
@@ -1097,6 +1108,7 @@ class FantasyLineupService:
                     kickoffs=kickoffs,
                     locked_flags=locked_flags,
                     scores_by_athlete=scores_by_athlete,
+                    probable=probable.get(row.athlete_id),
                 )
                 for row in roster
             ],
@@ -1328,12 +1340,54 @@ class FantasyLineupService:
         )
 
     @staticmethod
+    def _probable_hints(
+        self,
+        round_id: UUID,
+        athlete_ids: list[UUID],
+    ) -> dict[UUID, AthleteProbable]:
+        fixture_ids = list(
+            self._session.scalars(
+                select(FantasyRoundFixture.fixture_id).where(
+                    FantasyRoundFixture.round_id == round_id,
+                    FantasyRoundFixture.excluded_at.is_(None),
+                )
+            ).all()
+        )
+        return hints_for_fixtures(self._session, fixture_ids, athlete_ids)
+
+    def _reject_newly_blocked_starters(
+        self,
+        *,
+        round_id: UUID,
+        roster_ids: list[UUID],
+        starter_ids: list[UUID],
+        submission: LineupSubmission | None,
+    ) -> None:
+        hints = self._probable_hints(round_id, roster_ids)
+        blocked = {athlete_id for athlete_id, hint in hints.items() if hint.blocked}
+        if not blocked:
+            return
+        previous = set()
+        if submission is not None:
+            previous = {
+                player.athlete_id
+                for player in submission.players
+                if player.slot_kind == LineupSlotKind.STARTER
+            }
+        if (set(starter_ids) & blocked) - previous:
+            raise ValidationAuthError(
+                "Un calciatore indisponibile non può entrare tra i titolari.",
+                code="player_unavailable",
+            )
+
+    @staticmethod
     def _to_roster_player(
         row: _RosterRow,
         *,
         kickoffs: dict[UUID, _KickoffRef],
         locked_flags: dict[UUID, bool],
         scores_by_athlete: dict[UUID, RoundAthleteScore],
+        probable: AthleteProbable | None = None,
     ) -> LineupRosterPlayerResponse:
         kickoff = kickoffs.get(row.athlete_id)
         score = scores_by_athlete.get(row.athlete_id)
@@ -1353,6 +1407,9 @@ class FantasyLineupService:
             malusTotal=score.malus_total if score is not None else 0.0,
             bonusMalus=list(score.bonus_malus) if score is not None else [],
             fixtureStatusLabel=score.fixture_status_label if score is not None else None,
+            probableHint=None if probable is None else probable.hint,
+            probableNote=None if probable is None else probable.note,
+            selectionBlocked=False if probable is None else probable.blocked,
         )
 
     def _to_previous(self, submission: LineupSubmission) -> PreviousLineupResponse:
