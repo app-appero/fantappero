@@ -1654,11 +1654,6 @@ export function FormationPage() {
               positions={pitchPositions}
               onAthletePress={athleteCard?.open}
             />
-            {roster.some((row) => row.probableHint) ? (
-              <p data-testid="formation-probable-hint">
-                I titolari probabili sono segnati nel campo. Gli indisponibili non si possono schierare.
-              </p>
-            ) : null}
           </div>
 
           <div
