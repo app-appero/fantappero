@@ -57,9 +57,8 @@ const styles = lazyStyles(() =>
     bar: {
       alignSelf: "center",
       zIndex: 2,
-      height: 28,
-      marginTop: -14,
-      marginBottom: -14,
+      marginTop: spacing.sm,
+      marginBottom: spacing.xs,
       backgroundColor: "transparent",
     },
     pill: {
