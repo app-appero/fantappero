@@ -13,7 +13,7 @@ class AuthSettingsMixin:
         validation_alias="JWT_SECRET_KEY",
     )
     jwt_access_token_expire_minutes: int = Field(
-        default=15,
+        default=720,
         validation_alias="JWT_ACCESS_TOKEN_EXPIRE_MINUTES",
     )
     jwt_refresh_token_expire_days: int = Field(

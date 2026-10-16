@@ -66,6 +66,7 @@ export function AppHeader({
   }
 
   return (
+    <>
     <View
       style={[styles.header, isAdmin ? styles.headerAdmin : styles.headerApp]}
       accessibilityRole="header"
@@ -176,15 +177,18 @@ export function AppHeader({
         </View>
         ) : null}
       </View>
+    </View>
       {countdown && !isAdmin ? (
-        <View style={styles.countdownStrip} testID="header-lock-strip">
-          <Feather name="lock" size={14} color={colors.accentSecondary} />
-          <LockCountdown
-            state={countdown.state}
-            nextLockAt={countdown.nextLockAt}
-            onExpire={refetchCountdown}
-            testID="header-lock-countdown"
-          />
+        <View style={styles.countdownBar}>
+          <View style={styles.countdownStrip} testID="header-lock-strip">
+            <Feather name="lock" size={14} color={colors.accentSecondary} />
+            <LockCountdown
+              state={countdown.state}
+              nextLockAt={countdown.nextLockAt}
+              onExpire={refetchCountdown}
+              testID="header-lock-countdown"
+            />
+          </View>
         </View>
       ) : null}
       <Modal
@@ -234,7 +238,7 @@ export function AppHeader({
           </Pressable>
         </Pressable>
       </Modal>
-    </View>
+    </>
   );
 }
 
@@ -333,13 +337,16 @@ const styles = lazyStyles(() => StyleSheet.create({
     color: colors.foreground,
     fontWeight: typography.fontWeight.semibold,
   },
+  countdownBar: {
+    alignItems: "flex-end",
+    paddingHorizontal: spacing.md,
+    paddingBottom: spacing.xs,
+    backgroundColor: colors.background,
+  },
   countdownStrip: {
     flexDirection: "row",
     alignItems: "center",
-    alignSelf: "flex-start",
     gap: spacing.xs,
-    marginTop: spacing.xs,
-    marginLeft: spacing.xs,
     paddingHorizontal: spacing.sm,
     paddingVertical: 4,
     borderRadius: radius.pill,

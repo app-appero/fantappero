@@ -49,9 +49,27 @@ export type UploadOptions<TFile> = {
   fieldName?: string;
 };
 
+export type UnauthorizedRecoveryInput = {
+  path: string;
+  accessToken: string;
+  error: ApiError;
+};
+
+/**
+ * Called once after an authenticated request gets 401.
+ * Return a new access token to retry the request, or null when the session is dead.
+ * Throw to keep the current session (for example a network failure during refresh).
+ */
+export type UnauthorizedRecovery = (input: UnauthorizedRecoveryInput) => Promise<string | null>;
+
 export type ApiClientConfig<TFile = unknown> = {
   /** Resolve the current API base URL. May throw; the error propagates as-is. */
   resolveBaseUrl: () => string;
+  /**
+   * Silent session renewal. When set, a 401 on an authenticated call outside
+   * `/auth/` retries once with the token this function returns.
+   */
+  recoverUnauthorized?: UnauthorizedRecovery;
   /** Returns true when diagnostics should be logged to the console. Defaults to always false. */
   isDev?: () => boolean;
   /** Turn a platform file reference into a value `FormData.append` accepts. */
@@ -159,7 +177,7 @@ export function createApiClient<TFile = unknown>(config: ApiClientConfig<TFile>)
     }
   }
 
-  function raiseRequestFailed(url: string, response: Response, payload: FastApiErrorBody): never {
+  function toApiError(url: string, response: Response, payload: FastApiErrorBody): ApiError {
     const message = extractErrorMessage(payload, response.status, messages);
     if (isDev()) {
       console.log("[api] request failed", {
@@ -169,10 +187,40 @@ export function createApiClient<TFile = unknown>(config: ApiClientConfig<TFile>)
         body: payload,
       });
     }
-    throw new ApiError(message, response.status, payload.code ?? "unknown_error");
+    return new ApiError(message, response.status, payload.code ?? "unknown_error");
   }
 
-  async function apiRequest<T>(path: string, options: ApiRequestOptions = {}): Promise<T> {
+  function sessionExpiredError(): ApiError {
+    return new ApiError("Sessione scaduta. Accedi di nuovo.", 401, "session_expired");
+  }
+
+  async function recoverAndRetry<T>(
+    path: string,
+    accessToken: string | null | undefined,
+    error: ApiError,
+    retry: (token: string) => Promise<T>,
+  ): Promise<T> {
+    const recover = config.recoverUnauthorized;
+    const canRecover =
+      Boolean(accessToken) &&
+      error.status === 401 &&
+      Boolean(recover) &&
+      !path.startsWith("/auth/");
+    if (!canRecover || !recover || !accessToken) {
+      throw error;
+    }
+    const next = await recover({ path, accessToken, error });
+    if (!next || next === accessToken) {
+      throw sessionExpiredError();
+    }
+    return retry(next);
+  }
+
+  async function apiRequest<T>(
+    path: string,
+    options: ApiRequestOptions = {},
+    allowRecovery = true,
+  ): Promise<T> {
     const baseUrl = config.resolveBaseUrl();
     const url = `${baseUrl}${path}`;
     const headers: Record<string, string> = {
@@ -197,12 +245,22 @@ export function createApiClient<TFile = unknown>(config: ApiClientConfig<TFile>)
 
     const payload = await parseJsonBody<T>(response, url);
     if (!response.ok) {
-      raiseRequestFailed(url, response, payload as FastApiErrorBody);
+      const error = toApiError(url, response, payload as FastApiErrorBody);
+      if (!allowRecovery) {
+        throw error;
+      }
+      return recoverAndRetry(path, options.accessToken, error, (token) =>
+        apiRequest<T>(path, { ...options, accessToken: token }, false),
+      );
     }
     return payload as T;
   }
 
-  async function apiUpload<T>(path: string, options: UploadOptions<TFile>): Promise<T> {
+  async function apiUpload<T>(
+    path: string,
+    options: UploadOptions<TFile>,
+    allowRecovery = true,
+  ): Promise<T> {
     const baseUrl = config.resolveBaseUrl();
     const url = `${baseUrl}${path}`;
     const formData = new FormData();
@@ -219,7 +277,13 @@ export function createApiClient<TFile = unknown>(config: ApiClientConfig<TFile>)
 
     const payload = await parseJsonBody<T>(response, url);
     if (!response.ok) {
-      raiseRequestFailed(url, response, payload as FastApiErrorBody);
+      const error = toApiError(url, response, payload as FastApiErrorBody);
+      if (!allowRecovery) {
+        throw error;
+      }
+      return recoverAndRetry(path, options.accessToken, error, (token) =>
+        apiUpload<T>(path, { ...options, accessToken: token }, false),
+      );
     }
     return payload as T;
   }

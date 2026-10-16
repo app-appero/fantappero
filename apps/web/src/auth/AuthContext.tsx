@@ -17,7 +17,7 @@ import {
   type ReactNode,
 } from "react";
 import * as authApi from "../api/auth";
-import { getApiErrorMessage } from "../api/client";
+import { getApiErrorMessage, setUnauthorizedRecovery } from "../api/client";
 import { fetchMyLeagues } from "../api/leagues";
 import { useSearchParams } from "../router/simpleRouter";
 import {
@@ -40,6 +40,12 @@ import {
   saveStoredSession,
   type StoredSession,
 } from "./sessionStorage";
+import {
+  isTransientApiError,
+  recoverAccessToken,
+  refreshSessionIfExpiring,
+  setSessionChangeListener,
+} from "./refreshAccessToken";
 
 export type AuthContextValue = {
   user: SessionUser | null;
@@ -185,28 +191,40 @@ export function AuthProvider({ children }: AuthProviderProps) {
       let sessionUser: SessionUser;
       try {
         sessionUser = await authApi.fetchMe(accessToken);
-      } catch {
-        try {
-          const refreshed = await authApi.refresh({ refreshToken: stored.refreshToken });
-          saveStoredSession({
-            accessToken: refreshed.accessToken,
-            refreshToken: refreshed.refreshToken,
-            user: refreshed.user,
-          });
-          accessToken = refreshed.accessToken;
-          sessionUser = refreshed.user;
-        } catch {
-          if (cancelled) {
-            return;
+      } catch (error) {
+        const renewed = loadStoredSession();
+        if (renewed && renewed.accessToken !== accessToken) {
+          accessToken = renewed.accessToken;
+          sessionUser = renewed.user;
+        } else if (isTransientApiError(error)) {
+          sessionUser = stored.user;
+        } else {
+          try {
+            const refreshed = await authApi.refresh({ refreshToken: stored.refreshToken });
+            saveStoredSession({
+              accessToken: refreshed.accessToken,
+              refreshToken: refreshed.refreshToken,
+              user: refreshed.user,
+            });
+            accessToken = refreshed.accessToken;
+            sessionUser = refreshed.user;
+          } catch (refreshError) {
+            if (isTransientApiError(refreshError)) {
+              sessionUser = stored.user;
+            } else {
+              if (cancelled) {
+                return;
+              }
+              clearStoredSession();
+              clearStoredActiveLeagueId();
+              setUser(null);
+              setLeaguesState([]);
+              setActiveLeagueIdState(null);
+              setImpersonatorSession(null);
+              setLoading(false);
+              return;
+            }
           }
-          clearStoredSession();
-          clearStoredActiveLeagueId();
-          setUser(null);
-          setLeaguesState([]);
-          setActiveLeagueIdState(null);
-          setImpersonatorSession(null);
-          setLoading(false);
-          return;
         }
       }
 
@@ -245,6 +263,34 @@ export function AuthProvider({ children }: AuthProviderProps) {
       cancelled = true;
     };
   }, [isDemoMode, demoLeagues, demoUser, searchParams, applyMemberships]);
+
+  useEffect(() => {
+    if (isDemoMode) {
+      return;
+    }
+    setUnauthorizedRecovery((input) => recoverAccessToken(input.accessToken));
+    setSessionChangeListener((session) => {
+      if (!session) {
+        setUser(null);
+        setLeaguesState([]);
+        setActiveLeagueIdState(null);
+        setImpersonatorSession(null);
+        return;
+      }
+      setUser(session.user);
+    });
+    function onVisible() {
+      if (document.visibilityState === "visible") {
+        void refreshSessionIfExpiring();
+      }
+    }
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      setUnauthorizedRecovery(null);
+      setSessionChangeListener(null);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, [isDemoMode]);
 
   const applySession = useCallback((tokens: AuthTokensResponse) => {
     saveStoredSession({

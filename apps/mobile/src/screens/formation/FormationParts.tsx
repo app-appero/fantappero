@@ -135,6 +135,7 @@ function surname(name: string | null): string {
 export type Candidate = {
   athleteId: string;
   name: string;
+  role?: LineupRole | null;
   state: "libero" | "titolare" | "panchina" | "bloccato";
   stateLabel: string;
   scoreLabel: string | null;
@@ -199,6 +200,8 @@ export function PlayerPickerSheet({
   onPick,
   onClear,
   onClose,
+  title,
+  subtitle,
 }: {
   visible: boolean;
   role: LineupRole;
@@ -209,6 +212,8 @@ export function PlayerPickerSheet({
   onPick: (athleteId: string) => void;
   onClear: () => void;
   onClose: () => void;
+  title?: string;
+  subtitle?: string;
 }) {
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<Filter>("tutti");
@@ -224,8 +229,8 @@ export function PlayerPickerSheet({
   return (
     <BottomSheet
       visible={visible}
-      title={`Scegli ${ROLE_NAME[role].toLowerCase()}`}
-      subtitle={`Slot ${role} ${slotNumber} · modulo ${moduleCode}`}
+      title={title ?? `Scegli ${ROLE_NAME[role].toLowerCase()}`}
+      subtitle={subtitle ?? `Slot ${role} ${slotNumber} · modulo ${moduleCode}`}
       onClose={onClose}
       testID="formation-picker"
       badge={
@@ -271,8 +276,8 @@ export function PlayerPickerSheet({
             ]}
             testID={`formation-pick-${c.athleteId}`}
           >
-            <View style={[styles.roleDotSm, { backgroundColor: roleRingColor(role) }]}>
-              <Text style={styles.roleDotText}>{role}</Text>
+            <View style={[styles.roleDotSm, { backgroundColor: roleRingColor(c.role ?? role) }]}>
+              <Text style={styles.roleDotText}>{c.role ?? role}</Text>
             </View>
             <View style={styles.candBody}>
               <Text style={styles.candName} numberOfLines={1}>

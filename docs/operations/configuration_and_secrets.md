@@ -63,7 +63,7 @@ All `.env` files are gitignored. Only `*.env.example` files are committed.
 | `SPORTS_SCHEDULER_ENABLED` | No (default `false`) | No | Abilita Celery beat schedule pre/live/post/late (EP04-06) |
 | `SPORTS_POLL_*_INTERVAL_SECONDS` | No | No | Intervalli beat (live/pre/post/late); vedi [`sports_scheduler.md`](./sports_scheduler.md) |
 | `JWT_SECRET_KEY` | Yes (auth enabled) | **Yes** | HS256 signing key for access tokens |
-| `JWT_ACCESS_TOKEN_EXPIRE_MINUTES` | No (default `15`) | No | Access token TTL |
+| `JWT_ACCESS_TOKEN_EXPIRE_MINUTES` | No (default `720`, 12 ore) | No | Access token TTL |
 | `JWT_REFRESH_TOKEN_EXPIRE_DAYS` | No (default `30`) | No | Refresh session TTL |
 | `AUTH_EMAIL_VERIFICATION_EXPIRE_HOURS` | No (default `24`) | No | Email verification link TTL |
 | `AUTH_PASSWORD_RESET_EXPIRE_HOURS` | No (default `1`) | No | Password reset link TTL |

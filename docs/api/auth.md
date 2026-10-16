@@ -19,7 +19,7 @@ Endpoint sotto `/auth` per registrazione, login, verifica email e reset password
 
 ## Token
 
-- **Access token**: JWT HS256, scadenza configurabile (`JWT_ACCESS_TOKEN_EXPIRE_MINUTES`, default 15).
+- **Access token**: JWT HS256, scadenza configurabile (`JWT_ACCESS_TOKEN_EXPIRE_MINUTES`, default 720 minuti / 12 ore).
 - **Refresh token**: opaco, persistito in `refresh_sessions`, revocabile al logout.
 - **Token email/reset**: monouso in `auth_tokens`, consegnati via SMTP.
 

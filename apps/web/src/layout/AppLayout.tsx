@@ -285,6 +285,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
         className="fa-surface-pitch fa-surface-pitch--subtle"
         skipLink={<SkipLink />}
         header={
+          <>
           <AppHeader
             menuSlot={<MenuButton open={drawerOpen} onOpen={openDrawer} />}
             brand={
@@ -306,23 +307,14 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                       onChange={setActiveLeagueId}
                       placeholder="Seleziona lega"
                       accessory={
-                        <>
-                          {activeLeagueSummary ? (
-                            <Badge
-                              variant="neutral"
-                              data-testid="active-league-status"
-                            >
-                              {leagueStateLabel(activeLeagueSummary.state)}
-                            </Badge>
-                          ) : null}
-                          {countdown ? (
-                            <LockCountdown
-                              state={countdown.state}
-                              nextLockAt={countdown.nextLockAt}
-                              onExpire={refetchCountdown}
-                            />
-                          ) : null}
-                        </>
+                        activeLeagueSummary ? (
+                          <Badge
+                            variant="neutral"
+                            data-testid="active-league-status"
+                          >
+                            {leagueStateLabel(activeLeagueSummary.state)}
+                          </Badge>
+                        ) : null
                       }
                     />
                   ) : null}
@@ -365,6 +357,16 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
               </>
             }
           />
+          {countdown ? (
+            <div className="fa-lock-countdown-bar" data-testid="header-lock-strip">
+              <LockCountdown
+                state={countdown.state}
+                nextLockAt={countdown.nextLockAt}
+                onExpire={refetchCountdown}
+              />
+            </div>
+          ) : null}
+          </>
         }
         sidebar={
           <SidebarNav

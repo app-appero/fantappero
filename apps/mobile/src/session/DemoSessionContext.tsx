@@ -17,7 +17,8 @@ import {
   type ReactNode,
 } from "react";
 import * as authApi from "../api/auth";
-import { ApiError, getApiErrorMessage } from "../api/client";
+import { AppState } from "react-native";
+import { ApiError, getApiErrorMessage, setUnauthorizedRecovery } from "../api/client";
 import { fetchMyLeagues } from "../api/leagues";
 import { buildPermissionContext } from "./demoSession";
 import {
@@ -34,6 +35,12 @@ import {
   setMemorySession,
   type StoredSession,
 } from "./sessionStorage";
+import {
+  isTransientApiError,
+  recoverAccessToken,
+  refreshSessionIfExpiring,
+  setSessionChangeListener,
+} from "./refreshAccessToken";
 
 export type AuthSessionContextValue = {
   user: SessionUser | null;
@@ -113,8 +120,14 @@ export function AuthSessionProvider({ children }: { children: ReactNode }) {
         const me = await authApi.fetchMe(session.accessToken);
         session = { ...session, user: me };
         await persistSession(session);
-      } catch {
-        if (!session.refreshToken) {
+      } catch (error) {
+        const renewed = getMemorySession();
+        if (renewed && renewed.accessToken !== session.accessToken) {
+          session = renewed;
+        } else if (isTransientApiError(error)) {
+          // Rete assente al rientro: tieni la sessione salvata, il prossimo
+          // 401 la rinnova. Non è un login fallito.
+        } else if (!session.refreshToken) {
           const operator = await loadImpersonatorSession();
           if (!operator) {
             await clearStoredSession();
@@ -136,13 +149,15 @@ export function AuthSessionProvider({ children }: { children: ReactNode }) {
               user: refreshed.user,
             };
             await persistSession(session);
-          } catch {
-            await clearStoredSession();
-            setMemorySession(null);
-            if (!cancelled) {
-              clearToLoggedOut();
+          } catch (refreshError) {
+            if (!isTransientApiError(refreshError)) {
+              await clearStoredSession();
+              setMemorySession(null);
+              if (!cancelled) {
+                clearToLoggedOut();
+              }
+              return;
             }
-            return;
           }
         }
       }
@@ -184,6 +199,28 @@ export function AuthSessionProvider({ children }: { children: ReactNode }) {
       cancelled = true;
     };
   }, [clearToLoggedOut, persistSession]);
+
+  useEffect(() => {
+    setUnauthorizedRecovery((input) => recoverAccessToken(input.accessToken));
+    setSessionChangeListener((session) => {
+      if (!session) {
+        clearToLoggedOut();
+        return;
+      }
+      setAccessToken(session.accessToken);
+      setUser(session.user);
+    });
+    const subscription = AppState.addEventListener("change", (state) => {
+      if (state === "active") {
+        void refreshSessionIfExpiring();
+      }
+    });
+    return () => {
+      setUnauthorizedRecovery(null);
+      setSessionChangeListener(null);
+      subscription.remove();
+    };
+  }, [clearToLoggedOut]);
 
   const applySession = useCallback(
     async (tokens: AuthTokensResponse) => {
