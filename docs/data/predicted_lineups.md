@@ -18,7 +18,8 @@ La chiave non va nel repository, nei log né nelle risposte HTTP. Su Railway va 
 ## Endpoint
 
 - Provider: `GET /api/v1/matches/by-date?date=YYYYMMDD` e `GET /api/v1/matches/{matchId}/lineups`.
-- Interno, solo admin di lega: `POST /leagues/{leagueId}/turni/probabili-formazioni`.
+- Operatore, tutte le leghe: `POST /admin/turni/probabili-formazioni`. Il pulsante è nel pannello Turni.
+- Admin di lega, solo quella lega: `POST /leagues/{leagueId}/turni/probabili-formazioni`.
 - Lettura partita: `GET /leagues/{leagueId}/turni/{roundId}/partite/{fixtureId}` aggiunge `lineupKind`, `lineupNote` e `unavailablePlayers`. Se esiste la formazione ufficiale, quella resta; gli indisponibili si aggiungono lo stesso.
 - Rosa formazione: `probableHint` (`starter` | `bench` | `unavailable`), `probableNote`, `selectionBlocked`.
 
@@ -39,7 +40,7 @@ Affidabilità, da controlli misurabili e non da una percentuale:
 
 ## Job
 
-Catalogo `sports-predicted-lineups`, task `sports_data.sync_predicted_lineups`. Prende le partite non iniziate dei turni europei nelle prossime 4 giorni. Il pulsante **Aggiorna probabili** nei turni europei fa lo stesso giro, solo per la lega, anche se lo snapshot è recente.
+Catalogo `sports-predicted-lineups`, task `sports_data.sync_predicted_lineups`. Prende le partite non iniziate dei turni europei nelle prossime 4 giorni. Il pulsante **Aggiorna probabili** nel pannello operatore (Turni) fa lo stesso giro su tutte le leghe, anche se lo snapshot è recente e anche se il job automatico è spento.
 
 Il log `fotmob_predicted_lineups_synced` riporta i conteggi, mai la chiave.
 

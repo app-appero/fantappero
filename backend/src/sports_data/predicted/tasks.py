@@ -34,11 +34,14 @@ def run_predicted_lineup_sync(
     *,
     force: bool = False,
     league_id: str | None = None,
+    manual: bool = False,
 ) -> dict[str, object]:
     from system_jobs.service import allow_periodic
 
     settings = get_api_settings()
-    if league_id is None and not allow_periodic(
+    # Il cron rispetta l'interruttore del pannello. Il pulsante operatore
+    # (`manual`) e il giro di una singola lega partono comunque.
+    if not manual and league_id is None and not allow_periodic(
         "sports-predicted-lineups",
         settings.predicted_lineups_enabled,
     ):

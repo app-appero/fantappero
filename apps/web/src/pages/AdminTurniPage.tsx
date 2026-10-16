@@ -23,6 +23,7 @@ import {
   generateAllAiLineups,
   importSeasonCalendar,
   recoverStaleResults,
+  refreshPredictedLineups,
   repairHistoricalRounds,
   syncAllLeagueTurns,
   syncCalendarForAllLeagues,
@@ -79,6 +80,11 @@ const COMMAND_LEGEND: { label: string; description: string }[] = [
   {
     label: "Ricalcola cutoff",
     description: "Ricalcola il cutoff del turno dagli orari reali delle partite aggiornati dal provider.",
+  },
+  {
+    label: "Aggiorna probabili",
+    description:
+      "Scarica da FotMob le formazioni probabili e gli indisponibili delle partite non ancora iniziate, per tutte le leghe.",
   },
 ];
 
@@ -166,6 +172,10 @@ export function AdminTurniPage() {
   const [repairResult, setRepairResult] = useState<string | null>(null);
   const [repairError, setRepairError] = useState<string | null>(null);
 
+  const [refreshingPredicted, setRefreshingPredicted] = useState(false);
+  const [predictedResult, setPredictedResult] = useState<string | null>(null);
+  const [predictedError, setPredictedError] = useState<string | null>(null);
+
   const visibleLeagues = useMemo(() => {
     const trimmed = query.trim().toLowerCase();
     if (!trimmed) {
@@ -220,6 +230,27 @@ export function AdminTurniPage() {
       setTurnsError(getApiErrorMessage(error, "Sincronizzazione turni non riuscita."));
     } finally {
       setSyncingTurns(false);
+    }
+  }
+
+  async function onRefreshPredicted() {
+    const session = loadStoredSession();
+    if (!session?.accessToken) {
+      return;
+    }
+    setRefreshingPredicted(true);
+    setPredictedError(null);
+    setPredictedResult(null);
+    try {
+      const result = await refreshPredictedLineups(session.accessToken);
+      setPredictedResult(
+        result.message ??
+          `Formazioni probabili aggiornate: ${result.snapshotsSaved} salvate, ${result.skippedUnmatched} senza corrispondenza.`,
+      );
+    } catch (error) {
+      setPredictedError(getApiErrorMessage(error, "Aggiornamento formazioni probabili non riuscito."));
+    } finally {
+      setRefreshingPredicted(false);
     }
   }
 
@@ -541,6 +572,16 @@ export function AdminTurniPage() {
             >
               Recupera risultati
             </Button>
+            <Button
+              type="button"
+              variant="secondary"
+              loading={refreshingPredicted}
+              disabled={refreshingPredicted}
+              onClick={() => void onRefreshPredicted()}
+              data-testid="admin-turni-refresh-predicted"
+            >
+              Aggiorna probabili
+            </Button>
           </div>
 
           {turnsResult ? (
@@ -557,6 +598,22 @@ export function AdminTurniPage() {
               title="Sincronizzazione non riuscita"
               message={turnsError}
               testId="admin-turni-sync-all-error"
+            />
+          ) : null}
+          {predictedResult ? (
+            <UiStatePanel
+              state="success"
+              title="Formazioni probabili aggiornate"
+              message={predictedResult}
+              testId="admin-turni-refresh-predicted-success"
+            />
+          ) : null}
+          {predictedError ? (
+            <UiStatePanel
+              state="error"
+              title="Formazioni probabili non aggiornate"
+              message={predictedError}
+              testId="admin-turni-refresh-predicted-error"
             />
           ) : null}
 

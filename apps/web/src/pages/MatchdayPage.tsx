@@ -39,7 +39,6 @@ import {
   fetchFantasyTurns,
   fetchH2HCalendar,
   fetchPendingFixtures,
-  refreshPredictedLineups,
 } from "../api/leagues";
 import { getApiErrorMessage, useAuth } from "../auth/AuthContext";
 import { loadStoredSession } from "../auth/sessionStorage";
@@ -836,36 +835,6 @@ export function MatchdayPage() {
                     onChange={(event) => void selectTurn(event.target.value)}
                     data-testid="matchday-turn-select"
                   />
-                  {isAdmin && !isDemoMode ? (
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      disabled={busy}
-                      loading={busy}
-                      data-testid="matchday-refresh-predicted"
-                      onClick={() => {
-                        const token = loadStoredSession()?.accessToken ?? "";
-                        if (!activeLeagueId || !token) {
-                          return;
-                        }
-                        setBusy(true);
-                        setActionError(null);
-                        void refreshPredictedLineups(token, activeLeagueId)
-                          .then((result) => {
-                            setActionMessage(
-                              result.message ??
-                                `Formazioni probabili aggiornate: ${result.snapshotsSaved} salvate, ${result.skippedUnmatched} senza corrispondenza.`,
-                            );
-                          })
-                          .catch((error: unknown) => {
-                            setActionError(getApiErrorMessage(error, "Aggiornamento formazioni probabili non riuscito."));
-                          })
-                          .finally(() => setBusy(false));
-                      }}
-                    >
-                      Aggiorna probabili
-                    </Button>
-                  ) : null}
                 </div>
               </div>
             ) : null}

@@ -6,11 +6,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const fetchAdminLeagueTurnStatusMock = vi.fn();
 const calculateCurrentRoundsAllLeaguesMock = vi.fn();
 const repairHistoricalRoundsMock = vi.fn();
+const refreshPredictedLineupsMock = vi.fn();
 vi.mock("../api/admin", () => ({
   fetchAdminLeagueTurnStatus: (...args: unknown[]) => fetchAdminLeagueTurnStatusMock(...args),
   generateAllAiLineups: vi.fn(),
   syncAllLeagueTurns: vi.fn(),
   syncCalendarForAllLeagues: vi.fn(),
+  refreshPredictedLineups: (...args: unknown[]) => refreshPredictedLineupsMock(...args),
   calculateCurrentRoundsAllLeagues: (...args: unknown[]) =>
     calculateCurrentRoundsAllLeaguesMock(...args),
   repairHistoricalRounds: (...args: unknown[]) => repairHistoricalRoundsMock(...args),
@@ -63,6 +65,7 @@ describe("AdminTurniPage (EP-turni-calcolo)", () => {
     fetchAdminLeagueTurnStatusMock.mockReset();
     calculateCurrentRoundsAllLeaguesMock.mockReset();
     repairHistoricalRoundsMock.mockReset();
+    refreshPredictedLineupsMock.mockReset();
     calculateCurrentRoundMock.mockReset();
     saveStoredSession({
       accessToken: "token-123",
@@ -91,6 +94,8 @@ describe("AdminTurniPage (EP-turni-calcolo)", () => {
 
     expect(container.querySelector('[data-testid="admin-turni-legend"]')).not.toBeNull();
     expect(container.textContent).toContain("Calcola giornata corrente");
+    expect(container.textContent).toContain("Aggiorna probabili");
+    expect(container.querySelector('[data-testid="admin-turni-refresh-predicted"]')).not.toBeNull();
     expect(container.textContent).toContain("Lega Uno");
     expect(container.textContent).toContain("Lega Due");
   });
@@ -179,6 +184,40 @@ describe("AdminTurniPage (EP-turni-calcolo)", () => {
 
     expect(calculateCurrentRoundMock).toHaveBeenCalledWith("token-123", "league-1", "round-1");
     expect(container.textContent).toContain("Turno 3 calcolato e omologato.");
+  });
+
+  it("refreshes probable lineups from the operator panel", async () => {
+    fetchAdminLeagueTurnStatusMock.mockResolvedValue([league()]);
+    refreshPredictedLineupsMock.mockResolvedValue({
+      fixturesConsidered: 2,
+      matchesLinked: 2,
+      snapshotsSaved: 1,
+      skippedRecent: 0,
+      skippedUnmatched: 1,
+      rejected: 0,
+      warnings: 0,
+      requestsMade: 3,
+      message: null,
+    });
+
+    await act(async () => {
+      root.render(createElement(AdminTurniPage));
+    });
+
+    const button = container.querySelector<HTMLButtonElement>(
+      '[data-testid="admin-turni-refresh-predicted"]',
+    );
+    expect(button).not.toBeNull();
+
+    await act(async () => {
+      button!.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(refreshPredictedLineupsMock).toHaveBeenCalledWith("token-123");
+    expect(container.textContent).toContain("1 salvate, 1 senza corrispondenza");
   });
 
   it("disables the historical repair button until a reason is entered", async () => {

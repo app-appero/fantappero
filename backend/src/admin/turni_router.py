@@ -42,6 +42,7 @@ from fantasy_turns.calendar_refresh_progress import (
     new_job_id,
     save_progress,
 )
+from fantasy_turns.schemas import PredictedLineupSyncResponse
 from fantasy_turns.service import FantasyTurnService
 
 router = APIRouter(prefix="/admin", tags=["admin"])
@@ -71,6 +72,31 @@ def sync_all_league_turns(
     totals = FantasyTurnService(session).ensure_upcoming_for_active_leagues()
     session.commit()
     return AdminTurniSyncResultResponse.model_validate(totals)
+
+
+@router.post("/turni/probabili-formazioni", response_model=PredictedLineupSyncResponse)
+def refresh_predicted_lineups(
+    _operator: User = Depends(require_permissions(Permission.GLOBAL_OPERATE)),
+) -> PredictedLineupSyncResponse:
+    """Scarica subito le formazioni probabili delle partite non iniziate.
+
+    Stessa primitiva del cron giornaliero, per tutte le leghe, anche se uno
+    snapshot è recente e anche se il job automatico è spento.
+    """
+    from sports_data.predicted.tasks import run_predicted_lineup_sync
+
+    payload = run_predicted_lineup_sync(force=True, manual=True)
+    return PredictedLineupSyncResponse(
+        fixturesConsidered=int(payload.get("fixtures_considered") or 0),
+        matchesLinked=int(payload.get("matches_linked") or 0),
+        snapshotsSaved=int(payload.get("snapshots_saved") or 0),
+        skippedRecent=int(payload.get("skipped_recent") or 0),
+        skippedUnmatched=int(payload.get("skipped_unmatched") or 0),
+        rejected=int(payload.get("rejected") or 0),
+        warnings=int(payload.get("warnings") or 0),
+        requestsMade=int(payload.get("requests_made") or 0),
+        message=payload.get("message") if isinstance(payload.get("message"), str) else None,
+    )
 
 
 @router.post("/formazioni-ia/genera", response_model=AdminAiLineupsSyncResultResponse)
