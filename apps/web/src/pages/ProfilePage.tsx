@@ -31,6 +31,54 @@ import { resolveAvatarUrl } from "../utils/avatar";
 import { writeThemePreference } from "../theme/colorScheme";
 import { useThemePreference } from "../theme/useThemePreference";
 
+const AVATAR_MAX_BYTES = 5 * 1024 * 1024;
+
+function compressAvatarFile(file: File): Promise<File | null> {
+  return new Promise((resolve) => {
+    const url = URL.createObjectURL(file);
+    const image = new Image();
+    image.onload = () => {
+      const maxSide = 1280;
+      const scale = Math.min(1, maxSide / Math.max(image.width, image.height));
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.max(1, Math.round(image.width * scale));
+      canvas.height = Math.max(1, Math.round(image.height * scale));
+      const context = canvas.getContext("2d");
+      if (!context) {
+        URL.revokeObjectURL(url);
+        resolve(null);
+        return;
+      }
+      context.drawImage(image, 0, 0, canvas.width, canvas.height);
+      canvas.toBlob(
+        (blob) => {
+          URL.revokeObjectURL(url);
+          resolve(blob ? new File([blob], "avatar.jpg", { type: "image/jpeg" }) : null);
+        },
+        "image/jpeg",
+        0.85,
+      );
+    };
+    image.onerror = () => {
+      URL.revokeObjectURL(url);
+      resolve(null);
+    };
+    image.src = url;
+  });
+}
+
+async function prepareAvatarFile(file: File): Promise<File> {
+  const supported = file.type === "image/jpeg" || file.type === "image/png" || file.type === "image/webp";
+  if (supported && file.size <= AVATAR_MAX_BYTES) {
+    return file;
+  }
+  const compressed = await compressAvatarFile(file);
+  if (!compressed || compressed.size > AVATAR_MAX_BYTES) {
+    throw new Error("size");
+  }
+  return compressed;
+}
+
 const DEMO_PROFILE: UserProfile = {
   email: "demo@fantappero.local",
   displayName: "Marco Rossi",
@@ -218,10 +266,15 @@ export function ProfilePage() {
     setFormError(null);
     setSuccessMessage(null);
     try {
-      const updated = await uploadAvatar(stored.accessToken, file);
+      const prepared = await prepareAvatarFile(file);
+      const updated = await uploadAvatar(stored.accessToken, prepared);
       applyProfile(updated);
       setSuccessMessage("Avatar aggiornato.");
     } catch (uploadError) {
+      if (uploadError instanceof Error && uploadError.message === "size") {
+        setFormError("L'immagine supera la dimensione massima consentita (5 MB).");
+        return;
+      }
       setFormError(getApiErrorMessage(uploadError, "Caricamento avatar non riuscito."));
     } finally {
       setAvatarUploading(false);
@@ -481,7 +534,7 @@ export function ProfilePage() {
                 ) : null}
               </div>
             </div>
-            <p className="fa-field__hint">JPEG, PNG o WebP — massimo 2 MB.</p>
+            <p className="fa-field__hint">JPEG, PNG o WebP — massimo 5 MB.</p>
           </CardBody>
         </Card>
 

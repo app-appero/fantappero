@@ -286,6 +286,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
         skipLink={<SkipLink />}
         header={
           <>
+          <div className="fa-app-chrome">
           <AppHeader
             menuSlot={<MenuButton open={drawerOpen} onOpen={openDrawer} />}
             brand={
@@ -366,6 +367,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
               />
             </div>
           ) : null}
+          </div>
           </>
         }
         sidebar={
@@ -429,7 +431,10 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
 }
 
 export function AdminLayout({ children }: { children: React.ReactNode }) {
-  const { user, can } = useAuth();
+  const { user, can, activeLeagueId, isDemoMode } = useAuth();
+  const { countdown, refetch: refetchCountdown } = useLockCountdown(
+    !isDemoMode ? activeLeagueId : null,
+  );
   const location = useLocation();
   const {
     open: drawerOpen,
@@ -457,6 +462,7 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
       surface="admin"
       skipLink={<SkipLink />}
       header={
+        <div className="fa-app-chrome">
         <AppHeader
           variant="admin"
           menuSlot={<MenuButton open={drawerOpen} onOpen={openDrawer} />}
@@ -483,6 +489,16 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
             </>
           }
         />
+        {countdown ? (
+          <div className="fa-lock-countdown-bar" data-testid="header-lock-strip">
+            <LockCountdown
+              state={countdown.state}
+              nextLockAt={countdown.nextLockAt}
+              onExpire={refetchCountdown}
+            />
+          </div>
+        ) : null}
+        </div>
       }
       sidebar={
         <SidebarNav

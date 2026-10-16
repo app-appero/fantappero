@@ -25,7 +25,7 @@ Tutti gli endpoint richiedono `Authorization: Bearer <access_token>`.
 | Nome visualizzato | 1–80 caratteri, trim |
 | Lingua | BCP47; attualmente supportata: `it` |
 | Fuso orario | IANA (`Europe/Rome`, …) |
-| Avatar | JPEG/PNG/WebP, max 2 MB (configurabile `AVATAR_MAX_BYTES`) |
+| Avatar | JPEG/PNG/WebP, max 5 MB (configurabile `AVATAR_MAX_BYTES`) |
 | Policy | `policyVersion` deve coincidere con `PROFILE_POLICY_VERSION` |
 
 ## Avatar
@@ -39,7 +39,7 @@ In Docker Compose è montato il volume `fantappero_avatar_data` sul servizio `ap
 | Variabile | Default | Descrizione |
 | --- | --- | --- |
 | `AVATAR_STORAGE_PATH` | `/data/avatars` | Directory locale avatar |
-| `AVATAR_MAX_BYTES` | `2097152` | Dimensione massima upload |
+| `AVATAR_MAX_BYTES` | `5242880` | Dimensione massima upload |
 | `PROFILE_POLICY_VERSION` | `2026-01` | Versione policy corrente |
 
 ## Metriche

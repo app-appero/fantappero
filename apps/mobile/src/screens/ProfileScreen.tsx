@@ -12,6 +12,7 @@ import { Image, Pressable, Share, StyleSheet, Switch, Text, View } from "react-n
 import { AppTextInput as TextInput } from "../components/AppTextInput";
 import { deleteAccount, exportAccountData } from "../api/privacy";
 import {
+  AVATAR_MAX_BYTES,
   fetchProfile,
   recordPolicyConsent,
   removeAvatar,
@@ -182,12 +183,18 @@ export function ProfileScreen() {
     }
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ["images"],
-      quality: 0.8,
+      // Su iOS `compatible` converte HEIC in JPEG e applica la compressione.
+      quality: 0.7,
+      preferredAssetRepresentationMode: ImagePicker.UIImagePickerPreferredAssetRepresentationMode.Compatible,
     });
     if (result.canceled || !result.assets?.[0]) {
       return;
     }
     const asset = result.assets[0];
+    if (asset.fileSize != null && asset.fileSize > AVATAR_MAX_BYTES) {
+      setFormError("L'immagine supera la dimensione massima consentita (5 MB).");
+      return;
+    }
     const name = asset.fileName ?? asset.uri.split("/").pop() ?? "avatar.jpg";
     const type = asset.mimeType ?? "image/jpeg";
     setAvatarBusy(true);
@@ -397,7 +404,7 @@ export function ProfileScreen() {
             </Text>
           </View>
         )}
-        <Text style={styles.hint}>JPEG, PNG o WebP — massimo 2 MB.</Text>
+        <Text style={styles.hint}>JPEG, PNG o WebP — massimo 5 MB.</Text>
         <Pressable
           accessibilityRole="button"
           disabled={avatarBusy}
@@ -662,14 +669,18 @@ const styles = lazyStyles(() => StyleSheet.create({
     height: 88,
     borderRadius: 44,
     backgroundColor: colors.backgroundElevated,
+    borderWidth: 2,
+    borderColor: colors.accent,
   },
   avatarPlaceholder: {
     width: 88,
     height: 88,
     borderRadius: 44,
-    backgroundColor: colors.backgroundElevated,
+    backgroundColor: colors.backgroundSubtle,
     alignItems: "center",
     justifyContent: "center",
+    borderWidth: 2,
+    borderColor: colors.accent,
   },
   avatarPlaceholderLabel: {
     fontSize: typography.fontSize.lg,

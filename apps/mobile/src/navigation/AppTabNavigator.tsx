@@ -12,6 +12,7 @@ import { openAdminScreen } from "./adminEntry";
 import { fetchPendingInviteCount } from "../api/managerInvites";
 import { subscribePendingInvitesChanged } from "./pendingInviteEvents";
 import { AppHeader } from "../layout/AppHeader";
+import { LockCountdownBar } from "../layout/LockCountdownBar";
 import { AuctionHubScreen } from "../screens/AuctionHubScreen";
 import { FormationScreen } from "../screens/FormationScreen";
 import { MarketScreen } from "../screens/MarketScreen";
@@ -221,7 +222,6 @@ function AppTabShell({
         showLeagueSelector={leagues.length > 0}
         leagues={leagues.map((league) => ({ value: league.id, label: league.name }))}
         activeLeagueId={activeLeagueId}
-        accessToken={accessToken}
         onLeagueChange={(leagueId) => {
           setActiveLeagueId(leagueId);
           navigation.navigate("LeagueHome", { leagueId });
@@ -230,6 +230,7 @@ function AppTabShell({
         onJoinLeaguePress={() => navigation.navigate("JoinLeague")}
         onBrandPress={() => navigation.navigate("LeagueHome")}
       />
+      <LockCountdownBar />
       <AppDrawer
         visible={drawerOpen}
         items={drawerItems}
