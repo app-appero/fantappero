@@ -1038,11 +1038,6 @@ export function FormationScreen() {
             setPickerIndex(index);
           }}
         />
-        {roster.some((row) => row.probableHint) ? (
-          <Text style={styles.meta} testID="formation-probable-hint">
-            I titolari probabili sono segnati nel campo. Gli indisponibili non si possono schierare.
-          </Text>
-        ) : null}
 
         <View style={styles.benchHead}>
           <Text style={styles.sectionTitle}>Panchina</Text>
