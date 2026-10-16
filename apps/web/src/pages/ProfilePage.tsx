@@ -498,6 +498,7 @@ export function ProfilePage() {
             <div className="fa-profile-avatar">
               {avatarSrc ? (
                 <img
+                  key={avatarSrc}
                   src={avatarSrc}
                   alt=""
                   className="fa-profile-avatar__image"

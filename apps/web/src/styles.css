@@ -1436,7 +1436,12 @@ a.fa-member-list__identity:focus-visible {
   margin: var(--fa-space-xs) 0 0;
   padding: var(--fa-space-xs);
   display: grid;
+  align-content: start;
   gap: 2px;
+  height: 22rem;
+  min-height: 22rem;
+  max-height: 22rem;
+  overflow-y: auto;
   border: 1px solid var(--fa-color-input-border);
   border-radius: var(--fa-radius-md);
   background-color: var(--fa-color-input-bg);
@@ -1548,7 +1553,12 @@ a.fa-member-list__identity:focus-visible {
   margin: 0;
   padding: 0;
   display: grid;
+  align-content: start;
   gap: var(--fa-space-xs);
+  height: 22rem;
+  min-height: 22rem;
+  max-height: 22rem;
+  overflow-y: auto;
 }
 
 .fa-bench-picker__option {
@@ -1919,14 +1929,47 @@ a.fa-member-list__identity:focus-visible {
   position: sticky;
   top: 0;
   z-index: var(--fa-z-sticky);
-  background-color: var(--fa-color-background);
+  background: transparent;
+  overflow: visible;
+  /* Lascia sotto l'header lo spazio della metà di pillola che esce, senza un riquadro che copre la pagina. */
+  margin-bottom: 0.9rem;
 }
 
+.fa-app-chrome > .fa-app-header {
+  position: relative;
+  top: auto;
+}
+
+@media (max-width: 767px) {
+  .fa-app-chrome > .fa-app-header {
+    padding-bottom: 0.85rem;
+  }
+}
+
+/* La pillola sta a cavallo del bordo dell'header, al centro.
+   Il contenitore non ha sfondo e non intercetta i clic sul resto della pagina. */
 .fa-lock-countdown-bar {
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  z-index: calc(var(--fa-z-sticky) + 1);
   display: flex;
-  justify-content: flex-end;
-  padding: var(--fa-space-lg) var(--fa-space-md) var(--fa-space-sm);
-  background-color: var(--fa-color-background);
+  width: max-content;
+  max-width: calc(100% - (var(--fa-space-md) * 2));
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  pointer-events: none;
+  transform: translate(-50%, 50%);
+}
+
+.fa-lock-countdown-bar > * {
+  pointer-events: auto;
+  padding: 2px var(--fa-space-sm);
+  border: 1px solid var(--fa-color-border);
+  border-radius: var(--fa-radius-pill);
+  background-color: var(--fa-color-background-elevated);
+  box-shadow: 0 6px 16px rgba(2, 6, 23, 0.18);
 }
 
 .fa-matchday-round__header {

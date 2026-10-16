@@ -439,7 +439,9 @@ const styles = lazyStyles(() =>
     backdrop: { flex: 1, backgroundColor: "rgba(5,8,22,0.62)", justifyContent: "flex-end" },
     backdropTap: { flex: 1 },
     sheet: {
+      height: "86%",
       maxHeight: "86%",
+      overflow: "hidden",
       backgroundColor: colors.backgroundElevated,
       borderTopLeftRadius: 28,
       borderTopRightRadius: 28,
@@ -489,7 +491,7 @@ const styles = lazyStyles(() =>
     },
     filterActive: { borderColor: colors.brand, borderWidth: 2 },
     filterText: { color: colors.foreground, fontSize: typography.fontSize.sm, fontWeight: "600" },
-    list: { flexGrow: 0 },
+    list: { flexGrow: 1, flexShrink: 1, flexBasis: 0 },
     listContent: { gap: spacing.xs },
     empty: { color: colors.foregroundMuted, padding: spacing.md },
     cand: {

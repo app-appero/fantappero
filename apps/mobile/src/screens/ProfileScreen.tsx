@@ -392,7 +392,11 @@ export function ProfileScreen() {
         <Text style={styles.sectionTitle}>Avatar</Text>
         {resolveAvatarUrl(profile.avatarUrl) ? (
           <Image
-            source={{ uri: resolveAvatarUrl(profile.avatarUrl) ?? undefined }}
+            key={profile.avatarUrl}
+            source={{
+              uri: resolveAvatarUrl(profile.avatarUrl) ?? undefined,
+              cache: "reload",
+            }}
             style={styles.avatarImage}
             testID="profile-avatar-image"
             accessibilityLabel="Avatar profilo"

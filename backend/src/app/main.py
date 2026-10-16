@@ -9,6 +9,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
+from starlette.types import ASGIApp, Receive, Scope, Send
 
 from admin.jobs_router import router as admin_jobs_router
 from admin.router import router as admin_router
@@ -108,6 +109,34 @@ _avatar_settings = get_api_settings()
 _avatar_mount = Path(_avatar_settings.avatar_storage_path)
 _avatar_mount.mkdir(parents=True, exist_ok=True)
 app.mount("/media/avatars", StaticFiles(directory=str(_avatar_mount)), name="avatars")
+
+
+class AvatarCacheControlMiddleware:
+    """Path avatar stabile: senza no-cache il browser continua a mostrare la prima foto."""
+
+    def __init__(self, app: ASGIApp) -> None:
+        self.app = app
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http" or not str(scope.get("path", "")).startswith("/media/avatars/"):
+            await self.app(scope, receive, send)
+            return
+
+        async def send_no_cache(message: dict) -> None:
+            if message["type"] == "http.response.start":
+                headers = [
+                    (key, value)
+                    for key, value in message.get("headers") or []
+                    if key.lower() != b"cache-control"
+                ]
+                headers.append((b"cache-control", b"no-cache"))
+                message = {**message, "headers": headers}
+            await send(message)
+
+        await self.app(scope, receive, send_no_cache)
+
+
+app.add_middleware(AvatarCacheControlMiddleware)
 
 
 @app.exception_handler(AuthError)
