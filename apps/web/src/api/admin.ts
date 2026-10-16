@@ -20,6 +20,7 @@ import type {
   AdminSeasonImportProgress,
   AdminSeasonImportResult,
   AdminTurniSyncResult,
+  PredictedLineupSyncResult,
   SystemJob,
   SystemJobUpdate,
   AdminUser,
@@ -149,6 +150,15 @@ export function fetchAdminLeagueTurnStatus(
 
 export function syncAllLeagueTurns(accessToken: string): Promise<AdminTurniSyncResult> {
   return apiRequest<AdminTurniSyncResult>("/admin/turni/sincronizza", {
+    accessToken,
+    method: "POST",
+  });
+}
+
+export function refreshPredictedLineups(
+  accessToken: string,
+): Promise<PredictedLineupSyncResult> {
+  return apiRequest<PredictedLineupSyncResult>("/admin/turni/probabili-formazioni", {
     accessToken,
     method: "POST",
   });

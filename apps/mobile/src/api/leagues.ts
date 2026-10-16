@@ -35,7 +35,6 @@ import type {
   FixtureLiveDetail,
   GenerateFantasyTurnRequest,
   PendingFixtureSummary,
-  PredictedLineupSyncResult,
   RoundCalculationResult,
   LineupContext,
   LineupLockCountdown,
@@ -728,16 +727,6 @@ export function generateFantasyTurn(
     method: "POST",
     accessToken,
     body,
-  });
-}
-
-export function refreshPredictedLineups(
-  accessToken: string,
-  leagueId: string,
-): Promise<PredictedLineupSyncResult> {
-  return apiRequest<PredictedLineupSyncResult>(`/leagues/${leagueId}/turni/probabili-formazioni`, {
-    method: "POST",
-    accessToken,
   });
 }
 
