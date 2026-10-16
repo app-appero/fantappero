@@ -1,7 +1,7 @@
 import type { LineupRole } from "@fantappero/contracts";
 import { theme } from "@fantappero/ui/theme";
 import { useMemo, useState, type ReactNode } from "react";
-import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Image, Modal, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { AppTextInput as TextInput } from "../../components/AppTextInput";
 import { lazyStyles } from "../../theme/lazyStyles";
 
@@ -37,6 +37,9 @@ export type PitchSlot = {
   scoreLabel: string | null;
   /** Titolare probabile: anello e nome verdi. */
   probable?: boolean;
+  photoUrl?: string | null;
+  /** Countdown del prossimo blocco, sotto il nome. */
+  lockCountdown?: string | null;
 };
 
 /** Posizione percentuale di ogni slot: righe P / D / C / A, spaziate in base a quanti ne ha il modulo. */
@@ -108,7 +111,11 @@ export function FormationPitch({
                   selected ? styles.selectedRing : null,
                 ]}
               >
-                <Text style={styles.initial}>{(slot.name ?? "?").trim().charAt(0).toUpperCase()}</Text>
+                {slot.photoUrl ? (
+                  <Image source={{ uri: slot.photoUrl }} style={styles.photo} />
+                ) : (
+                  <Text style={styles.initial}>{(slot.name ?? "?").trim().charAt(0).toUpperCase()}</Text>
+                )}
                 {slot.locked ? (
                   <View style={styles.lockDot}>
                     <Text style={styles.lockText}>🔒</Text>
@@ -128,6 +135,11 @@ export function FormationPitch({
                 {!empty && slot.scoreLabel ? ` · ${slot.scoreLabel}` : ""}
               </Text>
             </View>
+            {!empty && slot.lockCountdown ? (
+              <View style={styles.lockPill}>
+                <Text style={styles.lockCountdown}>{slot.lockCountdown}</Text>
+              </View>
+            ) : null}
           </Pressable>
         );
       })}
@@ -436,6 +448,15 @@ const styles = lazyStyles(() =>
     },
     plus: { color: "#ffffff", fontSize: 26, fontWeight: "300", marginTop: -2 },
     initial: { color: "#0A0F22", fontSize: 19, fontStyle: "italic", fontWeight: "800" },
+    photo: { width: 38, height: 38, borderRadius: 19 },
+    lockPill: {
+      maxWidth: 84,
+      paddingHorizontal: 6,
+      paddingVertical: 1,
+      borderRadius: 999,
+      backgroundColor: "rgba(8,12,30,0.82)",
+    },
+    lockCountdown: { color: "#ffffff", fontSize: 10, fontWeight: "700" },
     lockDot: {
       position: "absolute",
       right: -8,

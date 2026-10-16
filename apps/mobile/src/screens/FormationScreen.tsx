@@ -16,6 +16,10 @@ import {
   evaluateLineup,
   evaluateProgressiveLock,
   evaluateTacticalMove,
+  athleteLockAt,
+  computeCountdown,
+  earliestAthleteLockAt,
+  formatCountdown,
   formatFantasyPoints,
   isAthleteKickoffLocked,
   moveBenchToIndex,
@@ -28,7 +32,7 @@ import {
 } from "@fantappero/contracts";
 import { theme } from "@fantappero/ui/theme";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Image, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { AthleteName } from "../athletes/AthleteCard";
 import {
   fetchFantasyTeams,
@@ -96,6 +100,11 @@ export function FormationScreen() {
   const isOperator = can(["global:operate"]);
   const canChangeTurn = isAdmin || isOperator;
   const { countdown, refetch: refetchCountdown } = useLockCountdown(accessToken, activeLeagueId);
+  const [lockNow, setLockNow] = useState(() => new Date());
+  useEffect(() => {
+    const timer = setInterval(() => setLockNow(new Date()), 1000);
+    return () => clearInterval(timer);
+  }, []);
 
   const [turns, setTurns] = useState<FantasyTurnSummary[]>([]);
   const [selectedRoundId, setSelectedRoundId] = useState("");
@@ -702,6 +711,34 @@ export function FormationScreen() {
   const editable = context.modificationAllowed && canEdit;
   const maxSubs = context.maxAutomaticSubstitutions ?? MAX_AUTOMATIC_SUBSTITUTIONS;
 
+  const lockMargin = context.lineupLockMarginMinutes ?? 0;
+  const placedForLock = [...displayStarters, ...displayBench].filter(Boolean);
+  const nextLockAt = earliestAthleteLockAt(
+    placedForLock
+      .map((id) => roster.find((row) => row.athleteId === id))
+      .filter((row): row is NonNullable<typeof row> => row != null),
+    lockNow,
+    lockMargin,
+  );
+  const nextLockMs = nextLockAt ? new Date(nextLockAt).getTime() : null;
+  const lockLabel = (athleteId: string): string | null => {
+    const player = roster.find((row) => row.athleteId === athleteId);
+    if (!player || nextLockMs == null) {
+      return null;
+    }
+    const own = athleteLockAt(
+      lockNow,
+      player.kickoffAt,
+      player.fixtureStatus,
+      player.lockLatched,
+      lockMargin,
+    );
+    if (!own || new Date(own).getTime() !== nextLockMs) {
+      return null;
+    }
+    return formatCountdown(computeCountdown(own, lockNow)) || null;
+  };
+
   const pitchSlots: PitchSlot[] = template.map((role, index) => {
     const athleteId = displayStarters[index] ?? "";
     const row = roster.find((r) => r.athleteId === athleteId);
@@ -712,6 +749,8 @@ export function FormationScreen() {
       name: row ? row.athleteName : null,
       locked: athleteId ? playerLocked(athleteId) : false,
       probable: row?.probableHint === "starter",
+      photoUrl: row?.photoUrl ?? null,
+      lockCountdown: athleteId ? lockLabel(athleteId) : null,
       scoreLabel: athleteId ? playerScoreLabel(athleteId) : null,
     };
   });
@@ -1045,17 +1084,28 @@ export function FormationScreen() {
               return (
                 <View
                   key={id}
-                  style={[styles.benchRow, benchPickerIndex === index ? styles.benchRowSelected : null]}
+                  style={[
+                    styles.benchRow,
+                    row?.probableHint === "starter" ? styles.benchProbable : null,
+                    benchPickerIndex === index ? styles.benchRowSelected : null,
+                  ]}
                   testID={`formation-bench-${index}`}
                 >
                   <Text style={styles.benchOrder}>{index + 1}°</Text>
-                  <View style={[styles.benchRole, { backgroundColor: roleRingColor(role) }]}>
-                    <Text style={styles.benchRoleText}>{role}</Text>
-                  </View>
+                  {row?.photoUrl ? (
+                    <Image source={{ uri: row.photoUrl }} style={styles.benchPhoto} />
+                  ) : (
+                    <View style={[styles.benchRole, { backgroundColor: roleRingColor(role) }]}>
+                      <Text style={styles.benchRoleText}>{role}</Text>
+                    </View>
+                  )}
                   <View style={styles.benchBody}>
-                    <AthleteName plain athleteId={id} style={styles.benchName}>
-                      {name}
-                    </AthleteName>
+                    <View style={styles.benchNameRow}>
+                      <AthleteName plain athleteId={id} style={styles.benchName}>
+                        {name}
+                      </AthleteName>
+                      {lockLabel(id) ? <Text style={styles.benchLock}>{lockLabel(id)}</Text> : null}
+                    </View>
                     <Text style={styles.meta}>
                       {locked ? "Bloccato · " : ""}
                       può subentrare
@@ -1100,17 +1150,28 @@ export function FormationScreen() {
                   return (
                     <View
                       key={id}
-                      style={[styles.benchRow, styles.benchOverflow]}
+                      style={[
+                        styles.benchRow,
+                        styles.benchOverflow,
+                        row?.probableHint === "starter" ? styles.benchProbable : null,
+                      ]}
                       testID={`formation-bench-${index}`}
                     >
                       <Text style={styles.benchOrder}>{index + 1}°</Text>
-                      <View style={[styles.benchRole, { backgroundColor: roleRingColor(role) }]}>
-                        <Text style={styles.benchRoleText}>{role}</Text>
-                      </View>
+                      {row?.photoUrl ? (
+                        <Image source={{ uri: row.photoUrl }} style={styles.benchPhoto} />
+                      ) : (
+                        <View style={[styles.benchRole, { backgroundColor: roleRingColor(role) }]}>
+                          <Text style={styles.benchRoleText}>{role}</Text>
+                        </View>
+                      )}
                       <View style={styles.benchBody}>
-                        <AthleteName plain athleteId={id} style={styles.benchName}>
-                          {name}
-                        </AthleteName>
+                        <View style={styles.benchNameRow}>
+                          <AthleteName plain athleteId={id} style={styles.benchName}>
+                            {name}
+                          </AthleteName>
+                          {lockLabel(id) ? <Text style={styles.benchLock}>{lockLabel(id)}</Text> : null}
+                        </View>
                         <Text style={styles.meta}>oltre i {maxSubs} cambi</Text>
                       </View>
                     </View>
@@ -1290,7 +1351,7 @@ export function FormationScreen() {
             <Text style={styles.toolTitle}>Applica formazione migliore</Text>
             <Text style={styles.meta}>Sceglie i titolari con il punteggio atteso più alto.</Text>
           </Pressable>
-          {isAdmin ? (
+          {isAdmin && context.leagueHasAiManager ? (
             <View style={styles.tool} testID="formation-ai-admin">
               <Text style={styles.toolTitle}>Formazioni IA</Text>
               <Text style={styles.meta}>
@@ -1520,6 +1581,22 @@ const styles = lazyStyles(() => StyleSheet.create({
     padding: spacing.sm,
   },
   benchOverflow: { opacity: 0.65 },
+  benchProbable: {
+    opacity: 1,
+    borderColor: colors.success,
+    backgroundColor: "rgba(61, 220, 151, 0.16)",
+  },
+  benchPhoto: { width: 36, height: 36, borderRadius: 18 },
+  benchNameRow: { flexDirection: "row", alignItems: "center", gap: spacing.xs, flexWrap: "wrap" },
+  benchLock: {
+    color: "#ffffff",
+    fontSize: 11,
+    fontWeight: "700",
+    backgroundColor: "rgba(8,12,30,0.82)",
+    borderRadius: 999,
+    paddingHorizontal: 6,
+    overflow: "hidden",
+  },
   benchRowSelected: { borderColor: colors.accent },
   benchOrder: {
     width: 30,

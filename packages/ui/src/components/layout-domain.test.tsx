@@ -327,6 +327,18 @@ describe("EP13-P04-quater match experience components", () => {
     expect(html).not.toContain("titolare probabile");
   });
 
+  it("shows the next lock countdown under the player", () => {
+    const html = renderToStaticMarkup(
+      createElement(FootballPitch, {
+        title: "Modulo 4-3-3",
+        players: [{ id: "a1", name: "Alexander Isak", role: "A", lockCountdown: "17:50:23" }],
+        positions: [{ id: "a1", xPercent: 50, yPercent: 20 }],
+      }),
+    );
+    expect(html).toContain("17:50:23");
+    expect(html).toContain("fa-pitch-player__lock");
+  });
+
   it("renders a vertical timeline with home/away sides and period markers", () => {
     const html = renderToStaticMarkup(
       createElement(MatchTimeline, {

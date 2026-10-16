@@ -100,6 +100,11 @@ describe("EP06-06 formation page", () => {
     expect(html).toContain("Partita già iniziata");
     expect(html).toContain("Salva formazione");
     expect(html).toContain('data-testid="formation-starter-0"');
+    expect(html).toContain("fa-pitch-player--probable");
+    expect(html).toContain("fa-bench-order__row--probable");
+    expect(html).toContain("fa-pitch-player__lock");
+    expect(html).toContain("fa-bench-order__lock");
+    expect(html).toContain("04:10:00");
   });
 
   it("shows empty state", () => {

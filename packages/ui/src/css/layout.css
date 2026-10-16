@@ -1229,6 +1229,18 @@ button.fa-app-header__league-action {
   color: #fff;
 }
 
+.fa-pitch-player__lock {
+  font-size: 0.62rem;
+  font-weight: 700;
+  line-height: 1.2;
+  color: #fff;
+  text-align: center;
+  padding: 0 6px;
+  border-radius: var(--fa-radius-pill);
+  background: rgba(8, 12, 30, 0.82);
+  white-space: nowrap;
+}
+
 /* ── Event badges ────────────────────────────────────────────────────── */
 
 .fa-event-badges {

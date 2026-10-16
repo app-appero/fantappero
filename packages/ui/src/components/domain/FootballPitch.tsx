@@ -19,6 +19,8 @@ export type PitchPlayer = {
   athleteId?: string | null;
   /** Titolare probabile: anello e nome verde sul campo. */
   probableStarter?: boolean;
+  /** Countdown del prossimo blocco, sotto il nome. */
+  lockCountdown?: string | null;
 };
 
 export type FootballPitchProps = HTMLAttributes<HTMLDivElement> & {
@@ -58,6 +60,9 @@ function PlayerPillBody({ player }: { player: PitchPlayer }) {
         <RoleBadge code={player.role} className="fa-pitch-player__role" />
       </div>
       <span className="fa-pitch-player__name">{abbreviateName(player.name)}</span>
+      {player.lockCountdown ? (
+        <span className="fa-pitch-player__lock">{player.lockCountdown}</span>
+      ) : null}
       {player.scoreLabel ? (
         <span className="fa-pitch-player__score">{player.scoreLabel}</span>
       ) : null}

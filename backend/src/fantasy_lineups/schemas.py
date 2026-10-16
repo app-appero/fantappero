@@ -142,6 +142,7 @@ class LineupContextResponse(ApiModel):
     copy_available: bool = Field(default=False, alias="copyAvailable")
     copy_issues: list[LineupIssueResponse] = Field(default_factory=list, alias="copyIssues")
     issues: list[LineupIssueResponse] = Field(default_factory=list)
+    league_has_ai_manager: bool = Field(default=False, alias="leagueHasAiManager")
 
 
 class LineupLockCountdownResponse(ApiModel):

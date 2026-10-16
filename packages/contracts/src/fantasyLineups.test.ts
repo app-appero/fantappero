@@ -9,6 +9,8 @@ import {
   evaluateProgressiveLock,
   evaluateTacticalMove,
   isApprovedModule,
+  athleteLockAt,
+  earliestAthleteLockAt,
   isAthleteKickoffLocked,
   isLineupModificationAllowed,
   isTacticalWindowActive,
@@ -153,6 +155,19 @@ describe("fantasyLineups rules", () => {
     const kickoff = "2026-08-15T16:00:00.000Z";
     assert.equal(isAthleteKickoffLocked("2026-08-15T15:44:59.000Z", kickoff, "NS", false, 15), false);
     assert.equal(isAthleteKickoffLocked("2026-08-15T15:45:00.000Z", kickoff, "NS", false, 15), true);
+    assert.equal(athleteLockAt("2026-08-15T15:00:00.000Z", kickoff, "NS", false, 15), "2026-08-15T15:45:00.000Z");
+    assert.equal(athleteLockAt("2026-08-15T15:45:00.000Z", kickoff, "NS", false, 15), null);
+    assert.equal(
+      earliestAthleteLockAt(
+        [
+          { kickoffAt: "2026-08-15T18:30:00.000Z", fixtureStatus: "NS" },
+          { kickoffAt: kickoff, fixtureStatus: "NS" },
+        ],
+        "2026-08-15T12:00:00.000Z",
+        0,
+      ),
+      kickoff,
+    );
     // Default margin (omitted) reproduces the previous exact-kickoff behavior.
     assert.equal(isAthleteKickoffLocked("2026-08-15T15:45:00.000Z", kickoff, "NS"), false);
     // Started/latched/inactive statuses are unaffected by the margin.
