@@ -675,7 +675,7 @@ export function FormationScreen() {
       <PageContainer title="Formazione">
         <UiStatePanel
           state="error"
-          title="Formazione non salvata"
+          title="Formazione non caricata"
           message={loadError}
           testID="formation-error"
         />

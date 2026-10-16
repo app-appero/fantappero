@@ -1413,7 +1413,7 @@ export function FormationPage() {
         <div data-testid="formation-error-wrap">
           <UiStatePanel
             state="error"
-            title="Formazione non salvata"
+            title="Formazione non caricata"
             message={loadError}
             testId="formation-error"
           />
