@@ -35,6 +35,8 @@ export type PitchSlot = {
   name: string | null;
   locked: boolean;
   scoreLabel: string | null;
+  /** Titolare probabile: anello e nome verdi. */
+  probable?: boolean;
 };
 
 /** Posizione percentuale di ogni slot: righe P / D / C / A, spaziate in base a quanti ne ha il modulo. */
@@ -102,6 +104,7 @@ export function FormationPitch({
                 style={[
                   styles.circle,
                   { borderColor: roleRingColor(slot.role) },
+                  slot.probable ? styles.probableRing : null,
                   selected ? styles.selectedRing : null,
                 ]}
               >
@@ -113,7 +116,13 @@ export function FormationPitch({
                 ) : null}
               </View>
             )}
-            <View style={[styles.label, empty && selected ? styles.labelSelected : null]}>
+            <View
+              style={[
+                styles.label,
+                slot.probable ? styles.probableLabel : null,
+                empty && selected ? styles.labelSelected : null,
+              ]}
+            >
               <Text style={styles.labelText} numberOfLines={1}>
                 {empty ? ROLE_SHORT[slot.role] : surname(slot.name)}
                 {!empty && slot.scoreLabel ? ` · ${slot.scoreLabel}` : ""}
@@ -412,6 +421,18 @@ const styles = lazyStyles(() =>
     selectedRing: {
       borderColor: "#ffffff",
       borderWidth: 4,
+    },
+    probableRing: {
+      borderColor: colors.success,
+      borderWidth: 4,
+      shadowColor: colors.success,
+      shadowOffset: { width: 0, height: 0 },
+      shadowOpacity: 1,
+      shadowRadius: 8,
+      elevation: 6,
+    },
+    probableLabel: {
+      backgroundColor: "#0b8a6b",
     },
     plus: { color: "#ffffff", fontSize: 26, fontWeight: "300", marginTop: -2 },
     initial: { color: "#0A0F22", fontSize: 19, fontStyle: "italic", fontWeight: "800" },

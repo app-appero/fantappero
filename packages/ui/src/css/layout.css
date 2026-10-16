@@ -1217,6 +1217,18 @@ button.fa-app-header__league-action {
   padding: 0 4px;
 }
 
+.fa-pitch-player--probable .fa-pitch-player__card {
+  border-color: var(--fa-success-400);
+  box-shadow:
+    0 0 0 3px color-mix(in srgb, var(--fa-success-500) 70%, transparent),
+    0 0 18px 5px var(--fa-success-500);
+}
+
+.fa-pitch-player--probable .fa-pitch-player__name {
+  background: var(--fa-success-600);
+  color: #fff;
+}
+
 /* ── Event badges ────────────────────────────────────────────────────── */
 
 .fa-event-badges {

@@ -345,22 +345,6 @@ export function FormationScreen() {
   };
   const playerBlocked = (athleteId: string) =>
     roster.some((row) => row.athleteId === athleteId && row.selectionBlocked === true);
-  const probableSuffix = (athleteId: string) => {
-    const player = roster.find((row) => row.athleteId === athleteId);
-    if (!player) {
-      return "";
-    }
-    if (player.selectionBlocked || player.probableHint === "unavailable") {
-      return " · out";
-    }
-    if (player.probableHint === "starter") {
-      return " · prob.";
-    }
-    if (player.probableHint === "bench") {
-      return " · panch.";
-    }
-    return "";
-  };
   const playerScoreLabel = (athleteId: string): string | null => {
     const player = roster.find((row) => row.athleteId === athleteId);
     if (!player || player.fantasyScore == null) {
@@ -725,8 +709,9 @@ export function FormationScreen() {
       index,
       role,
       athleteId,
-      name: row ? `${row.athleteName}${probableSuffix(athleteId)}` : null,
+      name: row ? row.athleteName : null,
       locked: athleteId ? playerLocked(athleteId) : false,
+      probable: row?.probableHint === "starter",
       scoreLabel: athleteId ? playerScoreLabel(athleteId) : null,
     };
   });
