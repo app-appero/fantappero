@@ -902,12 +902,7 @@ export function FormationScreen() {
           </Text>
         ) : null}
 
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.modules}
-          testID="formation-module"
-        >
+        <View style={styles.modules} testID="formation-module">
           {APPROVED_MODULES.map((code) => (
             <Pressable
               key={code}
@@ -916,19 +911,26 @@ export function FormationScreen() {
               onPress={() => changeModule(code)}
               style={[styles.pill, moduleCode === code ? styles.pillActive : null]}
             >
-              <Text style={[styles.pillText, moduleCode === code ? styles.pillTextActive : null]}>{code}</Text>
+              <Text
+                style={[styles.pillText, moduleCode === code ? styles.pillTextActive : null]}
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.7}
+              >
+                {code}
+              </Text>
             </Pressable>
           ))}
-        </ScrollView>
+        </View>
 
         <View style={styles.progressHead}>
-          <Text style={styles.progressTitle}>
-            Titolari{" "}
+          <View style={styles.progressTitle}>
+            <Text style={styles.progressLabel}>Titolari</Text>
             <Text style={[styles.progressCount, missing === 0 ? styles.progressOk : null]}>
               {filledCount}/{totalSlots}
             </Text>
-          </Text>
-          <Text style={styles.meta}>
+          </View>
+          <Text style={styles.progressHint} numberOfLines={2}>
             {missing === 0 ? "Formazione completa" : "Tocca un cerchio per scegliere"}
           </Text>
         </View>
@@ -948,7 +950,7 @@ export function FormationScreen() {
             <Text style={styles.meta}>
               Compila la formazione in un tocco, poi ritocca gli slot che vuoi cambiare.
             </Text>
-            <View style={styles.row}>
+            <View style={styles.startRow}>
               <Pressable
                 accessibilityRole="button"
                 disabled={toolDisabled}
@@ -956,7 +958,9 @@ export function FormationScreen() {
                 style={[styles.startButton, styles.startButtonPrimary, toolDisabled ? styles.disabled : null]}
                 testID="formation-apply-best"
               >
-                <Text style={styles.buttonLabel}>Formazione migliore</Text>
+                <Text style={styles.startButtonLabel} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
+                  Formazione migliore
+                </Text>
               </Pressable>
               <Pressable
                 accessibilityRole="button"
@@ -968,7 +972,12 @@ export function FormationScreen() {
                 ]}
                 testID="formation-copy"
               >
-                <Text style={styles.buttonSecondaryLabel}>
+                <Text
+                  style={styles.startButtonLabelSecondary}
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.75}
+                >
                   {context.previousLineup ? `Copia turno ${context.previousLineup.roundNumber}` : "Copia precedente"}
                 </Text>
               </Pressable>
@@ -1367,26 +1376,57 @@ const styles = lazyStyles(() => StyleSheet.create({
     flexWrap: "wrap",
     gap: spacing.xs,
   },
-  modules: { gap: spacing.xs, paddingVertical: spacing.xs },
+  modules: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
   pill: {
+    flex: 1,
+    minWidth: 0,
     borderWidth: 1,
     borderColor: colors.border,
     borderRadius: radius.pill,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    minHeight: 40,
+    paddingHorizontal: 2,
+    paddingVertical: 8,
+    minHeight: 36,
+    alignItems: "center",
     justifyContent: "center",
   },
   pillActive: { backgroundColor: colors.brand, borderColor: colors.brand },
-  pillText: { color: colors.foreground, fontWeight: "600" },
+  pillText: {
+    color: colors.foreground,
+    fontWeight: "700",
+    fontSize: typography.fontSize.xs,
+    textAlign: "center",
+  },
   pillTextActive: { color: colors.onBrand },
   progressHead: {
     flexDirection: "row",
-    alignItems: "baseline",
+    alignItems: "center",
     justifyContent: "space-between",
+    gap: spacing.sm,
   },
-  progressTitle: { color: colors.foreground, fontWeight: "600" },
-  progressCount: { fontSize: typography.fontSize.xl, fontStyle: "italic", fontWeight: "800" },
+  progressTitle: {
+    flexDirection: "row",
+    alignItems: "baseline",
+    flexShrink: 0,
+    gap: 6,
+  },
+  progressLabel: { color: colors.foreground, fontWeight: "600" },
+  progressCount: {
+    fontSize: typography.fontSize.xl,
+    fontStyle: "italic",
+    fontWeight: "800",
+    paddingRight: 6,
+  },
+  progressHint: {
+    flex: 1,
+    flexShrink: 1,
+    textAlign: "right",
+    color: colors.foregroundMuted,
+    fontSize: typography.fontSize.sm,
+  },
   progressOk: { color: colors.success },
   progressTrack: {
     height: 6,
@@ -1405,16 +1445,36 @@ const styles = lazyStyles(() => StyleSheet.create({
     padding: spacing.md,
   },
   startTitle: { color: colors.foreground, fontWeight: "700", fontSize: typography.fontSize.md },
+  startRow: {
+    flexDirection: "row",
+    flexWrap: "nowrap",
+    alignItems: "center",
+    gap: spacing.xs,
+  },
   startButton: {
     flexGrow: 1,
+    flexShrink: 1,
     flexBasis: 0,
+    minWidth: 0,
     minHeight: 44,
     alignItems: "center",
     justifyContent: "center",
     borderRadius: radius.pill,
     borderWidth: 1,
     borderColor: colors.border,
-    paddingHorizontal: spacing.sm,
+    paddingHorizontal: spacing.xs,
+  },
+  startButtonLabel: {
+    color: colors.onBrand,
+    fontWeight: "600",
+    fontSize: typography.fontSize.sm,
+    textAlign: "center",
+  },
+  startButtonLabelSecondary: {
+    color: colors.foreground,
+    fontWeight: "600",
+    fontSize: typography.fontSize.sm,
+    textAlign: "center",
   },
   startButtonPrimary: { backgroundColor: colors.brand, borderColor: colors.brand },
   benchHead: { gap: 2, marginTop: spacing.sm },
