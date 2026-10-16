@@ -1931,8 +1931,8 @@ a.fa-member-list__identity:focus-visible {
   z-index: var(--fa-z-sticky);
   background: transparent;
   overflow: visible;
-  /* Lascia sotto l'header lo spazio della metà di pillola che esce, senza un riquadro che copre la pagina. */
-  margin-bottom: 0.9rem;
+  /* Spazio per la pillola che esce sotto l'header, senza un riquadro che copre la pagina. */
+  margin-bottom: 1.5rem;
 }
 
 .fa-app-chrome > .fa-app-header {
@@ -1946,8 +1946,8 @@ a.fa-member-list__identity:focus-visible {
   }
 }
 
-/* La pillola sta a cavallo del bordo dell'header, al centro.
-   Il contenitore non ha sfondo e non intercetta i clic sul resto della pagina. */
+/* La pillola è centrata e sta appena sotto il bordo dell'header,
+   staccata dalle icone. Il contenitore non intercetta i clic sul resto della pagina. */
 .fa-lock-countdown-bar {
   position: absolute;
   left: 50%;
@@ -1960,7 +1960,7 @@ a.fa-member-list__identity:focus-visible {
   padding: 0;
   background: transparent;
   pointer-events: none;
-  transform: translate(-50%, 50%);
+  transform: translate(-50%, calc(50% + 10px));
 }
 
 .fa-lock-countdown-bar > * {
