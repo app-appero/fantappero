@@ -83,6 +83,7 @@ def run_predicted_lineup_sync(
                 min_age=timedelta(hours=settings.predicted_lineups_min_age_hours),
                 oracle=oracle,
                 oracle_min_confidence=settings.soccer_oracle_min_confidence,
+                oracle_max_lookup_calls=settings.soccer_oracle_max_lookup_calls,
             )
     finally:
         if client is not None:

@@ -1,8 +1,9 @@
-"""Lettura difensiva delle risposte di ``GET /players/lineups`` (Soccer-Oracle).
+"""Lettura difensiva delle risposte di Soccer-Oracle (``/players/lineups``,
+``/players/lookup``).
 
 Contratto in docs/player_identity.md su romy1992/ia_predict_soccer
 (branch ccr-f82a865a-m1lzbd, non ancora deployato). Come per FotMob in
-``parse.py``, un payload malformato produce una formazione vuota, non
+``parse.py``, un payload malformato produce un risultato vuoto, non
 un'eccezione: il job non deve bloccarsi per una risposta inattesa.
 """
 
@@ -10,8 +11,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
+from typing import Literal
 
 _UNCERTAIN_PHRASES = ("doubtful", "dubbio", "uncertain", "unconfirmed", "da confermare")
+_LOOKUP_STATUSES = frozenset({"found", "ambiguous", "not_found"})
 
 
 @dataclass(frozen=True)
@@ -44,6 +47,29 @@ class OracleFixtureLineup:
     source: str | None  # "api_sports" | "fotmob" | None
     unmapped_starters: int | None
     teams: tuple[OracleTeam, ...]
+
+
+@dataclass(frozen=True)
+class LookupResult:
+    status: Literal["found", "ambiguous", "not_found"]
+    api_sports_id: int | None
+    confidence: float
+
+
+def parse_lookup_response(payload: object) -> LookupResult:
+    """Risposta di ``/players/lookup``. Uno status fuori vocabolario conta
+    come ``not_found``: prudente, non inventiamo un abbinamento."""
+    if not isinstance(payload, dict):
+        return LookupResult(status="not_found", api_sports_id=None, confidence=0.0)
+    status = _text(payload.get("status"))
+    if status not in _LOOKUP_STATUSES:
+        status = "not_found"
+    confidence = _float(payload.get("confidence"))
+    return LookupResult(
+        status=status,  # type: ignore[arg-type]
+        api_sports_id=_int(payload.get("api_sports_id")) if status == "found" else None,
+        confidence=confidence if confidence is not None else 0.0,
+    )
 
 
 def parse_oracle_lineups_response(payload: object) -> dict[int, OracleFixtureLineup]:

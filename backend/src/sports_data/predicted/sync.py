@@ -29,6 +29,7 @@ from sports_data.predicted.oracle_parse import (
     OracleFixtureLineup,
     OraclePlayer,
     OracleTeam,
+    parse_lookup_response,
     parse_oracle_lineups_response,
 )
 from sports_data.predicted.parse import (
@@ -85,6 +86,7 @@ def sync_predicted_lineups(
     min_age: timedelta = timedelta(hours=20),
     oracle: SoccerOracleClient | None = None,
     oracle_min_confidence: float = 0.6,
+    oracle_max_lookup_calls: int = 30,
 ) -> PredictedSyncSummary:
     """Aggiorna le partite non iniziate della finestra.
 
@@ -111,7 +113,15 @@ def sync_predicted_lineups(
     remaining = pending
     if oracle is not None:
         try:
-            _sync_via_oracle(session, oracle, pending, summary, moment, oracle_min_confidence)
+            _sync_via_oracle(
+                session,
+                oracle,
+                pending,
+                summary,
+                moment,
+                oracle_min_confidence,
+                oracle_max_lookup_calls,
+            )
             remaining = []
         except SoccerOracleError:
             logger.warning("soccer_oracle_sync_unavailable_falling_back_to_fotmob", exc_info=True)
@@ -150,6 +160,21 @@ def sync_predicted_lineups(
     return summary
 
 
+class _LookupBudget:
+    """Tetto alle chiamate extra ``/players/lookup`` per giro di sync — non
+    vogliamo una lookup per ogni giocatore non abbinato, potrebbero essere
+    centinaia tra tutte le leghe."""
+
+    def __init__(self, remaining: int) -> None:
+        self.remaining = remaining
+
+    def take(self) -> bool:
+        if self.remaining <= 0:
+            return False
+        self.remaining -= 1
+        return True
+
+
 def _sync_via_oracle(
     session: Session,
     oracle: SoccerOracleClient,
@@ -157,6 +182,7 @@ def _sync_via_oracle(
     summary: PredictedSyncSummary,
     now: datetime,
     min_confidence: float,
+    max_lookup_calls: int,
 ) -> None:
     """Interamente o niente: se una chiamata fallisce, il chiamante ricade su FotMob."""
     if not fixtures:
@@ -164,6 +190,7 @@ def _sync_via_oracle(
     by_provider_id = {fixture.provider_id: fixture for fixture in fixtures}
     provider_ids = list(by_provider_id)
     pending_links: list[dict[str, object]] = []
+    lookup_budget = _LookupBudget(max_lookup_calls)
     for start in range(0, len(provider_ids), _ORACLE_LINEUPS_BATCH_SIZE):
         batch = provider_ids[start : start + _ORACLE_LINEUPS_BATCH_SIZE]
         payload = oracle.lineups(batch, prefer="predicted")
@@ -178,6 +205,8 @@ def _sync_via_oracle(
                 now,
                 min_confidence,
                 pending_links,
+                oracle,
+                lookup_budget,
             )
     if pending_links:
         try:
@@ -650,6 +679,8 @@ def _store_oracle_snapshot(
     now: datetime,
     min_confidence: float,
     pending_links: list[dict[str, object]],
+    oracle: SoccerOracleClient,
+    lookup_budget: _LookupBudget,
 ) -> None:
     if lineup is None or lineup.lineup_type is None or not lineup.teams:
         return
@@ -702,6 +733,8 @@ def _store_oracle_snapshot(
         kickoff_at=fixture.kickoff_at,
         min_confidence=min_confidence,
         pending_links=pending_links,
+        oracle=oracle,
+        lookup_budget=lookup_budget,
     )
     _add_oracle_team(
         session,
@@ -713,6 +746,8 @@ def _store_oracle_snapshot(
         kickoff_at=fixture.kickoff_at,
         min_confidence=min_confidence,
         pending_links=pending_links,
+        oracle=oracle,
+        lookup_budget=lookup_budget,
     )
     summary.snapshots_saved += 1
     summary.warnings += len(warnings)
@@ -731,6 +766,8 @@ def _add_oracle_team(
     kickoff_at: datetime | None,
     min_confidence: float,
     pending_links: list[dict[str, object]],
+    oracle: SoccerOracleClient,
+    lookup_budget: _LookupBudget,
 ) -> None:
     if team is None:
         return
@@ -755,7 +792,27 @@ def _add_oracle_team(
                 min_confidence=min_confidence,
                 sort_order=order,
                 pending_links=pending_links,
+                oracle=oracle,
+                lookup_budget=lookup_budget,
             )
+
+
+def _resolve_via_oracle_lookup(
+    session: Session, oracle: SoccerOracleClient, fotmob_id: int
+) -> UUID | None:
+    """Ultimo tentativo per ID esatto, quando né Soccer-Oracle né il nostro
+    riscontro interno hanno abbinato il giocatore. Niente ambiguità di nome:
+    o lo trova per ID o niente."""
+    try:
+        payload = oracle.lookup(provider="fotmob", provider_id=fotmob_id)
+    except SoccerOracleError:
+        logger.warning("soccer_oracle_lookup_failed", exc_info=True)
+        return None
+    result = parse_lookup_response(payload)
+    if result.status != "found" or result.api_sports_id is None:
+        return None
+    athlete = session.scalar(select(Athlete).where(Athlete.provider_id == result.api_sports_id))
+    return None if athlete is None else athlete.id
 
 
 def _add_oracle_player(
@@ -772,6 +829,8 @@ def _add_oracle_player(
     min_confidence: float,
     sort_order: int,
     pending_links: list[dict[str, object]],
+    oracle: SoccerOracleClient,
+    lookup_budget: _LookupBudget,
 ) -> None:
     athlete_id: UUID | None = None
     if player.mapped and player.confidence >= min_confidence and player.api_sports_id is not None:
@@ -795,6 +854,8 @@ def _add_oracle_player(
                         ),
                     }
                 )
+        elif player.fotmob_id is not None and lookup_budget.take():
+            athlete_id = _resolve_via_oracle_lookup(session, oracle, player.fotmob_id)
 
     expected = player.absence_expected_return_at
     kickoff = kickoff_at

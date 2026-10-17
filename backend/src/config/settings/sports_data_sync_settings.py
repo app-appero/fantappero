@@ -124,6 +124,17 @@ class SportsDataSyncSettingsMixin:
             "Minimum Soccer-Oracle mapping confidence to trust for probable-lineup hints."
         ),
     )
+    soccer_oracle_max_lookup_calls: int = Field(
+        default=30,
+        validation_alias="SOCCER_ORACLE_MAX_LOOKUP_CALLS",
+        ge=0,
+        le=200,
+        description=(
+            "Cap of extra /players/lookup-by-ID calls per sync run, for players that "
+            "neither Soccer-Oracle's /players/lineups nor our own shirt+surname match "
+            "resolved."
+        ),
+    )
 
     @field_validator("rapidapi_key", mode="before")
     @classmethod

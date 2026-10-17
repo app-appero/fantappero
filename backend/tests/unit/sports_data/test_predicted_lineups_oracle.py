@@ -16,17 +16,29 @@ import httpx
 import pytest
 
 from sports_data.predicted.oracle_client import SoccerOracleClient, SoccerOracleError
-from sports_data.predicted.oracle_parse import parse_oracle_lineups_response
+from sports_data.predicted.oracle_parse import parse_lookup_response, parse_oracle_lineups_response
 from sports_data.predicted.sync import (
     _MISSING_KEY,
     PredictedSyncSummary,
     _add_oracle_player,
     _confident_shirt_match,
+    _LookupBudget,
     _OracleSquadMember,
+    _resolve_via_oracle_lookup,
     _store_oracle_snapshot,
     _sync_via_oracle,
     sync_predicted_lineups,
 )
+
+_NO_LOOKUPS = _LookupBudget(0)
+
+
+def _no_oracle_calls() -> MagicMock:
+    """Un oracle che non deve mai essere chiamato (usato con ``_NO_LOOKUPS``)."""
+    oracle = MagicMock()
+    oracle.lookup.side_effect = AssertionError("non doveva chiamare /players/lookup")
+    return oracle
+
 
 # ---------------------------------------------------------------------------
 # Client: nessuna rete reale, chiave mai nei log/errori.
@@ -291,6 +303,8 @@ def test_add_oracle_player_unmapped_stays_without_athlete_id_and_without_colour(
         min_confidence=0.6,
         sort_order=1,
         pending_links=[],
+        oracle=_no_oracle_calls(),
+        lookup_budget=_NO_LOOKUPS,
     )
     row = added[0]
     assert row.athlete_id is None
@@ -316,6 +330,8 @@ def test_add_oracle_player_below_confidence_threshold_is_not_trusted() -> None:
         min_confidence=0.6,
         sort_order=1,
         pending_links=[],
+        oracle=_no_oracle_calls(),
+        lookup_budget=_NO_LOOKUPS,
     )
     row = added[0]
     assert row.athlete_id is None
@@ -342,6 +358,8 @@ def test_add_oracle_player_mapped_above_threshold_resolves_athlete_id() -> None:
         min_confidence=0.6,
         sort_order=1,
         pending_links=[],
+        oracle=_no_oracle_calls(),
+        lookup_budget=_NO_LOOKUPS,
     )
     row = added[0]
     assert row.athlete_id == athlete_id
@@ -377,6 +395,8 @@ def test_add_oracle_player_unmapped_but_confident_shirt_match_queues_link() -> N
         min_confidence=0.6,
         sort_order=1,
         pending_links=pending_links,
+        oracle=_no_oracle_calls(),
+        lookup_budget=_NO_LOOKUPS,
     )
     row = added[0]
     assert row.athlete_id == athlete_id
@@ -419,6 +439,8 @@ def test_add_oracle_player_unavailable_injured_blocks_selection() -> None:
         min_confidence=0.6,
         sort_order=1,
         pending_links=[],
+        oracle=_no_oracle_calls(),
+        lookup_budget=_NO_LOOKUPS,
     )
     row = added[0]
     assert row.is_unavailable is True
@@ -453,6 +475,8 @@ def test_add_oracle_player_doubtful_absence_does_not_block() -> None:
         min_confidence=0.6,
         sort_order=1,
         pending_links=[],
+        oracle=_no_oracle_calls(),
+        lookup_budget=_NO_LOOKUPS,
     )
     row = added[0]
     assert row.blocks_selection is False
@@ -504,13 +528,13 @@ def test_sync_via_oracle_all_or_nothing_propagates_failure_to_caller() -> None:
     oracle.lineups.side_effect = SoccerOracleError(500, "boom")
     summary = PredictedSyncSummary()
     with pytest.raises(SoccerOracleError):
-        _sync_via_oracle(MagicMock(), oracle, [fixture], summary, datetime.now(UTC), 0.6)
+        _sync_via_oracle(MagicMock(), oracle, [fixture], summary, datetime.now(UTC), 0.6, 0)
 
 
 def test_sync_via_oracle_does_nothing_for_an_empty_fixture_list() -> None:
     oracle = MagicMock()
     summary = PredictedSyncSummary()
-    _sync_via_oracle(MagicMock(), oracle, [], summary, datetime.now(UTC), 0.6)
+    _sync_via_oracle(MagicMock(), oracle, [], summary, datetime.now(UTC), 0.6, 0)
     oracle.lineups.assert_not_called()
 
 
@@ -537,6 +561,170 @@ def test_store_oracle_snapshot_skips_when_no_lineup_data_yet() -> None:
     summary = PredictedSyncSummary()
     lineup = OracleFixtureLineup(lineup_type=None, source=None, unmapped_starters=None, teams=())
 
-    _store_oracle_snapshot(session, fixture, lineup, summary, datetime.now(UTC), 0.6, [])
+    _store_oracle_snapshot(
+        session,
+        fixture,
+        lineup,
+        summary,
+        datetime.now(UTC),
+        0.6,
+        [],
+        _no_oracle_calls(),
+        _NO_LOOKUPS,
+    )
     assert added == []
     assert summary.snapshots_saved == 0
+
+
+# ---------------------------------------------------------------------------
+# Lookup per ID esatto: ultimo tentativo quando Oracle e il riscontro interno
+# falliscono entrambi.
+# ---------------------------------------------------------------------------
+
+
+def test_parse_lookup_response_found() -> None:
+    result = parse_lookup_response({"status": "found", "api_sports_id": 42, "confidence": 0.9})
+    assert result.status == "found"
+    assert result.api_sports_id == 42
+    assert result.confidence == 0.9
+
+
+def test_parse_lookup_response_ambiguous_has_no_id() -> None:
+    result = parse_lookup_response(
+        {"status": "ambiguous", "api_sports_id": 42, "candidates": [1, 2]}
+    )
+    assert result.status == "ambiguous"
+    assert result.api_sports_id is None  # un id non e' affidabile se lo status non e' found
+
+
+def test_parse_lookup_response_unexpected_status_is_not_found() -> None:
+    assert parse_lookup_response({"status": "who-knows"}).status == "not_found"
+    assert parse_lookup_response(None).status == "not_found"
+    assert parse_lookup_response("not a dict").status == "not_found"
+
+
+def test_resolve_via_oracle_lookup_found_resolves_athlete() -> None:
+    athlete_id = uuid4()
+    session = MagicMock()
+    session.scalar.return_value = SimpleNamespace(id=athlete_id)
+    oracle = MagicMock()
+    oracle.lookup.return_value = {"status": "found", "api_sports_id": 999}
+
+    resolved = _resolve_via_oracle_lookup(session, oracle, 12345)
+    assert resolved == athlete_id
+    oracle.lookup.assert_called_once_with(provider="fotmob", provider_id=12345)
+
+
+def test_resolve_via_oracle_lookup_not_found_returns_none() -> None:
+    session = MagicMock()
+    oracle = MagicMock()
+    oracle.lookup.return_value = {"status": "not_found"}
+    assert _resolve_via_oracle_lookup(session, oracle, 12345) is None
+    session.scalar.assert_not_called()
+
+
+def test_resolve_via_oracle_lookup_error_is_swallowed() -> None:
+    session = MagicMock()
+    oracle = MagicMock()
+    oracle.lookup.side_effect = SoccerOracleError(500, "boom")
+    assert _resolve_via_oracle_lookup(session, oracle, 12345) is None
+
+
+def test_add_oracle_player_falls_back_to_lookup_when_nothing_else_matches() -> None:
+    athlete_id = uuid4()
+    session = MagicMock()
+    added: list[object] = []
+    session.add.side_effect = added.append
+    session.scalar.return_value = SimpleNamespace(id=athlete_id)
+    oracle = MagicMock()
+    oracle.lookup.return_value = {"status": "found", "api_sports_id": 555}
+    budget = _LookupBudget(1)
+    # mapped=False e nessun candidato di maglia nella rosa: ne' Oracle ne'
+    # il nostro riscontro interno hanno trovato nulla da soli.
+    player = _oracle_player(mapped=False, confidence=0.0, shirt_number=None, fotmob_id=777)
+
+    _add_oracle_player(
+        session,
+        snapshot=SimpleNamespace(id=uuid4()),
+        player=player,
+        side="home",
+        club_id=uuid4(),
+        squad=[],
+        kickoff_at=None,
+        is_starter=True,
+        is_unavailable=False,
+        min_confidence=0.6,
+        sort_order=1,
+        pending_links=[],
+        oracle=oracle,
+        lookup_budget=budget,
+    )
+    row = added[0]
+    assert row.athlete_id == athlete_id
+    assert budget.remaining == 0
+
+
+def test_add_oracle_player_skips_lookup_when_budget_exhausted() -> None:
+    session = MagicMock()
+    added: list[object] = []
+    session.add.side_effect = added.append
+    oracle = _no_oracle_calls()
+    player = _oracle_player(mapped=False, confidence=0.0, shirt_number=None, fotmob_id=777)
+
+    _add_oracle_player(
+        session,
+        snapshot=SimpleNamespace(id=uuid4()),
+        player=player,
+        side="home",
+        club_id=uuid4(),
+        squad=[],
+        kickoff_at=None,
+        is_starter=True,
+        is_unavailable=False,
+        min_confidence=0.6,
+        sort_order=1,
+        pending_links=[],
+        oracle=oracle,
+        lookup_budget=_NO_LOOKUPS,
+    )
+    row = added[0]
+    assert row.athlete_id is None
+
+
+def test_add_oracle_player_own_match_wins_over_lookup_no_budget_spent() -> None:
+    athlete_id = uuid4()
+    squad = [
+        _OracleSquadMember(
+            athlete_id=athlete_id,
+            provider_id=777,
+            last_name="rossi",
+            shirt_number=7,
+            birth_date=None,
+        )
+    ]
+    session = MagicMock()
+    added: list[object] = []
+    session.add.side_effect = added.append
+    oracle = _no_oracle_calls()
+    budget = _LookupBudget(5)
+    player = _oracle_player(mapped=False, confidence=0.0, shirt_number=7, fotmob_id=321)
+
+    _add_oracle_player(
+        session,
+        snapshot=SimpleNamespace(id=uuid4()),
+        player=player,
+        side="home",
+        club_id=uuid4(),
+        squad=squad,
+        kickoff_at=None,
+        is_starter=True,
+        is_unavailable=False,
+        min_confidence=0.6,
+        sort_order=1,
+        pending_links=[],
+        oracle=oracle,
+        lookup_budget=budget,
+    )
+    row = added[0]
+    assert row.athlete_id == athlete_id
+    assert budget.remaining == 5  # il riscontro interno ha gia' risolto, niente lookup

@@ -61,6 +61,14 @@ class SoccerOracleClient:
             "GET", "/players/lineups", params={"fixture_ids": ids, "prefer": prefer}
         )
 
+    def lookup(self, *, provider: str, provider_id: int) -> Any:
+        """Ricerca per ID esatto del provider — niente ambiguità di nome."""
+        return self._request(
+            "GET",
+            "/players/lookup",
+            params={"provider": provider, "provider_id": str(provider_id)},
+        )
+
     def links_bulk(self, links: list[dict[str, Any]], *, source: str = "external_project") -> Any:
         if not links:
             return {"count": 0}
