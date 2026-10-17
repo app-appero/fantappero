@@ -1429,6 +1429,7 @@ class FantasyLineupService:
             fixtureStatusLabel=score.fixture_status_label if score is not None else None,
             probableHint=None if probable is None else probable.hint,
             probableNote=None if probable is None else probable.note,
+            probableAbsence=None if probable is None else probable.absence,
             selectionBlocked=False if probable is None else probable.blocked,
         )
 

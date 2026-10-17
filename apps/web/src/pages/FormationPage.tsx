@@ -275,8 +275,28 @@ function probableMark(roster: LineupRosterPlayer[], athleteId: string): string {
   return "";
 }
 
+type ProbableState = "starter" | "bench" | "expelled" | "unavailable" | null;
+
+function probableState(roster: LineupRosterPlayer[], athleteId: string): ProbableState {
+  const player = roster.find((row) => row.athleteId === athleteId);
+  if (!player) {
+    return null;
+  }
+  if (player.probableHint === "unavailable" || player.selectionBlocked) {
+    return player.probableAbsence === "suspended" ? "expelled" : "unavailable";
+  }
+  if (player.probableHint === "starter") {
+    return "starter";
+  }
+  return player.probableHint === "bench" ? "bench" : null;
+}
+
 function playerBlocked(roster: LineupRosterPlayer[], athleteId: string): boolean {
-  return roster.some((row) => row.athleteId === athleteId && row.selectionBlocked === true);
+  return roster.some(
+    (row) =>
+      row.athleteId === athleteId &&
+      (row.selectionBlocked === true || row.probableAbsence === "suspended"),
+  );
 }
 
 function playerBadges(roster: LineupRosterPlayer[], athleteId: string) {
@@ -408,6 +428,7 @@ function BenchOrderRow({
   onAssign,
   scoreLabel,
   probable,
+  state,
   lockCountdown,
 }: {
   athleteId: string;
@@ -424,6 +445,7 @@ function BenchOrderRow({
   onAssign: (athleteId: string) => void;
   scoreLabel?: string | null;
   probable?: boolean;
+  state?: ProbableState;
   lockCountdown?: string | null;
 }) {
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -440,6 +462,9 @@ function BenchOrderRow({
           "fa-bench-order__row",
           canEnter ? "" : "fa-bench-order__row--overflow",
           probable ? "fa-bench-order__row--probable" : "",
+          state === "bench" || state === "expelled" || state === "unavailable"
+            ? `fa-bench-order__row--${state}`
+            : "",
         ]
           .filter(Boolean)
           .join(" ")
@@ -1398,6 +1423,10 @@ export function FormationPage() {
       name: athleteId ? playerName(roster, athleteId) : "Libero",
       role,
       probableStarter: athleteId ? isProbableStarter(athleteId) : false,
+      probableState: (() => {
+        const state = athleteId ? probableState(roster, athleteId) : null;
+        return state === "bench" || state === "expelled" || state === "unavailable" ? state : null;
+      })(),
       lockCountdown: athleteId ? lockLabel(athleteId) : null,
       photoUrl: athleteId ? playerPhotoUrl(roster, athleteId) : null,
       scoreLabel: athleteId ? playerScoreLabel(roster, athleteId) : null,
@@ -1438,7 +1467,7 @@ export function FormationPage() {
         if (row.role !== role || selected.has(row.athleteId)) {
           return false;
         }
-        if (row.selectionBlocked && row.athleteId !== currentId) {
+        if ((row.selectionBlocked || row.probableAbsence === "suspended") && row.athleteId !== currentId) {
           return false;
         }
         return true;
@@ -1720,6 +1749,13 @@ export function FormationPage() {
             </Badge>
           </div>
 
+          <div className="fa-formation-legend" data-testid="formation-legend" aria-label="Legenda formazioni probabili">
+            <span className="fa-formation-legend__item"><span className="fa-formation-legend__dot fa-formation-legend__dot--starter" />Titolare probabile</span>
+            <span className="fa-formation-legend__item"><span className="fa-formation-legend__dot fa-formation-legend__dot--bench" />Possibile panchina</span>
+            <span className="fa-formation-legend__item"><span className="fa-formation-legend__dot fa-formation-legend__dot--expelled" />Espulso / squalificato (non selezionabile)</span>
+            <span className="fa-formation-legend__item"><span className="fa-formation-legend__dot fa-formation-legend__dot--unavailable" />Indisponibile</span>
+          </div>
+
           <div className="fa-formation-layout__pitch-row">
           <div className="fa-formation-layout__pitch">
             <FootballPitch
@@ -1810,6 +1846,7 @@ export function FormationPage() {
                             onAssign={(athleteId) => assignBenchPlayer(index, athleteId)}
                             scoreLabel={playerScoreLabel(roster, athleteId)}
                             probable={isProbableStarter(athleteId)}
+                            state={probableState(roster, athleteId)}
                             lockCountdown={lockLabel(athleteId)}
                           />
                         ) : null,
@@ -1848,6 +1885,7 @@ export function FormationPage() {
                             onAssign={(athleteId) => assignBenchPlayer(index, athleteId)}
                             scoreLabel={playerScoreLabel(roster, athleteId)}
                             probable={isProbableStarter(athleteId)}
+                            state={probableState(roster, athleteId)}
                             lockCountdown={lockLabel(athleteId)}
                           />
                         ) : null,

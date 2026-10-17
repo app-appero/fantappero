@@ -37,10 +37,61 @@ export type PitchSlot = {
   scoreLabel: string | null;
   /** Titolare probabile: anello e nome verdi. */
   probable?: boolean;
+  /** Altri stati dalle formazioni probabili: giallo = possibile panchina, rosso = espulso, grigio = indisponibile. */
+  probableState?: ProbableTone | null;
   photoUrl?: string | null;
   /** Countdown del prossimo blocco, sotto il nome. */
   lockCountdown?: string | null;
 };
+
+export type ProbableTone = "starter" | "bench" | "expelled" | "unavailable";
+
+export const TONE_COLOR: Record<ProbableTone, string> = {
+  starter: "#22c55e",
+  bench: "#facc15",
+  expelled: "#ef4444",
+  unavailable: "#9ca3af",
+};
+
+export const TONE_LABEL_BG: Record<ProbableTone, string> = {
+  starter: "#0b8a6b",
+  bench: "#ca8a04",
+  expelled: "#dc2626",
+  unavailable: "#6b7280",
+};
+
+/** Stato di un calciatore dalle formazioni probabili, per colorare campo, panchina e scelta. */
+export function probableTone(row: {
+  probableHint?: "starter" | "bench" | "unavailable" | null;
+  probableAbsence?: "suspended" | "injured" | "other" | null;
+  selectionBlocked?: boolean;
+}): ProbableTone | null {
+  if (row.probableHint === "unavailable" || row.selectionBlocked) {
+    return row.probableAbsence === "suspended" ? "expelled" : "unavailable";
+  }
+  if (row.probableHint === "starter") return "starter";
+  if (row.probableHint === "bench") return "bench";
+  return null;
+}
+
+export function FormationLegend() {
+  const items: { tone: ProbableTone; label: string }[] = [
+    { tone: "starter", label: "Titolare probabile" },
+    { tone: "bench", label: "Possibile panchina" },
+    { tone: "expelled", label: "Espulso / squalificato (non selezionabile)" },
+    { tone: "unavailable", label: "Indisponibile" },
+  ];
+  return (
+    <View style={styles.legend} testID="formation-legend">
+      {items.map((item) => (
+        <View key={item.tone} style={styles.legendItem}>
+          <View style={[styles.legendDot, { backgroundColor: TONE_COLOR[item.tone] }]} />
+          <Text style={styles.legendText}>{item.label}</Text>
+        </View>
+      ))}
+    </View>
+  );
+}
 
 /** Posizione percentuale di ogni slot: righe P / D / C / A, spaziate in base a quanti ne ha il modulo. */
 export function pitchPositions(roles: readonly LineupRole[]): { x: number; y: number }[] {
@@ -108,6 +159,7 @@ export function FormationPitch({
                   styles.circle,
                   { borderColor: roleRingColor(slot.role) },
                   slot.probable ? styles.probableRing : null,
+                  slot.probableState ? toneRing(slot.probableState) : null,
                   selected ? styles.selectedRing : null,
                 ]}
               >
@@ -127,6 +179,7 @@ export function FormationPitch({
               style={[
                 styles.label,
                 slot.probable ? styles.probableLabel : null,
+                slot.probableState ? { backgroundColor: TONE_LABEL_BG[slot.probableState] } : null,
                 empty && selected ? styles.labelSelected : null,
               ]}
             >
@@ -147,6 +200,19 @@ export function FormationPitch({
   );
 }
 
+function toneRing(tone: ProbableTone) {
+  return {
+    borderColor: TONE_COLOR[tone],
+    borderWidth: 4,
+    shadowColor: TONE_COLOR[tone],
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: tone === "unavailable" ? 0 : 1,
+    shadowRadius: 8,
+    elevation: tone === "unavailable" ? 0 : 6,
+    opacity: tone === "unavailable" ? 0.7 : 1,
+  } as const;
+}
+
 function surname(name: string | null): string {
   if (!name) return "";
   const parts = name.trim().split(/\s+/);
@@ -161,6 +227,7 @@ export type Candidate = {
   stateLabel: string;
   scoreLabel: string | null;
   current: boolean;
+  tone?: ProbableTone | null;
 };
 
 type Filter = "tutti" | "libero" | "titolare" | "panchina";
@@ -325,6 +392,7 @@ export function PlayerPickerSheet({
               styles.cand,
               c.current ? styles.candCurrent : null,
               c.state === "bloccato" && !c.current ? styles.candLocked : null,
+              c.tone && c.tone !== "starter" ? { borderColor: TONE_COLOR[c.tone], borderWidth: 2 } : null,
             ]}
             testID={`formation-pick-${c.athleteId}`}
           >
@@ -568,6 +636,18 @@ const styles = lazyStyles(() =>
       borderWidth: 1,
       borderColor: colors.border,
     },
+    legend: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      gap: spacing.xs,
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: radius.lg,
+      padding: spacing.sm,
+    },
+    legendItem: { flexDirection: "row", alignItems: "center", gap: 6, marginRight: spacing.sm },
+    legendDot: { width: 12, height: 12, borderRadius: 6 },
+    legendText: { color: colors.foreground, fontSize: typography.fontSize.xs },
     clearText: { color: colors.danger, fontWeight: "600" },
   }),
 );

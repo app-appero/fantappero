@@ -58,6 +58,10 @@ class LineupRosterPlayerResponse(ApiModel):
         alias="probableHint",
     )
     probable_note: str | None = Field(default=None, alias="probableNote")
+    probable_absence: Literal["suspended", "injured", "other"] | None = Field(
+        default=None,
+        alias="probableAbsence",
+    )
     selection_blocked: bool = Field(default=False, alias="selectionBlocked")
 
 

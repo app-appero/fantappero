@@ -73,6 +73,8 @@ export interface LineupRosterPlayer {
   /** Titolare o panchinaro nella formazione probabile, oppure indisponibile. */
   probableHint?: "starter" | "bench" | "unavailable" | null;
   probableNote?: string | null;
+  /** Solo se indisponibile: espulso/squalificato, infortunato o altro motivo. */
+  probableAbsence?: "suspended" | "injured" | "other" | null;
   /** Non può essere aggiunto tra i titolari. Chi è già schierato resta finché non lo si toglie. */
   selectionBlocked?: boolean;
 }
