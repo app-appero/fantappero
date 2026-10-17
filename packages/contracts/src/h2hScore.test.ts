@@ -5,6 +5,7 @@ import {
   describeH2HResult,
   formatFantasyGoals,
   formatFantasyPoints,
+  playerVoteState,
   h2hResultAriaLabel,
 } from "./h2hScore.ts";
 import type { H2HMatchupScore } from "./leagues.ts";
@@ -152,5 +153,15 @@ describe("describeH2HResult (EP13-P02)", () => {
       label,
       "Roma FC contro Milan FC. Gol fantasy 2 – 1. Punti 72,5 – 68,0. Finale",
     );
+  });
+});
+
+describe("playerVoteState", () => {
+  it("marks S.V., provisional 6 LIVE and live votes", () => {
+    assert.deepEqual(playerVoteState({ fantasyScore: 7.5, fixtureStatusLabel: "Terminata" }), { kind: "voted", label: "7,5", live: false });
+    assert.deepEqual(playerVoteState({ fantasyScore: 6.5, fixtureStatusLabel: "LIVE" }), { kind: "live", label: "6,5 LIVE", live: true });
+    assert.deepEqual(playerVoteState({ fantasyScore: null, fixtureStatusLabel: "LIVE" }), { kind: "provisional", label: "6 LIVE", live: true });
+    assert.deepEqual(playerVoteState({ fantasyScore: null, fixtureStatusLabel: "Terminata" }), { kind: "sv", label: "S.V.", live: false });
+    assert.deepEqual(playerVoteState({ fantasyScore: null, fixtureStatusLabel: "Da giocare" }), { kind: "pending", label: null, live: false });
   });
 });

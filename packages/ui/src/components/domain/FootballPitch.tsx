@@ -21,6 +21,8 @@ export type PitchPlayer = {
   probableStarter?: boolean;
   /** Partita del giocatore in corso: alone blu lampeggiante. */
   live?: boolean;
+  /** `sv` = titolare senza voto (viola); `provisional` = 6 LIVE provvisorio (bollino tratteggiato). */
+  voteKind?: "sv" | "provisional" | null;
   /** Altri stati dalle formazioni probabili: possibile panchina (giallo), espulso (rosso), indisponibile (grigio). */
   probableState?: "bench" | "expelled" | "unavailable" | null;
   /** Countdown del prossimo blocco, sotto il nome. */
@@ -68,7 +70,15 @@ function PlayerPillBody({ player }: { player: PitchPlayer }) {
         <span className="fa-pitch-player__lock">{player.lockCountdown}</span>
       ) : null}
       {player.scoreLabel ? (
-        <span className="fa-pitch-player__score">{player.scoreLabel}</span>
+        <span
+          className={classNames(
+            "fa-pitch-player__score",
+            player.voteKind === "sv" && "fa-pitch-player__score--sv",
+            player.voteKind === "provisional" && "fa-pitch-player__score--provisional",
+          )}
+        >
+          {player.scoreLabel}
+        </span>
       ) : null}
     </>
   );
@@ -85,6 +95,7 @@ function PlayerPill({
     "fa-pitch-player",
     player.probableStarter && "fa-pitch-player--probable",
     player.live && "fa-pitch-player--live",
+    player.voteKind === "sv" && "fa-pitch-player--sv",
     player.probableState === "bench" && "fa-pitch-player--bench",
     player.probableState === "expelled" && "fa-pitch-player--expelled",
     player.probableState === "unavailable" && "fa-pitch-player--unavailable",
