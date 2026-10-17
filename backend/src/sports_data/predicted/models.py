@@ -42,7 +42,10 @@ class PredictedLineupSnapshot(Base, UUIDPrimaryKeyMixin, TimestampMixin):
         nullable=False,
         index=True,
     )
-    fotmob_match_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    #: Nullo per gli snapshot presi da Soccer-Oracle: lì non c'è un singolo
+    #: match FotMob (può essere ufficiale API-Sports o predicted FotMob per
+    #: giocatore, non per partita).
+    fotmob_match_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     lineup_type: Mapped[str] = mapped_column(String(16), nullable=False)
     source: Mapped[str | None] = mapped_column(String(64), nullable=True)
     reliability: Mapped[str] = mapped_column(String(32), nullable=False)
