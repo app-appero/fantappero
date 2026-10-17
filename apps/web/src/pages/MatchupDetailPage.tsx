@@ -4,6 +4,7 @@ import {
   H2H_POINTS_LABEL,
   describeH2HResult,
   fantasyBadgesFromBonusMalus,
+  playerVoteState,
   formatFantasyGoals,
   formatFantasyPoints,
   layoutFromModule,
@@ -111,13 +112,9 @@ const DEMO_DETAIL: H2HMatchupDetail = {
   },
 };
 
-/** `"7.5"`, `"7.5 LIVE"` mentre la partita reale del giocatore è in corso, o `null` se non ancora sceso in campo (§21). */
+/** `"7,5"`, `"6,5 LIVE"`, `"6 LIVE"` (provvisorio) o `"S.V."`; `null` se non ancora sceso in campo (§21). */
 function playerScoreLabel(player: H2HPlayerScore): string | null {
-  if (player.fantasyScore === null) {
-    return null;
-  }
-  const base = formatFantasyPoints(player.fantasyScore);
-  return player.fixtureStatusLabel === "LIVE" ? `${base} LIVE` : base;
+  return playerVoteState(player).label;
 }
 
 function toFantasyPitchPlayers(players: readonly H2HPlayerScore[]): PitchPlayer[] {
@@ -129,7 +126,11 @@ function toFantasyPitchPlayers(players: readonly H2HPlayerScore[]): PitchPlayer[
     badges: fantasyBadgesFromBonusMalus(player.bonusMalus ?? []),
     scoreLabel: playerScoreLabel(player),
     photoUrl: player.photoUrl,
-    live: player.fixtureStatusLabel === "LIVE",
+    live: playerVoteState(player).live,
+    voteKind: (() => {
+      const kind = playerVoteState(player).kind;
+      return kind === "sv" || kind === "provisional" ? kind : null;
+    })(),
   }));
 }
 
@@ -192,7 +193,16 @@ function SideBlock({ side, title }: { side: H2HSideLineup; title: string }) {
                       {scoreLabel ? (
                         <>
                           {" · "}
-                          <strong data-testid={`matchup-bench-player-score-${player.athleteId}`}>
+                          <strong
+                            data-testid={`matchup-bench-player-score-${player.athleteId}`}
+                            style={
+                              playerVoteState(player).kind === "sv"
+                                ? { color: "#c084fc" }
+                                : playerVoteState(player).kind === "provisional"
+                                  ? { color: "#60a5fa" }
+                                  : undefined
+                            }
+                          >
                             {scoreLabel}
                           </strong>
                         </>
