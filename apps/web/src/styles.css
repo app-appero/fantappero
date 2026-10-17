@@ -1502,6 +1502,25 @@ a.fa-member-list__identity:focus-visible {
     0 0 14px color-mix(in srgb, var(--fa-success-500) 70%, transparent);
 }
 
+.fa-bench-order__row--bench {
+  border-radius: 12px;
+  background: rgba(250, 204, 21, 0.14);
+  box-shadow: 0 0 0 2px #facc15, 0 0 14px rgba(250, 204, 21, 0.6);
+}
+
+.fa-bench-order__row--expelled {
+  border-radius: 12px;
+  background: rgba(239, 68, 68, 0.14);
+  box-shadow: 0 0 0 2px #ef4444, 0 0 14px rgba(239, 68, 68, 0.6);
+}
+
+.fa-bench-order__row--unavailable {
+  border-radius: 12px;
+  background: rgba(156, 163, 175, 0.14);
+  box-shadow: 0 0 0 2px #9ca3af;
+  filter: grayscale(1);
+}
+
 .fa-bench-order__lock {
   font-size: 0.75rem;
   font-weight: 700;

@@ -44,7 +44,7 @@ import {
   saveLineupDraft,
   saveMyLineup,
 } from "../api/leagues";
-import { BottomSheet, FormationPitch, PlayerPickerSheet, roleRingColor, type Candidate, type PitchSlot } from "./formation/FormationParts";
+import { BottomSheet, FormationLegend, FormationPitch, PlayerPickerSheet, TONE_COLOR, probableTone, roleRingColor, type Candidate, type PitchSlot } from "./formation/FormationParts";
 import { LockCountdown } from "../components/LockCountdown";
 import { OptionPicker } from "../components/OptionPicker";
 import { UiStatePanel } from "../components/UiStatePanel";
@@ -353,7 +353,11 @@ export function FormationScreen() {
     );
   };
   const playerBlocked = (athleteId: string) =>
-    roster.some((row) => row.athleteId === athleteId && row.selectionBlocked === true);
+    roster.some(
+      (row) =>
+        row.athleteId === athleteId &&
+        (row.selectionBlocked === true || row.probableAbsence === "suspended"),
+    );
   const playerScoreLabel = (athleteId: string): string | null => {
     const player = roster.find((row) => row.athleteId === athleteId);
     if (!player || player.fantasyScore == null) {
@@ -749,6 +753,10 @@ export function FormationScreen() {
       name: row ? row.athleteName : null,
       locked: athleteId ? playerLocked(athleteId) : false,
       probable: row?.probableHint === "starter",
+      probableState: row ? (() => {
+        const tone = probableTone(row);
+        return tone === "starter" ? null : tone;
+      })() : null,
       photoUrl: row?.photoUrl ?? null,
       lockCountdown: athleteId ? lockLabel(athleteId) : null,
       scoreLabel: athleteId ? playerScoreLabel(athleteId) : null,
@@ -842,7 +850,7 @@ export function FormationScreen() {
             if (isCurrent) {
               state = "titolare";
               stateLabel = "Schierato qui";
-            } else if (row.selectionBlocked) {
+            } else if (row.selectionBlocked || row.probableAbsence === "suspended") {
               state = "bloccato";
               stateLabel = row.probableNote ?? "Indisponibile";
             } else if (playerLocked(row.athleteId)) {
@@ -866,6 +874,7 @@ export function FormationScreen() {
               stateLabel,
               scoreLabel: playerScoreLabel(row.athleteId),
               current: isCurrent,
+              tone: probableTone(row),
             };
           })
       : [];
@@ -885,7 +894,7 @@ export function FormationScreen() {
             if (isCurrent) {
               state = "panchina";
               stateLabel = "Schierato qui";
-            } else if (row.selectionBlocked) {
+            } else if (row.selectionBlocked || row.probableAbsence === "suspended") {
               state = "bloccato";
               stateLabel = row.probableNote ?? "Indisponibile";
             } else if (locked) {
@@ -903,12 +912,30 @@ export function FormationScreen() {
               role: row.role,
               state,
               stateLabel,
+              tone: probableTone(row),
               scoreLabel: playerScoreLabel(row.athleteId),
               current: isCurrent,
             };
           })
       : [];
   const toolDisabled = busy || !editable;
+  const benchToneStyle = (row: (typeof roster)[number] | undefined) => {
+    const tone = row ? probableTone(row) : null;
+    if (!tone || tone === "starter") {
+      return null;
+    }
+    return {
+      opacity: 1,
+      borderColor: TONE_COLOR[tone],
+      borderWidth: 2,
+      backgroundColor:
+        tone === "bench"
+          ? "rgba(250, 204, 21, 0.16)"
+          : tone === "expelled"
+            ? "rgba(239, 68, 68, 0.16)"
+            : "rgba(156, 163, 175, 0.16)",
+    } as const;
+  };
 
   return (
     <PageContainer title="Formazione">
@@ -1047,6 +1074,7 @@ export function FormationScreen() {
           </View>
         ) : null}
 
+        <FormationLegend />
         <FormationPitch
           slots={pitchSlots}
           selectedIndex={pickerIndex}
@@ -1087,6 +1115,7 @@ export function FormationScreen() {
                   style={[
                     styles.benchRow,
                     row?.probableHint === "starter" ? styles.benchProbable : null,
+                    benchToneStyle(row),
                     benchPickerIndex === index ? styles.benchRowSelected : null,
                   ]}
                   testID={`formation-bench-${index}`}
@@ -1154,6 +1183,7 @@ export function FormationScreen() {
                         styles.benchRow,
                         styles.benchOverflow,
                         row?.probableHint === "starter" ? styles.benchProbable : null,
+                        benchToneStyle(row),
                       ]}
                       testID={`formation-bench-${index}`}
                     >

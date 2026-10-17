@@ -56,6 +56,8 @@ class AthleteProbable:
     hint: Literal["starter", "bench", "unavailable"]
     note: str
     blocked: bool
+    #: Solo per ``unavailable``: ``suspended`` = espulso/squalificato, ``injured``, ``other``.
+    absence: Literal["suspended", "injured", "other"] | None = None
 
 
 def latest_predicted_view(session: Session, fixture_id: UUID) -> PredictedView | None:
@@ -169,6 +171,7 @@ def _hint_for(player: PredictedLineupPlayer) -> AthleteProbable | None:
             hint="unavailable",
             note=label,
             blocked=player.blocks_selection,
+            absence=_absence_category(player.unavailability_type, label),
         )
     if player.is_starter:
         return AthleteProbable(hint="starter", note="Titolare probabile", blocked=False)
@@ -181,6 +184,18 @@ def _hint_rank(hint: str) -> int:
     if hint == "starter":
         return 2
     return 1
+
+
+def _absence_category(kind: str | None, label: str | None) -> Literal["suspended", "injured", "other"]:
+    normalized = (kind or "").strip().lower()
+    if normalized in {"suspension", "suspended", "red", "red_card", "redcard"}:
+        return "suspended"
+    if normalized == "injury":
+        return "injured"
+    text = (label or "").lower()
+    if "espuls" in text or "squalific" in text or "red card" in text or "suspen" in text:
+        return "suspended"
+    return "other"
 
 
 def _absence_label(kind: str | None) -> str:

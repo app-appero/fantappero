@@ -19,6 +19,8 @@ export type PitchPlayer = {
   athleteId?: string | null;
   /** Titolare probabile: anello e nome verde sul campo. */
   probableStarter?: boolean;
+  /** Altri stati dalle formazioni probabili: possibile panchina (giallo), espulso (rosso), indisponibile (grigio). */
+  probableState?: "bench" | "expelled" | "unavailable" | null;
   /** Countdown del prossimo blocco, sotto il nome. */
   lockCountdown?: string | null;
 };
@@ -80,6 +82,9 @@ function PlayerPill({
   const className = classNames(
     "fa-pitch-player",
     player.probableStarter && "fa-pitch-player--probable",
+    player.probableState === "bench" && "fa-pitch-player--bench",
+    player.probableState === "expelled" && "fa-pitch-player--expelled",
+    player.probableState === "unavailable" && "fa-pitch-player--unavailable",
   );
   if (player.athleteId && onAthletePress) {
     const athleteId = player.athleteId;
