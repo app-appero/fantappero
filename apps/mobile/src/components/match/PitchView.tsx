@@ -23,6 +23,8 @@ export type PitchPlayer = {
   athleteId?: string | null;
   /** Partita in corso: alone blu lampeggiante. */
   live?: boolean;
+  /** `sv` = titolare senza voto (viola vivo); `provisional` = 6 LIVE provvisorio (bollino tratteggiato). */
+  voteKind?: "sv" | "provisional" | null;
 };
 
 export type PitchViewProps = {
@@ -84,7 +86,7 @@ export function PitchView({ title, players, positions, testID, onAthletePress }:
 }
 
 /** Alone blu che pulsa mentre la partita del giocatore è in corso. */
-function LiveGlow() {
+function LiveGlow({ color = "#3b82f6", fill = "rgba(59,130,246,0.25)" }: { color?: string; fill?: string }) {
   const pulse = useRef(new Animated.Value(0)).current;
   useEffect(() => {
     const loop = Animated.loop(
@@ -101,6 +103,7 @@ function LiveGlow() {
       pointerEvents="none"
       style={[
         styles.liveGlow,
+        { borderColor: color, backgroundColor: fill },
         {
           opacity: pulse.interpolate({ inputRange: [0, 1], outputRange: [0.25, 1] }),
           transform: [{ scale: pulse.interpolate({ inputRange: [0, 1], outputRange: [1, 1.18] }) }],
@@ -122,8 +125,15 @@ function PitchPlayerBody({
       <View style={styles.badgesRow}>
         <EventBadges badges={player.badges ?? []} size={11} />
       </View>
-      <View style={[styles.card, player.live ? styles.cardLive : null]}>
+      <View
+        style={[
+          styles.card,
+          player.live ? styles.cardLive : null,
+          player.voteKind === "sv" ? styles.cardSv : null,
+        ]}
+      >
         {player.live ? <LiveGlow /> : null}
+        {player.voteKind === "sv" ? <LiveGlow color="#a855f7" fill="rgba(168,85,247,0.3)" /> : null}
         {player.photoUrl ? (
           <Image source={{ uri: player.photoUrl }} style={styles.photo} />
         ) : player.shirtNumber != null ? (
@@ -138,10 +148,20 @@ function PitchPlayerBody({
           <RoleBadge code={player.role} />
         </View>
       </View>
-      <Text style={styles.name} numberOfLines={1}>
+      <Text style={[styles.name, player.voteKind === "sv" ? styles.nameSv : null]} numberOfLines={1}>
         {abbreviateName(player.name)}
       </Text>
-      {player.scoreLabel ? <Text style={styles.score}>{player.scoreLabel}</Text> : null}
+      {player.scoreLabel ? (
+        <Text
+          style={[
+            styles.score,
+            player.voteKind === "sv" ? styles.scoreSv : null,
+            player.voteKind === "provisional" ? styles.scoreProvisional : null,
+          ]}
+        >
+          {player.scoreLabel}
+        </Text>
+      ) : null}
     </>
   );
   if (player.athleteId && onAthletePress) {
@@ -287,6 +307,21 @@ const styles = lazyStyles(() => StyleSheet.create({
     color: "#fff",
     fontSize: 9,
     textAlign: "center",
+  },
+  cardSv: { borderColor: "#c084fc", borderWidth: 2 },
+  nameSv: {
+    backgroundColor: "#7c3aed",
+    borderRadius: 999,
+    paddingHorizontal: 5,
+    overflow: "hidden",
+  },
+  scoreSv: { backgroundColor: "#7c3aed", color: "#fff" },
+  scoreProvisional: {
+    backgroundColor: "#2563eb",
+    color: "#fff",
+    borderWidth: 1,
+    borderStyle: "dashed",
+    borderColor: "rgba(255,255,255,0.8)",
   },
   score: {
     fontSize: 9,

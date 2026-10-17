@@ -49,6 +49,49 @@ export function formatFantasyGoals(value: number | null | undefined): string {
   return isMissing(value) ? H2H_VALUE_UNAVAILABLE : goalsFormatter.format(value);
 }
 
+/** Voto provvisorio mostrato mentre il provider non ha ancora un voto per chi sta giocando. */
+export const PROVISIONAL_LIVE_SCORE = 6;
+
+export type PlayerVoteKind = "voted" | "live" | "provisional" | "sv" | "pending";
+
+export interface PlayerVoteState {
+  kind: PlayerVoteKind;
+  /** Testo del bollino: `7,5`, `6,5 LIVE`, `6 LIVE`, `S.V.` oppure `null` se non ancora giocato. */
+  label: string | null;
+  /** Partita in corso: alone blu lampeggiante. */
+  live: boolean;
+}
+
+/**
+ * Stato del voto di un giocatore nello scontro:
+ * - voto presente → `voted` (o `live` se la sua partita è in corso);
+ * - partita in corso senza voto del provider → `provisional` (6 LIVE);
+ * - partita terminata senza voto (minutaggio insufficiente) → `sv`;
+ * - altrimenti `pending`.
+ */
+export function playerVoteState(player: {
+  fantasyScore?: number | null;
+  fixtureStatusLabel?: string | null;
+  scoreFinal?: boolean;
+}): PlayerVoteState {
+  const isLive = player.fixtureStatusLabel === "LIVE";
+  if (player.fantasyScore != null) {
+    const base = formatFantasyPoints(player.fantasyScore);
+    return { kind: isLive ? "live" : "voted", label: isLive ? `${base} LIVE` : base, live: isLive };
+  }
+  if (isLive) {
+    return {
+      kind: "provisional",
+      label: `${formatFantasyPoints(PROVISIONAL_LIVE_SCORE)} LIVE`.replace(",0", ""),
+      live: true,
+    };
+  }
+  if (player.fixtureStatusLabel === "Terminata" || player.scoreFinal === true) {
+    return { kind: "sv", label: "S.V.", live: false };
+  }
+  return { kind: "pending", label: null, live: false };
+}
+
 export type H2HResultStatus = "pending" | "provisional" | "final";
 
 export interface H2HResultDisplay {
