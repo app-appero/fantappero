@@ -44,6 +44,7 @@ function toFantasyPitchPlayers(players: readonly H2HPlayerScore[]) {
     badges: fantasyBadgesFromBonusMalus(player.bonusMalus ?? []),
     scoreLabel: playerScoreLabel(player),
     photoUrl: player.photoUrl,
+    live: player.fixtureStatusLabel === "LIVE",
   }));
 }
 

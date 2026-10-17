@@ -129,6 +129,7 @@ function toFantasyPitchPlayers(players: readonly H2HPlayerScore[]): PitchPlayer[
     badges: fantasyBadgesFromBonusMalus(player.bonusMalus ?? []),
     scoreLabel: playerScoreLabel(player),
     photoUrl: player.photoUrl,
+    live: player.fixtureStatusLabel === "LIVE",
   }));
 }
 
