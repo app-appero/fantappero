@@ -1229,6 +1229,27 @@ button.fa-app-header__league-action {
   color: #fff;
 }
 
+.fa-pitch-player--live .fa-pitch-player__card {
+  border-color: #60a5fa;
+  animation: fa-pitch-live 1.2s ease-in-out infinite;
+}
+
+@keyframes fa-pitch-live {
+  0%, 100% {
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.35), 0 0 6px 1px rgba(59, 130, 246, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 0 4px rgba(96, 165, 250, 0.95), 0 0 22px 8px rgba(59, 130, 246, 0.95);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fa-pitch-player--live .fa-pitch-player__card {
+    animation: none;
+    box-shadow: 0 0 0 4px rgba(96, 165, 250, 0.95), 0 0 16px 5px rgba(59, 130, 246, 0.8);
+  }
+}
+
 .fa-pitch-player--bench .fa-pitch-player__card {
   border-color: #facc15;
   box-shadow:
