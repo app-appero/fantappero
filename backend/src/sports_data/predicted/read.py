@@ -9,12 +9,17 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
+from fantasy_turns.models import FantasyRoundFixture
+from sports_data.catalog.models import Club
+from sports_data.fixtures.models import Fixture
 from sports_data.predicted.models import PredictedLineupPlayer, PredictedLineupSnapshot
+from sports_data.predicted.names import normalize_person
 from sports_data.predicted.validate import (
     RELIABILITY_PARTIAL,
     RELIABILITY_VALIDATED,
     USABLE_RELIABILITY,
 )
+from sports_data.roster.models import Athlete, SquadMembership
 
 
 @dataclass(frozen=True)
@@ -219,3 +224,220 @@ def _note(lineup_type: str, reliability: str) -> str:
     if reliability == RELIABILITY_PARTIAL:
         return f"{prefix} · verifica parziale sulla rosa"
     return f"{prefix} · non verificata sulla rosa, non usata in formazione"
+
+
+@dataclass(frozen=True)
+class HintDiagnosis:
+    """Perché un atleta ha (o non ha) un indizio di formazione probabile.
+
+    Solo per diagnosi operatore (pannello admin): non è sul percorso usato
+    dalla formazione vera e propria, quindi può permettersi query più
+    costose di ``hints_for_fixtures``.
+    """
+
+    athlete_id: UUID
+    athlete_name: str
+    club_name: str | None
+    fixture_id: UUID | None
+    hint: Literal["starter", "bench", "unavailable"] | None
+    reason: Literal[
+        "hinted",
+        "no_active_squad",
+        "no_fixture_in_round",
+        "no_snapshot_yet",
+        "snapshot_not_usable",
+        "unmapped_in_snapshot",
+    ]
+    detail: str
+    #: Nomi non abbinati nello snapshot che finiscono con lo stesso cognome
+    #: dell'atleta — spesso è proprio lui, scaricato con un nome diverso.
+    similar_unmatched_names: tuple[str, ...] = ()
+
+
+def diagnose_hints(
+    session: Session,
+    round_id: UUID,
+    athlete_ids: list[UUID],
+) -> tuple[HintDiagnosis, ...]:
+    if not athlete_ids:
+        return ()
+
+    athletes = {
+        row.id: row
+        for row in session.scalars(select(Athlete).where(Athlete.id.in_(athlete_ids))).all()
+    }
+
+    fixture_rows = session.execute(
+        select(FantasyRoundFixture.fixture_id, Fixture.home_club_id, Fixture.away_club_id)
+        .join(Fixture, Fixture.id == FantasyRoundFixture.fixture_id)
+        .where(
+            FantasyRoundFixture.round_id == round_id,
+            FantasyRoundFixture.excluded_at.is_(None),
+        )
+    ).all()
+    fixture_by_club: dict[UUID, UUID] = {}
+    fixture_ids: list[UUID] = []
+    for fixture_id, home_club_id, away_club_id in fixture_rows:
+        fixture_by_club[home_club_id] = fixture_id
+        fixture_by_club[away_club_id] = fixture_id
+        fixture_ids.append(fixture_id)
+
+    memberships = session.scalars(
+        select(SquadMembership).where(
+            SquadMembership.athlete_id.in_(athlete_ids),
+            SquadMembership.is_active.is_(True),
+        )
+    ).all()
+    club_by_athlete = {row.athlete_id: row.club_id for row in memberships}
+
+    club_ids = set(fixture_by_club) | set(club_by_athlete.values())
+    club_names: dict[UUID, str] = {}
+    if club_ids:
+        for row in session.scalars(select(Club).where(Club.id.in_(club_ids))).all():
+            club_names[row.id] = row.name
+
+    latest_by_fixture: dict[UUID, PredictedLineupSnapshot] = {}
+    if fixture_ids:
+        snapshots = session.scalars(
+            select(PredictedLineupSnapshot)
+            .where(PredictedLineupSnapshot.fixture_id.in_(fixture_ids))
+            .options(selectinload(PredictedLineupSnapshot.players))
+            .order_by(PredictedLineupSnapshot.fetched_at.desc())
+        ).all()
+        for snapshot in snapshots:
+            latest_by_fixture.setdefault(snapshot.fixture_id, snapshot)
+
+    results: list[HintDiagnosis] = []
+    for athlete_id in athlete_ids:
+        athlete = athletes.get(athlete_id)
+        athlete_name = athlete.canonical_name if athlete is not None else str(athlete_id)
+        club_id = club_by_athlete.get(athlete_id)
+        club_name = club_names.get(club_id) if club_id is not None else None
+
+        if club_id is None:
+            results.append(
+                HintDiagnosis(
+                    athlete_id=athlete_id,
+                    athlete_name=athlete_name,
+                    club_name=None,
+                    fixture_id=None,
+                    hint=None,
+                    reason="no_active_squad",
+                    detail="Nessuna rosa attiva trovata per questo atleta nella stagione corrente.",
+                )
+            )
+            continue
+
+        fixture_id = fixture_by_club.get(club_id)
+        if fixture_id is None:
+            results.append(
+                HintDiagnosis(
+                    athlete_id=athlete_id,
+                    athlete_name=athlete_name,
+                    club_name=club_name,
+                    fixture_id=None,
+                    hint=None,
+                    reason="no_fixture_in_round",
+                    detail=(
+                        f"Il club ({club_name or club_id}) non ha una partita collegata a "
+                        "questo turno: o è fuori dalla finestra sincronizzata, o la fixture "
+                        "non è ancora linkata al turno."
+                    ),
+                )
+            )
+            continue
+
+        snapshot = latest_by_fixture.get(fixture_id)
+        if snapshot is None:
+            results.append(
+                HintDiagnosis(
+                    athlete_id=athlete_id,
+                    athlete_name=athlete_name,
+                    club_name=club_name,
+                    fixture_id=fixture_id,
+                    hint=None,
+                    reason="no_snapshot_yet",
+                    detail=(
+                        "La partita è collegata al turno ma non è ancora stata scaricata "
+                        "nessuna formazione (né FotMob né Soccer-Oracle)."
+                    ),
+                )
+            )
+            continue
+
+        if snapshot.reliability not in USABLE_RELIABILITY:
+            results.append(
+                HintDiagnosis(
+                    athlete_id=athlete_id,
+                    athlete_name=athlete_name,
+                    club_name=club_name,
+                    fixture_id=fixture_id,
+                    hint=None,
+                    reason="snapshot_not_usable",
+                    detail=(
+                        f"L'ultimo snapshot ha affidabilità '{snapshot.reliability}' "
+                        f"(fonte: {snapshot.source or 'sconosciuta'}), troppo bassa per "
+                        "mostrare indizi su nessun giocatore di questa partita."
+                    ),
+                )
+            )
+            continue
+
+        player_row = next(
+            (player for player in snapshot.players if player.athlete_id == athlete_id),
+            None,
+        )
+        if player_row is None:
+            candidates = () if athlete is None else _similar_unmatched_names(snapshot, athlete)
+            detail = "Il giocatore non è stato abbinato in questo snapshot."
+            if candidates:
+                detail += f" Nomi non abbinati che somigliano: {', '.join(candidates)}."
+            results.append(
+                HintDiagnosis(
+                    athlete_id=athlete_id,
+                    athlete_name=athlete_name,
+                    club_name=club_name,
+                    fixture_id=fixture_id,
+                    hint=None,
+                    reason="unmapped_in_snapshot",
+                    detail=detail,
+                    similar_unmatched_names=candidates,
+                )
+            )
+            continue
+
+        hint = _hint_for(player_row)
+        hint_value = None if hint is None else hint.hint
+        results.append(
+            HintDiagnosis(
+                athlete_id=athlete_id,
+                athlete_name=athlete_name,
+                club_name=club_name,
+                fixture_id=fixture_id,
+                hint=hint_value,
+                reason="hinted" if hint_value is not None else "unmapped_in_snapshot",
+                detail=(
+                    f"Indizio presente: {hint_value} (fonte: {snapshot.source or 'sconosciuta'})."
+                    if hint_value is not None
+                    else "Il giocatore è nello snapshot ma senza un indizio derivabile."
+                ),
+            )
+        )
+    return tuple(results)
+
+
+def _similar_unmatched_names(
+    snapshot: PredictedLineupSnapshot, athlete: Athlete
+) -> tuple[str, ...]:
+    target = normalize_person(athlete.last_name or athlete.canonical_name).split()
+    last = target[-1] if target else ""
+    if not last:
+        return ()
+    seen: list[str] = []
+    for player in snapshot.players:
+        if player.athlete_id is not None:
+            continue
+        tokens = normalize_person(player.display_name).split()
+        if tokens and tokens[-1] == last and player.display_name not in seen:
+            seen.append(player.display_name)
+    return tuple(seen)
