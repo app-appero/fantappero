@@ -8,7 +8,9 @@ puntuali (una lega/turno specifico) restano sugli endpoint già esistenti in
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends
+from uuid import UUID
+
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
@@ -22,6 +24,7 @@ from admin.schemas import (
     AdminHistoricalRepairRequest,
     AdminHistoricalRepairResultResponse,
     AdminLeagueTurnStatusResponse,
+    AdminPredictedHintDiagnosisResponse,
     AdminResultRecoveryJobResponse,
     AdminResultRecoveryProgressResponse,
     AdminResultRecoveryResultResponse,
@@ -97,6 +100,46 @@ def refresh_predicted_lineups(
         requestsMade=int(payload.get("requests_made") or 0),
         message=payload.get("message") if isinstance(payload.get("message"), str) else None,
     )
+
+
+@router.get(
+    "/turni/probabili-formazioni/diagnosi",
+    response_model=list[AdminPredictedHintDiagnosisResponse],
+)
+def diagnose_predicted_lineup_hints(
+    fantasyTeamId: UUID,
+    roundId: UUID,
+    _operator: User = Depends(require_permissions(Permission.GLOBAL_OPERATE)),
+    session: Session = Depends(get_db_session),
+) -> list[AdminPredictedHintDiagnosisResponse]:
+    """Per ogni giocatore in rosa, perché ha (o non ha) un indizio di formazione
+    probabile: nessuna fixture collegata al turno, nessuno snapshot ancora
+    scaricato, snapshot scartato per affidabilità, o non abbinato dal provider.
+
+    Diagnostica, non usata dalla formazione vera e propria: query più ampie di
+    ``hints_for_fixtures``, apposta per spiegare un buco, non per servirlo veloce.
+    """
+    from fantasy_teams.models import FantasyTeam
+    from sports_data.predicted.read import diagnose_hints
+
+    team = session.get(FantasyTeam, fantasyTeamId)
+    if team is None:
+        raise HTTPException(status_code=404, detail="Squadra non trovata.")
+    athlete_ids = [slot.athlete_id for slot in team.slots if slot.athlete_id is not None]
+    diagnoses = diagnose_hints(session, roundId, athlete_ids)
+    return [
+        AdminPredictedHintDiagnosisResponse(
+            athleteId=str(diagnosis.athlete_id),
+            athleteName=diagnosis.athlete_name,
+            clubName=diagnosis.club_name,
+            fixtureId=None if diagnosis.fixture_id is None else str(diagnosis.fixture_id),
+            hint=diagnosis.hint,
+            reason=diagnosis.reason,
+            detail=diagnosis.detail,
+            similarUnmatchedNames=list(diagnosis.similar_unmatched_names),
+        )
+        for diagnosis in diagnoses
+    ]
 
 
 @router.post("/formazioni-ia/genera", response_model=AdminAiLineupsSyncResultResponse)

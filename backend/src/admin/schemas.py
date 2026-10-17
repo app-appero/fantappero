@@ -288,3 +288,23 @@ class AdminTransferReviewedResponse(ApiModel):
     id: str
     reviewed_at: datetime = Field(alias="reviewedAt")
     reviewed_by_user_id: str = Field(alias="reviewedByUserId")
+
+
+class AdminPredictedHintDiagnosisResponse(ApiModel):
+    """Perché un atleta ha (o non ha) un indizio di formazione probabile."""
+
+    athlete_id: str = Field(alias="athleteId")
+    athlete_name: str = Field(alias="athleteName")
+    club_name: str | None = Field(default=None, alias="clubName")
+    fixture_id: str | None = Field(default=None, alias="fixtureId")
+    hint: Literal["starter", "bench", "unavailable"] | None = None
+    reason: Literal[
+        "hinted",
+        "no_active_squad",
+        "no_fixture_in_round",
+        "no_snapshot_yet",
+        "snapshot_not_usable",
+        "unmapped_in_snapshot",
+    ]
+    detail: str
+    similar_unmatched_names: list[str] = Field(default_factory=list, alias="similarUnmatchedNames")
