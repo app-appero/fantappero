@@ -1,7 +1,8 @@
 import { lazyStyles } from "../../theme/lazyStyles";
 import type { MatchBadge, PitchPosition } from "@fantappero/contracts";
 import { theme } from "@fantappero/ui/theme";
-import { Image, Pressable, StyleSheet, Text, View } from "react-native";
+import { useEffect, useRef } from "react";
+import { Animated, Easing, Image, Pressable, StyleSheet, Text, View } from "react-native";
 import { EventBadges } from "./EventBadges";
 import { RoleBadge } from "./RoleBadge";
 
@@ -20,6 +21,10 @@ export type PitchPlayer = {
   photoUrl?: string | null;
   /** Id interno del calciatore, quando il pallino deve aprire la scheda. */
   athleteId?: string | null;
+  /** Partita in corso: alone blu lampeggiante. */
+  live?: boolean;
+  /** `sv` = titolare senza voto (viola vivo); `provisional` = 6 LIVE provvisorio (bollino tratteggiato). */
+  voteKind?: "sv" | "provisional" | null;
 };
 
 export type PitchViewProps = {
@@ -80,6 +85,34 @@ export function PitchView({ title, players, positions, testID, onAthletePress }:
   );
 }
 
+/** Alone blu che pulsa mentre la partita del giocatore è in corso. */
+function LiveGlow({ color = "#3b82f6", fill = "rgba(59,130,246,0.25)" }: { color?: string; fill?: string }) {
+  const pulse = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulse, { toValue: 1, duration: 600, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+        Animated.timing(pulse, { toValue: 0, duration: 600, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+      ]),
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [pulse]);
+  return (
+    <Animated.View
+      pointerEvents="none"
+      style={[
+        styles.liveGlow,
+        { borderColor: color, backgroundColor: fill },
+        {
+          opacity: pulse.interpolate({ inputRange: [0, 1], outputRange: [0.25, 1] }),
+          transform: [{ scale: pulse.interpolate({ inputRange: [0, 1], outputRange: [1, 1.18] }) }],
+        },
+      ]}
+    />
+  );
+}
+
 function PitchPlayerBody({
   player,
   onAthletePress,
@@ -92,7 +125,15 @@ function PitchPlayerBody({
       <View style={styles.badgesRow}>
         <EventBadges badges={player.badges ?? []} size={11} />
       </View>
-      <View style={styles.card}>
+      <View
+        style={[
+          styles.card,
+          player.live ? styles.cardLive : null,
+          player.voteKind === "sv" ? styles.cardSv : null,
+        ]}
+      >
+        {player.live ? <LiveGlow /> : null}
+        {player.voteKind === "sv" ? <LiveGlow color="#a855f7" fill="rgba(168,85,247,0.3)" /> : null}
         {player.photoUrl ? (
           <Image source={{ uri: player.photoUrl }} style={styles.photo} />
         ) : player.shirtNumber != null ? (
@@ -107,10 +148,20 @@ function PitchPlayerBody({
           <RoleBadge code={player.role} />
         </View>
       </View>
-      <Text style={styles.name} numberOfLines={1}>
+      <Text style={[styles.name, player.voteKind === "sv" ? styles.nameSv : null]} numberOfLines={1}>
         {abbreviateName(player.name)}
       </Text>
-      {player.scoreLabel ? <Text style={styles.score}>{player.scoreLabel}</Text> : null}
+      {player.scoreLabel ? (
+        <Text
+          style={[
+            styles.score,
+            player.voteKind === "sv" ? styles.scoreSv : null,
+            player.voteKind === "provisional" ? styles.scoreProvisional : null,
+          ]}
+        >
+          {player.scoreLabel}
+        </Text>
+      ) : null}
     </>
   );
   if (player.athleteId && onAthletePress) {
@@ -208,6 +259,18 @@ const styles = lazyStyles(() => StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+  cardLive: { borderColor: "#60a5fa", borderWidth: 2 },
+  liveGlow: {
+    position: "absolute",
+    top: -5,
+    left: -5,
+    right: -5,
+    bottom: -5,
+    borderRadius: 20,
+    borderWidth: 3,
+    borderColor: "#3b82f6",
+    backgroundColor: "rgba(59,130,246,0.25)",
+  },
   number: {
     color: colors.foreground,
     fontSize: 11,
@@ -244,6 +307,21 @@ const styles = lazyStyles(() => StyleSheet.create({
     color: "#fff",
     fontSize: 9,
     textAlign: "center",
+  },
+  cardSv: { borderColor: "#c084fc", borderWidth: 2 },
+  nameSv: {
+    backgroundColor: "#7c3aed",
+    borderRadius: 999,
+    paddingHorizontal: 5,
+    overflow: "hidden",
+  },
+  scoreSv: { backgroundColor: "#7c3aed", color: "#fff" },
+  scoreProvisional: {
+    backgroundColor: "#2563eb",
+    color: "#fff",
+    borderWidth: 1,
+    borderStyle: "dashed",
+    borderColor: "rgba(255,255,255,0.8)",
   },
   score: {
     fontSize: 9,

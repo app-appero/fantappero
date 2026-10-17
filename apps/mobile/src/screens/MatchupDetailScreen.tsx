@@ -5,6 +5,7 @@ import {
   H2H_POINTS_LABEL,
   describeH2HResult,
   fantasyBadgesFromBonusMalus,
+  playerVoteState,
   formatFantasyGoals,
   formatFantasyPoints,
   layoutFromModule,
@@ -26,13 +27,9 @@ import { getApiErrorMessage, useAuthSession } from "../session/DemoSessionContex
 
 const { colors, spacing, typography, radius } = theme;
 
-/** `"7.5"`, `"7.5 LIVE"` mentre la partita reale del giocatore è in corso (§21). */
+/** `"7,5"`, `"6,5 LIVE"`, `"6 LIVE"` (provvisorio) o `"S.V."`; `null` se non ancora sceso in campo (§21). */
 function playerScoreLabel(player: H2HPlayerScore): string | null {
-  if (player.fantasyScore === null) {
-    return null;
-  }
-  const base = formatFantasyPoints(player.fantasyScore);
-  return player.fixtureStatusLabel === "LIVE" ? `${base} LIVE` : base;
+  return playerVoteState(player).label;
 }
 
 function toFantasyPitchPlayers(players: readonly H2HPlayerScore[]) {
@@ -44,6 +41,11 @@ function toFantasyPitchPlayers(players: readonly H2HPlayerScore[]) {
     badges: fantasyBadgesFromBonusMalus(player.bonusMalus ?? []),
     scoreLabel: playerScoreLabel(player),
     photoUrl: player.photoUrl,
+    live: playerVoteState(player).live,
+    voteKind: (() => {
+      const kind = playerVoteState(player).kind;
+      return kind === "sv" || kind === "provisional" ? kind : null;
+    })(),
   }));
 }
 
@@ -60,7 +62,14 @@ function BenchRow({ player }: { player: H2HPlayerScore }) {
           ({player.role}) · {player.realTeamName ?? "Squadra reale non associata"}
         </Text>
         {scoreLabel ? (
-          <Text style={styles.body} testID={`matchup-bench-player-score-${player.athleteId}`}>
+          <Text
+            style={[
+              styles.body,
+              playerVoteState(player).kind === "sv" ? { color: "#c084fc", fontWeight: "700" } : null,
+              playerVoteState(player).kind === "provisional" ? { color: "#60a5fa", fontWeight: "700" } : null,
+            ]}
+            testID={`matchup-bench-player-score-${player.athleteId}`}
+          >
             {" "}
             · {scoreLabel}
           </Text>
