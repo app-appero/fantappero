@@ -1229,6 +1229,69 @@ button.fa-app-header__league-action {
   color: #fff;
 }
 
+.fa-pitch-player--bench .fa-pitch-player__card {
+  border-color: #facc15;
+  box-shadow:
+    0 0 0 3px rgba(250, 204, 21, 0.7),
+    0 0 18px 5px rgba(250, 204, 21, 0.85);
+}
+
+.fa-pitch-player--bench .fa-pitch-player__name {
+  background: #ca8a04;
+  color: #fff;
+}
+
+.fa-pitch-player--expelled .fa-pitch-player__card {
+  border-color: #f87171;
+  box-shadow:
+    0 0 0 3px rgba(239, 68, 68, 0.75),
+    0 0 18px 5px rgba(239, 68, 68, 0.85);
+}
+
+.fa-pitch-player--expelled .fa-pitch-player__name {
+  background: #dc2626;
+  color: #fff;
+}
+
+.fa-pitch-player--unavailable .fa-pitch-player__card {
+  border-color: #9ca3af;
+  filter: grayscale(1);
+  opacity: 0.8;
+}
+
+.fa-pitch-player--unavailable .fa-pitch-player__name {
+  background: #6b7280;
+  color: #fff;
+}
+
+.fa-formation-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  margin: 8px 0;
+  padding: 10px 14px;
+  border-radius: 14px;
+  border: 1px solid var(--fa-border, rgba(255, 255, 255, 0.16));
+  font-size: 13px;
+}
+
+.fa-formation-legend__item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.fa-formation-legend__dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+}
+
+.fa-formation-legend__dot--starter { background: #22c55e; box-shadow: 0 0 8px #22c55e; }
+.fa-formation-legend__dot--bench { background: #facc15; box-shadow: 0 0 8px #facc15; }
+.fa-formation-legend__dot--expelled { background: #ef4444; box-shadow: 0 0 8px #ef4444; }
+.fa-formation-legend__dot--unavailable { background: #9ca3af; }
+
 .fa-pitch-player__lock {
   font-size: 0.62rem;
   font-weight: 700;
