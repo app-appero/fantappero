@@ -93,6 +93,37 @@ class SportsDataSyncSettingsMixin:
             "Skip a fixture whose latest snapshot is newer than this, unless the run is manual."
         ),
     )
+    soccer_oracle_base_url: str | None = Field(
+        default=None,
+        validation_alias="SOCCER_ORACLE_BASE_URL",
+        description="Base URL of the Soccer-Oracle players API. Unset disables the integration.",
+    )
+    soccer_oracle_players_key: SecretStr | None = Field(
+        default=None,
+        validation_alias="SOCCER_ORACLE_PLAYERS_KEY",
+        description="X-Service-Key for the Soccer-Oracle players API. Never logged or returned.",
+    )
+    soccer_oracle_timeout_seconds: float = Field(
+        default=5.0,
+        validation_alias="SOCCER_ORACLE_TIMEOUT_SECONDS",
+        ge=1.0,
+        le=30.0,
+    )
+    soccer_oracle_max_retries: int = Field(
+        default=1,
+        validation_alias="SOCCER_ORACLE_MAX_RETRIES",
+        ge=0,
+        le=3,
+    )
+    soccer_oracle_min_confidence: float = Field(
+        default=0.6,
+        validation_alias="SOCCER_ORACLE_MIN_CONFIDENCE",
+        ge=0.0,
+        le=1.0,
+        description=(
+            "Minimum Soccer-Oracle mapping confidence to trust for probable-lineup hints."
+        ),
+    )
 
     @field_validator("rapidapi_key", mode="before")
     @classmethod
@@ -101,10 +132,30 @@ class SportsDataSyncSettingsMixin:
             return None
         return value
 
+    @field_validator("soccer_oracle_base_url", mode="before")
+    @classmethod
+    def _blank_soccer_oracle_base_url(cls, value: object) -> object:
+        if isinstance(value, str) and not value.strip():
+            return None
+        return value
+
+    @field_validator("soccer_oracle_players_key", mode="before")
+    @classmethod
+    def _blank_soccer_oracle_key(cls, value: object) -> object:
+        if isinstance(value, str) and not value.strip():
+            return None
+        return value
+
     def resolved_rapidapi_key(self) -> str | None:
         if self.rapidapi_key is None:
             return None
         value = self.rapidapi_key.get_secret_value().strip()
+        return value or None
+
+    def resolved_soccer_oracle_key(self) -> str | None:
+        if self.soccer_oracle_players_key is None:
+            return None
+        value = self.soccer_oracle_players_key.get_secret_value().strip()
         return value or None
 
     @field_validator(

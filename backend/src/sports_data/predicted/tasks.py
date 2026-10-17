@@ -11,6 +11,7 @@ from config.settings import get_api_settings
 from database.session import create_engine_from_url, create_session_factory, session_scope
 from observability.logging import get_logger
 from sports_data.predicted.client import FotmobClient
+from sports_data.predicted.oracle_client import SoccerOracleClient
 from sports_data.predicted.sync import PredictedSyncSummary, sync_predicted_lineups
 
 logger = get_logger(__name__)
@@ -57,6 +58,17 @@ def run_predicted_lineup_sync(
             max_retries=settings.fotmob_max_retries,
         )
     )
+    oracle_key = settings.resolved_soccer_oracle_key()
+    oracle = (
+        None
+        if oracle_key is None or not settings.soccer_oracle_base_url
+        else SoccerOracleClient(
+            oracle_key,
+            base_url=settings.soccer_oracle_base_url,
+            timeout_seconds=settings.soccer_oracle_timeout_seconds,
+            max_retries=settings.soccer_oracle_max_retries,
+        )
+    )
     engine = create_engine_from_url(settings.database_url)
     factory = create_session_factory(engine)
     try:
@@ -69,10 +81,14 @@ def run_predicted_lineup_sync(
                 force=force,
                 league_id=None if league_id is None else UUID(league_id),
                 min_age=timedelta(hours=settings.predicted_lineups_min_age_hours),
+                oracle=oracle,
+                oracle_min_confidence=settings.soccer_oracle_min_confidence,
             )
     finally:
         if client is not None:
             client.close()
+        if oracle is not None:
+            oracle.close()
         engine.dispose()
     return _summary_payload(summary)
 

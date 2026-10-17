@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from uuid import UUID
 
 from sqlalchemy import or_, select
@@ -18,7 +18,19 @@ from sports_data.predicted.models import (
     PredictedLineupPlayer,
     PredictedLineupSnapshot,
 )
-from sports_data.predicted.names import SquadPlayer, clubs_match, match_squad_player
+from sports_data.predicted.names import (
+    SquadPlayer,
+    clubs_match,
+    match_squad_player,
+    normalize_person,
+)
+from sports_data.predicted.oracle_client import SoccerOracleClient, SoccerOracleError
+from sports_data.predicted.oracle_parse import (
+    OracleFixtureLineup,
+    OraclePlayer,
+    OracleTeam,
+    parse_oracle_lineups_response,
+)
 from sports_data.predicted.parse import (
     ParsedLineup,
     ParsedMatchRef,
@@ -28,7 +40,10 @@ from sports_data.predicted.parse import (
     parse_matches_by_date,
 )
 from sports_data.predicted.validate import (
+    RELIABILITY_PARTIAL,
     RELIABILITY_REJECTED,
+    RELIABILITY_UNVERIFIED,
+    RELIABILITY_VALIDATED,
     blocks_selection,
     check_side,
     classify_reliability,
@@ -36,9 +51,10 @@ from sports_data.predicted.validate import (
     side_starters,
     starter_key,
 )
-from sports_data.roster.models import SquadMembership
+from sports_data.roster.models import Athlete, SquadMembership
 
 logger = get_logger(__name__)
+_ORACLE_LINEUPS_BATCH_SIZE = 50
 
 UPCOMING_STATUSES = ("NS", "TBD", "PST", "SUSP")
 _MISSING_KEY = "Chiave RapidAPI assente: le formazioni probabili non sono state aggiornate."
@@ -67,10 +83,18 @@ def sync_predicted_lineups(
     force: bool = False,
     league_id: UUID | None = None,
     min_age: timedelta = timedelta(hours=20),
+    oracle: SoccerOracleClient | None = None,
+    oracle_min_confidence: float = 0.6,
 ) -> PredictedSyncSummary:
-    """Aggiorna le partite non iniziate della finestra. Senza client non chiama nulla."""
+    """Aggiorna le partite non iniziate della finestra.
+
+    Se ``oracle`` è configurato, le formazioni arrivano da Soccer-Oracle
+    (ID esatti invece dell'abbinamento per nome). Se l'API non risponde o la
+    chiave manca, si ricade sull'abbinamento FotMob per nome di sempre.
+    Senza né client né oracle non si chiama nulla.
+    """
     summary = PredictedSyncSummary()
-    if client is None:
+    if client is None and oracle is None:
         summary.message = _MISSING_KEY
         return summary
     moment = now or datetime.now(UTC)
@@ -84,19 +108,36 @@ def sync_predicted_lineups(
         pending.append(fixture)
     pending = pending[: max(0, max_lineup_calls)]
 
-    by_date: dict[str, tuple[ParsedMatchRef, ...] | None] = {}
-    try:
-        for fixture in pending:
-            _sync_one(session, client, fixture, by_date=by_date, summary=summary, now=moment)
-    except FotmobError as exc:
-        if exc.status in {401, 403}:
-            summary.message = "Il provider ha rifiutato l'accesso alle formazioni probabili."
-            logger.warning("fotmob_auth_failed", extra={"status": exc.status})
+    remaining = pending
+    if oracle is not None:
+        try:
+            _sync_via_oracle(session, oracle, pending, summary, moment, oracle_min_confidence)
+            remaining = []
+        except SoccerOracleError:
+            logger.warning("soccer_oracle_sync_unavailable_falling_back_to_fotmob", exc_info=True)
+            remaining = pending
+
+    if remaining:
+        if client is None:
+            summary.message = _MISSING_KEY
         else:
-            summary.warnings += 1
-            summary.message = "Aggiornamento interrotto: il provider non ha risposto."
-            logger.warning("fotmob_sync_failed", extra={"status": exc.status})
-    summary.requests_made = client.requests_made
+            by_date: dict[str, tuple[ParsedMatchRef, ...] | None] = {}
+            try:
+                for fixture in remaining:
+                    _sync_one(
+                        session, client, fixture, by_date=by_date, summary=summary, now=moment
+                    )
+            except FotmobError as exc:
+                if exc.status in {401, 403}:
+                    summary.message = (
+                        "Il provider ha rifiutato l'accesso alle formazioni probabili."
+                    )
+                    logger.warning("fotmob_auth_failed", extra={"status": exc.status})
+                else:
+                    summary.warnings += 1
+                    summary.message = "Aggiornamento interrotto: il provider non ha risposto."
+                    logger.warning("fotmob_sync_failed", extra={"status": exc.status})
+            summary.requests_made = client.requests_made
     logger.info(
         "fotmob_predicted_lineups_synced",
         extra={
@@ -107,6 +148,42 @@ def sync_predicted_lineups(
         },
     )
     return summary
+
+
+def _sync_via_oracle(
+    session: Session,
+    oracle: SoccerOracleClient,
+    fixtures: list[Fixture],
+    summary: PredictedSyncSummary,
+    now: datetime,
+    min_confidence: float,
+) -> None:
+    """Interamente o niente: se una chiamata fallisce, il chiamante ricade su FotMob."""
+    if not fixtures:
+        return
+    by_provider_id = {fixture.provider_id: fixture for fixture in fixtures}
+    provider_ids = list(by_provider_id)
+    pending_links: list[dict[str, object]] = []
+    for start in range(0, len(provider_ids), _ORACLE_LINEUPS_BATCH_SIZE):
+        batch = provider_ids[start : start + _ORACLE_LINEUPS_BATCH_SIZE]
+        payload = oracle.lineups(batch, prefer="predicted")
+        parsed = parse_oracle_lineups_response(payload)
+        for provider_id in batch:
+            fixture = by_provider_id[provider_id]
+            _store_oracle_snapshot(
+                session,
+                fixture,
+                parsed.get(provider_id),
+                summary,
+                now,
+                min_confidence,
+                pending_links,
+            )
+    if pending_links:
+        try:
+            oracle.links_bulk(pending_links)
+        except SoccerOracleError:
+            logger.warning("soccer_oracle_links_bulk_failed", exc_info=True)
 
 
 def _candidate_fixtures(
@@ -477,6 +554,283 @@ def _add_player(
             if is_unavailable
             else False,
             grid=grid,
+            sort_order=sort_order,
+        )
+    )
+
+
+@dataclass(frozen=True)
+class _OracleSquadMember:
+    """Rosa interna con maglia e data di nascita, per il riscontro dei giocatori
+    che Soccer-Oracle segnala come ``mapped=false``."""
+
+    athlete_id: UUID
+    provider_id: int
+    last_name: str
+    shirt_number: int | None
+    birth_date: date | None
+
+
+def _oracle_squad(session: Session, club_id: UUID, season_id: UUID) -> list[_OracleSquadMember]:
+    rows = session.scalars(
+        select(SquadMembership)
+        .where(
+            SquadMembership.club_id == club_id,
+            SquadMembership.sport_season_id == season_id,
+            SquadMembership.is_active.is_(True),
+        )
+        .options(selectinload(SquadMembership.athlete))
+    ).all()
+    return [
+        _OracleSquadMember(
+            athlete_id=row.athlete_id,
+            provider_id=row.athlete.provider_id,
+            last_name=_oracle_last_name(row.athlete),
+            shirt_number=row.shirt_number,
+            birth_date=row.athlete.birth_date,
+        )
+        for row in rows
+        if row.athlete is not None
+    ]
+
+
+def _oracle_last_name(athlete: Athlete) -> str:
+    explicit = normalize_person(athlete.last_name)
+    if explicit:
+        return explicit
+    parts = normalize_person(athlete.canonical_name).split()
+    return parts[-1] if parts else ""
+
+
+def _confident_shirt_match(
+    name: str,
+    shirt_number: int | None,
+    squad: list[_OracleSquadMember],
+) -> _OracleSquadMember | None:
+    """Maglia + cognome, univoco: l'unico indizio forte che possiamo mandare
+    indietro a Soccer-Oracle per un giocatore che loro segnano come non abbinato."""
+    if shirt_number is None:
+        return None
+    tokens = normalize_person(name).split()
+    if not tokens:
+        return None
+    target_last = tokens[-1]
+    candidates = [
+        member
+        for member in squad
+        if member.shirt_number == shirt_number and member.last_name == target_last
+    ]
+    if len(candidates) == 1:
+        return candidates[0]
+    return None
+
+
+def _team_for_club(teams: tuple[OracleTeam, ...], club_provider_id: int) -> OracleTeam | None:
+    for team in teams:
+        if team.team_api_id == club_provider_id:
+            return team
+    return None
+
+
+def _count_oracle_mapped(team: OracleTeam | None, min_confidence: float) -> tuple[int, int]:
+    if team is None:
+        return 0, 0
+    total = len(team.starters)
+    mapped = sum(
+        1 for player in team.starters if player.mapped and player.confidence >= min_confidence
+    )
+    return mapped, total
+
+
+def _store_oracle_snapshot(
+    session: Session,
+    fixture: Fixture,
+    lineup: OracleFixtureLineup | None,
+    summary: PredictedSyncSummary,
+    now: datetime,
+    min_confidence: float,
+    pending_links: list[dict[str, object]],
+) -> None:
+    if lineup is None or lineup.lineup_type is None or not lineup.teams:
+        return
+    home_team = _team_for_club(lineup.teams, fixture.home_club.provider_id)
+    away_team = _team_for_club(lineup.teams, fixture.away_club.provider_id)
+    if home_team is None and away_team is None:
+        return
+
+    home_mapped, home_total = _count_oracle_mapped(home_team, min_confidence)
+    away_mapped, away_total = _count_oracle_mapped(away_team, min_confidence)
+    total_starters = home_total + away_total
+    total_mapped = home_mapped + away_mapped
+    warnings: list[str] = []
+    if lineup.unmapped_starters:
+        warnings.append(f"oracle_unmapped_starters:{lineup.unmapped_starters}")
+    if total_starters == 0:
+        reliability_code = RELIABILITY_REJECTED
+    elif total_mapped == total_starters:
+        reliability_code = RELIABILITY_VALIDATED
+    elif total_mapped > 0:
+        reliability_code = RELIABILITY_PARTIAL
+    else:
+        reliability_code = RELIABILITY_UNVERIFIED
+
+    snapshot = PredictedLineupSnapshot(
+        fixture_id=fixture.id,
+        fotmob_match_id=None,
+        lineup_type="confirmed" if lineup.lineup_type == "official" else "predicted",
+        source=f"soccer_oracle:{lineup.source or 'unknown'}",
+        reliability=reliability_code,
+        warning_codes=warnings,
+        home_formation=None if home_team is None else home_team.formation,
+        away_formation=None if away_team is None else away_team.formation,
+        home_coach=None,
+        away_coach=None,
+        fetched_at=now,
+    )
+    session.add(snapshot)
+    session.flush()
+
+    home_squad = _oracle_squad(session, fixture.home_club_id, fixture.sport_season_id)
+    away_squad = _oracle_squad(session, fixture.away_club_id, fixture.sport_season_id)
+    _add_oracle_team(
+        session,
+        snapshot,
+        home_team,
+        side="home",
+        club_id=fixture.home_club_id,
+        squad=home_squad,
+        kickoff_at=fixture.kickoff_at,
+        min_confidence=min_confidence,
+        pending_links=pending_links,
+    )
+    _add_oracle_team(
+        session,
+        snapshot,
+        away_team,
+        side="away",
+        club_id=fixture.away_club_id,
+        squad=away_squad,
+        kickoff_at=fixture.kickoff_at,
+        min_confidence=min_confidence,
+        pending_links=pending_links,
+    )
+    summary.snapshots_saved += 1
+    summary.warnings += len(warnings)
+    if reliability_code == RELIABILITY_REJECTED:
+        summary.rejected += 1
+
+
+def _add_oracle_team(
+    session: Session,
+    snapshot: PredictedLineupSnapshot,
+    team: OracleTeam | None,
+    *,
+    side: str,
+    club_id: UUID,
+    squad: list[_OracleSquadMember],
+    kickoff_at: datetime | None,
+    min_confidence: float,
+    pending_links: list[dict[str, object]],
+) -> None:
+    if team is None:
+        return
+    order = 0
+    for is_starter, is_unavailable, players in (
+        (True, False, team.starters),
+        (False, False, team.bench),
+        (False, True, team.unavailable),
+    ):
+        for player in players:
+            order += 1
+            _add_oracle_player(
+                session,
+                snapshot,
+                player,
+                side=side,
+                club_id=club_id,
+                squad=squad,
+                kickoff_at=kickoff_at,
+                is_starter=is_starter,
+                is_unavailable=is_unavailable,
+                min_confidence=min_confidence,
+                sort_order=order,
+                pending_links=pending_links,
+            )
+
+
+def _add_oracle_player(
+    session: Session,
+    snapshot: PredictedLineupSnapshot,
+    player: OraclePlayer,
+    *,
+    side: str,
+    club_id: UUID,
+    squad: list[_OracleSquadMember],
+    kickoff_at: datetime | None,
+    is_starter: bool,
+    is_unavailable: bool,
+    min_confidence: float,
+    sort_order: int,
+    pending_links: list[dict[str, object]],
+) -> None:
+    athlete_id: UUID | None = None
+    if player.mapped and player.confidence >= min_confidence and player.api_sports_id is not None:
+        athlete = session.scalar(select(Athlete).where(Athlete.provider_id == player.api_sports_id))
+        if athlete is not None:
+            athlete_id = athlete.id
+    if athlete_id is None:
+        own_match = _confident_shirt_match(player.name, player.shirt_number, squad)
+        if own_match is not None:
+            athlete_id = own_match.athlete_id
+            if player.fotmob_id is not None:
+                pending_links.append(
+                    {
+                        "api_sports_id": own_match.provider_id,
+                        "fotmob_id": player.fotmob_id,
+                        "name": player.name,
+                        "birth_date": (
+                            own_match.birth_date.isoformat()
+                            if own_match.birth_date is not None
+                            else None
+                        ),
+                    }
+                )
+
+    expected = player.absence_expected_return_at
+    kickoff = kickoff_at
+    if (
+        expected is not None
+        and kickoff is not None
+        and (expected.tzinfo is None or kickoff.tzinfo is None)
+    ):
+        expected = None
+    session.add(
+        PredictedLineupPlayer(
+            snapshot_id=snapshot.id,
+            club_id=club_id,
+            athlete_id=athlete_id,
+            side=side,
+            display_name=player.name[:160],
+            shirt_number=player.shirt_number,
+            fotmob_player_id=player.fotmob_id,
+            is_starter=is_starter,
+            is_unavailable=is_unavailable,
+            unavailability_type=None if not is_unavailable else player.absence_type,
+            unavailability_label=(
+                None
+                if not is_unavailable or player.absence_label is None
+                else player.absence_label[:160]
+            ),
+            blocks_selection=blocks_selection(
+                mapped=athlete_id is not None,
+                unavailability_type=player.absence_type,
+                uncertain=player.absence_uncertain,
+                expected_return_at=expected,
+                kickoff_at=kickoff,
+            )
+            if is_unavailable
+            else False,
+            grid=None,
             sort_order=sort_order,
         )
     )
