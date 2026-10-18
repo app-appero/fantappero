@@ -20,6 +20,9 @@ export function RosterCreditsPanel({
   onAdminAdjust,
   adjustMessage,
   adjustError,
+  teamName,
+  filledSlots,
+  rosterSize,
 }: {
   isAdmin: boolean;
   leagueTeams: FantasyTeamSummary[];
@@ -36,6 +39,9 @@ export function RosterCreditsPanel({
   onAdminAdjust: () => void | Promise<void>;
   adjustMessage: string | null;
   adjustError: string | null;
+  teamName?: string | null;
+  filledSlots?: number | null;
+  rosterSize?: number | null;
 }) {
   const [open, setOpen] = useState(false);
 
@@ -65,11 +71,40 @@ export function RosterCreditsPanel({
           })}
         </ScrollView>
       ) : null}
-      <View style={styles.creditsRow}>
-        <Text style={styles.creditsBalance} testID="roster-credits-balance" numberOfLines={1}>
-          Crediti residui: {credits?.balance ?? "—"}
-        </Text>
-        {isAdmin ? (
+      <View style={styles.heroCard}>
+        {teamName ? (
+          <View style={styles.heroTop}>
+            <Text style={styles.heroName} numberOfLines={1}>
+              {teamName}
+            </Text>
+            {isAdmin ? (
+              <Pressable
+                style={styles.creditsButton}
+                onPress={() => setOpen(true)}
+                testID="roster-admin-credits"
+              >
+                <Text style={styles.creditsButtonLabel}>Aggiusta crediti</Text>
+              </Pressable>
+            ) : null}
+          </View>
+        ) : null}
+        <View style={styles.heroRow}>
+          <View>
+            <Text style={styles.heroLabel}>Crediti residui</Text>
+            <Text style={styles.heroBalance} testID="roster-credits-balance" numberOfLines={1}>
+              {credits?.balance ?? "—"}
+            </Text>
+          </View>
+          {filledSlots != null && rosterSize != null ? (
+            <View>
+              <Text style={styles.heroLabel}>Giocatori</Text>
+              <Text style={styles.heroSlots}>
+                {filledSlots}/{rosterSize}
+              </Text>
+            </View>
+          ) : null}
+        </View>
+        {!teamName && isAdmin ? (
           <Pressable
             style={styles.creditsButton}
             onPress={() => setOpen(true)}
