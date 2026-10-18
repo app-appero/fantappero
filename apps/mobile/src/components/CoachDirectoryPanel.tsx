@@ -194,20 +194,22 @@ export function CoachDirectoryPanel({
 
   return (
     <View style={styles.section} testID={loadError ? undefined : `${testIDPrefix}-success`}>
-      <TextInput
-        value={query}
-        onChangeText={setQuery}
-        placeholder="Cerca per nome o email"
-        placeholderTextColor={colors.foregroundMuted}
-        autoCapitalize="none"
-        autoCorrect={false}
-        style={styles.search}
-        testID={`${testIDPrefix}-search`}
-      />
-      <Text style={styles.hint}>
-        Tutti i fantallenatori della piattaforma, non solo quelli di questa lega.
-        {capacity > 0 ? ` Posti ${memberCount}/${capacity}.` : ""}
-      </Text>
+      <View style={styles.panel}>
+        <TextInput
+          value={query}
+          onChangeText={setQuery}
+          placeholder="Cerca per nome o email"
+          placeholderTextColor={colors.foregroundMuted}
+          autoCapitalize="none"
+          autoCorrect={false}
+          style={styles.search}
+          testID={`${testIDPrefix}-search`}
+        />
+        <Text style={styles.hint}>
+          Tutti i fantallenatori della piattaforma, non solo quelli di questa lega.
+          {capacity > 0 ? ` Posti ${memberCount}/${capacity}.` : ""}
+        </Text>
+      </View>
       {loading ? (
         <UiStatePanel
           state="loading"
@@ -268,7 +270,11 @@ export function CoachDirectoryPanel({
           testID={`${testIDPrefix}-empty`}
         />
       ) : (
-        items.map((coach) => {
+        <>
+        <Text style={styles.count} testID={`${testIDPrefix}-count`}>
+          {items.length} {items.length === 1 ? "fantallenatore" : "fantallenatori"}
+        </Text>
+        {items.map((coach) => {
           const pending = coach.namedInviteStatus === "pending";
           const unavailable = !coach.availableForInvites;
           const inLeague = coach.inLeague === true;
@@ -295,19 +301,28 @@ export function CoachDirectoryPanel({
                     : "Invita";
           return (
             <View key={coach.userId} style={styles.card}>
-              <CoachAvatar name={coach.displayName} avatarUrl={coach.avatarUrl} />
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel={`Apri il profilo di ${coach.displayName}`}
                 onPress={() => openProfile(coach)}
-                style={styles.identity}
+                style={styles.cardTop}
                 testID={`${testIDPrefix}-open-${coach.userId}`}
               >
-                <Text style={styles.name}>{coach.displayName}</Text>
-                <Text style={styles.status}>{coach.email}</Text>
-                <Text style={styles.status}>
-                  {coach.userType === "ai" ? "IA" : "Manuale"} ·{" "}
-                  {isSelf
+                <CoachAvatar name={coach.displayName} avatarUrl={coach.avatarUrl} />
+                <View style={styles.identity}>
+                  <Text style={styles.name}>{coach.displayName}</Text>
+                  <Text style={styles.email}>{coach.email}</Text>
+                </View>
+              </Pressable>
+              <View style={styles.chips}>
+                <Text style={styles.chip}>{coach.userType === "ai" ? "IA" : "MANUALE"}</Text>
+                <Text
+                  style={[
+                    styles.chip,
+                    isSelf || inLeague || unverified || unavailable ? styles.chipMuted : styles.chipOk,
+                  ]}
+                >
+                  {(isSelf
                     ? "Sei tu"
                     : inLeague
                       ? "Già in lega"
@@ -315,13 +330,14 @@ export function CoachDirectoryPanel({
                         ? "Email non verificata"
                         : coach.availableForInvites
                           ? "Disponibile"
-                          : "Non disponibile"}
-                  {coach.memberSince ? ` · dal ${coach.memberSince}` : ""}
+                          : "Non disponibile"
+                  ).toUpperCase()}
                 </Text>
-                <Text style={styles.status} testID={`${testIDPrefix}-history-${coach.userId}`}>
-                  {coach.historySummary}
-                </Text>
-              </Pressable>
+                {coach.memberSince ? <Text style={styles.since}>dal {coach.memberSince}</Text> : null}
+              </View>
+              <Text style={styles.history} testID={`${testIDPrefix}-history-${coach.userId}`}>
+                {coach.historySummary}
+              </Text>
               <Pressable
                 accessibilityRole="button"
                 disabled={inviteBlocked}
@@ -333,7 +349,8 @@ export function CoachDirectoryPanel({
               </Pressable>
             </View>
           );
-        })
+        })}
+        </>
       )}
         </>
       ) : null}
@@ -358,23 +375,72 @@ const styles = lazyStyles(() => StyleSheet.create({
     color: colors.foreground,
     backgroundColor: colors.background,
   },
+  panel: {
+    gap: spacing.sm,
+    padding: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.xl,
+    backgroundColor: colors.backgroundElevated,
+    marginBottom: spacing.sm,
+  },
+  count: {
+    color: colors.foreground,
+    fontSize: typography.fontSize.xl,
+    fontStyle: "italic",
+    fontWeight: "800",
+    textTransform: "uppercase",
+    marginTop: spacing.xs,
+  },
   card: {
     padding: spacing.md,
     borderWidth: 1,
     borderColor: colors.border,
     borderRadius: radius.xl,
     backgroundColor: colors.backgroundElevated,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
     gap: spacing.sm,
+    marginBottom: spacing.xs,
+  },
+  cardTop: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: spacing.md,
   },
   identity: {
     flex: 1,
+    minWidth: 0,
+    gap: 2,
   },
+  email: {
+    color: colors.foregroundMuted,
+    fontSize: typography.fontSize.sm,
+    flexShrink: 1,
+  },
+  chips: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    alignItems: "center",
+    gap: spacing.xs,
+  },
+  chip: {
+    color: colors.foreground,
+    fontSize: 11,
+    fontWeight: "700",
+    letterSpacing: 0.6,
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+    borderRadius: 999,
+    overflow: "hidden",
+    backgroundColor: "rgba(255,255,255,0.1)",
+  },
+  chipOk: { backgroundColor: "rgba(52,211,153,0.22)", color: colors.success },
+  chipMuted: { backgroundColor: "rgba(156,163,175,0.2)" },
+  since: { color: colors.foregroundMuted, fontSize: typography.fontSize.sm },
+  history: { color: colors.foregroundMuted, fontSize: typography.fontSize.sm },
   name: {
     color: colors.foreground,
-    fontWeight: typography.fontWeight.semibold,
+    fontWeight: "700",
+    fontSize: typography.fontSize.lg,
   },
   status: {
     color: colors.foregroundMuted,
@@ -382,8 +448,10 @@ const styles = lazyStyles(() => StyleSheet.create({
     marginTop: spacing.xs,
   },
   button: {
+    minHeight: 46,
+    alignItems: "center",
+    justifyContent: "center",
     paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
     borderRadius: radius.pill,
     backgroundColor: colors.brand,
   },
@@ -404,14 +472,14 @@ const styles = lazyStyles(() => StyleSheet.create({
     fontWeight: typography.fontWeight.semibold,
   },
   avatarImage: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
   },
   avatarPlaceholder: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: colors.brand,

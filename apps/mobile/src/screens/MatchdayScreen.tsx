@@ -18,6 +18,7 @@ import { useNavigation, type NavigationProp } from "@react-navigation/core";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   View,
@@ -421,7 +422,12 @@ export function MatchdayScreen() {
               </Pressable>
             ) : null}
             {fixtureFilter === "all" ? (
-              <View style={styles.chipRow} testID="matchday-competition-tabs">
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.chipScroll}
+                testID="matchday-competition-tabs"
+              >
                 {[...groupFixtures(selected.fixtures).keys()].map((competition) => (
                   <Pressable
                     key={competition}
@@ -432,7 +438,7 @@ export function MatchdayScreen() {
                     <Text style={styles.chipLabel}>{competition}</Text>
                   </Pressable>
                 ))}
-              </View>
+              </ScrollView>
             ) : null}
             {(fixtureFilter === "unplayed"
               ? selected.fixtures.filter((fixture) => isUnplayedFixtureStatus(fixture.statusShort))
@@ -579,6 +585,12 @@ const styles = lazyStyles(() => StyleSheet.create({
     borderColor: colors.border,
     borderRadius: radius.pill,
     padding: spacing.sm,
+  },
+  chipScroll: {
+    flexDirection: "row",
+    gap: spacing.sm,
+    paddingVertical: spacing.xs,
+    paddingRight: spacing.md,
   },
   chipRow: {
     flexDirection: "row",
