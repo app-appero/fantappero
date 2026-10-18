@@ -1,4 +1,5 @@
 import type { AthleteCard } from "@fantappero/contracts";
+import { formatFantasyPoints } from "@fantappero/contracts";
 import { Modal, UiStatePanel } from "@fantappero/ui";
 import {
   createContext,
@@ -78,19 +79,6 @@ function roleLabel(code: string | null): string | null {
   return ROLE_LABEL[code] ? `${ROLE_LABEL[code]} (${code})` : code;
 }
 
-function transferLabel(transferType: string): string {
-  if (transferType === "Loan") {
-    return "Prestito";
-  }
-  if (transferType === "Free") {
-    return "Parametro zero";
-  }
-  if (transferType === "N/A" || transferType === "€") {
-    return "Trasferimento";
-  }
-  return transferType;
-}
-
 function initials(name: string): string {
   const parts = name.trim().split(/\s+/).filter(Boolean);
   if (parts.length === 0) {
@@ -135,14 +123,22 @@ export function AthleteCardView({ card }: { card: AthleteCard }) {
   if (card.injured != null) {
     facts.push({ label: "Stato", value: card.injured ? "Infortunato" : "Disponibile" });
   }
-  facts.push({
-    label: "In questa lega",
-    value: card.assignment
-      ? `${card.assignment.teamName} · slot ${card.assignment.slotIndex + 1}${
-          card.assignment.purchaseCredits != null ? ` · ${card.assignment.purchaseCredits} crediti` : ""
-        }`
-      : "Libero",
-  });
+  if (card.live) {
+    facts.unshift({
+      label: "Voto live",
+      value: card.live.score != null ? `${formatFantasyPoints(card.live.score)}${card.live.isFantasy ? "" : " (voto provider)"}` : "In corso",
+    });
+  }
+  if (card.seasonStats) {
+    const st = card.seasonStats;
+    facts.push(
+      { label: "Media voto", value: st.averageRating != null ? formatFantasyPoints(st.averageRating) : "—" },
+      { label: "Media fantacalcio", value: st.fantasyAverage != null ? formatFantasyPoints(st.fantasyAverage) : "—" },
+      { label: "Partite giocate", value: String(st.matches) },
+      { label: "Gol", value: String(st.goals) },
+      { label: "Assist", value: String(st.assists) },
+    );
+  }
 
   return (
     <div className="fa-athlete-card" data-testid="athlete-card">
@@ -181,21 +177,6 @@ export function AthleteCardView({ card }: { card: AthleteCard }) {
                 {season.shirtNumber != null ? ` · n. ${season.shirtNumber}` : ""}
                 {season.positionRaw ? ` · ${season.positionRaw}` : ""}
                 {season.isActive ? " · in rosa" : ""}
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
-      <section className="fa-athlete-card__section">
-        <h3>Trasferimenti</h3>
-        {card.transfers.length === 0 ? (
-          <p className="fa-athlete-card__muted">Nessun trasferimento salvato dal provider.</p>
-        ) : (
-          <ul className="fa-athlete-card__list">
-            {card.transfers.map((transfer) => (
-              <li key={`${transfer.transferDate}-${transfer.fromClubName ?? ""}-${transfer.toClubName ?? ""}`}>
-                {formatIsoDate(transfer.transferDate)} · {transfer.fromClubName ?? "—"} →{" "}
-                {transfer.toClubName ?? "—"} · {transferLabel(transfer.transferType)}
               </li>
             ))}
           </ul>

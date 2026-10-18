@@ -116,6 +116,8 @@ export type {
   LeagueLifecycleStep,
   AthleteCard,
   AthleteCardAssignment,
+  AthleteCardLive,
+  AthleteCardSeasonStats,
   AthleteCardSeason,
   AthleteCardTransfer,
   LeagueListoneEntry,

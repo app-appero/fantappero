@@ -662,6 +662,23 @@ export interface AthleteCard {
   assignment: AthleteCardAssignment | null;
   seasons: AthleteCardSeason[];
   transfers: AthleteCardTransfer[];
+  /** Gol, assist e medie del campionato corrente. */
+  seasonStats?: AthleteCardSeasonStats | null;
+  /** Voto attuale, solo se la partita del calciatore è in corso. */
+  live?: AthleteCardLive | null;
+}
+
+export interface AthleteCardSeasonStats {
+  matches: number;
+  goals: number;
+  assists: number;
+  averageRating: number | null;
+  fantasyAverage: number | null;
+}
+
+export interface AthleteCardLive {
+  score: number | null;
+  isFantasy: boolean;
 }
 
 export interface LeagueListoneRefreshCounters {
