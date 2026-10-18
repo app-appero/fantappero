@@ -48,27 +48,36 @@ const CARD: AthleteCard = {
 };
 
 describe("AthleteCardView", () => {
-  it("mostra foto, anagrafica, stagione, trasferimento e squadra di lega", () => {
+  it("mostra foto, anagrafica, stagione, media, gol e assist; niente fantallenatore né trasferimenti", () => {
     const html = renderToStaticMarkup(createElement(AthleteCardView, { card: CARD }));
     expect(html).toContain("https://example.test/thuram.png");
     expect(html).toContain("Khéphren Thuram");
     expect(html).toContain("Nice");
     expect(html).toContain("France");
     expect(html).toContain("26/03/2001");
-    expect(html).toContain("Rosa Nord");
-    expect(html).toContain("22 crediti");
+    expect(html).not.toContain("Rosa Nord");
+    expect(html).not.toContain("crediti");
     expect(html).toContain("2099");
-    expect(html).toContain("Lille");
-    expect(html).toContain("Prestito");
+    expect(html).not.toContain("Lille");
+    expect(html).not.toContain("Trasferimenti");
     expect(html).toContain("Disponibile");
   });
 
-  it("indica Libero quando nessuno ha il calciatore in rosa", () => {
+  it("mostra voto live, media del campionato, gol e assist", () => {
     const html = renderToStaticMarkup(
-      createElement(AthleteCardView, { card: { ...CARD, assignment: null, photoUrl: null } }),
+      createElement(AthleteCardView, {
+        card: {
+          ...CARD,
+          live: { score: 6.5, isFantasy: true },
+          seasonStats: { matches: 8, goals: 3, assists: 2, averageRating: 6.8, fantasyAverage: 7.1 },
+        },
+      }),
     );
-    expect(html).toContain("Libero");
-    expect(html).toContain("KT");
+    expect(html).toContain("Voto live");
+    expect(html).toContain("6,5");
+    expect(html).toContain("Media voto");
+    expect(html).toContain("Gol");
+    expect(html).toContain("Assist");
   });
 });
 

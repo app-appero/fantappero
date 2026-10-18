@@ -3,6 +3,7 @@ import {
   MAX_AUTOMATIC_SUBSTITUTIONS,
   computeCountdown,
   fantasyBadgesFromBonusMalus,
+  cleanDisplayName,
   formatFantasyPoints,
   formatCountdown,
   playerVoteState,
@@ -157,12 +158,52 @@ export function BenchTabs({ side, title }: { side: H2HSideLineup; title: string 
   );
 }
 
-const ROLE_GROUPS: Array<[string, string]> = [
-  ["P", "POR"],
-  ["D", "DIF"],
-  ["C", "CEN"],
-  ["A", "ATT"],
-];
+const ROLE_ORDER = ["P", "D", "C", "A"];
+
+/** Cella della vista affiancata: nome intero su una riga, voto o countdown sotto. */
+function VersusCell({ player, dim, now }: { player: H2HPlayerScore | undefined; dim: boolean; now: number }) {
+  if (!player) {
+    return <div />;
+  }
+  const vote = playerVoteState(player);
+  const countdown = vote.kind === "pending" ? kickoffCountdown(player, now) : null;
+  const badges = fantasyBadgesFromBonusMalus(player.bonusMalus ?? []);
+  const className = [
+    "fa-vcell",
+    dim ? "fa-mrow--dim" : "",
+    vote.live ? "fa-mrow--live" : "",
+    vote.kind === "sv" ? "fa-mrow--sv" : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
+  return (
+    <div className={className} data-testid={`matchup-versus-player-${player.athleteId}`}>
+      <span className="fa-vcell__name">
+        <AthleteName athleteId={player.athleteId}>{cleanDisplayName(player.name)}</AthleteName>
+        <EventBadges badges={badges} size={12} />
+      </span>
+      {vote.label ? (
+        <span
+          className={[
+            "fa-mrow__vote",
+            vote.live ? "fa-mrow__vote--live" : "",
+            vote.kind === "provisional" ? "fa-mrow__vote--provisional" : "",
+            vote.kind === "sv" ? "fa-mrow__vote--sv" : "",
+          ]
+            .filter(Boolean)
+            .join(" ")}
+          data-testid={`matchup-versus-score-${player.athleteId}`}
+        >
+          {vote.label}
+        </span>
+      ) : countdown ? (
+        <span className="fa-vcell__cd" data-testid={`matchup-versus-countdown-${player.athleteId}`}>
+          {countdown}
+        </span>
+      ) : null}
+    </div>
+  );
+}
 
 function TeamHead({ side }: { side: H2HSideLineup }) {
   return (
@@ -176,51 +217,41 @@ function TeamHead({ side }: { side: H2HSideLineup }) {
   );
 }
 
-/** Vista affiancata: le rose complete dei due allenatori a confronto, riga per riga. */
+/** Vista affiancata: le rose complete dei due allenatori a confronto; i titolari sempre per ruolo. */
 export function RosterVersus({ home, away }: { home: H2HSideLineup; away: H2HSideLineup }) {
   const now = useNow();
-  const row = (player: H2HPlayerScore | undefined, dim: boolean, prefix: string) =>
-    player ? (
-      <MatchupPlayerRow player={player} dim={dim} compact now={now} testIdPrefix={prefix} as="div" />
-    ) : (
-      <div />
-    );
-  const pair = (key: string, a: H2HPlayerScore | undefined, b: H2HPlayerScore | undefined, mid: string, dim: boolean, prefix: string) => (
+  const pair = (key: string, a: H2HPlayerScore | undefined, b: H2HPlayerScore | undefined, dim: boolean) => (
     <div className="fa-versus__row" key={key}>
-      {row(a, dim, prefix)}
-      <span className="fa-versus__mid">{mid}</span>
-      {row(b, dim, prefix)}
+      <VersusCell player={a} dim={dim} now={now} />
+      <VersusCell player={b} dim={dim} now={now} />
     </div>
   );
   const rows: ReactElement[] = [];
-  for (const [role, label] of ROLE_GROUPS) {
+  for (const role of ROLE_ORDER) {
     const left = home.starters.filter((p) => p.role === role);
     const right = away.starters.filter((p) => p.role === role);
     for (let i = 0; i < Math.max(left.length, right.length); i += 1) {
-      rows.push(pair(`s-${role}-${i}`, left[i], right[i], i === 0 ? label : "", false, "matchup-starter-player"));
+      rows.push(pair(`s-${role}-${i}`, left[i], right[i], false));
     }
   }
   const slots = MAX_AUTOMATIC_SUBSTITUTIONS;
+  const total = Math.max(home.bench.length, away.bench.length);
   const benchRows: ReactElement[] = [];
-  for (let i = 0; i < Math.min(slots, Math.max(home.bench.length, away.bench.length)); i += 1) {
-    benchRows.push(pair(`b-${i}`, home.bench[i], away.bench[i], `${i + 1}°`, false, "matchup-bench-player"));
-  }
   const tribRows: ReactElement[] = [];
-  for (let i = slots; i < Math.max(home.bench.length, away.bench.length); i += 1) {
-    tribRows.push(pair(`t-${i}`, home.bench[i], away.bench[i], `${i + 1}°`, true, "matchup-bench-player"));
+  for (let i = 0; i < total; i += 1) {
+    (i >= slots ? tribRows : benchRows).push(pair(`b-${i}`, home.bench[i], away.bench[i], i >= slots));
   }
   return (
     <div className="fa-versus" data-testid="matchup-versus">
       <div className="fa-versus__row fa-versus__row--head">
         <TeamHead side={home} />
-        <span className="fa-versus__mid">VS</span>
         <TeamHead side={away} />
       </div>
       <h3 className="fa-versus__title">Titolari</h3>
       {rows}
-      {benchRows.length > 0 ? <h3 className="fa-versus__title">Panchina <small>i primi {slots} cambi, in ordine di ingresso</small></h3> : null}
+      {benchRows.length > 0 ? <h3 className="fa-versus__title">Panchina</h3> : null}
       {benchRows}
-      {tribRows.length > 0 ? <h3 className="fa-versus__title">Tribuna <small>oltre i {slots} cambi</small></h3> : null}
+      {tribRows.length > 0 ? <h3 className="fa-versus__title">Tribuna</h3> : null}
       {tribRows}
     </div>
   );

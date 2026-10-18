@@ -2,6 +2,7 @@ import { lazyStyles } from "../../theme/lazyStyles";
 import type { H2HPlayerScore, H2HSideLineup } from "@fantappero/contracts";
 import {
   MAX_AUTOMATIC_SUBSTITUTIONS,
+  cleanDisplayName,
   computeCountdown,
   fantasyBadgesFromBonusMalus,
   formatFantasyPoints,
@@ -187,12 +188,55 @@ export function BenchTabs({ side, title, compact }: { side: H2HSideLineup; title
   );
 }
 
-const ROLE_GROUPS: Array<[string, string]> = [
-  ["P", "POR"],
-  ["D", "DIF"],
-  ["C", "CEN"],
-  ["A", "ATT"],
-];
+const ROLE_ORDER = ["P", "D", "C", "A"];
+
+/** Cella della vista affiancata: nome intero su una riga, voto o countdown sotto. */
+function VersusCell({ player, dim, now }: { player: H2HPlayerScore | undefined; dim: boolean; now: number }) {
+  if (!player) {
+    return <View style={styles.cell} />;
+  }
+  const vote = playerVoteState(player);
+  const countdown = vote.kind === "pending" ? kickoffCountdown(player, now) : null;
+  const badges = fantasyBadgesFromBonusMalus(player.bonusMalus ?? []);
+  return (
+    <View
+      style={[
+        styles.cell,
+        styles.vcell,
+        dim ? styles.dim : null,
+        vote.live ? styles.rowLive : null,
+        vote.kind === "sv" ? styles.rowSv : null,
+      ]}
+      testID={`matchup-versus-player-${player.athleteId}`}
+    >
+      {vote.live ? <LivePulse /> : null}
+      <View style={styles.nameLine}>
+        <AthleteName fit plain athleteId={player.athleteId} style={styles.vname} numberOfLines={1}>
+          {cleanDisplayName(player.name)}
+        </AthleteName>
+        <EventBadges badges={badges} size={11} />
+      </View>
+      {vote.label ? (
+        <Text
+          style={[
+            styles.vote,
+            styles.voteWhite,
+            vote.live ? styles.voteLive : null,
+            vote.kind === "provisional" ? styles.voteProvisional : null,
+            vote.kind === "sv" ? styles.voteSv : null,
+          ]}
+          testID={`matchup-versus-score-${player.athleteId}`}
+        >
+          {vote.label}
+        </Text>
+      ) : countdown ? (
+        <Text style={styles.vcd} testID={`matchup-versus-countdown-${player.athleteId}`}>
+          {countdown}
+        </Text>
+      ) : null}
+    </View>
+  );
+}
 
 function TeamHead({ side }: { side: H2HSideLineup }) {
   return (
@@ -208,34 +252,21 @@ function TeamHead({ side }: { side: H2HSideLineup }) {
   );
 }
 
-/** Vista affiancata: le rose complete dei due allenatori a confronto, riga per riga. */
+/** Vista affiancata: le rose complete dei due allenatori a confronto; i titolari sempre per ruolo. */
 export function RosterVersus({ home, away }: { home: H2HSideLineup; away: H2HSideLineup }) {
   const now = useNow();
-  const cell = (player: H2HPlayerScore | undefined, dim: boolean, prefix: string) => (
-    <View style={styles.cell}>
-      {player ? <MatchupPlayerRow player={player} dim={dim} compact now={now} testIDPrefix={prefix} /> : null}
-    </View>
-  );
-  const pair = (
-    key: string,
-    a: H2HPlayerScore | undefined,
-    b: H2HPlayerScore | undefined,
-    mid: string,
-    dim: boolean,
-    prefix: string,
-  ) => (
+  const pair = (key: string, a: H2HPlayerScore | undefined, b: H2HPlayerScore | undefined, dim: boolean) => (
     <View style={styles.versusRow} key={key}>
-      {cell(a, dim, prefix)}
-      <Text style={styles.mid}>{mid}</Text>
-      {cell(b, dim, prefix)}
+      <VersusCell player={a} dim={dim} now={now} />
+      <VersusCell player={b} dim={dim} now={now} />
     </View>
   );
   const rows: ReactElement[] = [];
-  for (const [role, label] of ROLE_GROUPS) {
+  for (const role of ROLE_ORDER) {
     const left = home.starters.filter((p) => p.role === role);
     const right = away.starters.filter((p) => p.role === role);
     for (let i = 0; i < Math.max(left.length, right.length); i += 1) {
-      rows.push(pair(`s-${role}-${i}`, left[i], right[i], i === 0 ? label : "", false, "matchup-starter-player"));
+      rows.push(pair(`s-${role}-${i}`, left[i], right[i], false));
     }
   }
   const slots = MAX_AUTOMATIC_SUBSTITUTIONS;
@@ -243,10 +274,7 @@ export function RosterVersus({ home, away }: { home: H2HSideLineup; away: H2HSid
   const benchRows: ReactElement[] = [];
   const tribRows: ReactElement[] = [];
   for (let i = 0; i < total; i += 1) {
-    const isTrib = i >= slots;
-    (isTrib ? tribRows : benchRows).push(
-      pair(`b-${i}`, home.bench[i], away.bench[i], `${i + 1}°`, isTrib, "matchup-bench-player"),
-    );
+    (i >= slots ? tribRows : benchRows).push(pair(`b-${i}`, home.bench[i], away.bench[i], i >= slots));
   }
   return (
     <View style={styles.versus} testID="matchup-versus">
@@ -254,7 +282,6 @@ export function RosterVersus({ home, away }: { home: H2HSideLineup; away: H2HSid
         <View style={styles.cell}>
           <TeamHead side={home} />
         </View>
-        <Text style={styles.mid}>VS</Text>
         <View style={styles.cell}>
           <TeamHead side={away} />
         </View>
@@ -308,7 +335,7 @@ const styles = lazyStyles(() =>
     team: { color: colors.foregroundMuted, fontSize: typography.fontSize.xs },
     countdown: { color: colors.foregroundMuted, fontSize: 11, fontWeight: "700" },
     vote: {
-      color: colors.foreground,
+      color: "#ffffff",
       backgroundColor: "rgba(255,255,255,0.12)",
       borderRadius: 999,
       paddingHorizontal: 8,
@@ -317,7 +344,7 @@ const styles = lazyStyles(() =>
       fontWeight: "700",
       overflow: "hidden",
     },
-    voteLive: { backgroundColor: "#2563eb", color: "#fff" },
+    voteLive: { backgroundColor: "#2563eb", color: "#ffffff" },
     voteProvisional: { borderWidth: 1, borderStyle: "dashed", borderColor: "rgba(255,255,255,0.8)" },
     voteSv: { backgroundColor: "#7c3aed", color: "#fff" },
     tabs: { gap: spacing.xs },
@@ -333,6 +360,19 @@ const styles = lazyStyles(() =>
     tabActive: { backgroundColor: colors.brand },
     tabText: { color: colors.foreground, fontWeight: "600", fontSize: typography.fontSize.sm },
     tabTextActive: { color: colors.onBrand },
+    vcell: {
+      gap: 3,
+      paddingHorizontal: spacing.sm,
+      paddingVertical: 6,
+      borderRadius: radius.md,
+      borderWidth: 1,
+      borderColor: colors.border,
+      backgroundColor: colors.backgroundElevated,
+      alignItems: "flex-start",
+    },
+    vname: { color: colors.foreground, fontWeight: "700", fontSize: typography.fontSize.sm },
+    vcd: { color: "#c9d2f0", fontSize: 11, fontWeight: "700" },
+    voteWhite: { color: "#ffffff" },
     versus: { gap: 6 },
     versusRow: { flexDirection: "row", alignItems: "stretch", gap: 4 },
     cell: { flex: 1, minWidth: 0 },

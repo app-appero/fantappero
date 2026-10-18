@@ -49,6 +49,16 @@ export function formatFantasyGoals(value: number | null | undefined): string {
   return isMissing(value) ? H2H_VALUE_UNAVAILABLE : goalsFormatter.format(value);
 }
 
+/** Nomi dal provider con entità HTML (`N&apos;Diaye`): li riporta a testo normale. */
+export function cleanDisplayName(name: string): string {
+  return name
+    .replace(/&apos;|&#0?39;|&rsquo;/g, "'")
+    .replace(/&quot;/g, '"')
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">");
+}
+
 /** Voto provvisorio mostrato mentre il provider non ha ancora un voto per chi sta giocando. */
 export const PROVISIONAL_LIVE_SCORE = 6;
 

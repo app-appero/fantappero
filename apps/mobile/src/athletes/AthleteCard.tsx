@@ -1,4 +1,5 @@
 import type { AthleteCard } from "@fantappero/contracts";
+import { formatFantasyPoints } from "@fantappero/contracts";
 import { theme } from "@fantappero/ui/theme";
 import {
   createContext,
@@ -52,11 +53,14 @@ export function AthleteName({
   containerStyle,
   numberOfLines,
   plain,
+  fit,
 }: {
   athleteId?: string | null;
   children: string;
   /** Senza sottolineatura né colore link: il nome resta toccabile ma si legge come testo. */
   plain?: boolean;
+  /** Riduce il carattere pur di mostrare il nome intero su una riga. */
+  fit?: boolean;
   style?: StyleProp<TextStyle>;
   /** Layout della cella: applicato al Pressable, o al testo se la scheda non è disponibile. */
   containerStyle?: StyleProp<ViewStyle>;
@@ -77,7 +81,12 @@ export function AthleteName({
       accessibilityLabel={`Apri scheda di ${children}`}
       onPress={() => card.open(athleteId)}
     >
-      <Text style={[style, plain ? null : styles.link]} numberOfLines={numberOfLines}>
+      <Text
+        style={[style, plain ? null : styles.link]}
+        numberOfLines={numberOfLines}
+        adjustsFontSizeToFit={fit}
+        minimumFontScale={fit ? 0.6 : undefined}
+      >
         {children}
       </Text>
     </Pressable>
@@ -100,19 +109,6 @@ function roleLabel(code: string | null): string | null {
     return null;
   }
   return ROLE_LABEL[code] ? `${ROLE_LABEL[code]} (${code})` : code;
-}
-
-function transferLabel(transferType: string): string {
-  if (transferType === "Loan") {
-    return "Prestito";
-  }
-  if (transferType === "Free") {
-    return "Parametro zero";
-  }
-  if (transferType === "N/A" || transferType === "€") {
-    return "Trasferimento";
-  }
-  return transferType;
 }
 
 function initials(name: string): string {
@@ -159,14 +155,22 @@ function AthleteCardView({ card }: { card: AthleteCard }) {
   if (card.injured != null) {
     facts.push({ label: "Stato", value: card.injured ? "Infortunato" : "Disponibile" });
   }
-  facts.push({
-    label: "In questa lega",
-    value: card.assignment
-      ? `${card.assignment.teamName} · slot ${card.assignment.slotIndex + 1}${
-          card.assignment.purchaseCredits != null ? ` · ${card.assignment.purchaseCredits} crediti` : ""
-        }`
-      : "Libero",
-  });
+  if (card.live) {
+    facts.unshift({
+      label: "Voto live",
+      value: card.live.score != null ? `${formatFantasyPoints(card.live.score)}${card.live.isFantasy ? "" : " (voto provider)"}` : "In corso",
+    });
+  }
+  if (card.seasonStats) {
+    const st = card.seasonStats;
+    facts.push(
+      { label: "Media voto", value: st.averageRating != null ? formatFantasyPoints(st.averageRating) : "—" },
+      { label: "Media fantacalcio", value: st.fantasyAverage != null ? formatFantasyPoints(st.fantasyAverage) : "—" },
+      { label: "Partite giocate", value: String(st.matches) },
+      { label: "Gol", value: String(st.goals) },
+      { label: "Assist", value: String(st.assists) },
+    );
+  }
 
   return (
     <View testID="athlete-card">
@@ -203,20 +207,6 @@ function AthleteCardView({ card }: { card: AthleteCard }) {
             {season.shirtNumber != null ? ` · n. ${season.shirtNumber}` : ""}
             {season.positionRaw ? ` · ${season.positionRaw}` : ""}
             {season.isActive ? " · in rosa" : ""}
-          </Text>
-        ))
-      )}
-      <Text style={styles.sectionTitle}>Trasferimenti</Text>
-      {card.transfers.length === 0 ? (
-        <Text style={styles.sub}>Nessun trasferimento salvato dal provider.</Text>
-      ) : (
-        card.transfers.map((transfer) => (
-          <Text
-            key={`${transfer.transferDate}-${transfer.fromClubName ?? ""}-${transfer.toClubName ?? ""}`}
-            style={styles.line}
-          >
-            {formatIsoDate(transfer.transferDate)} · {transfer.fromClubName ?? "—"} → {transfer.toClubName ?? "—"} ·{" "}
-            {transferLabel(transfer.transferType)}
           </Text>
         ))
       )}
