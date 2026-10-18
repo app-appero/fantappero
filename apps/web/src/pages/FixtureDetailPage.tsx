@@ -1,5 +1,6 @@
 import type {
   FixtureLineup,
+  FixtureUnavailablePlayer,
   FixtureLineupPlayer,
   FixtureLiveDetail,
   FixtureTimelineEvent,
@@ -124,20 +125,130 @@ function benchStatusLabel(player: FixtureLineupPlayer, events: readonly FixtureT
   return "Non utilizzato";
 }
 
-function BenchList({ players, events, side }: { players: readonly FixtureLineupPlayer[]; events: readonly FixtureTimelineEvent[]; side: string }) {
-  if (players.length === 0) {
+function subMinute(player: FixtureLineupPlayer, events: readonly FixtureTimelineEvent[]): string | null {
+  const entered = events.find(
+    (event) => event.eventType.toLowerCase() === "subst" && event.relatedAthleteId === player.athleteId,
+  );
+  return entered ? entered.minuteLabel : null;
+}
+
+function isSentOff(player: FixtureLineupPlayer, events: readonly FixtureTimelineEvent[]): boolean {
+  return events.some(
+    (event) =>
+      event.athleteId === player.athleteId &&
+      event.eventType.toLowerCase() === "card" &&
+      (event.eventDetail ?? "").toLowerCase().includes("red"),
+  );
+}
+
+function isSuspension(kind: string | null): boolean {
+  const normalized = (kind ?? "").toLowerCase();
+  return ["suspension", "suspended", "red", "red_card", "redcard"].includes(normalized);
+}
+
+/** Panchina e indisponibili di una squadra: due tab con righe a scheda (stile turni fantallenatori). */
+function SquadTabs({
+  bench,
+  unavailable,
+  events,
+  side,
+}: {
+  bench: readonly FixtureLineupPlayer[];
+  unavailable: readonly FixtureUnavailablePlayer[];
+  events: readonly FixtureTimelineEvent[];
+  side: string;
+}) {
+  const [tab, setTab] = useState<"panchina" | "indisponibili">(bench.length > 0 ? "panchina" : "indisponibili");
+  if (bench.length === 0 && unavailable.length === 0) {
     return null;
   }
   return (
-    <ul className="fa-ds-showcase__stack" data-testid={`fixture-bench-${side}`}>
-      {players.map((player) => (
-        <li key={pitchPlayerId(player)} data-testid={`fixture-bench-player-${pitchPlayerId(player)}`}>
-          <RoleBadge code={player.position} /> {player.shirtNumber !== null ? `${player.shirtNumber}. ` : ""}
-          <AthleteName athleteId={player.athleteId}>{player.name}</AthleteName> —{" "}
-          <em>{benchStatusLabel(player, events)}</em>
-        </li>
-      ))}
-    </ul>
+    <div className="fa-mtabs" data-testid={`fixture-squad-${side}`}>
+      <h4>Panchina e indisponibili</h4>
+      <div className="fa-mtabs__bar" role="tablist" aria-label="Panchina e indisponibili">
+        {(
+          [
+            ["panchina", "Panchina", bench.length],
+            ["indisponibili", "Indisponibili", unavailable.length],
+          ] as const
+        ).map(([id, label, count]) => (
+          <button
+            key={id}
+            type="button"
+            role="tab"
+            aria-selected={tab === id}
+            className={`fa-mtabs__tab${tab === id ? " fa-mtabs__tab--active" : ""}`}
+            onClick={() => setTab(id)}
+            data-testid={`fixture-tab-${id}-${side}`}
+          >
+            {label} <span className="fa-mtabs__count">{count}</span>
+          </button>
+        ))}
+      </div>
+      <p className="fa-mtabs__hint">
+        {tab === "panchina" ? "Chi è entrato e chi è rimasto in panchina." : "Infortunati e squalificati di questa squadra."}
+      </p>
+      {tab === "panchina" ? (
+        bench.length === 0 ? (
+          <p className="fa-mtabs__empty">Nessun panchinaro.</p>
+        ) : (
+          <ul className="fa-mlist" data-testid={`fixture-bench-${side}`}>
+            {bench.map((player) => {
+              const minute = subMinute(player, events);
+              const off = isSentOff(player, events);
+              const offEvent = events.find(
+                (event) =>
+                  event.athleteId === player.athleteId &&
+                  event.eventType.toLowerCase() === "card" &&
+                  (event.eventDetail ?? "").toLowerCase().includes("red"),
+              );
+              return (
+                <li
+                  key={pitchPlayerId(player)}
+                  className={`fa-mrow${off ? " fa-mrow--out" : ""}`}
+                  data-testid={`fixture-bench-player-${pitchPlayerId(player)}`}
+                >
+                  <RoleBadge code={player.position} />
+                  <span className="fa-mrow__body">
+                    <span className="fa-mrow__name">
+                      {player.shirtNumber !== null ? `${player.shirtNumber}. ` : ""}
+                      <AthleteName athleteId={player.athleteId}>{player.name}</AthleteName>
+                    </span>
+                    <span className="fa-mrow__team">{benchStatusLabel(player, events)}</span>
+                  </span>
+                  {minute ? <span className="fa-mrow__chip fa-mrow__chip--in">↑ {minute}</span> : null}
+                  {off && offEvent ? <span className="fa-mrow__chip fa-mrow__chip--out">{offEvent.minuteLabel}</span> : null}
+                </li>
+              );
+            })}
+          </ul>
+        )
+      ) : unavailable.length === 0 ? (
+        <p className="fa-mtabs__empty">Nessun indisponibile.</p>
+      ) : (
+        <ul className="fa-mlist" data-testid={`fixture-unavailable-${side}`}>
+          {unavailable.map((player) => {
+            const susp = isSuspension(player.kind);
+            return (
+              <li
+                key={`${player.side}-${player.athleteId ?? player.name}`}
+                className={`fa-mrow ${susp ? "fa-mrow--out" : "fa-mrow--gone"}`}
+              >
+                <span className="fa-mrow__body">
+                  <span className="fa-mrow__name">
+                    <AthleteName athleteId={player.athleteId}>{player.name}</AthleteName>
+                  </span>
+                  <span className="fa-mrow__team">{absenceLabel(player.kind, player.label)}</span>
+                </span>
+                <span className={`fa-mrow__chip ${susp ? "fa-mrow__chip--out" : "fa-mrow__chip--gone"}`}>
+                  {susp ? "Squalifica" : "Infortunio"}
+                </span>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </div>
   );
 }
 
@@ -158,10 +269,12 @@ function LineupBlock({
   lineup,
   events,
   side,
+  unavailable,
 }: {
   lineup: FixtureLineup | null;
   events: readonly FixtureTimelineEvent[];
   side: string;
+  unavailable: readonly FixtureUnavailablePlayer[];
 }) {
   const athleteCard = useAthleteCard();
   if (lineup === null) {
@@ -173,6 +286,7 @@ function LineupBlock({
           message="Non c'è ancora né la formazione ufficiale né una formazione probabile per questa squadra."
           testId={`fixture-lineup-empty-${side}`}
         />
+        <SquadTabs bench={[]} unavailable={unavailable} events={events} side={side} />
       </section>
     );
   }
@@ -220,8 +334,7 @@ function LineupBlock({
           ))}
         </ul>
       ) : null}
-      {lineup.bench.length > 0 ? <h4>Panchina</h4> : null}
-      <BenchList players={lineup.bench} events={events} side={side} />
+      <SquadTabs bench={lineup.bench} unavailable={unavailable} events={events} side={side} />
     </section>
   );
 }
@@ -391,6 +504,8 @@ export function FixtureDetailBody({ detail }: { detail: FixtureLiveDetail }) {
   const matchStatus = mapFixtureMatchStatus(detail.statusShort);
   const isFinished = matchStatus === "finished";
   const isLive = matchStatus === "live";
+  const unavailableFor = (side: "home" | "away") =>
+    (detail.unavailablePlayers ?? []).filter((player) => player.side === side);
 
   return (
     <div className="fa-ds-showcase__stack" data-testid="fixture-detail">
@@ -435,23 +550,9 @@ export function FixtureDetailBody({ detail }: { detail: FixtureLiveDetail }) {
       ) : null}
 
       <div className="fa-pitch-row">
-        <LineupBlock lineup={detail.homeLineup} events={detail.events} side="home" />
-        <LineupBlock lineup={detail.awayLineup} events={detail.events} side="away" />
+        <LineupBlock lineup={detail.homeLineup} events={detail.events} side="home" unavailable={unavailableFor("home")} />
+        <LineupBlock lineup={detail.awayLineup} events={detail.events} side="away" unavailable={unavailableFor("away")} />
       </div>
-
-      {(detail.unavailablePlayers ?? []).length > 0 ? (
-        <section aria-labelledby="fixture-unavailable-title" data-testid="fixture-unavailable">
-          <h3 id="fixture-unavailable-title">Indisponibili</h3>
-          <ul>
-            {(detail.unavailablePlayers ?? []).map((player) => (
-              <li key={`${player.side}-${player.athleteId ?? player.name}`}>
-                <AthleteName athleteId={player.athleteId}>{player.name}</AthleteName>
-                {player.clubName ? ` · ${player.clubName}` : ""} · {absenceLabel(player.kind, player.label)}
-              </li>
-            ))}
-          </ul>
-        </section>
-      ) : null}
 
       <section aria-labelledby="fixture-timeline-title">
         <h3 id="fixture-timeline-title">Cronologia</h3>
