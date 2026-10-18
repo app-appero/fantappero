@@ -265,6 +265,7 @@ export {
   formatFantasyGoals,
   formatFantasyPoints,
   playerVoteState,
+  cleanDisplayName,
   PROVISIONAL_LIVE_SCORE,
   h2hResultAriaLabel,
 } from "./h2hScore.js";

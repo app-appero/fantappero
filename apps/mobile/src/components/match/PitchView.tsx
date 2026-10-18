@@ -337,7 +337,7 @@ const styles = lazyStyles(() => StyleSheet.create({
   score: {
     fontSize: 9,
     fontWeight: "700",
-    color: colors.accentContrast,
+    color: "#ffffff",
     backgroundColor: "rgba(0,0,0,0.45)",
     borderRadius: radius.sm,
     paddingHorizontal: 3,
