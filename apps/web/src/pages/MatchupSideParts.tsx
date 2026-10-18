@@ -178,6 +178,8 @@ function VersusCell({ player, dim, now }: { player: H2HPlayerScore | undefined; 
     .join(" ");
   return (
     <div className={className} data-testid={`matchup-versus-player-${player.athleteId}`}>
+      <span className={`fa-mrow__role fa-mrow__role--${ROLE_CLASS[player.role] ?? "gk"} fa-vcell__role`}>{player.role}</span>
+      <span className="fa-vcell__main">
       <span className="fa-vcell__name">
         <AthleteName athleteId={player.athleteId}>{cleanDisplayName(player.name)}</AthleteName>
         <EventBadges badges={badges} size={12} />
@@ -201,6 +203,7 @@ function VersusCell({ player, dim, now }: { player: H2HPlayerScore | undefined; 
           {countdown}
         </span>
       ) : null}
+      </span>
     </div>
   );
 }
