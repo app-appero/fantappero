@@ -76,6 +76,14 @@ const NOMINATION_MODE_SHORT_LABEL: Record<MarketLiveNominationMode, string> = {
   random: "casuale",
 };
 
+const NOMINATION_MODE_ICON: Record<MarketLiveNominationMode, string> = {
+  manual: "☝",
+  turn_based: "⟳",
+  sequential: "☰",
+  alphabetical_by_role: "A–Z",
+  random: "⚄",
+};
+
 const NOMINATION_MODE_OPTIONS: Array<{ value: MarketLiveNominationMode; label: string }> = [
   { value: "manual", label: "Libera — sceglie l'admin/delegato" },
   { value: "turn_based", label: "A richiamo (a turno)" },
@@ -508,30 +516,49 @@ export function AuctionLivePage() {
       {!loading && !loadError && activeLeagueId ? (
         <div data-testid="wireframe-auction-live-success" className="fa-auction-live-page">
           {canManageSession && !currentSession ? (
-            <WireframeSection label="Crea sessione asta a rilanci" testId="auction-live-create">
-              <form data-testid="auction-live-create-form" onSubmit={handleCreateSession}>
-                <Input label="Apertura" name="opens-at" type="datetime-local" value={opensAt} onChange={(e) => setOpensAt(e.target.value)} required />
-                <Input label="Chiusura" name="closes-at" type="datetime-local" value={closesAt} onChange={(e) => setClosesAt(e.target.value)} required />
-                <Select
-                  label="Modalità di chiamata"
-                  name="nomination-mode"
-                  hint={NOMINATION_MODE_HINT[nominationMode]}
-                  value={nominationMode}
-                  onChange={(e) => setNominationMode(e.target.value as MarketLiveNominationMode)}
-                  options={NOMINATION_MODE_OPTIONS}
-                />
-                <Input label="Incremento minimo (crediti)" name="min-increment" type="number" min={1} value={minIncrement} onChange={(e) => setMinIncrement(e.target.value)} />
-                <Input label="Soft-close (secondi)" name="soft-close" type="number" min={5} max={120} value={softClose} onChange={(e) => setSoftClose(e.target.value)} />
-                <Input label="Durata lotto (secondi)" name="lot-duration" type="number" min={10} max={300} value={lotDuration} onChange={(e) => setLotDuration(e.target.value)} />
-                <Select
-                  label="Delegato (opzionale)"
-                  name="operator-user-id"
-                  value={operatorUserId}
-                  onChange={(e) => setOperatorUserId(e.target.value)}
-                  placeholder="Nessun delegato — solo admin"
-                  options={members.map((row) => ({ value: row.userId, label: row.displayName }))}
-                />
-                {nominationMode === "sequential" ? (
+            <form
+              data-testid="auction-live-create-form"
+              className="fa-live-config"
+              onSubmit={handleCreateSession}
+            >
+              <div data-testid="auction-live-create" className="fa-live-config__main">
+                <section className="fa-live-config__card">
+                  <h3>1 · Quando</h3>
+                  <p className="fa-live-config__sub">Finestra in cui l'asta resta aperta</p>
+                  <div className="fa-live-config__grid">
+                    <Input label="Apertura" name="opens-at" type="datetime-local" value={opensAt} onChange={(e) => setOpensAt(e.target.value)} required />
+                    <Input label="Chiusura" name="closes-at" type="datetime-local" value={closesAt} onChange={(e) => setClosesAt(e.target.value)} required />
+                  </div>
+                </section>
+
+                <section className="fa-live-config__card">
+                  <h3>2 · Come si chiama</h3>
+                  <p className="fa-live-config__sub">Modalità di chiamata dei calciatori</p>
+                  <div className="fa-live-config__modes" role="radiogroup" aria-label="Modalità di chiamata">
+                    {NOMINATION_MODE_OPTIONS.map((option) => (
+                      <button
+                        key={option.value}
+                        type="button"
+                        role="radio"
+                        aria-checked={nominationMode === option.value}
+                        className={
+                          nominationMode === option.value
+                            ? "fa-live-config__mode fa-live-config__mode--active"
+                            : "fa-live-config__mode"
+                        }
+                        onClick={() => setNominationMode(option.value)}
+                        data-testid={`auction-live-mode-${option.value}`}
+                      >
+                        <span className="fa-live-config__mode-icon">{NOMINATION_MODE_ICON[option.value]}</span>
+                        <span className="fa-live-config__mode-label">{option.label}</span>
+                        <span className="fa-live-config__radio" aria-hidden="true" />
+                      </button>
+                    ))}
+                  </div>
+                  <p className="fa-live-config__hint" data-testid="auction-live-mode-hint">
+                    {NOMINATION_MODE_HINT[nominationMode]}
+                  </p>
+                  {nominationMode === "sequential" ? (
                   <fieldset data-testid="auction-live-queue-picker">
                     <legend>Lista di chiamata (in ordine di selezione)</legend>
                     {freeAgents.map((entry) => {
@@ -551,7 +578,7 @@ export function AuctionLivePage() {
                     })}
                   </fieldset>
                 ) : null}
-                {AUTO_QUEUE_MODES.includes(nominationMode) && nominationMode !== "sequential" ? (
+                  {AUTO_QUEUE_MODES.includes(nominationMode) && nominationMode !== "sequential" ? (
                   <UiStatePanel
                     state="empty"
                     title="Lista generata automaticamente"
@@ -559,14 +586,70 @@ export function AuctionLivePage() {
                     testId="auction-live-auto-queue-hint"
                   />
                 ) : null}
+                </section>
+
+                <section className="fa-live-config__card">
+                  <h3>3 · Regole di rilancio</h3>
+                  <p className="fa-live-config__sub">Come funzionano i rilanci al tavolo</p>
+                  <div className="fa-live-config__grid fa-live-config__grid--3">
+                    <Input label="Rilancio minimo (crediti)" name="min-increment" type="number" min={1} value={minIncrement} onChange={(e) => setMinIncrement(e.target.value)} />
+                    <Input label="Soft-close (secondi)" name="soft-close" type="number" min={5} max={120} value={softClose} onChange={(e) => setSoftClose(e.target.value)} />
+                    <Input label="Durata lotto (secondi)" name="lot-duration" type="number" min={10} max={300} value={lotDuration} onChange={(e) => setLotDuration(e.target.value)} />
+                  </div>
+                  <p className="fa-live-config__hint">Se rilanci nei secondi finali, il timer si ricarica.</p>
+                </section>
+
+                <section className="fa-live-config__card">
+                  <h3>4 · Delegato</h3>
+                  <p className="fa-live-config__sub">Può chiamare i calciatori al posto dell'admin</p>
+                  <Select
+                    label="Delegato (opzionale)"
+                    name="operator-user-id"
+                    value={operatorUserId}
+                    onChange={(e) => setOperatorUserId(e.target.value)}
+                    placeholder="Nessun delegato — solo admin"
+                    options={members.map((row) => ({ value: row.userId, label: row.displayName }))}
+                  />
+                </section>
+              </div>
+
+              <aside className="fa-live-config__side">
+                <section className="fa-live-config__card fa-live-config__summary">
+                  <span className="fa-live-config__eyebrow">Riepilogo</span>
+                  {(
+                    [
+                      ["Apertura", opensAt ? new Date(opensAt).toLocaleString("it-IT", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : "—"],
+                      ["Chiusura", closesAt ? new Date(closesAt).toLocaleString("it-IT", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : "—"],
+                      ["Chiamata", NOMINATION_MODE_SHORT_LABEL[nominationMode]],
+                      ["Rilancio minimo", `+${Number(minIncrement) || 1} cr.`],
+                      ["Soft-close", `${Number(softClose) || 5} s`],
+                      ["Durata lotto", `${Number(lotDuration) || 10} s`],
+                      ["Delegato", members.find((row) => row.userId === operatorUserId)?.displayName ?? "Solo admin"],
+                    ] as Array<[string, string]>
+                  ).map(([key, value]) => (
+                    <div key={key} className="fa-live-config__row">
+                      <span>{key}</span>
+                      <strong>{value}</strong>
+                    </div>
+                  ))}
+                </section>
+                <section className="fa-live-config__card">
+                  <span className="fa-live-config__eyebrow">Tavolo · {teams.length} squadre</span>
+                  {teams.map((row) => (
+                    <div key={row.id} className="fa-live-config__row">
+                      <span>{row.name}</span>
+                      <strong>{row.userType === "ai" ? "AI" : ""}</strong>
+                    </div>
+                  ))}
+                </section>
                 {createError ? (
                   <UiStatePanel state="error" title="Sessione non creata" message={createError} testId="auction-live-create-error" />
                 ) : null}
                 <Button type="submit" variant="primary" disabled={creating || !marketOpen}>
-                  {creating ? "Creazione…" : "Crea sessione"}
+                  {creating ? "Creazione…" : "Crea sessione ed entra nel tavolo"}
                 </Button>
-              </form>
-            </WireframeSection>
+              </aside>
+            </form>
           ) : null}
 
           {!canManageSession && !currentSession ? (

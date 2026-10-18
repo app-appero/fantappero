@@ -355,6 +355,7 @@ export function MarketPage() {
       .then(resetTradeForm);
   }
 
+  const [tradeTab, setTradeTab] = useState<"all" | "received" | "sent" | "done">("all");
   const [counteringProposalId, setCounteringProposalId] = useState<string | null>(null);
   const [counterOfferedAthleteIds, setCounterOfferedAthleteIds] = useState<string[]>([]);
   const [counterRequestedAthleteIds, setCounterRequestedAthleteIds] = useState<string[]>([]);
@@ -411,6 +412,24 @@ export function MarketPage() {
       </PageContainer>
     );
   }
+
+  const OPEN_TRADE_STATUSES = ["proposed", "countered", "accepted", "pending_approval"];
+  const receivedTrades = trade.proposals.filter(
+    (row) => row.recipientTeamId === team?.id && OPEN_TRADE_STATUSES.includes(row.status),
+  );
+  const sentTrades = trade.proposals.filter(
+    (row) => row.proposerTeamId === team?.id && OPEN_TRADE_STATUSES.includes(row.status),
+  );
+  const doneTrades = trade.proposals.filter((row) => !OPEN_TRADE_STATUSES.includes(row.status));
+  const visibleTrades =
+    tradeTab === "all"
+      ? trade.proposals
+      : tradeTab === "received"
+        ? receivedTrades
+        : tradeTab === "sent"
+          ? sentTrades
+          : doneTrades;
+  const pendingForMe = receivedTrades.filter((row) => row.status === "proposed").length;
 
   return (
     <PageContainer
@@ -550,6 +569,28 @@ export function MarketPage() {
           </WireframeSection>
         ) : null}
 
+        {!loading && !loadError && !isDemoMode && activeLeagueId ? (
+          <div className="fa-trade-stats" data-testid="market-trade-stats">
+            <div className="fa-trade-stat">
+              <span>Crediti residui</span>
+              <strong>{balance ?? "—"}</strong>
+            </div>
+            <div className="fa-trade-stat">
+              <span>In attesa di te</span>
+              <strong>{pendingForMe}</strong>
+            </div>
+            <div className="fa-trade-stat">
+              <span>Inviate aperte</span>
+              <strong>{sentTrades.length}</strong>
+            </div>
+            <div className="fa-trade-stat">
+              <span>Scambi conclusi</span>
+              <strong>{doneTrades.length}</strong>
+            </div>
+          </div>
+        ) : null}
+
+        <div className="fa-market-cols">
         {!loading && !loadError && !isDemoMode && activeLeagueId ? (
           <WireframeSection label="Nuova proposta di scambio" testId="market-trade-form-section">
             {ownedSlots.length === 0 ? (
@@ -752,11 +793,38 @@ export function MarketPage() {
               />
             ) : null}
 
-            {!trade.loading && !trade.loadError && trade.proposals.length === 0 ? (
+            <div className="fa-trade-tabs" role="tablist" data-testid="market-trade-tabs">
+              {(
+                [
+                  ["all", "Tutte", trade.proposals.length],
+                  ["received", "Ricevute", receivedTrades.length],
+                  ["sent", "Inviate", sentTrades.length],
+                  ["done", "Concluse", doneTrades.length],
+                ] as const
+              ).map(([id, label, count]) => (
+                <button
+                  key={id}
+                  type="button"
+                  role="tab"
+                  aria-selected={tradeTab === id}
+                  className={tradeTab === id ? "fa-trade-tabs__tab fa-trade-tabs__tab--active" : "fa-trade-tabs__tab"}
+                  onClick={() => setTradeTab(id)}
+                  data-testid={`market-trade-tab-${id}`}
+                >
+                  {count > 0 ? `${label} ${count}` : label}
+                </button>
+              ))}
+            </div>
+
+            {!trade.loading && !trade.loadError && visibleTrades.length === 0 ? (
               <UiStatePanel
                 state="empty"
                 title="Nessuna proposta"
-                message="Non ci sono proposte di scambio inviate o ricevute."
+                message={
+                  trade.proposals.length === 0
+                    ? "Non ci sono proposte di scambio inviate o ricevute."
+                    : "Nessuna proposta in questa sezione."
+                }
                 testId="market-trade-empty"
               />
             ) : null}
@@ -770,9 +838,9 @@ export function MarketPage() {
               />
             ) : null}
 
-            {!trade.loading && !trade.loadError && trade.proposals.length > 0 ? (
+            {!trade.loading && !trade.loadError && visibleTrades.length > 0 ? (
               <ul data-testid="market-trade-list" className="fa-trade-list">
-                {trade.proposals.map((proposal) => {
+                {visibleTrades.map((proposal) => {
                   const isProposer = proposal.proposerTeamId === team?.id;
                   const isRecipient = proposal.recipientTeamId === team?.id;
                   const pending = trade.actionPendingId === proposal.id;
@@ -995,6 +1063,8 @@ export function MarketPage() {
             ) : null}
           </WireframeSection>
         ) : null}
+
+        </div>
 
         {SHOW_MARKET_HISTORY && !isDemoMode && activeLeagueId ? (
           <WireframeSection label="Storico mercato" testId="wireframe-region-market-history">
