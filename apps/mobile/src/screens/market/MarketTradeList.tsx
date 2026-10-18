@@ -1,4 +1,9 @@
-import type { FantasyRosterSlot, FantasyTeamSummary, RosterOccupancyEntry } from "@fantappero/contracts";
+import type {
+  FantasyRosterSlot,
+  FantasyTeamSummary,
+  RosterOccupancyEntry,
+  TradeProposal,
+} from "@fantappero/contracts";
 import { useState } from "react";
 import { Pressable, Text, View } from "react-native";
 import { AthleteName } from "../../athletes/AthleteCard";
@@ -8,6 +13,38 @@ import { UiStatePanel } from "../../components/UiStatePanel";
 import { TRADE_STATUS_COLOR, TRADE_STATUS_LABEL } from "../../market/marketLabels";
 import { marketUiStyles as styles } from "../../market/marketUiStyles";
 import type { useTradeFlow } from "../../market/useTradeFlow";
+
+type TradeTab = "all" | "received" | "sent" | "done";
+const OPEN_STATUSES = new Set(["proposed", "countered", "accepted", "pending_approval"]);
+
+function TradeSide({
+  title,
+  athletes,
+  credits,
+}: {
+  title: string;
+  athletes: TradeProposal["offeredAthletes"];
+  credits: number;
+}) {
+  return (
+    <View style={{ gap: 6 }}>
+      <Text style={styles.sideLabel}>{title}</Text>
+      {athletes.length === 0 ? <Text style={styles.meta}>—</Text> : null}
+      {athletes.map((athlete) => (
+        <View key={athlete.id} style={styles.miniPlayer}>
+          <AthleteName athleteId={athlete.id} style={styles.optionLabel}>
+            {athlete.name}
+          </AthleteName>
+        </View>
+      ))}
+      {credits > 0 ? (
+        <View style={styles.creditsChip}>
+          <Text style={styles.creditsChipLabel}>{`+ ${credits} crediti`}</Text>
+        </View>
+      ) : null}
+    </View>
+  );
+}
 
 function toggleId(list: string[], id: string): string[] {
   return list.includes(id) ? list.filter((row) => row !== id) : [...list, id];
@@ -31,6 +68,7 @@ export function MarketTradeList({
   ownedSlots: FantasyRosterSlot[];
   canManageMarket: boolean;
 }) {
+  const [tab, setTab] = useState<TradeTab>("all");
   const [counteringProposalId, setCounteringProposalId] = useState<string | null>(null);
   const [counterOfferedAthleteIds, setCounterOfferedAthleteIds] = useState<string[]>([]);
   const [counterRequestedAthleteIds, setCounterRequestedAthleteIds] = useState<string[]>([]);
@@ -73,9 +111,39 @@ export function MarketTradeList({
       .then(() => setCounteringProposalId(null));
   }
 
+  const received = trade.proposals.filter(
+    (row) => row.recipientTeamId === selfTeamId && OPEN_STATUSES.has(row.status),
+  );
+  const sent = trade.proposals.filter(
+    (row) => row.proposerTeamId === selfTeamId && OPEN_STATUSES.has(row.status),
+  );
+  const done = trade.proposals.filter((row) => !OPEN_STATUSES.has(row.status));
+  const visible =
+    tab === "all" ? trade.proposals : tab === "received" ? received : tab === "sent" ? sent : done;
+  const tabs: Array<{ id: TradeTab; label: string; count: number }> = [
+    { id: "all", label: "Tutte", count: trade.proposals.length },
+    { id: "received", label: "Ricevute", count: received.length },
+    { id: "sent", label: "Inviate", count: sent.length },
+    { id: "done", label: "Concluse", count: done.length },
+  ];
+
   return (
-    <View style={styles.section} testID="wireframe-region-market-trade">
-      <Text style={styles.sectionTitle}>Proposte di scambio</Text>
+    <View style={{ gap: 12 }} testID="wireframe-region-market-trade">
+      <View style={styles.pillRow} testID="market-trade-tabs">
+        {tabs.map((item) => (
+          <Pressable
+            key={item.id}
+            style={[styles.pill, tab === item.id && styles.pillActive]}
+            onPress={() => setTab(item.id)}
+            accessibilityState={{ selected: tab === item.id }}
+            testID={`market-trade-tab-${item.id}`}
+          >
+            <Text style={[styles.pillLabel, tab === item.id && styles.pillLabelActive]}>
+              {item.count > 0 ? `${item.label} ${item.count}` : item.label}
+            </Text>
+          </Pressable>
+        ))}
+      </View>
 
       {trade.loading ? (
         <UiStatePanel
@@ -95,11 +163,15 @@ export function MarketTradeList({
         />
       ) : null}
 
-      {!trade.loading && !trade.loadError && trade.proposals.length === 0 ? (
+      {!trade.loading && !trade.loadError && visible.length === 0 ? (
         <UiStatePanel
           state="empty"
           title="Nessuna proposta"
-          message="Non ci sono proposte di scambio inviate o ricevute."
+          message={
+            trade.proposals.length === 0
+              ? "Non ci sono proposte di scambio inviate o ricevute."
+              : "Nessuna proposta in questa sezione."
+          }
           testID="market-trade-empty"
         />
       ) : null}
@@ -113,9 +185,9 @@ export function MarketTradeList({
         />
       ) : null}
 
-      {!trade.loading && !trade.loadError && trade.proposals.length > 0 ? (
-        <View testID="market-trade-list">
-          {trade.proposals.map((proposal) => {
+      {!trade.loading && !trade.loadError && visible.length > 0 ? (
+        <View testID="market-trade-list" style={{ gap: 12 }}>
+          {visible.map((proposal) => {
             const isProposer = proposal.proposerTeamId === selfTeamId;
             const isRecipient = proposal.recipientTeamId === selfTeamId;
             const pending = trade.actionPendingId === proposal.id;
@@ -123,11 +195,11 @@ export function MarketTradeList({
             return (
               <View
                 key={proposal.id}
-                style={styles.listRow}
+                style={[styles.proposalCard, isRecipient && proposal.status === "proposed" && styles.proposalCardMine]}
                 testID={`market-trade-proposal-${proposal.id}`}
               >
-                <View style={styles.rowActions}>
-                  <Text style={styles.meta}>
+                <View style={styles.proposalHead}>
+                  <Text style={styles.proposalTitle}>
                     {teamNameFor(proposal.proposerTeamId)} → {teamNameFor(proposal.recipientTeamId)}
                   </Text>
                   <StatusBadge
@@ -136,42 +208,13 @@ export function MarketTradeList({
                     textColor={statusColor.text}
                   />
                 </View>
-                <View style={{ flexDirection: "row", flexWrap: "wrap" }}>
-                  <Text style={styles.meta}>Offerti: </Text>
-                  {proposal.offeredAthletes.length === 0 ? (
-                    <Text style={styles.meta}>—</Text>
-                  ) : (
-                    proposal.offeredAthletes.map((athlete, index) => (
-                      <View key={athlete.id} style={{ flexDirection: "row" }}>
-                        {index > 0 ? <Text style={styles.meta}>, </Text> : null}
-                        <AthleteName athleteId={athlete.id} style={styles.meta}>
-                          {athlete.name}
-                        </AthleteName>
-                      </View>
-                    ))
-                  )}
-                  {proposal.offeredCredits > 0 ? (
-                    <Text style={styles.meta}>{` + ${proposal.offeredCredits} crediti`}</Text>
-                  ) : null}
-                </View>
-                <View style={{ flexDirection: "row", flexWrap: "wrap" }}>
-                  <Text style={styles.meta}>Richiesti: </Text>
-                  {proposal.requestedAthletes.length === 0 ? (
-                    <Text style={styles.meta}>—</Text>
-                  ) : (
-                    proposal.requestedAthletes.map((athlete, index) => (
-                      <View key={athlete.id} style={{ flexDirection: "row" }}>
-                        {index > 0 ? <Text style={styles.meta}>, </Text> : null}
-                        <AthleteName athleteId={athlete.id} style={styles.meta}>
-                          {athlete.name}
-                        </AthleteName>
-                      </View>
-                    ))
-                  )}
-                  {proposal.requestedCredits > 0 ? (
-                    <Text style={styles.meta}>{` + ${proposal.requestedCredits} crediti`}</Text>
-                  ) : null}
-                </View>
+                {proposal.expiresAt ? (
+                  <Text style={styles.meta}>
+                    {`Scade il ${new Date(proposal.expiresAt).toLocaleString("it-IT", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}`}
+                  </Text>
+                ) : null}
+                <TradeSide title="Offre" athletes={proposal.offeredAthletes} credits={proposal.offeredCredits} />
+                <TradeSide title="Chiede" athletes={proposal.requestedAthletes} credits={proposal.requestedCredits} />
 
                 {proposal.status === "proposed" && isProposer ? (
                   <Pressable

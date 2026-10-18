@@ -44,8 +44,6 @@ import {
   LIVE_LOT_STATUS_LABEL,
   LIVE_SESSION_STATUS_COLOR,
   LIVE_SESSION_STATUS_LABEL,
-  NOMINATION_MODE_HINT,
-  NOMINATION_MODE_OPTIONS,
   NOMINATION_MODE_SHORT_LABEL,
 } from "../market/liveAuctionLabels";
 import { marketUiStyles as styles } from "../market/marketUiStyles";
@@ -53,6 +51,7 @@ import { useLiveAuctionPolling } from "../market/useLiveAuctionPolling";
 import { useMarketGate } from "../market/useMarketGate";
 import { getApiErrorMessage, useAuthSession } from "../session/DemoSessionContext";
 import { LiveAuctionTable } from "./auction-live/LiveAuctionTable";
+import { LiveSessionConfigForm } from "./auction-live/LiveSessionConfigForm";
 
 /**
  * Asta a rilanci: sessione live, lotti e rilanci collegati alle API reali
@@ -389,94 +388,33 @@ export function AuctionLiveScreen() {
       ) : null}
 
       {!loading && !loadError && canManageSession && !currentSession ? (
-        <View style={styles.section} testID="auction-live-create">
-          <Text style={styles.sectionTitle}>Crea sessione asta a rilanci</Text>
-
-          <Text style={styles.fieldLabel}>Apertura (AAAA-MM-GG HH:MM)</Text>
-          <TextInput style={styles.input} value={opensAt} onChangeText={setOpensAt} placeholder="2026-09-10 20:00" autoCapitalize="none" autoCorrect={false} testID="auction-live-opens-at" />
-          <Text style={styles.fieldLabel}>Chiusura (AAAA-MM-GG HH:MM)</Text>
-          <TextInput style={styles.input} value={closesAt} onChangeText={setClosesAt} placeholder="2026-09-10 23:00" autoCapitalize="none" autoCorrect={false} testID="auction-live-closes-at" />
-
-          <Text style={styles.fieldLabel}>Modalità di chiamata</Text>
-          <View style={styles.chipRow}>
-            {NOMINATION_MODE_OPTIONS.map((option) => (
-              <Pressable
-                key={option.value}
-                style={[styles.chip, nominationMode === option.value && styles.chipActive]}
-                onPress={() => setNominationMode(option.value)}
-                testID={`auction-live-mode-${option.value}`}
-              >
-                <Text style={[styles.chipLabel, nominationMode === option.value && styles.chipLabelActive]}>
-                  {option.label}
-                </Text>
-              </Pressable>
-            ))}
-          </View>
-          <Text style={styles.meta} testID="auction-live-mode-hint">
-            {NOMINATION_MODE_HINT[nominationMode]}
-          </Text>
-
-          <Text style={styles.fieldLabel}>Incremento minimo (crediti)</Text>
-          <TextInput style={styles.input} value={minIncrement} onChangeText={setMinIncrement} keyboardType="numeric" testID="auction-live-min-increment" />
-          <Text style={styles.fieldLabel}>Soft-close (secondi)</Text>
-          <TextInput style={styles.input} value={softClose} onChangeText={setSoftClose} keyboardType="numeric" testID="auction-live-soft-close" />
-          <Text style={styles.fieldLabel}>Durata lotto (secondi)</Text>
-          <TextInput style={styles.input} value={lotDuration} onChangeText={setLotDuration} keyboardType="numeric" testID="auction-live-lot-duration" />
-
-          <OptionPicker
-            label="Delegato (opzionale)"
-            options={memberOptions}
-            value={operatorUserId}
-            onChange={setOperatorUserId}
-            placeholder="Nessun delegato — solo admin"
-            testID="auction-live-operator"
-          />
-
-          {nominationMode === "sequential" ? (
-            <View testID="auction-live-queue-picker">
-              <Text style={styles.fieldLabel}>Lista di chiamata</Text>
-              <View style={styles.chipRow}>
-                {entries.map((entry) => {
-                  const owned = ownedAthleteIds.has(entry.athleteId);
-                  const active = queueAthleteIds.includes(entry.athleteId);
-                  return (
-                    <View
-                      key={entry.athleteId}
-                      style={[styles.chip, { flexDirection: "row", alignItems: "center" }, active && styles.chipActive, owned && styles.disabled]}
-                    >
-                      <AthleteName
-                        athleteId={entry.athleteId}
-                        style={[styles.chipLabel, active && styles.chipLabelActive]}
-                      >
-                        {entry.canonicalName}
-                      </AthleteName>
-                      <Pressable
-                        disabled={owned}
-                        onPress={() => toggleQueueAthlete(entry.athleteId)}
-                        accessibilityLabel={owned ? `${entry.canonicalName} già assegnato` : `Chiama ${entry.canonicalName}`}
-                      >
-                        <Text style={[styles.chipLabel, active && styles.chipLabelActive]}>
-                          {owned ? " (assegnato)" : active ? " ✓" : " +"}
-                        </Text>
-                      </Pressable>
-                    </View>
-                  );
-                })}
-              </View>
-            </View>
-          ) : null}
-
-          {createError ? <Text style={styles.error} testID="auction-live-create-error">{createError}</Text> : null}
-          <Pressable
-            style={[styles.button, (creating || !marketOpen) && styles.disabled]}
-            disabled={creating || !marketOpen}
-            onPress={() => void handleCreateSession()}
-            testID="auction-live-create-submit"
-          >
-            <Text style={styles.buttonLabel}>{creating ? "Creazione…" : "Crea sessione"}</Text>
-          </Pressable>
-        </View>
+        <LiveSessionConfigForm
+          opensAt={opensAt}
+          onOpensAtChange={setOpensAt}
+          closesAt={closesAt}
+          onClosesAtChange={setClosesAt}
+          nominationMode={nominationMode}
+          onNominationModeChange={setNominationMode}
+          minIncrement={minIncrement}
+          onMinIncrementChange={setMinIncrement}
+          softClose={softClose}
+          onSoftCloseChange={setSoftClose}
+          lotDuration={lotDuration}
+          onLotDurationChange={setLotDuration}
+          operatorUserId={operatorUserId}
+          onOperatorUserIdChange={setOperatorUserId}
+          memberOptions={memberOptions}
+          entries={entries}
+          ownedAthleteIds={ownedAthleteIds}
+          queueAthleteIds={queueAthleteIds}
+          onToggleQueueAthlete={toggleQueueAthlete}
+          createError={createError}
+          creating={creating}
+          disabled={!marketOpen}
+          onSubmit={() => void handleCreateSession()}
+        />
       ) : null}
+
 
       {!loading && !loadError && !canManageSession && !currentSession ? (
         <UiStatePanel

@@ -107,6 +107,12 @@ export function MarketScreen() {
   const otherTeams = useMemo(() => teams.filter((row) => row.id !== team?.id), [teams, team]);
 
   const trade = useTradeFlow({ leagueId: activeLeagueId, accessToken, active: true });
+  const [showForm, setShowForm] = useState(false);
+  const openStatuses = ["proposed", "countered", "accepted", "pending_approval"];
+  const openTotal = trade.proposals.filter((row) => openStatuses.includes(row.status)).length;
+  const pendingForMe = trade.proposals.filter(
+    (row) => row.recipientTeamId === team?.id && row.status === "proposed",
+  ).length;
   const history = useMarketHistory({ leagueId: activeLeagueId, accessToken, active: true });
 
   const ownedSlots = useMemo(
@@ -275,7 +281,10 @@ export function MarketScreen() {
         requestedCredits: Number(requestedCredits) || 0,
         expiresAt: parsed.toISOString(),
       })
-      .then(resetTradeForm);
+      .then(() => {
+        resetTradeForm();
+        setShowForm(false);
+      });
   }
 
   useEffect(() => {
@@ -288,7 +297,7 @@ export function MarketScreen() {
   }, [activeLeagueId]);
 
   return (
-    <PageContainer title="Mercato" testID="screen-market" refreshing={refreshing} onRefresh={onRefresh}>
+    <PageContainer title="Scambi" testID="screen-market" refreshing={refreshing} onRefresh={onRefresh}>
       <ScreenTabs
         items={MARKET_HUB_TABS}
         activeId="Market"
@@ -355,6 +364,32 @@ export function MarketScreen() {
       ) : null}
 
       {!loading && !loadError && activeLeagueId ? (
+        <View style={{ gap: 12 }}>
+          <View style={styles.statRow} testID="market-trade-stats">
+            <View style={styles.statTile}>
+              <Text style={styles.heroLabel}>Crediti</Text>
+              <Text style={styles.heroValue}>{balance ?? "—"}</Text>
+            </View>
+            <View style={styles.statTile}>
+              <Text style={styles.heroLabel}>Da gestire</Text>
+              <Text style={styles.heroValue}>{pendingForMe}</Text>
+            </View>
+            <View style={styles.statTile}>
+              <Text style={styles.heroLabel}>Aperte</Text>
+              <Text style={styles.heroValue}>{openTotal}</Text>
+            </View>
+          </View>
+          <Pressable
+            style={styles.bigButton}
+            onPress={() => setShowForm((value) => !value)}
+            testID="market-trade-new-toggle"
+          >
+            <Text style={styles.bigButtonLabel}>{showForm ? "Chiudi" : "+ Nuova proposta"}</Text>
+          </Pressable>
+        </View>
+      ) : null}
+
+      {!loading && !loadError && activeLeagueId && showForm ? (
         <MarketTradeCreateForm
           recipientOptions={recipientOptions}
           recipientTeamId={recipientTeamId}

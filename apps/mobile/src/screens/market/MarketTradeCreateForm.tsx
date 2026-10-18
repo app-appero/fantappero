@@ -23,16 +23,18 @@ function AthleteCheckRow({
 }) {
   return (
     <Pressable
-      style={[styles.optionRow, disabled && styles.disabled]}
+      style={[styles.pickRow, checked && styles.pickRowActive, disabled && styles.disabled]}
       onPress={onToggle}
       disabled={disabled}
       accessibilityState={{ disabled, checked }}
       testID={testID}
     >
+      <View style={[styles.checkBox, checked && styles.checkBoxActive]}>
+        {checked ? <Text style={styles.pillLabelActive}>✓</Text> : null}
+      </View>
       <AthleteName athleteId={athleteId} style={styles.optionLabel}>
         {label}
       </AthleteName>
-      <Text style={styles.meta}>{checked ? "☑" : "☐"}</Text>
     </Pressable>
   );
 }
@@ -85,8 +87,8 @@ export function MarketTradeCreateForm({
 }) {
   const canPropose = ownedSlots.length > 0;
   return (
-    <View style={styles.section} testID="market-trade-form-section">
-      <Text style={styles.sectionTitle}>Nuova proposta di scambio</Text>
+    <View style={styles.heroCard} testID="market-trade-form-section">
+      <Text style={styles.sectionTitle}>Nuova proposta</Text>
       {canPropose ? null : (
         <UiStatePanel
           state="empty"
@@ -106,7 +108,7 @@ export function MarketTradeCreateForm({
           testID="market-trade-recipient"
         />
 
-        <Text style={styles.fieldLabel}>Giocatori offerti (dalla tua rosa)</Text>
+        <Text style={styles.fieldLabel}>Offri · dalla tua rosa</Text>
         <View testID="market-trade-offered-athletes">
           {canPropose ? (
             ownedSlots.map((slot) => (
@@ -124,7 +126,7 @@ export function MarketTradeCreateForm({
           )}
         </View>
 
-        <Text style={styles.fieldLabel}>Giocatori richiesti</Text>
+        <Text style={styles.fieldLabel}>Chiedi · dalla rosa di lui</Text>
         <View testID="market-trade-requested-athletes">
           {!recipientTeamId ? <Text style={styles.meta}>Scegli prima una squadra destinataria.</Text> : null}
           {recipientTeamId && recipientRosterLoading ? (
@@ -208,12 +210,12 @@ export function MarketTradeCreateForm({
         ) : null}
 
         <Pressable
-          style={[styles.button, (creating || !recipientTeamId || !canPropose) && styles.disabled]}
+          style={[styles.bigButton, (creating || !recipientTeamId || !canPropose) && styles.disabled]}
           disabled={creating || !recipientTeamId || !canPropose}
           onPress={onSubmit}
           testID="market-trade-create-submit"
         >
-          <Text style={styles.buttonLabel}>{creating ? "Invio…" : "Proponi scambio"}</Text>
+          <Text style={styles.bigButtonLabel}>{creating ? "Invio…" : "Invia proposta"}</Text>
         </Pressable>
       </View>
     </View>
