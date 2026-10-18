@@ -3940,7 +3940,9 @@ h2 {
   .fa-versus .fa-mrow { padding: 6px 8px; gap: 6px; }
   .fa-versus .fa-mrow__role { width: 20px; height: 20px; font-size: 10px; }
   .fa-versus .fa-mrow__name { font-size: 13px; }
-  .fa-versus .fa-mrow__team { display: none; }
-  .fa-versus .fa-mrow__vote { padding: 2px 7px; font-size: 11px; }
+    .fa-versus .fa-mrow__vote { padding: 2px 7px; font-size: 11px; }
   .fa-versus .fa-mrow__countdown { font-size: 10px; padding: 1px 5px; }
 }
+
+.fa-mrow__countdown--under { align-self: flex-start; margin-top: 2px; }
+.fa-versus .fa-mrow__team { display: none; }
