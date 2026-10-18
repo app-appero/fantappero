@@ -453,11 +453,12 @@ export function MatchupDetailPage() {
               </div>
               {view === "affiancata" && detail.away ? (
                 <RosterVersus home={detail.home} away={detail.away} />
-              ) : null}
-              <div className="fa-pitch-row" hidden={view === "affiancata" && Boolean(detail.away)}>
-                <SideBlock side={detail.home} title="home" />
-                {detail.away ? <SideBlock side={detail.away} title="away" /> : null}
-              </div>
+              ) : (
+                <div className="fa-pitch-row">
+                  <SideBlock side={detail.home} title="home" />
+                  {detail.away ? <SideBlock side={detail.away} title="away" /> : null}
+                </div>
+              )}
             </>
           )}
         </div>
