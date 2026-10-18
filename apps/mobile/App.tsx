@@ -1,5 +1,7 @@
+import { BarlowCondensed_800ExtraBold_Italic } from "@expo-google-fonts/barlow-condensed";
 import { theme } from "@fantappero/ui/theme";
 import { NavigationContainer } from "@react-navigation/native";
+import { useFonts } from "expo-font";
 import { StatusBar } from "expo-status-bar";
 import { View } from "react-native";
 import { GlobalListoneRefreshBar, ListoneRefreshProvider } from "./src/admin/ListoneRefreshContext";
@@ -34,6 +36,8 @@ function ThemedShell() {
 }
 
 export default function App() {
+  // I font si caricano in background: finché non sono pronti vale il font di sistema.
+  useFonts({ BarlowCondensed_800ExtraBold_Italic });
   return (
     <AppThemeProvider>
       <ThemedShell />

@@ -1,3 +1,5 @@
+import Feather from "@expo/vector-icons/Feather";
+import { theme } from "@fantappero/ui/theme";
 import { useState } from "react";
 import { Pressable, Switch, Text, View } from "react-native";
 import { marketUiStyles as styles } from "./marketUiStyles";
@@ -21,12 +23,13 @@ export function MarketGateBar() {
         </View>
         <Pressable
           style={styles.gateInfo}
+          hitSlop={8}
           accessibilityRole="button"
           accessibilityLabel="Informazioni sul mercato"
           testID="market-gate-info"
           onPress={() => setInfoOpen((open) => !open)}
         >
-          <Text style={styles.gateInfoLabel}>i</Text>
+          <Feather name="info" size={18} color={theme.colors.accent} />
         </Pressable>
         <View style={styles.gateSpacer} />
         {canManage ? (

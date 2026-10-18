@@ -1,3 +1,4 @@
+import { DISPLAY_FONT } from "../theme/fonts";
 import { lazyStyles } from "../theme/lazyStyles";
 import { theme } from "@fantappero/ui/theme";
 import { StyleSheet } from "react-native";
@@ -7,13 +8,17 @@ const { colors, spacing, typography, radius } = theme;
 export const marketUiStyles = lazyStyles(() => StyleSheet.create({
   section: {
     padding: spacing.md,
-    borderRadius: radius.md,
+    borderRadius: radius.xl,
+    borderWidth: 1,
+    borderColor: colors.border,
     backgroundColor: colors.backgroundElevated,
     gap: spacing.sm,
   },
   sectionTitle: {
-    fontSize: typography.fontSize.lg,
-    fontWeight: typography.fontWeight.semibold,
+    fontSize: 26,
+    lineHeight: 28,
+    fontFamily: DISPLAY_FONT,
+    textTransform: "uppercase",
     color: colors.foreground,
   },
   rowActions: {
@@ -135,12 +140,12 @@ export const marketUiStyles = lazyStyles(() => StyleSheet.create({
   input: {
     borderWidth: 1,
     borderColor: colors.border,
-    borderRadius: radius.md,
-    paddingHorizontal: spacing.md,
+    borderRadius: radius.pill,
+    paddingHorizontal: spacing.md + 4,
     paddingVertical: spacing.sm,
     color: colors.foreground,
     backgroundColor: colors.background,
-    minHeight: 44,
+    minHeight: 48,
   },
   fieldLabel: {
     fontSize: typography.fontSize.sm,
@@ -304,11 +309,11 @@ export const marketUiStyles = lazyStyles(() => StyleSheet.create({
     flex: 1,
   },
   gateInfo: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    borderWidth: 1,
-    borderColor: colors.border,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    borderWidth: 1.5,
+    borderColor: colors.accent,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -331,7 +336,7 @@ export const marketUiStyles = lazyStyles(() => StyleSheet.create({
     backgroundColor: colors.backgroundElevated,
   },
   heroLabel: { color: colors.foregroundMuted, fontSize: 11, letterSpacing: 1.4, textTransform: "uppercase" },
-  heroValue: { color: colors.foreground, fontSize: 30, lineHeight: 34, fontStyle: "italic", fontWeight: "800" },
+  heroValue: { color: colors.foreground, fontSize: 30, lineHeight: 34, fontFamily: DISPLAY_FONT },
   statRow: { flexDirection: "row", gap: spacing.xs },
   statTile: {
     flex: 1,
@@ -413,7 +418,7 @@ export const marketUiStyles = lazyStyles(() => StyleSheet.create({
     backgroundColor: colors.border,
   },
   stepperBtnLabel: { color: colors.foreground, fontSize: 20, fontWeight: "700" },
-  stepperValue: { color: colors.foreground, fontSize: 24, fontStyle: "italic", fontWeight: "800" },
+  stepperValue: { color: colors.foreground, fontSize: 24, fontFamily: DISPLAY_FONT },
   summaryRow: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -474,4 +479,23 @@ export const marketUiStyles = lazyStyles(() => StyleSheet.create({
     justifyContent: "center",
   },
   checkBoxActive: { backgroundColor: colors.brand, borderColor: colors.brand },
+  proposalAvatar: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.brand,
+  },
+  proposalAvatarLabel: { color: colors.onBrand, fontFamily: DISPLAY_FONT, fontSize: 15 },
+  swapBadge: {
+    alignSelf: "center",
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.brand,
+  },
+  swapBadgeLabel: { color: colors.onBrand, fontSize: 16, fontWeight: "700" },
 }));

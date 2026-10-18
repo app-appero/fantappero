@@ -42,7 +42,7 @@ export function AuctionAdminPanel({
 }) {
   return (
     <View style={styles.section} testID={`wireframe-region-${testIdPrefix}-admin`}>
-      <Text style={styles.sectionTitle}>Gestione sessione (admin)</Text>
+      <Text style={styles.sectionTitle}>Gestione sessione</Text>
 
       {flow.loading ? (
         <UiStatePanel
@@ -147,6 +147,8 @@ export function AuctionAdminPanel({
       ) : null}
 
       <View style={styles.field} testID={`${testIdPrefix}-create-session-form`}>
+        <Text style={styles.sectionTitle}>Nuova sessione</Text>
+        <Text style={styles.meta}>Finestra in cui l'asta resta aperta.</Text>
         <Text style={styles.fieldLabel}>Apertura (AAAA-MM-GG HH:MM)</Text>
         <TextInput
           style={styles.input}

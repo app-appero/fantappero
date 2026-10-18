@@ -1,7 +1,9 @@
+import { DISPLAY_FONT } from "../theme/fonts";
 import { lazyStyles } from "../theme/lazyStyles";
 import { useState, type ReactNode } from "react";
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { AppTextInput as TextInput } from "./AppTextInput";
+import Feather from "@expo/vector-icons/Feather";
 import { theme } from "@fantappero/ui/theme";
 
 const { colors, spacing, typography, radius } = theme;
@@ -79,7 +81,7 @@ export function LeagueSelector({
           {current?.label ?? placeholder}
         </Text>
         <View style={styles.pillCaret}>
-          <Text style={styles.pillCaretLabel}>⌄</Text>
+          <Feather name="chevron-down" size={20} color={colors.onBrand} />
         </View>
       </Pressable>
 
@@ -229,7 +231,7 @@ const styles = lazyStyles(() => StyleSheet.create({
   },
   grip: { alignSelf: "center", width: 44, height: 5, borderRadius: 3, backgroundColor: colors.border },
   sheetHead: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
-  sheetTitle: { color: colors.foreground, fontSize: 26, fontStyle: "italic", fontWeight: "800" },
+  sheetTitle: { color: colors.foreground, fontSize: 28, fontFamily: DISPLAY_FONT, textTransform: "uppercase" },
   sheetCount: { color: colors.accent },
   sheetClose: { color: colors.foregroundMuted, fontSize: 20 },
   search: {
