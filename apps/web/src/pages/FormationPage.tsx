@@ -251,11 +251,19 @@ function playerPhotoUrl(roster: LineupRosterPlayer[], athleteId: string): string
 /** `"7.5"`, `"7.5 LIVE"` mentre la partita reale è in corso, o `null` se non ancora giocata. */
 function playerScoreLabel(roster: LineupRosterPlayer[], athleteId: string): string | null {
   const player = roster.find((row) => row.athleteId === athleteId);
-  if (!player || player.fantasyScore == null) {
+  if (!player) {
     return null;
+  }
+  if (player.fantasyScore == null) {
+    return playerIsSv(player) ? "S.V." : null;
   }
   const base = formatFantasyPoints(player.fantasyScore);
   return player.fixtureStatusLabel === "LIVE" ? `${base} LIVE` : base;
+}
+
+/** Titolare senza voto a partita finita: viola fisso (non lampeggia). */
+function playerIsSv(player: LineupRosterPlayer): boolean {
+  return player.fantasyScore == null && player.fixtureStatusLabel === "Terminata";
 }
 
 function probableMark(roster: LineupRosterPlayer[], athleteId: string): string {
@@ -1423,6 +1431,7 @@ export function FormationPage() {
       name: athleteId ? playerName(roster, athleteId) : "Libero",
       role,
       probableStarter: athleteId ? isProbableStarter(athleteId) : false,
+      voteKind: athleteId && roster.some((row) => row.athleteId === athleteId && playerIsSv(row)) ? ("sv" as const) : null,
       probableState: (() => {
         const state = athleteId ? probableState(roster, athleteId) : null;
         return state === "bench" || state === "expelled" || state === "unavailable" ? state : null;

@@ -133,7 +133,7 @@ function PitchPlayerBody({
         ]}
       >
         {player.live ? <LiveGlow /> : null}
-        {player.voteKind === "sv" ? <LiveGlow color="#a855f7" fill="rgba(168,85,247,0.3)" /> : null}
+        {player.voteKind === "sv" ? <View pointerEvents="none" style={styles.svGlow} /> : null}
         {player.photoUrl ? (
           <Image source={{ uri: player.photoUrl }} style={styles.photo} />
         ) : player.shirtNumber != null ? (
@@ -307,6 +307,17 @@ const styles = lazyStyles(() => StyleSheet.create({
     color: "#fff",
     fontSize: 9,
     textAlign: "center",
+  },
+  svGlow: {
+    position: "absolute",
+    top: -4,
+    left: -4,
+    right: -4,
+    bottom: -4,
+    borderRadius: 19,
+    borderWidth: 3,
+    borderColor: "#a855f7",
+    backgroundColor: "rgba(168,85,247,0.25)",
   },
   cardSv: { borderColor: "#c084fc", borderWidth: 2 },
   nameSv: {

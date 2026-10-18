@@ -360,8 +360,12 @@ export function FormationScreen() {
     );
   const playerScoreLabel = (athleteId: string): string | null => {
     const player = roster.find((row) => row.athleteId === athleteId);
-    if (!player || player.fantasyScore == null) {
+    if (!player) {
       return null;
+    }
+    if (player.fantasyScore == null) {
+      // Titolare senza voto a partita finita: S.V. viola fisso.
+      return player.fixtureStatusLabel === "Terminata" ? "S.V." : null;
     }
     const base = formatFantasyPoints(player.fantasyScore);
     return player.fixtureStatusLabel === "LIVE" ? `${base} LIVE` : base;
@@ -753,6 +757,7 @@ export function FormationScreen() {
       name: row ? row.athleteName : null,
       locked: athleteId ? playerLocked(athleteId) : false,
       probable: row?.probableHint === "starter",
+      sv: row ? row.fantasyScore == null && row.fixtureStatusLabel === "Terminata" : false,
       probableState: row ? (() => {
         const tone = probableTone(row);
         return tone === "starter" ? null : tone;
