@@ -19,19 +19,22 @@ export function RosterSectionTabs({
     { id: "storico", label: "Storico" },
   ];
   return (
-    <View style={styles.chipRow} testID="roster-section-tabs">
-      {items.map((item) => (
-        <Pressable
-          key={item.id}
-          style={[styles.chip, pageSection === item.id && styles.chipSelected]}
-          onPress={() => onSelect(item.id)}
-          testID={`roster-section-${item.id}`}
-        >
-          <Text style={[styles.chipLabel, pageSection === item.id && styles.chipLabelSelected]}>
-            {item.label}
-          </Text>
-        </Pressable>
-      ))}
+    <View style={styles.segment} testID="roster-section-tabs">
+      {items.map((item) => {
+        const active = pageSection === item.id;
+        return (
+          <Pressable
+            key={item.id}
+            accessibilityRole="tab"
+            accessibilityState={{ selected: active }}
+            style={[styles.segmentItem, active && styles.segmentItemActive]}
+            onPress={() => onSelect(item.id)}
+            testID={`roster-section-${item.id}`}
+          >
+            <Text style={[styles.segmentLabel, active && styles.segmentLabelActive]}>{item.label}</Text>
+          </Pressable>
+        );
+      })}
     </View>
   );
 }

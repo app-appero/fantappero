@@ -1,5 +1,6 @@
 import { lazyStyles } from "../theme/lazyStyles";
 import { theme } from "@fantappero/ui/theme";
+import { DISPLAY_FONT } from "../theme/fonts";
 import {
   RefreshControl,
   ScrollView,
@@ -76,8 +77,10 @@ const styles = lazyStyles(() => StyleSheet.create({
   },
   title: {
     color: colors.foreground,
-    fontSize: typography.fontSize["2xl"],
-    fontWeight: typography.fontWeight.semibold,
+    fontFamily: DISPLAY_FONT,
+    fontSize: 44,
+    lineHeight: 46,
+    textTransform: "uppercase",
     marginBottom: spacing.md,
   },
   body: {

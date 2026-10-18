@@ -1,4 +1,5 @@
 import type { CreditAccount, FantasyTeamSummary } from "@fantappero/contracts";
+import { theme } from "@fantappero/ui/theme";
 import { useState } from "react";
 import { Modal, Pressable, ScrollView, Text, View } from "react-native";
 import { AppTextInput as TextInput } from "../../components/AppTextInput";
@@ -44,46 +45,24 @@ export function RosterCreditsPanel({
   rosterSize?: number | null;
 }) {
   const [open, setOpen] = useState(false);
+  const [teamsOpen, setTeamsOpen] = useState(false);
+  const canSwitch = isAdmin && leagueTeams.length > 1;
 
   return (
     <View style={styles.credits} testID="roster-credits">
-      {isAdmin && leagueTeams.length > 0 ? (
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={[styles.chipRow, styles.chipRowNowrap]}
-          testID="roster-admin-team"
-        >
-          {leagueTeams.map((row) => {
-            const selected = row.id === adminTeamId;
-            return (
-              <Pressable
-                key={row.id}
-                style={[styles.chip, selected && styles.chipSelected]}
-                disabled={adminBusy || adjusting}
-                onPress={() => onSelectAdminTeam(row.id)}
-              >
-                <Text style={[styles.chipLabel, selected && styles.chipLabelSelected]} numberOfLines={1}>
-                  {row.name}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </ScrollView>
-      ) : null}
       <View style={styles.heroCard}>
         {teamName ? (
           <View style={styles.heroTop}>
             <Text style={styles.heroName} numberOfLines={1}>
               {teamName}
             </Text>
-            {isAdmin ? (
+            {canSwitch ? (
               <Pressable
                 style={styles.creditsButton}
-                onPress={() => setOpen(true)}
-                testID="roster-admin-credits"
+                onPress={() => setTeamsOpen(true)}
+                testID="roster-admin-team"
               >
-                <Text style={styles.creditsButtonLabel}>Aggiusta crediti</Text>
+                <Text style={styles.creditsButtonLabel}>Cambia</Text>
               </Pressable>
             ) : null}
           </View>
@@ -104,7 +83,7 @@ export function RosterCreditsPanel({
             </View>
           ) : null}
         </View>
-        {!teamName && isAdmin ? (
+        {isAdmin ? (
           <Pressable
             style={styles.creditsButton}
             onPress={() => setOpen(true)}
@@ -114,6 +93,35 @@ export function RosterCreditsPanel({
           </Pressable>
         ) : null}
       </View>
+      <Modal visible={teamsOpen} transparent animationType="slide" onRequestClose={() => setTeamsOpen(false)}>
+        <Pressable style={styles.adjustBackdrop} onPress={() => setTeamsOpen(false)}>
+          <Pressable style={styles.adjustSheet} onPress={() => undefined} testID="roster-admin-team-sheet">
+            <Text style={styles.blockTitle}>Squadra</Text>
+            <ScrollView style={{ maxHeight: 420 }} contentContainerStyle={{ gap: 6 }}>
+              {leagueTeams.map((row) => {
+                const selected = row.id === adminTeamId;
+                return (
+                  <Pressable
+                    key={row.id}
+                    style={[styles.moveRow, selected && { borderColor: theme.colors.brand }]}
+                    disabled={adminBusy || adjusting}
+                    onPress={() => {
+                      onSelectAdminTeam(row.id);
+                      setTeamsOpen(false);
+                    }}
+                  >
+                    <Text style={[styles.moveTitle, { flex: 1 }]} numberOfLines={1}>
+                      {row.name}
+                    </Text>
+                    <Text style={styles.moveDate}>{`${row.filledSlots}/${row.rosterSize}`}</Text>
+                    {selected ? <Text style={styles.moveTitle}>✓</Text> : null}
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
+          </Pressable>
+        </Pressable>
+      </Modal>
       <Modal
         visible={open}
         transparent

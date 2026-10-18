@@ -829,9 +829,7 @@ export function RosterScreen() {
         testID="market-hub-tabs"
       />
       <MarketGateBar />
-      <Text style={styles.meta}>
-        {activeLeague ? `Lega: ${activeLeague.name}` : "Seleziona una lega dal selettore in alto."}
-      </Text>
+      {activeLeague ? null : <Text style={styles.meta}>Seleziona una lega dal selettore in alto.</Text>}
 
       {!loading && canView && !loadError ? (
         <RosterSectionTabs pageSection={pageSection} onSelect={setPageSection} showListone={canEdit} />
@@ -904,7 +902,7 @@ export function RosterScreen() {
         />
       ) : null}
 
-      {pageSection === "rosa" && !loading && canView && !loadError && (viewedTeam || team) ? (
+      {pageSection !== "storico" && !loading && canView && !loadError && (viewedTeam || team) ? (
         <RosterCreditsPanel
           isAdmin={isAdmin}
           leagueTeams={leagueTeams}
@@ -957,7 +955,7 @@ export function RosterScreen() {
       ) : null}
 
       {pageSection === "rosa" && !loading && canView && !loadError && viewedTeam && isEmpty ? (
-        <RosterEmptyState viewedTeam={viewedTeam} />
+        <RosterEmptyState viewedTeam={viewedTeam} onGoAuction={() => navigation.navigate("Auction")} />
       ) : null}
 
       {pageSection === "rosa" && !loading && canView && !loadError && viewedTeam && !isEmpty ? (
