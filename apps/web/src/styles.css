@@ -3799,3 +3799,137 @@ h2 {
     font-size: 1.3rem;
   }
 }
+
+/* ── Scontro: righe giocatore, tab panchina/tribuna, vista affiancata ── */
+.fa-mview {
+  display: inline-flex;
+  gap: 4px;
+  padding: 4px;
+  border-radius: 999px;
+  border: 1px solid var(--fa-border, rgba(255, 255, 255, 0.16));
+  align-self: flex-start;
+}
+.fa-mview__btn {
+  border: 0;
+  background: transparent;
+  color: inherit;
+  padding: 8px 18px;
+  border-radius: 999px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.fa-mview__btn--active {
+  background: var(--fa-gradient-accent, linear-gradient(135deg, #3560f0, #7a4dff));
+  color: #fff;
+}
+.fa-pitch-row--split {
+  display: grid !important;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+.fa-mlist {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.fa-mrow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  border: 1px solid var(--fa-border, rgba(255, 255, 255, 0.12));
+  background: rgba(255, 255, 255, 0.05);
+  min-width: 0;
+}
+.fa-mrow--dim { opacity: 0.6; }
+.fa-mrow__order { font-style: italic; font-weight: 800; color: #9db8ff; min-width: 26px; }
+.fa-mrow__role {
+  flex: 0 0 auto;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 800;
+  color: #11162b;
+}
+.fa-mrow__role--gk { background: #ffd23f; }
+.fa-mrow__role--def { background: #38bdf8; }
+.fa-mrow__role--mid { background: #b58cff; }
+.fa-mrow__role--fwd { background: #ff6b8a; }
+.fa-mrow__body { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.fa-mrow__name { font-weight: 600; display: inline-flex; align-items: center; gap: 6px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fa-mrow__team { font-size: 12px; opacity: 0.7; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fa-mrow__countdown {
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  font-size: 11px;
+  font-weight: 700;
+  font-family: ui-monospace, monospace;
+  white-space: nowrap;
+}
+.fa-mrow__vote {
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.fa-mrow__vote--live { background: linear-gradient(135deg, #2563eb, #3b82f6); color: #fff; }
+.fa-mrow__vote--provisional { border: 1.5px dashed rgba(255, 255, 255, 0.75); }
+.fa-mrow__vote--sv { background: linear-gradient(135deg, #6d28d9, #a855f7); color: #fff; box-shadow: 0 0 10px rgba(168, 85, 247, 0.7); }
+.fa-mrow--live {
+  border-color: #60a5fa;
+  background: rgba(59, 130, 246, 0.14);
+  animation: fa-mrow-live 1.2s ease-in-out infinite;
+}
+.fa-mrow--sv {
+  border-color: #c084fc;
+  background: rgba(168, 85, 247, 0.14);
+  box-shadow: 0 0 12px rgba(168, 85, 247, 0.45);
+}
+@keyframes fa-mrow-live {
+  0%, 100% { box-shadow: 0 0 0 1px rgba(59, 130, 246, 0.4), 0 0 6px rgba(59, 130, 246, 0.4); }
+  50% { box-shadow: 0 0 0 2px rgba(96, 165, 250, 0.95), 0 0 18px 4px rgba(59, 130, 246, 0.9); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .fa-mrow--live { animation: none; box-shadow: 0 0 0 2px rgba(96, 165, 250, 0.95), 0 0 12px 3px rgba(59, 130, 246, 0.7); }
+}
+.fa-mtabs { display: flex; flex-direction: column; gap: 8px; }
+.fa-mtabs__bar {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  border-radius: 999px;
+  border: 1px solid var(--fa-border, rgba(255, 255, 255, 0.16));
+}
+.fa-mtabs__tab {
+  flex: 1;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  padding: 9px 14px;
+  border-radius: 999px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.fa-mtabs__tab--active { background: var(--fa-gradient-accent, linear-gradient(135deg, #3560f0, #7a4dff)); color: #fff; }
+.fa-mtabs__count { opacity: 0.8; }
+.fa-mtabs__hint, .fa-mtabs__empty { margin: 0; font-size: 12px; opacity: 0.7; }
+@media (max-width: 700px) {
+  .fa-pitch-row--split { gap: 8px; }
+  .fa-pitch-row--split .fa-mrow { padding: 6px 8px; gap: 6px; }
+  .fa-pitch-row--split .fa-mrow__role { width: 20px; height: 20px; font-size: 10px; }
+  .fa-pitch-row--split .fa-mrow__name { font-size: 13px; }
+  .fa-pitch-row--split .fa-mrow__team { display: none; }
+  .fa-pitch-row--split .fa-mrow__vote { padding: 2px 7px; font-size: 11px; }
+  .fa-pitch-row--split .fa-mtabs__tab { padding: 7px 4px; font-size: 12px; }
+}

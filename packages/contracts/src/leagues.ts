@@ -563,6 +563,8 @@ export interface H2HPlayerScore {
   fixtureStatus?: string | null;
   fixtureStatusLabel?: string;
   scoreFinal?: boolean;
+  /** Calcio d'inizio della partita reale del giocatore (per il countdown). */
+  kickoffAt?: string | null;
   isEffectiveStarter: boolean;
   isBench: boolean;
 }

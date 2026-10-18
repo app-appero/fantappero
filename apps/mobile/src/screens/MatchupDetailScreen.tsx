@@ -15,7 +15,8 @@ import { useNavigation, useRoute, type RouteProp } from "@react-navigation/core"
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useCallback, useEffect, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
-import { AthleteName, useAthleteCard } from "../athletes/AthleteCard";
+import { useAthleteCard } from "../athletes/AthleteCard";
+import { BenchTabs, StartersList } from "../components/match/MatchupLists";
 import { fetchH2HMatchup } from "../api/leagues";
 import { PitchView } from "../components/match/PitchView";
 import { StatusBadge } from "../components/StatusBadge";
@@ -49,36 +50,6 @@ function toFantasyPitchPlayers(players: readonly H2HPlayerScore[]) {
   }));
 }
 
-function BenchRow({ player }: { player: H2HPlayerScore }) {
-  const scoreLabel = playerScoreLabel(player);
-  return (
-    <View style={styles.playerScore} testID={`matchup-bench-player-${player.athleteId}`}>
-      <View style={styles.benchLine}>
-        <AthleteName athleteId={player.athleteId} style={styles.playerName}>
-          {player.name}
-        </AthleteName>
-        <Text style={styles.body}>
-          {" "}
-          ({player.role}) · {player.realTeamName ?? "Squadra reale non associata"}
-        </Text>
-        {scoreLabel ? (
-          <Text
-            style={[
-              styles.body,
-              playerVoteState(player).kind === "sv" ? { color: "#c084fc", fontWeight: "700" } : null,
-              playerVoteState(player).kind === "provisional" ? { color: "#60a5fa", fontWeight: "700" } : null,
-            ]}
-            testID={`matchup-bench-player-score-${player.athleteId}`}
-          >
-            {" "}
-            · {scoreLabel}
-          </Text>
-        ) : null}
-      </View>
-    </View>
-  );
-}
-
 function outcomeLabel(outcome: "home" | "away" | "draw" | null): string {
   if (outcome === "home") {
     return "Vittoria casa";
@@ -92,11 +63,13 @@ function outcomeLabel(outcome: "home" | "away" | "draw" | null): string {
   return "Esito non disponibile";
 }
 
-function SideBlock({ side, title }: { side: H2HSideLineup; title: string }) {
+type MatchupView = "campo" | "affiancata";
+
+function SideBlock({ side, title, view }: { side: H2HSideLineup; title: string; view: MatchupView }) {
   const athleteCard = useAthleteCard();
   const teamLabel = side.teamName ?? side.displayName;
   return (
-    <View style={styles.side} testID={`matchup-side-${title}`}>
+    <View style={[styles.side, view === "affiancata" ? styles.sideSplit : null]} testID={`matchup-side-${title}`}>
       <Text style={styles.heading}>
         {teamLabel}
         {side.module ? ` · ${side.module}` : ""}
@@ -119,25 +92,30 @@ function SideBlock({ side, title }: { side: H2HSideLineup; title: string }) {
         />
       ) : (
         <View style={styles.lineupGroup}>
-          <PitchView
-            title={`Titolari — ${teamLabel}`}
-            players={toFantasyPitchPlayers(side.starters)}
-            positions={layoutFromModule(
-              side.starters,
-              side.module,
-              (player) => player.role,
-              (player) => player.athleteId,
-              (player) => side.starters.indexOf(player),
-            )}
-            testID={`matchup-pitch-${title}`}
-            onAthletePress={athleteCard?.open}
-          />
+          {view === "campo" ? (
+            <PitchView
+              title={`Titolari — ${teamLabel}`}
+              players={toFantasyPitchPlayers(side.starters)}
+              positions={layoutFromModule(
+                side.starters,
+                side.module,
+                (player) => player.role,
+                (player) => player.athleteId,
+                (player) => side.starters.indexOf(player),
+              )}
+              testID={`matchup-pitch-${title}`}
+              onAthletePress={athleteCard?.open}
+            />
+          ) : (
+            <>
+              <Text style={styles.subheading}>Titolari</Text>
+              <StartersList side={side} title={title} compact />
+            </>
+          )}
           {side.bench.length > 0 ? (
             <>
-              <Text style={styles.subheading}>Panchina</Text>
-              {side.bench.map((player) => (
-                <BenchRow key={player.athleteId} player={player} />
-              ))}
+              <Text style={styles.subheading}>Panchina e tribuna</Text>
+              <BenchTabs side={side} title={title} compact={view === "affiancata"} />
             </>
           ) : null}
         </View>
@@ -155,6 +133,7 @@ export function MatchupDetailScreen() {
   const canView = can(["matchday:view"]);
 
   const [detail, setDetail] = useState<H2HMatchupDetail | null>(null);
+  const [view, setView] = useState<MatchupView>("campo");
   const resultDisplay = describeH2HResult(detail?.result);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -316,9 +295,28 @@ export function MatchupDetailScreen() {
                   {resultDisplay.statusLabel} · {outcomeLabel(detail.result?.outcome ?? null)}
                 </Text>
               </View>
-              <View style={styles.sides}>
-                <SideBlock side={detail.home} title="home" />
-                {detail.away ? <SideBlock side={detail.away} title="away" /> : null}
+              <View style={styles.viewToggle} testID="matchup-view-toggle">
+                {(
+                  [
+                    ["campo", "Campo"],
+                    ["affiancata", "Affiancata"],
+                  ] as const
+                ).map(([id, label]) => (
+                  <Pressable
+                    key={id}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: view === id }}
+                    onPress={() => setView(id)}
+                    style={[styles.viewButton, view === id ? styles.viewButtonActive : null]}
+                    testID={`matchup-view-${id}`}
+                  >
+                    <Text style={[styles.viewLabel, view === id ? styles.viewLabelActive : null]}>{label}</Text>
+                  </Pressable>
+                ))}
+              </View>
+              <View style={view === "affiancata" ? styles.sidesSplit : styles.sides}>
+                <SideBlock side={detail.home} title="home" view={view} />
+                {detail.away ? <SideBlock side={detail.away} title="away" view={view} /> : null}
               </View>
             </>
           )}
@@ -361,6 +359,24 @@ const styles = lazyStyles(() => StyleSheet.create({
   sides: {
     gap: spacing.md,
   },
+  sidesSplit: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: spacing.xs,
+  },
+  viewToggle: {
+    flexDirection: "row",
+    alignSelf: "flex-start",
+    gap: 4,
+    padding: 4,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  viewButton: { paddingHorizontal: spacing.md, paddingVertical: 8, borderRadius: 999 },
+  viewButtonActive: { backgroundColor: colors.brand },
+  viewLabel: { color: colors.foreground, fontWeight: "600" },
+  viewLabelActive: { color: colors.onBrand },
   side: {
     borderWidth: 1,
     borderColor: colors.border,
@@ -369,6 +385,7 @@ const styles = lazyStyles(() => StyleSheet.create({
     gap: spacing.xs,
     backgroundColor: colors.backgroundElevated,
   },
+  sideSplit: { flex: 1, minWidth: 0, padding: spacing.xs },
   lineupGroup: {
     gap: spacing.xs,
   },

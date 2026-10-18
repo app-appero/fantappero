@@ -34,6 +34,7 @@ class RoundAthleteScore:
     fixture_status: str | None = None
     fixture_status_label: str = "Partita non associata"
     score_final: bool = False
+    kickoff_at: datetime | None = None
 
 
 def _fixture_status_label(status: str | None) -> str:
@@ -114,6 +115,7 @@ def compute_round_athlete_scores(
             fixture_status=fixture.status_short,
             fixture_status_label=_fixture_status_label(fixture.status_short),
             score_final=(fixture.status_short or "").upper() in FINISHED_FIXTURE_STATUSES,
+            kickoff_at=fixture.kickoff_at,
         )
 
     stat_club_by_player = {
@@ -194,5 +196,6 @@ def compute_round_athlete_scores(
                 if fixture is not None
                 else prior.score_final
             ),
+            kickoff_at=fixture.kickoff_at if fixture is not None else prior.kickoff_at,
         )
     return snapshots
