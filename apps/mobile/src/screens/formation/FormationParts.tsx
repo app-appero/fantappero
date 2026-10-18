@@ -37,6 +37,8 @@ export type PitchSlot = {
   scoreLabel: string | null;
   /** Titolare probabile: anello e nome verdi. */
   probable?: boolean;
+  /** Titolare senza voto a partita finita: anello e nome viola fissi. */
+  sv?: boolean;
   /** Altri stati dalle formazioni probabili: giallo = possibile panchina, rosso = espulso, grigio = indisponibile. */
   probableState?: ProbableTone | null;
   photoUrl?: string | null;
@@ -159,6 +161,7 @@ export function FormationPitch({
                   styles.circle,
                   { borderColor: roleRingColor(slot.role) },
                   slot.probable ? styles.probableRing : null,
+                  slot.sv ? styles.svRing : null,
                   slot.probableState ? toneRing(slot.probableState) : null,
                   selected ? styles.selectedRing : null,
                 ]}
@@ -179,6 +182,7 @@ export function FormationPitch({
               style={[
                 styles.label,
                 slot.probable ? styles.probableLabel : null,
+                slot.sv ? styles.svLabel : null,
                 slot.probableState ? { backgroundColor: TONE_LABEL_BG[slot.probableState] } : null,
                 empty && selected ? styles.labelSelected : null,
               ]}
@@ -511,6 +515,16 @@ const styles = lazyStyles(() =>
       shadowRadius: 8,
       elevation: 6,
     },
+    svRing: {
+      borderColor: "#c084fc",
+      borderWidth: 4,
+      shadowColor: "#a855f7",
+      shadowOffset: { width: 0, height: 0 },
+      shadowOpacity: 1,
+      shadowRadius: 8,
+      elevation: 6,
+    },
+    svLabel: { backgroundColor: "#7c3aed" },
     probableLabel: {
       backgroundColor: "#0b8a6b",
     },
