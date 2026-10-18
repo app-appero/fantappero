@@ -3822,11 +3822,6 @@ h2 {
   background: var(--fa-gradient-accent, linear-gradient(135deg, #3560f0, #7a4dff));
   color: #fff;
 }
-.fa-pitch-row--split {
-  display: grid !important;
-  grid-template-columns: 1fr 1fr;
-  gap: 16px;
-}
 .fa-mlist {
   list-style: none;
   margin: 0;
@@ -3924,12 +3919,28 @@ h2 {
 .fa-mtabs__tab--active { background: var(--fa-gradient-accent, linear-gradient(135deg, #3560f0, #7a4dff)); color: #fff; }
 .fa-mtabs__count { opacity: 0.8; }
 .fa-mtabs__hint, .fa-mtabs__empty { margin: 0; font-size: 12px; opacity: 0.7; }
+
+/* ── Scontro: vista affiancata, rose a confronto riga per riga ── */
+.fa-versus { display: flex; flex-direction: column; gap: 10px; }
+.fa-versus__row { display: grid; grid-template-columns: 1fr 64px 1fr; gap: 10px; align-items: stretch; }
+.fa-versus__row > .fa-mrow { min-width: 0; }
+.fa-versus__mid { display: flex; align-items: center; justify-content: center; font-style: italic; font-weight: 800; font-size: 18px; color: #9db8ff; }
+.fa-versus__title { margin: 8px 0 0; font-style: italic; font-weight: 800; text-transform: uppercase; }
+.fa-versus__title small { font-size: 12px; font-style: normal; text-transform: none; opacity: 0.7; margin-left: 8px; font-weight: 400; }
+.fa-versus__head { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 14px 18px; border-radius: 20px; border: 1px solid var(--fa-border, rgba(255,255,255,.14)); background: rgba(255,255,255,.06); min-width: 0; }
+.fa-versus__head-name { display: flex; flex-direction: column; min-width: 0; }
+.fa-versus__head-name strong { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fa-versus__head-name span { font-size: 12px; opacity: .7; }
+.fa-versus__head-score { font-style: italic; font-weight: 800; font-size: 34px; line-height: 1; }
 @media (max-width: 700px) {
-  .fa-pitch-row--split { gap: 8px; }
-  .fa-pitch-row--split .fa-mrow { padding: 6px 8px; gap: 6px; }
-  .fa-pitch-row--split .fa-mrow__role { width: 20px; height: 20px; font-size: 10px; }
-  .fa-pitch-row--split .fa-mrow__name { font-size: 13px; }
-  .fa-pitch-row--split .fa-mrow__team { display: none; }
-  .fa-pitch-row--split .fa-mrow__vote { padding: 2px 7px; font-size: 11px; }
-  .fa-pitch-row--split .fa-mtabs__tab { padding: 7px 4px; font-size: 12px; }
+  .fa-versus__row { grid-template-columns: 1fr 30px 1fr; gap: 6px; }
+  .fa-versus__mid { font-size: 14px; }
+  .fa-versus__head { padding: 10px 12px; }
+  .fa-versus__head-score { font-size: 24px; }
+  .fa-versus .fa-mrow { padding: 6px 8px; gap: 6px; }
+  .fa-versus .fa-mrow__role { width: 20px; height: 20px; font-size: 10px; }
+  .fa-versus .fa-mrow__name { font-size: 13px; }
+  .fa-versus .fa-mrow__team { display: none; }
+  .fa-versus .fa-mrow__vote { padding: 2px 7px; font-size: 11px; }
+  .fa-versus .fa-mrow__countdown { font-size: 10px; padding: 1px 5px; }
 }
