@@ -72,8 +72,13 @@ export function MatchupPlayerRow({ player, order, dim, compact, now, testIdPrefi
           <EventBadges badges={badges} size={12} />
         </span>
         <span className="fa-mrow__team">{player.realTeamName ?? "Squadra reale non associata"}</span>
+        {compact && countdown ? (
+          <span className="fa-mrow__countdown fa-mrow__countdown--under" data-testid={`${testIdPrefix}-countdown-${player.athleteId}`}>
+            {countdown}
+          </span>
+        ) : null}
       </span>
-      {countdown ? (
+      {!compact && countdown ? (
         <span className="fa-mrow__countdown" data-testid={`${testIdPrefix}-countdown-${player.athleteId}`}>
           {countdown}
         </span>
