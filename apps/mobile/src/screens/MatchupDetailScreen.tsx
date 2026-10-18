@@ -6,6 +6,7 @@ import {
   describeH2HResult,
   fantasyBadgesFromBonusMalus,
   playerVoteState,
+  cleanDisplayName,
   formatFantasyGoals,
   formatFantasyPoints,
   layoutFromModule,
@@ -37,7 +38,7 @@ function toFantasyPitchPlayers(players: readonly H2HPlayerScore[]) {
   return players.map((player) => ({
     id: player.athleteId,
     athleteId: player.athleteId,
-    name: player.name,
+    name: cleanDisplayName(player.name),
     role: player.role,
     badges: fantasyBadgesFromBonusMalus(player.bonusMalus ?? []),
     scoreLabel: playerScoreLabel(player),

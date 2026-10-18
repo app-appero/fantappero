@@ -288,6 +288,23 @@ class AthleteCardAssignmentResponse(ApiModel):
     purchase_credits: int | None = Field(default=None, alias="purchaseCredits")
 
 
+class AthleteCardSeasonStatsResponse(ApiModel):
+    """Statistiche del campionato corrente (solo partite finite o in corso)."""
+
+    matches: int = 0
+    goals: int = 0
+    assists: int = 0
+    average_rating: float | None = Field(default=None, alias="averageRating")
+    fantasy_average: float | None = Field(default=None, alias="fantasyAverage")
+
+
+class AthleteCardLiveResponse(ApiModel):
+    """Voto attuale se la partita del calciatore è in corso."""
+
+    score: float | None = None
+    is_fantasy: bool = Field(default=False, alias="isFantasy")
+
+
 class AthleteCardResponse(ApiModel):
     """Scheda calciatore: anagrafica provider, stagioni, trasferimenti e rosa di lega."""
 
@@ -311,3 +328,5 @@ class AthleteCardResponse(ApiModel):
     assignment: AthleteCardAssignmentResponse | None = None
     seasons: list[AthleteCardSeasonResponse] = Field(default_factory=list)
     transfers: list[AthleteCardTransferResponse] = Field(default_factory=list)
+    season_stats: AthleteCardSeasonStatsResponse | None = Field(default=None, alias="seasonStats")
+    live: AthleteCardLiveResponse | None = None
