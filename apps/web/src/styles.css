@@ -3958,3 +3958,12 @@ h2 {
 .fa-vcell__main { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; min-width: 0; }
 .fa-vcell__role { flex: 0 0 auto; }
 @media (max-width: 700px) { .fa-vcell { gap: 5px !important; } .fa-vcell .fa-mrow__role { width: 18px; height: 18px; font-size: 9px; } }
+
+/* Partita: panchina e indisponibili per squadra */
+.fa-mrow--out { border-color: #ef4444; background: rgba(239, 68, 68, 0.12); }
+.fa-mrow--gone { border-color: #9ca3af; background: rgba(156, 163, 175, 0.1); filter: grayscale(1); opacity: 0.85; }
+.fa-mrow__chip { padding: 3px 10px; border-radius: 999px; font-size: 12px; font-weight: 700; white-space: nowrap; background: rgba(255,255,255,.1); }
+.fa-mrow__chip--in { background: rgba(52, 211, 153, 0.15); color: #9ff0cb; }
+.fa-mrow__chip--out { background: rgba(239, 68, 68, 0.2); color: #ffc2ca; }
+.fa-mrow__chip--gone { background: rgba(156, 163, 175, 0.2); color: #d1d5db; }
+.fa-mlist .fa-mrow__team { opacity: 0.85; }

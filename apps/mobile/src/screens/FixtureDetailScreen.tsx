@@ -5,6 +5,7 @@ import type {
   FixtureLineupPlayer,
   FixtureLiveDetail,
   FixtureTimelineEvent,
+  FixtureUnavailablePlayer,
   MatchBadge,
   ProviderFeedState,
 } from "@fantappero/contracts";
@@ -13,7 +14,7 @@ import { theme } from "@fantappero/ui/theme";
 import { liveStringMap } from "../theme/liveColors";
 import { useRoute, type RouteProp } from "@react-navigation/core";
 import { useCallback, useState, type ReactNode } from "react";
-import { Image, StyleSheet, Text, View } from "react-native";
+import { Image, Pressable, StyleSheet, Text, View } from "react-native";
 import { fetchFixtureLiveDetail } from "../api/leagues";
 import { AthleteName, useAthleteCard } from "../athletes/AthleteCard";
 import { MatchTimeline, type TimelineEntry } from "../components/match/MatchTimeline";
@@ -118,25 +119,117 @@ function benchStatusLabel(player: FixtureLineupPlayer, events: readonly FixtureT
   return "Non utilizzato";
 }
 
-function BenchList({ players, events, side }: { players: readonly FixtureLineupPlayer[]; events: readonly FixtureTimelineEvent[]; side: string }) {
-  if (players.length === 0) {
+function isSuspension(kind: string | null): boolean {
+  const normalized = (kind ?? "").toLowerCase();
+  return ["suspension", "suspended", "red", "red_card", "redcard"].includes(normalized);
+}
+
+/** Panchina e indisponibili di una squadra: due tab con righe a scheda (stile turni fantallenatori). */
+function SquadTabs({
+  bench,
+  unavailable,
+  events,
+  side,
+}: {
+  bench: readonly FixtureLineupPlayer[];
+  unavailable: readonly FixtureUnavailablePlayer[];
+  events: readonly FixtureTimelineEvent[];
+  side: string;
+}) {
+  const [tab, setTab] = useState<"panchina" | "indisponibili">(bench.length > 0 ? "panchina" : "indisponibili");
+  if (bench.length === 0 && unavailable.length === 0) {
     return null;
   }
   return (
-    <View testID={`fixture-bench-${side}`}>
-      {players.map((player) => (
-        <View key={pitchPlayerId(player)} style={styles.playerRow} testID={`fixture-bench-player-${pitchPlayerId(player)}`}>
-          <RoleBadge code={player.position} />
-          <View style={styles.eventLine}>
-            <Text style={styles.body}>{player.shirtNumber !== null ? `${player.shirtNumber}. ` : ""}</Text>
-            <AthleteName athleteId={player.athleteId} style={styles.body}>
-              {player.name}
-            </AthleteName>
-            <Text style={styles.body}> — </Text>
-            <Text style={styles.benchStatus}>{benchStatusLabel(player, events)}</Text>
+    <View style={styles.squad} testID={`fixture-squad-${side}`}>
+      <Text style={styles.subheading}>Panchina e indisponibili</Text>
+      <View style={styles.tabBar}>
+        {(
+          [
+            ["panchina", "Panchina", bench.length],
+            ["indisponibili", "Indisponibili", unavailable.length],
+          ] as const
+        ).map(([id, label, count]) => (
+          <Pressable
+            key={id}
+            accessibilityRole="tab"
+            accessibilityState={{ selected: tab === id }}
+            onPress={() => setTab(id)}
+            style={[styles.tab, tab === id ? styles.tabActive : null]}
+            testID={`fixture-tab-${id}-${side}`}
+          >
+            <Text style={[styles.tabText, tab === id ? styles.tabTextActive : null]}>
+              {label} {count}
+            </Text>
+          </Pressable>
+        ))}
+      </View>
+      <Text style={styles.benchStatus}>
+        {tab === "panchina" ? "Chi è entrato e chi è rimasto in panchina." : "Infortunati e squalificati di questa squadra."}
+      </Text>
+      {tab === "panchina" ? (
+        bench.length === 0 ? (
+          <Text style={styles.benchStatus}>Nessun panchinaro.</Text>
+        ) : (
+          <View style={styles.squadList} testID={`fixture-bench-${side}`}>
+            {bench.map((player) => {
+              const entered = events.find(
+                (event) => event.eventType.toLowerCase() === "subst" && event.relatedAthleteId === player.athleteId,
+              );
+              const offEvent = events.find(
+                (event) =>
+                  event.athleteId === player.athleteId &&
+                  event.eventType.toLowerCase() === "card" &&
+                  (event.eventDetail ?? "").toLowerCase().includes("red"),
+              );
+              return (
+                <View
+                  key={pitchPlayerId(player)}
+                  style={[styles.squadRow, offEvent ? styles.squadRowOut : null]}
+                  testID={`fixture-bench-player-${pitchPlayerId(player)}`}
+                >
+                  <RoleBadge code={player.position} />
+                  <View style={styles.squadBody}>
+                    <View style={styles.eventLine}>
+                      <Text style={styles.body}>{player.shirtNumber !== null ? `${player.shirtNumber}. ` : ""}</Text>
+                      <AthleteName plain athleteId={player.athleteId} style={styles.squadName}>
+                        {player.name}
+                      </AthleteName>
+                    </View>
+                    <Text style={styles.benchStatus}>{benchStatusLabel(player, events)}</Text>
+                  </View>
+                  {entered ? <Text style={[styles.chip, styles.chipIn]}>↑ {entered.minuteLabel}</Text> : null}
+                  {offEvent ? <Text style={[styles.chip, styles.chipOut]}>{offEvent.minuteLabel}</Text> : null}
+                </View>
+              );
+            })}
           </View>
+        )
+      ) : unavailable.length === 0 ? (
+        <Text style={styles.benchStatus}>Nessun indisponibile.</Text>
+      ) : (
+        <View style={styles.squadList} testID={`fixture-unavailable-${side}`}>
+          {unavailable.map((player) => {
+            const susp = isSuspension(player.kind);
+            return (
+              <View
+                key={`${player.side}-${player.athleteId ?? player.name}`}
+                style={[styles.squadRow, susp ? styles.squadRowOut : styles.squadRowGone]}
+              >
+                <View style={styles.squadBody}>
+                  <AthleteName plain athleteId={player.athleteId} style={styles.squadName}>
+                    {player.name}
+                  </AthleteName>
+                  <Text style={styles.benchStatus}>{absenceLabel(player.kind, player.label)}</Text>
+                </View>
+                <Text style={[styles.chip, susp ? styles.chipOut : styles.chipGone]}>
+                  {susp ? "Squalifica" : "Infortunio"}
+                </Text>
+              </View>
+            );
+          })}
         </View>
-      ))}
+      )}
     </View>
   );
 }
@@ -158,10 +251,12 @@ function LineupBlock({
   lineup,
   events,
   side,
+  unavailable,
 }: {
   lineup: FixtureLineup | null;
   events: readonly FixtureTimelineEvent[];
   side: string;
+  unavailable: readonly FixtureUnavailablePlayer[];
 }) {
   const athleteCard = useAthleteCard();
   if (lineup === null) {
@@ -217,8 +312,7 @@ function LineupBlock({
           {player.name}
         </Text>
       ))}
-      {lineup.bench.length > 0 ? <Text style={styles.subheading}>Panchina</Text> : null}
-      <BenchList players={lineup.bench} events={events} side={side} />
+      <SquadTabs bench={lineup.bench} unavailable={unavailable} events={events} side={side} />
     </View>
   );
 }
@@ -534,20 +628,18 @@ export function FixtureDetailScreen() {
             </Text>
           ) : null}
 
-          <LineupBlock lineup={detail.homeLineup} events={detail.events} side="home" />
-          <LineupBlock lineup={detail.awayLineup} events={detail.events} side="away" />
-
-          {(detail.unavailablePlayers ?? []).length > 0 ? (
-            <View style={styles.section} testID="fixture-unavailable">
-              <Text style={styles.heading}>Indisponibili</Text>
-              {(detail.unavailablePlayers ?? []).map((player) => (
-                <Text key={`${player.side}-${player.athleteId ?? player.name}`} style={styles.body}>
-                  {player.name}
-                  {player.clubName ? ` · ${player.clubName}` : ""} · {absenceLabel(player.kind, player.label)}
-                </Text>
-              ))}
-            </View>
-          ) : null}
+          <LineupBlock
+            lineup={detail.homeLineup}
+            events={detail.events}
+            side="home"
+            unavailable={(detail.unavailablePlayers ?? []).filter((player) => player.side === "home")}
+          />
+          <LineupBlock
+            lineup={detail.awayLineup}
+            events={detail.events}
+            side="away"
+            unavailable={(detail.unavailablePlayers ?? []).filter((player) => player.side === "away")}
+          />
 
           <View style={styles.section}>
             <Text style={styles.heading}>Cronologia</Text>
@@ -624,6 +716,40 @@ const styles = lazyStyles(() => StyleSheet.create({
     color: colors.foregroundMuted,
     fontSize: typography.fontSize.xs,
   },
+  squad: { gap: spacing.xs },
+  tabBar: { flexDirection: "row", gap: 4, padding: 4, borderRadius: 999, borderWidth: 1, borderColor: colors.border },
+  tab: { flex: 1, alignItems: "center", paddingVertical: 8, borderRadius: 999 },
+  tabActive: { backgroundColor: colors.brand },
+  tabText: { color: colors.foreground, fontWeight: "600", fontSize: typography.fontSize.sm },
+  tabTextActive: { color: colors.onBrand },
+  squadList: { gap: spacing.xs },
+  squadRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+    padding: spacing.sm,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.backgroundElevated,
+  },
+  squadRowOut: { borderColor: "#ef4444", backgroundColor: "rgba(239,68,68,0.12)" },
+  squadRowGone: { borderColor: "#9ca3af", backgroundColor: "rgba(156,163,175,0.1)", opacity: 0.85 },
+  squadBody: { flex: 1, minWidth: 0 },
+  squadName: { color: colors.foreground, fontWeight: "700", fontSize: typography.fontSize.md },
+  chip: {
+    color: "#ffffff",
+    fontSize: 12,
+    fontWeight: "700",
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 999,
+    overflow: "hidden",
+    backgroundColor: "rgba(255,255,255,0.12)",
+  },
+  chipIn: { backgroundColor: "rgba(52,211,153,0.25)" },
+  chipOut: { backgroundColor: "rgba(239,68,68,0.35)" },
+  chipGone: { backgroundColor: "rgba(156,163,175,0.3)" },
   benchStatus: {
     fontStyle: "italic",
     color: colors.foregroundMuted,
