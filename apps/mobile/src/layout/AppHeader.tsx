@@ -116,9 +116,11 @@ export function AppHeader({
                 leagues={leagues}
                 value={activeLeagueId}
                 onChange={onLeagueChange}
+                onCreatePress={onCreateLeaguePress}
+                onJoinPress={onJoinLeaguePress}
               />
             ) : null}
-            {canAddLeague ? (
+            {canAddLeague && !(showLeagueSelector && activeLeagueId && onLeagueChange && leagues.length > 0) ? (
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel="Crea o unisciti a una lega"
