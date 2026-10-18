@@ -25,7 +25,7 @@ import { getApiErrorMessage, useAuth } from "../auth/AuthContext";
 import { loadStoredSession } from "../auth/sessionStorage";
 import { useLiveMatchupPolling } from "../matchday/useLiveMatchupPolling";
 import { Link, useLocation } from "../router/simpleRouter";
-import { BenchTabs, StartersList } from "./MatchupSideParts";
+import { BenchTabs, RosterVersus } from "./MatchupSideParts";
 import { parseWireframeStateFromSearch } from "../wireframes/useWireframeState";
 
 const DEMO_DETAIL: H2HMatchupDetail = {
@@ -137,7 +137,7 @@ function toFantasyPitchPlayers(players: readonly H2HPlayerScore[]): PitchPlayer[
 
 type MatchupView = "campo" | "affiancata";
 
-function SideBlock({ side, title, view }: { side: H2HSideLineup; title: string; view: MatchupView }) {
+function SideBlock({ side, title }: { side: H2HSideLineup; title: string }) {
   const athleteCard = useAthleteCard();
   const teamLabel = side.teamName ?? side.displayName;
   return (
@@ -167,26 +167,19 @@ function SideBlock({ side, title, view }: { side: H2HSideLineup; title: string; 
         />
       ) : (
         <>
-          {view === "campo" ? (
-            <FootballPitch
-              title={`Titolari — ${teamLabel}`}
-              players={toFantasyPitchPlayers(side.starters)}
-              onAthletePress={athleteCard?.open}
-              positions={layoutFromModule(
-                side.starters,
-                side.module,
-                (player) => player.role,
-                (player) => player.athleteId,
-                (player) => side.starters.indexOf(player),
-              )}
-              pitchAriaLabel={`Titolari ${teamLabel}`}
-            />
-          ) : (
-            <>
-              <h3>Titolari</h3>
-              <StartersList side={side} title={title} />
-            </>
-          )}
+          <FootballPitch
+            title={`Titolari — ${teamLabel}`}
+            players={toFantasyPitchPlayers(side.starters)}
+            onAthletePress={athleteCard?.open}
+            positions={layoutFromModule(
+              side.starters,
+              side.module,
+              (player) => player.role,
+              (player) => player.athleteId,
+              (player) => side.starters.indexOf(player),
+            )}
+            pitchAriaLabel={`Titolari ${teamLabel}`}
+          />
           {side.bench.length > 0 ? (
             <>
               <h3>Panchina e tribuna</h3>
@@ -458,9 +451,12 @@ export function MatchupDetailPage() {
                   </button>
                 ))}
               </div>
-              <div className={`fa-pitch-row${view === "affiancata" ? " fa-pitch-row--split" : ""}`}>
-                <SideBlock side={detail.home} title="home" view={view} />
-                {detail.away ? <SideBlock side={detail.away} title="away" view={view} /> : null}
+              {view === "affiancata" && detail.away ? (
+                <RosterVersus home={detail.home} away={detail.away} />
+              ) : null}
+              <div className="fa-pitch-row" hidden={view === "affiancata" && Boolean(detail.away)}>
+                <SideBlock side={detail.home} title="home" />
+                {detail.away ? <SideBlock side={detail.away} title="away" /> : null}
               </div>
             </>
           )}
