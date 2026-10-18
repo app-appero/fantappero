@@ -210,6 +210,10 @@ function VersusCell({ player, dim, now }: { player: H2HPlayerScore | undefined; 
       testID={`matchup-versus-player-${player.athleteId}`}
     >
       {vote.live ? <LivePulse /> : null}
+      <View style={[styles.role, styles.roleCompact, { backgroundColor: ROLE_COLOR[player.role] ?? colors.border }]}>
+        <Text style={styles.roleText}>{player.role}</Text>
+      </View>
+      <View style={styles.vmain}>
       <View style={styles.nameLine}>
         <AthleteName fit plain athleteId={player.athleteId} style={styles.vname} numberOfLines={1}>
           {cleanDisplayName(player.name)}
@@ -234,6 +238,7 @@ function VersusCell({ player, dim, now }: { player: H2HPlayerScore | undefined; 
           {countdown}
         </Text>
       ) : null}
+      </View>
     </View>
   );
 }
@@ -368,8 +373,10 @@ const styles = lazyStyles(() =>
       borderWidth: 1,
       borderColor: colors.border,
       backgroundColor: colors.backgroundElevated,
-      alignItems: "flex-start",
+      flexDirection: "row",
+      alignItems: "center",
     },
+    vmain: { flex: 1, minWidth: 0, gap: 3, alignItems: "flex-start" },
     vname: { color: colors.foreground, fontWeight: "700", fontSize: typography.fontSize.sm },
     vcd: { color: "#c9d2f0", fontSize: 11, fontWeight: "700" },
     voteWhite: { color: "#ffffff" },
