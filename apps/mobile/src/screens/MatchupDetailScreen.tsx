@@ -16,7 +16,7 @@ import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useCallback, useEffect, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useAthleteCard } from "../athletes/AthleteCard";
-import { BenchTabs, StartersList } from "../components/match/MatchupLists";
+import { BenchTabs, RosterVersus } from "../components/match/MatchupLists";
 import { fetchH2HMatchup } from "../api/leagues";
 import { PitchView } from "../components/match/PitchView";
 import { StatusBadge } from "../components/StatusBadge";
@@ -65,11 +65,11 @@ function outcomeLabel(outcome: "home" | "away" | "draw" | null): string {
 
 type MatchupView = "campo" | "affiancata";
 
-function SideBlock({ side, title, view }: { side: H2HSideLineup; title: string; view: MatchupView }) {
+function SideBlock({ side, title }: { side: H2HSideLineup; title: string }) {
   const athleteCard = useAthleteCard();
   const teamLabel = side.teamName ?? side.displayName;
   return (
-    <View style={[styles.side, view === "affiancata" ? styles.sideSplit : null]} testID={`matchup-side-${title}`}>
+    <View style={styles.side} testID={`matchup-side-${title}`}>
       <Text style={styles.heading}>
         {teamLabel}
         {side.module ? ` · ${side.module}` : ""}
@@ -92,30 +92,23 @@ function SideBlock({ side, title, view }: { side: H2HSideLineup; title: string; 
         />
       ) : (
         <View style={styles.lineupGroup}>
-          {view === "campo" ? (
-            <PitchView
-              title={`Titolari — ${teamLabel}`}
-              players={toFantasyPitchPlayers(side.starters)}
-              positions={layoutFromModule(
-                side.starters,
-                side.module,
-                (player) => player.role,
-                (player) => player.athleteId,
-                (player) => side.starters.indexOf(player),
-              )}
-              testID={`matchup-pitch-${title}`}
-              onAthletePress={athleteCard?.open}
-            />
-          ) : (
-            <>
-              <Text style={styles.subheading}>Titolari</Text>
-              <StartersList side={side} title={title} compact />
-            </>
-          )}
+          <PitchView
+            title={`Titolari — ${teamLabel}`}
+            players={toFantasyPitchPlayers(side.starters)}
+            positions={layoutFromModule(
+              side.starters,
+              side.module,
+              (player) => player.role,
+              (player) => player.athleteId,
+              (player) => side.starters.indexOf(player),
+            )}
+            testID={`matchup-pitch-${title}`}
+            onAthletePress={athleteCard?.open}
+          />
           {side.bench.length > 0 ? (
             <>
               <Text style={styles.subheading}>Panchina e tribuna</Text>
-              <BenchTabs side={side} title={title} compact={view === "affiancata"} />
+              <BenchTabs side={side} title={title} />
             </>
           ) : null}
         </View>
@@ -314,10 +307,14 @@ export function MatchupDetailScreen() {
                   </Pressable>
                 ))}
               </View>
-              <View style={view === "affiancata" ? styles.sidesSplit : styles.sides}>
-                <SideBlock side={detail.home} title="home" view={view} />
-                {detail.away ? <SideBlock side={detail.away} title="away" view={view} /> : null}
+              {view === "affiancata" && detail.away ? (
+                <RosterVersus home={detail.home} away={detail.away} />
+              ) : (
+              <View style={styles.sides}>
+                <SideBlock side={detail.home} title="home" />
+                {detail.away ? <SideBlock side={detail.away} title="away" /> : null}
               </View>
+              )}
             </>
           )}
         </View>
@@ -359,11 +356,6 @@ const styles = lazyStyles(() => StyleSheet.create({
   sides: {
     gap: spacing.md,
   },
-  sidesSplit: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: spacing.xs,
-  },
   viewToggle: {
     flexDirection: "row",
     alignSelf: "flex-start",
@@ -385,7 +377,6 @@ const styles = lazyStyles(() => StyleSheet.create({
     gap: spacing.xs,
     backgroundColor: colors.backgroundElevated,
   },
-  sideSplit: { flex: 1, minWidth: 0, padding: spacing.xs },
   lineupGroup: {
     gap: spacing.xs,
   },

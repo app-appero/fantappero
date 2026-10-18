@@ -4,11 +4,12 @@ import {
   MAX_AUTOMATIC_SUBSTITUTIONS,
   computeCountdown,
   fantasyBadgesFromBonusMalus,
+  formatFantasyPoints,
   formatCountdown,
   playerVoteState,
 } from "@fantappero/contracts";
 import { theme } from "@fantappero/ui/theme";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactElement } from "react";
 import { Animated, Easing, Pressable, StyleSheet, Text, View } from "react-native";
 import { AthleteName } from "../../athletes/AthleteCard";
 import { EventBadges } from "./EventBadges";
@@ -186,13 +187,84 @@ export function BenchTabs({ side, title, compact }: { side: H2HSideLineup; title
   );
 }
 
-export function StartersList({ side, title, compact }: { side: H2HSideLineup; title: string; compact?: boolean }) {
-  const now = useNow();
+const ROLE_GROUPS: Array<[string, string]> = [
+  ["P", "POR"],
+  ["D", "DIF"],
+  ["C", "CEN"],
+  ["A", "ATT"],
+];
+
+function TeamHead({ side }: { side: H2HSideLineup }) {
   return (
-    <View style={styles.list} testID={`matchup-starters-${title}`}>
-      {side.starters.map((player) => (
-        <MatchupPlayerRow key={player.athleteId} player={player} compact={compact} now={now} testIDPrefix="matchup-starter-player" />
-      ))}
+    <View style={styles.head}>
+      <View style={styles.headName}>
+        <Text style={styles.headTitle} numberOfLines={1}>
+          {side.teamName ?? side.displayName}
+        </Text>
+        <Text style={styles.headModule}>{side.module ?? ""}</Text>
+      </View>
+      <Text style={styles.headScore}>{formatFantasyPoints(side.totalScore)}</Text>
+    </View>
+  );
+}
+
+/** Vista affiancata: le rose complete dei due allenatori a confronto, riga per riga. */
+export function RosterVersus({ home, away }: { home: H2HSideLineup; away: H2HSideLineup }) {
+  const now = useNow();
+  const cell = (player: H2HPlayerScore | undefined, dim: boolean, prefix: string) => (
+    <View style={styles.cell}>
+      {player ? <MatchupPlayerRow player={player} dim={dim} compact now={now} testIDPrefix={prefix} /> : null}
+    </View>
+  );
+  const pair = (
+    key: string,
+    a: H2HPlayerScore | undefined,
+    b: H2HPlayerScore | undefined,
+    mid: string,
+    dim: boolean,
+    prefix: string,
+  ) => (
+    <View style={styles.versusRow} key={key}>
+      {cell(a, dim, prefix)}
+      <Text style={styles.mid}>{mid}</Text>
+      {cell(b, dim, prefix)}
+    </View>
+  );
+  const rows: ReactElement[] = [];
+  for (const [role, label] of ROLE_GROUPS) {
+    const left = home.starters.filter((p) => p.role === role);
+    const right = away.starters.filter((p) => p.role === role);
+    for (let i = 0; i < Math.max(left.length, right.length); i += 1) {
+      rows.push(pair(`s-${role}-${i}`, left[i], right[i], i === 0 ? label : "", false, "matchup-starter-player"));
+    }
+  }
+  const slots = MAX_AUTOMATIC_SUBSTITUTIONS;
+  const total = Math.max(home.bench.length, away.bench.length);
+  const benchRows: ReactElement[] = [];
+  const tribRows: ReactElement[] = [];
+  for (let i = 0; i < total; i += 1) {
+    const isTrib = i >= slots;
+    (isTrib ? tribRows : benchRows).push(
+      pair(`b-${i}`, home.bench[i], away.bench[i], `${i + 1}°`, isTrib, "matchup-bench-player"),
+    );
+  }
+  return (
+    <View style={styles.versus} testID="matchup-versus">
+      <View style={styles.versusRow}>
+        <View style={styles.cell}>
+          <TeamHead side={home} />
+        </View>
+        <Text style={styles.mid}>VS</Text>
+        <View style={styles.cell}>
+          <TeamHead side={away} />
+        </View>
+      </View>
+      <Text style={styles.sectionTitle}>Titolari</Text>
+      {rows}
+      {benchRows.length > 0 ? <Text style={styles.sectionTitle}>Panchina</Text> : null}
+      {benchRows}
+      {tribRows.length > 0 ? <Text style={styles.sectionTitle}>Tribuna</Text> : null}
+      {tribRows}
     </View>
   );
 }
@@ -261,6 +333,33 @@ const styles = lazyStyles(() =>
     tabActive: { backgroundColor: colors.brand },
     tabText: { color: colors.foreground, fontWeight: "600", fontSize: typography.fontSize.sm },
     tabTextActive: { color: colors.onBrand },
+    versus: { gap: 6 },
+    versusRow: { flexDirection: "row", alignItems: "stretch", gap: 4 },
+    cell: { flex: 1, minWidth: 0 },
+    mid: { width: 30, textAlign: "center", alignSelf: "center", color: colors.accent, fontStyle: "italic", fontWeight: "800" },
+    sectionTitle: {
+      color: colors.foreground,
+      fontSize: typography.fontSize.lg,
+      fontStyle: "italic",
+      fontWeight: "800",
+      textTransform: "uppercase",
+      marginTop: spacing.xs,
+    },
+    head: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      gap: 6,
+      padding: spacing.sm,
+      borderRadius: radius.lg,
+      borderWidth: 1,
+      borderColor: colors.border,
+      backgroundColor: colors.backgroundElevated,
+    },
+    headName: { flex: 1, minWidth: 0 },
+    headTitle: { color: colors.foreground, fontWeight: "700", fontSize: typography.fontSize.sm },
+    headModule: { color: colors.foregroundMuted, fontSize: 10 },
+    headScore: { color: colors.foreground, fontSize: 22, fontStyle: "italic", fontWeight: "800" },
     hint: { color: colors.foregroundMuted, fontSize: typography.fontSize.xs },
   }),
 );
