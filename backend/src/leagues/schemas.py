@@ -378,6 +378,7 @@ class H2HPlayerScoreResponse(ApiModel):
     fixture_status: str | None = Field(default=None, alias="fixtureStatus")
     fixture_status_label: str = Field(default="Partita non associata", alias="fixtureStatusLabel")
     score_final: bool = Field(default=False, alias="scoreFinal")
+    kickoff_at: datetime | None = Field(default=None, alias="kickoffAt")
     is_effective_starter: bool = Field(alias="isEffectiveStarter")
     is_bench: bool = Field(alias="isBench")
 

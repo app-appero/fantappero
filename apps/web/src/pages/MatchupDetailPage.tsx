@@ -19,12 +19,13 @@ import {
   type PitchPlayer,
 } from "@fantappero/ui";
 import { useCallback, useEffect, useState } from "react";
-import { AthleteName, useAthleteCard } from "../athletes/AthleteCard";
+import { useAthleteCard } from "../athletes/AthleteCard";
 import { fetchH2HMatchup } from "../api/leagues";
 import { getApiErrorMessage, useAuth } from "../auth/AuthContext";
 import { loadStoredSession } from "../auth/sessionStorage";
 import { useLiveMatchupPolling } from "../matchday/useLiveMatchupPolling";
 import { Link, useLocation } from "../router/simpleRouter";
+import { BenchTabs, StartersList } from "./MatchupSideParts";
 import { parseWireframeStateFromSearch } from "../wireframes/useWireframeState";
 
 const DEMO_DETAIL: H2HMatchupDetail = {
@@ -134,7 +135,9 @@ function toFantasyPitchPlayers(players: readonly H2HPlayerScore[]): PitchPlayer[
   }));
 }
 
-function SideBlock({ side, title }: { side: H2HSideLineup; title: string }) {
+type MatchupView = "campo" | "affiancata";
+
+function SideBlock({ side, title, view }: { side: H2HSideLineup; title: string; view: MatchupView }) {
   const athleteCard = useAthleteCard();
   const teamLabel = side.teamName ?? side.displayName;
   return (
@@ -164,53 +167,30 @@ function SideBlock({ side, title }: { side: H2HSideLineup; title: string }) {
         />
       ) : (
         <>
-          <FootballPitch
-            title={`Titolari — ${teamLabel}`}
-            players={toFantasyPitchPlayers(side.starters)}
-            onAthletePress={athleteCard?.open}
-            positions={layoutFromModule(
-              side.starters,
-              side.module,
-              (player) => player.role,
-              (player) => player.athleteId,
-              (player) => side.starters.indexOf(player),
-            )}
-            pitchAriaLabel={`Titolari ${teamLabel}`}
-          />
+          {view === "campo" ? (
+            <FootballPitch
+              title={`Titolari — ${teamLabel}`}
+              players={toFantasyPitchPlayers(side.starters)}
+              onAthletePress={athleteCard?.open}
+              positions={layoutFromModule(
+                side.starters,
+                side.module,
+                (player) => player.role,
+                (player) => player.athleteId,
+                (player) => side.starters.indexOf(player),
+              )}
+              pitchAriaLabel={`Titolari ${teamLabel}`}
+            />
+          ) : (
+            <>
+              <h3>Titolari</h3>
+              <StartersList side={side} title={title} />
+            </>
+          )}
           {side.bench.length > 0 ? (
             <>
-              <h3>Panchina</h3>
-              <ul data-testid={`matchup-bench-${title}`}>
-                {side.bench.map((player) => {
-                  const scoreLabel = playerScoreLabel(player);
-                  return (
-                    <li key={player.athleteId} data-testid={`matchup-bench-player-${player.athleteId}`}>
-                      <strong>
-                        <AthleteName athleteId={player.athleteId}>{player.name}</AthleteName>
-                      </strong>{" "}
-                      ({player.role}) ·{" "}
-                      {player.realTeamName ?? "Squadra reale non associata"}
-                      {scoreLabel ? (
-                        <>
-                          {" · "}
-                          <strong
-                            data-testid={`matchup-bench-player-score-${player.athleteId}`}
-                            style={
-                              playerVoteState(player).kind === "sv"
-                                ? { color: "#c084fc" }
-                                : playerVoteState(player).kind === "provisional"
-                                  ? { color: "#60a5fa" }
-                                  : undefined
-                            }
-                          >
-                            {scoreLabel}
-                          </strong>
-                        </>
-                      ) : null}
-                    </li>
-                  );
-                })}
-              </ul>
+              <h3>Panchina e tribuna</h3>
+              <BenchTabs side={side} title={title} />
             </>
           ) : null}
         </>
@@ -246,6 +226,21 @@ export function MatchupDetailPage() {
     isDemoMode && demoState === "success" ? DEMO_DETAIL : null,
   );
   const resultDisplay = describeH2HResult(detail?.result);
+  const [view, setView] = useState<MatchupView>(() => {
+    try {
+      return window.localStorage.getItem("fantappero.matchupView") === "affiancata" ? "affiancata" : "campo";
+    } catch {
+      return "campo";
+    }
+  });
+  const chooseView = (next: MatchupView) => {
+    setView(next);
+    try {
+      window.localStorage.setItem("fantappero.matchupView", next);
+    } catch {
+      /* preferenza non salvata */
+    }
+  };
   const [loading, setLoading] = useState(() => (isDemoMode ? demoState === "loading" : true));
   const [error, setError] = useState<string | null>(() =>
     isDemoMode && demoState === "error" ? "Impossibile caricare lo scontro (demo)." : null,
@@ -444,9 +439,28 @@ export function MatchupDetailPage() {
                   {outcomeLabel(detail.result?.outcome ?? null)}
                 </p>
               </div>
-              <div className="fa-pitch-row">
-                <SideBlock side={detail.home} title="home" />
-                {detail.away ? <SideBlock side={detail.away} title="away" /> : null}
+              <div className="fa-mview" role="group" aria-label="Vista" data-testid="matchup-view-toggle">
+                {(
+                  [
+                    ["campo", "Campo"],
+                    ["affiancata", "Affiancata"],
+                  ] as const
+                ).map(([id, label]) => (
+                  <button
+                    key={id}
+                    type="button"
+                    aria-pressed={view === id}
+                    className={`fa-mview__btn${view === id ? " fa-mview__btn--active" : ""}`}
+                    onClick={() => chooseView(id)}
+                    data-testid={`matchup-view-${id}`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+              <div className={`fa-pitch-row${view === "affiancata" ? " fa-pitch-row--split" : ""}`}>
+                <SideBlock side={detail.home} title="home" view={view} />
+                {detail.away ? <SideBlock side={detail.away} title="away" view={view} /> : null}
               </div>
             </>
           )}
