@@ -25,17 +25,17 @@ const stateAccent = liveStringMap<WireframeUiState>(() => ({
 export function UiStatePanel({ state, title, message, testID }: UiStatePanelProps) {
   return (
     <View
-      style={[styles.panel, { borderLeftColor: stateAccent[state] }]}
+      style={[styles.panel, state === "empty" && styles.panelEmpty, state !== "empty" && { borderColor: stateAccent[state] }]}
       accessibilityRole="summary"
       accessibilityLabel={`${title}. ${message}`}
       accessibilityLiveRegion={state === "loading" ? "polite" : undefined}
       accessibilityState={{ busy: state === "loading" }}
       testID={testID ?? `ui-state-${state}`}
     >
-      <Text style={[styles.title, { color: stateAccent[state] }]} accessibilityRole="header">
+      <Text style={[styles.title, { color: state === "empty" ? colors.foreground : stateAccent[state] }, state === "empty" && styles.centered]} accessibilityRole="header">
         {title}
       </Text>
-      <Text style={styles.message}>{message}</Text>
+      <Text style={[styles.message, state === "empty" && styles.centered]}>{message}</Text>
     </View>
   );
 }
@@ -45,15 +45,21 @@ const styles = lazyStyles(() => StyleSheet.create({
     padding: spacing.md,
     borderWidth: 1,
     borderColor: colors.border,
-    borderLeftWidth: 4,
-    borderRadius: radius.lg,
+    borderRadius: radius.xl,
     backgroundColor: colors.backgroundElevated,
+  },
+  panelEmpty: {
+    borderStyle: "dashed",
+    borderWidth: 1.5,
+    alignItems: "center",
+    paddingVertical: spacing.lg,
   },
   title: {
     fontSize: typography.fontSize.lg,
     fontWeight: typography.fontWeight.semibold,
     marginBottom: spacing.sm,
   },
+  centered: { textAlign: "center" },
   message: {
     color: colors.foregroundMuted,
     fontSize: typography.fontSize.sm,

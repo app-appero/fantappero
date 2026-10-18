@@ -1,3 +1,4 @@
+import { DISPLAY_FONT } from "../../theme/fonts";
 import type { LineupRole } from "@fantappero/contracts";
 import { theme } from "@fantappero/ui/theme";
 import { useMemo, useState, type ReactNode } from "react";
@@ -529,7 +530,7 @@ const styles = lazyStyles(() =>
       backgroundColor: "#0b8a6b",
     },
     plus: { color: "#ffffff", fontSize: 26, fontWeight: "300", marginTop: -2 },
-    initial: { color: "#0A0F22", fontSize: 19, fontStyle: "italic", fontWeight: "800" },
+    initial: { color: "#0A0F22", fontSize: 19, fontFamily: DISPLAY_FONT },
     photo: { width: 38, height: 38, borderRadius: 19 },
     lockPill: {
       maxWidth: 84,

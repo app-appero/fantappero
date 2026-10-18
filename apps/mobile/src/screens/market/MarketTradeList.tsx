@@ -199,6 +199,11 @@ export function MarketTradeList({
                 testID={`market-trade-proposal-${proposal.id}`}
               >
                 <View style={styles.proposalHead}>
+                  <View style={styles.proposalAvatar}>
+                    <Text style={styles.proposalAvatarLabel}>
+                      {teamNameFor(proposal.proposerTeamId).slice(0, 2).toUpperCase()}
+                    </Text>
+                  </View>
                   <Text style={styles.proposalTitle}>
                     {teamNameFor(proposal.proposerTeamId)} → {teamNameFor(proposal.recipientTeamId)}
                   </Text>
@@ -214,6 +219,9 @@ export function MarketTradeList({
                   </Text>
                 ) : null}
                 <TradeSide title="Offre" athletes={proposal.offeredAthletes} credits={proposal.offeredCredits} />
+                <View style={styles.swapBadge}>
+                  <Text style={styles.swapBadgeLabel}>⇅</Text>
+                </View>
                 <TradeSide title="Chiede" athletes={proposal.requestedAthletes} credits={proposal.requestedCredits} />
 
                 {proposal.status === "proposed" && isProposer ? (

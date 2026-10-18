@@ -74,13 +74,16 @@ function ListoneAssignRow({
             accessibilityLabel={`Prezzo acquisto ${entry.canonicalName}`}
             testID={`roster-admin-listone-price-${entry.athleteId}`}
           />
-          <RosterActionBadge
-            action="assign"
+          <Pressable
+            style={[styles.assignPill, (adminBusy || !canAssign || !isValid) && styles.disabled]}
             disabled={adminBusy || !canAssign || !isValid}
             testID={`roster-admin-assign-${entry.athleteId}`}
+            accessibilityRole="button"
             accessibilityLabel={`Assegna ${entry.canonicalName}`}
             onPress={() => void onAssignAthlete(entry.athleteId, parsed)}
-          />
+          >
+            <Text style={styles.assignPillLabel}>Assegna</Text>
+          </Pressable>
         </View>
       ) : owner && canRelease ? (
         <RosterActionBadge
@@ -212,8 +215,8 @@ export function RosterAdminManualCard({
   const ownedAthleteIds = new Set(ownership.keys());
 
   return (
-    <View style={styles.adjust} testID="roster-admin-manual">
-      <Text style={styles.summary}>Inserimento manuale rose</Text>
+    <View style={styles.toolsCard} testID="roster-admin-manual">
+      <Text style={styles.blockTitle}>Inserimento manuale</Text>
       <Text style={styles.subtitle}>
         {isAdmin
           ? "Assegna o rimuovi calciatori dal listone sulla squadra target selezionata sopra."
@@ -264,7 +267,7 @@ export function RosterAdminManualCard({
             <View>
               <Text style={styles.fieldLabel}>Cerca calciatore</Text>
               <TextInput
-                style={styles.input}
+                style={styles.searchBox}
                 value={listoneQuery}
                 onChangeText={onListoneQueryChange}
                 placeholder="Nome o club…"
@@ -290,13 +293,13 @@ export function RosterAdminManualCard({
                   return (
                     <Pressable
                       key={tab.value}
-                      style={[styles.chip, selected && styles.chipSelected]}
+                      style={[styles.pill, selected && styles.pillActive]}
                       accessibilityRole="tab"
                       accessibilityState={{ selected }}
                       testID={`roster-admin-listone-tab-${tab.value}`}
                       onPress={() => setRoleTab(tab.value)}
                     >
-                      <Text style={[styles.chipLabel, selected && styles.chipLabelSelected]}>
+                      <Text style={[styles.pillLabel, selected && styles.pillLabelActive]}>
                         {tab.label}
                       </Text>
                     </Pressable>

@@ -1,3 +1,4 @@
+import { DISPLAY_FONT } from "../../theme/fonts";
 import { lazyStyles } from "../../theme/lazyStyles";
 import type { H2HPlayerScore, H2HSideLineup } from "@fantappero/contracts";
 import {
@@ -329,7 +330,7 @@ const styles = lazyStyles(() =>
       borderWidth: 2,
       borderColor: "#3b82f6",
     },
-    order: { width: 26, color: colors.accent, fontStyle: "italic", fontWeight: "800" },
+    order: { width: 26, color: colors.accent, fontFamily: DISPLAY_FONT },
     role: { width: 26, height: 26, borderRadius: 13, alignItems: "center", justifyContent: "center" },
     roleCompact: { width: 20, height: 20, borderRadius: 10 },
     roleText: { color: "#11162B", fontWeight: "800", fontSize: 11 },
@@ -383,7 +384,7 @@ const styles = lazyStyles(() =>
     versus: { gap: 6 },
     versusRow: { flexDirection: "row", alignItems: "stretch", gap: 4 },
     cell: { flex: 1, minWidth: 0 },
-    mid: { width: 30, textAlign: "center", alignSelf: "center", color: colors.accent, fontStyle: "italic", fontWeight: "800" },
+    mid: { width: 30, textAlign: "center", alignSelf: "center", color: colors.accent, fontFamily: DISPLAY_FONT },
     sectionTitle: {
       color: colors.foreground,
       fontSize: typography.fontSize.lg,
@@ -406,7 +407,7 @@ const styles = lazyStyles(() =>
     headName: { flex: 1, minWidth: 0 },
     headTitle: { color: colors.foreground, fontWeight: "700", fontSize: typography.fontSize.sm },
     headModule: { color: colors.foregroundMuted, fontSize: 10 },
-    headScore: { color: colors.foreground, fontSize: 22, fontStyle: "italic", fontWeight: "800" },
+    headScore: { color: colors.foreground, fontSize: 22, fontFamily: DISPLAY_FONT },
     hint: { color: colors.foregroundMuted, fontSize: typography.fontSize.xs },
   }),
 );

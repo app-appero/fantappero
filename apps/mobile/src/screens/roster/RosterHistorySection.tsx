@@ -9,7 +9,7 @@ import { Pressable, Text, View } from "react-native";
 import { AppTextInput as TextInput } from "../../components/AppTextInput";
 import { UiStatePanel } from "../../components/UiStatePanel";
 import { AthleteName } from "../../athletes/AthleteCard";
-import { formatLedgerEntry, LEDGER_PAGE_SIZE } from "./rosterHelpers";
+import { formatLedgerDate, LEDGER_PAGE_SIZE, reasonLabel } from "./rosterHelpers";
 import { rosterStyles as styles } from "./rosterStyles";
 
 const { spacing } = theme;
@@ -58,14 +58,33 @@ export function RosterHistorySection({
   return (
     <View testID="roster-history">
       <View style={{ marginBottom: spacing.md }}>
-        <Text style={styles.summary}>Movimenti crediti</Text>
+        <Text style={styles.blockTitle}>Movimenti crediti</Text>
         {hasLedger ? (
           <View testID="roster-credits-ledger">
-            {pagedLedgerEntries.map((entry) => (
-              <Text key={entry.id} style={styles.meta}>
-                {formatLedgerEntry(entry)}
-              </Text>
-            ))}
+            {pagedLedgerEntries.map((entry) => {
+              const plus = entry.amount > 0;
+              const tint = plus ? "#34D399" : "#FF6B8A";
+              const note = entry.note?.trim();
+              return (
+                <View key={entry.id} style={styles.moveRow}>
+                  <View style={[styles.moveSign, { backgroundColor: `${tint}2E` }]}>
+                    <Text style={[styles.moveSignLabel, { color: tint }]}>{plus ? "+" : "−"}</Text>
+                  </View>
+                  <View style={{ flex: 1, minWidth: 0 }}>
+                    <Text style={styles.moveTitle} numberOfLines={2}>
+                      {note || reasonLabel(entry.reason)}
+                    </Text>
+                    <Text style={styles.moveDate}>
+                      {reasonLabel(entry.reason)} · {formatLedgerDate(entry.createdAt)} · saldo {entry.balanceAfter}
+                    </Text>
+                  </View>
+                  <Text style={[styles.moveValue, { color: tint }]}>
+                    {plus ? "+" : ""}
+                    {entry.amount}
+                  </Text>
+                </View>
+              );
+            })}
             {ledgerEntriesCount > LEDGER_PAGE_SIZE ? (
               <View style={styles.pagination}>
                 <Pressable
@@ -128,23 +147,24 @@ export function RosterHistorySection({
       ) : null}
       {!historyLoading && !historyError && history && history.intervals.length > 0 ? (
         <View testID="roster-history-success">
-          <Text style={styles.summary}>Intervalli di possesso</Text>
+          <Text style={styles.blockTitle}>Intervalli di possesso</Text>
           {history.intervals.map((row) => (
-            <View key={row.id} style={{ flexDirection: "row", flexWrap: "wrap" }}>
-              <AthleteName athleteId={row.athleteId} style={styles.meta}>
-                {row.athleteName ?? row.athleteId}
-              </AthleteName>
-              <Text style={styles.meta}>
-                {" "}
-                · slot {row.slotIndex + 1} · {row.purchaseCredits} cr · {row.releasedAt ? "chiuso" : "in rosa"} ·{" "}
-                {row.source}
-              </Text>
+            <View key={row.id} style={styles.moveRow}>
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <AthleteName athleteId={row.athleteId} style={styles.moveTitle}>
+                  {row.athleteName ?? row.athleteId}
+                </AthleteName>
+                <Text style={styles.moveDate}>
+                  slot {row.slotIndex + 1} · {row.source}
+                </Text>
+              </View>
+              <Text style={styles.moveDate}>{`${row.purchaseCredits} cr · ${row.releasedAt ? "chiuso" : "in rosa"}`}</Text>
             </View>
           ))}
         </View>
       ) : null}
       <View style={{ marginTop: spacing.md }} testID="roster-snapshots">
-        <Text style={styles.summary}>Snapshot per turno</Text>
+        <Text style={styles.blockTitle}>Snapshot per turno</Text>
         <TextInput
           style={styles.input}
           value={snapshotRound}

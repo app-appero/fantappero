@@ -35,7 +35,8 @@ export function RosterAdminToolsPanel({
     (adminOrViewedTeam?.filledSlots ?? 0) < (adminOrViewedTeam?.rosterSize ?? 0);
 
   return (
-    <View style={styles.admin} testID="roster-admin-tools">
+    <View style={styles.toolsCard} testID="roster-admin-tools">
+      <Text style={styles.cardTitle}>Strumenti admin</Text>
       <Pressable
         style={[styles.button, (ensuring || randomAiBusy) && styles.disabled]}
         disabled={ensuring || randomAiBusy}
