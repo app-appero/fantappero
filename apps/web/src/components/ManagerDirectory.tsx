@@ -562,6 +562,7 @@ export function ManagerDirectory({
         Consulta i fantallenatori e invitali nominativamente nella lega.
       </p>
 
+      <div className="fa-manager-directory__panel">
       <div className="fa-manager-directory__filters">
         <Input
           label="Cerca per nome o email"
@@ -597,6 +598,24 @@ export function ManagerDirectory({
             { value: "false", label: "Non disponibile" },
           ]}
         />
+      </div>
+      <div className="fa-manager-directory__panel-foot">
+        <span>Filtra la directory e invita i fantallenatori che vuoi nella tua lega.</span>
+        {query || userType || availableFilter ? (
+          <button
+            type="button"
+            className="fa-manager-directory__reset"
+            onClick={() => {
+              setQuery("");
+              setUserType("");
+              setAvailableFilter("");
+              setPage(1);
+            }}
+          >
+            Reimposta filtri
+          </button>
+        ) : null}
+      </div>
       </div>
 
       {success ? (
@@ -654,6 +673,9 @@ export function ManagerDirectory({
       ) : null}
       {!loading && !loadError && result && result.items.length > 0 ? (
         <>
+          <p className="fa-manager-directory__count" data-testid="manager-directory-count">
+            {result.total} {result.total === 1 ? "fantallenatore" : "fantallenatori"}
+          </p>
           <ul className="fa-manager-directory__list" data-testid="manager-directory-list">
             {result.items.map((manager) => {
               const unavailable = !manager.availableForInvites;
