@@ -1,6 +1,6 @@
 import type { FantasyRole, FantasyTeam } from "@fantappero/contracts";
 import { useEffect, useState } from "react";
-import { Pressable, Text, View } from "react-native";
+import { Pressable, ScrollView, Text, View } from "react-native";
 import { AppTextInput as TextInput } from "../../components/AppTextInput";
 import {
   compositionStatusLabel,
@@ -39,7 +39,7 @@ function PurchaseCreditsCell({
   }, [slot.purchaseCredits]);
 
   if (!canEdit || !slot.athleteId || !onUpdatePurchaseCredits) {
-    return <Text style={styles.meta}>{slot.purchaseCredits ?? "—"}</Text>;
+    return <Text style={styles.playerPriceValue}>{slot.purchaseCredits ?? "—"}</Text>;
   }
 
   const parsed = Number.parseInt(draft, 10);
@@ -121,50 +121,49 @@ function RosterRoleSection({
         <Text style={styles.meta}>Nessun giocatore in questo ruolo.</Text>
       ) : (
         <>
-          <View style={styles.playerTable}>
-            <View style={styles.playerHeaderRow}>
-              <Text style={[styles.playerHeaderCell, styles.playerNameCell]}>Calciatore</Text>
-              <Text style={[styles.playerHeaderCell, styles.playerClubCell]}>Club</Text>
-              <Text style={[styles.playerHeaderCell, styles.playerCreditsCell]}>Crediti</Text>
-              <Text style={[styles.playerHeaderCell, styles.playerSlotCell]}>Slot</Text>
-              {canEdit ? <Text style={[styles.playerHeaderCell, styles.playerActionCell]}> </Text> : null}
-            </View>
-            {pagedSlots.map((slot) => (
-              <View key={slot.id} style={styles.playerRow}>
-                <AthleteName
-                  athleteId={slot.athleteId}
-                  style={styles.playerName}
-                  containerStyle={styles.playerNameCell}
-                  numberOfLines={1}
-                >
-                  {slot.athleteName ?? "Calciatore"}
-                </AthleteName>
-                <Text style={[styles.playerClub, styles.playerClubCell]} numberOfLines={1}>
-                  {slot.clubName ?? "—"}
-                </Text>
-                <View style={styles.playerCreditsCell}>
-                  <PurchaseCreditsCell
-                    slot={slot}
-                    canEdit={canEdit}
-                    busy={adminBusy}
-                    compact
-                    onUpdatePurchaseCredits={onUpdatePurchaseCredits}
-                  />
+          <View testID={`${testId}-cards`}>
+            {pagedSlots.map((slot) => {
+              const dot = roleBadgeColors(slot.role);
+              return (
+                <View key={slot.id} style={styles.playerCard}>
+                  <View style={[styles.playerDot, { backgroundColor: dot.backgroundColor }]}>
+                    <Text style={[styles.roleBadgeText, { color: dot.color }]}>{slot.role ?? "?"}</Text>
+                  </View>
+                  <View style={styles.playerBody}>
+                    <AthleteName
+                      athleteId={slot.athleteId}
+                      style={styles.playerName}
+                      numberOfLines={1}
+                      plain
+                    >
+                      {slot.athleteName ?? "Calciatore"}
+                    </AthleteName>
+                    <Text style={styles.playerClub} numberOfLines={1}>
+                      {slot.clubName ?? "—"} · slot {slot.slotIndex + 1}
+                    </Text>
+                  </View>
+                  <View style={styles.playerPrice}>
+                    <PurchaseCreditsCell
+                      slot={slot}
+                      canEdit={canEdit}
+                      busy={adminBusy}
+                      compact
+                      onUpdatePurchaseCredits={onUpdatePurchaseCredits}
+                    />
+                    <Text style={styles.playerPriceLabel}>crediti</Text>
+                  </View>
+                  {canEdit && slot.athleteId ? (
+                    <RosterActionBadge
+                      action="release"
+                      disabled={adminBusy}
+                      testID={`roster-admin-release-${slot.athleteId}`}
+                      accessibilityLabel={`Rimuovi ${slot.athleteName ?? "calciatore"}`}
+                      onPress={() => void onReleaseAthlete(slot.athleteId!)}
+                    />
+                  ) : null}
                 </View>
-                <Text style={[styles.playerClub, styles.playerSlotCell]}>{slot.slotIndex + 1}</Text>
-                {canEdit && slot.athleteId ? (
-                  <RosterActionBadge
-                    action="release"
-                    disabled={adminBusy}
-                    testID={`roster-admin-release-${slot.athleteId}`}
-                    accessibilityLabel={`Rimuovi ${slot.athleteName ?? "calciatore"}`}
-                    onPress={() => void onReleaseAthlete(slot.athleteId!)}
-                  />
-                ) : canEdit ? (
-                  <View style={styles.playerActionCell} />
-                ) : null}
-              </View>
-            ))}
+              );
+            })}
           </View>
           {pageCount > 1 ? (
             <View style={styles.pagination} testID={`${testId}-pagination`}>
@@ -229,6 +228,17 @@ export function RosterFilledSummary({
     return compositionLimits.forwards;
   };
 
+  const [query, setQuery] = useState("");
+  const [roleFilter, setRoleFilter] = useState<"all" | FantasyRole>("all");
+  const needle = query.trim().toLocaleLowerCase("it-IT");
+  const filterSlots = (slots: RosterSlot[]) =>
+    needle
+      ? slots.filter((slot) =>
+          `${slot.athleteName ?? ""} ${slot.clubName ?? ""}`.toLocaleLowerCase("it-IT").includes(needle),
+        )
+      : slots;
+  const counts = viewedTeam.composition?.counts;
+
   return (
     <View testID="roster-success">
       <Text style={styles.summary} testID="roster-summary">
@@ -236,15 +246,41 @@ export function RosterFilledSummary({
       </Text>
       {viewedTeam.composition ? (
         <View testID="roster-composition" style={styles.compositionBox}>
-          <Text style={styles.meta}>
-            Composizione: {compositionStatusLabel(viewedTeam.composition.status)}
-          </Text>
+          <View style={styles.tiles}>
+            {ROLE_SECTION_ORDER.map((role) => {
+              const have = counts?.[role] ?? 0;
+              const need = roleLimit(role) ?? 0;
+              const ok = need > 0 && have >= need;
+              const dot = roleBadgeColors(role);
+              return (
+                <View key={role} style={[styles.tile, ok ? styles.tileOk : styles.tileMissing]}>
+                  <View style={[styles.playerDot, { backgroundColor: dot.backgroundColor, width: 26, height: 26, borderRadius: 13 }]}>
+                    <Text style={[styles.roleBadgeText, { color: dot.color }]}>{role}</Text>
+                  </View>
+                  <Text style={styles.tileCount}>
+                    {have}/{need}
+                  </Text>
+                  <View style={styles.tileBar}>
+                    <View
+                      style={[
+                        styles.tileFill,
+                        {
+                          width: `${Math.min(100, need > 0 ? Math.round((have / need) * 100) : 0)}%` as `${number}%`,
+                          backgroundColor: ok ? "#34D399" : "#FFD23F",
+                        },
+                      ]}
+                    />
+                  </View>
+                </View>
+              );
+            })}
+          </View>
           <Text style={styles.meta} testID="roster-composition-counts">
             {viewedTeam.composition.counts.P}/{viewedTeam.composition.limits.goalkeepers}P ·{" "}
             {viewedTeam.composition.counts.D}/{viewedTeam.composition.limits.defenders}D ·{" "}
             {viewedTeam.composition.counts.C}/{viewedTeam.composition.limits.midfielders}C ·{" "}
             {viewedTeam.composition.counts.A}/{viewedTeam.composition.limits.forwards}A ·{" "}
-            {viewedTeam.composition.competitionCount} campionati
+            {viewedTeam.composition.competitionCount} campionati · {compositionStatusLabel(viewedTeam.composition.status)}
           </Text>
           {viewedTeam.composition.issues.map((issue) => (
             <Text key={`${issue.code}-${issue.message}`} style={styles.errorText}>
@@ -253,9 +289,32 @@ export function RosterFilledSummary({
           ))}
         </View>
       ) : null}
+      <TextInput
+        style={styles.searchBox}
+        value={query}
+        onChangeText={setQuery}
+        placeholder="Cerca calciatore o club"
+        autoCapitalize="none"
+        autoCorrect={false}
+        testID="roster-search"
+      />
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.pillRow}>
+        {(["all", ...ROLE_SECTION_ORDER] as const).map((value) => (
+          <Pressable
+            key={value}
+            style={[styles.pill, roleFilter === value && styles.pillActive]}
+            onPress={() => setRoleFilter(value)}
+            testID={`roster-role-filter-${value}`}
+          >
+            <Text style={[styles.pillLabel, roleFilter === value && styles.pillLabelActive]}>
+              {value === "all" ? `Tutti ${viewedTeam.filledSlots}` : `${value} ${filledByRole[value].length}`}
+            </Text>
+          </Pressable>
+        ))}
+      </ScrollView>
       <View testID="roster-filled-table" style={styles.roleTables}>
-        {ROLE_SECTION_ORDER.map((role) => {
-          const slots = filledByRole[role];
+        {ROLE_SECTION_ORDER.filter((role) => roleFilter === "all" || roleFilter === role).map((role) => {
+          const slots = filterSlots(filledByRole[role]);
           const limit = roleLimit(role);
           return (
             <RosterRoleSection
@@ -264,7 +323,7 @@ export function RosterFilledSummary({
               title={ROLE_SECTION_TITLE[role]}
               badge={role}
               slots={slots}
-              countLabel={`${slots.length}${limit != null ? `/${limit}` : ""}`}
+              countLabel={`${filledByRole[role].length}${limit != null ? `/${limit}` : ""}`}
               canEdit={canEdit}
               adminBusy={adminBusy}
               onReleaseAthlete={onReleaseAthlete}
@@ -272,7 +331,7 @@ export function RosterFilledSummary({
             />
           );
         })}
-        {filledByRole.unknown.length > 0 ? (
+        {roleFilter === "all" && filledByRole.unknown.length > 0 ? (
           <RosterRoleSection
             testId="roster-filled-table-unknown"
             title="Senza ruolo"

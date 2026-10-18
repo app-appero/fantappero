@@ -61,7 +61,7 @@ import {
   type AthleteOwnership,
 } from "./roster/rosterHelpers";
 import { RosterHistorySection } from "./roster/RosterHistorySection";
-import { RosterSectionTabs } from "./roster/RosterSectionTabs";
+import { RosterSectionTabs, type RosterSection } from "./roster/RosterSectionTabs";
 import { rosterStyles as styles } from "./roster/rosterStyles";
 
 /** Rosa fantasy, ledger crediti, inserimento manuale e import Excel admin. */
@@ -106,7 +106,7 @@ export function RosterScreen() {
   const [csvBusy, setCsvBusy] = useState(false);
   const [csvMessage, setCsvMessage] = useState<string | null>(null);
   const [csvError, setCsvError] = useState<string | null>(null);
-  const [pageSection, setPageSection] = useState<"rosa" | "storico">("rosa");
+  const [pageSection, setPageSection] = useState<RosterSection>("rosa");
   const [history, setHistory] = useState<RosterOwnershipHistory | null>(null);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [historyError, setHistoryError] = useState<string | null>(null);
@@ -834,7 +834,7 @@ export function RosterScreen() {
       </Text>
 
       {!loading && canView && !loadError ? (
-        <RosterSectionTabs pageSection={pageSection} onSelect={setPageSection} />
+        <RosterSectionTabs pageSection={pageSection} onSelect={setPageSection} showListone={canEdit} />
       ) : null}
 
       {!loading && canView && !loadError && pageSection === "storico" ? (
@@ -921,10 +921,13 @@ export function RosterScreen() {
           onAdminAdjust={onAdminAdjust}
           adjustMessage={adjustMessage}
           adjustError={adjustError}
+          teamName={(viewedTeam ?? team)?.name ?? null}
+          filledSlots={(viewedTeam ?? team)?.filledSlots ?? null}
+          rosterSize={(viewedTeam ?? team)?.rosterSize ?? null}
         />
       ) : null}
 
-      {isAdmin && canView && !loading ? (
+      {pageSection === "listone" && isAdmin && canView && !loading ? (
         <>
           <RosterCsvImportCard
             csvBusy={csvBusy}
@@ -968,7 +971,7 @@ export function RosterScreen() {
         />
       ) : null}
 
-      {pageSection === "rosa" && canEdit && canView ? (
+      {pageSection === "listone" && canEdit && canView ? (
         <RosterAdminManualCard
           isAdmin={isAdmin}
           leagueTeams={leagueTeams}

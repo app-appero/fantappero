@@ -44,35 +44,27 @@ function ListoneAssignRow({
   const roleColors = roleBadgeColors(entry.effectiveRole);
 
   return (
-    <View style={styles.playerRow}>
-      <View style={[styles.roleBadge, styles.listoneRoleCell, roleColors]}>
-        <Text style={[styles.roleBadgeText, { color: roleColors.color }]}>
-          {entry.effectiveRole}
+    <View style={[styles.playerCard, owner ? { opacity: 0.65 } : null]}>
+      <View style={[styles.playerDot, { backgroundColor: roleColors.backgroundColor }]}>
+        <Text style={[styles.roleBadgeText, { color: roleColors.color }]}>{entry.effectiveRole}</Text>
+      </View>
+      <View style={styles.playerBody}>
+        <AthleteName athleteId={entry.athleteId} style={styles.playerName} numberOfLines={1} plain>
+          {entry.canonicalName}
+        </AthleteName>
+        <Text style={styles.playerClub} numberOfLines={1}>
+          {entry.clubName ?? "—"}
+        </Text>
+        <Text
+          style={owner ? styles.listoneStatusOwned : styles.listoneStatusFree}
+          numberOfLines={1}
+          accessibilityLabel={owner ? `In rosa: ${owner.teamName}` : "Libero"}
+        >
+          {owner ? `In rosa · ${owner.teamName}` : "Libero"}
         </Text>
       </View>
-      <AthleteName
-        athleteId={entry.athleteId}
-        style={styles.playerName}
-        containerStyle={styles.listoneNameCell}
-        numberOfLines={1}
-      >
-        {entry.canonicalName}
-      </AthleteName>
-      <Text style={[styles.playerClub, styles.listoneClubCell]} numberOfLines={1}>
-        {entry.clubName ?? "—"}
-      </Text>
-      <Text
-        style={[
-          owner ? styles.listoneStatusOwned : styles.listoneStatusFree,
-          styles.listoneStatusCell,
-        ]}
-        numberOfLines={1}
-        accessibilityLabel={owner ? `In rosa: ${owner.teamName}` : "Libero"}
-      >
-        {owner ? owner.teamName : "Libero"}
-      </Text>
-      <View style={styles.playerCreditsCell}>
-        {!owner ? (
+      {!owner ? (
+        <View style={styles.priceRowCompact}>
           <TextInput
             style={styles.priceInputCompact}
             value={draft}
@@ -82,11 +74,15 @@ function ListoneAssignRow({
             accessibilityLabel={`Prezzo acquisto ${entry.canonicalName}`}
             testID={`roster-admin-listone-price-${entry.athleteId}`}
           />
-        ) : (
-          <Text style={styles.playerClub}>—</Text>
-        )}
-      </View>
-      {owner && canRelease ? (
+          <RosterActionBadge
+            action="assign"
+            disabled={adminBusy || !canAssign || !isValid}
+            testID={`roster-admin-assign-${entry.athleteId}`}
+            accessibilityLabel={`Assegna ${entry.canonicalName}`}
+            onPress={() => void onAssignAthlete(entry.athleteId, parsed)}
+          />
+        </View>
+      ) : owner && canRelease ? (
         <RosterActionBadge
           action="release"
           disabled={adminBusy}
@@ -94,17 +90,7 @@ function ListoneAssignRow({
           accessibilityLabel={`Rimuovi ${entry.canonicalName}`}
           onPress={() => void onReleaseAthlete(entry.athleteId)}
         />
-      ) : !owner ? (
-        <RosterActionBadge
-          action="assign"
-          disabled={adminBusy || !canAssign || !isValid}
-          testID={`roster-admin-assign-${entry.athleteId}`}
-          accessibilityLabel={`Assegna ${entry.canonicalName}`}
-          onPress={() => void onAssignAthlete(entry.athleteId, parsed)}
-        />
-      ) : (
-        <View style={styles.playerActionCell} />
-      )}
+      ) : null}
     </View>
   );
 }
@@ -147,14 +133,6 @@ function ListoneTable({
   return (
     <View testID={`roster-admin-listone-table-${tabValue}`}>
       <View style={styles.playerTable}>
-        <View style={styles.playerHeaderRow}>
-          <Text style={[styles.playerHeaderCell, styles.listoneRoleCell]}> </Text>
-          <Text style={[styles.playerHeaderCell, styles.listoneNameCell]}>Calciatore</Text>
-          <Text style={[styles.playerHeaderCell, styles.listoneClubCell]}>Club</Text>
-          <Text style={[styles.playerHeaderCell, styles.listoneStatusCell]}>Stato</Text>
-          <Text style={[styles.playerHeaderCell, styles.playerCreditsCell]}>Crediti</Text>
-          <Text style={[styles.playerHeaderCell, styles.playerActionCell]}> </Text>
-        </View>
       {pagedRows.map((entry) => {
         const owner = ownership.get(entry.athleteId);
         const canAssign = !owner && emptySlotsCount > 0;
