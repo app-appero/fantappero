@@ -3967,3 +3967,44 @@ h2 {
 .fa-mrow__chip--out { background: rgba(239, 68, 68, 0.2); color: #ffc2ca; }
 .fa-mrow__chip--gone { background: rgba(156, 163, 175, 0.2); color: #d1d5db; }
 .fa-mlist .fa-mrow__team { opacity: 0.85; }
+
+/* Turni europei: tab dei campionati scorrevoli in orizzontale */
+.fa-matchday-competitions-tabs .fa-tablist {
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  scroll-snap-type: x proximity;
+  scrollbar-width: none;
+}
+.fa-matchday-competitions-tabs .fa-tablist::-webkit-scrollbar { display: none; }
+.fa-matchday-competitions-tabs .fa-tab { flex: 0 0 auto; white-space: nowrap; scroll-snap-align: start; }
+
+/* Directory: filtro staccato dalle card, riepilogo e card leggibili */
+.fa-manager-directory { gap: var(--fa-space-xl, 2rem); }
+.fa-manager-directory__panel {
+  display: grid;
+  gap: var(--fa-space-md);
+  padding: var(--fa-space-lg);
+  border-radius: var(--fa-radius-xl);
+  background: var(--fa-color-background-elevated);
+  border: 1px solid var(--fa-color-border);
+}
+.fa-manager-directory__panel .fa-manager-directory__filters { padding: 0; border: 0; background: transparent; }
+.fa-manager-directory__panel-foot {
+  display: flex; justify-content: space-between; align-items: center; gap: var(--fa-space-md);
+  font-size: var(--fa-text-sm); color: var(--fa-color-foreground-muted);
+}
+.fa-manager-directory__reset { border: 0; background: transparent; color: var(--fa-color-accent); font-weight: 600; cursor: pointer; text-decoration: underline; }
+.fa-manager-directory__count {
+  margin: 0; font-size: var(--fa-text-xl, 1.5rem); font-style: italic; font-weight: 800; text-transform: uppercase;
+}
+.fa-manager-directory__list { gap: var(--fa-space-lg); }
+.fa-manager-directory__email { overflow-wrap: anywhere; }
+.fa-manager-directory__name { font-size: var(--fa-text-lg); font-weight: 700; }
+@media (max-width: 700px) {
+  .fa-manager-directory { gap: var(--fa-space-lg, 1.5rem); }
+  .fa-manager-directory__panel { padding: var(--fa-space-md); }
+  .fa-manager-directory__list .fa-manager-directory__item > .fa-btn,
+  .fa-manager-directory__list .fa-manager-directory__status { align-self: stretch; width: 100%; }
+}
