@@ -3953,3 +3953,8 @@ h2 {
 .fa-vcell__cd { padding: 2px 8px; border-radius: 999px; border: 1px solid rgba(255,255,255,.2); font-size: 11px; font-weight: 700; font-family: ui-monospace, monospace; white-space: nowrap; }
 .fa-vcell .fa-mrow__vote { color: #fff; }
 @media (max-width: 700px) { .fa-vcell { padding: 6px 8px; } .fa-vcell__name { font-size: clamp(10px, 3vw, 13px); } }
+
+.fa-vcell { flex-direction: row !important; align-items: center !important; gap: 8px !important; }
+.fa-vcell__main { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; min-width: 0; }
+.fa-vcell__role { flex: 0 0 auto; }
+@media (max-width: 700px) { .fa-vcell { gap: 5px !important; } .fa-vcell .fa-mrow__role { width: 18px; height: 18px; font-size: 9px; } }
