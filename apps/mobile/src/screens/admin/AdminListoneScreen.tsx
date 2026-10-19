@@ -1,4 +1,5 @@
 import { lazyStyles } from "../../theme/lazyStyles";
+import { HScroll } from "../../components/HScroll";
 import type { AdminListoneEntry, FantasyRole } from "@fantappero/contracts";
 import { theme } from "@fantappero/ui/theme";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -271,7 +272,7 @@ export function AdminListoneScreen() {
               testID="admin-listone-search"
             />
 
-            <View style={styles.chipRow} testID="admin-listone-tabs">
+            <HScroll testID="admin-listone-tabs">
               {ROLE_TABS.map((tab) => (
                 <Pressable
                   key={tab.value}
@@ -289,7 +290,7 @@ export function AdminListoneScreen() {
                   </Text>
                 </Pressable>
               ))}
-            </View>
+            </HScroll>
 
             {visibleEntries.length === 0 ? (
               <UiStatePanel

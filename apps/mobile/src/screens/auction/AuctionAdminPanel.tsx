@@ -150,7 +150,7 @@ export function AuctionAdminPanel({
         <Text style={styles.sectionTitle}>Nuova sessione</Text>
         <Text style={styles.meta}>Finestra in cui l'asta resta aperta.</Text>
         <DateTimeField label="Apertura" value={opensAt} onChange={onOpensAtChange} testID={`${testIdPrefix}-opens-at`} />
-        <DateTimeField label="Chiusura" value={closesAt} onChange={onClosesAtChange} testID={`${testIdPrefix}-closes-at`} />
+        <DateTimeField label="Chiusura" value={closesAt} onChange={onClosesAtChange} min={opensAt} minHint="La chiusura deve essere dopo l'apertura" testID={`${testIdPrefix}-closes-at`} />
         {formError ? (
           <Text style={styles.error} testID={`${testIdPrefix}-create-session-format-error`}>
             {formError}
