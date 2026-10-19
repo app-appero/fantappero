@@ -328,6 +328,9 @@ def upsert_match_event(
         session.add(row)
         session.flush()
         counters.incr_entity("events", "created")
+        from notifications.match_events import notify_match_event
+
+        notify_match_event(session, event=row, fixture_status=fixture.status_short)
         return row
 
     was_retracted = not row.is_active

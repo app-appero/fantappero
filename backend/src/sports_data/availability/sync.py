@@ -125,6 +125,9 @@ def upsert_player_availability(
     session.add(row)
     session.flush()
     counters.created += 1
+    from notifications.match_events import notify_availability
+
+    notify_availability(session, availability=row)
     get_metrics().incr(
         AVAILABILITY_SYNC_ENTITIES_TOTAL,
         labels={"provider": PROVIDER_NAME, "result": "created"},
