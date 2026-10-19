@@ -29,6 +29,7 @@ import {
   fetchTeamPlayersForTrade,
 } from "../api/leagues";
 import { AthleteName } from "../athletes/AthleteCard";
+import { RoleGroupedAthletes } from "./RoleGroupedAthletes";
 import { getApiErrorMessage, useAuth } from "../auth/AuthContext";
 import { loadStoredSession } from "../auth/sessionStorage";
 import { useMarketHistory } from "../market/useMarketHistory";
@@ -171,6 +172,14 @@ export function MarketPage() {
   useEffect(() => {
     void loadTeam();
   }, [loadTeam]);
+
+  const roleByAthleteId = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const entry of listoneEntries) {
+      map.set(entry.athleteId, entry.effectiveRole);
+    }
+    return map;
+  }, [listoneEntries]);
 
   const athleteNameById = useMemo(() => {
     const map = new Map<string, string>();
@@ -609,22 +618,11 @@ export function MarketPage() {
                     {ownedSlots.length === 0 ? (
                       <p>Nessun giocatore in rosa da offrire.</p>
                     ) : (
-                      <div className="fa-trade-athlete-list">
-                        {ownedSlots.map((slot) => (
-                          <label key={slot.id}>
-                            <input
-                              type="checkbox"
-                              checked={offeredAthleteIds.includes(slot.athleteId as string)}
-                              onChange={() =>
-                                setOfferedAthleteIds((prev) =>
-                                  toggleAthleteId(prev, slot.athleteId as string),
-                                )
-                              }
-                            />
-                            <AthleteName athleteId={slot.athleteId}>{slot.athleteName}</AthleteName>
-                          </label>
-                        ))}
-                      </div>
+                      <RoleGroupedAthletes
+                        rows={ownedSlots.map((slot) => ({ athleteId: slot.athleteId as string, name: slot.athleteName ?? "Giocatore", role: slot.role ?? roleByAthleteId.get(slot.athleteId as string) ?? null, price: slot.purchaseCredits ?? null }))}
+                        checked={offeredAthleteIds}
+                        onToggle={(id) => setOfferedAthleteIds((prev) => toggleAthleteId(prev, id))}
+                      />
                     )}
                   </fieldset>
                 </div>
@@ -688,23 +686,12 @@ export function MarketPage() {
                     !recipientRosterLoading &&
                     !recipientRosterError &&
                     recipientPlayers.length > 0 ? (
-                      <div className="fa-trade-athlete-list">
-                        {recipientPlayers.map((athlete) => (
-                          <label key={athlete.athleteId}>
-                            <input
-                              type="checkbox"
-                              checked={requestedAthleteIds.includes(athlete.athleteId)}
-                              disabled={ownedSlots.length === 0}
-                              onChange={() =>
-                                setRequestedAthleteIds((prev) =>
-                                  toggleAthleteId(prev, athlete.athleteId),
-                                )
-                              }
-                            />
-                            <AthleteName athleteId={athlete.athleteId}>{athlete.athleteName}</AthleteName>
-                          </label>
-                        ))}
-                      </div>
+                      <RoleGroupedAthletes
+                        rows={recipientPlayers.map((athlete) => ({ athleteId: athlete.athleteId, name: athlete.athleteName, role: roleByAthleteId.get(athlete.athleteId) ?? null, price: athlete.purchaseCredits ?? null }))}
+                        checked={requestedAthleteIds}
+                        disabled={ownedSlots.length === 0}
+                        onToggle={(id) => setRequestedAthleteIds((prev) => toggleAthleteId(prev, id))}
+                      />
                     ) : null}
                   </fieldset>
                 </div>
@@ -952,51 +939,23 @@ export function MarketPage() {
                             <div className="fa-trade-columns__left">
                               <fieldset>
                                 <legend>Giocatori offerti nella controproposta</legend>
-                                <div className="fa-trade-athlete-list">
-                                  {ownedSlots.map((slot) => (
-                                    <label key={slot.id}>
-                                      <input
-                                        type="checkbox"
-                                        checked={counterOfferedAthleteIds.includes(
-                                          slot.athleteId as string,
-                                        )}
-                                        onChange={() =>
-                                          setCounterOfferedAthleteIds((prev) =>
-                                            toggleAthleteId(prev, slot.athleteId as string),
-                                          )
-                                        }
-                                      />
-                                      <AthleteName athleteId={slot.athleteId}>{slot.athleteName}</AthleteName>
-                                    </label>
-                                  ))}
-                                </div>
+                                <RoleGroupedAthletes
+                                  rows={ownedSlots.map((slot) => ({ athleteId: slot.athleteId as string, name: slot.athleteName ?? "Giocatore", role: slot.role ?? roleByAthleteId.get(slot.athleteId as string) ?? null, price: slot.purchaseCredits ?? null }))}
+                                  checked={counterOfferedAthleteIds}
+                                  onToggle={(id) => setCounterOfferedAthleteIds((prev) => toggleAthleteId(prev, id))}
+                                />
                               </fieldset>
                             </div>
                             <div className="fa-trade-columns__right">
                               <fieldset>
                                 <legend>Giocatori richiesti nella controproposta</legend>
-                                <div className="fa-trade-athlete-list">
-                                  {occupancy
+                                <RoleGroupedAthletes
+                                  rows={occupancy
                                     .filter((entry) => entry.fantasyTeamId === proposal.proposerTeamId)
-                                    .map((entry) => (
-                                      <label key={entry.athleteId}>
-                                        <input
-                                          type="checkbox"
-                                          checked={counterRequestedAthleteIds.includes(entry.athleteId)}
-                                          onChange={() =>
-                                            setCounterRequestedAthleteIds((prev) =>
-                                              toggleAthleteId(prev, entry.athleteId),
-                                            )
-                                          }
-                                        />
-                                        <AthleteName athleteId={entry.athleteId}>
-                                          {entry.athleteName ??
-                                            athleteNameById.get(entry.athleteId) ??
-                                            "Giocatore"}
-                                        </AthleteName>
-                                      </label>
-                                    ))}
-                                </div>
+                                    .map((entry) => ({ athleteId: entry.athleteId, name: entry.athleteName ?? athleteNameById.get(entry.athleteId) ?? "Giocatore", role: roleByAthleteId.get(entry.athleteId) ?? null, price: entry.purchaseCredits ?? null }))}
+                                  checked={counterRequestedAthleteIds}
+                                  onToggle={(id) => setCounterRequestedAthleteIds((prev) => toggleAthleteId(prev, id))}
+                                />
                               </fieldset>
                             </div>
                           </div>

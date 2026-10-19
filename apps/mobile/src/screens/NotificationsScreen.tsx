@@ -12,6 +12,7 @@ import {
 import { UiStatePanel } from "../components/UiStatePanel";
 import { useScreenData } from "../hooks/useScreenData";
 import { PageContainer } from "../layout/PageContainer";
+import { resolveNotificationRoute } from "../navigation/notificationDestination";
 import type { RootStackParamList } from "../navigation/types";
 import { getApiErrorMessage, useAuthSession } from "../session/DemoSessionContext";
 
@@ -22,11 +23,6 @@ const CATEGORY_LABELS: Record<string, string> = {
   formazione: "Formazione",
   mercato: "Mercato",
   risultati: "Risultati",
-};
-
-/** Deep link interni → destinazione mobile equivalente (EP13-P07). */
-const DEEP_LINK_ROUTES: Record<string, keyof RootStackParamList> = {
-  "/inviti": "ReceivedInvites",
 };
 
 function formatDateTime(value: string): string {
@@ -88,9 +84,11 @@ export function NotificationsScreen() {
         setActionError(getApiErrorMessage(error, "Impossibile segnare come letta."));
       }
     }
-    const route = item.deepLink ? DEEP_LINK_ROUTES[item.deepLink] : undefined;
-    if (route) {
-      navigation.navigate(route as never);
+    const route = resolveNotificationRoute(item);
+    if (route?.kind === "stack") {
+      navigation.navigate(route.name as never);
+    } else if (route?.kind === "tab") {
+      navigation.navigate("MainTabs", { screen: route.screen });
     }
   }
 
