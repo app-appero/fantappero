@@ -32,7 +32,14 @@
         }
       ],
       "expo-secure-store",
-      "expo-status-bar"
+      "expo-status-bar",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/adaptive-icon.png",
+          "color": "#2748D8"
+        }
+      ]
     ],
     "icon": "./assets/icon.png"
   }

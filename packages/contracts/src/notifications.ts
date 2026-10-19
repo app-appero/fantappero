@@ -46,3 +46,16 @@ export interface ListNotificationsFilters {
   page?: number;
   pageSize?: number;
 }
+
+/** Piattaforme supportate per la registrazione del token push (EP09-05). */
+export type PushDevicePlatform = "ios" | "android";
+
+export interface RegisterPushDeviceRequest {
+  token: string;
+  platform: PushDevicePlatform;
+}
+
+export interface PushDeviceResponse {
+  id: string;
+  platform: PushDevicePlatform;
+}

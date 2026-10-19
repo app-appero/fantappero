@@ -446,6 +446,9 @@ export type {
   NotificationList,
   NotificationPreference,
   NotificationPreferenceList,
+  PushDevicePlatform,
+  PushDeviceResponse,
+  RegisterPushDeviceRequest,
   UpdateNotificationPreferenceRequest,
 } from "./notifications.js";
 
