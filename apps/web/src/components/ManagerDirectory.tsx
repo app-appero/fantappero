@@ -368,7 +368,7 @@ export function ManagerDirectory({
       ? {
           items: demoState === "empty" ? [] : DEMO_MANAGERS,
           page: 1,
-          pageSize: 12,
+          pageSize: 10,
           total: demoState === "empty" ? 0 : DEMO_MANAGERS.length,
           totalPages: 1,
         }
@@ -424,7 +424,7 @@ export function ManagerDirectory({
                 (availableFilter === "" ||
                   manager.availableForInvites === (availableFilter === "true")),
             );
-      setResult({ items: filtered, page: 1, pageSize: 12, total: filtered.length, totalPages: 1 });
+      setResult({ items: filtered, page: 1, pageSize: 10, total: filtered.length, totalPages: 1 });
       setLoadError(null);
       return;
     }
@@ -450,6 +450,7 @@ export function ManagerDirectory({
           available:
             availableFilter === "" ? undefined : availableFilter === "true",
           page,
+          pageSize: 10,
         }),
       );
     } catch (directoryError) {
@@ -584,20 +585,18 @@ export function ManagerDirectory({
             { value: "ai", label: "IA" },
           ]}
         />
-        <Select
-          label="Disponibilità"
-          name="manager-available"
-          value={availableFilter}
-          onChange={(event) => {
-            setPage(1);
-            setAvailableFilter(event.target.value as "" | "true" | "false");
-          }}
-          options={[
-            { value: "", label: "Tutte" },
-            { value: "true", label: "Disponibile" },
-            { value: "false", label: "Non disponibile" },
-          ]}
-        />
+        <label className="fa-manager-directory__check">
+          <input
+            type="checkbox"
+            name="manager-available"
+            checked={availableFilter === "true"}
+            onChange={(event) => {
+              setPage(1);
+              setAvailableFilter(event.target.checked ? "true" : "");
+            }}
+          />
+          <span>Solo disponibili</span>
+        </label>
       </div>
       <div className="fa-manager-directory__panel-foot">
         <span>Filtra la directory e invita i fantallenatori che vuoi nella tua lega.</span>

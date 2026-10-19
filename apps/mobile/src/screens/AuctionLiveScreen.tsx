@@ -645,15 +645,15 @@ export function AuctionLiveScreen() {
                 </View>
                 {swapError ? <Text style={styles.error} testID="auction-live-swap-error">{swapError}</Text> : null}
                 {pendingSwap.candidates.map((candidate) => (
-                  <View key={candidate.athleteId} style={styles.rowActions}>
-                    <View style={{ flexDirection: "row", flexWrap: "wrap", flex: 1 }}>
-                      <AthleteName athleteId={candidate.athleteId} style={styles.meta}>
+                  <View key={candidate.athleteId} style={[styles.pickRow, { marginTop: 10, gap: 12 }]}>
+                    <View style={{ flex: 1, minWidth: 0 }}>
+                      <AthleteName athleteId={candidate.athleteId} style={styles.optionLabel} numberOfLines={1} plain>
                         {candidate.athleteName}
                       </AthleteName>
-                      <Text style={styles.meta}> ({candidate.purchaseCredits} crediti)</Text>
+                      <Text style={styles.meta}>{candidate.purchaseCredits} crediti</Text>
                     </View>
                     <Pressable
-                      style={[styles.button, swapBusy && styles.disabled]}
+                      style={[styles.button, { paddingHorizontal: 20 }, swapBusy && styles.disabled]}
                       disabled={swapBusy}
                       onPress={() => handleResolveSwap(candidate.athleteId)}
                       testID={`auction-live-swap-with-${candidate.athleteId}`}
@@ -663,7 +663,7 @@ export function AuctionLiveScreen() {
                   </View>
                 ))}
                 <Pressable
-                  style={[styles.secondaryButton, swapBusy && styles.disabled]}
+                  style={[styles.secondaryButton, { marginTop: 16 }, swapBusy && styles.disabled]}
                   disabled={swapBusy}
                   onPress={handleDeclineSwap}
                   testID="auction-live-swap-decline"

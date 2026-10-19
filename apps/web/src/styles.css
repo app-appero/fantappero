@@ -4302,3 +4302,12 @@ h2 {
 .fa-trade-columns__right {
   margin-top: var(--fa-space-sm);
 }
+
+.fa-manager-directory__check {
+  display: inline-flex;
+  align-items: center;
+  align-self: end;
+  gap: var(--fa-space-sm);
+  min-height: 2.75rem;
+  font-weight: 600;
+}
