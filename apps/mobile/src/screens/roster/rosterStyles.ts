@@ -149,7 +149,7 @@ export const rosterStyles = lazyStyles(() => StyleSheet.create({
   },
   roleBadgeText: {
     fontSize: typography.fontSize.sm,
-    fontWeight: typography.fontWeight.semibold,
+    fontFamily: DISPLAY_FONT,
   },
   admin: {
     marginTop: spacing.lg,
@@ -512,7 +512,8 @@ export const rosterStyles = lazyStyles(() => StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: spacing.sm,
-    padding: spacing.sm,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
     borderRadius: radius.lg,
     borderWidth: 1,
     borderColor: colors.border,
@@ -523,7 +524,7 @@ export const rosterStyles = lazyStyles(() => StyleSheet.create({
   playerBody: { flex: 1, minWidth: 0 },
   playerPrice: { alignItems: "flex-end", minWidth: 48 },
   playerPriceValue: { color: colors.foreground, fontSize: 22, fontFamily: DISPLAY_FONT },
-  playerPriceLabel: { color: colors.foregroundMuted, fontSize: 9, letterSpacing: 1.2, textTransform: "uppercase" },
+  playerPriceLabel: { color: colors.foregroundMuted, fontSize: 10, letterSpacing: 1.2, textTransform: "uppercase" },
   freeSlot: {
     flexDirection: "row",
     alignItems: "center",
