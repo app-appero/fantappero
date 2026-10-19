@@ -18,7 +18,7 @@ import {
   type AthleteOwnership,
   type RoleTab,
 } from "./rosterHelpers";
-import { RosterActionBadge } from "./RosterActionBadge";
+import { SwipeHint, SwipeRow } from "./SwipeRow";
 import { rosterStyles as styles } from "./rosterStyles";
 
 function ListoneAssignRow({
@@ -29,12 +29,14 @@ function ListoneAssignRow({
   adminBusy,
   onReleaseAthlete,
   onAssignAthlete,
+  nudge = false,
 }: {
   entry: LeagueListoneEntry;
   owner: AthleteOwnership | undefined;
   canAssign: boolean;
   canRelease: boolean;
   adminBusy: boolean;
+  nudge?: boolean;
   onReleaseAthlete: (athleteId: string) => void | Promise<void>;
   onAssignAthlete: (athleteId: string, purchaseCredits: number) => void | Promise<void>;
 }) {
@@ -43,33 +45,41 @@ function ListoneAssignRow({
   const isValid = Number.isFinite(parsed) && parsed >= 1;
   const roleColors = roleBadgeColors(entry.effectiveRole);
 
+  const assignDisabled = adminBusy || !canAssign || !isValid;
   return (
-    <View style={[styles.playerCard, owner ? { opacity: 0.65 } : null]}>
-      <View style={[styles.playerDot, { backgroundColor: roleColors.backgroundColor }]}>
-        <Text style={[styles.roleBadgeText, { color: roleColors.color }]}>{entry.effectiveRole}</Text>
-      </View>
-      <View style={styles.playerBody}>
-        <AthleteName athleteId={entry.athleteId} style={styles.playerName} numberOfLines={1} plain>
-          {entry.canonicalName}
-        </AthleteName>
-        <Text style={styles.playerClub} numberOfLines={1}>
-          {entry.clubName ?? "—"}
-        </Text>
-      </View>
-      <View style={{ alignItems: "flex-end", gap: 6 }}>
-        <View
-          style={[
-            styles.statusChip,
-            { backgroundColor: owner ? "rgba(255,255,255,0.1)" : "rgba(52,211,153,0.2)" },
-          ]}
-          accessibilityLabel={owner ? `In rosa: ${owner.teamName}` : "Libero"}
-        >
-          <Text style={[styles.statusChipLabel, { color: owner ? "#B9C3E6" : "#6EE7B7" }]} numberOfLines={1}>
-            {owner ? `In rosa · ${owner.teamName}` : "Libero"}
+    <SwipeRow
+      onSwipeRight={!owner && !assignDisabled ? () => void onAssignAthlete(entry.athleteId, parsed) : undefined}
+      onSwipeLeft={owner && canRelease && !adminBusy ? () => void onReleaseAthlete(entry.athleteId) : undefined}
+      rightLabel="Assegna"
+      leftLabel="Rimuovi"
+      nudge={nudge ? (owner ? "left" : "right") : undefined}
+      testID={owner ? `roster-admin-release-${entry.athleteId}` : `roster-admin-assign-${entry.athleteId}`}
+    >
+      <View style={[styles.playerCard, { marginBottom: 0 }, owner ? { opacity: 0.7 } : null]}>
+        <View style={[styles.playerDot, { backgroundColor: roleColors.backgroundColor }]}>
+          <Text style={[styles.roleBadgeText, { color: roleColors.color }]}>{entry.effectiveRole}</Text>
+        </View>
+        <View style={styles.playerBody}>
+          <AthleteName athleteId={entry.athleteId} style={styles.playerName} numberOfLines={1} plain>
+            {entry.canonicalName}
+          </AthleteName>
+          <Text style={styles.playerClub} numberOfLines={1}>
+            {entry.clubName ?? "—"}
           </Text>
+          <View
+            style={[
+              styles.statusChip,
+              { alignSelf: "flex-start", marginTop: 4, backgroundColor: owner ? "rgba(255,255,255,0.1)" : "rgba(52,211,153,0.2)" },
+            ]}
+            accessibilityLabel={owner ? `In rosa: ${owner.teamName}` : "Libero"}
+          >
+            <Text style={[styles.statusChipLabel, { color: owner ? "#B9C3E6" : "#6EE7B7" }]} numberOfLines={1}>
+              {owner ? `In rosa · ${owner.teamName}` : "Libero"}
+            </Text>
+          </View>
         </View>
         {!owner ? (
-          <View style={styles.priceRowCompact}>
+          <View style={{ alignItems: "center", gap: 2 }}>
             <TextInput
               style={styles.priceInputCompact}
               value={draft}
@@ -79,28 +89,11 @@ function ListoneAssignRow({
               accessibilityLabel={`Prezzo acquisto ${entry.canonicalName}`}
               testID={`roster-admin-listone-price-${entry.athleteId}`}
             />
-            <Pressable
-              style={[styles.assignPill, (adminBusy || !canAssign || !isValid) && styles.disabled]}
-              disabled={adminBusy || !canAssign || !isValid}
-              testID={`roster-admin-assign-${entry.athleteId}`}
-              accessibilityRole="button"
-              accessibilityLabel={`Assegna ${entry.canonicalName}`}
-              onPress={() => void onAssignAthlete(entry.athleteId, parsed)}
-            >
-              <Text style={styles.assignPillLabel}>Assegna</Text>
-            </Pressable>
+            <Text style={styles.playerPriceLabel}>crediti</Text>
           </View>
-        ) : canRelease ? (
-          <RosterActionBadge
-            action="release"
-            disabled={adminBusy}
-            testID={`roster-admin-release-${entry.athleteId}`}
-            accessibilityLabel={`Rimuovi ${entry.canonicalName}`}
-            onPress={() => void onReleaseAthlete(entry.athleteId)}
-          />
         ) : null}
       </View>
-    </View>
+    </SwipeRow>
   );
 }
 
@@ -141,8 +134,9 @@ function ListoneTable({
 
   return (
     <View testID={`roster-admin-listone-table-${tabValue}`}>
+      <SwipeHint right="scorri a destra per assegnare" left="a sinistra per rimuovere" />
       <View style={styles.playerTable}>
-      {pagedRows.map((entry) => {
+      {pagedRows.map((entry, index) => {
         const owner = ownership.get(entry.athleteId);
         const canAssign = !owner && emptySlotsCount > 0;
         const canRelease = owner ? canReleaseAthlete(owner.teamId) : false;
@@ -154,6 +148,7 @@ function ListoneTable({
             canAssign={canAssign}
             canRelease={canRelease}
             adminBusy={adminBusy}
+            nudge={index === 0 && safePage === 0}
             onReleaseAthlete={onReleaseAthlete}
             onAssignAthlete={onAssignAthlete}
           />
