@@ -10,7 +10,7 @@ import {
   roleBadgeColors,
 } from "./rosterHelpers";
 import { AthleteName } from "../../athletes/AthleteCard";
-import { RosterActionBadge } from "./RosterActionBadge";
+import { SwipeToRelease } from "./SwipeToRelease";
 import { rosterStyles as styles } from "./rosterStyles";
 
 type RosterSlot = FantasyTeam["slots"][number];
@@ -38,6 +38,8 @@ function PurchaseCreditsCell({
     setDraft(String(slot.purchaseCredits ?? 0));
   }, [slot.purchaseCredits]);
 
+  const [editing, setEditing] = useState(false);
+
   if (!canEdit || !slot.athleteId || !onUpdatePurchaseCredits) {
     return <Text style={styles.playerPriceValue}>{slot.purchaseCredits ?? "—"}</Text>;
   }
@@ -47,6 +49,19 @@ function PurchaseCreditsCell({
   const isDirty = isValid && parsed !== (slot.purchaseCredits ?? 0);
   const athleteId = slot.athleteId;
 
+  if (!editing) {
+    return (
+      <Pressable
+        onPress={() => setEditing(true)}
+        accessibilityRole="button"
+        accessibilityLabel={`Modifica prezzo ${slot.athleteName ?? "calciatore"}`}
+        testID={`roster-purchase-credits-edit-${athleteId}`}
+      >
+        <Text style={styles.playerPriceValue}>{slot.purchaseCredits ?? "—"}</Text>
+      </Pressable>
+    );
+  }
+
   return (
     <View style={compact ? styles.priceRowCompact : styles.priceRow}>
       <TextInput
@@ -54,20 +69,24 @@ function PurchaseCreditsCell({
         value={draft}
         onChangeText={setDraft}
         keyboardType="numeric"
+        autoFocus
         editable={!busy}
         accessibilityLabel={`Prezzo acquisto ${slot.athleteName ?? "calciatore"}`}
         testID={`roster-purchase-credits-${athleteId}`}
       />
-      {isDirty ? (
-        <Pressable
-          style={[styles.ghostButton, busy && styles.disabled]}
-          disabled={busy}
-          testID={`roster-purchase-credits-save-${athleteId}`}
-          onPress={() => void onUpdatePurchaseCredits(slot.slotIndex, athleteId, parsed)}
-        >
-          <Text style={styles.ghostButtonLabel}>Salva</Text>
-        </Pressable>
-      ) : null}
+      <Pressable
+        style={[styles.ghostButton, (busy || !isValid) && styles.disabled]}
+        disabled={busy || !isValid}
+        testID={`roster-purchase-credits-save-${athleteId}`}
+        onPress={() => {
+          if (isDirty) {
+            void onUpdatePurchaseCredits(slot.slotIndex, athleteId, parsed);
+          }
+          setEditing(false);
+        }}
+      >
+        <Text style={styles.ghostButtonLabel}>{isDirty ? "Salva" : "Ok"}</Text>
+      </Pressable>
     </View>
   );
 }
@@ -127,43 +146,38 @@ function RosterRoleSection({
             {pagedSlots.map((slot) => {
               const dot = roleBadgeColors(slot.role);
               return (
-                <View key={slot.id} style={styles.playerCard}>
-                  <View style={[styles.playerDot, { backgroundColor: dot.backgroundColor }]}>
-                    <Text style={[styles.roleBadgeText, { color: dot.color }]}>{slot.role ?? "?"}</Text>
+                <SwipeToRelease
+                  key={slot.id}
+                  enabled={canEdit && !!slot.athleteId && !adminBusy}
+                  label="Rimuovi"
+                  confirmTitle={`Rimuovere ${slot.athleteName ?? "il calciatore"}?`}
+                  onRelease={() => void onReleaseAthlete(slot.athleteId!)}
+                  testID={`roster-admin-release-${slot.athleteId}`}
+                >
+                  <View style={[styles.playerCard, { marginBottom: 0 }]}>
+                    <View style={[styles.playerDot, { backgroundColor: dot.backgroundColor }]}>
+                      <Text style={[styles.roleBadgeText, { color: dot.color }]}>{slot.role ?? "?"}</Text>
+                    </View>
+                    <View style={styles.playerBody}>
+                      <AthleteName athleteId={slot.athleteId} style={styles.playerName} numberOfLines={1} plain>
+                        {slot.athleteName ?? "Calciatore"}
+                      </AthleteName>
+                      <Text style={styles.playerClub} numberOfLines={1}>
+                        {slot.clubName ?? "—"} · slot {slot.slotIndex + 1}
+                      </Text>
+                    </View>
+                    <View style={styles.playerPrice}>
+                      <PurchaseCreditsCell
+                        slot={slot}
+                        canEdit={canEdit}
+                        busy={adminBusy}
+                        compact
+                        onUpdatePurchaseCredits={onUpdatePurchaseCredits}
+                      />
+                      <Text style={styles.playerPriceLabel}>crediti</Text>
+                    </View>
                   </View>
-                  <View style={styles.playerBody}>
-                    <AthleteName
-                      athleteId={slot.athleteId}
-                      style={styles.playerName}
-                      numberOfLines={1}
-                      plain
-                    >
-                      {slot.athleteName ?? "Calciatore"}
-                    </AthleteName>
-                    <Text style={styles.playerClub} numberOfLines={1}>
-                      {slot.clubName ?? "—"} · slot {slot.slotIndex + 1}
-                    </Text>
-                  </View>
-                  <View style={styles.playerPrice}>
-                    <PurchaseCreditsCell
-                      slot={slot}
-                      canEdit={canEdit}
-                      busy={adminBusy}
-                      compact
-                      onUpdatePurchaseCredits={onUpdatePurchaseCredits}
-                    />
-                    <Text style={styles.playerPriceLabel}>crediti</Text>
-                  </View>
-                  {canEdit && slot.athleteId ? (
-                    <RosterActionBadge
-                      action="release"
-                      disabled={adminBusy}
-                      testID={`roster-admin-release-${slot.athleteId}`}
-                      accessibilityLabel={`Rimuovi ${slot.athleteName ?? "calciatore"}`}
-                      onPress={() => void onReleaseAthlete(slot.athleteId!)}
-                    />
-                  ) : null}
-                </View>
+                </SwipeToRelease>
               );
             })}
           </View>
