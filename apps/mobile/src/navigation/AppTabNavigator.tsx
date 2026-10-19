@@ -21,6 +21,7 @@ import { ProfileScreen } from "../screens/ProfileScreen";
 import { RosterScreen } from "../screens/RosterScreen";
 import { WaiverScreen } from "../screens/WaiverScreen";
 import { StandingsScreen } from "../screens/StandingsScreen";
+import { useUnreadNotifications } from "../hooks/useUnreadNotifications";
 import { useAuthSession } from "../session/DemoSessionContext";
 import {
   filterMobileNavItems,
@@ -119,6 +120,13 @@ function AppTabShell({
 
   // Nessun polling: si aggiorna all'apertura, all'apertura del drawer e dopo
   // ogni azione sugli inviti (EP13-P07).
+  const { unreadCount: unreadNotifications, refresh: refreshUnreadNotifications } =
+    useUnreadNotifications(accessToken);
+  // Tornando da una schermata (es. dopo aver letto le notifiche) il badge si riallinea.
+  useEffect(() => {
+    return navigation.addListener("state", refreshUnreadNotifications);
+  }, [navigation, refreshUnreadNotifications]);
+
   const refreshPendingInvites = useCallback(async () => {
     const requestId = ++pendingRequest.current;
     if (!accessToken) {
@@ -219,6 +227,8 @@ function AppTabShell({
           setDrawerOpen(true);
         }}
         onProfilePress={() => navigation.navigate("MainTabs", { screen: "Profile" })}
+        unreadNotifications={unreadNotifications}
+        onNotificationsPress={() => navigation.navigate("Notifications")}
         showLeagueSelector={leagues.length > 0}
         leagues={leagues.map((league) => ({ value: league.id, label: league.name }))}
         activeLeagueId={activeLeagueId}

@@ -4288,3 +4288,17 @@ h2 {
   max-height: none;
   overflow: visible;
 }
+
+/* Il modulo «Nuova proposta» sta in una colonna stretta: le due liste vanno una sotto l'altra. */
+.fa-market-cols .fa-trade-columns {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.fa-trade-columns fieldset {
+  min-width: 0;
+  margin: 0;
+}
+
+.fa-trade-columns__right {
+  margin-top: var(--fa-space-sm);
+}
