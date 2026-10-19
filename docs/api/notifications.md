@@ -62,7 +62,7 @@ ticket immediato), è un miglioramento futuro, non un bug noto.
 | --- | --- | --- |
 | `NOTIFICATIONS_PUSH_ENABLED` | API e worker | Interruttore globale, default acceso. |
 | `EXPO_PUSH_BASE_URL` | opzionale | Default `https://exp.host/--/api/v2/push/send`. |
-| `EXPO_PUSH_ACCESS_TOKEN` | opzionale | Header `Authorization: Bearer ...` per la modalità "enhanced security" di Expo. Mai nei log. |
+| `EXPO_PUSH_ACCESS_TOKEN` | opzionale | Token per la modalità "enhanced security" di Expo (stesso schema OAuth usato altrove nell'API). Mai nei log. |
 | `EXPO_PUSH_TIMEOUT_SECONDS` | opzionale | Default 10. |
 
 ### Cosa manca lato mobile (non toccato da questo lavoro — `apps/mobile` resta di chi fa la grafica)
