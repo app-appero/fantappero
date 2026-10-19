@@ -10,7 +10,7 @@ import {
   roleBadgeColors,
 } from "./rosterHelpers";
 import { AthleteName } from "../../athletes/AthleteCard";
-import { SwipeToRelease } from "./SwipeToRelease";
+import { SwipeHint, SwipeRow } from "./SwipeRow";
 import { rosterStyles as styles } from "./rosterStyles";
 
 type RosterSlot = FantasyTeam["slots"][number];
@@ -101,6 +101,7 @@ function RosterRoleSection({
   adminBusy,
   onReleaseAthlete,
   onUpdatePurchaseCredits,
+  showHint = false,
 }: {
   testId: string;
   title: string;
@@ -109,6 +110,7 @@ function RosterRoleSection({
   countLabel: string;
   canEdit: boolean;
   adminBusy: boolean;
+  showHint?: boolean;
   onReleaseAthlete: (athleteId: string) => void | Promise<void>;
   onUpdatePurchaseCredits?: (
     slotIndex: number,
@@ -142,16 +144,16 @@ function RosterRoleSection({
         </View>
       ) : (
         <>
+          {canEdit && showHint ? <SwipeHint left="scorri a sinistra per rimuovere" /> : null}
           <View testID={`${testId}-cards`}>
             {pagedSlots.map((slot) => {
               const dot = roleBadgeColors(slot.role);
               return (
-                <SwipeToRelease
+                <SwipeRow
                   key={slot.id}
-                  enabled={canEdit && !!slot.athleteId && !adminBusy}
-                  label="Rimuovi"
-                  confirmTitle={`Rimuovere ${slot.athleteName ?? "il calciatore"}?`}
-                  onRelease={() => void onReleaseAthlete(slot.athleteId!)}
+                  onSwipeLeft={canEdit && slot.athleteId && !adminBusy ? () => void onReleaseAthlete(slot.athleteId!) : undefined}
+                  leftLabel="Rimuovi"
+                  nudge={canEdit && showHint && slot.id === slots[0]?.id ? "left" : undefined}
                   testID={`roster-admin-release-${slot.athleteId}`}
                 >
                   <View style={[styles.playerCard, { marginBottom: 0 }]}>
@@ -177,7 +179,7 @@ function RosterRoleSection({
                       <Text style={styles.playerPriceLabel}>crediti</Text>
                     </View>
                   </View>
-                </SwipeToRelease>
+                </SwipeRow>
               );
             })}
           </View>
@@ -348,6 +350,7 @@ export function RosterFilledSummary({
               title={ROLE_SECTION_TITLE[role]}
               badge={role}
               slots={slots}
+              showHint={role === ROLE_SECTION_ORDER.find((r) => filledByRole[r].length > 0)}
               countLabel={`${filledByRole[role].length}${limit != null ? `/${limit}` : ""}`}
               canEdit={canEdit}
               adminBusy={adminBusy}

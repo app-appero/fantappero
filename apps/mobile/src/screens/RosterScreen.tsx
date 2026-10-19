@@ -187,13 +187,17 @@ export function RosterScreen() {
     if (!accessToken || !activeLeagueId) {
       return;
     }
-    const viewedId = adminTeamIdRef.current;
-    if (isAdmin && viewedId) {
-      const result = await fetchFantasyTeamCreditsForAdmin(accessToken, activeLeagueId, viewedId);
-      applyLedgerResult(result);
-      return;
+    try {
+      const viewedId = adminTeamIdRef.current;
+      if (isAdmin && viewedId) {
+        const result = await fetchFantasyTeamCreditsForAdmin(accessToken, activeLeagueId, viewedId);
+        applyLedgerResult(result);
+        return;
+      }
+      await refreshMyCredits();
+    } catch {
+      // Il movimento è già stato registrato: se il ricarico del saldo fallisce non va annullato a schermo.
     }
-    await refreshMyCredits();
   }, [accessToken, activeLeagueId, applyLedgerResult, isAdmin, refreshMyCredits]);
 
   const loadEditContext = useCallback(
@@ -668,6 +672,7 @@ export function RosterScreen() {
     } catch (error) {
       applyTeamUpdate(previousTeam);
       setAdminError(getApiErrorMessage(error, "Impossibile assegnare il calciatore."));
+      void loadRoster({ silent: true });
     } finally {
       setAdminBusy(false);
     }
@@ -746,6 +751,7 @@ export function RosterScreen() {
         applyTeamUpdate(previousTeam);
       }
       setAdminError(getApiErrorMessage(error, "Impossibile liberare lo slot."));
+      void loadRoster({ silent: true });
     } finally {
       setAdminBusy(false);
     }
