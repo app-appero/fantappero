@@ -15,13 +15,15 @@ from auth.models.user_profile import UserProfile
 from database.enums import NotificationCategory, NotificationStatus
 from notifications.email_dispatch import dispatch_notification_email
 from notifications.exceptions import NotificationNotFoundError
-from notifications.models import Notification, NotificationPreference
+from notifications.models import Notification, NotificationPreference, PushDevice
+from notifications.push_dispatch import dispatch_notification_push
 from notifications.schemas import (
     MarkAllReadResponse,
     NotificationItemResponse,
     NotificationListResponse,
     NotificationPreferenceItemResponse,
     NotificationPreferenceListResponse,
+    PushDeviceResponse,
 )
 from notifications.templates import render_notification
 from observability.logging import get_logger
@@ -127,6 +129,7 @@ class NotificationService:
             extra={"category": category.value, "template_key": template_key},
         )
         self._dispatch_email(notification)
+        self._dispatch_push(notification)
         return notification, True
 
     def _dispatch_email(self, notification: Notification) -> None:
@@ -135,6 +138,13 @@ class NotificationService:
             return
         profile = self._session.get(UserProfile, notification.user_id)
         dispatch_notification_email(notification=notification, user=user, profile=profile)
+
+    def _dispatch_push(self, notification: Notification) -> None:
+        user = self._session.get(User, notification.user_id)
+        if user is None:
+            return
+        profile = self._session.get(UserProfile, notification.user_id)
+        dispatch_notification_push(notification=notification, user=user, profile=profile)
 
     def list_notifications(
         self,
@@ -248,3 +258,44 @@ class NotificationService:
             category=category.value,
             inAppEnabled=preference.in_app_enabled,
         )
+
+    def register_push_device(
+        self, *, user_id: UUID, token: str, platform: str
+    ) -> PushDeviceResponse:
+        """Upsert per ``token``: un reinstall o un altro utente sullo stesso
+        dispositivo deve spostare il token, non duplicarlo."""
+        now = datetime.now(UTC)
+        existing = self._session.scalar(select(PushDevice).where(PushDevice.token == token))
+        if existing is not None:
+            existing.user_id = user_id
+            existing.platform = platform
+            existing.last_seen_at = now
+            existing.revoked_at = None
+            self._session.flush()
+            return PushDeviceResponse(id=str(existing.id), platform=existing.platform)
+
+        device = PushDevice(user_id=user_id, token=token, platform=platform, last_seen_at=now)
+        try:
+            with self._session.begin_nested():
+                self._session.add(device)
+                self._session.flush()
+        except IntegrityError:
+            # Registrazione concorrente dello stesso token — rileggi e aggiorna.
+            replayed = self._session.scalar(select(PushDevice).where(PushDevice.token == token))
+            if replayed is None:
+                raise
+            replayed.user_id = user_id
+            replayed.platform = platform
+            replayed.last_seen_at = now
+            replayed.revoked_at = None
+            self._session.flush()
+            return PushDeviceResponse(id=str(replayed.id), platform=replayed.platform)
+        return PushDeviceResponse(id=str(device.id), platform=device.platform)
+
+    def unregister_push_device(self, *, user_id: UUID, token: str) -> None:
+        device = self._session.scalar(
+            select(PushDevice).where(PushDevice.token == token, PushDevice.user_id == user_id)
+        )
+        if device is not None:
+            self._session.delete(device)
+            self._session.flush()

@@ -42,7 +42,7 @@ from market.live_models import (
     MarketLiveTurnOrderEntry,
 )
 from market.models import MarketBid, MarketSession, TradeProposal
-from notifications.models import Notification, NotificationPreference
+from notifications.models import Notification, NotificationPreference, PushDevice
 from sports_data.availability.models import PlayerAvailability
 from sports_data.catalog.models import Club, CompetitionSeasonClub, SportSeason
 from sports_data.fixtures.models import (
@@ -114,6 +114,7 @@ __all__ = [
     "PlayerMatchStat",
     "PrivacyAuditEvent",
     "ProviderSnapshot",
+    "PushDevice",
     "RoleAssignment",
     "RosterImportSession",
     "RosterOwnershipInterval",
