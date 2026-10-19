@@ -5,7 +5,7 @@ import type {
   LeagueListoneEntry,
 } from "@fantappero/contracts";
 import { useEffect, useState } from "react";
-import { Pressable, Text, View } from "react-native";
+import { Pressable, ScrollView, Text, View } from "react-native";
 import { AppTextInput as TextInput } from "../../components/AppTextInput";
 import { AthleteName } from "../../athletes/AthleteCard";
 import { UiStatePanel } from "../../components/UiStatePanel";
@@ -55,45 +55,51 @@ function ListoneAssignRow({
         <Text style={styles.playerClub} numberOfLines={1}>
           {entry.clubName ?? "—"}
         </Text>
-        <Text
-          style={owner ? styles.listoneStatusOwned : styles.listoneStatusFree}
-          numberOfLines={1}
+      </View>
+      <View style={{ alignItems: "flex-end", gap: 6 }}>
+        <View
+          style={[
+            styles.statusChip,
+            { backgroundColor: owner ? "rgba(255,255,255,0.1)" : "rgba(52,211,153,0.2)" },
+          ]}
           accessibilityLabel={owner ? `In rosa: ${owner.teamName}` : "Libero"}
         >
-          {owner ? `In rosa · ${owner.teamName}` : "Libero"}
-        </Text>
-      </View>
-      {!owner ? (
-        <View style={styles.priceRowCompact}>
-          <TextInput
-            style={styles.priceInputCompact}
-            value={draft}
-            onChangeText={setDraft}
-            keyboardType="numeric"
-            editable={!adminBusy && canAssign}
-            accessibilityLabel={`Prezzo acquisto ${entry.canonicalName}`}
-            testID={`roster-admin-listone-price-${entry.athleteId}`}
-          />
-          <Pressable
-            style={[styles.assignPill, (adminBusy || !canAssign || !isValid) && styles.disabled]}
-            disabled={adminBusy || !canAssign || !isValid}
-            testID={`roster-admin-assign-${entry.athleteId}`}
-            accessibilityRole="button"
-            accessibilityLabel={`Assegna ${entry.canonicalName}`}
-            onPress={() => void onAssignAthlete(entry.athleteId, parsed)}
-          >
-            <Text style={styles.assignPillLabel}>Assegna</Text>
-          </Pressable>
+          <Text style={[styles.statusChipLabel, { color: owner ? "#B9C3E6" : "#6EE7B7" }]} numberOfLines={1}>
+            {owner ? `In rosa · ${owner.teamName}` : "Libero"}
+          </Text>
         </View>
-      ) : owner && canRelease ? (
-        <RosterActionBadge
-          action="release"
-          disabled={adminBusy}
-          testID={`roster-admin-release-${entry.athleteId}`}
-          accessibilityLabel={`Rimuovi ${entry.canonicalName}`}
-          onPress={() => void onReleaseAthlete(entry.athleteId)}
-        />
-      ) : null}
+        {!owner ? (
+          <View style={styles.priceRowCompact}>
+            <TextInput
+              style={styles.priceInputCompact}
+              value={draft}
+              onChangeText={setDraft}
+              keyboardType="numeric"
+              editable={!adminBusy && canAssign}
+              accessibilityLabel={`Prezzo acquisto ${entry.canonicalName}`}
+              testID={`roster-admin-listone-price-${entry.athleteId}`}
+            />
+            <Pressable
+              style={[styles.assignPill, (adminBusy || !canAssign || !isValid) && styles.disabled]}
+              disabled={adminBusy || !canAssign || !isValid}
+              testID={`roster-admin-assign-${entry.athleteId}`}
+              accessibilityRole="button"
+              accessibilityLabel={`Assegna ${entry.canonicalName}`}
+              onPress={() => void onAssignAthlete(entry.athleteId, parsed)}
+            >
+              <Text style={styles.assignPillLabel}>Assegna</Text>
+            </Pressable>
+          </View>
+        ) : canRelease ? (
+          <RosterActionBadge
+            action="release"
+            disabled={adminBusy}
+            testID={`roster-admin-release-${entry.athleteId}`}
+            accessibilityLabel={`Rimuovi ${entry.canonicalName}`}
+            onPress={() => void onReleaseAthlete(entry.athleteId)}
+          />
+        ) : null}
+      </View>
     </View>
   );
 }
@@ -192,6 +198,7 @@ export function RosterAdminManualCard({
   adminBusy,
   onReleaseAthlete,
   onAssignAthlete,
+  onSelectTargetTeam,
   adminMessage,
   adminError,
 }: {
@@ -207,6 +214,7 @@ export function RosterAdminManualCard({
   adminBusy: boolean;
   onReleaseAthlete: (athleteId: string) => void | Promise<void>;
   onAssignAthlete: (athleteId: string, purchaseCredits: number) => void | Promise<void>;
+  onSelectTargetTeam?: (teamId: string) => void;
   adminMessage: string | null;
   adminError: string | null;
 }) {
@@ -215,13 +223,40 @@ export function RosterAdminManualCard({
   const ownedAthleteIds = new Set(ownership.keys());
 
   return (
-    <View style={styles.toolsCard} testID="roster-admin-manual">
-      <Text style={styles.blockTitle}>Inserimento manuale</Text>
-      <Text style={styles.subtitle}>
-        {isAdmin
-          ? "Assegna o rimuovi calciatori dal listone sulla squadra target selezionata sopra."
-          : "Assegna o rimuovi calciatori dal listone sulla tua rosa."}
-      </Text>
+    <View style={{ gap: 12 }} testID="roster-admin-manual">
+      <View style={styles.toolsCard}>
+        <Text style={styles.assignHead}>
+          Inserimento manuale · assegna a
+        </Text>
+        {isAdmin && leagueTeams.length > 0 ? (
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
+            {leagueTeams.map((row) => {
+              const selected = row.id === targetTeam?.id;
+              return (
+                <Pressable
+                  key={row.id}
+                  style={[styles.teamPill, selected && styles.pillActive]}
+                  disabled={adminBusy}
+                  onPress={() => onSelectTargetTeam?.(row.id)}
+                >
+                  <Text style={[styles.pillLabel, selected && styles.pillLabelActive]} numberOfLines={1}>
+                    {row.name}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+        ) : (
+          <Text style={styles.subtitle}>
+            {isAdmin ? "" : "Assegna o rimuovi calciatori dal listone sulla tua rosa."}
+          </Text>
+        )}
+        {targetTeam ? (
+          <Text style={styles.meta} testID="roster-admin-team-summary">
+            {targetTeam.name}: {targetTeam.filledSlots}/{targetTeam.rosterSize} slot · {emptySlotsCount} liberi
+          </Text>
+        ) : null}
+      </View>
       {isAdmin && leagueTeams.length === 0 ? (
         <UiStatePanel
           state="empty"
@@ -238,13 +273,6 @@ export function RosterAdminManualCard({
         />
       ) : (
         <>
-          {targetTeam ? (
-            <Text style={styles.meta} testID="roster-admin-team-summary">
-              {targetTeam.name}: {targetTeam.filledSlots}/{targetTeam.rosterSize} slot ·{" "}
-              {emptySlotsCount} liberi
-            </Text>
-          ) : null}
-
           {adminMessage ? (
             <Text style={styles.ok} testID="roster-admin-ok">
               {adminMessage}
@@ -265,7 +293,6 @@ export function RosterAdminManualCard({
             />
           ) : (
             <View>
-              <Text style={styles.fieldLabel}>Cerca calciatore</Text>
               <TextInput
                 style={styles.searchBox}
                 value={listoneQuery}
@@ -286,6 +313,7 @@ export function RosterAdminManualCard({
                   {onlyFree ? <Text style={styles.freeMark}>✓</Text> : null}
                 </View>
                 <Text style={styles.freeLabel}>Solo disponibili</Text>
+                <Text style={[styles.meta, { marginLeft: "auto" }]}>{listone.length} calciatori</Text>
               </Pressable>
               <View style={styles.chipRow} accessibilityRole="tablist">
                 {ROLE_TABS.map((tab) => {

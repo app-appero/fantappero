@@ -24,6 +24,8 @@ export function RosterCreditsPanel({
   teamName,
   filledSlots,
   rosterSize,
+  spent,
+  leagueName,
 }: {
   isAdmin: boolean;
   leagueTeams: FantasyTeamSummary[];
@@ -43,6 +45,9 @@ export function RosterCreditsPanel({
   teamName?: string | null;
   filledSlots?: number | null;
   rosterSize?: number | null;
+  /** Crediti spesi per i giocatori in rosa (somma dei prezzi di acquisto). */
+  spent?: number | null;
+  leagueName?: string | null;
 }) {
   const [open, setOpen] = useState(false);
   const [teamsOpen, setTeamsOpen] = useState(false);
@@ -51,22 +56,21 @@ export function RosterCreditsPanel({
   return (
     <View style={styles.credits} testID="roster-credits">
       <View style={styles.heroCard}>
-        {teamName ? (
-          <View style={styles.heroTop}>
-            <Text style={styles.heroName} numberOfLines={1}>
-              {teamName}
+        <View style={styles.heroTop}>
+          <View style={styles.heroAvatar}>
+            <Text style={styles.heroAvatarLabel}>{(teamName ?? "?").slice(0, 2).toUpperCase()}</Text>
+          </View>
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <Text style={styles.heroName} numberOfLines={2}>
+              {teamName ?? "La tua squadra"}
             </Text>
-            {canSwitch ? (
-              <Pressable
-                style={styles.creditsButton}
-                onPress={() => setTeamsOpen(true)}
-                testID="roster-admin-team"
-              >
-                <Text style={styles.creditsButtonLabel}>Cambia</Text>
-              </Pressable>
+            {leagueName ? (
+              <Text style={styles.heroSub} numberOfLines={1}>
+                {leagueName}
+              </Text>
             ) : null}
           </View>
-        ) : null}
+        </View>
         <View style={styles.heroRow}>
           <View>
             <Text style={styles.heroLabel}>Crediti residui</Text>
@@ -76,21 +80,47 @@ export function RosterCreditsPanel({
           </View>
           {filledSlots != null && rosterSize != null ? (
             <View>
-              <Text style={styles.heroLabel}>Giocatori</Text>
+              <Text style={[styles.heroLabel, { textAlign: "right" }]}>Giocatori</Text>
               <Text style={styles.heroSlots}>
-                {filledSlots}/{rosterSize}
+                {filledSlots}
+                <Text style={styles.heroSlotsNeed}>/{rosterSize}</Text>
               </Text>
             </View>
           ) : null}
         </View>
-        {isAdmin ? (
-          <Pressable
-            style={styles.creditsButton}
-            onPress={() => setOpen(true)}
-            testID="roster-admin-credits"
-          >
-            <Text style={styles.creditsButtonLabel}>Aggiusta crediti</Text>
-          </Pressable>
+        {spent != null && credits ? (
+          <>
+            <View style={styles.heroBar}>
+              <View
+                style={[
+                  styles.heroBarFill,
+                  { width: `${Math.min(100, Math.round((spent / Math.max(1, spent + credits.balance)) * 100))}%` as `${number}%` },
+                ]}
+              />
+            </View>
+            <View style={styles.heroFoot}>
+              <Text style={styles.heroFootLabel}>
+                Spesi {spent} su {spent + credits.balance}
+              </Text>
+              <Text style={styles.heroFootLabel}>
+                {Math.round((spent / Math.max(1, spent + credits.balance)) * 100)}%
+              </Text>
+            </View>
+          </>
+        ) : null}
+        {canSwitch || isAdmin ? (
+          <View style={styles.heroActions}>
+            {canSwitch ? (
+              <Pressable style={styles.creditsButton} onPress={() => setTeamsOpen(true)} testID="roster-admin-team">
+                <Text style={styles.creditsButtonLabel}>Cambia squadra</Text>
+              </Pressable>
+            ) : null}
+            {isAdmin ? (
+              <Pressable style={styles.creditsButton} onPress={() => setOpen(true)} testID="roster-admin-credits">
+                <Text style={styles.creditsButtonLabel}>Aggiusta crediti</Text>
+              </Pressable>
+            ) : null}
+          </View>
         ) : null}
       </View>
       <Modal visible={teamsOpen} transparent animationType="slide" onRequestClose={() => setTeamsOpen(false)}>
