@@ -1,4 +1,5 @@
 import type { LeagueListoneEntry, MarketLiveNominationMode } from "@fantappero/contracts";
+import { DateTimeField } from "../../components/DateTimeField";
 import { Pressable, Text, View } from "react-native";
 import { AthleteName } from "../../athletes/AthleteCard";
 import { AppTextInput as TextInput } from "../../components/AppTextInput";
@@ -133,10 +134,8 @@ export function LiveSessionConfigForm({
       <Text style={styles.heroValue}>Configura asta</Text>
 
       <Section title="1 · Quando" subtitle="Finestra in cui l'asta resta aperta">
-        <Text style={styles.fieldLabel}>Apertura (AAAA-MM-GG HH:MM)</Text>
-        <TextInput style={styles.input} value={opensAt} onChangeText={onOpensAtChange} placeholder="2026-09-10 20:00" autoCapitalize="none" autoCorrect={false} testID="auction-live-opens-at" />
-        <Text style={styles.fieldLabel}>Chiusura (AAAA-MM-GG HH:MM)</Text>
-        <TextInput style={styles.input} value={closesAt} onChangeText={onClosesAtChange} placeholder="2026-09-10 23:00" autoCapitalize="none" autoCorrect={false} testID="auction-live-closes-at" />
+        <DateTimeField label="Apertura" value={opensAt} onChange={onOpensAtChange} testID="auction-live-opens-at" />
+        <DateTimeField label="Chiusura" value={closesAt} onChange={onClosesAtChange} testID="auction-live-closes-at" />
       </Section>
 
       <Section title="2 · Come si chiama" subtitle="Modalità di chiamata dei calciatori">

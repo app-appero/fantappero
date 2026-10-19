@@ -1,4 +1,5 @@
 import type { FantasyRosterSlot, TeamRosterPlayer } from "@fantappero/contracts";
+import { DateTimeField } from "../../components/DateTimeField";
 import { Pressable, Text, View } from "react-native";
 import { AthleteName } from "../../athletes/AthleteCard";
 import { AppTextInput as TextInput } from "../../components/AppTextInput";
@@ -191,15 +192,11 @@ export function MarketTradeCreateForm({
           editable={canPropose}
           testID="market-trade-requested-credits"
         />
-        <Text style={styles.fieldLabel}>Scadenza (AAAA-MM-GG HH:MM)</Text>
-        <TextInput
-          style={[styles.input, !canPropose && styles.disabled]}
+        <DateTimeField
+          label="Scadenza"
           value={expiresAt}
-          onChangeText={onExpiresAtChange}
-          placeholder="2026-09-01 00:00"
-          autoCapitalize="none"
-          autoCorrect={false}
-          editable={canPropose}
+          onChange={onExpiresAtChange}
+          placeholder="Scegli quando scade la proposta"
           testID="market-trade-expires-at"
         />
 

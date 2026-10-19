@@ -1,5 +1,5 @@
 import { Pressable, Text, View } from "react-native";
-import { AppTextInput as TextInput } from "../../components/AppTextInput";
+import { DateTimeField } from "../../components/DateTimeField";
 import { StatusBadge } from "../../components/StatusBadge";
 import { UiStatePanel } from "../../components/UiStatePanel";
 import type { MarketSessionFlow } from "../../market/useMarketSessionFlow";
@@ -149,26 +149,8 @@ export function AuctionAdminPanel({
       <View style={styles.field} testID={`${testIdPrefix}-create-session-form`}>
         <Text style={styles.sectionTitle}>Nuova sessione</Text>
         <Text style={styles.meta}>Finestra in cui l'asta resta aperta.</Text>
-        <Text style={styles.fieldLabel}>Apertura (AAAA-MM-GG HH:MM)</Text>
-        <TextInput
-          style={styles.input}
-          value={opensAt}
-          onChangeText={onOpensAtChange}
-          placeholder="2026-08-25 10:00"
-          autoCapitalize="none"
-          autoCorrect={false}
-          testID={`${testIdPrefix}-opens-at`}
-        />
-        <Text style={styles.fieldLabel}>Chiusura (AAAA-MM-GG HH:MM)</Text>
-        <TextInput
-          style={styles.input}
-          value={closesAt}
-          onChangeText={onClosesAtChange}
-          placeholder="2026-08-26 10:00"
-          autoCapitalize="none"
-          autoCorrect={false}
-          testID={`${testIdPrefix}-closes-at`}
-        />
+        <DateTimeField label="Apertura" value={opensAt} onChange={onOpensAtChange} testID={`${testIdPrefix}-opens-at`} />
+        <DateTimeField label="Chiusura" value={closesAt} onChange={onClosesAtChange} testID={`${testIdPrefix}-closes-at`} />
         {formError ? (
           <Text style={styles.error} testID={`${testIdPrefix}-create-session-format-error`}>
             {formError}
