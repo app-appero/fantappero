@@ -4230,3 +4230,61 @@ h2 {
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+/* ── Scambi: calciatori divisi per ruolo ──────────────────────────────── */
+
+.fa-trade-roles {
+  display: grid;
+  gap: var(--fa-space-md);
+  max-height: 32rem;
+  overflow-y: auto;
+}
+
+.fa-trade-role__head {
+  display: flex;
+  align-items: center;
+  gap: var(--fa-space-sm);
+  margin: 0 0 var(--fa-space-xs);
+  font-size: 1.1rem;
+  font-style: italic;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.fa-trade-role__dot {
+  display: grid;
+  place-items: center;
+  width: 1.7rem;
+  height: 1.7rem;
+  border-radius: 50%;
+  color: #11162b;
+  background: var(--fa-color-border);
+  font-size: 0.85rem;
+}
+
+.fa-trade-role[data-role="P"] .fa-trade-role__dot { background: #ffd23f; }
+.fa-trade-role[data-role="D"] .fa-trade-role__dot { background: #38bdf8; }
+.fa-trade-role[data-role="C"] .fa-trade-role__dot { background: #b58cff; }
+.fa-trade-role[data-role="A"] .fa-trade-role__dot { background: #ff6b8a; }
+
+.fa-trade-role__title {
+  flex: 1;
+}
+
+.fa-trade-role__count {
+  font-size: 0.8rem;
+  font-style: normal;
+  font-weight: 600;
+  color: var(--fa-color-foreground-muted);
+}
+
+.fa-trade-role__price {
+  margin-left: auto;
+  font-weight: 700;
+  font-style: italic;
+}
+
+.fa-trade-roles .fa-trade-athlete-list {
+  max-height: none;
+  overflow: visible;
+}
