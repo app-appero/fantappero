@@ -4,6 +4,8 @@ import type {
   NotificationItem,
   NotificationList,
   NotificationPreferenceList,
+  PushDeviceResponse,
+  RegisterPushDeviceRequest,
   UpdateNotificationPreferenceRequest,
 } from "@fantappero/contracts";
 import { apiRequest } from "./client";
@@ -62,5 +64,23 @@ export function updateNotificationPreference(
     accessToken,
     method: "PUT",
     body,
+  });
+}
+
+export function registerPushDevice(
+  accessToken: string,
+  body: RegisterPushDeviceRequest,
+): Promise<PushDeviceResponse> {
+  return apiRequest<PushDeviceResponse>("/notifications/push-devices", {
+    accessToken,
+    method: "POST",
+    body,
+  });
+}
+
+export function unregisterPushDevice(accessToken: string, token: string): Promise<void> {
+  return apiRequest<void>(`/notifications/push-devices/${encodeURIComponent(token)}`, {
+    accessToken,
+    method: "DELETE",
   });
 }

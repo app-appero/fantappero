@@ -21,6 +21,7 @@ import { ProfileScreen } from "../screens/ProfileScreen";
 import { RosterScreen } from "../screens/RosterScreen";
 import { WaiverScreen } from "../screens/WaiverScreen";
 import { StandingsScreen } from "../screens/StandingsScreen";
+import { usePushNotifications } from "../hooks/usePushNotifications";
 import { useUnreadNotifications } from "../hooks/useUnreadNotifications";
 import { useAuthSession } from "../session/DemoSessionContext";
 import {
@@ -122,6 +123,8 @@ function AppTabShell({
   // ogni azione sugli inviti (EP13-P07).
   const { unreadCount: unreadNotifications, refresh: refreshUnreadNotifications } =
     useUnreadNotifications(accessToken);
+  // Registra il token push e naviga alla destinazione giusta al tap (EP09-05).
+  usePushNotifications(accessToken);
   // Tornando da una schermata (es. dopo aver letto le notifiche) il badge si riallinea.
   useEffect(() => {
     return navigation.addListener("state", refreshUnreadNotifications);
