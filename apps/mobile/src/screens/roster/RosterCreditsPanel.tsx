@@ -2,6 +2,7 @@ import type { CreditAccount, FantasyTeamSummary } from "@fantappero/contracts";
 import { theme } from "@fantappero/ui/theme";
 import { useState } from "react";
 import { Modal, Pressable, ScrollView, Text, View } from "react-native";
+import { HScroll } from "../../components/HScroll";
 import { AppTextInput as TextInput } from "../../components/AppTextInput";
 import { rosterStyles as styles } from "./rosterStyles";
 
@@ -109,7 +110,7 @@ export function RosterCreditsPanel({
           </>
         ) : null}
         {canSwitch || isAdmin ? (
-          <View style={styles.heroActions}>
+          <HScroll>
             {canSwitch ? (
               <Pressable style={styles.creditsButton} onPress={() => setTeamsOpen(true)} testID="roster-admin-team">
                 <Text style={styles.creditsButtonLabel}>Cambia squadra</Text>
@@ -120,7 +121,7 @@ export function RosterCreditsPanel({
                 <Text style={styles.creditsButtonLabel}>Aggiusta crediti</Text>
               </Pressable>
             ) : null}
-          </View>
+          </HScroll>
         ) : null}
       </View>
       <Modal visible={teamsOpen} transparent animationType="slide" onRequestClose={() => setTeamsOpen(false)}>

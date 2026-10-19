@@ -38,6 +38,8 @@ const styles = lazyStyles(() => StyleSheet.create({
     justifyContent: "center",
   },
   text: {
+    textAlign: "center",
+    paddingHorizontal: 3,
     color: colors.onBrand,
     fontStyle: "italic",
     fontWeight: "800",

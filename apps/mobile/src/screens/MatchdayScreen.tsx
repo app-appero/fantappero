@@ -653,17 +653,20 @@ const styles = lazyStyles(() => StyleSheet.create({
   },
   fixtureTeam: {
     flex: 1,
+    minWidth: 0,
     color: colors.foreground,
+    fontSize: typography.fontSize.sm,
     fontWeight: typography.fontWeight.semibold,
   },
   fixtureTeamAway: {
     textAlign: "right",
   },
   fixtureScore: {
-    minWidth: 52,
+    minWidth: 72,
+    flexShrink: 0,
     textAlign: "center",
     color: colors.foreground,
-    fontSize: typography.fontSize.xl,
+    fontSize: typography.fontSize.lg,
     fontStyle: "italic",
     fontWeight: "800",
   },

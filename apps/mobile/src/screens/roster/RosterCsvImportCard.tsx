@@ -1,4 +1,5 @@
 import type { RosterImportPreview } from "@fantappero/contracts";
+import { HScroll } from "../../components/HScroll";
 import { Pressable, Text, View } from "react-native";
 import { rosterStyles as styles } from "./rosterStyles";
 
@@ -24,7 +25,7 @@ export function RosterCsvImportCard({
   return (
     <View style={styles.excelCard} testID="roster-excel-import">
       <Text style={styles.cardTitle}>Rose Excel</Text>
-      <View style={styles.excelActions}>
+      <HScroll>
         <Pressable
           style={[styles.creditsButton, csvBusy && styles.disabled]}
           disabled={csvBusy}
@@ -57,7 +58,7 @@ export function RosterCsvImportCard({
         >
           <Text style={styles.creditsButtonLabel}>Conferma</Text>
         </Pressable>
-      </View>
+      </HScroll>
       <Text style={styles.meta}>
         Nome del listone oppure solo il cognome, maiuscole indifferenti. Se non si trova, la riga
         non cambia la rosa.

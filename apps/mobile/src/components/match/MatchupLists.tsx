@@ -219,8 +219,12 @@ function VersusCell({ player, dim, now }: { player: H2HPlayerScore | undefined; 
         <AthleteName fit plain athleteId={player.athleteId} style={styles.vname} numberOfLines={1}>
           {cleanDisplayName(player.name)}
         </AthleteName>
-        <EventBadges badges={badges} size={11} />
       </View>
+      {badges.length > 0 ? (
+        <View style={styles.badgeLine}>
+          <EventBadges badges={badges} size={11} />
+        </View>
+      ) : null}
       {vote.label ? (
         <Text
           style={[
@@ -336,6 +340,7 @@ const styles = lazyStyles(() =>
     roleText: { color: "#11162B", fontWeight: "800", fontSize: 11 },
     body: { flex: 1, minWidth: 0 },
     nameLine: { flexDirection: "row", alignItems: "center", gap: 4 },
+    badgeLine: { flexDirection: "row", alignItems: "center", marginTop: 2 },
     name: { color: colors.foreground, fontWeight: "700", fontSize: typography.fontSize.md },
     nameCompact: { color: colors.foreground, fontWeight: "700", fontSize: typography.fontSize.sm, flexShrink: 1 },
     team: { color: colors.foregroundMuted, fontSize: typography.fontSize.xs },

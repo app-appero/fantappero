@@ -22,7 +22,7 @@ function CoachAvatar({ name, avatarUrl }: { name: string; avatarUrl: string | nu
   }
   return (
     <View style={styles.avatarPlaceholder}>
-      <Text style={styles.avatarInitial}>{name.charAt(0)}</Text>
+      <Text style={styles.avatarInitial}>{name.charAt(0).toUpperCase()}</Text>
     </View>
   );
 }
@@ -61,7 +61,20 @@ export function CoachDirectoryPanel({
   const [success, setSuccess] = useState<string | null>(null);
   const [workingId, setWorkingId] = useState<string | null>(null);
   const [capacityReached, setCapacityReached] = useState(false);
+  const [onlyAvailable, setOnlyAvailable] = useState(false);
+  const [page, setPage] = useState(0);
   const leagueFull = capacity > 0 && (capacityReached || memberCount >= capacity);
+
+  const visibleItems = onlyAvailable
+    ? items.filter((coach) => coach.availableForInvites && !coach.inLeague && !coach.isSelf && coach.emailVerified !== false)
+    : items;
+  const pageCount = Math.max(1, Math.ceil(visibleItems.length / PAGE_SIZE));
+  const safePage = Math.min(page, pageCount - 1);
+  const pagedItems = visibleItems.slice(safePage * PAGE_SIZE, safePage * PAGE_SIZE + PAGE_SIZE);
+
+  useEffect(() => {
+    setPage(0);
+  }, [debouncedQuery, onlyAvailable]);
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedQuery(query.trim()), 300);
@@ -205,6 +218,18 @@ export function CoachDirectoryPanel({
           style={styles.search}
           testID={`${testIDPrefix}-search`}
         />
+        <Pressable
+          style={styles.checkRow}
+          onPress={() => setOnlyAvailable((current) => !current)}
+          accessibilityRole="checkbox"
+          accessibilityState={{ checked: onlyAvailable }}
+          testID={`${testIDPrefix}-only-available`}
+        >
+          <View style={[styles.checkBox, onlyAvailable && styles.checkBoxOn]}>
+            {onlyAvailable ? <Text style={styles.checkMark}>✓</Text> : null}
+          </View>
+          <Text style={styles.checkLabel}>Solo disponibili</Text>
+        </Pressable>
         <Text style={styles.hint}>
           Tutti i fantallenatori della piattaforma, non solo quelli di questa lega.
           {capacity > 0 ? ` Posti ${memberCount}/${capacity}.` : ""}
@@ -262,7 +287,7 @@ export function CoachDirectoryPanel({
           testID={`${testIDPrefix}-invite-error`}
         />
       ) : null}
-      {items.length === 0 ? (
+      {visibleItems.length === 0 ? (
         <UiStatePanel
           state="empty"
           title="Nessun fantallenatore trovato"
@@ -272,9 +297,9 @@ export function CoachDirectoryPanel({
       ) : (
         <>
         <Text style={styles.count} testID={`${testIDPrefix}-count`}>
-          {items.length} {items.length === 1 ? "fantallenatore" : "fantallenatori"}
+          {visibleItems.length} {visibleItems.length === 1 ? "fantallenatore" : "fantallenatori"}
         </Text>
-        {items.map((coach) => {
+        {pagedItems.map((coach) => {
           const pending = coach.namedInviteStatus === "pending";
           const unavailable = !coach.availableForInvites;
           const inLeague = coach.inLeague === true;
@@ -350,6 +375,27 @@ export function CoachDirectoryPanel({
             </View>
           );
         })}
+        {pageCount > 1 ? (
+          <View style={styles.pager} testID={`${testIDPrefix}-pager`}>
+            <Pressable
+              style={[styles.pagerButton, safePage === 0 && styles.buttonDisabled]}
+              disabled={safePage === 0}
+              onPress={() => setPage(safePage - 1)}
+            >
+              <Text style={styles.pagerLabel}>Precedente</Text>
+            </Pressable>
+            <Text style={styles.hint}>
+              Pagina {safePage + 1} di {pageCount}
+            </Text>
+            <Pressable
+              style={[styles.pagerButton, safePage >= pageCount - 1 && styles.buttonDisabled]}
+              disabled={safePage >= pageCount - 1}
+              onPress={() => setPage(safePage + 1)}
+            >
+              <Text style={styles.pagerLabel}>Successiva</Text>
+            </Pressable>
+          </View>
+        ) : null}
         </>
       )}
         </>
@@ -358,10 +404,34 @@ export function CoachDirectoryPanel({
   );
 }
 
+const PAGE_SIZE = 10;
+
 const styles = lazyStyles(() => StyleSheet.create({
   section: {
     gap: spacing.sm,
   },
+  checkRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
+  checkBox: {
+    width: 24,
+    height: 24,
+    borderRadius: 7,
+    borderWidth: 1.5,
+    borderColor: colors.border,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  checkBoxOn: { backgroundColor: colors.brand, borderColor: colors.brand },
+  checkMark: { color: colors.onBrand, fontWeight: "800" },
+  checkLabel: { color: colors.foreground, fontWeight: "600" },
+  pager: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: spacing.sm },
+  pagerButton: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  pagerLabel: { color: colors.foreground, fontWeight: "600" },
   hint: {
     color: colors.foregroundMuted,
     fontSize: typography.fontSize.sm,
@@ -489,6 +559,8 @@ const styles = lazyStyles(() => StyleSheet.create({
   avatarInitial: {
     fontWeight: "800",
     fontStyle: "italic",
+    textAlign: "center",
+    paddingHorizontal: 4,
     color: colors.onBrand,
   },
 }));
