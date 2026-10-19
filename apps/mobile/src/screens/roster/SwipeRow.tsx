@@ -43,12 +43,18 @@ export function SwipeRow({
     const to = nudge === "left" ? -36 : 36;
     Animated.sequence([
       Animated.delay(600),
-      Animated.timing(x, { toValue: to, duration: 260, useNativeDriver: true }),
-      Animated.timing(x, { toValue: 0, duration: 320, useNativeDriver: true }),
+      Animated.timing(x, { toValue: to, duration: 260, useNativeDriver: false }),
+      Animated.timing(x, { toValue: 0, duration: 320, useNativeDriver: false }),
     ]).start();
     // Solo all'apertura.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Se cambia cosa si può fare (es. calciatore appena assegnato), la riga riparte da ferma.
+  useEffect(() => {
+    x.stopAnimation();
+    x.setValue(0);
+  }, [canLeft, canRight, x]);
 
   const responder = useMemo(
     () =>
@@ -63,15 +69,16 @@ export function SwipeRow({
           x.setValue(Math.max(min, Math.min(max, gesture.dx)));
         },
         onPanResponderRelease: (_event, gesture) => {
-          Animated.spring(x, { toValue: 0, useNativeDriver: true, bounciness: 0 }).start();
-          if (gesture.dx <= -THRESHOLD) {
-            leftRef.current?.();
-          } else if (gesture.dx >= THRESHOLD) {
-            rightRef.current?.();
-          }
+          const action =
+            gesture.dx <= -THRESHOLD ? leftRef.current : gesture.dx >= THRESHOLD ? rightRef.current : undefined;
+          // La riga torna al suo posto prima di eseguire l'azione, così non resta mai spostata.
+          Animated.timing(x, { toValue: 0, duration: 140, useNativeDriver: false }).start(() => {
+            x.setValue(0);
+            action?.();
+          });
         },
         onPanResponderTerminate: () => {
-          Animated.spring(x, { toValue: 0, useNativeDriver: true, bounciness: 0 }).start();
+          Animated.timing(x, { toValue: 0, duration: 140, useNativeDriver: false }).start(() => x.setValue(0));
         },
       }),
     [canLeft, canRight, x],
