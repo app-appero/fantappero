@@ -75,7 +75,7 @@ ticket immediato), è un miglioramento futuro, non un bug noto.
 
 ### Cosa manca ancora, in generale (fuori da questo giro)
 
-- Nessuna categoria/evento per gol, infortuni o espulsioni live — oggi solo `sistema`, `formazione`, `mercato`, `risultati`.
+- Eventi live (`notifications/match_events.py`, categoria `risultati`): gol/rigore segnato e cartellino rosso durante la partita, infortunio/squalifica alla creazione della disponibilità. Solo a chi ha il giocatore in rosa; dedup per evento e utente; mai bloccante per la sync dati. Autogol e gialli ignorati.
 - Nessun web push (service worker/VAPID) per `apps/web` — solo mobile per ora.
 - Nessun realtime in-app (SSE/WebSocket): il centro notifiche web fa polling ogni 20s (`useNotificationCenter.ts`), il contatore si aggiorna al ritorno di focus, non istantaneamente.
 
