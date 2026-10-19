@@ -327,6 +327,7 @@ export function MatchdayH2HPanel({
               color={activeRound.homologationStatus === "homologated" ? colors.success : colors.warning}
               textColor={colors.accentContrast}
               style={styles.roundBadge}
+              small
               testID="h2h-round-status"
             />
           </View>
@@ -400,14 +401,10 @@ const styles = lazyStyles(() => StyleSheet.create({
     opacity: 0.5,
   },
   roundHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: spacing.sm,
+    gap: spacing.xs,
   },
   roundBadge: {
-    alignSelf: "center",
-    flexShrink: 1,
+    alignSelf: "flex-start",
   },
   heading: {
     color: colors.foreground,
@@ -425,9 +422,9 @@ const styles = lazyStyles(() => StyleSheet.create({
   },
   matchupTeams: {
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "flex-start",
     justifyContent: "space-between",
-    gap: spacing.sm,
+    gap: spacing.xs,
   },
   team: {
     flex: 1,
@@ -437,11 +434,19 @@ const styles = lazyStyles(() => StyleSheet.create({
   },
   bigScore: {
     color: colors.foreground,
-    fontSize: 32,
+    flexShrink: 0,
+    marginTop: 8,
+    minWidth: 76,
+    textAlign: "center",
+    fontSize: 28,
     fontStyle: "italic",
     fontWeight: "800",
   },
   vs: {
+    flexShrink: 0,
+    marginTop: 14,
+    minWidth: 76,
+    textAlign: "center",
     color: colors.foregroundMuted,
     fontWeight: "600",
   },
@@ -453,7 +458,7 @@ const styles = lazyStyles(() => StyleSheet.create({
   },
   teamLine: {
     color: colors.foreground,
-    fontSize: typography.fontSize.md,
+    fontSize: typography.fontSize.sm,
     fontWeight: "600",
     flexShrink: 1,
     textAlign: "center",
