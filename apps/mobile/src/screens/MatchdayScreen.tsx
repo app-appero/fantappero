@@ -1,4 +1,5 @@
 import { lazyStyles } from "../theme/lazyStyles";
+import { HScroll } from "../components/HScroll";
 import type {
   FantasyTurnDetail,
   FantasyTurnSummary,
@@ -290,7 +291,7 @@ export function MatchdayScreen() {
   return (
     <PageContainer title="Turni" testID="screen-matchday">
       <View style={styles.stack}>
-        <View style={styles.chipRow} testID="matchday-tabs">
+        <HScroll testID="matchday-tabs">
           <Pressable
             style={[styles.chip, tab === "calendario" ? styles.chipActive : null]}
             onPress={() => setTab("calendario")}
@@ -305,7 +306,7 @@ export function MatchdayScreen() {
           >
             <Text style={styles.chipLabel}>Turni europei</Text>
           </Pressable>
-        </View>
+        </HScroll>
 
         {tab === "calendario" ? (
           <View testID="matchday-h2h">
@@ -378,7 +379,7 @@ export function MatchdayScreen() {
                 già usate restano consumate.
               </Text>
             ) : null}
-            <View style={styles.chipRow} testID="matchday-fixture-filters">
+            <HScroll testID="matchday-fixture-filters">
               <Pressable
                 style={[styles.chip, fixtureFilter === "all" ? styles.chipActive : null]}
                 onPress={() => setFixtureFilter("all")}
@@ -395,7 +396,7 @@ export function MatchdayScreen() {
                   Non disputate e rinviate ({selected.fixtures.filter((fixture) => isUnplayedFixtureStatus(fixture.statusShort)).length})
                 </Text>
               </Pressable>
-            </View>
+            </HScroll>
             {isAdmin && selected.modificationAllowed ? (
               <Pressable
                 style={[

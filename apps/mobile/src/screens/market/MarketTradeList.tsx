@@ -4,7 +4,8 @@ import type {
   RosterOccupancyEntry,
   TradeProposal,
 } from "@fantappero/contracts";
-import { DateTimeField } from "../../components/DateTimeField";
+import { HScroll } from "../../components/HScroll";
+import { DateTimeField, formatDateTimeValue } from "../../components/DateTimeField";
 import { useState } from "react";
 import { Pressable, Text, View } from "react-native";
 import { AthleteName } from "../../athletes/AthleteCard";
@@ -130,7 +131,7 @@ export function MarketTradeList({
 
   return (
     <View style={{ gap: 12 }} testID="wireframe-region-market-trade">
-      <View style={styles.pillRow} testID="market-trade-tabs">
+      <HScroll testID="market-trade-tabs">
         {tabs.map((item) => (
           <Pressable
             key={item.id}
@@ -144,7 +145,7 @@ export function MarketTradeList({
             </Text>
           </Pressable>
         ))}
-      </View>
+      </HScroll>
 
       {trade.loading ? (
         <UiStatePanel
@@ -352,6 +353,8 @@ export function MarketTradeList({
                       value={counterExpiresAt}
                       onChange={setCounterExpiresAt}
                       placeholder="Scegli quando scade la proposta"
+                      min={formatDateTimeValue(new Date())}
+                      minHint="La scadenza deve essere futura"
                     />
                     <View style={styles.rowActions}>
                       <Pressable

@@ -97,6 +97,10 @@ export function AuctionScreen() {
       setSessionFormError("Scegli data e ora di apertura e di chiusura.");
       return;
     }
+    if (new Date(closesAtIso).getTime() <= new Date(opensAtIso).getTime()) {
+      setSessionFormError("La chiusura deve essere dopo l'apertura.");
+      return;
+    }
     setSessionFormError(null);
     void flow.createSession({ opensAt: opensAtIso, closesAt: closesAtIso });
   }

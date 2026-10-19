@@ -1,4 +1,5 @@
 import { DISPLAY_FONT } from "../../theme/fonts";
+import { HScroll } from "../../components/HScroll";
 import type { LineupRole } from "@fantappero/contracts";
 import { theme } from "@fantappero/ui/theme";
 import { useMemo, useState, type ReactNode } from "react";
@@ -356,7 +357,7 @@ export function PlayerPickerSheet({
         testID="formation-picker-search"
       />
       {showRoleTabs ? (
-        <View style={styles.filters} testID="formation-picker-roles">
+        <HScroll testID="formation-picker-roles">
           {ROLE_FILTERS.map((tab) => (
             <Pressable
               key={tab.id}
@@ -370,9 +371,9 @@ export function PlayerPickerSheet({
               <Text style={styles.filterText}>{tab.label}</Text>
             </Pressable>
           ))}
-        </View>
+        </HScroll>
       ) : null}
-      <View style={styles.filters}>
+      <HScroll>
         {FILTERS.map((f) => (
           <Pressable
             key={f.id}
@@ -383,7 +384,7 @@ export function PlayerPickerSheet({
             <Text style={styles.filterText}>{f.label}</Text>
           </Pressable>
         ))}
-      </View>
+      </HScroll>
       <ScrollView style={styles.list} contentContainerStyle={styles.listContent}>
         {shown.length === 0 ? <Text style={styles.empty}>Nessun calciatore corrisponde.</Text> : null}
         {shown.map((c) => (

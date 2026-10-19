@@ -135,7 +135,7 @@ export function LiveSessionConfigForm({
 
       <Section title="1 · Quando" subtitle="Finestra in cui l'asta resta aperta">
         <DateTimeField label="Apertura" value={opensAt} onChange={onOpensAtChange} testID="auction-live-opens-at" />
-        <DateTimeField label="Chiusura" value={closesAt} onChange={onClosesAtChange} testID="auction-live-closes-at" />
+        <DateTimeField label="Chiusura" value={closesAt} onChange={onClosesAtChange} min={opensAt} minHint="La chiusura deve essere dopo l'apertura" testID="auction-live-closes-at" />
       </Section>
 
       <Section title="2 · Come si chiama" subtitle="Modalità di chiamata dei calciatori">
