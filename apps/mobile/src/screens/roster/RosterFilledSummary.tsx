@@ -108,17 +108,19 @@ function RosterRoleSection({
 
   return (
     <View style={styles.roleSection} testID={testId}>
-      <View style={styles.roleSectionHeader}>
+      <View style={styles.sectionHead}>
         {badge && roleColors ? (
-          <View style={[styles.roleBadge, roleColors]}>
+          <View style={[styles.sectionDot, { backgroundColor: roleColors.backgroundColor }]}>
             <Text style={[styles.roleBadgeText, { color: roleColors.color }]}>{badge}</Text>
           </View>
         ) : null}
-        <Text style={styles.roleSectionTitle}>{title}</Text>
-        <Text style={styles.roleSectionCount}>{countLabel}</Text>
+        <Text style={styles.sectionTitle2}>{title}</Text>
+        <Text style={styles.sectionCount2}>{countLabel}</Text>
       </View>
       {slots.length === 0 ? (
-        <Text style={styles.meta}>Nessun giocatore in questo ruolo.</Text>
+        <View style={styles.dashedRow}>
+          <Text style={styles.meta}>Nessun giocatore in questo ruolo.</Text>
+        </View>
       ) : (
         <>
           <View testID={`${testId}-cards`}>
@@ -238,12 +240,15 @@ export function RosterFilledSummary({
         )
       : slots;
   const counts = viewedTeam.composition?.counts;
+  const filledSlotsList = viewedTeam.slots.filter((slot) => slot.athleteId);
+  const totalValue = filledSlotsList.reduce((sum, slot) => sum + (slot.purchaseCredits ?? 0), 0);
+  const averageCost =
+    filledSlotsList.length > 0
+      ? (totalValue / filledSlotsList.length).toLocaleString("it-IT", { maximumFractionDigits: 1 })
+      : "—";
 
   return (
     <View testID="roster-success">
-      <Text style={styles.summary} testID="roster-summary">
-        {viewedTeam.name}: {viewedTeam.filledSlots}/{viewedTeam.rosterSize} giocatori
-      </Text>
       {viewedTeam.composition ? (
         <View testID="roster-composition" style={styles.compositionBox}>
           <View style={styles.tiles}>
@@ -258,7 +263,8 @@ export function RosterFilledSummary({
                     <Text style={[styles.roleBadgeText, { color: dot.color }]}>{role}</Text>
                   </View>
                   <Text style={styles.tileCount}>
-                    {have}/{need}
+                    {have}
+                    <Text style={styles.tileNeed}>/{need}</Text>
                   </Text>
                   <View style={styles.tileBar}>
                     <View
@@ -275,13 +281,6 @@ export function RosterFilledSummary({
               );
             })}
           </View>
-          <Text style={styles.meta} testID="roster-composition-counts">
-            {viewedTeam.composition.counts.P}/{viewedTeam.composition.limits.goalkeepers}P ·{" "}
-            {viewedTeam.composition.counts.D}/{viewedTeam.composition.limits.defenders}D ·{" "}
-            {viewedTeam.composition.counts.C}/{viewedTeam.composition.limits.midfielders}C ·{" "}
-            {viewedTeam.composition.counts.A}/{viewedTeam.composition.limits.forwards}A ·{" "}
-            {viewedTeam.composition.competitionCount} campionati · {compositionStatusLabel(viewedTeam.composition.status)}
-          </Text>
           {viewedTeam.composition.issues.map((issue) => (
             <Text key={`${issue.code}-${issue.message}`} style={styles.errorText}>
               {issue.message}
@@ -289,6 +288,18 @@ export function RosterFilledSummary({
           ))}
         </View>
       ) : null}
+      <View style={styles.statTilesRow} testID="roster-value-tiles">
+        <View style={styles.statTile}>
+          <Text style={styles.heroLabel}>Valore rosa</Text>
+          <Text style={styles.statTileValue}>{totalValue}</Text>
+          <Text style={styles.statTileSub}>{viewedTeam.filledSlots} acquisti</Text>
+        </View>
+        <View style={styles.statTile}>
+          <Text style={styles.heroLabel}>Costo medio</Text>
+          <Text style={styles.statTileValue}>{averageCost}</Text>
+          <Text style={styles.statTileSub}>per calciatore</Text>
+        </View>
+      </View>
       <TextInput
         style={styles.searchBox}
         value={query}
