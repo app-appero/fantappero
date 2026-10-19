@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, Query, Response, status
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
@@ -18,6 +18,8 @@ from notifications.schemas import (
     NotificationItemResponse,
     NotificationListResponse,
     NotificationPreferenceListResponse,
+    PushDeviceResponse,
+    RegisterPushDeviceRequest,
     UpdateNotificationPreferenceRequest,
 )
 from notifications.service import DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE, NotificationService
@@ -104,3 +106,31 @@ def update_notification_preference(
         in_app_enabled=body.in_app_enabled,
     )
     return service.get_preferences(user_id=current_user.id)
+
+
+@router.post("/push-devices", response_model=PushDeviceResponse)
+def register_push_device(
+    body: RegisterPushDeviceRequest,
+    current_user: User = Depends(require_permissions(Permission.PROFILE_VIEW)),
+    service: NotificationService = Depends(get_notification_service),
+) -> PushDeviceResponse:
+    """Registra (o sposta su questo utente) il token Expo del dispositivo."""
+    return service.register_push_device(
+        user_id=current_user.id,
+        token=body.token,
+        platform=body.platform,
+    )
+
+
+@router.delete(
+    "/push-devices/{token}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    response_class=Response,
+)
+def unregister_push_device(
+    token: str,
+    current_user: User = Depends(require_permissions(Permission.PROFILE_VIEW)),
+    service: NotificationService = Depends(get_notification_service),
+) -> Response:
+    service.unregister_push_device(user_id=current_user.id, token=token)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)

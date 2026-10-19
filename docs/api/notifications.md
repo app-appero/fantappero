@@ -34,6 +34,51 @@ copy non riscrive le notifiche già inviate.
 | `formazione.scadenza_turno` | 1 | Reminder formazione (EP09-02) |
 | `mercato.esito_busta` | 1 | Esito asta a buste (EP09-03) |
 
+## Push (EP09-05)
+
+Oltre all'in-app (sempre) e all'email (se `notifications_email` è attivo nel
+profilo), ogni notifica creata prova anche a mandare una push Expo — stessa
+logica dell'email: mai bloccante, mai propaga un errore, salta se l'utente
+ha `notifications_push` spento nel profilo (il campo esisteva già ma prima
+non era collegato a nulla) o se siamo in orario di silenzio.
+
+| Metodo | Path | Permesso | Descrizione |
+| --- | --- | --- | --- |
+| `POST` | `/notifications/push-devices` | autenticato | Registra (o sposta su questo utente) il token Expo del dispositivo. Body: `{ "token": "ExponentPushToken[...]", "platform": "ios"\|"android" }` |
+| `DELETE` | `/notifications/push-devices/{token}` | autenticato | Rimuove il token. No-op silenzioso se il token non è tuo. |
+
+L'upsert è per `token`, non per `(user, token)`: un reinstall o un login con
+un altro account sullo stesso dispositivo sposta il token al nuovo
+proprietario invece di duplicarlo.
+
+Quando Expo risponde `DeviceNotRegistered` per un token (disinstallazione),
+il token viene marcato `revoked_at` e non viene più usato — non c'è ancora
+un job di pulizia dei receipt differiti di Expo (il controllo è solo sul
+ticket immediato), è un miglioramento futuro, non un bug noto.
+
+### Variabili
+
+| Variabile | Dove | Effetto |
+| --- | --- | --- |
+| `NOTIFICATIONS_PUSH_ENABLED` | API e worker | Interruttore globale, default acceso. |
+| `EXPO_PUSH_BASE_URL` | opzionale | Default `https://exp.host/--/api/v2/push/send`. |
+| `EXPO_PUSH_ACCESS_TOKEN` | opzionale | Header `Authorization: Bearer ...` per la modalità "enhanced security" di Expo. Mai nei log. |
+| `EXPO_PUSH_TIMEOUT_SECONDS` | opzionale | Default 10. |
+
+### Cosa manca lato mobile (non toccato da questo lavoro — `apps/mobile` resta di chi fa la grafica)
+
+1. Installare `expo-notifications`.
+2. Chiedere il permesso e ottenere l'Expo push token (`Notifications.getExpoPushTokenAsync()`).
+3. Chiamare `POST /notifications/push-devices` con quel token dopo login/avvio app, e ad ogni refresh del token.
+4. Chiamare `DELETE /notifications/push-devices/{token}` al logout (best-effort).
+5. Il payload `data` della push contiene `notificationId`, `deepLink`, `category` — stessa forma dei deep link già gestiti da `notificationDestination.ts` per il tap sulle notifiche in-app, così il tap su una push può riusare la stessa mappatura.
+
+### Cosa manca ancora, in generale (fuori da questo giro)
+
+- Nessuna categoria/evento per gol, infortuni o espulsioni live — oggi solo `sistema`, `formazione`, `mercato`, `risultati`.
+- Nessun web push (service worker/VAPID) per `apps/web` — solo mobile per ora.
+- Nessun realtime in-app (SSE/WebSocket): il centro notifiche web fa polling ogni 20s (`useNotificationCenter.ts`), il contatore si aggiorna al ritorno di focus, non istantaneamente.
+
 ## Idempotenza
 
 `create_notification` è idempotente su `dedup_key`: se esiste già una riga con

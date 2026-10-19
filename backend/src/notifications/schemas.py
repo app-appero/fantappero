@@ -43,3 +43,13 @@ class NotificationPreferenceListResponse(ApiModel):
 class UpdateNotificationPreferenceRequest(ApiModel):
     category: str
     in_app_enabled: bool = Field(alias="inAppEnabled")
+
+
+class RegisterPushDeviceRequest(ApiModel):
+    token: str = Field(min_length=1, max_length=255)
+    platform: str = Field(min_length=1, max_length=16)
+
+
+class PushDeviceResponse(ApiModel):
+    id: str
+    platform: str

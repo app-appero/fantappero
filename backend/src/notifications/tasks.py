@@ -1,15 +1,22 @@
-"""Celery tasks for periodic notification reminders (EP09-02)."""
+"""Celery tasks for periodic notification reminders (EP09-02) and push delivery (EP09-05)."""
 
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from uuid import UUID
+
+from sqlalchemy import select
 
 import database.models  # noqa: F401 — register ORM mappers
 from app.worker import celery_app
 from config.settings.loader import get_api_settings, validate_worker_settings
 from database.session import create_engine_from_url, create_session_factory, session_scope
+from notifications.expo_push_client import ExpoPushClient
+from notifications.models import PushDevice
+from notifications.push_send import send_to_devices
 from notifications.reminder_service import LineupReminderService
 from observability.logging import get_logger
+from observability.metrics import get_metrics
 
 logger = get_logger(__name__)
 
@@ -45,3 +52,58 @@ def send_lineup_reminders_task() -> dict[str, int]:
         engine.dispose()
     logger.info("notifications_lineup_reminder_task_done", extra=totals)
     return totals
+
+
+@celery_app.task(name="notifications.send_push")
+def send_push_task(
+    *,
+    user_id: str,
+    notification_id: str,
+    title: str,
+    body: str,
+    deep_link: str | None,
+    category: str,
+) -> dict[str, int]:
+    """Manda la push a tutti i dispositivi attivi dell'utente, revoca i token morti."""
+    settings = get_api_settings()
+    engine = create_engine_from_url(settings.database_url)
+    factory = create_session_factory(engine)
+    try:
+        with session_scope(factory) as session:
+            devices = session.scalars(
+                select(PushDevice).where(
+                    PushDevice.user_id == UUID(user_id),
+                    PushDevice.revoked_at.is_(None),
+                )
+            ).all()
+            if not devices:
+                return {"sent": 0, "revoked": 0}
+            client = ExpoPushClient(
+                base_url=settings.expo_push_base_url,
+                access_token=settings.resolved_expo_push_access_token(),
+                timeout_seconds=settings.expo_push_timeout_seconds,
+            )
+            try:
+                result = send_to_devices(
+                    session,
+                    client,
+                    list(devices),
+                    title=title,
+                    body=body,
+                    data={
+                        "notificationId": notification_id,
+                        "deepLink": deep_link,
+                        "category": category,
+                    },
+                )
+            finally:
+                client.close()
+    finally:
+        engine.dispose()
+    get_metrics().incr(
+        "notifications_push_sent_total", labels={"category": category}, amount=result["sent"]
+    )
+    if result["revoked"]:
+        get_metrics().incr("notifications_push_revoked_total", amount=result["revoked"])
+    logger.info("notifications_push_task_done", extra={"category": category, **result})
+    return result
