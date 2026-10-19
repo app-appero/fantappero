@@ -41,6 +41,12 @@
         }
       ]
     ],
-    "icon": "./assets/icon.png"
+    "icon": "./assets/icon.png",
+    "extra": {
+      "eas": {
+        "projectId": "5134538d-7b9a-4f8a-98a8-0d801636040b"
+      }
+    },
+    "owner": "romy92"
   }
 }

@@ -52,3 +52,6 @@ credentials.json
 secrets.yaml
 secrets.yml
 **/secrets.json
+
+# Config Firebase/FCM (chiavi del progetto, non nel repo)
+apps/mobile/google-services.json
