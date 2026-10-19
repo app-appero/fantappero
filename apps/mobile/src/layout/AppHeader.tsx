@@ -23,6 +23,9 @@ export type AppHeaderProps = {
   onBackToAppPress?: () => void;
   /** Apre il profilo al posto del nome utente (solo surface app). */
   onProfilePress?: () => void;
+  /** Campanella notifiche con badge dei non lette (solo surface app). */
+  onNotificationsPress?: () => void;
+  unreadNotifications?: number;
   /** Apre il drawer laterale (solo surface app). */
   onMenuPress?: () => void;
   showMenuButton?: boolean;
@@ -43,6 +46,8 @@ export function AppHeader({
   onProfilePress,
   onBackToAppPress,
   onMenuPress,
+  onNotificationsPress,
+  unreadNotifications = 0,
   showMenuButton = false,
   onLogoutPress,
   showLogout = false,
@@ -104,6 +109,25 @@ export function AppHeader({
             testID="header-profile-button"
           >
             <NavIcon id="profile" color={colors.foreground} size={20} />
+          </Pressable>
+        ) : null}
+
+        {!isAdmin && onNotificationsPress ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={
+              unreadNotifications > 0 ? `Notifiche: ${unreadNotifications} non lette` : "Notifiche"
+            }
+            onPress={onNotificationsPress}
+            style={styles.profileButton}
+            testID="header-notifications-button"
+          >
+            <Feather name="bell" size={20} color={colors.foreground} />
+            {unreadNotifications > 0 ? (
+              <View style={styles.bellBadge} testID="header-notifications-badge">
+                <Text style={styles.bellBadgeLabel}>{unreadNotifications > 9 ? "9+" : unreadNotifications}</Text>
+              </View>
+            ) : null}
           </Pressable>
         ) : null}
 
@@ -249,6 +273,19 @@ const styles = lazyStyles(() => StyleSheet.create({
     borderColor: colors.border,
     flexShrink: 0,
   },
+  bellBadge: {
+    position: "absolute",
+    top: -4,
+    right: -4,
+    minWidth: 18,
+    height: 18,
+    paddingHorizontal: 4,
+    borderRadius: 9,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.danger,
+  },
+  bellBadgeLabel: { color: "#fff", fontSize: 11, fontWeight: "800" },
   leagueInline: {
     flex: 1,
     flexDirection: "row",
