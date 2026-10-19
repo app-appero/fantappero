@@ -4,6 +4,7 @@ import type {
   RosterOccupancyEntry,
   TradeProposal,
 } from "@fantappero/contracts";
+import { DateTimeField } from "../../components/DateTimeField";
 import { useState } from "react";
 import { Pressable, Text, View } from "react-native";
 import { AthleteName } from "../../athletes/AthleteCard";
@@ -346,14 +347,11 @@ export function MarketTradeList({
                       onChangeText={setCounterRequestedCredits}
                       keyboardType="numeric"
                     />
-                    <Text style={styles.fieldLabel}>Scadenza (AAAA-MM-GG HH:MM)</Text>
-                    <TextInput
-                      style={styles.input}
+                    <DateTimeField
+                      label="Scadenza"
                       value={counterExpiresAt}
-                      onChangeText={setCounterExpiresAt}
-                      placeholder="2026-09-01 00:00"
-                      autoCapitalize="none"
-                      autoCorrect={false}
+                      onChange={setCounterExpiresAt}
+                      placeholder="Scegli quando scade la proposta"
                     />
                     <View style={styles.rowActions}>
                       <Pressable

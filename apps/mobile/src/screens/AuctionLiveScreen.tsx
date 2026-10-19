@@ -194,7 +194,7 @@ export function AuctionLiveScreen() {
     const opensAtIso = parseLocalDateTimeInput(opensAt);
     const closesAtIso = parseLocalDateTimeInput(closesAt);
     if (!opensAtIso || !closesAtIso) {
-      setCreateError("Inserisci date valide nel formato AAAA-MM-GG HH:MM.");
+      setCreateError("Scegli data e ora di apertura e di chiusura.");
       return;
     }
     setCreating(true);
