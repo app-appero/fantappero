@@ -112,20 +112,19 @@ export function roleLabel(role: string | null): string {
   return role;
 }
 
+const ROLE_COLOR: Record<string, string> = {
+  P: "#FFD23F",
+  D: "#38BDF8",
+  C: "#B58CFF",
+  A: "#FF6B8A",
+};
+
 export function roleBadgeColors(
   role: string | null | undefined,
 ): { backgroundColor: string; color: string } {
-  if (role === "P") {
-    return { backgroundColor: colors.success, color: colors.accentContrast };
-  }
-  if (role === "D") {
-    return { backgroundColor: colors.warning, color: colors.background };
-  }
-  if (role === "C") {
-    return { backgroundColor: colors.accent, color: colors.accentContrast };
-  }
-  if (role === "A") {
-    return { backgroundColor: colors.danger, color: colors.accentContrast };
+  const background = role ? ROLE_COLOR[role] : undefined;
+  if (background) {
+    return { backgroundColor: background, color: "#11162B" };
   }
   return { backgroundColor: colors.border, color: colors.foreground };
 }

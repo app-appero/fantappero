@@ -922,6 +922,8 @@ export function RosterScreen() {
           teamName={(viewedTeam ?? team)?.name ?? null}
           filledSlots={(viewedTeam ?? team)?.filledSlots ?? null}
           rosterSize={(viewedTeam ?? team)?.rosterSize ?? null}
+          spent={((viewedTeam ?? team)?.slots ?? []).reduce((sum, slot) => sum + (slot.athleteId ? (slot.purchaseCredits ?? 0) : 0), 0)}
+          leagueName={activeLeague?.name ?? null}
         />
       ) : null}
 
@@ -983,6 +985,7 @@ export function RosterScreen() {
           adminBusy={adminBusy || !marketOpen}
           onReleaseAthlete={onReleaseAthlete}
           onAssignAthlete={onAssignAthlete}
+          onSelectTargetTeam={onSelectAdminTeam}
           adminMessage={adminMessage}
           adminError={adminError}
         />
