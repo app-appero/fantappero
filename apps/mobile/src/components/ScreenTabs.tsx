@@ -1,6 +1,6 @@
 import { lazyStyles } from "../theme/lazyStyles";
 import { theme } from "@fantappero/ui/theme";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, Text } from "react-native";
 
 const { colors, spacing, typography, radius } = theme;
 
@@ -29,7 +29,7 @@ export function ScreenTabs({
     return null;
   }
   return (
-    <View style={styles.row} testID={testID}>
+    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.scroll} contentContainerStyle={styles.row} testID={testID}>
       {items.map((item) => {
         const selected = item.id === activeId;
         return (
@@ -45,16 +45,17 @@ export function ScreenTabs({
           </Pressable>
         );
       })}
-    </View>
+    </ScrollView>
   );
 }
 
 const styles = lazyStyles(() => StyleSheet.create({
+  scroll: { flexGrow: 0, marginBottom: spacing.md },
   row: {
     flexDirection: "row",
-    flexWrap: "wrap",
+    alignItems: "center",
     gap: spacing.xs,
-    marginBottom: spacing.md,
+    paddingRight: spacing.md,
   },
   chip: {
     borderWidth: 1,

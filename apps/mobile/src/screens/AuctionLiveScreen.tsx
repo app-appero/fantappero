@@ -197,6 +197,10 @@ export function AuctionLiveScreen() {
       setCreateError("Scegli data e ora di apertura e di chiusura.");
       return;
     }
+    if (new Date(closesAtIso).getTime() <= new Date(opensAtIso).getTime()) {
+      setCreateError("La chiusura deve essere dopo l'apertura.");
+      return;
+    }
     setCreating(true);
     setCreateError(null);
     try {

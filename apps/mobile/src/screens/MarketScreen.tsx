@@ -104,6 +104,19 @@ export function MarketScreen() {
     return map;
   }, [listoneEntries]);
 
+  const athleteMeta = useMemo(() => {
+    const map = new Map<string, { role: string | null; club: string | null }>();
+    for (const entry of listoneEntries) {
+      map.set(entry.athleteId, { role: entry.effectiveRole ?? null, club: entry.clubName ?? null });
+    }
+    for (const slot of team?.slots ?? []) {
+      if (slot.athleteId && !map.has(slot.athleteId)) {
+        map.set(slot.athleteId, { role: slot.role ?? null, club: slot.clubName ?? null });
+      }
+    }
+    return map;
+  }, [listoneEntries, team]);
+
   const otherTeams = useMemo(() => teams.filter((row) => row.id !== team?.id), [teams, team]);
 
   const trade = useTradeFlow({ leagueId: activeLeagueId, accessToken, active: true });
@@ -412,6 +425,7 @@ export function MarketScreen() {
           createError={trade.createError}
           creating={trade.creating}
           onSubmit={handleCreateProposal}
+          athleteMeta={athleteMeta}
         />
       ) : null}
 

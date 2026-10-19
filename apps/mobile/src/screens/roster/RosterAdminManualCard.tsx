@@ -4,6 +4,7 @@ import type {
   FantasyTeamSummary,
   LeagueListoneEntry,
 } from "@fantappero/contracts";
+import { HScroll } from "../../components/HScroll";
 import { useEffect, useState } from "react";
 import { Pressable, ScrollView, Text, View } from "react-native";
 import { AppTextInput as TextInput } from "../../components/AppTextInput";
@@ -310,7 +311,7 @@ export function RosterAdminManualCard({
                 <Text style={styles.freeLabel}>Solo disponibili</Text>
                 <Text style={[styles.meta, { marginLeft: "auto" }]}>{listone.length} calciatori</Text>
               </Pressable>
-              <View style={styles.chipRow} accessibilityRole="tablist">
+              <HScroll accessibilityRole="tablist">
                 {ROLE_TABS.map((tab) => {
                   const selected = tab.value === roleTab;
                   return (
@@ -328,7 +329,7 @@ export function RosterAdminManualCard({
                     </Pressable>
                   );
                 })}
-              </View>
+              </HScroll>
               {ROLE_TABS.map((tab) => {
                 if (tab.value !== roleTab) {
                   return null;

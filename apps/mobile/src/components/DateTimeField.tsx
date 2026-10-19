@@ -44,20 +44,29 @@ export function DateTimeField({
   onChange,
   placeholder = "Scegli data e ora",
   testID,
+  min,
+  minHint = "Deve essere dopo l'apertura",
 }: {
   label?: string;
   value: string;
   onChange: (value: string) => void;
   placeholder?: string;
   testID?: string;
+  /** Valore `AAAA-MM-GG HH:MM` prima del quale non si può scegliere (es. la chiusura dopo l'apertura). */
+  min?: string;
+  minHint?: string;
 }) {
+  const minDate = useMemo(() => (min ? parseDateTimeValue(min) : null), [min]);
   const current = useMemo(() => parseDateTimeValue(value), [value]);
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState<Date>(() => current ?? defaultDraft());
   const [month, setMonth] = useState<Date>(() => new Date((current ?? defaultDraft()).getFullYear(), (current ?? defaultDraft()).getMonth(), 1));
 
   function openPicker() {
-    const base = current ?? defaultDraft();
+    let base = current ?? defaultDraft();
+    if (minDate && base.getTime() <= minDate.getTime()) {
+      base = new Date(minDate.getTime() + 60 * 60 * 1000);
+    }
     setDraft(base);
     setMonth(new Date(base.getFullYear(), base.getMonth(), 1));
     setOpen(true);
@@ -73,8 +82,13 @@ export function DateTimeField({
   const today = new Date();
   const isToday = (day: number) =>
     day === today.getDate() && month.getMonth() === today.getMonth() && month.getFullYear() === today.getFullYear();
+  const isBeforeMin = (day: number) =>
+    !!minDate &&
+    new Date(month.getFullYear(), month.getMonth(), day, 23, 59).getTime() <= minDate.getTime();
   const isSelected = (day: number) =>
     day === draft.getDate() && month.getMonth() === draft.getMonth() && month.getFullYear() === draft.getFullYear();
+
+  const invalid = !!minDate && draft.getTime() <= minDate.getTime();
 
   function pickDay(day: number) {
     setDraft(new Date(month.getFullYear(), month.getMonth(), day, draft.getHours(), draft.getMinutes()));
@@ -137,7 +151,8 @@ export function DateTimeField({
                 ) : (
                   <Pressable
                     key={`d${day}`}
-                    style={[styles.cell, isToday(day) && styles.cellToday, isSelected(day) && styles.cellSelected]}
+                    style={[styles.cell, isToday(day) && styles.cellToday, isSelected(day) && styles.cellSelected, isBeforeMin(day) && styles.cellDisabled]}
+                    disabled={isBeforeMin(day)}
                     onPress={() => pickDay(day)}
                     accessibilityLabel={`${day} ${MONTHS[month.getMonth()]}`}
                     accessibilityState={{ selected: isSelected(day) }}
@@ -174,12 +189,14 @@ export function DateTimeField({
             </ScrollView>
 
             <Text style={styles.summary}>{formatLabel(draft)}</Text>
+            {invalid ? <Text style={styles.invalid}>{minHint}</Text> : null}
             <View style={styles.actions}>
               <Pressable style={styles.secondary} onPress={() => setOpen(false)}>
                 <Text style={styles.secondaryLabel}>Annulla</Text>
               </Pressable>
               <Pressable
-                style={styles.primary}
+                style={[styles.primary, invalid && { opacity: 0.4 }]}
+                disabled={invalid}
                 onPress={() => {
                   onChange(formatDateTimeValue(draft));
                   setOpen(false);
@@ -239,6 +256,8 @@ const styles = lazyStyles(() =>
     weekday: { width: `${100 / 7}%`, textAlign: "center", color: colors.foregroundMuted, fontSize: 12, paddingVertical: 4 },
     cell: { width: `${100 / 7}%`, aspectRatio: 1, alignItems: "center", justifyContent: "center", borderRadius: 999 },
     cellToday: { borderWidth: 1, borderColor: colors.accent },
+    cellDisabled: { opacity: 0.25 },
+    invalid: { color: colors.danger, textAlign: "center" },
     cellSelected: { backgroundColor: colors.brand, borderColor: colors.brand },
     cellLabel: { color: colors.foreground, fontWeight: "600" },
     cellLabelSelected: { color: colors.onBrand },

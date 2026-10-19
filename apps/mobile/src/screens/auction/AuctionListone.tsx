@@ -1,4 +1,5 @@
 import type { LeagueListoneEntry, LeagueSummary } from "@fantappero/contracts";
+import { HScroll } from "../../components/HScroll";
 import { useMemo } from "react";
 import { Pressable, ScrollView, Text, View } from "react-native";
 import { AthleteName } from "../../athletes/AthleteCard";
@@ -78,7 +79,7 @@ export function AuctionListone({
       {!loading && !loadError && activeLeagueId ? (
         <>
           <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-            <View style={styles.chipRow}>
+            <HScroll>
               {ROLE_TABS.map((item) => (
                 <Pressable
                   key={item.value}
@@ -91,7 +92,7 @@ export function AuctionListone({
                   </Text>
                 </Pressable>
               ))}
-            </View>
+            </HScroll>
           </ScrollView>
 
           {visibleEntries.length === 0 ? (
