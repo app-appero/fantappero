@@ -7,6 +7,7 @@ import { useEffect, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { AppTextInput as TextInput } from "../components/AppTextInput";
 import { useGoogleAuth } from "../auth/useGoogleAuth";
+import { loadMobileEnv } from "../config/env";
 import { AuthShell } from "../auth/AuthShell";
 import { UiStatePanel } from "../components/UiStatePanel";
 import type { RootStackParamList } from "../navigation/types";
@@ -15,6 +16,14 @@ import { clearLastUser, initialsOf, readLastUser, writeLastUser, type LastUser }
 import { getMemorySession } from "../session/sessionStorage";
 
 const { colors, spacing, typography, radius } = theme;
+
+function devApiHost(): string {
+  try {
+    return loadMobileEnv().expoPublicApiBaseUrl;
+  } catch {
+    return "EXPO_PUBLIC_API_BASE_URL mancante";
+  }
+}
 
 /** Login — allineato a web /accedi. */
 export function AuthScreen() {
@@ -69,7 +78,9 @@ export function AuthScreen() {
         void writeLastUser({ displayName: user.displayName, email: email.trim() });
       }
     } catch (loginError) {
-      setError(getApiErrorMessage(loginError, "Accesso non riuscito."));
+      const message = getApiErrorMessage(loginError, "Accesso non riuscito.");
+      // Solo in sviluppo: dice a quale server sta parlando l'app, per capire un «Connessione non disponibile».
+      setError(__DEV__ ? `${message} [API: ${devApiHost()}]` : message);
     } finally {
       setSubmitting(false);
     }
@@ -99,6 +110,12 @@ export function AuthScreen() {
               </View>
               <Text style={styles.googleMainLabel}>{googleSubmitting ? "Accesso…" : googleLabel}</Text>
             </Pressable>
+          ) : null}
+          {__DEV__ && !googleAuth.available ? (
+            <Text style={styles.muted} testID="auth-dev-google-hint">
+              Solo sviluppo: «Continua con Google» è nascosto perché manca EXPO_PUBLIC_GOOGLE_CLIENT_ID_WEB o
+              EXPO_PUBLIC_WEB_BASE_URL. Avvia Expo con «pnpm start:pilota».
+            </Text>
           ) : null}
           <View style={styles.appleDisabled} accessibilityRole="button" accessibilityState={{ disabled: true }} accessibilityLabel="Continua con Apple, disponibile presto" testID="auth-apple-disabled">
             <Text style={styles.appleGlyph}>{"\uF8FF"}</Text>
