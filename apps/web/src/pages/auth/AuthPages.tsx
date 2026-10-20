@@ -63,9 +63,37 @@ function GoogleSignInButton({
   }
 
   return (
-    <div className="fa-auth-layout__google">
-      <p className="fa-auth-layout__divider">oppure</p>
+    <div className="fa-auth-layout__google fa-auth-layout__google--main">
       <div ref={containerRef} className="fa-auth-layout__google-button" data-testid="auth-google-button" />
+    </div>
+  );
+}
+
+/** Accesso con Apple: visibile ma non ancora attivo (arriverà con la versione iPhone). */
+function AppleSignInPlaceholder({ label }: { label: string }) {
+  return (
+    <button
+      type="button"
+      className="fa-auth-apple"
+      disabled
+      aria-disabled="true"
+      data-testid="auth-apple-disabled"
+    >
+      <span className="fa-auth-apple__glyph" aria-hidden="true">
+        {"\uF8FF"}
+      </span>
+      <span>{label}</span>
+      <span className="fa-auth-apple__soon">Presto</span>
+    </button>
+  );
+}
+
+function SocialLogins({ onError, appleLabel, dividerLabel }: { onError: (message: string) => void; appleLabel: string; dividerLabel: string }) {
+  return (
+    <div className="fa-auth-social">
+      <GoogleSignInButton onError={onError} />
+      <AppleSignInPlaceholder label={appleLabel} />
+      <p className="fa-auth-layout__divider">{dividerLabel}</p>
     </div>
   );
 }
@@ -169,11 +197,12 @@ export function AuthRegisterPage() {
           </>
         ) : (
           <>
+            <SocialLogins onError={setError} appleLabel="Registrati con Apple" dividerLabel="oppure con email" />
             <AuthFormLayout
               brand={null}
               hideBrand
               title="Registrati"
-              submitLabel="Crea account"
+              submitLabel="Crea account con email"
               showDisplayName
               showConfirmPassword
               email={email}
@@ -193,7 +222,6 @@ export function AuthRegisterPage() {
                 </p>
               }
             />
-            <GoogleSignInButton onError={setError} />
           </>
         )}
       </section>
@@ -292,11 +320,12 @@ export function AuthLoginPage() {
         </ul>
       </section>
       <section className="fa-login__panel">
+        <SocialLogins onError={setError} appleLabel="Continua con Apple" dividerLabel={remembered ? "oppure con la password" : "oppure con email"} />
         <AuthFormLayout
           brand={null}
           hideBrand
           title="Accedi"
-          submitLabel={remembered ? `Accedi come ${firstName}` : "Accedi"}
+          submitLabel={remembered ? `Accedi come ${firstName}` : "Accedi con email"}
           email={email}
           password={password}
           onEmailChange={setEmail}
@@ -336,7 +365,6 @@ export function AuthLoginPage() {
             </p>
           }
         />
-        <GoogleSignInButton onError={setError} />
       </section>
     </div>
   );

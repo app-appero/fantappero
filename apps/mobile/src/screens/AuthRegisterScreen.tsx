@@ -74,31 +74,90 @@ export function AuthRegisterScreen() {
         successMessage ? undefined : (
           <>
             {googleAuth.available ? (
-              <>
-                <View style={styles.orRow}>
-                  <View style={styles.orLine} />
-                  <Text style={styles.muted}>oppure</Text>
-                  <View style={styles.orLine} />
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Registrati con Google"
+                disabled={googleSubmitting}
+                onPress={() => {
+                  void googleAuth.promptAsync().catch((googleError: unknown) => {
+                    setError(getApiErrorMessage(googleError, "Accesso con Google non riuscito."));
+                  });
+                }}
+                style={[styles.googleMain, googleSubmitting && styles.disabled]}
+                testID="auth-register-google"
+              >
+                <View style={styles.googleMarkMain}>
+                  <Text style={styles.googleMarkLabel}>G</Text>
                 </View>
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel="Continua con Google"
-                  disabled={googleSubmitting}
-                  onPress={() => {
-                    void googleAuth.promptAsync().catch((googleError: unknown) => {
-                      setError(getApiErrorMessage(googleError, "Accesso con Google non riuscito."));
-                    });
-                  }}
-                  style={[styles.googleButton, googleSubmitting && styles.disabled]}
-                  testID="auth-register-google"
-                >
-                  <View style={styles.googleMark}>
-                    <Text style={styles.googleMarkLabel}>G</Text>
-                  </View>
-                  <Text style={styles.secondaryLabel}>{googleSubmitting ? "Accesso…" : "Continua con Google"}</Text>
-                </Pressable>
-              </>
+                <Text style={styles.googleMainLabel}>{googleSubmitting ? "Accesso…" : "Registrati con Google"}</Text>
+              </Pressable>
             ) : null}
+            <View style={styles.appleDisabled} accessibilityRole="button" accessibilityState={{ disabled: true }} accessibilityLabel="Registrati con Apple, disponibile presto" testID="auth-register-apple-disabled">
+              <Text style={styles.appleGlyph}>{"\uF8FF"}</Text>
+              <Text style={styles.appleLabel}>Registrati con Apple</Text>
+              <View style={styles.soonChip}>
+                <Text style={styles.soonLabel}>PRESTO</Text>
+              </View>
+            </View>
+            <View style={styles.orRow}>
+              <View style={styles.orLine} />
+              <Text style={styles.muted}>oppure con email</Text>
+              <View style={styles.orLine} />
+            </View>
+            <Text style={styles.label}>Nome visualizzato</Text>
+            <TextInput
+              value={displayName}
+              onChangeText={setDisplayName}
+              placeholder="Es. Marco Rossi"
+              placeholderTextColor={styles.muted.color}
+              style={styles.input}
+              accessibilityLabel="Nome visualizzato"
+              testID="auth-register-display-name"
+            />
+            <Text style={styles.label}>Email</Text>
+            <TextInput
+              value={email}
+              onChangeText={setEmail}
+              autoCapitalize="none"
+              autoCorrect={false}
+              keyboardType="email-address"
+              placeholder="nome@esempio.it"
+              placeholderTextColor={styles.muted.color}
+              style={styles.input}
+              accessibilityLabel="Email"
+              testID="auth-register-email"
+            />
+            <Text style={styles.label}>Password</Text>
+            <TextInput
+              value={password}
+              onChangeText={setPassword}
+              secureTextEntry
+              placeholder="Almeno 8 caratteri"
+              placeholderTextColor={styles.muted.color}
+              style={styles.input}
+              accessibilityLabel="Password"
+              testID="auth-register-password"
+            />
+            <Text style={styles.label}>Conferma password</Text>
+            <TextInput
+              value={confirmPassword}
+              onChangeText={setConfirmPassword}
+              secureTextEntry
+              placeholder="Ripeti la password"
+              placeholderTextColor={styles.muted.color}
+              style={styles.input}
+              accessibilityLabel="Conferma password"
+              testID="auth-register-confirm-password"
+            />
+            <Pressable
+              accessibilityRole="button"
+              disabled={submitting}
+              onPress={() => void onSubmit()}
+              style={[styles.emailButton, { marginTop: 8 }, submitting && styles.disabled]}
+              testID="auth-register-submit"
+            >
+              <Text style={styles.emailButtonLabel}>{submitting ? "Registrazione…" : "Crea account con email"}</Text>
+            </Pressable>
             <Pressable
               accessibilityRole="button"
               onPress={() => navigation.navigate("Auth")}
@@ -153,60 +212,6 @@ export function AuthRegisterScreen() {
                 testID="auth-register-error"
               />
             ) : null}
-            <Text style={styles.label}>Nome visualizzato</Text>
-            <TextInput
-              value={displayName}
-              onChangeText={setDisplayName}
-              placeholder="Es. Marco Rossi"
-              placeholderTextColor={styles.muted.color}
-              style={styles.input}
-              accessibilityLabel="Nome visualizzato"
-              testID="auth-register-display-name"
-            />
-            <Text style={styles.label}>Email</Text>
-            <TextInput
-              value={email}
-              onChangeText={setEmail}
-              autoCapitalize="none"
-              autoCorrect={false}
-              keyboardType="email-address"
-              placeholder="nome@esempio.it"
-              placeholderTextColor={styles.muted.color}
-              style={styles.input}
-              accessibilityLabel="Email"
-              testID="auth-register-email"
-            />
-            <Text style={styles.label}>Password</Text>
-            <TextInput
-              value={password}
-              onChangeText={setPassword}
-              secureTextEntry
-              placeholder="Almeno 8 caratteri"
-              placeholderTextColor={styles.muted.color}
-              style={styles.input}
-              accessibilityLabel="Password"
-              testID="auth-register-password"
-            />
-            <Text style={styles.label}>Conferma password</Text>
-            <TextInput
-              value={confirmPassword}
-              onChangeText={setConfirmPassword}
-              secureTextEntry
-              placeholder="Ripeti la password"
-              placeholderTextColor={styles.muted.color}
-              style={styles.input}
-              accessibilityLabel="Conferma password"
-              testID="auth-register-confirm-password"
-            />
-            <Pressable
-              accessibilityRole="button"
-              disabled={submitting}
-              onPress={() => void onSubmit()}
-              style={[styles.primaryButton, submitting && styles.disabled]}
-              testID="auth-register-submit"
-            >
-              <Text style={styles.primaryLabel}>{submitting ? "Registrazione…" : "Crea account"}</Text>
-            </Pressable>
           </>
         )}
       </View>
