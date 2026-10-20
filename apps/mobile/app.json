@@ -15,6 +15,7 @@
     },
     "android": {
       "package": "com.fantappero.mobile",
+      "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundImage": "./assets/adaptive-background.png",
@@ -32,8 +33,21 @@
         }
       ],
       "expo-secure-store",
-      "expo-status-bar"
+      "expo-status-bar",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/adaptive-icon.png",
+          "color": "#2748D8"
+        }
+      ]
     ],
-    "icon": "./assets/icon.png"
+    "icon": "./assets/icon.png",
+    "extra": {
+      "eas": {
+        "projectId": "5134538d-7b9a-4f8a-98a8-0d801636040b"
+      }
+    },
+    "owner": "romy92"
   }
 }

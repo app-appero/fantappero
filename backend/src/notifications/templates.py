@@ -224,3 +224,34 @@ def _render_risultati_correzione(params: NotificationParams) -> NotificationCont
         ),
         deep_link="/classifica",
     )
+
+
+def _live_content(title_fmt: str, body_fmt: str, params: NotificationParams) -> NotificationContent:
+    minute = params.get("minute")
+    suffix = f" al {minute}'" if minute is not None else ""
+    player = params.get("player", "Un tuo giocatore")
+    return NotificationContent(
+        title=title_fmt,
+        body=body_fmt.format(player=player, suffix=suffix),
+        deep_link="/turni",
+    )
+
+
+@register_template("risultati.gol", 1)
+def _render_risultati_gol(params: NotificationParams) -> NotificationContent:
+    return _live_content("Gol!", "{player} ha segnato{suffix}.", params)
+
+
+@register_template("risultati.espulsione", 1)
+def _render_risultati_espulsione(params: NotificationParams) -> NotificationContent:
+    return _live_content("Espulsione", "{player} è stato espulso{suffix}.", params)
+
+
+@register_template("risultati.infortunio", 1)
+def _render_risultati_infortunio(params: NotificationParams) -> NotificationContent:
+    return _live_content("Giocatore infortunato", "{player} risulta infortunato.", params)
+
+
+@register_template("risultati.squalifica", 1)
+def _render_risultati_squalifica(params: NotificationParams) -> NotificationContent:
+    return _live_content("Giocatore squalificato", "{player} risulta squalificato.", params)
