@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 from uuid import UUID
+from zoneinfo import ZoneInfo
 
 from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
@@ -68,6 +69,9 @@ def _parse_optional_datetime(value: str | None, *, field: str) -> datetime | Non
     if value is None or not value.strip():
         return None
     return _parse_required_datetime(value, field=field)
+
+
+_MONTHS_IT = ("gen", "feb", "mar", "apr", "mag", "giu", "lug", "ago", "set", "ott", "nov", "dic")
 
 
 class TradeService:
@@ -583,15 +587,44 @@ class TradeService:
     ) -> None:
         recipients = user_ids_for_teams(self._session, team_ids)
         notifications = NotificationService(self._session)
-        for user_id in recipients.values():
+        proposal = self._session.get(TradeProposal, proposal_id)
+        shared = self._trade_notification_params(proposal)
+        for team_id, user_id in recipients.items():
+            params: dict[str, object] = {"status": status.value, **shared}
+            if proposal is not None:
+                other_id = (
+                    proposal.proposer_team_id
+                    if team_id == proposal.recipient_team_id
+                    else proposal.recipient_team_id
+                )
+                other = self._session.get(FantasyTeam, other_id)
+                if other is not None:
+                    params["other_team"] = other.name
             notifications.create_notification(
                 user_id=user_id,
                 category=NotificationCategory.MERCATO,
                 template_key="mercato.scambio",
-                template_version=1,
-                params={"status": status.value},
+                template_version=2,
+                params=params,
                 dedup_key=f"trade_status:{proposal_id}:{status.value}:{user_id}",
             )
+
+    def _trade_notification_params(self, proposal: TradeProposal | None) -> dict[str, object]:
+        """Giocatori, crediti e scadenza da mostrare nel testo della notifica."""
+        if proposal is None:
+            return {}
+        params: dict[str, object] = {
+            "offered": [row.name for row in self._athlete_labels(proposal.offered_athlete_ids)],
+            "requested": [row.name for row in self._athlete_labels(proposal.requested_athlete_ids)],
+            "offered_credits": proposal.offered_credits,
+            "requested_credits": proposal.requested_credits,
+        }
+        if proposal.expires_at is not None:
+            local = proposal.expires_at.astimezone(ZoneInfo("Europe/Rome"))
+            params["expires_label"] = (
+                f"il {local.day} {_MONTHS_IT[local.month - 1]} alle {local:%H:%M}"
+            )
+        return params
 
     def _to_response(self, proposal: TradeProposal) -> TradeProposalResponse:
         now = datetime.now(UTC)

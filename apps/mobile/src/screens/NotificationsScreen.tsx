@@ -2,17 +2,25 @@ import { lazyStyles } from "../theme/lazyStyles";
 import type { NotificationItem } from "@fantappero/contracts";
 import { theme } from "@fantappero/ui/theme";
 import { useNavigation, type NavigationProp } from "@react-navigation/core";
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import {
   fetchNotifications,
   markAllNotificationsRead,
   markNotificationRead,
 } from "../api/notifications";
+import { HScroll } from "../components/HScroll";
 import { UiStatePanel } from "../components/UiStatePanel";
 import { useScreenData } from "../hooks/useScreenData";
 import { PageContainer } from "../layout/PageContainer";
 import { resolveNotificationRoute } from "../navigation/notificationDestination";
+import {
+  NOTIFICATION_GROUP_COLOR,
+  NOTIFICATION_GROUP_LABEL,
+  notificationDayLabel,
+  notificationKind,
+  type NotificationGroup,
+} from "../navigation/notificationKind";
 import type { RootStackParamList } from "../navigation/types";
 import { getApiErrorMessage, useAuthSession } from "../session/DemoSessionContext";
 
@@ -24,6 +32,14 @@ const CATEGORY_LABELS: Record<string, string> = {
   mercato: "Mercato",
   risultati: "Risultati",
 };
+
+function formatTime(value: string): string {
+  try {
+    return new Intl.DateTimeFormat("it-IT", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Rome" }).format(new Date(value));
+  } catch {
+    return value;
+  }
+}
 
 function formatDateTime(value: string): string {
   try {
@@ -44,6 +60,7 @@ export function NotificationsScreen() {
 
   const [items, setItems] = useState<NotificationItem[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [filter, setFilter] = useState<"tutte" | NotificationGroup>("tutte");
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -70,6 +87,24 @@ export function NotificationsScreen() {
   }, [accessToken]);
 
   const { refreshing, onRefresh } = useScreenData(load);
+
+  const visibleItems = useMemo(
+    () => (filter === "tutte" ? items : items.filter((row) => notificationKind(row).group === filter)),
+    [items, filter],
+  );
+  const groupedByDay = useMemo(() => {
+    const groups: Array<[string, NotificationItem[]]> = [];
+    for (const row of visibleItems) {
+      const label = notificationDayLabel(row.createdAt);
+      const last = groups[groups.length - 1];
+      if (last && last[0] === label) {
+        last[1].push(row);
+      } else {
+        groups.push([label, [row]]);
+      }
+    }
+    return groups;
+  }, [visibleItems]);
 
   async function onOpen(item: NotificationItem) {
     setActionError(null);
@@ -157,31 +192,72 @@ export function NotificationsScreen() {
             </Text>
           ) : null}
 
-          {items.length === 0 ? (
+          <HScroll testID="notifications-filters">
+            {(["tutte", "giocatori", "scambi", "asta", "formazione", "turni", "sistema"] as const).map((value) => {
+              const count =
+                value === "tutte"
+                  ? items.length
+                  : items.filter((row) => notificationKind(row).group === value).length;
+              if (value !== "tutte" && count === 0 && filter !== value) {
+                return null;
+              }
+              const active = filter === value;
+              return (
+                <Pressable
+                  key={value}
+                  style={[styles.filterPill, active && styles.filterPillActive]}
+                  onPress={() => setFilter(value)}
+                  accessibilityState={{ selected: active }}
+                  testID={`notifications-filter-${value}`}
+                >
+                  <Text style={[styles.filterLabel, active && styles.filterLabelActive]}>
+                    {`${value === "tutte" ? "Tutte" : NOTIFICATION_GROUP_LABEL[value]}${count > 0 ? ` ${count}` : ""}`}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </HScroll>
+
+          {visibleItems.length === 0 ? (
             <UiStatePanel
               state="empty"
               title="Nessuna notifica"
-              message="Qui compariranno inviti, scadenze formazione ed esiti di mercato."
+              message="Qui compariranno gol e cartellini dei tuoi giocatori, proposte di scambio, asta, scadenze formazione ed esiti dei turni."
               testID="notifications-empty"
             />
           ) : (
-            items.map((item) => (
-              <Pressable
-                key={item.id}
-                accessibilityRole="button"
-                accessibilityLabel={`${item.title}${item.read ? "" : ", non letta"}`}
-                onPress={() => void onOpen(item)}
-                style={[styles.card, !item.read && styles.cardUnread]}
-                testID={`notification-${item.id}`}
-              >
-                <Text style={styles.category}>
-                  {CATEGORY_LABELS[item.category] ?? item.category}
-                  {item.read ? "" : " · non letta"}
-                </Text>
-                <Text style={styles.title}>{item.title}</Text>
-                <Text style={styles.body}>{item.body}</Text>
-                <Text style={styles.meta}>{formatDateTime(item.createdAt)}</Text>
-              </Pressable>
+            groupedByDay.map(([day, rows]) => (
+              <View key={day} style={styles.stack}>
+                <Text style={styles.dayLabel}>{day}</Text>
+                {rows.map((item) => {
+                  const kind = notificationKind(item);
+                  const color = NOTIFICATION_GROUP_COLOR[kind.group];
+                  return (
+                    <Pressable
+                      key={item.id}
+                      accessibilityRole="button"
+                      accessibilityLabel={`${item.title}${item.read ? "" : ", non letta"}`}
+                      onPress={() => void onOpen(item)}
+                      style={[styles.card, !item.read && styles.cardUnread]}
+                      testID={`notification-${item.id}`}
+                    >
+                      <View style={styles.cardRow}>
+                        <View style={[styles.glyphBox, { backgroundColor: color.bg }]}>
+                          <Text style={styles.glyph}>{kind.glyph}</Text>
+                        </View>
+                        <View style={styles.cardText}>
+                          <Text style={styles.title}>{item.title}</Text>
+                          <Text style={styles.body}>{item.body}</Text>
+                          <Text style={styles.meta}>
+                            {`${NOTIFICATION_GROUP_LABEL[kind.group]} · ${formatTime(item.createdAt)}`}
+                          </Text>
+                        </View>
+                        {item.read ? null : <View style={styles.unreadDot} testID={`notification-unread-${item.id}`} />}
+                      </View>
+                    </Pressable>
+                  );
+                })}
+              </View>
             ))
           )}
         </View>
@@ -246,4 +322,26 @@ const styles = lazyStyles(() => StyleSheet.create({
     color: colors.foreground,
     fontSize: typography.fontSize.sm,
   },
+  filterPill: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  filterPillActive: { backgroundColor: colors.brand, borderColor: colors.brand },
+  filterLabel: { color: colors.foreground, fontWeight: "600" },
+  filterLabelActive: { color: colors.onBrand },
+  dayLabel: {
+    color: colors.foregroundMuted,
+    fontSize: 12,
+    letterSpacing: 1.4,
+    textTransform: "uppercase",
+    marginTop: spacing.sm,
+  },
+  cardRow: { flexDirection: "row", alignItems: "flex-start", gap: spacing.sm },
+  cardText: { flex: 1, minWidth: 0, gap: 2 },
+  glyphBox: { width: 40, height: 40, borderRadius: 13, alignItems: "center", justifyContent: "center" },
+  glyph: { fontSize: 20 },
+  unreadDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: "#FF6B8A", marginTop: 6 },
 }));
