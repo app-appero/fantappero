@@ -35,6 +35,7 @@ from leagues.router import router as leagues_router
 from leagues.scoring_router import router as scoring_router
 from market.live_router import router as market_live_router
 from market.router import router as market_router
+from notifications.admin_router import router as admin_notifications_router
 from notifications.router import router as notifications_router
 from observability.error_tracking import configure_error_tracking
 from observability.health import as_readiness, liveness
@@ -99,6 +100,7 @@ app.include_router(effective_lineup_router)
 app.include_router(fantasy_ratings_router)
 app.include_router(quality_router)
 app.include_router(notifications_router)
+app.include_router(admin_notifications_router)
 app.include_router(ai_assistant_router)
 app.include_router(ai_assistant_feedback_router)
 app.include_router(billing_router)

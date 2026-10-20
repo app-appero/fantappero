@@ -144,6 +144,17 @@ SYSTEM_JOBS: tuple[SystemJobSpec, ...] = (
         max_interval_seconds=86400,
     ),
     SystemJobSpec(
+        key="notifications-broadcast-dispatch",
+        task="notifications.dispatch_broadcasts",
+        title="Avvisi programmati",
+        description="Invia gli avvisi che un operatore ha programmato per più tardi.",
+        enabled_attr="notifications_broadcast_dispatch_enabled",
+        interval_attr="notifications_broadcast_dispatch_interval_seconds",
+        default_interval_seconds=60,
+        min_interval_seconds=30,
+        max_interval_seconds=3600,
+    ),
+    SystemJobSpec(
         key="sports-data-sync-catalog",
         task="sports_data.sync_mvp_catalog",
         title="Catalogo campionati",

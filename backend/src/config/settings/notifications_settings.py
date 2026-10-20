@@ -44,6 +44,17 @@ class NotificationsSettingsMixin:
         value = self.expo_push_access_token.get_secret_value().strip()
         return value or None
 
+    notifications_broadcast_dispatch_enabled: bool = Field(
+        default=True,
+        validation_alias="NOTIFICATIONS_BROADCAST_DISPATCH_ENABLED",
+        description="When true, Celery beat sends operator broadcasts scheduled for later.",
+    )
+    notifications_broadcast_dispatch_interval_seconds: int = Field(
+        default=60,
+        validation_alias="NOTIFICATIONS_BROADCAST_DISPATCH_INTERVAL_SECONDS",
+        ge=30,
+        le=3600,
+    )
     notifications_lineup_reminder_enabled: bool = Field(
         default=True,
         validation_alias="NOTIFICATIONS_LINEUP_REMINDER_ENABLED",
@@ -66,6 +77,7 @@ class NotificationsSettingsMixin:
 
     @field_validator(
         "notifications_push_enabled",
+        "notifications_broadcast_dispatch_enabled",
         "notifications_lineup_reminder_enabled",
         mode="before",
     )

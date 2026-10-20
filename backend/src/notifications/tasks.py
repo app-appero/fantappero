@@ -107,3 +107,26 @@ def send_push_task(
         get_metrics().incr("notifications_push_revoked_total", amount=result["revoked"])
     logger.info("notifications_push_task_done", extra={"category": category, **result})
     return result
+
+
+@celery_app.task(name="notifications.dispatch_broadcasts")
+def dispatch_broadcasts_task() -> int:
+    """Invia gli avvisi programmati dagli operatori il cui orario è arrivato."""
+    from notifications.broadcast_service import dispatch_due
+    from system_jobs.service import allow_periodic
+
+    settings = get_api_settings()
+    if not allow_periodic(
+        "notifications-broadcast-dispatch", settings.notifications_broadcast_dispatch_enabled
+    ):
+        return 0
+    engine = create_engine_from_url(settings.database_url)
+    factory = create_session_factory(engine)
+    try:
+        with session_scope(factory) as session:
+            sent = dispatch_due(session, now=datetime.now(UTC))
+    finally:
+        engine.dispose()
+    if sent:
+        logger.info("notifications_broadcasts_dispatched", extra={"count": sent})
+    return sent
