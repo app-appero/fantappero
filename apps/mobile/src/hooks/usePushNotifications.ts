@@ -1,25 +1,47 @@
 import type { PushDevicePlatform } from "@fantappero/contracts";
 import { useNavigation, type NavigationProp } from "@react-navigation/core";
-import Constants from "expo-constants";
+import Constants, { ExecutionEnvironment } from "expo-constants";
 import * as Device from "expo-device";
-import * as Notifications from "expo-notifications";
+import type * as NotificationsModule from "expo-notifications";
 import { useEffect, useRef } from "react";
 import { Platform } from "react-native";
 import { registerPushDevice } from "../api/notifications";
 import { resolveNotificationRoute } from "../navigation/notificationDestination";
 import type { RootStackParamList } from "../navigation/types";
 
-// Mentre l'app è in primo piano una push arrivata si vede comunque, come se
-// fosse in background — altrimenti su iOS sparirebbe senza che l'utente se
-// ne accorga.
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowBanner: true,
-    shouldShowList: true,
-    shouldPlaySound: true,
-    shouldSetBadge: false,
-  }),
-});
+type Notifications = typeof NotificationsModule;
+
+/**
+ * `expo-notifications` richiede un modulo nativo che Expo Go non ha: importarlo
+ * a livello di file manderebbe in crash tutta l'app. Lo carichiamo solo in una
+ * build vera (APK/dev client); in Expo Go le push restano semplicemente spente.
+ */
+let cached: Notifications | null | undefined;
+function loadNotifications(): Notifications | null {
+  if (cached !== undefined) {
+    return cached;
+  }
+  if (Constants.executionEnvironment === ExecutionEnvironment.StoreClient) {
+    cached = null;
+    return cached;
+  }
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const module = require("expo-notifications") as Notifications;
+    module.setNotificationHandler({
+      handleNotification: async () => ({
+        shouldShowBanner: true,
+        shouldShowList: true,
+        shouldPlaySound: true,
+        shouldSetBadge: false,
+      }),
+    });
+    cached = module;
+  } catch {
+    cached = null;
+  }
+  return cached;
+}
 
 function platformName(): PushDevicePlatform | null {
   if (Platform.OS === "ios") return "ios";
@@ -32,26 +54,18 @@ function platformName(): PushDevicePlatform | null {
  * utente loggato, e naviga alla destinazione giusta quando l'utente tocca
  * una push — sia ad app aperta sia riaprendola da ferma (EP09-05).
  *
- * Richiede un progetto EAS collegato (`app.json` → `extra.eas.projectId`):
- * senza quello `getExpoPushTokenAsync` fallisce e la registrazione viene
- * saltata silenziosamente, l'app resta comunque utilizzabile.
+ * Richiede un progetto EAS collegato (`app.json` → `extra.eas.projectId`) e una
+ * build vera: in Expo Go non fa nulla.
  */
 export function usePushNotifications(accessToken: string | null | undefined): void {
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
   const registeredForToken = useRef<string | null>(null);
   const lastHandledResponseId = useRef<string | null>(null);
-  const response = Notifications.useLastNotificationResponse();
 
   useEffect(() => {
-    if (!accessToken) {
-      return;
-    }
+    const Notifications = loadNotifications();
     const platform = platformName();
-    if (platform === null) {
-      return;
-    }
-    if (!Device.isDevice) {
-      // Simulatore/emulatore: niente push reali, Expo rifiuterebbe comunque.
+    if (!accessToken || !Notifications || platform === null || !Device.isDevice) {
       return;
     }
     if (registeredForToken.current === accessToken) {
@@ -62,15 +76,10 @@ export function usePushNotifications(accessToken: string | null | undefined): vo
       const current = await Notifications.getPermissionsAsync();
       let granted = current.granted;
       if (!granted && current.canAskAgain) {
-        const requested = await Notifications.requestPermissionsAsync();
-        granted = requested.granted;
-      }
-      if (!granted || cancelled) {
-        return;
+        granted = (await Notifications.requestPermissionsAsync()).granted;
       }
       const projectId = Constants.expoConfig?.extra?.eas?.projectId as string | undefined;
-      if (!projectId) {
-        // Nessun progetto EAS collegato: non possiamo ottenere un token Expo.
+      if (!granted || cancelled || !projectId) {
         return;
       }
       try {
@@ -81,8 +90,7 @@ export function usePushNotifications(accessToken: string | null | undefined): vo
         await registerPushDevice(accessToken, { token, platform });
         registeredForToken.current = accessToken;
       } catch {
-        // Offline o errore del provider push: non blocca l'app, si ritenta
-        // al prossimo avvio o cambio di accessToken.
+        // Offline o errore del provider push: si ritenta al prossimo avvio.
       }
     })();
     return () => {
@@ -91,21 +99,31 @@ export function usePushNotifications(accessToken: string | null | undefined): vo
   }, [accessToken]);
 
   useEffect(() => {
-    if (!response) {
+    const Notifications = loadNotifications();
+    if (!Notifications) {
       return;
     }
-    const id = response.notification.request.identifier;
-    if (lastHandledResponseId.current === id) {
-      return;
+    function handle(response: NotificationsModule.NotificationResponse | null | undefined) {
+      if (!response) {
+        return;
+      }
+      const id = response.notification.request.identifier;
+      if (lastHandledResponseId.current === id) {
+        return;
+      }
+      lastHandledResponseId.current = id;
+      const content = response.notification.request.content;
+      const deepLink = (content.data?.deepLink as string | null | undefined) ?? null;
+      const route = resolveNotificationRoute({ title: content.title ?? "", deepLink });
+      if (route?.kind === "stack") {
+        navigation.navigate(route.name as never);
+      } else if (route?.kind === "tab") {
+        navigation.navigate("MainTabs", { screen: route.screen });
+      }
     }
-    lastHandledResponseId.current = id;
-    const content = response.notification.request.content;
-    const deepLink = (content.data?.deepLink as string | null | undefined) ?? null;
-    const route = resolveNotificationRoute({ title: content.title ?? "", deepLink });
-    if (route?.kind === "stack") {
-      navigation.navigate(route.name as never);
-    } else if (route?.kind === "tab") {
-      navigation.navigate("MainTabs", { screen: route.screen });
-    }
-  }, [response, navigation]);
+    // App riaperta da ferma toccando la notifica, poi tocchi ad app viva.
+    void Notifications.getLastNotificationResponseAsync().then(handle);
+    const subscription = Notifications.addNotificationResponseReceivedListener(handle);
+    return () => subscription.remove();
+  }, [navigation]);
 }
