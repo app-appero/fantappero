@@ -130,3 +130,14 @@ def test_trade_v1_still_renders_for_old_notifications() -> None:
         render_notification("mercato.scambio", 1, {"status": "proposed"}).title
         == "Nuova proposta di scambio"
     )
+
+
+def test_every_test_sample_renders() -> None:
+    from notifications.samples import SAMPLES
+
+    keys = [s.key for s in SAMPLES]
+    assert len(keys) == len(set(keys))
+    for sample in SAMPLES:
+        content = render_notification(sample.template_key, sample.template_version, sample.params)
+        assert content.title
+        assert content.body
