@@ -1,6 +1,6 @@
 import type { LeagueListoneEntry } from "@fantappero/contracts";
 import { useCallback, useMemo, useState } from "react";
-import { fetchLeagueListone, fetchMyCredits } from "../api/leagues";
+import { fetchLeagueListone, fetchMyCredits, fetchRosterOccupancy } from "../api/leagues";
 import {
   closeAuctionSession,
   createAuctionSession,
@@ -38,6 +38,7 @@ export function AuctionScreen() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [balance, setBalance] = useState<number | null>(null);
+  const [ownedAthleteIds, setOwnedAthleteIds] = useState<Set<string>>(new Set());
 
   const loadListone = useCallback(async () => {
     if (!activeLeagueId) {
@@ -55,11 +56,13 @@ export function AuctionScreen() {
     setLoading(true);
     setLoadError(null);
     try {
-      const [rows, credits] = await Promise.all([
+      const [rows, credits, occupancy] = await Promise.all([
         fetchLeagueListone(accessToken, activeLeagueId),
         fetchMyCredits(accessToken, activeLeagueId).catch(() => null),
+        fetchRosterOccupancy(accessToken, activeLeagueId).catch(() => []),
       ]);
       setEntries(rows);
+      setOwnedAthleteIds(new Set(occupancy.map((row) => row.athleteId)));
       if (credits) {
         setBalance(credits.balance);
       }
@@ -156,6 +159,8 @@ export function AuctionScreen() {
         flow={flow}
         balance={balance}
         playerOptions={playerOptions}
+        chooserEntries={entries}
+        ownedAthleteIds={ownedAthleteIds}
         bidAthleteId={bidAthleteId}
         onBidAthleteIdChange={setBidAthleteId}
         bidAmount={bidAmount}
