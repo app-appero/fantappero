@@ -6,6 +6,7 @@ import {
   AdminLeaguesPage,
   AdminListonePage,
   AdminJobsPage,
+  AdminNotificationsPage,
   AdminTurniPage,
   AdminUsersPage,
   AuthForgotPasswordPage,
@@ -292,6 +293,16 @@ export function AppRoutes() {
       <AdminSection>
         <RequirePermissions required={["global:operate"]}>
           <AdminJobsPage />
+        </RequirePermissions>
+      </AdminSection>
+    );
+  }
+
+  if (pathname === "/admin/notifiche") {
+    return (
+      <AdminSection>
+        <RequirePermissions required={["global:operate"]}>
+          <AdminNotificationsPage />
         </RequirePermissions>
       </AdminSection>
     );

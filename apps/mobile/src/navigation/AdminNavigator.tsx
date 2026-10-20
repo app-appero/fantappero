@@ -13,6 +13,7 @@ import { LockCountdownBar } from "../layout/LockCountdownBar";
 import { AdminDashboardScreen } from "../screens/admin/AdminDashboardScreen";
 import { AdminLeaguesScreen } from "../screens/admin/AdminLeaguesScreen";
 import { AdminListoneScreen } from "../screens/admin/AdminListoneScreen";
+import { AdminNotificationsScreen } from "../screens/admin/AdminNotificationsScreen";
 import { AdminJobsScreen } from "../screens/admin/AdminJobsScreen";
 import { AdminTurniScreen } from "../screens/admin/AdminTurniScreen";
 import { AdminUsersScreen } from "../screens/admin/AdminUsersScreen";
@@ -32,6 +33,7 @@ const ADMIN_SCREEN_BY_ID: Record<string, keyof AdminStackParamList> = {
   "admin-listone": "AdminListone",
   "admin-turni": "AdminTurni",
   "admin-jobs": "AdminJobs",
+  "admin-notifications": "AdminNotifications",
 };
 
 const ADMIN_NAV_ID_BY_ROUTE: Record<string, string> = {
@@ -41,6 +43,7 @@ const ADMIN_NAV_ID_BY_ROUTE: Record<string, string> = {
   AdminListone: "admin-listone",
   AdminTurni: "admin-turni",
   AdminJobs: "admin-jobs",
+  AdminNotifications: "admin-notifications",
 };
 
 /**
@@ -152,6 +155,12 @@ export function AdminNavigator() {
             {({ navigation }) => {
               rememberStack(navigation);
               return <AdminJobsScreen />;
+            }}
+          </Stack.Screen>
+          <Stack.Screen name="AdminNotifications">
+            {({ navigation }) => {
+              rememberStack(navigation);
+              return <AdminNotificationsScreen />;
             }}
           </Stack.Screen>
         </Stack.Navigator>
