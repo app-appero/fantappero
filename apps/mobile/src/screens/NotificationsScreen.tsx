@@ -7,6 +7,7 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 import {
   fetchNotifications,
   markAllNotificationsRead,
+  sendTestNotifications,
   markNotificationRead,
 } from "../api/notifications";
 import { HScroll } from "../components/HScroll";
@@ -56,7 +57,7 @@ function formatDateTime(value: string): string {
 /** Centro notifiche mobile — parità con la campanella web (EP13-P07). */
 export function NotificationsScreen() {
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
-  const { accessToken } = useAuthSession();
+  const { accessToken, can } = useAuthSession();
 
   const [items, setItems] = useState<NotificationItem[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -127,6 +128,19 @@ export function NotificationsScreen() {
     }
   }
 
+  async function onSendSamples() {
+    if (!accessToken) {
+      return;
+    }
+    setActionError(null);
+    try {
+      await sendTestNotifications(accessToken);
+      await load();
+    } catch (error) {
+      setActionError(getApiErrorMessage(error, "Impossibile inviare le notifiche di prova."));
+    }
+  }
+
   async function onMarkAll() {
     if (!accessToken) {
       return;
@@ -185,6 +199,17 @@ export function NotificationsScreen() {
               </Pressable>
             ) : null}
           </View>
+
+          {can(["global:operate"]) ? (
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => void onSendSamples()}
+              style={styles.secondaryButton}
+              testID="notifications-send-samples"
+            >
+              <Text style={styles.secondaryLabel}>Invia notifiche di prova</Text>
+            </Pressable>
+          ) : null}
 
           {actionError ? (
             <Text style={styles.error} testID="notifications-action-error">
