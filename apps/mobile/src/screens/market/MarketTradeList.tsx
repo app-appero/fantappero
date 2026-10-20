@@ -238,33 +238,34 @@ export function MarketTradeList({
                 ) : null}
 
                 {proposal.status === "proposed" && isRecipient ? (
-                  <View style={styles.rowActions}>
+                  <View style={styles.tradeActions}>
                     <Pressable
-                      style={[styles.button, pending && styles.disabled]}
+                      style={[styles.button, styles.tradeAction, pending && styles.disabled]}
                       disabled={pending}
                       onPress={() => void trade.acceptProposal(proposal.id)}
                       testID={`market-trade-accept-${proposal.id}`}
                     >
-                      <Text style={styles.buttonLabel}>Accetta</Text>
+                      <Text style={styles.buttonLabel} numberOfLines={1} adjustsFontSizeToFit>Accetta</Text>
                     </Pressable>
                     <Pressable
-                      style={[styles.secondaryButton, pending && styles.disabled]}
+                      style={[styles.secondaryButton, styles.tradeAction, pending && styles.disabled]}
                       disabled={pending}
                       onPress={() => void trade.rejectProposal(proposal.id)}
                       testID={`market-trade-reject-${proposal.id}`}
                     >
-                      <Text style={styles.secondaryButtonLabel}>Rifiuta</Text>
+                      <Text style={styles.secondaryButtonLabel} numberOfLines={1} adjustsFontSizeToFit>Rifiuta</Text>
                     </Pressable>
                     <Pressable
                       style={[
                         styles.secondaryButton,
+                        styles.tradeAction,
                         (pending || ownedSlots.length === 0) && styles.disabled,
                       ]}
                       disabled={pending || ownedSlots.length === 0}
                       onPress={() => startCounter(proposal.id)}
                       testID={`market-trade-counter-start-${proposal.id}`}
                     >
-                      <Text style={styles.secondaryButtonLabel}>Controproponi</Text>
+                      <Text style={styles.secondaryButtonLabel} numberOfLines={1} adjustsFontSizeToFit>Controproponi</Text>
                     </Pressable>
                   </View>
                 ) : null}
