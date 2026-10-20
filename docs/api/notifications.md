@@ -95,7 +95,7 @@ Errori 422 con `code`: `email_unavailable` (nessun provider email), `invalid_dee
 
 `push: true` manda la push solo a chi ha preferenza accesa e un dispositivo registrato (`pushCount`); `inApp` c'è sempre. Un `scheduledAt` futuro salva l'avviso e lo invia il job `notifications.dispatch_broadcasts` (ogni 60 s, `NOTIFICATIONS_BROADCAST_DISPATCH_*`).
 
-**`deepLink` validi** (quelli che l'app mobile sa aprire): `/inviti`, `/formazione`, `/classifica`, `/turni`, `/rosa`, `/asta`, `/svincolati`, `/scambi`, `/mercato`, `/profilo` (anche con sottopercorso o query). Altro: 422.
+**`deepLink` validi** (quelli che l'app mobile sa aprire): `/` (home della lega), `/inviti`, `/formazione`, `/classifica`, `/turni`, `/rosa`, `/asta`, `/svincolati`, `/scambi`, `/mercato`, `/profilo` (anche con sottopercorso o query). Altro: 422.
 
 ## Idempotenza
 

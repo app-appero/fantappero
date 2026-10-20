@@ -451,6 +451,7 @@ export type {
   NotificationRecipient,
   NotificationRecipientList,
   SendTestSamplesRequest,
+  SendTestSamplesResult,
   TestSampleItem,
   TestSampleList,
   MarkAllNotificationsReadResult,

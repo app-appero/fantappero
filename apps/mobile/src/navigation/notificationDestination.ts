@@ -26,6 +26,7 @@ const AUCTION_TITLES = new Set([
 
 /** Percorsi web (deep link del payload) → schermata mobile equivalente. */
 const PATH_ROUTES: Array<[RegExp, NotificationRoute]> = [
+  [/^\/$/, { kind: "stack", name: "LeagueHome" }],
   [/^\/inviti/, { kind: "stack", name: "ReceivedInvites" }],
   [/^\/formazione/, { kind: "tab", screen: "Formation" }],
   [/^\/classifica/, { kind: "tab", screen: "Standings" }],

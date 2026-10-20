@@ -40,7 +40,7 @@ def _patch_audience(monkeypatch: pytest.MonkeyPatch, users: list) -> list[object
     return delivered
 
 
-@pytest.mark.parametrize("link", ["/turni", "/formazione?x=1", "/scambi/123", "/inviti"])
+@pytest.mark.parametrize("link", ["/", "/turni", "/formazione?x=1", "/scambi/123", "/inviti"])
 def test_valid_deep_links(link: str) -> None:
     svc.validate_deep_link(link)
 

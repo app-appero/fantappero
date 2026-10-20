@@ -23,6 +23,7 @@ logger = get_logger(__name__)
 BROADCAST_KINDS = frozenset({"test", "avviso", "novita", "manutenzione"})
 # Destinazioni che l'app mobile sa aprire (navigation/notificationDestination.ts).
 VALID_DEEP_LINK_PREFIXES = (
+    # "/" da solo = home della lega (gestito a parte in validate_deep_link)
     "/inviti",
     "/formazione",
     "/classifica",
@@ -47,6 +48,8 @@ def validate_deep_link(deep_link: str | None) -> None:
     if deep_link is None:
         return
     path = deep_link.split("?")[0].split("#")[0]
+    if path == "/":
+        return  # home della lega
     if not path.startswith("/") or path.startswith("//") or "://" in deep_link:
         raise BroadcastError("invalid_deep_link", "Il link deve essere un percorso interno.")
     if not any(path == p or path.startswith(p + "/") for p in VALID_DEEP_LINK_PREFIXES):

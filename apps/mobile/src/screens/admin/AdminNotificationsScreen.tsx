@@ -444,7 +444,7 @@ function TestTab({ accessToken }: { accessToken: string }) {
         sampleKeys: [...chosen],
         userIds: toOthers ? [...users.keys()] : undefined,
       });
-      setDone(`${r.markedCount} notifiche di prova create.`);
+      setDone(`${r.createdCount} notifiche di prova create.`);
     } catch (e) {
       setError(getApiErrorMessage(e, "Invio non riuscito."));
     } finally {

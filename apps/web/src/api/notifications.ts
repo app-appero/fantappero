@@ -5,6 +5,7 @@ import type {
   ListRecipientsFilters,
   NotificationRecipientList,
   SendTestSamplesRequest,
+  SendTestSamplesResult,
   TestSampleList,
   ListNotificationsFilters,
   MarkAllNotificationsReadResult,
@@ -112,8 +113,8 @@ export function fetchTestSamples(accessToken: string): Promise<TestSampleList> {
 export function sendTestSamples(
   accessToken: string,
   body: SendTestSamplesRequest,
-): Promise<MarkAllNotificationsReadResult> {
-  return apiRequest<MarkAllNotificationsReadResult>("/admin/notifications/test-samples", {
+): Promise<SendTestSamplesResult> {
+  return apiRequest<SendTestSamplesResult>("/admin/notifications/test-samples", {
     accessToken,
     method: "POST",
     body,
