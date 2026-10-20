@@ -133,6 +133,16 @@ export function AdminDashboardScreen() {
         </Pressable>
         <Pressable
           style={styles.linkCard}
+          onPress={() => navigation.navigate("AdminNotifications")}
+          testID="admin-dashboard-link-notifications"
+        >
+          <Text style={styles.linkCardTitle}>Notifiche</Text>
+          <Text style={styles.linkCardHint}>
+            Invia avvisi, novità e notifiche di prova agli utenti.
+          </Text>
+        </Pressable>
+        <Pressable
+          style={styles.linkCard}
           onPress={() => navigation.navigate("AdminTurni")}
           testID="admin-dashboard-link-turni"
         >

@@ -1,4 +1,11 @@
 import type {
+  BroadcastList,
+  CreateBroadcastRequest,
+  CreateBroadcastResponse,
+  ListRecipientsFilters,
+  NotificationRecipientList,
+  SendTestSamplesRequest,
+  TestSampleList,
   ListNotificationsFilters,
   MarkAllNotificationsReadResult,
   NotificationItem,
@@ -61,6 +68,54 @@ export function updateNotificationPreference(
   return apiRequest<NotificationPreferenceList>("/notifications/preferences", {
     accessToken,
     method: "PUT",
+    body,
+  });
+}
+
+export function fetchNotificationRecipients(
+  accessToken: string,
+  filters: ListRecipientsFilters = {},
+): Promise<NotificationRecipientList> {
+  const params = new URLSearchParams();
+  if (filters.search) params.set("search", filters.search);
+  if (filters.leagueId) params.set("leagueId", filters.leagueId);
+  if (filters.pushOnly) params.set("pushOnly", "true");
+  if (filters.noPush) params.set("noPush", "true");
+  if (filters.operatorsOnly) params.set("operatorsOnly", "true");
+  if (filters.page) params.set("page", String(filters.page));
+  if (filters.pageSize) params.set("pageSize", String(filters.pageSize));
+  const qs = params.toString();
+  return apiRequest<NotificationRecipientList>(`/admin/notifications/recipients${qs ? `?${qs}` : ""}`, {
+    accessToken,
+  });
+}
+
+export function createBroadcast(
+  accessToken: string,
+  body: CreateBroadcastRequest,
+): Promise<CreateBroadcastResponse> {
+  return apiRequest<CreateBroadcastResponse>("/admin/notifications/broadcasts", {
+    accessToken,
+    method: "POST",
+    body,
+  });
+}
+
+export function fetchBroadcasts(accessToken: string, page = 1): Promise<BroadcastList> {
+  return apiRequest<BroadcastList>(`/admin/notifications/broadcasts?page=${page}`, { accessToken });
+}
+
+export function fetchTestSamples(accessToken: string): Promise<TestSampleList> {
+  return apiRequest<TestSampleList>("/admin/notifications/test-samples", { accessToken });
+}
+
+export function sendTestSamples(
+  accessToken: string,
+  body: SendTestSamplesRequest,
+): Promise<MarkAllNotificationsReadResult> {
+  return apiRequest<MarkAllNotificationsReadResult>("/admin/notifications/test-samples", {
+    accessToken,
+    method: "POST",
     body,
   });
 }
