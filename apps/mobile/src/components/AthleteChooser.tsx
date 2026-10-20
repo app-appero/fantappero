@@ -27,6 +27,7 @@ export function AthleteChooser({
   selected,
   onToggle,
   single = false,
+  readOnly = false,
   testID,
 }: {
   entries: LeagueListoneEntry[];
@@ -34,6 +35,8 @@ export function AthleteChooser({
   selected: string[];
   onToggle: (athleteId: string) => void;
   single?: boolean;
+  /** Solo consultazione: nessuna casella, le righe non si selezionano. */
+  readOnly?: boolean;
   testID?: string;
 }) {
   const [query, setQuery] = useState("");
@@ -103,13 +106,16 @@ export function AthleteChooser({
               key={entry.athleteId}
               style={[styles.pickRow, active && styles.pickRowActive]}
               onPress={() => onToggle(entry.athleteId)}
+              disabled={readOnly}
               accessibilityRole={single ? "radio" : "checkbox"}
               accessibilityState={{ checked: active }}
               testID={testID ? `${testID}-${entry.athleteId}` : undefined}
             >
-              <View style={[styles.checkBox, active && styles.checkBoxActive, single && { borderRadius: 11 }]}>
-                {active ? <Text style={styles.pillLabelActive}>{single ? "✓" : position}</Text> : null}
-              </View>
+              {readOnly ? null : (
+                <View style={[styles.checkBox, active && styles.checkBoxActive, single && { borderRadius: 11 }]}>
+                  {active ? <Text style={styles.pillLabelActive}>{single ? "✓" : position}</Text> : null}
+                </View>
+              )}
               <View style={[styles.proposalAvatar, { width: 30, height: 30, borderRadius: 15, backgroundColor: dot.backgroundColor }]}>
                 <Text style={[styles.proposalAvatarLabel, { color: dot.color }]}>{entry.effectiveRole}</Text>
               </View>

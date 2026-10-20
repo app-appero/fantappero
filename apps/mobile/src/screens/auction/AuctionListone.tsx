@@ -1,17 +1,13 @@
 import type { LeagueListoneEntry, LeagueSummary } from "@fantappero/contracts";
-import { HScroll } from "../../components/HScroll";
-import { useMemo } from "react";
-import { Pressable, ScrollView, Text, View } from "react-native";
-import { AthleteName } from "../../athletes/AthleteCard";
+import { Pressable, Text, View } from "react-native";
+import { AthleteChooser } from "../../components/AthleteChooser";
 import { UiStatePanel } from "../../components/UiStatePanel";
 import { marketUiStyles as styles } from "../../market/marketUiStyles";
-import { filterByTab, roleBadgeColors, ROLE_LABEL, ROLE_TABS, type RoleTab } from "./auctionListoneHelpers";
 
 // The "Tutti" tab returns the whole listone (several hundred players).
 // Rendering that as plain Views inside a ScrollView (no FlatList — see
 // RosterAdminManualCard.tsx for why) mounts too many native views at once
 // and gets the app killed for excessive memory use on a real device.
-const LISTONE_RENDER_LIMIT = 60;
 
 /** Official listone with role tabs — read-only reference table shown below the bid panel (EP08-01/02). */
 export function AuctionListone({
@@ -21,8 +17,8 @@ export function AuctionListone({
   onRetry,
   activeLeagueId,
   activeLeague,
-  tab,
-  onTabChange,
+  ownedAthleteIds,
+  bidding = false,
 }: {
   entries: LeagueListoneEntry[];
   loading: boolean;
@@ -30,10 +26,10 @@ export function AuctionListone({
   onRetry: () => void;
   activeLeagueId: string | null;
   activeLeague: LeagueSummary | null;
-  tab: RoleTab;
-  onTabChange: (tab: RoleTab) => void;
+  ownedAthleteIds: Set<string>;
+  /** Con l'asta aperta l'elenco per scegliere sta nel pannello «Nuova offerta». */
+  bidding?: boolean;
 }) {
-  const visibleEntries = useMemo(() => filterByTab(entries, tab), [entries, tab]);
 
   return (
     <View style={styles.section} testID="auction-listone-card">
@@ -78,73 +74,26 @@ export function AuctionListone({
 
       {!loading && !loadError && activeLeagueId ? (
         <>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-            <HScroll>
-              {ROLE_TABS.map((item) => (
-                <Pressable
-                  key={item.value}
-                  onPress={() => onTabChange(item.value)}
-                  style={[styles.chip, tab === item.value ? styles.chipActive : null]}
-                  testID={`auction-tab-${item.value}`}
-                >
-                  <Text style={tab === item.value ? styles.chipLabelActive : styles.chipLabel}>
-                    {item.label}
-                  </Text>
-                </Pressable>
-              ))}
-            </HScroll>
-          </ScrollView>
-
-          {visibleEntries.length === 0 ? (
+          {bidding ? (
+            <Text style={styles.meta} testID="auction-listone-bidding-hint">
+              L'asta è aperta: scegli il giocatore dall'elenco in «Nuova offerta».
+            </Text>
+          ) : entries.length === 0 ? (
             <UiStatePanel
               state="empty"
-              title="Nessun calciatore"
-              message={
-                tab === "all"
-                  ? "Il listone è vuoto. Verrà popolato dagli operatori della piattaforma."
-                  : `Nessun ${ROLE_LABEL[tab].toLowerCase()} nel listone.`
-              }
-              testID={`auction-listone-empty-${tab}`}
+              title="Listone vuoto"
+              message="Verrà popolato dagli operatori della piattaforma."
+              testID="auction-listone-empty-all"
             />
           ) : (
-            <View testID={`auction-listone-table-${tab}`}>
-              {visibleEntries.length > LISTONE_RENDER_LIMIT ? (
-                <Text style={styles.meta} testID="auction-listone-truncated">
-                  Mostrati i primi {LISTONE_RENDER_LIMIT} di {visibleEntries.length} calciatori.
-                  Usa i filtri ruolo per restringere l'elenco.
-                </Text>
-              ) : null}
-              {visibleEntries.slice(0, LISTONE_RENDER_LIMIT).map((entry) => {
-                const roleColors = roleBadgeColors(entry.effectiveRole);
-                return (
-                  <View key={entry.athleteId} style={styles.listRow}>
-                    <View style={styles.nameRow}>
-                      <View style={[styles.roleBadge, roleColors]}>
-                        <Text style={[styles.roleBadgeText, { color: roleColors.color }]}>
-                          {entry.effectiveRole}
-                        </Text>
-                      </View>
-                      <AthleteName athleteId={entry.athleteId} style={styles.name} numberOfLines={2}>
-                        {entry.canonicalName}
-                      </AthleteName>
-                    </View>
-                    <Text style={styles.meta}>
-                      {ROLE_LABEL[entry.effectiveRole]} · {entry.clubName ?? "—"}
-                    </Text>
-                    {entry.providerPositionRaw ? (
-                      <Text style={styles.meta}>Provider: {entry.providerPositionRaw}</Text>
-                    ) : null}
-                    {entry.override ? (
-                      <Text style={styles.override}>
-                        {entry.override.pending
-                          ? `Override dal turno ${entry.override.effectiveFromRound ?? "?"}`
-                          : `Override attivo → ${entry.override.role}`}
-                      </Text>
-                    ) : null}
-                  </View>
-                );
-              })}
-            </View>
+            <AthleteChooser
+              entries={entries}
+              ownedAthleteIds={ownedAthleteIds}
+              selected={[]}
+              onToggle={() => undefined}
+              readOnly
+              testID="auction-listone-table-all"
+            />
           )}
         </>
       ) : null}
