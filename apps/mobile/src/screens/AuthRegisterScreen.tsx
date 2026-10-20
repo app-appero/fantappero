@@ -4,11 +4,11 @@ import { useState } from "react";
 import { Pressable, Text, View } from "react-native";
 import { AppTextInput as TextInput } from "../components/AppTextInput";
 import { register as registerApi } from "../api/auth";
-import { BrandLogo } from "../components/BrandLogo";
+import { AuthShell } from "../auth/AuthShell";
+import { useGoogleAuth } from "../auth/useGoogleAuth";
 import { UiStatePanel } from "../components/UiStatePanel";
-import { PageContainer } from "../layout/PageContainer";
 import type { RootStackParamList } from "../navigation/types";
-import { getApiErrorMessage } from "../session/DemoSessionContext";
+import { getApiErrorMessage, useAuthSession } from "../session/DemoSessionContext";
 import { authFormStyles as styles } from "./AuthScreen";
 
 /** Registrazione — allineata a web /accedi/registrati. */
@@ -21,6 +21,19 @@ export function AuthRegisterScreen() {
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const { loginWithGoogle } = useAuthSession();
+  const [googleSubmitting, setGoogleSubmitting] = useState(false);
+  const googleAuth = useGoogleAuth((idToken) => {
+    setError(null);
+    setGoogleSubmitting(true);
+    return loginWithGoogle(idToken)
+      .catch((googleError: unknown) => {
+        setError(getApiErrorMessage(googleError, "Accesso con Google non riuscito."));
+      })
+      .finally(() => {
+        setGoogleSubmitting(false);
+      });
+  });
 
   async function onSubmit() {
     setError(null);
@@ -48,11 +61,59 @@ export function AuthRegisterScreen() {
   }
 
   return (
-    <View style={styles.root} testID="screen-auth-register">
-      <PageContainer title="Registrati" testID="screen-auth-register-form">
-        <View style={styles.brand}>
-          <BrandLogo variant="full" size="lg" />
-        </View>
+    <AuthShell
+      testID="screen-auth-register"
+      badge={
+        successMessage ? undefined : (
+          <View style={styles.stepBadge}>
+            <Text style={styles.stepBadgeLabel}>Passo 1 di 3</Text>
+          </View>
+        )
+      }
+      footer={
+        successMessage ? undefined : (
+          <>
+            {googleAuth.available ? (
+              <>
+                <View style={styles.orRow}>
+                  <View style={styles.orLine} />
+                  <Text style={styles.muted}>oppure</Text>
+                  <View style={styles.orLine} />
+                </View>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Continua con Google"
+                  disabled={googleSubmitting}
+                  onPress={() => {
+                    void googleAuth.promptAsync().catch((googleError: unknown) => {
+                      setError(getApiErrorMessage(googleError, "Accesso con Google non riuscito."));
+                    });
+                  }}
+                  style={[styles.googleButton, googleSubmitting && styles.disabled]}
+                  testID="auth-register-google"
+                >
+                  <View style={styles.googleMark}>
+                    <Text style={styles.googleMarkLabel}>G</Text>
+                  </View>
+                  <Text style={styles.secondaryLabel}>{googleSubmitting ? "Accesso…" : "Continua con Google"}</Text>
+                </Pressable>
+              </>
+            ) : null}
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => navigation.navigate("Auth")}
+              style={styles.centerLink}
+              testID="auth-register-login-link"
+            >
+              <Text style={styles.muted}>
+                Hai già un account? <Text style={styles.linkStrong}>Accedi</Text>
+              </Text>
+            </Pressable>
+          </>
+        )
+      }
+    >
+      <View testID="screen-auth-register-form">
         {successMessage ? (
           <>
             <UiStatePanel
@@ -64,24 +125,26 @@ export function AuthRegisterScreen() {
             <Pressable
               accessibilityRole="button"
               onPress={() => navigation.navigate("AuthVerifyEmail")}
-              style={styles.linkRow}
+              style={styles.centerLink}
               testID="auth-register-verify-link"
             >
-              <Text style={styles.link}>Ho un codice di verifica</Text>
+              <Text style={styles.linkUnderline}>Ho un codice di verifica</Text>
             </Pressable>
             <Pressable
               accessibilityRole="button"
               onPress={() => navigation.navigate("Auth")}
-              style={styles.linkRow}
+              style={styles.centerLink}
               testID="auth-register-back-login"
             >
-              <Text style={styles.link}>Torna al login</Text>
+              <Text style={styles.linkUnderline}>Torna al login</Text>
             </Pressable>
           </>
         ) : (
           <>
-            <Text style={styles.heroTitleLeft}>Crea la tua squadra</Text>
-            <Text style={styles.lead}>Gratis, in meno di un minuto. Passo 1 di 3.</Text>
+            <Text style={styles.displayTitleLeft}>
+              Crea la tua{"\n"}
+              <Text style={styles.displayAccent}>squadra</Text>
+            </Text>
             {error ? (
               <UiStatePanel
                 state="error"
@@ -107,7 +170,7 @@ export function AuthRegisterScreen() {
               autoCapitalize="none"
               autoCorrect={false}
               keyboardType="email-address"
-              placeholder="tu@email.it"
+              placeholder="nome@esempio.it"
               placeholderTextColor={styles.muted.color}
               style={styles.input}
               accessibilityLabel="Email"
@@ -118,7 +181,7 @@ export function AuthRegisterScreen() {
               value={password}
               onChangeText={setPassword}
               secureTextEntry
-              placeholder="Password"
+              placeholder="Almeno 8 caratteri"
               placeholderTextColor={styles.muted.color}
               style={styles.input}
               accessibilityLabel="Password"
@@ -129,7 +192,7 @@ export function AuthRegisterScreen() {
               value={confirmPassword}
               onChangeText={setConfirmPassword}
               secureTextEntry
-              placeholder="Ripeti password"
+              placeholder="Ripeti la password"
               placeholderTextColor={styles.muted.color}
               style={styles.input}
               accessibilityLabel="Conferma password"
@@ -142,23 +205,11 @@ export function AuthRegisterScreen() {
               style={[styles.primaryButton, submitting && styles.disabled]}
               testID="auth-register-submit"
             >
-              <Text style={styles.primaryLabel}>
-                {submitting ? "Registrazione…" : "Crea account"}
-              </Text>
-            </Pressable>
-            <Pressable
-              accessibilityRole="button"
-              onPress={() => navigation.navigate("Auth")}
-              style={styles.linkRow}
-              testID="auth-register-login-link"
-            >
-              <Text style={styles.muted}>
-                Hai già un account? <Text style={styles.link}>Accedi</Text>
-              </Text>
+              <Text style={styles.primaryLabel}>{submitting ? "Registrazione…" : "Crea account"}</Text>
             </Pressable>
           </>
         )}
-      </PageContainer>
-    </View>
+      </View>
+    </AuthShell>
   );
 }
