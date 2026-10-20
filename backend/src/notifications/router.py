@@ -13,6 +13,7 @@ from auth.exceptions import AuthError
 from auth.models.user import User
 from authorization.dependencies import require_permissions
 from database.enums import NotificationCategory, Permission
+from notifications.samples import SAMPLES
 from notifications.schemas import (
     MarkAllReadResponse,
     NotificationItemResponse,
@@ -22,7 +23,6 @@ from notifications.schemas import (
     RegisterPushDeviceRequest,
     UpdateNotificationPreferenceRequest,
 )
-from notifications.samples import SAMPLES
 from notifications.service import DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE, NotificationService
 
 router = APIRouter(prefix="/notifications", tags=["notifications"])

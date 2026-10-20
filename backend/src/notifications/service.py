@@ -70,6 +70,8 @@ class NotificationService:
         template_version: int,
         params: dict[str, object],
         dedup_key: str,
+        push: bool = True,
+        email: bool = True,
     ) -> tuple[Notification | None, bool]:
         """Create an in-app notification, or return the existing one for ``dedup_key``.
 
@@ -128,8 +130,10 @@ class NotificationService:
             "notification_created",
             extra={"category": category.value, "template_key": template_key},
         )
-        self._dispatch_email(notification)
-        self._dispatch_push(notification)
+        if email:
+            self._dispatch_email(notification)
+        if push:
+            self._dispatch_push(notification)
         return notification, True
 
     def _dispatch_email(self, notification: Notification) -> None:

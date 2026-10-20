@@ -184,3 +184,9 @@ export const BROADCAST_CATEGORY_OPTIONS: ReadonlyArray<{
   { value: "mercato", label: "Mercato" },
   { value: "risultati", label: "Risultati" },
 ];
+
+/** Risposta di `POST /admin/notifications/test-samples` (EP09-06). */
+export interface SendTestSamplesResult {
+  createdCount: number;
+  recipientCount: number;
+}

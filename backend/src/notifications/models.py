@@ -6,7 +6,8 @@ from datetime import datetime
 from typing import TYPE_CHECKING
 from uuid import UUID
 
-from sqlalchemy import Enum, ForeignKey, Index, Integer, String, UniqueConstraint, text
+from sqlalchemy import Enum, ForeignKey, Index, Integer, String, Text, UniqueConstraint, text
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from database.base import Base, TimestampMixin, UUIDPrimaryKeyMixin
@@ -118,3 +119,35 @@ class PushDevice(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     revoked_at: Mapped[datetime | None] = mapped_column(UTCDateTime(), nullable=True)
 
     user: Mapped[User] = relationship()
+
+
+class NotificationBroadcast(Base, UUIDPrimaryKeyMixin, TimestampMixin):
+    """Avviso inviato (o programmato) da un operatore a un pubblico scelto (EP09-06).
+
+    Letti e consegnati non sono colonne: si ricavano dalle notifiche create,
+    la cui ``dedup_key`` inizia per ``broadcast:<id>:``.
+    """
+
+    __tablename__ = "notification_broadcasts"
+    __table_args__ = (
+        Index("ix_notification_broadcasts_status_scheduled_at", "status", "scheduled_at"),
+    )
+
+    kind: Mapped[str] = mapped_column(String(16), nullable=False)
+    title: Mapped[str] = mapped_column(String(120), nullable=False)
+    body: Mapped[str] = mapped_column(Text, nullable=False)
+    category: Mapped[str] = mapped_column(String(16), nullable=False)
+    deep_link: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    channels: Mapped[dict[str, bool]] = mapped_column(JSONB, nullable=False)
+    audience: Mapped[dict[str, object]] = mapped_column(JSONB, nullable=False)
+    audience_label: Mapped[str] = mapped_column(String(200), nullable=False)
+    #: ``scheduled`` -> ``sending`` -> ``sent``; oppure ``cancelled``.
+    status: Mapped[str] = mapped_column(String(16), nullable=False)
+    scheduled_at: Mapped[datetime | None] = mapped_column(UTCDateTime(), nullable=True)
+    sent_at: Mapped[datetime | None] = mapped_column(UTCDateTime(), nullable=True)
+    recipient_count: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("0"))
+    push_count: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("0"))
+    created_by_user_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+    )
