@@ -59,6 +59,7 @@ def test_goal_notifies_owner_during_live_match() -> None:
     call = _FakeService.calls[0]
     assert call["template_key"] == "risultati.gol"
     assert call["params"] == {"minute": 63, "player": "Mario Rossi"}
+    assert call["template_version"] == 2
 
 
 def test_red_card_notifies_owner() -> None:
@@ -67,12 +68,35 @@ def test_red_card_notifies_owner() -> None:
     assert _FakeService.calls[0]["template_key"] == "risultati.espulsione"
 
 
-def test_yellow_card_and_own_goal_are_ignored() -> None:
+def test_yellow_card_notifies_owner() -> None:
     yellow = _event(event_type="Card", event_detail="Yellow Card")
+    assert match_events.notify_match_event(_session(), event=yellow, fixture_status="1H") == 1
+    assert _FakeService.calls[0]["template_key"] == "risultati.ammonizione"
+
+
+def test_second_yellow_counts_as_red() -> None:
+    event = _event(event_type="Card", event_detail="Second Yellow card")
+    assert match_events.notify_match_event(_session(), event=event, fixture_status="2H") == 1
+    assert _FakeService.calls[0]["template_key"] == "risultati.espulsione"
+
+
+def test_own_goal_is_ignored() -> None:
     own = _event(scoring_kind="own_goal")
-    assert match_events.notify_match_event(_session(), event=yellow, fixture_status="1H") == 0
     assert match_events.notify_match_event(_session(), event=own, fixture_status="1H") == 0
     assert _FakeService.calls == []
+
+
+def test_goal_with_assist_notifies_the_assist_owner_too() -> None:
+    event = _event(scoring_kind="goal", related_athlete_id=uuid4())
+    assert match_events.notify_match_event(_session(), event=event, fixture_status="2H") == 2
+    keys = [call["template_key"] for call in _FakeService.calls]
+    assert keys == ["risultati.gol", "risultati.assist"]
+
+
+def test_substitution_notifies_owners_of_both_players() -> None:
+    event = _event(event_type="subst", related_athlete_id=uuid4())
+    assert match_events.notify_match_event(_session(), event=event, fixture_status="2H") == 2
+    assert {call["template_key"] for call in _FakeService.calls} == {"risultati.sostituzione"}
 
 
 def test_finished_match_does_not_notify_backfill() -> None:
