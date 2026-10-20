@@ -1,14 +1,14 @@
 import { lazyStyles } from "../theme/lazyStyles";
 import { theme } from "@fantappero/ui/theme";
+import { DISPLAY_FONT } from "../theme/fonts";
 import { useNavigation } from "@react-navigation/core";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useEffect, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { AppTextInput as TextInput } from "../components/AppTextInput";
 import { useGoogleAuth } from "../auth/useGoogleAuth";
-import { BrandLogo } from "../components/BrandLogo";
+import { AuthShell } from "../auth/AuthShell";
 import { UiStatePanel } from "../components/UiStatePanel";
-import { PageContainer } from "../layout/PageContainer";
 import type { RootStackParamList } from "../navigation/types";
 import { getApiErrorMessage, useAuthSession } from "../session/DemoSessionContext";
 import { clearLastUser, initialsOf, readLastUser, writeLastUser, type LastUser } from "../session/lastUser";
@@ -76,11 +76,44 @@ export function AuthScreen() {
   }
 
   return (
-    <View style={styles.root} testID="screen-auth">
-      <PageContainer title="Accedi" testID="screen-auth-form">
-        <View style={styles.brand}>
-          <BrandLogo variant="full" size="lg" />
-        </View>
+    <AuthShell
+      testID="screen-auth"
+      footer={
+        <>
+          {googleAuth.available ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Continua con Google"
+              disabled={googleSubmitting}
+              onPress={() => {
+                void googleAuth.promptAsync().catch((googleError: unknown) => {
+                  setError(getApiErrorMessage(googleError, "Accesso con Google non riuscito."));
+                });
+              }}
+              style={[styles.googleButton, googleSubmitting && styles.disabled]}
+              testID="auth-google-submit"
+            >
+              <View style={styles.googleMark}>
+                <Text style={styles.googleMarkLabel}>G</Text>
+              </View>
+              <Text style={styles.secondaryLabel}>{googleSubmitting ? "Accesso…" : "Continua con Google"}</Text>
+            </Pressable>
+          ) : null}
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Crea un account"
+            onPress={() => navigation.navigate("AuthRegister")}
+            style={styles.centerLink}
+            testID="auth-register-link"
+          >
+            <Text style={styles.muted}>
+              Nuovo qui? <Text style={styles.linkStrong}>Crea un account</Text>
+            </Text>
+          </Pressable>
+        </>
+      }
+    >
+      <View testID="screen-auth-form">
         {remembered ? (
           <View style={styles.hero} testID="auth-welcome">
             <View style={styles.avatarRing}>
@@ -88,18 +121,16 @@ export function AuthScreen() {
                 <Text style={styles.avatarText}>{initialsOf(remembered.displayName)}</Text>
               </View>
             </View>
-            <Text style={styles.heroTitle}>Bentornato, {firstName}</Text>
+            <Text style={styles.displayTitle}>Bentornato, {firstName}</Text>
           </View>
         ) : (
-          <Text style={styles.lead}>Accedi con il tuo account FantApperò.</Text>
+          <Text style={styles.displayTitleLeft}>
+            Il fantacalcio{"\n"}che si <Text style={styles.displayAccent}>gioca{"\n"}</Text>
+            <Text style={styles.displayAccent2}>davvero</Text>
+          </Text>
         )}
         {error ? (
-          <UiStatePanel
-            state="error"
-            title="Accesso non riuscito"
-            message={error}
-            testID="auth-error"
-          />
+          <UiStatePanel state="error" title="Accesso non riuscito" message={error} testID="auth-error" />
         ) : null}
         {remembered ? (
           <View style={styles.accountRow} testID="auth-account">
@@ -120,7 +151,7 @@ export function AuthScreen() {
               autoCapitalize="none"
               autoCorrect={false}
               keyboardType="email-address"
-              placeholder="tu@email.it"
+              placeholder="nome@esempio.it"
               placeholderTextColor={colors.foregroundMuted}
               style={styles.input}
               accessibilityLabel="Email"
@@ -133,7 +164,7 @@ export function AuthScreen() {
           value={password}
           onChangeText={setPassword}
           secureTextEntry
-          placeholder="Password"
+          placeholder="La tua password"
           placeholderTextColor={colors.foregroundMuted}
           style={styles.input}
           accessibilityLabel="Password"
@@ -143,10 +174,10 @@ export function AuthScreen() {
           accessibilityRole="button"
           accessibilityLabel="Password dimenticata"
           onPress={() => navigation.navigate("AuthForgotPassword")}
-          style={styles.linkRow}
+          style={styles.rightLink}
           testID="auth-forgot-link"
         >
-          <Text style={styles.link}>Password dimenticata?</Text>
+          <Text style={styles.linkUnderline}>Password dimenticata?</Text>
         </Pressable>
         <Pressable
           accessibilityRole="button"
@@ -158,42 +189,13 @@ export function AuthScreen() {
         >
           <Text style={styles.primaryLabel}>{submitting ? "Accesso…" : remembered ? `Accedi come ${firstName}` : "Accedi"}</Text>
         </Pressable>
-        {googleAuth.available ? (
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Continua con Google"
-            disabled={googleSubmitting}
-            onPress={() => {
-              void googleAuth.promptAsync().catch((googleError: unknown) => {
-                setError(getApiErrorMessage(googleError, "Accesso con Google non riuscito."));
-              });
-            }}
-            style={[styles.secondaryButton, googleSubmitting && styles.disabled]}
-            testID="auth-google-submit"
-          >
-            <Text style={styles.secondaryLabel}>
-              {googleSubmitting ? "Accesso…" : "Continua con Google"}
-            </Text>
-          </Pressable>
-        ) : null}
         {remembered ? (
-          <Pressable accessibilityRole="button" accessibilityLabel={`Non sei ${firstName}? Cambia account`} onPress={switchAccount} style={styles.linkRow} testID="auth-not-you">
-            <Text style={styles.link}>Non sei {firstName}? Cambia account</Text>
+          <Pressable accessibilityRole="button" accessibilityLabel={`Non sei ${firstName}? Cambia account`} onPress={switchAccount} style={styles.centerLink} testID="auth-not-you">
+            <Text style={styles.linkUnderline}>Non sei {firstName}? Cambia account</Text>
           </Pressable>
         ) : null}
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Registrati"
-          onPress={() => navigation.navigate("AuthRegister")}
-          style={styles.linkRow}
-          testID="auth-register-link"
-        >
-          <Text style={styles.muted}>
-            Non hai un account? <Text style={styles.link}>Registrati</Text>
-          </Text>
-        </Pressable>
-      </PageContainer>
-    </View>
+      </View>
+    </AuthShell>
   );
 }
 
@@ -218,19 +220,19 @@ export const authFormStyles = lazyStyles(() => StyleSheet.create({
   },
   input: {
     marginTop: spacing.xs,
-    minHeight: 44,
+    minHeight: 54,
     borderWidth: 1,
     borderColor: colors.border,
-    borderRadius: radius.md,
-    paddingHorizontal: spacing.md,
+    borderRadius: 18,
+    paddingHorizontal: spacing.md + 2,
     color: colors.foreground,
-    backgroundColor: colors.backgroundElevated,
+    backgroundColor: colors.background,
   },
   primaryButton: {
-    marginTop: spacing.lg,
-    minHeight: 44,
+    marginTop: spacing.md,
+    minHeight: 58,
     paddingVertical: spacing.md,
-    borderRadius: radius.pill,
+    borderRadius: 20,
     backgroundColor: colors.brand,
     alignItems: "center",
     justifyContent: "center",
@@ -278,9 +280,9 @@ export const authFormStyles = lazyStyles(() => StyleSheet.create({
     marginBottom: spacing.md,
   },
   avatarRing: {
-    width: 92,
-    height: 92,
-    borderRadius: 46,
+    width: 100,
+    height: 100,
+    borderRadius: 50,
     padding: 4,
     backgroundColor: colors.accentSecondary,
   },
@@ -305,6 +307,52 @@ export const authFormStyles = lazyStyles(() => StyleSheet.create({
     textTransform: "uppercase",
     textAlign: "center",
   },
+  displayTitle: {
+    color: colors.foreground,
+    fontSize: 40,
+    lineHeight: 42,
+    fontFamily: DISPLAY_FONT,
+    textTransform: "uppercase",
+    textAlign: "center",
+  },
+  displayTitleLeft: {
+    color: colors.foreground,
+    fontSize: 46,
+    lineHeight: 48,
+    fontFamily: DISPLAY_FONT,
+    textTransform: "uppercase",
+    marginBottom: spacing.md,
+  },
+  displayAccent: { color: "#8CA8FF" },
+  displayAccent2: { color: "#C58CFF" },
+  googleButton: {
+    minHeight: 54,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: spacing.sm,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.backgroundElevated,
+  },
+  googleMark: { width: 24, height: 24, borderRadius: 12, backgroundColor: "#fff", alignItems: "center", justifyContent: "center" },
+  googleMarkLabel: { color: "#4285F4", fontWeight: "800", fontSize: 14 },
+  centerLink: { minHeight: 40, alignItems: "center", justifyContent: "center" },
+  rightLink: { alignSelf: "flex-end", minHeight: 40, justifyContent: "center" },
+  linkUnderline: { color: colors.accent, fontSize: typography.fontSize.sm, textDecorationLine: "underline" },
+  linkStrong: { color: colors.accent, fontWeight: typography.fontWeight.semibold, textDecorationLine: "underline" },
+  stepBadge: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: 6,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.backgroundElevated,
+  },
+  stepBadgeLabel: { color: colors.foregroundMuted, fontSize: 12, fontWeight: "600" },
+  orRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
+  orLine: { flex: 1, height: 1, backgroundColor: colors.border },
   heroTitleLeft: {
     color: colors.foreground,
     fontSize: typography.fontSize.xl,
