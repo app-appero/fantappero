@@ -7,6 +7,7 @@ import {
 } from "../api/notifications";
 import { getApiErrorMessage } from "../auth/AuthContext";
 import { loadStoredSession } from "../auth/sessionStorage";
+import { useRealtimeEvent } from "../realtime/useRealtimeEvent";
 
 const PAGE_SIZE = 20;
 /** Intervallo di polling per il popup toast su nuove notifiche (EP13-P07). */
@@ -123,6 +124,12 @@ export function useNotificationCenter(onNewNotifications?: (items: NotificationI
       readListeners.delete(refresh);
     };
   }, [load]);
+
+  useRealtimeEvent((event) => {
+    if (event.type === "notification.created") {
+      void load("refresh");
+    }
+  });
 
   useEffect(() => {
     const timer = window.setInterval(() => void load("refresh"), POLL_INTERVAL_MS);

@@ -28,6 +28,7 @@ from notifications.schemas import (
 from notifications.templates import render_notification
 from observability.logging import get_logger
 from observability.metrics import get_metrics
+from realtime.publisher import publish_after_commit, user_channel
 
 DEFAULT_PAGE_SIZE = 20
 MAX_PAGE_SIZE = 100
@@ -129,6 +130,15 @@ class NotificationService:
         logger.info(
             "notification_created",
             extra={"category": category.value, "template_key": template_key},
+        )
+        publish_after_commit(
+            self._session,
+            user_channel(user_id),
+            {
+                "type": "notification.created",
+                "notificationId": str(notification.id),
+                "category": category.value,
+            },
         )
         if email:
             self._dispatch_email(notification)

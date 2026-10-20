@@ -471,6 +471,13 @@ export {
   BROADCAST_KIND_OPTIONS,
 } from "./notifications.js";
 
+export { REALTIME_STREAM_PATH } from "./realtime.js";
+export type {
+  MarketUpdatedEvent,
+  NotificationCreatedEvent,
+  RealtimeEvent,
+} from "./realtime.js";
+
 export { computeCountdown, formatCountdown } from "./countdown.js";
 export type { CountdownParts } from "./countdown.js";
 

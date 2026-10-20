@@ -4,6 +4,7 @@ import type {
   TradeProposal,
 } from "@fantappero/contracts";
 import { useCallback, useEffect, useState } from "react";
+import { useRealtimeEvent } from "../realtime/useRealtimeEvent";
 import {
   acceptTradeProposal,
   approveTradeProposal,
@@ -34,7 +35,7 @@ export function useTradeFlow({ leagueId, accessToken, active }: UseTradeFlowOpti
   const [actionError, setActionError] = useState<string | null>(null);
   const [actionPendingId, setActionPendingId] = useState<string | null>(null);
 
-  const loadProposals = useCallback(async () => {
+  const loadProposals = useCallback(async (silent = false) => {
     if (!active || !leagueId) {
       setLoading(false);
       setProposals([]);
@@ -46,18 +47,30 @@ export function useTradeFlow({ leagueId, accessToken, active }: UseTradeFlowOpti
       setLoadError("Sessione non disponibile. Accedi di nuovo.");
       return;
     }
-    setLoading(true);
-    setLoadError(null);
+    if (!silent) {
+      setLoading(true);
+      setLoadError(null);
+    }
     try {
       const result = await fetchTradeProposals(accessToken, leagueId);
       setProposals(result.proposals);
+      setLoadError(null);
     } catch (error) {
+      if (silent) {
+        return;
+      }
       setProposals([]);
       setLoadError(getApiErrorMessage(error, "Impossibile caricare le proposte di scambio."));
     } finally {
       setLoading(false);
     }
   }, [accessToken, active, leagueId]);
+
+  useRealtimeEvent((event) => {
+    if (event.type === "market.updated" && event.kind === "trades" && event.leagueId === leagueId) {
+      void loadProposals(true);
+    }
+  }, active && !!leagueId);
 
   useEffect(() => {
     void loadProposals();
