@@ -4,6 +4,7 @@ import { DISPLAY_FONT } from "../theme/fonts";
 import { useNavigation } from "@react-navigation/core";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useEffect, useState } from "react";
+import Ionicons from "@expo/vector-icons/Ionicons";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { AppTextInput as TextInput } from "../components/AppTextInput";
 import { useGoogleAuth } from "../auth/useGoogleAuth";
@@ -118,7 +119,7 @@ export function AuthScreen() {
             </Text>
           ) : null}
           <View style={styles.appleDisabled} accessibilityRole="button" accessibilityState={{ disabled: true }} accessibilityLabel="Continua con Apple, disponibile presto" testID="auth-apple-disabled">
-            <Text style={styles.appleGlyph}>{"\uF8FF"}</Text>
+            <Ionicons name="logo-apple" size={22} color="#FFFFFF" />
             <Text style={styles.appleLabel}>Continua con Apple</Text>
             <View style={styles.soonChip}>
               <Text style={styles.soonLabel}>PRESTO</Text>

@@ -44,6 +44,7 @@ import {
   startLiveAuctionSession,
 } from "../api/marketLive";
 import { AthleteName } from "../athletes/AthleteCard";
+import { AthleteChooser } from "../components/AthleteChooser";
 import { getApiErrorMessage, useAuth } from "../auth/AuthContext";
 import { useMarketGate } from "../market/MarketGateContext";
 import { loadStoredSession } from "../auth/sessionStorage";
@@ -559,25 +560,14 @@ export function AuctionLivePage() {
                     {NOMINATION_MODE_HINT[nominationMode]}
                   </p>
                   {nominationMode === "sequential" ? (
-                  <fieldset data-testid="auction-live-queue-picker">
-                    <legend>Lista di chiamata (in ordine di selezione)</legend>
-                    {freeAgents.map((entry) => {
-                      const owned = ownedAthleteIds.has(entry.athleteId);
-                      return (
-                        <label key={entry.athleteId} style={{ display: "block", opacity: owned ? 0.5 : 1 }}>
-                          <input
-                            type="checkbox"
-                            disabled={owned}
-                            checked={queueAthleteIds.includes(entry.athleteId)}
-                            onChange={() => toggleQueueAthlete(entry.athleteId)}
-                          />{" "}
-                          <AthleteName athleteId={entry.athleteId}>{entry.canonicalName}</AthleteName>
-                          {owned ? " (assegnato)" : ""}
-                        </label>
-                      );
-                    })}
-                  </fieldset>
-                ) : null}
+                    <AthleteChooser
+                      testId="auction-live-queue-picker"
+                      entries={freeAgents}
+                      ownedAthleteIds={ownedAthleteIds}
+                      selected={queueAthleteIds}
+                      onToggle={toggleQueueAthlete}
+                    />
+                  ) : null}
                   {AUTO_QUEUE_MODES.includes(nominationMode) && nominationMode !== "sequential" ? (
                   <UiStatePanel
                     state="empty"
@@ -710,20 +700,17 @@ export function AuctionLivePage() {
               {canNominate && currentSession.status === "open" && !currentLot ? (
                 <div className="fa-auction-live-nominate" data-testid="auction-live-nominate">
                   {needsExplicitAthlete ? (
-                    <Select
-                      label="Calciatore da chiamare"
-                      name="manual-athlete"
-                      value={manualAthleteId}
-                      onChange={(e) => setManualAthleteId(e.target.value)}
-                      placeholder="Scegli un giocatore…"
-                      options={freeAgents.map((entry) => ({
-                        value: entry.athleteId,
-                        label: ownedAthleteIds.has(entry.athleteId)
-                          ? `${entry.canonicalName} (assegnato)`
-                          : entry.canonicalName,
-                        disabled: ownedAthleteIds.has(entry.athleteId),
-                      }))}
-                    />
+                    <div className="fa-auction-live-nominate__chooser">
+                      <p className="fa-athlete-chooser__count">Calciatore da chiamare</p>
+                      <AthleteChooser
+                        testId="auction-live-manual-athlete"
+                        entries={freeAgents}
+                        ownedAthleteIds={ownedAthleteIds}
+                        selected={manualAthleteId ? [manualAthleteId] : []}
+                        onToggle={(id) => setManualAthleteId(id === manualAthleteId ? "" : id)}
+                        single
+                      />
+                    </div>
                   ) : null}
                   <Button
                     variant="primary"

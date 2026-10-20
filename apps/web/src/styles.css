@@ -4370,3 +4370,145 @@ h2 {
   flex: 1;
   width: auto;
 }
+
+/* ── Scelta calciatori (asta): solo disponibili, per ruolo, a pagine ──── */
+
+.fa-athlete-chooser {
+  display: grid;
+  gap: var(--fa-space-sm);
+}
+
+.fa-athlete-chooser__search {
+  min-height: 2.75rem;
+  padding: 0 1rem;
+  border-radius: 999px;
+  border: 1px solid var(--fa-color-border);
+  background: var(--fa-color-background);
+  color: var(--fa-color-foreground);
+  font: inherit;
+}
+
+.fa-athlete-chooser__pills {
+  display: flex;
+  gap: var(--fa-space-xs);
+  overflow-x: auto;
+  padding-bottom: 2px;
+}
+
+.fa-athlete-chooser__pill {
+  flex: none;
+  padding: 0.5rem 1rem;
+  border-radius: 999px;
+  border: 1px solid var(--fa-color-border);
+  background: transparent;
+  color: var(--fa-color-foreground);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.fa-athlete-chooser__pill--active {
+  background: var(--fa-color-accent);
+  border-color: var(--fa-color-accent);
+  color: var(--fa-color-on-brand);
+}
+
+.fa-athlete-chooser__count {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--fa-color-foreground-muted);
+}
+
+.fa-athlete-chooser__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+
+.fa-athlete-chooser__row {
+  display: flex;
+  align-items: center;
+  gap: var(--fa-space-sm);
+  width: 100%;
+  padding: 0.55rem 0.8rem;
+  border-radius: var(--fa-radius-lg);
+  border: 1px solid var(--fa-color-border);
+  background: var(--fa-color-background-elevated);
+  color: var(--fa-color-foreground);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.fa-athlete-chooser__row--active {
+  border-color: var(--fa-color-accent);
+}
+
+.fa-athlete-chooser__mark {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 7px;
+  border: 1.5px solid var(--fa-color-border);
+  font-size: 0.8rem;
+  font-weight: 800;
+}
+
+.fa-athlete-chooser__row--active .fa-athlete-chooser__mark {
+  background: var(--fa-color-accent);
+  border-color: var(--fa-color-accent);
+  color: var(--fa-color-on-brand);
+}
+
+.fa-athlete-chooser__dot {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 1.9rem;
+  height: 1.9rem;
+  border-radius: 50%;
+  color: #11162b;
+  font-weight: 800;
+  font-style: italic;
+}
+
+.fa-athlete-chooser__dot--P { background: #ffd23f; }
+.fa-athlete-chooser__dot--D { background: #38bdf8; }
+.fa-athlete-chooser__dot--C { background: #b58cff; }
+.fa-athlete-chooser__dot--A { background: #ff6b8a; }
+
+.fa-athlete-chooser__name {
+  display: grid;
+  min-width: 0;
+}
+
+.fa-athlete-chooser__name small {
+  color: var(--fa-color-foreground-muted);
+}
+
+.fa-athlete-chooser__pager {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--fa-space-sm);
+}
+
+.fa-athlete-chooser__pager button {
+  padding: 0.5rem 1.1rem;
+  border-radius: 999px;
+  border: 1px solid var(--fa-color-border);
+  background: transparent;
+  color: var(--fa-color-foreground);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.fa-athlete-chooser__pager button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
