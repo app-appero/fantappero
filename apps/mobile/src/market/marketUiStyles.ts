@@ -498,4 +498,6 @@ export const marketUiStyles = lazyStyles(() => StyleSheet.create({
     backgroundColor: colors.brand,
   },
   swapBadgeLabel: { color: colors.onBrand, fontSize: 16, fontWeight: "700" },
+  tradeActions: { flexDirection: "row", gap: spacing.xs },
+  tradeAction: { flex: 1, paddingHorizontal: spacing.sm },
 }));

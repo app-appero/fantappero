@@ -34,6 +34,7 @@ import {
   resolveLiveAuctionSwap,
   startLiveAuctionSession,
 } from "../api/marketLive";
+import { AthleteChooser } from "../components/AthleteChooser";
 import { OptionPicker } from "../components/OptionPicker";
 import { StatusBadge } from "../components/StatusBadge";
 import { UiStatePanel } from "../components/UiStatePanel";
@@ -484,14 +485,14 @@ export function AuctionLiveScreen() {
           {canNominate && currentSession.status === "open" && !currentLot ? (
             <View style={styles.nominateRow} testID="auction-live-nominate">
               {needsExplicitAthlete ? (
-                <View style={styles.nominateField}>
-                  <OptionPicker
-                    label="Calciatore da chiamare"
-                    options={playerOptions}
-                    value={manualAthleteId}
-                    onChange={setManualAthleteId}
-                    placeholder="Scegli un giocatore…"
-                    searchable
+                <View style={{ flexBasis: "100%", gap: 6 }}>
+                  <Text style={styles.fieldLabel}>Calciatore da chiamare</Text>
+                  <AthleteChooser
+                    entries={entries}
+                    ownedAthleteIds={ownedAthleteIds}
+                    selected={manualAthleteId ? [manualAthleteId] : []}
+                    onToggle={(id) => setManualAthleteId(id === manualAthleteId ? "" : id)}
+                    single
                     testID="auction-live-manual-athlete"
                   />
                 </View>
