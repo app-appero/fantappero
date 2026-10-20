@@ -1,7 +1,7 @@
 import type { LeagueListoneEntry, MarketLiveNominationMode } from "@fantappero/contracts";
 import { DateTimeField } from "../../components/DateTimeField";
 import { Pressable, Text, View } from "react-native";
-import { AthleteName } from "../../athletes/AthleteCard";
+import { AthleteChooser } from "../../components/AthleteChooser";
 import { AppTextInput as TextInput } from "../../components/AppTextInput";
 import { OptionPicker, type OptionPickerOption } from "../../components/OptionPicker";
 import { marketUiStyles as styles } from "../../market/marketUiStyles";
@@ -166,29 +166,13 @@ export function LiveSessionConfigForm({
 
       {nominationMode === "sequential" ? (
         <Section title="Lista di chiamata" subtitle={`${queueAthleteIds.length} selezionati · in ordine di selezione`}>
-          <View testID="auction-live-queue-picker" style={{ gap: 6 }}>
-            {entries.map((entry) => {
-              const owned = ownedAthleteIds.has(entry.athleteId);
-              const position = queueAthleteIds.indexOf(entry.athleteId) + 1;
-              return (
-                <Pressable
-                  key={entry.athleteId}
-                  disabled={owned}
-                  onPress={() => onToggleQueueAthlete(entry.athleteId)}
-                  style={[styles.pickRow, position > 0 && styles.pickRowActive, owned && styles.disabled]}
-                  accessibilityLabel={owned ? `${entry.canonicalName} già assegnato` : `Chiama ${entry.canonicalName}`}
-                >
-                  <View style={[styles.checkBox, position > 0 && styles.checkBoxActive]}>
-                    {position > 0 ? <Text style={styles.pillLabelActive}>{position}</Text> : null}
-                  </View>
-                  <AthleteName athleteId={entry.athleteId} style={styles.optionLabel}>
-                    {entry.canonicalName}
-                  </AthleteName>
-                  {owned ? <Text style={styles.meta}>Assegnato</Text> : null}
-                </Pressable>
-              );
-            })}
-          </View>
+          <AthleteChooser
+            entries={entries}
+            ownedAthleteIds={ownedAthleteIds}
+            selected={queueAthleteIds}
+            onToggle={onToggleQueueAthlete}
+            testID="auction-live-queue-picker"
+          />
         </Section>
       ) : null}
 

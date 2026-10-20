@@ -4356,3 +4356,17 @@ h2 {
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
+
+/* Separatore «oppure con email»: due linee ai lati, senza passare sotto il testo. */
+.fa-auth-social .fa-auth-layout__divider {
+  display: flex;
+  align-items: center;
+  gap: var(--fa-space-md);
+}
+
+.fa-auth-social .fa-auth-layout__divider::before,
+.fa-auth-social .fa-auth-layout__divider::after {
+  position: static;
+  flex: 1;
+  width: auto;
+}
