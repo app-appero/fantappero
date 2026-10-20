@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AppState } from "react-native";
 import { fetchNotifications } from "../api/notifications";
+import { useRealtimeEvent } from "../realtime/useRealtimeEvent";
 
 const POLL_MS = 30_000;
 
@@ -23,6 +24,12 @@ export function useUnreadNotifications(accessToken: string | null | undefined): 
       .then((result) => setUnreadCount(result.unreadCount))
       .catch(() => undefined);
   }, []);
+
+  useRealtimeEvent((event) => {
+    if (event.type === "notification.created") {
+      refresh();
+    }
+  });
 
   useEffect(() => {
     refresh();

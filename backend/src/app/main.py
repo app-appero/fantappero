@@ -42,6 +42,8 @@ from observability.health import as_readiness, liveness
 from observability.logging import configure_logging
 from observability.metrics import get_metrics
 from observability.middleware import install_correlation_middleware
+from realtime.middleware import RealtimeMarketMiddleware
+from realtime.router import router as realtime_router
 from sports_data.quality.retry import QualityRetryError
 from sports_data.quality.router import quality_error_handler
 from sports_data.quality.router import router as quality_router
@@ -77,6 +79,7 @@ install_body_size_guard(app)
 # requests in the first place) instead of restricting to a per-environment
 # origin allowlist that would need new configuration to keep in sync with
 # apps/web + apps/mobile across dev/staging/prod.
+app.add_middleware(RealtimeMarketMiddleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -101,6 +104,7 @@ app.include_router(fantasy_ratings_router)
 app.include_router(quality_router)
 app.include_router(notifications_router)
 app.include_router(admin_notifications_router)
+app.include_router(realtime_router)
 app.include_router(ai_assistant_router)
 app.include_router(ai_assistant_feedback_router)
 app.include_router(billing_router)

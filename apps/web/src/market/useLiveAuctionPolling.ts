@@ -2,6 +2,7 @@ import type { LiveLotState } from "@fantappero/contracts";
 import { useEffect, useRef, useState } from "react";
 import { fetchLiveAuctionState } from "../api/marketLive";
 import { loadStoredSession } from "../auth/sessionStorage";
+import { useRealtimeEvent } from "../realtime/useRealtimeEvent";
 
 const POLL_INTERVAL_MS = 2_500;
 const MAX_INTERVAL_MS = 15_000;
@@ -24,6 +25,13 @@ export function useLiveAuctionPolling(
   onUpdateRef.current = onUpdate;
 
   const shouldPoll = enabled && !!leagueId && !!sessionId;
+  const nudge = useRef<(() => void) | null>(null);
+
+  useRealtimeEvent((event) => {
+    if (event.type === "market.updated" && event.kind === "auction_live" && event.sessionId === sessionId) {
+      nudge.current?.();
+    }
+  }, shouldPoll);
 
   useEffect(() => {
     if (!shouldPoll || !leagueId || !sessionId) {
@@ -69,7 +77,13 @@ export function useLiveAuctionPolling(
     }
 
     timer = setTimeout(() => void tick(), intervalMs);
+    // Evento in tempo reale: ricarica subito invece di aspettare il giro successivo.
+    nudge.current = () => {
+      clearTimeout(timer);
+      void tick();
+    };
     return () => {
+      nudge.current = null;
       cancelled = true;
       clearTimeout(timer);
     };
