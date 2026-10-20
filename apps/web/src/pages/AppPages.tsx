@@ -24,6 +24,7 @@ export { AdminLeaguesPage } from "./AdminLeaguesPage";
 export { AdminListonePage } from "./AdminListonePage";
 export { AdminTurniPage } from "./AdminTurniPage";
 export { AdminJobsPage } from "./AdminJobsPage";
+export { AdminNotificationsPage } from "./AdminNotificationsPage";
 export { AdminUsersPage } from "./AdminUsersPage";
 export { RosterPage } from "./RosterPage";
 export { StandingsPage } from "./StandingsPage";

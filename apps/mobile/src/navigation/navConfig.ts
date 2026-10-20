@@ -97,6 +97,12 @@ export const MOBILE_ADMIN_NAV_ITEMS: readonly NavItemDefinition[] = [
     requiredPermissions: ["global:operate"],
     surface: "admin",
   },
+  {
+    id: "admin-notifications",
+    path: "/admin/notifiche",
+    requiredPermissions: ["global:operate"],
+    surface: "admin",
+  },
 ];
 
 /**
@@ -122,6 +128,7 @@ export const NAV_LABELS: Record<string, string> = {
   "admin-listone": "Listone",
   "admin-turni": "Turni",
   "admin-jobs": "Job automatici",
+  "admin-notifications": "Notifiche",
   auth: "Accedi",
 };
 

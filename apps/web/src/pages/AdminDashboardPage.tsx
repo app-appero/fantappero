@@ -116,6 +116,10 @@ export function AdminDashboardPage() {
               <strong>Job automatici</strong>
               <span>Accendi, spegni, cambia la frequenza</span>
             </Link>
+            <Link to="/admin/notifiche">
+              <strong>Notifiche</strong>
+              <span>Avvisi, novità e prove agli utenti</span>
+            </Link>
           </nav>
         </div>
       ) : null}

@@ -439,7 +439,20 @@ export type {
 } from "./pitch.js";
 
 export type {
+  BroadcastAudience,
+  BroadcastItem,
+  BroadcastKind,
+  BroadcastList,
+  BroadcastStatus,
+  CreateBroadcastRequest,
+  CreateBroadcastResponse,
   ListNotificationsFilters,
+  ListRecipientsFilters,
+  NotificationRecipient,
+  NotificationRecipientList,
+  SendTestSamplesRequest,
+  TestSampleItem,
+  TestSampleList,
   MarkAllNotificationsReadResult,
   NotificationCategory,
   NotificationItem,
@@ -450,6 +463,12 @@ export type {
   PushDeviceResponse,
   RegisterPushDeviceRequest,
   UpdateNotificationPreferenceRequest,
+} from "./notifications.js";
+
+export {
+  BROADCAST_CATEGORY_OPTIONS,
+  BROADCAST_DESTINATIONS,
+  BROADCAST_KIND_OPTIONS,
 } from "./notifications.js";
 
 export { computeCountdown, formatCountdown } from "./countdown.js";
