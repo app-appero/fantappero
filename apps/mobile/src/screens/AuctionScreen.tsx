@@ -178,8 +178,8 @@ export function AuctionScreen() {
         onRetry={() => void loadListone()}
         activeLeagueId={activeLeagueId}
         activeLeague={activeLeague}
-        tab={tab}
-        onTabChange={setTab}
+        ownedAthleteIds={ownedAthleteIds}
+        bidding={marketOpen && flow.currentSession?.status === "open"}
       />
     </>
   );
