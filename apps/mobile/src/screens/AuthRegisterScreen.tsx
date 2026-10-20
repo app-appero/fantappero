@@ -1,6 +1,7 @@
 import { useNavigation } from "@react-navigation/core";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useState } from "react";
+import Ionicons from "@expo/vector-icons/Ionicons";
 import { Pressable, Text, View } from "react-native";
 import { AppTextInput as TextInput } from "../components/AppTextInput";
 import { register as registerApi } from "../api/auth";
@@ -93,7 +94,7 @@ export function AuthRegisterScreen() {
               </Pressable>
             ) : null}
             <View style={styles.appleDisabled} accessibilityRole="button" accessibilityState={{ disabled: true }} accessibilityLabel="Registrati con Apple, disponibile presto" testID="auth-register-apple-disabled">
-              <Text style={styles.appleGlyph}>{"\uF8FF"}</Text>
+              <Ionicons name="logo-apple" size={22} color="#FFFFFF" />
               <Text style={styles.appleLabel}>Registrati con Apple</Text>
               <View style={styles.soonChip}>
                 <Text style={styles.soonLabel}>PRESTO</Text>

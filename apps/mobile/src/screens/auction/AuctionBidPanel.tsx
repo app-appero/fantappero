@@ -1,5 +1,7 @@
 import type { ReactNode } from "react";
 import { Pressable, Text, View } from "react-native";
+import type { LeagueListoneEntry } from "@fantappero/contracts";
+import { AthleteChooser } from "../../components/AthleteChooser";
 import { AppTextInput as TextInput } from "../../components/AppTextInput";
 import { OptionPicker, type OptionPickerOption } from "../../components/OptionPicker";
 import { StatusBadge } from "../../components/StatusBadge";
@@ -17,6 +19,8 @@ export function AuctionBidPanel({
   flow,
   balance,
   playerOptions,
+  chooserEntries,
+  ownedAthleteIds,
   bidAthleteId,
   onBidAthleteIdChange,
   bidAmount,
@@ -32,6 +36,9 @@ export function AuctionBidPanel({
   flow: MarketSessionFlow;
   balance: number | null;
   playerOptions: readonly OptionPickerOption[];
+  /** Se presenti, il giocatore si sceglie dall'elenco dei soli disponibili (per ruolo, a pagine). */
+  chooserEntries?: LeagueListoneEntry[];
+  ownedAthleteIds?: Set<string>;
   bidAthleteId: string;
   onBidAthleteIdChange: (value: string) => void;
   bidAmount: string;
@@ -64,15 +71,29 @@ export function AuctionBidPanel({
       ) : (
         <View style={styles.field} testID={`${testIdPrefix}-bid-panel`}>
           <Text style={styles.meta}>Budget residuo: {balance !== null ? `${balance} crediti` : "—"}</Text>
-          <OptionPicker
-            label="Giocatore"
-            options={playerOptions}
-            value={bidAthleteId}
-            onChange={onBidAthleteIdChange}
-            placeholder="Scegli un giocatore…"
-            searchable
-            testID={`${testIdPrefix}-bid-player`}
-          />
+          {chooserEntries && ownedAthleteIds ? (
+            <View style={{ gap: 6 }}>
+              <Text style={styles.fieldLabel}>Giocatore</Text>
+              <AthleteChooser
+                entries={chooserEntries}
+                ownedAthleteIds={ownedAthleteIds}
+                selected={bidAthleteId ? [bidAthleteId] : []}
+                onToggle={(id) => onBidAthleteIdChange(id === bidAthleteId ? "" : id)}
+                single
+                testID={`${testIdPrefix}-bid-player`}
+              />
+            </View>
+          ) : (
+            <OptionPicker
+              label="Giocatore"
+              options={playerOptions}
+              value={bidAthleteId}
+              onChange={onBidAthleteIdChange}
+              placeholder="Scegli un giocatore…"
+              searchable
+              testID={`${testIdPrefix}-bid-player`}
+            />
+          )}
           {extraField}
           <Text style={styles.fieldLabel}>Offerta (crediti)</Text>
           <TextInput
