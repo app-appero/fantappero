@@ -4311,3 +4311,48 @@ h2 {
   min-height: 2.75rem;
   font-weight: 600;
 }
+
+/* ── Accesso: Google in evidenza, Apple presto, email sotto ───────────── */
+
+.fa-auth-social {
+  display: grid;
+  gap: var(--fa-space-sm);
+  margin-bottom: var(--fa-space-md);
+}
+
+.fa-auth-layout__google--main {
+  display: flex;
+  justify-content: center;
+}
+
+.fa-auth-apple {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--fa-space-sm);
+  min-height: 3rem;
+  border-radius: var(--fa-radius-lg);
+  border: 1px solid var(--fa-color-border);
+  background: var(--fa-color-background-elevated);
+  color: var(--fa-color-foreground);
+  font: inherit;
+  font-weight: 700;
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.fa-auth-apple__glyph {
+  font-size: 1.25rem;
+}
+
+.fa-auth-apple__soon {
+  position: absolute;
+  right: 0.9rem;
+  padding: 0.15rem 0.6rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--fa-color-foreground) 14%, transparent);
+  font-size: 0.7rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}

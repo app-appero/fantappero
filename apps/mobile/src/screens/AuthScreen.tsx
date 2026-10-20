@@ -75,6 +75,7 @@ export function AuthScreen() {
     }
   }
 
+  const googleLabel = remembered ? `Continua come ${firstName} con Google` : "Continua con Google";
   return (
     <AuthShell
       testID="screen-auth"
@@ -83,20 +84,98 @@ export function AuthScreen() {
           {googleAuth.available ? (
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel="Continua con Google"
+              accessibilityLabel={googleLabel}
               disabled={googleSubmitting}
               onPress={() => {
                 void googleAuth.promptAsync().catch((googleError: unknown) => {
                   setError(getApiErrorMessage(googleError, "Accesso con Google non riuscito."));
                 });
               }}
-              style={[styles.googleButton, googleSubmitting && styles.disabled]}
+              style={[styles.googleMain, googleSubmitting && styles.disabled]}
               testID="auth-google-submit"
             >
-              <View style={styles.googleMark}>
+              <View style={styles.googleMarkMain}>
                 <Text style={styles.googleMarkLabel}>G</Text>
               </View>
-              <Text style={styles.secondaryLabel}>{googleSubmitting ? "Accesso…" : "Continua con Google"}</Text>
+              <Text style={styles.googleMainLabel}>{googleSubmitting ? "Accesso…" : googleLabel}</Text>
+            </Pressable>
+          ) : null}
+          <View style={styles.appleDisabled} accessibilityRole="button" accessibilityState={{ disabled: true }} accessibilityLabel="Continua con Apple, disponibile presto" testID="auth-apple-disabled">
+            <Text style={styles.appleGlyph}>{"\uF8FF"}</Text>
+            <Text style={styles.appleLabel}>Continua con Apple</Text>
+            <View style={styles.soonChip}>
+              <Text style={styles.soonLabel}>PRESTO</Text>
+            </View>
+          </View>
+          <View style={styles.orRow}>
+            <View style={styles.orLine} />
+            <Text style={styles.muted}>{remembered ? "oppure con la password" : "oppure con email"}</Text>
+            <View style={styles.orLine} />
+          </View>
+          {remembered ? (
+            <View style={styles.accountRow} testID="auth-account">
+              <View style={styles.accountText}>
+                <Text style={styles.accountCaption}>Account</Text>
+                <Text style={styles.accountEmail} numberOfLines={1}>{remembered.email}</Text>
+              </View>
+              <Pressable accessibilityRole="button" accessibilityLabel="Cambia account" onPress={switchAccount} testID="auth-switch-account">
+                <Text style={styles.link}>Cambia</Text>
+              </Pressable>
+            </View>
+          ) : (
+            <View>
+              <Text style={styles.label}>Email</Text>
+              <TextInput
+                value={email}
+                onChangeText={setEmail}
+                autoCapitalize="none"
+                autoCorrect={false}
+                keyboardType="email-address"
+                placeholder="nome@esempio.it"
+                placeholderTextColor={colors.foregroundMuted}
+                style={styles.input}
+                accessibilityLabel="Email"
+                testID="auth-email"
+              />
+            </View>
+          )}
+          <View>
+            <Text style={styles.label}>Password</Text>
+            <TextInput
+              value={password}
+              onChangeText={setPassword}
+              secureTextEntry
+              placeholder="La tua password"
+              placeholderTextColor={colors.foregroundMuted}
+              style={styles.input}
+              accessibilityLabel="Password"
+              testID="auth-password"
+            />
+          </View>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Password dimenticata"
+            onPress={() => navigation.navigate("AuthForgotPassword")}
+            style={styles.rightLink}
+            testID="auth-forgot-link"
+          >
+            <Text style={styles.linkUnderline}>Password dimenticata?</Text>
+          </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Accedi"
+            disabled={submitting}
+            onPress={() => void onLogin()}
+            style={[styles.emailButton, submitting && styles.disabled]}
+            testID="auth-login-submit"
+          >
+            <Text style={styles.emailButtonLabel}>
+              {submitting ? "Accesso…" : remembered ? `Accedi come ${firstName}` : "Accedi con email"}
+            </Text>
+          </Pressable>
+          {remembered ? (
+            <Pressable accessibilityRole="button" accessibilityLabel={`Non sei ${firstName}? Cambia account`} onPress={switchAccount} style={styles.centerLink} testID="auth-not-you">
+              <Text style={styles.linkUnderline}>Non sei {firstName}? Cambia account</Text>
             </Pressable>
           ) : null}
           <Pressable
@@ -131,68 +210,6 @@ export function AuthScreen() {
         )}
         {error ? (
           <UiStatePanel state="error" title="Accesso non riuscito" message={error} testID="auth-error" />
-        ) : null}
-        {remembered ? (
-          <View style={styles.accountRow} testID="auth-account">
-            <View style={styles.accountText}>
-              <Text style={styles.accountCaption}>Account</Text>
-              <Text style={styles.accountEmail} numberOfLines={1}>{remembered.email}</Text>
-            </View>
-            <Pressable accessibilityRole="button" accessibilityLabel="Cambia account" onPress={switchAccount} testID="auth-switch-account">
-              <Text style={styles.link}>Cambia</Text>
-            </Pressable>
-          </View>
-        ) : (
-          <>
-            <Text style={styles.label}>Email</Text>
-            <TextInput
-              value={email}
-              onChangeText={setEmail}
-              autoCapitalize="none"
-              autoCorrect={false}
-              keyboardType="email-address"
-              placeholder="nome@esempio.it"
-              placeholderTextColor={colors.foregroundMuted}
-              style={styles.input}
-              accessibilityLabel="Email"
-              testID="auth-email"
-            />
-          </>
-        )}
-        <Text style={styles.label}>Password</Text>
-        <TextInput
-          value={password}
-          onChangeText={setPassword}
-          secureTextEntry
-          placeholder="La tua password"
-          placeholderTextColor={colors.foregroundMuted}
-          style={styles.input}
-          accessibilityLabel="Password"
-          testID="auth-password"
-        />
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Password dimenticata"
-          onPress={() => navigation.navigate("AuthForgotPassword")}
-          style={styles.rightLink}
-          testID="auth-forgot-link"
-        >
-          <Text style={styles.linkUnderline}>Password dimenticata?</Text>
-        </Pressable>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Accedi"
-          disabled={submitting}
-          onPress={() => void onLogin()}
-          style={[styles.primaryButton, submitting && styles.disabled]}
-          testID="auth-login-submit"
-        >
-          <Text style={styles.primaryLabel}>{submitting ? "Accesso…" : remembered ? `Accedi come ${firstName}` : "Accedi"}</Text>
-        </Pressable>
-        {remembered ? (
-          <Pressable accessibilityRole="button" accessibilityLabel={`Non sei ${firstName}? Cambia account`} onPress={switchAccount} style={styles.centerLink} testID="auth-not-you">
-            <Text style={styles.linkUnderline}>Non sei {firstName}? Cambia account</Text>
-          </Pressable>
         ) : null}
       </View>
     </AuthShell>
@@ -325,6 +342,58 @@ export const authFormStyles = lazyStyles(() => StyleSheet.create({
   },
   displayAccent: { color: "#8CA8FF" },
   displayAccent2: { color: "#C58CFF" },
+  googleMain: {
+    minHeight: 58,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: spacing.sm,
+    borderRadius: 20,
+    backgroundColor: "#FFFFFF",
+  },
+  googleMarkMain: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    borderWidth: 1.5,
+    borderColor: "#D9DEEC",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  googleMainLabel: { color: "#11162B", fontWeight: "700", fontSize: typography.fontSize.md },
+  appleDisabled: {
+    minHeight: 58,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: spacing.sm,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.backgroundElevated,
+    opacity: 0.5,
+  },
+  appleGlyph: { color: "#fff", fontSize: 20 },
+  appleLabel: { color: "#fff", fontWeight: "700", fontSize: typography.fontSize.md },
+  soonChip: {
+    position: "absolute",
+    right: 14,
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+    borderRadius: radius.pill,
+    backgroundColor: "rgba(255,255,255,0.14)",
+  },
+  soonLabel: { color: "#fff", fontSize: 11, fontWeight: "700", letterSpacing: 0.8 },
+  emailButton: {
+    minHeight: 54,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 20,
+    borderWidth: 1.5,
+    borderColor: "#7A4DFF",
+    backgroundColor: "rgba(122,77,255,0.12)",
+  },
+  emailButtonLabel: { color: "#E7DDFF", fontWeight: "700", fontSize: typography.fontSize.md },
   googleButton: {
     minHeight: 54,
     flexDirection: "row",
