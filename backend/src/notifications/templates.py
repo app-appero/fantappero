@@ -255,3 +255,136 @@ def _render_risultati_infortunio(params: NotificationParams) -> NotificationCont
 @register_template("risultati.squalifica", 1)
 def _render_risultati_squalifica(params: NotificationParams) -> NotificationContent:
     return _live_content("Giocatore squalificato", "{player} risulta squalificato.", params)
+
+
+# -- Versione 2: testi specifici (chi, cosa, dove) -------------------------------------------------
+
+
+def _join(*parts: object, sep: str = " · ") -> str:
+    return sep.join(str(part) for part in parts if part)
+
+
+def _minute_suffix(params: NotificationParams) -> str:
+    minute = params.get("minute")
+    return f" al {minute}'" if minute is not None else ""
+
+
+def _match_line(params: NotificationParams) -> str:
+    """«Inter–Juventus 1–0» (solo ciò che si conosce)."""
+    return _join(params.get("fixture_label"), params.get("score_label"), sep=" ")
+
+
+def _team_note(params: NotificationParams) -> str:
+    team = params.get("team_name")
+    return f"nel tuo {team}" if team else ""
+
+
+def _live_content_v2(
+    title: str, detail: str, params: NotificationParams, *, deep_link: str = "/turni"
+) -> NotificationContent:
+    body = _join(
+        _match_line(params) and f"{_match_line(params)}{detail}" or detail.lstrip(" ·"),
+        _team_note(params),
+    )
+    return NotificationContent(title=title, body=body, deep_link=deep_link)
+
+
+def _player(params: NotificationParams) -> str:
+    return str(params.get("player", "Un tuo giocatore"))
+
+
+@register_template("risultati.gol", 2)
+def _render_risultati_gol_v2(params: NotificationParams) -> NotificationContent:
+    return _live_content_v2(f"Gol di {_player(params)}", _minute_suffix(params), params)
+
+
+@register_template("risultati.assist", 1)
+def _render_risultati_assist(params: NotificationParams) -> NotificationContent:
+    scorer = params.get("scorer")
+    detail = f" · assist per il gol di {scorer}" if scorer else " · assist"
+    return _live_content_v2(f"Assist di {_player(params)}", detail, params)
+
+
+@register_template("risultati.ammonizione", 1)
+def _render_risultati_ammonizione(params: NotificationParams) -> NotificationContent:
+    return _live_content_v2(
+        f"Ammonito {_player(params)}", f" · giallo{_minute_suffix(params)}", params
+    )
+
+
+@register_template("risultati.espulsione", 2)
+def _render_risultati_espulsione_v2(params: NotificationParams) -> NotificationContent:
+    return _live_content_v2(
+        f"Espulso {_player(params)}", f" · rosso{_minute_suffix(params)}", params
+    )
+
+
+@register_template("risultati.sostituzione", 1)
+def _render_risultati_sostituzione(params: NotificationParams) -> NotificationContent:
+    out_player = params.get("player_out", "un giocatore")
+    in_player = params.get("player_in", "un compagno")
+    return _live_content_v2(
+        f"Esce {out_player}, entra {in_player}", f" · cambio{_minute_suffix(params)}", params
+    )
+
+
+@register_template("risultati.infortunio", 2)
+def _render_risultati_infortunio_v2(params: NotificationParams) -> NotificationContent:
+    return _live_content_v2(
+        f"Infortunio per {_player(params)}",
+        " · controlla la formazione",
+        params,
+        deep_link="/formazione",
+    )
+
+
+@register_template("risultati.squalifica", 2)
+def _render_risultati_squalifica_v2(params: NotificationParams) -> NotificationContent:
+    return _live_content_v2(
+        f"{_player(params)} squalificato", " · non schierarlo", params, deep_link="/formazione"
+    )
+
+
+def _credits(value: object) -> str:
+    return f"{value} cr." if value else ""
+
+
+def _names(value: object) -> str:
+    if isinstance(value, list):
+        return " + ".join(str(name) for name in value)
+    return ""
+
+
+_TRADE_V2_TITLES: dict[str, str] = {
+    "proposed": "{team} ti propone uno scambio",
+    "accepted": "{team} ha accettato lo scambio",
+    "rejected": "{team} ha rifiutato lo scambio",
+    "countered": "{team} ti ha fatto una controproposta",
+    "pending_approval": "Scambio con {team} in attesa dell'amministratore",
+    "executed": "Scambio con {team} approvato",
+    "rejected_by_admin": "Scambio con {team} rifiutato dall'amministratore",
+}
+
+
+@register_template("mercato.scambio", 2)
+def _render_mercato_scambio_v2(params: NotificationParams) -> NotificationContent:
+    status = str(params.get("status"))
+    team = str(params.get("other_team", "Un altro fantallenatore"))
+    title = _TRADE_V2_TITLES.get(status, "Aggiornamento scambio").format(team=team)
+    gives = _join(_names(params.get("offered")), _credits(params.get("offered_credits")), sep=" + ")
+    asks = _join(
+        _names(params.get("requested")), _credits(params.get("requested_credits")), sep=" + "
+    )
+    # «offered» è ciò che dà chi ha proposto: per chi riceve è ciò che riceve.
+    body = _join(
+        f"Offre {gives}" if gives else "",
+        f"chiede {asks}" if asks else "",
+        f"scade {params['expires_label']}"
+        if status == "proposed" and params.get("expires_label")
+        else "",
+    )
+    return NotificationContent(
+        title=title,
+        body=body or "Apri Scambi per i dettagli.",
+        deep_link="/mercato",
+    )

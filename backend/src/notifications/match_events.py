@@ -13,7 +13,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from database.enums import NotificationCategory
-from fantasy_teams.models import FantasyRosterSlot
+from fantasy_teams.models import FantasyRosterSlot, FantasyTeam
 from notifications.recipients import user_ids_for_teams
 from notifications.service import NotificationService
 from observability.logging import get_logger
@@ -25,11 +25,29 @@ LIVE_STATUSES = frozenset({"1H", "HT", "2H", "ET", "BT", "P", "LIVE", "INT"})
 _GOAL_KINDS = frozenset({"goal", "penalty_scored"})
 
 
-def _owner_user_ids(session: Session, athlete_id: UUID) -> set[UUID]:
+def _owners(session: Session, athlete_id: UUID) -> dict[UUID, UUID]:
+    """``fantasy_team_id -> user_id`` di chi ha il giocatore in rosa."""
     team_ids = session.scalars(
         select(FantasyRosterSlot.fantasy_team_id).where(FantasyRosterSlot.athlete_id == athlete_id)
     ).all()
-    return set(user_ids_for_teams(session, team_ids).values())
+    return dict(user_ids_for_teams(session, team_ids))
+
+
+def _fixture_context(event: object) -> dict[str, object]:
+    """Squadre e risultato della partita, se disponibili (mai bloccante)."""
+    fixture = getattr(event, "fixture", None)
+    if fixture is None:
+        return {}
+    context: dict[str, object] = {}
+    home = getattr(getattr(fixture, "home_club", None), "name", None)
+    away = getattr(getattr(fixture, "away_club", None), "name", None)
+    if isinstance(home, str) and isinstance(away, str):
+        context["fixture_label"] = f"{home}–{away}"
+    home_goals = getattr(fixture, "home_goals", None)
+    away_goals = getattr(fixture, "away_goals", None)
+    if isinstance(home_goals, int) and isinstance(away_goals, int):
+        context["score_label"] = f"{home_goals}–{away_goals}"
+    return context
 
 
 def _notify_owners(
@@ -39,6 +57,7 @@ def _notify_owners(
     template_key: str,
     params: dict[str, object],
     dedup_prefix: str,
+    template_version: int = 1,
 ) -> int:
     athlete = session.get(Athlete, athlete_id)
     if athlete is None:
@@ -46,15 +65,18 @@ def _notify_owners(
     params = {**params, "player": athlete.canonical_name}
     service = NotificationService(session)
     sent = 0
-    for user_id in _owner_user_ids(session, athlete_id):
+    for team_id, user_id in _owners(session, athlete_id).items():
+        team = session.get(FantasyTeam, team_id)
+        team_name = getattr(team, "name", None)
+        recipient_params = {**params, **({"team_name": team_name} if team_name else {})}
         with session.begin_nested():
             _, created = service.create_notification(
                 user_id=user_id,
                 category=NotificationCategory.RISULTATI,
                 template_key=template_key,
-                template_version=1,
-                params=params,
-                dedup_key=f"{dedup_prefix}:{user_id}",
+                template_version=template_version,
+                params=recipient_params,
+                dedup_key=f"{dedup_prefix}:{user_id}:{team_id}",
             )
         sent += 1 if created else 0
     return sent
@@ -68,20 +90,71 @@ def notify_match_event(session: Session, *, event: object, fixture_status: str |
     scoring_kind = getattr(event, "scoring_kind", None)
     event_type = (getattr(event, "event_type", "") or "").lower()
     detail = (getattr(event, "event_detail", "") or "").lower()
-    if scoring_kind in _GOAL_KINDS:
-        template_key = "risultati.gol"
-    elif event_type == "card" and "red" in detail:
-        template_key = "risultati.espulsione"
-    else:
-        return 0
+    minute = getattr(event, "minute_elapsed", None)
+    base: dict[str, object] = {"minute": minute, **_fixture_context(event)}
+    event_id = getattr(event, "id", None)
+    related_id = getattr(event, "related_athlete_id", None)
+
     try:
-        return _notify_owners(
-            session,
-            athlete_id=athlete_id,
-            template_key=template_key,
-            params={"minute": getattr(event, "minute_elapsed", None)},
-            dedup_prefix=f"match_event:{event.id}",  # type: ignore[attr-defined]
-        )
+        sent = 0
+        if scoring_kind in _GOAL_KINDS:
+            sent += _notify_owners(
+                session,
+                athlete_id=athlete_id,
+                template_key="risultati.gol",
+                template_version=2,
+                params=base,
+                dedup_prefix=f"match_event:{event_id}",
+            )
+            if related_id is not None:
+                scorer = session.get(Athlete, athlete_id)
+                sent += _notify_owners(
+                    session,
+                    athlete_id=related_id,
+                    template_key="risultati.assist",
+                    template_version=1,
+                    params={**base, "scorer": getattr(scorer, "canonical_name", None)},
+                    dedup_prefix=f"match_event_assist:{event_id}",
+                )
+        elif event_type == "card" and ("red" in detail or "second yellow" in detail):
+            sent += _notify_owners(
+                session,
+                athlete_id=athlete_id,
+                template_key="risultati.espulsione",
+                template_version=2,
+                params=base,
+                dedup_prefix=f"match_event:{event_id}",
+            )
+        elif event_type == "card" and "yellow" in detail:
+            sent += _notify_owners(
+                session,
+                athlete_id=athlete_id,
+                template_key="risultati.ammonizione",
+                template_version=1,
+                params=base,
+                dedup_prefix=f"match_event:{event_id}",
+            )
+        elif event_type == "subst":
+            # Il provider indica in «player» chi esce e in «assist» chi entra.
+            entering = session.get(Athlete, related_id) if related_id is not None else None
+            leaving = session.get(Athlete, athlete_id)
+            params = {
+                **base,
+                "player_out": getattr(leaving, "canonical_name", None),
+                "player_in": getattr(entering, "canonical_name", None),
+            }
+            for owned_id in (athlete_id, related_id):
+                if owned_id is None:
+                    continue
+                sent += _notify_owners(
+                    session,
+                    athlete_id=owned_id,
+                    template_key="risultati.sostituzione",
+                    template_version=1,
+                    params=params,
+                    dedup_prefix=f"match_event_subst:{event_id}:{owned_id}",
+                )
+        return sent
     except Exception:
         logger.warning("match_event_notification_failed", exc_info=True)
         return 0
@@ -99,6 +172,7 @@ def notify_availability(session: Session, *, availability: object) -> int:
             session,
             athlete_id=athlete_id,
             template_key=template_key,
+            template_version=2,
             params={},
             dedup_prefix=f"availability:{availability.id}",  # type: ignore[attr-defined]
         )

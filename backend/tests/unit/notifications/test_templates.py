@@ -60,3 +60,73 @@ def test_render_risultati_templates_include_round_number() -> None:
     assert "7" in homologation.body
     correction = render_notification("risultati.correzione", 1, {"round_number": 7})
     assert "7" in correction.body
+
+
+def test_goal_v2_names_player_in_title_and_match_in_body() -> None:
+    content = render_notification(
+        "risultati.gol",
+        2,
+        {
+            "player": "Lautaro Martinez",
+            "minute": 23,
+            "fixture_label": "Inter–Juventus",
+            "score_label": "1–0",
+            "team_name": "Marco FC",
+        },
+    )
+    assert content.title == "Gol di Lautaro Martinez"
+    assert content.body == "Inter–Juventus 1–0 al 23' · nel tuo Marco FC"
+    assert content.deep_link == "/turni"
+
+
+def test_player_events_v2_titles() -> None:
+    assert (
+        render_notification("risultati.espulsione", 2, {"player": "Bastoni", "minute": 61}).title
+        == "Espulso Bastoni"
+    )
+    assert (
+        render_notification("risultati.ammonizione", 1, {"player": "Barella"}).title
+        == "Ammonito Barella"
+    )
+    assert (
+        render_notification("risultati.infortunio", 2, {"player": "Lookman"}).title
+        == "Infortunio per Lookman"
+    )
+    sub = render_notification(
+        "risultati.sostituzione", 1, {"player_out": "Leao", "player_in": "Chiesa", "minute": 70}
+    )
+    assert sub.title == "Esce Leao, entra Chiesa"
+    assert sub.body == "cambio al 70'"
+
+
+def test_assist_v2_mentions_scorer() -> None:
+    content = render_notification(
+        "risultati.assist", 1, {"player": "Dumfries", "scorer": "Lautaro"}
+    )
+    assert content.title == "Assist di Dumfries"
+    assert "assist per il gol di Lautaro" in content.body
+
+
+def test_trade_v2_says_who_and_what() -> None:
+    content = render_notification(
+        "mercato.scambio",
+        2,
+        {
+            "status": "proposed",
+            "other_team": "Giulia United",
+            "offered": ["Tonali"],
+            "requested": ["Lookman"],
+            "offered_credits": 5,
+            "expires_label": "il 21 ott alle 20:00",
+        },
+    )
+    assert content.title == "Giulia United ti propone uno scambio"
+    assert content.body == "Offre Tonali + 5 cr. · chiede Lookman · scade il 21 ott alle 20:00"
+    assert content.deep_link == "/mercato"
+
+
+def test_trade_v1_still_renders_for_old_notifications() -> None:
+    assert (
+        render_notification("mercato.scambio", 1, {"status": "proposed"}).title
+        == "Nuova proposta di scambio"
+    )
