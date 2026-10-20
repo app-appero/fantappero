@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Depends, Query, Response, status
 from fastapi.responses import JSONResponse
@@ -22,6 +22,7 @@ from notifications.schemas import (
     RegisterPushDeviceRequest,
     UpdateNotificationPreferenceRequest,
 )
+from notifications.samples import SAMPLES
 from notifications.service import DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE, NotificationService
 
 router = APIRouter(prefix="/notifications", tags=["notifications"])
@@ -57,6 +58,27 @@ def list_notifications(
         page=page,
         page_size=page_size,
     )
+
+
+@router.post("/test-samples", response_model=MarkAllReadResponse)
+def send_test_samples(
+    current_user: User = Depends(require_permissions(Permission.GLOBAL_OPERATE)),
+    service: NotificationService = Depends(get_notification_service),
+) -> MarkAllReadResponse:
+    """Crea per l'operatore un esempio di ogni tipo di notifica (anche push), per provarle."""
+    batch = uuid4()
+    created = 0
+    for sample in SAMPLES:
+        _, was_created = service.create_notification(
+            user_id=current_user.id,
+            category=sample.category,
+            template_key=sample.template_key,
+            template_version=sample.template_version,
+            params=sample.params,
+            dedup_key=f"test-sample:{batch}:{sample.key}",
+        )
+        created += 1 if was_created else 0
+    return MarkAllReadResponse(marked_count=created)
 
 
 @router.post("/{notification_id}/read", response_model=NotificationItemResponse)

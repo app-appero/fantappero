@@ -84,3 +84,13 @@ export function unregisterPushDevice(accessToken: string, token: string): Promis
     method: "DELETE",
   });
 }
+
+/** Operatori: crea una notifica di esempio per ogni tipo (solo per test). */
+export function sendTestNotifications(
+  accessToken: string,
+): Promise<MarkAllNotificationsReadResult> {
+  return apiRequest<MarkAllNotificationsReadResult>("/notifications/test-samples", {
+    accessToken,
+    method: "POST",
+  });
+}
