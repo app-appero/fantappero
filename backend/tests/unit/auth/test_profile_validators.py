@@ -12,6 +12,7 @@ from auth.profile_validators import (
     validate_language,
     validate_policy_version,
     validate_profile_display_name,
+    validate_profile_nickname,
     validate_timezone,
 )
 
@@ -30,6 +31,18 @@ def test_validate_profile_display_name_trims() -> None:
 def test_validate_profile_display_name_rejects_empty() -> None:
     with pytest.raises(ValidationAuthError, match="nome visualizzato"):
         validate_profile_display_name("   ")
+
+
+def test_validate_profile_nickname_normalizes_and_allows_empty() -> None:
+    assert validate_profile_nickname("  Nick  Name ") == "Nick Name"
+    assert validate_profile_nickname("  ") is None
+
+
+def test_validate_profile_nickname_rejects_invalid_values() -> None:
+    with pytest.raises(ValidationAuthError, match="nickname"):
+        validate_profile_nickname("x")
+    with pytest.raises(ValidationAuthError, match="nickname"):
+        validate_profile_nickname("nome!")
 
 
 def test_validate_language_accepts_italian() -> None:

@@ -6,8 +6,8 @@ Endpoint sotto `/profile` per preferenze dell'utente autenticato. I dati sono vi
 
 | Metodo | Percorso | Descrizione |
 | --- | --- | --- |
-| `GET` | `/profile/me` | Profilo completo (email, nome, avatar, preferenze, consenso) |
-| `PATCH` | `/profile/me` | Aggiorna nome, lingua, fuso, notifiche |
+| `GET` | `/profile/me` | Profilo completo (email, nome, nickname, avatar, preferenze, consenso) |
+| `PATCH` | `/profile/me` | Aggiorna nome, nickname, lingua, fuso, notifiche |
 | `POST` | `/profile/me/avatar` | Upload avatar (`multipart/form-data`, campo `file`) |
 | `DELETE` | `/profile/me/avatar` | Rimuove avatar |
 | `POST` | `/profile/me/policy-consent` | Registra consenso policy |
@@ -23,10 +23,15 @@ Tutti gli endpoint richiedono `Authorization: Bearer <access_token>`.
 | Campo | Regole |
 | --- | --- |
 | Nome visualizzato | 1–80 caratteri, trim |
+| Nickname | Facoltativo, 2–30 caratteri, univoco senza distinzione maiuscole/minuscole; vuoto per rimuoverlo |
 | Lingua | BCP47; attualmente supportata: `it` |
 | Fuso orario | IANA (`Europe/Rome`, …) |
 | Avatar | JPEG/PNG/WebP, max 5 MB (configurabile `AVATAR_MAX_BYTES`) |
 | Policy | `policyVersion` deve coincidere con `PROFILE_POLICY_VERSION` |
+
+## Identità
+
+Il nickname, se impostato, è il nome pubblico mostrato nei turni; in sua assenza viene usato il nome visualizzato.
 
 ## Avatar
 

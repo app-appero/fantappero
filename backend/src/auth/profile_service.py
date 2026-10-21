@@ -6,7 +6,7 @@ import secrets
 from pathlib import Path
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
 
 from auth.exceptions import ValidationAuthError
@@ -18,6 +18,7 @@ from auth.profile_validators import (
     validate_language,
     validate_policy_version,
     validate_profile_display_name,
+    validate_profile_nickname,
     validate_quiet_hour,
     validate_timezone,
 )
@@ -44,6 +45,14 @@ class ProfileService:
 
         if payload.display_name is not None:
             profile.display_name = validate_profile_display_name(payload.display_name)
+            changed = True
+        if payload.nickname is not None:
+            nickname = validate_profile_nickname(payload.nickname)
+            if nickname is not None and self._nickname_taken(nickname, profile.user_id):
+                raise ValidationAuthError(
+                    "Questo nickname è già in uso.", code="nickname_taken"
+                )
+            profile.nickname = nickname
             changed = True
         if payload.language is not None:
             profile.language = validate_language(payload.language)
@@ -183,12 +192,24 @@ class ProfileService:
             if existing.is_file():
                 existing.unlink()
 
+    def _nickname_taken(self, nickname: str, user_id: UUID) -> bool:
+        return (
+            self._session.scalar(
+                select(UserProfile.user_id).where(
+                    func.lower(UserProfile.nickname) == nickname.lower(),
+                    UserProfile.user_id != user_id,
+                )
+            )
+            is not None
+        )
+
     def _to_response(self, user: User, profile: UserProfile) -> ProfileResponse:
         consent_at = profile.policy_consent_at
         return ProfileResponse(
             email=user.email,
             displayName=profile.display_name or user.display_name,
             avatarUrl=profile.avatar_url,
+            nickname=profile.nickname,
             language=profile.language,
             timezone=profile.timezone,
             notificationsEmail=profile.notifications_email,

@@ -15,6 +15,7 @@ import {
 } from "@fantappero/ui";
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "../router/simpleRouter";
+import { resolveAvatarUrl } from "../utils/avatar";
 
 type Props = {
   calendar: H2HCalendar | null;
@@ -81,13 +82,16 @@ function roundStatusHint(round: H2HCalendarRound): string {
 }
 
 function MatchupRow({ matchup }: { matchup: H2HCalendarMatchup }) {
-  const homeName = matchup.homeTeamName ?? matchup.homeDisplayName;
+  const homeName = matchup.homeDisplayName || matchup.homeTeamName || "Fantallenatore";
+  const homeAvatarUrl = resolveAvatarUrl(matchup.homeAvatarUrl ?? null);
   if (matchup.isBye) {
     return (
       <div className="fa-matchday-matchup" data-testid={`h2h-matchup-${matchup.slotId}`}>
         <MatchCard
           homeTeam={homeName}
           awayTeam="Riposo"
+          homeSubtitle={matchup.homeTeamName ?? undefined}
+          homeAvatarUrl={homeAvatarUrl}
           kickoffLabel="Bye"
           status="scheduled"
           statusLabel="Riposo"
@@ -97,7 +101,8 @@ function MatchupRow({ matchup }: { matchup: H2HCalendarMatchup }) {
     );
   }
 
-  const awayName = matchup.awayTeamName ?? matchup.awayDisplayName ?? "Avversario";
+  const awayName = matchup.awayDisplayName ?? matchup.awayTeamName ?? "Avversario";
+  const awayAvatarUrl = resolveAvatarUrl(matchup.awayAvatarUrl ?? null);
   const display = describeH2HResult(matchup.result);
   const status =
     display.status === "final" ? "finished" : matchup.live ? "live" : "scheduled";
@@ -118,6 +123,10 @@ function MatchupRow({ matchup }: { matchup: H2HCalendarMatchup }) {
         <MatchCard
           homeTeam={homeName}
           awayTeam={awayName}
+          homeSubtitle={matchup.homeTeamName ?? undefined}
+          awaySubtitle={matchup.awayTeamName ?? undefined}
+          homeAvatarUrl={homeAvatarUrl}
+          awayAvatarUrl={awayAvatarUrl}
           kickoffLabel={computedAtLabel(matchup.result?.computedAt)}
           status={status}
           statusLabel={statusLabel}

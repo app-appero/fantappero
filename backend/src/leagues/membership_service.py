@@ -301,6 +301,7 @@ class LeagueMembershipService:
         return LeagueMemberResponse(
             userId=str(membership.user_id),
             displayName=membership.user.display_name,
+            avatarUrl=membership.user.avatar_url,
             userType=membership.user.user_type.value,
             role=league_member_role_to_league_role(membership.role).value,
             joinedAt=membership.created_at,

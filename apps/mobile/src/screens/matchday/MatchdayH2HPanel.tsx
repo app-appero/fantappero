@@ -104,15 +104,18 @@ function MatchupRow({
   matchup: H2HCalendarMatchup;
   onOpenMatchup: (slotId: string) => void;
 }) {
-  const homeName = matchup.homeTeamName ?? matchup.homeDisplayName;
+  const homeName = matchup.homeDisplayName || matchup.homeTeamName || "Fantallenatore";
 
   if (matchup.isBye) {
     return (
       <View style={styles.matchup} testID={`h2h-matchup-${matchup.slotId}`}>
         <View style={styles.matchupTeams}>
           <View style={styles.team}>
-            <TeamAvatar name={homeName} />
+            <TeamAvatar name={homeName} avatarUrl={matchup.homeAvatarUrl} />
             <Text style={styles.teamLine} numberOfLines={2}>{homeName}</Text>
+            {matchup.homeTeamName ? (
+              <Text style={styles.teamClub} numberOfLines={1}>{matchup.homeTeamName}</Text>
+            ) : null}
           </View>
           <Text style={styles.vs}>vs</Text>
           <View style={styles.team}>
@@ -125,7 +128,7 @@ function MatchupRow({
     );
   }
 
-  const awayName = matchup.awayTeamName ?? matchup.awayDisplayName ?? "Avversario";
+  const awayName = matchup.awayDisplayName ?? matchup.awayTeamName ?? "Avversario";
   const display = describeH2HResult(matchup.result);
   const statusLabel = matchup.live
     ? "LIVE / provvisorio"
@@ -149,8 +152,11 @@ function MatchupRow({
     >
       <View style={styles.matchupTeams}>
         <View style={styles.team}>
-          <TeamAvatar name={homeName} />
+          <TeamAvatar name={homeName} avatarUrl={matchup.homeAvatarUrl} />
           <Text style={styles.teamLine} numberOfLines={2}>{homeName}</Text>
+          {matchup.homeTeamName ? (
+            <Text style={styles.teamClub} numberOfLines={1}>{matchup.homeTeamName}</Text>
+          ) : null}
         </View>
         {display.goalsAvailable && matchup.result ? (
           <Text style={styles.bigScore}>
@@ -160,8 +166,11 @@ function MatchupRow({
           <Text style={styles.vs}>vs</Text>
         )}
         <View style={styles.team}>
-          <TeamAvatar name={awayName} />
+          <TeamAvatar name={awayName} avatarUrl={matchup.awayAvatarUrl} />
           <Text style={styles.teamLine} numberOfLines={2}>{awayName}</Text>
+          {matchup.awayTeamName ? (
+            <Text style={styles.teamClub} numberOfLines={1}>{matchup.awayTeamName}</Text>
+          ) : null}
         </View>
       </View>
       <View style={styles.matchupHeader}>
@@ -461,6 +470,11 @@ const styles = lazyStyles(() => StyleSheet.create({
     fontSize: typography.fontSize.sm,
     fontWeight: "600",
     flexShrink: 1,
+    textAlign: "center",
+  },
+  teamClub: {
+    color: colors.foregroundMuted,
+    fontSize: typography.fontSize.xs,
     textAlign: "center",
   },
   body: {

@@ -19,6 +19,11 @@ export type MatchCardProps = HTMLAttributes<HTMLElement> & {
   /** Club crest, when the provider has published one. */
   homeLogoUrl?: string | null;
   awayLogoUrl?: string | null;
+  /** Manager avatar for fantasy matchups. */
+  homeAvatarUrl?: string | null;
+  awayAvatarUrl?: string | null;
+  homeSubtitle?: string;
+  awaySubtitle?: string;
 };
 
 const STATUS_VARIANTS = {
@@ -29,9 +34,20 @@ const STATUS_VARIANTS = {
   needs_update: "warning",
 } as const;
 
-function TeamMark({ name, logoUrl }: { name: string; logoUrl?: string | null }) {
+function TeamMark({
+  name,
+  logoUrl,
+  avatarUrl,
+}: {
+  name: string;
+  logoUrl?: string | null;
+  avatarUrl?: string | null;
+}) {
   if (logoUrl) {
     return <img className="fa-match-card__team-logo" src={logoUrl} alt="" aria-hidden="true" />;
+  }
+  if (avatarUrl) {
+    return <img className="fa-match-card__person-avatar" src={avatarUrl} alt="" aria-hidden="true" />;
   }
   const initials = name
     .split(/\s+/)
@@ -57,6 +73,10 @@ export function MatchCard({
   score,
   homeLogoUrl,
   awayLogoUrl,
+  homeAvatarUrl,
+  awayAvatarUrl,
+  homeSubtitle,
+  awaySubtitle,
   className,
   ...rest
 }: MatchCardProps) {
@@ -66,8 +86,9 @@ export function MatchCard({
         {contextLabel ? <p className="fa-match-card__context">{contextLabel}</p> : null}
         <div className="fa-match-card__teams">
           <span className="fa-match-card__team">
-            <TeamMark name={homeTeam} logoUrl={homeLogoUrl} />
+            <TeamMark name={homeTeam} logoUrl={homeLogoUrl} avatarUrl={homeAvatarUrl} />
             <span className="fa-match-card__team-name">{homeTeam}</span>
+            {homeSubtitle ? <span className="fa-match-card__team-subtitle">{homeSubtitle}</span> : null}
           </span>
           {score ? (
             <span className="fa-match-card__score" data-testid="match-card-score">
@@ -79,8 +100,9 @@ export function MatchCard({
             </span>
           )}
           <span className="fa-match-card__team">
-            <TeamMark name={awayTeam} logoUrl={awayLogoUrl} />
+            <TeamMark name={awayTeam} logoUrl={awayLogoUrl} avatarUrl={awayAvatarUrl} />
             <span className="fa-match-card__team-name">{awayTeam}</span>
+            {awaySubtitle ? <span className="fa-match-card__team-subtitle">{awaySubtitle}</span> : null}
           </span>
         </div>
         <div className="fa-match-card__footer">

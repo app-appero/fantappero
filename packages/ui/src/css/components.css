@@ -975,6 +975,40 @@ button.fa-pitch-player {
   text-align: left;
 }
 
+.fa-standings-row__identity {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--fa-space-sm);
+  min-width: 0;
+}
+
+.fa-standings-row__labels {
+  display: inline-flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.fa-standings-row__avatar {
+  width: 2rem;
+  height: 2rem;
+  flex: 0 0 2rem;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.fa-standings-row__avatar--initials {
+  display: grid;
+  place-items: center;
+  background: var(--fa-gradient-accent);
+  color: var(--fa-color-on-brand);
+  font-weight: 800;
+}
+
+.fa-standings-row__manager-name {
+  color: var(--fa-color-foreground-muted);
+  font-size: var(--fa-text-sm);
+}
+
 .fa-standings-row__manager-link:hover {
   color: var(--fa-color-accent);
   text-decoration: underline;

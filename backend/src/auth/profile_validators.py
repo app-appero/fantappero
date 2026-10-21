@@ -38,6 +38,23 @@ def validate_profile_display_name(display_name: str) -> str:
     return cleaned
 
 
+_NICKNAME_PATTERN = re.compile(r"^[\w .\-]{2,30}$", re.UNICODE)
+
+
+def validate_profile_nickname(nickname: str) -> str | None:
+    """Stringa vuota = nessun nickname (si torna al nome visualizzato)."""
+    cleaned = " ".join(nickname.split())
+    if not cleaned:
+        return None
+    if not _NICKNAME_PATTERN.match(cleaned):
+        raise ValidationAuthError(
+            "Il nickname deve avere 2-30 caratteri: lettere, numeri, spazi, punto, "
+            "trattino o underscore.",
+            code="invalid_nickname",
+        )
+    return cleaned
+
+
 def validate_language(language: str) -> str:
     normalized = language.strip()
     if not _LANGUAGE_PATTERN.match(normalized):

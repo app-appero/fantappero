@@ -49,9 +49,11 @@ function calendar(matchResult: H2HMatchupScore | null, matchupLive = false): H2H
             homeUserId: "u1",
             homeDisplayName: "Marco",
             homeTeamName: "Roma FC",
+            homeAvatarUrl: "https://example.test/marco.png",
             awayUserId: "u2",
             awayDisplayName: "Giulia",
             awayTeamName: "Milan FC",
+            awayAvatarUrl: "https://example.test/giulia.png",
             live: matchupLive,
             result: matchResult,
           },
@@ -128,7 +130,12 @@ describe("MatchdayH2HPanel — Punti e Gol fantasy espliciti (EP13-P02)", () => 
   });
 
   it("distingue provvisorio e finale", () => {
-    expect(render(result({ resultFinal: false }))).toContain("Provvisorio / in attesa");
+    const html = render(result({ resultFinal: false }));
+    expect(html).toContain("Provvisorio / in attesa");
+    expect(html).toContain("Marco");
+    expect(html).toContain("Roma FC");
+    expect(html).toContain('src="https://example.test/marco.png"');
+    expect(html).toContain('src="https://example.test/giulia.png"');
     expect(render(result({ resultFinal: false }), true)).toContain("LIVE / provvisorio");
     expect(render(result())).toContain("Finale");
   });

@@ -38,6 +38,9 @@ class UserProfile(Base, TimestampMixin):
     )
     display_name: Mapped[str | None] = mapped_column(String(80), nullable=True)
     avatar_url: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Nome pubblico scelto dall'utente (turni, classifica, membri). Univoco senza
+    # distinzione di maiuscole; se manca si usa il nome visualizzato.
+    nickname: Mapped[str | None] = mapped_column(String(30), nullable=True)
     language: Mapped[str] = mapped_column(String(16), nullable=False, server_default=text("'it'"))
     timezone: Mapped[str] = mapped_column(
         String(64),

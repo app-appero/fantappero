@@ -5,6 +5,7 @@ export interface UserProfile {
   email: string;
   displayName: string;
   avatarUrl: string | null;
+  nickname?: string | null;
   language: string;
   timezone: string;
   notificationsEmail: boolean;
@@ -23,6 +24,7 @@ export type UserType = "human" | "ai";
 
 export interface UpdateProfileRequest {
   displayName?: string;
+  nickname?: string;
   language?: string;
   timezone?: string;
   notificationsEmail?: boolean;

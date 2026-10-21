@@ -159,12 +159,38 @@ button.fa-link-muted,
 .fa-member-list__identity {
   display: flex;
   flex-wrap: wrap;
-  align-items: baseline;
+  align-items: center;
   gap: 0.2rem 0.55rem;
   min-width: 0;
   color: inherit;
   text-decoration: none;
   border-radius: var(--fa-radius-sm);
+}
+
+.fa-member-list__avatar {
+  display: grid;
+  place-items: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  flex: 0 0 2.5rem;
+  overflow: hidden;
+  border-radius: 50%;
+  background: var(--fa-gradient-accent);
+  color: var(--fa-color-on-brand);
+  font-weight: 800;
+}
+
+.fa-member-list__avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.fa-member-list__text {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
 }
 
 a.fa-member-list__identity:hover strong {
@@ -4075,6 +4101,7 @@ h2 {
 .fa-manager-directory__list { gap: var(--fa-space-lg); }
 .fa-manager-directory__email { overflow-wrap: anywhere; }
 .fa-manager-directory__name { font-size: var(--fa-text-lg); font-weight: 700; }
+.fa-manager-directory__nickname { color: var(--fa-color-foreground-muted); }
 @media (max-width: 700px) {
   .fa-manager-directory { gap: var(--fa-space-lg, 1.5rem); }
   .fa-manager-directory__panel { padding: var(--fa-space-md); }

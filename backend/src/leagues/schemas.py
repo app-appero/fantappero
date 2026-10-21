@@ -133,6 +133,7 @@ class LeagueAdminPanelResponse(ApiModel):
 class LeagueMemberResponse(ApiModel):
     user_id: str = Field(alias="userId")
     display_name: str = Field(alias="displayName")
+    avatar_url: str | None = Field(default=None, alias="avatarUrl")
     user_type: Literal["human", "ai"] = Field(alias="userType")
     role: Literal["member", "league_admin"]
     joined_at: datetime = Field(alias="joinedAt")
@@ -188,6 +189,7 @@ class FantasyCoachDirectoryItem(ApiModel):
     # mostrato (EP13-P06bis).
     email: str
     avatar_url: str | None = Field(default=None, alias="avatarUrl")
+    nickname: str | None = None
     user_type: Literal["human", "ai"] = Field(alias="userType")
     available_for_invites: bool = Field(alias="availableForInvites")
     # True se è già iscritto a questa lega: resta in elenco, ma l'invito è disabilitato.
@@ -224,6 +226,7 @@ class FantasyCoachProfileResponse(ApiModel):
     display_name: str = Field(alias="displayName")
     email: str
     avatar_url: str | None = Field(default=None, alias="avatarUrl")
+    nickname: str | None = None
     user_type: Literal["human", "ai"] = Field(alias="userType")
     available_for_invites: bool = Field(alias="availableForInvites")
     named_invite_status: Literal["pending", "accepted", "declined", "revoked", "expired"] | None = (
@@ -323,9 +326,11 @@ class H2HCalendarMatchupResponse(ApiModel):
     home_user_id: str = Field(alias="homeUserId")
     home_display_name: str = Field(alias="homeDisplayName")
     home_team_name: str | None = Field(default=None, alias="homeTeamName")
+    home_avatar_url: str | None = Field(default=None, alias="homeAvatarUrl")
     away_user_id: str | None = Field(default=None, alias="awayUserId")
     away_display_name: str | None = Field(default=None, alias="awayDisplayName")
     away_team_name: str | None = Field(default=None, alias="awayTeamName")
+    away_avatar_url: str | None = Field(default=None, alias="awayAvatarUrl")
     live: bool = False
     result: H2HMatchupScoreResponse | None = None
 
@@ -498,6 +503,8 @@ class LeagueStandingResponse(ApiModel):
     # Proprietario della squadra fantasy: già visibile a ogni membro tramite
     # /leagues/{id}/membri, riusato qui per collegare la riga al fantallenatore.
     manager_user_id: str = Field(alias="managerUserId")
+    manager_display_name: str | None = Field(default=None, alias="managerDisplayName")
+    manager_avatar_url: str | None = Field(default=None, alias="managerAvatarUrl")
     position: int
     played: int
     won: int

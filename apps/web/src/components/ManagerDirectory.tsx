@@ -271,6 +271,9 @@ export function CoachProfilePanel({
           <p className="fa-coach-profile__email" data-testid="coach-profile-email">
             {profile.email}
           </p>
+          {profile.nickname ? (
+            <p className="fa-manager-directory__nickname">Nickname: {profile.nickname}</p>
+          ) : null}
           <div className="fa-coach-profile__meta">
             <Badge variant={profile.userType === "ai" ? "accent" : "neutral"}>
               {userTypeLabel(profile.userType)}
@@ -417,12 +420,17 @@ export function ManagerDirectory({
         demoState === "empty"
           ? []
           : DEMO_MANAGERS.filter(
-              (manager) =>
-                (!debouncedQuery ||
-                  manager.displayName.toLowerCase().includes(debouncedQuery.toLowerCase())) &&
+              (manager) => {
+                const query = debouncedQuery.toLowerCase();
+                return (
+                  (!query ||
+                    manager.displayName.toLowerCase().includes(query) ||
+                    manager.nickname?.toLowerCase().includes(query) === true) &&
                 (!userType || manager.userType === userType) &&
                 (availableFilter === "" ||
-                  manager.availableForInvites === (availableFilter === "true")),
+                    manager.availableForInvites === (availableFilter === "true"))
+                );
+              },
             );
       setResult({ items: filtered, page: 1, pageSize: 10, total: filtered.length, totalPages: 1 });
       setLoadError(null);
@@ -566,7 +574,7 @@ export function ManagerDirectory({
       <div className="fa-manager-directory__panel">
       <div className="fa-manager-directory__filters">
         <Input
-          label="Cerca per nome o email"
+          label="Cerca per nome, nickname o email"
           name="manager-query"
           value={query}
           onChange={(event) => setQuery(event.target.value)}
@@ -698,6 +706,11 @@ export function ManagerDirectory({
                     data-testid={`manager-open-${manager.userId}`}
                   >
                     <span className="fa-manager-directory__name">{manager.displayName}</span>
+                    {manager.nickname ? (
+                      <span className="fa-manager-directory__nickname">
+                        Nickname: {manager.nickname}
+                      </span>
+                    ) : null}
                     <span
                       className="fa-manager-directory__email"
                       data-testid={`manager-email-${manager.userId}`}

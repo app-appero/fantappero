@@ -23,6 +23,8 @@ export type StandingsRow = {
   highlightLabel?: string;
   /** Fantallenatore proprietario della squadra; abilita il click sul nome. */
   managerUserId?: string;
+  managerDisplayName?: string | null;
+  managerAvatarUrl?: string | null;
 };
 
 export type StandingsTableProps = {
@@ -81,18 +83,44 @@ export function StandingsTable({
           >
             <TableCell>{row.position}</TableCell>
             <TableCell>
-              {onManagerClick && row.managerUserId ? (
-                <button
-                  type="button"
-                  className="fa-standings-row__manager-link"
-                  onClick={() => onManagerClick(row)}
-                  aria-label={`Apri il profilo del fantallenatore di ${row.teamName}`}
-                >
-                  {row.teamName}
-                </button>
-              ) : (
-                row.teamName
-              )}
+              <span className="fa-standings-row__identity">
+                {row.managerDisplayName ? (
+                  row.managerAvatarUrl ? (
+                    <img
+                      className="fa-standings-row__avatar"
+                      src={row.managerAvatarUrl}
+                      alt=""
+                      aria-hidden="true"
+                    />
+                  ) : (
+                    <span className="fa-standings-row__avatar fa-standings-row__avatar--initials" aria-hidden="true">
+                      {row.managerDisplayName.charAt(0).toUpperCase()}
+                    </span>
+                  )
+                ) : null}
+                <span className="fa-standings-row__labels">
+                  {onManagerClick && row.managerUserId ? (
+                    <button
+                      type="button"
+                      className="fa-standings-row__manager-link"
+                      onClick={() => onManagerClick(row)}
+                      aria-label={`Apri il profilo del fantallenatore di ${row.teamName}`}
+                    >
+                      <span>{row.teamName}</span>
+                      {row.managerDisplayName ? (
+                        <small className="fa-standings-row__manager-name">{row.managerDisplayName}</small>
+                      ) : null}
+                    </button>
+                  ) : (
+                    <>
+                      <span>{row.teamName}</span>
+                      {row.managerDisplayName ? (
+                        <small className="fa-standings-row__manager-name">{row.managerDisplayName}</small>
+                      ) : null}
+                    </>
+                  )}
+                </span>
+              </span>
               {row.highlightLabel ? (
                 <Badge variant="accent" className="fa-standings-row__badge">
                   {row.highlightLabel}

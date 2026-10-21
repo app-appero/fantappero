@@ -2280,6 +2280,13 @@ button.fa-app-header__league-action {
   height: 2.75rem;
 }
 
+.fa-match-card__person-avatar {
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
 .fa-match-card__avatar {
   width: 2.75rem;
   height: 2.75rem;
@@ -2290,6 +2297,12 @@ button.fa-app-header__league-action {
   color: var(--fa-color-on-brand);
   font-style: italic;
   font-weight: 800;
+}
+
+.fa-match-card__team-subtitle {
+  color: var(--fa-color-foreground-muted);
+  font-size: var(--fa-text-sm);
+  overflow-wrap: anywhere;
 }
 
 .fa-match-card__score {

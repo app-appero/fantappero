@@ -11,6 +11,7 @@ import {
 import { getApiErrorMessage, useAuth } from "../auth/AuthContext";
 import { loadStoredSession } from "../auth/sessionStorage";
 import { Link } from "../router/simpleRouter";
+import { resolveAvatarUrl } from "../utils/avatar";
 
 const DEMO_MEMBERS: LeagueMember[] = [
   {
@@ -301,17 +302,27 @@ export function LeagueMembersPanel({
               user && member.userId === user.id
                 ? null
                 : `/fantallenatori/${member.userId}${qs ? `?${qs}` : ""}`;
+            const avatarSrc = resolveAvatarUrl(member.avatarUrl ?? null);
             const identity = (
               <>
-                <strong>{member.displayName}</strong>
-                {member.email ? (
-                  <span
-                    className="fa-member-list__email"
-                    data-testid={`league-member-email-${member.userId}`}
-                  >
-                    {member.email}
-                  </span>
-                ) : null}
+                <span className="fa-member-list__avatar" aria-hidden="true">
+                  {avatarSrc ? (
+                    <img src={avatarSrc} alt="" />
+                  ) : (
+                    member.displayName.charAt(0).toUpperCase()
+                  )}
+                </span>
+                <span className="fa-member-list__text">
+                  <strong>{member.displayName}</strong>
+                  {member.email ? (
+                    <span
+                      className="fa-member-list__email"
+                      data-testid={`league-member-email-${member.userId}`}
+                    >
+                      {member.email}
+                    </span>
+                  ) : null}
+                </span>
                 <span>{`· ${roleLabel}`}</span>
               </>
             );

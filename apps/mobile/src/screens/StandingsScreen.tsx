@@ -196,11 +196,18 @@ function StandingsTableBlock({
             <Text style={[styles.podiumRank, row.position === 1 ? styles.podiumRankFirst : null]}>
               {row.position}°
             </Text>
-            <TeamAvatar name={row.teamName} size={row.position === 1 ? 52 : 44} />
+            <TeamAvatar
+              name={row.managerDisplayName ?? row.teamName}
+              avatarUrl={row.managerAvatarUrl}
+              size={row.position === 1 ? 52 : 44}
+            />
             <View style={styles.podiumInfo}>
               <Text style={styles.podiumName} numberOfLines={1}>
                 {row.teamName}
               </Text>
+              {row.managerDisplayName ? (
+                <Text style={styles.managerName} numberOfLines={1}>{row.managerDisplayName}</Text>
+              ) : null}
               <Text style={styles.meta}>
                 {row.played} gare · GF:GS {row.fantasyGoalsFor}:{row.fantasyGoalsAgainst}
               </Text>
@@ -230,6 +237,11 @@ function StandingsTableBlock({
         >
           <Text style={[styles.cell, styles.posCell]}>{row.position}</Text>
           <View style={[styles.teamCell, styles.teamCellInner]}>
+            <TeamAvatar
+              name={row.managerDisplayName ?? row.teamName}
+              avatarUrl={row.managerAvatarUrl}
+              size={32}
+            />
             {onManagerPress ? (
               <Pressable
                 accessibilityRole="button"
@@ -237,10 +249,16 @@ function StandingsTableBlock({
                 onPress={() => onManagerPress(row.managerUserId)}
                 testID={`standings-manager-${row.fantasyTeamId}`}
               >
-                <Text style={[styles.teamName, styles.teamNameLink]}>{row.teamName}</Text>
+                <View>
+                  <Text style={[styles.teamName, styles.teamNameLink]}>{row.teamName}</Text>
+                  {row.managerDisplayName ? <Text style={styles.managerName}>{row.managerDisplayName}</Text> : null}
+                </View>
               </Pressable>
             ) : (
-              <Text style={styles.teamName}>{row.teamName}</Text>
+              <View>
+                <Text style={styles.teamName}>{row.teamName}</Text>
+                {row.managerDisplayName ? <Text style={styles.managerName}>{row.managerDisplayName}</Text> : null}
+              </View>
             )}
           </View>
           <Text style={[styles.cell, styles.statCell]}>{row.played}</Text>
@@ -376,6 +394,10 @@ const styles = lazyStyles(() => StyleSheet.create({
   teamNameLink: {
     color: colors.accent,
     fontWeight: typography.fontWeight.semibold,
+  },
+  managerName: {
+    color: colors.foregroundMuted,
+    fontSize: typography.fontSize.xs,
   },
   statCell: {
     width: 32,

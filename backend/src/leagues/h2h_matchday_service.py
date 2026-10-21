@@ -8,7 +8,6 @@ progressivo su quelli generati prima (EP07-05).
 from __future__ import annotations
 
 from collections import defaultdict
-from dataclasses import dataclass
 from datetime import UTC, datetime
 from uuid import UUID
 
@@ -23,6 +22,7 @@ from database.enums import (
     LineupSlotKind,
 )
 from fantasy_lineups.models import EffectiveLineup, LineupPlayer, LineupSubmission
+from fantasy_ratings.round_scores import RoundAthleteScore, compute_round_athlete_scores
 from fantasy_teams.models import FantasyTeam
 from fantasy_turns.models import FantasyRound, FantasyRoundFixture
 from fantasy_turns.readiness import LIVE_FIXTURE_STATUSES
@@ -42,7 +42,6 @@ from leagues.schemas import (
     H2HSideLineupResponse,
     LeagueCalendarSummaryResponse,
 )
-from fantasy_ratings.round_scores import RoundAthleteScore, compute_round_athlete_scores
 from sports_data.fixtures.models import Fixture, PlayerMatchStat
 from sports_data.roster.models import Athlete, SquadMembership
 
@@ -139,9 +138,11 @@ def get_h2h_calendar(
                     homeUserId=str(home.user_id),
                     homeDisplayName=home.user.display_name,
                     homeTeamName=home_team.name if home_team is not None else None,
+                    homeAvatarUrl=home.user.avatar_url,
                     awayUserId=None if away is None else str(away.user_id),
                     awayDisplayName=None if away is None else away.user.display_name,
                     awayTeamName=away_team.name if away_team is not None else None,
+                    awayAvatarUrl=None if away is None else away.user.avatar_url,
                     live=matchup_live,
                     result=_score_payload(slot),
                 )

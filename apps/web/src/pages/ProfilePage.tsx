@@ -134,6 +134,7 @@ export function ProfilePage() {
 
   const themePreference = useThemePreference();
   const [displayName, setDisplayName] = useState(demoProfile?.displayName ?? "");
+  const [nickname, setNickname] = useState(demoProfile?.nickname ?? "");
   const [language, setLanguage] = useState(demoProfile?.language ?? "it");
   const [timezone, setTimezone] = useState(demoProfile?.timezone ?? "Europe/Rome");
   const [notificationsEmail, setNotificationsEmail] = useState(
@@ -155,6 +156,7 @@ export function ProfilePage() {
   const applyProfile = useCallback((next: UserProfile) => {
     setProfile(next);
     setDisplayName(next.displayName);
+    setNickname(next.nickname ?? "");
     setLanguage(next.language);
     setTimezone(next.timezone);
     setNotificationsEmail(next.notificationsEmail);
@@ -232,6 +234,7 @@ export function ProfilePage() {
     try {
       const updated = await updateProfile(stored.accessToken, {
         displayName,
+        nickname,
         language,
         timezone,
         notificationsEmail,
@@ -549,6 +552,14 @@ export function ProfilePage() {
                 value={displayName}
                 onChange={(event) => setDisplayName(event.target.value)}
                 required
+                disabled={saving}
+              />
+              <Input
+                label="Nickname"
+                name="nickname"
+                value={nickname}
+                onChange={(event) => setNickname(event.target.value)}
+                hint="Facoltativo: è il nome mostrato nei turni. Deve essere univoco."
                 disabled={saving}
               />
               <Input

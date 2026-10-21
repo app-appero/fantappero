@@ -13,6 +13,7 @@ class ProfileResponse(ApiModel):
     email: str
     displayName: str
     avatarUrl: str | None = None
+    nickname: str | None = None
     language: str
     timezone: str
     notificationsEmail: bool
@@ -28,6 +29,8 @@ class ProfileResponse(ApiModel):
 
 class UpdateProfileRequest(ApiModel):
     display_name: str | None = Field(default=None, alias="displayName")
+    # "" = rimuove il nickname.
+    nickname: str | None = None
     language: str | None = None
     timezone: str | None = None
     notifications_email: bool | None = Field(default=None, alias="notificationsEmail")

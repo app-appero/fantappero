@@ -8,7 +8,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, Query, Response, status
 from fastapi.responses import JSONResponse
 from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from auth.dependencies import get_db_session, get_rate_limiter
 from auth.exceptions import AuthError
@@ -693,11 +693,23 @@ def get_league_standings(
         for team in teams
         if team.membership_id in membership_owners
     }
+    owners = session.scalars(
+        select(User)
+        .where(User.id.in_(set(manager_ids.values())))
+        .options(selectinload(User.profile))
+    ).all()
+    manager_labels = {user.id: user.display_name for user in owners}
+    manager_avatars = {
+        user.id: user.profile.avatar_url if user.profile is not None else None
+        for user in owners
+    }
     return [
         LeagueStandingResponse(
             fantasyTeamId=str(row.fantasy_team_id),
             teamName=team_names.get(row.fantasy_team_id, "Squadra"),
             managerUserId=str(manager_ids[row.fantasy_team_id]),
+            managerDisplayName=manager_labels.get(manager_ids[row.fantasy_team_id]),
+            managerAvatarUrl=manager_avatars.get(manager_ids[row.fantasy_team_id]),
             position=row.position,
             played=row.played,
             won=row.won,

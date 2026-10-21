@@ -52,6 +52,7 @@ def test_profile_get_and_update_flow(client: TestClient) -> None:
     body = profile.json()
     assert body["email"] == "profilo@example.com"
     assert body["displayName"] == "Luca Bianchi"
+    assert body["nickname"] is None
     assert body["language"] == "it"
     assert body["timezone"] == "Europe/Rome"
     assert body["currentPolicyVersion"]
@@ -74,6 +75,40 @@ def test_profile_get_and_update_flow(client: TestClient) -> None:
     me = client.get("/auth/me", headers=headers)
     assert me.status_code == 200
     assert me.json()["displayName"] == "Luca B."
+
+
+def test_profile_nickname_is_unique_and_used_as_public_name(client: TestClient) -> None:
+    first = _register_and_login(client, "nickname1@example.com", "Luca Bianchi")
+    second = _register_and_login(client, "nickname2@example.com", "Marco Verdi")
+    first_headers = {"Authorization": f"Bearer {first['access']}"}
+    second_headers = {"Authorization": f"Bearer {second['access']}"}
+
+    saved = client.patch(
+        "/profile/me",
+        headers=first_headers,
+        json={"nickname": "Luca"},
+    )
+    assert saved.status_code == 200
+    assert saved.json()["displayName"] == "Luca Bianchi"
+    assert saved.json()["nickname"] == "Luca"
+    assert client.get("/auth/me", headers=first_headers).json()["displayName"] == "Luca"
+
+    duplicate = client.patch(
+        "/profile/me",
+        headers=second_headers,
+        json={"nickname": "luca"},
+    )
+    assert duplicate.status_code == 400
+    assert duplicate.json()["code"] == "nickname_taken"
+
+    cleared = client.patch(
+        "/profile/me",
+        headers=first_headers,
+        json={"nickname": ""},
+    )
+    assert cleared.status_code == 200
+    assert cleared.json()["nickname"] is None
+    assert client.get("/auth/me", headers=first_headers).json()["displayName"] == "Luca Bianchi"
 
 
 def test_profile_requires_authentication(client: TestClient) -> None:

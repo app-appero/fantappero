@@ -250,6 +250,7 @@ export interface LeagueAdminPanel {
 export interface LeagueMember {
   userId: string;
   displayName: string;
+  avatarUrl?: string | null;
   userType: import("./profile.js").UserType;
   role: "member" | "league_admin";
   joinedAt: string;
@@ -263,6 +264,8 @@ export interface LeagueStanding {
   teamName: string;
   /** Fantallenatore proprietario della squadra; già esposto da /leagues/{id}/membri. */
   managerUserId: string;
+  managerDisplayName?: string | null;
+  managerAvatarUrl?: string | null;
   position: number;
   played: number;
   won: number;
@@ -322,6 +325,7 @@ export type NamedLeagueInviteStatus =
 export interface FantasyCoachDirectoryItem {
   userId: string;
   displayName: string;
+  nickname?: string | null;
   /** Visibile solo a chi amministra la lega (EP13-P06bis). */
   email: string;
   avatarUrl: string | null;
@@ -355,6 +359,7 @@ export interface CoachPlacement {
 export interface FantasyCoachProfile {
   userId: string;
   displayName: string;
+  nickname?: string | null;
   /** Visibile solo a chi amministra la lega (EP13-P06bis). */
   email: string;
   avatarUrl: string | null;
@@ -506,9 +511,11 @@ export interface H2HCalendarMatchup {
   homeUserId: string;
   homeDisplayName: string;
   homeTeamName: string | null;
+  homeAvatarUrl?: string | null;
   awayUserId: string | null;
   awayDisplayName: string | null;
   awayTeamName: string | null;
+  awayAvatarUrl?: string | null;
   /** True solo se una fixture reale di almeno un titolare dello scontro è in corso. */
   live?: boolean;
   result: H2HMatchupScore | null;

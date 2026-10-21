@@ -14,6 +14,7 @@ import { fetchLeagueStandings, fetchMyFantasyTeam } from "../api/leagues";
 import { getApiErrorMessage, useAuth } from "../auth/AuthContext";
 import { loadStoredSession } from "../auth/sessionStorage";
 import { useLocation, useNavigate } from "../router/simpleRouter";
+import { resolveAvatarUrl } from "../utils/avatar";
 import { WireframePage } from "../wireframes/WireframePage";
 import { parseWireframeStateFromSearch } from "../wireframes/useWireframeState";
 
@@ -85,6 +86,8 @@ function toTableRows(
       position: row.position,
       teamName: row.teamName,
       managerUserId: row.managerUserId,
+      managerDisplayName: row.managerDisplayName ?? null,
+      managerAvatarUrl: resolveAvatarUrl(row.managerAvatarUrl ?? null),
       played: row.played,
       points: row.points,
       goalsFor: row.fantasyGoalsFor,

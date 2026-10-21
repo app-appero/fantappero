@@ -77,6 +77,7 @@ export function ProfileScreen() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [displayName, setDisplayName] = useState("");
+  const [nickname, setNickname] = useState("");
   const [timezone, setTimezone] = useState("Europe/Rome");
   const [notificationsEmail, setNotificationsEmail] = useState(true);
   const [notificationsPush, setNotificationsPush] = useState(true);
@@ -94,6 +95,7 @@ export function ProfileScreen() {
   const applyProfile = useCallback((next: UserProfile) => {
     setProfile(next);
     setDisplayName(next.displayName);
+    setNickname(next.nickname ?? "");
     setTimezone(next.timezone);
     setNotificationsEmail(next.notificationsEmail);
     setNotificationsPush(next.notificationsPush);
@@ -152,6 +154,7 @@ export function ProfileScreen() {
     try {
       const updated = await updateProfile(accessToken, {
         displayName: displayName.trim(),
+        nickname: nickname.trim(),
         language: profile.language,
         timezone,
         notificationsEmail,
@@ -441,6 +444,15 @@ export function ProfileScreen() {
           style={styles.input}
           accessibilityLabel="Nome visualizzato"
         />
+        <Text style={styles.label}>Nickname</Text>
+        <TextInput
+          value={nickname}
+          onChangeText={setNickname}
+          style={styles.input}
+          accessibilityLabel="Nickname"
+          placeholder="Facoltativo, mostrato nei turni"
+        />
+        <Text style={styles.hint}>Deve essere univoco. Se vuoto, nei turni verrà mostrato il nome visualizzato.</Text>
 
         <Text style={styles.label}>Email</Text>
         <TextInput value={profile.email} editable={false} style={[styles.input, styles.readonly]} />

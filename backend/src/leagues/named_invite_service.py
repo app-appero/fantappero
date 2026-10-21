@@ -111,6 +111,7 @@ class NamedLeagueInviteService:
                     or_(
                         User.email.ilike(pattern, escape="\\"),
                         UserProfile.display_name.ilike(pattern, escape="\\"),
+                        UserProfile.nickname.ilike(pattern, escape="\\"),
                     )
                 )
         if user_type is not None:
@@ -150,6 +151,7 @@ class NamedLeagueInviteService:
                 ),
                 email=user.email,
                 avatarUrl=profile.avatar_url if profile is not None else None,
+                nickname=profile.nickname if profile is not None else None,
                 userType=user.user_type.value,
                 availableForInvites=(
                     user.user_type == UserType.AI
@@ -233,6 +235,7 @@ class NamedLeagueInviteService:
             displayName=profile.display_name or "",
             email=user.email,
             avatarUrl=profile.avatar_url,
+            nickname=profile.nickname,
             userType=user.user_type.value,
             availableForInvites=(user.user_type == UserType.AI or profile.available_for_invites),
             namedInviteStatus=invite_status.value if invite_status is not None else None,

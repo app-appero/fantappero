@@ -211,7 +211,7 @@ export function CoachDirectoryPanel({
         <TextInput
           value={query}
           onChangeText={setQuery}
-          placeholder="Cerca per nome o email"
+          placeholder="Cerca per nome, nickname o email"
           placeholderTextColor={colors.foregroundMuted}
           autoCapitalize="none"
           autoCorrect={false}
@@ -336,6 +336,7 @@ export function CoachDirectoryPanel({
                 <CoachAvatar name={coach.displayName} avatarUrl={coach.avatarUrl} />
                 <View style={styles.identity}>
                   <Text style={styles.name}>{coach.displayName}</Text>
+                  {coach.nickname ? <Text style={styles.nickname}>Nickname: {coach.nickname}</Text> : null}
                   <Text style={styles.email}>{coach.email}</Text>
                 </View>
               </Pressable>
@@ -511,6 +512,10 @@ const styles = lazyStyles(() => StyleSheet.create({
     color: colors.foreground,
     fontWeight: "700",
     fontSize: typography.fontSize.lg,
+  },
+  nickname: {
+    color: colors.foregroundMuted,
+    fontSize: typography.fontSize.sm,
   },
   status: {
     color: colors.foregroundMuted,

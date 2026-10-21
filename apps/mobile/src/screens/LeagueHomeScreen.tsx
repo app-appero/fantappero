@@ -212,7 +212,7 @@ export function LeagueHomeScreen() {
             <View style={styles.card} testID="league-home-members-list">
               {members.map((member) => (
                 <View key={member.userId} style={styles.memberRow}>
-                  <TeamAvatar name={member.displayName} size={40} />
+                  <TeamAvatar name={member.displayName} size={40} avatarUrl={member.avatarUrl} />
                   <View style={styles.memberText}>
                     <Text style={styles.memberName}>{member.displayName}</Text>
                     <Text style={styles.body}>

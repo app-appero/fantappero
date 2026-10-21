@@ -75,7 +75,14 @@ class User(Base, UUIDPrimaryKeyMixin, TimestampMixin, SoftDeleteMixin):
         return self.email_verified_at is not None
 
     @property
+    def avatar_url(self) -> str | None:
+        return self.profile.avatar_url if self.profile is not None else None
+
+    @property
     def display_name(self) -> str:
+        """Nome pubblico: nickname se scelto, altrimenti nome visualizzato."""
+        if self.profile is not None and self.profile.nickname:
+            return self.profile.nickname
         if self.profile is not None and self.profile.display_name:
             return self.profile.display_name
         local_part = self.email.split("@", maxsplit=1)[0]
