@@ -49,6 +49,7 @@ import { LockCountdown } from "../components/LockCountdown";
 import { OptionPicker } from "../components/OptionPicker";
 import { UiStatePanel } from "../components/UiStatePanel";
 import { PageContainer } from "../layout/PageContainer";
+import { usePullRefresh } from "../hooks/usePullRefresh";
 import { useLockCountdown } from "../matchday/useLockCountdown";
 import { getApiErrorMessage, useAuthSession } from "../session/DemoSessionContext";
 
@@ -198,6 +199,7 @@ export function FormationScreen() {
   useEffect(() => {
     void load();
   }, [load]);
+  const pull = usePullRefresh(load);
 
   useEffect(() => {
     if (!isOperator || !activeLeagueId || !accessToken) {
@@ -943,7 +945,7 @@ export function FormationScreen() {
   };
 
   return (
-    <PageContainer title="Formazione">
+    <PageContainer title="Formazione" refreshing={pull.refreshing} onRefresh={pull.onRefresh}>
       <View style={styles.content}>
         <View style={styles.statusRow}>
           <Text style={styles.turnTitle} testID="formation-cutoff">
@@ -1141,7 +1143,7 @@ export function FormationScreen() {
                       {lockLabel(id) ? <Text style={styles.benchLock}>{lockLabel(id)}</Text> : null}
                     </View>
                     <Text style={styles.meta}>
-                      {locked ? "Bloccato · " : ""}
+                      {locked ? "🔒 " : ""}
                       può subentrare
                       {playerScoreLabel(id) ? ` · ${playerScoreLabel(id)}` : ""}
                     </Text>

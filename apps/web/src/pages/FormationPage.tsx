@@ -493,7 +493,11 @@ function BenchOrderRow({
         <Badge variant={roleBadgeVariant(role)}>{role ?? "?"}</Badge>
         <AthleteName athleteId={athleteId}>{name}</AthleteName>
         {lockCountdown ? <span className="fa-bench-order__lock">{lockCountdown}</span> : null}
-        {locked ? " — bloccato" : ""}
+        {locked ? (
+          <span className="fa-bench-order__lockicon" role="img" aria-label="Bloccato" title="Bloccato">
+            {" 🔒"}
+          </span>
+        ) : null}
         {scoreLabel ? (
           <strong
             className="fa-bench-order__score"
@@ -1437,6 +1441,8 @@ export function FormationPage() {
         return state === "bench" || state === "expelled" || state === "unavailable" ? state : null;
       })(),
       lockCountdown: athleteId ? lockLabel(athleteId) : null,
+      locked: athleteId ? playerLocked(roster, athleteId, clock, lockMarginMinutes) : false,
+      live: athleteId ? roster.some((row) => row.athleteId === athleteId && row.fixtureStatusLabel === "LIVE") : false,
       photoUrl: athleteId ? playerPhotoUrl(roster, athleteId) : null,
       scoreLabel: athleteId ? playerScoreLabel(roster, athleteId) : null,
       badges: athleteId ? playerBadges(roster, athleteId) : [],

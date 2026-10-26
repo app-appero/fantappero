@@ -25,6 +25,8 @@ export type PitchPlayer = {
   voteKind?: "sv" | "provisional" | null;
   /** Altri stati dalle formazioni probabili: possibile panchina (giallo), espulso (rosso), indisponibile (grigio). */
   probableState?: "bench" | "expelled" | "unavailable" | null;
+  /** Calciatore bloccato (partita iniziata): lucchetto sul pallino. */
+  locked?: boolean;
   /** Countdown del prossimo blocco, sotto il nome. */
   lockCountdown?: string | null;
 };
@@ -48,9 +50,30 @@ function abbreviateName(name: string): string {
   return `${initials.join(" ")} ${last}`;
 }
 
+function PlayerScore({ player, above }: { player: PitchPlayer; above?: boolean }) {
+  if (!player.scoreLabel) {
+    return null;
+  }
+  return (
+    <span
+      className={classNames(
+        "fa-pitch-player__score",
+        above && "fa-pitch-player__score--above",
+        player.voteKind === "sv" && "fa-pitch-player__score--sv",
+        player.voteKind === "provisional" && "fa-pitch-player__score--provisional",
+      )}
+    >
+      {player.scoreLabel}
+    </span>
+  );
+}
+
 function PlayerPillBody({ player }: { player: PitchPlayer }) {
+  // Il portiere sta in fondo al campo: il voto (con LIVE) va sopra la foto, dove si legge.
+  const scoreAbove = player.role === "P" || player.role === "G";
   return (
     <>
+      {scoreAbove ? <PlayerScore player={player} above /> : null}
       <div className="fa-pitch-player__badges">
         <EventBadges badges={player.badges ?? []} size={12} />
       </div>
@@ -64,22 +87,17 @@ function PlayerPillBody({ player }: { player: PitchPlayer }) {
           <span className="fa-pitch-player__number-badge">{player.shirtNumber}</span>
         ) : null}
         <RoleBadge code={player.role} className="fa-pitch-player__role" />
+        {player.locked ? (
+          <span className="fa-pitch-player__lockdot" role="img" aria-label="Bloccato">
+            🔒
+          </span>
+        ) : null}
       </div>
       <span className="fa-pitch-player__name">{abbreviateName(player.name)}</span>
       {player.lockCountdown ? (
         <span className="fa-pitch-player__lock">{player.lockCountdown}</span>
       ) : null}
-      {player.scoreLabel ? (
-        <span
-          className={classNames(
-            "fa-pitch-player__score",
-            player.voteKind === "sv" && "fa-pitch-player__score--sv",
-            player.voteKind === "provisional" && "fa-pitch-player__score--provisional",
-          )}
-        >
-          {player.scoreLabel}
-        </span>
-      ) : null}
+      {scoreAbove ? null : <PlayerScore player={player} />}
     </>
   );
 }
