@@ -40,6 +40,7 @@ from leagues.pro_export_service import build_league_export
 from leagues.schemas import (
     AcceptLeagueInviteRequest,
     AcceptLeagueInviteResponse,
+    CompetitionAvailabilityResponse,
     CompetitionSummaryResponse,
     CreateLeagueInviteRequest,
     CreateLeagueInviteResponse,
@@ -133,6 +134,24 @@ def list_competitions(
 ) -> list[CompetitionSummaryResponse]:
     """List MVP competitions available when configuring a league."""
     return service.list_competitions()
+
+
+@router.get(
+    "/available-competitions",
+    response_model=list[CompetitionAvailabilityResponse],
+)
+def list_available_competitions(
+    season_year: int = Query(alias="seasonYear"),
+    _current_user: User = Depends(require_permissions(Permission.LEAGUE_VIEW)),
+    service: LeagueService = Depends(get_league_service),
+) -> list[CompetitionAvailabilityResponse]:
+    """Competizioni con stato di selezionabilità per la stagione (TASK 9).
+
+    ``selectable=false`` quando il girone di ritorno è già iniziato: la UI
+    può disabilitare la competizione prima del submit di creazione lega,
+    che applica comunque lo stesso controllo lato server.
+    """
+    return service.list_available_competitions(season_year)
 
 
 @router.post("", response_model=LeagueDetailResponse, status_code=status.HTTP_201_CREATED)

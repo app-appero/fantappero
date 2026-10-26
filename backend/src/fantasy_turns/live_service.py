@@ -23,6 +23,7 @@ from fantasy_turns.live_view import (
     build_timeline,
     fixture_feed_state,
     minute_label,
+    substitution_minutes,
 )
 from fantasy_turns.models import FantasyRound, FantasyRoundFixture
 from fantasy_turns.schemas import (
@@ -90,13 +91,23 @@ def get_fixture_live_detail(
         now=now,
     )
     predicted = latest_predicted_view(session, fixture.id)
-    home_lineup = _lineup_payload(session, fixture_id=fixture.id, club_id=fixture.home_club_id)
-    away_lineup = _lineup_payload(session, fixture_id=fixture.id, club_id=fixture.away_club_id)
+    raw_events = _raw_events(session, fixture_id=fixture.id)
+    sub_out, sub_in = substitution_minutes(raw_events)
+    home_lineup = _lineup_payload(
+        session, fixture_id=fixture.id, club_id=fixture.home_club_id, sub_out=sub_out, sub_in=sub_in
+    )
+    away_lineup = _lineup_payload(
+        session, fixture_id=fixture.id, club_id=fixture.away_club_id, sub_out=sub_out, sub_in=sub_in
+    )
     if predicted is not None:
         if home_lineup is None and predicted.home is not None:
-            home_lineup = _predicted_lineup_payload(predicted.home, fixture.home_club)
+            home_lineup = _predicted_lineup_payload(
+                predicted.home, fixture.home_club, sub_out=sub_out, sub_in=sub_in
+            )
         if away_lineup is None and predicted.away is not None:
-            away_lineup = _predicted_lineup_payload(predicted.away, fixture.away_club)
+            away_lineup = _predicted_lineup_payload(
+                predicted.away, fixture.away_club, sub_out=sub_out, sub_in=sub_in
+            )
 
     return FixtureLiveDetailResponse(
         fixtureId=str(fixture.id),
@@ -124,7 +135,7 @@ def get_fixture_live_detail(
         homeLineup=home_lineup,
         awayLineup=away_lineup,
         unavailablePlayers=_unavailable_payload(predicted, fixture),
-        events=_timeline_payload(session, fixture_id=fixture.id),
+        events=_timeline_payload(raw_events),
     )
 
 
@@ -139,6 +150,8 @@ def _lineup_payload(
     *,
     fixture_id: UUID,
     club_id: UUID,
+    sub_out: dict[str, int],
+    sub_in: dict[str, int],
 ) -> FixtureLineupResponse | None:
     lineup = session.execute(
         select(OfficialLineup)
@@ -158,10 +171,14 @@ def _lineup_payload(
     entries = sorted(lineup.entries, key=lambda row: (row.sort_order, row.athlete_provider_id))
     starters: list[FixtureLineupPlayerResponse] = []
     bench: list[FixtureLineupPlayerResponse] = []
+    bench_order = 0
     for entry in entries:
         athlete = entry.athlete
+        athlete_id = None if athlete is None else str(athlete.id)
+        if not entry.is_starter:
+            bench_order += 1
         payload = FixtureLineupPlayerResponse(
-            athleteId=None if athlete is None else str(athlete.id),
+            athleteId=athlete_id,
             # Senza anagrafica collegata resta il numero provider: è ciò che
             # sappiamo davvero, meglio di un nome inventato.
             name=_athlete_name(athlete) or f"#{entry.athlete_provider_id}",
@@ -169,6 +186,9 @@ def _lineup_payload(
             position=entry.position_raw,
             grid=entry.grid,
             photoUrl=None if athlete is None else athlete.photo_url,
+            benchOrder=None if entry.is_starter else bench_order,
+            substitutedOutMinute=None if athlete_id is None else sub_out.get(athlete_id),
+            substitutedInMinute=None if athlete_id is None else sub_in.get(athlete_id),
         )
         (starters if entry.is_starter else bench).append(payload)
 
@@ -183,23 +203,38 @@ def _lineup_payload(
     )
 
 
-def _predicted_player(row: PredictedViewPlayer) -> FixtureLineupPlayerResponse:
+def _predicted_player(
+    row: PredictedViewPlayer,
+    *,
+    sub_out: dict[str, int],
+    sub_in: dict[str, int],
+) -> FixtureLineupPlayerResponse:
     return FixtureLineupPlayerResponse(
         athleteId=row.athlete_id,
         name=row.name,
         shirtNumber=row.shirt_number,
         grid=row.grid,
+        role=row.role,
+        benchOrder=row.bench_order,
+        substitutedOutMinute=None if row.athlete_id is None else sub_out.get(row.athlete_id),
+        substitutedInMinute=None if row.athlete_id is None else sub_in.get(row.athlete_id),
     )
 
 
-def _predicted_lineup_payload(side: PredictedViewSide, club: Club) -> FixtureLineupResponse:
+def _predicted_lineup_payload(
+    side: PredictedViewSide,
+    club: Club,
+    *,
+    sub_out: dict[str, int],
+    sub_in: dict[str, int],
+) -> FixtureLineupResponse:
     return FixtureLineupResponse(
         clubName=club.name,
         clubLogoUrl=club.logo_url,
         formation=side.formation,
         coachName=side.coach_name,
-        starters=[_predicted_player(row) for row in side.starters],
-        bench=[_predicted_player(row) for row in side.bench],
+        starters=[_predicted_player(row, sub_out=sub_out, sub_in=sub_in) for row in side.starters],
+        bench=[_predicted_player(row, sub_out=sub_out, sub_in=sub_in) for row in side.bench],
         lineupKind="predicted",
         lineupNote=side.note,
     )
@@ -228,11 +263,11 @@ def _unavailable_payload(
     return rows
 
 
-def _timeline_payload(
+def _raw_events(
     session: Session,
     *,
     fixture_id: UUID,
-) -> list[FixtureTimelineEventResponse]:
+) -> list[RawTimelineEvent]:
     rows = session.scalars(
         select(MatchEvent)
         .where(MatchEvent.fixture_id == fixture_id)
@@ -243,7 +278,7 @@ def _timeline_payload(
         )
     ).all()
 
-    timeline = build_timeline(
+    return [
         RawTimelineEvent(
             id=str(row.id),
             minute_elapsed=row.minute_elapsed,
@@ -265,7 +300,11 @@ def _timeline_payload(
             sources=tuple(row.sources) if isinstance(row.sources, list) else (),
         )
         for row in rows
-    )
+    ]
+
+
+def _timeline_payload(raw_events: list[RawTimelineEvent]) -> list[FixtureTimelineEventResponse]:
+    timeline = build_timeline(raw_events)
 
     return [
         FixtureTimelineEventResponse(

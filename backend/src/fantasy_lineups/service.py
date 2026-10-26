@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from typing import Literal
 from uuid import UUID
 
 from sqlalchemy import delete, select
@@ -14,6 +15,7 @@ from auth.models.user import User
 from authorization.context import LeagueAccess, PermissionContext
 from authorization.permissions import has_permissions
 from database.enums import (
+    FantasyModule,
     FantasyRole,
     FantasyTurnStatus,
     LeagueAuditAction,
@@ -23,13 +25,16 @@ from database.enums import (
     TacticalMoveStatus,
     UserType,
 )
+from fantasy_lineups.ai_selection import LineupPlan
 from fantasy_lineups.ai_service import DEFAULT_MODULE
 from fantasy_lineups.best_lineup_service import (
     compute_best_lineup_for_team,
     compute_best_lineup_respecting_locks,
+    select_best_module,
 )
 from fantasy_lineups.models import LineupDraft, LineupPlayer, LineupSubmission, TacticalMove
 from fantasy_lineups.rules import (
+    APPROVED_MODULES,
     DEFAULT_LINEUP_LOCK_MARGIN_MINUTES,
     MAX_AUTOMATIC_SUBSTITUTIONS,
     MAX_TACTICAL_MOVES,
@@ -63,12 +68,12 @@ from fantasy_lineups.schemas import (
     SaveLineupRequest,
     TacticalMoveResponse,
 )
-from fantasy_ratings.round_scores import RoundAthleteScore, compute_round_athlete_scores
 from fantasy_lineups.validators import (
     parse_optional_athlete_ids,
     validate_athlete_id_list,
     validate_module_code,
 )
+from fantasy_ratings.round_scores import RoundAthleteScore, compute_round_athlete_scores
 from fantasy_teams.composition_service import resolve_effective_athlete_roles
 from fantasy_teams.factory import ensure_team_for_membership, find_team_for_membership
 from fantasy_teams.models import FantasyRosterSlot, FantasyTeam
@@ -586,6 +591,7 @@ class FantasyLineupService:
         league_access: LeagueAccess,
         round_id: UUID,
         target_team_id: UUID | None = None,
+        mode: Literal["keep_module", "best_module"] = "keep_module",
     ) -> LineupContextResponse:
         """Precompila la bozza con la stessa formula ``ai_lineup_v1`` delle squadre IA.
 
@@ -601,7 +607,22 @@ class FantasyLineupService:
         ancora una formazione confermata) resta in panchina — l'euristica
         ottimizza solo i calciatori non ancora bloccati, esattamente come
         farebbe un salvataggio manuale.
+
+        ``mode`` decide se il modulo è un input (``keep_module``, default:
+        ottimizza la rosa sul modulo già impostato dall'utente — la bozza se
+        non c'è ancora una formazione confermata, altrimenti il modulo
+        attuale) o un altro output da scegliere (``best_module``: prova ogni
+        modulo approvato e tiene quello con il punteggio totale più alto tra
+        i titolari, a parità di vincoli di blocco). Se nessun modulo è
+        completabile con la rosa attuale, ``best_module`` ricade sullo stesso
+        modulo di ``keep_module`` — stesso errore "rosa insufficiente" in
+        entrambi i casi, nessuna sorpresa per via della modalità scelta.
         """
+        if mode not in ("keep_module", "best_module"):
+            raise ValidationAuthError(
+                "Modalità non valida per l'applicazione della formazione migliore.",
+                code="invalid_lineup_mode",
+            )
         now = datetime.now(UTC)
         fantasy_round = self._load_round(league_access.league.id, round_id, for_update=True)
         if not self._actor_bypasses_kickoff_lock(league_access):
@@ -633,11 +654,11 @@ class FantasyLineupService:
         submission = self._load_submission(fantasy_round.id, team.id)
         draft = self._load_draft(fantasy_round.id, team.id)
         if submission is not None:
-            module = submission.module
+            current_module = submission.module
         elif draft is not None:
-            module = draft.module
+            current_module = draft.module
         else:
-            module = DEFAULT_MODULE
+            current_module = DEFAULT_MODULE
 
         roster = self._roster_rows(league_access.league.season_year, team)
         kickoffs = self._athlete_kickoffs(
@@ -656,38 +677,26 @@ class FantasyLineupService:
             }
         )
 
-        if not locked_ids:
-            plan = compute_best_lineup_for_team(
-                self._session,
-                league_id=league_access.league.id,
-                round_id=fantasy_round.id,
-                team_id=team.id,
-                season_year=league_access.league.season_year,
-                module=module,
-                decided_at=now,
+        if mode == "best_module":
+            module, plan = self._best_module_plan(
+                league_access=league_access,
+                fantasy_round=fantasy_round,
+                team=team,
+                now=now,
+                locked_ids=locked_ids,
+                submission=submission,
+                fallback_module=current_module,
             )
         else:
-            confirmed_slots = self._slots_from_submission(submission)
-            confirmed_starter_ids = {
-                UUID(athlete_id)
-                for athlete_id, slot_kind in confirmed_slots.items()
-                if slot_kind == LineupSlotKind.STARTER.value
-            }
-            confirmed_bench_order = [
-                UUID(athlete_id)
-                for athlete_id in self._bench_order_from_submission(submission)
-            ]
-            plan = compute_best_lineup_respecting_locks(
-                self._session,
-                league_id=league_access.league.id,
-                round_id=fantasy_round.id,
-                team_id=team.id,
-                season_year=league_access.league.season_year,
+            module = current_module
+            plan = self._plan_for_module(
+                league_access=league_access,
+                fantasy_round=fantasy_round,
+                team=team,
                 module=module,
-                decided_at=now,
-                locked_athlete_ids=locked_ids,
-                confirmed_starter_ids=confirmed_starter_ids,
-                confirmed_bench_order=confirmed_bench_order,
+                now=now,
+                locked_ids=locked_ids,
+                submission=submission,
             )
         if not plan.is_complete:
             get_metrics().incr(
@@ -718,6 +727,7 @@ class FantasyLineupService:
                 "roundId": str(fantasy_round.id),
                 "fantasyTeamId": str(team.id),
                 "module": module.value,
+                "mode": mode,
                 "algorithmVersion": plan.algorithm_version,
             },
         )
@@ -732,6 +742,102 @@ class FantasyLineupService:
             now=now,
             season_year=league_access.league.season_year,
             fantasy_team_id=team.id,
+        )
+
+    def _plan_for_module(
+        self,
+        *,
+        league_access: LeagueAccess,
+        fantasy_round: FantasyRound,
+        team: FantasyTeam,
+        module: FantasyModule,
+        now: datetime,
+        locked_ids: set[UUID],
+        submission: LineupSubmission | None,
+    ) -> LineupPlan:
+        """Un piano per un modulo specifico — stessa scelta tra le due euristiche
+        (libera o a blocchi rispettati) già usata da ``apply_best_lineup``,
+        isolata qui per poter essere ripetuta su più moduli in ``best_module``."""
+        if not locked_ids:
+            return compute_best_lineup_for_team(
+                self._session,
+                league_id=league_access.league.id,
+                round_id=fantasy_round.id,
+                team_id=team.id,
+                season_year=league_access.league.season_year,
+                module=module,
+                decided_at=now,
+            )
+        confirmed_slots = self._slots_from_submission(submission)
+        confirmed_starter_ids = {
+            UUID(athlete_id)
+            for athlete_id, slot_kind in confirmed_slots.items()
+            if slot_kind == LineupSlotKind.STARTER.value
+        }
+        confirmed_bench_order = [
+            UUID(athlete_id) for athlete_id in self._bench_order_from_submission(submission)
+        ]
+        return compute_best_lineup_respecting_locks(
+            self._session,
+            league_id=league_access.league.id,
+            round_id=fantasy_round.id,
+            team_id=team.id,
+            season_year=league_access.league.season_year,
+            module=module,
+            decided_at=now,
+            locked_athlete_ids=locked_ids,
+            confirmed_starter_ids=confirmed_starter_ids,
+            confirmed_bench_order=confirmed_bench_order,
+        )
+
+    def _best_module_plan(
+        self,
+        *,
+        league_access: LeagueAccess,
+        fantasy_round: FantasyRound,
+        team: FantasyTeam,
+        now: datetime,
+        locked_ids: set[UUID],
+        submission: LineupSubmission | None,
+        fallback_module: FantasyModule,
+    ) -> tuple[FantasyModule, LineupPlan]:
+        """Il modulo approvato (tra tutti quelli del catalogo) che massimizza il
+        punteggio totale degli undici titolari scelti, vincoli di blocco
+        compresi. A parità di punteggio vince il modulo con codice minore
+        (ordine stabile, nessuna sorpresa a parità di rosa).
+
+        Se nessun modulo è completabile con la rosa attuale — stessa rosa
+        validata, quindi può succedere solo per un vincolo di ruolo troppo
+        stretto — ricade sul modulo attuale: lo stesso piano (anche
+        incompleto) che ``keep_module`` userebbe, così l'errore "rosa
+        insufficiente" non cambia comportamento in base alla modalità scelta.
+        """
+        plans = [
+            (
+                module,
+                self._plan_for_module(
+                    league_access=league_access,
+                    fantasy_round=fantasy_round,
+                    team=team,
+                    module=module,
+                    now=now,
+                    locked_ids=locked_ids,
+                    submission=submission,
+                ),
+            )
+            for module in APPROVED_MODULES
+        ]
+        best = select_best_module(plans)
+        if best is not None:
+            return best
+        return fallback_module, self._plan_for_module(
+            league_access=league_access,
+            fantasy_round=fantasy_round,
+            team=team,
+            module=fallback_module,
+            now=now,
+            locked_ids=locked_ids,
+            submission=submission,
         )
 
     def save_my_draft(

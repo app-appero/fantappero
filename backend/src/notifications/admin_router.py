@@ -16,8 +16,9 @@ from auth.models.user import User
 from auth.schemas import ApiModel
 from authorization.dependencies import require_permissions
 from database.enums import Permission
-from notifications import broadcast_service
+from notifications import broadcast_service, operator_email_service
 from notifications.broadcast_service import BroadcastError
+from notifications.operator_email_service import OperatorEmailError
 from notifications.samples import SAMPLES
 from notifications.service import NotificationService
 from notifications.templates import render_notification
@@ -100,6 +101,33 @@ class BroadcastHistoryItem(ApiModel):
 
 class BroadcastHistory(ApiModel):
     items: list[BroadcastHistoryItem]
+    total: int
+    page: int
+    page_size: int = Field(alias="pageSize")
+
+
+class SendOperatorEmailRequest(ApiModel):
+    subject: str = Field(min_length=1, max_length=120)
+    body: str = Field(min_length=1, max_length=5000)
+    audience: BroadcastAudience
+
+
+class OperatorEmailSent(ApiModel):
+    id: str
+    recipient_count: int = Field(alias="recipientCount")
+
+
+class OperatorEmailHistoryItem(ApiModel):
+    id: str
+    subject: str
+    audience_label: str = Field(alias="audienceLabel")
+    recipient_count: int = Field(alias="recipientCount")
+    sent_at: str = Field(alias="sentAt")
+    created_by_user_id: str | None = Field(default=None, alias="createdByUserId")
+
+
+class OperatorEmailHistory(ApiModel):
+    items: list[OperatorEmailHistoryItem]
     total: int
     page: int
     page_size: int = Field(alias="pageSize")
@@ -253,6 +281,54 @@ def cancel_broadcast(
             },
         )
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+def _email_error(exc: OperatorEmailError) -> JSONResponse:
+    return JSONResponse(
+        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        content={"message": exc.message, "code": exc.code},
+    )
+
+
+@router.post("/emails", response_model=OperatorEmailSent)
+def send_operator_email(
+    body: SendOperatorEmailRequest,
+    operator: User = Depends(require_permissions(Permission.GLOBAL_OPERATE)),
+    session: Session = Depends(get_db_session),
+) -> OperatorEmailSent | JSONResponse:
+    try:
+        log = operator_email_service.send_operator_email(
+            session,
+            created_by=operator.id,
+            subject=body.subject,
+            body=body.body,
+            audience=body.audience.model_dump(mode="json"),
+        )
+    except OperatorEmailError as exc:
+        return _email_error(exc)
+    return OperatorEmailSent(id=str(log.id), recipientCount=log.recipient_count)
+
+
+@router.get("/emails", response_model=OperatorEmailHistory)
+def list_operator_emails(
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=10, ge=1, le=100, alias="pageSize"),
+    _operator: User = Depends(require_permissions(Permission.GLOBAL_OPERATE)),
+    session: Session = Depends(get_db_session),
+) -> OperatorEmailHistory:
+    rows, total = operator_email_service.list_history(session, page=page, page_size=page_size)
+    items = [
+        OperatorEmailHistoryItem(
+            id=str(row.id),
+            subject=row.subject,
+            audienceLabel=row.audience_label,
+            recipientCount=row.recipient_count,
+            sentAt=row.sent_at.isoformat(),
+            createdByUserId=str(row.created_by_user_id) if row.created_by_user_id else None,
+        )
+        for row in rows
+    ]
+    return OperatorEmailHistory(items=items, total=total, page=page, pageSize=page_size)
 
 
 @router.get("/test-samples", response_model=SampleList)

@@ -34,13 +34,14 @@ from fantasy_turns.validators import (
     validate_turn_coverage_threshold,
 )
 from leagues.calendar_service import league_has_confirmed_calendar
-from leagues.models.competition import Competition
 from leagues.market_open import read_market_open, read_market_open_map
+from leagues.models.competition import Competition
 from leagues.models.league import League
 from leagues.models.league_audit_event import LeagueAuditEvent
 from leagues.models.league_membership import LeagueMembership
 from leagues.models.league_rules import LeagueRules
 from leagues.schemas import (
+    CompetitionAvailabilityResponse,
     CompetitionSummaryResponse,
     CreateLeagueRequest,
     LeagueAdminPanelResponse,
@@ -54,6 +55,7 @@ from leagues.schemas import (
     TransitionLeagueStateRequest,
     UpdateLeagueRulesRequest,
 )
+from leagues.second_leg import SecondLegStatus, second_leg_statuses_for_competitions
 from leagues.validators import (
     LEAGUE_TRANSITIONS,
     MAX_PARTICIPANTS,
@@ -80,6 +82,7 @@ from leagues.validators import (
     validate_preset_name,
     validate_refund_percent,
     validate_season_year,
+    validate_second_leg_not_started,
     validate_standard_roster,
     validate_total_credits,
 )
@@ -101,6 +104,26 @@ class LeagueService:
         ).all()
         return [self._to_competition_summary(row) for row in rows]
 
+    def list_available_competitions(
+        self,
+        season_year: int,
+    ) -> list[CompetitionAvailabilityResponse]:
+        """Catalogo competizioni con lo stato "girone di ritorno" per la stagione (TASK 9).
+
+        Permette alla UI di disabilitare in anticipo le competizioni non più
+        selezionabili, prima ancora del submit di creazione lega.
+        """
+        season_year = validate_season_year(season_year)
+        rows = self._session.scalars(
+            select(Competition).order_by(Competition.name.asc()),
+        ).all()
+        statuses = second_leg_statuses_for_competitions(
+            self._session,
+            competition_ids=[row.id for row in rows],
+            season_year=season_year,
+        )
+        return [self._to_competition_availability(row, statuses[row.id]) for row in rows]
+
     def create_league(self, user: User, payload: CreateLeagueRequest) -> LeagueDetailResponse:
         name = validate_league_name(payload.name)
         season_year = validate_season_year(payload.season_year)
@@ -114,6 +137,21 @@ class LeagueService:
                 "Uno o più campionati selezionati non sono validi.",
                 code="invalid_competition_ids",
             )
+
+        # TASK 9: la creazione è consentita solo se *tutte* le competizioni
+        # selezionate non hanno ancora iniziato il girone di ritorno. Una
+        # sola bloccante basta a bloccare l'intera richiesta.
+        second_leg_statuses = second_leg_statuses_for_competitions(
+            self._session,
+            competition_ids=[competition.id for competition in competitions],
+            season_year=season_year,
+        )
+        blocked_names = [
+            competition.name
+            for competition in competitions
+            if second_leg_statuses[competition.id].second_leg_started
+        ]
+        validate_second_leg_not_started(blocked_names)
 
         league = League(
             name=name,
@@ -633,6 +671,22 @@ class LeagueService:
             providerId=competition.provider_id,
             name=competition.name,
             country=competition.country,
+        )
+
+    @staticmethod
+    def _to_competition_availability(
+        competition: Competition,
+        status: SecondLegStatus,
+    ) -> CompetitionAvailabilityResponse:
+        return CompetitionAvailabilityResponse(
+            id=str(competition.id),
+            providerId=competition.provider_id,
+            name=competition.name,
+            country=competition.country,
+            secondLegStarted=status.second_leg_started,
+            selectable=not status.second_leg_started,
+            currentRound=status.current_round,
+            totalRounds=status.total_rounds,
         )
 
     def _to_league_detail(self, league: League, *, viewer_role: str | None) -> LeagueDetailResponse:

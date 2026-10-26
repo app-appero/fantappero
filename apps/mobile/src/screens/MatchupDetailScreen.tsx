@@ -23,6 +23,7 @@ import { PitchView } from "../components/match/PitchView";
 import { StatusBadge } from "../components/StatusBadge";
 import { UiStatePanel } from "../components/UiStatePanel";
 import { PageContainer } from "../layout/PageContainer";
+import { usePullRefresh } from "../hooks/usePullRefresh";
 import { useLiveMatchupPolling } from "../matchday/useLiveMatchupPolling";
 import type { RootStackParamList } from "../navigation/types";
 import { getApiErrorMessage, useAuthSession } from "../session/DemoSessionContext";
@@ -164,6 +165,7 @@ export function MatchupDetailScreen() {
   useEffect(() => {
     void loadDetail();
   }, [loadDetail]);
+  const pull = usePullRefresh(loadDetail);
 
   const { degraded: liveDegraded } = useLiveMatchupPolling(
     accessToken,
@@ -188,7 +190,7 @@ export function MatchupDetailScreen() {
   }
 
   return (
-    <PageContainer title="Scontro diretto" testID="screen-matchup-detail">
+    <PageContainer title="Scontro diretto" testID="screen-matchup-detail" refreshing={pull.refreshing} onRefresh={pull.onRefresh}>
       <Pressable onPress={() => navigation.goBack()} testID="matchup-back">
         <Text style={styles.link}>← Torna al calendario fantallenatori</Text>
       </Pressable>

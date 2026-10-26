@@ -58,7 +58,9 @@ def test_goal_notifies_owner_during_live_match() -> None:
     assert sent == 1
     call = _FakeService.calls[0]
     assert call["template_key"] == "risultati.gol"
-    assert call["params"] == {"minute": 63, "player": "Mario Rossi"}
+    # "deep_link" è sempre presente (TASK4): col session finto non si risolve
+    # nessuno scontro, quindi ricade sul percorso generico "/turni".
+    assert call["params"] == {"minute": 63, "player": "Mario Rossi", "deep_link": "/turni"}
     assert call["template_version"] == 2
 
 
@@ -127,3 +129,52 @@ def test_availability_injury_and_suspension() -> None:
 def test_availability_other_category_ignored() -> None:
     row = SimpleNamespace(id=uuid4(), athlete_id=uuid4(), category=SimpleNamespace(value="other"))
     assert match_events.notify_availability(_session(), availability=row) == 0
+
+
+# -- TASK4: deep link allo scontro H2H specifico -----------------------------------------------
+
+
+def test_goal_resolves_deep_link_per_recipient_team(monkeypatch: pytest.MonkeyPatch) -> None:
+    """La risoluzione del deep link è chiamata con la fixture dell'evento e il
+    team del destinatario (non una volta sola per l'evento): squadre diverse
+    possono finire in scontri H2H diversi."""
+    fixture_id = uuid4()
+    seen_calls: list[dict[str, object]] = []
+
+    def fake_resolve(session: object, *, team_id: object, fixture_id: object, fallback: str) -> str:
+        seen_calls.append({"team_id": team_id, "fixture_id": fixture_id, "fallback": fallback})
+        return f"/turni/scontro/{team_id}"
+
+    monkeypatch.setattr(match_events, "resolve_matchup_deep_link", fake_resolve)
+    event = _event(scoring_kind="goal", fixture_id=fixture_id)
+    assert match_events.notify_match_event(_session(), event=event, fixture_status="2H") == 1
+
+    assert len(seen_calls) == 1
+    assert seen_calls[0]["fixture_id"] == fixture_id
+    assert seen_calls[0]["fallback"] == "/turni"
+    call_params = _FakeService.calls[0]["params"]
+    assert call_params["deep_link"] == f"/turni/scontro/{seen_calls[0]['team_id']}"
+
+
+def test_availability_resolves_deep_link_with_formation_fallback(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Infortunio/squalifica: se la fixture non porta a nessuno scontro si
+    torna su «/formazione» (non «/turni»): è il posto giusto da cui togliere
+    il giocatore, coerente col comportamento preesistente dei template v2."""
+    fixture_id = uuid4()
+    seen_fallbacks: list[str] = []
+
+    def fake_resolve(session: object, *, team_id: object, fixture_id: object, fallback: str) -> str:
+        seen_fallbacks.append(fallback)
+        return fallback
+
+    monkeypatch.setattr(match_events, "resolve_matchup_deep_link", fake_resolve)
+    row = SimpleNamespace(
+        id=uuid4(),
+        athlete_id=uuid4(),
+        category=SimpleNamespace(value="injury"),
+        fixture_id=fixture_id,
+    )
+    assert match_events.notify_availability(_session(), availability=row) == 1
+    assert seen_fallbacks == ["/formazione"]

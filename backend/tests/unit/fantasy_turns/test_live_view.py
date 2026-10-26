@@ -13,6 +13,7 @@ from fantasy_turns.live_view import (
     build_timeline,
     fixture_feed_state,
     minute_label,
+    substitution_minutes,
     turn_feed_state,
 )
 
@@ -236,3 +237,58 @@ def test_synthetic_event_without_a_raw_counterpart_is_kept() -> None:
     timeline = build_timeline([only_from_stats])
     assert len(timeline) == 1
     assert timeline[0].id == "penalty-saved"
+
+
+# ---------------------------------------------------------------------------
+# Badge "sostituito" (EP13-P04 — TASK 3)
+# ---------------------------------------------------------------------------
+
+
+def test_substitution_minutes_split_out_and_in_from_the_generic_event_fields() -> None:
+    """Nella struttura generica dell'evento (condivisa con gol+assist), il
+    provider mette in `athlete_id` chi esce e in `related_athlete_id` chi
+    entra: stessa convenzione osservata nei payload reali API-Football per
+    l'evento di tipo `subst`."""
+    sub = event("sub-1", minute=55, event_type="subst", scoring_kind=None)
+    out_minutes, in_minutes = substitution_minutes([sub])
+    assert out_minutes == {"athlete-1": 55}
+    assert in_minutes == {"athlete-2": 55}
+
+
+def test_substitution_event_type_match_is_case_insensitive() -> None:
+    sub = event("sub-1", minute=60, event_type="Subst", scoring_kind=None)
+    out_minutes, in_minutes = substitution_minutes([sub])
+    assert out_minutes == {"athlete-1": 60}
+    assert in_minutes == {"athlete-2": 60}
+
+
+def test_non_substitution_events_do_not_produce_substitution_minutes() -> None:
+    goal = event("goal-1", minute=10)
+    out_minutes, in_minutes = substitution_minutes([goal])
+    assert out_minutes == {}
+    assert in_minutes == {}
+
+
+def test_retracted_or_inactive_substitution_is_ignored() -> None:
+    retracted = event("sub-1", minute=55, event_type="subst", scoring_kind=None, retracted=NOW)
+    inactive = event("sub-2", minute=60, event_type="subst", scoring_kind=None, active=False)
+    out_minutes, in_minutes = substitution_minutes([retracted, inactive])
+    assert out_minutes == {}
+    assert in_minutes == {}
+
+
+def test_substitution_without_a_minute_is_not_recorded() -> None:
+    sub = event("sub-1", minute=None, event_type="subst", scoring_kind=None)
+    out_minutes, in_minutes = substitution_minutes([sub])
+    assert out_minutes == {}
+    assert in_minutes == {}
+
+
+def test_first_substitution_minute_wins_if_a_player_appears_twice() -> None:
+    """Un calciatore esce (o entra) una sola volta in una partita: se per un
+    qualsiasi motivo compaiono due righe, la prima incontrata resta quella
+    valida invece di essere sovrascritta silenziosamente."""
+    first = event("sub-1", minute=40, event_type="subst", scoring_kind=None)
+    second = event("sub-2", minute=75, event_type="subst", scoring_kind=None)
+    out_minutes, _ = substitution_minutes([first, second])
+    assert out_minutes == {"athlete-1": 40}

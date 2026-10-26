@@ -119,10 +119,18 @@ def match_squad_player(name: str | None, squad: Sequence[SquadPlayer]) -> UUID |
     if len(tokens) >= 2 and len(tokens[0]) <= 2:
         initial = tokens[0][0]
         last = " ".join(tokens[1:])
+        # Un calciatore in rosa senza nome proprio noto (es. anagrafica
+        # incompleta: `canonical_name` è solo il cognome) non va scartato per
+        # questo: non possiamo confermare l'iniziale, ma nemmeno escluderla.
+        # Altrimenti un cognome univoco smette di abbinarsi solo perché la
+        # rosa non ha il nome proprio, mentre un compagno con anagrafica
+        # completa continua ad abbinarsi — esattamente il tipo di asimmetria
+        # che fa sembrare "rotto" un singolo giocatore.
         hits = [
             player
             for player in squad
-            if _last_name(player) == last and _first_initial(player) == initial
+            if _last_name(player) == last
+            and (_first_initial(player) == initial or _first_initial(player) == "")
         ]
         if len(hits) == 1:
             return hits[0].athlete_id
@@ -136,7 +144,11 @@ def match_squad_player(name: str | None, squad: Sequence[SquadPlayer]) -> UUID |
         refined: list[SquadPlayer] = []
         for player in hits:
             given = _given_name(player)
-            if given.startswith(first) or (len(first) == 1 and given.startswith(first)):
+            if not given:
+                # Nome proprio sconosciuto in rosa: il cognome resta l'unico
+                # segnale disponibile, non lo invalidiamo.
+                refined.append(player)
+            elif given.startswith(first) or (len(first) == 1 and given.startswith(first)):
                 refined.append(player)
         hits = refined
     if len(hits) == 1:

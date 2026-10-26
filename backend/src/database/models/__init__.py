@@ -45,6 +45,7 @@ from market.models import MarketBid, MarketSession, TradeProposal
 from notifications.models import (
     Notification,
     NotificationBroadcast,
+    NotificationEventPreference,
     NotificationPreference,
     PushDevice,
 )
@@ -110,6 +111,7 @@ __all__ = [
     "NamedLeagueInvite",
     "Notification",
     "NotificationBroadcast",
+    "NotificationEventPreference",
     "NotificationPreference",
     "OfficialLineup",
     "OfficialLineupEntry",
