@@ -37,6 +37,7 @@ import { LockCountdown } from "../components/LockCountdown";
 import { StatusBadge } from "../components/StatusBadge";
 import { UiStatePanel } from "../components/UiStatePanel";
 import { PageContainer } from "../layout/PageContainer";
+import { usePullRefresh } from "../hooks/usePullRefresh";
 import { useLiveH2HPolling } from "../matchday/useLiveH2HPolling";
 import { useLiveTurnPolling } from "../matchday/useLiveTurnPolling";
 import { useLockCountdown } from "../matchday/useLockCountdown";
@@ -206,6 +207,8 @@ export function MatchdayScreen() {
     }
   }, [accessToken, activeLeagueId]);
 
+  const pull = usePullRefresh(loadH2H, loadTurns, loadPendingFixtures);
+
   useEffect(() => {
     void loadH2H();
     void loadTurns();
@@ -289,7 +292,7 @@ export function MatchdayScreen() {
   }
 
   return (
-    <PageContainer title="Turni" testID="screen-matchday">
+    <PageContainer title="Turni" testID="screen-matchday" refreshing={pull.refreshing} onRefresh={pull.onRefresh}>
       <View style={styles.stack}>
         <HScroll testID="matchday-tabs">
           <Pressable

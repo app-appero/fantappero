@@ -139,6 +139,13 @@ export function FormationPitch({
         const pos = positions[slot.index];
         const empty = !slot.athleteId;
         const selected = selectedIndex === slot.index;
+        const scoreAbove = slot.role === "P";
+        const scorePill =
+          !empty && slot.scoreLabel ? (
+            <View style={[styles.scorePill, slot.sv ? styles.scorePillSv : null]} testID={`formation-score-${slot.index}`}>
+              <Text style={styles.scorePillText}>{slot.scoreLabel}</Text>
+            </View>
+          ) : null;
         return (
           <Pressable
             key={slot.index}
@@ -153,6 +160,7 @@ export function FormationPitch({
             style={[styles.slot, { left: `${pos?.x ?? 50}%` as `${number}%`, top: `${pos?.y ?? 50}%` as `${number}%` }]}
             testID={`formation-starter-${slot.index}`}
           >
+            {scoreAbove ? scorePill : null}
             {empty ? (
               <View style={[styles.emptyCircle, selected ? styles.selectedRing : null]}>
                 <Text style={styles.plus}>+</Text>
@@ -191,9 +199,9 @@ export function FormationPitch({
             >
               <Text style={styles.labelText} numberOfLines={1}>
                 {empty ? ROLE_SHORT[slot.role] : surname(slot.name)}
-                {!empty && slot.scoreLabel ? ` · ${slot.scoreLabel}` : ""}
               </Text>
             </View>
+            {scoreAbove ? null : scorePill}
             {!empty && slot.lockCountdown ? (
               <View style={styles.lockPill}>
                 <Text style={styles.lockCountdown}>{slot.lockCountdown}</Text>
@@ -541,6 +549,16 @@ const styles = lazyStyles(() =>
       backgroundColor: "rgba(8,12,30,0.82)",
     },
     lockCountdown: { color: "#ffffff", fontSize: 10, fontWeight: "700" },
+    scorePill: {
+      paddingHorizontal: 7,
+      paddingVertical: 1,
+      borderRadius: 999,
+      backgroundColor: "rgba(8,12,30,0.9)",
+      borderWidth: 1,
+      borderColor: "rgba(255,210,63,0.7)",
+    },
+    scorePillSv: { borderColor: "rgba(181,140,255,0.8)" },
+    scorePillText: { color: "#FFD23F", fontSize: 10, fontWeight: "800" },
     lockDot: {
       position: "absolute",
       right: -8,
