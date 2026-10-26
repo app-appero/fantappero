@@ -79,6 +79,31 @@ def test_goal_v2_names_player_in_title_and_match_in_body() -> None:
     assert content.deep_link == "/turni"
 
 
+def test_goal_v2_uses_matchup_deep_link_when_resolved() -> None:
+    """TASK4: se il produttore ha risolto lo scontro H2H del destinatario,
+    il link specifico vince sul generico "/turni"."""
+    content = render_notification(
+        "risultati.gol",
+        2,
+        {"player": "Lautaro Martinez", "minute": 23, "deep_link": "/turni/scontro/abc-123"},
+    )
+    assert content.deep_link == "/turni/scontro/abc-123"
+
+
+def test_infortunio_v2_defaults_to_formazione_without_matchup() -> None:
+    content = render_notification("risultati.infortunio", 2, {"player": "Lookman"})
+    assert content.deep_link == "/formazione"
+
+
+def test_infortunio_v2_uses_matchup_deep_link_when_resolved() -> None:
+    content = render_notification(
+        "risultati.infortunio",
+        2,
+        {"player": "Lookman", "deep_link": "/turni/scontro/xyz-999"},
+    )
+    assert content.deep_link == "/turni/scontro/xyz-999"
+
+
 def test_player_events_v2_titles() -> None:
     assert (
         render_notification("risultati.espulsione", 2, {"player": "Bastoni", "minute": 61}).title

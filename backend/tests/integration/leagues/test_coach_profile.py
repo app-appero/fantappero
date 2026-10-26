@@ -278,10 +278,13 @@ def test_unknown_coach_is_not_found(
     assert response.json()["code"] == "coach_not_found"
 
 
-def test_requester_cannot_query_their_own_profile(
+def test_requester_can_query_their_own_profile(
     client: TestClient, competition_ids: list[str]
 ) -> None:
-    """Stesso perimetro della directory: sé stessi non compaiono in elenco."""
+    """Regressione bug 8a: cliccare sul proprio nome in Classifica non deve
+    restituire "Profilo non trovato". La directory espone già sé stessi con
+    `isSelf=True`, quindi il lookup singolo deve restare coerente e non
+    escludere il chiamante."""
     token, user_id = _register_and_login(client, "dir-self@example.com")
     league_id = _create_league(client, token, competition_ids, "Lega Se Stesso")
 
@@ -289,8 +292,8 @@ def test_requester_cannot_query_their_own_profile(
         f"/leagues/{league_id}/amministrazione/fantallenatori/{user_id}",
         headers={"Authorization": f"Bearer {token}"},
     )
-    assert response.status_code == 400
-    assert response.json()["code"] == "coach_not_found"
+    assert response.status_code == 200
+    assert response.json()["userId"] == str(user_id)
 
 
 def test_current_league_member_is_reachable_from_standings(
@@ -370,3 +373,57 @@ def test_active_league_does_not_count_towards_history(
     assert response.status_code == 200
     assert response.json()["concludedLeagues"] == 0
     assert response.json()["historySummary"] == "Nessuna lega conclusa"
+
+
+def _promote_to_operator(db_session: Session, user_id: UUID) -> None:
+    user = db_session.get(User, user_id)
+    assert user is not None
+    user.platform_role = PlatformRole.OPERATOR
+    db_session.commit()
+
+
+def test_impersonated_league_admin_can_open_a_teammates_profile(
+    client: TestClient, db_session: Session, competition_ids: list[str]
+) -> None:
+    """Regressione bug 8b: un operatore impersona un utente normale (A, admin
+    della propria lega) e deve poter aprire il profilo di un ALTRO
+    fantallenatore (B) della stessa lega, esattamente come se A avesse
+    effettuato login normalmente.
+
+    L'endpoint di `impersonate` emette un access token che è, a tutti gli
+    effetti, il token dell'utente target: non esiste un claim separato che
+    preservi l'identità dell'operatore reale (`backend/src/admin/service.py`,
+    `create_access_token(user_id=user.id, ...)`). Di conseguenza i permessi
+    durante l'impersonazione sono SEMPRE quelli dell'utente impersonato nella
+    lega richiesta (qui: admin, perché A ha creato la lega), non quelli
+    dell'operatore. Questo test fissa quel comportamento come corretto."""
+    operator_token, operator_id = _register_and_login(client, "imp-operator@example.com")
+    _promote_to_operator(db_session, operator_id)
+
+    normal_token, normal_id = _register_and_login(client, "imp-normal-admin@example.com")
+    league_id = _create_league(client, normal_token, competition_ids, "Lega Impersonata")
+
+    seed = int(datetime.now(UTC).timestamp() * 1000) % 400_000
+    teammate = _make_coach(db_session, "impersonato-teammate", seed)
+    db_session.add(
+        LeagueMembership(
+            league_id=UUID(league_id),
+            user_id=teammate.id,
+            role=LeagueMemberRole.MEMBER,
+        )
+    )
+    db_session.commit()
+
+    impersonate = client.post(
+        f"/admin/users/{normal_id}/impersonate",
+        headers={"Authorization": f"Bearer {operator_token}"},
+    )
+    assert impersonate.status_code == 200, impersonate.text
+    impersonated_token = impersonate.json()["accessToken"]
+
+    response = client.get(
+        f"/leagues/{league_id}/amministrazione/fantallenatori/{teammate.id}",
+        headers={"Authorization": f"Bearer {impersonated_token}"},
+    )
+    assert response.status_code == 200, response.text
+    assert response.json()["userId"] == str(teammate.id)

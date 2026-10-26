@@ -144,6 +144,40 @@ class RawTimelineEvent:
     sources: tuple[str, ...] = ()
 
 
+#: Tipo evento del provider per una sostituzione (minuscolo nel payload
+#: API-Football; confrontato case-insensitive perché altri tipi — "Goal" —
+#: arrivano capitalizzati).
+SUBSTITUTION_EVENT_TYPE = "subst"
+
+
+def substitution_minutes(
+    events: Iterable[RawTimelineEvent],
+) -> tuple[dict[str, int], dict[str, int]]:
+    """Minuto di uscita e di ingresso per calciatore, dagli eventi di sostituzione.
+
+    Nella struttura generica di `MatchEvent` (condivisa con gol+assist),
+    il provider mette nel campo "principale" (`athlete_id`, ex `player`) chi
+    esce dal campo e nel campo "collegato" (`related_athlete_id`, ex
+    `assist`) chi entra. Un evento ritrattato o non più attivo (correzione
+    tardiva del provider) non deve generare un badge "sostituito" per una
+    sostituzione che non è mai avvenuta o è stata cancellata.
+    """
+    out_minutes: dict[str, int] = {}
+    in_minutes: dict[str, int] = {}
+    for event in events:
+        if not event.is_active or event.retracted_at is not None:
+            continue
+        if (event.event_type or "").strip().lower() != SUBSTITUTION_EVENT_TYPE:
+            continue
+        if event.minute_elapsed is None:
+            continue
+        if event.athlete_id is not None and event.athlete_id not in out_minutes:
+            out_minutes[event.athlete_id] = event.minute_elapsed
+        if event.related_athlete_id is not None and event.related_athlete_id not in in_minutes:
+            in_minutes[event.related_athlete_id] = event.minute_elapsed
+    return out_minutes, in_minutes
+
+
 def minute_label(minute_elapsed: int | None, minute_extra: int | None) -> str:
     """`45+2'` per i recuperi, `—` quando il minuto non è noto."""
     if minute_elapsed is None:

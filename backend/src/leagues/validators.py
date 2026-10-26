@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Literal
@@ -104,6 +105,30 @@ def validate_competition_ids(competition_ids: list[UUID]) -> list[UUID]:
             code="insufficient_competitions",
         )
     return competition_ids
+
+
+def validate_second_leg_not_started(blocked_names: Sequence[str]) -> None:
+    """TASK 9: blocca la creazione se una competizione selezionata ha già
+    iniziato il girone di ritorno.
+
+    ``blocked_names`` arriva già filtrato dal chiamante (service layer, che
+    ha i dati di calendario): qui viene solo composto il messaggio italiano,
+    nello stesso stile degli altri validator di questo modulo.
+    """
+    if not blocked_names:
+        return
+    ordered = sorted(set(blocked_names))
+    if len(ordered) == 1:
+        subject = f"il campionato '{ordered[0]}'"
+        verb = "ha"
+    else:
+        quoted = ", ".join(f"'{name}'" for name in ordered)
+        subject = f"i campionati {quoted}"
+        verb = "hanno"
+    raise ValidationAuthError(
+        f"Non è possibile creare la lega: {subject} {verb} già iniziato il girone di ritorno.",
+        code="competition_second_leg_started",
+    )
 
 
 def validate_preset_name(preset_name: str) -> str:

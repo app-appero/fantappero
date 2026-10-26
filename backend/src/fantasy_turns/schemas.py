@@ -62,6 +62,14 @@ class FixtureLineupPlayerResponse(ApiModel):
     position: str | None = None
     grid: str | None = None
     photo_url: str | None = Field(default=None, alias="photoUrl")
+    #: Ruolo fantacalcistico P/D/C/A, quando l'atleta è abbinato alla rosa.
+    role: str | None = None
+    #: Ordine di probabilità in panchina (1 = primo cambio). Assente per i titolari.
+    bench_order: int | None = Field(default=None, alias="benchOrder")
+    #: Badge "sostituito" — presenti solo sulle formazioni ufficiali/live, non
+    #: su quelle probabili (che non hanno eventi di gioco).
+    substituted_out_minute: int | None = Field(default=None, alias="substitutedOutMinute")
+    substituted_in_minute: int | None = Field(default=None, alias="substitutedInMinute")
 
 
 class FixtureLineupResponse(ApiModel):

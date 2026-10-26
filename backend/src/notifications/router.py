@@ -13,6 +13,7 @@ from auth.exceptions import AuthError
 from auth.models.user import User
 from authorization.dependencies import require_permissions
 from database.enums import NotificationCategory, Permission
+from notifications.event_catalog import EVENT_KEYS
 from notifications.samples import SAMPLES
 from notifications.schemas import (
     MarkAllReadResponse,
@@ -115,6 +116,47 @@ def update_notification_preference(
     current_user: User = Depends(require_permissions(Permission.PROFILE_VIEW)),
     service: NotificationService = Depends(get_notification_service),
 ) -> NotificationPreferenceListResponse | JSONResponse:
+    """Due forme nello stesso corpo (TASK5): per categoria (compatibilità,
+    EP09-01) o granulare per evento, selezionate da quale campo è presente.
+    """
+    if body.event_key is not None:
+        if body.category is not None:
+            return JSONResponse(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                content={
+                    "message": "Non si possono aggiornare categoria ed evento insieme.",
+                    "code": "invalid_preference_request",
+                },
+            )
+        if body.event_key not in EVENT_KEYS:
+            return JSONResponse(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                content={"message": "Evento non valido.", "code": "invalid_event_key"},
+            )
+        if body.in_app_enabled is None and body.push_enabled is None:
+            return JSONResponse(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                content={
+                    "message": "Specifica almeno un canale da aggiornare.",
+                    "code": "invalid_preference_request",
+                },
+            )
+        service.update_event_preference(
+            user_id=current_user.id,
+            event_key=body.event_key,
+            in_app_enabled=body.in_app_enabled,
+            push_enabled=body.push_enabled,
+        )
+        return service.get_preferences(user_id=current_user.id)
+
+    if body.category is None or body.in_app_enabled is None:
+        return JSONResponse(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            content={
+                "message": "Specifica una categoria e lo stato in-app.",
+                "code": "invalid_preference_request",
+            },
+        )
     try:
         category = NotificationCategory(body.category)
     except ValueError:

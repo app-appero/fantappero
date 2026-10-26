@@ -187,14 +187,20 @@ class NamedLeagueInviteService:
     ) -> FantasyCoachProfileResponse:
         """Profilo storico limitato di un fantallenatore (EP13-P06).
 
-        Reso accessibile a qualunque utente verificato diverso dal chiamante
-        (candidati da invitare così come membri già in questa lega, es. dal
-        click su un nome in Classifica): l'endpoint resta protetto da
-        `Permission.LEAGUE_ADMIN` sulla lega indicata. Lo storico restituisce
-        solo fatti derivati da leghe concluse — mai budget, rose o nomi di
-        lega; l'email è inclusa ed è visibile solo a chi amministra la lega,
-        per distinguere account diversi con lo stesso nome mostrato
-        (EP13-P06bis).
+        Reso accessibile a qualunque utente verificato, incluso il chiamante
+        stesso (candidati da invitare così come membri già in questa lega,
+        es. dal click su un nome in Classifica — anche il proprio): l'endpoint
+        resta protetto da `Permission.LEAGUE_ADMIN` sulla lega indicata. Lo
+        storico restituisce solo fatti derivati da leghe concluse — mai
+        budget, rose o nomi di lega; l'email è inclusa ed è visibile solo a
+        chi amministra la lega, per distinguere account diversi con lo
+        stesso nome mostrato (EP13-P06bis).
+
+        Il chiamante NON viene escluso: la directory (`directory()`) lo
+        elenca già con `isSelf=True`, e la Classifica può linkare anche la
+        propria riga. Escluderlo qui rompeva il click sul proprio nome con
+        "Fantallenatore non trovato" pur essendo un membro valido della lega
+        (bug 8a).
         """
         self._check_rate_limit("coach_directory", league_access)
         now = datetime.now(UTC)
@@ -217,7 +223,6 @@ class NamedLeagueInviteService:
                 User.id == user_id,
                 User.deleted_at.is_(None),
                 User.email_verified_at.is_not(None),
-                User.id != league_access.user.id,
                 UserProfile.display_name.is_not(None),
                 UserProfile.display_name != "",
             )

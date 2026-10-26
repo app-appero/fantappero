@@ -5,6 +5,7 @@ from __future__ import annotations
 import re
 from uuid import UUID
 
+import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
@@ -81,6 +82,110 @@ def test_create_notification_skips_when_preference_disabled(
     assert was_created is False
     listing = service.list_notifications(user_id=user_id, category=NotificationCategory.MERCATO)
     assert listing.total == 0
+
+
+def test_create_notification_skips_when_event_preference_disabled(
+    client: TestClient, db_session: Session
+) -> None:
+    """TASK5: spegnere il singolo evento "gol" non deve zittire tutta la
+    categoria "risultati" (es. l'omologazione del turno deve continuare ad
+    arrivare)."""
+    user_id = _register_and_login(client, "notif-event-pref@example.com")
+    service = NotificationService(db_session)
+
+    service.update_event_preference(
+        user_id=user_id, event_key="calciatori.gol", in_app_enabled=False, push_enabled=None
+    )
+    db_session.commit()
+
+    goal, goal_created = service.create_notification(
+        user_id=user_id,
+        category=NotificationCategory.RISULTATI,
+        template_key="risultati.gol",
+        template_version=2,
+        params={"player": "Bomber", "minute": 10},
+        dedup_key="test:event-pref:goal",
+    )
+    omologazione, omologazione_created = service.create_notification(
+        user_id=user_id,
+        category=NotificationCategory.RISULTATI,
+        template_key="risultati.omologazione",
+        template_version=1,
+        params={"round_number": 7},
+        dedup_key="test:event-pref:omologazione",
+    )
+    db_session.commit()
+
+    assert goal is None
+    assert goal_created is False
+    assert omologazione is not None
+    assert omologazione_created is True
+    assert service.list_notifications(user_id=user_id).total == 1
+
+
+def test_create_notification_with_push_disabled_still_creates_in_app_row(
+    client: TestClient, db_session: Session, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """TASK5: push e in-app sono canali indipendenti. Spegnere solo la push
+    su un evento deve lasciare intatta la notifica in-app (la campanella),
+    sopprimendo solo l'invio push per quella notifica."""
+    import notifications.service as service_module
+
+    dispatched: list[str] = []
+    monkeypatch.setattr(
+        service_module,
+        "dispatch_notification_push",
+        lambda **kwargs: dispatched.append(kwargs["notification"].dedup_key),
+    )
+
+    user_id = _register_and_login(client, "notif-push-pref@example.com")
+    service = NotificationService(db_session)
+    service.update_event_preference(
+        user_id=user_id, event_key="calciatori.gol", in_app_enabled=None, push_enabled=False
+    )
+    db_session.commit()
+
+    notification, created = service.create_notification(
+        user_id=user_id,
+        category=NotificationCategory.RISULTATI,
+        template_key="risultati.gol",
+        template_version=2,
+        params={"player": "Bomber", "minute": 10},
+        dedup_key="test:push-pref:goal",
+    )
+    db_session.commit()
+
+    assert notification is not None
+    assert created is True
+    assert service.list_notifications(user_id=user_id).total == 1
+    assert dispatched == []
+
+
+def test_get_preferences_includes_granular_events_defaulting_to_enabled(
+    client: TestClient, db_session: Session
+) -> None:
+    user_id = _register_and_login(client, "notif-event-defaults@example.com")
+    service = NotificationService(db_session)
+
+    preferences = service.get_preferences(user_id=user_id)
+    events_by_key = {event.event_key: event for event in preferences.events}
+    assert "calciatori.gol" in events_by_key
+    assert "sistema.asta" in events_by_key
+    assert events_by_key["calciatori.gol"].in_app_enabled is True
+    assert events_by_key["calciatori.gol"].push_enabled is True
+
+    service.update_event_preference(
+        user_id=user_id, event_key="calciatori.gol", in_app_enabled=False, push_enabled=None
+    )
+    db_session.commit()
+
+    refreshed = service.get_preferences(user_id=user_id)
+    refreshed_by_key = {event.event_key: event for event in refreshed.events}
+    assert refreshed_by_key["calciatori.gol"].in_app_enabled is False
+    # push_enabled non è stato toccato (None nell'update): resta sul default.
+    assert refreshed_by_key["calciatori.gol"].push_enabled is True
+    # Gli altri eventi non sono stati sfiorati.
+    assert refreshed_by_key["calciatori.assist"].in_app_enabled is True
 
 
 def test_mark_all_read_marks_only_own_unread(client: TestClient, db_session: Session) -> None:

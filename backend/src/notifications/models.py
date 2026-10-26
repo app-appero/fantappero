@@ -92,6 +92,38 @@ class NotificationPreference(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     user: Mapped[User] = relationship()
 
 
+class NotificationEventPreference(Base, UUIDPrimaryKeyMixin, TimestampMixin):
+    """Per-user, per-event granular opt-out, canali in-app/push separati (TASK5).
+
+    Più fine di ``NotificationPreference`` (quella resta per categoria, es.
+    spegnere tutto «risultati»): qui l'utente può spegnere solo i gol e
+    tenere l'ammonizione, o tenere l'in-app e spegnere solo la push su un
+    singolo evento. ``event_key`` è definito in
+    ``notifications/event_catalog.py`` e raggruppa uno o più ``template_key``.
+
+    Nessuna riga per (user_id, event_key) = tutto attivo: è il default per
+    chi non ha ancora toccato le preferenze granulari.
+    """
+
+    __tablename__ = "notification_event_preferences"
+    __table_args__ = (
+        UniqueConstraint(
+            "user_id", "event_key", name="uq_notification_event_preferences_user_event"
+        ),
+        Index("ix_notification_event_preferences_user_id", "user_id"),
+    )
+
+    user_id: Mapped[UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    event_key: Mapped[str] = mapped_column(String(64), nullable=False)
+    in_app_enabled: Mapped[bool] = mapped_column(nullable=False, server_default=text("true"))
+    push_enabled: Mapped[bool] = mapped_column(nullable=False, server_default=text("true"))
+
+    user: Mapped[User] = relationship()
+
+
 class PushDevice(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     """Expo push token for one installed app instance (EP09-05).
 
@@ -151,3 +183,26 @@ class NotificationBroadcast(Base, UUIDPrimaryKeyMixin, TimestampMixin):
         ForeignKey("users.id", ondelete="SET NULL"),
         nullable=True,
     )
+
+
+class OperatorEmailLog(Base, UUIDPrimaryKeyMixin, TimestampMixin):
+    """History of operator-composed emails sent from the portal (Task 6c).
+
+    Separate from ``NotificationBroadcast``: this is a direct email send (not
+    an in-app notification), so there is no delivered/read count to derive —
+    only who sent it, to whom, and when.
+    """
+
+    __tablename__ = "operator_email_logs"
+    __table_args__ = (Index("ix_operator_email_logs_sent_at", "sent_at"),)
+
+    subject: Mapped[str] = mapped_column(String(120), nullable=False)
+    body: Mapped[str] = mapped_column(Text, nullable=False)
+    audience: Mapped[dict[str, object]] = mapped_column(JSONB, nullable=False)
+    audience_label: Mapped[str] = mapped_column(String(200), nullable=False)
+    recipient_count: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("0"))
+    created_by_user_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    sent_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False)

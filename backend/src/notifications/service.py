@@ -14,11 +14,23 @@ from auth.models.user import User
 from auth.models.user_profile import UserProfile
 from database.enums import NotificationCategory, NotificationStatus
 from notifications.email_dispatch import dispatch_notification_email
+from notifications.event_catalog import (
+    EVENT_DEFINITION_BY_KEY,
+    EVENT_DEFINITIONS,
+    EVENT_KEYS,
+    event_key_for_template,
+)
 from notifications.exceptions import NotificationNotFoundError
-from notifications.models import Notification, NotificationPreference, PushDevice
+from notifications.models import (
+    Notification,
+    NotificationEventPreference,
+    NotificationPreference,
+    PushDevice,
+)
 from notifications.push_dispatch import dispatch_notification_push
 from notifications.schemas import (
     MarkAllReadResponse,
+    NotificationEventPreferenceItemResponse,
     NotificationItemResponse,
     NotificationListResponse,
     NotificationPreferenceItemResponse,
@@ -62,6 +74,16 @@ class NotificationService:
         )
         return preference is None or preference.in_app_enabled
 
+    def _event_preference(
+        self, user_id: UUID, event_key: str
+    ) -> NotificationEventPreference | None:
+        return self._session.scalar(
+            select(NotificationEventPreference).where(
+                NotificationEventPreference.user_id == user_id,
+                NotificationEventPreference.event_key == event_key,
+            )
+        )
+
     def create_notification(
         self,
         *,
@@ -77,9 +99,19 @@ class NotificationService:
         """Create an in-app notification, or return the existing one for ``dedup_key``.
 
         Returns ``(notification, created)``. ``notification`` is ``None`` (no
-        row involved) only when the user has disabled the category in their
-        preferences; ``created`` is ``False`` whenever an existing row for
-        ``dedup_key`` was returned instead of a new one (idempotent replay).
+        row involved) only when the user has disabled the category — or,
+        more granularly (TASK5), the specific event — in their preferences;
+        ``created`` is ``False`` whenever an existing row for ``dedup_key``
+        was returned instead of a new one (idempotent replay).
+
+        The granular per-event preference (``notifications/event_catalog.py``)
+        only applies when ``template_key`` is mapped to an event: unmapped
+        template keys keep behaving exactly as before, governed solely by the
+        category preference. A granular ``push_enabled=False`` does not drop
+        the in-app row — it only suppresses the push for *this* notification,
+        the same way the category-level switch never touched push/email: it
+        only ever gated whether the row (and therefore every channel hanging
+        off it) got created at all.
         """
         existing = self._session.scalar(
             select(Notification).where(
@@ -94,6 +126,17 @@ class NotificationService:
         if not self._in_app_enabled(user_id, category):
             get_metrics().incr("notifications_skipped_total", labels={"category": category.value})
             return None, False
+
+        event_key = event_key_for_template(template_key)
+        event_preference = self._event_preference(user_id, event_key) if event_key else None
+        if event_preference is not None and not event_preference.in_app_enabled:
+            get_metrics().incr(
+                "notifications_skipped_total",
+                labels={"category": category.value, "event_key": event_key or ""},
+            )
+            return None, False
+        if event_preference is not None and not event_preference.push_enabled:
+            push = False
 
         content = render_notification(template_key, template_version, params)
         notification = Notification(
@@ -247,7 +290,33 @@ class NotificationService:
             )
             for category in NotificationCategory
         ]
-        return NotificationPreferenceListResponse(items=items)
+        event_rows = {
+            row.event_key: row
+            for row in self._session.scalars(
+                select(NotificationEventPreference).where(
+                    NotificationEventPreference.user_id == user_id
+                )
+            ).all()
+        }
+        events = [
+            NotificationEventPreferenceItemResponse(
+                eventKey=definition.event_key,
+                category=definition.category,
+                label=definition.label,
+                inAppEnabled=(
+                    event_rows[definition.event_key].in_app_enabled
+                    if definition.event_key in event_rows
+                    else True
+                ),
+                pushEnabled=(
+                    event_rows[definition.event_key].push_enabled
+                    if definition.event_key in event_rows
+                    else True
+                ),
+            )
+            for definition in EVENT_DEFINITIONS
+        ]
+        return NotificationPreferenceListResponse(items=items, events=events)
 
     def update_preference(
         self, *, user_id: UUID, category: NotificationCategory, in_app_enabled: bool
@@ -271,6 +340,47 @@ class NotificationService:
         return NotificationPreferenceItemResponse(
             category=category.value,
             inAppEnabled=preference.in_app_enabled,
+        )
+
+    def update_event_preference(
+        self,
+        *,
+        user_id: UUID,
+        event_key: str,
+        in_app_enabled: bool | None,
+        push_enabled: bool | None,
+    ) -> NotificationEventPreferenceItemResponse:
+        """Aggiorna uno o entrambi i canali di un evento granulare (TASK5).
+
+        ``None`` lascia il canale com'era (o sul default "attivo" se la riga
+        non esisteva ancora): permette al chiamante di toccare solo in-app o
+        solo push senza dover rileggere lo stato attuale.
+        """
+        if event_key not in EVENT_KEYS:
+            msg = f"Evento non valido: {event_key}"
+            raise ValueError(msg)
+        definition = EVENT_DEFINITION_BY_KEY[event_key]
+        preference = self._event_preference(user_id, event_key)
+        if preference is None:
+            preference = NotificationEventPreference(
+                user_id=user_id,
+                event_key=event_key,
+                in_app_enabled=in_app_enabled if in_app_enabled is not None else True,
+                push_enabled=push_enabled if push_enabled is not None else True,
+            )
+            self._session.add(preference)
+        else:
+            if in_app_enabled is not None:
+                preference.in_app_enabled = in_app_enabled
+            if push_enabled is not None:
+                preference.push_enabled = push_enabled
+        self._session.flush()
+        return NotificationEventPreferenceItemResponse(
+            eventKey=event_key,
+            category=definition.category,
+            label=definition.label,
+            inAppEnabled=preference.in_app_enabled,
+            pushEnabled=preference.push_enabled,
         )
 
     def register_push_device(
