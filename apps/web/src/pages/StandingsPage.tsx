@@ -95,7 +95,7 @@ function toTableRows(
       fantasyPointsFor: formatFantasyPoints(row.fantasyPointsFor),
       fantasyPointsAgainst: formatFantasyPoints(row.fantasyPointsAgainst),
       isCurrentUser,
-      highlightLabel: isCurrentUser ? "Tu" : undefined,
+      highlightLabel: undefined,
     };
   });
 }
