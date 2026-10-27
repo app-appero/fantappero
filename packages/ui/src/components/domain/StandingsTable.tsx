@@ -36,7 +36,9 @@ export type StandingsTableProps = {
   playedLabel: string;
   pointsLabel: string;
   goalsLabel: string;
-  /** Quando presente aggiunge la colonna Fantapunti fatti:subiti. */
+  /** Se presente, gol fatti e gol subiti sono due colonne separate (`goalsLabel` = gol fatti). */
+  goalsAgainstLabel?: string;
+  /** Quando presente aggiunge la colonna Fantapunti. Con `goalsAgainstLabel` mostra solo i fatti. */
   fantasyPointsLabel?: string;
   rows: StandingsRow[];
   testId?: string;
@@ -60,13 +62,22 @@ export function StandingsTable({
   playedLabel,
   pointsLabel,
   goalsLabel,
+  goalsAgainstLabel,
   fantasyPointsLabel,
   rows,
   testId = "standings-table",
   onManagerClick,
 }: StandingsTableProps) {
+  const split = Boolean(goalsAgainstLabel);
   return (
-    <Table compact data-testid={testId}>
+    <>
+    <StandingsCards
+      rows={rows}
+      onManagerClick={onManagerClick}
+      labels={{ played: playedLabel, goalsFor: goalsLabel, goalsAgainst: goalsAgainstLabel, fantasy: fantasyPointsLabel }}
+      testId={`${testId}-cards`}
+    />
+    <Table compact data-testid={testId} className="fa-standings-desk">
       <caption className="fa-sr-only">{caption}</caption>
       <TableHead>
         <TableRow>
@@ -75,6 +86,7 @@ export function StandingsTable({
           <TableHeaderCell>{playedLabel}</TableHeaderCell>
           <TableHeaderCell>{pointsLabel}</TableHeaderCell>
           <TableHeaderCell>{goalsLabel}</TableHeaderCell>
+          {split ? <TableHeaderCell>{goalsAgainstLabel}</TableHeaderCell> : null}
           {fantasyPointsLabel ? (
             <TableHeaderCell>{fantasyPointsLabel}</TableHeaderCell>
           ) : null}
@@ -127,17 +139,92 @@ export function StandingsTable({
             </TableCell>
             <TableCell>{row.played}</TableCell>
             <TableCell>{row.points}</TableCell>
-            <TableCell>
-              {row.goalsFor}:{row.goalsAgainst}
-            </TableCell>
+            {split ? (
+              <>
+                <TableCell>{row.goalsFor}</TableCell>
+                <TableCell>{row.goalsAgainst}</TableCell>
+              </>
+            ) : (
+              <TableCell>
+                {row.goalsFor}:{row.goalsAgainst}
+              </TableCell>
+            )}
             {fantasyPointsLabel ? (
               <TableCell>
-                {row.fantasyPointsFor ?? "—"}:{row.fantasyPointsAgainst ?? "—"}
+                {split
+                  ? (row.fantasyPointsFor ?? "—")
+                  : `${row.fantasyPointsFor ?? "—"}:${row.fantasyPointsAgainst ?? "—"}`}
               </TableCell>
             ) : null}
           </TableRow>
         ))}
       </TableBody>
     </Table>
+    </>
+  );
+}
+
+/** Vista a schede (schermi stretti): come l'app mobile, un allenatore per scheda. */
+function StandingsCards({
+  rows,
+  onManagerClick,
+  labels,
+  testId,
+}: {
+  rows: StandingsRow[];
+  onManagerClick?: (row: StandingsRow) => void;
+  labels: { played: string; goalsFor: string; goalsAgainst?: string; fantasy?: string };
+  testId: string;
+}) {
+  return (
+    <ul className="fa-standings-cards" data-testid={testId}>
+      {rows.map((row) => {
+        const name = primaryLabel(row);
+        const initial = name.charAt(0).toUpperCase();
+        return (
+          <li
+            key={row.id}
+            className={
+              row.isCurrentUser ? "fa-standings-card fa-standings-card--current" : "fa-standings-card"
+            }
+          >
+            <div className="fa-standings-card__top">
+              <span className="fa-standings-card__pos">{row.position}</span>
+              {row.managerAvatarUrl ? (
+                <img className="fa-standings-row__avatar" src={row.managerAvatarUrl} alt="" aria-hidden="true" />
+              ) : (
+                <span className="fa-standings-row__avatar fa-standings-row__avatar--initials" aria-hidden="true">
+                  {initial}
+                </span>
+              )}
+              {onManagerClick && row.managerUserId ? (
+                <button
+                  type="button"
+                  className="fa-standings-card__name fa-standings-row__manager-link"
+                  onClick={() => onManagerClick(row)}
+                  aria-label={`Apri il profilo di ${name}`}
+                >
+                  {name}
+                </button>
+              ) : (
+                <span className="fa-standings-card__name">{name}</span>
+              )}
+              <span className="fa-standings-card__points">
+                <strong>{row.points}</strong>
+                <small>PUNTI</small>
+              </span>
+            </div>
+            <dl className="fa-standings-card__stats">
+              <div><dt>Gare</dt><dd>{row.played}</dd></div>
+              <div><dt>{labels.goalsAgainst ? "Gol fatti" : labels.goalsFor}</dt><dd>{labels.goalsAgainst ? row.goalsFor : `${row.goalsFor}:${row.goalsAgainst}`}</dd></div>
+              {labels.goalsAgainst ? (
+                <div className="fa-standings-card__stat--danger"><dt>Gol subiti</dt><dd>{row.goalsAgainst}</dd></div>
+              ) : null}
+              {labels.fantasy ? <div><dt>Fantapunti</dt><dd>{row.fantasyPointsFor ?? "—"}</dd></div> : null}
+            </dl>
+          </li>
+        );
+      })}
+    </ul>
   );
 }
