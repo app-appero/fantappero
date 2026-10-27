@@ -164,8 +164,8 @@ export function StandingsScreen() {
 function Stat({ label, value, tone }: { label: string; value: string; tone?: "danger" }) {
   return (
     <View style={styles.stat}>
-      <Text style={styles.statLabel} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>{label}</Text>
-      <Text style={[styles.statValue, tone === "danger" ? styles.statValueDanger : null]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
+      <Text style={styles.statLabel} numberOfLines={1}>{label}</Text>
+      <Text style={[styles.statValue, tone === "danger" ? styles.statValueDanger : null]} numberOfLines={1}>
         {value}
       </Text>
     </View>
@@ -397,6 +397,7 @@ const styles = lazyStyles(() => StyleSheet.create({
   },
   statValue: {
     color: colors.foreground,
+    fontSize: 14,
     fontWeight: "700",
   },
   statValueDanger: {
