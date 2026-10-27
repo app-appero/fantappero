@@ -1147,7 +1147,7 @@ export function FormationScreen() {
                   ]}
                   testID={`formation-bench-${index}`}
                 >
-                  <Text style={styles.benchOrder} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>{index + 1}°</Text>
+                  <Text style={styles.benchOrder} numberOfLines={1}>{index + 1}°</Text>
                   {row?.photoUrl ? (
                     <Image source={{ uri: row.photoUrl }} style={[styles.benchPhoto, { borderColor: roleRingColor(role) }]} />
                   ) : (
@@ -1214,7 +1214,7 @@ export function FormationScreen() {
                       ]}
                       testID={`formation-bench-${index}`}
                     >
-                      <Text style={styles.benchOrder} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>{index + 1}°</Text>
+                      <Text style={styles.benchOrder} numberOfLines={1}>{index + 1}°</Text>
                       {row?.photoUrl ? (
                         <Image source={{ uri: row.photoUrl }} style={[styles.benchPhoto, { borderColor: roleRingColor(role) }]} />
                       ) : (
@@ -1713,9 +1713,9 @@ const styles = lazyStyles(() => StyleSheet.create({
   },
   benchRowSelected: { borderColor: colors.accent },
   benchOrder: {
-    width: 34,
+    width: 38,
     color: colors.accent,
-    fontSize: typography.fontSize.md,
+    fontSize: 15,
     fontStyle: "italic",
     fontWeight: "800",
   },
