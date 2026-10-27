@@ -57,7 +57,7 @@ export function CoachProfileScreen() {
 
   return (
     <PageContainer
-      title={profile?.displayName ?? "Profilo fantallenatore"}
+      title={profile?.nickname?.trim() || profile?.displayName || "Profilo fantallenatore"}
       testID="screen-coach-profile"
       refreshing={refreshing}
       onRefresh={onRefresh}
@@ -91,7 +91,10 @@ export function CoachProfileScreen() {
               </View>
             )}
             <View style={styles.headerText}>
-              <Text style={styles.name}>{profile.displayName}</Text>
+              <Text style={styles.name}>{profile.nickname?.trim() || profile.displayName}</Text>
+              {profile.nickname?.trim() ? (
+                <Text style={styles.realName}>{profile.displayName}</Text>
+              ) : null}
               <View style={styles.badgeRow}>
                 <View style={styles.badge}>
                   <Text style={styles.badgeLabel}>
@@ -190,6 +193,7 @@ const styles = lazyStyles(() => StyleSheet.create({
     flex: 1,
     gap: spacing.xs,
   },
+  realName: { color: colors.foregroundMuted, fontSize: typography.fontSize.sm },
   name: {
     color: colors.foreground,
     fontSize: typography.fontSize.xl,
