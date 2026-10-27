@@ -90,9 +90,9 @@ describe("EP06-06 formation page", () => {
     expect(html).toContain("Maignan (bloccato)");
     expect(html).toContain("Meret");
     expect(html).toContain("Acerbi");
-    expect(html).toContain("Panchina — massimo 5 subentri");
+    expect(html).toContain("Panchina — 10 posti · massimo 5 subentri");
     expect(html).toContain("può subentrare");
-    expect(html).toContain("oltre i 5 cambi");
+    expect(html).toContain("Dal 11° in poi è tribuna");
     expect(html).toContain("Entrano al massimo 5 panchinari");
     expect(html).toContain("Mosse 3/3");
     expect(html).toContain("fa-badge--success");
