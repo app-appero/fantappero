@@ -266,13 +266,13 @@ export function CoachProfilePanel({
         />
         <div>
           <h3 id="coach-profile-title" className="fa-coach-profile__title">
-            {profile.displayName}
+            {profile.nickname?.trim() || profile.displayName}
           </h3>
           <p className="fa-coach-profile__email" data-testid="coach-profile-email">
             {profile.email}
           </p>
           {profile.nickname ? (
-            <p className="fa-manager-directory__nickname">Nickname: {profile.nickname}</p>
+            <p className="fa-manager-directory__nickname">{profile.displayName}</p>
           ) : null}
           <div className="fa-coach-profile__meta">
             <Badge variant={profile.userType === "ai" ? "accent" : "neutral"}>
@@ -705,11 +705,11 @@ export function ManagerDirectory({
                     aria-label={`Apri il profilo di ${manager.displayName}`}
                     data-testid={`manager-open-${manager.userId}`}
                   >
-                    <span className="fa-manager-directory__name">{manager.displayName}</span>
+                    <span className="fa-manager-directory__name">
+                      {manager.nickname?.trim() || manager.displayName}
+                    </span>
                     {manager.nickname ? (
-                      <span className="fa-manager-directory__nickname">
-                        Nickname: {manager.nickname}
-                      </span>
+                      <span className="fa-manager-directory__nickname">{manager.displayName}</span>
                     ) : null}
                     <span
                       className="fa-manager-directory__email"

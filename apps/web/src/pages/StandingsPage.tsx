@@ -87,6 +87,7 @@ function toTableRows(
       teamName: row.teamName,
       managerUserId: row.managerUserId,
       managerDisplayName: row.managerDisplayName ?? null,
+      managerNickname: row.managerNickname ?? null,
       managerAvatarUrl: resolveAvatarUrl(row.managerAvatarUrl ?? null),
       played: row.played,
       points: row.points,

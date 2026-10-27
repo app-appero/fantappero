@@ -44,6 +44,7 @@ import {
   CardHeader,
   FootballPitch,
   LockCountdown,
+  Modal,
   PageContainer,
   Select,
   UiStatePanel,
@@ -630,6 +631,8 @@ export function FormationPage() {
   );
   const [loading, setLoading] = useState(() => (isDemoMode ? demoState === "loading" : true));
   const [busy, setBusy] = useState(false);
+  const [bestModalOpen, setBestModalOpen] = useState(false);
+  const [bestMode, setBestMode] = useState<"keep_module" | "best_module">("keep_module");
   const [loadError, setLoadError] = useState<string | null>(() =>
     isDemoMode && demoState === "error" ? "Impossibile caricare la formazione (demo)." : null,
   );
@@ -1263,7 +1266,7 @@ export function FormationPage() {
     pushToast({ title: "Modifiche annullate.", variant: "info" });
   }
 
-  async function applyBestFormation() {
+  async function applyBestFormation(mode: "keep_module" | "best_module" = "keep_module") {
     if (isDemoMode) {
       pushToast({
         title: "Applica formazione migliore non è disponibile in modalità demo.",
@@ -1283,6 +1286,7 @@ export function FormationPage() {
         activeLeagueId,
         selectedRoundId,
         targetTeamIdRef.current || undefined,
+        mode,
       );
       if (!isCurrentLineupRequest(requestId)) {
         return;
@@ -1696,11 +1700,67 @@ export function FormationPage() {
               type="button"
               variant="secondary"
               disabled={busy || !context.modificationAllowed || !canEdit}
-              onClick={() => void applyBestFormation()}
+              onClick={() => setBestModalOpen(true)}
               data-testid="formation-apply-best"
             >
               Applica formazione migliore
             </Button>
+            <Modal
+              open={bestModalOpen}
+              onClose={() => setBestModalOpen(false)}
+              title="Applica la formazione migliore"
+              footer={
+                <>
+                  <Button type="button" variant="secondary" onClick={() => setBestModalOpen(false)} data-testid="formation-best-cancel">
+                    Annulla
+                  </Button>
+                  <Button
+                    type="button"
+                    onClick={() => {
+                      setBestModalOpen(false);
+                      void applyBestFormation(bestMode);
+                    }}
+                    data-testid="formation-best-confirm"
+                  >
+                    Applica
+                  </Button>
+                </>
+              }
+            >
+              <p className="fa-field__hint">
+                Come vuoi comporla? I calciatori già bloccati restano al loro posto.
+              </p>
+              <div className="fa-nop-radios" role="radiogroup" aria-label="Modulo">
+                <button
+                  type="button"
+                  role="radio"
+                  aria-checked={bestMode === "keep_module"}
+                  className={bestMode === "keep_module" ? "fa-nop-radio fa-nop-radio--on" : "fa-nop-radio"}
+                  onClick={() => setBestMode("keep_module")}
+                  data-testid="formation-best-keep"
+                >
+                  <span className="fa-nop-radio__dot" aria-hidden="true" />
+                  <span>
+                    <strong>Mantieni il modulo attuale</strong>
+                    <small>{`Cerco i migliori 11 con il tuo ${moduleCode}.`}</small>
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  role="radio"
+                  aria-checked={bestMode === "best_module"}
+                  className={bestMode === "best_module" ? "fa-nop-radio fa-nop-radio--on" : "fa-nop-radio"}
+                  onClick={() => setBestMode("best_module")}
+                  data-testid="formation-best-module"
+                >
+                  <span className="fa-nop-radio__dot" aria-hidden="true" />
+                  <span>
+                    <strong>Usa il modulo migliore</strong>
+                    <small>Scelgo anche il modulo più forte.</small>
+                  </span>
+                </button>
+              </div>
+            </Modal>
             <Button
               type="button"
               variant="ghost"

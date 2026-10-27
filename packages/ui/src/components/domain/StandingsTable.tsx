@@ -24,6 +24,8 @@ export type StandingsRow = {
   /** Fantallenatore proprietario della squadra; abilita il click sul nome. */
   managerUserId?: string;
   managerDisplayName?: string | null;
+  /** Se presente è l'unico nome mostrato in classifica (al posto di squadra + nome). */
+  managerNickname?: string | null;
   managerAvatarUrl?: string | null;
 };
 
@@ -47,6 +49,10 @@ export type StandingsTableProps = {
 };
 
 /** Presentational standings table for wireframes and future classifica views. */
+function primaryLabel(row: StandingsRow): string {
+  return row.managerNickname?.trim() || row.managerDisplayName?.trim() || row.teamName;
+}
+
 export function StandingsTable({
   caption,
   positionLabel,
@@ -104,20 +110,12 @@ export function StandingsTable({
                       type="button"
                       className="fa-standings-row__manager-link"
                       onClick={() => onManagerClick(row)}
-                      aria-label={`Apri il profilo del fantallenatore di ${row.teamName}`}
+                      aria-label={`Apri il profilo di ${primaryLabel(row)}`}
                     >
-                      <span>{row.teamName}</span>
-                      {row.managerDisplayName ? (
-                        <small className="fa-standings-row__manager-name">{row.managerDisplayName}</small>
-                      ) : null}
+                      <span>{primaryLabel(row)}</span>
                     </button>
                   ) : (
-                    <>
-                      <span>{row.teamName}</span>
-                      {row.managerDisplayName ? (
-                        <small className="fa-standings-row__manager-name">{row.managerDisplayName}</small>
-                      ) : null}
-                    </>
+                    <span>{primaryLabel(row)}</span>
                   )}
                 </span>
               </span>

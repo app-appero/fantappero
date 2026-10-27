@@ -54,7 +54,7 @@ describe("CoachProfilePanel — profilo storico limitato (EP13-P06)", () => {
     const html = render(profile());
     expect(html).toContain('data-testid="coach-profile"');
     expect(html).toContain("Lucia Bianchi");
-    expect(html).toContain("Nickname: Lucia");
+    expect(html).toContain(">Lucia<");
     expect(html).toContain("iscritto da 03/2025");
     expect(html).toContain("2 leghe concluse · miglior 1º");
   });
