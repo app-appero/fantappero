@@ -19,3 +19,11 @@ test("senza meta noto non naviga", () => {
   assert.equal(resolveNotificationRoute({ title: "x", deepLink: null }), null);
   assert.equal(resolveNotificationRoute({ title: "x", deepLink: "https://evil.example" }), null);
 });
+
+test("il deep link di un evento calciatore apre lo scontro tra fantallenatori", () => {
+  assert.deepEqual(
+    resolveNotificationRoute({ title: "Gol", deepLink: "/turni/scontro/abc-123" }),
+    { kind: "matchup", slotId: "abc-123" },
+  );
+  assert.deepEqual(resolveNotificationRoute({ title: "Gol", deepLink: "/turni" }), { kind: "tab", screen: "Matchday" });
+});

@@ -112,7 +112,7 @@ describe("layoutFromModule", () => {
     });
   }
 
-  it("supports a module with two distinct midfield lines (4-2-3-1) dynamically", () => {
+  it("keeps all midfielders on one line so different modules stay aligned side by side (4-2-3-1)", () => {
     const players = fantasyPlayers([
       "G",
       "D",
@@ -129,10 +129,20 @@ describe("layoutFromModule", () => {
     const positions = layoutFromModule(players, "4-2-3-1", roleOf, idOf, sortKeyOf);
     assert.equal(positions.length, players.length);
     const byId = new Map(positions.map((p) => [p.id, p]));
-    // The two midfield lines must occupy two different heights.
-    const defensiveMid = byId.get("M-5")!; // first two of the five midfielders (row of 2)
-    const attackingMid = byId.get("M-7")!; // later midfielders (row of 3, further forward)
-    assert.notEqual(defensiveMid.yPercent, attackingMid.yPercent);
+    // Reparti sempre alla stessa altezza: tutto il centrocampo su una sola riga.
+    const first = byId.get("M-5")!;
+    const last = byId.get("M-9")!;
+    assert.equal(first.yPercent, last.yPercent);
+    // …e identica a quella di un 4-3-3, così due formazioni affiancate si allineano.
+    const other = layoutFromModule(
+      fantasyPlayers(["G", "D", "D", "D", "D", "M", "M", "M", "F", "F", "F"]),
+      "4-3-3",
+      roleOf,
+      idOf,
+      sortKeyOf,
+    );
+    const otherMid = other.find((p) => p.id === "M-5")!;
+    assert.equal(first.yPercent, otherMid.yPercent);
   });
 
   it("supports an arbitrary module not hardcoded anywhere (3-4-3)", () => {

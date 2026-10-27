@@ -158,7 +158,9 @@ export function layoutFromModule<T>(
       ? parsedRowCounts
       : [buckets.DEF.length, buckets.MID.length, buckets.FWD.length].filter((n) => n > 0);
 
-  const totalRows = rowCounts.length + 1;
+  // Sempre 4 reparti (P, D, C, A) alla stessa altezza: due squadre con moduli
+  // diversi (4-3-3 contro 4-2-3-1) restano allineate quando sono affiancate.
+  const totalRows = 4;
   const positions: PitchPosition[] = [];
 
   const placeRow = (row: number, pool: T[], count: number): void => {
@@ -179,16 +181,10 @@ export function layoutFromModule<T>(
     const defPool = [...buckets.DEF];
     placeRow(2, defPool, rowCounts[0] ?? defPool.length);
 
-    // Le righe tra la prima (difesa) e l'ultima (attacco) sono tutte
-    // centrocampo: il fantacalcio non distingue mediano da trequartista, il
-    // provider a volte sì (es. "4-2-3-1"), quindi il pool centrocampisti
-    // viene distribuito in ordine sulle righe intermedie che il modulo
-    // dichiara, quante che siano.
-    const midRowCounts = rowCounts.slice(1, -1);
+    // Il fantacalcio non distingue mediano da trequartista: tutto il centrocampo
+    // sta su una sola riga, qualunque cifra intermedia dichiari il modulo.
     const midPool = [...buckets.MID];
-    midRowCounts.forEach((count, index) => {
-      placeRow(3 + index, midPool, count);
-    });
+    placeRow(3, midPool, midPool.length);
 
     const fwdPool = [...buckets.FWD];
     const lastCount = rowCounts[rowCounts.length - 1] ?? fwdPool.length;
@@ -334,6 +330,21 @@ const FANTASY_BONUS_BADGE: Record<string, MatchBadgeKind> = {
   yellow_card: "yellowCard",
   red_card: "redCard",
 };
+
+/** Badge "uscito/entrato" di un giocatore dai minuti di sostituzione (come gol e assist). */
+export function substitutionBadges(player: {
+  substitutedOutMinute?: number | null;
+  substitutedInMinute?: number | null;
+}): MatchBadge[] {
+  const out: MatchBadge[] = [];
+  if (player.substitutedInMinute != null) {
+    out.push({ kind: "substitutionIn", count: 1 });
+  }
+  if (player.substitutedOutMinute != null) {
+    out.push({ kind: "substitutionOut", count: 1 });
+  }
+  return out;
+}
 
 /** Badge di un giocatore fantasy dalle componenti bonus/malus già calcolate (§20). */
 export function fantasyBadgesFromBonusMalus(

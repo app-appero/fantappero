@@ -3,6 +3,7 @@ import {
   MAX_AUTOMATIC_SUBSTITUTIONS,
   computeCountdown,
   fantasyBadgesFromBonusMalus,
+  substitutionBadges,
   cleanDisplayName,
   formatFantasyPoints,
   formatCountdown,
@@ -53,7 +54,7 @@ export function MatchupPlayerRow({ player, order, dim, compact, now, testIdPrefi
   const Tag = as;
   const vote = playerVoteState(player);
   const countdown = vote.kind === "pending" ? kickoffCountdown(player, now) : null;
-  const badges = fantasyBadgesFromBonusMalus(player.bonusMalus ?? []);
+  const badges = [...fantasyBadgesFromBonusMalus(player.bonusMalus ?? []), ...substitutionBadges(player)];
   const className = [
     "fa-mrow",
     compact ? "fa-mrow--compact" : "",
@@ -167,7 +168,7 @@ function VersusCell({ player, dim, now }: { player: H2HPlayerScore | undefined; 
   }
   const vote = playerVoteState(player);
   const countdown = vote.kind === "pending" ? kickoffCountdown(player, now) : null;
-  const badges = fantasyBadgesFromBonusMalus(player.bonusMalus ?? []);
+  const badges = [...fantasyBadgesFromBonusMalus(player.bonusMalus ?? []), ...substitutionBadges(player)];
   const className = [
     "fa-vcell",
     dim ? "fa-mrow--dim" : "",

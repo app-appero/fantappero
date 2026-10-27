@@ -121,7 +121,9 @@ export function NotificationsScreen() {
       }
     }
     const route = resolveNotificationRoute(item);
-    if (route?.kind === "stack") {
+    if (route?.kind === "matchup") {
+      navigation.navigate("MatchupDetail", { slotId: route.slotId });
+    } else if (route?.kind === "stack") {
       navigation.navigate(route.name as never);
     } else if (route?.kind === "tab") {
       navigation.navigate("MainTabs", { screen: route.screen });

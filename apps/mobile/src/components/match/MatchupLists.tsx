@@ -6,6 +6,7 @@ import {
   cleanDisplayName,
   computeCountdown,
   fantasyBadgesFromBonusMalus,
+  substitutionBadges,
   formatFantasyPoints,
   formatCountdown,
   playerVoteState,
@@ -79,7 +80,7 @@ export function MatchupPlayerRow({
 }) {
   const vote = playerVoteState(player);
   const countdown = vote.kind === "pending" ? kickoffCountdown(player, now) : null;
-  const badges = fantasyBadgesFromBonusMalus(player.bonusMalus ?? []);
+  const badges = [...fantasyBadgesFromBonusMalus(player.bonusMalus ?? []), ...substitutionBadges(player)];
   return (
     <View
       style={[
@@ -198,7 +199,7 @@ function VersusCell({ player, dim, now }: { player: H2HPlayerScore | undefined; 
   }
   const vote = playerVoteState(player);
   const countdown = vote.kind === "pending" ? kickoffCountdown(player, now) : null;
-  const badges = fantasyBadgesFromBonusMalus(player.bonusMalus ?? []);
+  const badges = [...fantasyBadgesFromBonusMalus(player.bonusMalus ?? []), ...substitutionBadges(player)];
   return (
     <View
       style={[
