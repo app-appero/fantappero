@@ -718,6 +718,9 @@ def get_league_standings(
         .options(selectinload(User.profile))
     ).all()
     manager_labels = {user.id: user.display_name for user in owners}
+    manager_nicknames = {
+        user.id: user.profile.nickname if user.profile is not None else None for user in owners
+    }
     manager_avatars = {
         user.id: user.profile.avatar_url if user.profile is not None else None
         for user in owners
@@ -728,6 +731,7 @@ def get_league_standings(
             teamName=team_names.get(row.fantasy_team_id, "Squadra"),
             managerUserId=str(manager_ids[row.fantasy_team_id]),
             managerDisplayName=manager_labels.get(manager_ids[row.fantasy_team_id]),
+            managerNickname=manager_nicknames.get(manager_ids[row.fantasy_team_id]),
             managerAvatarUrl=manager_avatars.get(manager_ids[row.fantasy_team_id]),
             position=row.position,
             played=row.played,
