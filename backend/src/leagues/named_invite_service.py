@@ -188,10 +188,10 @@ class NamedLeagueInviteService:
     ) -> FantasyCoachProfileResponse:
         """Profilo storico limitato di un fantallenatore (EP13-P06).
 
-        Reso accessibile a qualunque utente verificato, incluso il chiamante
-        stesso (candidati da invitare così come membri già in questa lega,
-        es. dal click su un nome in Classifica — anche il proprio): l'endpoint
-        è protetto da `Permission.LEAGUE_VIEW` sulla lega indicata (qualunque
+        Reso accessibile a qualunque utente, incluso il chiamante stesso
+        (candidati da invitare così come membri già in questa lega, es. dal
+        click su un nome in Classifica — anche il proprio): l'endpoint è
+        protetto da `Permission.LEAGUE_VIEW` sulla lega indicata (qualunque
         membro, non solo admin — prima era `LEAGUE_ADMIN`, impedendo a un
         membro normale di aprire il profilo di un altro fantallenatore della
         sua stessa lega). Lo storico restituisce solo fatti derivati da
@@ -205,6 +205,15 @@ class NamedLeagueInviteService:
         propria riga. Escluderlo qui rompeva il click sul proprio nome con
         "Fantallenatore non trovato" pur essendo un membro valido della lega
         (bug 8a).
+
+        Né email verificata né `UserProfile` completo sono richiesti: la
+        directory elenca anche utenti con email non verificata o senza
+        profilo (es. un fantallenatore creato manualmente) — filtrare questa
+        query più del necessario produceva lo stesso "Fantallenatore non
+        trovato" per chiunque comparisse in quella lista senza soddisfare
+        requisiti che la directory stessa non richiede. Nome visualizzato
+        con lo stesso fallback sull'email di `directory()` quando il profilo
+        manca o non ha un nome impostato.
         """
         self._check_rate_limit("coach_directory", league_access)
         now = datetime.now(UTC)
@@ -222,19 +231,27 @@ class NamedLeagueInviteService:
         )
         row = self._session.execute(
             select(User, UserProfile, latest_status.label("invite_status"))
-            .join(UserProfile, UserProfile.user_id == User.id)
+            .outerjoin(UserProfile, UserProfile.user_id == User.id)
             .where(
                 User.id == user_id,
                 User.deleted_at.is_(None),
-                User.email_verified_at.is_not(None),
-                UserProfile.display_name.is_not(None),
-                UserProfile.display_name != "",
             )
         ).first()
         if row is None:
             self._fail("Fantallenatore non trovato.", "coach_not_found", "not_found")
 
         user, profile, invite_status = row
+        # Niente filtro su email verificata / nome visualizzato impostato:
+        # la directory (`directory()`) elenca già utenti non verificati o
+        # senza profilo completo (es. un fantallenatore MANUALE appena
+        # creato), con lo stesso fallback sul nome qui sotto — escluderli
+        # qui produceva "Fantallenatore non trovato" per chiunque comparisse
+        # in quella lista senza soddisfare questi requisiti.
+        display_name = (
+            profile.display_name
+            if profile is not None and profile.display_name
+            else (user.email.split("@", 1)[0] or user.email)
+        )
         history = load_history(self._session, user_id=user.id)
         page_items, total = placements_page(history.placements, page=page, page_size=page_size)
         is_admin = league_access.operator_bypass or (
@@ -244,12 +261,15 @@ class NamedLeagueInviteService:
         get_metrics().incr("coach_profile_viewed_total", labels={"result": "success"})
         return FantasyCoachProfileResponse(
             userId=str(user.id),
-            displayName=profile.display_name or "",
+            displayName=display_name,
             email=user.email if is_admin else None,
-            avatarUrl=profile.avatar_url,
-            nickname=profile.nickname,
+            avatarUrl=profile.avatar_url if profile is not None else None,
+            nickname=profile.nickname if profile is not None else None,
             userType=user.user_type.value,
-            availableForInvites=(user.user_type == UserType.AI or profile.available_for_invites),
+            availableForInvites=(
+                user.user_type == UserType.AI
+                or (profile is not None and profile.available_for_invites)
+            ),
             namedInviteStatus=invite_status.value if invite_status is not None else None,
             memberSince=seniority_label(user.created_at, now=now),
             concludedLeagues=history.concluded_leagues,

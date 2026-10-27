@@ -467,3 +467,61 @@ def test_impersonated_league_admin_can_open_a_teammates_profile(
     )
     assert response.status_code == 200, response.text
     assert response.json()["userId"] == str(teammate.id)
+
+
+def test_profile_works_for_a_coach_with_unverified_email(
+    client: TestClient, db_session: Session, competition_ids: list[str]
+) -> None:
+    """Regressione: la directory elenca anche fantallenatori con email non
+    verificata (badge "Email non verificata" in UI) — il profilo deve
+    restare apribile per loro, non rispondere "Fantallenatore non trovato"
+    solo perché non hanno ancora verificato l'email."""
+    token, _ = _register_and_login(client, "unverified-viewer@example.com")
+    league_id = _create_league(client, token, competition_ids, "Lega Non Verificato")
+
+    seed = int(datetime.now(UTC).timestamp() * 1000) % 400_000
+    coach = _make_coach(db_session, "non-verificato", seed)
+    coach.email_verified_at = None
+    db_session.add(coach)
+    db_session.commit()
+
+    response = client.get(
+        f"/leagues/{league_id}/amministrazione/fantallenatori/{coach.id}",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert response.status_code == 200, response.text
+    assert response.json()["userId"] == str(coach.id)
+
+
+def test_profile_works_for_a_coach_without_a_profile_row(
+    client: TestClient, db_session: Session, competition_ids: list[str]
+) -> None:
+    """Regressione: un fantallenatore creato manualmente (utente MANUALE)
+    può non avere ancora una riga `UserProfile` (nickname/avatar/display
+    name mai impostati). Il profilo deve comunque apparire, con il nome
+    visualizzato ricavato dall'email come fa già la directory, non un
+    "Fantallenatore non trovato" per assenza di un INNER JOIN su un profilo
+    che semplicemente non esiste ancora."""
+    token, _ = _register_and_login(client, "no-profile-viewer@example.com")
+    league_id = _create_league(client, token, competition_ids, "Lega Senza Profilo")
+
+    seed = int(datetime.now(UTC).timestamp() * 1000) % 400_000
+    bare_user = User(
+        email=f"manuale-{seed}@example.com",
+        password_hash="x",
+        platform_role=PlatformRole.USER,
+        email_verified_at=NOW - timedelta(days=400),
+        user_type=UserType.HUMAN,
+    )
+    db_session.add(bare_user)
+    db_session.commit()
+
+    response = client.get(
+        f"/leagues/{league_id}/amministrazione/fantallenatori/{bare_user.id}",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["userId"] == str(bare_user.id)
+    assert body["displayName"] == f"manuale-{seed}"
+    assert body["availableForInvites"] is False
