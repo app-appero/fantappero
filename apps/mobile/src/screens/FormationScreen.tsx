@@ -9,6 +9,7 @@ import type {
 } from "@fantappero/contracts";
 import {
   APPROVED_MODULES,
+  BENCH_ACTIVE_SIZE,
   MAX_AUTOMATIC_SUBSTITUTIONS,
   MAX_TACTICAL_MOVES,
   blockingLineupSaveIssue,
@@ -725,6 +726,8 @@ export function FormationScreen() {
   const missing = totalSlots - filledCount;
   const editable = context.modificationAllowed && canEdit;
   const maxSubs = context.maxAutomaticSubstitutions ?? MAX_AUTOMATIC_SUBSTITUTIONS;
+  // Panchina attiva: i primi 10 posti (1P·3D·3C·3A); oltre è tribuna. I cambi automatici restano `maxSubs`.
+  const benchActive = context.benchActiveSize ?? BENCH_ACTIVE_SIZE;
 
   const lockMargin = context.lineupLockMarginMinutes ?? 0;
   const placedForLock = [...displayStarters, ...displayBench].filter(Boolean);
@@ -891,8 +894,8 @@ export function FormationScreen() {
           })
       : [];
 
-  const panchinaIds = displayBench.slice(0, maxSubs);
-  const tribunaIds = displayBench.slice(maxSubs);
+  const panchinaIds = displayBench.slice(0, benchActive);
+  const tribunaIds = displayBench.slice(benchActive);
   const benchCandidates: Candidate[] =
     benchPickerIndex != null
       ? roster
@@ -912,7 +915,7 @@ export function FormationScreen() {
             } else if (locked) {
               state = "bloccato";
               stateLabel = "Bloccato · partita iniziata";
-            } else if (benchPos >= 0 && benchPos < maxSubs) {
+            } else if (benchPos >= 0 && benchPos < benchActive) {
               state = "panchina";
               stateLabel = `In panchina · ${benchPos + 1}°`;
             } else {
@@ -1106,8 +1109,9 @@ export function FormationScreen() {
         <View style={styles.benchHead}>
           <Text style={styles.sectionTitle}>Panchina</Text>
           <Text style={styles.meta} testID="formation-sub-hint">
-            Entrano al massimo {maxSubs} panchinari, nell'ordine e solo a parità di ruolo. Tocca Cambia
-            per scegliere chi inserire: i tab filtrano per ruolo. Il nome apre la scheda.
+            {benchActive} posti: 1 portiere, 3 difensori, 3 centrocampisti e 3 attaccanti. Entrano al
+            massimo {maxSubs} panchinari, nell'ordine e solo a parità di ruolo. Tocca Cambia per
+            scegliere chi inserire: i tab filtrano per ruolo. Il nome apre la scheda.
           </Text>
         </View>
         {displayBench.length === 0 ? (
@@ -1184,7 +1188,7 @@ export function FormationScreen() {
             ) : null}
             {showAllBench
               ? tribunaIds.map((id, offset) => {
-                  const index = maxSubs + offset;
+                  const index = benchActive + offset;
                   const row = roster.find((r) => r.athleteId === id);
                   const name = row?.athleteName ?? id;
                   const role = row?.role ?? "?";
@@ -1214,7 +1218,7 @@ export function FormationScreen() {
                           </AthleteName>
                           {lockLabel(id) ? <Text style={styles.benchLock}>{lockLabel(id)}</Text> : null}
                         </View>
-                        <Text style={styles.meta}>oltre i {maxSubs} cambi</Text>
+                        <Text style={styles.meta}>tribuna</Text>
                       </View>
                     </View>
                   );
@@ -1449,7 +1453,8 @@ export function FormationScreen() {
             disabled={toolDisabled}
             onPress={() => {
               setToolsOpen(false);
-              setBestModalOpen(true);
+              // Due Modal che cambiano insieme su Android: il secondo non si apre. Aspetto la chiusura del primo.
+              setTimeout(() => setBestModalOpen(true), 450);
             }}
             style={[styles.tool, toolDisabled ? styles.disabled : null]}
             testID="formation-apply-best-tool"
