@@ -160,7 +160,6 @@ export function BenchTabs({ side, title }: { side: H2HSideLineup; title: string 
 }
 
 const ROLE_ORDER = ["P", "D", "C", "A"];
-const ROLE_LABEL: Record<string, string> = { P: "Portieri", D: "Difensori", C: "Centrocampisti", A: "Attaccanti" };
 
 
 /** Cella della vista affiancata: nome intero su una riga, voto o countdown sotto. */
@@ -234,19 +233,14 @@ export function RosterVersus({ home, away }: { home: H2HSideLineup; away: H2HSid
     </div>
   );
   const rows: ReactElement[] = [];
-  for (const role of ROLE_ORDER) {
-    const left = home.starters.filter((p) => p.role === role);
-    const right = away.starters.filter((p) => p.role === role);
-    if (left.length + right.length > 0) {
-      rows.push(
-        <h4 className="fa-versus__role" key={`h-${role}`}>
-          {ROLE_LABEL[role]}
-        </h4>,
-      );
-    }
-    for (let i = 0; i < Math.max(left.length, right.length); i += 1) {
-      rows.push(pair(`s-${role}-${i}`, left[i], right[i], false));
-    }
+  // Gli 11 titolari uno sotto l'altro, a coppie, a prescindere dal modulo: ogni lista
+  // è ordinata per reparto (P, D, C, A) e la riga N di un allenatore sta accanto alla N dell'altro.
+  const byRole = (players: H2HPlayerScore[]) =>
+    [...players].sort((x, y) => ROLE_ORDER.indexOf(x.role) - ROLE_ORDER.indexOf(y.role));
+  const left = byRole(home.starters);
+  const right = byRole(away.starters);
+  for (let i = 0; i < Math.max(left.length, right.length); i += 1) {
+    rows.push(pair(`s-${i}`, left[i], right[i], false));
   }
   const slots = MAX_AUTOMATIC_SUBSTITUTIONS;
   const total = Math.max(home.bench.length, away.bench.length);
