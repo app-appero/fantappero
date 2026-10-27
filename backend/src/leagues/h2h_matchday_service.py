@@ -137,10 +137,18 @@ def get_h2h_calendar(
                     isBye=slot.is_bye,
                     homeUserId=str(home.user_id),
                     homeDisplayName=home.user.display_name,
+                    homeNickname=(
+                        home.user.profile.nickname if home.user.profile is not None else None
+                    ),
                     homeTeamName=home_team.name if home_team is not None else None,
                     homeAvatarUrl=home.user.avatar_url,
                     awayUserId=None if away is None else str(away.user_id),
                     awayDisplayName=None if away is None else away.user.display_name,
+                    awayNickname=(
+                        None
+                        if away is None or away.user.profile is None
+                        else away.user.profile.nickname
+                    ),
                     awayTeamName=away_team.name if away_team is not None else None,
                     awayAvatarUrl=None if away is None else away.user.avatar_url,
                     live=matchup_live,
@@ -198,8 +206,12 @@ def get_h2h_matchup_detail(
             ),
         )
         .options(
-            selectinload(LeagueCalendarSlot.home_membership).selectinload(LeagueMembership.user),
-            selectinload(LeagueCalendarSlot.away_membership).selectinload(LeagueMembership.user),
+            selectinload(LeagueCalendarSlot.home_membership)
+            .selectinload(LeagueMembership.user)
+            .selectinload(User.profile),
+            selectinload(LeagueCalendarSlot.away_membership)
+            .selectinload(LeagueMembership.user)
+            .selectinload(User.profile),
         )
     ).scalar_one_or_none()
     if slot is None:
@@ -425,11 +437,13 @@ def _build_side(
     persisted_goals: int | None,
 ) -> H2HSideLineupResponse:
     display_name = membership.user.display_name
+    nickname = membership.user.profile.nickname if membership.user.profile is not None else None
     if team is None or fantasy_round is None:
         return H2HSideLineupResponse(
             fantasyTeamId=str(team.id) if team is not None else None,
             teamName=team.name if team is not None else None,
             displayName=display_name,
+            nickname=nickname,
             module=None,
             lineupSource="none",
             totalScore=persisted_total,
@@ -459,6 +473,7 @@ def _build_side(
             submission=submission,
             team=team,
             display_name=display_name,
+            nickname=nickname,
             scores_by_athlete=scores_by_athlete,
             persisted_total=persisted_total,
             persisted_goals=persisted_goals,
@@ -470,6 +485,7 @@ def _build_side(
             submission=submission,
             team=team,
             display_name=display_name,
+            nickname=nickname,
             scores_by_athlete=scores_by_athlete,
             persisted_total=persisted_total,
             persisted_goals=persisted_goals,
@@ -479,6 +495,7 @@ def _build_side(
         fantasyTeamId=str(team.id),
         teamName=team.name,
         displayName=display_name,
+        nickname=nickname,
         module=None,
         lineupSource="none",
         totalScore=persisted_total,
@@ -494,6 +511,7 @@ def _side_from_effective(
     submission: LineupSubmission,
     team: FantasyTeam,
     display_name: str,
+    nickname: str | None,
     scores_by_athlete: dict[UUID, RoundAthleteScore],
     persisted_total: float | None,
     persisted_goals: int | None,
@@ -549,6 +567,7 @@ def _side_from_effective(
         fantasyTeamId=str(team.id),
         teamName=team.name,
         displayName=display_name,
+        nickname=nickname,
         module=effective.module.value,
         lineupSource="effective",
         totalScore=total,
@@ -563,6 +582,7 @@ def _side_from_submission(
     submission: LineupSubmission,
     team: FantasyTeam,
     display_name: str,
+    nickname: str | None,
     scores_by_athlete: dict[UUID, RoundAthleteScore],
     persisted_total: float | None,
     persisted_goals: int | None,
@@ -594,6 +614,7 @@ def _side_from_submission(
         fantasyTeamId=str(team.id),
         teamName=team.name,
         displayName=display_name,
+        nickname=nickname,
         module=submission.module.value,
         lineupSource="submitted",
         totalScore=total,
@@ -635,6 +656,8 @@ def _player_score_response(
         fixtureStatusLabel=score.fixture_status_label,
         scoreFinal=score.score_final,
         kickoffAt=score.kickoff_at,
+        substitutedOutMinute=score.substituted_out_minute,
+        substitutedInMinute=score.substituted_in_minute,
         isEffectiveStarter=is_effective_starter,
         isBench=is_bench,
     )

@@ -8,6 +8,7 @@ Formazione — nessun cambio di comportamento rispetto all'originale.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime
 from uuid import UUID
 
 from sqlalchemy import or_, select
@@ -15,9 +16,10 @@ from sqlalchemy.orm import Session, selectinload
 
 from fantasy_ratings.config import default_formula_config
 from fantasy_ratings.models import PlayerMatchRating
+from fantasy_turns.live_view import RawTimelineEvent, substitution_minutes
 from fantasy_turns.models import FantasyRoundFixture
 from fantasy_turns.readiness import FINISHED_FIXTURE_STATUSES
-from sports_data.fixtures.models import Fixture, PlayerMatchStat
+from sports_data.fixtures.models import Fixture, MatchEvent, PlayerMatchStat
 from sports_data.roster.models import SquadMembership
 
 __all__ = ["RoundAthleteScore", "compute_round_athlete_scores"]
@@ -35,6 +37,65 @@ class RoundAthleteScore:
     fixture_status_label: str = "Partita non associata"
     score_final: bool = False
     kickoff_at: datetime | None = None
+    substituted_out_minute: int | None = None
+    substituted_in_minute: int | None = None
+
+
+def _substitution_minutes_for_fixtures(
+    session: Session,
+    *,
+    fixture_ids: list[UUID],
+) -> tuple[dict[UUID, int], dict[UUID, int]]:
+    """Minuto di uscita/ingresso per atleta, su tutte le fixture del turno.
+
+    Riusa ``fantasy_turns.live_view.substitution_minutes`` (stessa logica
+    del badge "sostituito" sulla pagina Turni) invece di duplicarla: qui
+    serve per lo stesso badge sulla pagina di uno scontro H2H
+    (``H2HPlayerScoreResponse``), che legge i voti da questo modulo e non
+    dalla pipeline live.
+    """
+    rows = session.execute(
+        select(
+            MatchEvent.athlete_id,
+            MatchEvent.related_athlete_id,
+            MatchEvent.event_type,
+            MatchEvent.minute_elapsed,
+            MatchEvent.is_active,
+            MatchEvent.retracted_at,
+        ).where(MatchEvent.fixture_id.in_(fixture_ids))
+    ).all()
+    events = [
+        RawTimelineEvent(
+            id="",
+            minute_elapsed=minute_elapsed,
+            minute_extra=None,
+            event_type=event_type,
+            event_detail=None,
+            scoring_kind=None,
+            club_id=None,
+            club_name=None,
+            athlete_id=None if athlete_id is None else str(athlete_id),
+            athlete_name=None,
+            related_athlete_id=None if related_athlete_id is None else str(related_athlete_id),
+            related_athlete_name=None,
+            comments=None,
+            is_active=is_active,
+            retracted_at=retracted_at,
+        )
+        for (
+            athlete_id,
+            related_athlete_id,
+            event_type,
+            minute_elapsed,
+            is_active,
+            retracted_at,
+        ) in rows
+    ]
+    out_minutes, in_minutes = substitution_minutes(events)
+    return (
+        {UUID(athlete_id): minute for athlete_id, minute in out_minutes.items()},
+        {UUID(athlete_id): minute for athlete_id, minute in in_minutes.items()},
+    )
 
 
 def _fixture_status_label(status: str | None) -> str:
@@ -76,6 +137,9 @@ def compute_round_athlete_scores(
         return {}
 
     fixture_by_id = {fixture.id: fixture for fixture in fixtures}
+    substitution_out_by_athlete, substitution_in_by_athlete = _substitution_minutes_for_fixtures(
+        session, fixture_ids=fixture_ids
+    )
     context_by_membership: dict[tuple[UUID, UUID], tuple[Fixture, str]] = {}
     for fixture in fixtures:
         context_by_membership[(fixture.sport_season_id, fixture.home_club_id)] = (
@@ -116,6 +180,8 @@ def compute_round_athlete_scores(
             fixture_status_label=_fixture_status_label(fixture.status_short),
             score_final=(fixture.status_short or "").upper() in FINISHED_FIXTURE_STATUSES,
             kickoff_at=fixture.kickoff_at,
+            substituted_out_minute=substitution_out_by_athlete.get(membership.athlete_id),
+            substituted_in_minute=substitution_in_by_athlete.get(membership.athlete_id),
         )
 
     stat_club_by_player = {
@@ -197,5 +263,11 @@ def compute_round_athlete_scores(
                 else prior.score_final
             ),
             kickoff_at=fixture.kickoff_at if fixture is not None else prior.kickoff_at,
+            substituted_out_minute=(
+                substitution_out_by_athlete.get(row.athlete_id, prior.substituted_out_minute)
+            ),
+            substituted_in_minute=(
+                substitution_in_by_athlete.get(row.athlete_id, prior.substituted_in_minute)
+            ),
         )
     return snapshots

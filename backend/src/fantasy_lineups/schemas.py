@@ -52,6 +52,8 @@ class LineupRosterPlayerResponse(ApiModel):
     bonus_total: float = Field(default=0.0, alias="bonusTotal")
     malus_total: float = Field(default=0.0, alias="malusTotal")
     bonus_malus: list[dict[str, object]] = Field(default_factory=list, alias="bonusMalus")
+    substituted_out_minute: int | None = Field(default=None, alias="substitutedOutMinute")
+    substituted_in_minute: int | None = Field(default=None, alias="substitutedInMinute")
     fixture_status_label: str | None = Field(default=None, alias="fixtureStatusLabel")
     probable_hint: Literal["starter", "bench", "unavailable"] | None = Field(
         default=None,
