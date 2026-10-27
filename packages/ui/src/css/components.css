@@ -1706,8 +1706,9 @@ select option,
 }
 
 .fa-standings-card__stats dt {
-  font-size: 0.62rem;
-  letter-spacing: 0.1em;
+  font-size: 0.56rem;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
   text-transform: uppercase;
   color: var(--fa-color-foreground-muted);
 }

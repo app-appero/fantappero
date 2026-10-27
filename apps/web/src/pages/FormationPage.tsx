@@ -1304,6 +1304,14 @@ export function FormationPage() {
         return;
       }
       commitLineup(requestId, detail);
+      // Panchina dal portiere all'attaccante (1P·3D·3C·3A nei primi 10).
+      setBenchIds(
+        orderBenchForActiveRoles(
+          (detail.draft?.benchAthleteIds ?? detail.lineup?.bench.map((player) => player.athleteId) ?? []).map(
+            (athleteId) => ({ athleteId, role: playerRole(roster, athleteId) }),
+          ),
+        ).map((player) => player.athleteId),
+      );
       pushToast({ title: "Formazione migliore applicata in bozza.", variant: "success" });
     } catch (error) {
       if (!isCurrentLineupRequest(requestId)) {

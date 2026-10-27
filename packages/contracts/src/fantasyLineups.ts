@@ -311,8 +311,8 @@ export function benchActiveShortfall(bench: readonly LineupPlayerInput[]): Parti
 }
 
 /**
- * Riordina la panchina perché i primi 10 posti rispettino 1P·3D·3C·3A (o quanto disponibile),
- * mantenendo l'ordine relativo di chi è già in lista: i primi per ciascun ruolo entrano nella
+ * Riordina la panchina perché i primi 10 posti rispettino 1P·3D·3C·3A (o quanto disponibile) e,
+ * dentro panchina e tribuna, dal portiere all'attaccante; mantiene l'ordine relativo nello stesso ruolo: i primi per ciascun ruolo entrano nella
  * panchina attiva, gli altri seguono nell'ordine originale.
  */
 export function orderBenchForActiveRoles<T extends LineupPlayerInput>(bench: readonly T[]): T[] {
@@ -338,8 +338,16 @@ export function orderBenchForActiveRoles<T extends LineupPlayerInput>(bench: rea
   const fill = rest.slice(0, Math.max(0, BENCH_ACTIVE_SIZE - active.length));
   // Ordine interno della panchina attiva = ordine originale della lista.
   const activeSet = new Set<T>([...active, ...fill]);
-  const activeOrdered = filled.filter((player) => activeSet.has(player));
-  const tribuna = filled.filter((player) => !activeSet.has(player));
+  // Ogni blocco in ordine di ruolo (P, D, C, A): i cambi sono solo a parità di ruolo, quindi
+  // conta solo l'ordine relativo dentro lo stesso ruolo, che il sort stabile conserva.
+  const roleRank = (player: T) => ["P", "D", "C", "A"].indexOf(player.role ?? "");
+  const byRole = (list: T[]) =>
+    list
+      .map((player, index) => ({ player, index }))
+      .sort((x, y) => roleRank(x.player) - roleRank(y.player) || x.index - y.index)
+      .map((entry) => entry.player);
+  const activeOrdered = byRole(filled.filter((player) => activeSet.has(player)));
+  const tribuna = byRole(filled.filter((player) => !activeSet.has(player)));
   return [...activeOrdered, ...tribuna, ...empty];
 }
 
