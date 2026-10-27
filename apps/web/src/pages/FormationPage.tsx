@@ -9,6 +9,7 @@ import type {
 } from "@fantappero/contracts";
 import {
   APPROVED_MODULES,
+  BENCH_ACTIVE_SIZE,
   MAX_AUTOMATIC_SUBSTITUTIONS,
   MAX_TACTICAL_MOVES,
   approvedModuleCatalog,
@@ -1471,14 +1472,16 @@ export function FormationPage() {
     (entry) => entry.index,
   );
   const maxSubs = context?.maxAutomaticSubstitutions ?? MAX_AUTOMATIC_SUBSTITUTIONS;
-  const panchinaIds = displayBench.slice(0, maxSubs);
+  // Panchina attiva: i primi 10 posti (1P·3D·3C·3A); oltre è tribuna. I cambi automatici restano `maxSubs`.
+  const benchActive = context?.benchActiveSize ?? BENCH_ACTIVE_SIZE;
+  const panchinaIds = displayBench.slice(0, benchActive);
   const benchChoices = displayBench.map((athleteId) => ({
     athleteId,
     name: `${playerName(roster, athleteId)}${probableMark(roster, athleteId)}`,
     role: playerRole(roster, athleteId),
     disabled: playerBlocked(roster, athleteId),
   }));
-  const tribunaIds = displayBench.slice(maxSubs);
+  const tribunaIds = displayBench.slice(benchActive);
 
   const optionsForSlot = (index: number, role: LineupRole) => {
     const currentId = displayStarters[index] ?? "";
@@ -1902,9 +1905,10 @@ export function FormationPage() {
 
           <div data-testid="formation-bench-order" className="fa-ds-showcase__stack">
             <p data-testid="formation-sub-hint">
-              Entrano al massimo {maxSubs} panchinari, nell&apos;ordine di ingresso sotto e solo a
-              parità di ruolo (P con P, D con D, C con C, A con A). Dal {maxSubs + 1}° in poi restano
-              fuori se i {maxSubs} cambi sono già stati usati.
+              La panchina ha {benchActive} posti: 1 portiere, 3 difensori, 3 centrocampisti e 3
+              attaccanti. Entrano al massimo {maxSubs} panchinari, nell&apos;ordine sotto e solo a
+              parità di ruolo (P con P, D con D, C con C, A con A). Dal {benchActive + 1}° in poi è
+              tribuna.
             </p>
             <p className="fa-bench-touch-hint">
               Tocca Cambia per sostituire il calciatore. I tab filtrano per ruolo; il nome apre la
@@ -1916,14 +1920,14 @@ export function FormationPage() {
               <div className="fa-formation-layout__benches">
                 <div>
                   <h4 className="fa-formation-layout__section-title">
-                    Panchina — massimo {maxSubs} subentri
+                    Panchina — {benchActive} posti · massimo {maxSubs} subentri
                   </h4>
                   {panchinaIds.length === 0 ? (
                     <p data-testid="formation-panchina-empty">Nessun panchinaro disponibile.</p>
                   ) : (
                     <ol className="fa-bench-order" data-testid="formation-bench-panchina">
                       {displayBench.map((athleteId, index) =>
-                        index < maxSubs ? (
+                        index < benchActive ? (
                           <BenchOrderRow
                             key={athleteId}
                             athleteId={athleteId}
@@ -1956,13 +1960,13 @@ export function FormationPage() {
                   <h4 className="fa-formation-layout__section-title">Tribuna</h4>
                   {tribunaIds.length === 0 ? (
                     <p data-testid="formation-tribuna-empty">
-                      Nessuno oltre i {maxSubs} cambi: tutta la rosa disponibile è titolare o in
-                      panchina.
+                      Nessuno oltre i {benchActive} posti di panchina: tutta la rosa disponibile è
+                      titolare o in panchina.
                     </p>
                   ) : (
                     <ol className="fa-bench-order" data-testid="formation-bench-tribuna">
                       {displayBench.map((athleteId, index) =>
-                        index >= maxSubs ? (
+                        index >= benchActive ? (
                           <BenchOrderRow
                             key={athleteId}
                             athleteId={athleteId}
