@@ -95,6 +95,12 @@ export const ADMIN_NAV_ITEMS: readonly NavItemDefinition[] = [
     requiredPermissions: ["global:operate"],
     surface: "admin",
   },
+  {
+    id: "admin-email",
+    path: "/admin/email",
+    requiredPermissions: ["global:operate"],
+    surface: "admin",
+  },
 ];
 
 /**
@@ -122,6 +128,7 @@ export const NAV_LABELS: Record<string, string> = {
   "admin-turni": "Turni",
   "admin-jobs": "Job automatici",
   "admin-notifications": "Notifiche",
+  "admin-email": "Email",
 };
 
 export type ResolvedNavItem = NavItemDefinition & {

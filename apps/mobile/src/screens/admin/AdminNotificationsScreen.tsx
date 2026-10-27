@@ -35,7 +35,7 @@ const PAGE_SIZE = 10;
 const KIND_GLYPH: Record<BroadcastKind, string> = { test: "🧪", avviso: "📣", novita: "✨", manutenzione: "🛠" };
 const { colors, spacing, radius } = theme;
 
-function Pill({ label, on, onPress, testID }: { label: string; on: boolean; onPress: () => void; testID?: string }) {
+export function Pill({ label, on, onPress, testID }: { label: string; on: boolean; onPress: () => void; testID?: string }) {
   return (
     <Pressable
       onPress={onPress}
@@ -48,7 +48,7 @@ function Pill({ label, on, onPress, testID }: { label: string; on: boolean; onPr
   );
 }
 
-function RadioCard({ label, hint, on, onPress, testID }: { label: string; hint: string; on: boolean; onPress: () => void; testID?: string }) {
+export function RadioCard({ label, hint, on, onPress, testID }: { label: string; hint: string; on: boolean; onPress: () => void; testID?: string }) {
   return (
     <Pressable
       onPress={onPress}
@@ -66,7 +66,7 @@ function RadioCard({ label, hint, on, onPress, testID }: { label: string; hint: 
   );
 }
 
-function Check({ on }: { on: boolean }) {
+export function Check({ on }: { on: boolean }) {
   return (
     <View style={[styles.check, on && styles.checkOn]}>
       {on ? <Text style={styles.checkMark}>✓</Text> : null}
@@ -74,7 +74,7 @@ function Check({ on }: { on: boolean }) {
   );
 }
 
-function RecipientPicker({
+export function RecipientPicker({
   selected,
   onChange,
   onSelectAll,
@@ -635,3 +635,5 @@ const styles = lazyStyles(() => StyleSheet.create({
   error: { color: "#FF8FA8" },
   done: { color: "#6EE7B7", fontWeight: "600" },
 }));
+
+export const adminNotificationStyles = styles;

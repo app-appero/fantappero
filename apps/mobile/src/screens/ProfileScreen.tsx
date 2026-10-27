@@ -20,6 +20,7 @@ import {
   updateProfile,
   uploadAvatar,
 } from "../api/profile";
+import { NotificationEventSettings } from "../components/NotificationEventSettings";
 import { UiStatePanel } from "../components/UiStatePanel";
 import { useScreenData } from "../hooks/useScreenData";
 import { PageContainer } from "../layout/PageContainer";
@@ -492,6 +493,9 @@ export function ProfileScreen() {
             testID="profile-notifications-push"
           />
         </View>
+
+        <Text style={styles.sectionTitle}>Centro notifiche</Text>
+        <NotificationEventSettings />
 
         <Text style={styles.sectionTitle}>Silenzio notifiche (email/push)</Text>
         <Text style={styles.hint}>Ore 0-23. Lascia entrambi i campi vuoti per disattivare.</Text>
