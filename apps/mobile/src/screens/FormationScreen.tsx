@@ -579,6 +579,17 @@ export function FormationScreen() {
       );
       setContext(detail);
       applyEditor(detail);
+      // Panchina dal portiere all'attaccante (1P·3D·3C·3A nei primi 10).
+      setBenchIds(
+        orderBenchForActiveRoles(
+          (detail.draft?.benchAthleteIds ?? detail.lineup?.bench.map((player) => player.athleteId) ?? []).map(
+            (athleteId) => ({
+              athleteId,
+              role: roster.find((row) => row.athleteId === athleteId)?.role ?? null,
+            }),
+          ),
+        ).map((player) => player.athleteId),
+      );
       setActionMessage("Formazione migliore applicata in bozza.");
     } catch (error) {
       setActionError(getApiErrorMessage(error, "Applicazione della formazione migliore non riuscita."));
@@ -1136,9 +1147,9 @@ export function FormationScreen() {
                   ]}
                   testID={`formation-bench-${index}`}
                 >
-                  <Text style={styles.benchOrder}>{index + 1}°</Text>
+                  <Text style={styles.benchOrder} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>{index + 1}°</Text>
                   {row?.photoUrl ? (
-                    <Image source={{ uri: row.photoUrl }} style={styles.benchPhoto} />
+                    <Image source={{ uri: row.photoUrl }} style={[styles.benchPhoto, { borderColor: roleRingColor(role) }]} />
                   ) : (
                     <View style={[styles.benchRole, { backgroundColor: roleRingColor(role) }]}>
                       <Text style={styles.benchRoleText}>{role}</Text>
@@ -1203,9 +1214,9 @@ export function FormationScreen() {
                       ]}
                       testID={`formation-bench-${index}`}
                     >
-                      <Text style={styles.benchOrder}>{index + 1}°</Text>
+                      <Text style={styles.benchOrder} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>{index + 1}°</Text>
                       {row?.photoUrl ? (
-                        <Image source={{ uri: row.photoUrl }} style={styles.benchPhoto} />
+                        <Image source={{ uri: row.photoUrl }} style={[styles.benchPhoto, { borderColor: roleRingColor(role) }]} />
                       ) : (
                         <View style={[styles.benchRole, { backgroundColor: roleRingColor(role) }]}>
                           <Text style={styles.benchRoleText}>{role}</Text>
@@ -1689,7 +1700,7 @@ const styles = lazyStyles(() => StyleSheet.create({
     borderColor: colors.success,
     backgroundColor: "rgba(61, 220, 151, 0.16)",
   },
-  benchPhoto: { width: 36, height: 36, borderRadius: 18 },
+  benchPhoto: { width: 38, height: 38, borderRadius: 19, borderWidth: 3 },
   benchNameRow: { flexDirection: "row", alignItems: "center", gap: spacing.xs, flexWrap: "wrap" },
   benchLock: {
     color: "#ffffff",
@@ -1702,9 +1713,9 @@ const styles = lazyStyles(() => StyleSheet.create({
   },
   benchRowSelected: { borderColor: colors.accent },
   benchOrder: {
-    width: 30,
+    width: 34,
     color: colors.accent,
-    fontSize: typography.fontSize.lg,
+    fontSize: typography.fontSize.md,
     fontStyle: "italic",
     fontWeight: "800",
   },
