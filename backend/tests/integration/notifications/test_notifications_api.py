@@ -135,3 +135,90 @@ def test_preferences_default_enabled_and_can_be_updated(client: TestClient) -> N
     items_by_category = {item["category"]: item["inAppEnabled"] for item in updated.json()["items"]}
     assert items_by_category["mercato"] is False
     assert items_by_category["sistema"] is True
+
+
+def test_preferences_default_includes_granular_events_all_enabled(client: TestClient) -> None:
+    """TASK5: oltre alla categoria, GET deve elencare gli eventi granulari
+    (uno per gol/assist/.../asta/scambi/...), con default "tutto attivo"."""
+    token, _ = _register_and_login(client, "notif-api-events-default@example.com")
+    headers = {"Authorization": f"Bearer {token}"}
+
+    defaults = client.get("/notifications/preferences", headers=headers)
+    assert defaults.status_code == 200
+    events = defaults.json()["events"]
+    events_by_key = {event["eventKey"]: event for event in events}
+
+    for expected_key in (
+        "calciatori.gol",
+        "calciatori.assist",
+        "calciatori.ammonizione",
+        "calciatori.espulsione",
+        "calciatori.sostituzione",
+        "calciatori.infortunio",
+        "calciatori.squalifica",
+        "sistema.scambi",
+        "sistema.asta",
+        "sistema.formazione",
+        "sistema.turno_omologato",
+        "sistema.avvisi_operatori",
+    ):
+        assert expected_key in events_by_key, expected_key
+        assert events_by_key[expected_key]["inAppEnabled"] is True
+        assert events_by_key[expected_key]["pushEnabled"] is True
+
+    assert events_by_key["calciatori.gol"]["category"] == "calciatori"
+    assert events_by_key["sistema.asta"]["category"] == "sistema"
+
+
+def test_put_preferences_granular_event_updates_single_channel(client: TestClient) -> None:
+    token, _ = _register_and_login(client, "notif-api-events-update@example.com")
+    headers = {"Authorization": f"Bearer {token}"}
+
+    response = client.put(
+        "/notifications/preferences",
+        headers=headers,
+        json={"eventKey": "calciatori.gol", "pushEnabled": False},
+    )
+    assert response.status_code == 200
+    events_by_key = {event["eventKey"]: event for event in response.json()["events"]}
+    assert events_by_key["calciatori.gol"]["pushEnabled"] is False
+    # In-app non è stato toccato: resta sul default.
+    assert events_by_key["calciatori.gol"]["inAppEnabled"] is True
+    # La categoria "risultati" resta intatta (non è più l'unico livello di controllo).
+    items_by_category = {
+        item["category"]: item["inAppEnabled"] for item in response.json()["items"]
+    }
+    assert items_by_category["risultati"] is True
+
+
+def test_put_preferences_rejects_unknown_event_key(client: TestClient) -> None:
+    token, _ = _register_and_login(client, "notif-api-events-unknown@example.com")
+    response = client.put(
+        "/notifications/preferences",
+        headers={"Authorization": f"Bearer {token}"},
+        json={"eventKey": "calciatori.boh", "inAppEnabled": False},
+    )
+    assert response.status_code == 400
+    assert response.json()["code"] == "invalid_event_key"
+
+
+def test_put_preferences_rejects_both_category_and_event_key(client: TestClient) -> None:
+    token, _ = _register_and_login(client, "notif-api-events-mixed@example.com")
+    response = client.put(
+        "/notifications/preferences",
+        headers={"Authorization": f"Bearer {token}"},
+        json={"category": "mercato", "eventKey": "calciatori.gol", "inAppEnabled": False},
+    )
+    assert response.status_code == 400
+    assert response.json()["code"] == "invalid_preference_request"
+
+
+def test_put_preferences_rejects_event_key_without_any_channel(client: TestClient) -> None:
+    token, _ = _register_and_login(client, "notif-api-events-empty@example.com")
+    response = client.put(
+        "/notifications/preferences",
+        headers={"Authorization": f"Bearer {token}"},
+        json={"eventKey": "calciatori.gol"},
+    )
+    assert response.status_code == 400
+    assert response.json()["code"] == "invalid_preference_request"

@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session, selectinload
 from fantasy_turns.models import FantasyRoundFixture
 from sports_data.catalog.models import Club
 from sports_data.fixtures.models import Fixture
+from sports_data.listone.mapping import map_provider_position_to_role
 from sports_data.predicted.models import PredictedLineupPlayer, PredictedLineupSnapshot
 from sports_data.predicted.names import normalize_person
 from sports_data.predicted.validate import (
@@ -28,6 +29,13 @@ class PredictedViewPlayer:
     name: str
     shirt_number: int | None
     grid: str | None
+    #: Ruolo fantacalcistico (P/D/C/A), derivato dalla rosa reale quando
+    #: l'atleta è stato abbinato. ``None`` se non abbinato o senza posizione
+    #: nota dal provider.
+    role: str | None = None
+    #: Posizione nell'ordine di probabilità in panchina (1 = primo cambio).
+    #: ``None`` per i titolari.
+    bench_order: int | None = None
 
 
 @dataclass(frozen=True)
@@ -79,9 +87,12 @@ def latest_predicted_view(session: Session, fixture_id: UUID) -> PredictedView |
     if snapshot is None:
         return None
     note = _note(snapshot.lineup_type, snapshot.reliability)
+    roles = _athlete_roles(
+        session, {player.athlete_id for player in snapshot.players if player.athlete_id is not None}
+    )
     return PredictedView(
-        home=_side(snapshot, "home", snapshot.home_formation, snapshot.home_coach, note),
-        away=_side(snapshot, "away", snapshot.away_formation, snapshot.away_coach, note),
+        home=_side(snapshot, "home", snapshot.home_formation, snapshot.home_coach, note, roles),
+        away=_side(snapshot, "away", snapshot.away_formation, snapshot.away_coach, note, roles),
         unavailable=tuple(
             PredictedUnavailable(
                 athlete_id=None if player.athlete_id is None else str(player.athlete_id),
@@ -138,6 +149,7 @@ def _side(
     formation: str | None,
     coach: str | None,
     note: str,
+    roles: dict[UUID, str],
 ) -> PredictedViewSide | None:
     rows = [
         player
@@ -148,16 +160,25 @@ def _side(
         return None
     ordered = sorted(rows, key=lambda player: player.sort_order)
 
-    def view(player: PredictedLineupPlayer) -> PredictedViewPlayer:
+    def view(player: PredictedLineupPlayer, *, bench_order: int | None) -> PredictedViewPlayer:
         return PredictedViewPlayer(
             athlete_id=None if player.athlete_id is None else str(player.athlete_id),
             name=player.display_name,
             shirt_number=player.shirt_number,
             grid=player.grid,
+            role=None if player.athlete_id is None else roles.get(player.athlete_id),
+            bench_order=bench_order,
         )
 
-    starters = tuple(view(player) for player in ordered if player.is_starter)
-    bench = tuple(view(player) for player in ordered if not player.is_starter)
+    starters = tuple(view(player, bench_order=None) for player in ordered if player.is_starter)
+    # L'ordine di panchina è relativo alla panchina stessa (1 = primo cambio
+    # probabile), non il ``sort_order`` grezzo che conta anche i titolari.
+    bench = tuple(
+        view(player, bench_order=index)
+        for index, player in enumerate(
+            (player for player in ordered if not player.is_starter), start=1
+        )
+    )
     if not starters and not bench:
         return None
     return PredictedViewSide(
@@ -167,6 +188,31 @@ def _side(
         starters=starters,
         bench=bench,
     )
+
+
+def _athlete_roles(session: Session, athlete_ids: set[UUID]) -> dict[UUID, str]:
+    """Ruolo fantacalcistico (P/D/C/A) per gli atleti abbinati in questo snapshot.
+
+    Deriva dalla posizione grezza del provider in rosa (``SquadMembership``),
+    la stessa fonte già usata per il listone: non inventiamo un ruolo che il
+    provider delle formazioni probabili non fornisce.
+    """
+    if not athlete_ids:
+        return {}
+    rows = session.execute(
+        select(SquadMembership.athlete_id, SquadMembership.provider_position_raw).where(
+            SquadMembership.athlete_id.in_(athlete_ids),
+            SquadMembership.is_active.is_(True),
+        )
+    ).all()
+    roles: dict[UUID, str] = {}
+    for athlete_id, position_raw in rows:
+        if athlete_id in roles:
+            continue
+        role = map_provider_position_to_role(position_raw)
+        if role is not None:
+            roles[athlete_id] = role.value
+    return roles
 
 
 def _hint_for(player: PredictedLineupPlayer) -> AthleteProbable | None:
@@ -191,7 +237,9 @@ def _hint_rank(hint: str) -> int:
     return 1
 
 
-def _absence_category(kind: str | None, label: str | None) -> Literal["suspended", "injured", "other"]:
+def _absence_category(
+    kind: str | None, label: str | None
+) -> Literal["suspended", "injured", "other"]:
     normalized = (kind or "").strip().lower()
     if normalized in {"suspension", "suspended", "red", "red_card", "redcard"}:
         return "suspended"

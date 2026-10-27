@@ -1,9 +1,13 @@
 """Email delivery for external-channel notifications (EP09-05).
 
 Opt-in via the existing profile toggle (``UserProfile.notifications_email``,
-EP02-02), gated by quiet hours. Reuses the mail outbox task from EP01/EP02
-rather than a parallel delivery path. Never raises: a failure here must not
-block the in-app notification that already succeeded.
+EP02-02), gated by quiet hours and by the global
+``NOTIFICATIONS_ROUTINE_EMAIL_ENABLED`` kill switch (Task 6b — routine
+in-app notifications about game events are in-app/push only by default; see
+docs/operations/email_notifications.md). Mirrors ``push_dispatch.py``.
+Reuses the mail outbox task from EP01/EP02 rather than a parallel delivery
+path. Never raises: a failure here must not block the in-app notification
+that already succeeded.
 """
 
 from __future__ import annotations
@@ -13,6 +17,7 @@ from datetime import UTC, datetime
 
 from auth.models.user import User
 from auth.models.user_profile import UserProfile
+from config.settings.loader import get_api_settings
 from notifications.models import Notification
 from notifications.quiet_hours import is_within_quiet_hours
 from observability.logging import get_logger
@@ -29,6 +34,12 @@ def dispatch_notification_email(
     profile: UserProfile | None,
 ) -> None:
     if profile is None or not profile.notifications_email:
+        return
+    if not get_api_settings().notifications_routine_email_enabled:
+        get_metrics().incr(
+            "notifications_email_skipped_total",
+            labels={"reason": "routine_disabled", "category": notification.category.value},
+        )
         return
     if is_within_quiet_hours(
         now=datetime.now(UTC),

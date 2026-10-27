@@ -44,7 +44,7 @@ function formatWhen(item: BroadcastItem): string {
   }
 }
 
-function RadioCard(props: { label: string; hint: string; checked: boolean; onSelect: () => void; testId: string }) {
+export function RadioCard(props: { label: string; hint: string; checked: boolean; onSelect: () => void; testId: string }) {
   return (
     <button
       type="button"
@@ -63,7 +63,7 @@ function RadioCard(props: { label: string; hint: string; checked: boolean; onSel
   );
 }
 
-function Check(props: { on: boolean }) {
+export function Check(props: { on: boolean }) {
   return (
     <span className={props.on ? "fa-nop-check fa-nop-check--on" : "fa-nop-check"} aria-hidden="true">
       {props.on ? "✓" : ""}
@@ -71,7 +71,7 @@ function Check(props: { on: boolean }) {
   );
 }
 
-function RecipientPicker(props: {
+export function RecipientPicker(props: {
   selected: Map<string, string>;
   onChange: (next: Map<string, string>) => void;
   onSelectAll: (total: number) => void;

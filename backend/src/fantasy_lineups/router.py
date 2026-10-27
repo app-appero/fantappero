@@ -21,6 +21,7 @@ from fantasy_lineups.ai_service import (
 from fantasy_lineups.schemas import (
     AiLineupRunResponse,
     AiLineupTeamResultResponse,
+    ApplyBestLineupRequest,
     ComputeEffectiveLineupsRequest,
     ComputeEffectiveLineupsResponse,
     EffectiveLineupResponse,
@@ -138,13 +139,19 @@ def copy_previous_lineup_to_draft(
 )
 def apply_best_lineup(
     round_id: UUID,
+    body: ApplyBestLineupRequest | None = None,
     team_id: LineupTeamId = None,
     league_access: LeagueAccess = Depends(require_league_permissions(Permission.ROSTER_EDIT)),
     service: FantasyLineupService = Depends(get_fantasy_lineup_service),
 ) -> LineupContextResponse | JSONResponse:
-    """Precompila la bozza con la stessa formula ``ai_lineup_v1`` delle squadre IA."""
+    """Precompila la bozza con la stessa formula ``ai_lineup_v1`` delle squadre IA.
+
+    Corpo opzionale ``{"mode": "keep_module" | "best_module"}`` (default
+    ``keep_module``, compatibile con le chiamate senza corpo già in uso).
+    """
+    mode = body.mode if body is not None else "keep_module"
     try:
-        return service.apply_best_lineup(league_access, round_id, team_id)
+        return service.apply_best_lineup(league_access, round_id, team_id, mode=mode)
     except AuthError as exc:
         return _error_response(exc)
 

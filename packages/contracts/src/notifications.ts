@@ -31,13 +31,26 @@ export interface NotificationPreference {
   inAppEnabled: boolean;
 }
 
-export interface NotificationPreferenceList {
-  items: NotificationPreference[];
+/** Preferenza granulare per evento (calciatori.gol, sistema.scambi, …), canali separati. */
+export interface NotificationEventPreference {
+  eventKey: string;
+  category: "calciatori" | "sistema";
+  label: string;
+  inAppEnabled: boolean;
+  pushEnabled: boolean;
 }
 
+export interface NotificationPreferenceList {
+  items: NotificationPreference[];
+  events?: NotificationEventPreference[];
+}
+
+/** Per categoria (`category` + `inAppEnabled`) oppure per evento (`eventKey` + canali). */
 export interface UpdateNotificationPreferenceRequest {
-  category: NotificationCategory;
-  inAppEnabled: boolean;
+  category?: NotificationCategory;
+  eventKey?: string;
+  inAppEnabled?: boolean;
+  pushEnabled?: boolean;
 }
 
 export interface ListNotificationsFilters {
@@ -189,4 +202,31 @@ export const BROADCAST_CATEGORY_OPTIONS: ReadonlyArray<{
 export interface SendTestSamplesResult {
   createdCount: number;
   recipientCount: number;
+}
+
+export interface SendOperatorEmailRequest {
+  subject: string;
+  body: string;
+  audience: BroadcastAudience;
+}
+
+export interface OperatorEmailSent {
+  id: string;
+  recipientCount: number;
+}
+
+export interface OperatorEmailHistoryItem {
+  id: string;
+  subject: string;
+  audienceLabel: string;
+  recipientCount: number;
+  sentAt: string;
+  createdByUserId: string | null;
+}
+
+export interface OperatorEmailHistory {
+  items: OperatorEmailHistoryItem[];
+  total: number;
+  page: number;
+  pageSize: number;
 }

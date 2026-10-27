@@ -38,7 +38,11 @@ from fantasy_lineups.ai_selection import LineupPlan, build_lineup_plan
 from fantasy_lineups.ai_service import collect_candidates_for_team
 from fantasy_lineups.rules import module_counts
 
-__all__ = ["compute_best_lineup_for_team", "compute_best_lineup_respecting_locks"]
+__all__ = [
+    "compute_best_lineup_for_team",
+    "compute_best_lineup_respecting_locks",
+    "select_best_module",
+]
 
 _ROLE_ORDER = (FantasyRole.P, FantasyRole.D, FantasyRole.C, FantasyRole.A)
 
@@ -161,6 +165,35 @@ def compute_best_lineup_respecting_locks(
         used_fallback=free_plan.used_fallback,
         unfilled_roles=free_plan.unfilled_roles,
     )
+
+
+def select_best_module(
+    plans: Sequence[tuple[FantasyModule, LineupPlan]],
+) -> tuple[FantasyModule, LineupPlan] | None:
+    """Tra più piani (uno per modulo), quello con il punteggio totale più alto
+    tra gli undici titolari scelti — ``None`` se nessuno è completabile.
+
+    Funzione pura (EP-self-service, modalità ``best_module``): prende piani
+    già calcolati (con o senza blocchi rispettati, indifferentemente) invece
+    di calcolarli lei stessa, così la scelta del modulo migliore è
+    testabile senza sessione né rosa reale. A parità di punteggio vince il
+    modulo con codice testuale minore, per un ordine stabile e deterministico
+    — nessuna sorpresa a rosa invariata.
+    """
+    best: tuple[FantasyModule, LineupPlan] | None = None
+    best_score: float = float("-inf")
+    for module, plan in plans:
+        if not plan.is_complete:
+            continue
+        starters = set(plan.starters)
+        score = sum(
+            candidate.score for candidate in plan.candidates if candidate.athlete_id in starters
+        )
+        tie_break_wins = score == best_score and best is not None and module.value < best[0].value
+        if best is None or score > best_score or tie_break_wins:
+            best = (module, plan)
+            best_score = score
+    return best
 
 
 def _role_targets(module: FantasyModule) -> list[tuple[FantasyRole, int]]:

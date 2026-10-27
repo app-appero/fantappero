@@ -184,6 +184,19 @@ class SaveLineupDraftRequest(ApiModel):
     bench_athlete_ids: list[str] = Field(alias="benchAthleteIds")
 
 
+class ApplyBestLineupRequest(ApiModel):
+    """Corpo opzionale di ``POST .../formazione/migliore``.
+
+    ``mode="keep_module"`` (default, compatibile con le chiamate senza corpo
+    già in uso): ottimizza la rosa sul modulo già impostato dall'utente.
+    ``mode="best_module"``: prova anche tutti i moduli approvati e applica
+    quello con il punteggio totale più alto tra i titolari, a parità di
+    vincoli di blocco.
+    """
+
+    mode: Literal["keep_module", "best_module"] = Field(default="keep_module")
+
+
 class ComputeEffectiveLineupsRequest(ApiModel):
     max_automatic_substitutions: int | None = Field(default=None, alias="maxAutomaticSubstitutions")
 

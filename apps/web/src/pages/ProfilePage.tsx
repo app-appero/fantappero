@@ -1,3 +1,4 @@
+import { NotificationEventSettings } from "../notifications/NotificationEventSettings";
 import {
   DELETE_ACCOUNT_CONFIRMATION_PHRASE,
   PROFILE_LANGUAGE_OPTIONS,
@@ -539,6 +540,13 @@ export function ProfilePage() {
               </div>
             </div>
             <p className="fa-field__hint">JPEG, PNG o WebP — massimo 5 MB.</p>
+          </CardBody>
+        </Card>
+
+        <Card>
+          <CardHeader title="Centro notifiche" />
+          <CardBody>
+            <NotificationEventSettings />
           </CardBody>
         </Card>
 

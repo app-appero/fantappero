@@ -36,13 +36,36 @@ class NotificationPreferenceItemResponse(ApiModel):
     in_app_enabled: bool = Field(alias="inAppEnabled")
 
 
+class NotificationEventPreferenceItemResponse(ApiModel):
+    """Preferenza granulare per singolo evento (TASK5), canali separati."""
+
+    event_key: str = Field(alias="eventKey")
+    category: str
+    label: str
+    in_app_enabled: bool = Field(alias="inAppEnabled")
+    push_enabled: bool = Field(alias="pushEnabled")
+
+
 class NotificationPreferenceListResponse(ApiModel):
     items: list[NotificationPreferenceItemResponse]
+    #: Preferenze granulari per evento (TASK5). Lista aggiuntiva, additiva:
+    #: ``items`` resta per compatibilità con chi legge solo la categoria.
+    events: list[NotificationEventPreferenceItemResponse] = Field(default_factory=list)
 
 
 class UpdateNotificationPreferenceRequest(ApiModel):
-    category: str
-    in_app_enabled: bool = Field(alias="inAppEnabled")
+    """Corpo del ``PUT /notifications/preferences``.
+
+    Due forme, selezionate dal campo presente:
+    - per categoria (compatibilità, EP09-01): ``{"category": ..., "inAppEnabled": ...}``
+    - granulare per evento (TASK5): ``{"eventKey": ..., "inAppEnabled": ..., "pushEnabled": ...}``
+      (almeno uno dei due booleani; l'altro resta invariato)
+    """
+
+    category: str | None = None
+    event_key: str | None = Field(default=None, alias="eventKey")
+    in_app_enabled: bool | None = Field(default=None, alias="inAppEnabled")
+    push_enabled: bool | None = Field(default=None, alias="pushEnabled")
 
 
 class RegisterPushDeviceRequest(ApiModel):
