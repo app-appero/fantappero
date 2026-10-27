@@ -940,6 +940,7 @@ export function applyBestLineup(
   roundId: string,
   teamId?: string,
   mode: "keep_module" | "best_module" = "keep_module",
+  module?: string,
 ): Promise<LineupContext> {
   const query = teamId ? `?teamId=${teamId}` : "";
   return apiRequest<LineupContext>(
@@ -947,7 +948,7 @@ export function applyBestLineup(
     {
       method: "POST",
       accessToken,
-      body: { mode },
+      body: module ? { mode, module } : { mode },
     },
   );
 }

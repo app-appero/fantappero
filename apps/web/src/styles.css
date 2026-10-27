@@ -5067,3 +5067,6 @@ h2 {
 .fa-nop-mail small {
   color: #8a93b2;
 }
+
+.fa-versus__role { margin: 6px 0 0; font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: var(--fa-color-foreground-muted); }
+.fa-vcell--empty { min-height: 56px; border: 1px dashed rgba(255, 255, 255, 0.14); border-radius: 18px; background: transparent; }
