@@ -238,11 +238,15 @@ class CoachPlacementResponse(ApiModel):
 
 
 class FantasyCoachProfileResponse(ApiModel):
-    """Profilo storico limitato, visibile alla sola directory amministrativa."""
+    """Profilo storico limitato, accessibile a qualunque membro della lega.
+
+    ``email`` è ``null`` per chi non amministra la lega (vedi
+    ``NamedLeagueInviteService.coach_profile``).
+    """
 
     user_id: str = Field(alias="userId")
     display_name: str = Field(alias="displayName")
-    email: str
+    email: str | None = None
     avatar_url: str | None = Field(default=None, alias="avatarUrl")
     nickname: str | None = None
     user_type: Literal["human", "ai"] = Field(alias="userType")
@@ -343,10 +347,15 @@ class H2HCalendarMatchupResponse(ApiModel):
     is_bye: bool = Field(alias="isBye")
     home_user_id: str = Field(alias="homeUserId")
     home_display_name: str = Field(alias="homeDisplayName")
+    # Separati da home/awayDisplayName (che già preferisce il nickname se
+    # impostato): la UI vuole poter mostrare SOLO il nickname con fallback
+    # esplicito al nome visualizzato.
+    home_nickname: str | None = Field(default=None, alias="homeNickname")
     home_team_name: str | None = Field(default=None, alias="homeTeamName")
     home_avatar_url: str | None = Field(default=None, alias="homeAvatarUrl")
     away_user_id: str | None = Field(default=None, alias="awayUserId")
     away_display_name: str | None = Field(default=None, alias="awayDisplayName")
+    away_nickname: str | None = Field(default=None, alias="awayNickname")
     away_team_name: str | None = Field(default=None, alias="awayTeamName")
     away_avatar_url: str | None = Field(default=None, alias="awayAvatarUrl")
     live: bool = False
@@ -402,6 +411,8 @@ class H2HPlayerScoreResponse(ApiModel):
     fixture_status_label: str = Field(default="Partita non associata", alias="fixtureStatusLabel")
     score_final: bool = Field(default=False, alias="scoreFinal")
     kickoff_at: datetime | None = Field(default=None, alias="kickoffAt")
+    substituted_out_minute: int | None = Field(default=None, alias="substitutedOutMinute")
+    substituted_in_minute: int | None = Field(default=None, alias="substitutedInMinute")
     is_effective_starter: bool = Field(alias="isEffectiveStarter")
     is_bench: bool = Field(alias="isBench")
 
@@ -410,6 +421,7 @@ class H2HSideLineupResponse(ApiModel):
     fantasy_team_id: str | None = Field(default=None, alias="fantasyTeamId")
     team_name: str | None = Field(default=None, alias="teamName")
     display_name: str = Field(alias="displayName")
+    nickname: str | None = Field(default=None)
     module: str | None = None
     lineup_source: Literal["effective", "submitted", "none"] = Field(alias="lineupSource")
     total_score: float | None = Field(default=None, alias="totalScore")
@@ -522,6 +534,11 @@ class LeagueStandingResponse(ApiModel):
     # /leagues/{id}/membri, riusato qui per collegare la riga al fantallenatore.
     manager_user_id: str = Field(alias="managerUserId")
     manager_display_name: str | None = Field(default=None, alias="managerDisplayName")
+    # Separato da managerDisplayName (che già preferisce il nickname se
+    # impostato, via User.display_name): la UI vuole poter mostrare SOLO il
+    # nickname con fallback esplicito al nome visualizzato, non il valore
+    # già fuso.
+    manager_nickname: str | None = Field(default=None, alias="managerNickname")
     manager_avatar_url: str | None = Field(default=None, alias="managerAvatarUrl")
     position: int
     played: int

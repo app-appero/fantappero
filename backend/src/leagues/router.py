@@ -287,10 +287,17 @@ def get_fantasy_coach_profile(
     user_id: UUID,
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=20, ge=1, le=50, alias="pageSize"),
-    league_access: LeagueAccess = Depends(require_league_permissions(Permission.LEAGUE_ADMIN)),
+    league_access: LeagueAccess = Depends(require_league_permissions(Permission.LEAGUE_VIEW)),
     service: NamedLeagueInviteService = Depends(get_named_league_invite_service),
 ) -> FantasyCoachProfileResponse | JSONResponse:
-    """Profilo storico limitato di un fantallenatore (EP13-P06)."""
+    """Profilo storico limitato di un fantallenatore (EP13-P06).
+
+    Accessibile a qualunque membro della lega (non solo admin): l'email
+    resta nascosta (``null``) a chi non amministra la lega, per lo stesso
+    motivo per cui oggi è visibile solo agli admin (EP13-P06bis — distinguere
+    account diversi con lo stesso nome mostrato è un bisogno amministrativo,
+    non di un membro qualsiasi).
+    """
     try:
         return service.coach_profile(league_access, user_id, page=page, page_size=page_size)
     except AuthError as exc:
@@ -718,6 +725,9 @@ def get_league_standings(
         .options(selectinload(User.profile))
     ).all()
     manager_labels = {user.id: user.display_name for user in owners}
+    manager_nicknames = {
+        user.id: user.profile.nickname if user.profile is not None else None for user in owners
+    }
     manager_avatars = {
         user.id: user.profile.avatar_url if user.profile is not None else None
         for user in owners
@@ -728,6 +738,7 @@ def get_league_standings(
             teamName=team_names.get(row.fantasy_team_id, "Squadra"),
             managerUserId=str(manager_ids[row.fantasy_team_id]),
             managerDisplayName=manager_labels.get(manager_ids[row.fantasy_team_id]),
+            managerNickname=manager_nicknames.get(manager_ids[row.fantasy_team_id]),
             managerAvatarUrl=manager_avatars.get(manager_ids[row.fantasy_team_id]),
             position=row.position,
             played=row.played,

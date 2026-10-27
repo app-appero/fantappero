@@ -18,6 +18,7 @@ from authorization.context import LeagueAccess
 from database.enums import (
     LeagueAuditAction,
     LeagueMemberRole,
+    LeagueRole,
     NamedInviteStatus,
     NotificationCategory,
     UserType,
@@ -190,11 +191,14 @@ class NamedLeagueInviteService:
         Reso accessibile a qualunque utente verificato, incluso il chiamante
         stesso (candidati da invitare così come membri già in questa lega,
         es. dal click su un nome in Classifica — anche il proprio): l'endpoint
-        resta protetto da `Permission.LEAGUE_ADMIN` sulla lega indicata. Lo
-        storico restituisce solo fatti derivati da leghe concluse — mai
-        budget, rose o nomi di lega; l'email è inclusa ed è visibile solo a
-        chi amministra la lega, per distinguere account diversi con lo
-        stesso nome mostrato (EP13-P06bis).
+        è protetto da `Permission.LEAGUE_VIEW` sulla lega indicata (qualunque
+        membro, non solo admin — prima era `LEAGUE_ADMIN`, impedendo a un
+        membro normale di aprire il profilo di un altro fantallenatore della
+        sua stessa lega). Lo storico restituisce solo fatti derivati da
+        leghe concluse — mai budget, rose o nomi di lega; l'email resta
+        `null` per chi non amministra la lega, per distinguere account
+        diversi con lo stesso nome mostrato solo a chi ha bisogno di
+        amministrare la lega (EP13-P06bis).
 
         Il chiamante NON viene escluso: la directory (`directory()`) lo
         elenca già con `isSelf=True`, e la Classifica può linkare anche la
@@ -233,12 +237,15 @@ class NamedLeagueInviteService:
         user, profile, invite_status = row
         history = load_history(self._session, user_id=user.id)
         page_items, total = placements_page(history.placements, page=page, page_size=page_size)
+        is_admin = league_access.operator_bypass or (
+            league_access.api_role == LeagueRole.LEAGUE_ADMIN
+        )
 
         get_metrics().incr("coach_profile_viewed_total", labels={"result": "success"})
         return FantasyCoachProfileResponse(
             userId=str(user.id),
             displayName=profile.display_name or "",
-            email=user.email,
+            email=user.email if is_admin else None,
             avatarUrl=profile.avatar_url,
             nickname=profile.nickname,
             userType=user.user_type.value,
