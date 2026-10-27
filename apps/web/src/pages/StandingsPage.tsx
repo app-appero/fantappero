@@ -161,11 +161,12 @@ function StandingsTableBlock({
       <StandingsTable
         caption="Classifica lega"
         positionLabel="Pos."
-        teamLabel="Squadra"
+        teamLabel="Allenatore"
         playedLabel="G"
         pointsLabel="Pt"
-        goalsLabel="GF:GS"
-        fantasyPointsLabel="FP:FS"
+        goalsLabel="Gol fatti"
+        goalsAgainstLabel="Gol subiti"
+        fantasyPointsLabel="Fantapunti"
         rows={rows}
         testId={testId}
         onManagerClick={onManagerClick}
@@ -176,11 +177,11 @@ function StandingsTableBlock({
 
 /** Classifica lega aggiornata dai risultati H2H (EP07-06). */
 export function StandingsPage() {
-  const { isDemoMode, activeLeagueId, activeLeague, can } = useAuth();
+  const { isDemoMode, activeLeagueId, activeLeague } = useAuth();
   const { search } = useLocation();
   const navigate = useNavigate();
   const demoState = isDemoMode ? parseWireframeStateFromSearch(search) : null;
-  const canViewCoachProfiles = can(["league:admin"]);
+  const canViewCoachProfiles = true;
 
   const [standings, setStandings] = useState<LeagueStanding[]>(() =>
     isDemoMode && demoState !== "empty" && demoState !== "error" && demoState !== "loading"
