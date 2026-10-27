@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections import Counter
 from datetime import UTC, datetime
 from zoneinfo import ZoneInfo
 
@@ -11,6 +12,8 @@ from auth.exceptions import ValidationAuthError
 from database.enums import FantasyModule, FantasyRole, FantasyTurnStatus, LineupSlotKind
 from fantasy_lineups.rules import (
     APPROVED_MODULES,
+    BENCH_ACTIVE_ROLE_QUOTA,
+    BENCH_ACTIVE_SIZE,
     MAX_AUTOMATIC_SUBSTITUTIONS,
     MAX_TACTICAL_MOVES,
     MIN_AUTOMATIC_SUBSTITUTIONS,
@@ -20,6 +23,7 @@ from fantasy_lineups.rules import (
     assert_lineup_modification_allowed,
     assert_progressive_lock,
     assert_tactical_move,
+    bench_active_role_requirements,
     coerce_max_automatic_substitutions,
     copy_previous_lineup,
     evaluate_bench_order_lock,
@@ -61,13 +65,26 @@ def _valid_433() -> tuple[list[str], list[LineupPlayerRef], list[LineupPlayerRef
         *_players(forwards[:3], FantasyRole.A),
     ]
     starter_ids = [player.athlete_id for player in starters]
-    bench_ids = remaining_roster_for_bench(roster, starter_ids)
+    remaining = remaining_roster_for_bench(roster, starter_ids)
     role_by_prefix = {
         "p": FantasyRole.P,
         "d": FantasyRole.D,
         "c": FantasyRole.C,
         "a": FantasyRole.A,
     }
+    # Panchina attiva valida (1P-3D-3C-3A nei primi 10): la rosa ha
+    # abbastanza giocatori per ruolo, quindi gli stessi non ancora schierati
+    # bastano a soddisfare la quota senza bisogno di una rosa più grande.
+    by_role: dict[str, list[str]] = {"p": [], "d": [], "c": [], "a": []}
+    for item in remaining:
+        by_role[str(item)[0]].append(item)
+    quota = {"p": 1, "d": 3, "c": 3, "a": 3}
+    bench_ids = [
+        item for prefix in ("p", "d", "c", "a") for item in by_role[prefix][: quota[prefix]]
+    ]
+    bench_ids += [
+        item for prefix in ("p", "d", "c", "a") for item in by_role[prefix][quota[prefix] :]
+    ]
     bench = [
         LineupPlayerRef(athlete_id=item, role=role_by_prefix[str(item)[0]]) for item in bench_ids
     ]
@@ -153,6 +170,98 @@ def test_duplicate_and_non_roster_players() -> None:
         roster_athlete_ids=roster,
     )
     assert any(issue.code == "athlete_not_in_roster" for issue in result.issues)
+
+
+def test_bench_active_roles_valid_433_is_accepted() -> None:
+    """_valid_433() ha già 1P-3D-3C-3A nei primi 10 (vedi la sua costruzione)."""
+    roster, starters, bench = _valid_433()
+    result = evaluate_lineup(
+        module="4-3-3",
+        starters=starters,
+        bench=bench,
+        roster_athlete_ids=roster,
+    )
+    assert result.valid
+    assert not any(issue.code == "bench_roles_invalid" for issue in result.issues)
+
+
+def test_bench_active_roles_rejects_unbalanced_first_ten() -> None:
+    """Stessa rosa di _valid_433(), ma con i 2 portieri e i 7 difensori di
+    panchina messi in testa: nei primi 10 posti (2P+7D+1C) resta solo 1
+    centrocampista e nessun attaccante."""
+    roster, starters, bench = _valid_433()
+    by_role: dict[FantasyRole, list[LineupPlayerRef]] = {role: [] for role in FantasyRole}
+    for player in bench:
+        by_role[player.role].append(player)
+    unbalanced_bench = [
+        *by_role[FantasyRole.P],
+        *by_role[FantasyRole.D],
+        *by_role[FantasyRole.C],
+        *by_role[FantasyRole.A],
+    ]
+    result = evaluate_lineup(
+        module="4-3-3",
+        starters=starters,
+        bench=unbalanced_bench,
+        roster_athlete_ids=roster,
+    )
+    assert not result.valid
+    issue = next(item for item in result.issues if item.code == "bench_roles_invalid")
+    assert "3 centrocampisti" in issue.message  # quota fissa nel messaggio
+    assert "mancano: 2 centrocampisti e 3 attaccanti" in issue.message
+
+
+def test_bench_active_roles_relaxed_when_roster_is_short_on_a_role() -> None:
+    """Una rosa con solo 2 attaccanti rimasti in panchina non può essere
+    bloccata da una quota (3A) che richiede più attaccanti di quanti ce ne
+    siano in tutta la panchina: required[A] si riduce a 2, non 3."""
+    bench = [
+        LineupPlayerRef(athlete_id="p-1", role=FantasyRole.P),
+        *[LineupPlayerRef(athlete_id=f"d-{i}", role=FantasyRole.D) for i in range(3)],
+        *[LineupPlayerRef(athlete_id=f"c-{i}", role=FantasyRole.C) for i in range(3)],
+        *[LineupPlayerRef(athlete_id=f"a-{i}", role=FantasyRole.A) for i in range(2)],
+    ]
+    required = bench_active_role_requirements(bench)
+    assert required[FantasyRole.A] == 2
+    assert required == {FantasyRole.P: 1, FantasyRole.D: 3, FantasyRole.C: 3, FantasyRole.A: 2}
+
+
+def test_bench_active_roles_vacuous_when_bench_has_fewer_than_active_size() -> None:
+    """Panchina con meno di BENCH_ACTIVE_SIZE giocatori: il vincolo si
+    applica a tutta la panchina, quindi è sempre soddisfatto per
+    costruzione (required[r] <= conteggio reale di r in panchina)."""
+    bench = [
+        LineupPlayerRef(athlete_id="p-1", role=FantasyRole.P),
+        LineupPlayerRef(athlete_id="d-1", role=FantasyRole.D),
+        LineupPlayerRef(athlete_id="a-1", role=FantasyRole.A),
+    ]
+    assert len(bench) < BENCH_ACTIVE_SIZE
+    starters = _players(_ids("x", 11), FantasyRole.D)
+    result = evaluate_lineup(
+        module="4-3-3",
+        starters=starters,
+        bench=bench,
+        roster_athlete_ids=[*[p.athlete_id for p in starters], *[p.athlete_id for p in bench]],
+    )
+    assert not any(issue.code == "bench_roles_invalid" for issue in result.issues)
+
+
+def test_bench_active_roles_not_enforced_on_drafts() -> None:
+    """La bozza (strict=False) resta salvabile incompleta: niente
+    bench_roles_invalid anche con una panchina sbilanciata."""
+    bench = [LineupPlayerRef(athlete_id=f"a-{i}", role=FantasyRole.A) for i in range(5)]
+    result = evaluate_lineup(
+        module="4-3-3",
+        starters=[],
+        bench=bench,
+        roster_athlete_ids=[p.athlete_id for p in bench],
+        strict=False,
+    )
+    assert not any(issue.code == "bench_roles_invalid" for issue in result.issues)
+
+
+def test_bench_active_role_quota_sums_to_active_size() -> None:
+    assert sum(BENCH_ACTIVE_ROLE_QUOTA.values()) == BENCH_ACTIVE_SIZE
 
 
 def test_lineup_turn_gate_allows_open_and_locked() -> None:
@@ -697,6 +806,76 @@ def test_copy_previous_lineup_drops_players_no_longer_in_roster() -> None:
     assert copied.starter_ids[4] == ""
     assert dropped_id not in copied.starter_ids
     assert dropped_id not in copied.bench_ids
+
+
+def test_copy_previous_lineup_self_heals_an_unbalanced_bench_order() -> None:
+    """La panchina del turno precedente era valida con un altro modulo (o
+    prima che la regola esistesse) e ha i 2 portieri in testa: senza
+    bloccati di mezzo, copy_previous_lineup riordina da sola invece di
+    bloccare una copia altrimenti valida."""
+    roster, starters, bench = _valid_433()
+    starter_ids = [player.athlete_id for player in starters]
+    by_role: dict[FantasyRole, list[LineupPlayerRef]] = {role: [] for role in FantasyRole}
+    for player in bench:
+        by_role[player.role].append(player)
+    unbalanced_bench_ids = [
+        player.athlete_id
+        for player in (
+            *by_role[FantasyRole.P],
+            *by_role[FantasyRole.D],
+            *by_role[FantasyRole.C],
+            *by_role[FantasyRole.A],
+        )
+    ]
+    role_by_id = {player.athlete_id: player.role for player in [*starters, *bench]}
+
+    copied = copy_previous_lineup(
+        previous_module="4-3-3",
+        previous_starter_ids=starter_ids,
+        previous_bench_ids=unbalanced_bench_ids,
+        roster_athlete_ids=roster,
+        role_by_athlete_id=role_by_id,
+    )
+    assert not any(issue.code == "bench_roles_invalid" for issue in copied.issues)
+    assert copied.can_confirm is True
+    assert set(copied.bench_ids) == set(unbalanced_bench_ids)  # stessi giocatori, altro ordine
+    first_ten_roles = Counter(role_by_id[item] for item in copied.bench_ids[:10])
+    assert first_ten_roles[FantasyRole.C] == 3
+    assert first_ten_roles[FantasyRole.A] == 3
+
+
+def test_copy_previous_lineup_reports_unfixable_bench_roles_when_locked() -> None:
+    """Stesso squilibrio, ma con un bloccato già in panchina: il riordino
+    automatico è disattivato (rischierebbe di scavalcarlo) e la violazione
+    resta segnalata come issue invece di sparire silenziosamente dentro
+    can_confirm=False."""
+    roster, starters, bench = _valid_433()
+    starter_ids = [player.athlete_id for player in starters]
+    by_role: dict[FantasyRole, list[LineupPlayerRef]] = {role: [] for role in FantasyRole}
+    for player in bench:
+        by_role[player.role].append(player)
+    unbalanced_bench_ids = [
+        player.athlete_id
+        for player in (
+            *by_role[FantasyRole.P],
+            *by_role[FantasyRole.D],
+            *by_role[FantasyRole.C],
+            *by_role[FantasyRole.A],
+        )
+    ]
+    role_by_id = {player.athlete_id: player.role for player in [*starters, *bench]}
+
+    copied = copy_previous_lineup(
+        previous_module="4-3-3",
+        previous_starter_ids=starter_ids,
+        previous_bench_ids=unbalanced_bench_ids,
+        roster_athlete_ids=roster,
+        role_by_athlete_id=role_by_id,
+        locked_athlete_ids=[unbalanced_bench_ids[0]],
+        current_confirmed_bench=unbalanced_bench_ids,
+    )
+    assert any(issue.code == "bench_roles_invalid" for issue in copied.issues)
+    assert copied.can_confirm is False
 
 
 def test_copy_previous_lineup_unavailable_on_simultaneous_timezone_kickoffs() -> None:

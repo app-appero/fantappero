@@ -283,6 +283,75 @@ def test_bench_size_is_capped_when_requested() -> None:
     assert len(plan.bench) == 2
 
 
+def test_bench_active_roles_mix_overrides_pure_score_order() -> None:
+    """Rosa 4-3-3 con panchina abbondante: senza la regola, i migliori 10 per
+    punteggio sarebbero quasi tutti centrocampisti (recent_form alto) — con
+    la regola, i primi 10 devono garantire 1P-3D-3C-3A anche se un difensore
+    con punteggio basso deve precedere un centrocampista con punteggio alto."""
+    starters_pool = [
+        candidate(0, role=FantasyRole.P, recent_form=5.0),
+        *[candidate(1 + i, role=FantasyRole.D, recent_form=5.0) for i in range(4)],
+        *[candidate(5 + i, role=FantasyRole.C, recent_form=5.0) for i in range(3)],
+        *[candidate(8 + i, role=FantasyRole.A, recent_form=5.0) for i in range(3)],
+    ]
+    bench_keeper = candidate(100, role=FantasyRole.P, recent_form=1.0)
+    bench_defenders = [candidate(101 + i, role=FantasyRole.D, recent_form=1.0) for i in range(3)]
+    # Panchina di centrocampisti ad alto punteggio: senza la regola
+    # finirebbero tutti davanti ai difensori di panchina (score più alto).
+    bench_midfielders_strong = [
+        candidate(110 + i, role=FantasyRole.C, recent_form=9.0) for i in range(5)
+    ]
+    bench_forwards = [candidate(120 + i, role=FantasyRole.A, recent_form=2.0) for i in range(3)]
+    pool = [
+        *starters_pool,
+        bench_keeper,
+        *bench_defenders,
+        *bench_midfielders_strong,
+        *bench_forwards,
+    ]
+    plan = build_lineup_plan(
+        pool,
+        [(FantasyRole.P, 1), (FantasyRole.D, 4), (FantasyRole.C, 3), (FantasyRole.A, 3)],
+        decided_at=DECIDED_AT,
+    )
+    by_id = {c.athlete_id: c for c in plan.candidates}
+    first_ten = plan.bench[:10]
+    role_counts: dict[FantasyRole, int] = {role: 0 for role in FantasyRole}
+    for athlete_id in first_ten:
+        role_counts[by_id[athlete_id].role] += 1
+    assert role_counts[FantasyRole.P] == 1
+    assert role_counts[FantasyRole.D] == 3
+    assert role_counts[FantasyRole.C] == 3
+    assert role_counts[FantasyRole.A] == 3
+    # Il difensore di panchina più debole è comunque entrato nei primi 10
+    # (quota rispettata), nonostante punteggio più basso dei centrocampisti.
+    assert bench_defenders[-1].athlete_id in first_ten
+
+
+def test_bench_active_roles_relaxed_when_a_role_is_short_on_the_bench() -> None:
+    """Solo 2 attaccanti rimasti in panchina (rosa sbilanciata): la quota
+    (3A) non può bloccare l'intera panchina, si riduce a 2."""
+    starters_pool = [
+        candidate(0, role=FantasyRole.P, recent_form=5.0),
+        *[candidate(1 + i, role=FantasyRole.D, recent_form=5.0) for i in range(4)],
+        *[candidate(5 + i, role=FantasyRole.C, recent_form=5.0) for i in range(3)],
+        *[candidate(8 + i, role=FantasyRole.A, recent_form=5.0) for i in range(3)],
+    ]
+    bench = [
+        candidate(100, role=FantasyRole.P, recent_form=1.0),
+        *[candidate(101 + i, role=FantasyRole.D, recent_form=1.0) for i in range(3)],
+        *[candidate(104 + i, role=FantasyRole.C, recent_form=1.0) for i in range(3)],
+        *[candidate(107 + i, role=FantasyRole.A, recent_form=1.0) for i in range(2)],
+    ]
+    plan = build_lineup_plan(
+        [*starters_pool, *bench],
+        [(FantasyRole.P, 1), (FantasyRole.D, 4), (FantasyRole.C, 3), (FantasyRole.A, 3)],
+        decided_at=DECIDED_AT,
+    )
+    assert plan.is_complete
+    assert len(plan.bench) == len(bench)  # tutti in panchina, nessuno "perso"
+
+
 def test_locked_player_can_still_be_selected_for_retroactive_generation() -> None:
     """Creazione retroattiva (EP13-P04-bis): il kickoff non esclude più il candidato
 

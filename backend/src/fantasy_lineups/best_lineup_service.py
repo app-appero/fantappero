@@ -27,6 +27,7 @@ selezione.
 
 from __future__ import annotations
 
+from collections import Counter
 from collections.abc import Sequence
 from datetime import datetime
 from uuid import UUID
@@ -34,9 +35,17 @@ from uuid import UUID
 from sqlalchemy.orm import Session
 
 from database.enums import FantasyModule, FantasyRole
-from fantasy_lineups.ai_selection import LineupPlan, build_lineup_plan
+from fantasy_lineups.ai_selection import (
+    CandidateInput,
+    LineupPlan,
+    ScoredCandidate,
+    active_bench_order,
+    build_lineup_plan,
+    is_eligible,
+    score_candidate,
+)
 from fantasy_lineups.ai_service import collect_candidates_for_team
-from fantasy_lineups.rules import module_counts
+from fantasy_lineups.rules import BENCH_ACTIVE_ROLE_QUOTA, BENCH_ACTIVE_SIZE, module_counts
 
 __all__ = [
     "compute_best_lineup_for_team",
@@ -155,6 +164,13 @@ def compute_best_lineup_respecting_locks(
     ]
     carried_set = set(carried_bench)
     new_arrivals = [athlete_id for athlete_id in non_starter_ids if athlete_id not in carried_set]
+    new_arrivals = _role_aware_new_arrivals(
+        candidates=candidates,
+        free_plan=free_plan,
+        non_starter_ids=non_starter_ids,
+        carried_bench=carried_bench,
+        new_arrival_ids=new_arrivals,
+    )
 
     return LineupPlan(
         algorithm_version=free_plan.algorithm_version,
@@ -164,6 +180,82 @@ def compute_best_lineup_respecting_locks(
         candidates=free_plan.candidates,
         used_fallback=free_plan.used_fallback,
         unfilled_roles=free_plan.unfilled_roles,
+    )
+
+
+def _role_aware_new_arrivals(
+    *,
+    candidates: Sequence[CandidateInput],
+    free_plan: LineupPlan,
+    non_starter_ids: Sequence[UUID],
+    carried_bench: Sequence[UUID],
+    new_arrival_ids: Sequence[UUID],
+) -> list[UUID]:
+    """Riordina i nuovi arrivi in coda alla panchina già confermata (regola
+    "panchina attiva"): `carried_bench` non si tocca (lock safety, v.
+    `compute_best_lineup_respecting_locks`), ma i nuovi arrivi completano
+    prima gli slot attivi ancora scoperti dopo il prefisso già confermato,
+    scegliendo i migliori per ruolo tra chi manca — poi il resto per
+    punteggio, esattamente come `active_bench_order` per il caso normale.
+    """
+    if not new_arrival_ids:
+        return []
+
+    by_id = {c.athlete_id: c for c in candidates}
+    role_by_id = {c.athlete_id: c.role for c in candidates}
+
+    all_roles = Counter(role_by_id[athlete_id] for athlete_id in non_starter_ids)
+    required = {
+        role: min(BENCH_ACTIVE_ROLE_QUOTA.get(role, 0), all_roles.get(role, 0))
+        for role in FantasyRole
+    }
+    carried_prefix_roles = Counter(
+        role_by_id[athlete_id] for athlete_id in carried_bench[:BENCH_ACTIVE_SIZE]
+    )
+    still_needed = {
+        role: max(0, required[role] - carried_prefix_roles.get(role, 0)) for role in FantasyRole
+    }
+    remaining_active_slots = max(0, BENCH_ACTIVE_SIZE - len(carried_bench[:BENCH_ACTIVE_SIZE]))
+
+    free_plan_by_id = {c.athlete_id: c for c in free_plan.candidates}
+    pool: list[ScoredCandidate] = []
+    for athlete_id in new_arrival_ids:
+        scored = free_plan_by_id.get(athlete_id)
+        if scored is not None:
+            pool.append(scored)
+            continue
+        # Bloccato (pinned_bench): mai scorato da build_lineup_plan, perché
+        # la sua posizione in panchina non viene mai ridiscussa — qui serve
+        # solo per decidere il suo posto fra gli altri nuovi arrivi.
+        candidate = by_id[athlete_id]
+        reason = is_eligible(candidate)
+        if reason is not None:
+            pool.append(
+                ScoredCandidate(
+                    athlete_id=athlete_id,
+                    role=candidate.role,
+                    score=0.0,
+                    sources=(),
+                    excluded_reason=reason,
+                )
+            )
+            continue
+        value, sources = score_candidate(candidate)
+        pool.append(
+            ScoredCandidate(
+                athlete_id=athlete_id,
+                role=candidate.role,
+                score=value,
+                sources=sources,
+                excluded_reason=None,
+            )
+        )
+
+    return active_bench_order(
+        pool,
+        by_id,
+        required=still_needed,
+        active_size=remaining_active_slots,
     )
 
 
