@@ -265,6 +265,7 @@ export interface LeagueStanding {
   /** Fantallenatore proprietario della squadra; già esposto da /leagues/{id}/membri. */
   managerUserId: string;
   managerDisplayName?: string | null;
+  managerNickname?: string | null;
   managerAvatarUrl?: string | null;
   position: number;
   played: number;

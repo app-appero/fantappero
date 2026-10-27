@@ -120,6 +120,8 @@ export function FormationScreen() {
   const [benchIds, setBenchIds] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
+  const [bestModalOpen, setBestModalOpen] = useState(false);
+  const [bestMode, setBestMode] = useState<"keep_module" | "best_module">("keep_module");
   const [loadError, setLoadError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [actionMessage, setActionMessage] = useState<string | null>(null);
@@ -557,7 +559,7 @@ export function FormationScreen() {
     }
   }
 
-  async function applyBestFormation() {
+  async function applyBestFormation(mode: "keep_module" | "best_module" = "keep_module") {
     setActionError(null);
     setActionMessage(null);
     if (!accessToken || !activeLeagueId || !selectedRoundId) {
@@ -570,6 +572,7 @@ export function FormationScreen() {
         activeLeagueId,
         selectedRoundId,
         targetTeamId || undefined,
+        mode,
       );
       setContext(detail);
       applyEditor(detail);
@@ -1306,6 +1309,50 @@ export function FormationScreen() {
       />
 
       <BottomSheet
+        visible={bestModalOpen}
+        title="Applica la formazione migliore"
+        onClose={() => setBestModalOpen(false)}
+        testID="formation-best-sheet"
+      >
+        <View style={styles.toolsBody}>
+          <Text style={styles.meta}>Come vuoi comporla? I calciatori già bloccati restano al loro posto.</Text>
+          {(
+            [
+              ["keep_module", "Mantieni il modulo attuale", `Cerco i migliori 11 con il tuo ${moduleCode}.`],
+              ["best_module", "Usa il modulo migliore", "Scelgo anche il modulo più forte."],
+            ] as const
+          ).map(([value, label, hint]) => (
+            <Pressable
+              key={value}
+              accessibilityRole="radio"
+              accessibilityState={{ selected: bestMode === value }}
+              onPress={() => setBestMode(value)}
+              style={[styles.tool, bestMode === value ? styles.bestOptionOn : null]}
+              testID={`formation-best-${value}`}
+            >
+              <Text style={styles.toolTitle}>{label}</Text>
+              <Text style={styles.meta}>{hint}</Text>
+            </Pressable>
+          ))}
+          <View style={styles.row}>
+            <Pressable style={styles.startButton} onPress={() => setBestModalOpen(false)} testID="formation-best-cancel">
+              <Text style={styles.bestButtonLabel}>Annulla</Text>
+            </Pressable>
+            <Pressable
+              style={styles.startButton}
+              onPress={() => {
+                setBestModalOpen(false);
+                void applyBestFormation(bestMode);
+              }}
+              testID="formation-best-confirm"
+            >
+              <Text style={styles.bestButtonLabel}>Applica</Text>
+            </Pressable>
+          </View>
+        </View>
+      </BottomSheet>
+
+      <BottomSheet
         visible={toolsOpen}
         title="Strumenti"
         onClose={() => setToolsOpen(false)}
@@ -1380,7 +1427,7 @@ export function FormationScreen() {
             disabled={toolDisabled}
             onPress={() => {
               setToolsOpen(false);
-              void applyBestFormation();
+              setBestModalOpen(true);
             }}
             style={[styles.tool, toolDisabled ? styles.disabled : null]}
             testID="formation-apply-best-tool"
@@ -1747,6 +1794,8 @@ const styles = lazyStyles(() => StyleSheet.create({
   },
   saveDisabled: { backgroundColor: colors.border },
   toolsBody: { gap: spacing.sm, paddingBottom: spacing.md },
+  bestButtonLabel: { color: colors.foreground, fontWeight: "700" },
+  bestOptionOn: { borderColor: colors.brand, borderWidth: 1.5 },
   tool: {
     gap: spacing.xs,
     borderWidth: 1,

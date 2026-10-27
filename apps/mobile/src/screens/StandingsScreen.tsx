@@ -145,7 +145,7 @@ export function StandingsScreen() {
             standings={standings}
             myTeamId={myTeamId}
             onManagerPress={
-              can(["league:admin"]) && activeLeagueId
+              activeLeagueId
                 ? (managerUserId) =>
                     navigation.navigate("CoachProfile", {
                       userId: managerUserId,
@@ -158,6 +158,11 @@ export function StandingsScreen() {
       ) : null}
     </PageContainer>
   );
+}
+
+/** In classifica si vede solo il nickname (se manca, il nome; in ultimo la squadra). */
+function standingLabel(row: LeagueStanding): string {
+  return row.managerNickname?.trim() || row.managerDisplayName?.trim() || row.teamName;
 }
 
 function StandingsTableBlock({
@@ -203,11 +208,8 @@ function StandingsTableBlock({
             />
             <View style={styles.podiumInfo}>
               <Text style={styles.podiumName} numberOfLines={1}>
-                {row.teamName}
+                {standingLabel(row)}
               </Text>
-              {row.managerDisplayName ? (
-                <Text style={styles.managerName} numberOfLines={1}>{row.managerDisplayName}</Text>
-              ) : null}
               <Text style={styles.meta}>
                 {row.played} gare · GF:GS {row.fantasyGoalsFor}:{row.fantasyGoalsAgainst}
               </Text>
@@ -223,7 +225,7 @@ function StandingsTableBlock({
     <View style={styles.table} testID="standings-table">
       <View style={[styles.row, styles.headerRow]}>
         <Text style={[styles.cell, styles.posCell, styles.headerCell]}>Pos.</Text>
-        <Text style={[styles.cell, styles.teamCell, styles.headerCell]}>Squadra</Text>
+        <Text style={[styles.cell, styles.teamCell, styles.headerCell]}>Allenatore</Text>
         <Text style={[styles.cell, styles.statCell, styles.headerCell]}>G</Text>
         <Text style={[styles.cell, styles.statCell, styles.headerCell]}>Pt</Text>
         <Text style={[styles.cell, styles.goalsCell, styles.headerCell]}>GF:GS</Text>
@@ -245,20 +247,14 @@ function StandingsTableBlock({
             {onManagerPress ? (
               <Pressable
                 accessibilityRole="button"
-                accessibilityLabel={`Apri il profilo del fantallenatore di ${row.teamName}`}
+                accessibilityLabel={`Apri il profilo di ${standingLabel(row)}`}
                 onPress={() => onManagerPress(row.managerUserId)}
                 testID={`standings-manager-${row.fantasyTeamId}`}
               >
-                <View>
-                  <Text style={[styles.teamName, styles.teamNameLink]}>{row.teamName}</Text>
-                  {row.managerDisplayName ? <Text style={styles.managerName}>{row.managerDisplayName}</Text> : null}
-                </View>
+                <Text style={[styles.teamName, styles.teamNameLink]}>{standingLabel(row)}</Text>
               </Pressable>
             ) : (
-              <View>
-                <Text style={styles.teamName}>{row.teamName}</Text>
-                {row.managerDisplayName ? <Text style={styles.managerName}>{row.managerDisplayName}</Text> : null}
-              </View>
+              <Text style={styles.teamName}>{standingLabel(row)}</Text>
             )}
           </View>
           <Text style={[styles.cell, styles.statCell]}>{row.played}</Text>
