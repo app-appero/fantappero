@@ -1335,50 +1335,6 @@ export function FormationScreen() {
       />
 
       <BottomSheet
-        visible={bestModalOpen}
-        title="Applica la formazione migliore"
-        onClose={() => setBestModalOpen(false)}
-        testID="formation-best-sheet"
-      >
-        <View style={styles.toolsBody}>
-          <Text style={styles.meta}>Come vuoi comporla? I calciatori già bloccati restano al loro posto.</Text>
-          {(
-            [
-              ["keep_module", "Mantieni il modulo attuale", `Cerco i migliori 11 con il tuo ${moduleCode}.`],
-              ["best_module", "Usa il modulo migliore", "Scelgo anche il modulo più forte."],
-            ] as const
-          ).map(([value, label, hint]) => (
-            <Pressable
-              key={value}
-              accessibilityRole="radio"
-              accessibilityState={{ selected: bestMode === value }}
-              onPress={() => setBestMode(value)}
-              style={[styles.tool, bestMode === value ? styles.bestOptionOn : null]}
-              testID={`formation-best-${value}`}
-            >
-              <Text style={styles.toolTitle}>{label}</Text>
-              <Text style={styles.meta}>{hint}</Text>
-            </Pressable>
-          ))}
-          <View style={styles.row}>
-            <Pressable style={styles.startButton} onPress={() => setBestModalOpen(false)} testID="formation-best-cancel">
-              <Text style={styles.bestButtonLabel}>Annulla</Text>
-            </Pressable>
-            <Pressable
-              style={styles.startButton}
-              onPress={() => {
-                setBestModalOpen(false);
-                void applyBestFormation(bestMode);
-              }}
-              testID="formation-best-confirm"
-            >
-              <Text style={styles.bestButtonLabel}>Applica</Text>
-            </Pressable>
-          </View>
-        </View>
-      </BottomSheet>
-
-      <BottomSheet
         visible={toolsOpen}
         title="Strumenti"
         onClose={() => setToolsOpen(false)}
@@ -1451,17 +1407,53 @@ export function FormationScreen() {
           <Pressable
             accessibilityRole="button"
             disabled={toolDisabled}
-            onPress={() => {
-              setToolsOpen(false);
-              // Due Modal che cambiano insieme su Android: il secondo non si apre. Aspetto la chiusura del primo.
-              setTimeout(() => setBestModalOpen(true), 450);
-            }}
+            onPress={() => setBestModalOpen((open) => !open)}
             style={[styles.tool, toolDisabled ? styles.disabled : null]}
             testID="formation-apply-best-tool"
           >
             <Text style={styles.toolTitle}>Applica formazione migliore</Text>
             <Text style={styles.meta}>Sceglie i titolari con il punteggio atteso più alto.</Text>
           </Pressable>
+          {bestModalOpen ? (
+            <View style={styles.tool} testID="formation-best-choice">
+              <Text style={styles.toolTitle}>Come vuoi comporla?</Text>
+              <Text style={styles.meta}>I calciatori già bloccati restano al loro posto.</Text>
+              {(
+                [
+                  ["keep_module", "Mantieni il modulo attuale", `Cerco i migliori 11 con il tuo ${moduleCode}.`],
+                  ["best_module", "Usa il modulo migliore", "Scelgo anche il modulo più forte."],
+                ] as const
+              ).map(([value, label, hint]) => (
+                <Pressable
+                  key={value}
+                  accessibilityRole="radio"
+                  accessibilityState={{ selected: bestMode === value }}
+                  onPress={() => setBestMode(value)}
+                  style={[styles.tool, bestMode === value ? styles.bestOptionOn : null]}
+                  testID={`formation-best-${value}`}
+                >
+                  <Text style={styles.toolTitle}>{label}</Text>
+                  <Text style={styles.meta}>{hint}</Text>
+                </Pressable>
+              ))}
+              <View style={styles.row}>
+                <Pressable style={styles.startButton} onPress={() => setBestModalOpen(false)} testID="formation-best-cancel">
+                  <Text style={styles.bestButtonLabel}>Annulla</Text>
+                </Pressable>
+                <Pressable
+                  style={styles.startButton}
+                  onPress={() => {
+                    setBestModalOpen(false);
+                    setToolsOpen(false);
+                    void applyBestFormation(bestMode);
+                  }}
+                  testID="formation-best-confirm"
+                >
+                  <Text style={styles.bestButtonLabel}>Applica</Text>
+                </Pressable>
+              </View>
+            </View>
+          ) : null}
           {isAdmin && context.leagueHasAiManager ? (
             <View style={styles.tool} testID="formation-ai-admin">
               <Text style={styles.toolTitle}>Formazioni IA</Text>
