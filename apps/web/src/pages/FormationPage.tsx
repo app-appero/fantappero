@@ -28,6 +28,7 @@ import {
   layoutFromModule,
   lineupSignature,
   moveBenchToIndex,
+  orderBenchForActiveRoles,
   orderedBenchFromRoster,
   preserveLockedStarters,
   labelFantasyTurnStatus,
@@ -1020,6 +1021,15 @@ export function FormationPage() {
     );
   }
 
+  /** Riporta la panchina alla regola 1P·3D·3C·3A nei primi 10 posti, senza toccare i titolari. */
+  function fixActiveBench() {
+    const ordered = orderBenchForActiveRoles(
+      displayBench.map((athleteId) => ({ athleteId, role: validationRole(athleteId) })),
+    );
+    setBenchIds(ordered.map((player) => player.athleteId));
+    pushToast({ title: "Panchina sistemata: 1 portiere, 3 difensori, 3 centrocampisti, 3 attaccanti.", variant: "success" });
+  }
+
   function assignStarter(index: number, athleteId: string) {
     const currentId = displayStarters[index] ?? "";
     // Chi occupa lo slot ha già la partita iniziata: non si tocca più.
@@ -1677,6 +1687,18 @@ export function FormationPage() {
                   <li key={`${issue.code}-${issue.message}`}>{issue.message}</li>
                 ))}
               </ul>
+              {clientEvaluation.issues.some((issue) => issue.code === "bench_roles_invalid") ? (
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  disabled={busy || !canEdit}
+                  onClick={() => fixActiveBench()}
+                  data-testid="formation-fix-bench"
+                >
+                  Sistema la panchina
+                </Button>
+              ) : null}
             </div>
           ) : null}
 
