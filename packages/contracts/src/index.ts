@@ -231,7 +231,11 @@ export type {
 } from "./fantasyLineups.js";
 export {
   APPROVED_MODULES,
+  BENCH_ACTIVE_ROLE_QUOTA,
+  BENCH_ACTIVE_SIZE,
   MAX_AUTOMATIC_SUBSTITUTIONS,
+  benchActiveShortfall,
+  orderBenchForActiveRoles,
   MAX_TACTICAL_MOVES,
   approvedModuleCatalog,
   blockingLineupSaveIssue,

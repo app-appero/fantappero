@@ -6,6 +6,8 @@ import {
   blockingLineupSaveIssue,
   evaluateBenchOrderLock,
   evaluateLineup,
+  orderBenchForActiveRoles,
+  benchActiveShortfall,
   evaluateProgressiveLock,
   evaluateTacticalMove,
   isApprovedModule,
@@ -52,7 +54,7 @@ function valid433Roster() {
     ...players(a.slice(0, 3), "A"),
   ];
   const starterIds = starters.map((item) => item.athleteId);
-  const bench = remainingRosterForBench(roster, starterIds).map((athleteId) => {
+  const bench = orderBenchForActiveRoles(remainingRosterForBench(roster, starterIds).map((athleteId) => {
     const role = athleteId.startsWith("p")
       ? "P"
       : athleteId.startsWith("d")
@@ -61,7 +63,7 @@ function valid433Roster() {
           ? "C"
           : "A";
     return { athleteId, role: role as "P" | "D" | "C" | "A" };
-  });
+  }));
   return { roster, starters, bench };
 }
 
@@ -99,6 +101,34 @@ describe("fantasyLineups rules", () => {
     assert.equal(result.valid, true);
     assert.deepEqual(result.issues, []);
     assert.deepEqual(result.starterCounts, { P: 1, D: 4, C: 3, A: 3 });
+  });
+
+  it("richiede 1P·3D·3C·3A nei primi 10 della panchina (o quanto disponibile)", () => {
+    const { roster, starters, bench } = valid433Roster();
+    // Panchina in ordine di rosa: 2 portieri e 8 difensori nei primi 10 → non valida.
+    const raw = [...bench].sort((x, y) => x.athleteId.localeCompare(y.athleteId));
+    const bad = evaluateLineup({ module: "4-3-3", starters, bench: raw, rosterAthleteIds: roster });
+    assert.ok(bad.issues.some((item) => item.code === "bench_roles_invalid"));
+    assert.ok(Object.keys(benchActiveShortfall(raw)).length > 0);
+    // Riordinata: valida.
+    const ok = evaluateLineup({ module: "4-3-3", starters, bench: orderBenchForActiveRoles(raw), rosterAthleteIds: roster });
+    assert.equal(ok.valid, true);
+    // In bozza non si blocca.
+    const draft = evaluateLineup({ module: "4-3-3", starters, bench: raw, rosterAthleteIds: roster, strict: false });
+    assert.ok(!draft.issues.some((item) => item.code === "bench_roles_invalid"));
+  });
+
+  it("non pretende ruoli che la rosa non ha (solo 2 attaccanti in panchina)", () => {
+    const starters = [
+      ...players(["p1"], "P"), ...players(ids("d", 4), "D"), ...players(ids("c", 3), "C"), ...players(ids("a", 3), "A"),
+    ];
+    const bench = orderBenchForActiveRoles([
+      ...players(["p2", "p3"], "P"), ...players(ids("dd", 4), "D"), ...players(ids("cc", 4), "C"), ...players(ids("aa", 2), "A"),
+    ]);
+    assert.deepEqual(benchActiveShortfall(bench), {});
+    const first10 = bench.slice(0, 10);
+    assert.equal(first10.filter((p) => p.role === "A").length, 2);
+    assert.equal(first10.length, 10);
   });
 
   it("rejects an incompatible module with a motivation", () => {
