@@ -149,6 +149,9 @@ export interface TacticalMoveEvaluation {
 
 export interface LineupContext {
   leagueId: string;
+  /** Panchina attiva: primi N posti con la composizione `benchRoleQuota` (default 10 · 1P 3D 3C 3A). */
+  benchActiveSize?: number;
+  benchRoleQuota?: Record<LineupRole, number>;
   /** Squadra a cui appartiene questa formazione. Assente solo nelle risposte vecchie. */
   fantasyTeamId?: string;
   teamName?: string;
