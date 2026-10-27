@@ -183,92 +183,100 @@ function StandingsTableBlock({
     [myTeamId, standings],
   );
 
-  const podium = rows.filter((row) => row.position <= 3).slice(0, 3);
+  const first = rows.find((row) => row.position === 1);
+  const second = rows.find((row) => row.position === 2);
+  const third = rows.find((row) => row.position === 3);
+  // Podio: 2° · 1° · 3° affiancati, ognuno con una sola riga di nome.
+  const podium = [second, first, third].filter((row): row is (typeof rows)[number] => Boolean(row));
 
   return (
     <View style={styles.stack}>
-    {podium.length > 0 ? (
-      <View style={styles.podium} testID="standings-podium">
-        {podium.map((row) => (
-          <View
-            key={row.fantasyTeamId}
-            style={[
-              styles.podiumCard,
-              row.position === 1 ? styles.podiumFirst : null,
-              row.isCurrentUser ? styles.podiumCurrent : null,
-            ]}
-          >
-            <Text style={[styles.podiumRank, row.position === 1 ? styles.podiumRankFirst : null]}>
-              {row.position}°
-            </Text>
-            <TeamAvatar
-              name={row.managerDisplayName ?? row.teamName}
-              avatarUrl={row.managerAvatarUrl}
-              size={row.position === 1 ? 52 : 44}
-            />
-            <View style={styles.podiumInfo}>
-              <Text style={styles.podiumName} numberOfLines={1}>
-                {standingLabel(row)}
-              </Text>
-              <Text style={styles.meta}>
-                {row.played} gare · GF:GS {row.fantasyGoalsFor}:{row.fantasyGoalsAgainst}
-              </Text>
-            </View>
-            <Text style={styles.podiumPoints}>
-              {row.points}
-              <Text style={styles.podiumPointsUnit}> pt</Text>
-            </Text>
-          </View>
-        ))}
-      </View>
-    ) : null}
-    <View style={styles.table} testID="standings-table">
-      <View style={[styles.row, styles.headerRow]}>
-        <Text style={[styles.cell, styles.posCell, styles.headerCell]}>Pos.</Text>
-        <Text style={[styles.cell, styles.teamCell, styles.headerCell]}>Allenatore</Text>
-        <Text style={[styles.cell, styles.statCell, styles.headerCell]}>G</Text>
-        <Text style={[styles.cell, styles.statCell, styles.headerCell]}>Pt</Text>
-        <Text style={[styles.cell, styles.goalsCell, styles.headerCell]}>GF:GS</Text>
-        <Text style={[styles.cell, styles.goalsCell, styles.headerCell]}>FP:FS</Text>
-      </View>
-      {rows.map((row) => (
-        <View
-          key={row.fantasyTeamId}
-          style={[styles.row, row.isCurrentUser ? styles.rowCurrent : null]}
-          testID={row.isCurrentUser ? "standings-row-current" : undefined}
-        >
-          <Text style={[styles.cell, styles.posCell]}>{row.position}</Text>
-          <View style={[styles.teamCell, styles.teamCellInner]}>
-            <TeamAvatar
-              name={row.managerDisplayName ?? row.teamName}
-              avatarUrl={row.managerAvatarUrl}
-              size={32}
-            />
-            {onManagerPress ? (
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel={`Apri il profilo di ${standingLabel(row)}`}
-                onPress={() => onManagerPress(row.managerUserId)}
-                testID={`standings-manager-${row.fantasyTeamId}`}
+      {podium.length > 0 ? (
+        <View style={styles.podium} testID="standings-podium">
+          {podium.map((row) => {
+            const isFirst = row.position === 1;
+            return (
+              <View
+                key={row.fantasyTeamId}
+                style={[
+                  styles.podiumCard,
+                  isFirst ? styles.podiumFirst : styles.podiumSide,
+                  row.isCurrentUser ? styles.podiumCurrent : null,
+                ]}
               >
-                <Text style={[styles.teamName, styles.teamNameLink]}>{standingLabel(row)}</Text>
-              </Pressable>
-            ) : (
-              <Text style={styles.teamName}>{standingLabel(row)}</Text>
-            )}
-          </View>
-          <Text style={[styles.cell, styles.statCell]}>{row.played}</Text>
-          <Text style={[styles.cell, styles.statCell]}>{row.points}</Text>
-          <Text style={[styles.cell, styles.goalsCell]}>
-            {row.fantasyGoalsFor}:{row.fantasyGoalsAgainst}
-          </Text>
-          <Text style={[styles.cell, styles.goalsCell]}>
-            {formatFantasyPoints(row.fantasyPointsFor)}:
-            {formatFantasyPoints(row.fantasyPointsAgainst)}
-          </Text>
+                <Text style={[styles.podiumRank, isFirst ? styles.podiumRankFirst : null]}>
+                  {row.position}°
+                </Text>
+                <TeamAvatar
+                  name={row.managerNickname ?? row.managerDisplayName ?? row.teamName}
+                  avatarUrl={row.managerAvatarUrl}
+                  size={isFirst ? 46 : 38}
+                />
+                <Text style={styles.podiumName} numberOfLines={1}>
+                  {standingLabel(row)}
+                </Text>
+                <Text style={styles.podiumPoints}>
+                  {row.points}
+                  <Text style={styles.podiumPointsUnit}> pt</Text>
+                </Text>
+              </View>
+            );
+          })}
         </View>
-      ))}
-    </View>
+      ) : null}
+
+      <View style={styles.listHead}>
+        <Text style={styles.meta}>Pos. · Allenatore</Text>
+        <Text style={styles.meta}>Punti classifica</Text>
+      </View>
+
+      <View style={styles.list} testID="standings-table">
+        {rows.map((row) => {
+          const label = standingLabel(row);
+          const body = (
+            <>
+              <Text style={styles.rowPos}>{row.position}</Text>
+              <TeamAvatar
+                name={row.managerNickname ?? row.managerDisplayName ?? row.teamName}
+                avatarUrl={row.managerAvatarUrl}
+                size={40}
+              />
+              <View style={styles.rowInfo}>
+                <Text style={[styles.rowName, onManagerPress ? styles.teamNameLink : null]} numberOfLines={1}>
+                  {label}
+                </Text>
+                <Text style={styles.rowMeta} numberOfLines={1}>
+                  {row.played} gare · GF:GS {row.fantasyGoalsFor}:{row.fantasyGoalsAgainst}
+                </Text>
+                <Text style={styles.rowMetaSoft} numberOfLines={1}>
+                  Fantapunti {formatFantasyPoints(row.fantasyPointsFor)} : {formatFantasyPoints(row.fantasyPointsAgainst)}
+                </Text>
+              </View>
+              <View style={styles.rowPoints}>
+                <Text style={styles.rowPointsValue}>{row.points}</Text>
+                <Text style={styles.rowPointsUnit}>PT</Text>
+              </View>
+            </>
+          );
+          const rowStyle = [styles.row, row.isCurrentUser ? styles.rowCurrent : null];
+          return onManagerPress ? (
+            <Pressable
+              key={row.fantasyTeamId}
+              accessibilityRole="button"
+              accessibilityLabel={`Apri il profilo di ${label}`}
+              onPress={() => onManagerPress(row.managerUserId)}
+              style={rowStyle}
+              testID={`standings-manager-${row.fantasyTeamId}`}
+            >
+              {body}
+            </Pressable>
+          ) : (
+            <View key={row.fantasyTeamId} style={rowStyle} testID={row.isCurrentUser ? "standings-row-current" : undefined}>
+              {body}
+            </View>
+          );
+        })}
+      </View>
     </View>
   );
 }
@@ -293,27 +301,32 @@ const styles = lazyStyles(() => StyleSheet.create({
     fontWeight: "600",
   },
   podium: {
+    flexDirection: "row",
+    alignItems: "flex-end",
     gap: spacing.sm,
   },
   podiumCard: {
-    flexDirection: "row",
+    flex: 1,
+    minWidth: 0,
     alignItems: "center",
-    gap: spacing.md,
-    padding: spacing.md,
+    gap: 6,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.xs,
     borderRadius: radius.xl,
     borderWidth: 1,
     borderColor: colors.border,
     backgroundColor: colors.backgroundElevated,
   },
+  podiumSide: { marginBottom: 0, paddingTop: spacing.md },
   podiumFirst: {
     borderColor: colors.accentSecondary,
     borderWidth: 2,
+    paddingVertical: spacing.md,
   },
   podiumCurrent: {
     backgroundColor: "rgba(79, 92, 245, 0.22)",
   },
   podiumRank: {
-    width: 40,
     color: colors.foregroundMuted,
     fontSize: typography.fontSize.xl,
     fontStyle: "italic",
@@ -322,12 +335,11 @@ const styles = lazyStyles(() => StyleSheet.create({
   podiumRankFirst: {
     color: "#ffd23f",
   },
-  podiumInfo: {
-    flex: 1,
-    minWidth: 0,
-  },
   podiumName: {
+    width: "100%",
+    textAlign: "center",
     color: colors.foreground,
+    fontSize: typography.fontSize.sm,
     fontWeight: typography.fontWeight.semibold,
   },
   podiumPoints: {
@@ -341,66 +353,68 @@ const styles = lazyStyles(() => StyleSheet.create({
     fontSize: typography.fontSize.sm,
     fontWeight: "600",
   },
-  table: {
-    marginHorizontal: -(spacing.lg - spacing.sm),
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.xl,
-    overflow: "hidden",
+  listHead: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginTop: spacing.xs,
+  },
+  list: {
+    gap: spacing.sm,
   },
   row: {
     flexDirection: "row",
     alignItems: "center",
+    gap: spacing.sm,
     paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.xs,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-    gap: spacing.xs,
-  },
-  headerRow: {
+    paddingHorizontal: spacing.md,
+    borderRadius: radius.xl,
+    borderWidth: 1,
+    borderColor: colors.border,
     backgroundColor: colors.backgroundElevated,
   },
   rowCurrent: {
+    borderColor: colors.accentSecondary,
     backgroundColor: "rgba(79, 92, 245, 0.22)",
   },
-  cell: {
-    color: colors.foreground,
-    fontSize: typography.fontSize.sm,
-  },
-  headerCell: {
-    fontWeight: typography.fontWeight.semibold,
+  rowPos: {
+    width: 22,
+    textAlign: "center",
     color: colors.foregroundMuted,
+    fontWeight: "800",
   },
-  posCell: {
-    width: 32,
-  },
-  teamCell: {
+  rowInfo: {
     flex: 1,
+    minWidth: 0,
+    gap: 1,
   },
-  teamCellInner: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.xs,
-  },
-  teamName: {
+  rowName: {
     color: colors.foreground,
-    fontSize: typography.fontSize.sm,
-    flexShrink: 1,
+    fontWeight: typography.fontWeight.semibold,
   },
   teamNameLink: {
     color: colors.accent,
-    fontWeight: typography.fontWeight.semibold,
   },
-  managerName: {
+  rowMeta: {
     color: colors.foregroundMuted,
-    fontSize: typography.fontSize.xs,
+    fontSize: typography.fontSize.sm,
   },
-  statCell: {
-    width: 32,
-    textAlign: "center",
+  rowMetaSoft: {
+    color: colors.foregroundMuted,
+    fontSize: typography.fontSize.sm,
+    opacity: 0.85,
   },
-  goalsCell: {
-    width: 64,
-    textAlign: "right",
+  rowPoints: {
+    alignItems: "flex-end",
+  },
+  rowPointsValue: {
+    color: colors.foreground,
+    fontSize: typography.fontSize.xl,
+    fontStyle: "italic",
+    fontWeight: "800",
+  },
+  rowPointsUnit: {
+    color: colors.foregroundMuted,
+    fontSize: 11,
+    letterSpacing: 1,
   },
 }));
