@@ -191,11 +191,14 @@ export function BenchTabs({ side, title, compact }: { side: H2HSideLineup; title
 }
 
 const ROLE_ORDER = ["P", "D", "C", "A"];
+const ROLE_LABEL: Record<string, string> = { P: "Portieri", D: "Difensori", C: "Centrocampisti", A: "Attaccanti" };
+
 
 /** Cella della vista affiancata: nome intero su una riga, voto o countdown sotto. */
 function VersusCell({ player, dim, now }: { player: H2HPlayerScore | undefined; dim: boolean; now: number }) {
   if (!player) {
-    return <View style={styles.cell} />;
+    // Spazio vuoto: i due allenatori possono avere un numero diverso di giocatori per reparto.
+    return <View style={[styles.cell, styles.vempty]} />;
   }
   const vote = playerVoteState(player);
   const countdown = vote.kind === "pending" ? kickoffCountdown(player, now) : null;
@@ -276,6 +279,13 @@ export function RosterVersus({ home, away }: { home: H2HSideLineup; away: H2HSid
   for (const role of ROLE_ORDER) {
     const left = home.starters.filter((p) => p.role === role);
     const right = away.starters.filter((p) => p.role === role);
+    if (left.length + right.length > 0) {
+      rows.push(
+        <Text style={styles.roleLabel} key={`h-${role}`}>
+          {ROLE_LABEL[role]}
+        </Text>,
+      );
+    }
     for (let i = 0; i < Math.max(left.length, right.length); i += 1) {
       rows.push(pair(`s-${role}-${i}`, left[i], right[i], false));
     }
@@ -388,6 +398,20 @@ const styles = lazyStyles(() =>
     vcd: { color: "#c9d2f0", fontSize: 11, fontWeight: "700" },
     voteWhite: { color: "#ffffff" },
     versus: { gap: 6 },
+    vempty: {
+      minHeight: 56,
+      borderRadius: radius.md,
+      borderWidth: 1,
+      borderStyle: "dashed",
+      borderColor: colors.border,
+    },
+    roleLabel: {
+      color: colors.foregroundMuted,
+      fontSize: 11,
+      letterSpacing: 1.4,
+      textTransform: "uppercase",
+      marginTop: spacing.xs,
+    },
     versusRow: { flexDirection: "row", alignItems: "stretch", gap: 4 },
     cell: { flex: 1, minWidth: 0 },
     mid: { width: 30, textAlign: "center", alignSelf: "center", color: colors.accent, fontFamily: DISPLAY_FONT },

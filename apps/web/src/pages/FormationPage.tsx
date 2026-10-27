@@ -1287,6 +1287,7 @@ export function FormationPage() {
         selectedRoundId,
         targetTeamIdRef.current || undefined,
         mode,
+        moduleCode,
       );
       if (!isCurrentLineupRequest(requestId)) {
         return;

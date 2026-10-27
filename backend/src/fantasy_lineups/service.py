@@ -592,6 +592,7 @@ class FantasyLineupService:
         round_id: UUID,
         target_team_id: UUID | None = None,
         mode: Literal["keep_module", "best_module"] = "keep_module",
+        requested_module: str | None = None,
     ) -> LineupContextResponse:
         """Precompila la bozza con la stessa formula ``ai_lineup_v1`` delle squadre IA.
 
@@ -659,6 +660,14 @@ class FantasyLineupService:
             current_module = draft.module
         else:
             current_module = DEFAULT_MODULE
+        if mode == "keep_module" and requested_module is not None:
+            # Il modulo scelto adesso dall'utente (anche non salvato) vince su quello salvato.
+            try:
+                current_module = FantasyModule(requested_module)
+            except ValueError as exc:
+                raise ValidationAuthError(
+                    "Modulo non valido.", code="invalid_lineup_module"
+                ) from exc
 
         roster = self._roster_rows(league_access.league.season_year, team)
         kickoffs = self._athlete_kickoffs(
