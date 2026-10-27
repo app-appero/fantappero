@@ -25,6 +25,7 @@ export const NAV_ICON_MAP: Record<string, FeatherName> = {
   "admin-turni": "calendar",
   "admin-jobs": "clock",
   "admin-notifications": "bell",
+  "admin-email": "mail",
 };
 
 export function NavIcon({ id, color, size = 22 }: { id: string; color: string; size?: number }) {

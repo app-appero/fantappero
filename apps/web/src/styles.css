@@ -4957,3 +4957,113 @@ h2 {
     display: none;
   }
 }
+
+/* ── Centro notifiche personale ───────────────────────────────────────── */
+
+.fa-notif-settings {
+  display: grid;
+  gap: var(--fa-space-lg);
+}
+
+.fa-notif-settings__group {
+  display: grid;
+  gap: var(--fa-space-sm);
+}
+
+.fa-notif-settings__head h4 {
+  margin: 0;
+  font-size: 1.2rem;
+}
+
+.fa-notif-settings__head p {
+  margin: 2px 0 0;
+  color: var(--fa-color-foreground-muted);
+  font-size: 0.9rem;
+}
+
+.fa-notif-settings__bulk {
+  display: inline-flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.fa-notif-settings__bulk button {
+  padding: 6px 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.fa-notif-settings__cols,
+.fa-notif-settings__row {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr) 84px 84px;
+  gap: 10px;
+  align-items: center;
+}
+
+.fa-notif-settings__cols {
+  font-size: 0.7rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--fa-color-foreground-muted);
+}
+
+.fa-notif-settings__cols span:nth-child(n + 3) {
+  text-align: center;
+}
+
+.fa-notif-settings__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.fa-notif-settings__row {
+  padding: 10px 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.fa-notif-settings__row > :nth-child(n + 3) {
+  justify-self: center;
+}
+
+.fa-notif-settings__glyph {
+  width: 34px;
+  height: 34px;
+  border-radius: 11px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(157, 184, 255, 0.16);
+}
+
+.fa-nop-mail {
+  display: grid;
+  gap: 8px;
+  padding: 18px;
+  border-radius: 18px;
+  background: #fff;
+  color: #11162b;
+}
+
+.fa-nop-mail h4 {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.fa-nop-mail p {
+  margin: 0;
+  white-space: pre-wrap;
+  color: #2a3350;
+  line-height: 1.5;
+}
+
+.fa-nop-mail small {
+  color: #8a93b2;
+}

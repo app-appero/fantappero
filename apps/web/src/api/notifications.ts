@@ -1,4 +1,7 @@
 import type {
+  OperatorEmailHistory,
+  OperatorEmailSent,
+  SendOperatorEmailRequest,
   BroadcastList,
   CreateBroadcastRequest,
   CreateBroadcastResponse,
@@ -118,5 +121,22 @@ export function sendTestSamples(
     accessToken,
     method: "POST",
     body,
+  });
+}
+
+export function sendOperatorEmail(
+  accessToken: string,
+  body: SendOperatorEmailRequest,
+): Promise<OperatorEmailSent> {
+  return apiRequest<OperatorEmailSent>("/admin/notifications/emails", {
+    accessToken,
+    method: "POST",
+    body,
+  });
+}
+
+export function fetchOperatorEmails(accessToken: string, page = 1): Promise<OperatorEmailHistory> {
+  return apiRequest<OperatorEmailHistory>(`/admin/notifications/emails?page=${page}`, {
+    accessToken,
   });
 }

@@ -78,6 +78,7 @@ export type AdminStackParamList = {
   AdminTurni: WireframeParams | undefined;
   AdminJobs: WireframeParams | undefined;
   AdminNotifications: WireframeParams | undefined;
+  AdminEmail: WireframeParams | undefined;
 };
 
 declare global {
