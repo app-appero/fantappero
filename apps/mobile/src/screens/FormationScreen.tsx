@@ -573,6 +573,7 @@ export function FormationScreen() {
         selectedRoundId,
         targetTeamId || undefined,
         mode,
+        moduleCode,
       );
       setContext(detail);
       applyEditor(detail);

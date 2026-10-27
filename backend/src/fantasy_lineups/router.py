@@ -150,8 +150,11 @@ def apply_best_lineup(
     ``keep_module``, compatibile con le chiamate senza corpo già in uso).
     """
     mode = body.mode if body is not None else "keep_module"
+    requested_module = body.module if body is not None else None
     try:
-        return service.apply_best_lineup(league_access, round_id, team_id, mode=mode)
+        return service.apply_best_lineup(
+            league_access, round_id, team_id, mode=mode, requested_module=requested_module
+        )
     except AuthError as exc:
         return _error_response(exc)
 

@@ -197,6 +197,9 @@ class ApplyBestLineupRequest(ApiModel):
     """
 
     mode: Literal["keep_module", "best_module"] = Field(default="keep_module")
+    #: Modulo scelto in questo momento dall'utente (anche non ancora salvato):
+    #: con ``keep_module`` è quello su cui ottimizzare, non l'ultimo salvato.
+    module: FantasyModuleLiteral | None = None
 
 
 class ComputeEffectiveLineupsRequest(ApiModel):
