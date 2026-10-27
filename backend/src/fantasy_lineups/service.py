@@ -1532,6 +1532,8 @@ class FantasyLineupService:
             bonusTotal=score.bonus_total if score is not None else 0.0,
             malusTotal=score.malus_total if score is not None else 0.0,
             bonusMalus=list(score.bonus_malus) if score is not None else [],
+            substitutedOutMinute=score.substituted_out_minute if score is not None else None,
+            substitutedInMinute=score.substituted_in_minute if score is not None else None,
             fixtureStatusLabel=score.fixture_status_label if score is not None else None,
             probableHint=None if probable is None else probable.hint,
             probableNote=None if probable is None else probable.note,

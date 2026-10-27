@@ -323,6 +323,46 @@ def test_current_league_member_is_reachable_from_standings(
     assert response.json()["userId"] == str(coach.id)
 
 
+def test_a_plain_member_can_open_a_teammates_profile_without_seeing_email(
+    client: TestClient, db_session: Session, competition_ids: list[str]
+) -> None:
+    """Click su un nome in Classifica da parte di chi NON amministra la lega:
+    deve funzionare (prima richiedeva Permission.LEAGUE_ADMIN, bloccando
+    qualunque membro normale), ma senza l'email del fantallenatore
+    guardato — quella resta un dato riservato a chi amministra la lega
+    (EP13-P06bis)."""
+    admin_token, _ = _register_and_login(client, "member-view-admin@example.com")
+    league_id = _create_league(client, admin_token, competition_ids, "Lega Membro")
+
+    member_token, member_id = _register_and_login(client, "member-view-caller@example.com")
+    db_session.add(
+        LeagueMembership(
+            league_id=UUID(league_id),
+            user_id=member_id,
+            role=LeagueMemberRole.MEMBER,
+        )
+    )
+    seed = int(datetime.now(UTC).timestamp() * 1000) % 400_000
+    coach = _make_coach(db_session, "visto-da-membro", seed)
+    db_session.add(
+        LeagueMembership(
+            league_id=UUID(league_id),
+            user_id=coach.id,
+            role=LeagueMemberRole.MEMBER,
+        )
+    )
+    db_session.commit()
+
+    response = client.get(
+        f"/leagues/{league_id}/amministrazione/fantallenatori/{coach.id}",
+        headers={"Authorization": f"Bearer {member_token}"},
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["userId"] == str(coach.id)
+    assert body["email"] is None
+
+
 def test_deleted_coach_disappears_from_the_profile_endpoint(
     client: TestClient, db_session: Session, competition_ids: list[str]
 ) -> None:

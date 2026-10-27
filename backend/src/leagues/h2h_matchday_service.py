@@ -656,6 +656,8 @@ def _player_score_response(
         fixtureStatusLabel=score.fixture_status_label,
         scoreFinal=score.score_final,
         kickoffAt=score.kickoff_at,
+        substitutedOutMinute=score.substituted_out_minute,
+        substitutedInMinute=score.substituted_in_minute,
         isEffectiveStarter=is_effective_starter,
         isBench=is_bench,
     )

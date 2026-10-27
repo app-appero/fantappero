@@ -287,10 +287,17 @@ def get_fantasy_coach_profile(
     user_id: UUID,
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=20, ge=1, le=50, alias="pageSize"),
-    league_access: LeagueAccess = Depends(require_league_permissions(Permission.LEAGUE_ADMIN)),
+    league_access: LeagueAccess = Depends(require_league_permissions(Permission.LEAGUE_VIEW)),
     service: NamedLeagueInviteService = Depends(get_named_league_invite_service),
 ) -> FantasyCoachProfileResponse | JSONResponse:
-    """Profilo storico limitato di un fantallenatore (EP13-P06)."""
+    """Profilo storico limitato di un fantallenatore (EP13-P06).
+
+    Accessibile a qualunque membro della lega (non solo admin): l'email
+    resta nascosta (``null``) a chi non amministra la lega, per lo stesso
+    motivo per cui oggi è visibile solo agli admin (EP13-P06bis — distinguere
+    account diversi con lo stesso nome mostrato è un bisogno amministrativo,
+    non di un membro qualsiasi).
+    """
     try:
         return service.coach_profile(league_access, user_id, page=page, page_size=page_size)
     except AuthError as exc:

@@ -238,11 +238,15 @@ class CoachPlacementResponse(ApiModel):
 
 
 class FantasyCoachProfileResponse(ApiModel):
-    """Profilo storico limitato, visibile alla sola directory amministrativa."""
+    """Profilo storico limitato, accessibile a qualunque membro della lega.
+
+    ``email`` è ``null`` per chi non amministra la lega (vedi
+    ``NamedLeagueInviteService.coach_profile``).
+    """
 
     user_id: str = Field(alias="userId")
     display_name: str = Field(alias="displayName")
-    email: str
+    email: str | None = None
     avatar_url: str | None = Field(default=None, alias="avatarUrl")
     nickname: str | None = None
     user_type: Literal["human", "ai"] = Field(alias="userType")
@@ -407,6 +411,8 @@ class H2HPlayerScoreResponse(ApiModel):
     fixture_status_label: str = Field(default="Partita non associata", alias="fixtureStatusLabel")
     score_final: bool = Field(default=False, alias="scoreFinal")
     kickoff_at: datetime | None = Field(default=None, alias="kickoffAt")
+    substituted_out_minute: int | None = Field(default=None, alias="substitutedOutMinute")
+    substituted_in_minute: int | None = Field(default=None, alias="substitutedInMinute")
     is_effective_starter: bool = Field(alias="isEffectiveStarter")
     is_bench: bool = Field(alias="isBench")
 
