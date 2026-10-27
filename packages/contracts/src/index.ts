@@ -426,6 +426,7 @@ export {
   pitchRoleFullLabel,
   pitchRoleVariant,
   realMatchBadgesByAthlete,
+  substitutionBadges,
   resolvePitchRole,
 } from "./pitch.js";
 export type {

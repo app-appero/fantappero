@@ -3,6 +3,7 @@ import type { AppTabParamList, RootStackParamList } from "./types";
 
 export type NotificationRoute =
   | { kind: "stack"; name: keyof RootStackParamList }
+  | { kind: "matchup"; slotId: string }
   | { kind: "tab"; screen: keyof AppTabParamList };
 
 const TRADE_TITLES = new Set([
@@ -52,6 +53,10 @@ export function resolveNotificationRoute(
   const link = (item.deepLink ?? "").trim();
   if (link.startsWith("/") && !link.startsWith("//") && !link.includes("://")) {
     const path = link.split(/[?#]/)[0] ?? link;
+    const matchup = /^\/turni\/scontro\/([^/]+)\/?$/.exec(path);
+    if (matchup?.[1]) {
+      return { kind: "matchup", slotId: decodeURIComponent(matchup[1]) };
+    }
     if (/^\/mercato/.test(path)) {
       return { kind: "tab", screen: "Roster" };
     }

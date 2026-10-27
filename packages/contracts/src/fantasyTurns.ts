@@ -87,6 +87,12 @@ export interface FixtureLineupPlayer {
   position: string | null;
   grid: string | null;
   photoUrl: string | null;
+  /** Ruolo fantacalcistico P/D/C/A, quando il calciatore è abbinato alla rosa. */
+  role?: string | null;
+  /** Ordine di ingresso previsto in panchina (1 = primo cambio). */
+  benchOrder?: number | null;
+  substitutedOutMinute?: number | null;
+  substitutedInMinute?: number | null;
 }
 
 export interface FixtureLineup {

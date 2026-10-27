@@ -7,7 +7,7 @@ import {
   UiStatePanel,
 } from "@fantappero/ui";
 import { type FormEvent, useCallback, useEffect, useMemo, useState } from "react";
-import { createLeague, fetchCompetitions } from "../api/leagues";
+import { createLeague, fetchAvailableCompetitions, fetchCompetitions } from "../api/leagues";
 import { getApiErrorMessage, useAuth } from "../auth/AuthContext";
 import { ManagerDirectory } from "../components/ManagerDirectory";
 import { loadStoredSession } from "../auth/sessionStorage";
@@ -154,7 +154,9 @@ export function CreateLeaguePage() {
   const [formError, setFormError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [createdLeague, setCreatedLeague] = useState<LeagueDetail | null>(null);
-  const allSelected = competitions.length > 0 && selectedIds.size === competitions.length;
+  const allSelected =
+    competitions.filter((row) => row.selectable !== false).length > 0 &&
+    selectedIds.size === competitions.filter((row) => row.selectable !== false).length;
 
   const loadCatalog = useCallback(async () => {
     if (isDemoMode) {
@@ -191,20 +193,34 @@ export function CreateLeaguePage() {
     setLoadingCatalog(true);
     setCatalogError(null);
     try {
-      const rows = await fetchCompetitions(stored.accessToken);
+      let rows: CompetitionSummary[];
+      try {
+        rows = await fetchAvailableCompetitions(stored.accessToken, seasonYear);
+      } catch {
+        rows = await fetchCompetitions(stored.accessToken);
+      }
       setCompetitions(rows);
+      setSelectedIds((current) => {
+        const blocked = new Set(rows.filter((row) => row.selectable === false).map((row) => row.id));
+        return new Set([...current].filter((id) => !blocked.has(id)));
+      });
     } catch (error) {
       setCatalogError(getApiErrorMessage(error, "Impossibile caricare i campionati."));
     } finally {
       setLoadingCatalog(false);
     }
-  }, [demoState, isDemoMode]);
+  }, [demoState, isDemoMode, seasonYear]);
 
   useEffect(() => {
     void loadCatalog();
   }, [loadCatalog]);
 
+  const selectableCompetitions = competitions.filter((row) => row.selectable !== false);
+
   function toggleCompetition(competitionId: string) {
+    if (competitions.find((row) => row.id === competitionId)?.selectable === false) {
+      return;
+    }
     setSelectedIds((current) => {
       const next = new Set(current);
       if (next.has(competitionId)) {
@@ -218,10 +234,10 @@ export function CreateLeaguePage() {
 
   function toggleSelectAll() {
     setSelectedIds((current) => {
-      if (competitions.length > 0 && current.size === competitions.length) {
+      if (selectableCompetitions.length > 0 && current.size === selectableCompetitions.length) {
         return new Set();
       }
-      return new Set(competitions.map((row) => row.id));
+      return new Set(selectableCompetitions.map((row) => row.id));
     });
   }
 
@@ -380,11 +396,16 @@ export function CreateLeaguePage() {
                         name="competition"
                         value={competition.id}
                         checked={checked}
+                        disabled={competition.selectable === false}
                         onChange={() => toggleCompetition(competition.id)}
                       />
                       <span className="fa-competition-picker__label">
                         <span className="fa-competition-picker__name">{competition.name}</span>
-                        <span className="fa-competition-picker__country">{competition.country}</span>
+                        <span className="fa-competition-picker__country">
+                          {competition.selectable === false
+                            ? `${competition.country} · girone di ritorno già iniziato`
+                            : competition.country}
+                        </span>
                       </span>
                     </label>
                   </li>
