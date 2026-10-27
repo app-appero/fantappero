@@ -84,7 +84,7 @@ describe("EP06-06 formation page", () => {
     expect(html).toContain('data-testid="formation-sub-hint"');
     expect(html).toContain('data-testid="formation-bench-position-0"');
     expect(html).toContain('data-testid="formation-bench-panchina"');
-    expect(html).toContain('data-testid="formation-bench-tribuna"');
+    expect(html).toContain('data-testid="formation-tribuna-empty"');
     expect(html).toContain("4-3-3");
     expect(html).toContain("Portiere 1 (bloccato)");
     expect(html).toContain("Maignan (bloccato)");
