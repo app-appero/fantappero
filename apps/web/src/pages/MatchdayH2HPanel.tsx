@@ -82,7 +82,8 @@ function roundStatusHint(round: H2HCalendarRound): string {
 }
 
 function MatchupRow({ matchup }: { matchup: H2HCalendarMatchup }) {
-  const homeName = matchup.homeDisplayName || matchup.homeTeamName || "Fantallenatore";
+  const homeName =
+    matchup.homeNickname?.trim() || matchup.homeDisplayName || matchup.homeTeamName || "Fantallenatore";
   const homeAvatarUrl = resolveAvatarUrl(matchup.homeAvatarUrl ?? null);
   if (matchup.isBye) {
     return (
@@ -101,7 +102,8 @@ function MatchupRow({ matchup }: { matchup: H2HCalendarMatchup }) {
     );
   }
 
-  const awayName = matchup.awayDisplayName ?? matchup.awayTeamName ?? "Avversario";
+  const awayName =
+    matchup.awayNickname?.trim() || matchup.awayDisplayName || matchup.awayTeamName || "Avversario";
   const awayAvatarUrl = resolveAvatarUrl(matchup.awayAvatarUrl ?? null);
   const display = describeH2HResult(matchup.result);
   const status =

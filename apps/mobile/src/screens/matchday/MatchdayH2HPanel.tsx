@@ -104,7 +104,8 @@ function MatchupRow({
   matchup: H2HCalendarMatchup;
   onOpenMatchup: (slotId: string) => void;
 }) {
-  const homeName = matchup.homeDisplayName || matchup.homeTeamName || "Fantallenatore";
+  const homeName =
+    matchup.homeNickname?.trim() || matchup.homeDisplayName || matchup.homeTeamName || "Fantallenatore";
 
   if (matchup.isBye) {
     return (
@@ -128,7 +129,8 @@ function MatchupRow({
     );
   }
 
-  const awayName = matchup.awayDisplayName ?? matchup.awayTeamName ?? "Avversario";
+  const awayName =
+    matchup.awayNickname?.trim() || matchup.awayDisplayName || matchup.awayTeamName || "Avversario";
   const display = describeH2HResult(matchup.result);
   const statusLabel = matchup.live
     ? "LIVE / provvisorio"

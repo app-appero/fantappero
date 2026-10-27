@@ -514,10 +514,12 @@ export interface H2HCalendarMatchup {
   isBye: boolean;
   homeUserId: string;
   homeDisplayName: string;
+  homeNickname?: string | null;
   homeTeamName: string | null;
   homeAvatarUrl?: string | null;
   awayUserId: string | null;
   awayDisplayName: string | null;
+  awayNickname?: string | null;
   awayTeamName: string | null;
   awayAvatarUrl?: string | null;
   /** True solo se una fixture reale di almeno un titolare dello scontro è in corso. */
@@ -587,6 +589,7 @@ export interface H2HSideLineup {
   fantasyTeamId: string | null;
   teamName: string | null;
   displayName: string;
+  nickname?: string | null;
   module: string | null;
   lineupSource: "effective" | "submitted" | "none";
   totalScore: number | null;
