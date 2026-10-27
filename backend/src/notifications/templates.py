@@ -282,11 +282,17 @@ def _team_note(params: NotificationParams) -> str:
 def _live_content_v2(
     title: str, detail: str, params: NotificationParams, *, deep_link: str = "/turni"
 ) -> NotificationContent:
+    """``deep_link`` è il fallback: se il produttore (``notifications/match_
+    events.py``) è riuscito a risalire allo scontro H2H del destinatario
+    (TASK4) lo passa già risolto in ``params["deep_link"]`` e questo vince
+    sul generico ``/turni``/``/formazione`` passato come default qui sotto."""
     body = _join(
         _match_line(params) and f"{_match_line(params)}{detail}" or detail.lstrip(" ·"),
         _team_note(params),
     )
-    return NotificationContent(title=title, body=body, deep_link=deep_link)
+    resolved = params.get("deep_link")
+    final_deep_link = str(resolved) if isinstance(resolved, str) and resolved else deep_link
+    return NotificationContent(title=title, body=body, deep_link=final_deep_link)
 
 
 def _player(params: NotificationParams) -> str:

@@ -25,6 +25,7 @@ from leagues.validators import (
     validate_participant_count,
     validate_preset_name,
     validate_season_year,
+    validate_second_leg_not_started,
     validate_standard_roster,
     validate_total_credits,
 )
@@ -255,3 +256,27 @@ def test_auction_activation_blockers_include_calendar_until_configured() -> None
     assert hints_by_code["calendar_not_configured"] == "calendar"
     assert hints_by_code["fantasy_teams_not_configured"] == "teams"
     assert hints_by_code["credits_not_configured"] == "teams"
+
+
+def test_validate_second_leg_not_started_allows_empty_blocklist() -> None:
+    validate_second_leg_not_started([])
+
+
+def test_validate_second_leg_not_started_singular_message() -> None:
+    with pytest.raises(ValidationAuthError) as excinfo:
+        validate_second_leg_not_started(["Serie A"])
+    assert excinfo.value.code == "competition_second_leg_started"
+    assert (
+        excinfo.value.message
+        == "Non è possibile creare la lega: il campionato 'Serie A' ha già "
+        "iniziato il girone di ritorno."
+    )
+
+
+def test_validate_second_leg_not_started_plural_message_lists_all_names() -> None:
+    with pytest.raises(ValidationAuthError) as excinfo:
+        validate_second_leg_not_started(["Serie A", "Premier League"])
+    assert excinfo.value.code == "competition_second_leg_started"
+    assert "Premier League" in excinfo.value.message
+    assert "Serie A" in excinfo.value.message
+    assert "hanno già iniziato il girone di ritorno" in excinfo.value.message

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
 import pytest
@@ -19,6 +20,8 @@ from leagues.models.league_audit_event import LeagueAuditEvent
 from leagues.models.league_membership import LeagueMembership
 from leagues.models.league_rules import LeagueRules
 from mail.capture import get_captured_emails
+from sports_data.catalog.models import Club, SportSeason
+from sports_data.fixtures.models import Fixture
 
 
 def _extract_token_from_email_body(body: str) -> str | None:
@@ -83,6 +86,54 @@ def competition_ids(db_session: Session) -> list[str]:
     rows = db_session.scalars(select(Competition).order_by(Competition.name.asc())).all()
     assert len(rows) >= 3
     return [str(row.id) for row in rows[:3]]
+
+
+def _seed_competition_rounds(
+    db_session: Session,
+    *,
+    competition_id: UUID,
+    season_year: int,
+    total_rounds: int,
+    finished_rounds: int,
+) -> None:
+    """Semina una SportSeason con ``total_rounds`` giornate (TASK 9).
+
+    Le prime ``finished_rounds`` giornate sono ``FT`` con kickoff nel
+    passato; le restanti sono ``NS`` con kickoff nel futuro. Riusa le stesse
+    due squadre per ogni giornata: qui interessano solo round_label/status/
+    kickoff, non un calendario round-robin plausibile.
+    """
+    season = SportSeason(competition_id=competition_id, year=season_year, is_current=True)
+    db_session.add(season)
+    db_session.flush()
+
+    seed = f"{competition_id}-{season_year}"
+    home = Club(provider_id=abs(hash(f"{seed}-home")) % 1_000_000 + 1, name=f"Home {seed}")
+    away = Club(provider_id=abs(hash(f"{seed}-away")) % 1_000_000 + 1, name=f"Away {seed}")
+    db_session.add_all([home, away])
+    db_session.flush()
+
+    now = datetime.now(UTC)
+    provider_base = (abs(hash(seed)) % 1_000_000) * 1_000
+    for round_number in range(1, total_rounds + 1):
+        finished = round_number <= finished_rounds
+        kickoff = (
+            now - timedelta(days=(finished_rounds - round_number + 1))
+            if finished
+            else now + timedelta(days=(round_number - finished_rounds))
+        )
+        db_session.add(
+            Fixture(
+                provider_id=provider_base + round_number,
+                sport_season_id=season.id,
+                home_club_id=home.id,
+                away_club_id=away.id,
+                kickoff_at=kickoff,
+                status_short="FT" if finished else "NS",
+                round_label=f"Regular Season - {round_number}",
+            )
+        )
+    db_session.commit()
 
 
 def test_list_competitions_returns_mvp_catalog(
@@ -180,6 +231,151 @@ def test_create_league_rejects_insufficient_competitions(
         },
     )
     assert response.status_code == 422
+
+
+def test_create_league_allowed_when_second_leg_not_started(
+    client: TestClient,
+    db_session: Session,
+    competition_ids: list[str],
+) -> None:
+    """TASK 9: girone di ritorno non iniziato → creazione permessa.
+
+    ``season_year`` è dedicato a questo test (non 2026, usato da quasi tutti
+    gli altri test del file): la SportSeason seminata qui è per
+    ``competition_ids[0]``, condiviso con gli altri test TASK9 — un
+    ``season_year`` comune farebbe collidere l'unique constraint
+    ``(competition_id, year)`` fra test diversi dello stesso modulo (la DB
+    non viene ripulita fra una funzione di test e l'altra, solo fra moduli).
+    """
+    competition_id = UUID(competition_ids[0])
+    _seed_competition_rounds(
+        db_session,
+        competition_id=competition_id,
+        season_year=2021,
+        total_rounds=38,
+        finished_rounds=10,  # ben prima della giornata 20 (inizio ritorno).
+    )
+
+    token, _ = _register_and_login(client, "second.leg.allowed@example.com")
+    response = client.post(
+        "/leagues",
+        headers={"Authorization": f"Bearer {token}"},
+        json={
+            "name": "Lega Ritorno Non Iniziato",
+            "seasonYear": 2021,
+            "competitionIds": competition_ids,
+        },
+    )
+    assert response.status_code == 201
+
+
+def test_create_league_blocked_when_second_leg_started(
+    client: TestClient,
+    db_session: Session,
+    competition_ids: list[str],
+) -> None:
+    """TASK 9: girone di ritorno già iniziato → creazione bloccata con errore italiano.
+
+    ``season_year`` dedicato (v. nota in ``test_create_league_allowed_when_second_leg_not_started``).
+    """
+    competition_id = UUID(competition_ids[0])
+    _seed_competition_rounds(
+        db_session,
+        competition_id=competition_id,
+        season_year=2022,
+        total_rounds=38,
+        finished_rounds=25,  # oltre la giornata 20 (inizio ritorno).
+    )
+    competition_name = db_session.get(Competition, competition_id).name
+
+    token, _ = _register_and_login(client, "second.leg.blocked@example.com")
+    response = client.post(
+        "/leagues",
+        headers={"Authorization": f"Bearer {token}"},
+        json={
+            "name": "Lega Ritorno Iniziato",
+            "seasonYear": 2022,
+            "competitionIds": competition_ids,
+        },
+    )
+    assert response.status_code == 400
+    body = response.json()
+    assert body["code"] == "competition_second_leg_started"
+    assert competition_name in body["message"]
+    assert "girone di ritorno" in body["message"]
+
+
+def test_create_league_blocked_when_one_of_several_competitions_started_second_leg(
+    client: TestClient,
+    db_session: Session,
+    competition_ids: list[str],
+) -> None:
+    """TASK 9: selezione mista (una bloccante, le altre senza dati) → bloccata interamente.
+
+    ``season_year`` dedicato (v. nota in ``test_create_league_allowed_when_second_leg_not_started``).
+    """
+    blocked_competition_id = UUID(competition_ids[0])
+    _seed_competition_rounds(
+        db_session,
+        competition_id=blocked_competition_id,
+        season_year=2023,
+        total_rounds=38,
+        finished_rounds=30,
+    )
+    # Le altre due competizioni non hanno dati di calendario per la stagione:
+    # da sole sarebbero selezionabili (nessun segnale di ritorno iniziato).
+
+    token, _ = _register_and_login(client, "second.leg.mixed@example.com")
+    response = client.post(
+        "/leagues",
+        headers={"Authorization": f"Bearer {token}"},
+        json={
+            "name": "Lega Selezione Mista",
+            "seasonYear": 2023,
+            "competitionIds": competition_ids,
+        },
+    )
+    assert response.status_code == 400
+    assert response.json()["code"] == "competition_second_leg_started"
+
+
+def test_available_competitions_marks_second_leg_started_as_not_selectable(
+    client: TestClient,
+    db_session: Session,
+    competition_ids: list[str],
+) -> None:
+    """TASK 9: l'elenco espone selectable/secondLegStarted per disabilitare in anticipo.
+
+    ``season_year`` dedicato (v. nota in ``test_create_league_allowed_when_second_leg_not_started``).
+    """
+    blocked_id = UUID(competition_ids[0])
+    allowed_id = competition_ids[1]
+    _seed_competition_rounds(
+        db_session,
+        competition_id=blocked_id,
+        season_year=2024,
+        total_rounds=38,
+        finished_rounds=30,
+    )
+
+    token, _ = _register_and_login(client, "available.competitions@example.com")
+    response = client.get(
+        "/leagues/available-competitions",
+        params={"seasonYear": 2024},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert response.status_code == 200
+    rows_by_id = {row["id"]: row for row in response.json()}
+
+    blocked_row = rows_by_id[str(blocked_id)]
+    assert blocked_row["selectable"] is False
+    assert blocked_row["secondLegStarted"] is True
+    assert blocked_row["currentRound"] == 30
+    assert blocked_row["totalRounds"] == 38
+
+    allowed_row = rows_by_id[allowed_id]
+    assert allowed_row["selectable"] is True
+    assert allowed_row["secondLegStarted"] is False
 
 
 def test_create_league_rejects_invalid_name(client: TestClient, competition_ids: list[str]) -> None:

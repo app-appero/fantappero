@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session
 
 from database.enums import NotificationCategory
 from fantasy_teams.models import FantasyRosterSlot, FantasyTeam
+from notifications.matchup_links import resolve_matchup_deep_link
 from notifications.recipients import user_ids_for_teams
 from notifications.service import NotificationService
 from observability.logging import get_logger
@@ -58,7 +59,13 @@ def _notify_owners(
     params: dict[str, object],
     dedup_prefix: str,
     template_version: int = 1,
+    fixture_id: UUID | None = None,
+    deep_link_fallback: str = "/turni",
 ) -> int:
+    """Notifica ogni proprietario, con un deep link allo scontro H2H del
+    destinatario (EP09-05 / TASK4): per squadre diverse la stessa fixture può
+    cadere in scontri diversi (lega diversa, avversario diverso), quindi il
+    link va calcolato per destinatario e non una volta per l'evento."""
     athlete = session.get(Athlete, athlete_id)
     if athlete is None:
         return 0
@@ -68,7 +75,14 @@ def _notify_owners(
     for team_id, user_id in _owners(session, athlete_id).items():
         team = session.get(FantasyTeam, team_id)
         team_name = getattr(team, "name", None)
-        recipient_params = {**params, **({"team_name": team_name} if team_name else {})}
+        deep_link = resolve_matchup_deep_link(
+            session, team_id=team_id, fixture_id=fixture_id, fallback=deep_link_fallback
+        )
+        recipient_params = {
+            **params,
+            **({"team_name": team_name} if team_name else {}),
+            "deep_link": deep_link,
+        }
         with session.begin_nested():
             _, created = service.create_notification(
                 user_id=user_id,
@@ -94,6 +108,9 @@ def notify_match_event(session: Session, *, event: object, fixture_status: str |
     base: dict[str, object] = {"minute": minute, **_fixture_context(event)}
     event_id = getattr(event, "id", None)
     related_id = getattr(event, "related_athlete_id", None)
+    # Serve a risalire, per destinatario, allo scontro H2H preciso (TASK4):
+    # senza questo id il deep link resta sulla pagina Turni generica.
+    fixture_id = getattr(event, "fixture_id", None)
 
     try:
         sent = 0
@@ -105,6 +122,7 @@ def notify_match_event(session: Session, *, event: object, fixture_status: str |
                 template_version=2,
                 params=base,
                 dedup_prefix=f"match_event:{event_id}",
+                fixture_id=fixture_id,
             )
             if related_id is not None:
                 scorer = session.get(Athlete, athlete_id)
@@ -115,6 +133,7 @@ def notify_match_event(session: Session, *, event: object, fixture_status: str |
                     template_version=1,
                     params={**base, "scorer": getattr(scorer, "canonical_name", None)},
                     dedup_prefix=f"match_event_assist:{event_id}",
+                    fixture_id=fixture_id,
                 )
         elif event_type == "card" and ("red" in detail or "second yellow" in detail):
             sent += _notify_owners(
@@ -124,6 +143,7 @@ def notify_match_event(session: Session, *, event: object, fixture_status: str |
                 template_version=2,
                 params=base,
                 dedup_prefix=f"match_event:{event_id}",
+                fixture_id=fixture_id,
             )
         elif event_type == "card" and "yellow" in detail:
             sent += _notify_owners(
@@ -133,6 +153,7 @@ def notify_match_event(session: Session, *, event: object, fixture_status: str |
                 template_version=1,
                 params=base,
                 dedup_prefix=f"match_event:{event_id}",
+                fixture_id=fixture_id,
             )
         elif event_type == "subst":
             # Il provider indica in «player» chi esce e in «assist» chi entra.
@@ -153,6 +174,7 @@ def notify_match_event(session: Session, *, event: object, fixture_status: str |
                     template_version=1,
                     params=params,
                     dedup_prefix=f"match_event_subst:{event_id}:{owned_id}",
+                    fixture_id=fixture_id,
                 )
         return sent
     except Exception:
@@ -167,6 +189,11 @@ def notify_availability(session: Session, *, availability: object) -> int:
     if athlete_id is None or category not in {"injury", "suspension"}:
         return 0
     template_key = "risultati.infortunio" if category == "injury" else "risultati.squalifica"
+    # Se l'indisponibilità è legata a una fixture precisa, punta allo scontro
+    # H2H di quella giornata (TASK4); altrimenti resta su «/formazione»
+    # (fallback di default dei template v2), che è comunque il posto giusto
+    # da cui togliere il giocatore infortunato/squalificato.
+    fixture_id = getattr(availability, "fixture_id", None)
     try:
         return _notify_owners(
             session,
@@ -175,6 +202,8 @@ def notify_availability(session: Session, *, availability: object) -> int:
             template_version=2,
             params={},
             dedup_prefix=f"availability:{availability.id}",  # type: ignore[attr-defined]
+            fixture_id=fixture_id,
+            deep_link_fallback="/formazione",
         )
     except Exception:
         logger.warning("availability_notification_failed", exc_info=True)

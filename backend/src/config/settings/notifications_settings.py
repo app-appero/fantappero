@@ -44,6 +44,17 @@ class NotificationsSettingsMixin:
         value = self.expo_push_access_token.get_secret_value().strip()
         return value or None
 
+    notifications_routine_email_enabled: bool = Field(
+        default=False,
+        validation_alias="NOTIFICATIONS_ROUTINE_EMAIL_ENABLED",
+        description=(
+            "Kill switch for routine in-app notification emails (sistema/formazione/"
+            "mercato/risultati, EP09-05). Default off: these stay in-app/push only "
+            "(Task 6b, see docs/operations/email_notifications.md). Does not affect "
+            "auth emails (verification, password reset) or operator-composed emails, "
+            "which use a separate code path."
+        ),
+    )
     notifications_broadcast_dispatch_enabled: bool = Field(
         default=True,
         validation_alias="NOTIFICATIONS_BROADCAST_DISPATCH_ENABLED",
@@ -77,6 +88,7 @@ class NotificationsSettingsMixin:
 
     @field_validator(
         "notifications_push_enabled",
+        "notifications_routine_email_enabled",
         "notifications_broadcast_dispatch_enabled",
         "notifications_lineup_reminder_enabled",
         mode="before",

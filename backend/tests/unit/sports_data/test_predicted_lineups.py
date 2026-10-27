@@ -133,6 +133,35 @@ def test_player_match_is_unique_or_nothing() -> None:
     assert match_squad_player("Silva", squad) is None
 
 
+def test_player_without_known_given_name_still_matches_unique_surname() -> None:
+    """Bug: un titolare con anagrafica incompleta in rosa (solo cognome in
+    `canonical_name`, `first_name`/`last_name` non popolati) non veniva mai
+    abbinato alle formazioni probabili, anche con cognome univoco in rosa:
+    il filtro per iniziale/nome proprio scartava l'unico candidato valido
+    perché non riusciva a confermarne il nome proprio. Un compagno con
+    anagrafica completa continuava ad abbinarsi normalmente, facendo
+    sembrare il problema specifico di quel singolo giocatore (es. "Simeone
+    titolare ma non illuminato in formazione" mentre un altro titolare sì).
+    """
+    simeone = uuid4()
+    other_starter = uuid4()
+    squad = [
+        # Anagrafica incompleta: solo il cognome, come può capitare per
+        # alcuni atleti sincronizzati dal roster.
+        SquadPlayer(simeone, "Simeone", None, None),
+        SquadPlayer(other_starter, "Hakan Çalhanoğlu", "Hakan", "Çalhanoğlu"),
+    ]
+    # Iniziale + cognome (lo schema più comune nelle formazioni probabili).
+    assert match_squad_player("G. Simeone", squad) == simeone
+    # Nome completo + cognome.
+    assert match_squad_player("Giovanni Simeone", squad) == simeone
+    # Il compagno con anagrafica completa deve continuare a funzionare.
+    assert match_squad_player("H. Çalhanoğlu", squad) == other_starter
+    # Il cognome resta comunque ambiguo se compare più di una volta.
+    squad_ambiguous = squad + [SquadPlayer(uuid4(), "Simeone", None, None)]
+    assert match_squad_player("G. Simeone", squad_ambiguous) is None
+
+
 def test_reliability_requires_eleven_unique_mapped_starters() -> None:
     home_players = tuple(
         parse_lineup_payload(

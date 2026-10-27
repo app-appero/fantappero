@@ -27,6 +27,24 @@ class CompetitionSummaryResponse(ApiModel):
     country: str
 
 
+class CompetitionAvailabilityResponse(ApiModel):
+    """Competizione reale con lo stato di selezionabilità per una stagione (TASK 9).
+
+    ``selectable`` è l'esatto negato di ``secondLegStarted``: la UI può
+    disabilitare la competizione in anticipo senza dover reimplementare la
+    regola del girone di ritorno lato client.
+    """
+
+    id: str
+    provider_id: int = Field(alias="providerId")
+    name: str
+    country: str
+    second_leg_started: bool = Field(alias="secondLegStarted")
+    selectable: bool
+    current_round: int | None = Field(default=None, alias="currentRound")
+    total_rounds: int | None = Field(default=None, alias="totalRounds")
+
+
 class LeagueRosterConfig(ApiModel):
     roster_size: int = Field(alias="rosterSize")
     goalkeepers: int
