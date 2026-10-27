@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections import Counter
+from collections import Counter, defaultdict
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime, timedelta
@@ -32,6 +32,31 @@ MIN_AUTOMATIC_SUBSTITUTIONS = 0
 MAX_AUTOMATIC_SUBSTITUTIONS = 5
 STANDARD_AUTOMATIC_SUBSTITUTIONS = 5
 MAX_TACTICAL_MOVES = 3
+#: Dimensione della "panchina attiva" (regola di gioco, non il numero di
+#: cambi automatici: ``MAX_AUTOMATIC_SUBSTITUTIONS`` resta un parametro
+#: indipendente). I primi ``BENCH_ACTIVE_SIZE`` posti della panchina ordinata
+#: devono garantire una copertura minima per ruolo (``BENCH_ACTIVE_ROLE_QUOTA``);
+#: dall'11° posto in poi ("tribuna") qualunque ruolo è libero.
+BENCH_ACTIVE_SIZE = 10
+BENCH_ACTIVE_ROLE_QUOTA: dict[FantasyRole, int] = {
+    FantasyRole.P: 1,
+    FantasyRole.D: 3,
+    FantasyRole.C: 3,
+    FantasyRole.A: 3,
+}
+_BENCH_ROLE_LABELS: dict[FantasyRole, tuple[str, str]] = {
+    FantasyRole.P: ("portiere", "portieri"),
+    FantasyRole.D: ("difensore", "difensori"),
+    FantasyRole.C: ("centrocampista", "centrocampisti"),
+    FantasyRole.A: ("attaccante", "attaccanti"),
+}
+BENCH_ACTIVE_ROLE_QUOTA_MESSAGE = (
+    f"Nei primi {BENCH_ACTIVE_SIZE} della panchina servono "
+    f"{BENCH_ACTIVE_ROLE_QUOTA[FantasyRole.P]} portiere, "
+    f"{BENCH_ACTIVE_ROLE_QUOTA[FantasyRole.D]} difensori, "
+    f"{BENCH_ACTIVE_ROLE_QUOTA[FantasyRole.C]} centrocampisti e "
+    f"{BENCH_ACTIVE_ROLE_QUOTA[FantasyRole.A]} attaccanti"
+)
 #: Margine di preavviso del lock per-giocatore quando la lega non ne ha uno
 #: configurato (EP-turni-automazione), editabile per lega in `LeagueRules`.
 DEFAULT_LINEUP_LOCK_MARGIN_MINUTES = 15
@@ -182,6 +207,73 @@ def count_roles(players: Sequence[LineupPlayerRef]) -> dict[FantasyRole, int]:
     return {role: int(counter.get(role, 0)) for role in FantasyRole}
 
 
+def bench_active_role_requirements(
+    bench: Sequence[LineupPlayerRef],
+) -> dict[FantasyRole, int]:
+    """Quota minima per ruolo nei primi ``BENCH_ACTIVE_SIZE`` posti di panchina.
+
+    ``required[r] = min(quota[r], giocatori di ruolo r in panchina)``: una
+    rosa sbilanciata (es. solo 2 attaccanti rimasti fuori dagli undici
+    titolari) non può essere bloccata da una quota che richiede più
+    giocatori di quel ruolo di quanti ce ne siano in tutta la panchina.
+    """
+    bench_role_counts = count_roles(bench)
+    return {
+        role: min(BENCH_ACTIVE_ROLE_QUOTA.get(role, 0), bench_role_counts.get(role, 0))
+        for role in FantasyRole
+    }
+
+
+def reorder_bench_for_active_roles(
+    bench: Sequence[LineupPlayerRef],
+) -> list[LineupPlayerRef]:
+    """Riordina (stabile, senza punteggio) per soddisfare la regola
+    "panchina attiva" quando la rosa lo permette.
+
+    Usata da `copy_previous_lineup`: una copia che violerebbe la regola
+    solo per l'ORDINE ereditato dal turno precedente si auto-corregge,
+    invece di bloccare un'azione altrimenti valida. Non inventa né rimuove
+    giocatori — sposta solo l'ordine di quelli già in panchina, scegliendo
+    per ciascun ruolo chi compare prima (nessuna sorpresa su chi finisce
+    nei primi 10, solo l'ordine). Una rosa che non ha proprio abbastanza
+    giocatori di un ruolo resta non sistemabile: `bench_roles_invalid`
+    scatterà comunque in `evaluate_lineup`, qui non c'è nulla da spostare.
+    """
+    if not bench:
+        return []
+    required = bench_active_role_requirements(bench)
+    active_size = min(BENCH_ACTIVE_SIZE, len(bench))
+
+    by_role: dict[FantasyRole | None, list[LineupPlayerRef]] = defaultdict(list)
+    for player in bench:
+        by_role[player.role].append(player)
+
+    active: list[LineupPlayerRef] = []
+    used_ids: set[object] = set()
+    for role, needed in required.items():
+        chosen = by_role.get(role, [])[: max(0, needed)]
+        active.extend(chosen)
+        used_ids.update(player.athlete_id for player in chosen)
+
+    rest = [player for player in bench if player.athlete_id not in used_ids]
+    fill = max(0, active_size - len(active))
+    active.extend(rest[:fill])
+    tail = rest[fill:]
+    return active + tail
+
+
+def _bench_role_shortfall_message(missing: Mapping[FantasyRole, int]) -> str:
+    parts = []
+    for role in FantasyRole:
+        count = missing.get(role, 0)
+        if count <= 0:
+            continue
+        singular, plural = _BENCH_ROLE_LABELS[role]
+        parts.append(f"{count} {singular if count == 1 else plural}")
+    shortfall = " e ".join(parts) if len(parts) <= 2 else f"{', '.join(parts[:-1])} e {parts[-1]}"
+    return f"{BENCH_ACTIVE_ROLE_QUOTA_MESSAGE} (mancano: {shortfall})."
+
+
 def evaluate_lineup(
     *,
     module: str,
@@ -301,6 +393,23 @@ def evaluate_lineup(
                         f"{starter_role_counts[FantasyRole.C]}C–"
                         f"{starter_role_counts[FantasyRole.A]}A)."
                     ),
+                )
+            )
+
+    if strict and filled_bench:
+        required = bench_active_role_requirements(filled_bench)
+        active_slots = filled_bench[:BENCH_ACTIVE_SIZE]
+        active_role_counts = count_roles(active_slots)
+        missing = {
+            role: needed - active_role_counts.get(role, 0)
+            for role, needed in required.items()
+            if active_role_counts.get(role, 0) < needed
+        }
+        if missing:
+            issues.append(
+                LineupIssue(
+                    code="bench_roles_invalid",
+                    message=_bench_role_shortfall_message(missing),
                 )
             )
 
@@ -867,6 +976,24 @@ def copy_previous_lineup(
         starter_ids,
         [*previous_bench_kept, *displaced],
     )
+    # La panchina ereditata dal turno precedente può non rispettare più la
+    # regola "panchina attiva" solo per l'ordine (es. i cambi di modulo
+    # hanno spostato chi è titolare/panchinaro): si auto-corregge quando la
+    # rosa lo permette, invece di bloccare una copia altrimenti valida. Non
+    # quando c'è già un bloccato in panchina: riordinare potrebbe scavalcarlo
+    # (`evaluate_bench_order_lock`), e quel vincolo ha priorità — in quel
+    # caso l'eventuale violazione resta segnalata più sotto come issue.
+    roles = role_by_athlete_id or {}
+    if not locked:
+        bench_ids = [
+            player.athlete_id
+            for player in reorder_bench_for_active_roles(
+                [
+                    LineupPlayerRef(athlete_id=athlete_id, role=roles.get(athlete_id))
+                    for athlete_id in bench_ids
+                ]
+            )
+        ]
 
     lock_issues = [
         *evaluate_progressive_lock(
@@ -901,7 +1028,6 @@ def copy_previous_lineup(
         )
     issues.extend(lock_issues)
 
-    roles = role_by_athlete_id or {}
     confirmation = evaluate_lineup(
         module=previous_module,
         starters=[
@@ -920,6 +1046,11 @@ def copy_previous_lineup(
         ],
         roster_athlete_ids=roster_athlete_ids,
     )
+    # Non rispostabile con il solo riordino (rosa senza abbastanza giocatori
+    # di un ruolo, o bloccato di mezzo che impedisce il riordino sopra):
+    # segnalata come le altre issue, non lasciata silenziosa dentro
+    # `can_confirm=False`.
+    issues.extend(item for item in confirmation.issues if item.code == "bench_roles_invalid")
     return CopyLineupResult(
         module=previous_module,
         starter_ids=tuple(starter_ids),

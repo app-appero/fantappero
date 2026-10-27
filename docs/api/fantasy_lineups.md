@@ -115,6 +115,34 @@ Nessun fallback cross-ruolo in questa card. La risoluzione contro i voti reali
 e la persistenza per turno sono in
 [`fantasy_lineups_effective.md`](./fantasy_lineups_effective.md) (EP07-04).
 
+## Panchina attiva (regola di gioco, non i cambi automatici)
+
+Costanti condivise in `fantasy_lineups.rules`: `BENCH_ACTIVE_SIZE = 10` e
+`BENCH_ACTIVE_ROLE_QUOTA = {P: 1, D: 3, C: 3, A: 3}` (somma 10). **Non** è
+`maxAutomaticSubstitutions` (quello resta solo il numero di cambi
+automatici, 0–5 per lega, invariato) — è un vincolo su **chi occupa i primi
+10 posti** della panchina ordinata: oltre il 10° posto ("tribuna") qualunque
+ruolo è libero.
+
+`required[r] = min(quota[r], giocatori di ruolo r in panchina)`: una rosa
+sbilanciata (es. solo 2 attaccanti rimasti fuori dagli undici titolari) non
+può essere bloccata da una quota che richiede più giocatori di quel ruolo di
+quanti ce ne siano in tutta la panchina — `required` si riduce di
+conseguenza. Se la panchina ha meno di `BENCH_ACTIVE_SIZE` giocatori il
+vincolo si applica a tutta la panchina (sempre soddisfatto per costruzione).
+
+| Dove | Comportamento |
+| --- | --- |
+| `evaluate_lineup` (salvataggio, `strict=True`) | Issue `bench_roles_invalid` se i primi 10 posti non coprono `required`. Messaggio in italiano con la quota fissa e il dettaglio di cosa manca, es. *"Nei primi 10 della panchina servono 1 portiere, 3 difensori, 3 centrocampisti e 3 attaccanti (mancano: 1 attaccante)."* |
+| Bozza (`strict=False`) | **Non applicata**: la bozza resta salvabile incompleta. |
+| `build_lineup_plan` (IA e "formazione migliore", `ai_selection.active_bench_order`) | I primi 10 posti si riempiono con i migliori per ruolo secondo `required` (punteggio decrescente entro il ruolo); il resto per punteggio complessivo. L'ordine finale dei primi 10 resta per punteggio decrescente complessivo (priorità di subentro automatico), non raggruppato per ruolo. |
+| `compute_best_lineup_respecting_locks` | La panchina già confermata non si riordina (lock safety); solo i **nuovi arrivi** si inseriscono negli slot attivi ancora scoperti, scelti per ruolo tra chi manca. |
+| `copy_previous_lineup` | Riordino automatico (`reorder_bench_for_active_roles`, stabile, nessun punteggio: sposta solo l'ordine di chi è già in panchina) quando non c'è un bloccato di mezzo. Con un bloccato il riordino è disattivato (rischierebbe di scavalcarlo, `evaluate_bench_order_lock` ha priorità) e la violazione resta segnalata come issue `bench_roles_invalid`. |
+| `fallback_service` (formazione non salvata entro il turno) | Eredita il comportamento di `copy_previous_lineup`/draft usati internamente — nessuna logica propria aggiuntiva. |
+
+`LineupContextResponse` espone `benchActiveSize` (int) e `benchRoleQuota`
+(`{"P": 1, "D": 3, "C": 3, "A": 3}`) così la UI non li hardcoda.
+
 ## Tre mosse tattiche
 
 Costante condivisa: `MAX_TACTICAL_MOVES = 3`.
