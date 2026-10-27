@@ -161,6 +161,17 @@ export function StandingsScreen() {
 }
 
 /** In classifica si vede solo il nickname (se manca, il nome; in ultimo la squadra). */
+function Stat({ label, value, tone }: { label: string; value: string; tone?: "danger" }) {
+  return (
+    <View style={styles.stat}>
+      <Text style={styles.statLabel}>{label}</Text>
+      <Text style={[styles.statValue, tone === "danger" ? styles.statValueDanger : null]} numberOfLines={1}>
+        {value}
+      </Text>
+    </View>
+  );
+}
+
 function standingLabel(row: LeagueStanding): string {
   return row.managerNickname?.trim() || row.managerDisplayName?.trim() || row.teamName;
 }
@@ -235,29 +246,29 @@ function StandingsTableBlock({
           const label = standingLabel(row);
           const body = (
             <>
+            <View style={styles.rowTop}>
               <Text style={styles.rowPos}>{row.position}</Text>
               <TeamAvatar
                 name={row.managerNickname ?? row.managerDisplayName ?? row.teamName}
                 avatarUrl={row.managerAvatarUrl}
                 size={40}
               />
-              <View style={styles.rowInfo}>
-                <Text style={[styles.rowName, onManagerPress ? styles.teamNameLink : null]} numberOfLines={1}>
-                  {label}
-                </Text>
-                <Text style={styles.rowMeta} numberOfLines={1}>
-                  {row.played} gare · GF:GS {row.fantasyGoalsFor}:{row.fantasyGoalsAgainst}
-                </Text>
-                <Text style={styles.rowMetaSoft} numberOfLines={1}>
-                  Fantapunti {formatFantasyPoints(row.fantasyPointsFor)} : {formatFantasyPoints(row.fantasyPointsAgainst)}
-                </Text>
-              </View>
+              <Text style={[styles.rowName, onManagerPress ? styles.teamNameLink : null]} numberOfLines={1}>
+                {label}
+              </Text>
               <View style={styles.rowPoints}>
                 <Text style={styles.rowPointsValue}>{row.points}</Text>
-                <Text style={styles.rowPointsUnit}>PT</Text>
+                <Text style={styles.rowPointsUnit}>PUNTI</Text>
               </View>
-            </>
-          );
+            </View>
+            <View style={styles.statsRow}>
+              <Stat label="Gare" value={String(row.played)} />
+              <Stat label="Gol fatti" value={String(row.fantasyGoalsFor)} />
+              <Stat label="Gol subiti" value={String(row.fantasyGoalsAgainst)} tone="danger" />
+              <Stat label="Fantapunti" value={formatFantasyPoints(row.fantasyPointsFor)} />
+            </View>
+          </>
+        );
           const rowStyle = [styles.row, row.isCurrentUser ? styles.rowCurrent : null];
           return onManagerPress ? (
             <Pressable
@@ -361,10 +372,38 @@ const styles = lazyStyles(() => StyleSheet.create({
   list: {
     gap: spacing.sm,
   },
-  row: {
+  rowTop: {
     flexDirection: "row",
     alignItems: "center",
     gap: spacing.sm,
+  },
+  statsRow: {
+    flexDirection: "row",
+    gap: spacing.xs,
+    marginTop: spacing.sm,
+    paddingTop: spacing.sm,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+  },
+  stat: {
+    flex: 1,
+    minWidth: 0,
+  },
+  statLabel: {
+    color: colors.foregroundMuted,
+    fontSize: 10,
+    letterSpacing: 1.1,
+    textTransform: "uppercase",
+  },
+  statValue: {
+    color: colors.foreground,
+    fontWeight: "700",
+  },
+  statValueDanger: {
+    color: "#FF8FA8",
+  },
+  row: {
+    gap: 0,
     paddingVertical: spacing.sm,
     paddingHorizontal: spacing.md,
     borderRadius: radius.xl,
@@ -388,6 +427,8 @@ const styles = lazyStyles(() => StyleSheet.create({
     gap: 1,
   },
   rowName: {
+    flex: 1,
+    minWidth: 0,
     color: colors.foreground,
     fontWeight: typography.fontWeight.semibold,
   },
