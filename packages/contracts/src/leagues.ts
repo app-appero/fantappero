@@ -156,6 +156,9 @@ export interface CompetitionSummary {
   providerId: number;
   name: string;
   country: string;
+  /** Solo da `/leagues/available-competitions`: false se il girone di ritorno è già iniziato. */
+  selectable?: boolean;
+  secondLegStarted?: boolean;
 }
 
 export interface LeagueRosterConfig {
@@ -575,6 +578,9 @@ export interface H2HPlayerScore {
   kickoffAt?: string | null;
   isEffectiveStarter: boolean;
   isBench: boolean;
+  /** Minuto in cui il calciatore è uscito / entrato nella partita reale. */
+  substitutedOutMinute?: number | null;
+  substitutedInMinute?: number | null;
 }
 
 export interface H2HSideLineup {

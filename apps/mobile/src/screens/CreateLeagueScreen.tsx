@@ -6,7 +6,7 @@ import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useCallback, useMemo, useState } from "react";
 import { Pressable, StyleSheet, Switch, Text, View } from "react-native";
 import { AppTextInput as TextInput } from "../components/AppTextInput";
-import { createLeague, fetchCompetitions } from "../api/leagues";
+import { createLeague, fetchAvailableCompetitions, fetchCompetitions } from "../api/leagues";
 import { UiStatePanel } from "../components/UiStatePanel";
 import { useScreenData } from "../hooks/useScreenData";
 import { PageContainer } from "../layout/PageContainer";
@@ -39,8 +39,9 @@ export function CreateLeagueScreen() {
   const [formError, setFormError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  const selectedCount = competitions.filter((row) => selected[row.id]).length;
-  const allSelected = competitions.length > 0 && selectedCount === competitions.length;
+  const selectableCompetitions = competitions.filter((row) => row.selectable !== false);
+  const selectedCount = selectableCompetitions.filter((row) => selected[row.id]).length;
+  const allSelected = selectableCompetitions.length > 0 && selectedCount === selectableCompetitions.length;
 
   const loadCatalog = useCallback(
     async (options?: { silent?: boolean }) => {
@@ -54,14 +55,29 @@ export function CreateLeagueScreen() {
       }
       setCatalogError(null);
       try {
-        setCompetitions(await fetchCompetitions(accessToken));
+        let rows: CompetitionSummary[];
+        try {
+          rows = await fetchAvailableCompetitions(accessToken, seasonYear);
+        } catch {
+          rows = await fetchCompetitions(accessToken);
+        }
+        setCompetitions(rows);
+        setSelected((current) => {
+          const next = { ...current };
+          for (const row of rows) {
+            if (row.selectable === false) {
+              delete next[row.id];
+            }
+          }
+          return next;
+        });
       } catch (error) {
         setCatalogError(getApiErrorMessage(error, "Impossibile caricare i campionati."));
       } finally {
         setLoadingCatalog(false);
       }
     },
-    [accessToken],
+    [accessToken, seasonYear],
   );
 
   const { refreshing, onRefresh } = useScreenData(loadCatalog);
@@ -80,6 +96,9 @@ export function CreateLeagueScreen() {
   }
 
   function toggleCompetition(id: string) {
+    if (competitions.find((row) => row.id === id)?.selectable === false) {
+      return;
+    }
     setSelected((current) => ({ ...current, [id]: !current[id] }));
   }
 
@@ -89,7 +108,7 @@ export function CreateLeagueScreen() {
       return;
     }
     const next: Record<string, boolean> = {};
-    for (const row of competitions) {
+    for (const row of selectableCompetitions) {
       next[row.id] = true;
     }
     setSelected(next);
@@ -199,28 +218,33 @@ export function CreateLeagueScreen() {
             </Pressable>
           </View>
           <Text style={styles.competitionCount}>
-            {selectedCount} di {competitions.length} selezionati
+            {selectedCount} di {selectableCompetitions.length} selezionati
           </Text>
           {competitions.map((competition) => {
             const isSelected = Boolean(selected[competition.id]);
+            const blocked = competition.selectable === false;
             return (
               <Pressable
                 key={competition.id}
+                disabled={blocked}
                 accessibilityRole="checkbox"
                 accessibilityState={{ checked: isSelected }}
                 onPress={() => toggleCompetition(competition.id)}
-                style={[styles.competitionRow, isSelected && styles.competitionRowSelected]}
+                style={[styles.competitionRow, isSelected && styles.competitionRowSelected, blocked && { opacity: 0.5 }]}
                 testID={`create-league-competition-${competition.id}`}
               >
                 <Switch
                   value={isSelected}
+                  disabled={blocked}
                   onValueChange={() => toggleCompetition(competition.id)}
                   trackColor={{ false: colors.border, true: colors.accent }}
                   pointerEvents="none"
                 />
                 <View style={styles.competitionText}>
                   <Text style={styles.competitionLabel}>{competition.name}</Text>
-                  <Text style={styles.competitionCountry}>{competition.country}</Text>
+                  <Text style={styles.competitionCountry}>
+                    {blocked ? `${competition.country} · girone di ritorno già iniziato` : competition.country}
+                  </Text>
                 </View>
               </Pressable>
             );

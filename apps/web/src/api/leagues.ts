@@ -67,6 +67,17 @@ export function fetchCompetitions(accessToken: string): Promise<CompetitionSumma
   return apiRequest<CompetitionSummary[]>("/leagues/competitions", { accessToken });
 }
 
+/** Competizioni con stato di selezionabilità (girone di ritorno già iniziato = non selezionabile). */
+export function fetchAvailableCompetitions(
+  accessToken: string,
+  seasonYear: number,
+): Promise<CompetitionSummary[]> {
+  return apiRequest<CompetitionSummary[]>(
+    `/leagues/available-competitions?seasonYear=${seasonYear}`,
+    { accessToken },
+  );
+}
+
 export function fetchMyLeagues(accessToken: string): Promise<LeagueSummary[]> {
   return apiRequest<LeagueSummary[]>("/leagues/mine", { accessToken });
 }

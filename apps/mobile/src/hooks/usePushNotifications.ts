@@ -115,7 +115,9 @@ export function usePushNotifications(accessToken: string | null | undefined): vo
       const content = response.notification.request.content;
       const deepLink = (content.data?.deepLink as string | null | undefined) ?? null;
       const route = resolveNotificationRoute({ title: content.title ?? "", deepLink });
-      if (route?.kind === "stack") {
+      if (route?.kind === "matchup") {
+        (navigation as unknown as { navigate: (name: string, params: object) => void }).navigate("MatchupDetail", { slotId: route.slotId });
+      } else if (route?.kind === "stack") {
         navigation.navigate(route.name as never);
       } else if (route?.kind === "tab") {
         navigation.navigate("MainTabs", { screen: route.screen });
