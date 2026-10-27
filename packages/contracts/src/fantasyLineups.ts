@@ -149,6 +149,9 @@ export interface TacticalMoveEvaluation {
 
 export interface LineupContext {
   leagueId: string;
+  /** Panchina attiva: primi N posti con la composizione `benchRoleQuota` (default 10 · 1P 3D 3C 3A). */
+  benchActiveSize?: number;
+  benchRoleQuota?: Record<LineupRole, number>;
   /** Squadra a cui appartiene questa formazione. Assente solo nelle risposte vecchie. */
   fantasyTeamId?: string;
   teamName?: string;
@@ -277,6 +280,69 @@ function countRoles(players: readonly LineupPlayerInput[]): Record<LineupRole, n
   return counts;
 }
 
+/** Panchina attiva: i primi 10 posti della panchina (poi tribuna libera). */
+export const BENCH_ACTIVE_SIZE = 10;
+/** Composizione richiesta nella panchina attiva: 1 portiere, 3 difensori, 3 centrocampisti, 3 attaccanti. */
+export const BENCH_ACTIVE_ROLE_QUOTA: Readonly<Record<LineupRole, number>> = { P: 1, D: 3, C: 3, A: 3 };
+
+const BENCH_ROLE_LABEL: Record<LineupRole, [string, string]> = {
+  P: ["portiere", "portieri"],
+  D: ["difensore", "difensori"],
+  C: ["centrocampista", "centrocampisti"],
+  A: ["attaccante", "attaccanti"],
+};
+
+/**
+ * Ruoli che mancano nella panchina attiva. Il vincolo per ruolo è `min(quota, disponibili in
+ * panchina)`: se la rosa non ha abbastanza giocatori di un ruolo non lo si può pretendere.
+ */
+export function benchActiveShortfall(bench: readonly LineupPlayerInput[]): Partial<Record<LineupRole, number>> {
+  const filled = bench.filter((player) => player.athleteId);
+  const available = countRoles(filled);
+  const active = countRoles(filled.slice(0, BENCH_ACTIVE_SIZE));
+  const missing: Partial<Record<LineupRole, number>> = {};
+  for (const role of ["P", "D", "C", "A"] as const) {
+    const required = Math.min(BENCH_ACTIVE_ROLE_QUOTA[role], available[role]);
+    if (active[role] < required) {
+      missing[role] = required - active[role];
+    }
+  }
+  return missing;
+}
+
+/**
+ * Riordina la panchina perché i primi 10 posti rispettino 1P·3D·3C·3A (o quanto disponibile),
+ * mantenendo l'ordine relativo di chi è già in lista: i primi per ciascun ruolo entrano nella
+ * panchina attiva, gli altri seguono nell'ordine originale.
+ */
+export function orderBenchForActiveRoles<T extends LineupPlayerInput>(bench: readonly T[]): T[] {
+  const filled = bench.filter((player) => player.athleteId);
+  const empty = bench.filter((player) => !player.athleteId);
+  const taken = new Set<T>();
+  const active: T[] = [];
+  for (const role of ["P", "D", "C", "A"] as const) {
+    let needed = BENCH_ACTIVE_ROLE_QUOTA[role];
+    for (const player of filled) {
+      if (needed === 0) {
+        break;
+      }
+      if (player.role === role) {
+        taken.add(player);
+        active.push(player);
+        needed -= 1;
+      }
+    }
+  }
+  // Posti liberi della panchina attiva (ruolo mancante in rosa): i successivi nell'ordine originale.
+  const rest = filled.filter((player) => !taken.has(player));
+  const fill = rest.slice(0, Math.max(0, BENCH_ACTIVE_SIZE - active.length));
+  // Ordine interno della panchina attiva = ordine originale della lista.
+  const activeSet = new Set<T>([...active, ...fill]);
+  const activeOrdered = filled.filter((player) => activeSet.has(player));
+  const tribuna = filled.filter((player) => !activeSet.has(player));
+  return [...activeOrdered, ...tribuna, ...empty];
+}
+
 function issue(code: string, message: string): LineupIssue {
   return { code, message };
 }
@@ -385,6 +451,21 @@ export function evaluateLineup(input: {
         `Tutti i calciatori in rosa devono essere schierati: mancano ${unusedRoster.length} in panchina.`,
       ),
     );
+  }
+
+  if (strict) {
+    const missing = benchActiveShortfall(input.bench);
+    const parts = (["P", "D", "C", "A"] as const)
+      .filter((role) => missing[role])
+      .map((role) => `${missing[role]} ${BENCH_ROLE_LABEL[role][(missing[role] ?? 0) === 1 ? 0 : 1]}`);
+    if (parts.length > 0) {
+      issues.push(
+        issue(
+          "bench_roles_invalid",
+          `Nei primi ${BENCH_ACTIVE_SIZE} della panchina servono 1 portiere, 3 difensori, 3 centrocampisti e 3 attaccanti (mancano: ${parts.join(", ")}).`,
+        ),
+      );
+    }
   }
 
   const uniqueIssues = issues.filter(

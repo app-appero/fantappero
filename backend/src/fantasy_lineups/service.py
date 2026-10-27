@@ -35,6 +35,8 @@ from fantasy_lineups.best_lineup_service import (
 from fantasy_lineups.models import LineupDraft, LineupPlayer, LineupSubmission, TacticalMove
 from fantasy_lineups.rules import (
     APPROVED_MODULES,
+    BENCH_ACTIVE_ROLE_QUOTA,
+    BENCH_ACTIVE_SIZE,
     DEFAULT_LINEUP_LOCK_MARGIN_MINUTES,
     MAX_AUTOMATIC_SUBSTITUTIONS,
     MAX_TACTICAL_MOVES,
@@ -1204,6 +1206,8 @@ class FantasyLineupService:
             modificationAllowed=turn_editable and any_unlocked,
             serverNow=now,
             maxAutomaticSubstitutions=max_automatic_substitutions,
+            benchActiveSize=BENCH_ACTIVE_SIZE,
+            benchRoleQuota={role.value: quota for role, quota in BENCH_ACTIVE_ROLE_QUOTA.items()},
             lineupLockMarginMinutes=lock_margin,
             maxTacticalMoves=MAX_TACTICAL_MOVES,
             tacticalMovesUsed=used,

@@ -10,13 +10,15 @@ e ogni esclusione porta con sé il motivo.
 
 from __future__ import annotations
 
-from collections.abc import Iterable, Sequence
+from collections import defaultdict
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import StrEnum
 from uuid import UUID
 
 from database.enums import FantasyRole
+from fantasy_lineups.rules import BENCH_ACTIVE_ROLE_QUOTA, BENCH_ACTIVE_SIZE
 
 #: Versione della formula. Cambiarla invalida il confronto fra decisioni.
 AI_LINEUP_ALGORITHM_VERSION = "ai_lineup_v1"
@@ -142,6 +144,67 @@ def _sort_key(scored: ScoredCandidate, candidate: CandidateInput) -> tuple[float
     return (-scored.score, -candidate.recent_appearances, str(scored.athlete_id))
 
 
+def active_bench_order(
+    pool: Sequence[ScoredCandidate],
+    by_id: dict[UUID, CandidateInput],
+    *,
+    required: Mapping[FantasyRole, int] | None = None,
+    active_size: int | None = None,
+) -> list[UUID]:
+    """Ordina la panchina (regola "panchina attiva", v. ``fantasy_lineups.rules``).
+
+    I primi ``min(active_size, len(pool))`` posti devono garantire
+    ``required[r]`` per ruolo: scelti i migliori per ruolo (stesso
+    ordinamento deterministico di ``_sort_key``, che penalizza a zero gli
+    esclusi — infortunati/senza fixture restano fuori dagli slot attivi a
+    meno che non servano a coprire la quota). Il resto della panchina, slot
+    attivi compresi al loro interno, resta ordinato per punteggio
+    complessivo decrescente (priorità di subentro automatico).
+
+    ``required``/``active_size`` di default coprono l'intera ``pool`` (uso
+    normale, ``build_lineup_plan``). ``compute_best_lineup_respecting_locks``
+    passa invece la quota e gli slot **ancora scoperti** dopo la panchina
+    già confermata (che non si riordina, per non violare il lock), per
+    completare solo i nuovi arrivi in coda in modo role-aware.
+    """
+    if not pool:
+        return []
+
+    def key(item: ScoredCandidate) -> tuple[float, int, str]:
+        return _sort_key(item, by_id[item.athlete_id])
+
+    by_role: dict[FantasyRole, list[ScoredCandidate]] = defaultdict(list)
+    for item in pool:
+        by_role[item.role].append(item)
+    for role_items in by_role.values():
+        role_items.sort(key=key)
+
+    if required is None:
+        role_counts = {role: len(by_role.get(role, ())) for role in FantasyRole}
+        required = {
+            role: min(BENCH_ACTIVE_ROLE_QUOTA.get(role, 0), role_counts.get(role, 0))
+            for role in FantasyRole
+        }
+    if active_size is None:
+        active_size = BENCH_ACTIVE_SIZE
+    active_size = min(active_size, len(pool))
+
+    active: list[ScoredCandidate] = []
+    used: set[UUID] = set()
+    for role, needed in required.items():
+        chosen = by_role.get(role, [])[: max(0, needed)]
+        active.extend(chosen)
+        used.update(item.athlete_id for item in chosen)
+
+    rest = sorted((item for item in pool if item.athlete_id not in used), key=key)
+    fill = max(0, active_size - len(active))
+    active.extend(rest[:fill])
+    tail = rest[fill:]
+
+    active.sort(key=key)
+    return [item.athlete_id for item in active] + [item.athlete_id for item in tail]
+
+
 def build_lineup_plan(
     candidates: Iterable[CandidateInput],
     role_targets: Sequence[tuple[FantasyRole, int]],
@@ -213,7 +276,11 @@ def build_lineup_plan(
         key=lambda item: (item.role.value, str(item.athlete_id)),
     )
     remaining.extend(excluded_remaining)
-    bench_ids = [item.athlete_id for item in remaining]
+    # Regola "panchina attiva" (fantasy_lineups.rules): i primi
+    # BENCH_ACTIVE_SIZE posti devono garantire la quota minima per ruolo,
+    # scelta tra i migliori disponibili — non il semplice ordine per
+    # punteggio complessivo usato finora.
+    bench_ids = active_bench_order(remaining, by_id)
     if bench_size is not None:
         bench_ids = bench_ids[:bench_size]
 

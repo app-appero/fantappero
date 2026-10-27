@@ -23,6 +23,7 @@ import {
   formatFantasyPoints,
   isAthleteKickoffLocked,
   moveBenchToIndex,
+  orderBenchForActiveRoles,
   orderedBenchFromRoster,
   preserveLockedStarters,
   labelFantasyTurnStatus,
@@ -1234,6 +1235,26 @@ export function FormationScreen() {
                 • {issue.message}
               </Text>
             ))}
+            {evaluation.issues.some((issue) => issue.code === "bench_roles_invalid") ? (
+              <Pressable
+                accessibilityRole="button"
+                disabled={busy || !editable}
+                onPress={() => {
+                  const ordered = orderBenchForActiveRoles(
+                    displayBench.map((athleteId) => ({
+                      athleteId,
+                      role: roster.find((row) => row.athleteId === athleteId)?.role ?? null,
+                    })),
+                  );
+                  setBenchIds(ordered.map((player) => player.athleteId));
+                  setActionMessage("Panchina sistemata: 1 portiere, 3 difensori, 3 centrocampisti, 3 attaccanti.");
+                }}
+                style={styles.startButton}
+                testID="formation-fix-bench"
+              >
+                <Text style={styles.bestButtonLabel}>Sistema la panchina</Text>
+              </Pressable>
+            ) : null}
           </View>
         ) : null}
         {actionMessage ? (
