@@ -132,6 +132,12 @@ class LineupContextResponse(ApiModel):
     modification_allowed: bool = Field(alias="modificationAllowed")
     server_now: datetime = Field(alias="serverNow")
     max_automatic_substitutions: int = Field(alias="maxAutomaticSubstitutions")
+    # Regola "panchina attiva" (distinta da maxAutomaticSubstitutions, che
+    # resta solo il numero di cambi automatici): i primi benchActiveSize
+    # posti di panchina devono garantire benchRoleQuota per ruolo. Esposti
+    # così la UI non li hardcoda.
+    bench_active_size: int = Field(alias="benchActiveSize")
+    bench_role_quota: dict[str, int] = Field(alias="benchRoleQuota")
     lineup_lock_margin_minutes: int = Field(alias="lineupLockMarginMinutes")
     max_tactical_moves: int = Field(alias="maxTacticalMoves")
     tactical_moves_used: int = Field(alias="tacticalMovesUsed")

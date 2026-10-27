@@ -488,7 +488,23 @@ def test_apply_best_lineup_is_deterministic_across_calls(
 def _module_433_split(grouped: dict[str, list[Athlete]]) -> tuple[list[Athlete], list[Athlete]]:
     starters = [*grouped["P"][:1], *grouped["D"][:4], *grouped["C"][:3], *grouped["A"][:3]]
     starter_ids = {athlete.id for athlete in starters}
-    bench = [athlete for role in ("P", "D", "C", "A") for athlete in grouped[role] if athlete.id not in starter_ids]
+    by_remaining_role = {
+        role: [athlete for athlete in grouped[role] if athlete.id not in starter_ids]
+        for role in ("P", "D", "C", "A")
+    }
+    # Panchina attiva valida (1P-3D-3C-3A nei primi 10, v. fantasy_lineups.rules):
+    # senza interleave per ruolo, un ruolo per volta viola la regola.
+    quota = {"P": 1, "D": 3, "C": 3, "A": 3}
+    bench = [
+        athlete
+        for role in ("P", "D", "C", "A")
+        for athlete in by_remaining_role[role][: quota[role]]
+    ]
+    bench += [
+        athlete
+        for role in ("P", "D", "C", "A")
+        for athlete in by_remaining_role[role][quota[role] :]
+    ]
     return starters, bench
 
 

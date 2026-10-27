@@ -225,7 +225,25 @@ def _lineup_payload(athletes: list[Athlete], module: str = "4-3-3") -> dict:
             *by_role["A"][:2],
         ]
     roster_ids = [str(athlete.id) for athlete in athletes]
-    bench = remaining_roster_for_bench(roster_ids, starters)
+    remaining_set = set(remaining_roster_for_bench(roster_ids, starters))
+    # Panchina attiva valida (1P-3D-3C-3A nei primi 10, v. fantasy_lineups.rules):
+    # by_role è già in ordine di rosa per prefisso — qui basta filtrare ai soli
+    # id rimasti in panchina e intercalare le quote invece di accodare un
+    # ruolo per volta (altrimenti i primi 10 sarebbero tutti P poi D...).
+    by_remaining_role = {
+        prefix: [item for item in ids if item in remaining_set] for prefix, ids in by_role.items()
+    }
+    quota = {"P": 1, "D": 3, "C": 3, "A": 3}
+    bench = [
+        athlete_id
+        for prefix in ("P", "D", "C", "A")
+        for athlete_id in by_remaining_role[prefix][: quota[prefix]]
+    ]
+    bench += [
+        athlete_id
+        for prefix in ("P", "D", "C", "A")
+        for athlete_id in by_remaining_role[prefix][quota[prefix] :]
+    ]
     return {
         "module": module,
         "starterAthleteIds": starters,
@@ -291,9 +309,11 @@ def test_full_roster_and_lineup_query_counts_are_bounded(
     assert lineup.status_code == 200
     assert len(lineup.json()["roster"]) == 35
     # Budget alzato di un pugno di query bulk (non per-giocatore) per
-    # `compute_round_athlete_scores` (EP-formazione-voti): stesso numero
-    # costante di query indipendentemente dalla dimensione della rosa.
-    assert lineup_queries <= 45
+    # `compute_round_athlete_scores` (EP-formazione-voti) e per il badge
+    # "sostituito" (`_substitution_minutes_for_fixtures`, stessa funzione):
+    # stesso numero costante di query indipendentemente dalla dimensione
+    # della rosa, non per-giocatore.
+    assert lineup_queries <= 50
 
 
 def test_roster_exposes_athlete_photo_url_when_available(
@@ -631,8 +651,11 @@ def test_progressive_kickoff_lock_future_players_remain_editable(
 
     moved_locked = list(payload["starterAthleteIds"])
     moved_locked[0] = str(grouped["P"][1].id)
+    # Stesso posto del P promosso (non in coda): qui si testa il rifiuto per
+    # kickoff bloccato, non la regola "panchina attiva" — appendere in coda
+    # toglierebbe il portiere dai primi 10 della panchina.
     locked_bench = [item for item in payload["benchAthleteIds"] if item != str(grouped["P"][1].id)]
-    locked_bench.append(str(locked_gk.id))
+    locked_bench.insert(0, str(locked_gk.id))
     rejected = client.put(
         f"/leagues/{league_id}/turni/{fantasy_round.id}/formazione",
         headers={"Authorization": f"Bearer {token}"},
@@ -648,8 +671,10 @@ def test_progressive_kickoff_lock_future_players_remain_editable(
     swapped_starters = list(payload["starterAthleteIds"])
     c_index = swapped_starters.index(str(future_mid.id))
     swapped_starters[c_index] = str(bench_mid.id)
-    swapped_bench = [item for item in payload["benchAthleteIds"] if item != str(bench_mid.id)]
-    swapped_bench.append(str(future_mid.id))
+    # Stesso posto del centrocampista promosso (non in coda): la panchina
+    # resta con 3 centrocampisti nei primi 10 ("panchina attiva").
+    swapped_bench = list(payload["benchAthleteIds"])
+    swapped_bench[swapped_bench.index(str(bench_mid.id))] = str(future_mid.id)
     allowed = client.put(
         f"/leagues/{league_id}/turni/{fantasy_round.id}/formazione",
         headers={"Authorization": f"Bearer {token}"},
@@ -803,8 +828,9 @@ def _swap_starter_with_bench(payload: dict, starter_id: str, bench_id: str) -> d
     starters = list(payload["starterAthleteIds"])
     bench = list(payload["benchAthleteIds"])
     starters[starters.index(starter_id)] = bench_id
-    bench = [item for item in bench if item != bench_id]
-    bench.append(starter_id)
+    # Stesso posto del panchinaro promosso (non in coda): non deve rompere
+    # la quota per ruolo nei primi 10 della panchina ("panchina attiva").
+    bench[bench.index(bench_id)] = starter_id
     return {
         "module": payload["module"],
         "starterAthleteIds": starters,
@@ -860,8 +886,8 @@ def test_fourth_tactical_move_is_rejected_and_locked_players_stay_frozen(
 
     moved_locked = list(payload["starterAthleteIds"])
     moved_locked[0] = str(grouped["P"][1].id)
-    locked_bench = [item for item in payload["benchAthleteIds"] if item != str(grouped["P"][1].id)]
-    locked_bench.append(str(locked_gk.id))
+    locked_bench = list(payload["benchAthleteIds"])
+    locked_bench[locked_bench.index(str(grouped["P"][1].id))] = str(locked_gk.id)
     rejected_lock = client.put(
         f"/leagues/{league_id}/turni/{fantasy_round.id}/formazione",
         headers={"Authorization": f"Bearer {token}"},
@@ -1223,8 +1249,8 @@ def test_postponement_after_kickoff_keeps_lock_and_tactical_moves(
     swapped_starters = list(payload["starterAthleteIds"])
     c_index = swapped_starters.index(str(future_mid.id))
     swapped_starters[c_index] = str(bench_mid.id)
-    swapped_bench = [item for item in payload["benchAthleteIds"] if item != str(bench_mid.id)]
-    swapped_bench.append(str(future_mid.id))
+    swapped_bench = list(payload["benchAthleteIds"])
+    swapped_bench[swapped_bench.index(str(bench_mid.id))] = str(future_mid.id)
     moved = client.put(
         f"/leagues/{league_id}/turni/{fantasy_round.id}/formazione",
         headers={"Authorization": f"Bearer {token}"},
