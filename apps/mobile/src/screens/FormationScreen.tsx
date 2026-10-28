@@ -123,6 +123,7 @@ export function FormationScreen() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [bestModalOpen, setBestModalOpen] = useState(false);
+  const [bestSheetOpen, setBestSheetOpen] = useState(false);
   const [bestMode, setBestMode] = useState<"keep_module" | "best_module">("keep_module");
   const [loadError, setLoadError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -1069,7 +1070,7 @@ export function FormationScreen() {
               <Pressable
                 accessibilityRole="button"
                 disabled={toolDisabled}
-                onPress={() => void applyBestFormation()}
+                onPress={() => setBestSheetOpen(true)}
                 style={[styles.startButton, styles.startButtonPrimary, toolDisabled ? styles.disabled : null]}
                 testID="formation-apply-best"
               >
@@ -1344,6 +1345,50 @@ export function FormationScreen() {
         onClear={() => setBenchPickerIndex(null)}
         onClose={() => setBenchPickerIndex(null)}
       />
+
+      <BottomSheet
+        visible={bestSheetOpen}
+        title="Applica la formazione migliore"
+        onClose={() => setBestSheetOpen(false)}
+        testID="formation-best-sheet"
+      >
+        <View style={styles.toolsBody}>
+          <Text style={styles.meta}>Come vuoi comporla? I calciatori già bloccati restano al loro posto.</Text>
+          {(
+            [
+              ["keep_module", "Mantieni il modulo attuale", `Cerco i migliori 11 con il tuo ${moduleCode}.`],
+              ["best_module", "Usa il modulo migliore", "Scelgo anche il modulo più forte."],
+            ] as const
+          ).map(([value, label, hint]) => (
+            <Pressable
+              key={value}
+              accessibilityRole="radio"
+              accessibilityState={{ selected: bestMode === value }}
+              onPress={() => setBestMode(value)}
+              style={[styles.tool, bestMode === value ? styles.bestOptionOn : null]}
+              testID={`formation-sheet-best-${value}`}
+            >
+              <Text style={styles.toolTitle}>{label}</Text>
+              <Text style={styles.meta}>{hint}</Text>
+            </Pressable>
+          ))}
+          <View style={styles.row}>
+            <Pressable style={styles.startButton} onPress={() => setBestSheetOpen(false)} testID="formation-sheet-best-cancel">
+              <Text style={styles.bestButtonLabel}>Annulla</Text>
+            </Pressable>
+            <Pressable
+              style={styles.startButton}
+              onPress={() => {
+                setBestSheetOpen(false);
+                void applyBestFormation(bestMode);
+              }}
+              testID="formation-sheet-best-confirm"
+            >
+              <Text style={styles.bestButtonLabel}>Applica</Text>
+            </Pressable>
+          </View>
+        </View>
+      </BottomSheet>
 
       <BottomSheet
         visible={toolsOpen}

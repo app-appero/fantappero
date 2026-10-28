@@ -2,6 +2,7 @@ import { DISPLAY_FONT } from "../../theme/fonts";
 import { lazyStyles } from "../../theme/lazyStyles";
 import type { H2HPlayerScore, H2HSideLineup } from "@fantappero/contracts";
 import {
+  BENCH_ACTIVE_SIZE,
   MAX_AUTOMATIC_SUBSTITUTIONS,
   cleanDisplayName,
   computeCountdown,
@@ -135,10 +136,10 @@ export function MatchupPlayerRow({
 export function BenchTabs({ side, title, compact }: { side: H2HSideLineup; title: string; compact?: boolean }) {
   const [tab, setTab] = useState<"panchina" | "tribuna">("panchina");
   const now = useNow();
-  const panchina = side.bench.slice(0, MAX_AUTOMATIC_SUBSTITUTIONS);
-  const tribuna = side.bench.slice(MAX_AUTOMATIC_SUBSTITUTIONS);
+  const panchina = side.bench.slice(0, BENCH_ACTIVE_SIZE);
+  const tribuna = side.bench.slice(BENCH_ACTIVE_SIZE);
   const rows = tab === "panchina" ? panchina : tribuna;
-  const offset = tab === "panchina" ? 0 : MAX_AUTOMATIC_SUBSTITUTIONS;
+  const offset = tab === "panchina" ? 0 : BENCH_ACTIVE_SIZE;
   return (
     <View style={styles.tabs} testID={`matchup-bench-wrap-${title}`}>
       <View style={styles.tabBar}>
@@ -165,8 +166,8 @@ export function BenchTabs({ side, title, compact }: { side: H2HSideLineup; title
       {compact ? null : (
         <Text style={styles.hint}>
           {tab === "panchina"
-            ? `Entrano al massimo ${MAX_AUTOMATIC_SUBSTITUTIONS} panchinari, nell'ordine e a parità di ruolo.`
-            : `Oltre i ${MAX_AUTOMATIC_SUBSTITUTIONS} cambi: restano fuori anche se disponibili.`}
+            ? `Panchina da ${BENCH_ACTIVE_SIZE} posti: entrano al massimo ${MAX_AUTOMATIC_SUBSTITUTIONS} panchinari, nell'ordine e a parità di ruolo.`
+            : `Dal ${BENCH_ACTIVE_SIZE + 1}° posto in poi: restano fuori anche se disponibili.`}
         </Text>
       )}
       {rows.length === 0 ? (
@@ -284,7 +285,7 @@ export function RosterVersus({ home, away }: { home: H2HSideLineup; away: H2HSid
   for (let i = 0; i < Math.max(left.length, right.length); i += 1) {
     rows.push(pair(`s-${i}`, left[i], right[i], false));
   }
-  const slots = MAX_AUTOMATIC_SUBSTITUTIONS;
+  const slots = BENCH_ACTIVE_SIZE;
   const total = Math.max(home.bench.length, away.bench.length);
   const benchRows: ReactElement[] = [];
   const tribRows: ReactElement[] = [];
