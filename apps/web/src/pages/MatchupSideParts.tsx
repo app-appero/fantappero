@@ -1,5 +1,6 @@
 import type { H2HPlayerScore, H2HSideLineup } from "@fantappero/contracts";
 import {
+  BENCH_ACTIVE_SIZE,
   MAX_AUTOMATIC_SUBSTITUTIONS,
   computeCountdown,
   fantasyBadgesFromBonusMalus,
@@ -108,10 +109,10 @@ export function MatchupPlayerRow({ player, order, dim, compact, now, testIdPrefi
 export function BenchTabs({ side, title }: { side: H2HSideLineup; title: string }) {
   const [tab, setTab] = useState<"panchina" | "tribuna">("panchina");
   const now = useNow();
-  const panchina = side.bench.slice(0, MAX_AUTOMATIC_SUBSTITUTIONS);
-  const tribuna = side.bench.slice(MAX_AUTOMATIC_SUBSTITUTIONS);
+  const panchina = side.bench.slice(0, BENCH_ACTIVE_SIZE);
+  const tribuna = side.bench.slice(BENCH_ACTIVE_SIZE);
   const rows = tab === "panchina" ? panchina : tribuna;
-  const offset = tab === "panchina" ? 0 : MAX_AUTOMATIC_SUBSTITUTIONS;
+  const offset = tab === "panchina" ? 0 : BENCH_ACTIVE_SIZE;
   return (
     <div className="fa-mtabs" data-testid={`matchup-bench-wrap-${title}`}>
       <div className="fa-mtabs__bar" role="tablist" aria-label="Panchina e tribuna">
@@ -136,8 +137,8 @@ export function BenchTabs({ side, title }: { side: H2HSideLineup; title: string 
       </div>
       <p className="fa-mtabs__hint">
         {tab === "panchina"
-          ? `Entrano al massimo ${MAX_AUTOMATIC_SUBSTITUTIONS} panchinari, nell'ordine e a parità di ruolo.`
-          : `Oltre i ${MAX_AUTOMATIC_SUBSTITUTIONS} cambi: restano fuori anche se disponibili.`}
+          ? `Panchina da ${BENCH_ACTIVE_SIZE} posti: entrano al massimo ${MAX_AUTOMATIC_SUBSTITUTIONS} panchinari, nell'ordine e a parità di ruolo.`
+          : `Dal ${BENCH_ACTIVE_SIZE + 1}° posto in poi: restano fuori anche se disponibili.`}
       </p>
       {rows.length === 0 ? (
         <p className="fa-mtabs__empty">{tab === "panchina" ? "Nessun panchinaro." : "Nessuno in tribuna."}</p>
@@ -242,7 +243,7 @@ export function RosterVersus({ home, away }: { home: H2HSideLineup; away: H2HSid
   for (let i = 0; i < Math.max(left.length, right.length); i += 1) {
     rows.push(pair(`s-${i}`, left[i], right[i], false));
   }
-  const slots = MAX_AUTOMATIC_SUBSTITUTIONS;
+  const slots = BENCH_ACTIVE_SIZE;
   const total = Math.max(home.bench.length, away.bench.length);
   const benchRows: ReactElement[] = [];
   const tribRows: ReactElement[] = [];
