@@ -90,6 +90,7 @@ export function MatchupPlayerRow({
         dim ? styles.dim : null,
         vote.live ? styles.rowLive : null,
         vote.kind === "sv" ? styles.rowSv : null,
+        vote.kind === "voted" ? styles.rowFinal : null,
       ]}
       testID={`${testIDPrefix}-${player.athleteId}`}
     >
@@ -123,6 +124,7 @@ export function MatchupPlayerRow({
             vote.live ? styles.voteLive : null,
             vote.kind === "provisional" ? styles.voteProvisional : null,
             vote.kind === "sv" ? styles.voteSv : null,
+            vote.kind === "voted" ? styles.voteFinal : null,
           ]}
           testID={`${testIDPrefix}-score-${player.athleteId}`}
         >
@@ -211,6 +213,7 @@ function VersusCell({ player, dim, now }: { player: H2HPlayerScore | undefined; 
         dim ? styles.dim : null,
         vote.live ? styles.rowLive : null,
         vote.kind === "sv" ? styles.rowSv : null,
+        vote.kind === "voted" ? styles.rowFinal : null,
       ]}
       testID={`matchup-versus-player-${player.athleteId}`}
     >
@@ -237,6 +240,7 @@ function VersusCell({ player, dim, now }: { player: H2HPlayerScore | undefined; 
             vote.live ? styles.voteLive : null,
             vote.kind === "provisional" ? styles.voteProvisional : null,
             vote.kind === "sv" ? styles.voteSv : null,
+            vote.kind === "voted" ? styles.voteFinal : null,
           ]}
           testID={`matchup-versus-score-${player.athleteId}`}
         >
@@ -330,6 +334,16 @@ const styles = lazyStyles(() =>
     dim: { opacity: 0.6 },
     rowLive: { borderColor: "#60a5fa", backgroundColor: "rgba(59,130,246,0.14)" },
     rowSv: { borderColor: "#c084fc", backgroundColor: "rgba(168,85,247,0.14)" },
+    rowFinal: {
+      borderColor: "rgba(255,255,255,0.92)",
+      borderWidth: 1.5,
+      backgroundColor: "rgba(255,255,255,0.1)",
+      shadowColor: "#ffffff",
+      shadowOffset: { width: 0, height: 0 },
+      shadowOpacity: 0.3,
+      shadowRadius: 8,
+      elevation: 3,
+    },
     livePulse: {
       position: "absolute",
       top: -2,
@@ -364,6 +378,7 @@ const styles = lazyStyles(() =>
     voteLive: { backgroundColor: "#2563eb", color: "#ffffff" },
     voteProvisional: { borderWidth: 1, borderStyle: "dashed", borderColor: "rgba(255,255,255,0.8)" },
     voteSv: { backgroundColor: "#7c3aed", color: "#fff" },
+    voteFinal: { backgroundColor: "#ffffff", color: "#11162B" },
     tabs: { gap: spacing.xs },
     tabBar: {
       flexDirection: "row",

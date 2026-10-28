@@ -62,6 +62,7 @@ export function MatchupPlayerRow({ player, order, dim, compact, now, testIdPrefi
     dim ? "fa-mrow--dim" : "",
     vote.live ? "fa-mrow--live" : "",
     vote.kind === "sv" ? "fa-mrow--sv" : "",
+    vote.kind === "voted" ? "fa-mrow--final" : "",
   ]
     .filter(Boolean)
     .join(" ");
@@ -93,6 +94,7 @@ export function MatchupPlayerRow({ player, order, dim, compact, now, testIdPrefi
             vote.live ? "fa-mrow__vote--live" : "",
             vote.kind === "provisional" ? "fa-mrow__vote--provisional" : "",
             vote.kind === "sv" ? "fa-mrow__vote--sv" : "",
+            vote.kind === "voted" ? "fa-mrow__vote--final" : "",
           ]
             .filter(Boolean)
             .join(" ")}
@@ -177,6 +179,7 @@ function VersusCell({ player, dim, now }: { player: H2HPlayerScore | undefined; 
     dim ? "fa-mrow--dim" : "",
     vote.live ? "fa-mrow--live" : "",
     vote.kind === "sv" ? "fa-mrow--sv" : "",
+    vote.kind === "voted" ? "fa-mrow--final" : "",
   ]
     .filter(Boolean)
     .join(" ");
@@ -195,6 +198,7 @@ function VersusCell({ player, dim, now }: { player: H2HPlayerScore | undefined; 
             vote.live ? "fa-mrow__vote--live" : "",
             vote.kind === "provisional" ? "fa-mrow__vote--provisional" : "",
             vote.kind === "sv" ? "fa-mrow__vote--sv" : "",
+            vote.kind === "voted" ? "fa-mrow__vote--final" : "",
           ]
             .filter(Boolean)
             .join(" ")}

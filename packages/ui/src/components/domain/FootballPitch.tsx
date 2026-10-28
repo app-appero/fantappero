@@ -22,7 +22,7 @@ export type PitchPlayer = {
   /** Partita del giocatore in corso: alone blu lampeggiante. */
   live?: boolean;
   /** `sv` = titolare senza voto (viola); `provisional` = 6 LIVE provvisorio (bollino tratteggiato). */
-  voteKind?: "sv" | "provisional" | null;
+  voteKind?: "sv" | "provisional" | "final" | null;
   /** Altri stati dalle formazioni probabili: possibile panchina (giallo), espulso (rosso), indisponibile (grigio). */
   probableState?: "bench" | "expelled" | "unavailable" | null;
   /** Calciatore bloccato (partita iniziata): lucchetto sul pallino. */
@@ -61,6 +61,7 @@ function PlayerScore({ player, above }: { player: PitchPlayer; above?: boolean }
         above && "fa-pitch-player__score--above",
         player.voteKind === "sv" && "fa-pitch-player__score--sv",
         player.voteKind === "provisional" && "fa-pitch-player__score--provisional",
+        player.voteKind === "final" && "fa-pitch-player__score--final",
       )}
     >
       {player.scoreLabel}
@@ -114,6 +115,7 @@ function PlayerPill({
     player.probableStarter && "fa-pitch-player--probable",
     player.live && "fa-pitch-player--live",
     player.voteKind === "sv" && "fa-pitch-player--sv",
+    player.voteKind === "final" && "fa-pitch-player--final",
     player.probableState === "bench" && "fa-pitch-player--bench",
     player.probableState === "expelled" && "fa-pitch-player--expelled",
     player.probableState === "unavailable" && "fa-pitch-player--unavailable",
