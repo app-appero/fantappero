@@ -24,7 +24,7 @@ export type PitchPlayer = {
   /** Partita in corso: alone blu lampeggiante. */
   live?: boolean;
   /** `sv` = titolare senza voto (viola vivo); `provisional` = 6 LIVE provvisorio (bollino tratteggiato). */
-  voteKind?: "sv" | "provisional" | null;
+  voteKind?: "sv" | "provisional" | "final" | null;
 };
 
 export type PitchViewProps = {
@@ -130,6 +130,7 @@ function PitchPlayerBody({
           styles.card,
           player.live ? styles.cardLive : null,
           player.voteKind === "sv" ? styles.cardSv : null,
+          player.voteKind === "final" ? styles.cardFinal : null,
         ]}
       >
         {player.live ? <LiveGlow /> : null}
@@ -157,6 +158,7 @@ function PitchPlayerBody({
             styles.score,
             player.voteKind === "sv" ? styles.scoreSv : null,
             player.voteKind === "provisional" ? styles.scoreProvisional : null,
+            player.voteKind === "final" ? styles.scoreFinal : null,
           ]}
         >
           {player.scoreLabel}
@@ -320,6 +322,16 @@ const styles = lazyStyles(() => StyleSheet.create({
     backgroundColor: "rgba(168,85,247,0.25)",
   },
   cardSv: { borderColor: "#c084fc", borderWidth: 2 },
+  cardFinal: {
+    borderColor: "#ffffff",
+    borderWidth: 3,
+    shadowColor: "#ffffff",
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.8,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  scoreFinal: { backgroundColor: "#ffffff", color: "#11162B" },
   nameSv: {
     backgroundColor: "#7c3aed",
     borderRadius: 999,
