@@ -157,9 +157,13 @@ def active_bench_order(
     ``required[r]`` per ruolo: scelti i migliori per ruolo (stesso
     ordinamento deterministico di ``_sort_key``, che penalizza a zero gli
     esclusi — infortunati/senza fixture restano fuori dagli slot attivi a
-    meno che non servano a coprire la quota). Il resto della panchina, slot
-    attivi compresi al loro interno, resta ordinato per punteggio
-    complessivo decrescente (priorità di subentro automatico).
+    meno che non servano a coprire la quota), **a blocchi P→D→C→A** (non
+    interlacciati per punteggio complessivo). Idem la tribuna (11°+): a
+    blocchi di ruolo nello stesso ordine, punteggio decrescente dentro lo
+    stesso ruolo. Eventuali posti liberi nella panchina attiva (somma
+    ``required`` < ``active_size``, rosa con un ruolo scarso) restano per
+    punteggio complessivo, qualunque ruolo — sono per definizione senza un
+    ruolo da garantire.
 
     ``required``/``active_size`` di default coprono l'intera ``pool`` (uso
     normale, ``build_lineup_plan``). ``compute_best_lineup_respecting_locks``
@@ -196,12 +200,19 @@ def active_bench_order(
         active.extend(chosen)
         used.update(item.athlete_id for item in chosen)
 
-    rest = sorted((item for item in pool if item.athlete_id not in used), key=key)
     fill = max(0, active_size - len(active))
-    active.extend(rest[:fill])
-    tail = rest[fill:]
+    if fill:
+        free_candidates = sorted((item for item in pool if item.athlete_id not in used), key=key)
+        picked = free_candidates[:fill]
+        active.extend(picked)
+        used.update(item.athlete_id for item in picked)
 
-    active.sort(key=key)
+    tail = [
+        item
+        for role in (FantasyRole.P, FantasyRole.D, FantasyRole.C, FantasyRole.A)
+        for item in by_role.get(role, ())
+        if item.athlete_id not in used
+    ]
     return [item.athlete_id for item in active] + [item.athlete_id for item in tail]
 
 
