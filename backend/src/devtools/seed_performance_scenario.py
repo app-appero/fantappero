@@ -38,8 +38,9 @@ from devtools.seed_e2e_scenario import (
     stage_roster,
 )
 from fantasy_lineups.models import LineupPlayer, LineupSubmission
+from fantasy_teams.composition_service import resolve_effective_athlete_roles
 from fantasy_teams.factory import find_team_for_membership
-from fantasy_teams.models import FantasyRosterSlot
+from fantasy_teams.models import FantasyRosterSlot, FantasyTeam
 from fantasy_turns.models import FantasyRound
 from leagues.models.competition import Competition
 from leagues.models.league import League
@@ -184,7 +185,38 @@ def _lineup_payload(session: Session, *, round_id, team_id) -> tuple[dict[str, o
     # EP12-01's direct opponent lineup needs only four useful substitutes for
     # scoring.  The public save endpoint is stricter and requires every
     # remaining roster athlete, exactly as the real UI sends it.
-    bench = [str(athlete_id) for athlete_id in roster_ids if str(athlete_id) not in starter_set]
+    remaining_ids = [
+        athlete_id for athlete_id in roster_ids if str(athlete_id) not in starter_set
+    ]
+    team = session.get(FantasyTeam, team_id)
+    assert team is not None
+    league = session.get(League, team.league_id)
+    assert league is not None
+    effective_roles = resolve_effective_athlete_roles(
+        session,
+        league_id=team.league_id,
+        athlete_ids=remaining_ids,
+        season_year=league.season_year,
+    )
+    # Panchina attiva (1P-3D-3C-3A nei primi 10, fantasy_lineups.rules): lo
+    # slot_index della rosa è a blocchi di ruolo, un ruolo per volta
+    # violerebbe la regola applicata dall'endpoint reale.
+    by_role: dict[FantasyRole, list[str]] = {role: [] for role in FantasyRole}
+    for athlete_id in remaining_ids:
+        resolved = effective_roles.get(athlete_id)
+        if resolved is not None:
+            by_role[resolved.role].append(str(athlete_id))
+    quota = {FantasyRole.P: 1, FantasyRole.D: 3, FantasyRole.C: 3, FantasyRole.A: 3}
+    bench = [
+        athlete_id
+        for role in (FantasyRole.P, FantasyRole.D, FantasyRole.C, FantasyRole.A)
+        for athlete_id in by_role[role][: quota[role]]
+    ]
+    bench += [
+        athlete_id
+        for role in (FantasyRole.P, FantasyRole.D, FantasyRole.C, FantasyRole.A)
+        for athlete_id in by_role[role][quota[role] :]
+    ]
     first_slot = session.scalar(
         select(FantasyRosterSlot.slot_index)
         .where(

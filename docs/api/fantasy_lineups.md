@@ -131,14 +131,31 @@ quanti ce ne siano in tutta la panchina — `required` si riduce di
 conseguenza. Se la panchina ha meno di `BENCH_ACTIVE_SIZE` giocatori il
 vincolo si applica a tutta la panchina (sempre soddisfatto per costruzione).
 
+**Ordine a blocchi, non interlacciato**: sia la panchina attiva (i primi
+`BENCH_ACTIVE_SIZE` posti) sia la tribuna (dall'11° in poi) sono a blocchi
+di ruolo **P → D → C → A**, non ordinate per punteggio complessivo
+attraverso i ruoli. L'ordine relativo *dentro* lo stesso ruolo segue
+punteggio decrescente (motori IA/best-lineup) o l'ordine di panchina
+esistente (`reorder_bench_for_active_roles`, puro riordino senza
+punteggio). Un eventuale posto libero nella panchina attiva (somma
+`required` < `BENCH_ACTIVE_SIZE`, rosa scarsa in un ruolo) resta per
+punteggio/ordine esistente, qualunque ruolo — per definizione non ha un
+ruolo da garantire.
+
 | Dove | Comportamento |
 | --- | --- |
 | `evaluate_lineup` (salvataggio, `strict=True`) | Issue `bench_roles_invalid` se i primi 10 posti non coprono `required`. Messaggio in italiano con la quota fissa e il dettaglio di cosa manca, es. *"Nei primi 10 della panchina servono 1 portiere, 3 difensori, 3 centrocampisti e 3 attaccanti (mancano: 1 attaccante)."* |
 | Bozza (`strict=False`) | **Non applicata**: la bozza resta salvabile incompleta. |
-| `build_lineup_plan` (IA e "formazione migliore", `ai_selection.active_bench_order`) | I primi 10 posti si riempiono con i migliori per ruolo secondo `required` (punteggio decrescente entro il ruolo); il resto per punteggio complessivo. L'ordine finale dei primi 10 resta per punteggio decrescente complessivo (priorità di subentro automatico), non raggruppato per ruolo. |
-| `compute_best_lineup_respecting_locks` | La panchina già confermata non si riordina (lock safety); solo i **nuovi arrivi** si inseriscono negli slot attivi ancora scoperti, scelti per ruolo tra chi manca. |
-| `copy_previous_lineup` | Riordino automatico (`reorder_bench_for_active_roles`, stabile, nessun punteggio: sposta solo l'ordine di chi è già in panchina) quando non c'è un bloccato di mezzo. Con un bloccato il riordino è disattivato (rischierebbe di scavalcarlo, `evaluate_bench_order_lock` ha priorità) e la violazione resta segnalata come issue `bench_roles_invalid`. |
+| `build_lineup_plan` (IA e "formazione migliore", `ai_selection.active_bench_order`) | Panchina attiva e tribuna a blocchi P→D→C→A come sopra; dentro ogni ruolo, punteggio decrescente (`_sort_key`, penalizza a zero infortunati/senza fixture). |
+| `compute_best_lineup_respecting_locks` | La panchina già confermata non si riordina (lock safety); solo i **nuovi arrivi** si inseriscono negli slot attivi ancora scoperti, scelti per ruolo tra chi manca (stessa funzione `active_bench_order`, con quota/slot residui). |
+| `copy_previous_lineup` | Riordino automatico (`reorder_bench_for_active_roles`, stabile, nessun punteggio: sposta solo l'ordine di chi è già in panchina, a blocchi P→D→C→A) quando non c'è un bloccato di mezzo. Con un bloccato il riordino è disattivato (rischierebbe di scavalcarlo, `evaluate_bench_order_lock` ha priorità) e la violazione resta segnalata come issue `bench_roles_invalid`. |
 | `fallback_service` (formazione non salvata entro il turno) | Eredita il comportamento di `copy_previous_lineup`/draft usati internamente — nessuna logica propria aggiuntiva. |
+| `leagues.h2h_matchday_service` (dettaglio scontro H2H, `H2HSideLineupResponse.bench`) | Legge l'ordine già salvato (`sort_order`): sempre conforme, perché garantito a monte dal salvataggio. Nessuna logica di riordino qui. |
+| Import/seed (`devtools.seed_performance_scenario`) | La panchina inviata al vero endpoint di salvataggio è ricomposta a blocchi P→D→C→A prima dell'invio — altrimenti l'endpoint reale (più stretto del bypass UI usato da EP12-01) la rifiuterebbe. |
+
+`MAX_AUTOMATIC_SUBSTITUTIONS` (0–5 per lega) resta un parametro
+indipendente, non toccato da questa regola né usato per troncare la
+panchina: nessun punto dell'API applica uno slice `[:5]` alla panchina.
 
 `LineupContextResponse` espone `benchActiveSize` (int) e `benchRoleQuota`
 (`{"P": 1, "D": 3, "C": 3, "A": 3}`) così la UI non li hardcoda.

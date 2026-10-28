@@ -39,6 +39,7 @@ from fantasy_lineups.rules import (
     parse_module,
     remaining_roster_for_bench,
     remaining_tactical_moves,
+    reorder_bench_for_active_roles,
     resolve_automatic_substitutions,
     starter_template,
 )
@@ -262,6 +263,44 @@ def test_bench_active_roles_not_enforced_on_drafts() -> None:
 
 def test_bench_active_role_quota_sums_to_active_size() -> None:
     assert sum(BENCH_ACTIVE_ROLE_QUOTA.values()) == BENCH_ACTIVE_SIZE
+
+
+def test_reorder_bench_for_active_roles_groups_both_zones_by_role() -> None:
+    """A blocchi P->D->C->A sia nella panchina attiva sia in tribuna (11°+),
+    ordine relativo dentro lo stesso ruolo invariato (stabile, nessun
+    punteggio qui — v. active_bench_order per la versione con score)."""
+    bench = [
+        LineupPlayerRef(athlete_id="c-1", role=FantasyRole.C),
+        LineupPlayerRef(athlete_id="p-1", role=FantasyRole.P),
+        LineupPlayerRef(athlete_id="a-1", role=FantasyRole.A),
+        LineupPlayerRef(athlete_id="d-1", role=FantasyRole.D),
+        LineupPlayerRef(athlete_id="c-2", role=FantasyRole.C),
+        LineupPlayerRef(athlete_id="d-2", role=FantasyRole.D),
+        LineupPlayerRef(athlete_id="a-2", role=FantasyRole.A),
+        LineupPlayerRef(athlete_id="d-3", role=FantasyRole.D),
+        LineupPlayerRef(athlete_id="c-3", role=FantasyRole.C),
+        LineupPlayerRef(athlete_id="a-3", role=FantasyRole.A),
+        LineupPlayerRef(athlete_id="c-4", role=FantasyRole.C),  # tribuna
+        LineupPlayerRef(athlete_id="c-5", role=FantasyRole.C),  # tribuna
+    ]
+    reordered = reorder_bench_for_active_roles(bench)
+    roles = [player.role for player in reordered]
+    assert roles[:10] == [
+        FantasyRole.P,
+        FantasyRole.D,
+        FantasyRole.D,
+        FantasyRole.D,
+        FantasyRole.C,
+        FantasyRole.C,
+        FantasyRole.C,
+        FantasyRole.A,
+        FantasyRole.A,
+        FantasyRole.A,
+    ]
+    assert [player.athlete_id for player in reordered[10:]] == ["c-4", "c-5"]
+    assert set(player.athlete_id for player in reordered) == set(
+        player.athlete_id for player in bench
+    )
 
 
 def test_lineup_turn_gate_allows_open_and_locked() -> None:
