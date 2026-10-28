@@ -238,6 +238,12 @@ def reorder_bench_for_active_roles(
     nei primi 10, solo l'ordine). Una rosa che non ha proprio abbastanza
     giocatori di un ruolo resta non sistemabile: `bench_roles_invalid`
     scatterà comunque in `evaluate_lineup`, qui non c'è nulla da spostare.
+
+    Esito a blocchi di ruolo P→D→C→A sia nella panchina attiva sia in
+    tribuna (11°+), ordine relativo dentro lo stesso ruolo invariato
+    (stabile). Eventuali posti liberi nella panchina attiva (somma
+    `required` < `active_size`) restano nell'ordine di bench originale,
+    qualunque ruolo — sono per definizione senza un ruolo da garantire.
     """
     if not bench:
         return []
@@ -255,10 +261,19 @@ def reorder_bench_for_active_roles(
         active.extend(chosen)
         used_ids.update(player.athlete_id for player in chosen)
 
-    rest = [player for player in bench if player.athlete_id not in used_ids]
     fill = max(0, active_size - len(active))
-    active.extend(rest[:fill])
-    tail = rest[fill:]
+    if fill:
+        free_candidates = [player for player in bench if player.athlete_id not in used_ids]
+        picked = free_candidates[:fill]
+        active.extend(picked)
+        used_ids.update(player.athlete_id for player in picked)
+
+    tail = [
+        player
+        for role in (FantasyRole.P, FantasyRole.D, FantasyRole.C, FantasyRole.A)
+        for player in by_role.get(role, ())
+        if player.athlete_id not in used_ids
+    ]
     return active + tail
 
 

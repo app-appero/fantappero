@@ -326,6 +326,16 @@ def test_bench_active_roles_mix_overrides_pure_score_order() -> None:
     # Il difensore di panchina più debole è comunque entrato nei primi 10
     # (quota rispettata), nonostante punteggio più basso dei centrocampisti.
     assert bench_defenders[-1].athlete_id in first_ten
+    # A blocchi P->D->C->A (non interlacciati per punteggio complessivo):
+    # i 5 centrocampisti forti non scavalcano il blocco difensori.
+    assert [by_id[athlete_id].role for athlete_id in first_ten] == (
+        [FantasyRole.P] + [FantasyRole.D] * 3 + [FantasyRole.C] * 3 + [FantasyRole.A] * 3
+    )
+    # Tribuna (11°+): i 2 centrocampisti forti rimasti fuori dalla quota,
+    # anche loro a blocco di ruolo (qui solo C, essendo l'unico in eccesso).
+    tribuna = plan.bench[10:]
+    assert len(tribuna) == 2
+    assert all(by_id[athlete_id].role == FantasyRole.C for athlete_id in tribuna)
 
 
 def test_bench_active_roles_relaxed_when_a_role_is_short_on_the_bench() -> None:
