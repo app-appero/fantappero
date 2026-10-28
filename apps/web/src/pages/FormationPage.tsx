@@ -9,6 +9,7 @@ import type {
 } from "@fantappero/contracts";
 import {
   APPROVED_MODULES,
+  playerVoteState,
   BENCH_ACTIVE_SIZE,
   MAX_AUTOMATIC_SUBSTITUTIONS,
   MAX_TACTICAL_MOVES,
@@ -1459,7 +1460,13 @@ export function FormationPage() {
       name: athleteId ? playerName(roster, athleteId) : "Libero",
       role,
       probableStarter: athleteId ? isProbableStarter(athleteId) : false,
-      voteKind: athleteId && roster.some((row) => row.athleteId === athleteId && playerIsSv(row)) ? ("sv" as const) : null,
+      voteKind: (() => {
+        if (!athleteId) return null;
+        const row = roster.find((entry) => entry.athleteId === athleteId);
+        if (!row) return null;
+        if (playerIsSv(row)) return "sv" as const;
+        return playerVoteState(row).kind === "voted" ? ("final" as const) : null;
+      })(),
       probableState: (() => {
         const state = athleteId ? probableState(roster, athleteId) : null;
         return state === "bench" || state === "expelled" || state === "unavailable" ? state : null;

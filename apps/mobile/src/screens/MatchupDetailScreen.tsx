@@ -48,7 +48,7 @@ function toFantasyPitchPlayers(players: readonly H2HPlayerScore[]) {
     live: playerVoteState(player).live,
     voteKind: (() => {
       const kind = playerVoteState(player).kind;
-      return kind === "sv" || kind === "provisional" ? kind : null;
+      return kind === "sv" || kind === "provisional" ? kind : kind === "voted" ? ("final" as const) : null;
     })(),
   }));
 }

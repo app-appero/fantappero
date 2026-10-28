@@ -41,6 +41,8 @@ export type PitchSlot = {
   probable?: boolean;
   /** Titolare senza voto a partita finita: anello e nome viola fissi. */
   sv?: boolean;
+  /** Voto definitivo a partita finita: bianco semplice. */
+  final?: boolean;
   /** Altri stati dalle formazioni probabili: giallo = possibile panchina, rosso = espulso, grigio = indisponibile. */
   probableState?: ProbableTone | null;
   photoUrl?: string | null;
@@ -142,8 +144,8 @@ export function FormationPitch({
         const scoreAbove = slot.role === "P";
         const scorePill =
           !empty && slot.scoreLabel ? (
-            <View style={[styles.scorePill, slot.sv ? styles.scorePillSv : null]} testID={`formation-score-${slot.index}`}>
-              <Text style={styles.scorePillText}>{slot.scoreLabel}</Text>
+            <View style={[styles.scorePill, slot.sv ? styles.scorePillSv : null, slot.final ? styles.scorePillFinal : null]} testID={`formation-score-${slot.index}`}>
+              <Text style={[styles.scorePillText, slot.final ? styles.scorePillTextFinal : null]}>{slot.scoreLabel}</Text>
             </View>
           ) : null;
         return (
@@ -172,6 +174,7 @@ export function FormationPitch({
                   { borderColor: roleRingColor(slot.role) },
                   slot.probable ? styles.probableRing : null,
                   slot.sv ? styles.svRing : null,
+                  slot.final ? styles.finalRing : null,
                   slot.probableState ? toneRing(slot.probableState) : null,
                   selected ? styles.selectedRing : null,
                 ]}
@@ -535,6 +538,16 @@ const styles = lazyStyles(() =>
       elevation: 6,
     },
     svLabel: { backgroundColor: "#7c3aed" },
+    finalRing: {
+      borderColor: "#ffffff",
+      borderWidth: 4,
+      shadowColor: "#ffffff",
+      shadowOffset: { width: 0, height: 0 },
+      shadowOpacity: 0.9,
+      shadowRadius: 8,
+      elevation: 6,
+    },
+    scorePillFinal: { backgroundColor: "#ffffff", borderColor: "#ffffff" },
     probableLabel: {
       backgroundColor: "#0b8a6b",
     },
@@ -559,6 +572,7 @@ const styles = lazyStyles(() =>
     },
     scorePillSv: { borderColor: "rgba(181,140,255,0.8)" },
     scorePillText: { color: "#FFD23F", fontSize: 10, fontWeight: "800" },
+    scorePillTextFinal: { color: "#11162B" },
     lockDot: {
       position: "absolute",
       right: -8,

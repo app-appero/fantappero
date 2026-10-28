@@ -780,6 +780,7 @@ export function FormationScreen() {
       locked: athleteId ? playerLocked(athleteId) : false,
       probable: row?.probableHint === "starter",
       sv: row ? row.fantasyScore == null && row.fixtureStatusLabel === "Terminata" : false,
+      final: row ? row.fantasyScore != null && row.fixtureStatusLabel !== "LIVE" : false,
       probableState: row ? (() => {
         const tone = probableTone(row);
         return tone === "starter" ? null : tone;

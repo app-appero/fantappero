@@ -2347,3 +2347,17 @@ button.fa-app-header__league-action {
   color: var(--fa-color-foreground-muted);
   font-size: 1.1rem;
 }
+
+/* Voto definitivo a partita finita: bianco semplice. */
+.fa-pitch-player--final .fa-pitch-player__card {
+  border-color: #ffffff;
+  box-shadow:
+    0 0 0 3px rgba(255, 255, 255, 0.95),
+    0 0 16px 4px rgba(255, 255, 255, 0.55);
+}
+
+.fa-pitch-player__score--final {
+  background: #ffffff;
+  color: #11162b;
+  box-shadow: 0 0 10px rgba(255, 255, 255, 0.55);
+}

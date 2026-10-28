@@ -3990,6 +3990,13 @@ h2 {
   background: rgba(168, 85, 247, 0.14);
   box-shadow: 0 0 12px rgba(168, 85, 247, 0.45);
 }
+.fa-mrow--final {
+  border-color: rgba(255, 255, 255, 0.92);
+  background: rgba(255, 255, 255, 0.1);
+  box-shadow: 0 0 14px rgba(255, 255, 255, 0.28);
+}
+.fa-mrow__vote--final { background: #ffffff; color: #11162b; }
+.fa-vcell .fa-mrow__vote--final { color: #11162b; }
 @keyframes fa-mrow-live {
   0%, 100% { box-shadow: 0 0 0 1px rgba(59, 130, 246, 0.4), 0 0 6px rgba(59, 130, 246, 0.4); }
   50% { box-shadow: 0 0 0 2px rgba(96, 165, 250, 0.95), 0 0 18px 4px rgba(59, 130, 246, 0.9); }
