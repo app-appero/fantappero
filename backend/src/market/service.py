@@ -938,6 +938,7 @@ class MarketService:
             fantasyTeamId=str(bid.fantasy_team_id),
             athleteId=str(bid.athlete_id),
             athleteName=athlete.canonical_name,
+            photoUrl=athlete.photo_url,
             amountCredits=bid.amount_credits,
             status=bid.status.value,
             submittedAt=bid.submitted_at.isoformat(),

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import random
+from collections.abc import Sequence
 from datetime import UTC, datetime
 from typing import NoReturn
 from uuid import UUID
@@ -116,8 +117,11 @@ from fantasy_teams.validators import (
 )
 from fantasy_teams.xlsx_roster import (
     is_xlsx,
+    parse_bulk_roster_xlsx,
     parse_roster_xlsx,
+    rows_to_bulk_xlsx_bytes,
     rows_to_xlsx_bytes,
+    safe_sheet_name,
     template_xlsx_bytes,
 )
 from leagues.models.league import League
@@ -1155,6 +1159,117 @@ class FantasyTeamService:
             rows.append((athlete.canonical_name, slot.purchase_credits or 0))
         return rows_to_xlsx_bytes(rows)
 
+    def _coach_sheet_names(
+        self, teams: Sequence[FantasyTeam]
+    ) -> list[tuple[FantasyTeam, str]]:
+        """Ordine deterministico (squadra -> nome foglio) condiviso da export
+        e import massivo: se due allenatori hanno lo stesso nome, i due lati
+        devono applicare la stessa regola di disambiguazione per concordare."""
+        ordered = sorted(teams, key=lambda team: (team.name.lower(), str(team.id)))
+        used_lower: set[str] = set()
+        result: list[tuple[FantasyTeam, str]] = []
+        for team in ordered:
+            coach_name = team.membership.user.display_name or team.name
+            result.append((team, safe_sheet_name(coach_name, used_lower=used_lower)))
+        return result
+
+    def export_all_rosters_xlsx(self, league_access: LeagueAccess) -> bytes:
+        """Un foglio per squadra della lega, intitolato con il nome
+        dell'allenatore: stessa idea dell'export singolo, per tutte le rose."""
+        teams = list(
+            self._session.scalars(
+                select(FantasyTeam)
+                .where(FantasyTeam.league_id == league_access.league.id)
+                .options(
+                    selectinload(FantasyTeam.slots).selectinload(FantasyRosterSlot.athlete),
+                    selectinload(FantasyTeam.membership).selectinload(LeagueMembership.user),
+                )
+            ).all()
+        )
+        team_rows: list[tuple[str, list[tuple[object, ...]]]] = []
+        for team, sheet_name in self._coach_sheet_names(teams):
+            rows: list[tuple[object, ...]] = []
+            for slot in sorted(team.slots, key=lambda item: item.slot_index):
+                athlete = slot.athlete
+                if athlete is None:
+                    continue
+                rows.append((athlete.canonical_name, slot.purchase_credits or 0))
+            team_rows.append((sheet_name, rows))
+        return rows_to_bulk_xlsx_bytes(team_rows)
+
+    def preview_bulk_roster_import(
+        self,
+        league_access: LeagueAccess,
+        *,
+        data: bytes,
+        filename: str | None,
+    ) -> RosterImportPreviewResponse:
+        """Anteprima dell'import massivo: un foglio Excel per allenatore, il
+        nome del foglio deve combaciare con il nome dell'allenatore (stessa
+        regola dell'export). I fogli che non combaciano vengono ignorati."""
+        league = self._lock_league(league_access.league.id)
+        file_sha = sha256_hex(data)
+        if not is_xlsx(data):
+            raise ValidationAuthError(
+                "L'import massivo richiede un file Excel con un foglio per allenatore.",
+                code="xlsx_required",
+            )
+        teams = list(
+            self._session.scalars(
+                select(FantasyTeam)
+                .where(FantasyTeam.league_id == league.id)
+                .options(
+                    selectinload(FantasyTeam.membership).selectinload(LeagueMembership.user),
+                )
+            ).all()
+        )
+        team_name_by_sheet_name_lower = {
+            sheet_name.lower(): team.name for team, sheet_name in self._coach_sheet_names(teams)
+        }
+        parsed, skipped_sheets = parse_bulk_roster_xlsx(
+            data, team_name_by_sheet_name_lower=team_name_by_sheet_name_lower
+        )
+        rows = build_preview_rows(
+            self._session,
+            league_id=league.id,
+            season_year=league.season_year,
+            parsed_rows=parsed,
+            competition_ids={competition.id for competition in league.competitions},
+        )
+        skip_unmatched_excel_rows(rows)
+        error_count, warning_count = count_preview_issues(rows)
+        payload = {
+            "rows": [preview_row_to_dict(row) for row in rows],
+            "skippedSheets": skipped_sheets,
+        }
+        session = RosterImportSession(
+            league_id=league.id,
+            actor_id=league_access.user.id,
+            status=RosterImportStatus.DRAFT,
+            file_sha256=file_sha,
+            original_filename=(filename or "")[:255] or None,
+            preview_payload=payload,
+            row_count=len(rows),
+            error_count=error_count,
+            warning_count=warning_count,
+        )
+        self._session.add(session)
+        self._session.commit()
+        get_metrics().incr(
+            "fantasy_roster_csv_preview_total",
+            labels={"result": "success" if error_count == 0 else "with_errors"},
+        )
+        logger.info(
+            "fantasy_roster_bulk_xlsx_preview",
+            extra={
+                "result": "success",
+                "row_count": len(rows),
+                "error_count": error_count,
+                "warning_count": warning_count,
+            },
+        )
+        return self._to_import_preview(session)
+
     def preview_csv_import(
         self,
         league_access: LeagueAccess,
@@ -1261,6 +1376,7 @@ class FantasyTeamService:
                 preview=self._to_import_preview(session),
             )
 
+        skipped_sheets = session.preview_payload.get("skippedSheets") or []
         rows = [
             preview_row_from_dict(item)
             for item in (session.preview_payload.get("rows") or [])
@@ -1279,7 +1395,10 @@ class FantasyTeamService:
         rows = apply_resolutions(rows, resolutions)
         rows = recompute_slot_assignments(self._session, league_id=league.id, rows=rows)
         error_count, warning_count = count_preview_issues(rows)
-        session.preview_payload = {"rows": [preview_row_to_dict(row) for row in rows]}
+        session.preview_payload = {
+            "rows": [preview_row_to_dict(row) for row in rows],
+            "skippedSheets": skipped_sheets,
+        }
         session.error_count = error_count
         session.warning_count = warning_count
         session.row_count = len(rows)
@@ -1332,6 +1451,7 @@ class FantasyTeamService:
             "rows": [preview_row_to_dict(row) for row in rows],
             "assignedCount": assigned,
             "teamsTouched": len(teams_touched),
+            "skippedSheets": skipped_sheets,
         }
         self._add_audit(
             league.id,
@@ -1546,6 +1666,11 @@ class FantasyTeamService:
             warningCount=session.warning_count,
             rows=rows,
             confirmedAt=session.confirmed_at.isoformat() if session.confirmed_at else None,
+            skippedSheets=[
+                str(name)
+                for name in (session.preview_payload.get("skippedSheets") or [])
+                if isinstance(name, str)
+            ],
         )
 
     def _refund_purchase(
@@ -1899,6 +2024,7 @@ class FantasyTeamService:
             slotIndex=slot.slot_index,
             athleteId=str(slot.athlete_id) if slot.athlete_id else None,
             athleteName=slot.athlete.canonical_name if slot.athlete is not None else None,
+            photoUrl=slot.athlete.photo_url if slot.athlete is not None else None,
             clubName=club_name,
             role=role,
             purchaseCredits=slot.purchase_credits,

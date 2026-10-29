@@ -359,6 +359,7 @@ export function MatchdayScreen() {
                   )
                   .finally(() => setBusy(false));
               }}
+              scrollToValue={resolveDefaultEuropeanTurn(turns)?.id}
               testID="matchday-turn-select"
             />
           </View>

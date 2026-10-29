@@ -12,6 +12,7 @@ class FantasyRosterSlotResponse(ApiModel):
     slot_index: int = Field(alias="slotIndex")
     athlete_id: str | None = Field(default=None, alias="athleteId")
     athlete_name: str | None = Field(default=None, alias="athleteName")
+    photo_url: str | None = Field(default=None, alias="photoUrl")
     club_name: str | None = Field(default=None, alias="clubName")
     role: str | None = None
     purchase_credits: int | None = Field(default=None, alias="purchaseCredits")
@@ -174,6 +175,9 @@ class RosterImportPreviewResponse(ApiModel):
     warning_count: int = Field(alias="warningCount")
     rows: list[RosterImportRowResponse] = Field(default_factory=list)
     confirmed_at: str | None = Field(default=None, alias="confirmedAt")
+    # Solo per l'import massivo: nomi dei fogli che non combaciavano con nessun
+    # allenatore della lega e sono stati ignorati. Vuoto per CSV e import singolo.
+    skipped_sheets: list[str] = Field(default_factory=list, alias="skippedSheets")
 
 
 class RosterImportResolutionItem(ApiModel):
