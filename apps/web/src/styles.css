@@ -3991,8 +3991,8 @@ h2 {
   box-shadow: 0 0 12px rgba(168, 85, 247, 0.45);
 }
 .fa-mrow--final {
-  border-color: rgba(255, 255, 255, 0.92);
-  background: rgba(255, 255, 255, 0.1);
+  border-color: #ffffff;
+  background: #454f7d;
   box-shadow: 0 0 14px rgba(255, 255, 255, 0.28);
 }
 .fa-mrow__vote--final { background: #ffffff; color: #11162b; }
