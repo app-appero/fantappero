@@ -1,6 +1,6 @@
 import { lazyStyles } from "../theme/lazyStyles";
 import { theme } from "@fantappero/ui/theme";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { AppTextInput as TextInput } from "./AppTextInput";
 
@@ -25,6 +25,14 @@ export type OptionPickerProps = {
   disabled?: boolean;
   /** Shows an inline search box to filter long option lists (e.g. athlete rosters). */
   searchable?: boolean;
+  /**
+   * Option to scroll into view when the menu opens, instead of `value`. For
+   * pickers where the selected option may be a past/historical entry (e.g.
+   * a "giornata" round browser) while the menu should still land on the
+   * upcoming/current one. Opt-in: omit to keep the previous no-scroll
+   * behaviour (menu opens at the top of the list).
+   */
+  scrollToValue?: string;
   testID?: string;
 };
 
@@ -41,10 +49,13 @@ export function OptionPicker({
   placeholder = "Scegli un'opzione…",
   disabled = false,
   searchable = false,
+  scrollToValue,
   testID,
 }: OptionPickerProps) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
+  const scrollRef = useRef<ScrollView>(null);
+  const offsetsRef = useRef<Map<string, number>>(new Map());
   const selected = options.find((option) => option.value === value);
   const normalizedQuery = query.trim().toLocaleLowerCase("it-IT");
   const filtered =
@@ -81,7 +92,12 @@ export function OptionPicker({
               testID={testID ? `${testID}-search` : undefined}
             />
           ) : null}
-          <ScrollView style={styles.menuScroll} nestedScrollEnabled keyboardShouldPersistTaps="handled">
+          <ScrollView
+            ref={scrollRef}
+            style={styles.menuScroll}
+            nestedScrollEnabled
+            keyboardShouldPersistTaps="handled"
+          >
             {options.length === 0 ? (
               <Text style={styles.empty}>Nessuna opzione disponibile.</Text>
             ) : filtered.length === 0 ? (
@@ -109,6 +125,20 @@ export function OptionPicker({
                     onChange(option.value);
                     setOpen(false);
                     setQuery("");
+                  }}
+                  onLayout={(event) => {
+                    const y = event.nativeEvent.layout.y;
+                    offsetsRef.current.set(option.value, y);
+                    // The menu (and this Pressable) only mounts while open,
+                    // so this fires fresh on every open — scroll the target
+                    // into view as soon as its position is known, no need
+                    // to wait for the whole list to settle.
+                    if (scrollToValue === option.value) {
+                      scrollRef.current?.scrollTo({
+                        y: Math.max(0, y - spacing.sm),
+                        animated: false,
+                      });
+                    }
                   }}
                   testID={testID ? `${testID}-option-${option.value}` : undefined}
                 >
