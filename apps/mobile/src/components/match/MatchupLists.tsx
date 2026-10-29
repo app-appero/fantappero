@@ -334,15 +334,11 @@ const styles = lazyStyles(() =>
     dim: { opacity: 0.6 },
     rowLive: { borderColor: "#60a5fa", backgroundColor: "rgba(59,130,246,0.14)" },
     rowSv: { borderColor: "#c084fc", backgroundColor: "rgba(168,85,247,0.14)" },
+    // Riempimento pieno e opaco: su Android un fondo trasparente con elevation mostra un'ombra scura dentro la riga.
     rowFinal: {
-      borderColor: "rgba(255,255,255,0.92)",
+      borderColor: "#ffffff",
       borderWidth: 1.5,
-      backgroundColor: "rgba(255,255,255,0.1)",
-      shadowColor: "#ffffff",
-      shadowOffset: { width: 0, height: 0 },
-      shadowOpacity: 0.3,
-      shadowRadius: 8,
-      elevation: 3,
+      backgroundColor: "#454F7D",
     },
     livePulse: {
       position: "absolute",
