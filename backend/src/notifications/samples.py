@@ -109,6 +109,13 @@ SAMPLES: tuple[SampleNotification, ...] = (
         {"round_number": 8, "cutoff_local": "20:45"},
     ),
     SampleNotification(
+        "formazione-blocco",
+        NotificationCategory.FORMAZIONE,
+        "formazione.blocco_imminente",
+        1,
+        {"round_number": 8, "kickoff_local": "20:45", "player_count": 3},
+    ),
+    SampleNotification(
         "turno",
         NotificationCategory.RISULTATI,
         "risultati.omologazione",

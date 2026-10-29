@@ -85,12 +85,36 @@ class NotificationsSettingsMixin:
         le=168,
         description="How far ahead of cutoff a team without a lineup is reminded.",
     )
+    notifications_lineup_lock_reminder_enabled: bool = Field(
+        default=True,
+        validation_alias="NOTIFICATIONS_LINEUP_LOCK_REMINDER_ENABLED",
+        description=(
+            "When true, Celery beat warns before EVERY upcoming per-player "
+            "progressive lock instant (not just the once-per-round cutoff "
+            "reminder above) — each instant may lock one or many players at once."
+        ),
+    )
+    notifications_lineup_lock_reminder_interval_seconds: int = Field(
+        default=900,
+        validation_alias="NOTIFICATIONS_LINEUP_LOCK_REMINDER_INTERVAL_SECONDS",
+        ge=60,
+        le=86400,
+        description="How often the lock-reminder task is enqueued (default every 15 minutes).",
+    )
+    notifications_lineup_lock_reminder_window_minutes: int = Field(
+        default=180,
+        validation_alias="NOTIFICATIONS_LINEUP_LOCK_REMINDER_WINDOW_MINUTES",
+        ge=5,
+        le=1440,
+        description="How far ahead of the next lock instant a team is warned.",
+    )
 
     @field_validator(
         "notifications_push_enabled",
         "notifications_routine_email_enabled",
         "notifications_broadcast_dispatch_enabled",
         "notifications_lineup_reminder_enabled",
+        "notifications_lineup_lock_reminder_enabled",
         mode="before",
     )
     @classmethod

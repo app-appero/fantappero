@@ -84,6 +84,7 @@ EVENT_KEY_BY_TEMPLATE_KEY: dict[str, str] = {
     "mercato.asta_live_sorpassato": "sistema.asta",
     "mercato.asta_live_scambio_richiesto": "sistema.asta",
     "formazione.scadenza_turno": "sistema.formazione",
+    "formazione.blocco_imminente": "sistema.formazione",
     "risultati.omologazione": "sistema.turno_omologato",
     "risultati.correzione": "sistema.turno_omologato",
     "sistema.generico": "sistema.avvisi_operatori",

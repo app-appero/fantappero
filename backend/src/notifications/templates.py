@@ -113,6 +113,27 @@ def _render_formazione_scadenza_turno(params: NotificationParams) -> Notificatio
     )
 
 
+@register_template("formazione.blocco_imminente", 1)
+def _render_formazione_blocco_imminente(params: NotificationParams) -> NotificationContent:
+    """Prossimo istante di lock progressivo (non lo stesso di scadenza_turno,
+    che è il cutoff del turno): può riguardare uno o più calciatori insieme
+    (stesso kickoff). Riusa il conteggio già calcolato dal chiamante —
+    nessun nome di calciatore, solo quanti."""
+    kickoff_local = params.get("kickoff_local")
+    player_count = int(params.get("player_count") or 1)
+    subject = "1 calciatore" if player_count == 1 else f"{player_count} calciatori"
+    verb = "si blocca" if player_count == 1 else "si bloccano"
+    pronoun = "il suo" if player_count == 1 else "il loro"
+    return NotificationContent(
+        title="Blocco formazione in arrivo",
+        body=(
+            f"Tra poco {verb} {subject} della tua formazione: "
+            f"{pronoun} turno inizia alle {kickoff_local}."
+        ),
+        deep_link="/formazione",
+    )
+
+
 @register_template("mercato.esito_busta", 1)
 def _render_mercato_esito_busta(params: NotificationParams) -> NotificationContent:
     athlete_name = params.get("athlete_name", "un giocatore")

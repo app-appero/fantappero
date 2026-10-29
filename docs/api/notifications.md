@@ -32,6 +32,7 @@ copy non riscrive le notifiche già inviate.
 | `sistema.generico` | 1 | Uso generico |
 | `sistema.invito_lega` | 1 | Invito nominativo (EP13-P07) |
 | `formazione.scadenza_turno` | 1 | Reminder formazione (EP09-02) |
+| `formazione.blocco_imminente` | 1 | Reminder blocco progressivo per-calciatore (EP-turni-automazione) |
 | `mercato.esito_busta` | 1 | Esito asta a buste (EP09-03) |
 
 ## Email (EP09-05) — spenta di default per le notifiche di routine (Task 6b)
@@ -113,7 +114,7 @@ evento, canali in-app e push indipendenti — definito in
 | `calciatori` | `calciatori.squalifica` | `risultati.squalifica` |
 | `sistema` | `sistema.scambi` | `mercato.scambio` |
 | `sistema` | `sistema.asta` | `mercato.esito_busta`, `mercato.asta_live_iniziata`, `mercato.asta_live_aggiudicato`, `mercato.asta_live_sorpassato`, `mercato.asta_live_scambio_richiesto` |
-| `sistema` | `sistema.formazione` | `formazione.scadenza_turno` |
+| `sistema` | `sistema.formazione` | `formazione.scadenza_turno`, `formazione.blocco_imminente` |
 | `sistema` | `sistema.turno_omologato` | `risultati.omologazione`, `risultati.correzione` |
 | `sistema` | `sistema.avvisi_operatori` | `sistema.generico` (avvisi EP09-06) |
 
@@ -183,6 +184,34 @@ aggiornato. Errori `400` con `code`:
 | `invalid_category` | `category` non è una categoria valida |
 | `invalid_event_key` | `eventKey` non è un evento del catalogo |
 | `invalid_preference_request` | `category` ed `eventKey` insieme, nessuno dei due, o `eventKey` senza alcun canale specificato |
+
+## Reminder formazione: scadenza turno vs blocco per-calciatore
+
+Due job periodici distinti, entrambi categoria `formazione`:
+
+| | `formazione.scadenza_turno` (`LineupReminderService`) | `formazione.blocco_imminente` (`LineupLockReminderService`) |
+| --- | --- | --- |
+| Quando avvisa | Una volta per turno: il `round.cutoff_at` (primo kickoff del turno) si avvicina e la squadra non ha ancora salvato **nessuna** formazione. | Per **ogni** prossimo istante di lock progressivo per-calciatore (`fantasy_lineups.rules.next_unlocked_kickoff`, lo stesso calcolo del countdown "Prossimo blocco" in UI) — anche con una formazione già salvata, perché il lock riguarda chi può ancora essere spostato, non il salvataggio in sé. |
+| Quanti avvisi per turno | Al massimo 1 (finché non salvi). | Uno per ogni istante di blocco distinto del turno (più fixture a orari diversi → più avvisi in sequenza). |
+| Quanti calciatori coinvolge | — (riguarda l'intera formazione). | Da 1 a N: tutti i calciatori di rosa il cui kickoff coincide con quell'istante. Il testo riporta solo il conteggio, mai i nomi. |
+| Dedup | `(round, team)`. | `(round, team, istante di blocco)` — un istante già notificato non si ripete, il successivo sì. |
+| Deep link | `/formazione` | `/formazione` |
+
+Entrambi condividono la stessa query dei kickoff reali per atleta
+(`fantasy_lineups.kickoffs.athlete_kickoffs`, estratta da
+`FantasyLineupService._athlete_kickoffs` apposta per essere riusabile da un
+job periodico senza un `LeagueAccess` autenticato).
+
+### Variabili
+
+| Variabile | Dove | Effetto |
+| --- | --- | --- |
+| `NOTIFICATIONS_LINEUP_REMINDER_ENABLED` | API e worker | Interruttore `scadenza_turno`, default acceso. |
+| `NOTIFICATIONS_LINEUP_REMINDER_INTERVAL_SECONDS` | worker | Ogni quanto gira il job (default 15 min). |
+| `NOTIFICATIONS_LINEUP_REMINDER_WINDOW_HOURS` | API e worker | Quanto in anticipo sul cutoff (default 24h). |
+| `NOTIFICATIONS_LINEUP_LOCK_REMINDER_ENABLED` | API e worker | Interruttore `blocco_imminente`, default acceso. |
+| `NOTIFICATIONS_LINEUP_LOCK_REMINDER_INTERVAL_SECONDS` | worker | Ogni quanto gira il job (default 15 min). |
+| `NOTIFICATIONS_LINEUP_LOCK_REMINDER_WINDOW_MINUTES` | API e worker | Quanto in anticipo sul prossimo istante di blocco (default 180 min). |
 
 ## Push (EP09-05)
 
