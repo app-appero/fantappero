@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Literal
 from uuid import UUID
 
@@ -213,7 +213,13 @@ class FantasyLineupService:
         )
         if next_lock is None:
             return LineupLockCountdownResponse(**base, state="no_pending_lock")
-        return LineupLockCountdownResponse(**base, state="counting_down", nextLockAt=next_lock)
+        # `next_unlocked_kickoff` ritorna il kickoff grezzo, non l'istante di
+        # blocco vero (anticipato dal margine di lega) — stesso passaggio già
+        # fatto in `lock_reminder_service.py` per lo stesso motivo.
+        lock_instant = next_lock - timedelta(minutes=margin)
+        return LineupLockCountdownResponse(
+            **base, state="counting_down", nextLockAt=lock_instant
+        )
 
     def save_my_lineup(
         self,

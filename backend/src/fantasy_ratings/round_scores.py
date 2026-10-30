@@ -140,21 +140,25 @@ def compute_round_athlete_scores(
     substitution_out_by_athlete, substitution_in_by_athlete = _substitution_minutes_for_fixtures(
         session, fixture_ids=fixture_ids
     )
+    # `fixtures` è già ordinato per kickoff crescente (riga sopra): con
+    # `setdefault` un club con doppio turno nella stessa giornata fantacalcistica
+    # resta agganciato alla fixture più vicina, non all'ultima incontrata.
     context_by_membership: dict[tuple[UUID, UUID], tuple[Fixture, str]] = {}
     for fixture in fixtures:
-        context_by_membership[(fixture.sport_season_id, fixture.home_club_id)] = (
-            fixture,
-            fixture.home_club.name,
+        context_by_membership.setdefault(
+            (fixture.sport_season_id, fixture.home_club_id),
+            (fixture, fixture.home_club.name),
         )
-        context_by_membership[(fixture.sport_season_id, fixture.away_club_id)] = (
-            fixture,
-            fixture.away_club.name,
+        context_by_membership.setdefault(
+            (fixture.sport_season_id, fixture.away_club_id),
+            (fixture, fixture.away_club.name),
         )
 
     snapshots: dict[UUID, RoundAthleteScore] = {}
     memberships = session.scalars(
         select(SquadMembership)
         .where(
+            SquadMembership.is_active.is_(True),
             or_(
                 *(
                     (SquadMembership.sport_season_id == season_id)

@@ -16,11 +16,24 @@ import { theme } from "@fantappero/ui/theme";
 import { useEffect, useRef, useState, type ReactElement } from "react";
 import { Animated, Easing, Pressable, StyleSheet, Text, View } from "react-native";
 import { AthleteName } from "../../athletes/AthleteCard";
+import { TONE_COLOR, probableTone, type ProbableTone } from "../../screens/formation/FormationParts";
+import { PlayerPhotoRing } from "../PlayerPhotoRing";
 import { EventBadges } from "./EventBadges";
 
 const { colors, spacing, typography, radius } = theme;
 
 const ROLE_COLOR: Record<string, string> = { P: "#ffd23f", D: "#38bdf8", C: "#b58cff", A: "#ff6b8a" };
+
+const TONE_ROW_BG: Record<ProbableTone, string> = {
+  starter: "rgba(34,197,94,0.14)",
+  bench: "rgba(250,204,21,0.14)",
+  expelled: "rgba(239,68,68,0.14)",
+  unavailable: "rgba(156,163,175,0.14)",
+};
+
+function probableRowStyle(tone: ProbableTone) {
+  return { borderColor: TONE_COLOR[tone], backgroundColor: TONE_ROW_BG[tone] } as const;
+}
 
 /** Orologio che scatta ogni secondo, per i countdown ai calci d'inizio. */
 export function useNow(intervalMs = 1000): number {
@@ -82,6 +95,7 @@ export function MatchupPlayerRow({
   const vote = playerVoteState(player);
   const countdown = vote.kind === "pending" ? kickoffCountdown(player, now) : null;
   const badges = [...fantasyBadgesFromBonusMalus(player.bonusMalus ?? []), ...substitutionBadges(player)];
+  const tone = probableTone(player);
   return (
     <View
       style={[
@@ -91,14 +105,19 @@ export function MatchupPlayerRow({
         vote.live ? styles.rowLive : null,
         vote.kind === "sv" ? styles.rowSv : null,
         vote.kind === "voted" ? styles.rowFinal : null,
+        !vote.live && vote.kind !== "sv" && vote.kind !== "voted" && tone ? probableRowStyle(tone) : null,
       ]}
       testID={`${testIDPrefix}-${player.athleteId}`}
     >
       {vote.live ? <LivePulse /> : null}
       {order != null ? <Text style={styles.order}>{order}°</Text> : null}
-      <View style={[styles.role, compact ? styles.roleCompact : null, { backgroundColor: ROLE_COLOR[player.role] ?? colors.border }]}>
-        <Text style={styles.roleText}>{player.role}</Text>
-      </View>
+      {player.photoUrl ? (
+        <PlayerPhotoRing photoUrl={player.photoUrl} role={player.role} size={compact ? 20 : 26} />
+      ) : (
+        <View style={[styles.role, compact ? styles.roleCompact : null, { backgroundColor: ROLE_COLOR[player.role] ?? colors.border }]}>
+          <Text style={styles.roleText}>{player.role}</Text>
+        </View>
+      )}
       <View style={styles.body}>
         <View style={styles.nameLine}>
           <AthleteName plain athleteId={player.athleteId} style={compact ? styles.nameCompact : styles.name} numberOfLines={1}>
@@ -205,6 +224,7 @@ function VersusCell({ player, dim, now }: { player: H2HPlayerScore | undefined; 
   const vote = playerVoteState(player);
   const countdown = vote.kind === "pending" ? kickoffCountdown(player, now) : null;
   const badges = [...fantasyBadgesFromBonusMalus(player.bonusMalus ?? []), ...substitutionBadges(player)];
+  const tone = probableTone(player);
   return (
     <View
       style={[
@@ -214,13 +234,18 @@ function VersusCell({ player, dim, now }: { player: H2HPlayerScore | undefined; 
         vote.live ? styles.rowLive : null,
         vote.kind === "sv" ? styles.rowSv : null,
         vote.kind === "voted" ? styles.rowFinal : null,
+        !vote.live && vote.kind !== "sv" && vote.kind !== "voted" && tone ? probableRowStyle(tone) : null,
       ]}
       testID={`matchup-versus-player-${player.athleteId}`}
     >
       {vote.live ? <LivePulse /> : null}
-      <View style={[styles.role, styles.roleCompact, { backgroundColor: ROLE_COLOR[player.role] ?? colors.border }]}>
-        <Text style={styles.roleText}>{player.role}</Text>
-      </View>
+      {player.photoUrl ? (
+        <PlayerPhotoRing photoUrl={player.photoUrl} role={player.role} size={20} />
+      ) : (
+        <View style={[styles.role, styles.roleCompact, { backgroundColor: ROLE_COLOR[player.role] ?? colors.border }]}>
+          <Text style={styles.roleText}>{player.role}</Text>
+        </View>
+      )}
       <View style={styles.vmain}>
       <View style={styles.nameLine}>
         <AthleteName fit plain athleteId={player.athleteId} style={styles.vname} numberOfLines={1}>

@@ -21,6 +21,7 @@ import { useAthleteCard } from "../athletes/AthleteCard";
 import { BenchTabs, RosterVersus } from "../components/match/MatchupLists";
 import { fetchH2HMatchup } from "../api/leagues";
 import { PitchView } from "../components/match/PitchView";
+import { probableTone } from "./formation/FormationParts";
 import { StatusBadge } from "../components/StatusBadge";
 import { UiStatePanel } from "../components/UiStatePanel";
 import { PageContainer } from "../layout/PageContainer";
@@ -45,6 +46,7 @@ function toFantasyPitchPlayers(players: readonly H2HPlayerScore[]) {
     badges: [...fantasyBadgesFromBonusMalus(player.bonusMalus ?? []), ...substitutionBadges(player)],
     scoreLabel: playerScoreLabel(player),
     photoUrl: player.photoUrl,
+    probable: probableTone(player),
     live: playerVoteState(player).live,
     voteKind: (() => {
       const kind = playerVoteState(player).kind;

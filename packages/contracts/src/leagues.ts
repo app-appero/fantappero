@@ -583,6 +583,11 @@ export interface H2HPlayerScore {
   /** Minuto in cui il calciatore è uscito / entrato nella partita reale. */
   substitutedOutMinute?: number | null;
   substitutedInMinute?: number | null;
+  /** Indizio di formazione probabile, stessa fonte usata in Formazione. */
+  probableHint?: "starter" | "bench" | "unavailable" | null;
+  probableNote?: string | null;
+  probableAbsence?: "suspended" | "injured" | "other" | null;
+  selectionBlocked?: boolean;
 }
 
 export interface H2HSideLineup {

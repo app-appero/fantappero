@@ -19,7 +19,6 @@ import {
   evaluateTacticalMove,
   athleteLockAt,
   computeCountdown,
-  earliestAthleteLockAt,
   formatCountdown,
   formatFantasyPoints,
   isAthleteKickoffLocked,
@@ -742,18 +741,9 @@ export function FormationScreen() {
   const benchActive = context.benchActiveSize ?? BENCH_ACTIVE_SIZE;
 
   const lockMargin = context.lineupLockMarginMinutes ?? 0;
-  const placedForLock = [...displayStarters, ...displayBench].filter(Boolean);
-  const nextLockAt = earliestAthleteLockAt(
-    placedForLock
-      .map((id) => roster.find((row) => row.athleteId === id))
-      .filter((row): row is NonNullable<typeof row> => row != null),
-    lockNow,
-    lockMargin,
-  );
-  const nextLockMs = nextLockAt ? new Date(nextLockAt).getTime() : null;
   const lockLabel = (athleteId: string): string | null => {
     const player = roster.find((row) => row.athleteId === athleteId);
-    if (!player || nextLockMs == null) {
+    if (!player) {
       return null;
     }
     const own = athleteLockAt(
@@ -763,7 +753,7 @@ export function FormationScreen() {
       player.lockLatched,
       lockMargin,
     );
-    if (!own || new Date(own).getTime() !== nextLockMs) {
+    if (!own) {
       return null;
     }
     return formatCountdown(computeCountdown(own, lockNow)) || null;

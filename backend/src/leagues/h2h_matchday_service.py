@@ -23,7 +23,7 @@ from database.enums import (
 )
 from fantasy_lineups.models import EffectiveLineup, LineupPlayer, LineupSubmission
 from fantasy_ratings.round_scores import RoundAthleteScore, compute_round_athlete_scores
-from fantasy_teams.models import FantasyTeam
+from fantasy_teams.models import FantasyRosterSlot, FantasyTeam
 from fantasy_turns.models import FantasyRound, FantasyRoundFixture
 from fantasy_turns.readiness import LIVE_FIXTURE_STATUSES
 from fantasy_turns.rules import derive_effective_status
@@ -42,8 +42,12 @@ from leagues.schemas import (
     H2HSideLineupResponse,
     LeagueCalendarSummaryResponse,
 )
+from observability.logging import get_logger
 from sports_data.fixtures.models import Fixture, PlayerMatchStat
+from sports_data.predicted.read import AthleteProbable, hints_for_fixtures
 from sports_data.roster.models import Athlete, SquadMembership
+
+logger = get_logger(__name__)
 
 
 def get_h2h_calendar(
@@ -245,11 +249,17 @@ def get_h2h_matchup_detail(
         live = bool(_live_team_ids_for_round(session, fantasy_round) & relevant_team_ids)
 
     scores_by_athlete: dict[UUID, RoundAthleteScore] = {}
+    probable_by_athlete: dict[UUID, AthleteProbable] = {}
     if fantasy_round is not None:
         scores_by_athlete = compute_round_athlete_scores(
             session,
             fantasy_round.id,
             league_id=league_id,
+        )
+        probable_by_athlete = _probable_hints_for_round(
+            session,
+            round_id=fantasy_round.id,
+            team_ids=[team.id for team in (home_team, away_team) if team is not None],
         )
 
     home_side = _build_side(
@@ -258,6 +268,7 @@ def get_h2h_matchup_detail(
         team=home_team,
         fantasy_round=fantasy_round,
         scores_by_athlete=scores_by_athlete,
+        probable_by_athlete=probable_by_athlete,
         persisted_total=slot.home_score,
         persisted_goals=slot.home_fantasy_goals,
     )
@@ -269,6 +280,7 @@ def get_h2h_matchup_detail(
             team=away_team,
             fantasy_round=fantasy_round,
             scores_by_athlete=scores_by_athlete,
+            probable_by_athlete=probable_by_athlete,
             persisted_total=slot.away_score,
             persisted_goals=slot.away_fantasy_goals,
         )
@@ -426,6 +438,43 @@ def _team_for_membership(session: Session, membership_id: UUID | None) -> Fantas
     ).scalar_one_or_none()
 
 
+def _probable_hints_for_round(
+    session: Session,
+    *,
+    round_id: UUID,
+    team_ids: list[UUID],
+) -> dict[UUID, AthleteProbable]:
+    """Indizi di formazione probabile per i roster coinvolti (EP-turni-h2h-probabili).
+
+    Stessa fonte di `fantasy_lineups.service._probable_hints` (Formazione):
+    un errore qui non deve impedire di aprire lo scontro.
+    """
+    if not team_ids:
+        return {}
+    try:
+        with session.begin_nested():
+            fixture_ids = list(
+                session.scalars(
+                    select(FantasyRoundFixture.fixture_id).where(
+                        FantasyRoundFixture.round_id == round_id,
+                        FantasyRoundFixture.excluded_at.is_(None),
+                    )
+                ).all()
+            )
+            athlete_ids = list(
+                session.scalars(
+                    select(FantasyRosterSlot.athlete_id).where(
+                        FantasyRosterSlot.fantasy_team_id.in_(team_ids),
+                        FantasyRosterSlot.athlete_id.is_not(None),
+                    )
+                ).all()
+            )
+            return hints_for_fixtures(session, fixture_ids, athlete_ids)
+    except Exception:
+        logger.warning("h2h_probable_lineup_hints_unavailable", exc_info=True)
+        return {}
+
+
 def _build_side(
     session: Session,
     *,
@@ -433,6 +482,7 @@ def _build_side(
     team: FantasyTeam | None,
     fantasy_round: FantasyRound | None,
     scores_by_athlete: dict[UUID, RoundAthleteScore],
+    probable_by_athlete: dict[UUID, AthleteProbable],
     persisted_total: float | None,
     persisted_goals: int | None,
 ) -> H2HSideLineupResponse:
@@ -475,6 +525,7 @@ def _build_side(
             display_name=display_name,
             nickname=nickname,
             scores_by_athlete=scores_by_athlete,
+            probable_by_athlete=probable_by_athlete,
             persisted_total=persisted_total,
             persisted_goals=persisted_goals,
             session=session,
@@ -487,6 +538,7 @@ def _build_side(
             display_name=display_name,
             nickname=nickname,
             scores_by_athlete=scores_by_athlete,
+            probable_by_athlete=probable_by_athlete,
             persisted_total=persisted_total,
             persisted_goals=persisted_goals,
         )
@@ -513,6 +565,7 @@ def _side_from_effective(
     display_name: str,
     nickname: str | None,
     scores_by_athlete: dict[UUID, RoundAthleteScore],
+    probable_by_athlete: dict[UUID, AthleteProbable],
     persisted_total: float | None,
     persisted_goals: int | None,
     session: Session,
@@ -538,6 +591,7 @@ def _side_from_effective(
                 photo_url=athlete.photo_url if athlete is not None else None,
                 role=role,
                 snapshot=scores_by_athlete.get(athlete_id),
+                probable=probable_by_athlete.get(athlete_id),
                 is_effective_starter=True,
                 is_bench=False,
             )
@@ -556,6 +610,7 @@ def _side_from_effective(
                 photo_url=player.athlete.photo_url if player.athlete is not None else None,
                 role=player.role.value,
                 snapshot=scores_by_athlete.get(player.athlete_id),
+                probable=probable_by_athlete.get(player.athlete_id),
                 is_effective_starter=False,
                 is_bench=True,
             )
@@ -584,6 +639,7 @@ def _side_from_submission(
     display_name: str,
     nickname: str | None,
     scores_by_athlete: dict[UUID, RoundAthleteScore],
+    probable_by_athlete: dict[UUID, AthleteProbable],
     persisted_total: float | None,
     persisted_goals: int | None,
 ) -> H2HSideLineupResponse:
@@ -600,6 +656,7 @@ def _side_from_submission(
             photo_url=player.athlete.photo_url if player.athlete is not None else None,
             role=player.role.value,
             snapshot=scores_by_athlete.get(player.athlete_id),
+            probable=probable_by_athlete.get(player.athlete_id),
             is_effective_starter=is_starter,
             is_bench=not is_starter,
         )
@@ -637,6 +694,7 @@ def _player_score_response(
     photo_url: str | None,
     role: str,
     snapshot: RoundAthleteScore | None,
+    probable: AthleteProbable | None,
     is_effective_starter: bool,
     is_bench: bool,
 ) -> H2HPlayerScoreResponse:
@@ -660,4 +718,8 @@ def _player_score_response(
         substitutedInMinute=score.substituted_in_minute,
         isEffectiveStarter=is_effective_starter,
         isBench=is_bench,
+        probableHint=None if probable is None else probable.hint,
+        probableNote=None if probable is None else probable.note,
+        probableAbsence=None if probable is None else probable.absence,
+        selectionBlocked=False if probable is None else probable.blocked,
     )

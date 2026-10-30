@@ -185,7 +185,10 @@ def test_counting_down_picks_the_earliest_unlocked_kickoff_with_league_margin(
     assert body["state"] == "counting_down"
     assert body["roundId"] == str(fantasy_round.id)
     next_lock_at = datetime.fromisoformat(body["nextLockAt"].replace("Z", "+00:00"))
-    assert next_lock_at == later_kickoff
+    # `nextLockAt` è l'istante di blocco vero (kickoff - margine di lega),
+    # non il kickoff grezzo — coerente con `lock_reminder_service.py` e col
+    # countdown per-giocatore mostrato in Formazione.
+    assert next_lock_at == later_kickoff - timedelta(minutes=20)
 
 
 def test_turn_not_open_never_creates_a_team(

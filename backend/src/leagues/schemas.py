@@ -415,6 +415,16 @@ class H2HPlayerScoreResponse(ApiModel):
     substituted_in_minute: int | None = Field(default=None, alias="substitutedInMinute")
     is_effective_starter: bool = Field(alias="isEffectiveStarter")
     is_bench: bool = Field(alias="isBench")
+    probable_hint: Literal["starter", "bench", "unavailable"] | None = Field(
+        default=None,
+        alias="probableHint",
+    )
+    probable_note: str | None = Field(default=None, alias="probableNote")
+    probable_absence: Literal["suspended", "injured", "other"] | None = Field(
+        default=None,
+        alias="probableAbsence",
+    )
+    selection_blocked: bool = Field(default=False, alias="selectionBlocked")
 
 
 class H2HSideLineupResponse(ApiModel):
