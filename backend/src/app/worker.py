@@ -53,6 +53,10 @@ _beat_schedule.update(
         broadcast_interval_seconds=(
             _worker_settings.notifications_broadcast_dispatch_interval_seconds
         ),
+        lock_reminder_enabled=_worker_settings.notifications_lineup_lock_reminder_enabled,
+        lock_reminder_interval_seconds=(
+            _worker_settings.notifications_lineup_lock_reminder_interval_seconds
+        ),
     )
 )
 _beat_schedule.update(

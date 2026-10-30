@@ -36,7 +36,12 @@ from fantasy_teams.schemas import (
     TeamRosterPlayerResponse,
 )
 from fantasy_teams.service import FantasyTeamService
-from fantasy_teams.xlsx_roster import XLSX_EXPORT_FILENAME, XLSX_MEDIA_TYPE, XLSX_TEMPLATE_FILENAME
+from fantasy_teams.xlsx_roster import (
+    XLSX_EXPORT_ALL_FILENAME,
+    XLSX_EXPORT_FILENAME,
+    XLSX_MEDIA_TYPE,
+    XLSX_TEMPLATE_FILENAME,
+)
 
 router = APIRouter(prefix="/leagues", tags=["fantasy-teams"])
 
@@ -344,6 +349,25 @@ def export_roster_excel(
     )
 
 
+@router.get("/{league_id}/amministrazione/rose/excel-tutte")
+def export_all_rosters_excel(
+    league_access: LeagueAccess = Depends(require_league_permissions(Permission.LEAGUE_ADMIN)),
+    service: FantasyTeamService = Depends(get_fantasy_team_service),
+) -> Response:
+    """Download every team's roster as one workbook, one sheet per allenatore."""
+    try:
+        content = service.export_all_rosters_xlsx(league_access)
+    except AuthError as exc:
+        return _error_response(exc)
+    return Response(
+        content=content,
+        media_type=XLSX_MEDIA_TYPE,
+        headers={
+            "Content-Disposition": f'attachment; filename="{XLSX_EXPORT_ALL_FILENAME}"',
+        },
+    )
+
+
 @router.get("/{league_id}/amministrazione/import-csv/modello")
 def download_roster_csv_template(
     formato: str = Query(default="csv"),
@@ -394,6 +418,27 @@ async def preview_roster_csv_import(
             data=data,
             filename=file.filename,
             team_id=team_id,
+        )
+    except AuthError as exc:
+        return _error_response(exc)
+
+
+@router.post(
+    "/{league_id}/amministrazione/import-csv/anteprima-massiva",
+    response_model=RosterImportPreviewResponse,
+)
+async def preview_bulk_roster_import(
+    file: UploadFile = File(...),
+    league_access: LeagueAccess = Depends(require_league_permissions(Permission.LEAGUE_ADMIN)),
+    service: FantasyTeamService = Depends(get_fantasy_team_service),
+) -> RosterImportPreviewResponse | JSONResponse:
+    """Preview a multi-team Excel import: one sheet per allenatore."""
+    try:
+        data = await file.read()
+        return service.preview_bulk_roster_import(
+            league_access,
+            data=data,
+            filename=file.filename,
         )
     except AuthError as exc:
         return _error_response(exc)

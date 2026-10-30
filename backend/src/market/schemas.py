@@ -45,6 +45,7 @@ class MarketBidResponse(ApiModel):
     fantasy_team_id: str = Field(alias="fantasyTeamId")
     athlete_id: str = Field(alias="athleteId")
     athlete_name: str = Field(alias="athleteName")
+    photo_url: str | None = Field(default=None, alias="photoUrl")
     amount_credits: int = Field(alias="amountCredits")
     status: str
     submitted_at: str = Field(alias="submittedAt")

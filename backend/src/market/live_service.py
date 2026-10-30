@@ -796,6 +796,7 @@ class LiveMarketService:
             lotId=str(lot.id),
             athleteId=str(lot.athlete_id),
             athleteName=lot.athlete.canonical_name,
+            photoUrl=lot.athlete.photo_url,
             amountCredits=lot.current_amount_credits,
             role=target_role.value if target_role is not None else "",
             roleLabel=ROLE_LABEL_IT.get(target_role, "") if target_role is not None else "",
@@ -804,6 +805,7 @@ class LiveMarketService:
                     slotIndex=slot.slot_index,
                     athleteId=str(athlete.id),
                     athleteName=athlete.canonical_name,
+                    photoUrl=athlete.photo_url,
                     purchaseCredits=slot.purchase_credits or 0,
                 )
                 for slot, athlete in candidates
@@ -1435,6 +1437,7 @@ class LiveMarketService:
             sessionId=str(lot.session_id),
             athleteId=str(lot.athlete_id),
             athleteName=athlete.canonical_name,
+            photoUrl=athlete.photo_url,
             sequenceNumber=lot.sequence_number,
             status=lot.status.value,
             openedAt=lot.opened_at.isoformat(),

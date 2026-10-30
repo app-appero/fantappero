@@ -157,6 +157,31 @@ def test_trade_v1_still_renders_for_old_notifications() -> None:
     )
 
 
+def test_render_formazione_blocco_imminente_singular() -> None:
+    content = render_notification(
+        "formazione.blocco_imminente",
+        1,
+        {"round_number": 8, "kickoff_local": "20:45", "player_count": 1},
+    )
+    assert content.title == "Blocco formazione in arrivo"
+    assert "1 calciatore" in content.body
+    assert "si blocca " in content.body  # singolare, non "si bloccano"
+    assert "il suo turno" in content.body
+    assert "20:45" in content.body
+    assert content.deep_link == "/formazione"
+
+
+def test_render_formazione_blocco_imminente_plural() -> None:
+    content = render_notification(
+        "formazione.blocco_imminente",
+        1,
+        {"round_number": 8, "kickoff_local": "18:00", "player_count": 4},
+    )
+    assert "4 calciatori" in content.body
+    assert "si bloccano" in content.body
+    assert "il loro turno" in content.body
+
+
 def test_every_test_sample_renders() -> None:
     from notifications.samples import SAMPLES
 

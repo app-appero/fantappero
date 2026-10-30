@@ -310,6 +310,10 @@ export function MatchdayH2HPanel({
           options={roundOptions}
           value={activeRoundNumber != null ? String(activeRoundNumber) : ""}
           onChange={(value) => setSelectedRound(Number(value))}
+          // Il menu si apre sulla prossima giornata da disputare, non su
+          // quella al momento selezionata: `value` può essere uno storico
+          // che l'utente sta solo consultando.
+          scrollToValue={String(resolveDefaultH2HRound(calendar))}
           testID="h2h-round-select"
         />
         <View style={styles.badgeRow}>

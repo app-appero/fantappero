@@ -96,10 +96,12 @@ placeholder: verificano rose e conti reali.
 | `PUT` | `/leagues/{id}/amministrazione/squadre/{teamId}/slot/{slotIndex}` | `roster:edit` — assegna calciatore (`athleteId`, `purchaseCredits`); solo propria squadra se non admin |
 | `DELETE` | `/leagues/{id}/amministrazione/squadre/{teamId}/slot/{slotIndex}` | `roster:edit` — libera slot (+ rimborso); solo propria squadra se non admin |
 | `GET` | `/leagues/{id}/amministrazione/import-csv/modello` | `league:admin` — modello. `?formato=xlsx` (default admin) oppure `csv` |
-| `GET` | `/leagues/{id}/amministrazione/rose/excel?teamId=` | `league:admin` — export `.xlsx` della squadra: Calciatore, Crediti |
-| `POST` | `/leagues/{id}/amministrazione/import-csv/anteprima` | `league:admin` — upload CSV o `.xlsx` (`teamId` obbligatorio per Excel), anteprima senza write |
+| `GET` | `/leagues/{id}/amministrazione/rose/excel?teamId=` | `league:admin` — export `.xlsx` di UNA squadra: Calciatore, Crediti |
+| `GET` | `/leagues/{id}/amministrazione/rose/excel-tutte` | `league:admin` — export `.xlsx` di TUTTE le squadre: un foglio per allenatore (FR-ROS-EXP-BULK) |
+| `POST` | `/leagues/{id}/amministrazione/import-csv/anteprima` | `league:admin` — upload CSV o `.xlsx` di UNA squadra (`teamId` obbligatorio per Excel), anteprima senza write |
+| `POST` | `/leagues/{id}/amministrazione/import-csv/anteprima-massiva` | `league:admin` — upload `.xlsx` con un foglio per allenatore, anteprima senza write (FR-ROS-IMP-BULK) |
 | `POST` | `/leagues/{id}/amministrazione/import-csv/anteprima-testo` | `league:admin` — stesso flusso con testo JSON (`csvText`) |
-| `POST` | `/leagues/{id}/amministrazione/import-csv/{importId}/conferma` | `league:admin` — applica atomico; idempotente se già confirmed |
+| `POST` | `/leagues/{id}/amministrazione/import-csv/{importId}/conferma` | `league:admin` — applica atomico (sia singolo che massivo); idempotente se già confirmed |
 
 ### CSV (EP05-04 / FR-ROS-03)
 
@@ -115,11 +117,38 @@ slot liberi, tetti ruolo P–D–C–A. Diversità campionati e completezza valg
 
 Conferma: un solo evento audit `fantasy_roster_csv_imported`; nessuna scrittura rosa/crediti in anteprima.
 
+### Excel massivo — un foglio per allenatore (FR-ROS-EXP-BULK / FR-ROS-IMP-BULK)
+
+Export (`/rose/excel-tutte`): un workbook con un foglio per squadra della lega, stesse colonne
+`Calciatore`/`Crediti` dell'export singolo. Il **titolo del foglio è il nome pubblico
+dell'allenatore** (nickname se impostato, altrimenti nome visualizzato — stessa regola di
+`User.display_name`), reso univoco e Excel-safe (niente `\ / ? * [ ] :`, max 31 caratteri;
+duplicati disambiguati con ` (2)`, ` (3)`, ...). Lega senza squadre → un foglio segnaposto
+`Nessuna squadra` (un workbook non può avere zero fogli).
+
+Import (`/import-csv/anteprima-massiva`): accetta solo `.xlsx`, un foglio per allenatore. Ogni
+foglio viene confrontato (case-insensitive) con i nomi foglio calcolati dall'export per le
+squadre correnti della lega:
+
+- foglio riconosciuto → le sue righe entrano nell'anteprima con `squadra` impostata al vero
+  `team.name` (stessa pipeline di risoluzione/validazione del CSV multi-squadra con colonna
+  `squadra`, incluso lo "skip silenzioso" delle righe Excel ambigue o senza match);
+- foglio **non** riconosciuto → ignorato silenziosamente, nessuna riga, nessun errore; il suo
+  nome finisce in `skippedSheets` nella risposta di anteprima (utile solo per un eventuale avviso
+  informativo in UI, non blocca la conferma);
+- se **nessun** foglio combacia, l'anteprima fallisce con `xlsx_bulk_no_match`;
+- file non `.xlsx` → `xlsx_required`.
+
+La conferma (`{importId}/conferma`) è l'endpoint esistente, invariato: opera per riga
+(`fantasyTeamId` + `slotIndex`) quindi assegna automaticamente più squadre in un'unica chiamata
+atomica, sia per l'import singolo che per quello massivo.
+
 ## UI
 
 - Web `/rosa` e Mobile tab Rosa: inserimento manuale, crediti, composizione P/D/C/A, «Assicura squadre».
 - Sezione **Storico**: intervalli di possesso e snapshot per turno; admin può creare snapshot.
-- **Rose Excel (admin):** su web e app, modello, export e import `.xlsx` della squadra selezionata.
+- **Rose Excel (admin):** su web e app, modello, export e import `.xlsx` della squadra selezionata,
+  oppure export/import massivo di tutte le rose (un foglio per allenatore, vedi sopra).
   Colonne del file: `Calciatore`, `Crediti`. Niente nome squadra e niente `provider_id`.
   Il nome può essere quello del listone (`L. Martinez`) oppure solo il cognome (`Martinez`).
   Maiuscole e minuscole non contano. Se non si trova, o il cognome corrisponde a più calciatori,

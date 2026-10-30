@@ -78,6 +78,7 @@ class LiveLotResponse(ApiModel):
     session_id: str = Field(alias="sessionId")
     athlete_id: str = Field(alias="athleteId")
     athlete_name: str = Field(alias="athleteName")
+    photo_url: str | None = Field(default=None, alias="photoUrl")
     sequence_number: int = Field(alias="sequenceNumber")
     status: str
     opened_at: str = Field(alias="openedAt")
@@ -103,6 +104,7 @@ class LiveSwapCandidateResponse(ApiModel):
     slot_index: int = Field(alias="slotIndex")
     athlete_id: str = Field(alias="athleteId")
     athlete_name: str = Field(alias="athleteName")
+    photo_url: str | None = Field(default=None, alias="photoUrl")
     purchase_credits: int = Field(alias="purchaseCredits")
 
 
@@ -110,6 +112,7 @@ class PendingSwapResponse(ApiModel):
     lot_id: str = Field(alias="lotId")
     athlete_id: str = Field(alias="athleteId")
     athlete_name: str = Field(alias="athleteName")
+    photo_url: str | None = Field(default=None, alias="photoUrl")
     amount_credits: int = Field(alias="amountCredits")
     role: str
     role_label: str = Field(alias="roleLabel")

@@ -12,6 +12,7 @@ from app.worker import celery_app
 from config.settings.loader import get_api_settings, validate_worker_settings
 from database.session import create_engine_from_url, create_session_factory, session_scope
 from notifications.expo_push_client import ExpoPushClient
+from notifications.lock_reminder_service import LineupLockReminderService
 from notifications.models import PushDevice
 from notifications.push_send import send_to_devices
 from notifications.reminder_service import LineupReminderService
@@ -51,6 +52,45 @@ def send_lineup_reminders_task() -> dict[str, int]:
     finally:
         engine.dispose()
     logger.info("notifications_lineup_reminder_task_done", extra=totals)
+    return totals
+
+
+@celery_app.task(name="notifications.send_lineup_lock_reminders")
+def send_lineup_lock_reminders_task() -> dict[str, int]:
+    """Warn before every upcoming per-player progressive lock instant.
+
+    Distinct from ``send_lineup_reminders_task`` (one reminder per round,
+    "save before the round closes"): this fires once per distinct lock
+    instant (one or many players locking together), see
+    ``notifications.lock_reminder_service``.
+    """
+    try:
+        worker = validate_worker_settings()
+        enabled = worker.notifications_lineup_lock_reminder_enabled
+        window_minutes = worker.notifications_lineup_lock_reminder_window_minutes
+    except Exception:
+        api = get_api_settings()
+        enabled = api.notifications_lineup_lock_reminder_enabled
+        window_minutes = api.notifications_lineup_lock_reminder_window_minutes
+
+    from system_jobs.service import allow_periodic
+
+    if not allow_periodic("notifications-lineup-lock-reminders", enabled):
+        logger.info("notifications_lineup_lock_reminder_skipped_disabled")
+        return {"rounds_checked": 0, "teams_checked": 0, "reminders_sent": 0}
+
+    settings = get_api_settings()
+    engine = create_engine_from_url(settings.database_url)
+    factory = create_session_factory(engine)
+    try:
+        with session_scope(factory) as session:
+            totals = LineupLockReminderService(session).send_due_reminders(
+                now=datetime.now(UTC),
+                window_minutes=window_minutes,
+            )
+    finally:
+        engine.dispose()
+    logger.info("notifications_lineup_lock_reminder_task_done", extra=totals)
     return totals
 
 

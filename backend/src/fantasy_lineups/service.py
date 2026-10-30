@@ -32,6 +32,7 @@ from fantasy_lineups.best_lineup_service import (
     compute_best_lineup_respecting_locks,
     select_best_module,
 )
+from fantasy_lineups.kickoffs import KickoffRef, athlete_kickoffs
 from fantasy_lineups.models import LineupDraft, LineupPlayer, LineupSubmission, TacticalMove
 from fantasy_lineups.rules import (
     APPROVED_MODULES,
@@ -88,20 +89,13 @@ from leagues.models.league_rules import LeagueRules
 from observability.context import get_correlation_id
 from observability.logging import get_logger
 from observability.metrics import get_metrics
-from sports_data.catalog.models import SportSeason
-from sports_data.fixtures.models import Fixture
-from sports_data.listone.models import RoleAssignment
 from sports_data.predicted.read import AthleteProbable, hints_for_fixtures
-from sports_data.roster.models import SquadMembership
 
 logger = get_logger(__name__)
 
-
-@dataclass(frozen=True)
-class _KickoffRef:
-    kickoff_at: datetime | None
-    status_short: str | None
-    lock_latched: bool = False
+#: Alias storico: la definizione vive in fantasy_lineups.kickoffs (condivisa
+#: con LineupLockReminderService).
+_KickoffRef = KickoffRef
 
 
 @dataclass(frozen=True)
@@ -1262,85 +1256,16 @@ class FantasyLineupService:
         athlete_ids: list[UUID],
         for_update: bool = False,
     ) -> dict[UUID, _KickoffRef]:
-        if not athlete_ids:
-            return {}
-        links = self._session.scalars(
-            select(FantasyRoundFixture)
-            .options(selectinload(FantasyRoundFixture.fixture))
-            .where(
-                FantasyRoundFixture.round_id == round_id,
-                FantasyRoundFixture.excluded_at.is_(None),
-            )
-        ).all()
-        locked_fixtures_by_id: dict[UUID, Fixture] = {}
-        if for_update:
-            fixture_ids = {link.fixture_id for link in links if link.fixture_id is not None}
-            if fixture_ids:
-                # Blocca le righe delle partite coinvolte finché la richiesta non
-                # fa commit: un aggiornamento concorrente del kickoff/stato (es.
-                # lo scheduler dati sportivi) deve attendere questa transazione
-                # invece di intrufolarsi tra la lettura e il salvataggio.
-                locked = self._session.scalars(
-                    select(Fixture).where(Fixture.id.in_(fixture_ids)).with_for_update()
-                ).all()
-                locked_fixtures_by_id = {fixture.id: fixture for fixture in locked}
-        fixture_by_club: dict[UUID, tuple[Fixture, FantasyRoundFixture]] = {}
-        for link in links:
-            fixture = (
-                locked_fixtures_by_id.get(link.fixture_id) if for_update else link.fixture
-            )
-            if fixture is None:
-                continue
-            for club_id in (fixture.home_club_id, fixture.away_club_id):
-                current = fixture_by_club.get(club_id)
-                if current is None:
-                    fixture_by_club[club_id] = (fixture, link)
-                    continue
-                current_fixture = current[0]
-                if fixture.kickoff_at is None:
-                    continue
-                current_kickoff = current_fixture.kickoff_at
-                if current_kickoff is None or fixture.kickoff_at < current_kickoff:
-                    fixture_by_club[club_id] = (fixture, link)
-
-        club_by_athlete: dict[UUID, UUID] = {}
-        assignments = self._session.scalars(
-            select(RoleAssignment).where(
-                RoleAssignment.athlete_id.in_(athlete_ids),
-                RoleAssignment.season_year == season_year,
-            )
-        ).all()
-        for assignment in assignments:
-            if assignment.club_id is not None:
-                club_by_athlete[assignment.athlete_id] = assignment.club_id
-
-        missing = [athlete_id for athlete_id in athlete_ids if athlete_id not in club_by_athlete]
-        if missing:
-            memberships = self._session.scalars(
-                select(SquadMembership)
-                .join(SportSeason, SquadMembership.sport_season_id == SportSeason.id)
-                .where(
-                    SquadMembership.athlete_id.in_(missing),
-                    SquadMembership.is_active.is_(True),
-                    SquadMembership.ended_at.is_(None),
-                    SportSeason.year == season_year,
-                )
-            ).all()
-            for membership in memberships:
-                club_by_athlete.setdefault(membership.athlete_id, membership.club_id)
-
-        result: dict[UUID, _KickoffRef] = {}
-        for athlete_id, club_id in club_by_athlete.items():
-            mapped = fixture_by_club.get(club_id)
-            if mapped is None:
-                continue
-            fixture, link = mapped
-            result[athlete_id] = _KickoffRef(
-                kickoff_at=fixture.kickoff_at,
-                status_short=fixture.status_short,
-                lock_latched=link.lock_latched_at is not None,
-            )
-        return result
+        # Estratta in fantasy_lineups.kickoffs: serve anche a
+        # LineupLockReminderService, che gira come job periodico senza un
+        # LeagueAccess autenticato.
+        return athlete_kickoffs(
+            self._session,
+            round_id=round_id,
+            season_year=season_year,
+            athlete_ids=athlete_ids,
+            for_update=for_update,
+        )
 
     @staticmethod
     def _is_row_locked(
