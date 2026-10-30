@@ -6,6 +6,7 @@ import { marketUiStyles as styles } from "../market/marketUiStyles";
 import { roleBadgeColors } from "../screens/roster/rosterHelpers";
 import { AppTextInput as TextInput } from "./AppTextInput";
 import { HScroll } from "./HScroll";
+import { PlayerPhotoRing } from "./PlayerPhotoRing";
 
 const PAGE_SIZE = 10;
 const ROLE_PILLS: Array<{ value: "all" | FantasyRole; label: string }> = [
@@ -116,9 +117,13 @@ export function AthleteChooser({
                   {active ? <Text style={styles.pillLabelActive}>{single ? "✓" : position}</Text> : null}
                 </View>
               )}
-              <View style={[styles.proposalAvatar, { width: 30, height: 30, borderRadius: 15, backgroundColor: dot.backgroundColor }]}>
-                <Text style={[styles.proposalAvatarLabel, { color: dot.color }]}>{entry.effectiveRole}</Text>
-              </View>
+              {entry.photoUrl ? (
+                <PlayerPhotoRing photoUrl={entry.photoUrl} role={entry.effectiveRole} size={30} />
+              ) : (
+                <View style={[styles.proposalAvatar, { width: 30, height: 30, borderRadius: 15, backgroundColor: dot.backgroundColor }]}>
+                  <Text style={[styles.proposalAvatarLabel, { color: dot.color }]}>{entry.effectiveRole}</Text>
+                </View>
+              )}
               <View style={{ flex: 1, minWidth: 0 }}>
                 <AthleteName athleteId={entry.athleteId} style={styles.optionLabel} numberOfLines={1} plain>
                   {entry.canonicalName}

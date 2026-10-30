@@ -10,6 +10,7 @@ import type { AthleteOwnership } from "./rosterHelpers";
 const entries: LeagueListoneEntry[] = Array.from({ length: 25 }, (_, index) => ({
   athleteId: `athlete-${index}`,
   canonicalName: `Calciatore ${index}`,
+  photoUrl: null,
   seasonYear: 2026,
   officialRole: "D",
   effectiveRole: "D",

@@ -622,6 +622,7 @@ export interface LeagueListoneOverride {
 export interface LeagueListoneEntry {
   athleteId: string;
   canonicalName: string;
+  photoUrl: string | null;
   seasonYear: number;
   officialRole: FantasyRole;
   effectiveRole: FantasyRole;
@@ -775,6 +776,7 @@ export interface FantasyRosterSlot {
   slotIndex: number;
   athleteId: string | null;
   athleteName: string | null;
+  photoUrl: string | null;
   clubName: string | null;
   role: string | null;
   purchaseCredits: number | null;

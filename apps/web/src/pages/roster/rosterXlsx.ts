@@ -165,3 +165,4 @@ export function downloadBlob(blob: Blob, filename: string): void {
 
 export const ROSTER_XLSX_TEMPLATE_NAME = "fantappero-import-rosa.xlsx";
 export const ROSTER_XLSX_EXPORT_NAME = "fantappero-rose.xlsx";
+export const ROSTER_XLSX_EXPORT_ALL_NAME = "fantappero-rose-lega.xlsx";

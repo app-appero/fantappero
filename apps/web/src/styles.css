@@ -811,6 +811,12 @@ a.fa-member-list__identity:focus-visible {
   margin-top: 0.75rem;
 }
 
+.fa-roster-excel__modal-options {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
 @media (max-width: 767px) {
   .fa-roster-adjust__popover {
     left: 0;

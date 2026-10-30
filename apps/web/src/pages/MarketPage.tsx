@@ -89,6 +89,7 @@ const DEMO_TEAM: FantasyTeam = {
       slotIndex: 0,
       athleteId: "demo-athlete-1",
       athleteName: "P. Fagioli",
+      photoUrl: null,
       clubName: "Juventus",
       role: "C",
       purchaseCredits: 12,

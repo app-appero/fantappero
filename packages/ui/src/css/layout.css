@@ -2294,6 +2294,10 @@ button.fa-app-header__league-action {
 .fa-match-card__team-name {
   min-width: 0;
   overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
 }
 
 .fa-match-card__team-logo {
@@ -2323,7 +2327,10 @@ button.fa-app-header__league-action {
 .fa-match-card__team-subtitle {
   color: var(--fa-color-foreground-muted);
   font-size: var(--fa-text-sm);
-  overflow-wrap: anywhere;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .fa-match-card__score {

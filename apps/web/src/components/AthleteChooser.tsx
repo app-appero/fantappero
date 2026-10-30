@@ -1,4 +1,5 @@
 import type { FantasyRole, LeagueListoneEntry } from "@fantappero/contracts";
+import { PlayerPhotoBadge } from "@fantappero/ui";
 import { useEffect, useMemo, useState } from "react";
 import { AthleteName } from "../athletes/AthleteCard";
 
@@ -102,9 +103,17 @@ export function AthleteChooser({
                 data-testid={testId ? `${testId}-${entry.athleteId}` : undefined}
               >
                 <span className="fa-athlete-chooser__mark">{active ? (single ? "✓" : position) : ""}</span>
-                <span className={`fa-athlete-chooser__dot fa-athlete-chooser__dot--${entry.effectiveRole}`}>
-                  {entry.effectiveRole}
-                </span>
+                {entry.photoUrl ? (
+                  <PlayerPhotoBadge
+                    className="fa-athlete-chooser__dot"
+                    photoUrl={entry.photoUrl}
+                    role={entry.effectiveRole}
+                  />
+                ) : (
+                  <span className={`fa-athlete-chooser__dot fa-athlete-chooser__dot--${entry.effectiveRole}`}>
+                    {entry.effectiveRole}
+                  </span>
+                )}
                 <span className="fa-athlete-chooser__name">
                   <AthleteName athleteId={entry.athleteId}>{entry.canonicalName}</AthleteName>
                   {entry.clubName ? <small>{entry.clubName}</small> : null}

@@ -2,6 +2,7 @@ import type { FantasyRole, FantasyTeam } from "@fantappero/contracts";
 import { useEffect, useState } from "react";
 import { Pressable, ScrollView, Text, View } from "react-native";
 import { AppTextInput as TextInput } from "../../components/AppTextInput";
+import { PlayerPhotoRing } from "../../components/PlayerPhotoRing";
 import {
   compositionStatusLabel,
   ROLE_SECTION_ORDER,
@@ -157,9 +158,13 @@ function RosterRoleSection({
                   testID={`roster-admin-release-${slot.athleteId}`}
                 >
                   <View style={[styles.playerCard, { marginBottom: 0 }]}>
-                    <View style={[styles.playerDot, { backgroundColor: dot.backgroundColor }]}>
-                      <Text style={[styles.roleBadgeText, { color: dot.color }]}>{slot.role ?? "?"}</Text>
-                    </View>
+                    {slot.photoUrl ? (
+                      <PlayerPhotoRing photoUrl={slot.photoUrl} role={slot.role} size={34} />
+                    ) : (
+                      <View style={[styles.playerDot, { backgroundColor: dot.backgroundColor }]}>
+                        <Text style={[styles.roleBadgeText, { color: dot.color }]}>{slot.role ?? "?"}</Text>
+                      </View>
+                    )}
                     <View style={styles.playerBody}>
                       <AthleteName athleteId={slot.athleteId} style={styles.playerName} numberOfLines={1} plain>
                         {slot.athleteName ?? "Calciatore"}

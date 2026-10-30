@@ -122,6 +122,7 @@ const TEAM_WITH_PLAYER: FantasyTeam = {
       slotIndex: 0,
       athleteId: "athlete-1",
       athleteName: "Giocatore Svincolabile",
+      photoUrl: null,
       clubName: "Lazio",
       role: "A",
       purchaseCredits: 30,

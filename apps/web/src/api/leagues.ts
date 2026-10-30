@@ -530,6 +530,26 @@ export function downloadRosterExcelExport(
   });
 }
 
+export function downloadAllRostersExcelExport(
+  accessToken: string,
+  leagueId: string,
+): Promise<Blob> {
+  return apiRequestBlob(`/leagues/${leagueId}/amministrazione/rose/excel-tutte`, {
+    accessToken,
+  });
+}
+
+export function previewBulkRosterImport(
+  accessToken: string,
+  leagueId: string,
+  file: File,
+): Promise<RosterImportPreview> {
+  return apiUpload<RosterImportPreview>(
+    `/leagues/${leagueId}/amministrazione/import-csv/anteprima-massiva`,
+    { accessToken, file },
+  );
+}
+
 export function previewRosterCsvImport(
   accessToken: string,
   leagueId: string,

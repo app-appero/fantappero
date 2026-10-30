@@ -3,6 +3,8 @@ import {
   Badge,
   Button,
   Input,
+  PlayerPhotoBadge,
+  RoleBadge,
   Table,
   TableBody,
   TableCell,
@@ -147,7 +149,20 @@ function RosterRoleTable({
               {pagedSlots.map((slot) => (
                 <TableRow key={slot.id}>
                   <TableCell className="fa-roster-col fa-roster-col--name">
-                    <AthleteName athleteId={slot.athleteId}>{slot.athleteName ?? "Calciatore"}</AthleteName>
+                    <span className="fa-auction-player">
+                      {slot.photoUrl ? (
+                        <PlayerPhotoBadge
+                          className="fa-auction-player__role"
+                          photoUrl={slot.photoUrl}
+                          role={slot.role}
+                        />
+                      ) : slot.role ? (
+                        <RoleBadge className="fa-auction-player__role" code={slot.role} />
+                      ) : null}
+                      <AthleteName className="fa-auction-player__name" athleteId={slot.athleteId}>
+                        {slot.athleteName ?? "Calciatore"}
+                      </AthleteName>
+                    </span>
                   </TableCell>
                   <TableCell className="fa-roster-col fa-roster-col--club">{slot.clubName ?? "—"}</TableCell>
                   <TableCell className="fa-roster-col fa-roster-col--credits">

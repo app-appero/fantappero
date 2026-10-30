@@ -18,6 +18,7 @@ import {
   assignRosterSlot,
   confirmRosterCsvImport,
   createRosterTurnSnapshot,
+  downloadAllRostersExcelExport,
   downloadRosterExcelExport,
   downloadRosterExcelTemplate,
   ensureFantasyTeams,
@@ -34,6 +35,7 @@ import {
   fetchRosterTurnSnapshots,
   fetchTeamRosterHistoryForAdmin,
   postAdminCreditMovement,
+  previewBulkRosterImport,
   previewRosterCsvImport,
   releaseRosterSlot,
 } from "../api/leagues";
@@ -78,6 +80,7 @@ import { RosterSectionTabs } from "./roster/RosterSectionTabs";
 import {
   buildRosterXlsx,
   downloadBlob,
+  ROSTER_XLSX_EXPORT_ALL_NAME,
   ROSTER_XLSX_EXPORT_NAME,
   ROSTER_XLSX_TEMPLATE_NAME,
 } from "./roster/rosterXlsx";
@@ -192,6 +195,7 @@ export function RosterPage() {
   const [snapshotMessage, setSnapshotMessage] = useState<string | null>(null);
   const [snapshotError, setSnapshotError] = useState<string | null>(null);
   const csvFileInputRef = useRef<HTMLInputElement | null>(null);
+  const bulkCsvFileInputRef = useRef<HTMLInputElement | null>(null);
   const adminTeamIdRef = useRef(adminTeamId);
   adminTeamIdRef.current = adminTeamId;
 
@@ -855,6 +859,43 @@ export function RosterPage() {
     }
   };
 
+  const onDownloadAllRostersExport = async () => {
+    setCsvError(null);
+    setCsvMessage(null);
+    if (isDemoMode) {
+      const rows = [DEMO_TEAM, DEMO_TEAM_B].flatMap((demoTeam) =>
+        demoTeam.slots
+          .filter((slot) => slot.athleteName)
+          .map(
+            (slot) =>
+              [`${demoTeam.name} - ${slot.athleteName ?? ""}`, slot.purchaseCredits ?? 0] as [
+                string,
+                number,
+              ],
+          ),
+      );
+      downloadBlob(buildRosterXlsx(rows), ROSTER_XLSX_EXPORT_ALL_NAME);
+      setCsvMessage("Rose di tutta la lega esportate in Excel (demo).");
+      return;
+    }
+    if (!activeLeagueId) {
+      setCsvError("Seleziona una lega.");
+      return;
+    }
+    const stored = loadStoredSession();
+    if (!stored?.accessToken) {
+      setCsvError("Sessione non disponibile. Accedi di nuovo.");
+      return;
+    }
+    try {
+      const blob = await downloadAllRostersExcelExport(stored.accessToken, activeLeagueId);
+      downloadBlob(blob, ROSTER_XLSX_EXPORT_ALL_NAME);
+      setCsvMessage("Rose di tutta la lega esportate in Excel.");
+    } catch (error) {
+      setCsvError(getApiErrorMessage(error, "Impossibile esportare le rose della lega."));
+    }
+  };
+
   const onCsvFileSelected = async (file: File | null) => {
     setCsvError(null);
     setCsvMessage(null);
@@ -919,6 +960,87 @@ export function RosterPage() {
         file,
         adminTeamId,
       );
+      setCsvPreview(preview);
+      if (preview.errorCount > 0) {
+        setCsvError("Anteprima con errori: correggi il file o risolvi le ambiguità.");
+      }
+    } catch (error) {
+      setCsvError(getApiErrorMessage(error, "Impossibile elaborare il file Excel."));
+    } finally {
+      setCsvBusy(false);
+    }
+  };
+
+  const onBulkCsvFileSelected = async (file: File | null) => {
+    setCsvError(null);
+    setCsvMessage(null);
+    setCsvPreview(null);
+    setCsvResolutions({});
+    if (!file) {
+      return;
+    }
+    if (isDemoMode) {
+      setCsvBusy(true);
+      window.setTimeout(() => {
+        setCsvPreview({
+          importId: "demo-import-all",
+          status: "draft",
+          fileSha256: "demo",
+          originalFilename: file.name,
+          canConfirm: true,
+          rowCount: 2,
+          errorCount: 0,
+          warningCount: 0,
+          confirmedAt: null,
+          rows: [
+            {
+              rowNumber: 2,
+              squadra: DEMO_TEAM.name,
+              providerId: 1,
+              nome: "L. Martinez",
+              crediti: 10,
+              status: "ok",
+              fantasyTeamId: DEMO_TEAM.id,
+              fantasyTeamName: DEMO_TEAM.name,
+              athleteId: "a1",
+              athleteName: "L. Martinez",
+              slotIndex: 2,
+              issues: [],
+              candidates: [],
+            },
+            {
+              rowNumber: 3,
+              squadra: DEMO_TEAM_B.name,
+              providerId: 2,
+              nome: "Osimhen",
+              crediti: 15,
+              status: "ok",
+              fantasyTeamId: DEMO_TEAM_B.id,
+              fantasyTeamName: DEMO_TEAM_B.name,
+              athleteId: "a2",
+              athleteName: "Osimhen",
+              slotIndex: 2,
+              issues: [],
+              candidates: [],
+            },
+          ],
+        });
+        setCsvBusy(false);
+      }, 200);
+      return;
+    }
+    if (!activeLeagueId) {
+      setCsvError("Seleziona una lega.");
+      return;
+    }
+    const stored = loadStoredSession();
+    if (!stored?.accessToken) {
+      setCsvError("Sessione non disponibile. Accedi di nuovo.");
+      return;
+    }
+    setCsvBusy(true);
+    try {
+      const preview = await previewBulkRosterImport(stored.accessToken, activeLeagueId, file);
       setCsvPreview(preview);
       if (preview.errorCount > 0) {
         setCsvError("Anteprima con errori: correggi il file o risolvi le ambiguità.");
@@ -1479,10 +1601,14 @@ export function RosterPage() {
         <>
           <RosterCsvImportCard
             csvBusy={csvBusy}
+            adminTeamName={adminTeam?.name}
             onDownloadCsvTemplate={onDownloadCsvTemplate}
             onDownloadRosterExport={onDownloadRosterExport}
+            onDownloadAllRostersExport={onDownloadAllRostersExport}
             csvFileInputRef={csvFileInputRef}
             onCsvFileSelected={onCsvFileSelected}
+            bulkCsvFileInputRef={bulkCsvFileInputRef}
+            onBulkCsvFileSelected={onBulkCsvFileSelected}
             csvCanConfirm={csvCanConfirm}
             onConfirmCsvImport={onConfirmCsvImport}
             csvMessage={csvMessage}

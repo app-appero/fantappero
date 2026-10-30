@@ -12,6 +12,8 @@ import {
   CardBody,
   CardHeader,
   Input,
+  PlayerPhotoBadge,
+  RoleBadge,
   Tab,
   Table,
   TableBody,
@@ -55,19 +57,6 @@ const ROLE_TABS: Array<{ value: RoleTab; label: string }> = [
   { value: "A", label: "Attaccanti" },
 ];
 
-function roleBadgeVariant(role: FantasyRole): "success" | "warning" | "accent" | "danger" {
-  if (role === "P") {
-    return "success";
-  }
-  if (role === "D") {
-    return "warning";
-  }
-  if (role === "C") {
-    return "accent";
-  }
-  return "danger";
-}
-
 const ROLE_LABEL: Record<FantasyRole, string> = {
   P: "Portiere",
   D: "Difensore",
@@ -104,6 +93,7 @@ const DEMO_LISTONE: LeagueListoneEntry[] = [
   {
     athleteId: "demo-p-1",
     canonicalName: "Rui Patrício",
+    photoUrl: null,
     seasonYear: 2026,
     officialRole: "P",
     effectiveRole: "P",
@@ -116,6 +106,7 @@ const DEMO_LISTONE: LeagueListoneEntry[] = [
   {
     athleteId: "demo-d-1",
     canonicalName: "C. Coady",
+    photoUrl: null,
     seasonYear: 2026,
     officialRole: "D",
     effectiveRole: "D",
@@ -128,6 +119,7 @@ const DEMO_LISTONE: LeagueListoneEntry[] = [
   {
     athleteId: "demo-c-1",
     canonicalName: "Rúben Neves",
+    photoUrl: null,
     seasonYear: 2026,
     officialRole: "C",
     effectiveRole: "A",
@@ -145,6 +137,7 @@ const DEMO_LISTONE: LeagueListoneEntry[] = [
   {
     athleteId: "demo-a-1",
     canonicalName: "R. Jiménez",
+    photoUrl: null,
     seasonYear: 2026,
     officialRole: "A",
     effectiveRole: "A",
@@ -193,6 +186,7 @@ export function AuctionPage() {
     initialDemoEntries(isDemoMode, demoState),
   );
   const [activeTab, setActiveTab] = useState<RoleTab>("all");
+  const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(() => (isDemoMode ? demoState === "loading" : true));
   const [loadError, setLoadError] = useState<string | null>(() =>
     isDemoMode && demoState === "error" ? "Impossibile caricare il listone (demo)." : null,
@@ -264,7 +258,16 @@ export function AuctionPage() {
     void loadListone();
   }, [loadListone]);
 
-  const visibleEntries = useMemo(() => filterByTab(entries, activeTab), [activeTab, entries]);
+  const visibleEntries = useMemo(() => {
+    const byTab = filterByTab(entries, activeTab);
+    const needle = query.trim().toLocaleLowerCase("it-IT");
+    if (!needle) {
+      return byTab;
+    }
+    return byTab.filter((entry) =>
+      `${entry.canonicalName} ${entry.clubName ?? ""}`.toLocaleLowerCase("it-IT").includes(needle),
+    );
+  }, [activeTab, entries, query]);
 
   const flow = useMarketSessionFlow(
     {
@@ -613,6 +616,18 @@ export function AuctionPage() {
             ) : null}
 
             {!loading && !loadError && (isDemoMode || activeLeagueId) ? (
+              <input
+                type="search"
+                className="fa-athlete-chooser__search"
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder="Cerca per nome o squadra"
+                aria-label="Cerca calciatore"
+                data-testid="auction-listone-search"
+              />
+            ) : null}
+
+            {!loading && !loadError && (isDemoMode || activeLeagueId) ? (
               <Tabs
                 value={activeTab}
                 onValueChange={(value) => setActiveTab(value as RoleTab)}
@@ -632,9 +647,11 @@ export function AuctionPage() {
                         state="empty"
                         title="Nessun calciatore"
                         message={
-                          tab.value === "all"
-                            ? "Il listone è vuoto. Verrà popolato dagli operatori della piattaforma."
-                            : `Nessun ${ROLE_LABEL[tab.value as FantasyRole].toLowerCase()} nel listone.`
+                          query.trim()
+                            ? "Nessun calciatore trovato per questa ricerca."
+                            : tab.value === "all"
+                              ? "Il listone è vuoto. Verrà popolato dagli operatori della piattaforma."
+                              : `Nessun ${ROLE_LABEL[tab.value as FantasyRole].toLowerCase()} nel listone.`
                         }
                         testId={`auction-listone-empty-${tab.value}`}
                       />
@@ -659,12 +676,18 @@ export function AuctionPage() {
                             <TableRow key={entry.athleteId}>
                               <TableCell className="fa-roster-col fa-roster-col--name">
                                 <span className="fa-auction-player">
-                                  <Badge
-                                    className="fa-auction-player__role"
-                                    variant={roleBadgeVariant(entry.effectiveRole)}
-                                  >
-                                    {entry.effectiveRole}
-                                  </Badge>
+                                  {entry.photoUrl ? (
+                                    <PlayerPhotoBadge
+                                      className="fa-auction-player__role"
+                                      photoUrl={entry.photoUrl}
+                                      role={entry.effectiveRole}
+                                    />
+                                  ) : (
+                                    <RoleBadge
+                                      className="fa-auction-player__role"
+                                      code={entry.effectiveRole}
+                                    />
+                                  )}
                                   <span className="fa-auction-player__role-name">
                                     {ROLE_LABEL[entry.effectiveRole]}
                                   </span>

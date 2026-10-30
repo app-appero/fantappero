@@ -50,6 +50,7 @@ export interface MarketBid {
   fantasyTeamId: string;
   athleteId: string;
   athleteName: string;
+  photoUrl: string | null;
   amountCredits: number;
   status: MarketBidStatus;
   submittedAt: string;
@@ -263,6 +264,7 @@ export interface LiveLot {
   sessionId: string;
   athleteId: string;
   athleteName: string;
+  photoUrl: string | null;
   sequenceNumber: number;
   status: MarketLiveLotStatus;
   openedAt: string;
@@ -288,6 +290,7 @@ export interface LiveSwapCandidate {
   slotIndex: number;
   athleteId: string;
   athleteName: string;
+  photoUrl: string | null;
   purchaseCredits: number;
 }
 
@@ -295,6 +298,7 @@ export interface PendingSwapDecision {
   lotId: string;
   athleteId: string;
   athleteName: string;
+  photoUrl: string | null;
   amountCredits: number;
   role: FantasyRole;
   roleLabel: string;

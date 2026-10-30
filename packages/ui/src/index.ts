@@ -104,6 +104,8 @@ export type { FormationSlot, FormationViewProps } from "./components/domain/Form
 
 export { RoleBadge } from "./components/domain/RoleBadge.js";
 export type { RoleBadgeProps } from "./components/domain/RoleBadge.js";
+export { PlayerPhotoBadge } from "./components/domain/PlayerPhotoBadge.js";
+export type { PlayerPhotoBadgeProps } from "./components/domain/PlayerPhotoBadge.js";
 
 export { EventBadges } from "./components/domain/EventBadges.js";
 export type { EventBadgesProps } from "./components/domain/EventBadges.js";

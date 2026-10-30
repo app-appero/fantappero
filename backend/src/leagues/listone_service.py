@@ -584,6 +584,7 @@ class LeagueListoneService:
         return LeagueListoneEntryResponse(
             athleteId=str(assignment.athlete_id),
             canonicalName=athlete.canonical_name if athlete else "",
+            photoUrl=athlete.photo_url if athlete else None,
             seasonYear=assignment.season_year,
             officialRole=assignment.role.value,  # type: ignore[arg-type]
             effectiveRole=effective_role.value,  # type: ignore[arg-type]

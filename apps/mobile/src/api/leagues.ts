@@ -529,6 +529,16 @@ export function downloadRosterExcelExport(
   );
 }
 
+export function downloadAllRostersExcelExport(
+  accessToken: string,
+  leagueId: string,
+): Promise<ArrayBuffer> {
+  return downloadLeagueFile(
+    accessToken,
+    `/leagues/${leagueId}/amministrazione/rose/excel-tutte`,
+  );
+}
+
 async function downloadLeagueFile(accessToken: string, path: string): Promise<ArrayBuffer> {
   const baseUrl = loadMobileEnv().expoPublicApiBaseUrl;
   const response = await fetch(`${baseUrl}${path}`, {
@@ -552,6 +562,17 @@ export function previewRosterCsvImport(
   const params = new URLSearchParams({ teamId });
   return apiUpload<RosterImportPreview>(
     `/leagues/${leagueId}/amministrazione/import-csv/anteprima?${params}`,
+    { accessToken, file },
+  );
+}
+
+export function previewBulkRosterImport(
+  accessToken: string,
+  leagueId: string,
+  file: { uri: string; name: string; type?: string },
+): Promise<RosterImportPreview> {
+  return apiUpload<RosterImportPreview>(
+    `/leagues/${leagueId}/amministrazione/import-csv/anteprima-massiva`,
     { accessToken, file },
   );
 }

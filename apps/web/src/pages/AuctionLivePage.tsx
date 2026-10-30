@@ -124,6 +124,7 @@ const DEMO_TABLE_LOT: LiveLot = {
   sessionId: "demo-session",
   athleteId: "demo-athlete",
   athleteName: "L. Martinez",
+  photoUrl: null,
   sequenceNumber: 4,
   status: "open",
   openedAt: new Date().toISOString(),

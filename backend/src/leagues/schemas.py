@@ -565,6 +565,7 @@ class LeagueListoneOverrideResponse(ApiModel):
 class LeagueListoneEntryResponse(ApiModel):
     athlete_id: str = Field(alias="athleteId")
     canonical_name: str = Field(alias="canonicalName")
+    photo_url: str | None = Field(default=None, alias="photoUrl")
     season_year: int = Field(alias="seasonYear")
     official_role: Literal["P", "D", "C", "A"] = Field(alias="officialRole")
     effective_role: Literal["P", "D", "C", "A"] = Field(alias="effectiveRole")

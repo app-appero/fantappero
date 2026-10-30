@@ -115,6 +115,7 @@ export const DEMO_TEAM: FantasyTeam = {
       slotIndex: 0,
       athleteId: "a1",
       athleteName: "L. Martinez",
+      photoUrl: null,
       clubName: "Inter",
       role: "A",
       purchaseCredits: 50,
@@ -124,6 +125,7 @@ export const DEMO_TEAM: FantasyTeam = {
       slotIndex: 1,
       athleteId: "a2",
       athleteName: "N. Barella",
+      photoUrl: null,
       clubName: "Inter",
       role: "C",
       purchaseCredits: 35,
@@ -133,6 +135,7 @@ export const DEMO_TEAM: FantasyTeam = {
       slotIndex: index + 2,
       athleteId: null,
       athleteName: null,
+      photoUrl: null,
       clubName: null,
       role: null,
       purchaseCredits: null,
@@ -215,6 +218,7 @@ export const DEMO_LISTONE: LeagueListoneEntry[] = [
   {
     athleteId: "a1",
     canonicalName: "L. Martinez",
+    photoUrl: null,
     seasonYear: 2026,
     officialRole: "A",
     effectiveRole: "A",
@@ -227,6 +231,7 @@ export const DEMO_LISTONE: LeagueListoneEntry[] = [
   {
     athleteId: "a2",
     canonicalName: "N. Barella",
+    photoUrl: null,
     seasonYear: 2026,
     officialRole: "C",
     effectiveRole: "C",
@@ -239,6 +244,7 @@ export const DEMO_LISTONE: LeagueListoneEntry[] = [
   {
     athleteId: "a3",
     canonicalName: "R. Leao",
+    photoUrl: null,
     seasonYear: 2026,
     officialRole: "A",
     effectiveRole: "A",
@@ -251,6 +257,7 @@ export const DEMO_LISTONE: LeagueListoneEntry[] = [
   {
     athleteId: "a4",
     canonicalName: "M. Thuram",
+    photoUrl: null,
     seasonYear: 2026,
     officialRole: "A",
     effectiveRole: "A",

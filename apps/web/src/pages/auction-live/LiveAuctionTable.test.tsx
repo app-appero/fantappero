@@ -23,6 +23,7 @@ const LOT: LiveLot = {
   sessionId: "session",
   athleteId: "athlete",
   athleteName: "A. Abdi",
+  photoUrl: null,
   sequenceNumber: 1,
   status: "open",
   openedAt: "2026-10-05T10:00:00.000Z",

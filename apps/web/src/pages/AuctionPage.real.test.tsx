@@ -97,6 +97,7 @@ const LISTONE: LeagueListoneEntry[] = [
   {
     athleteId: "athlete-1",
     canonicalName: "M. Thuram",
+    photoUrl: null,
     seasonYear: 2026,
     officialRole: "A",
     effectiveRole: "A",

@@ -19,6 +19,7 @@ import {
   assignRosterSlot,
   confirmRosterCsvImport,
   createRosterTurnSnapshot,
+  downloadAllRostersExcelExport,
   downloadRosterExcelExport,
   downloadRosterExcelTemplate,
   ensureFantasyTeams,
@@ -35,6 +36,7 @@ import {
   fetchRosterTurnSnapshots,
   fetchTeamRosterHistoryForAdmin,
   postAdminCreditMovement,
+  previewBulkRosterImport,
   previewRosterCsvImport,
   releaseRosterSlot,
 } from "../api/leagues";
@@ -525,6 +527,25 @@ export function RosterScreen() {
     }
   };
 
+  const onExportAllRosters = async () => {
+    setCsvError(null);
+    setCsvMessage(null);
+    if (!activeLeagueId || !accessToken) {
+      setCsvError("Sessione o lega non disponibile.");
+      return;
+    }
+    setCsvBusy(true);
+    try {
+      const buffer = await downloadAllRostersExcelExport(accessToken, activeLeagueId);
+      await shareExcel(buffer, "fantappero-rose-lega.xlsx");
+      setCsvMessage("Rose di tutta la lega esportate in Excel.");
+    } catch (error) {
+      setCsvError(getApiErrorMessage(error, "Impossibile esportare le rose della lega."));
+    } finally {
+      setCsvBusy(false);
+    }
+  };
+
   const onPickExcel = async () => {
     setCsvError(null);
     setCsvMessage(null);
@@ -563,6 +584,46 @@ export function RosterScreen() {
         },
         adminTeamId,
       );
+      setCsvPreview(preview);
+      if (preview.errorCount > 0) {
+        setCsvError("Anteprima con errori: correggi il file Excel.");
+      }
+    } catch (error) {
+      setCsvError(getApiErrorMessage(error, "Impossibile elaborare il file Excel."));
+    } finally {
+      setCsvBusy(false);
+    }
+  };
+
+  const onPickBulkExcel = async () => {
+    setCsvError(null);
+    setCsvMessage(null);
+    setCsvPreview(null);
+    if (!activeLeagueId || !accessToken) {
+      setCsvError("Sessione o lega non disponibile.");
+      return;
+    }
+    try {
+      const DocumentPicker = await import("expo-document-picker");
+      const picked = await DocumentPicker.getDocumentAsync({
+        type: [
+          "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+          "application/vnd.ms-excel",
+        ],
+        copyToCacheDirectory: true,
+        multiple: false,
+      });
+      if (picked.canceled || !picked.assets[0]) {
+        return;
+      }
+      const asset = picked.assets[0];
+      setCsvBusy(true);
+      const preview = await previewBulkRosterImport(accessToken, activeLeagueId, {
+        uri: asset.uri,
+        name: asset.name || "rose.xlsx",
+        type:
+          asset.mimeType || "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      });
       setCsvPreview(preview);
       if (preview.errorCount > 0) {
         setCsvError("Anteprima con errori: correggi il file Excel.");
@@ -937,9 +998,12 @@ export function RosterScreen() {
         <>
           <RosterCsvImportCard
             csvBusy={csvBusy}
+            adminTeamName={adminTeam?.name}
             onDownloadTemplate={onDownloadExcelTemplate}
             onExportRosters={onExportRosters}
+            onExportAllRosters={onExportAllRosters}
             onPickExcel={onPickExcel}
+            onPickBulkExcel={onPickBulkExcel}
             csvPreview={csvPreview}
             onConfirmCsvImport={onConfirmCsvImport}
             csvMessage={csvMessage}
