@@ -11,6 +11,7 @@ import {
   CardBody,
   CardHeader,
   Input,
+  PlayerPhotoBadge,
   Tab,
   Table,
   TableBody,
@@ -60,7 +61,18 @@ function ListoneAssignRow({
   return (
     <TableRow>
       <TableCell className="fa-roster-col fa-roster-col--name">
-        <AthleteName athleteId={entry.athleteId}>{entry.canonicalName}</AthleteName>
+        <span className="fa-auction-player">
+          {entry.photoUrl ? (
+            <PlayerPhotoBadge
+              className="fa-auction-player__role"
+              photoUrl={entry.photoUrl}
+              role={entry.effectiveRole}
+            />
+          ) : null}
+          <AthleteName className="fa-auction-player__name" athleteId={entry.athleteId}>
+            {entry.canonicalName}
+          </AthleteName>
+        </span>
       </TableCell>
       <TableCell className="fa-roster-col fa-roster-col--role">
         <Badge variant={roleBadgeVariant(entry.effectiveRole)}>{entry.effectiveRole}</Badge>

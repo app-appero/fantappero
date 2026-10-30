@@ -5,6 +5,7 @@ import type {
   LeagueListoneEntry,
 } from "@fantappero/contracts";
 import { HScroll } from "../../components/HScroll";
+import { PlayerPhotoRing } from "../../components/PlayerPhotoRing";
 import { useEffect, useState } from "react";
 import { Pressable, ScrollView, Text, View } from "react-native";
 import { AppTextInput as TextInput } from "../../components/AppTextInput";
@@ -57,9 +58,13 @@ function ListoneAssignRow({
       testID={owner ? `roster-admin-release-${entry.athleteId}` : `roster-admin-assign-${entry.athleteId}`}
     >
       <View style={[styles.playerCard, { marginBottom: 0 }, owner ? { opacity: 0.7 } : null]}>
-        <View style={[styles.playerDot, { backgroundColor: roleColors.backgroundColor }]}>
-          <Text style={[styles.roleBadgeText, { color: roleColors.color }]}>{entry.effectiveRole}</Text>
-        </View>
+        {entry.photoUrl ? (
+          <PlayerPhotoRing photoUrl={entry.photoUrl} role={entry.effectiveRole} size={34} />
+        ) : (
+          <View style={[styles.playerDot, { backgroundColor: roleColors.backgroundColor }]}>
+            <Text style={[styles.roleBadgeText, { color: roleColors.color }]}>{entry.effectiveRole}</Text>
+          </View>
+        )}
         <View style={styles.playerBody}>
           <AthleteName athleteId={entry.athleteId} style={styles.playerName} numberOfLines={1} plain>
             {entry.canonicalName}

@@ -219,8 +219,6 @@ export function FormationPitch({
 
 function toneRing(tone: ProbableTone) {
   return {
-    borderColor: TONE_COLOR[tone],
-    borderWidth: 4,
     shadowColor: TONE_COLOR[tone],
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: tone === "unavailable" ? 0 : 1,
@@ -520,8 +518,6 @@ const styles = lazyStyles(() =>
       borderWidth: 4,
     },
     probableRing: {
-      borderColor: colors.success,
-      borderWidth: 4,
       shadowColor: colors.success,
       shadowOffset: { width: 0, height: 0 },
       shadowOpacity: 1,
@@ -529,8 +525,6 @@ const styles = lazyStyles(() =>
       elevation: 6,
     },
     svRing: {
-      borderColor: "#c084fc",
-      borderWidth: 4,
       shadowColor: "#a855f7",
       shadowOffset: { width: 0, height: 0 },
       shadowOpacity: 1,
@@ -539,8 +533,6 @@ const styles = lazyStyles(() =>
     },
     svLabel: { backgroundColor: "#7c3aed" },
     finalRing: {
-      borderColor: "#ffffff",
-      borderWidth: 4,
       shadowColor: "#ffffff",
       shadowOffset: { width: 0, height: 0 },
       shadowOpacity: 0.9,
