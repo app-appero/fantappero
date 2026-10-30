@@ -4419,6 +4419,8 @@ h2 {
 }
 
 .fa-athlete-chooser__search {
+  width: 100%;
+  box-sizing: border-box;
   min-height: 2.75rem;
   padding: 0 1rem;
   border-radius: 999px;

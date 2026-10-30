@@ -49,6 +49,8 @@ import { parseWireframeStateFromSearch } from "../wireframes/useWireframeState";
 
 type RoleTab = "all" | FantasyRole;
 
+const LISTONE_PAGE_SIZE = 30;
+
 const ROLE_TABS: Array<{ value: RoleTab; label: string }> = [
   { value: "all", label: "Tutti" },
   { value: "P", label: "Portieri" },
@@ -187,6 +189,7 @@ export function AuctionPage() {
   );
   const [activeTab, setActiveTab] = useState<RoleTab>("all");
   const [query, setQuery] = useState("");
+  const [listonePage, setListonePage] = useState(0);
   const [loading, setLoading] = useState(() => (isDemoMode ? demoState === "loading" : true));
   const [loadError, setLoadError] = useState<string | null>(() =>
     isDemoMode && demoState === "error" ? "Impossibile caricare il listone (demo)." : null,
@@ -268,6 +271,17 @@ export function AuctionPage() {
       `${entry.canonicalName} ${entry.clubName ?? ""}`.toLocaleLowerCase("it-IT").includes(needle),
     );
   }, [activeTab, entries, query]);
+
+  useEffect(() => {
+    setListonePage(0);
+  }, [activeTab, query]);
+
+  const listonePageCount = Math.max(1, Math.ceil(visibleEntries.length / LISTONE_PAGE_SIZE));
+  const safeListonePage = Math.min(listonePage, listonePageCount - 1);
+  const pagedEntries = visibleEntries.slice(
+    safeListonePage * LISTONE_PAGE_SIZE,
+    safeListonePage * LISTONE_PAGE_SIZE + LISTONE_PAGE_SIZE,
+  );
 
   const flow = useMarketSessionFlow(
     {
@@ -672,7 +686,7 @@ export function AuctionPage() {
                           </TableRow>
                         </TableHead>
                         <TableBody>
-                          {visibleEntries.map((entry) => (
+                          {pagedEntries.map((entry) => (
                             <TableRow key={entry.athleteId}>
                               <TableCell className="fa-roster-col fa-roster-col--name">
                                 <span className="fa-auction-player">
@@ -714,6 +728,27 @@ export function AuctionPage() {
                         </TableBody>
                       </Table>
                     )}
+                    {listonePageCount > 1 ? (
+                      <div className="fa-athlete-chooser__pager" data-testid={`auction-listone-pager-${tab.value}`}>
+                        <button
+                          type="button"
+                          disabled={safeListonePage === 0}
+                          onClick={() => setListonePage(safeListonePage - 1)}
+                        >
+                          Precedente
+                        </button>
+                        <span>
+                          Pagina {safeListonePage + 1} di {listonePageCount}
+                        </span>
+                        <button
+                          type="button"
+                          disabled={safeListonePage >= listonePageCount - 1}
+                          onClick={() => setListonePage(safeListonePage + 1)}
+                        >
+                          Successiva
+                        </button>
+                      </div>
+                    ) : null}
                   </TabPanel>
                 ))}
               </Tabs>
