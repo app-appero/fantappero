@@ -132,9 +132,7 @@ export function NotificationEventSettings() {
                 <View style={styles.glyph}>
                   <Text>{EVENT_GLYPH[row.eventKey] ?? "🔔"}</Text>
                 </View>
-                <Text style={[styles.flex, styles.label]} numberOfLines={1}>
-                  {row.label}
-                </Text>
+                <Text style={[styles.flex, styles.label]}>{row.label}</Text>
                 <View style={styles.switchCell}>
                   <Switch
                     value={row.inAppEnabled}

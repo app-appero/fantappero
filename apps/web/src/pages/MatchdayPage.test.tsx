@@ -70,7 +70,7 @@ describe("Matchday page H2H + europei", () => {
     expect(html).toContain('data-testid="h2h-calendar"');
     expect(html).toContain('data-testid="h2h-round-select"');
     expect(html).toContain("Giornata 2");
-    expect(html).toContain("Marco FC");
+    expect(html).toContain("Marco");
     expect(html).toContain("Riposo");
     expect(html).toContain("storico");
   });

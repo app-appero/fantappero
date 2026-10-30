@@ -114,9 +114,6 @@ function MatchupRow({
           <View style={styles.team}>
             <TeamAvatar name={homeName} avatarUrl={matchup.homeAvatarUrl} />
             <Text style={styles.teamLine} numberOfLines={2}>{homeName}</Text>
-            {matchup.homeTeamName ? (
-              <Text style={styles.teamClub} numberOfLines={1}>{matchup.homeTeamName}</Text>
-            ) : null}
           </View>
           <Text style={styles.vs}>vs</Text>
           <View style={styles.team}>
@@ -156,9 +153,6 @@ function MatchupRow({
         <View style={styles.team}>
           <TeamAvatar name={homeName} avatarUrl={matchup.homeAvatarUrl} />
           <Text style={styles.teamLine} numberOfLines={2}>{homeName}</Text>
-          {matchup.homeTeamName ? (
-            <Text style={styles.teamClub} numberOfLines={1}>{matchup.homeTeamName}</Text>
-          ) : null}
         </View>
         {display.goalsAvailable && matchup.result ? (
           <Text style={styles.bigScore}>
@@ -170,9 +164,6 @@ function MatchupRow({
         <View style={styles.team}>
           <TeamAvatar name={awayName} avatarUrl={matchup.awayAvatarUrl} />
           <Text style={styles.teamLine} numberOfLines={2}>{awayName}</Text>
-          {matchup.awayTeamName ? (
-            <Text style={styles.teamClub} numberOfLines={1}>{matchup.awayTeamName}</Text>
-          ) : null}
         </View>
       </View>
       <View style={styles.matchupHeader}>
@@ -476,11 +467,6 @@ const styles = lazyStyles(() => StyleSheet.create({
     fontSize: typography.fontSize.sm,
     fontWeight: "600",
     flexShrink: 1,
-    textAlign: "center",
-  },
-  teamClub: {
-    color: colors.foregroundMuted,
-    fontSize: typography.fontSize.xs,
     textAlign: "center",
   },
   body: {

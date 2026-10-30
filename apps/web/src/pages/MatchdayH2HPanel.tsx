@@ -91,7 +91,6 @@ function MatchupRow({ matchup }: { matchup: H2HCalendarMatchup }) {
         <MatchCard
           homeTeam={homeName}
           awayTeam="Riposo"
-          homeSubtitle={matchup.homeTeamName ?? undefined}
           homeAvatarUrl={homeAvatarUrl}
           kickoffLabel="Bye"
           status="scheduled"
@@ -125,8 +124,6 @@ function MatchupRow({ matchup }: { matchup: H2HCalendarMatchup }) {
         <MatchCard
           homeTeam={homeName}
           awayTeam={awayName}
-          homeSubtitle={matchup.homeTeamName ?? undefined}
-          awaySubtitle={matchup.awayTeamName ?? undefined}
           homeAvatarUrl={homeAvatarUrl}
           awayAvatarUrl={awayAvatarUrl}
           kickoffLabel={computedAtLabel(matchup.result?.computedAt)}

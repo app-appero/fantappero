@@ -133,7 +133,6 @@ describe("MatchdayH2HPanel — Punti e Gol fantasy espliciti (EP13-P02)", () => 
     const html = render(result({ resultFinal: false }));
     expect(html).toContain("Provvisorio / in attesa");
     expect(html).toContain("Marco");
-    expect(html).toContain("Roma FC");
     expect(html).toContain('src="https://example.test/marco.png"');
     expect(html).toContain('src="https://example.test/giulia.png"');
     expect(render(result({ resultFinal: false }), true)).toContain("LIVE / provvisorio");
