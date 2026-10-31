@@ -53,6 +53,26 @@ test("expo starts on the websocket tunnel instead of the shared ngrok account", 
   assert.equal(launch.env.EXPO_UNSTABLE_HEADLESS, "0");
 });
 
+test("raises Metro's heap limit to avoid SDK 58's larger bundle OOM-ing", () => {
+  const previous = process.env.NODE_OPTIONS;
+  try {
+    delete process.env.NODE_OPTIONS;
+    assert.equal(expoLaunchSpec().env.NODE_OPTIONS, "--max-old-space-size=8192");
+
+    process.env.NODE_OPTIONS = "--some-other-flag";
+    assert.equal(
+      expoLaunchSpec().env.NODE_OPTIONS,
+      "--some-other-flag --max-old-space-size=8192",
+    );
+  } finally {
+    if (previous === undefined) {
+      delete process.env.NODE_OPTIONS;
+    } else {
+      process.env.NODE_OPTIONS = previous;
+    }
+  }
+});
+
 test("pilota keeps the Railway URL even if .env.local has a LAN address", () => {
   const root = mkdtempSync(join(tmpdir(), "mobile-env-"));
   mkdirSync(join(root, "env"));

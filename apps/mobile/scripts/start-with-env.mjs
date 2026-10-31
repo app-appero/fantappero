@@ -71,12 +71,21 @@ function appRootFromHere() {
 // @expo/ngrok then crashes on a missing response body. The websocket tunnel
 // (the same one Expo uses outside ngrok) only accepts local port 8081.
 export function expoLaunchSpec() {
+  // SDK 58's larger module graph (RN 0.88 + the bumped expo-* tree) runs
+  // Metro past Node's default ~4 GB old-space limit on Android bundling,
+  // crashing with "JavaScript heap out of memory". Raise it instead of
+  // shrinking the graph — append to any NODE_OPTIONS the shell already set.
+  const metroHeapOption = "--max-old-space-size=8192";
+  const nodeOptions = process.env.NODE_OPTIONS
+    ? `${process.env.NODE_OPTIONS} ${metroHeapOption}`
+    : metroHeapOption;
   return {
     command: "pnpm",
     args: ["exec", "expo", "start", "--tunnel", "--port", "8081", "-c"],
     env: {
       EXPO_FORCE_WEBCONTAINER_ENV: "1",
       EXPO_UNSTABLE_HEADLESS: "0",
+      NODE_OPTIONS: nodeOptions,
     },
   };
 }
