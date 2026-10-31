@@ -18,7 +18,7 @@ import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useCallback, useEffect, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useAthleteCard } from "../athletes/AthleteCard";
-import { BenchTabs, RosterVersus } from "../components/match/MatchupLists";
+import { BenchTabs, RosterVersus, kickoffCountdown, useNow } from "../components/match/MatchupLists";
 import { fetchH2HMatchup } from "../api/leagues";
 import { PitchView } from "../components/match/PitchView";
 import { probableTone } from "./formation/FormationParts";
@@ -37,14 +37,16 @@ function playerScoreLabel(player: H2HPlayerScore): string | null {
   return playerVoteState(player).label;
 }
 
-function toFantasyPitchPlayers(players: readonly H2HPlayerScore[]) {
+function toFantasyPitchPlayers(players: readonly H2HPlayerScore[], now: number) {
   return players.map((player) => ({
     id: player.athleteId,
     athleteId: player.athleteId,
     name: cleanDisplayName(player.name),
     role: player.role,
     badges: [...fantasyBadgesFromBonusMalus(player.bonusMalus ?? []), ...substitutionBadges(player)],
-    scoreLabel: playerScoreLabel(player),
+    // Finché il titolare non è sceso in campo, al posto del voto si mostra
+    // il countdown al calcio d'inizio, come già succede nella panchina.
+    scoreLabel: playerScoreLabel(player) ?? kickoffCountdown(player, now),
     photoUrl: player.photoUrl,
     probable: probableTone(player),
     live: playerVoteState(player).live,
@@ -72,6 +74,7 @@ type MatchupView = "campo" | "affiancata";
 
 function SideBlock({ side, title }: { side: H2HSideLineup; title: string }) {
   const athleteCard = useAthleteCard();
+  const now = useNow();
   const teamLabel = side.teamName ?? side.displayName;
   return (
     <View style={styles.side} testID={`matchup-side-${title}`}>
@@ -99,7 +102,7 @@ function SideBlock({ side, title }: { side: H2HSideLineup; title: string }) {
         <View style={styles.lineupGroup}>
           <PitchView
             title={`Titolari — ${teamLabel}`}
-            players={toFantasyPitchPlayers(side.starters)}
+            players={toFantasyPitchPlayers(side.starters, now)}
             positions={layoutFromModule(
               side.starters,
               side.module,

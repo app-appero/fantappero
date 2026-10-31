@@ -92,7 +92,7 @@ export function PitchView({ title, players, positions, testID, onAthletePress }:
               ]}
               testID={`pitch-player-${player.id}`}
             >
-              <PitchPlayerBody player={player} onAthletePress={onAthletePress} />
+              <PitchPlayerBody player={player} yPercent={position.yPercent} onAthletePress={onAthletePress} />
             </View>
           );
         })}
@@ -129,43 +129,54 @@ function LiveGlow({ color = "#3b82f6", fill = "rgba(59,130,246,0.25)" }: { color
   );
 }
 
+/** Righe vicine al fondo del campo (es. il portiere): nome/voto sopra la
+ * foto invece che sotto, altrimenti escono dal bordo del campo (overflow
+ * hidden) e restano illeggibili. */
+const BOTTOM_ROW_THRESHOLD_PERCENT = 80;
+
 function PitchPlayerBody({
   player,
+  yPercent,
   onAthletePress,
 }: {
   player: PitchPlayer;
+  yPercent: number;
   onAthletePress?: (athleteId: string) => void;
 }) {
-  const content = (
-    <>
-      <View style={styles.badgesRow}>
-        <EventBadges badges={player.badges ?? []} size={11} />
-      </View>
-      <View
-        style={[
-          styles.card,
-          player.live ? styles.cardLive : null,
-          player.voteKind === "sv" ? styles.cardSv : null,
-          player.voteKind === "final" ? styles.cardFinal : null,
-          player.probable ? probableCardStyle(player.probable) : null,
-        ]}
-      >
-        {player.live ? <LiveGlow /> : null}
-        {player.voteKind === "sv" ? <View pointerEvents="none" style={styles.svGlow} /> : null}
-        {player.photoUrl ? (
-          <Image source={{ uri: player.photoUrl }} style={styles.photo} />
-        ) : player.shirtNumber != null ? (
-          <Text style={styles.number}>{player.shirtNumber}</Text>
-        ) : null}
-        {player.photoUrl && player.shirtNumber != null ? (
-          <View style={styles.numberBadge}>
-            <Text style={styles.numberBadgeText}>{player.shirtNumber}</Text>
-          </View>
-        ) : null}
-        <View style={styles.roleBadgeWrap}>
-          <RoleBadge code={player.role} />
+  const badges = (
+    <View style={styles.badgesRow}>
+      <EventBadges badges={player.badges ?? []} size={11} />
+    </View>
+  );
+  const card = (
+    <View
+      style={[
+        styles.card,
+        player.live ? styles.cardLive : null,
+        player.voteKind === "sv" ? styles.cardSv : null,
+        player.voteKind === "final" ? styles.cardFinal : null,
+        player.probable ? probableCardStyle(player.probable) : null,
+      ]}
+    >
+      {player.live ? <LiveGlow /> : null}
+      {player.voteKind === "sv" ? <View pointerEvents="none" style={styles.svGlow} /> : null}
+      {player.photoUrl ? (
+        <Image source={{ uri: player.photoUrl }} style={styles.photo} />
+      ) : player.shirtNumber != null ? (
+        <Text style={styles.number}>{player.shirtNumber}</Text>
+      ) : null}
+      {player.photoUrl && player.shirtNumber != null ? (
+        <View style={styles.numberBadge}>
+          <Text style={styles.numberBadgeText}>{player.shirtNumber}</Text>
         </View>
+      ) : null}
+      <View style={styles.roleBadgeWrap}>
+        <RoleBadge code={player.role} />
       </View>
+    </View>
+  );
+  const label = (
+    <>
       <Text style={[styles.name, player.voteKind === "sv" ? styles.nameSv : null]} numberOfLines={1}>
         {abbreviateName(player.name)}
       </Text>
@@ -183,6 +194,20 @@ function PitchPlayerBody({
       ) : null}
     </>
   );
+  const content =
+    yPercent >= BOTTOM_ROW_THRESHOLD_PERCENT ? (
+      <>
+        {label}
+        {badges}
+        {card}
+      </>
+    ) : (
+      <>
+        {badges}
+        {card}
+        {label}
+      </>
+    );
   if (player.athleteId && onAthletePress) {
     const athleteId = player.athleteId;
     return (

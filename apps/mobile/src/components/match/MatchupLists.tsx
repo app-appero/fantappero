@@ -45,7 +45,7 @@ export function useNow(intervalMs = 1000): number {
   return now;
 }
 
-function kickoffCountdown(player: H2HPlayerScore, now: number): string | null {
+export function kickoffCountdown(player: H2HPlayerScore, now: number): string | null {
   if (!player.kickoffAt || player.fixtureStatusLabel !== "Da giocare") {
     return null;
   }
