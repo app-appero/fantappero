@@ -27,7 +27,7 @@ import { getApiErrorMessage, useAuth } from "../auth/AuthContext";
 import { loadStoredSession } from "../auth/sessionStorage";
 import { useLiveMatchupPolling } from "../matchday/useLiveMatchupPolling";
 import { Link, useLocation } from "../router/simpleRouter";
-import { BenchTabs, RosterVersus } from "./MatchupSideParts";
+import { BenchTabs, RosterVersus, kickoffCountdown, useNow } from "./MatchupSideParts";
 import { parseWireframeStateFromSearch } from "../wireframes/useWireframeState";
 
 const DEMO_DETAIL: H2HMatchupDetail = {
@@ -120,14 +120,16 @@ function playerScoreLabel(player: H2HPlayerScore): string | null {
   return playerVoteState(player).label;
 }
 
-function toFantasyPitchPlayers(players: readonly H2HPlayerScore[]): PitchPlayer[] {
+function toFantasyPitchPlayers(players: readonly H2HPlayerScore[], now: number): PitchPlayer[] {
   return players.map((player) => ({
     id: player.athleteId,
     athleteId: player.athleteId,
     name: cleanDisplayName(player.name),
     role: player.role,
     badges: [...fantasyBadgesFromBonusMalus(player.bonusMalus ?? []), ...substitutionBadges(player)],
-    scoreLabel: playerScoreLabel(player),
+    // Finché il titolare non è sceso in campo, al posto del voto si mostra
+    // il countdown al calcio d'inizio, come già succede nella panchina.
+    scoreLabel: playerScoreLabel(player) ?? kickoffCountdown(player, now),
     photoUrl: player.photoUrl,
     live: playerVoteState(player).live,
     voteKind: (() => {
@@ -141,6 +143,7 @@ type MatchupView = "campo" | "affiancata";
 
 function SideBlock({ side, title }: { side: H2HSideLineup; title: string }) {
   const athleteCard = useAthleteCard();
+  const now = useNow();
   const teamLabel = side.teamName ?? side.displayName;
   return (
     <section data-testid={`matchup-side-${title}`}>
@@ -171,7 +174,7 @@ function SideBlock({ side, title }: { side: H2HSideLineup; title: string }) {
         <>
           <FootballPitch
             title={`Titolari — ${teamLabel}`}
-            players={toFantasyPitchPlayers(side.starters)}
+            players={toFantasyPitchPlayers(side.starters, now)}
             onAthletePress={athleteCard?.open}
             positions={layoutFromModule(
               side.starters,

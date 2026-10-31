@@ -141,13 +141,70 @@ export function FormationPitch({
         const pos = positions[slot.index];
         const empty = !slot.athleteId;
         const selected = selectedIndex === slot.index;
-        const scoreAbove = slot.role === "P";
+        // Il portiere sta in fondo al campo: nome, voto e countdown sotto il
+        // pallino uscivano dal bordo del campo e restavano illeggibili o
+        // sovrapposti. Qui vanno a destra del pallino invece, che resta alla
+        // sua altezza originale.
+        const isGoalkeeper = slot.role === "P";
         const scorePill =
           !empty && slot.scoreLabel ? (
             <View style={[styles.scorePill, slot.sv ? styles.scorePillSv : null, slot.final ? styles.scorePillFinal : null]} testID={`formation-score-${slot.index}`}>
-              <Text style={[styles.scorePillText, slot.final ? styles.scorePillTextFinal : null]}>{slot.scoreLabel}</Text>
+              <Text style={[styles.scorePillText, slot.final ? styles.scorePillTextFinal : null]} numberOfLines={1}>
+                {slot.scoreLabel}
+              </Text>
             </View>
           ) : null;
+        const lockPill =
+          !empty && slot.lockCountdown ? (
+            <View style={styles.lockPill}>
+              <Text style={styles.lockCountdown} numberOfLines={1}>
+                {slot.lockCountdown}
+              </Text>
+            </View>
+          ) : null;
+        const circleNode = empty ? (
+          <View style={[styles.emptyCircle, selected ? styles.selectedRing : null]}>
+            <Text style={styles.plus}>+</Text>
+          </View>
+        ) : (
+          <View
+            style={[
+              styles.circle,
+              { borderColor: roleRingColor(slot.role) },
+              slot.probable ? styles.probableRing : null,
+              slot.sv ? styles.svRing : null,
+              slot.final ? styles.finalRing : null,
+              slot.probableState ? toneRing(slot.probableState) : null,
+              selected ? styles.selectedRing : null,
+            ]}
+          >
+            {slot.photoUrl ? (
+              <Image source={{ uri: slot.photoUrl }} style={styles.photo} />
+            ) : (
+              <Text style={styles.initial}>{(slot.name ?? "?").trim().charAt(0).toUpperCase()}</Text>
+            )}
+            {slot.locked ? (
+              <View style={styles.lockDot}>
+                <Text style={styles.lockText}>🔒</Text>
+              </View>
+            ) : null}
+          </View>
+        );
+        const labelNode = (
+          <View
+            style={[
+              styles.label,
+              slot.probable ? styles.probableLabel : null,
+              slot.sv ? styles.svLabel : null,
+              slot.probableState ? { backgroundColor: TONE_LABEL_BG[slot.probableState] } : null,
+              empty && selected ? styles.labelSelected : null,
+            ]}
+          >
+            <Text style={styles.labelText} numberOfLines={1}>
+              {empty ? ROLE_SHORT[slot.role] : surname(slot.name)}
+            </Text>
+          </View>
+        );
         return (
           <Pressable
             key={slot.index}
@@ -159,57 +216,29 @@ export function FormationPitch({
             }
             disabled={disabled}
             onPress={() => onSlotPress(slot.index)}
-            style={[styles.slot, { left: `${pos?.x ?? 50}%` as `${number}%`, top: `${pos?.y ?? 50}%` as `${number}%` }]}
+            style={[
+              isGoalkeeper ? styles.slotGk : styles.slot,
+              { left: `${pos?.x ?? 50}%` as `${number}%`, top: `${pos?.y ?? 50}%` as `${number}%` },
+            ]}
             testID={`formation-starter-${slot.index}`}
           >
-            {scoreAbove ? scorePill : null}
-            {empty ? (
-              <View style={[styles.emptyCircle, selected ? styles.selectedRing : null]}>
-                <Text style={styles.plus}>+</Text>
+            {isGoalkeeper ? (
+              <View style={styles.gkRow}>
+                {circleNode}
+                <View style={styles.gkLabelColumn}>
+                  {labelNode}
+                  {scorePill}
+                  {lockPill}
+                </View>
               </View>
             ) : (
-              <View
-                style={[
-                  styles.circle,
-                  { borderColor: roleRingColor(slot.role) },
-                  slot.probable ? styles.probableRing : null,
-                  slot.sv ? styles.svRing : null,
-                  slot.final ? styles.finalRing : null,
-                  slot.probableState ? toneRing(slot.probableState) : null,
-                  selected ? styles.selectedRing : null,
-                ]}
-              >
-                {slot.photoUrl ? (
-                  <Image source={{ uri: slot.photoUrl }} style={styles.photo} />
-                ) : (
-                  <Text style={styles.initial}>{(slot.name ?? "?").trim().charAt(0).toUpperCase()}</Text>
-                )}
-                {slot.locked ? (
-                  <View style={styles.lockDot}>
-                    <Text style={styles.lockText}>🔒</Text>
-                  </View>
-                ) : null}
-              </View>
+              <>
+                {circleNode}
+                {labelNode}
+                {scorePill}
+                {lockPill}
+              </>
             )}
-            <View
-              style={[
-                styles.label,
-                slot.probable ? styles.probableLabel : null,
-                slot.sv ? styles.svLabel : null,
-                slot.probableState ? { backgroundColor: TONE_LABEL_BG[slot.probableState] } : null,
-                empty && selected ? styles.labelSelected : null,
-              ]}
-            >
-              <Text style={styles.labelText} numberOfLines={1}>
-                {empty ? ROLE_SHORT[slot.role] : surname(slot.name)}
-              </Text>
-            </View>
-            {scoreAbove ? null : scorePill}
-            {!empty && slot.lockCountdown ? (
-              <View style={styles.lockPill}>
-                <Text style={styles.lockCountdown}>{slot.lockCountdown}</Text>
-              </View>
-            ) : null}
           </Pressable>
         );
       })}
@@ -492,6 +521,21 @@ const styles = lazyStyles(() =>
       marginTop: -30,
       alignItems: "center",
       gap: 4,
+    },
+    slotGk: {
+      position: "absolute",
+      marginLeft: -23,
+      marginTop: -23,
+      alignItems: "flex-start",
+    },
+    gkRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 6,
+    },
+    gkLabelColumn: {
+      alignItems: "flex-start",
+      gap: 2,
     },
     circle: {
       width: 46,

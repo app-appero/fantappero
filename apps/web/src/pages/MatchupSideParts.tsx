@@ -26,8 +26,8 @@ export function useNow(intervalMs = 1000): number {
 
 const ROLE_CLASS: Record<string, string> = { P: "gk", D: "def", C: "mid", A: "fwd" };
 
-/** `tra 02:14:10` se la partita reale del giocatore deve ancora iniziare. */
-function kickoffCountdown(player: H2HPlayerScore, now: number): string | null {
+/** `02:14:10` se la partita reale del giocatore deve ancora iniziare. */
+export function kickoffCountdown(player: H2HPlayerScore, now: number): string | null {
   if (!player.kickoffAt || player.fixtureStatusLabel !== "Da giocare") {
     return null;
   }
@@ -35,7 +35,7 @@ function kickoffCountdown(player: H2HPlayerScore, now: number): string | null {
   if (!parts || (parts.days === 0 && parts.hours === 0 && parts.minutes === 0 && parts.seconds === 0)) {
     return null;
   }
-  return `tra ${formatCountdown(parts)}`;
+  return formatCountdown(parts);
 }
 
 export type MatchupRowProps = {

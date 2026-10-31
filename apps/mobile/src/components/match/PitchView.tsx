@@ -1,5 +1,5 @@
 import { lazyStyles } from "../../theme/lazyStyles";
-import type { MatchBadge, PitchPosition } from "@fantappero/contracts";
+import { resolvePitchRole, type MatchBadge, type PitchPosition } from "@fantappero/contracts";
 import { theme } from "@fantappero/ui/theme";
 import { useEffect, useRef } from "react";
 import { Animated, Easing, Image, Pressable, StyleSheet, Text, View } from "react-native";
@@ -83,16 +83,17 @@ export function PitchView({ title, players, positions, testID, onAthletePress }:
           if (!position) {
             return null;
           }
+          const isGoalkeeper = resolvePitchRole(player.role) === "GK";
           return (
             <View
               key={player.id}
               style={[
-                styles.slot,
+                isGoalkeeper ? styles.slotGk : styles.slot,
                 { left: `${position.xPercent}%` as `${number}%`, top: `${position.yPercent}%` as `${number}%` },
               ]}
               testID={`pitch-player-${player.id}`}
             >
-              <PitchPlayerBody player={player} yPercent={position.yPercent} onAthletePress={onAthletePress} />
+              <PitchPlayerBody player={player} isGoalkeeper={isGoalkeeper} onAthletePress={onAthletePress} />
             </View>
           );
         })}
@@ -129,18 +130,13 @@ function LiveGlow({ color = "#3b82f6", fill = "rgba(59,130,246,0.25)" }: { color
   );
 }
 
-/** Righe vicine al fondo del campo (es. il portiere): nome/voto sopra la
- * foto invece che sotto, altrimenti escono dal bordo del campo (overflow
- * hidden) e restano illeggibili. */
-const BOTTOM_ROW_THRESHOLD_PERCENT = 80;
-
 function PitchPlayerBody({
   player,
-  yPercent,
+  isGoalkeeper,
   onAthletePress,
 }: {
   player: PitchPlayer;
-  yPercent: number;
+  isGoalkeeper: boolean;
   onAthletePress?: (athleteId: string) => void;
 }) {
   const badges = (
@@ -175,39 +171,51 @@ function PitchPlayerBody({
       </View>
     </View>
   );
-  const label = (
+  const nameText = (
+    <Text
+      style={[styles.name, isGoalkeeper ? styles.nameGk : null, player.voteKind === "sv" ? styles.nameSv : null]}
+      numberOfLines={1}
+    >
+      {abbreviateName(player.name)}
+    </Text>
+  );
+  const scoreText = player.scoreLabel ? (
+    <Text
+      numberOfLines={1}
+      style={[
+        styles.score,
+        isGoalkeeper ? styles.scoreGk : null,
+        player.voteKind === "sv" ? styles.scoreSv : null,
+        player.voteKind === "provisional" ? styles.scoreProvisional : null,
+        player.voteKind === "final" ? styles.scoreFinal : null,
+      ]}
+    >
+      {player.scoreLabel}
+    </Text>
+  ) : null;
+  // Il portiere sta in fondo al campo: nome/voto sotto la foto uscivano dal
+  // bordo (overflow hidden) e restavano illeggibili. Qui vanno a destra
+  // della foto invece, che resta alla sua posizione originale.
+  const content = isGoalkeeper ? (
+    <View style={styles.gkRow}>
+      <View style={styles.gkPhotoColumn}>
+        {badges}
+        {card}
+      </View>
+      <View style={styles.gkLabel}>
+        {nameText}
+        {scoreText}
+      </View>
+    </View>
+  ) : (
     <>
-      <Text style={[styles.name, player.voteKind === "sv" ? styles.nameSv : null]} numberOfLines={1}>
-        {abbreviateName(player.name)}
-      </Text>
-      {player.scoreLabel ? (
-        <Text
-          style={[
-            styles.score,
-            player.voteKind === "sv" ? styles.scoreSv : null,
-            player.voteKind === "provisional" ? styles.scoreProvisional : null,
-            player.voteKind === "final" ? styles.scoreFinal : null,
-          ]}
-        >
-          {player.scoreLabel}
-        </Text>
-      ) : null}
+      {badges}
+      {card}
+      {nameText}
+      {scoreText}
     </>
   );
-  const content =
-    yPercent >= BOTTOM_ROW_THRESHOLD_PERCENT ? (
-      <>
-        {label}
-        {badges}
-        {card}
-      </>
-    ) : (
-      <>
-        {badges}
-        {card}
-        {label}
-      </>
-    );
+  const wrapperStyle = isGoalkeeper ? styles.playerGk : styles.player;
   if (player.athleteId && onAthletePress) {
     const athleteId = player.athleteId;
     return (
@@ -215,13 +223,13 @@ function PitchPlayerBody({
         accessibilityRole="button"
         accessibilityLabel={`Apri scheda di ${player.name}`}
         onPress={() => onAthletePress(athleteId)}
-        style={styles.player}
+        style={wrapperStyle}
       >
         {content}
       </Pressable>
     );
   }
-  return <View style={styles.player}>{content}</View>;
+  return <View style={wrapperStyle}>{content}</View>;
 }
 
 const styles = lazyStyles(() => StyleSheet.create({
@@ -289,6 +297,34 @@ const styles = lazyStyles(() => StyleSheet.create({
     alignItems: "center",
     width: "100%",
     gap: 1,
+  },
+  slotGk: {
+    position: "absolute",
+    transform: [{ translateX: -15 }, { translateY: -27 }],
+    alignItems: "flex-start",
+  },
+  playerGk: {
+    alignItems: "flex-start",
+  },
+  gkRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  gkPhotoColumn: {
+    width: 30,
+    alignItems: "center",
+    gap: 1,
+  },
+  gkLabel: {
+    alignItems: "flex-start",
+    gap: 1,
+  },
+  nameGk: {
+    textAlign: "left",
+  },
+  scoreGk: {
+    textAlign: "left",
   },
   badgesRow: {
     minHeight: 12,

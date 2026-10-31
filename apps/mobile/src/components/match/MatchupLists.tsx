@@ -53,7 +53,7 @@ export function kickoffCountdown(player: H2HPlayerScore, now: number): string | 
   if (!parts || (parts.days === 0 && parts.hours === 0 && parts.minutes === 0 && parts.seconds === 0)) {
     return null;
   }
-  return `tra ${formatCountdown(parts)}`;
+  return formatCountdown(parts);
 }
 
 /** Bordo blu che pulsa: solo per chi sta giocando ora. */
