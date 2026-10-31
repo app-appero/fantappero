@@ -10,6 +10,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
 from fantasy_turns.models import FantasyRoundFixture
+from fantasy_turns.rules import STARTED_FIXTURE_STATUSES
 from sports_data.catalog.models import Club
 from sports_data.fixtures.models import Fixture
 from sports_data.listone.mapping import map_provider_position_to_role
@@ -86,13 +87,34 @@ def latest_predicted_view(session: Session, fixture_id: UUID) -> PredictedView |
     ).first()
     if snapshot is None:
         return None
+    fixture = session.get(Fixture, fixture_id)
     note = _note(snapshot.lineup_type, snapshot.reliability)
     roles = _athlete_roles(
         session, {player.athlete_id for player in snapshot.players if player.athlete_id is not None}
     )
     return PredictedView(
-        home=_side(snapshot, "home", snapshot.home_formation, snapshot.home_coach, note, roles),
-        away=_side(snapshot, "away", snapshot.away_formation, snapshot.away_coach, note, roles),
+        home=_side(
+            session,
+            snapshot,
+            "home",
+            snapshot.home_formation,
+            snapshot.home_coach,
+            note,
+            roles,
+            fixture=fixture,
+            club_id=fixture.home_club_id if fixture is not None else None,
+        ),
+        away=_side(
+            session,
+            snapshot,
+            "away",
+            snapshot.away_formation,
+            snapshot.away_coach,
+            note,
+            roles,
+            fixture=fixture,
+            club_id=fixture.away_club_id if fixture is not None else None,
+        ),
         unavailable=tuple(
             PredictedUnavailable(
                 athlete_id=None if player.athlete_id is None else str(player.athlete_id),
@@ -128,6 +150,10 @@ def hints_for_fixtures(
     latest: dict[UUID, PredictedLineupSnapshot] = {}
     for snapshot in snapshots:
         latest.setdefault(snapshot.fixture_id, snapshot)
+    fixtures_by_id = {
+        fixture.id: fixture
+        for fixture in session.scalars(select(Fixture).where(Fixture.id.in_(latest.keys()))).all()
+    }
     wanted = set(athlete_ids)
     found: dict[UUID, AthleteProbable] = {}
     for snapshot in latest.values():
@@ -140,16 +166,81 @@ def hints_for_fixtures(
             current = found.get(player.athlete_id)
             if current is None or _hint_rank(hint.hint) > _hint_rank(current.hint):
                 found[player.athlete_id] = hint
+        fixture = fixtures_by_id.get(snapshot.fixture_id)
+        for side, club_id in (
+            ("home", fixture.home_club_id if fixture is not None else None),
+            ("away", fixture.away_club_id if fixture is not None else None),
+        ):
+            has_explicit_bench = any(
+                row.side == side and not row.is_starter and not row.is_unavailable
+                for row in snapshot.players
+            )
+            if has_explicit_bench:
+                continue
+            known_ids = {
+                row.athlete_id
+                for row in snapshot.players
+                if row.side == side and row.athlete_id is not None
+            }
+            inferred_ids = _inferred_bench_ids(
+                session,
+                fixture=fixture,
+                lineup_type=snapshot.lineup_type,
+                club_id=club_id,
+                known_ids=known_ids,
+            )
+            for athlete_id in inferred_ids & wanted:
+                found.setdefault(
+                    athlete_id,
+                    AthleteProbable(hint="bench", note="Possibile panchina (dedotta)", blocked=False),
+                )
     return found
 
 
+def _inferred_bench_ids(
+    session: Session,
+    *,
+    fixture: Fixture | None,
+    lineup_type: str,
+    club_id: UUID | None,
+    known_ids: set[UUID],
+) -> set[UUID]:
+    """Panchina dedotta quando il provider non la pubblica (EP-panchina-dedotta).
+
+    FotMob a volte restituisce solo titolari e indisponibili, senza panchina.
+    In quel caso chi è in rosa reale (``SquadMembership`` attiva) e non
+    rientra in nessuno dei due gruppi è *probabilmente* panchina. Vale solo
+    finché la formazione non è ufficiale (``lineup_type == "predicted"``) e
+    la partita non è iniziata — da lì in poi il provider pubblica sempre la
+    panchina vera, quindi l'inferenza non serve più.
+    """
+    if lineup_type != "predicted" or fixture is None or club_id is None:
+        return set()
+    if (fixture.status_short or "").strip().upper() in STARTED_FIXTURE_STATUSES:
+        return set()
+    squad_ids = set(
+        session.scalars(
+            select(SquadMembership.athlete_id).where(
+                SquadMembership.club_id == club_id,
+                SquadMembership.sport_season_id == fixture.sport_season_id,
+                SquadMembership.is_active.is_(True),
+            )
+        ).all()
+    )
+    return squad_ids - known_ids
+
+
 def _side(
+    session: Session,
     snapshot: PredictedLineupSnapshot,
     side: str,
     formation: str | None,
     coach: str | None,
     note: str,
     roles: dict[UUID, str],
+    *,
+    fixture: Fixture | None,
+    club_id: UUID | None,
 ) -> PredictedViewSide | None:
     rows = [
         player
@@ -179,6 +270,43 @@ def _side(
             (player for player in ordered if not player.is_starter), start=1
         )
     )
+    if not bench:
+        known_ids = {
+            player.athlete_id
+            for player in snapshot.players
+            if player.side == side and player.athlete_id is not None
+        }
+        inferred_ids = _inferred_bench_ids(
+            session,
+            fixture=fixture,
+            lineup_type=snapshot.lineup_type,
+            club_id=club_id,
+            known_ids=known_ids,
+        )
+        if inferred_ids:
+            inferred_roles = _athlete_roles(session, inferred_ids)
+            names = dict(
+                session.execute(
+                    select(Athlete.id, Athlete.canonical_name).where(
+                        Athlete.id.in_(inferred_ids)
+                    )
+                ).all()
+            )
+            inferred_players = sorted(
+                ((athlete_id, name) for athlete_id, name in names.items() if name),
+                key=lambda item: item[1],
+            )
+            bench = tuple(
+                PredictedViewPlayer(
+                    athlete_id=str(athlete_id),
+                    name=name,
+                    shirt_number=None,
+                    grid=None,
+                    role=inferred_roles.get(athlete_id),
+                    bench_order=index,
+                )
+                for index, (athlete_id, name) in enumerate(inferred_players, start=1)
+            )
     if not starters and not bench:
         return None
     return PredictedViewSide(
