@@ -1,7 +1,7 @@
 import { lazyStyles } from "../theme/lazyStyles";
 import { theme } from "@fantappero/ui/theme";
 import { useRef, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, Text, View, type ScrollViewInstance } from "react-native";
 import { AppTextInput as TextInput } from "./AppTextInput";
 
 const { colors, spacing, typography, radius } = theme;
@@ -54,7 +54,7 @@ export function OptionPicker({
 }: OptionPickerProps) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
-  const scrollRef = useRef<ScrollView>(null);
+  const scrollRef = useRef<ScrollViewInstance>(null);
   const offsetsRef = useRef<Map<string, number>>(new Map());
   const selected = options.find((option) => option.value === value);
   const normalizedQuery = query.trim().toLocaleLowerCase("it-IT");

@@ -15,7 +15,10 @@ export function lazyStyles<T extends Record<string, unknown>>(factory: () => T):
       }
       const id = getActiveColorScheme();
       if (!cached || cachedId !== id) {
-        cached = StyleSheet.create(factory() as StyleSheet.NamedStyles<any>) as T;
+        // `T` is already checked against `StyleSheet.create`'s constraint at
+        // each `factory()` call site; RN's internal style constraint type
+        // isn't exported, so there's no narrower bound to declare here.
+        cached = StyleSheet.create(factory() as any) as T;
         cachedId = id;
       }
       return cached[prop];

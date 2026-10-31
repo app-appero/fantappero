@@ -472,7 +472,7 @@ export function RosterScreen() {
       file.delete();
     }
     file.create();
-    file.write(new Uint8Array(buffer));
+    await file.write(new Uint8Array(buffer));
     const canShare = await Sharing.isAvailableAsync();
     if (!canShare) {
       setCsvMessage(`File pronto: ${filename}`);
