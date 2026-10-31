@@ -188,7 +188,7 @@ function SquadTabs({
                   style={[styles.squadRow, offEvent ? styles.squadRowOut : null]}
                   testID={`fixture-bench-player-${pitchPlayerId(player)}`}
                 >
-                  <RoleBadge code={player.position} />
+                  {player.position ? <RoleBadge code={player.position} /> : null}
                   <View style={styles.squadBody}>
                     <View style={styles.eventLine}>
                       <Text style={styles.body}>{player.shirtNumber !== null ? `${player.shirtNumber}. ` : ""}</Text>
