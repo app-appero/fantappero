@@ -528,7 +528,6 @@ def _build_side(
             probable_by_athlete=probable_by_athlete,
             persisted_total=persisted_total,
             persisted_goals=persisted_goals,
-            session=session,
         )
 
     if submission is not None:
@@ -568,30 +567,32 @@ def _side_from_effective(
     probable_by_athlete: dict[UUID, AthleteProbable],
     persisted_total: float | None,
     persisted_goals: int | None,
-    session: Session,
 ) -> H2HSideLineupResponse:
-    players_by_id = {player.athlete_id: player for player in submission.players}
-    starter_ids = [UUID(item) for item in effective.effective_starter_ids]
-    missing_ids = [athlete_id for athlete_id in starter_ids if athlete_id not in players_by_id]
-    athletes_by_id: dict[UUID, Athlete] = {}
-    if missing_ids:
-        athletes_by_id = {
-            row.id: row
-            for row in session.scalars(select(Athlete).where(Athlete.id.in_(missing_ids))).all()
-        }
+    # Il titolare originale resta sempre visibile al suo posto: solo il
+    # punteggio che conta per il totale è quello di chi è effettivamente
+    # subentrato (nessuno scambio di identità in campo, nessuno sparisce
+    # dalla panchina perché "promosso").
+    substitute_by_outgoing: dict[UUID, UUID] = {}
+    for item in effective.substitutions_json or []:
+        try:
+            substitute_by_outgoing[UUID(item["outAthleteId"])] = UUID(item["inAthleteId"])
+        except (KeyError, TypeError, ValueError):
+            continue
+
     starters: list[H2HPlayerScoreResponse] = []
-    for athlete_id in starter_ids:
-        player = players_by_id.get(athlete_id)
-        athlete = player.athlete if player is not None else athletes_by_id.get(athlete_id)
-        role = player.role.value if player is not None else "C"
+    for player in sorted(
+        (row for row in submission.players if row.slot_kind == LineupSlotKind.STARTER),
+        key=lambda row: row.sort_order,
+    ):
+        scoring_athlete_id = substitute_by_outgoing.get(player.athlete_id, player.athlete_id)
         starters.append(
             _player_score_response(
-                athlete_id=athlete_id,
-                name=_athlete_name(athlete, athlete_id),
-                photo_url=athlete.photo_url if athlete is not None else None,
-                role=role,
-                snapshot=scores_by_athlete.get(athlete_id),
-                probable=probable_by_athlete.get(athlete_id),
+                athlete_id=player.athlete_id,
+                name=_athlete_name(player.athlete, player.athlete_id),
+                photo_url=player.athlete.photo_url if player.athlete is not None else None,
+                role=player.role.value,
+                snapshot=scores_by_athlete.get(scoring_athlete_id),
+                probable=probable_by_athlete.get(player.athlete_id),
                 is_effective_starter=True,
                 is_bench=False,
             )
@@ -601,8 +602,6 @@ def _side_from_effective(
         (row for row in submission.players if row.slot_kind == LineupSlotKind.BENCH),
         key=lambda row: row.sort_order,
     ):
-        if player.athlete_id in starter_ids:
-            continue
         bench.append(
             _player_score_response(
                 athlete_id=player.athlete_id,

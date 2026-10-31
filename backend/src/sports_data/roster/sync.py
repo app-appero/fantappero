@@ -397,6 +397,41 @@ def _deactivate_membership(
         counters.incr_entity("memberships", "deactivated")
 
 
+# Una rosa reale ne ha sempre di più: una fetch più corta è probabilmente
+# parziale/troncata (rate limit, bug di paginazione) e non va usata per
+# disattivare in massa una rosa vera.
+MIN_SQUAD_SIZE_FOR_RECONCILIATION = 10
+
+
+def _deactivate_memberships_missing_from_fetch(
+    session: Session,
+    *,
+    club_id: UUID,
+    sport_season_id: UUID,
+    seen_athlete_ids: set[UUID],
+    counters: RosterSyncCounters,
+) -> None:
+    """Disattiva le membership attive non più restituite dal provider.
+
+    Senza questo, un calciatore ritirato o uscito senza un ``Transfer``
+    tracciato (es. fine contratto, o storico da prima del tracking
+    trasferimenti) resta ``is_active=True`` per sempre.
+    """
+    if len(seen_athlete_ids) < MIN_SQUAD_SIZE_FOR_RECONCILIATION:
+        return
+    stale = session.scalars(
+        select(SquadMembership).where(
+            SquadMembership.club_id == club_id,
+            SquadMembership.sport_season_id == sport_season_id,
+            SquadMembership.is_active.is_(True),
+            SquadMembership.athlete_id.not_in(seen_athlete_ids),
+        ),
+    ).all()
+    ended_at = datetime.now(UTC).date()
+    for membership in stale:
+        _deactivate_membership(membership, ended_at=ended_at, counters=counters)
+
+
 def upsert_transfer(
     session: Session,
     mapped: MappedTransfer,
@@ -580,6 +615,8 @@ def sync_squads_for_club(
     result = RosterSyncResult(counters=counters or RosterSyncCounters())
     _maybe_store_snapshot(session, envelope, result.counters, store_snapshots=store_snapshots)
 
+    seen_by_season: dict[UUID, set[UUID]] = {}
+    club_id: UUID | None = None
     for mapped in map_squad_memberships(
         envelope,
         competition_provider_id=competition_provider_id,
@@ -587,7 +624,23 @@ def sync_squads_for_club(
     ):
         if mapped.club_provider_id != club_provider_id:
             continue
-        upsert_squad_membership(session, mapped, result.counters)
+        membership = upsert_squad_membership(session, mapped, result.counters)
+        if membership is not None:
+            club_id = membership.club_id
+            seen_by_season.setdefault(membership.sport_season_id, set()).add(
+                membership.athlete_id,
+            )
+
+    for sport_season_id, seen_athlete_ids in seen_by_season.items():
+        if club_id is None:
+            continue
+        _deactivate_memberships_missing_from_fetch(
+            session,
+            club_id=club_id,
+            sport_season_id=sport_season_id,
+            seen_athlete_ids=seen_athlete_ids,
+            counters=result.counters,
+        )
 
     logger.info(
         "roster_squads_synced",
@@ -620,10 +673,28 @@ def sync_players_for_club(
     for mapped in map_athletes_from_players(envelope, league_ids=allowed):
         upsert_athlete(session, mapped, result.counters)
 
+    seen_by_season: dict[UUID, set[UUID]] = {}
+    club_id: UUID | None = None
     for mapped in map_squad_memberships_from_players(envelope, league_ids=allowed):
         if mapped.club_provider_id != club_provider_id or mapped.season_year != season_year:
             continue
-        upsert_squad_membership(session, mapped, result.counters)
+        membership = upsert_squad_membership(session, mapped, result.counters)
+        if membership is not None:
+            club_id = membership.club_id
+            seen_by_season.setdefault(membership.sport_season_id, set()).add(
+                membership.athlete_id,
+            )
+
+    for sport_season_id, seen_athlete_ids in seen_by_season.items():
+        if club_id is None:
+            continue
+        _deactivate_memberships_missing_from_fetch(
+            session,
+            club_id=club_id,
+            sport_season_id=sport_season_id,
+            seen_athlete_ids=seen_athlete_ids,
+            counters=result.counters,
+        )
 
     logger.info(
         "roster_players_synced",
