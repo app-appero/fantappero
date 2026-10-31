@@ -17,7 +17,8 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from auth.exceptions import ValidationAuthError
-from fantasy_lineups.models import EffectiveLineup
+from database.enums import LineupSlotKind
+from fantasy_lineups.models import EffectiveLineup, LineupPlayer
 from fantasy_ratings.config import default_formula_config
 from fantasy_ratings.models import PlayerMatchRating
 from fantasy_teams.models import FantasyTeam
@@ -108,9 +109,17 @@ def compute_round_results(
     result_final = (
         readiness.final_data_ready and bool(slots) and len(resolved_matchups) == len(slots)
     )
+    # I panchinari subentrati "entrano" nel conteggio solo a turno concluso:
+    # finché anche una sola fixture del turno è ancora in corso, il titolare
+    # S.V. resta a referto (0 punti) invece del punteggio del sostituto.
+    use_substitutes = readiness.all_fixtures_finished
     for slot, home_lineup, away_lineup in resolved_matchups:
-        home_points = _team_points(session, home_lineup, fixture_ids, version)
-        away_points = _team_points(session, away_lineup, fixture_ids, version)
+        home_points = _team_points(
+            session, home_lineup, fixture_ids, version, use_substitutes=use_substitutes
+        )
+        away_points = _team_points(
+            session, away_lineup, fixture_ids, version, use_substitutes=use_substitutes
+        )
         outcome = MatchOutcome.from_points(home_points=home_points, away_points=away_points)
 
         _upsert_slot_result(
@@ -160,8 +169,20 @@ def _team_points(
     lineup: EffectiveLineup,
     fixture_ids: list[UUID],
     formula_version: str,
+    *,
+    use_substitutes: bool,
 ) -> float:
-    athlete_ids = [UUID(item) for item in lineup.effective_starter_ids]
+    if use_substitutes:
+        athlete_ids = [UUID(item) for item in lineup.effective_starter_ids]
+    else:
+        athlete_ids = list(
+            session.scalars(
+                select(LineupPlayer.athlete_id).where(
+                    LineupPlayer.submission_id == lineup.submission_id,
+                    LineupPlayer.slot_kind == LineupSlotKind.STARTER,
+                )
+            ).all()
+        )
     if not athlete_ids or not fixture_ids:
         return 0.0
     rows = list(

@@ -568,30 +568,23 @@ def _side_from_effective(
     persisted_total: float | None,
     persisted_goals: int | None,
 ) -> H2HSideLineupResponse:
-    # Il titolare originale resta sempre visibile al suo posto: solo il
-    # punteggio che conta per il totale è quello di chi è effettivamente
-    # subentrato (nessuno scambio di identità in campo, nessuno sparisce
-    # dalla panchina perché "promosso").
-    substitute_by_outgoing: dict[UUID, UUID] = {}
-    for item in effective.substitutions_json or []:
-        try:
-            substitute_by_outgoing[UUID(item["outAthleteId"])] = UUID(item["inAthleteId"])
-        except (KeyError, TypeError, ValueError):
-            continue
-
+    # Il titolare originale resta sempre visibile al suo posto, con il SUO
+    # punteggio (S.V. finché non ha un voto): il sostituto non prende mai
+    # visivamente l'identità né il punteggio del titolare. L'eventuale
+    # sostituzione nel conteggio di squadra è decisa altrove (scoring_service,
+    # solo a turno concluso), non qui nella card individuale.
     starters: list[H2HPlayerScoreResponse] = []
     for player in sorted(
         (row for row in submission.players if row.slot_kind == LineupSlotKind.STARTER),
         key=lambda row: row.sort_order,
     ):
-        scoring_athlete_id = substitute_by_outgoing.get(player.athlete_id, player.athlete_id)
         starters.append(
             _player_score_response(
                 athlete_id=player.athlete_id,
                 name=_athlete_name(player.athlete, player.athlete_id),
                 photo_url=player.athlete.photo_url if player.athlete is not None else None,
                 role=player.role.value,
-                snapshot=scores_by_athlete.get(scoring_athlete_id),
+                snapshot=scores_by_athlete.get(player.athlete_id),
                 probable=probable_by_athlete.get(player.athlete_id),
                 is_effective_starter=True,
                 is_bench=False,

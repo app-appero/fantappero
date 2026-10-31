@@ -1,6 +1,8 @@
-"""Scontro diretto: il titolare con S.V. resta visibile in campo, il suo
-punteggio è quello del subentrante, e il subentrante resta visibile in
-panchina (non "promosso" al posto del titolare, non sparisce)."""
+"""Scontro diretto: il titolare con S.V. resta visibile in campo col SUO
+punteggio (mai quello del subentrante, che non lo "sostituisce" mai
+visivamente), e il subentrante resta visibile in panchina (non "promosso"
+al posto del titolare, non sparisce). La sostituzione nel conteggio di
+squadra è decisa altrove (scoring_service), solo a turno concluso."""
 
 from __future__ import annotations
 
@@ -24,11 +26,11 @@ def _player(athlete_id, *, slot_kind, role, sort_order):
     return player
 
 
-def test_starter_with_no_vote_keeps_his_identity_but_the_substitute_score() -> None:
-    starter_out_id = uuid4()  # Freeman: S.V., sostituito
-    substitute_in_id = uuid4()  # Hakimi: subentra, il suo punteggio conta
+def test_starter_with_no_vote_keeps_his_own_identity_and_his_own_score() -> None:
+    starter_out_id = uuid4()  # Freeman: S.V., sostituito nel conteggio finale
     other_starter_id = uuid4()
     bench_ids = [uuid4() for _ in range(10)]  # i 10 panchinari reali, incluso il subentrante
+    substitute_in_id = bench_ids[0]  # Hakimi: subentra solo nel conteggio finale
 
     submission = LineupSubmission(module=FantasyModule.M433)
     submission.players = [
@@ -39,8 +41,6 @@ def test_starter_with_no_vote_keeps_his_identity_but_the_substitute_score() -> N
             for i, bench_id in enumerate(bench_ids)
         ],
     ]
-    # Il subentrante è uno dei 10 panchinari reali.
-    substitute_in_id = bench_ids[0]
 
     effective = EffectiveLineup(
         module=FantasyModule.M433,
@@ -74,13 +74,14 @@ def test_starter_with_no_vote_keeps_his_identity_but_the_substitute_score() -> N
 
     assert len(result.starters) == 2
     starter_out = next(row for row in result.starters if row.athlete_id == str(starter_out_id))
-    # Identità in campo resta quella del titolare originale...
+    # Identità e punteggio in campo restano quelli del titolare originale: S.V./0,
+    # mai il punteggio (né i bonus) del subentrante.
     assert starter_out.athlete_id == str(starter_out_id)
-    # ...ma il punteggio contato è quello del subentrante.
-    assert starter_out.fantasy_score == 7.5
+    assert starter_out.fantasy_score == 0.0
 
-    # Tutti i 10 panchinari originali restano visibili, compreso il subentrante.
+    # Tutti i 10 panchinari originali restano visibili, compreso il subentrante,
+    # anch'esso col proprio punteggio individuale.
     assert len(result.bench) == 10
     assert {row.athlete_id for row in result.bench} == {str(b) for b in bench_ids}
-
-    assert result.total_score == 7.5 + 6.0
+    substitute_row = next(row for row in result.bench if row.athlete_id == str(substitute_in_id))
+    assert substitute_row.fantasy_score == 7.5
