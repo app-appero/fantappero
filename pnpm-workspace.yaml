@@ -2,6 +2,10 @@ packages:
   - "apps/*"
   - "packages/*"
 
+# Layout piatto (come richiesto da Expo / React Native in un monorepo pnpm): da pnpm 11 il
+# `node-linker` di .npmrc non viene più letto, va dichiarato qui.
+nodeLinker: hoisted
+
 allowBuilds:
   esbuild: true
 
