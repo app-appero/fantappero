@@ -122,6 +122,49 @@ export function layoutFromGrid<T extends GridEntryLike>(entries: readonly T[]): 
   return positions;
 }
 
+function gridRow(grid: string | null): number | null {
+  if (!grid) {
+    return null;
+  }
+  const row = Number.parseInt(grid.split(":")[0] ?? "", 10);
+  return Number.isFinite(row) ? row : null;
+}
+
+/**
+ * Ruolo dedotto dalla riga del `grid` ufficiale (riga 1 = portiere, ultima
+ * riga = attacco, righe intermedie = centrocampo): a differenza del campo
+ * `pos` del provider — che riflette il ruolo abituale/anagrafico del
+ * calciatore, non sempre quello schierato in questa specifica partita — è
+ * sempre coerente con la riga in cui il giocatore viene effettivamente
+ * disegnato da `layoutFromGrid`.
+ */
+export function pitchRoleCodeFromGrid(
+  grid: string | null,
+  allGrids: readonly (string | null)[],
+): "G" | "D" | "M" | "F" | null {
+  const row = gridRow(grid);
+  if (row === null) {
+    return null;
+  }
+  let maxRow = row;
+  for (const other of allGrids) {
+    const otherRow = gridRow(other);
+    if (otherRow !== null) {
+      maxRow = Math.max(maxRow, otherRow);
+    }
+  }
+  if (row <= 1) {
+    return "G";
+  }
+  if (row === maxRow) {
+    return "F";
+  }
+  if (row === 2) {
+    return "D";
+  }
+  return "M";
+}
+
 /**
  * Fallback quando il `grid` non è disponibile (sempre il caso per le
  * formazioni fantasy, mai schierate su un campo reale): usa modulo + ruolo +

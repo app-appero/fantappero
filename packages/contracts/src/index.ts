@@ -427,6 +427,7 @@ export {
   fantasyBadgesFromBonusMalus,
   layoutFromGrid,
   layoutFromModule,
+  pitchRoleCodeFromGrid,
   pitchRoleFullLabel,
   pitchRoleVariant,
   realMatchBadgesByAthlete,

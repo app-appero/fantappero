@@ -4,6 +4,7 @@ import {
   fantasyBadgesFromBonusMalus,
   layoutFromGrid,
   layoutFromModule,
+  pitchRoleCodeFromGrid,
   pitchRoleFullLabel,
   pitchRoleVariant,
   realMatchBadgesByAthlete,
@@ -83,6 +84,27 @@ describe("layoutFromGrid", () => {
     ]);
     assert.equal(positions.length, 1);
     assert.equal(positions[0]!.id, "gk");
+  });
+});
+
+describe("pitchRoleCodeFromGrid", () => {
+  it("derives G/D/M/F from the grid row, ignoring an unreliable provider pos", () => {
+    const grids = ["1:1", "2:1", "2:2", "2:3", "2:4", "3:1", "3:2", "3:3", "4:1", "4:2", "4:3"];
+    assert.equal(pitchRoleCodeFromGrid("1:1", grids), "G");
+    assert.equal(pitchRoleCodeFromGrid("2:1", grids), "D");
+    assert.equal(pitchRoleCodeFromGrid("3:1", grids), "M");
+    assert.equal(pitchRoleCodeFromGrid("4:1", grids), "F");
+  });
+
+  it("treats every row strictly between the back line and the front line as midfield (4-2-3-1)", () => {
+    const grids = ["1:1", "2:1", "2:2", "2:3", "2:4", "3:1", "3:2", "4:1", "4:2", "4:3", "5:1"];
+    assert.equal(pitchRoleCodeFromGrid("3:1", grids), "M");
+    assert.equal(pitchRoleCodeFromGrid("4:1", grids), "M");
+    assert.equal(pitchRoleCodeFromGrid("5:1", grids), "F");
+  });
+
+  it("returns null without a grid, so callers can fall back to the provider pos", () => {
+    assert.equal(pitchRoleCodeFromGrid(null, ["1:1"]), null);
   });
 });
 

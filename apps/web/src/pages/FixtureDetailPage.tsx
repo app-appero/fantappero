@@ -7,7 +7,7 @@ import type {
   MatchBadge,
   ProviderFeedState,
 } from "@fantappero/contracts";
-import { layoutFromGrid, mapFixtureMatchStatus, realMatchBadgesByAthlete } from "@fantappero/contracts";
+import { layoutFromGrid, mapFixtureMatchStatus, pitchRoleCodeFromGrid, realMatchBadgesByAthlete } from "@fantappero/contracts";
 import type { TimelineEntry } from "@fantappero/ui";
 import {
   AssistIcon,
@@ -91,12 +91,16 @@ function pitchPlayerId(player: FixtureLineupPlayer): string {
 }
 
 function toPitchPlayers(players: readonly FixtureLineupPlayer[], badgesByAthlete: Map<string, MatchBadge[]>) {
+  // Il "pos" del provider è il ruolo abituale/anagrafico del calciatore, non
+  // sempre quello schierato in questa partita: per i titolari il grid (che
+  // decide anche la riga su cui vengono disegnati) è la fonte più affidabile.
+  const allGrids = players.map((player) => player.grid);
   return players.map((player) => ({
     id: pitchPlayerId(player),
     athleteId: player.athleteId,
     shirtNumber: player.shirtNumber,
     name: player.name,
-    role: player.position,
+    role: pitchRoleCodeFromGrid(player.grid, allGrids) ?? player.position,
     badges: player.athleteId ? badgesByAthlete.get(player.athleteId) : undefined,
     photoUrl: player.photoUrl,
   }));
