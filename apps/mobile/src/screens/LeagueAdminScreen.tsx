@@ -45,6 +45,13 @@ import { copyToClipboard } from "../utils/clipboard";
 const { colors, spacing, typography, radius } = theme;
 
 
+function clampPercent(text: string, fallback: number): number {
+  if (text.trim() === "" || Number.isNaN(Number(text))) {
+    return fallback;
+  }
+  return Math.min(100, Math.max(0, Number(text)));
+}
+
 function buildPayloadFromRules(rules: LeagueRules): UpdateLeagueRulesRequest {
   return {
     presetName: rules.presetName,
@@ -55,6 +62,9 @@ function buildPayloadFromRules(rules: LeagueRules): UpdateLeagueRulesRequest {
     turnCoverageThreshold: rules.turnCoverageThreshold,
     lineupLockMarginMinutes: rules.lineupLockMarginMinutes,
     minutesThreshold: rules.minutesThreshold,
+    voluntaryReleaseRefundPercent: rules.voluntaryReleaseRefundPercent,
+    leagueExitRefundPercent: rules.leagueExitRefundPercent,
+    maxActiveTradeProposalsPerTeam: rules.maxActiveTradeProposalsPerTeam,
     options: { ...rules.options },
   };
 }
@@ -106,6 +116,11 @@ export function LeagueAdminScreen() {
   const [participantCountText, setParticipantCountText] = useState("8");
   const [minutesThresholdText, setMinutesThresholdText] = useState("15");
   const [lockMarginText, setLockMarginText] = useState("15");
+  const [creditsText, setCreditsText] = useState("1000");
+  const [turnCoverageText, setTurnCoverageText] = useState("75");
+  const [voluntaryRefundText, setVoluntaryRefundText] = useState("50");
+  const [exitRefundText, setExitRefundText] = useState("100");
+  const [maxTradeProposalsText, setMaxTradeProposalsText] = useState("10");
 
   const loadAll = useCallback(
     async (options?: { silent?: boolean }) => {
@@ -134,6 +149,11 @@ export function LeagueAdminScreen() {
         setParticipantCountText(String(panel.rules.participantCount));
         setMinutesThresholdText(String(panel.rules.minutesThreshold));
         setLockMarginText(String(panel.rules.lineupLockMarginMinutes));
+        setCreditsText(String(panel.rules.totalCredits));
+        setTurnCoverageText(String(Math.round(panel.rules.turnCoverageThreshold * 100)));
+        setVoluntaryRefundText(String(panel.rules.voluntaryReleaseRefundPercent));
+        setExitRefundText(String(panel.rules.leagueExitRefundPercent));
+        setMaxTradeProposalsText(String(panel.rules.maxActiveTradeProposalsPerTeam));
         setMembers(memberRows);
         setInvites(inviteRows);
         setCalendar(cal);
@@ -174,6 +194,17 @@ export function LeagueAdminScreen() {
       participantCount: Number(participantCountText) || rules.participantCount,
       minutesThreshold: Number(minutesThresholdText) || rules.minutesThreshold,
       lineupLockMarginMinutes: Number(lockMarginText) || rules.lineupLockMarginMinutes,
+      totalCredits: Number(creditsText) || rules.totalCredits,
+      turnCoverageThreshold:
+        Math.min(100, Math.max(50, Number(turnCoverageText) || 0)) / 100 ||
+        rules.turnCoverageThreshold,
+      voluntaryReleaseRefundPercent: clampPercent(
+        voluntaryRefundText,
+        rules.voluntaryReleaseRefundPercent,
+      ),
+      leagueExitRefundPercent: clampPercent(exitRefundText, rules.leagueExitRefundPercent),
+      maxActiveTradeProposalsPerTeam:
+        Math.max(1, Number(maxTradeProposalsText) || 0) || rules.maxActiveTradeProposalsPerTeam,
     };
     if (!leagueId || !accessToken) {
       setActionError("Seleziona una lega e accedi di nuovo.");
@@ -421,16 +452,29 @@ export function LeagueAdminScreen() {
       {!loading && rules && lifecycle ? (
         <View style={styles.content}>
           <Text style={styles.heading}>Regolamento</Text>
-          <Text style={styles.body}>Preset standard (fisso in M1)</Text>
-          <Text style={styles.label}>Partecipanti previsti</Text>
+          <Text style={styles.label}>Preset regolamento</Text>
+          <Text style={styles.body} testID="league-admin-preset">
+            Standard
+          </Text>
+          <Text style={styles.label}>Partecipanti</Text>
           <TextInput
             value={participantCountText}
             onChangeText={setParticipantCountText}
             keyboardType="number-pad"
             editable={canConfigure}
             style={styles.input}
-            accessibilityLabel="Partecipanti previsti"
+            accessibilityLabel="Partecipanti"
             testID="league-admin-participant-count"
+          />
+          <Text style={styles.label}>Crediti iniziali</Text>
+          <TextInput
+            value={creditsText}
+            onChangeText={setCreditsText}
+            keyboardType="number-pad"
+            editable={canConfigure}
+            style={styles.input}
+            accessibilityLabel="Crediti iniziali"
+            testID="league-admin-credits"
           />
           <Text style={styles.label}>Soglia minuti per il voto</Text>
           <TextInput
@@ -449,15 +493,32 @@ export function LeagueAdminScreen() {
             keyboardType="number-pad"
             editable={canConfigure}
             style={styles.input}
-            accessibilityLabel="Margine di preavviso lock formazione"
+            accessibilityLabel="Margine di preavviso lock formazione (minuti)"
             testID="league-admin-lock-margin"
           />
           <Text style={styles.body} testID="league-admin-lock-margin-hint">
-            Un giocatore si blocca in formazione questi minuti prima dell&apos;inizio della sua
-            partita reale — non del turno intero: la formazione a step resta invariata.
+            Un giocatore si blocca in formazione questi minuti prima dell&apos;inizio della sua partita reale — non del turno intero: la formazione a step resta invariata.
           </Text>
+          <Text style={styles.label}>Titolari minimi schierabili per giocare il turno (%)</Text>
+          <TextInput
+            value={turnCoverageText}
+            onChangeText={setTurnCoverageText}
+            keyboardType="number-pad"
+            editable={canConfigure}
+            style={styles.input}
+            accessibilityLabel="Titolari minimi schierabili per giocare il turno (%)"
+            testID="league-admin-turn-coverage"
+          />
+          <Text style={styles.body} testID="league-admin-turn-coverage-hint">
+            Percentuale dei titolari che ogni fantallenatore deve poter schierare perché una giornata diventi un Turno Europeo valido e quindi giocabile (minimo 50%, massimo 100%).
+          </Text>
+          <Text style={styles.label}>Rosa standard (fissa)</Text>
+          <Text style={styles.body} testID="league-admin-roster">
+            {`${rules.roster.rosterSize} giocatori: ${rules.roster.goalkeepers}P-${rules.roster.defenders}D-${rules.roster.midfielders}C-${rules.roster.forwards}A`}
+          </Text>
+          <Text style={styles.label}>Opzioni lega</Text>
           <View style={styles.switchRow}>
-            <Text style={styles.body}>Scambi consentiti</Text>
+            <Text style={[styles.body, styles.switchLabel]}>Abilita scambi</Text>
             <Switch
               value={rules.options.allowTrades}
               disabled={!canConfigure}
@@ -470,7 +531,7 @@ export function LeagueAdminScreen() {
             />
           </View>
           <View style={styles.switchRow}>
-            <Text style={styles.body}>Inviti manuali</Text>
+            <Text style={[styles.body, styles.switchLabel]}>Abilita inviti manuali</Text>
             <Switch
               value={rules.options.allowManualInvites}
               disabled={!canConfigure}
@@ -482,6 +543,50 @@ export function LeagueAdminScreen() {
               }
             />
           </View>
+          <View style={styles.switchRow}>
+            <Text style={[styles.body, styles.switchLabel]}>Richiedi approvazione amministratore per gli scambi</Text>
+            <Switch
+              value={rules.options.requireTradeApproval}
+              disabled={!canConfigure}
+              onValueChange={(value) =>
+                setRules({
+                  ...rules,
+                  options: { ...rules.options, requireTradeApproval: value },
+                })
+              }
+            />
+          </View>
+          <Text style={styles.label}>Regole mercato</Text>
+          <Text style={styles.label}>Rimborso svincolo volontario (%)</Text>
+          <TextInput
+            value={voluntaryRefundText}
+            onChangeText={setVoluntaryRefundText}
+            keyboardType="number-pad"
+            editable={canConfigure}
+            style={styles.input}
+            accessibilityLabel="Rimborso svincolo volontario (%)"
+            testID="league-admin-voluntary-refund"
+          />
+          <Text style={styles.label}>Rimborso svincolo per uscita dai cinque campionati (%)</Text>
+          <TextInput
+            value={exitRefundText}
+            onChangeText={setExitRefundText}
+            keyboardType="number-pad"
+            editable={canConfigure}
+            style={styles.input}
+            accessibilityLabel="Rimborso svincolo per uscita dai cinque campionati (%)"
+            testID="league-admin-exit-refund"
+          />
+          <Text style={styles.label}>Proposte di scambio attive per squadra (max)</Text>
+          <TextInput
+            value={maxTradeProposalsText}
+            onChangeText={setMaxTradeProposalsText}
+            keyboardType="number-pad"
+            editable={canConfigure}
+            style={styles.input}
+            accessibilityLabel="Proposte di scambio attive per squadra (max)"
+            testID="league-admin-max-trade-proposals"
+          />
           {saveSuccess ? (
             <UiStatePanel
               state="success"
@@ -510,8 +615,8 @@ export function LeagueAdminScreen() {
               title="Numero partecipanti non allineato"
               message={
                 members.length < rules.participantCount
-                  ? `Servono ancora ${rules.participantCount - members.length} iscritti, oppure abbassa «Partecipanti previsti» a ${members.length} e salva.`
-                  : `Ci sono più iscritti del previsto: alza «Partecipanti previsti» a ${members.length} e salva.`
+                  ? `Servono ancora ${rules.participantCount - members.length} iscritti, oppure abbassa «Partecipanti» a ${members.length} e salva.`
+                  : `Ci sono più iscritti del previsto: alza «Partecipanti» a ${members.length} e salva.`
               }
               testID="league-members-mismatch"
             />
@@ -842,6 +947,10 @@ const styles = lazyStyles(() => StyleSheet.create({
     paddingHorizontal: spacing.md,
     color: colors.foreground,
     backgroundColor: colors.backgroundElevated,
+  },
+  switchLabel: {
+    flex: 1,
+    paddingRight: spacing.sm,
   },
   switchRow: {
     flexDirection: "row",

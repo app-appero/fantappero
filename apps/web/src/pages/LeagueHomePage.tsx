@@ -348,16 +348,44 @@ export function LeagueHomePage() {
                     <dd>{league.rules.presetName}</dd>
                   </div>
                   <div>
-                    <dt>Rimborso svincolo</dt>
-                    <dd>{league.rules.voluntaryReleaseRefundPercent}%</dd>
+                    <dt>Crediti iniziali</dt>
+                    <dd>{league.rules.totalCredits}</dd>
+                  </div>
+                  <div>
+                    <dt>Soglia minuti per il voto</dt>
+                    <dd>{league.rules.minutesThreshold} min</dd>
                   </div>
                   <div>
                     <dt>Lock formazione</dt>
                     <dd>{league.rules.lineupLockMarginMinutes} min</dd>
                   </div>
                   <div>
+                    <dt>Titolari minimi per il turno</dt>
+                    <dd>{Math.round(league.rules.turnCoverageThreshold * 100)}%</dd>
+                  </div>
+                  <div>
                     <dt>Scambi</dt>
                     <dd>{league.rules.options.allowTrades ? "Attivi" : "Disattivati"}</dd>
+                  </div>
+                  <div>
+                    <dt>Inviti manuali</dt>
+                    <dd>{league.rules.options.allowManualInvites ? "Attivi" : "Disattivati"}</dd>
+                  </div>
+                  <div>
+                    <dt>Approvazione scambi</dt>
+                    <dd>{league.rules.options.requireTradeApproval ? "Richiesta" : "Non richiesta"}</dd>
+                  </div>
+                  <div>
+                    <dt>Rimborso svincolo volontario</dt>
+                    <dd>{league.rules.voluntaryReleaseRefundPercent}%</dd>
+                  </div>
+                  <div>
+                    <dt>Rimborso uscita dai cinque campionati</dt>
+                    <dd>{league.rules.leagueExitRefundPercent}%</dd>
+                  </div>
+                  <div>
+                    <dt>Proposte di scambio attive (max)</dt>
+                    <dd>{league.rules.maxActiveTradeProposalsPerTeam}</dd>
                   </div>
                 </dl>
               ) : (

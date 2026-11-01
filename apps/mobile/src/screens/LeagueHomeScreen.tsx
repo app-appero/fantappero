@@ -229,9 +229,16 @@ export function LeagueHomeScreen() {
             <View style={styles.card}>
               {[
                 ["Preset", league.rules.presetName],
-                ["Rimborso svincolo", `${league.rules.voluntaryReleaseRefundPercent}%`],
+                ["Crediti iniziali", `${league.rules.totalCredits}`],
+                ["Soglia minuti per il voto", `${league.rules.minutesThreshold} min`],
                 ["Lock formazione", `${league.rules.lineupLockMarginMinutes} min`],
+                ["Titolari minimi per il turno", `${Math.round(league.rules.turnCoverageThreshold * 100)}%`],
                 ["Scambi", league.rules.options.allowTrades ? "Attivi" : "Disattivati"],
+                ["Inviti manuali", league.rules.options.allowManualInvites ? "Attivi" : "Disattivati"],
+                ["Approvazione scambi", league.rules.options.requireTradeApproval ? "Richiesta" : "Non richiesta"],
+                ["Rimborso svincolo volontario", `${league.rules.voluntaryReleaseRefundPercent}%`],
+                ["Rimborso uscita dai cinque campionati", `${league.rules.leagueExitRefundPercent}%`],
+                ["Proposte di scambio attive (max)", `${league.rules.maxActiveTradeProposalsPerTeam}`],
               ].map(([label, value]) => (
                 <View key={label} style={styles.ruleRow}>
                   <Text style={styles.body}>{label}</Text>
