@@ -27,6 +27,7 @@
     },
     "plugins": [
       "./plugins/withGameCategory.js",
+      "./plugins/withAndroidCmakeVersion.js",
       [
         "expo-image-picker",
         {
