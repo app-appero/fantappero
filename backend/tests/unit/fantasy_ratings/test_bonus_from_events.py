@@ -25,6 +25,7 @@ def _event(
     status: str = "confirmed",
     event_type: str = "Goal",
     detail: str | None = None,
+    related: int | None = None,
 ):
     return SimpleNamespace(
         is_active=active,
@@ -33,6 +34,7 @@ def _event(
         status=status,
         event_type=event_type,
         event_detail=detail,
+        related_athlete_provider_id=related,
     )
 
 
@@ -132,6 +134,52 @@ def test_second_yellow_event_counts_as_expulsion():
     data, result = _run({}, [_card("Second Yellow card")])
     assert data.red_card is True
     assert result.total == -1.0
+
+
+# --- righe grezze della cronologia -------------------------------------------
+
+
+def _timeline(detail: str, *, pid: int = PLAYER, related: int | None = None):
+    return _event(None, pid=pid, status="timeline", event_type="Goal", detail=detail, related=related)
+
+
+def test_timeline_missed_penalty_gives_malus_without_normalized_row():
+    # "H. Kane — rigore sbagliato" in Cronologia, ma nessuna riga normalizzata.
+    data, result = _run({"penalty": {}}, [_timeline("Missed Penalty")])
+    assert data.penalty_missed == 1
+    assert result.total == -3.0
+
+
+def test_timeline_and_normalized_missed_penalty_are_not_summed():
+    events = [_timeline("Missed Penalty"), _event(ScoringEventKind.PENALTY_MISSED, detail="Missed Penalty")]
+    data, _ = _run({"penalty": {"missed": 1}}, events)
+    assert data.penalty_missed == 1
+
+
+def test_timeline_goal_and_assist_give_bonus_to_scorer_and_assister():
+    events = [_timeline("Normal Goal", pid=1, related=PLAYER)]
+    data, result = _run({}, events)
+    assert (data.goals, data.assists) == (0, 1)
+    assert result.total == 1.0
+    scorer = _run_for(1, events)
+    assert scorer.goals == 1
+
+
+def test_timeline_var_cancelled_goal_and_own_goal_do_not_count_as_goal():
+    events = [
+        _event(None, status="timeline", event_type="Var", detail="Goal cancelled"),
+        _timeline("Own Goal"),
+    ]
+    data, _ = _run({}, events)
+    assert data.goals == 0
+
+
+def _run_for(pid: int, events: list):
+    stat = SimpleNamespace(stats_json={}, athlete_provider_id=pid, club_id=None)
+    fixture = SimpleNamespace(home_club_id=None, away_club_id=None, home_goals=None, away_goals=None)
+    return bonus_input_from_stat(
+        fixture=fixture, stat=stat, role="A", own_goal_counts={}, event_counts=event_bonus_counts(events)
+    )
 
 
 # --- esclusioni ------------------------------------------------------------

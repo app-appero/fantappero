@@ -71,39 +71,82 @@ class EventBonusCounts:
 _EXCLUDED_EVENT_STATUSES = frozenset({EventStatus.ANOMALY.value, EventStatus.INSUFFICIENT.value})
 
 
-def event_bonus_counts(events: Iterable[MatchEvent]) -> EventBonusCounts:
-    """Conta gol, assist, cartellini e rigori per calciatore da eventi attivi."""
-    counts = EventBonusCounts()
+_TIMELINE_STATUS = "timeline"
 
-    def bump(target: dict[int, int], pid: int) -> None:
-        target[pid] = target.get(pid, 0) + 1
+
+def event_bonus_counts(events: Iterable[MatchEvent]) -> EventBonusCounts:
+    """Conta gol, assist, cartellini e rigori per calciatore da eventi attivi.
+
+    ``match_event`` contiene due viste dello stesso fatto: le righe grezze della
+    cronologia (``status == "timeline"``, quelle mostrate in "Cronologia") e le
+    righe normalizzate per il punteggio (con ``scoring_kind``). Si contano
+    separatamente e per ogni calciatore si prende il valore piu' alto (mai la
+    somma), cosi' un fatto presente in cronologia dà il bonus/malus anche se la
+    riga normalizzata non e' stata prodotta.
+    """
+    scoring = EventBonusCounts()
+    timeline = EventBonusCounts()
+
+    def bump(target: dict[int, int], pid: int | None) -> None:
+        if pid is not None:
+            target[int(pid)] = target.get(int(pid), 0) + 1
 
     for event in events:
-        if not event.is_active or event.athlete_provider_id is None:
+        if not event.is_active:
             continue
-        if getattr(event, "status", None) in _EXCLUDED_EVENT_STATUSES:
+        status = getattr(event, "status", None)
+        if status in _EXCLUDED_EVENT_STATUSES:
             continue
-        pid = int(event.athlete_provider_id)
+        pid = event.athlete_provider_id
         kind = event.scoring_kind
+        etype = str(event.event_type or "").lower()
+        detail = str(event.event_detail or "").lower()
+
+        if status == _TIMELINE_STATUS:
+            if etype == "goal":
+                if detail in ("normal goal", "penalty"):
+                    bump(timeline.goals, pid)
+                    bump(timeline.assists, getattr(event, "related_athlete_provider_id", None))
+                elif "missed" in detail:
+                    bump(timeline.penalty_missed, pid)
+            elif etype == "card":
+                if "red" in detail or "second yellow" in detail:
+                    bump(timeline.red_cards, pid)
+                elif "yellow" in detail:
+                    bump(timeline.yellow_cards, pid)
+            continue
+
+        if pid is None:
+            continue
         if kind in (ScoringEventKind.GOAL.value, ScoringEventKind.PENALTY_SCORED.value):
-            bump(counts.goals, pid)
+            bump(scoring.goals, pid)
         elif kind == ScoringEventKind.ASSIST.value:
-            bump(counts.assists, pid)
+            bump(scoring.assists, pid)
         elif kind in (
             ScoringEventKind.PENALTY_MISSED.value,
             ScoringEventKind.PENALTY_OFF_TARGET.value,
         ):
             # Parato o fuori/palo: in entrambi i casi il rigorista ha sbagliato.
-            bump(counts.penalty_missed, pid)
+            bump(scoring.penalty_missed, pid)
         elif kind == ScoringEventKind.PENALTY_SAVED.value:
-            bump(counts.penalty_saved, pid)
-        elif str(event.event_type or "").lower() == "card":
-            detail = str(event.event_detail or "").lower()
+            bump(scoring.penalty_saved, pid)
+        elif etype == "card":
             if "red" in detail or "second yellow" in detail:
-                bump(counts.red_cards, pid)
+                bump(scoring.red_cards, pid)
             elif "yellow" in detail:
-                bump(counts.yellow_cards, pid)
-    return counts
+                bump(scoring.yellow_cards, pid)
+
+    def merge(left: dict[int, int], right: dict[int, int]) -> dict[int, int]:
+        return {pid: max(left.get(pid, 0), right.get(pid, 0)) for pid in {*left, *right}}
+
+    return EventBonusCounts(
+        goals=merge(scoring.goals, timeline.goals),
+        assists=merge(scoring.assists, timeline.assists),
+        yellow_cards=merge(scoring.yellow_cards, timeline.yellow_cards),
+        red_cards=merge(scoring.red_cards, timeline.red_cards),
+        penalty_missed=merge(scoring.penalty_missed, timeline.penalty_missed),
+        penalty_saved=merge(scoring.penalty_saved, timeline.penalty_saved),
+    )
 
 
 def stoppage_entry_provider_ids(events: Iterable[MatchEvent]) -> set[int]:
