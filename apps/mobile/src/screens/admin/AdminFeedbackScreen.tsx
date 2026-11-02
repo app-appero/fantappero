@@ -8,15 +8,21 @@ import {
   type FeedbackStatus,
 } from "@fantappero/contracts";
 import { theme } from "@fantappero/ui/theme";
+import { useNavigation } from "@react-navigation/core";
+import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useCallback, useState } from "react";
-import { Image, Linking, Pressable, StyleSheet, Text, View } from "react-native";
-import { buildApiUrl } from "../../api/client";
+import { Image, Linking, Modal, Pressable, StyleSheet, Text, View } from "react-native";
+import { impersonateUser } from "../../api/admin";
+import { ApiError, buildApiUrl } from "../../api/client";
 import { fetchAdminFeedback, updateAdminFeedback } from "../../api/feedback";
 import { adminUiStyles as styles } from "../../admin/adminUiStyles";
 import { AppTextInput as TextInput } from "../../components/AppTextInput";
 import { UiStatePanel } from "../../components/UiStatePanel";
+import { impersonationTab } from "../../navigation/notificationDestination";
 import { useScreenData } from "../../hooks/useScreenData";
 import { PageContainer } from "../../layout/PageContainer";
+import { leaveAdminForApp } from "../../navigation/adminEntry";
+import type { RootStackParamList } from "../../navigation/types";
 import { getApiErrorMessage, useAuthSession } from "../../session/DemoSessionContext";
 import { lazyStyles } from "../../theme/lazyStyles";
 
@@ -49,11 +55,15 @@ function formatDate(value: string): string {
 function ReportCard({
   report,
   accessToken,
+  canImpersonate,
+  onImpersonate,
   onChanged,
   onExpired,
 }: {
   report: FeedbackAdminReport;
   accessToken: string;
+  canImpersonate: boolean;
+  onImpersonate: (report: FeedbackAdminReport) => void;
   onChanged: (next: FeedbackAdminReport) => void;
   onExpired: () => void;
 }) {
@@ -81,6 +91,16 @@ function ReportCard({
       <Text style={styles.meta}>
         {report.authorName} · {report.authorEmail}
       </Text>
+      {canImpersonate ? (
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => onImpersonate(report)}
+          style={local.secondary}
+          testID={`feedback-admin-impersonate-${report.id}`}
+        >
+          <Text style={local.secondaryLabel}>Impersona</Text>
+        </Pressable>
+      ) : null}
       <Text style={styles.meta}>{formatDate(report.createdAt)}</Text>
       <Text style={local.message}>{report.message}</Text>
 
@@ -162,7 +182,11 @@ function ReportCard({
 
 /** Pannello operatore: segnalazioni degli utenti con allegati e stato di lavorazione. */
 export function AdminFeedbackScreen() {
-  const { accessToken } = useAuthSession();
+  const { accessToken, user, startImpersonation } = useAuthSession();
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const [pending, setPending] = useState<FeedbackAdminReport | null>(null);
+  const [impersonating, setImpersonating] = useState(false);
+  const [impersonationError, setImpersonationError] = useState<string | null>(null);
   const [filter, setFilter] = useState<FeedbackStatus | "all">("all");
   const [page, setPage] = useState(1);
   const [data, setData] = useState<FeedbackAdminList | null>(null);
@@ -189,6 +213,39 @@ export function AdminFeedbackScreen() {
   }, [accessToken, filter, page]);
 
   const { refreshing, onRefresh } = useScreenData(load);
+
+  async function confirmImpersonation() {
+    if (!pending) {
+      return;
+    }
+    if (!accessToken) {
+      setImpersonationError("Sessione non disponibile. Accedi di nuovo.");
+      setPending(null);
+      return;
+    }
+    setImpersonating(true);
+    setImpersonationError(null);
+    try {
+      const result = await impersonateUser(accessToken, pending.authorUserId);
+      await startImpersonation(result);
+      const tab = impersonationTab(pending.pageContext);
+      setPending(null);
+      leaveAdminForApp();
+      // Si entra come l'utente nella schermata dove ha visto il problema.
+      navigation.getParent()?.navigate("MainTabs", tab ? { screen: tab } : undefined);
+    } catch (impersonateError) {
+      if (impersonateError instanceof ApiError && impersonateError.code === "cannot_impersonate_self") {
+        setImpersonationError("Non puoi impersonare te stesso.");
+      } else if (impersonateError instanceof ApiError && impersonateError.status === 403) {
+        setImpersonationError("Non hai i permessi per impersonare questo utente.");
+      } else {
+        setImpersonationError(getApiErrorMessage(impersonateError, "Impossibile impersonare l'utente."));
+      }
+      setPending(null);
+    } finally {
+      setImpersonating(false);
+    }
+  }
 
   const pages = data ? Math.max(1, Math.ceil(data.total / data.pageSize)) : 1;
   return (
@@ -228,6 +285,14 @@ export function AdminFeedbackScreen() {
           testID="feedback-admin-expired"
         />
       ) : null}
+      {impersonationError ? (
+        <UiStatePanel
+          state="error"
+          title="Impersonificazione non riuscita"
+          message={impersonationError}
+          testID="feedback-admin-impersonate-error"
+        />
+      ) : null}
       {error ? <UiStatePanel state="error" title="Errore di caricamento" message={error} testID="feedback-admin-error" /> : null}
       {data && data.items.length === 0 && !error ? (
         <UiStatePanel
@@ -243,6 +308,8 @@ export function AdminFeedbackScreen() {
               key={report.id}
               report={report}
               accessToken={accessToken}
+              canImpersonate={report.authorEmail !== "" && report.authorUserId !== user?.id}
+              onImpersonate={setPending}
               onChanged={(next) => {
                 setData((current) =>
                   current
@@ -279,6 +346,37 @@ export function AdminFeedbackScreen() {
           </Pressable>
         </View>
       ) : null}
+
+      <Modal
+        visible={pending !== null}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setPending(null)}
+      >
+        <View style={styles.confirmOverlay}>
+          {pending ? (
+            <View style={styles.confirmBox} testID="feedback-admin-impersonate-box">
+              <Text style={styles.sectionTitle}>Impersona utente</Text>
+              <Text style={styles.meta}>
+                {`Accederai come ${pending.authorName} per qualche minuto, a scopo di assistenza, e aprirai la schermata da cui ha segnalato il problema. L'operazione viene registrata nell'audit log.`}
+              </Text>
+              <View style={styles.rowActions}>
+                <Pressable style={styles.secondaryButton} onPress={() => setPending(null)}>
+                  <Text style={styles.secondaryButtonLabel}>Annulla</Text>
+                </Pressable>
+                <Pressable
+                  style={[styles.button, impersonating && local.disabled]}
+                  disabled={impersonating}
+                  onPress={() => void confirmImpersonation()}
+                  testID="feedback-admin-impersonate-confirm"
+                >
+                  <Text style={styles.buttonLabel}>{impersonating ? "Accesso…" : "Conferma"}</Text>
+                </Pressable>
+              </View>
+            </View>
+          ) : null}
+        </View>
+      </Modal>
     </PageContainer>
   );
 }

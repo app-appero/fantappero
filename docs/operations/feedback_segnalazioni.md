@@ -17,6 +17,9 @@ pannello e ricevono una notifica.
   utenti). Nessuna email. Toccandola si apre il pannello Segnalazioni.
 - Pannello: web `/admin/feedback`, app → menu operatore → **Segnalazioni**. Filtro per stato,
   conteggio «da leggere», autore, contesto, allegati, nota interna, cambio stato.
+- **Impersona**: accanto all'autore c'è il pulsante «Impersona» (con conferma e audit log, come
+  nella pagina Utenti). Entra come l'utente direttamente nella pagina o schermata da cui ha
+  segnalato il problema. Non compare per se stessi né per utenti eliminati.
 - Su web immagini e video si vedono in pagina; sull'app le immagini in anteprima e il video si
   apre nel lettore del telefono (l'app non ha un player integrato).
 

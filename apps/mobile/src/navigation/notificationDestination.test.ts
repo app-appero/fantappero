@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { resolveNotificationRoute } from "./notificationDestination.ts";
+import { impersonationTab, resolveNotificationRoute } from "./notificationDestination.ts";
 
 test("le notifiche di scambio aprono Scambi", () => {
   assert.deepEqual(resolveNotificationRoute({ title: "Nuova proposta di scambio", deepLink: "/mercato" }), { kind: "tab", screen: "Market" });
@@ -33,4 +33,17 @@ test("la notifica di una nuova segnalazione apre la schermata operatore", () => 
     resolveNotificationRoute({ title: "Nuovo bug da Mario", deepLink: "/admin/feedback" }),
     { kind: "admin", screen: "AdminFeedback" },
   );
+});
+
+test("impersonificazione: nome di schermata o percorso web aprono la tab giusta", () => {
+  assert.equal(impersonationTab("Formation"), "Formation");
+  assert.equal(impersonationTab(" Standings "), "Standings");
+  assert.equal(impersonationTab("/formazione"), "Formation");
+  assert.equal(impersonationTab("/classifica"), "Standings");
+});
+
+test("impersonificazione: contesto assente, sconosciuto o esterno apre la tab iniziale", () => {
+  for (const value of [null, undefined, "", "LeagueAdmin", "https://evil.example", "/admin/feedback"]) {
+    assert.equal(impersonationTab(value), undefined);
+  }
 });

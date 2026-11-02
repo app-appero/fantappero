@@ -8,12 +8,15 @@ import {
   type FeedbackAttachment,
   type FeedbackStatus,
 } from "@fantappero/contracts";
-import { Breadcrumb, Button, PageContainer, Select, Textarea, UiStatePanel } from "@fantappero/ui";
+import { Breadcrumb, Button, Modal, PageContainer, Select, Textarea, UiStatePanel } from "@fantappero/ui";
 import { useCallback, useEffect, useState } from "react";
+import { impersonateUser } from "../api/admin";
 import { fetchAdminFeedback, updateAdminFeedback } from "../api/feedback";
-import { buildApiUrl } from "../api/client";
-import { getApiErrorMessage } from "../auth/AuthContext";
+import { ApiError, buildApiUrl } from "../api/client";
+import { getApiErrorMessage, useAuth } from "../auth/AuthContext";
 import { loadStoredSession } from "../auth/sessionStorage";
+import { impersonationDestination } from "../feedback/impersonation";
+import { useNavigate } from "../router/simpleRouter";
 
 const FILTER_OPTIONS = [
   { value: "", label: "Tutte" },
@@ -62,10 +65,14 @@ function Media({ attachment, onExpired }: { attachment: FeedbackAttachment; onEx
 
 function ReportCard({
   report,
+  canImpersonate,
+  onImpersonate,
   onChanged,
   onExpired,
 }: {
   report: FeedbackAdminReport;
+  canImpersonate: boolean;
+  onImpersonate: (report: FeedbackAdminReport) => void;
   onChanged: (next: FeedbackAdminReport) => void;
   onExpired: () => void;
 }) {
@@ -101,6 +108,17 @@ function ReportCard({
         <span className="fa-feedback-admin__who">
           {report.authorName} · {report.authorEmail}
         </span>
+        {canImpersonate ? (
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            onClick={() => onImpersonate(report)}
+            data-testid={`feedback-admin-impersonate-${report.id}`}
+          >
+            Impersona
+          </Button>
+        ) : null}
         <time dateTime={report.createdAt}>{formatDate(report.createdAt)}</time>
       </header>
 
@@ -175,6 +193,11 @@ function ReportCard({
 
 /** Pannello operatore: segnalazioni degli utenti, con allegati e stato di lavorazione. */
 export function AdminFeedbackPage() {
+  const { user, startImpersonation } = useAuth();
+  const navigate = useNavigate();
+  const [pending, setPending] = useState<FeedbackAdminReport | null>(null);
+  const [impersonating, setImpersonating] = useState(false);
+  const [impersonationError, setImpersonationError] = useState<string | null>(null);
   const [filter, setFilter] = useState<FeedbackStatus | "">("");
   const [page, setPage] = useState(1);
   const [data, setData] = useState<FeedbackAdminList | null>(null);
@@ -213,6 +236,37 @@ export function AdminFeedbackPage() {
     void load();
   }
 
+  async function confirmImpersonation() {
+    if (!pending) {
+      return;
+    }
+    const token = loadStoredSession()?.accessToken;
+    if (!token) {
+      setImpersonationError("Sessione non disponibile. Accedi di nuovo.");
+      setPending(null);
+      return;
+    }
+    setImpersonating(true);
+    setImpersonationError(null);
+    try {
+      const result = await impersonateUser(token, pending.authorUserId);
+      await startImpersonation(result);
+      // Si entra come l'utente direttamente nella pagina dove ha visto il problema.
+      navigate(impersonationDestination(pending.pageContext));
+    } catch (impersonateError) {
+      if (impersonateError instanceof ApiError && impersonateError.code === "cannot_impersonate_self") {
+        setImpersonationError("Non puoi impersonare te stesso.");
+      } else if (impersonateError instanceof ApiError && impersonateError.status === 403) {
+        setImpersonationError("Non hai i permessi per impersonare questo utente.");
+      } else {
+        setImpersonationError(getApiErrorMessage(impersonateError, "Impossibile impersonare l'utente."));
+      }
+      setPending(null);
+    } finally {
+      setImpersonating(false);
+    }
+  }
+
   const pages = data ? Math.max(1, Math.ceil(data.total / data.pageSize)) : 1;
   return (
     <PageContainer
@@ -248,6 +302,14 @@ export function AdminFeedbackPage() {
           testId="feedback-admin-expired"
         />
       ) : null}
+      {impersonationError ? (
+        <UiStatePanel
+          state="error"
+          title="Impersonificazione non riuscita"
+          message={impersonationError}
+          testId="feedback-admin-impersonate-error"
+        />
+      ) : null}
       {loading && !data ? <UiStatePanel state="loading" title="Caricamento" message="Recupero le segnalazioni…" /> : null}
       {error ? <UiStatePanel state="error" title="Errore di caricamento" message={error} testId="feedback-admin-error" /> : null}
       {data && data.items.length === 0 && !error ? (
@@ -261,7 +323,14 @@ export function AdminFeedbackPage() {
 
       <div className="fa-feedback-admin__list">
         {data?.items.map((report) => (
-          <ReportCard key={report.id} report={report} onChanged={replace} onExpired={() => setExpired(true)} />
+          <ReportCard
+            key={report.id}
+            report={report}
+            canImpersonate={report.authorEmail !== "" && report.authorUserId !== user?.id}
+            onImpersonate={setPending}
+            onChanged={replace}
+            onExpired={() => setExpired(true)}
+          />
         ))}
       </div>
 
@@ -278,6 +347,35 @@ export function AdminFeedbackPage() {
           </Button>
         </div>
       ) : null}
+
+      <Modal
+        open={pending !== null}
+        onClose={() => setPending(null)}
+        title="Impersona utente"
+        footer={
+          <>
+            <Button type="button" variant="ghost" onClick={() => setPending(null)}>
+              Annulla
+            </Button>
+            <Button
+              type="button"
+              variant="primary"
+              loading={impersonating}
+              disabled={impersonating}
+              onClick={() => void confirmImpersonation()}
+              data-testid="feedback-admin-impersonate-confirm"
+            >
+              Conferma
+            </Button>
+          </>
+        }
+      >
+        <p>
+          {pending
+            ? `Accederai come ${pending.authorName} per qualche minuto, a scopo di assistenza, e aprirai la pagina da cui ha segnalato il problema. L'operazione viene registrata nell'audit log.`
+            : ""}
+        </p>
+      </Modal>
     </PageContainer>
   );
 }

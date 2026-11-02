@@ -5,18 +5,38 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const fetchAdminFeedbackMock = vi.fn();
 const updateAdminFeedbackMock = vi.fn();
+const impersonateUserMock = vi.fn();
+const startImpersonationMock = vi.fn();
+const navigateMock = vi.fn();
 
 vi.mock("../api/feedback", () => ({
   fetchAdminFeedback: (...args: unknown[]) => fetchAdminFeedbackMock(...args),
   updateAdminFeedback: (...args: unknown[]) => updateAdminFeedbackMock(...args),
 }));
-vi.mock("../api/client", () => ({
-  buildApiUrl: (path: string) => `https://api.example.test${path}`,
+vi.mock("../api/admin", () => ({
+  impersonateUser: (...args: unknown[]) => impersonateUserMock(...args),
 }));
+vi.mock("../api/client", () => {
+  class ApiError extends Error {
+    constructor(
+      message: string,
+      readonly status: number,
+      readonly code: string,
+    ) {
+      super(message);
+    }
+  }
+  return { ApiError, buildApiUrl: (path: string) => `https://api.example.test${path}` };
+});
 vi.mock("../auth/AuthContext", () => ({
+  useAuth: () => ({ user: { id: "op-1" }, startImpersonation: startImpersonationMock }),
   getApiErrorMessage: (error: unknown, fallback: string) =>
     error instanceof Error ? error.message : fallback,
 }));
+vi.mock("../router/simpleRouter", async () => {
+  const actual = await vi.importActual<typeof import("../router/simpleRouter")>("../router/simpleRouter");
+  return { ...actual, useNavigate: () => navigateMock };
+});
 
 import { clearStoredSession, saveStoredSession } from "../auth/sessionStorage";
 import { MemoryRouter } from "../router/simpleRouter";
@@ -67,6 +87,9 @@ describe("AdminFeedbackPage — pannello operatore", () => {
     root = createRoot(container);
     fetchAdminFeedbackMock.mockReset();
     updateAdminFeedbackMock.mockReset();
+    impersonateUserMock.mockReset();
+    startImpersonationMock.mockReset();
+    navigateMock.mockReset();
     saveStoredSession({
       accessToken: "op-token",
       refreshToken: "refresh",
@@ -130,5 +153,67 @@ describe("AdminFeedbackPage — pannello operatore", () => {
       q("feedback-admin-r1")!.querySelector("img")!.dispatchEvent(new Event("error"));
     });
     expect(q("feedback-admin-expired")).not.toBeNull();
+  });
+
+  it("impersona l'autore dopo la conferma e apre la pagina della segnalazione", async () => {
+    fetchAdminFeedbackMock.mockResolvedValue(listing([report({ pageContext: "/lega/amministrazione" })]));
+    const session = { accessToken: "imp-token", refreshToken: "r", user: { id: "u1" } };
+    impersonateUserMock.mockResolvedValue(session);
+    await render();
+
+    await act(async () => {
+      q("feedback-admin-impersonate-r1")!.click();
+    });
+    // Prima serve la conferma: nessuna chiamata finché non si conferma.
+    expect(impersonateUserMock).not.toHaveBeenCalled();
+    expect(document.body.textContent).toContain("Accederai come Mario");
+
+    await act(async () => {
+      (document.querySelector('[data-testid="feedback-admin-impersonate-confirm"]') as HTMLElement).click();
+    });
+    expect(impersonateUserMock).toHaveBeenCalledWith("op-token", "u1");
+    expect(startImpersonationMock).toHaveBeenCalledWith(session);
+    expect(navigateMock).toHaveBeenCalledWith("/lega/amministrazione");
+  });
+
+  it("ripiega sulle leghe se il contesto non è una pagina interna", async () => {
+    fetchAdminFeedbackMock.mockResolvedValue(listing([report({ pageContext: "Formation" })]));
+    impersonateUserMock.mockResolvedValue({});
+    await render();
+    await act(async () => {
+      q("feedback-admin-impersonate-r1")!.click();
+    });
+    await act(async () => {
+      (document.querySelector('[data-testid="feedback-admin-impersonate-confirm"]') as HTMLElement).click();
+    });
+    expect(navigateMock).toHaveBeenCalledWith("/leghe");
+  });
+
+  it("non offre il pulsante per se stessi né per un utente eliminato", async () => {
+    fetchAdminFeedbackMock.mockResolvedValue(
+      listing([
+        report({ id: "mine", authorUserId: "op-1" }),
+        report({ id: "gone", authorUserId: "u9", authorEmail: "" }),
+        report({ id: "ok", authorUserId: "u2" }),
+      ]),
+    );
+    await render();
+    expect(q("feedback-admin-impersonate-mine")).toBeNull();
+    expect(q("feedback-admin-impersonate-gone")).toBeNull();
+    expect(q("feedback-admin-impersonate-ok")).not.toBeNull();
+  });
+
+  it("mostra l'errore se l'impersonificazione non riesce", async () => {
+    fetchAdminFeedbackMock.mockResolvedValue(listing([report()]));
+    impersonateUserMock.mockRejectedValue(new Error("Utente non trovato"));
+    await render();
+    await act(async () => {
+      q("feedback-admin-impersonate-r1")!.click();
+    });
+    await act(async () => {
+      (document.querySelector('[data-testid="feedback-admin-impersonate-confirm"]') as HTMLElement).click();
+    });
+    expect(q("feedback-admin-impersonate-error")?.textContent).toContain("Utente non trovato");
+    expect(navigateMock).not.toHaveBeenCalled();
   });
 });

@@ -80,3 +80,35 @@ export function resolveNotificationRoute(
   }
   return null;
 }
+
+const TAB_NAMES: readonly (keyof AppTabParamList)[] = [
+  "Matchday",
+  "Standings",
+  "Roster",
+  "Formation",
+  "Auction",
+  "Waiver",
+  "Market",
+  "Profile",
+];
+
+/**
+ * Tab da aprire dopo l'impersonificazione dall'elenco segnalazioni: quella in cui
+ * l'utente ha visto il problema. Il contesto è il nome di una schermata dell'app
+ * (es. "Formation") oppure un percorso web (es. "/formazione") se la segnalazione
+ * arriva dal sito. `undefined` = tab iniziale.
+ */
+export function impersonationTab(
+  pageContext: string | null | undefined,
+): keyof AppTabParamList | undefined {
+  const context = (pageContext ?? "").trim();
+  const byName = TAB_NAMES.find((tab) => tab === context);
+  if (byName) {
+    return byName;
+  }
+  if (context.startsWith("/")) {
+    const route = resolveNotificationRoute({ title: "", deepLink: context });
+    return route?.kind === "tab" ? route.screen : undefined;
+  }
+  return undefined;
+}
