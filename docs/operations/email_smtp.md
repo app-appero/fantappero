@@ -74,7 +74,7 @@ poi non riesce a spedirla. L'esito vero sta nei **log del worker** (Railway → 
 
 | Riga nel log del worker | Significato |
 | --- | --- |
-| `mail_sent via=smtp` | spedita via SMTP: se non arriva guarda lo spam e le regole del provider |
+| `mail_sent via=smtp host=…` | spedita via SMTP dal server indicato in `host` (controlla che sia quello nuovo, per esempio `smtp.gmail.com`): se non arriva guarda lo spam e le regole del provider |
 | `mail_sent via=resend` | è partita da Resend, non da SMTP: `MAIL_TRANSPORT` non è `smtp` o c'è ancora `RESEND_API_KEY` in modalità `auto` |
 | `mail_send_failed … error=HTTPStatusError` | Resend ha rifiutato (sandbox: solo il titolare dell'account) |
 | `mail_send_failed … smtp_host=localhost error=ConnectionRefusedError` | le variabili `SMTP_*` mancano: il worker sta usando il default locale |

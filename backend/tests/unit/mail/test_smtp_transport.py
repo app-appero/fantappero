@@ -254,7 +254,10 @@ def test_successful_send_logs_only_the_channel_used(monkeypatch):
     client = _fake_smtp()
     with patch("mail.transport.smtplib.SMTP", return_value=client):
         send_email(Settings(), to_email="segreto@example.com", message=MESSAGE)
-    logger.info.assert_called_once_with("mail_sent via=smtp", extra={"via": "smtp"})
+    logger.info.assert_called_once_with(
+        "mail_sent via=smtp host=smtp.provider.example",
+        extra={"via": "smtp", "host": "smtp.provider.example"},
+    )
     assert not any(secret in repr(logger.mock_calls) for secret in SECRETS)
 
 
@@ -290,3 +293,12 @@ def test_task_failure_is_logged_with_the_channel_and_error_type_but_no_personal_
         extra=details,
     )
     assert not any(secret in repr(logger.mock_calls) for secret in SECRETS)
+
+
+def test_resend_send_logs_no_host(monkeypatch):
+    logger = MagicMock()
+    monkeypatch.setattr("mail.transport.logger", logger)
+    settings = Settings(resend_api_key=SecretStr("re_key"))
+    with patch("mail.transport.httpx.post", return_value=MagicMock(status_code=200)):
+        send_email(settings, to_email="a@example.com", message=MESSAGE)
+    logger.info.assert_called_once_with("mail_sent via=resend", extra={"via": "resend", "host": None})
