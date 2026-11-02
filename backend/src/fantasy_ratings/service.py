@@ -31,6 +31,7 @@ from fantasy_ratings.mapping import (
     bonus_input_from_stat,
     inputs_from_fixture_stats,
     own_goal_counts_by_provider_id,
+    penalty_counts_by_provider_id,
 )
 from fantasy_ratings.models import PlayerMatchRating
 from fantasy_ratings.schemas import ComputeRatingsResponse, PlayerMatchRatingResponse
@@ -208,6 +209,7 @@ def compute_fixture_ratings(
                 events=events,
             )
             own_goal_counts = own_goal_counts_by_provider_id(events)
+            penalty_missed_counts, penalty_saved_counts = penalty_counts_by_provider_id(events)
             kept_ids: set[int] = set()
             formula_snapshot = formula.as_dict()
             for player, stat in zip(inputs, stats, strict=True):
@@ -217,6 +219,8 @@ def compute_fixture_ratings(
                     stat=stat,
                     role=rating.role,
                     own_goal_counts=own_goal_counts,
+                    penalty_missed_counts=penalty_missed_counts,
+                    penalty_saved_counts=penalty_saved_counts,
                 )
                 bonus = compute_bonus_malus(bonus_input, bonus_cfg, eligible=rating.eligible)
                 _upsert_rating(
