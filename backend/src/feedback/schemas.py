@@ -63,3 +63,7 @@ class FeedbackAdminListResponse(ApiModel):
 class FeedbackUpdateRequest(ApiModel):
     status: FeedbackStatus | None = None
     operator_note: str | None = Field(default=None, alias="operatorNote", max_length=2000)
+
+
+class FeedbackDeletedResponse(ApiModel):
+    deleted: bool

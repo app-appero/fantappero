@@ -28,6 +28,8 @@ MESSAGE_MIN_CHARS = 10
 MESSAGE_MAX_CHARS = 2000
 NOTE_MAX_CHARS = 2000
 _EXCERPT_CHARS = 140
+#: Stati che l'autore vuole conoscere. «new» (anche una riapertura) non genera avvisi.
+AUTHOR_NOTIFIED_STATUSES = frozenset({"in_review", "resolved", "dismissed"})
 
 
 class FeedbackError(Exception):
@@ -290,6 +292,7 @@ class FeedbackService:
         operator_note: str | None,
     ) -> FeedbackReport:
         report = self.get_report(report_id)
+        previous_status = report.status
         if status is not None:
             if status not in STATUSES:
                 raise FeedbackError("feedback_invalid_status", "Stato non valido.")
@@ -298,8 +301,53 @@ class FeedbackService:
             report.operator_note = operator_note.strip()[:NOTE_MAX_CHARS] or None
         report.handled_by_id = operator.id
         report.handled_at = utc_now()
+        if status is not None and status != previous_status:
+            self._notify_author(report)
         self._session.commit()
         return self.get_report(report_id)
+
+    def delete_report(self, report_id: UUID) -> None:
+        """Elimina fisicamente la segnalazione: righe, testo e file allegati su disco.
+
+        Prima si cancella la riga e si conferma la transazione, poi i file: se il
+        database rifiuta la cancellazione non si perde nessun allegato. Se invece
+        un file non si riesce a togliere resta solo un file orfano, mai una
+        segnalazione senza i suoi allegati.
+        """
+        report = self.get_report(report_id)
+        storage = Path(self._settings.resolved_feedback_storage_path())
+        paths = [storage / attachment.stored_name for attachment in report.attachments]
+        self._session.delete(report)
+        self._session.commit()
+        for path in paths:
+            try:
+                path.unlink(missing_ok=True)
+            except OSError:
+                logger.warning("feedback_attachment_unlink_failed", extra={"file": path.name})
+        get_metrics().incr("feedback_reports_deleted_total")
+
+    # --- notifica all'autore ------------------------------------------------------------
+
+    def _notify_author(self, report: FeedbackReport) -> None:
+        """Avvisa chi ha scritto quando la segnalazione cambia stato (non per «Ricevuta»).
+
+        La nota interna dell'operatore non viaggia mai nella notifica.
+        """
+        if report.status not in AUTHOR_NOTIFIED_STATUSES:
+            return
+        excerpt = report.message[:_EXCERPT_CHARS] + ("…" if len(report.message) > _EXCERPT_CHARS else "")
+        NotificationService(self._session).create_notification(
+            user_id=report.user_id,
+            category=NotificationCategory.SISTEMA,
+            template_key="sistema.feedback_stato",
+            template_version=1,
+            params={"status": report.status, "excerpt": excerpt},
+            # Un avviso per ogni cambio di stato: se la segnalazione viene riaperta e
+            # richiusa l'autore deve ricevere di nuovo l'avviso.
+            dedup_key=f"feedback-status:{report.id}:{report.status}:{uuid4()}",
+            push=True,
+            email=False,
+        )
 
     # --- allegati -------------------------------------------------------------------
 

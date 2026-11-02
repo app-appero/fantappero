@@ -12,11 +12,21 @@ pannello e ricevono una notifica.
   Non vede note interne né dati di altri utenti.
 - Il contesto tecnico (ultima schermata vista, piattaforma, versione, dispositivo) viaggia da solo.
 
+- **Avvisi sullo stato**: l'autore riceve una notifica (in-app e push, mai email) quando una
+  segnalazione passa a *In lavorazione*, *Risolta* o *Chiusa*. Toccandola si apre «Segnala un
+  problema». Se la segnalazione viene riaperta e richiusa, riceve di nuovo l'avviso; cambiare solo
+  la nota interna o riaprire («Ricevuta») non genera avvisi. **La nota interna non viaggia mai
+  nell'avviso.**
+
 ## Per gli operatori
 - **Notifica**: in-app e push, solo agli utenti con ruolo operatore (mai all'autore, mai agli altri
   utenti). Nessuna email. Toccandola si apre il pannello Segnalazioni.
 - Pannello: web `/admin/feedback`, app → menu operatore → **Segnalazioni**. Filtro per stato,
   conteggio «da leggere», autore, contesto, allegati, nota interna, cambio stato.
+- **Elimina**: il pulsante «Elimina» (con conferma) cancella **fisicamente** la segnalazione:
+  riga, testo, allegati e i file di immagini e video dal disco. Non si può annullare. Prima si
+  conferma la cancellazione nel database e poi si tolgono i file, così un errore non lascia mai una
+  segnalazione senza allegati.
 - **Impersona**: accanto all'autore c'è il pulsante «Impersona» (con conferma e audit log, come
   nella pagina Utenti). Entra come l'utente direttamente nella pagina o schermata da cui ha
   segnalato il problema. Non compare per se stessi né per utenti eliminati.
@@ -29,7 +39,8 @@ pannello e ricevono una notifica.
 | `POST` | `/feedback` | utente | `multipart/form-data`: `message`, `category`, `pageContext`, `platform`, `appVersion`, `files[]` |
 | `GET` | `/feedback/me` | utente | le proprie segnalazioni |
 | `GET` | `/admin/feedback?status=&page=` | operatore | elenco con allegati e `newCount` |
-| `PATCH` | `/admin/feedback/{id}` | operatore | `status`, `operatorNote` |
+| `PATCH` | `/admin/feedback/{id}` | operatore | `status`, `operatorNote`; un cambio di stato avvisa l'autore |
+| `DELETE` | `/admin/feedback/{id}` | operatore | elimina riga, allegati e file; risposta `{"deleted": true}` |
 | `GET` | `/feedback/media/{attachmentId}?token=` | link firmato | vedi sotto |
 
 ## Sicurezza e privacy

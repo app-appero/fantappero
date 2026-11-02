@@ -11,7 +11,7 @@ import {
 import { Breadcrumb, Button, Modal, PageContainer, Select, Textarea, UiStatePanel } from "@fantappero/ui";
 import { useCallback, useEffect, useState } from "react";
 import { impersonateUser } from "../api/admin";
-import { fetchAdminFeedback, updateAdminFeedback } from "../api/feedback";
+import { deleteAdminFeedback, fetchAdminFeedback, updateAdminFeedback } from "../api/feedback";
 import { ApiError, buildApiUrl } from "../api/client";
 import { getApiErrorMessage, useAuth } from "../auth/AuthContext";
 import { loadStoredSession } from "../auth/sessionStorage";
@@ -67,12 +67,14 @@ function ReportCard({
   report,
   canImpersonate,
   onImpersonate,
+  onDelete,
   onChanged,
   onExpired,
 }: {
   report: FeedbackAdminReport;
   canImpersonate: boolean;
   onImpersonate: (report: FeedbackAdminReport) => void;
+  onDelete: (report: FeedbackAdminReport) => void;
   onChanged: (next: FeedbackAdminReport) => void;
   onExpired: () => void;
 }) {
@@ -186,6 +188,15 @@ function ReportCard({
             Salva nota
           </Button>
         ) : null}
+        <Button
+          type="button"
+          variant="danger"
+          disabled={busy}
+          onClick={() => onDelete(report)}
+          data-testid={`feedback-admin-delete-${report.id}`}
+        >
+          Elimina
+        </Button>
       </div>
     </article>
   );
@@ -198,6 +209,9 @@ export function AdminFeedbackPage() {
   const [pending, setPending] = useState<FeedbackAdminReport | null>(null);
   const [impersonating, setImpersonating] = useState(false);
   const [impersonationError, setImpersonationError] = useState<string | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<FeedbackAdminReport | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const [filter, setFilter] = useState<FeedbackStatus | "">("");
   const [page, setPage] = useState(1);
   const [data, setData] = useState<FeedbackAdminList | null>(null);
@@ -234,6 +248,35 @@ export function AdminFeedbackPage() {
     );
     // Lo stato è cambiato: il conteggio delle «da leggere» e il filtro attivo vanno riallineati.
     void load();
+  }
+
+  async function confirmDelete() {
+    if (!pendingDelete) {
+      return;
+    }
+    const token = loadStoredSession()?.accessToken;
+    if (!token) {
+      setDeleteError("Sessione non disponibile. Accedi di nuovo.");
+      setPendingDelete(null);
+      return;
+    }
+    setDeleting(true);
+    setDeleteError(null);
+    try {
+      await deleteAdminFeedback(token, pendingDelete.id);
+      setData((current) =>
+        current
+          ? { ...current, items: current.items.filter((item) => item.id !== pendingDelete.id) }
+          : current,
+      );
+      // Il totale, la pagina e le «da leggere» cambiano: si riallineano col server.
+      void load();
+    } catch (removeError) {
+      setDeleteError(getApiErrorMessage(removeError, "Eliminazione non riuscita."));
+    } finally {
+      setDeleting(false);
+      setPendingDelete(null);
+    }
   }
 
   async function confirmImpersonation() {
@@ -310,6 +353,14 @@ export function AdminFeedbackPage() {
           testId="feedback-admin-impersonate-error"
         />
       ) : null}
+      {deleteError ? (
+        <UiStatePanel
+          state="error"
+          title="Eliminazione non riuscita"
+          message={deleteError}
+          testId="feedback-admin-delete-error"
+        />
+      ) : null}
       {loading && !data ? <UiStatePanel state="loading" title="Caricamento" message="Recupero le segnalazioni…" /> : null}
       {error ? <UiStatePanel state="error" title="Errore di caricamento" message={error} testId="feedback-admin-error" /> : null}
       {data && data.items.length === 0 && !error ? (
@@ -328,6 +379,7 @@ export function AdminFeedbackPage() {
             report={report}
             canImpersonate={report.authorEmail !== "" && report.authorUserId !== user?.id}
             onImpersonate={setPending}
+            onDelete={setPendingDelete}
             onChanged={replace}
             onExpired={() => setExpired(true)}
           />
@@ -347,6 +399,37 @@ export function AdminFeedbackPage() {
           </Button>
         </div>
       ) : null}
+
+      <Modal
+        open={pendingDelete !== null}
+        onClose={() => setPendingDelete(null)}
+        title="Elimina segnalazione"
+        footer={
+          <>
+            <Button type="button" variant="ghost" onClick={() => setPendingDelete(null)}>
+              Annulla
+            </Button>
+            <Button
+              type="button"
+              variant="danger"
+              loading={deleting}
+              disabled={deleting}
+              onClick={() => void confirmDelete()}
+              data-testid="feedback-admin-delete-confirm"
+            >
+              Elimina definitivamente
+            </Button>
+          </>
+        }
+      >
+        <p>
+          {pendingDelete
+            ? `Vuoi eliminare la segnalazione di ${pendingDelete.authorName}? Si cancellano per sempre anche il testo${
+                pendingDelete.attachments.length > 0 ? ", le immagini e i video allegati" : ""
+              }. L'operazione non si può annullare.`
+            : ""}
+        </p>
+      </Modal>
 
       <Modal
         open={pending !== null}

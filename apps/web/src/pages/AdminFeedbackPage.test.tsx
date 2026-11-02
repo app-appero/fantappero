@@ -6,12 +6,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const fetchAdminFeedbackMock = vi.fn();
 const updateAdminFeedbackMock = vi.fn();
 const impersonateUserMock = vi.fn();
+const deleteAdminFeedbackMock = vi.fn();
 const startImpersonationMock = vi.fn();
 const navigateMock = vi.fn();
 
 vi.mock("../api/feedback", () => ({
   fetchAdminFeedback: (...args: unknown[]) => fetchAdminFeedbackMock(...args),
   updateAdminFeedback: (...args: unknown[]) => updateAdminFeedbackMock(...args),
+  deleteAdminFeedback: (...args: unknown[]) => deleteAdminFeedbackMock(...args),
 }));
 vi.mock("../api/admin", () => ({
   impersonateUser: (...args: unknown[]) => impersonateUserMock(...args),
@@ -88,6 +90,7 @@ describe("AdminFeedbackPage — pannello operatore", () => {
     fetchAdminFeedbackMock.mockReset();
     updateAdminFeedbackMock.mockReset();
     impersonateUserMock.mockReset();
+    deleteAdminFeedbackMock.mockReset();
     startImpersonationMock.mockReset();
     navigateMock.mockReset();
     saveStoredSession({
@@ -215,5 +218,49 @@ describe("AdminFeedbackPage — pannello operatore", () => {
     });
     expect(q("feedback-admin-impersonate-error")?.textContent).toContain("Utente non trovato");
     expect(navigateMock).not.toHaveBeenCalled();
+  });
+
+  it("elimina una segnalazione solo dopo la conferma e la toglie dall'elenco", async () => {
+    fetchAdminFeedbackMock.mockResolvedValueOnce(listing([report(), report({ id: "r2", message: "Altra" })]));
+    deleteAdminFeedbackMock.mockResolvedValue({ deleted: true });
+    fetchAdminFeedbackMock.mockResolvedValueOnce(listing([report({ id: "r2", message: "Altra" })]));
+    await render();
+
+    await act(async () => {
+      q("feedback-admin-delete-r1")!.click();
+    });
+    expect(deleteAdminFeedbackMock).not.toHaveBeenCalled();
+    expect(document.body.textContent).toContain("le immagini e i video allegati");
+    expect(document.body.textContent).toContain("non si può annullare");
+
+    await act(async () => {
+      (document.querySelector('[data-testid="feedback-admin-delete-confirm"]') as HTMLElement).click();
+    });
+    expect(deleteAdminFeedbackMock).toHaveBeenCalledWith("op-token", "r1");
+    expect(q("feedback-admin-r1")).toBeNull();
+    expect(q("feedback-admin-r2")).not.toBeNull();
+  });
+
+  it("non elimina se si annulla e mostra l'errore se il server rifiuta", async () => {
+    fetchAdminFeedbackMock.mockResolvedValue(listing([report()]));
+    await render();
+    await act(async () => {
+      q("feedback-admin-delete-r1")!.click();
+    });
+    await act(async () => {
+      (Array.from(document.querySelectorAll("button")).find((b) => b.textContent === "Annulla") as HTMLElement).click();
+    });
+    expect(deleteAdminFeedbackMock).not.toHaveBeenCalled();
+    expect(q("feedback-admin-r1")).not.toBeNull();
+
+    deleteAdminFeedbackMock.mockRejectedValue(new Error("Segnalazione non trovata."));
+    await act(async () => {
+      q("feedback-admin-delete-r1")!.click();
+    });
+    await act(async () => {
+      (document.querySelector('[data-testid="feedback-admin-delete-confirm"]') as HTMLElement).click();
+    });
+    expect(q("feedback-admin-delete-error")?.textContent).toContain("Segnalazione non trovata");
+    expect(q("feedback-admin-r1")).not.toBeNull();
   });
 });

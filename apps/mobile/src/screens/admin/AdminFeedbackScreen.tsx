@@ -14,7 +14,7 @@ import { useCallback, useState } from "react";
 import { Image, Linking, Modal, Pressable, StyleSheet, Text, View } from "react-native";
 import { impersonateUser } from "../../api/admin";
 import { ApiError, buildApiUrl } from "../../api/client";
-import { fetchAdminFeedback, updateAdminFeedback } from "../../api/feedback";
+import { deleteAdminFeedback, fetchAdminFeedback, updateAdminFeedback } from "../../api/feedback";
 import { adminUiStyles as styles } from "../../admin/adminUiStyles";
 import { AppTextInput as TextInput } from "../../components/AppTextInput";
 import { UiStatePanel } from "../../components/UiStatePanel";
@@ -57,6 +57,7 @@ function ReportCard({
   accessToken,
   canImpersonate,
   onImpersonate,
+  onDelete,
   onChanged,
   onExpired,
 }: {
@@ -64,6 +65,7 @@ function ReportCard({
   accessToken: string;
   canImpersonate: boolean;
   onImpersonate: (report: FeedbackAdminReport) => void;
+  onDelete: (report: FeedbackAdminReport) => void;
   onChanged: (next: FeedbackAdminReport) => void;
   onExpired: () => void;
 }) {
@@ -176,6 +178,15 @@ function ReportCard({
           <Text style={local.secondaryLabel}>Salva nota</Text>
         </Pressable>
       ) : null}
+      <Pressable
+        accessibilityRole="button"
+        disabled={busy}
+        onPress={() => onDelete(report)}
+        style={[local.danger, busy && local.disabled]}
+        testID={`feedback-admin-delete-${report.id}`}
+      >
+        <Text style={local.dangerLabel}>Elimina</Text>
+      </Pressable>
     </View>
   );
 }
@@ -187,6 +198,9 @@ export function AdminFeedbackScreen() {
   const [pending, setPending] = useState<FeedbackAdminReport | null>(null);
   const [impersonating, setImpersonating] = useState(false);
   const [impersonationError, setImpersonationError] = useState<string | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<FeedbackAdminReport | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const [filter, setFilter] = useState<FeedbackStatus | "all">("all");
   const [page, setPage] = useState(1);
   const [data, setData] = useState<FeedbackAdminList | null>(null);
@@ -213,6 +227,33 @@ export function AdminFeedbackScreen() {
   }, [accessToken, filter, page]);
 
   const { refreshing, onRefresh } = useScreenData(load);
+
+  async function confirmDelete() {
+    if (!pendingDelete) {
+      return;
+    }
+    if (!accessToken) {
+      setDeleteError("Sessione non disponibile. Accedi di nuovo.");
+      setPendingDelete(null);
+      return;
+    }
+    setDeleting(true);
+    setDeleteError(null);
+    try {
+      await deleteAdminFeedback(accessToken, pendingDelete.id);
+      setData((current) =>
+        current
+          ? { ...current, items: current.items.filter((item) => item.id !== pendingDelete.id) }
+          : current,
+      );
+      void load();
+    } catch (removeError) {
+      setDeleteError(getApiErrorMessage(removeError, "Eliminazione non riuscita."));
+    } finally {
+      setDeleting(false);
+      setPendingDelete(null);
+    }
+  }
 
   async function confirmImpersonation() {
     if (!pending) {
@@ -285,6 +326,14 @@ export function AdminFeedbackScreen() {
           testID="feedback-admin-expired"
         />
       ) : null}
+      {deleteError ? (
+        <UiStatePanel
+          state="error"
+          title="Eliminazione non riuscita"
+          message={deleteError}
+          testID="feedback-admin-delete-error"
+        />
+      ) : null}
       {impersonationError ? (
         <UiStatePanel
           state="error"
@@ -310,6 +359,7 @@ export function AdminFeedbackScreen() {
               accessToken={accessToken}
               canImpersonate={report.authorEmail !== "" && report.authorUserId !== user?.id}
               onImpersonate={setPending}
+              onDelete={setPendingDelete}
               onChanged={(next) => {
                 setData((current) =>
                   current
@@ -346,6 +396,39 @@ export function AdminFeedbackScreen() {
           </Pressable>
         </View>
       ) : null}
+
+      <Modal
+        visible={pendingDelete !== null}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setPendingDelete(null)}
+      >
+        <View style={styles.confirmOverlay}>
+          {pendingDelete ? (
+            <View style={styles.confirmBox} testID="feedback-admin-delete-box">
+              <Text style={styles.sectionTitle}>Elimina segnalazione</Text>
+              <Text style={styles.meta}>
+                {`Vuoi eliminare la segnalazione di ${pendingDelete.authorName}? Si cancellano per sempre anche il testo${
+                  pendingDelete.attachments.length > 0 ? ", le immagini e i video allegati" : ""
+                }. L'operazione non si può annullare.`}
+              </Text>
+              <View style={styles.rowActions}>
+                <Pressable style={styles.secondaryButton} onPress={() => setPendingDelete(null)}>
+                  <Text style={styles.secondaryButtonLabel}>Annulla</Text>
+                </Pressable>
+                <Pressable
+                  style={[local.dangerSolid, deleting && local.disabled]}
+                  disabled={deleting}
+                  onPress={() => void confirmDelete()}
+                  testID="feedback-admin-delete-confirm"
+                >
+                  <Text style={local.dangerSolidLabel}>{deleting ? "Eliminazione…" : "Elimina"}</Text>
+                </Pressable>
+              </View>
+            </View>
+          ) : null}
+        </View>
+      </Modal>
 
       <Modal
         visible={pending !== null}
@@ -438,6 +521,25 @@ const local = lazyStyles(() =>
       justifyContent: "center",
     },
     secondaryLabel: { color: colors.accent, fontWeight: typography.fontWeight.semibold },
+    danger: {
+      minHeight: 44,
+      padding: spacing.sm,
+      borderWidth: 1,
+      borderColor: colors.danger,
+      borderRadius: radius.pill,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    dangerLabel: { color: colors.danger, fontWeight: typography.fontWeight.semibold },
+    dangerSolid: {
+      minHeight: 44,
+      paddingHorizontal: spacing.md,
+      borderRadius: radius.pill,
+      backgroundColor: colors.danger,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    dangerSolidLabel: { color: colors.onBrand, fontWeight: typography.fontWeight.semibold },
     disabled: { opacity: 0.5 },
     pager: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: spacing.sm },
   }),

@@ -432,3 +432,20 @@ def _render_sistema_feedback_utente(params: NotificationParams) -> NotificationC
         body=f"{excerpt}{suffix}".strip(),
         deep_link="/admin/feedback",
     )
+
+
+@register_template("sistema.feedback_stato", 1)
+def _render_sistema_feedback_stato(params: NotificationParams) -> NotificationContent:
+    """La segnalazione dell'utente ha cambiato stato: arriva SOLO a chi l'ha scritta."""
+    status = str(params.get("status") or "")
+    title = {
+        "in_review": "Stiamo guardando la tua segnalazione",
+        "resolved": "La tua segnalazione è stata risolta",
+        "dismissed": "La tua segnalazione è stata chiusa",
+    }.get(status, "Aggiornamento sulla tua segnalazione")
+    excerpt = str(params.get("excerpt") or "")
+    return NotificationContent(
+        title=title,
+        body=f"«{excerpt}»" if excerpt else "",
+        deep_link="/feedback",
+    )

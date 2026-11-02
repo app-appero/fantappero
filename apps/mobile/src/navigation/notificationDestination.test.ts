@@ -47,3 +47,10 @@ test("impersonificazione: contesto assente, sconosciuto o esterno apre la tab in
     assert.equal(impersonationTab(value), undefined);
   }
 });
+
+test("l'avviso di stato di una propria segnalazione apre «Segnala un problema»", () => {
+  assert.deepEqual(
+    resolveNotificationRoute({ title: "La tua segnalazione è stata risolta", deepLink: "/feedback" }),
+    { kind: "stack", name: "Feedback" },
+  );
+});

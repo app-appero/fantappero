@@ -69,3 +69,13 @@ export function updateAdminFeedback(
     body,
   });
 }
+
+export function deleteAdminFeedback(
+  accessToken: string,
+  reportId: string,
+): Promise<{ deleted: boolean }> {
+  return apiRequest<{ deleted: boolean }>(`/admin/feedback/${reportId}`, {
+    accessToken,
+    method: "DELETE",
+  });
+}

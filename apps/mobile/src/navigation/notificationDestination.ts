@@ -30,6 +30,8 @@ const AUCTION_TITLES = new Set([
 const PATH_ROUTES: Array<[RegExp, NotificationRoute]> = [
   // Nuova segnalazione utente: la notifica arriva solo agli operatori.
   [/^\/admin\/feedback/, { kind: "admin", screen: "AdminFeedback" }],
+  // Aggiornamento di stato di una propria segnalazione.
+  [/^\/feedback/, { kind: "stack", name: "Feedback" }],
   [/^\/$/, { kind: "stack", name: "LeagueHome" }],
   [/^\/inviti/, { kind: "stack", name: "ReceivedInvites" }],
   [/^\/formazione/, { kind: "tab", screen: "Formation" }],

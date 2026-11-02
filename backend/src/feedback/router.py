@@ -19,6 +19,7 @@ from feedback.schemas import (
     FeedbackAdminListResponse,
     FeedbackAdminReportResponse,
     FeedbackAttachmentResponse,
+    FeedbackDeletedResponse,
     FeedbackReportSummaryResponse,
     FeedbackUpdateRequest,
 )
@@ -232,6 +233,20 @@ def list_feedback_for_operators(
         page=page,
         pageSize=_PAGE_SIZE,
     )
+
+
+@admin_router.delete("/{report_id}", response_model=FeedbackDeletedResponse)
+def delete_feedback(
+    report_id: UUID,
+    _operator: User = Depends(require_permissions(Permission.GLOBAL_OPERATE)),
+    service: FeedbackService = Depends(get_feedback_service),
+) -> FeedbackDeletedResponse | JSONResponse:
+    """Elimina fisicamente la segnalazione con testo e allegati (irreversibile)."""
+    try:
+        service.delete_report(report_id)
+    except FeedbackError as exc:
+        return _error(exc)
+    return FeedbackDeletedResponse(deleted=True)
 
 
 @admin_router.patch("/{report_id}", response_model=FeedbackAdminReportResponse)
