@@ -24,6 +24,8 @@ from auth.router import router as auth_router
 from authorization.exceptions import AuthorizationError
 from billing.router import router as billing_router
 from config.settings.loader import get_api_settings, validate_api_settings
+from feedback.router import admin_router as admin_feedback_router
+from feedback.router import router as feedback_router
 from fantasy_lineups.router import effective_lineup_router
 from fantasy_lineups.router import router as fantasy_lineups_router
 from fantasy_ratings.exceptions import FantasyRatingError
@@ -108,6 +110,8 @@ app.include_router(realtime_router)
 app.include_router(ai_assistant_router)
 app.include_router(ai_assistant_feedback_router)
 app.include_router(billing_router)
+app.include_router(feedback_router)
+app.include_router(admin_feedback_router)
 app.add_exception_handler(QualityRetryError, quality_error_handler)
 app.add_exception_handler(FantasyRatingError, rating_error_handler)
 

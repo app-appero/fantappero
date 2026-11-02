@@ -108,10 +108,10 @@ def test_upgrade_from_empty_database(clean_db: str) -> None:
                 .scalars()
                 .all()
             )
-            # Head aggiornata da 37c365bf2399 (review admin trasferimenti
-            # Loan/N.D., OQ-12) — aggiornare questa costante ad ogni nuova
-            # migrazione in coda.
-            assert version == "37c365bf2399"
+            # Head aggiornata a b7e2f4a91c30 (segnalazioni utente con allegati);
+            # prima 37c365bf2399 (review admin trasferimenti Loan/N.D., OQ-12).
+            # Aggiornare questa costante ad ogni nuova migrazione in coda.
+            assert version == "b7e2f4a91c30"
         assert named_statuses == ["pending", "accepted", "declined", "revoked", "expired"]
         assert calendar_statuses == ["draft", "confirmed"]
         assert fantasy_roles == ["P", "D", "C", "A"]

@@ -9,6 +9,7 @@ from config.settings.auth_settings import AuthSettingsMixin
 from config.settings.base import BaseAppSettings, require_non_empty
 from config.settings.billing_settings import BillingSettingsMixin
 from config.settings.fantasy_turns_settings import FantasyTurnsSettingsMixin
+from config.settings.feedback_settings import FeedbackSettingsMixin
 from config.settings.mail import MailSettingsMixin
 from config.settings.notifications_settings import NotificationsSettingsMixin
 from config.settings.profile_settings import ProfileSettingsMixin
@@ -26,6 +27,7 @@ class ApiSettings(
     FantasyTurnsSettingsMixin,
     NotificationsSettingsMixin,
     BillingSettingsMixin,
+    FeedbackSettingsMixin,
 ):
     """Configuration consumed by the API service."""
 

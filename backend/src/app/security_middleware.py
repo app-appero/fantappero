@@ -79,6 +79,16 @@ def install_range_header_guard(app: Any) -> None:
 # form data in the future. 10 MiB is comfortably above the largest real
 # payload here (a 5 MiB avatar, or a CSV roster import) with room to spare.
 _MAX_BODY_BYTES = 10 * 1024 * 1024
+# Le segnalazioni utente possono allegare un video (50 MiB) più qualche margine
+# per il testo e i campi del form. Soglia più alta SOLO per quel percorso.
+_FEEDBACK_UPLOAD_PATH = "/feedback"
+_MAX_FEEDBACK_BODY_BYTES = 60 * 1024 * 1024
+
+
+def _body_limit_for(scope: Scope) -> int:
+    if scope.get("method") == "POST" and scope.get("path") == _FEEDBACK_UPLOAD_PATH:
+        return _MAX_FEEDBACK_BODY_BYTES
+    return _MAX_BODY_BYTES
 
 
 class _BodyTooLargeError(Exception):
@@ -96,13 +106,14 @@ class BodySizeGuardMiddleware:
             await self.app(scope, receive, send)
             return
 
+        limit = _body_limit_for(scope)
         for name, value in scope.get("headers") or []:
             if name == b"content-length":
                 try:
                     declared_length = int(value)
                 except ValueError:
                     declared_length = None
-                if declared_length is not None and declared_length > _MAX_BODY_BYTES:
+                if declared_length is not None and declared_length > limit:
                     await _reject_body_too_large(send)
                     return
 
@@ -113,7 +124,7 @@ class BodySizeGuardMiddleware:
             message = await receive()
             if message["type"] == "http.request":
                 received += len(message.get("body") or b"")
-                if received > _MAX_BODY_BYTES:
+                if received > limit:
                     raise _BodyTooLargeError
             return message
 

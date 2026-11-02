@@ -8,6 +8,7 @@ from auth.models.user import User
 from auth.models.user_profile import UserProfile
 from billing.models import SubscriptionPayment, UserEntitlement
 from database.models.infrastructure import SystemFlag
+from feedback.models import FeedbackAttachment, FeedbackReport
 from fantasy_lineups.models import LineupDraft, LineupPlayer, LineupSubmission, TacticalMove
 from fantasy_ratings.models import PlayerMatchRating
 from fantasy_teams.models import (
@@ -136,6 +137,8 @@ __all__ = [
     "SubscriptionPayment",
     "SystemFlag",
     "SystemJob",
+    "FeedbackAttachment",
+    "FeedbackReport",
     "TradeProposal",
     "Transfer",
     "User",

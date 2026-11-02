@@ -415,3 +415,20 @@ def _render_mercato_scambio_v2(params: NotificationParams) -> NotificationConten
         body=body or "Apri Scambi per i dettagli.",
         deep_link="/mercato",
     )
+
+
+@register_template("sistema.feedback_utente", 1)
+def _render_sistema_feedback_utente(params: NotificationParams) -> NotificationContent:
+    """Nuova segnalazione utente: arriva SOLO agli operatori (vedi `feedback.service`)."""
+    author = str(params.get("author") or "Un utente")
+    category = str(params.get("category") or "bug")
+    label = {"bug": "bug", "suggerimento": "suggerimento", "altro": "segnalazione"}.get(
+        category, "segnalazione"
+    )
+    excerpt = str(params.get("excerpt") or "")
+    suffix = " (con allegato)" if params.get("has_media") else ""
+    return NotificationContent(
+        title=f"Nuovo {label} da {author}",
+        body=f"{excerpt}{suffix}".strip(),
+        deep_link="/admin/feedback",
+    )
