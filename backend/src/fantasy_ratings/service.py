@@ -260,7 +260,11 @@ def compute_fixture_ratings(
                 labels={"version": formula.version, "result": status},
             )
 
-    logger.info(
+    # Il calcolo gira ogni minuto per tutti i turni in corso (centinaia di righe al minuto):
+    # a livello INFO si scrive solo quando i voti sono cambiati davvero, altrimenti DEBUG.
+    # Il riepilogo del ciclo resta in `fantasy_live_pipeline_completed`.
+    changed = counters.created + counters.updated + counters.removed > 0
+    (logger.info if changed else logger.debug)(
         "fantasy_ratings_compute_done",
         extra={
             "fixture_id": str(fixture.id),
