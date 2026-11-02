@@ -254,7 +254,7 @@ def test_successful_send_logs_only_the_channel_used(monkeypatch):
     client = _fake_smtp()
     with patch("mail.transport.smtplib.SMTP", return_value=client):
         send_email(Settings(), to_email="segreto@example.com", message=MESSAGE)
-    logger.info.assert_called_once_with("mail_sent", extra={"via": "smtp"})
+    logger.info.assert_called_once_with("mail_sent via=smtp", extra={"via": "smtp"})
     assert not any(secret in repr(logger.mock_calls) for secret in SECRETS)
 
 
@@ -277,14 +277,16 @@ def test_task_failure_is_logged_with_the_channel_and_error_type_but_no_personal_
             html_body="<p>corpo riservato</p>",
             template="operator_email",
         )
+    details = {
+        "template": "operator_email",
+        "transport": "auto",
+        "resend_configured": True,
+        "smtp_host": "smtp.provider.example",
+        "error": "HTTPStatusError",
+    }
     logger.error.assert_called_once_with(
-        "mail_send_failed",
-        extra={
-            "template": "operator_email",
-            "transport": "auto",
-            "resend_configured": True,
-            "smtp_host": "smtp.provider.example",
-            "error": "HTTPStatusError",
-        },
+        "mail_send_failed template=operator_email transport=auto resend_configured=True "
+        "smtp_host=smtp.provider.example error=HTTPStatusError",
+        extra=details,
     )
     assert not any(secret in repr(logger.mock_calls) for secret in SECRETS)

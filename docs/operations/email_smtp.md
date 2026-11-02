@@ -72,15 +72,16 @@ non cifrata (se mancano sia `SMTP_USE_TLS` sia `SMTP_USE_SSL` l'invio viene rifi
 L'invio è **asincrono**: il pannello registra «inviata» appena l'email è in coda, anche se il worker
 poi non riesce a spedirla. L'esito vero sta nei **log del worker** (Railway → worker → Logs):
 
-| Riga nel log | Significato |
+| Riga nel log del worker | Significato |
 | --- | --- |
-| `mail_sent` con `"via": "smtp"` | spedita via SMTP: se non arriva guarda lo spam e le regole del provider |
-| `mail_sent` con `"via": "resend"` | è partita da Resend, non da SMTP: `MAIL_TRANSPORT` non è `smtp` o c'è ancora `RESEND_API_KEY` in modalità `auto` |
-| `mail_send_failed` con `"error": "HTTPStatusError"` | Resend ha rifiutato (sandbox: solo il titolare dell'account) |
-| `mail_send_failed` con `"error": "ConnectionRefusedError"` e `"smtp_host": "localhost"` | le variabili `SMTP_*` mancano: il worker sta usando il default locale |
-| `mail_send_failed` con `"error": "SMTPAuthenticationError"` | utente o password sbagliati |
-| `mail_send_failed` con `"error": "TimeoutError"` / `OSError` | porta bloccata (piano non Pro, o deploy non rifatto) |
-| nessuna riga | il worker non sta consumando la coda, oppure le variabili non sono state applicate: rifai il deploy |
+| `mail_sent via=smtp` | spedita via SMTP: se non arriva guarda lo spam e le regole del provider |
+| `mail_sent via=resend` | è partita da Resend, non da SMTP: `MAIL_TRANSPORT` non è `smtp` o c'è ancora `RESEND_API_KEY` in modalità `auto` |
+| `mail_send_failed … error=HTTPStatusError` | Resend ha rifiutato (sandbox: solo il titolare dell'account) |
+| `mail_send_failed … smtp_host=localhost error=ConnectionRefusedError` | le variabili `SMTP_*` mancano: il worker sta usando il default locale |
+| `mail_send_failed … error=SMTPAuthenticationError` | utente o password sbagliati |
+| `mail_send_failed … error=TimeoutError` / `OSError` | porta bloccata (piano non Pro, o deploy non rifatto) |
+| `Task mail.send_message[…] received` ma nessun `mail_sent` né `mail_send_failed` | l'invio è ancora in corso (timeout di 30 s) o il worker si è riavviato |
+| **nessun** `Task mail.send_message[…] received` | il worker non ha ricevuto nulla: l'API non ha accodato (cerca `operator_email_dispatch_failed` nei **log dell'API**) oppure usa un broker diverso dal worker (`REDIS_URL` / `CELERY_BROKER_URL` devono coincidere su `api` e `worker`) |
 
 Se commenti le variabili `SMTP_*` che c'erano già (erano quelle di Resend via SMTP) **devi** impostare
 quelle nuove: senza, l'SMTP punta a `localhost` e non parte nulla. Con `MAIL_TRANSPORT=smtp` la chiave

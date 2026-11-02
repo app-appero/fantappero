@@ -36,15 +36,18 @@ def send_message_task(
     except Exception as exc:
         # L'invio è asincrono: il pannello non vede l'errore, quindi va scritto chiaro nei log
         # del worker (canale configurato e tipo di errore; mai destinatario, testo o credenziali).
+        details = {
+            "template": template,
+            "transport": settings.resolved_mail_transport(),
+            "resend_configured": bool(settings.resolved_resend_api_key()),
+            "smtp_host": settings.smtp_host,
+            "error": type(exc).__name__,
+        }
+        # I campi stanno anche nel testo: il worker stampa solo il messaggio (formato Celery),
+        # non gli `extra` che il log JSON dell'API invece mostra.
         logger.error(
-            "mail_send_failed",
-            extra={
-                "template": template,
-                "transport": settings.resolved_mail_transport(),
-                "resend_configured": bool(settings.resolved_resend_api_key()),
-                "smtp_host": settings.smtp_host,
-                "error": type(exc).__name__,
-            },
+            "mail_send_failed " + " ".join(f"{key}={value}" for key, value in details.items()),
+            extra=details,
         )
         get_metrics().incr("auth_email_failed_total", labels={"template": template})
         raise

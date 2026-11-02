@@ -49,7 +49,7 @@ def send_email(
     api_key = settings.resolved_resend_api_key()
     used = _deliver(settings, transport=transport, api_key=api_key, to_email=to_email, message=message)
     # Solo il canale usato: mai destinatario, oggetto o credenziali nei log.
-    logger.info("mail_sent", extra={"via": used})
+    logger.info(f"mail_sent via={used}", extra={"via": used})
 
 
 def _deliver(
