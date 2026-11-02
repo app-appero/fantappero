@@ -198,18 +198,14 @@ function compareKeys(a: number[], b: number[]): number {
  * a più livelli), attacco (ultima cifra). Dentro un reparto l'ordine segue il
  * `grid` (colonna sinistra-destra), che resta utile come ordinamento.
  *
- * Restituisce `null` se i dati non sono coerenti (modulo illeggibile, ruoli
- * mancanti o conteggi per reparto diversi dal modulo): il chiamante ricade
- * allora su `layoutFromGrid`.
+ * Restituisce `null` solo se manca il ruolo di almeno un giocatore: il
+ * chiamante ricade allora su `layoutFromGrid`.
  */
 export function layoutFromRoles<T extends RoleLayoutEntryLike>(
   entries: readonly T[],
   formation: string | null | undefined,
 ): PitchPosition[] | null {
-  const parts = (formation ?? "")
-    .split("-")
-    .map((part) => Number.parseInt(part.trim(), 10));
-  if (parts.length < 2 || parts.some((n) => !Number.isFinite(n) || n <= 0)) {
+  if (entries.length === 0) {
     return null;
   }
   const buckets: Record<PitchRole, { entry: T; key: [number, number, number] }[]> = {
@@ -221,32 +217,38 @@ export function layoutFromRoles<T extends RoleLayoutEntryLike>(
   for (const [index, entry] of entries.entries()) {
     const role = resolvePitchRole(entry.position);
     if (!role) {
+      // Un ruolo mancante o sconosciuto: senza il ruolo di tutti non si può
+      // fidarsi del layout per reparto, ricade sul grid.
       return null;
     }
     buckets[role].push({ entry, key: gridSortKey(entry.grid, index) });
-  }
-  const midCount = parts.slice(1, -1).reduce((sum, n) => sum + n, 0);
-  if (
-    buckets.GK.length !== 1 ||
-    buckets.DEF.length !== parts[0] ||
-    buckets.FWD.length !== parts[parts.length - 1] ||
-    buckets.MID.length !== midCount
-  ) {
-    return null;
   }
   for (const role of Object.keys(buckets) as PitchRole[]) {
     buckets[role].sort((a, b) => compareKeys(a.key, b.key));
   }
 
-  const rows: T[][] = [
-    buckets.GK.map((item) => item.entry),
-    buckets.DEF.map((item) => item.entry),
-  ];
+  // Il ruolo dichiarato decide SEMPRE il reparto. Il modulo serve solo a
+  // spezzare il centrocampo su più righe (4-2-3-1) quando è coerente con i
+  // centrocampisti realmente schierati; altrimenti il centrocampo sta su una riga.
+  const parts = (formation ?? "")
+    .split("-")
+    .map((part) => Number.parseInt(part.trim(), 10));
+  const middleParts =
+    parts.length >= 3 && parts.every((n) => Number.isFinite(n) && n > 0) ? parts.slice(1, -1) : [];
+  const midSplit =
+    middleParts.length > 0 && middleParts.reduce((sum, n) => sum + n, 0) === buckets.MID.length
+      ? middleParts
+      : [buckets.MID.length];
+
+  const rows: T[][] = [buckets.GK.map((item) => item.entry), buckets.DEF.map((item) => item.entry)];
   const mids = buckets.MID.map((item) => item.entry);
-  for (const count of parts.slice(1, -1)) {
+  for (const count of midSplit) {
     rows.push(mids.splice(0, count));
   }
   rows.push(buckets.FWD.map((item) => item.entry));
+  const filledRows = rows.filter((row) => row.length > 0);
+  rows.length = 0;
+  rows.push(...filledRows);
 
   const positions: PitchPosition[] = [];
   rows.forEach((rowEntries, rowIndex) => {

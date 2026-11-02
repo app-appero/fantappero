@@ -335,9 +335,15 @@ describe("layoutFromRoles", () => {
     assert.equal(new Set(positions.map((p) => p.yPercent)).size, 5);
   });
 
-  it("returns null when roles do not match the formation or are missing", () => {
-    assert.equal(layoutFromRoles(scrambled, "4-4-2"), null);
-    assert.equal(layoutFromRoles(scrambled, null), null);
+  it("uses the declared roles even when the formation does not match them", () => {
+    const positions = layoutFromRoles(scrambled, "4-4-2")!;
+    const byId = new Map(positions.map((p) => [p.id, p]));
+    assert.ok(byId.get("mandas")!.yPercent > byId.get("tavares")!.yPercent);
+    assert.ok(byId.get("zaccagni")!.yPercent < byId.get("frattesi")!.yPercent);
+    assert.equal(layoutFromRoles(scrambled, null)!.length, 11);
+  });
+
+  it("returns null only when a player has no known role", () => {
     assert.equal(
       layoutFromRoles(scrambled.map((p, i) => (i === 0 ? { ...p, position: null } : p)), "4-3-3"),
       null,
