@@ -45,6 +45,8 @@ import { copyToClipboard } from "../utils/clipboard";
 const { colors, spacing, typography, radius } = theme;
 
 
+type SetupTab = "configurazione" | "invitati";
+
 function clampPercent(text: string, fallback: number): number {
   if (text.trim() === "" || Number.isNaN(Number(text))) {
     return fallback;
@@ -116,6 +118,8 @@ export function LeagueAdminScreen() {
   const [participantCountText, setParticipantCountText] = useState("8");
   const [minutesThresholdText, setMinutesThresholdText] = useState("15");
   const [lockMarginText, setLockMarginText] = useState("15");
+  const [configurationSaved, setConfigurationSaved] = useState(false);
+  const [setupTab, setSetupTab] = useState<SetupTab>("configurazione");
   const [creditsText, setCreditsText] = useState("1000");
   const [turnCoverageText, setTurnCoverageText] = useState("75");
   const [voluntaryRefundText, setVoluntaryRefundText] = useState("50");
@@ -146,6 +150,7 @@ export function LeagueAdminScreen() {
         ]);
         setRules(panel.rules);
         setLifecycle(panel.lifecycle);
+        setConfigurationSaved(panel.configurationSaved);
         setParticipantCountText(String(panel.rules.participantCount));
         setMinutesThresholdText(String(panel.rules.minutesThreshold));
         setLockMarginText(String(panel.rules.lineupLockMarginMinutes));
@@ -219,6 +224,8 @@ export function LeagueAdminScreen() {
       );
       setRules(saved);
       setSaveSuccess(true);
+      setConfigurationSaved(true);
+      setSetupTab("invitati");
     } catch (error) {
       setActionError(getApiErrorMessage(error, "Impossibile salvare il regolamento."));
     } finally {
@@ -451,6 +458,96 @@ export function LeagueAdminScreen() {
 
       {!loading && rules && lifecycle ? (
         <View style={styles.content}>
+          {calendar?.status === "confirmed" ? null : (
+            <>
+              <Text style={styles.heading}>Calendario fantallenatori</Text>
+              <View style={styles.section} testID="league-calendar-panel">
+                <Text style={styles.body} testID="league-calendar-status">
+                  Stato: {calendar ? "Anteprima" : "Non generato"}
+                  {calendar
+                    ? ` · ${calendar.matchupCount} incontri · ${calendar.roundCount} giornate${
+                        calendar.byeCount > 0 ? ` · ${calendar.byeCount} riposi` : ""
+                      }`
+                    : ""}
+                </Text>
+                <Text style={styles.body}>
+                  Genera e conferma il calendario quando tutte le rose in Partecipanti sono
+                  complete. Gli scontri si consultano nel tab Turni, giornata per giornata.
+                </Text>
+
+                {!calendar ? (
+                  <Text style={styles.body} testID="league-calendar-empty">
+                    Completa le rose di tutti i partecipanti, poi genera il calendario.
+                  </Text>
+                ) : null}
+
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={() => void onGenerateCalendar()}
+                  style={styles.primaryButton}
+                  testID="league-calendar-generate"
+                >
+                  <Text style={styles.primaryLabel}>Genera calendario</Text>
+                </Pressable>
+                {calendar ? (
+                  <Pressable
+                    accessibilityRole="button"
+                    onPress={() => void onConfirmCalendar()}
+                    style={styles.secondaryButton}
+                    testID="league-calendar-confirm"
+                  >
+                    <Text style={styles.secondaryLabel}>Conferma calendario</Text>
+                  </Pressable>
+                ) : null}
+              </View>
+            </>
+          )}
+
+          <Text style={styles.heading}>Stato stagione</Text>
+          <View style={styles.section} testID="league-season-panel">
+            <Text style={styles.body}>Stato corrente: {leagueStateLabel(currentState)}</Text>
+            {lifecycle.blockers.length > 0 ? (
+              <Text style={styles.body}>
+                Completa i passaggi in ordine (partecipanti → rose → calendario): la stagione parte
+                in automatico quando tutto è pronto.
+              </Text>
+            ) : null}
+            {orderLeagueSetupBlockers(lifecycle.blockers).map((blocker) => (
+              <Text key={blocker.code} style={styles.body}>
+                ·{" "}
+                {blocker.actionable
+                  ? blocker.message
+                  : `Completa prima il passaggio precedente. (${blocker.message})`}
+              </Text>
+            ))}
+            {currentState === "active" ? (
+              <Text style={styles.body} testID="league-season-in-progress">
+                La lega si concluderà automaticamente quando tutte le giornate saranno omologate.
+              </Text>
+            ) : null}
+          </View>
+
+          <Text style={styles.heading}>Prossime fasi</Text>
+          <Text style={styles.body}>
+            Prima salva la configurazione della lega, poi invita i fantallenatori.
+          </Text>
+          <ScreenTabs
+            items={[
+              { id: "configurazione", label: "Configurazione" },
+              { id: "invitati", label: "Invitati" },
+            ]}
+            activeId={setupTab}
+            disabledIds={configurationSaved ? [] : ["invitati"]}
+            onSelect={(id) => {
+              if (id === "invitati" && !configurationSaved) {
+                return;
+              }
+              setSetupTab(id as SetupTab);
+            }}
+            testID="league-admin-setup-tabs"
+          />
+          {setupTab === "configurazione" ? (
+            <>
           <Text style={styles.heading}>Regolamento</Text>
           <Text style={styles.label}>Preset regolamento</Text>
           <Text style={styles.body} testID="league-admin-preset">
@@ -605,6 +702,10 @@ export function LeagueAdminScreen() {
             <Text style={styles.primaryLabel}>Salva regolamento</Text>
           </Pressable>
 
+            </>
+          ) : null}
+          {setupTab === "invitati" ? (
+            <>
           <Text style={styles.heading}>Partecipanti iscritti</Text>
           <Text style={styles.body} testID="league-members-capacity">
             Iscritti: {members.length} / Previsti: {rules.participantCount}
@@ -652,75 +753,6 @@ export function LeagueAdminScreen() {
                 ) : null}
               </View>
             ))}
-          </View>
-
-          {calendar?.status === "confirmed" ? null : (
-            <>
-              <Text style={styles.heading}>Calendario fantallenatori</Text>
-              <View style={styles.section} testID="league-calendar-panel">
-                <Text style={styles.body} testID="league-calendar-status">
-                  Stato: {calendar ? "Anteprima" : "Non generato"}
-                  {calendar
-                    ? ` · ${calendar.matchupCount} incontri · ${calendar.roundCount} giornate${
-                        calendar.byeCount > 0 ? ` · ${calendar.byeCount} riposi` : ""
-                      }`
-                    : ""}
-                </Text>
-                <Text style={styles.body}>
-                  Genera e conferma il calendario quando tutte le rose in Partecipanti sono
-                  complete. Gli scontri si consultano nel tab Turni, giornata per giornata.
-                </Text>
-
-                {!calendar ? (
-                  <Text style={styles.body} testID="league-calendar-empty">
-                    Completa le rose di tutti i partecipanti, poi genera il calendario.
-                  </Text>
-                ) : null}
-
-                <Pressable
-                  accessibilityRole="button"
-                  onPress={() => void onGenerateCalendar()}
-                  style={styles.primaryButton}
-                  testID="league-calendar-generate"
-                >
-                  <Text style={styles.primaryLabel}>Genera calendario</Text>
-                </Pressable>
-                {calendar ? (
-                  <Pressable
-                    accessibilityRole="button"
-                    onPress={() => void onConfirmCalendar()}
-                    style={styles.secondaryButton}
-                    testID="league-calendar-confirm"
-                  >
-                    <Text style={styles.secondaryLabel}>Conferma calendario</Text>
-                  </Pressable>
-                ) : null}
-              </View>
-            </>
-          )}
-
-          <Text style={styles.heading}>Stato stagione</Text>
-          <View style={styles.section} testID="league-season-panel">
-            <Text style={styles.body}>Stato corrente: {leagueStateLabel(currentState)}</Text>
-            {lifecycle.blockers.length > 0 ? (
-              <Text style={styles.body}>
-                Completa i passaggi in ordine (partecipanti → rose → calendario): la stagione parte
-                in automatico quando tutto è pronto.
-              </Text>
-            ) : null}
-            {orderLeagueSetupBlockers(lifecycle.blockers).map((blocker) => (
-              <Text key={blocker.code} style={styles.body}>
-                ·{" "}
-                {blocker.actionable
-                  ? blocker.message
-                  : `Completa prima il passaggio precedente. (${blocker.message})`}
-              </Text>
-            ))}
-            {currentState === "active" ? (
-              <Text style={styles.body} testID="league-season-in-progress">
-                La lega si concluderà automaticamente quando tutte le giornate saranno omologate.
-              </Text>
-            ) : null}
           </View>
 
           <Text style={styles.heading}>Directory fantallenatori</Text>
@@ -860,6 +892,9 @@ export function LeagueAdminScreen() {
               ))}
             </View>
           )}
+
+            </>
+          ) : null}
 
           {isLeagueDeletable(currentState) ? (
             <View style={styles.section} testID="league-delete-panel">

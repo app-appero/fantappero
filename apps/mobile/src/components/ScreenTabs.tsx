@@ -19,11 +19,14 @@ export function ScreenTabs({
   activeId,
   onSelect,
   testID = "screen-tabs",
+  disabledIds = [],
 }: {
   items: readonly ScreenTabItem[];
   activeId: string;
   onSelect: (id: string) => void;
   testID?: string;
+  /** Tab visibili ma non selezionabili (es. Invitati prima di salvare la configurazione). */
+  disabledIds?: readonly string[];
 }) {
   if (items.length < 2) {
     return null;
@@ -32,13 +35,15 @@ export function ScreenTabs({
     <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.scroll} contentContainerStyle={styles.row} testID={testID}>
       {items.map((item) => {
         const selected = item.id === activeId;
+        const disabled = disabledIds.includes(item.id);
         return (
           <Pressable
             key={item.id}
             accessibilityRole="tab"
-            accessibilityState={{ selected }}
+            accessibilityState={{ selected, disabled }}
+            disabled={disabled}
             onPress={() => onSelect(item.id)}
-            style={[styles.chip, selected && styles.chipSelected]}
+            style={[styles.chip, selected && styles.chipSelected, disabled && styles.chipDisabled]}
             testID={`${testID}-${item.id}`}
           >
             <Text style={[styles.label, selected && styles.labelSelected]}>{item.label}</Text>
@@ -64,6 +69,9 @@ const styles = lazyStyles(() => StyleSheet.create({
     paddingHorizontal: spacing.sm,
     paddingVertical: spacing.xs,
     backgroundColor: colors.background,
+  },
+  chipDisabled: {
+    opacity: 0.45,
   },
   chipSelected: {
     borderColor: colors.brand,
