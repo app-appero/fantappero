@@ -1,4 +1,5 @@
 import type { PaginatedAdminLeagues } from "@fantappero/contracts";
+import { theme } from "@fantappero/ui/theme";
 import { useCallback, useEffect, useState } from "react";
 import { Pressable, Text, View } from "react-native";
 import { AppTextInput as TextInput } from "../../components/AppTextInput";
@@ -116,7 +117,7 @@ export function AdminLeaguesScreen() {
         />
       ) : null}
       {!loading && !error && result && result.items.length > 0 ? (
-        <View testID="admin-leagues-list">
+        <View testID="admin-leagues-list" style={{ gap: theme.spacing.md }}>
           {result.items.map((league) => (
             <View key={league.id} style={styles.listRow} testID={`admin-league-${league.id}`}>
               <Text style={styles.name}>{league.name}</Text>

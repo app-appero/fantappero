@@ -96,9 +96,6 @@ export function AuthRegisterScreen() {
             <View style={styles.appleDisabled} accessibilityRole="button" accessibilityState={{ disabled: true }} accessibilityLabel="Registrati con Apple, disponibile presto" testID="auth-register-apple-disabled">
               <Ionicons name="logo-apple" size={22} color="#FFFFFF" />
               <Text style={styles.appleLabel}>Registrati con Apple</Text>
-              <View style={styles.soonChip}>
-                <Text style={styles.soonLabel}>PRESTO</Text>
-              </View>
             </View>
             <View style={styles.orRow}>
               <View style={styles.orLine} />

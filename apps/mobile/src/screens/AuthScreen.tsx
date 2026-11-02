@@ -121,9 +121,6 @@ export function AuthScreen() {
           <View style={styles.appleDisabled} accessibilityRole="button" accessibilityState={{ disabled: true }} accessibilityLabel="Continua con Apple, disponibile presto" testID="auth-apple-disabled">
             <Ionicons name="logo-apple" size={22} color="#FFFFFF" />
             <Text style={styles.appleLabel}>Continua con Apple</Text>
-            <View style={styles.soonChip}>
-              <Text style={styles.soonLabel}>PRESTO</Text>
-            </View>
           </View>
           <View style={styles.orRow}>
             <View style={styles.orLine} />
@@ -393,15 +390,6 @@ export const authFormStyles = lazyStyles(() => StyleSheet.create({
   },
   appleGlyph: { color: "#fff", fontSize: 20 },
   appleLabel: { color: "#fff", fontWeight: "700", fontSize: typography.fontSize.md },
-  soonChip: {
-    position: "absolute",
-    right: 14,
-    paddingHorizontal: 10,
-    paddingVertical: 3,
-    borderRadius: radius.pill,
-    backgroundColor: "rgba(255,255,255,0.14)",
-  },
-  soonLabel: { color: "#fff", fontSize: 11, fontWeight: "700", letterSpacing: 0.8 },
   emailButton: {
     minHeight: 54,
     alignItems: "center",
