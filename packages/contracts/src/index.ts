@@ -443,6 +443,7 @@ export type {
   PitchRole,
   PitchRoleVariant,
   RealMatchBadgeEvent,
+  RoleLayout,
   RoleLayoutEntryLike,
 } from "./pitch.js";
 

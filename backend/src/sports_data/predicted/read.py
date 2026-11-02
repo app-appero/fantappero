@@ -318,6 +318,11 @@ def _side(
     )
 
 
+def athlete_fantasy_roles(session: Session, athlete_ids: set[UUID]) -> dict[UUID, str]:
+    """Ruolo reale P/D/C/A dalla rosa del provider, per gli atleti indicati."""
+    return _athlete_roles(session, athlete_ids)
+
+
 def _athlete_roles(session: Session, athlete_ids: set[UUID]) -> dict[UUID, str]:
     """Ruolo fantacalcistico (P/D/C/A) per gli atleti abbinati in questo snapshot.
 

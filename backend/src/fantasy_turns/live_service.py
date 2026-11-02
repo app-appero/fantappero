@@ -39,6 +39,7 @@ from sports_data.predicted.read import (
     PredictedView,
     PredictedViewPlayer,
     PredictedViewSide,
+    athlete_fantasy_roles,
     latest_predicted_view,
 )
 from sports_data.roster.models import Athlete
@@ -169,6 +170,13 @@ def _lineup_payload(
         return None
 
     entries = sorted(lineup.entries, key=lambda row: (row.sort_order, row.athlete_provider_id))
+    # Il "pos" della formazione dice dove il giocatore parte in questa partita;
+    # il ruolo reale (P/D/C/A) viene dalla rosa del provider ed è ciò che il
+    # client usa per mettere ogni giocatore nel reparto giusto.
+    real_roles = athlete_fantasy_roles(
+        session,
+        {entry.athlete.id for entry in entries if entry.athlete is not None},
+    )
     starters: list[FixtureLineupPlayerResponse] = []
     bench: list[FixtureLineupPlayerResponse] = []
     bench_order = 0
@@ -184,6 +192,7 @@ def _lineup_payload(
             name=_athlete_name(athlete) or f"#{entry.athlete_provider_id}",
             shirtNumber=entry.shirt_number,
             position=entry.position_raw,
+            role=None if athlete is None else real_roles.get(athlete.id),
             grid=entry.grid,
             photoUrl=None if athlete is None else athlete.photo_url,
             benchOrder=None if entry.is_starter else bench_order,

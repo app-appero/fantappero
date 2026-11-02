@@ -87,10 +87,10 @@ function pitchPlayerId(player: FixtureLineupPlayer): string {
 function toPitchPlayers(
   players: readonly FixtureLineupPlayer[],
   badgesByAthlete: Map<string, MatchBadge[]>,
-  roleFromPosition: boolean,
+  assignedRoles: ReadonlyMap<string, string> | null,
 ) {
-  // Se il layout è costruito dai ruoli dichiarati (vedi `layoutFromRoles`) il
-  // badge mostra quel ruolo. Altrimenti si ricade sul grid, che decide la riga
+  // Se il layout è costruito dai ruoli reali (vedi `layoutFromRoles`) il
+  // badge mostra il ruolo assegnato. Altrimenti si ricade sul grid, che decide la riga
   // su cui il giocatore viene disegnato, così badge e riga restano coerenti.
   const allGrids = players.map((player) => player.grid);
   return players.map((player) => ({
@@ -98,8 +98,8 @@ function toPitchPlayers(
     athleteId: player.athleteId,
     shirtNumber: player.shirtNumber,
     name: player.name,
-    role: roleFromPosition
-      ? (player.position ?? player.role ?? null)
+    role: assignedRoles
+      ? (assignedRoles.get(pitchPlayerId(player)) ?? player.position ?? null)
       : (pitchRoleCodeFromGrid(player.grid, allGrids) ?? player.position),
     badges: player.athleteId ? badgesByAthlete.get(player.athleteId) : undefined,
     photoUrl: player.photoUrl,
@@ -290,13 +290,14 @@ function LineupBlock({
   const roleLayout = layoutFromRoles(
     lineup.starters.map((player) => ({
       id: pitchPlayerId(player),
-      position: player.position ?? player.role ?? null,
+      position: player.position ?? null,
+      fantasyRole: player.role ?? null,
       grid: player.grid,
     })),
     lineup.formation,
   );
   const positions =
-    roleLayout ??
+    roleLayout?.positions ??
     layoutFromGrid(
       lineup.starters.map((player) => ({ id: pitchPlayerId(player), grid: player.grid })),
     );
@@ -321,7 +322,7 @@ function LineupBlock({
       {positions.length > 0 ? (
         <PitchView
           title={title}
-          players={toPitchPlayers(lineup.starters, badgesByAthlete, roleLayout !== null)}
+          players={toPitchPlayers(lineup.starters, badgesByAthlete, roleLayout?.roles ?? null)}
           positions={positions}
           testID={`fixture-pitch-${side}`}
           onAthletePress={athleteCard?.open}

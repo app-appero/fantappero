@@ -287,33 +287,45 @@ describe("fantasyBadgesFromBonusMalus", () => {
 });
 
 describe("layoutFromRoles", () => {
-  // Caso reale: il grid attribuisce righe sbagliate (portiere in difesa,
-  // centrocampista in porta), ma il pos per giocatore è corretto.
-  const scrambled = [
-    { id: "belahyane", position: "M", grid: "1:1" },
-    { id: "tavares", position: "D", grid: "2:1" },
-    { id: "taylor", position: "D", grid: "2:2" },
-    { id: "zaccagni", position: "F", grid: "2:3" },
-    { id: "mandas", position: "G", grid: "2:4" },
-    { id: "frattesi", position: "M", grid: "3:1" },
-    { id: "isaksen", position: "M", grid: "3:2" },
-    { id: "gila", position: "D", grid: "3:3" },
-    { id: "sutalo", position: "D", grid: "4:1" },
-    { id: "provstgaard", position: "F", grid: "4:2" },
-    { id: "noslin", position: "F", grid: "4:3" },
+  // Lazio 4-3-3 reale: il pos della partita dà Zaccagni come M (4 M e 2 F),
+  // ma il ruolo reale dalla rosa è A: il 4-3-3 richiede 3 attaccanti.
+  const lazio = [
+    { id: "mandas", position: "G", fantasyRole: "P", grid: "2:4" },
+    { id: "tavares", position: "D", fantasyRole: "D", grid: "2:1" },
+    { id: "sutalo", position: "D", fantasyRole: "D", grid: "4:1" },
+    { id: "provstgaard", position: "D", fantasyRole: "D", grid: "4:2" },
+    { id: "mussolini", position: "D", fantasyRole: "D", grid: "3:3" },
+    { id: "belahyane", position: "M", fantasyRole: "C", grid: "1:1" },
+    { id: "taylor", position: "M", fantasyRole: "C", grid: "2:2" },
+    { id: "frattesi", position: "M", fantasyRole: "C", grid: "3:1" },
+    { id: "zaccagni", position: "M", fantasyRole: "A", grid: "2:3" },
+    { id: "isaksen", position: "F", fantasyRole: "A", grid: "3:2" },
+    { id: "noslin", position: "F", fantasyRole: "A", grid: "4:3" },
   ];
 
-  it("places each player by the declared position, not by an unreliable grid row", () => {
-    const positions = layoutFromRoles(scrambled, "4-3-3");
-    assert.ok(positions);
-    const byId = new Map(positions.map((p) => [p.id, p]));
+  it("uses the real roster role and gets 1-4-3-3 on the pitch", () => {
+    const layout = layoutFromRoles(lazio, "4-3-3")!;
+    assert.ok(layout);
+    const byId = new Map(layout.positions.map((p) => [p.id, p]));
     const y = (id: string) => byId.get(id)!.yPercent;
-    assert.ok(y("mandas") > y("tavares"), "goalkeeper below the defenders");
-    assert.equal(y("tavares"), y("sutalo"));
+    assert.equal(layout.roles.get("zaccagni"), "F");
+    assert.equal(layout.roles.get("mandas"), "G");
+    const count = (role: string) => [...layout.roles.values()].filter((r) => r === role).length;
+    assert.deepEqual([count("G"), count("D"), count("M"), count("F")], [1, 4, 3, 3]);
+    assert.ok(y("mandas") > y("tavares"));
+    assert.equal(y("tavares"), y("mussolini"));
     assert.ok(y("tavares") > y("frattesi"));
-    assert.ok(y("frattesi") > y("noslin"));
-    assert.equal(y("belahyane"), y("frattesi"));
     assert.equal(y("zaccagni"), y("noslin"));
+    assert.ok(y("frattesi") > y("zaccagni"));
+  });
+
+  it("moves, to fit the formation, the player whose match pos already points there", () => {
+    // Nessun ruolo reale: 4 M e 2 F dal pos, il 4-3-3 chiede un M in più davanti.
+    const noRoster = lazio.map(({ fantasyRole: _ignored, ...rest }) => rest);
+    const layout = layoutFromRoles(noRoster, "4-3-3")!;
+    const count = (role: string) => [...layout.roles.values()].filter((r) => r === role).length;
+    assert.deepEqual([count("G"), count("D"), count("M"), count("F")], [1, 4, 3, 3]);
+    assert.equal(layout.roles.get("mandas"), "G");
   });
 
   it("builds one row per middle digit of the formation (4-2-3-1)", () => {
@@ -327,25 +339,22 @@ describe("layoutFromRoles", () => {
       { id: "a3", position: "M", grid: "4:3" },
       { id: "st", position: "F", grid: "5:1" },
     ];
-    const positions = layoutFromRoles(players, "4-2-3-1")!;
-    const byId = new Map(positions.map((p) => [p.id, p]));
+    const layout = layoutFromRoles(players, "4-2-3-1")!;
+    const byId = new Map(layout.positions.map((p) => [p.id, p]));
     assert.equal(byId.get("m1")!.yPercent, byId.get("m2")!.yPercent);
     assert.ok(byId.get("m1")!.yPercent > byId.get("a1")!.yPercent);
     assert.ok(byId.get("a1")!.yPercent > byId.get("st")!.yPercent);
-    assert.equal(new Set(positions.map((p) => p.yPercent)).size, 5);
+    assert.equal(new Set(layout.positions.map((p) => p.yPercent)).size, 5);
   });
 
-  it("uses the declared roles even when the formation does not match them", () => {
-    const positions = layoutFromRoles(scrambled, "4-4-2")!;
-    const byId = new Map(positions.map((p) => [p.id, p]));
-    assert.ok(byId.get("mandas")!.yPercent > byId.get("tavares")!.yPercent);
-    assert.ok(byId.get("zaccagni")!.yPercent < byId.get("frattesi")!.yPercent);
-    assert.equal(layoutFromRoles(scrambled, null)!.length, 11);
+  it("never moves the goalkeeper", () => {
+    const layout = layoutFromRoles(lazio, "3-4-3")!;
+    assert.equal(layout.roles.get("mandas"), "G");
   });
 
   it("returns null only when a player has no known role", () => {
     assert.equal(
-      layoutFromRoles(scrambled.map((p, i) => (i === 0 ? { ...p, position: null } : p)), "4-3-3"),
+      layoutFromRoles(lazio.map((p, i) => (i === 0 ? { ...p, position: null, fantasyRole: null } : p)), "4-3-3"),
       null,
     );
   });
