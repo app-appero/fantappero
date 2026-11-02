@@ -9,7 +9,10 @@ from config.settings.loader import get_worker_settings
 from mail.capture import capture_email
 from mail.templates import EmailMessage
 from mail.transport import send_email
+from observability.logging import get_logger
 from observability.metrics import get_metrics
+
+logger = get_logger(__name__)
 
 
 @celery_app.task(name="mail.send_message")
@@ -28,5 +31,21 @@ def send_message_task(
         return
 
     settings = get_worker_settings()
-    send_email(settings, to_email=to_email, message=message)
+    try:
+        send_email(settings, to_email=to_email, message=message)
+    except Exception as exc:
+        # L'invio è asincrono: il pannello non vede l'errore, quindi va scritto chiaro nei log
+        # del worker (canale configurato e tipo di errore; mai destinatario, testo o credenziali).
+        logger.error(
+            "mail_send_failed",
+            extra={
+                "template": template,
+                "transport": settings.resolved_mail_transport(),
+                "resend_configured": bool(settings.resolved_resend_api_key()),
+                "smtp_host": settings.smtp_host,
+                "error": type(exc).__name__,
+            },
+        )
+        get_metrics().incr("auth_email_failed_total", labels={"template": template})
+        raise
     get_metrics().incr("auth_email_sent_total", labels={"template": template})

@@ -241,3 +241,50 @@ def test_diagnostics_reports_rejected_credentials_without_leaking_them():
 def test_diagnostics_stops_on_a_bad_configuration():
     steps = diagnostics.check_smtp(Settings(smtp_use_ssl=True))
     assert [(s.name, s.ok) for s in steps] == [("configurazione", False)]
+
+
+# --- log leggibili nel worker (l'invio è asincrono: il pannello non vede gli errori) ------------------------
+
+SECRETS = ("segreto@example.com", "Oggetto riservato", "corpo riservato", "re_key", "s3cret")
+
+
+def test_successful_send_logs_only_the_channel_used(monkeypatch):
+    logger = MagicMock()
+    monkeypatch.setattr("mail.transport.logger", logger)
+    client = _fake_smtp()
+    with patch("mail.transport.smtplib.SMTP", return_value=client):
+        send_email(Settings(), to_email="segreto@example.com", message=MESSAGE)
+    logger.info.assert_called_once_with("mail_sent", extra={"via": "smtp"})
+    assert not any(secret in repr(logger.mock_calls) for secret in SECRETS)
+
+
+def test_task_failure_is_logged_with_the_channel_and_error_type_but_no_personal_data(monkeypatch):
+    from mail import tasks
+
+    logger = MagicMock()
+    monkeypatch.setattr(tasks, "logger", logger)
+    settings = Settings(resend_api_key=SecretStr("re_key"))
+    monkeypatch.setattr(tasks, "get_worker_settings", lambda: settings)
+    monkeypatch.delenv("FANTAPPERO_ENV", raising=False)
+    with (
+        patch("mail.transport.httpx.post", return_value=_resend_refuses()),
+        pytest.raises(httpx.HTTPStatusError),
+    ):
+        tasks.send_message_task(
+            to_email="segreto@example.com",
+            subject="Oggetto riservato",
+            text_body="corpo riservato",
+            html_body="<p>corpo riservato</p>",
+            template="operator_email",
+        )
+    logger.error.assert_called_once_with(
+        "mail_send_failed",
+        extra={
+            "template": "operator_email",
+            "transport": "auto",
+            "resend_configured": True,
+            "smtp_host": "smtp.provider.example",
+            "error": "HTTPStatusError",
+        },
+    )
+    assert not any(secret in repr(logger.mock_calls) for secret in SECRETS)

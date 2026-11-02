@@ -48,8 +48,9 @@ non cifrata (se mancano sia `SMTP_USE_TLS` sia `SMTP_USE_SSL` l'invio viene rifi
    servizio di invio con accesso SMTP. Controlla sul suo sito host, porta, modalità (STARTTLS o SSL),
    limiti giornalieri e quale mittente (`MAIL_FROM`) autorizza. Per un pilota piccolo bastano pochi
    invii al giorno, ma verifica il limite del provider.
-3. Imposta le variabili sopra nell'ambiente **`pilota`** su **entrambi** i servizi `api` e `worker`
-   (le email partono da entrambi: i messaggi degli operatori dall'API, il resto dal worker).
+3. Imposta le variabili sopra nell'ambiente **`pilota`** sul servizio **`worker`**. Le email non
+   partono dall'API: l'API le mette in coda (anche quelle scritte dal pannello operatore) e le
+   spedisce solo il worker. Sull'API le variabili email non servono.
 4. **Verifica dalla rete di Railway** (non dal tuo computer: è lì che la porta può essere bloccata),
    aprendo una shell nel servizio `worker`:
    ```
@@ -66,3 +67,21 @@ non cifrata (se mancano sia `SMTP_USE_TLS` sia `SMTP_USE_SSL` l'invio viene rifi
 - I provider di caselle (non di invio massivo) hanno limiti bassi di invii e destinatari: va bene per
   il pilota, meno per un lancio con molti utenti. In quel caso conviene verificare il dominio su
   Resend (o un servizio equivalente) e tornare a `MAIL_TRANSPORT=auto`.
+
+## «Dal pannello risulta inviata ma non arriva nulla»
+L'invio è **asincrono**: il pannello registra «inviata» appena l'email è in coda, anche se il worker
+poi non riesce a spedirla. L'esito vero sta nei **log del worker** (Railway → worker → Logs):
+
+| Riga nel log | Significato |
+| --- | --- |
+| `mail_sent` con `"via": "smtp"` | spedita via SMTP: se non arriva guarda lo spam e le regole del provider |
+| `mail_sent` con `"via": "resend"` | è partita da Resend, non da SMTP: `MAIL_TRANSPORT` non è `smtp` o c'è ancora `RESEND_API_KEY` in modalità `auto` |
+| `mail_send_failed` con `"error": "HTTPStatusError"` | Resend ha rifiutato (sandbox: solo il titolare dell'account) |
+| `mail_send_failed` con `"error": "ConnectionRefusedError"` e `"smtp_host": "localhost"` | le variabili `SMTP_*` mancano: il worker sta usando il default locale |
+| `mail_send_failed` con `"error": "SMTPAuthenticationError"` | utente o password sbagliati |
+| `mail_send_failed` con `"error": "TimeoutError"` / `OSError` | porta bloccata (piano non Pro, o deploy non rifatto) |
+| nessuna riga | il worker non sta consumando la coda, oppure le variabili non sono state applicate: rifai il deploy |
+
+Se commenti le variabili `SMTP_*` che c'erano già (erano quelle di Resend via SMTP) **devi** impostare
+quelle nuove: senza, l'SMTP punta a `localhost` e non parte nulla. Con `MAIL_TRANSPORT=smtp` la chiave
+`RESEND_API_KEY` può restare dov'è senza essere usata.

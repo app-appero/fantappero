@@ -15,7 +15,6 @@ SMTP supports STARTTLS (``SMTP_USE_TLS``, port 587) and implicit TLS
 
 from __future__ import annotations
 
-import logging
 import smtplib
 import ssl
 from email.mime.multipart import MIMEMultipart
@@ -26,8 +25,9 @@ import httpx
 
 from config.settings.mail import MailSettingsMixin
 from mail.templates import EmailMessage
+from observability.logging import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 RESEND_API_URL = "https://api.resend.com/emails"
 
@@ -47,24 +47,38 @@ def send_email(
 ) -> None:
     transport = settings.resolved_mail_transport()
     api_key = settings.resolved_resend_api_key()
+    used = _deliver(settings, transport=transport, api_key=api_key, to_email=to_email, message=message)
+    # Solo il canale usato: mai destinatario, oggetto o credenziali nei log.
+    logger.info("mail_sent", extra={"via": used})
 
+
+def _deliver(
+    settings: MailSettingsMixin,
+    *,
+    transport: str,
+    api_key: str | None,
+    to_email: str,
+    message: EmailMessage,
+) -> str:
     if transport == "smtp":
         _send_via_smtp(settings, to_email=to_email, message=message)
-        return
+        return "smtp"
     if transport == "resend" and not api_key:
         raise MailConfigError("MAIL_TRANSPORT=resend ma RESEND_API_KEY non è impostata.")
     if not api_key:  # auto senza chiave Resend
         _send_via_smtp(settings, to_email=to_email, message=message)
-        return
+        return "smtp"
 
     try:
         _send_via_resend(settings, api_key=api_key, to_email=to_email, message=message)
+        return "resend"
     except (httpx.HTTPError, OSError) as exc:
         if not (settings.resolved_flag("mail_fallback_to_smtp") and settings.is_smtp_configured()):
             raise
         # Nessun dato sensibile nel log: solo il tipo di errore, non destinatario né chiave.
         logger.warning("mail_resend_failed_fallback_to_smtp", extra={"error": type(exc).__name__})
         _send_via_smtp(settings, to_email=to_email, message=message)
+        return "smtp"
 
 
 def _send_via_resend(
