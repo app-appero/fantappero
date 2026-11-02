@@ -4,6 +4,7 @@ import {
   fantasyBadgesFromBonusMalus,
   layoutFromGrid,
   layoutFromModule,
+  layoutFromRoles,
   pitchRoleCodeFromGrid,
   pitchRoleFullLabel,
   pitchRoleVariant,
@@ -282,5 +283,64 @@ describe("fantasyBadgesFromBonusMalus", () => {
       { kind: "assist", count: 1 },
       { kind: "yellowCard", count: 1 },
     ]);
+  });
+});
+
+describe("layoutFromRoles", () => {
+  // Caso reale: il grid attribuisce righe sbagliate (portiere in difesa,
+  // centrocampista in porta), ma il pos per giocatore è corretto.
+  const scrambled = [
+    { id: "belahyane", position: "M", grid: "1:1" },
+    { id: "tavares", position: "D", grid: "2:1" },
+    { id: "taylor", position: "D", grid: "2:2" },
+    { id: "zaccagni", position: "F", grid: "2:3" },
+    { id: "mandas", position: "G", grid: "2:4" },
+    { id: "frattesi", position: "M", grid: "3:1" },
+    { id: "isaksen", position: "M", grid: "3:2" },
+    { id: "gila", position: "D", grid: "3:3" },
+    { id: "sutalo", position: "D", grid: "4:1" },
+    { id: "provstgaard", position: "F", grid: "4:2" },
+    { id: "noslin", position: "F", grid: "4:3" },
+  ];
+
+  it("places each player by the declared position, not by an unreliable grid row", () => {
+    const positions = layoutFromRoles(scrambled, "4-3-3");
+    assert.ok(positions);
+    const byId = new Map(positions.map((p) => [p.id, p]));
+    const y = (id: string) => byId.get(id)!.yPercent;
+    assert.ok(y("mandas") > y("tavares"), "goalkeeper below the defenders");
+    assert.equal(y("tavares"), y("sutalo"));
+    assert.ok(y("tavares") > y("frattesi"));
+    assert.ok(y("frattesi") > y("noslin"));
+    assert.equal(y("belahyane"), y("frattesi"));
+    assert.equal(y("zaccagni"), y("noslin"));
+  });
+
+  it("builds one row per middle digit of the formation (4-2-3-1)", () => {
+    const players = [
+      { id: "gk", position: "G", grid: null },
+      ...["d1", "d2", "d3", "d4"].map((id, i) => ({ id, position: "D", grid: `2:${i + 1}` })),
+      { id: "m1", position: "M", grid: "3:1" },
+      { id: "m2", position: "M", grid: "3:2" },
+      { id: "a1", position: "M", grid: "4:1" },
+      { id: "a2", position: "M", grid: "4:2" },
+      { id: "a3", position: "M", grid: "4:3" },
+      { id: "st", position: "F", grid: "5:1" },
+    ];
+    const positions = layoutFromRoles(players, "4-2-3-1")!;
+    const byId = new Map(positions.map((p) => [p.id, p]));
+    assert.equal(byId.get("m1")!.yPercent, byId.get("m2")!.yPercent);
+    assert.ok(byId.get("m1")!.yPercent > byId.get("a1")!.yPercent);
+    assert.ok(byId.get("a1")!.yPercent > byId.get("st")!.yPercent);
+    assert.equal(new Set(positions.map((p) => p.yPercent)).size, 5);
+  });
+
+  it("returns null when roles do not match the formation or are missing", () => {
+    assert.equal(layoutFromRoles(scrambled, "4-4-2"), null);
+    assert.equal(layoutFromRoles(scrambled, null), null);
+    assert.equal(
+      layoutFromRoles(scrambled.map((p, i) => (i === 0 ? { ...p, position: null } : p)), "4-3-3"),
+      null,
+    );
   });
 });

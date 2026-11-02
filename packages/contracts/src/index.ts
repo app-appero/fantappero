@@ -427,6 +427,7 @@ export {
   fantasyBadgesFromBonusMalus,
   layoutFromGrid,
   layoutFromModule,
+  layoutFromRoles,
   pitchRoleCodeFromGrid,
   pitchRoleFullLabel,
   pitchRoleVariant,
@@ -442,6 +443,7 @@ export type {
   PitchRole,
   PitchRoleVariant,
   RealMatchBadgeEvent,
+  RoleLayoutEntryLike,
 } from "./pitch.js";
 
 export type {

@@ -9,7 +9,7 @@ import type {
   MatchBadge,
   ProviderFeedState,
 } from "@fantappero/contracts";
-import { layoutFromGrid, mapFixtureMatchStatus, pitchRoleCodeFromGrid, realMatchBadgesByAthlete } from "@fantappero/contracts";
+import { layoutFromGrid, layoutFromRoles, mapFixtureMatchStatus, pitchRoleCodeFromGrid, realMatchBadgesByAthlete } from "@fantappero/contracts";
 import { theme } from "@fantappero/ui/theme";
 import { liveStringMap } from "../theme/liveColors";
 import { useRoute, type RouteProp } from "@react-navigation/core";
@@ -84,17 +84,23 @@ function pitchPlayerId(player: FixtureLineupPlayer): string {
   return player.athleteId ?? `${player.name}-${player.shirtNumber ?? ""}`;
 }
 
-function toPitchPlayers(players: readonly FixtureLineupPlayer[], badgesByAthlete: Map<string, MatchBadge[]>) {
-  // Il "pos" del provider è il ruolo abituale/anagrafico del calciatore, non
-  // sempre quello schierato in questa partita: per i titolari il grid (che
-  // decide anche la riga su cui vengono disegnati) è la fonte più affidabile.
+function toPitchPlayers(
+  players: readonly FixtureLineupPlayer[],
+  badgesByAthlete: Map<string, MatchBadge[]>,
+  roleFromPosition: boolean,
+) {
+  // Se il layout è costruito dai ruoli dichiarati (vedi `layoutFromRoles`) il
+  // badge mostra quel ruolo. Altrimenti si ricade sul grid, che decide la riga
+  // su cui il giocatore viene disegnato, così badge e riga restano coerenti.
   const allGrids = players.map((player) => player.grid);
   return players.map((player) => ({
     id: pitchPlayerId(player),
     athleteId: player.athleteId,
     shirtNumber: player.shirtNumber,
     name: player.name,
-    role: pitchRoleCodeFromGrid(player.grid, allGrids) ?? player.position,
+    role: roleFromPosition
+      ? (player.position ?? player.role ?? null)
+      : (pitchRoleCodeFromGrid(player.grid, allGrids) ?? player.position),
     badges: player.athleteId ? badgesByAthlete.get(player.athleteId) : undefined,
     photoUrl: player.photoUrl,
   }));
@@ -278,9 +284,22 @@ function LineupBlock({
   const predicted = lineup.lineupKind === "predicted";
 
   const badgesByAthlete = realMatchBadgesByAthlete(events);
-  const positions = layoutFromGrid(
-    lineup.starters.map((player) => ({ id: pitchPlayerId(player), grid: player.grid })),
+  // Il grid del provider a volte attribuisce la riga sbagliata (portiere in
+  // difesa, centrocampista in porta): si parte dai ruoli dichiarati + modulo e
+  // si usa il grid solo se i dati non sono coerenti.
+  const roleLayout = layoutFromRoles(
+    lineup.starters.map((player) => ({
+      id: pitchPlayerId(player),
+      position: player.position ?? player.role ?? null,
+      grid: player.grid,
+    })),
+    lineup.formation,
   );
+  const positions =
+    roleLayout ??
+    layoutFromGrid(
+      lineup.starters.map((player) => ({ id: pitchPlayerId(player), grid: player.grid })),
+    );
   const title = [lineup.clubName, lineup.formation, lineup.coachName ? `All. ${lineup.coachName}` : null]
     .filter(Boolean)
     .join(" · ");
@@ -302,7 +321,7 @@ function LineupBlock({
       {positions.length > 0 ? (
         <PitchView
           title={title}
-          players={toPitchPlayers(lineup.starters, badgesByAthlete)}
+          players={toPitchPlayers(lineup.starters, badgesByAthlete, roleLayout !== null)}
           positions={positions}
           testID={`fixture-pitch-${side}`}
           onAthletePress={athleteCard?.open}

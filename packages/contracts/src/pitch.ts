@@ -165,6 +165,103 @@ export function pitchRoleCodeFromGrid(
   return "M";
 }
 
+export interface RoleLayoutEntryLike {
+  id: string;
+  /** Codice ruolo del provider per questa partita (G/D/M/F). */
+  position: string | null;
+  /** Formato provider `"riga:colonna"`: usato solo per ordinare i giocatori dentro un reparto. */
+  grid: string | null;
+}
+
+function gridSortKey(grid: string | null, index: number): [number, number, number] {
+  const [rowRaw, colRaw] = (grid ?? "").split(":");
+  const row = Number.parseInt(rowRaw ?? "", 10);
+  const col = Number.parseInt(colRaw ?? "", 10);
+  return [Number.isFinite(row) ? row : 99, Number.isFinite(col) ? col : 99, index];
+}
+
+function compareKeys(a: number[], b: number[]): number {
+  for (let i = 0; i < a.length; i += 1) {
+    if (a[i] !== b[i]) {
+      return (a[i] ?? 0) - (b[i] ?? 0);
+    }
+  }
+  return 0;
+}
+
+/**
+ * Posiziona undici titolari reali usando il ruolo (`pos`) di ogni giocatore e
+ * il modulo (`"4-2-3-1"`), invece del `grid`: il `grid` del provider può
+ * attribuire una riga sbagliata (un portiere in difesa, un centrocampista in
+ * porta), mentre il ruolo dichiarato è coerente con la partita. Righe: portiere,
+ * difesa (prima cifra), una riga per ogni cifra intermedia (centrocampo
+ * a più livelli), attacco (ultima cifra). Dentro un reparto l'ordine segue il
+ * `grid` (colonna sinistra-destra), che resta utile come ordinamento.
+ *
+ * Restituisce `null` se i dati non sono coerenti (modulo illeggibile, ruoli
+ * mancanti o conteggi per reparto diversi dal modulo): il chiamante ricade
+ * allora su `layoutFromGrid`.
+ */
+export function layoutFromRoles<T extends RoleLayoutEntryLike>(
+  entries: readonly T[],
+  formation: string | null | undefined,
+): PitchPosition[] | null {
+  const parts = (formation ?? "")
+    .split("-")
+    .map((part) => Number.parseInt(part.trim(), 10));
+  if (parts.length < 2 || parts.some((n) => !Number.isFinite(n) || n <= 0)) {
+    return null;
+  }
+  const buckets: Record<PitchRole, { entry: T; key: [number, number, number] }[]> = {
+    GK: [],
+    DEF: [],
+    MID: [],
+    FWD: [],
+  };
+  for (const [index, entry] of entries.entries()) {
+    const role = resolvePitchRole(entry.position);
+    if (!role) {
+      return null;
+    }
+    buckets[role].push({ entry, key: gridSortKey(entry.grid, index) });
+  }
+  const midCount = parts.slice(1, -1).reduce((sum, n) => sum + n, 0);
+  if (
+    buckets.GK.length !== 1 ||
+    buckets.DEF.length !== parts[0] ||
+    buckets.FWD.length !== parts[parts.length - 1] ||
+    buckets.MID.length !== midCount
+  ) {
+    return null;
+  }
+  for (const role of Object.keys(buckets) as PitchRole[]) {
+    buckets[role].sort((a, b) => compareKeys(a.key, b.key));
+  }
+
+  const rows: T[][] = [
+    buckets.GK.map((item) => item.entry),
+    buckets.DEF.map((item) => item.entry),
+  ];
+  const mids = buckets.MID.map((item) => item.entry);
+  for (const count of parts.slice(1, -1)) {
+    rows.push(mids.splice(0, count));
+  }
+  rows.push(buckets.FWD.map((item) => item.entry));
+
+  const positions: PitchPosition[] = [];
+  rows.forEach((rowEntries, rowIndex) => {
+    // Dentro la riga il grid originale fornisce l'ordine sinistra-destra.
+    const ordered = [...rowEntries].sort((a, b) =>
+      compareKeys(gridSortKey(a.grid, 0).slice(1), gridSortKey(b.grid, 0).slice(1)),
+    );
+    const y = rowToYPercent(rowIndex + 1, rows.length);
+    ordered.forEach((entry, index) => {
+      positions.push({ id: entry.id, xPercent: columnToXPercent(index, ordered.length), yPercent: y });
+    });
+  });
+  return positions;
+}
+
 /**
  * Fallback quando il `grid` non è disponibile (sempre il caso per le
  * formazioni fantasy, mai schierate su un campo reale): usa modulo + ruolo +
