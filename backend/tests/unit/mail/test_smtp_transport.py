@@ -286,10 +286,12 @@ def test_task_failure_is_logged_with_the_channel_and_error_type_but_no_personal_
         "resend_configured": True,
         "smtp_host": "smtp.provider.example",
         "error": "HTTPStatusError",
+        "stage": None,
+        "smtp_code": None,
     }
     logger.error.assert_called_once_with(
         "mail_send_failed template=operator_email transport=auto resend_configured=True "
-        "smtp_host=smtp.provider.example error=HTTPStatusError",
+        "smtp_host=smtp.provider.example error=HTTPStatusError stage=None smtp_code=None",
         extra=details,
     )
     assert not any(secret in repr(logger.mock_calls) for secret in SECRETS)
@@ -302,3 +304,51 @@ def test_resend_send_logs_no_host(monkeypatch):
     with patch("mail.transport.httpx.post", return_value=MagicMock(status_code=200)):
         send_email(settings, to_email="a@example.com", message=MESSAGE)
     logger.info.assert_called_once_with("mail_sent via=resend", extra={"via": "resend", "host": None})
+
+
+# --- fase in cui fallisce l'SMTP -----------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("failing_call", "stage"),
+    [("starttls", "starttls"), ("login", "login"), ("sendmail", "invio")],
+)
+def test_smtp_failures_carry_the_stage_where_they_happened(failing_call, stage):
+    client = _fake_smtp()
+    getattr(client, failing_call).side_effect = smtplib.SMTPServerDisconnected("Connection unexpectedly closed")
+    with (
+        patch("mail.transport.smtplib.SMTP", return_value=client),
+        pytest.raises(smtplib.SMTPServerDisconnected) as error,
+    ):
+        send_email(Settings(), to_email="a@example.com", message=MESSAGE)
+    assert error.value.mail_stage == stage
+
+
+def test_connection_errors_are_tagged_as_connection_stage():
+    with (
+        patch("mail.transport.smtplib.SMTP", side_effect=TimeoutError("timed out")),
+        pytest.raises(TimeoutError) as error,
+    ):
+        send_email(Settings(), to_email="a@example.com", message=MESSAGE)
+    assert error.value.mail_stage == "connessione"
+
+
+def test_task_log_reports_stage_and_smtp_code_without_the_server_text(monkeypatch):
+    from mail import tasks
+
+    logger = MagicMock()
+    monkeypatch.setattr(tasks, "logger", logger)
+    monkeypatch.setattr(tasks, "get_worker_settings", lambda: Settings(mail_transport="smtp"))
+    monkeypatch.delenv("FANTAPPERO_ENV", raising=False)
+    client = _fake_smtp()
+    client.login.side_effect = smtplib.SMTPAuthenticationError(535, b"5.7.8 bad credentials for segreto@example.com")
+    with (
+        patch("mail.transport.smtplib.SMTP", return_value=client),
+        pytest.raises(smtplib.SMTPAuthenticationError),
+    ):
+        tasks.send_message_task(
+            to_email="segreto@example.com", subject="s", text_body="t", html_body="<p>t</p>", template="operator_email"
+        )
+    message = logger.error.call_args.args[0]
+    assert "error=SMTPAuthenticationError stage=login smtp_code=535" in message
+    assert "segreto@example.com" not in message

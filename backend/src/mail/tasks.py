@@ -42,6 +42,10 @@ def send_message_task(
             "resend_configured": bool(settings.resolved_resend_api_key()),
             "smtp_host": settings.smtp_host,
             "error": type(exc).__name__,
+            # Fase SMTP in cui è fallito (connessione/starttls/login/invio) e codice di risposta,
+            # se il server ne ha dato uno. Mai il testo della risposta: può contenere indirizzi.
+            "stage": getattr(exc, "mail_stage", None),
+            "smtp_code": getattr(exc, "smtp_code", None),
         }
         # I campi stanno anche nel testo: il worker stampa solo il messaggio (formato Celery),
         # non gli `extra` che il log JSON dell'API invece mostra.

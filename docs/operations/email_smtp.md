@@ -78,7 +78,8 @@ poi non riesce a spedirla. L'esito vero sta nei **log del worker** (Railway → 
 | `mail_sent via=resend` | è partita da Resend, non da SMTP: `MAIL_TRANSPORT` non è `smtp` o c'è ancora `RESEND_API_KEY` in modalità `auto` |
 | `mail_send_failed … error=HTTPStatusError` | Resend ha rifiutato (sandbox: solo il titolare dell'account) |
 | `mail_send_failed … smtp_host=localhost error=ConnectionRefusedError` | le variabili `SMTP_*` mancano: il worker sta usando il default locale |
-| `mail_send_failed … error=SMTPAuthenticationError` | utente o password sbagliati |
+| `mail_send_failed … error=SMTPAuthenticationError stage=login smtp_code=535` | utente o password sbagliati (per Gmail: serve la password per app) |
+| `mail_send_failed … error=SMTPServerDisconnected stage=login` | il server ha chiuso la connessione al momento del login: cifratura riuscita, ma il provider rifiuta l'accesso (credenziali bloccate, IP non gradito o troppi tentativi) |
 | `mail_send_failed … error=TimeoutError` / `OSError` | porta bloccata (piano non Pro, o deploy non rifatto) |
 | `Task mail.send_message[…] received` ma nessun `mail_sent` né `mail_send_failed` | l'invio è ancora in corso (timeout di 30 s) o il worker si è riavviato |
 | **nessun** `Task mail.send_message[…] received` | il worker non ha ricevuto nulla: l'API non ha accodato (cerca `operator_email_dispatch_failed` nei **log dell'API**) oppure usa un broker diverso dal worker (`REDIS_URL` / `CELERY_BROKER_URL` devono coincidere su `api` e `worker`) |

@@ -158,20 +158,30 @@ def _send_via_smtp(
     timeout = settings.resolved_smtp_timeout()
     envelope_from = parseaddr(settings.mail_from)[1] or settings.mail_from
 
-    if settings.resolved_flag("smtp_use_ssl"):
-        client = smtplib.SMTP_SSL(
-            settings.smtp_host,
-            settings.smtp_port,
-            timeout=timeout,
-            context=ssl.create_default_context(),
-        )
-    else:
-        client = smtplib.SMTP(settings.smtp_host, settings.smtp_port, timeout=timeout)
+    # Fase corrente: se qualcosa fallisce, il log dice in quale passo (utile quando il server
+    # chiude la connessione senza una risposta e il messaggio d'errore non basta).
+    stage = "connessione"
+    try:
+        if settings.resolved_flag("smtp_use_ssl"):
+            client = smtplib.SMTP_SSL(
+                settings.smtp_host,
+                settings.smtp_port,
+                timeout=timeout,
+                context=ssl.create_default_context(),
+            )
+        else:
+            client = smtplib.SMTP(settings.smtp_host, settings.smtp_port, timeout=timeout)
 
-    with client as smtp:
-        if settings.resolved_flag("smtp_use_tls"):
-            # Contesto esplicito: senza, starttls() non verificherebbe il certificato del server.
-            smtp.starttls(context=ssl.create_default_context())
-        if settings.smtp_user and password:
-            smtp.login(settings.smtp_user, password)
-        smtp.sendmail(envelope_from, [to_email], msg.as_string())
+        with client as smtp:
+            if settings.resolved_flag("smtp_use_tls"):
+                stage = "starttls"
+                # Contesto esplicito: senza, starttls() non verificherebbe il certificato del server.
+                smtp.starttls(context=ssl.create_default_context())
+            if settings.smtp_user and password:
+                stage = "login"
+                smtp.login(settings.smtp_user, password)
+            stage = "invio"
+            smtp.sendmail(envelope_from, [to_email], msg.as_string())
+    except Exception as exc:
+        exc.mail_stage = stage  # type: ignore[attr-defined]
+        raise
