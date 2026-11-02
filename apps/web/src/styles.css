@@ -4002,7 +4002,6 @@ h2 {
   box-shadow: 0 0 14px rgba(255, 255, 255, 0.28);
 }
 .fa-mrow__vote--final { background: #ffffff; color: #11162b; }
-.fa-vcell .fa-mrow__vote--final { color: #11162b; }
 @keyframes fa-mrow-live {
   0%, 100% { box-shadow: 0 0 0 1px rgba(59, 130, 246, 0.4), 0 0 6px rgba(59, 130, 246, 0.4); }
   50% { box-shadow: 0 0 0 2px rgba(96, 165, 250, 0.95), 0 0 18px 4px rgba(59, 130, 246, 0.9); }
@@ -4064,6 +4063,8 @@ h2 {
 .fa-vcell__name { font-weight: 600; white-space: nowrap; display: inline-flex; align-items: center; gap: 6px; max-width: 100%; font-size: clamp(11px, 3.1vw, 16px); }
 .fa-vcell__cd { padding: 2px 8px; border-radius: 999px; border: 1px solid rgba(255,255,255,.2); font-size: 11px; font-weight: 700; font-family: ui-monospace, monospace; white-space: nowrap; }
 .fa-vcell .fa-mrow__vote { color: #fff; }
+/* Dopo la regola generica sopra (stessa specificità): il voto finale ha sfondo bianco, il testo deve restare scuro. */
+.fa-vcell .fa-mrow__vote--final { color: #11162b; }
 @media (max-width: 700px) { .fa-vcell { padding: 6px 8px; } .fa-vcell__name { font-size: clamp(10px, 3vw, 13px); } }
 
 .fa-vcell { flex-direction: row !important; align-items: center !important; gap: 8px !important; }
