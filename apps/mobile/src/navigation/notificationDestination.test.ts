@@ -27,3 +27,10 @@ test("il deep link di un evento calciatore apre lo scontro tra fantallenatori", 
   );
   assert.deepEqual(resolveNotificationRoute({ title: "Gol", deepLink: "/turni" }), { kind: "tab", screen: "Matchday" });
 });
+
+test("la notifica di una nuova segnalazione apre la schermata operatore", () => {
+  assert.deepEqual(
+    resolveNotificationRoute({ title: "Nuovo bug da Mario", deepLink: "/admin/feedback" }),
+    { kind: "admin", screen: "AdminFeedback" },
+  );
+});

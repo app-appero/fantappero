@@ -26,6 +26,7 @@ import {
   IconCart,
   IconLayout,
   IconMenu,
+  IconMessage,
   IconShield,
   IconTrophy,
   IconUser,
@@ -34,6 +35,7 @@ import {
 import { RouterNavLinkAdapter } from "../navigation/RouterNavLink";
 import { NotificationCenter } from "../notifications/NotificationCenter";
 import { ImpersonationBanner } from "../auth/ImpersonationBanner";
+import { rememberLastAppPath } from "../feedback/lastPage";
 import { SkipLink } from "./SkipLink";
 
 const APP_ICONS: Record<string, ReactNode> = {
@@ -44,6 +46,7 @@ const APP_ICONS: Record<string, ReactNode> = {
   standings: <IconTrophy />,
   "market-hub": <IconCart />,
   formation: <IconLayout />,
+  feedback: <IconMessage />,
   profile: <IconUser />,
 };
 
@@ -236,6 +239,9 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     isImpersonating,
   } = useAuth();
   const location = useLocation();
+  useEffect(() => {
+    rememberLastAppPath(location.pathname);
+  }, [location.pathname]);
   const {
     open: drawerOpen,
     close: closeDrawer,

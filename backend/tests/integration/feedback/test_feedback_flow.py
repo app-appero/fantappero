@@ -221,3 +221,42 @@ def test_hourly_limit_blocks_spam(
     blocked = client.post("/feedback", headers=_auth(token), data={"message": MESSAGE})
     assert blocked.status_code == 429
     assert blocked.json()["code"] == "feedback_rate_limited"
+
+
+def test_export_includes_reports_and_account_deletion_removes_them_with_their_files(
+    client: TestClient, db_session: Session, tmp_path
+) -> None:
+    token, user_id = _register_and_login(client, db_session, "fb.privacy@example.com")
+    created = client.post(
+        "/feedback",
+        headers=_auth(token),
+        data={"message": MESSAGE},
+        files=[("files", ("foto.jpg", JPEG, "image/jpeg"))],
+    )
+    assert created.status_code == 201, created.text
+    stored_dir = tmp_path / "feedback"
+    assert len(list(stored_dir.iterdir())) == 1
+
+    # --- l'esportazione dei dati personali contiene le segnalazioni -------------------------
+    exported = client.get("/profile/me/export", headers=_auth(token)).json()
+    assert [item["message"] for item in exported["feedback"]] == [MESSAGE]
+    assert exported["feedback"][0]["attachmentCount"] == 1
+
+    # --- eliminando l'account spariscono testo, righe e file --------------------------------
+    deleted = client.post(
+        "/profile/me/delete",
+        headers=_auth(token),
+        json={"password": "Password123!", "confirmPhrase": "ELIMINA"},
+    )
+    assert deleted.status_code == 200, deleted.text
+    db_session.expire_all()
+    assert db_session.scalars(select(FeedbackReport).where(FeedbackReport.user_id == user_id)).all() == []
+    assert (
+        db_session.scalars(
+            select(FeedbackAttachment).where(
+                FeedbackAttachment.report_id == UUID(created.json()["id"])
+            )
+        ).all()
+        == []
+    )
+    assert list(stored_dir.iterdir()) == []

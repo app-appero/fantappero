@@ -14,6 +14,7 @@ import { HScroll } from "../components/HScroll";
 import { UiStatePanel } from "../components/UiStatePanel";
 import { useScreenData } from "../hooks/useScreenData";
 import { PageContainer } from "../layout/PageContainer";
+import { openAdminScreen } from "../navigation/adminEntry";
 import { resolveNotificationRoute } from "../navigation/notificationDestination";
 import {
   NOTIFICATION_GROUP_COLOR,
@@ -127,6 +128,9 @@ export function NotificationsScreen() {
       navigation.navigate(route.name as never);
     } else if (route?.kind === "tab") {
       navigation.navigate("MainTabs", { screen: route.screen });
+    } else if (route?.kind === "admin") {
+      openAdminScreen(route.screen);
+      navigation.navigate("AdminPanel");
     }
   }
 

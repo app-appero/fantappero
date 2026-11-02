@@ -30,6 +30,7 @@ import {
   MOBILE_NAV_GROUPS,
   type ResolvedMobileNavItem,
 } from "./navConfig";
+import { rememberLastScreen } from "../feedback/lastScreen";
 import type { AppTabParamList, RootStackParamList } from "./types";
 import { buildSceneBackgroundStyle } from "../theme/navigationTheme";
 
@@ -53,6 +54,7 @@ const STACK_ROUTE_MAP: Partial<Record<string, keyof RootStackParamList>> = {
   "league-hub": "LeagueHome",
   "received-invites": "ReceivedInvites",
   "manager-directory": "ManagerDirectory",
+  feedback: "Feedback",
 };
 
 const TAB_SCREEN_NAMES: (keyof AppTabParamList)[] = [
@@ -91,6 +93,7 @@ const NAV_ID_BY_ROUTE: Record<string, string> = {
   LeagueAdmin: "league-hub",
   ReceivedInvites: "received-invites",
   ManagerDirectory: "manager-directory",
+  Feedback: "feedback",
 };
 
 function AppTabShell({
@@ -173,6 +176,10 @@ function AppTabShell({
     // Stato annidato non ancora idratato: la tab iniziale è "Matchday".
     return "Matchday";
   });
+  // «Segnala un problema» porta con sé l'ultima schermata vista prima di aprirla.
+  useEffect(() => {
+    rememberLastScreen(activeRouteName);
+  }, [activeRouteName]);
   const activeItemId = activeRouteName ? (NAV_ID_BY_ROUTE[activeRouteName] ?? null) : null;
 
   const expandedGroupIds = MOBILE_NAV_GROUPS.filter(

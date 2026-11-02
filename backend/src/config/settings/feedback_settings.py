@@ -2,16 +2,23 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 from pydantic import Field, field_validator
 
 
 class FeedbackSettingsMixin:
     """Dove vivono gli allegati e quanto possono pesare."""
 
-    feedback_storage_path: str = Field(
-        default="/data/feedback",
+    feedback_storage_path: str | None = Field(
+        default=None,
         validation_alias="FEEDBACK_STORAGE_PATH",
-        description="Cartella PRIVATA degli allegati delle segnalazioni (mai servita come statica).",
+        description=(
+            "Cartella PRIVATA degli allegati delle segnalazioni (mai servita come statica). "
+            "Se manca, sta nel volume degli avatar (`<AVATAR_STORAGE_PATH>/feedback-private`): "
+            "è l'unico volume persistente del servizio API, e il mount pubblico degli avatar "
+            "non serve le sottocartelle."
+        ),
     )
     feedback_image_max_bytes: int = Field(
         default=8_388_608,
@@ -38,6 +45,15 @@ class FeedbackSettingsMixin:
         validation_alias="FEEDBACK_MEDIA_LINK_TTL_SECONDS",
         description="Durata dei link firmati con cui l'operatore vede gli allegati.",
     )
+
+    avatar_storage_path: str  # fornito da ProfileSettingsMixin
+
+    def resolved_feedback_storage_path(self) -> str:
+        """Percorso effettivo degli allegati (esplicito, oppure dentro il volume avatar)."""
+        explicit = (self.feedback_storage_path or "").strip()
+        if explicit:
+            return explicit
+        return str(Path(self.avatar_storage_path) / "feedback-private")
 
     @field_validator(
         "feedback_image_max_bytes",

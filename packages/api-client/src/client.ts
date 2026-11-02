@@ -49,6 +49,15 @@ export type UploadOptions<TFile> = {
   fieldName?: string;
 };
 
+export type UploadFormOptions<TFile> = {
+  accessToken: string;
+  /** Campi di testo del form (es. messaggio, categoria). I valori `undefined` si saltano. */
+  fields: Record<string, string | undefined>;
+  files: readonly TFile[];
+  /** Nome del campo che raccoglie i file (default `files`). */
+  fileFieldName?: string;
+};
+
 export type UnauthorizedRecoveryInput = {
   path: string;
   accessToken: string;
@@ -288,5 +297,46 @@ export function createApiClient<TFile = unknown>(config: ApiClientConfig<TFile>)
     return payload as T;
   }
 
-  return { apiRequest, apiUpload };
+  /** Invia un form multipart con campi di testo e più file (es. una segnalazione con allegati). */
+  async function apiUploadForm<T>(
+    path: string,
+    options: UploadFormOptions<TFile>,
+    allowRecovery = true,
+  ): Promise<T> {
+    const baseUrl = config.resolveBaseUrl();
+    const url = `${baseUrl}${path}`;
+    const formData = new FormData();
+    for (const [name, value] of Object.entries(options.fields)) {
+      if (value !== undefined) {
+        formData.append(name, value);
+      }
+    }
+    for (const file of options.files) {
+      formData.append(options.fileFieldName ?? "files", config.buildUploadValue(file));
+    }
+
+    // Niente Content-Type: lo imposta fetch con il boundary del multipart.
+    const response = await performFetch(url, baseUrl, {
+      method: "POST",
+      headers: {
+        Accept: "application/json",
+        Authorization: `Bearer ${options.accessToken}`,
+      },
+      body: formData,
+    });
+
+    const payload = await parseJsonBody<T>(response, url);
+    if (!response.ok) {
+      const error = toApiError(url, response, payload as FastApiErrorBody);
+      if (!allowRecovery) {
+        throw error;
+      }
+      return recoverAndRetry(path, options.accessToken, error, (token) =>
+        apiUploadForm<T>(path, { ...options, accessToken: token }, false),
+      );
+    }
+    return payload as T;
+  }
+
+  return { apiRequest, apiUpload, apiUploadForm };
 }

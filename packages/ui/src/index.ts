@@ -14,6 +14,8 @@ export type { SwitchProps } from "./components/Switch.js";
 
 export { Input } from "./components/Input.js";
 export type { InputProps } from "./components/Input.js";
+export { Textarea } from "./components/Textarea.js";
+export type { TextareaProps } from "./components/Textarea.js";
 
 export { Select } from "./components/Select.js";
 export type { SelectOption, SelectProps } from "./components/Select.js";

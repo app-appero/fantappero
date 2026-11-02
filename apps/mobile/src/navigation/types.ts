@@ -63,6 +63,7 @@ export type RootStackParamList = {
   JoinLeague: JoinLeagueParams | undefined;
   ReceivedInvites: ReceivedInvitesParams | undefined;
   Notifications: undefined;
+  Feedback: undefined;
   ManagerDirectory: undefined;
   CoachProfile: { userId: string; leagueId?: string };
   AdminPanel: undefined;
@@ -79,6 +80,7 @@ export type AdminStackParamList = {
   AdminJobs: WireframeParams | undefined;
   AdminNotifications: WireframeParams | undefined;
   AdminEmail: WireframeParams | undefined;
+  AdminFeedback: WireframeParams | undefined;
 };
 
 declare global {

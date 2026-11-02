@@ -143,6 +143,59 @@ describe("createApiClient", () => {
     }
   });
 
+  it("apiUploadForm sends text fields and every file in one multipart body", async () => {
+    let captured: FormData | undefined;
+    let headers: Record<string, string> = {};
+    const stub = installFetchStub((_url, init) => {
+      captured = init?.body as FormData;
+      headers = init?.headers as Record<string, string>;
+      return jsonResponse(201, { id: "r1" });
+    });
+    try {
+      const { apiUploadForm } = createApiClient<{ name: string }>({
+        resolveBaseUrl: () => "https://api.example.test",
+        buildUploadValue: (file) => `converted:${file.name}`,
+      });
+      const result = await apiUploadForm<{ id: string }>("/feedback", {
+        accessToken: "tok",
+        fields: { message: "non va", category: "bug", pageContext: undefined },
+        files: [{ name: "a.png" }, { name: "b.mp4" }],
+      });
+      assert.deepEqual(result, { id: "r1" });
+      assert.equal(captured?.get("message"), "non va");
+      assert.equal(captured?.get("category"), "bug");
+      assert.equal(captured?.has("pageContext"), false);
+      assert.deepEqual(captured?.getAll("files"), ["converted:a.png", "converted:b.mp4"]);
+      assert.equal(headers.Authorization, "Bearer tok");
+      // Il Content-Type lo imposta fetch (serve il boundary del multipart).
+      assert.equal(headers["Content-Type"], undefined);
+    } finally {
+      stub.restore();
+    }
+  });
+
+  it("apiUploadForm retries once with a renewed token after a 401", async () => {
+    const tokensUsed: string[] = [];
+    const stub = installFetchStub((_url, init) => {
+      const auth = (init?.headers as Record<string, string>).Authorization ?? "";
+      tokensUsed.push(auth);
+      return auth === "Bearer expired"
+        ? jsonResponse(401, { message: "Sessione scaduta.", code: "token_expired" })
+        : jsonResponse(201, { ok: true });
+    });
+    try {
+      const { apiUploadForm } = createApiClient<string>({
+        resolveBaseUrl: () => "https://api.example.test",
+        buildUploadValue: (file) => file,
+        recoverUnauthorized: async () => "fresh",
+      });
+      await apiUploadForm("/feedback", { accessToken: "expired", fields: { message: "x" }, files: [] });
+      assert.deepEqual(tokensUsed, ["Bearer expired", "Bearer fresh"]);
+    } finally {
+      stub.restore();
+    }
+  });
+
   it("retries an authenticated 401 once with the token from recoverUnauthorized", async () => {
     let calls = 0;
     const stub = installFetchStub((url, init) => {

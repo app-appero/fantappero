@@ -5,5 +5,6 @@ export type {
   FastApiErrorBody,
   UnauthorizedRecovery,
   UnauthorizedRecoveryInput,
+  UploadFormOptions,
   UploadOptions,
 } from "./client.js";

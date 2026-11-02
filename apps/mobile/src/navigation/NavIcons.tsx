@@ -16,6 +16,7 @@ export const NAV_ICON_MAP: Record<string, FeatherName> = {
   standings: "bar-chart-2",
   "market-hub": "repeat",
   formation: "grid",
+  feedback: "message-circle",
   profile: "user",
   more: "menu",
   "admin-home": "shield",
@@ -26,6 +27,7 @@ export const NAV_ICON_MAP: Record<string, FeatherName> = {
   "admin-jobs": "clock",
   "admin-notifications": "bell",
   "admin-email": "mail",
+  "admin-feedback": "message-circle",
 };
 
 export function NavIcon({ id, color, size = 22 }: { id: string; color: string; size?: number }) {

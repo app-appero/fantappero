@@ -17,6 +17,7 @@ from admin.turni_router import router as admin_turni_router
 from ai_assistant.router import feedback_router as ai_assistant_feedback_router
 from ai_assistant.router import router as ai_assistant_router
 from app.deps_health import aggregate_health
+from app.static_files import FlatStaticFiles
 from app.security_middleware import install_body_size_guard, install_range_header_guard
 from auth.exceptions import AuthError
 from auth.profile_router import router as profile_router
@@ -118,7 +119,9 @@ app.add_exception_handler(FantasyRatingError, rating_error_handler)
 _avatar_settings = get_api_settings()
 _avatar_mount = Path(_avatar_settings.avatar_storage_path)
 _avatar_mount.mkdir(parents=True, exist_ok=True)
-app.mount("/media/avatars", StaticFiles(directory=str(_avatar_mount)), name="avatars")
+
+
+app.mount("/media/avatars", FlatStaticFiles(directory=str(_avatar_mount)), name="avatars")
 
 
 class AvatarCacheControlMiddleware:

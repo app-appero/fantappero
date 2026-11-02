@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.orm import Session, selectinload
 
 from auth.exceptions import ValidationAuthError
@@ -25,6 +25,7 @@ from auth.privacy_validators import (
 from auth.security import hash_password, utc_now, verify_password
 from config.settings.api import ApiSettings
 from database.enums import PrivacyAuditAction
+from feedback.models import FeedbackAttachment, FeedbackReport
 from leagues.models.league_membership import LeagueMembership
 from observability.context import get_correlation_id
 from observability.metrics import get_metrics
@@ -79,6 +80,7 @@ class PrivacyService:
         self._revoke_all_sessions(loaded.id)
         self._invalidate_all_tokens(loaded.id)
         self._delete_avatar_files(loaded.id)
+        self._delete_feedback(loaded.id)
 
         self._record_audit_event(
             user_id=loaded.id,
@@ -153,6 +155,23 @@ class PrivacyService:
                 }
                 for membership in user.league_memberships
             ],
+            # Segnalazioni scritte dall'utente (testo e metadati; gli allegati sono solo contati).
+            "feedback": [
+                {
+                    "id": str(report.id),
+                    "category": report.category,
+                    "message": report.message,
+                    "status": report.status,
+                    "createdAt": report.created_at.isoformat(),
+                    "attachmentCount": len(report.attachments),
+                }
+                for report in self._session.scalars(
+                    select(FeedbackReport)
+                    .options(selectinload(FeedbackReport.attachments))
+                    .where(FeedbackReport.user_id == user.id)
+                    .order_by(FeedbackReport.created_at)
+                ).all()
+            ],
         }
 
     def _anonymize_competitive_records(self, user_id: UUID, historical_label: str) -> None:
@@ -214,6 +233,22 @@ class PrivacyService:
         ).all()
         for row in rows:
             row.used_at = now
+
+    def _delete_feedback(self, user_id: UUID) -> None:
+        """Elimina le segnalazioni dell'utente: testo, righe e file allegati su disco.
+
+        L'eliminazione dell'account è "soft" (i dati personali vengono ripuliti,
+        la riga resta), quindi la cascata del database non scatta: va fatto qui.
+        """
+        stored_names = self._session.scalars(
+            select(FeedbackAttachment.stored_name)
+            .join(FeedbackReport, FeedbackAttachment.report_id == FeedbackReport.id)
+            .where(FeedbackReport.user_id == user_id)
+        ).all()
+        storage_dir = Path(self._settings.resolved_feedback_storage_path())
+        for stored_name in stored_names:
+            (storage_dir / stored_name).unlink(missing_ok=True)
+        self._session.execute(delete(FeedbackReport).where(FeedbackReport.user_id == user_id))
 
     def _delete_avatar_files(self, user_id: UUID) -> None:
         storage_dir = Path(self._settings.avatar_storage_path)

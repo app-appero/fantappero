@@ -78,6 +78,14 @@ export function IconUser(props: IconProps) {
   );
 }
 
+export function IconMessage(props: IconProps) {
+  return (
+    <IconBase {...props}>
+      <path d="M21 15a2 2 0 0 1-2 2H8l-5 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+    </IconBase>
+  );
+}
+
 export function IconMenu(props: IconProps) {
   return (
     <IconBase width={24} height={24} {...props}>

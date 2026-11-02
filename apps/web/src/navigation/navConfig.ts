@@ -45,6 +45,12 @@ export const APP_NAV_ITEMS: readonly NavItemDefinition[] = [
     surface: "app",
   },
   {
+    id: "feedback",
+    path: "/feedback",
+    requiredPermissions: ["profile:view"],
+    surface: "app",
+  },
+  {
     id: "profile",
     path: "/profilo",
     requiredPermissions: ["profile:view"],
@@ -101,6 +107,12 @@ export const ADMIN_NAV_ITEMS: readonly NavItemDefinition[] = [
     requiredPermissions: ["global:operate"],
     surface: "admin",
   },
+  {
+    id: "admin-feedback",
+    path: "/admin/feedback",
+    requiredPermissions: ["global:operate"],
+    surface: "admin",
+  },
 ];
 
 /**
@@ -120,6 +132,7 @@ export const NAV_LABELS: Record<string, string> = {
   standings: "Classifica",
   "market-hub": "Mercato",
   formation: "Formazione",
+  feedback: "Segnala un problema",
   profile: "Profilo",
   "admin-home": "Pannello",
   "admin-leagues": "Leghe globali",
@@ -129,6 +142,7 @@ export const NAV_LABELS: Record<string, string> = {
   "admin-jobs": "Job automatici",
   "admin-notifications": "Notifiche",
   "admin-email": "Email",
+  "admin-feedback": "Segnalazioni",
 };
 
 export type ResolvedNavItem = NavItemDefinition & {

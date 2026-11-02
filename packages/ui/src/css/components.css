@@ -183,6 +183,11 @@ textarea::placeholder,
   color: #ffffff;
 }
 
+.fa-textarea {
+  min-height: 7rem;
+  resize: vertical;
+}
+
 .fa-input:hover:not(:disabled):not([aria-invalid="true"]),
 .fa-select:hover:not(:disabled):not([aria-invalid="true"]) {
   border-color: var(--fa-color-input-border-hover);

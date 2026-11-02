@@ -6,6 +6,7 @@ import type * as NotificationsModule from "expo-notifications";
 import { useEffect, useRef } from "react";
 import { Platform } from "react-native";
 import { registerPushDevice } from "../api/notifications";
+import { openAdminScreen } from "../navigation/adminEntry";
 import { resolveNotificationRoute } from "../navigation/notificationDestination";
 import type { RootStackParamList } from "../navigation/types";
 
@@ -121,6 +122,9 @@ export function usePushNotifications(accessToken: string | null | undefined): vo
         navigation.navigate(route.name as never);
       } else if (route?.kind === "tab") {
         navigation.navigate("MainTabs", { screen: route.screen });
+      } else if (route?.kind === "admin") {
+        openAdminScreen(route.screen);
+        navigation.navigate("AdminPanel");
       }
     }
     // App riaperta da ferma toccando la notifica, poi tocchi ad app viva.

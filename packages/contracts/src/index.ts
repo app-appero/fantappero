@@ -496,3 +496,30 @@ export type {
 export { computeCountdown, formatCountdown } from "./countdown.js";
 export type { CountdownParts } from "./countdown.js";
 
+
+export {
+  FEEDBACK_CATEGORIES,
+  FEEDBACK_CATEGORY_LABEL,
+  FEEDBACK_IMAGE_MAX_BYTES,
+  FEEDBACK_MAX_ATTACHMENTS,
+  FEEDBACK_MESSAGE_MAX_CHARS,
+  FEEDBACK_MESSAGE_MIN_CHARS,
+  FEEDBACK_NOTE_MAX_CHARS,
+  FEEDBACK_STATUSES,
+  FEEDBACK_STATUS_LABEL,
+  FEEDBACK_VIDEO_MAX_BYTES,
+  feedbackAttachmentKind,
+  validateFeedbackAttachment,
+  validateFeedbackDraft,
+} from "./feedback.js";
+export type {
+  FeedbackAdminList,
+  FeedbackAdminReport,
+  FeedbackAttachment,
+  FeedbackAttachmentDraft,
+  FeedbackCategory,
+  FeedbackPlatform,
+  FeedbackReportSummary,
+  FeedbackStatus,
+  FeedbackUpdate,
+} from "./feedback.js";

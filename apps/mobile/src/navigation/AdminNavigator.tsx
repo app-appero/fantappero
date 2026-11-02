@@ -14,6 +14,7 @@ import { AdminDashboardScreen } from "../screens/admin/AdminDashboardScreen";
 import { AdminLeaguesScreen } from "../screens/admin/AdminLeaguesScreen";
 import { AdminListoneScreen } from "../screens/admin/AdminListoneScreen";
 import { AdminEmailScreen } from "../screens/admin/AdminEmailScreen";
+import { AdminFeedbackScreen } from "../screens/admin/AdminFeedbackScreen";
 import { AdminNotificationsScreen } from "../screens/admin/AdminNotificationsScreen";
 import { AdminJobsScreen } from "../screens/admin/AdminJobsScreen";
 import { AdminTurniScreen } from "../screens/admin/AdminTurniScreen";
@@ -36,6 +37,7 @@ const ADMIN_SCREEN_BY_ID: Record<string, keyof AdminStackParamList> = {
   "admin-jobs": "AdminJobs",
   "admin-notifications": "AdminNotifications",
   "admin-email": "AdminEmail",
+  "admin-feedback": "AdminFeedback",
 };
 
 const ADMIN_NAV_ID_BY_ROUTE: Record<string, string> = {
@@ -47,6 +49,7 @@ const ADMIN_NAV_ID_BY_ROUTE: Record<string, string> = {
   AdminJobs: "admin-jobs",
   AdminNotifications: "admin-notifications",
   AdminEmail: "admin-email",
+  AdminFeedback: "admin-feedback",
 };
 
 /**
@@ -164,6 +167,12 @@ export function AdminNavigator() {
             {({ navigation }) => {
               rememberStack(navigation);
               return <AdminEmailScreen />;
+            }}
+          </Stack.Screen>
+          <Stack.Screen name="AdminFeedback">
+            {({ navigation }) => {
+              rememberStack(navigation);
+              return <AdminFeedbackScreen />;
             }}
           </Stack.Screen>
           <Stack.Screen name="AdminNotifications">

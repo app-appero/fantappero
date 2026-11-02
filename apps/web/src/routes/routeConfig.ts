@@ -69,6 +69,7 @@ export const APP_ROUTE_DEFINITIONS: readonly AppRouteDefinition[] = [
     requiredPermissions: ["league:admin"],
   },
   { id: "profile", path: "/profilo", layout: "app", requiredPermissions: ["profile:view"] },
+  { id: "feedback", path: "/feedback", layout: "app", requiredPermissions: ["profile:view"] },
   { id: "dev-design-system", path: "/dev/design-system", layout: "app" },
   { id: "dev-wireframes", path: "/dev/wireframes", layout: "app" },
   {
@@ -88,6 +89,13 @@ export const APP_ROUTE_DEFINITIONS: readonly AppRouteDefinition[] = [
   {
     id: "admin-users",
     path: "/admin/utenti",
+    layout: "admin",
+    requiredPermissions: ["global:operate"],
+    requireGlobalOperator: true,
+  },
+  {
+    id: "admin-feedback",
+    path: "/admin/feedback",
     layout: "admin",
     requiredPermissions: ["global:operate"],
     requireGlobalOperator: true,

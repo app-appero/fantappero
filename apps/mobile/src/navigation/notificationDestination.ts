@@ -1,10 +1,11 @@
 import type { NotificationItem } from "@fantappero/contracts";
-import type { AppTabParamList, RootStackParamList } from "./types";
+import type { AdminStackParamList, AppTabParamList, RootStackParamList } from "./types";
 
 export type NotificationRoute =
   | { kind: "stack"; name: keyof RootStackParamList }
   | { kind: "matchup"; slotId: string }
-  | { kind: "tab"; screen: keyof AppTabParamList };
+  | { kind: "tab"; screen: keyof AppTabParamList }
+  | { kind: "admin"; screen: keyof AdminStackParamList };
 
 const TRADE_TITLES = new Set([
   "Nuova proposta di scambio",
@@ -27,6 +28,8 @@ const AUCTION_TITLES = new Set([
 
 /** Percorsi web (deep link del payload) → schermata mobile equivalente. */
 const PATH_ROUTES: Array<[RegExp, NotificationRoute]> = [
+  // Nuova segnalazione utente: la notifica arriva solo agli operatori.
+  [/^\/admin\/feedback/, { kind: "admin", screen: "AdminFeedback" }],
   [/^\/$/, { kind: "stack", name: "LeagueHome" }],
   [/^\/inviti/, { kind: "stack", name: "ReceivedInvites" }],
   [/^\/formazione/, { kind: "tab", screen: "Formation" }],

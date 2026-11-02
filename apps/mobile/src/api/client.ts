@@ -60,6 +60,13 @@ const client = createApiClient<UploadFile>({
 
 export const apiRequest = client.apiRequest;
 
+export const apiUploadForm = client.apiUploadForm;
+
+/** URL assoluto di un path relativo dell'API (es. il link firmato di un allegato). */
+export function buildApiUrl(path: string): string {
+  return `${resolveApiBaseUrl()}${path}`;
+}
+
 export function apiUpload<T>(path: string, options: UploadOptions): Promise<T> {
   return client.apiUpload<T>(path, options);
 }

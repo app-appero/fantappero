@@ -3,6 +3,7 @@ import { RequireGlobalOperator, RequirePermissions } from "./auth/RequirePermiss
 import { AdminLayout, AppLayout } from "./layout/AppLayout";
 import {
   AdminDashboardPage,
+  AdminFeedbackPage,
   AdminLeaguesPage,
   AdminListonePage,
   AdminJobsPage,
@@ -17,6 +18,7 @@ import {
   AuthResetPasswordPage,
   AuthVerifyEmailPage,
   CreateLeaguePage,
+  FeedbackPage,
   FormationPage,
   LeagueHubPage,
   JoinLeaguePage,
@@ -217,6 +219,16 @@ export function AppRoutes() {
     );
   }
 
+  if (pathname === "/feedback") {
+    return (
+      <AppSection>
+        <RequirePermissions required={["profile:view"]}>
+          <FeedbackPage />
+        </RequirePermissions>
+      </AppSection>
+    );
+  }
+
   if (pathname === "/dev/design-system") {
     if (!import.meta.env.DEV) {
       return <NotFoundPage />;
@@ -304,6 +316,16 @@ export function AppRoutes() {
       <AdminSection>
         <RequirePermissions required={["global:operate"]}>
           <AdminEmailPage />
+        </RequirePermissions>
+      </AdminSection>
+    );
+  }
+
+  if (pathname === "/admin/feedback") {
+    return (
+      <AdminSection>
+        <RequirePermissions required={["global:operate"]}>
+          <AdminFeedbackPage />
         </RequirePermissions>
       </AdminSection>
     );

@@ -108,7 +108,7 @@ class FeedbackService:
         self._session.add(report)
         self._session.flush()
 
-        storage = Path(self._settings.feedback_storage_path)
+        storage = Path(self._settings.resolved_feedback_storage_path())
         written: list[Path] = []
         try:
             if checked:
@@ -304,7 +304,7 @@ class FeedbackService:
     # --- allegati -------------------------------------------------------------------
 
     def attachment_path(self, attachment: FeedbackAttachment) -> Path:
-        return Path(self._settings.feedback_storage_path) / attachment.stored_name
+        return Path(self._settings.resolved_feedback_storage_path()) / attachment.stored_name
 
     def get_attachment(self, attachment_id: UUID) -> FeedbackAttachment:
         attachment = self._session.get(FeedbackAttachment, attachment_id)
