@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterable
+from dataclasses import dataclass, field
 from typing import Any
 from uuid import UUID
 
@@ -13,7 +14,7 @@ from fantasy_ratings.eligibility import (
 )
 from fantasy_ratings.input import PlayerMatchInput, relevant_events_from_statistics
 from sports_data.fixtures.models import Fixture, MatchEvent, PlayerMatchStat
-from sports_data.normalization.types import ScoringEventKind
+from sports_data.normalization.types import EventStatus, ScoringEventKind
 
 
 def own_goal_provider_ids(events: Iterable[MatchEvent]) -> set[int]:
@@ -47,31 +48,62 @@ def own_goal_counts_by_provider_id(events: Iterable[MatchEvent]) -> dict[int, in
     return counts
 
 
-def penalty_counts_by_provider_id(
-    events: Iterable[MatchEvent],
-) -> tuple[dict[int, int], dict[int, int]]:
-    """Rigori sbagliati e parati per calciatore da ``match_event`` attivi (FR-SCO-02).
+@dataclass(frozen=True)
+class EventBonusCounts:
+    """Conteggi bonus/malus per calciatore ricavati da ``match_event`` (FR-SCO-02).
 
-    Il malus del rigore sbagliato non deve dipendere solo da
-    ``stats_json.penalty``: la statistica del provider puo' mancare o arrivare
-    dopo l'evento. Un rigore sbagliato e' sia ``penalty_missed`` (parato dal
-    portiere) sia ``penalty_off_target`` (fuori/palo): in entrambi i casi il
-    rigorista ha sbagliato. Ritorna ``(sbagliati, parati)``.
+    Servono come rete di sicurezza: le statistiche del provider
+    (``stats_json``) possono mancare o arrivare dopo gli eventi della partita.
+    Per ogni voce si usa il valore piu' alto tra statistica ed eventi, mai la
+    somma: sono lo stesso fatto visto da due feed e sommarli lo conterebbe due
+    volte.
     """
-    missed: dict[int, int] = {}
-    saved: dict[int, int] = {}
+
+    goals: dict[int, int] = field(default_factory=dict)
+    assists: dict[int, int] = field(default_factory=dict)
+    yellow_cards: dict[int, int] = field(default_factory=dict)
+    red_cards: dict[int, int] = field(default_factory=dict)
+    penalty_missed: dict[int, int] = field(default_factory=dict)
+    penalty_saved: dict[int, int] = field(default_factory=dict)
+
+
+# Stati che non vanno mai a punteggio: dati in contraddizione o insufficienti.
+_EXCLUDED_EVENT_STATUSES = frozenset({EventStatus.ANOMALY.value, EventStatus.INSUFFICIENT.value})
+
+
+def event_bonus_counts(events: Iterable[MatchEvent]) -> EventBonusCounts:
+    """Conta gol, assist, cartellini e rigori per calciatore da eventi attivi."""
+    counts = EventBonusCounts()
+
+    def bump(target: dict[int, int], pid: int) -> None:
+        target[pid] = target.get(pid, 0) + 1
+
     for event in events:
         if not event.is_active or event.athlete_provider_id is None:
             continue
+        if getattr(event, "status", None) in _EXCLUDED_EVENT_STATUSES:
+            continue
         pid = int(event.athlete_provider_id)
-        if event.scoring_kind in (
+        kind = event.scoring_kind
+        if kind in (ScoringEventKind.GOAL.value, ScoringEventKind.PENALTY_SCORED.value):
+            bump(counts.goals, pid)
+        elif kind == ScoringEventKind.ASSIST.value:
+            bump(counts.assists, pid)
+        elif kind in (
             ScoringEventKind.PENALTY_MISSED.value,
             ScoringEventKind.PENALTY_OFF_TARGET.value,
         ):
-            missed[pid] = missed.get(pid, 0) + 1
-        elif event.scoring_kind == ScoringEventKind.PENALTY_SAVED.value:
-            saved[pid] = saved.get(pid, 0) + 1
-    return missed, saved
+            # Parato o fuori/palo: in entrambi i casi il rigorista ha sbagliato.
+            bump(counts.penalty_missed, pid)
+        elif kind == ScoringEventKind.PENALTY_SAVED.value:
+            bump(counts.penalty_saved, pid)
+        elif str(event.event_type or "").lower() == "card":
+            detail = str(event.event_detail or "").lower()
+            if "red" in detail or "second yellow" in detail:
+                bump(counts.red_cards, pid)
+            elif "yellow" in detail:
+                bump(counts.yellow_cards, pid)
+    return counts
 
 
 def stoppage_entry_provider_ids(events: Iterable[MatchEvent]) -> set[int]:
@@ -166,29 +198,23 @@ def bonus_input_from_stat(
     stat: PlayerMatchStat,
     role: str | None,
     own_goal_counts: dict[int, int],
-    penalty_missed_counts: dict[int, int] | None = None,
-    penalty_saved_counts: dict[int, int] | None = None,
+    event_counts: EventBonusCounts | None = None,
 ) -> BonusMalusInput:
     statistics = dict(stat.stats_json or {})
     goals = statistics.get("goals") if isinstance(statistics.get("goals"), dict) else {}
     cards = statistics.get("cards") if isinstance(statistics.get("cards"), dict) else {}
     penalty = statistics.get("penalty") if isinstance(statistics.get("penalty"), dict) else {}
+    counts = event_counts or EventBonusCounts()
+    pid = stat.athlete_provider_id
+    # Valore piu' alto tra statistica ed eventi (vedi ``EventBonusCounts``).
     return BonusMalusInput(
-        goals=_as_int(goals.get("total")),
-        assists=_as_int(goals.get("assists")),
-        yellow_card=_as_int(cards.get("yellow")) > 0,
-        red_card=_as_int(cards.get("red")) > 0,
-        own_goals=own_goal_counts.get(stat.athlete_provider_id, 0),
-        # Il valore piu' alto tra statistica ed eventi (mai la somma: sono la
-        # stessa cosa vista da due feed, sommarli conterebbe il rigore due volte).
-        penalty_missed=max(
-            _as_int(penalty.get("missed")),
-            (penalty_missed_counts or {}).get(stat.athlete_provider_id, 0),
-        ),
-        penalty_saved=max(
-            _as_int(penalty.get("saved")),
-            (penalty_saved_counts or {}).get(stat.athlete_provider_id, 0),
-        ),
+        goals=max(_as_int(goals.get("total")), counts.goals.get(pid, 0)),
+        assists=max(_as_int(goals.get("assists")), counts.assists.get(pid, 0)),
+        yellow_card=_as_int(cards.get("yellow")) > 0 or counts.yellow_cards.get(pid, 0) > 0,
+        red_card=_as_int(cards.get("red")) > 0 or counts.red_cards.get(pid, 0) > 0,
+        own_goals=own_goal_counts.get(pid, 0),
+        penalty_missed=max(_as_int(penalty.get("missed")), counts.penalty_missed.get(pid, 0)),
+        penalty_saved=max(_as_int(penalty.get("saved")), counts.penalty_saved.get(pid, 0)),
         role=role,  # type: ignore[arg-type]
         team_goals_conceded=team_goals_conceded(fixture, stat.club_id),
     )
@@ -203,15 +229,14 @@ def bonus_inputs_from_fixture_stats(
 ) -> list[BonusMalusInput]:
     events = list(events)
     own_goal_counts = own_goal_counts_by_provider_id(events)
-    penalty_missed_counts, penalty_saved_counts = penalty_counts_by_provider_id(events)
+    event_counts = event_bonus_counts(events)
     return [
         bonus_input_from_stat(
             fixture=fixture,
             stat=stat,
             role=roles_by_provider_id.get(stat.athlete_provider_id),
             own_goal_counts=own_goal_counts,
-            penalty_missed_counts=penalty_missed_counts,
-            penalty_saved_counts=penalty_saved_counts,
+            event_counts=event_counts,
         )
         for stat in stats
     ]
