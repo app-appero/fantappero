@@ -19,7 +19,6 @@ import {
 import { type ChangeEvent, type FormEvent, useCallback, useEffect, useState } from "react";
 import {
   fetchProfile,
-  recordPolicyConsent,
   removeAvatar,
   updateInviteAvailability,
   updateProfile,
@@ -151,9 +150,6 @@ export function ProfilePage() {
   const [quietHoursEndHour, setQuietHoursEndHour] = useState<string>(
     demoProfile?.quietHoursEndHour?.toString() ?? "",
   );
-  const [policyAccepted, setPolicyAccepted] = useState(
-    demoProfile ? demoProfile.policyVersion === demoProfile.currentPolicyVersion : false,
-  );
 
   const applyProfile = useCallback((next: UserProfile) => {
     setProfile(next);
@@ -166,7 +162,6 @@ export function ProfilePage() {
     setQuietHoursStartHour(next.quietHoursStartHour?.toString() ?? "");
     setQuietHoursEndHour(next.quietHoursEndHour?.toString() ?? "");
     setAvailableForInvites(profileInviteAvailability(next));
-    setPolicyAccepted(next.policyVersion === next.currentPolicyVersion);
   }, []);
 
   useEffect(() => {
@@ -307,36 +302,6 @@ export function ProfilePage() {
       setFormError(getApiErrorMessage(removeError, "Rimozione avatar non riuscita."));
     } finally {
       setAvatarUploading(false);
-    }
-  }
-
-  async function handlePolicyConsent() {
-    if (isDemoMode) {
-      setSuccessMessage("Modalità demo: consenso simulato.");
-      setPolicyAccepted(true);
-      return;
-    }
-
-    const stored = loadStoredSession();
-    if (!stored?.accessToken || !profile) {
-      setFormError("Sessione scaduta. Accedi di nuovo.");
-      return;
-    }
-
-    setSaving(true);
-    setFormError(null);
-    try {
-      const updated = await recordPolicyConsent(stored.accessToken, {
-        policyVersion: profile.currentPolicyVersion,
-        accepted: true,
-      });
-      applyProfile(updated);
-      setPolicyAccepted(true);
-      setSuccessMessage("Consenso alla policy registrato.");
-    } catch (consentError) {
-      setFormError(getApiErrorMessage(consentError, "Registrazione consenso non riuscita."));
-    } finally {
-      setSaving(false);
     }
   }
 
@@ -717,42 +682,17 @@ export function ProfilePage() {
               />
             ) : null}
 
-            {needsPolicyConsent ? (
-              <div className="fa-profile-policy" data-testid="profile-policy-pending">
-                <p>
-                  È disponibile una nuova versione della{" "}
-                  <Link to="/privacy" data-testid="profile-privacy-link">
-                    informativa privacy
-                  </Link>{" "}
-                  ({profile.currentPolicyVersion}). Leggila e accetta per continuare a usare FantApperò.
-                </p>
-                <label className="fa-profile-checkbox">
-                  <input
-                    type="checkbox"
-                    checked={policyAccepted}
-                    onChange={(event) => setPolicyAccepted(event.target.checked)}
-                    disabled={saving}
-                    data-testid="profile-policy-checkbox"
-                  />
-                  Ho letto e accetto l'informativa privacy
-                </label>
-                <Button
-                  type="button"
-                  disabled={!policyAccepted || saving}
-                  onClick={() => void handlePolicyConsent()}
-                  data-testid="profile-policy-submit"
-                >
-                  Registra consenso
-                </Button>
-              </div>
-            ) : (
-              <UiStatePanel
-                state="success"
-                title="Policy accettata"
-                message={`Consenso registrato il ${profile.policyConsentAt ? new Date(profile.policyConsentAt).toLocaleString("it-IT") : "—"} (versione ${profile.policyVersion}).`}
-                testId="profile-policy-accepted"
-              />
-            )}
+            <div className="fa-profile-policy" data-testid="profile-policy-accepted">
+              <h3 className="fa-profile-privacy-actions__title">Informativa privacy</h3>
+              <p className="fa-field__hint">
+                {needsPolicyConsent
+                  ? "L'informativa è stata aggiornata: accedendo di nuovo la accetti."
+                  : `Hai accettato l'informativa privacy (versione ${profile.policyVersion}) il ${profile.policyConsentAt ? new Date(profile.policyConsentAt).toLocaleString("it-IT") : "—"}.`}{" "}
+                <Link to="/privacy" data-testid="profile-privacy-link">
+                  Leggi l&apos;informativa
+                </Link>
+              </p>
+            </div>
 
             <div className="fa-profile-privacy-actions" data-testid="profile-privacy-actions">
               <h3 className="fa-profile-privacy-actions__title">I tuoi dati</h3>

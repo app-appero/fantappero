@@ -17,7 +17,6 @@ import { deleteAccount, exportAccountData } from "../api/privacy";
 import {
   AVATAR_MAX_BYTES,
   fetchProfile,
-  recordPolicyConsent,
   removeAvatar,
   updateInviteAvailability,
   updateProfile,
@@ -89,7 +88,6 @@ export function ProfileScreen() {
   const [quietHoursStartHour, setQuietHoursStartHour] = useState("");
   const [quietHoursEndHour, setQuietHoursEndHour] = useState("");
   const [availableForInvites, setAvailableForInvites] = useState(false);
-  const [policyAccepted, setPolicyAccepted] = useState(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -107,7 +105,6 @@ export function ProfileScreen() {
     setQuietHoursStartHour(next.quietHoursStartHour?.toString() ?? "");
     setQuietHoursEndHour(next.quietHoursEndHour?.toString() ?? "");
     setAvailableForInvites(next.availableForInvites);
-    setPolicyAccepted(next.policyVersion === next.currentPolicyVersion);
   }, []);
 
   const loadProfile = useCallback(
@@ -232,32 +229,6 @@ export function ProfileScreen() {
       setFormError(getApiErrorMessage(error, "Rimozione avatar non riuscita."));
     } finally {
       setAvatarBusy(false);
-    }
-  }
-
-  async function handlePolicyConsent() {
-    setFormError(null);
-    setSuccessMessage(null);
-    if (!policyAccepted) {
-      setFormError("Accetta la policy per continuare.");
-      return;
-    }
-    if (!accessToken || !profile) {
-      setFormError("Sessione non disponibile. Accedi di nuovo.");
-      return;
-    }
-    setSaving(true);
-    try {
-      const updated = await recordPolicyConsent(accessToken, {
-        policyVersion: profile.currentPolicyVersion,
-        accepted: true,
-      });
-      applyProfile(updated);
-      setSuccessMessage("Consenso alla policy registrato.");
-    } catch (error) {
-      setFormError(getApiErrorMessage(error, "Registrazione consenso non riuscita."));
-    } finally {
-      setSaving(false);
     }
   }
 
@@ -561,10 +532,16 @@ export function ProfileScreen() {
         </View>
       </View>
 
-      <View style={styles.section} testID="profile-policy-pending">
-        <Text style={styles.sectionTitle}>Privacy</Text>
+      <View style={styles.section} testID="profile-policy-accepted">
+        <Text style={styles.sectionTitle}>Informativa privacy</Text>
         <Text style={styles.hint}>
-          Informativa privacy versione {profile.currentPolicyVersion}. Leggila e accetta per continuare.
+          {profile.policyVersion === profile.currentPolicyVersion
+            ? `Hai accettato l'informativa privacy (versione ${profile.policyVersion}) il ${
+                profile.policyConsentAt
+                  ? new Date(profile.policyConsentAt).toLocaleString("it-IT")
+                  : "—"
+              }.`
+            : "L'informativa è stata aggiornata: accedendo di nuovo la accetti."}
         </Text>
         <Pressable
           accessibilityRole="link"
@@ -574,23 +551,6 @@ export function ProfileScreen() {
           testID="profile-privacy-link"
         >
           <Text style={styles.secondaryButtonLabel}>Leggi l'informativa</Text>
-        </Pressable>
-        <View style={styles.switchRow}>
-          <Text style={styles.label}>Ho letto e accetto l'informativa</Text>
-          <Switch
-            value={policyAccepted}
-            onValueChange={setPolicyAccepted}
-            testID="profile-policy-checkbox"
-          />
-        </View>
-        <Pressable
-          accessibilityRole="button"
-          disabled={saving}
-          onPress={() => void handlePolicyConsent()}
-          style={styles.secondaryButton}
-          testID="profile-policy-submit"
-        >
-          <Text style={styles.secondaryButtonLabel}>Registra consenso</Text>
         </Pressable>
       </View>
 

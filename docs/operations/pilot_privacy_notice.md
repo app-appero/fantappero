@@ -59,6 +59,5 @@ Il testo qui sotto è la fonte unica: è mostrato in app e sul web alla pagina `
 - **Minorenni**: esclusi dal pilota; nessuna verifica automatica dell'età, regola di
   ammissione manuale applicata in fase di selezione dei partecipanti.
 - **Archivio richieste/ticket**: la casella `trottarosario@gmail.com` funge anche da archivio.
-- **Consenso**: richiesto a ogni cambio di versione (`PROFILE_POLICY_VERSION`); finché non
-  accettato, il profilo mostra l'avviso con il link alla pagina `/privacy`.
+- **Consenso**: l'accesso con Google vale come accettazione (frase con link sotto il tasto); il server salva versione e data al login e il profilo le mostra con il link all'informativa. A ogni nuova versione (`PROFILE_POLICY_VERSION`) l'accettazione si registra al prossimo accesso.
 - Coerente con `pilot_support_process.md` (stesso canale, divieto di inviare password/token).

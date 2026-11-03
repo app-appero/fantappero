@@ -199,10 +199,26 @@ class AuthService:
             get_metrics().incr("auth_google_login_total", labels={"result": "failure"})
             raise GoogleAuthError()
 
+        self._record_policy_acceptance(user)
         tokens = self._create_session(user)
         self._session.commit()
         get_metrics().incr("auth_google_login_total", labels={"result": "success"})
         return tokens
+
+    def _record_policy_acceptance(self, user: User) -> None:
+        """L'accesso con Google vale come accettazione dell'informativa mostrata sotto il tasto.
+
+        Salva versione e data se l'utente non ha già accettato la versione corrente.
+        """
+        current = self._settings.profile_policy_version
+        profile = user.profile
+        if profile is None:
+            profile = UserProfile(user_id=user.id)
+            self._session.add(profile)
+            user.profile = profile
+        if profile.policy_version != current:
+            profile.policy_version = current
+            profile.policy_consent_at = utc_now()
 
     def refresh(self, *, refresh_token: str) -> AuthTokensResponse:
         token_hash = hash_opaque_token(refresh_token)

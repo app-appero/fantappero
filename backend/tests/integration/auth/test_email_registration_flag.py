@@ -98,3 +98,24 @@ def test_google_registration_and_existing_password_logins_keep_working_when_disa
     assert google.status_code == 200, google.text
     assert google.json()["accessToken"]
     assert len(get_captured_emails()) == emails_before
+
+
+def test_google_login_records_policy_acceptance(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    identity = GoogleIdentity(
+        sub="google-sub-policy",
+        email="policy.google@example.com",
+        email_verified=True,
+        name="Utente Privacy",
+    )
+    monkeypatch.setattr(google_oauth, "verify_id_token", lambda *_a, **_k: identity)
+    google = client.post("/auth/google", json={"idToken": "fake"})
+    assert google.status_code == 200, google.text
+    headers = {"Authorization": f"Bearer {google.json()['accessToken']}"}
+
+    profile = client.get("/profile/me", headers=headers)
+    assert profile.status_code == 200, profile.text
+    body = profile.json()
+    assert body["policyVersion"] == body["currentPolicyVersion"]
+    assert body["policyConsentAt"]
