@@ -258,6 +258,62 @@ const REGISTER_STEPS_GOOGLE = [
   { title: "Entra in lega", detail: "Crea la tua o usa un invito" },
 ] as const;
 
+const SHOWCASE_PLAYERS: Array<{ name: string; role: "p" | "d" | "c" | "a"; x: number; y: number; state?: "final" | "live" }> = [
+  { name: "Lautaro", role: "a", x: 22, y: 14, state: "final" },
+  { name: "Lookman", role: "a", x: 50, y: 14, state: "live" },
+  { name: "Leao", role: "a", x: 78, y: 14 },
+  { name: "Barella", role: "c", x: 26, y: 40, state: "final" },
+  { name: "Tonali", role: "c", x: 50, y: 40 },
+  { name: "Mkhitaryan", role: "c", x: 74, y: 40 },
+  { name: "Bastoni", role: "d", x: 16, y: 66 },
+  { name: "Bremer", role: "d", x: 39, y: 66, state: "final" },
+  { name: "Theo", role: "d", x: 61, y: 66 },
+  { name: "Dumfries", role: "d", x: 84, y: 66 },
+  { name: "Maignan", role: "p", x: 50, y: 90 },
+];
+
+const SHOWCASE_FEATURES = [
+  { glyph: "🔨", title: "Asta live e scambi", text: "Costruisci la rosa con gli amici" },
+  { glyph: "🔒", title: "Formazione a step", text: "Ogni giocatore si blocca al suo fischio" },
+  { glyph: "🏆", title: "Più campionati", text: "Serie A, Premier e non solo, in una lega" },
+];
+
+/** Solo su schermi stretti: campo in miniatura e tre schede sopra «Continua con Google». */
+function LoginShowcase() {
+  return (
+    <div className="fa-login__showcase" data-testid="login-showcase">
+      <p className="fa-login__tagline">Ogni giocatore conta, minuto per minuto.</p>
+      <div className="fa-login__mini-pitch" aria-hidden="true">
+        {SHOWCASE_PLAYERS.map((player) => (
+          <span
+            key={player.name}
+            className={`fa-login__mini-player fa-login__mini-player--${player.role}${player.state ? ` fa-login__mini-player--${player.state}` : ""}`}
+            style={{ left: `${player.x}%`, top: `${player.y}%` }}
+          >
+            <i>{player.name.charAt(0)}</i>
+            <small>{player.name}</small>
+          </span>
+        ))}
+        <span className="fa-login__mini-badges">
+          <b>⚽ Gol!</b>
+          <b className="fa-login__mini-vote">8,0</b>
+        </span>
+      </div>
+      <ul className="fa-login__features">
+        {SHOWCASE_FEATURES.map((feature) => (
+          <li key={feature.title}>
+            <span aria-hidden="true">{feature.glyph}</span>
+            <div>
+              <strong>{feature.title}</strong>
+              <small>{feature.text}</small>
+            </div>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 const LOGIN_ROLES = [
   { code: "P", label: "Portieri" },
   { code: "D", label: "Difensori" },
@@ -348,6 +404,7 @@ export function AuthLoginPage() {
             </li>
           ))}
         </ul>
+        <LoginShowcase />
       </section>
       <section className="fa-login__panel">
         <SocialLogins onError={setError} appleLabel="Continua con Apple" dividerLabel={showEmailLogin ? (remembered ? "oppure con la password" : "oppure con email") : null} />
