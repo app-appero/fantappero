@@ -1,4 +1,4 @@
-import { LOGIN_SHOWCASE_FEATURES, LOGIN_SHOWCASE_LEAGUES, LOGIN_SHOWCASE_PITCH } from "@fantappero/contracts";
+import { LOGIN_CARDS, LOGIN_SHOWCASE_FEATURES, LOGIN_SHOWCASE_LEAGUES, LOGIN_SHOWCASE_PITCH } from "@fantappero/contracts";
 import { AuthFormLayout, BrandLogo, PageContainer, UiStatePanel } from "@fantappero/ui";
 import { type FormEvent, type ReactNode, useCallback, useEffect, useRef, useState } from "react";
 import {
@@ -331,6 +331,55 @@ function LoginFeatures() {
   );
 }
 
+/** Accesso solo Google: carte giocatore + titolo + un solo bottone. */
+function LoginCardsPage({ firstName, error, onError }: { firstName: string; error: string | null; onError: (message: string) => void }) {
+  return (
+    <div className="fa-auth-page fa-login fa-login-cards" data-testid="login-page">
+      <div className="fa-login-cards__pitch" aria-hidden="true" />
+      <div className="fa-login-cards__stage" aria-hidden="true" data-testid="login-showcase">
+        {LOGIN_CARDS.map((card) => (
+          <div key={card.name} className={`fa-login-card fa-login-card--${card.tone}`}>
+            <div className="fa-login-card__top">
+              <b>{card.vote}</b>
+              <span>{card.code}</span>
+            </div>
+            <div className="fa-login-card__initial">{card.name.charAt(0)}</div>
+            <div className="fa-login-card__foot">
+              <i>{card.role}</i>
+              <strong>{card.name}</strong>
+            </div>
+          </div>
+        ))}
+      </div>
+      <section className="fa-login-cards__content">
+        <BrandLogo variant="full" size="lg" />
+        <h1 className="fa-login__title">
+          {firstName ? (
+            <>
+              Bentornato, <span className="fa-login__title-accent">{firstName}</span>
+            </>
+          ) : (
+            <>
+              Schiera i migliori <span className="fa-login__title-accent">d&apos;Europa</span>
+            </>
+          )}
+        </h1>
+        <p className="fa-login-cards__sub">Serie A, Premier, LaLiga, Bundesliga e Ligue 1 in una sola lega.</p>
+        <ul className="fa-login-cards__codes" aria-label="Campionati">
+          {LOGIN_SHOWCASE_LEAGUES.map((league) => (
+            <li key={league.code}>{league.code}</li>
+          ))}
+        </ul>
+        <div className="fa-login-cards__cta" data-testid="login-google-only">
+          <SocialLogins onError={onError} appleLabel="Continua con Apple" dividerLabel={null} />
+          {error ? <UiStatePanel state="error" title="Accesso non riuscito" message={error} testId="auth-login-error" /> : null}
+          <p className="fa-login-cards__note">Niente password: un tocco e sei dentro</p>
+        </div>
+      </section>
+    </div>
+  );
+}
+
 export function AuthLoginPage() {
   const { login } = useAuth();
   const navigate = useNavigate();
@@ -377,6 +426,10 @@ export function AuthLoginPage() {
   }
 
   const firstName = remembered?.displayName.trim().split(/\s+/)[0] ?? "";
+
+  if (!showEmailLogin) {
+    return <LoginCardsPage firstName={firstName} error={error} onError={setError} />;
+  }
 
   return (
     <div className="fa-auth-page fa-login fa-login--home" data-testid="login-page">
