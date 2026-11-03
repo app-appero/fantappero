@@ -11,6 +11,7 @@ import { useAuthOptions } from "../auth/useAuthOptions";
 import { useGoogleAuth } from "../auth/useGoogleAuth";
 import { loadMobileEnv } from "../config/env";
 import { AuthShell } from "../auth/AuthShell";
+import { LoginCards } from "../auth/LoginCards";
 import { LoginShowcase } from "../auth/LoginShowcase";
 import { UiStatePanel } from "../components/UiStatePanel";
 import type { RootStackParamList } from "../navigation/types";
@@ -242,7 +243,9 @@ export function AuthScreen() {
       }
     >
       <View testID="screen-auth-form">
-        {remembered ? (
+        {!showEmailLogin ? (
+          <LoginCards firstName={remembered ? firstName : undefined} />
+        ) : remembered ? (
           <View style={styles.hero} testID="auth-welcome">
             <View style={styles.avatarRing}>
               <View style={styles.avatarInner}>
@@ -257,7 +260,7 @@ export function AuthScreen() {
             <Text style={styles.displayAccent2}>davvero</Text>
           </Text>
         )}
-        <LoginShowcase />
+        {showEmailLogin ? <LoginShowcase /> : null}
         {error ? (
           <UiStatePanel state="error" title="Accesso non riuscito" message={error} testID="auth-error" />
         ) : null}
