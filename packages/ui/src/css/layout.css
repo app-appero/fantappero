@@ -2960,7 +2960,9 @@ button.fa-app-header__league-action {
     gap: var(--fa-space-md);
     padding: var(--fa-space-lg) var(--fa-space-md);
   }
-  .fa-login-cards__pitch { inset: 1rem; }
+  .fa-login-cards { padding: 1.75rem 1.75rem; }
+  .fa-login-cards__pitch { inset: 0.5rem; }
+  .fa-login-cards__pitch::before { display: none; }
   .fa-login-cards__stage {
     order: 1;
     align-self: center;
