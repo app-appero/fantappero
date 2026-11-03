@@ -529,5 +529,6 @@ export {
   LOGIN_SHOWCASE_FEATURES,
   LOGIN_SHOWCASE_LEAGUES,
   LOGIN_SHOWCASE_PITCH,
+  LOGIN_CARDS,
 } from "./loginShowcase.js";
 export type { ShowcaseLeague, ShowcasePlayer, ShowcaseRole } from "./loginShowcase.js";

@@ -48,3 +48,10 @@ export const LOGIN_SHOWCASE_FEATURES = [
   { glyph: "🔒", title: "Formazione a step", text: "Ogni giocatore si blocca al suo fischio" },
   { glyph: "🏆", title: "Più campionati", text: "Una lega con i campionati che scegli" },
 ] as const;
+
+/** Le tre carte giocatore della schermata di accesso (solo Google): voto, sigla paese, ruolo. */
+export const LOGIN_CARDS = [
+  { name: "Haaland", role: "A", code: "ENG", vote: "9,0", tone: "blue" },
+  { name: "Mbappé", role: "A", code: "ESP", vote: "8,5", tone: "violet" },
+  { name: "Lautaro", role: "A", code: "ITA", vote: "8,0", tone: "pink" },
+] as const;
