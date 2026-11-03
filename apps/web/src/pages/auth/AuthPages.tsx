@@ -259,16 +259,41 @@ const REGISTER_STEPS_GOOGLE = [
   { title: "Entra in lega", detail: "Crea la tua o usa un invito" },
 ] as const;
 
-/** Vetrina dell'accesso: top player dei cinque campionati e campo in miniatura (mobile e desktop). */
+function LoginPitch({ variant }: { variant: "hero" | "panel" }) {
+  return (
+    <div className={`fa-login__mini-pitch fa-login__mini-pitch--${variant}`} aria-hidden="true">
+      {LOGIN_SHOWCASE_PITCH.map((player) => (
+        <span
+          key={player.name}
+          className={`fa-login__mini-player fa-login__mini-player--${player.role.toLowerCase()}${player.state ? ` fa-login__mini-player--${player.state}` : ""}`}
+          style={{ left: `${player.x}%`, top: `${player.y}%` }}
+        >
+          <i>{player.name.charAt(0)}</i>
+          <small>
+            {player.name}
+            <em>{player.code}</em>
+          </small>
+        </span>
+      ))}
+      <span className="fa-login__mini-badges">
+        <b>⚽ Gol!</b>
+        <b className="fa-login__mini-vote">8,0</b>
+      </span>
+    </div>
+  );
+}
+
+/** Vetrina dell'accesso: top player dei cinque campionati (e, su schermi stretti, il campo). */
 function LoginShowcase() {
   return (
     <div className="fa-login__showcase" data-testid="login-showcase">
       <p className="fa-login__tagline">5 campionati, una sola lega. I top player di tutta Europa, minuto per minuto.</p>
+      <LoginPitch variant="hero" />
       <ul className="fa-login__leagues" aria-label="Campionati">
         {LOGIN_SHOWCASE_LEAGUES.map((league) => (
           <li key={league.name} className="fa-login__league">
             <span className="fa-login__league-head">
-              <span aria-hidden="true">{league.flag}</span>
+              <i className="fa-login__code">{league.code}</i>
               <strong>{league.name}</strong>
             </span>
             <span className="fa-login__league-players">
@@ -282,25 +307,6 @@ function LoginShowcase() {
           </li>
         ))}
       </ul>
-      <div className="fa-login__mini-pitch" aria-hidden="true">
-        {LOGIN_SHOWCASE_PITCH.map((player) => (
-          <span
-            key={player.name}
-            className={`fa-login__mini-player fa-login__mini-player--${player.role.toLowerCase()}${player.state ? ` fa-login__mini-player--${player.state}` : ""}`}
-            style={{ left: `${player.x}%`, top: `${player.y}%` }}
-          >
-            <i>
-              {player.name.charAt(0)}
-              <em>{player.flag}</em>
-            </i>
-            <small>{player.name}</small>
-          </span>
-        ))}
-        <span className="fa-login__mini-badges">
-          <b>⚽ Gol!</b>
-          <b className="fa-login__mini-vote">8,0</b>
-        </span>
-      </div>
     </div>
   );
 }
@@ -308,7 +314,9 @@ function LoginShowcase() {
 /** Solo desktop: le tre funzioni sotto il riquadro di accesso. */
 function LoginFeatures() {
   return (
-    <ul className="fa-login__features" aria-label="Funzioni">
+    <>
+      <LoginPitch variant="panel" />
+      <ul className="fa-login__features" aria-label="Funzioni">
       {LOGIN_SHOWCASE_FEATURES.map((feature) => (
         <li key={feature.title}>
           <span aria-hidden="true">{feature.glyph}</span>
@@ -318,7 +326,8 @@ function LoginFeatures() {
           </div>
         </li>
       ))}
-    </ul>
+      </ul>
+    </>
   );
 }
 
@@ -370,7 +379,7 @@ export function AuthLoginPage() {
   const firstName = remembered?.displayName.trim().split(/\s+/)[0] ?? "";
 
   return (
-    <div className="fa-auth-page fa-login" data-testid="login-page">
+    <div className="fa-auth-page fa-login fa-login--home" data-testid="login-page">
       <section className="fa-login__hero">
         <BrandLogo variant="full" size="lg" />
         {remembered ? (
