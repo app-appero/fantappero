@@ -17,6 +17,12 @@ import { getApiErrorMessage, useAuthSession } from "../session/DemoSessionContex
 import { clearLastUser, initialsOf, readLastUser, writeLastUser, type LastUser } from "../session/lastUser";
 import { getMemorySession } from "../session/sessionStorage";
 
+/**
+ * Accesso con Apple: per ora nascosto (arriverà con la versione iPhone, Fase 2).
+ * Per rimetterlo come tasto disabilitato basta impostare `true`.
+ */
+const SHOW_APPLE_SIGN_IN = false;
+
 const { colors, spacing, typography, radius } = theme;
 
 function devApiHost(): string {
@@ -123,10 +129,12 @@ export function AuthScreen() {
               EXPO_PUBLIC_WEB_BASE_URL. Avvia Expo con «pnpm start:pilota».
             </Text>
           ) : null}
-          <View style={styles.appleDisabled} accessibilityRole="button" accessibilityState={{ disabled: true }} accessibilityLabel="Continua con Apple, disponibile presto" testID="auth-apple-disabled">
-            <Ionicons name="logo-apple" size={22} color="#FFFFFF" />
-            <Text style={styles.appleLabel}>Continua con Apple</Text>
-          </View>
+          {SHOW_APPLE_SIGN_IN ? (
+            <View style={styles.appleDisabled} accessibilityRole="button" accessibilityState={{ disabled: true }} accessibilityLabel="Continua con Apple, disponibile presto" testID="auth-apple-disabled">
+              <Ionicons name="logo-apple" size={22} color="#FFFFFF" />
+              <Text style={styles.appleLabel}>Continua con Apple</Text>
+            </View>
+          ) : null}
           {showEmailLogin ? (
             <>
           <View style={styles.orRow}>

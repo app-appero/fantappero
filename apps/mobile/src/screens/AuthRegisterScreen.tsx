@@ -13,6 +13,12 @@ import type { RootStackParamList } from "../navigation/types";
 import { getApiErrorMessage, useAuthSession } from "../session/DemoSessionContext";
 import { authFormStyles as styles } from "./AuthScreen";
 
+/**
+ * Accesso con Apple: per ora nascosto (arriverà con la versione iPhone, Fase 2).
+ * Per rimetterlo come tasto disabilitato basta impostare `true`.
+ */
+const SHOW_APPLE_SIGN_IN = false;
+
 /** Registrazione — allineata a web /accedi/registrati. */
 export function AuthRegisterScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
@@ -97,10 +103,12 @@ export function AuthRegisterScreen() {
                 <Text style={styles.googleMainLabel}>{googleSubmitting ? "Accesso…" : "Registrati con Google"}</Text>
               </Pressable>
             ) : null}
-            <View style={styles.appleDisabled} accessibilityRole="button" accessibilityState={{ disabled: true }} accessibilityLabel="Registrati con Apple, disponibile presto" testID="auth-register-apple-disabled">
-              <Ionicons name="logo-apple" size={22} color="#FFFFFF" />
-              <Text style={styles.appleLabel}>Registrati con Apple</Text>
-            </View>
+            {SHOW_APPLE_SIGN_IN ? (
+              <View style={styles.appleDisabled} accessibilityRole="button" accessibilityState={{ disabled: true }} accessibilityLabel="Registrati con Apple, disponibile presto" testID="auth-register-apple-disabled">
+                <Ionicons name="logo-apple" size={22} color="#FFFFFF" />
+                <Text style={styles.appleLabel}>Registrati con Apple</Text>
+              </View>
+            ) : null}
             {googleOnly ? (
               <Text style={[styles.muted, { textAlign: "center", marginTop: 12 }]} testID="auth-register-google-only">
                 In questa fase la registrazione è solo con Google.

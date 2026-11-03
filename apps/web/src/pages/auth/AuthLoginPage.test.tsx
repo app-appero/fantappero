@@ -54,6 +54,9 @@ describe("AuthLoginPage — accesso solo con Google nel pilota", () => {
     await render();
     expect(googleOnly()).not.toBeNull();
     expect(container.textContent).toContain("si accede solo con Google");
+    // Il tasto «Continua con Apple» è nascosto finché non c'è la versione iPhone.
+    expect(container.querySelector('[data-testid="auth-apple-disabled"]')).toBeNull();
+    expect(container.textContent).not.toContain("Apple");
     expect(passwordField()).toBeNull();
     expect(container.querySelector("form")).toBeNull();
     expect(container.textContent).not.toContain("Password dimenticata");

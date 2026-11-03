@@ -60,6 +60,9 @@ describe("AuthRegisterPage — registrazione solo con Google nel pilota", () => 
     await render();
     expect(container.querySelector('[data-testid="register-google-only"]')).not.toBeNull();
     expect(text()).toContain("solo con Google");
+    // Il tasto «Continua con Apple» è nascosto finché non c'è la versione iPhone.
+    expect(container.querySelector('[data-testid="auth-apple-disabled"]')).toBeNull();
+    expect(container.textContent).not.toContain("Apple");
     expect(text()).toContain("Continua con Google");
     expect(container.querySelector("form")).toBeNull();
     expect(container.querySelector('input[type="password"]')).toBeNull();

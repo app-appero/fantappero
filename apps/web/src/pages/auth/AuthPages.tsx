@@ -70,6 +70,12 @@ function GoogleSignInButton({
   );
 }
 
+/**
+ * Accesso con Apple: per ora nascosto (arriverà con la versione iPhone, Fase 2).
+ * Per rimetterlo come segnaposto «Presto» basta impostare `true`.
+ */
+const SHOW_APPLE_SIGN_IN = false;
+
 /** Accesso con Apple: visibile ma non ancora attivo (arriverà con la versione iPhone). */
 function AppleSignInPlaceholder({ label }: { label: string }) {
   return (
@@ -93,7 +99,7 @@ function SocialLogins({ onError, appleLabel, dividerLabel }: { onError: (message
   return (
     <div className="fa-auth-social">
       <GoogleSignInButton onError={onError} />
-      <AppleSignInPlaceholder label={appleLabel} />
+      {SHOW_APPLE_SIGN_IN ? <AppleSignInPlaceholder label={appleLabel} /> : null}
       {dividerLabel ? <p className="fa-auth-layout__divider">{dividerLabel}</p> : null}
     </div>
   );
