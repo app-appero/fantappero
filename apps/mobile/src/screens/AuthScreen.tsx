@@ -11,6 +11,7 @@ import { useAuthOptions } from "../auth/useAuthOptions";
 import { useGoogleAuth } from "../auth/useGoogleAuth";
 import { loadMobileEnv } from "../config/env";
 import { AuthShell } from "../auth/AuthShell";
+import { LoginShowcase } from "../auth/LoginShowcase";
 import { UiStatePanel } from "../components/UiStatePanel";
 import type { RootStackParamList } from "../navigation/types";
 import { getApiErrorMessage, useAuthSession } from "../session/DemoSessionContext";
@@ -122,6 +123,9 @@ export function AuthScreen() {
               </View>
               <Text style={styles.googleMainLabel}>{googleSubmitting ? "Accesso…" : googleLabel}</Text>
             </Pressable>
+          ) : null}
+          {googleAuth.available && !showEmailLogin ? (
+            <Text style={[styles.muted, styles.googleNote]}>Entri in un tocco: niente password da ricordare</Text>
           ) : null}
           {__DEV__ && !googleAuth.available ? (
             <Text style={styles.muted} testID="auth-dev-google-hint">
@@ -242,6 +246,7 @@ export function AuthScreen() {
             <Text style={styles.displayAccent2}>davvero</Text>
           </Text>
         )}
+        <LoginShowcase />
         {error ? (
           <UiStatePanel state="error" title="Accesso non riuscito" message={error} testID="auth-error" />
         ) : null}
@@ -251,6 +256,7 @@ export function AuthScreen() {
 }
 
 export const authFormStyles = lazyStyles(() => StyleSheet.create({
+  googleNote: { textAlign: "center" },
   root: {
     flex: 1,
     backgroundColor: colors.background,
