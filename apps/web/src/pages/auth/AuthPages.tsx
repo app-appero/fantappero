@@ -374,6 +374,9 @@ function LoginCardsPage({ firstName, error, onError }: { firstName: string; erro
           <SocialLogins onError={onError} appleLabel="Continua con Apple" dividerLabel={null} />
           {error ? <UiStatePanel state="error" title="Accesso non riuscito" message={error} testId="auth-login-error" /> : null}
           <p className="fa-login-cards__note">Niente password: un tocco e sei dentro</p>
+          <p className="fa-login-cards__note" data-testid="login-privacy-link">
+            Accedendo accetti l&apos;<Link to="/privacy">informativa privacy</Link>.
+          </p>
         </div>
       </section>
     </div>
