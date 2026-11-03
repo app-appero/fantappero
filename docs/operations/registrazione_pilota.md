@@ -1,7 +1,8 @@
-# Registrazione del pilota: solo Google
+# Accesso del pilota: solo Google
 
-Per il pilota la registrazione con email e password è **spenta**: si crea un account solo con
-«Continua con Google». Il codice della registrazione con email resta (spento, non cancellato).
+Per il pilota la registrazione **e il modulo di accesso** con email e password sono **spenti**:
+si entra solo con «Continua con Google». Il codice di registrazione e login con email resta
+(non cancellato).
 
 ## Interruttore
 | Variabile | Dove | Default | Pilota |
@@ -15,14 +16,19 @@ pubblico, risponde `{"emailRegistrationEnabled": false}`).
 ## Cosa cambia
 - `POST /auth/register` risponde **403** con codice `email_registration_disabled` e **non crea
   nessun account né invia email di verifica**.
-- Le schermate di registrazione (web e app) mostrano solo «Continua con Google» e la frase
+- Le schermate di **registrazione** (web e app) mostrano solo «Continua con Google» e la frase
   «In questa fase la registrazione è solo con Google». Mentre il server non ha ancora risposto non
   compare il modulo con email; se la richiesta fallisce si torna al modulo e decide il server.
+- La schermata di **accesso** (web e app) mostra solo «Continua con Google»: spariscono email,
+  password e «Password dimenticata?». Resta il link «Registrati» (che porta alla pagina solo Google).
+- **Account con password** (per esempio un operatore): sul web si apre
+  **`/accedi?accesso=email`**, che mostra il modulo. L'app non ha questo ingresso: lì si usa Google.
+  Chi entra con Google con lo stesso indirizzo email dell'account esistente accede allo stesso account.
 - Con Google l'account nasce **già verificato**: nessuna email di verifica e nessun reset password.
 
 ## Cosa non cambia
-- Chi ha già un account con password continua ad **accedere** con email e password (per esempio gli
-  operatori). «Password dimenticata» resta, ma richiede che l'invio email funzioni.
+- Il **server** accetta ancora il login con email e password (`POST /auth/login`): l'interruttore
+  nasconde il modulo, non blocca l'API. Gli account esistenti non vengono toccati.
 - L'**email dal pannello operatore** resta disponibile (oggi soggetta al blocco dell'invio).
 - Le notifiche di gioco restano in app e push; le email di routine restano spente
   (`NOTIFICATIONS_ROUTINE_EMAIL_ENABLED=false`, vedi `email_notifications.md`).

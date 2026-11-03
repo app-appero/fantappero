@@ -7,6 +7,7 @@ import { useEffect, useState } from "react";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { AppTextInput as TextInput } from "../components/AppTextInput";
+import { useAuthOptions } from "../auth/useAuthOptions";
 import { useGoogleAuth } from "../auth/useGoogleAuth";
 import { loadMobileEnv } from "../config/env";
 import { AuthShell } from "../auth/AuthShell";
@@ -87,6 +88,10 @@ export function AuthScreen() {
     }
   }
 
+  // Pilota: con la registrazione con email spenta anche l'accesso è solo con Google.
+  // Finché il server non risponde non si mostra il modulo; se la richiesta fallisce sì.
+  const authOptions = useAuthOptions();
+  const showEmailLogin = authOptions.loaded && authOptions.emailRegistrationEnabled;
   const googleLabel = remembered ? `Continua come ${firstName} con Google` : "Continua con Google";
   return (
     <AuthShell
@@ -122,6 +127,8 @@ export function AuthScreen() {
             <Ionicons name="logo-apple" size={22} color="#FFFFFF" />
             <Text style={styles.appleLabel}>Continua con Apple</Text>
           </View>
+          {showEmailLogin ? (
+            <>
           <View style={styles.orRow}>
             <View style={styles.orLine} />
             <Text style={styles.muted}>{remembered ? "oppure con la password" : "oppure con email"}</Text>
@@ -193,6 +200,12 @@ export function AuthScreen() {
               <Text style={styles.linkUnderline}>Non sei {firstName}? Cambia account</Text>
             </Pressable>
           ) : null}
+            </>
+          ) : (
+            <Text style={[styles.muted, { textAlign: "center" }]} testID="auth-google-only">
+              In questa fase si accede solo con Google.
+            </Text>
+          )}
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Crea un account"

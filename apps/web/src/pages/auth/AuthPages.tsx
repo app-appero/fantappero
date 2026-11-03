@@ -265,6 +265,13 @@ export function AuthLoginPage() {
   const { login } = useAuth();
   const navigate = useNavigate();
   const { search } = useLocation();
+  // Pilota: con la registrazione con email spenta anche l'accesso è solo con Google. Chi ha un
+  // account con password (es. un operatore) apre `/accedi?accesso=email`. Finché il server non
+  // risponde il modulo non si mostra; se la richiesta fallisce sì.
+  const authOptions = useAuthOptions();
+  const showEmailLogin =
+    (authOptions.loaded && authOptions.emailRegistrationEnabled) ||
+    new URLSearchParams(search).get("accesso") === "email";
   const [remembered, setRemembered] = useState<LastUser | null>(() => readLastUser());
   const [email, setEmail] = useState(() => readLastUser()?.email ?? "");
   const [password, setPassword] = useState("");
@@ -339,7 +346,17 @@ export function AuthLoginPage() {
         </ul>
       </section>
       <section className="fa-login__panel">
-        <SocialLogins onError={setError} appleLabel="Continua con Apple" dividerLabel={remembered ? "oppure con la password" : "oppure con email"} />
+        <SocialLogins onError={setError} appleLabel="Continua con Apple" dividerLabel={showEmailLogin ? (remembered ? "oppure con la password" : "oppure con email") : null} />
+        {!showEmailLogin ? (
+          <>
+            {error ? <UiStatePanel state="error" title="Accesso non riuscito" message={error} testId="auth-login-error" /> : null}
+            <p className="fa-auth-layout__register" data-testid="login-google-only">
+              In questa fase si accede solo con Google.
+              <br />
+              Non hai un account? <Link to="/accedi/registrati">Registrati</Link>
+            </p>
+          </>
+        ) : (
         <AuthFormLayout
           brand={null}
           hideBrand
@@ -384,6 +401,7 @@ export function AuthLoginPage() {
             </p>
           }
         />
+        )}
       </section>
     </div>
   );
