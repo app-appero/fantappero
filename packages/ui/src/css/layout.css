@@ -2978,3 +2978,9 @@ button.fa-app-header__league-action {
 @media (min-width: 900px) and (max-height: 700px) {
   .fa-login-cards__stage { height: 22rem; }
 }
+
+.fa-login-cards__note a {
+  color: inherit;
+  font-weight: 700;
+  text-decoration: underline;
+}
