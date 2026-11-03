@@ -33,9 +33,12 @@ function BrandMark({ className }: { className?: string }) {
           <stop offset="0" stopColor="#2748d8" />
           <stop offset="1" stopColor="#6a3fe0" />
         </linearGradient>
+        <clipPath id={`${gradientId}-clip`}>
+          <rect width="64" height="64" rx="18" />
+        </clipPath>
       </defs>
 <rect width="64" height="64" rx="18" fill={`url(#${gradientId})`}/>
-      <g opacity=".18">
+      <g opacity=".18" clipPath={`url(#${gradientId}-clip)`}>
         <rect x="0" width="8" height="64" fill="#ffffff"/>
         <rect x="16" width="8" height="64" fill="#ffffff"/>
         <rect x="32" width="8" height="64" fill="#ffffff"/>
