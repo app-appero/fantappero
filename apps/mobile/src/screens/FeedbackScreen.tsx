@@ -162,17 +162,20 @@ export function FeedbackScreen() {
       </Text>
 
       <Text style={styles.label}>Di cosa si tratta?</Text>
-      <View style={styles.row}>
+      <View style={styles.categoryRow}>
         {FEEDBACK_CATEGORIES.map((value) => (
           <Pressable
             key={value}
             accessibilityRole="button"
             accessibilityState={{ selected: category === value }}
             onPress={() => setCategory(value)}
-            style={[styles.chip, category === value && styles.chipSelected]}
+            style={[styles.chip, styles.categoryChip, category === value && styles.chipSelected]}
             testID={`feedback-category-${value}`}
           >
-            <Text style={[styles.chipLabel, category === value && styles.chipLabelSelected]}>
+            <Text
+              numberOfLines={1}
+              style={[styles.chipLabel, styles.categoryLabel, category === value && styles.chipLabelSelected]}
+            >
               {FEEDBACK_CATEGORY_LABEL[value]}
             </Text>
           </Pressable>
@@ -322,6 +325,10 @@ const styles = lazyStyles(() =>
     },
     hint: { color: colors.foregroundMuted, fontSize: typography.fontSize.sm },
     row: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
+    // Le tre categorie stanno sempre su una riga, della stessa larghezza e dello stesso carattere.
+    categoryRow: { flexDirection: "row", gap: spacing.xs },
+    categoryChip: { flex: 1, minWidth: 0, paddingHorizontal: 4, alignItems: "center" },
+    categoryLabel: { fontSize: 13, textAlign: "center" },
     chip: {
       minHeight: 40,
       paddingHorizontal: spacing.md,
