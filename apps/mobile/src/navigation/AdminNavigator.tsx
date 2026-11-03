@@ -59,6 +59,11 @@ const ADMIN_NAV_ID_BY_ROUTE: Record<string, string> = {
 export function AdminNavigator() {
   const insets = useSafeAreaInsets();
   const rootNavigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+
+  /** Torna all'app azzerando lo stack: niente schermata utente (es. Segnalazioni) rimasta sotto. */
+  function goToApp() {
+    rootNavigation.reset({ index: 0, routes: [{ name: "MainTabs" }] });
+  }
   const { user, logout, can, isImpersonating, stopImpersonation } = useAuthSession();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const stackNavigation = useRef<NativeStackNavigationProp<AdminStackParamList> | null>(null);
@@ -92,7 +97,7 @@ export function AdminNavigator() {
   useEffect(() => {
     return registerLeaveAdmin(() => {
       openAdminScreen("AdminUsers");
-      rootNavigation.navigate("MainTabs");
+      goToApp();
     });
   }, [rootNavigation]);
 
@@ -111,7 +116,7 @@ export function AdminNavigator() {
           displayName={user?.displayName ?? "un utente"}
           onExit={async () => {
             await stopImpersonation();
-            rootNavigation.navigate("MainTabs");
+            goToApp();
           }}
         />
       ) : null}
@@ -198,7 +203,7 @@ export function AdminNavigator() {
         }}
         onBackToAppPress={() => {
           closeDrawer();
-          rootNavigation.navigate("MainTabs");
+          goToApp();
         }}
         onLogout={() => {
           closeDrawer();
