@@ -12,10 +12,7 @@ from uuid import UUID
 from auth.exceptions import ValidationAuthError
 
 CSV_TEMPLATE_HEADERS = ("squadra", "provider_id", "nome", "crediti")
-CSV_TEMPLATE_BODY = (
-    "squadra,provider_id,nome,crediti\n"
-    "Squadra Esempio,12345,Nome Calciatore,10\n"
-)
+CSV_TEMPLATE_BODY = "squadra,provider_id,nome,crediti\nSquadra Esempio,12345,Nome Calciatore,10\n"
 CSV_MAX_BYTES = 512 * 1024
 CSV_MAX_ROWS = 500
 
@@ -285,9 +282,7 @@ def preview_row_from_dict(payload: dict[str, object]) -> PreviewRow:
         nome=str(payload.get("nome") or ""),
         crediti=payload.get("crediti") if payload.get("crediti") is not None else None,  # type: ignore[arg-type]
         status=str(payload.get("status") or "error"),
-        fantasy_team_id=(
-            str(payload["fantasyTeamId"]) if payload.get("fantasyTeamId") else None
-        ),
+        fantasy_team_id=(str(payload["fantasyTeamId"]) if payload.get("fantasyTeamId") else None),
         fantasy_team_name=(
             str(payload["fantasyTeamName"]) if payload.get("fantasyTeamName") else None
         ),

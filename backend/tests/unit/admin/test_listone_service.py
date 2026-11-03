@@ -150,6 +150,8 @@ def test_platform_refresh_maps_rate_limit(monkeypatch: pytest.MonkeyPatch) -> No
     )
     with pytest.raises(ValidationAuthError) as exc:
         refresh_platform_listone(
-            _FakeSession(), season_year=2026, client=client  # type: ignore[arg-type]
+            _FakeSession(),
+            season_year=2026,
+            client=client,  # type: ignore[arg-type]
         )
     assert exc.value.code == "provider_rate_limited"

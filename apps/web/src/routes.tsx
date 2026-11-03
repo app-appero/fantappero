@@ -34,6 +34,7 @@ import {
 } from "./pages/AppPages";
 import { DevShowcasePage } from "./pages/DevShowcasePage";
 import { FixtureDetailPage } from "./pages/FixtureDetailPage";
+import { PrivacyPage } from "./pages/PrivacyPage";
 import { WireframesHubPage } from "./pages/WireframesHubPage";
 import { useLocation } from "./router/simpleRouter";
 
@@ -60,6 +61,10 @@ export function AppRoutes() {
 
   if (pathname === "/accedi") {
     return <AuthLoginPage />;
+  }
+
+  if (pathname === "/privacy") {
+    return <PrivacyPage />;
   }
 
   if (pathname === "/accedi/google-app") {

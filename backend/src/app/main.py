@@ -8,7 +8,6 @@ from pathlib import Path
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, PlainTextResponse
-from fastapi.staticfiles import StaticFiles
 from starlette.types import ASGIApp, Receive, Scope, Send
 
 from admin.jobs_router import router as admin_jobs_router
@@ -17,16 +16,14 @@ from admin.turni_router import router as admin_turni_router
 from ai_assistant.router import feedback_router as ai_assistant_feedback_router
 from ai_assistant.router import router as ai_assistant_router
 from app.deps_health import aggregate_health
-from app.static_files import FlatStaticFiles
 from app.security_middleware import install_body_size_guard, install_range_header_guard
+from app.static_files import FlatStaticFiles
 from auth.exceptions import AuthError
 from auth.profile_router import router as profile_router
 from auth.router import router as auth_router
 from authorization.exceptions import AuthorizationError
 from billing.router import router as billing_router
 from config.settings.loader import get_api_settings, validate_api_settings
-from feedback.router import admin_router as admin_feedback_router
-from feedback.router import router as feedback_router
 from fantasy_lineups.router import effective_lineup_router
 from fantasy_lineups.router import router as fantasy_lineups_router
 from fantasy_ratings.exceptions import FantasyRatingError
@@ -34,6 +31,8 @@ from fantasy_ratings.router import rating_error_handler
 from fantasy_ratings.router import router as fantasy_ratings_router
 from fantasy_teams.router import router as fantasy_teams_router
 from fantasy_turns.router import router as fantasy_turns_router
+from feedback.router import admin_router as admin_feedback_router
+from feedback.router import router as feedback_router
 from leagues.router import router as leagues_router
 from leagues.scoring_router import router as scoring_router
 from market.live_router import router as market_live_router

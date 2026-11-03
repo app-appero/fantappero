@@ -128,4 +128,3 @@ def compute_turn_team_index(*, nominated_count: int, team_count: int) -> int | N
     if team_count <= 0:
         return None
     return nominated_count % team_count
-

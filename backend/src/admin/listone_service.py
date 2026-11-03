@@ -248,9 +248,7 @@ class AdminListoneService:
         if athlete_ids:
             athletes = {
                 row.id: row
-                for row in self._session.execute(
-                    select(Athlete).where(Athlete.id.in_(athlete_ids))
-                )
+                for row in self._session.execute(select(Athlete).where(Athlete.id.in_(athlete_ids)))
                 .scalars()
                 .all()
             }
@@ -272,9 +270,7 @@ class AdminListoneService:
             for assignment in assignments
         ]
 
-    def start_refresh_job(
-        self, *, season_year: int, actor: User
-    ) -> AdminListoneRefreshJobResponse:
+    def start_refresh_job(self, *, season_year: int, actor: User) -> AdminListoneRefreshJobResponse:
         from admin.listone_tasks import refresh_platform_listone_task
 
         job_id = new_job_id()

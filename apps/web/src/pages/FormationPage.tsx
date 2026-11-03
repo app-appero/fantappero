@@ -602,7 +602,7 @@ export function FormationPage() {
     !isDemoMode ? activeLeagueId : null,
   );
   const [lockNow, setLockNow] = useState(() =>
-    isDemoMode && demoState === "success" ? new Date(DEMO_CONTEXT.serverNow) : new Date(),
+    isDemoMode && demoState === "success" ? new Date(DEMO_CONTEXT.serverNow ?? Date.now()) : new Date(),
   );
   useEffect(() => {
     const timer = window.setInterval(() => setLockNow(new Date()), 1000);

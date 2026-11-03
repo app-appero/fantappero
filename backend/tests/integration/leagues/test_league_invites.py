@@ -433,9 +433,7 @@ def test_ai_named_invite_auto_accepts_and_ai_cannot_login(
             LeagueMembership.user_id == ai.id,
         )
     )
-    team = db_session.scalar(
-        select(FantasyTeam).where(FantasyTeam.membership_id == membership_id)
-    )
+    team = db_session.scalar(select(FantasyTeam).where(FantasyTeam.membership_id == membership_id))
     assert team is not None
 
     login = client.post(

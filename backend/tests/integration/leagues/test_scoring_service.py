@@ -603,8 +603,7 @@ def test_live_pipeline_keeps_provisional_then_finalizes_once(db_session: Session
     automatically_closed_round_ids = list(
         db_session.scalars(
             select(FantasyRound.id).where(
-                FantasyRound.homologation_status
-                == FantasyRoundHomologationStatus.HOMOLOGATED
+                FantasyRound.homologation_status == FantasyRoundHomologationStatus.HOMOLOGATED
             )
         ).all()
     )

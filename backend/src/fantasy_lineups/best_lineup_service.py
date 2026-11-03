@@ -148,9 +148,7 @@ def compute_best_lineup_respecting_locks(
         starters_by_role[candidate.role].append(candidate.athlete_id)
     for athlete_id in free_plan.starters:
         starters_by_role[free_role_by_id[athlete_id]].append(athlete_id)
-    starters = tuple(
-        athlete_id for role in _ROLE_ORDER for athlete_id in starters_by_role[role]
-    )
+    starters = tuple(athlete_id for role in _ROLE_ORDER for athlete_id in starters_by_role[role])
 
     # Nota: un eccesso di bloccati in un ruolo (modulo cambiato, o ruolo
     # riclassificato dal listone) non serve intercettarlo qui — `max(0, …)`

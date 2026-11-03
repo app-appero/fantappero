@@ -204,10 +204,7 @@ class FantasyLineupService:
         )
         margin = self._lineup_lock_margin_for_league(league.id)
         next_lock = next_unlocked_kickoff(
-            (
-                (ref.kickoff_at, ref.status_short, ref.lock_latched)
-                for ref in kickoffs.values()
-            ),
+            ((ref.kickoff_at, ref.status_short, ref.lock_latched) for ref in kickoffs.values()),
             now=now,
             margin_minutes=margin,
         )
@@ -217,9 +214,7 @@ class FantasyLineupService:
         # blocco vero (anticipato dal margine di lega) — stesso passaggio già
         # fatto in `lock_reminder_service.py` per lo stesso motivo.
         lock_instant = next_lock - timedelta(minutes=margin)
-        return LineupLockCountdownResponse(
-            **base, state="counting_down", nextLockAt=lock_instant
-        )
+        return LineupLockCountdownResponse(**base, state="counting_down", nextLockAt=lock_instant)
 
     def save_my_lineup(
         self,
@@ -1119,7 +1114,9 @@ class FantasyLineupService:
         operator_bypass = self._actor_bypasses_kickoff_lock(league_access)
         locked_flags = {
             row.athlete_id: (
-                False if operator_bypass else self._is_row_locked(row.athlete_id, kickoffs, now, lock_margin)
+                False
+                if operator_bypass
+                else self._is_row_locked(row.athlete_id, kickoffs, now, lock_margin)
             )
             for row in roster
         }
@@ -1293,9 +1290,7 @@ class FantasyLineupService:
 
     def _lineup_lock_margin_for_league(self, league_id: UUID) -> int:
         margin = self._session.execute(
-            select(LeagueRules.lineup_lock_margin_minutes).where(
-                LeagueRules.league_id == league_id
-            )
+            select(LeagueRules.lineup_lock_margin_minutes).where(LeagueRules.league_id == league_id)
         ).scalar_one_or_none()
         return margin if margin is not None else DEFAULT_LINEUP_LOCK_MARGIN_MINUTES
 
@@ -1717,7 +1712,9 @@ class FantasyLineupService:
             )
             team = self._session.scalars(query).first()
             if team is None:
-                raise ValidationAuthError("Squadra non trovata in questa lega.", code="fantasy_team_not_found")
+                raise ValidationAuthError(
+                    "Squadra non trovata in questa lega.", code="fantasy_team_not_found"
+                )
             return team
 
         membership = self._require_membership(league_access)

@@ -130,8 +130,8 @@ def test_threshold_target_rejects_both() -> None:
 # corpus reale api-football, non solo payload sintetici come sopra.
 # --------------------------------------------------------------------------
 
-import json
-from pathlib import Path
+import json  # noqa: E402
+from pathlib import Path  # noqa: E402
 
 _DATASET = Path(__file__).resolve().parents[3] / "tests" / "fixtures" / "api_football"
 

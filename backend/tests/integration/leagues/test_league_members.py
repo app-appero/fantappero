@@ -214,9 +214,7 @@ def test_remove_member_lowers_participant_count_to_remaining(
         )
         db_session.add(user)
         db_session.flush()
-        db_session.add(
-            UserProfile(user_id=user.id, display_name=f"Sync Member {index}")
-        )
+        db_session.add(UserProfile(user_id=user.id, display_name=f"Sync Member {index}"))
         member_ids.append(user.id)
     db_session.commit()
     for member_id in member_ids:
@@ -237,9 +235,7 @@ def test_remove_member_lowers_participant_count_to_remaining(
     assert rules is not None
     assert rules.participant_count == 4
     membership_count = db_session.scalar(
-        select(func.count(LeagueMembership.id)).where(
-            LeagueMembership.league_id == UUID(league_id)
-        )
+        select(func.count(LeagueMembership.id)).where(LeagueMembership.league_id == UUID(league_id))
     )
     assert membership_count == 4
     assert (

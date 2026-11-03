@@ -437,9 +437,7 @@ def test_decision_log_records_scores_and_exclusions(
     assert by_id[str(injured.id)]["excludedLabel"] == "Infortunato"
 
     starters = {
-        str(p.athlete_id)
-        for p in submission.players
-        if p.slot_kind == LineupSlotKind.STARTER
+        str(p.athlete_id) for p in submission.players if p.slot_kind == LineupSlotKind.STARTER
     }
     assert str(injured.id) not in starters
     # Come nel percorso umano, tutta la rosa rimane registrata: l'infortunato

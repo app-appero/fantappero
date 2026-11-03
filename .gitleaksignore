@@ -1,0 +1,11 @@
+# Falsi positivi / rischio già accettato (storia git). Fingerprint prodotti da gitleaks.
+# google-services.json: chiave client Firebase, pubblica per progettazione (finisce nell'APK).
+b412404e3210f0213f4391c97ad53c2995395f47:apps/mobile/google-services.json:generic-api-key:18
+b585b143836b51036370a6cdba283bd04dd75972:google-services.json:generic-api-key:18
+# Valori d'esempio in .env.example / documentazione / test di redazione.
+c6be3a89fa2c1f239c2893eddf2ef30eee0272a9:docs/operations/beta_readiness/ep12-04_security_review.md:generic-api-key:178
+bef68759e72a3dd61ec9ae5b7a1cdc715989ce06:docs/operations/beta_readiness/ep12-04_security_review.md:generic-api-key:169
+ce09c5e0c6d9d904f2e64362b8178d6c07e1dc90:infra/local/.env.example:generic-api-key:4
+b343888b6aa9db45deed547bfba097875b3b13e5:infra/local/.env.example:generic-api-key:4
+74bfe04fb3f83ec10cf4e4cd0f0f5ce8db92c39d:backend/tests/unit/config/test_redaction.py:generic-api-key:30
+74bfe04fb3f83ec10cf4e4cd0f0f5ce8db92c39d:backend/tests/unit/config/test_redaction.py:generic-api-key:40

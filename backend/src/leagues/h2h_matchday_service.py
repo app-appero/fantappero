@@ -126,12 +126,9 @@ def get_h2h_calendar(
                 if slot.away_membership_id is not None
                 else None
             )
-            matchup_live = (
-                fantasy_round is not None
-                and (
-                    (home_team is not None and home_team.id in live_team_ids)
-                    or (away_team is not None and away_team.id in live_team_ids)
-                )
+            matchup_live = fantasy_round is not None and (
+                (home_team is not None and home_team.id in live_team_ids)
+                or (away_team is not None and away_team.id in live_team_ids)
             )
             any_live = any_live or matchup_live
             matchups.append(
@@ -205,9 +202,7 @@ def get_h2h_matchup_detail(
         .where(
             LeagueCalendarSlot.id == slot_id,
             LeagueCalendar.league_id == league_id,
-            LeagueCalendar.status.in_(
-                [LeagueCalendarStatus.CONFIRMED, LeagueCalendarStatus.DRAFT]
-            ),
+            LeagueCalendar.status.in_([LeagueCalendarStatus.CONFIRMED, LeagueCalendarStatus.DRAFT]),
         )
         .options(
             selectinload(LeagueCalendarSlot.home_membership)
@@ -243,9 +238,7 @@ def get_h2h_matchup_detail(
         fantasy_round_id = str(fantasy_round.id)
         european_status = _effective_turn_status(fantasy_round)
         homologation = fantasy_round.homologation_status.value
-        relevant_team_ids = {
-            team.id for team in (home_team, away_team) if team is not None
-        }
+        relevant_team_ids = {team.id for team in (home_team, away_team) if team is not None}
         live = bool(_live_team_ids_for_round(session, fantasy_round) & relevant_team_ids)
 
     scores_by_athlete: dict[UUID, RoundAthleteScore] = {}
@@ -397,9 +390,9 @@ def _live_team_ids_for_round(session: Session, fantasy_round: FantasyRound) -> s
             )
         ).all()
     )
-    season_club_pairs = {
-        (row.sport_season_id, row.home_club_id) for row in fixture_rows
-    } | {(row.sport_season_id, row.away_club_id) for row in fixture_rows}
+    season_club_pairs = {(row.sport_season_id, row.home_club_id) for row in fixture_rows} | {
+        (row.sport_season_id, row.away_club_id) for row in fixture_rows
+    }
     live_athlete_ids.update(
         session.scalars(
             select(SquadMembership.athlete_id).where(

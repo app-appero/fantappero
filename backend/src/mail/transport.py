@@ -47,7 +47,9 @@ def send_email(
 ) -> None:
     transport = settings.resolved_mail_transport()
     api_key = settings.resolved_resend_api_key()
-    used = _deliver(settings, transport=transport, api_key=api_key, to_email=to_email, message=message)
+    used = _deliver(
+        settings, transport=transport, api_key=api_key, to_email=to_email, message=message
+    )
     # Solo il canale usato: mai destinatario, oggetto o credenziali nei log.
     host = settings.smtp_host if used == "smtp" else None
     logger.info(
@@ -118,7 +120,12 @@ def validate_smtp_settings(settings: MailSettingsMixin) -> None:
         )
     password = settings.resolved_smtp_password()
     host = (settings.smtp_host or "").strip().lower()
-    if settings.smtp_user and password and not (use_tls or use_ssl) and host not in _LOCAL_SMTP_HOSTS:
+    if (
+        settings.smtp_user
+        and password
+        and not (use_tls or use_ssl)
+        and host not in _LOCAL_SMTP_HOSTS
+    ):
         raise MailConfigError(
             "Credenziali SMTP su una connessione non cifrata: imposta SMTP_USE_TLS=true "
             "(porta 587) oppure SMTP_USE_SSL=true (porta 465)."
@@ -134,7 +141,7 @@ def build_mime_message(
     msg = MIMEMultipart("alternative")
     msg["Subject"] = message.subject
     # formataddr codifica solo il nome visualizzato (es. «FantApperò»): con una stringa
-    # unica il nome accentato farebbe codificare anche l'indirizzo e il From resterebbe senza mittente.
+    # unica il nome accentato farebbe codificare anche l'indirizzo e il From resterebbe senza mittente.  # noqa: E501
     msg["From"] = formataddr((settings.mail_from_name, settings.mail_from), charset="utf-8")
     msg["To"] = to_email
     # Senza Date e Message-ID molti filtri antispam scartano o declassano il messaggio.
@@ -175,7 +182,7 @@ def _send_via_smtp(
         with client as smtp:
             if settings.resolved_flag("smtp_use_tls"):
                 stage = "starttls"
-                # Contesto esplicito: senza, starttls() non verificherebbe il certificato del server.
+                # Contesto esplicito: senza, starttls() non verificherebbe il certificato del server.  # noqa: E501
                 smtp.starttls(context=ssl.create_default_context())
             if settings.smtp_user and password:
                 stage = "login"

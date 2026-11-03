@@ -709,8 +709,7 @@ def map_player_availabilities(
         fixture = row.get("fixture") if isinstance(row.get("fixture"), dict) else {}
         fixture_provider_id = _as_optional_int(fixture.get("id"))
         provider_key = (
-            f"{athlete_provider_id}:{fixture_provider_id}:{competition_provider_id}:"
-            f"{season_year}"
+            f"{athlete_provider_id}:{fixture_provider_id}:{competition_provider_id}:{season_year}"
         )
         out.append(
             MappedPlayerAvailability(

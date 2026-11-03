@@ -49,9 +49,7 @@ class ProfileService:
         if payload.nickname is not None:
             nickname = validate_profile_nickname(payload.nickname)
             if nickname is not None and self._nickname_taken(nickname, profile.user_id):
-                raise ValidationAuthError(
-                    "Questo nickname è già in uso.", code="nickname_taken"
-                )
+                raise ValidationAuthError("Questo nickname è già in uso.", code="nickname_taken")
             profile.nickname = nickname
             changed = True
         if payload.language is not None:

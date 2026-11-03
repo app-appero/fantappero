@@ -59,7 +59,10 @@ def test_auto_uses_resend_when_the_key_is_set_even_if_smtp_is_configured():
 def test_smtp_transport_ignores_the_resend_key():
     settings = Settings(resend_api_key=SecretStr("re_key"), mail_transport="smtp")
     client = _fake_smtp()
-    with patch("mail.transport.httpx.post") as post, patch("mail.transport.smtplib.SMTP", return_value=client):
+    with (
+        patch("mail.transport.httpx.post") as post,
+        patch("mail.transport.smtplib.SMTP", return_value=client),
+    ):
         send_email(settings, to_email="a@example.com", message=MESSAGE)
     post.assert_not_called()
     client.sendmail.assert_called_once()
@@ -123,7 +126,7 @@ def test_fallback_needs_a_real_smtp_server():
         send_email(settings, to_email="other@example.com", message=MESSAGE)
 
 
-# --- TLS e credenziali ------------------------------------------------------------------------------
+# --- TLS e credenziali -----------------------------------------------------------------------
 
 
 def test_starttls_verifies_the_server_certificate_and_logs_in():
@@ -159,7 +162,10 @@ def test_tls_and_ssl_together_are_rejected():
 
 def test_credentials_are_never_sent_over_an_unencrypted_remote_connection():
     settings = Settings(smtp_use_tls=False, smtp_use_ssl=False)
-    with patch("mail.transport.smtplib.SMTP") as smtp, pytest.raises(MailConfigError, match="non cifrata"):
+    with (
+        patch("mail.transport.smtplib.SMTP") as smtp,
+        pytest.raises(MailConfigError, match="non cifrata"),
+    ):
         send_email(settings, to_email="a@example.com", message=MESSAGE)
     smtp.assert_not_called()
 
@@ -175,7 +181,7 @@ def test_plain_smtp_without_credentials_is_fine_for_local_mailpit():
     client.login.assert_not_called()
 
 
-# --- intestazioni ---------------------------------------------------------------------------------------
+# --- intestazioni ----------------------------------------------------------------------------
 
 
 def test_message_has_date_and_message_id_from_the_sender_domain():
@@ -186,7 +192,7 @@ def test_message_has_date_and_message_id_from_the_sender_domain():
 
 
 def test_accented_sender_name_keeps_the_address_a_real_mailbox():
-    """Con un nome accentato il From deve restare «nome + indirizzo», non un unico nome codificato."""
+    """Con un nome accentato il From resta «nome + indirizzo», non un solo nome codificato."""
     from email import message_from_string
     from email.header import decode_header, make_header
     from email.utils import parseaddr
@@ -198,7 +204,7 @@ def test_accented_sender_name_keeps_the_address_a_real_mailbox():
     assert str(make_header(decode_header(name))) == "FantApperò"
 
 
-# --- diagnosi ---------------------------------------------------------------------------------------------
+# --- diagnosi --------------------------------------------------------------------------------
 
 
 def test_diagnostics_reports_every_step_without_sending_mail():
@@ -209,7 +215,14 @@ def test_diagnostics_reports_every_step_without_sending_mail():
         patch("mail.diagnostics.smtplib.SMTP", return_value=client),
     ):
         steps = diagnostics.check_smtp(Settings())
-    assert [step.name for step in steps] == ["configurazione", "risoluzione DNS", "connessione", "cifratura", "login", "NOOP"]
+    assert [step.name for step in steps] == [
+        "configurazione",
+        "risoluzione DNS",
+        "connessione",
+        "cifratura",
+        "login",
+        "NOOP",
+    ]
     assert all(step.ok for step in steps)
     client.sendmail.assert_not_called()
     assert "s3cret" not in " ".join(step.detail for step in steps)
@@ -243,7 +256,7 @@ def test_diagnostics_stops_on_a_bad_configuration():
     assert [(s.name, s.ok) for s in steps] == [("configurazione", False)]
 
 
-# --- log leggibili nel worker (l'invio è asincrono: il pannello non vede gli errori) ------------------------
+# --- log leggibili nel worker (l'invio è asincrono: il pannello non vede gli errori) ---------
 
 SECRETS = ("segreto@example.com", "Oggetto riservato", "corpo riservato", "re_key", "s3cret")
 
@@ -303,10 +316,12 @@ def test_resend_send_logs_no_host(monkeypatch):
     settings = Settings(resend_api_key=SecretStr("re_key"))
     with patch("mail.transport.httpx.post", return_value=MagicMock(status_code=200)):
         send_email(settings, to_email="a@example.com", message=MESSAGE)
-    logger.info.assert_called_once_with("mail_sent via=resend", extra={"via": "resend", "host": None})
+    logger.info.assert_called_once_with(
+        "mail_sent via=resend", extra={"via": "resend", "host": None}
+    )
 
 
-# --- fase in cui fallisce l'SMTP -----------------------------------------------------------------------------
+# --- fase in cui fallisce l'SMTP -------------------------------------------------------------
 
 
 @pytest.mark.parametrize(
@@ -315,7 +330,9 @@ def test_resend_send_logs_no_host(monkeypatch):
 )
 def test_smtp_failures_carry_the_stage_where_they_happened(failing_call, stage):
     client = _fake_smtp()
-    getattr(client, failing_call).side_effect = smtplib.SMTPServerDisconnected("Connection unexpectedly closed")
+    getattr(client, failing_call).side_effect = smtplib.SMTPServerDisconnected(
+        "Connection unexpectedly closed"
+    )
     with (
         patch("mail.transport.smtplib.SMTP", return_value=client),
         pytest.raises(smtplib.SMTPServerDisconnected) as error,
@@ -341,13 +358,19 @@ def test_task_log_reports_stage_and_smtp_code_without_the_server_text(monkeypatc
     monkeypatch.setattr(tasks, "get_worker_settings", lambda: Settings(mail_transport="smtp"))
     monkeypatch.delenv("FANTAPPERO_ENV", raising=False)
     client = _fake_smtp()
-    client.login.side_effect = smtplib.SMTPAuthenticationError(535, b"5.7.8 bad credentials for segreto@example.com")
+    client.login.side_effect = smtplib.SMTPAuthenticationError(
+        535, b"5.7.8 bad credentials for segreto@example.com"
+    )
     with (
         patch("mail.transport.smtplib.SMTP", return_value=client),
         pytest.raises(smtplib.SMTPAuthenticationError),
     ):
         tasks.send_message_task(
-            to_email="segreto@example.com", subject="s", text_body="t", html_body="<p>t</p>", template="operator_email"
+            to_email="segreto@example.com",
+            subject="s",
+            text_body="t",
+            html_body="<p>t</p>",
+            template="operator_email",
         )
     message = logger.error.call_args.args[0]
     assert "error=SMTPAuthenticationError stage=login smtp_code=535" in message

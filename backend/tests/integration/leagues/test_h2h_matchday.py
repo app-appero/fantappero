@@ -72,9 +72,7 @@ def test_h2h_calendar_and_matchup_detail_mapping(db_session: Session) -> None:
     away_m = LeagueMembership(
         league_id=league.id, user_id=away_user.id, role=LeagueMemberRole.MEMBER
     )
-    bye_m = LeagueMembership(
-        league_id=league.id, user_id=bye_user.id, role=LeagueMemberRole.MEMBER
-    )
+    bye_m = LeagueMembership(league_id=league.id, user_id=bye_user.id, role=LeagueMemberRole.MEMBER)
     db_session.add_all([home_m, away_m, bye_m])
     db_session.flush()
 

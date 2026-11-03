@@ -405,4 +405,3 @@ def league_rosters_complete(session: Session, league: League) -> bool:
         if not report.is_valid_for_season_start:
             return False
     return True
-

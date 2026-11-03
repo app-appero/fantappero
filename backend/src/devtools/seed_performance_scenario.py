@@ -185,9 +185,7 @@ def _lineup_payload(session: Session, *, round_id, team_id) -> tuple[dict[str, o
     # EP12-01's direct opponent lineup needs only four useful substitutes for
     # scoring.  The public save endpoint is stricter and requires every
     # remaining roster athlete, exactly as the real UI sends it.
-    remaining_ids = [
-        athlete_id for athlete_id in roster_ids if str(athlete_id) not in starter_set
-    ]
+    remaining_ids = [athlete_id for athlete_id in roster_ids if str(athlete_id) not in starter_set]
     team = session.get(FantasyTeam, team_id)
     assert team is not None
     league = session.get(League, team.league_id)

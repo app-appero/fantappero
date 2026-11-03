@@ -191,9 +191,7 @@ def test_new_coach_shows_a_neutral_summary_not_a_zero(
         headers={"Authorization": f"Bearer {token}"},
         params={"search": "Coach nuovo"},
     )
-    row = next(
-        item for item in response.json()["items"] if item["userId"] == str(coach.id)
-    )
+    row = next(item for item in response.json()["items"] if item["userId"] == str(coach.id))
     assert row["concludedLeagues"] == 0
     assert row["bestPosition"] is None
     assert row["historySummary"] == "Nessuna lega conclusa"
@@ -264,9 +262,7 @@ def test_profile_is_forbidden_for_a_non_admin(
     assert response.status_code in (401, 403)
 
 
-def test_unknown_coach_is_not_found(
-    client: TestClient, competition_ids: list[str]
-) -> None:
+def test_unknown_coach_is_not_found(client: TestClient, competition_ids: list[str]) -> None:
     token, _ = _register_and_login(client, "dir-unknown@example.com")
     league_id = _create_league(client, token, competition_ids, "Lega Sconosciuto")
 

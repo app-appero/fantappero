@@ -27,11 +27,13 @@ def notifications_beat_schedule(
         }
     if not enabled:
         return schedule
-    schedule.update({
-        "notifications-lineup-reminders": {
-            "task": "notifications.send_lineup_reminders",
-            "schedule": float(interval_seconds),
-            "options": {"expires": float(interval_seconds)},
-        },
-    })
+    schedule.update(
+        {
+            "notifications-lineup-reminders": {
+                "task": "notifications.send_lineup_reminders",
+                "schedule": float(interval_seconds),
+                "options": {"expires": float(interval_seconds)},
+            },
+        }
+    )
     return schedule

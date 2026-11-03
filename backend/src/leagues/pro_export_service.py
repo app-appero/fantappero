@@ -15,11 +15,11 @@ from uuid import UUID
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from fantasy_teams.models import FantasyTeam
 from leagues.models.league_audit_event import LeagueAuditEvent
 from leagues.pro_export_schemas import LeagueProExportResponse
 from leagues.schemas import LeagueStandingResponse
 from leagues.standings_service import list_league_standings
-from fantasy_teams.models import FantasyTeam
 
 
 def build_league_export(session: Session, *, league_id: UUID) -> LeagueProExportResponse:

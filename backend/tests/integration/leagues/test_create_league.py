@@ -276,7 +276,7 @@ def test_create_league_blocked_when_second_leg_started(
 ) -> None:
     """TASK 9: girone di ritorno già iniziato → creazione bloccata con errore italiano.
 
-    ``season_year`` dedicato (v. nota in ``test_create_league_allowed_when_second_leg_not_started``).
+    ``season_year`` dedicato (v. nota in il test «second_leg_not_started»).
     """
     competition_id = UUID(competition_ids[0])
     _seed_competition_rounds(
@@ -312,7 +312,7 @@ def test_create_league_blocked_when_one_of_several_competitions_started_second_l
 ) -> None:
     """TASK 9: selezione mista (una bloccante, le altre senza dati) → bloccata interamente.
 
-    ``season_year`` dedicato (v. nota in ``test_create_league_allowed_when_second_leg_not_started``).
+    ``season_year`` dedicato (v. nota in il test «second_leg_not_started»).
     """
     blocked_competition_id = UUID(competition_ids[0])
     _seed_competition_rounds(
@@ -346,7 +346,7 @@ def test_available_competitions_marks_second_leg_started_as_not_selectable(
 ) -> None:
     """TASK 9: l'elenco espone selectable/secondLegStarted per disabilitare in anticipo.
 
-    ``season_year`` dedicato (v. nota in ``test_create_league_allowed_when_second_leg_not_started``).
+    ``season_year`` dedicato (v. nota in il test «second_leg_not_started»).
     """
     blocked_id = UUID(competition_ids[0])
     allowed_id = competition_ids[1]

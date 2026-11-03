@@ -408,7 +408,9 @@ def test_apply_best_lineup_requires_validated_roster(
     competition_ids: list[str],
 ) -> None:
     token, _ = _register_and_login(client, "apply.best.unvalidated@example.com")
-    league_id = _create_league(client, token, competition_ids, "Lega Applica Migliore Rosa Incompleta")
+    league_id = _create_league(
+        client, token, competition_ids, "Lega Applica Migliore Rosa Incompleta"
+    )
     fantasy_round, _home_club_id = _create_round(
         db_session,
         league_id,
@@ -432,7 +434,9 @@ def test_apply_best_lineup_rejects_a_skipped_turn(
     competition_ids: list[str],
 ) -> None:
     token, _ = _register_and_login(client, "apply.best.skipped@example.com")
-    league_id = _create_league(client, token, competition_ids, "Lega Applica Migliore Turno Skippato")
+    league_id = _create_league(
+        client, token, competition_ids, "Lega Applica Migliore Turno Skippato"
+    )
     fantasy_round, home_club_id = _create_round(
         db_session,
         league_id,
@@ -459,7 +463,9 @@ def test_apply_best_lineup_is_deterministic_across_calls(
     competition_ids: list[str],
 ) -> None:
     token, _ = _register_and_login(client, "apply.best.deterministic@example.com")
-    league_id = _create_league(client, token, competition_ids, "Lega Applica Migliore Deterministica")
+    league_id = _create_league(
+        client, token, competition_ids, "Lega Applica Migliore Deterministica"
+    )
     fantasy_round, home_club_id = _create_round(
         db_session,
         league_id,
@@ -517,7 +523,9 @@ def test_apply_best_lineup_keeps_a_locked_injured_starter_in_place(
     anche se nel frattempo risulta infortunato — l'euristica libera lo
     escluderebbe sempre (`is_eligible`), il vincolo di lock lo impedisce."""
     token, user_id = _register_and_login(client, "apply.best.locked-starter@example.com")
-    league_id = _create_league(client, token, competition_ids, "Lega Applica Migliore Titolare Bloccato")
+    league_id = _create_league(
+        client, token, competition_ids, "Lega Applica Migliore Titolare Bloccato"
+    )
     fantasy_round, early_club_id, late_club_id = _create_round_with_two_fixtures(
         db_session, league_id, id_offset=2_550_000, competition_ids=competition_ids
     )
@@ -560,7 +568,9 @@ def test_apply_best_lineup_keeps_a_locked_injured_starter_in_place(
     # portiere in testa alla lista — altrimenti il client (che legge
     # `starterAthleteIds` per posizione, non per ruolo) lo scambia per un
     # portiere e duplica un altro titolare nello slot che gli spetterebbe.
-    role_by_id = {str(athlete.id): role for role, athletes in grouped.items() for athlete in athletes}
+    role_by_id = {
+        str(athlete.id): role for role, athletes in grouped.items() for athlete in athletes
+    }
     starter_roles = [role_by_id[athlete_id] for athlete_id in draft["starterAthleteIds"]]
     assert starter_roles == ["P"] + ["D"] * 4 + ["C"] * 3 + ["A"] * 3
     assert len(set(draft["starterAthleteIds"])) == 11
@@ -575,7 +585,9 @@ def test_apply_best_lineup_never_promotes_a_locked_bench_player(
     panchina — non può essere promosso titolare dall'euristica. L'ordine di
     panchina già confermato, per chi resta in panchina, non viene toccato."""
     token, user_id = _register_and_login(client, "apply.best.locked-bench@example.com")
-    league_id = _create_league(client, token, competition_ids, "Lega Applica Migliore Panchina Bloccata")
+    league_id = _create_league(
+        client, token, competition_ids, "Lega Applica Migliore Panchina Bloccata"
+    )
     fantasy_round, early_club_id, late_club_id = _create_round_with_two_fixtures(
         db_session, league_id, id_offset=2_560_000, competition_ids=competition_ids
     )

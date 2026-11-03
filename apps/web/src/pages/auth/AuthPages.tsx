@@ -464,6 +464,9 @@ export function AuthLoginPage() {
           // Solo Google: l'accesso crea l'account da solo, quindi nessun testo né link «Registrati».
           <div data-testid="login-google-only">
             {error ? <UiStatePanel state="error" title="Accesso non riuscito" message={error} testId="auth-login-error" /> : null}
+            <p className="fa-auth-layout__register" data-testid="login-privacy-link">
+              Accedendo accetti l'<Link to="/privacy">informativa privacy</Link>.
+            </p>
           </div>
         ) : (
         <AuthFormLayout

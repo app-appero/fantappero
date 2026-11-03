@@ -31,6 +31,8 @@ def is_unplayed_fixture_status(status_short: str | None) -> bool:
     da giocare e non va tolta in blocco.
     """
     return (status_short or "").strip().upper() in INACTIVE_FIXTURE_STATUSES
+
+
 STANDARD_MIN_FIXTURES = 25
 MIN_FIXTURES_PER_ROUND = 10
 MAX_FIXTURES_PER_ROUND = 40
@@ -188,7 +190,7 @@ def aggregate_turn_status(
     return "scheduled"
 
 
-def resolve_default_turn(entries: Sequence[tuple[_T, str]]) -> _T | None:
+def resolve_default_turn(entries: Sequence[tuple[_T, str]]) -> _T | None:  # noqa: UP047
     """Turno di default da mostrare: il primo non ancora concluso, o l'ultimo.
 
     Specchio Python di `resolveDefaultEuropeanTurn` in
@@ -313,7 +315,9 @@ def reconcile_fixture_kickoff_lock(
                 )
                 if has_elapsed and candidate is not None
             ]
-            latched = min(elapsed_candidates) if elapsed_candidates else (current or observed or now_utc)
+            latched = (
+                min(elapsed_candidates) if elapsed_candidates else (current or observed or now_utc)
+            )
             just_latched = True
 
     new_observed = current if current is not None else observed
@@ -486,9 +490,7 @@ def full_season_turn_specs(
         )
     tz = resolve_zone(tz_name)
     range_start = ensure_utc(datetime.combine(season_start, time.min, tzinfo=tz))
-    range_end = ensure_utc(
-        datetime.combine(season_end + timedelta(days=1), time.min, tzinfo=tz)
-    )
+    range_end = ensure_utc(datetime.combine(season_end + timedelta(days=1), time.min, tzinfo=tz))
     return _turn_specs_between(
         season_start - timedelta(days=4),
         season_end + timedelta(days=4),

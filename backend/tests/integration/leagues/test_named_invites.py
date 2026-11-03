@@ -197,7 +197,9 @@ def test_directory_pagination_filters_and_excludes_members(
         params={"search": "dir.unverified@example.com"},
     )
     assert by_email.status_code == 200
-    matched = [row for row in by_email.json()["items"] if row["email"] == "dir.unverified@example.com"]
+    matched = [
+        row for row in by_email.json()["items"] if row["email"] == "dir.unverified@example.com"
+    ]
     assert len(matched) == 1
     assert matched[0]["emailVerified"] is False
     assert matched[0]["inLeague"] is False

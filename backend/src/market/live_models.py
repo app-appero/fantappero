@@ -197,4 +197,3 @@ class MarketLiveTurnOrderEntry(Base, UUIDPrimaryKeyMixin, TimestampMixin):
 
     session: Mapped[MarketSession] = relationship()
     fantasy_team: Mapped[FantasyTeam] = relationship()
-

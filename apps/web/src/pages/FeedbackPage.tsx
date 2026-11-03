@@ -23,6 +23,7 @@ import {
 } from "@fantappero/ui";
 import { type ChangeEvent, type FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import { fetchMyFeedback, sendFeedback } from "../api/feedback";
+import { Link } from "../router/simpleRouter";
 import { getApiErrorMessage, useAuth } from "../auth/AuthContext";
 import { loadStoredSession } from "../auth/sessionStorage";
 import { readLastAppPath } from "../feedback/lastPage";
@@ -228,7 +229,8 @@ export function FeedbackPage() {
     >
       <p className="fa-feedback__intro">
         Hai trovato un bug o hai un'idea? Raccontacelo: ci aiuta a sistemare l'app. Se puoi, aggiungi
-        uno screenshot o un breve video che mostra il problema.
+        uno screenshot o un breve video che mostra il problema. Come trattiamo testo e allegati lo
+        trovi nell'<Link to="/privacy" data-testid="feedback-privacy-link">informativa privacy</Link>.
       </p>
 
       <form className="fa-feedback" onSubmit={(event) => void onSubmit(event)} data-testid="feedback-form">

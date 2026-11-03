@@ -507,12 +507,8 @@ def test_sync_falls_back_to_missing_key_when_oracle_down_and_no_fotmob_client(
         home_club=SimpleNamespace(provider_id=10, name="Home"),
         away_club=SimpleNamespace(provider_id=20, name="Away"),
     )
-    monkeypatch.setattr(
-        "sports_data.predicted.sync._candidate_fixtures", lambda *a, **k: [fixture]
-    )
-    monkeypatch.setattr(
-        "sports_data.predicted.sync._has_recent_snapshot", lambda *a, **k: False
-    )
+    monkeypatch.setattr("sports_data.predicted.sync._candidate_fixtures", lambda *a, **k: [fixture])
+    monkeypatch.setattr("sports_data.predicted.sync._has_recent_snapshot", lambda *a, **k: False)
     oracle = MagicMock()
     oracle.lineups.side_effect = SoccerOracleError(503, "down")
     session = MagicMock()

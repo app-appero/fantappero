@@ -200,9 +200,7 @@ def test_new_assignment_rejects_athlete_outside_competitions(
         db_session, provider_id=880004, name="Giocatore Non Assegnabile", club_id=club.id
     )
 
-    rosa = client.get(
-        f"/leagues/{league_id}/rosa", headers={"Authorization": f"Bearer {token}"}
-    )
+    rosa = client.get(f"/leagues/{league_id}/rosa", headers={"Authorization": f"Bearer {token}"})
     assert rosa.status_code == 200
     team_id = rosa.json()["id"]
 

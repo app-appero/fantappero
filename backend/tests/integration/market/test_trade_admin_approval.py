@@ -285,9 +285,7 @@ def test_max_active_trade_proposals_per_team_is_enforced(
         f"/leagues/{league_id}/rosa", headers={"Authorization": f"Bearer {member_token}"}
     ).json()["id"]
 
-    rules = _set_league_rules(
-        client, league_id, admin_token, max_active_trade_proposals_per_team=2
-    )
+    rules = _set_league_rules(client, league_id, admin_token, max_active_trade_proposals_per_team=2)
     assert rules["maxActiveTradeProposalsPerTeam"] == 2
 
     for _ in range(2):
@@ -382,8 +380,6 @@ def test_concurrent_admin_approve_and_reject_only_one_transition_wins(
     assert statuses.count(400) == 3
 
     db_session.expire_all()
-    row = db_session.scalar(
-        select(TradeProposal).where(TradeProposal.id == UUID(proposal["id"]))
-    )
+    row = db_session.scalar(select(TradeProposal).where(TradeProposal.id == UUID(proposal["id"])))
     assert row is not None
     assert row.status.value in {"executed", "rejected_by_admin"}

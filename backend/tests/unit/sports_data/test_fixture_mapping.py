@@ -84,9 +84,7 @@ def test_map_match_events_idempotent_keys() -> None:
     assert [e.provider_event_key for e in first] == [e.provider_event_key for e in second]
     assert len({e.provider_event_key for e in first}) == len(first)
     goal = next(
-        e
-        for e in first
-        if e.event_detail == "Normal Goal" and e.athlete_provider_id == 21694
+        e for e in first if e.event_detail == "Normal Goal" and e.athlete_provider_id == 21694
     )
     assert goal.provider_event_key == event_provider_key(
         fixture_id=1035055,

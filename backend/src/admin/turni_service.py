@@ -90,9 +90,7 @@ def list_league_turn_status(session: Session) -> list[AdminLeagueTurnStatusRespo
                 current_round_id=str(current.id) if current else None,
                 current_round_number=current.number if current else None,
                 current_round_status=current.status.value if current else None,
-                homologation_status=(
-                    current.homologation_status.value if current else None
-                ),
+                homologation_status=(current.homologation_status.value if current else None),
                 calendar_updated_at=calendar_updated_by_league.get(league.id),
             )
         )

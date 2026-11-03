@@ -301,12 +301,8 @@ def test_auto_conclude_when_all_h2h_rounds_homologated(db_session: Session) -> N
     league = League(name="Lega Auto Conclude", season_year=2026, state=LeagueState.ACTIVE)
     db_session.add(league)
     db_session.flush()
-    home_m = LeagueMembership(
-        league_id=league.id, user_id=owner.id, role=LeagueMemberRole.OWNER
-    )
-    away_m = LeagueMembership(
-        league_id=league.id, user_id=member.id, role=LeagueMemberRole.MEMBER
-    )
+    home_m = LeagueMembership(league_id=league.id, user_id=owner.id, role=LeagueMemberRole.OWNER)
+    away_m = LeagueMembership(league_id=league.id, user_id=member.id, role=LeagueMemberRole.MEMBER)
     db_session.add_all([home_m, away_m])
     db_session.flush()
 

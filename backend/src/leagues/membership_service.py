@@ -51,8 +51,7 @@ class LeagueMembershipService:
     ) -> list[LeagueMemberResponse]:
         memberships = self._load_memberships(league_access.league.id)
         return [
-            self._to_response(membership, include_email=include_email)
-            for membership in memberships
+            self._to_response(membership, include_email=include_email) for membership in memberships
         ]
 
     def remove(

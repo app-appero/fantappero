@@ -23,7 +23,9 @@ def _settings(**values):
 
 
 def test_default_storage_lives_inside_the_persistent_avatar_volume():
-    assert _settings().resolved_feedback_storage_path() == str(Path("/data/avatars/feedback-private"))
+    assert _settings().resolved_feedback_storage_path() == str(
+        Path("/data/avatars/feedback-private")
+    )
 
 
 def test_explicit_storage_path_wins_and_blank_is_ignored():

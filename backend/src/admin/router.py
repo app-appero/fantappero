@@ -49,7 +49,9 @@ def get_admin_listone_service(
     return AdminListoneService(session, settings)
 
 
-def get_admin_transfers_service(session: Session = Depends(get_db_session)) -> AdminTransfersService:
+def get_admin_transfers_service(
+    session: Session = Depends(get_db_session),
+) -> AdminTransfersService:
     return AdminTransfersService(session)
 
 

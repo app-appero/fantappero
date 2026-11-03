@@ -96,7 +96,9 @@ def refresh_full_calendar_active_leagues_task() -> dict[str, int]:
 
 
 @celery_app.task(name="fantasy_turns.materialize_initial_for_league")
-def materialize_initial_fantasy_turns_task(*, league_id: str, actor_id: str | None) -> dict[str, int]:
+def materialize_initial_fantasy_turns_task(
+    *, league_id: str, actor_id: str | None
+) -> dict[str, int]:
     """Backfill stagionale post-creazione lega (EP13-P04).
 
     Agganciato alla fine di ``LeagueService.create_league`` invece che
@@ -115,7 +117,9 @@ def materialize_initial_fantasy_turns_task(*, league_id: str, actor_id: str | No
         enabled = api.fantasy_turns_auto_generate_enabled
 
     if not enabled:
-        logger.info("fantasy_turns_materialize_initial_skipped_disabled", extra={"league_id": league_id})
+        logger.info(
+            "fantasy_turns_materialize_initial_skipped_disabled", extra={"league_id": league_id}
+        )
         return {"created": 0, "upgraded": 0, "opened": 0, "removed": 0}
 
     from uuid import UUID

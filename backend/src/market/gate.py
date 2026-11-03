@@ -11,9 +11,7 @@ from sqlalchemy.orm.exc import UnmappedInstanceError
 from auth.exceptions import ValidationAuthError
 
 MARKET_CLOSED_CODE = "market_closed"
-MARKET_CLOSED_MESSAGE = (
-    "Il mercato è chiuso. Restano disponibili solo gli scambi tra squadre."
-)
+MARKET_CLOSED_MESSAGE = "Il mercato è chiuso. Restano disponibili solo gli scambi tra squadre."
 
 
 class LeagueMarketGate(Protocol):

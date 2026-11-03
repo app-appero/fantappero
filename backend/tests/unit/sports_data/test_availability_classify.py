@@ -93,9 +93,7 @@ def test_map_player_availabilities_parses_real_payload_shape() -> None:
         ],
     }
     envelope = parse_envelope(payload, endpoint="/injuries", http_status=200)
-    mapped = map_player_availabilities(
-        envelope, competition_provider_id=135, season_year=2026
-    )
+    mapped = map_player_availabilities(envelope, competition_provider_id=135, season_year=2026)
 
     assert len(mapped) == 1
     row = mapped[0]

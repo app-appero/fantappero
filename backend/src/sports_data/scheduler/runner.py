@@ -247,9 +247,7 @@ def run_poll_cycle(
             return result
 
         candidates = select_fixtures_for_window(session, window, now=clock, league_ids=league_ids)
-        candidates.sort(
-            key=lambda row: stale_result_rank(row.status_short, row.kickoff_at, clock)
-        )
+        candidates.sort(key=lambda row: stale_result_rank(row.status_short, row.kickoff_at, clock))
         fixture_cap = max_fixtures_for_mode(policy.max_fixtures_per_run, mode)
         if fixture_cap is not None:
             candidates = candidates[:fixture_cap]

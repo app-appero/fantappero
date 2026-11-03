@@ -48,9 +48,7 @@ def _run(method: str, path: str, status: int, monkeypatch: pytest.MonkeyPatch) -
         return None
 
     asyncio.run(
-        RealtimeMarketMiddleware(app)(
-            {"type": "http", "method": method, "path": path}, None, send
-        )
+        RealtimeMarketMiddleware(app)({"type": "http", "method": method, "path": path}, None, send)
     )
     return published
 

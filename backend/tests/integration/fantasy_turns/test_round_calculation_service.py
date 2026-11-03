@@ -7,6 +7,15 @@ from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 from tests.integration.database.helpers import create_engine_for_url
+from tests.integration.fantasy_turns.test_fantasy_turns import (
+    _promote_to_operator,
+    _register_and_login,
+)
+from tests.integration.leagues.test_scoring_service import (
+    _build_two_team_round,
+    _seed_catalog,
+    _sync_match,
+)
 
 from database.enums import FantasyRoundHomologationStatus, LineupAutoResolutionSource
 from database.session import create_session_factory
@@ -17,15 +26,6 @@ from fantasy_turns.models import FantasyRound
 from fantasy_turns.round_calculation_service import calculate_league_round
 from leagues.models.league_calendar import LeagueCalendar, LeagueCalendarSlot
 from sports_data.fixtures.models import Fixture
-from tests.integration.fantasy_turns.test_fantasy_turns import (
-    _promote_to_operator,
-    _register_and_login,
-)
-from tests.integration.leagues.test_scoring_service import (
-    _build_two_team_round,
-    _seed_catalog,
-    _sync_match,
-)
 
 
 @pytest.fixture()

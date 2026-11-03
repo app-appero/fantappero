@@ -8,7 +8,6 @@ from auth.models.user import User
 from auth.models.user_profile import UserProfile
 from billing.models import SubscriptionPayment, UserEntitlement
 from database.models.infrastructure import SystemFlag
-from feedback.models import FeedbackAttachment, FeedbackReport
 from fantasy_lineups.models import LineupDraft, LineupPlayer, LineupSubmission, TacticalMove
 from fantasy_ratings.models import PlayerMatchRating
 from fantasy_teams.models import (
@@ -22,6 +21,7 @@ from fantasy_teams.models import (
     RosterTurnSnapshotEntry,
 )
 from fantasy_turns.models import FantasyRound, FantasyRoundFixture
+from feedback.models import FeedbackAttachment, FeedbackReport
 from leagues.models.competition import Competition
 from leagues.models.league import League
 from leagues.models.league_audit_event import LeagueAuditEvent

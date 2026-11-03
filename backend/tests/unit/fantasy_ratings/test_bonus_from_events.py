@@ -44,7 +44,9 @@ def _card(detail: str, **kwargs):
 
 def _run(stats_json: dict, events: list, *, role: str = "A"):
     stat = SimpleNamespace(stats_json=stats_json, athlete_provider_id=PLAYER, club_id=None)
-    fixture = SimpleNamespace(home_club_id=None, away_club_id=None, home_goals=None, away_goals=None)
+    fixture = SimpleNamespace(
+        home_club_id=None, away_club_id=None, home_goals=None, away_goals=None
+    )
     data = bonus_input_from_stat(
         fixture=fixture,
         stat=stat,
@@ -140,7 +142,9 @@ def test_second_yellow_event_counts_as_expulsion():
 
 
 def _timeline(detail: str, *, pid: int = PLAYER, related: int | None = None):
-    return _event(None, pid=pid, status="timeline", event_type="Goal", detail=detail, related=related)
+    return _event(
+        None, pid=pid, status="timeline", event_type="Goal", detail=detail, related=related
+    )
 
 
 def test_timeline_missed_penalty_gives_malus_without_normalized_row():
@@ -151,7 +155,10 @@ def test_timeline_missed_penalty_gives_malus_without_normalized_row():
 
 
 def test_timeline_and_normalized_missed_penalty_are_not_summed():
-    events = [_timeline("Missed Penalty"), _event(ScoringEventKind.PENALTY_MISSED, detail="Missed Penalty")]
+    events = [
+        _timeline("Missed Penalty"),
+        _event(ScoringEventKind.PENALTY_MISSED, detail="Missed Penalty"),
+    ]
     data, _ = _run({"penalty": {"missed": 1}}, events)
     assert data.penalty_missed == 1
 
@@ -176,9 +183,15 @@ def test_timeline_var_cancelled_goal_and_own_goal_do_not_count_as_goal():
 
 def _run_for(pid: int, events: list):
     stat = SimpleNamespace(stats_json={}, athlete_provider_id=pid, club_id=None)
-    fixture = SimpleNamespace(home_club_id=None, away_club_id=None, home_goals=None, away_goals=None)
+    fixture = SimpleNamespace(
+        home_club_id=None, away_club_id=None, home_goals=None, away_goals=None
+    )
     return bonus_input_from_stat(
-        fixture=fixture, stat=stat, role="A", own_goal_counts={}, event_counts=event_bonus_counts(events)
+        fixture=fixture,
+        stat=stat,
+        role="A",
+        own_goal_counts={},
+        event_counts=event_bonus_counts(events),
     )
 
 

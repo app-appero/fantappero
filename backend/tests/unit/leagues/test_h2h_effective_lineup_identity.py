@@ -35,7 +35,9 @@ def test_starter_with_no_vote_keeps_his_own_identity_and_his_own_score() -> None
     submission = LineupSubmission(module=FantasyModule.M433)
     submission.players = [
         _player(starter_out_id, slot_kind=LineupSlotKind.STARTER, role=FantasyRole.D, sort_order=1),
-        _player(other_starter_id, slot_kind=LineupSlotKind.STARTER, role=FantasyRole.D, sort_order=2),
+        _player(
+            other_starter_id, slot_kind=LineupSlotKind.STARTER, role=FantasyRole.D, sort_order=2
+        ),
         *[
             _player(bench_id, slot_kind=LineupSlotKind.BENCH, role=FantasyRole.D, sort_order=10 + i)
             for i, bench_id in enumerate(bench_ids)

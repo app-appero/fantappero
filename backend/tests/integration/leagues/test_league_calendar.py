@@ -11,6 +11,10 @@ from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 from tests.integration.database.helpers import create_engine_for_url
+from tests.integration.fantasy_turns.test_fantasy_turns import (
+    _seed_weekend_fixtures,
+    _set_min_fixtures,
+)
 
 from database.enums import LeagueAuditAction, LeagueCalendarStatus, LeagueState
 from database.session import create_session_factory
@@ -21,10 +25,6 @@ from leagues.models.league import League
 from leagues.models.league_audit_event import LeagueAuditEvent
 from leagues.models.league_calendar import LeagueCalendar
 from mail.capture import get_captured_emails
-from tests.integration.fantasy_turns.test_fantasy_turns import (
-    _seed_weekend_fixtures,
-    _set_min_fixtures,
-)
 
 
 def _register_and_login(client: TestClient, email: str) -> tuple[str, UUID]:
@@ -392,11 +392,13 @@ def test_generate_confirm_calendar_is_audited_and_clears_blocker(
     assert actions.count(LeagueAuditAction.LEAGUE_CALENDAR_CONFIRMED) == 1
     assert LeagueAuditAction.LEAGUE_STATE_CHANGED in actions
     state_audits = [
-        audit.details
-        for audit in audits
-        if audit.action == LeagueAuditAction.LEAGUE_STATE_CHANGED
+        audit.details for audit in audits if audit.action == LeagueAuditAction.LEAGUE_STATE_CHANGED
     ]
-    assert {"before": "configuring", "after": "active", "source": "auto_season_start"} in state_audits
+    assert {
+        "before": "configuring",
+        "after": "active",
+        "source": "auto_season_start",
+    } in state_audits
 
 
 def test_calendar_generation_requires_exact_participant_count(
@@ -511,12 +513,20 @@ def test_build_windows_excludes_windows_already_started_before_league_creation(
     before_creation = datetime(2026, 8, 15, 15, 0, tzinfo=UTC)
     after_creation = datetime(2026, 9, 5, 15, 0, tzinfo=UTC)
     _seed_weekend_fixtures(
-        db_session, competition_ids, count=10, kickoff=before_creation, id_offset=990_000,
+        db_session,
+        competition_ids,
+        count=10,
+        kickoff=before_creation,
+        id_offset=990_000,
         clubs_offset=770_000,
         league_id=league_id,
     )
     _seed_weekend_fixtures(
-        db_session, competition_ids, count=10, kickoff=after_creation, id_offset=991_000,
+        db_session,
+        competition_ids,
+        count=10,
+        kickoff=after_creation,
+        id_offset=991_000,
         clubs_offset=770_000,
         league_id=league_id,
     )
@@ -540,9 +550,7 @@ def test_build_windows_excludes_windows_already_started_before_league_creation(
         assert created.status_code == 201, created.text
 
     windows = LeagueCalendarService(db_session).build_windows(league)
-    eligible_bounds = {
-        (window.start_at, window.end_at) for window in windows if window.eligible
-    }
+    eligible_bounds = {(window.start_at, window.end_at) for window in windows if window.eligible}
 
     excluded_window = weekend_window(date(2026, 8, 15))
     included_window = weekend_window(date(2026, 9, 5))
@@ -572,7 +580,11 @@ def test_h2h_round_numbers_match_absolute_european_turn_numbers(
     # (come farebbe il backfill stagionale di Turni Europei).
     historical_kickoff = datetime(2026, 8, 15, 15, 0, tzinfo=UTC)
     _seed_weekend_fixtures(
-        db_session, competition_ids, count=10, kickoff=historical_kickoff, id_offset=992_000,
+        db_session,
+        competition_ids,
+        count=10,
+        kickoff=historical_kickoff,
+        id_offset=992_000,
         clubs_offset=770_000,
         league_id=league_id,
     )
@@ -597,7 +609,11 @@ def test_h2h_round_numbers_match_absolute_european_turn_numbers(
         anchor = date(2026, 8, 22) + timedelta(days=offset)
         kickoff = datetime(anchor.year, anchor.month, anchor.day, 15, 0, tzinfo=UTC)
         _seed_weekend_fixtures(
-            db_session, competition_ids, count=10, kickoff=kickoff, id_offset=id_offset,
+            db_session,
+            competition_ids,
+            count=10,
+            kickoff=kickoff,
+            id_offset=id_offset,
             clubs_offset=770_000,
             league_id=league_id,
         )
@@ -676,8 +692,11 @@ def test_a_window_that_is_not_a_valid_turn_produces_no_h2h_round(
     # riusata accumulerebbe le fixture di piu' test nella stessa finestra
     # reale, falsando la soglia.
     _seed_weekend_fixtures(
-        db_session, competition_ids, count=10,
-        kickoff=datetime(2026, 11, 7, 15, 0, tzinfo=UTC), id_offset=996_000,
+        db_session,
+        competition_ids,
+        count=10,
+        kickoff=datetime(2026, 11, 7, 15, 0, tzinfo=UTC),
+        id_offset=996_000,
         clubs_offset=770_000,
         league_id=league_id,
     )
@@ -700,8 +719,11 @@ def test_a_window_that_is_not_a_valid_turn_produces_no_h2h_round(
     # 11 giocatori proprio nei pochi club di questa finestra, cioe' copertura
     # piena — l'opposto di quello che il test vuole verificare.
     _seed_weekend_fixtures(
-        db_session, competition_ids, count=2,
-        kickoff=datetime(2026, 11, 14, 15, 0, tzinfo=UTC), id_offset=997_000,
+        db_session,
+        competition_ids,
+        count=2,
+        kickoff=datetime(2026, 11, 14, 15, 0, tzinfo=UTC),
+        id_offset=997_000,
         clubs_offset=770_000,
     )
     rejected = client.post(
@@ -714,7 +736,9 @@ def test_a_window_that_is_not_a_valid_turn_produces_no_h2h_round(
     for offset, id_offset in ((0, 998_000), (7, 999_000), (14, 999_500)):
         anchor = date(2026, 11, 21) + timedelta(days=offset)
         _seed_weekend_fixtures(
-            db_session, competition_ids, count=10,
+            db_session,
+            competition_ids,
+            count=10,
             kickoff=datetime(anchor.year, anchor.month, anchor.day, 15, 0, tzinfo=UTC),
             id_offset=id_offset,
             clubs_offset=770_000,

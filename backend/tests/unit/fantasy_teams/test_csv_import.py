@@ -27,11 +27,7 @@ def test_normalize_header_aliases() -> None:
 
 
 def test_parse_valid_csv() -> None:
-    data = (
-        b"squadra,provider_id,nome,crediti\n"
-        b"Romy,42,L. Martinez,10\n"
-        b"Romy,43,N. Barella,5\n"
-    )
+    data = b"squadra,provider_id,nome,crediti\nRomy,42,L. Martinez,10\nRomy,43,N. Barella,5\n"
     rows = parse_roster_csv(data)
     assert len(rows) == 2
     assert rows[0].squadra == "Romy"

@@ -163,7 +163,6 @@ def test_last_migration_applies_cleanly_to_a_populated_database(clean_db: str) -
     corrompere righe) quando la tabella contiene già dati — è esattamente il
     tipo di problema mai stato messo alla prova fino ad ora.
     """
-    from sqlalchemy.orm import Session as OrmSession
 
     from database.session import create_session_factory
     from devtools.seed_performance_scenario import seed

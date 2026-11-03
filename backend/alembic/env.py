@@ -43,6 +43,11 @@ if config.config_file_name is not None:
 target_metadata = Base.metadata
 
 
+_MIGRATION_ONLY_INDEXES = frozenset(
+    {"ix_notifications_dedup_key_prefix", "uq_user_profiles_nickname_lower"}
+)
+
+
 def _include_managed_object(
     object_: object,
     name: str | None,
@@ -52,7 +57,13 @@ def _include_managed_object(
 ) -> bool:
     """Ignore local smoke-test tables that are not application schema."""
     del object_, compare_to
-    return not (reflected and type_ == "table" and name == "_ep01_smoke")
+    if reflected and type_ == "table" and name == "_ep01_smoke":
+        return False
+    # Indici creati solo via migrazione (espressione / text_pattern_ops / parziale):
+    # non rappresentabili in modo stabile nei modelli, quindi esclusi dal confronto.
+    if reflected and type_ == "index" and name in _MIGRATION_ONLY_INDEXES:
+        return False
+    return True
 
 
 def _configure_url() -> None:

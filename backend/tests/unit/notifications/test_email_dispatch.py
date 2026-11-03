@@ -72,13 +72,9 @@ def test_dispatch_email_skips_by_default_routine_kill_switch(
     monkeypatch.setenv("FANTAPPERO_ENV", "test")
     monkeypatch.setattr("mail.tasks.send_message_task", _FakeTask())
     fake_settings = SimpleNamespace(notifications_routine_email_enabled=False)
-    monkeypatch.setattr(
-        "notifications.email_dispatch.get_api_settings", lambda: fake_settings
-    )
+    monkeypatch.setattr("notifications.email_dispatch.get_api_settings", lambda: fake_settings)
 
-    dispatch_notification_email(
-        notification=_notification(), user=_user(), profile=_profile()
-    )
+    dispatch_notification_email(notification=_notification(), user=_user(), profile=_profile())
     assert sent == []
 
 
@@ -94,9 +90,7 @@ def test_dispatch_email_enqueues_when_kill_switch_enabled(
     monkeypatch.setenv("FANTAPPERO_ENV", "test")
     monkeypatch.setattr("mail.tasks.send_message_task", _FakeTask())
     fake_settings = SimpleNamespace(notifications_routine_email_enabled=True)
-    monkeypatch.setattr(
-        "notifications.email_dispatch.get_api_settings", lambda: fake_settings
-    )
+    monkeypatch.setattr("notifications.email_dispatch.get_api_settings", lambda: fake_settings)
     user = _user()
     notification = _notification()
 
@@ -120,14 +114,8 @@ def test_dispatch_email_respects_quiet_hours_when_kill_switch_enabled(
     monkeypatch.setenv("FANTAPPERO_ENV", "test")
     monkeypatch.setattr("mail.tasks.send_message_task", _FakeTask())
     fake_settings = SimpleNamespace(notifications_routine_email_enabled=True)
-    monkeypatch.setattr(
-        "notifications.email_dispatch.get_api_settings", lambda: fake_settings
-    )
-    monkeypatch.setattr(
-        "notifications.email_dispatch.is_within_quiet_hours", lambda **kwargs: True
-    )
+    monkeypatch.setattr("notifications.email_dispatch.get_api_settings", lambda: fake_settings)
+    monkeypatch.setattr("notifications.email_dispatch.is_within_quiet_hours", lambda **kwargs: True)
 
-    dispatch_notification_email(
-        notification=_notification(), user=_user(), profile=_profile()
-    )
+    dispatch_notification_email(notification=_notification(), user=_user(), profile=_profile())
     assert sent == []

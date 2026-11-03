@@ -22,7 +22,7 @@ from mail.templates import EmailMessage
 from mail.transport import MailConfigError, send_email, validate_smtp_settings
 
 RAILWAY_HINT = (
-    "Su Railway l'SMTP in uscita è bloccato sui piani Free, Trial e Hobby e consentito dal Pro in su: "
+    "Su Railway l'SMTP in uscita è bloccato sui piani Free, Trial e Hobby e consentito dal Pro in su: "  # noqa: E501
     "dopo l'upgrade rifai il deploy del servizio. Se sei già sul Pro, controlla che il provider "
     "SMTP non blocchi gli IP di Railway."
 )
@@ -36,9 +36,9 @@ class CheckStep:
 
 
 def _blocked_hint(exc: BaseException) -> str:
-    if isinstance(exc, (TimeoutError, socket.timeout, ConnectionRefusedError, OSError)) and not isinstance(
-        exc, ssl.SSLError
-    ):
+    if isinstance(  # noqa: UP038
+        exc, (TimeoutError, socket.timeout, ConnectionRefusedError, OSError)
+    ) and not isinstance(exc, ssl.SSLError):
         return f" {RAILWAY_HINT}"
     return ""
 
@@ -124,9 +124,11 @@ def main(argv: list[str] | None = None) -> int:
     from config.settings.loader import get_worker_settings
 
     settings = get_worker_settings()
-    print(f"Trasporto: {settings.resolved_mail_transport()} · fallback SMTP: "
-          f"{'sì' if settings.resolved_flag('mail_fallback_to_smtp') else 'no'} · "
-          f"Resend: {'configurato' if settings.resolved_resend_api_key() else 'non configurato'}")
+    print(
+        f"Trasporto: {settings.resolved_mail_transport()} · fallback SMTP: "
+        f"{'sì' if settings.resolved_flag('mail_fallback_to_smtp') else 'no'} · "
+        f"Resend: {'configurato' if settings.resolved_resend_api_key() else 'non configurato'}"
+    )
     failed = False
     for step in check_smtp(settings):
         print(f"[{'OK' if step.ok else 'ERRORE'}] {step.name}: {step.detail}")

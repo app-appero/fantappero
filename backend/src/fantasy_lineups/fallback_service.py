@@ -32,7 +32,12 @@ from database.enums import (
     LineupSlotKind,
 )
 from fantasy_lineups.models import LineupDraft, LineupPlayer, LineupSubmission
-from fantasy_lineups.rules import LineupPlayerRef, copy_previous_lineup, evaluate_lineup, parse_module
+from fantasy_lineups.rules import (
+    LineupPlayerRef,
+    copy_previous_lineup,
+    evaluate_lineup,
+    parse_module,
+)
 from fantasy_teams.composition_service import resolve_effective_athlete_roles
 from fantasy_teams.models import FantasyTeam
 from fantasy_turns.models import FantasyRound
@@ -59,9 +64,7 @@ class LineupFallbackResult:
 
     @property
     def total_resolved(self) -> int:
-        return (
-            self.resolved_from_draft + self.resolved_from_previous_round + self.resolved_as_zero
-        )
+        return self.resolved_from_draft + self.resolved_from_previous_round + self.resolved_as_zero
 
 
 def ensure_lineup_submissions_for_round(

@@ -192,7 +192,9 @@ def hints_for_fixtures(
             for athlete_id in inferred_ids & wanted:
                 found.setdefault(
                     athlete_id,
-                    AthleteProbable(hint="bench", note="Possibile panchina (dedotta)", blocked=False),
+                    AthleteProbable(
+                        hint="bench", note="Possibile panchina (dedotta)", blocked=False
+                    ),
                 )
     return found
 
@@ -243,9 +245,7 @@ def _side(
     club_id: UUID | None,
 ) -> PredictedViewSide | None:
     rows = [
-        player
-        for player in snapshot.players
-        if player.side == side and not player.is_unavailable
+        player for player in snapshot.players if player.side == side and not player.is_unavailable
     ]
     if not rows and not formation:
         return None
@@ -287,9 +287,7 @@ def _side(
             inferred_roles = _athlete_roles(session, inferred_ids)
             names = dict(
                 session.execute(
-                    select(Athlete.id, Athlete.canonical_name).where(
-                        Athlete.id.in_(inferred_ids)
-                    )
+                    select(Athlete.id, Athlete.canonical_name).where(Athlete.id.in_(inferred_ids))
                 ).all()
             )
             inferred_players = sorted(

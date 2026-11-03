@@ -11,7 +11,6 @@ from database.enums import FantasyTurnKind
 from fantasy_turns.rules import EligibleFixtureRef
 from leagues.calendar_planning import (
     CALENDAR_ALGORITHM_VERSION,
-    UNUSED_WINDOW_REASON,
     WindowCandidate,
     assert_plan_invariants,
     balance_home_away,

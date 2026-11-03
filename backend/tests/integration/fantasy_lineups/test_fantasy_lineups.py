@@ -352,7 +352,10 @@ def test_roster_exposes_athlete_photo_url_when_available(
     )
     assert context.status_code == 200
     roster_by_id = {row["athleteId"]: row for row in context.json()["roster"]}
-    assert roster_by_id[str(photographed.id)]["photoUrl"] == "https://cdn.example.com/athletes/photo.jpg"
+    assert (
+        roster_by_id[str(photographed.id)]["photoUrl"]
+        == "https://cdn.example.com/athletes/photo.jpg"
+    )
 
 
 def test_roster_exposes_fantasy_score_for_a_concluded_fixture(
@@ -1424,9 +1427,7 @@ def test_athlete_kickoffs_for_update_locks_the_fixture_row_until_commit(
     assert saved.status_code == 200
 
     fixtures = _round_fixtures(db_session, fantasy_round.id)
-    bench_gk_fixture_id = next(
-        item.id for item in fixtures if item.home_club_id == clubs[0].id
-    )
+    bench_gk_fixture_id = next(item.id for item in fixtures if item.home_club_id == clubs[0].id)
 
     # Sessione "salvataggio": legge lo stato della partita con for_update=True
     # e NON fa commit subito — imita il salvataggio rimasto a metà, con il

@@ -417,13 +417,9 @@ def test_next_unlocked_kickoff_applies_the_league_margin() -> None:
     kickoff = datetime(2026, 8, 15, 16, 0, tzinfo=UTC)
     # A 10' dal kickoff, con margine 15': è già considerato bloccato — non
     # è un candidato al "prossimo" lock, quindi resta None.
-    assert next_unlocked_kickoff(
-        [(kickoff, "NS", False)], now=now, margin_minutes=15
-    ) is None
+    assert next_unlocked_kickoff([(kickoff, "NS", False)], now=now, margin_minutes=15) is None
     # Stesso identico kickoff, senza margine: ancora sbloccato.
-    assert next_unlocked_kickoff(
-        [(kickoff, "NS", False)], now=now, margin_minutes=0
-    ) == kickoff
+    assert next_unlocked_kickoff([(kickoff, "NS", False)], now=now, margin_minutes=0) == kickoff
 
 
 def test_next_unlocked_kickoff_ignores_entries_without_a_kickoff() -> None:

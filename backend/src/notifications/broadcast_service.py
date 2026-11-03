@@ -292,8 +292,7 @@ def list_history(
 ) -> tuple[list[tuple[NotificationBroadcast, int, int]], int]:
     visible = NotificationBroadcast.status != "cancelled"
     total = int(
-        session.scalar(select(func.count()).select_from(NotificationBroadcast).where(visible))
-        or 0
+        session.scalar(select(func.count()).select_from(NotificationBroadcast).where(visible)) or 0
     )
     when = func.coalesce(NotificationBroadcast.sent_at, NotificationBroadcast.scheduled_at)
     rows = session.scalars(

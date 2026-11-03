@@ -117,8 +117,6 @@ def test_effective_trade_status_never_expires_without_a_deadline() -> None:
 
 def test_effective_trade_status_terminal_state_wins_even_before_deadline() -> None:
     now = datetime.now(UTC)
-    proposal = _FakeTradeProposal(
-        status=TradeStatus.CANCELLED, expires_at=now + timedelta(hours=1)
-    )
+    proposal = _FakeTradeProposal(status=TradeStatus.CANCELLED, expires_at=now + timedelta(hours=1))
     assert effective_trade_status(proposal, now=now) == TradeStatus.CANCELLED
     assert not is_trade_actionable(proposal, now=now)

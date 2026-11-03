@@ -5,7 +5,6 @@ from __future__ import annotations
 from types import SimpleNamespace
 
 import pytest
-
 from sqlalchemy.exc import ProgrammingError
 
 from auth.exceptions import ValidationAuthError

@@ -146,9 +146,7 @@ def blocks_selection(
 def grids_for_starters(players: list[ParsedPlayer]) -> dict[str, str]:
     """``riga:colonna`` con riga 1 = portiere, se le coordinate bastano a separare le linee."""
     placed = [
-        player
-        for player in players
-        if player.layout_x is not None and player.layout_y is not None
+        player for player in players if player.layout_x is not None and player.layout_y is not None
     ]
     if len(placed) != len(players) or len(placed) < 2:
         return {}

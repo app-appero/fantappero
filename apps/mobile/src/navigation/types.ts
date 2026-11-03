@@ -64,6 +64,7 @@ export type RootStackParamList = {
   ReceivedInvites: ReceivedInvitesParams | undefined;
   Notifications: undefined;
   Feedback: undefined;
+  Privacy: undefined;
   ManagerDirectory: undefined;
   CoachProfile: { userId: string; leagueId?: string };
   AdminPanel: undefined;

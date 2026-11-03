@@ -215,6 +215,17 @@ export function AuthScreen() {
           ) : null}
             </>
           ) : null}
+          <Pressable
+            accessibilityRole="link"
+            accessibilityLabel="Leggi l'informativa privacy"
+            onPress={() => navigation.navigate("Privacy")}
+            style={styles.centerLink}
+            testID="auth-privacy-link"
+          >
+            <Text style={styles.muted}>
+              Accedendo accetti l'<Text style={styles.linkStrong}>informativa privacy</Text>
+            </Text>
+          </Pressable>
           {showEmailLogin ? (
             <Pressable
               accessibilityRole="button"

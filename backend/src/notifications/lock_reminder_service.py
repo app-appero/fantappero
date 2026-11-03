@@ -101,9 +101,7 @@ class LineupLockReminderService:
                 if lock_instant > now + timedelta(minutes=window_minutes):
                     continue
 
-                player_count = sum(
-                    1 for ref in kickoffs.values() if ref.kickoff_at == next_lock
-                )
+                player_count = sum(1 for ref in kickoffs.values() if ref.kickoff_at == next_lock)
                 if player_count == 0:
                     continue
 
@@ -130,9 +128,7 @@ class LineupLockReminderService:
 
     def _lock_margin(self, league_id: UUID) -> int:
         margin = self._session.execute(
-            select(LeagueRules.lineup_lock_margin_minutes).where(
-                LeagueRules.league_id == league_id
-            )
+            select(LeagueRules.lineup_lock_margin_minutes).where(LeagueRules.league_id == league_id)
         ).scalar_one_or_none()
         return margin if margin is not None else DEFAULT_LINEUP_LOCK_MARGIN_MINUTES
 

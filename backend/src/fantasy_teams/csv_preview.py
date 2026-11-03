@@ -142,9 +142,7 @@ def build_preview_rows(
                 row.issues.append(
                     PreviewRowIssue(
                         code="duplicate_athlete_in_file",
-                        message=(
-                            f"Calciatore già presente alla riga {seen_athletes[athlete.id]}."
-                        ),
+                        message=(f"Calciatore già presente alla riga {seen_athletes[athlete.id]}."),
                         severity="error",
                     )
                 )
@@ -156,9 +154,7 @@ def build_preview_rows(
                 row.issues.append(
                     PreviewRowIssue(
                         code="athlete_already_owned",
-                        message=(
-                            f"Il calciatore appartiene già alla squadra «{owner.name}»."
-                        ),
+                        message=(f"Il calciatore appartiene già alla squadra «{owner.name}»."),
                         severity="error",
                     )
                 )
@@ -171,8 +167,10 @@ def build_preview_rows(
                     )
                 )
 
-        if team is not None and row.status != "ambiguous" and not any(
-            issue.severity == "error" for issue in row.issues
+        if (
+            team is not None
+            and row.status != "ambiguous"
+            and not any(issue.severity == "error" for issue in row.issues)
         ):
             available = claimed_slots.get(team.id, [])
             if not available:
@@ -447,9 +445,7 @@ def count_preview_issues(rows: list[PreviewRow]) -> tuple[int, int]:
         if row.status in {"error", "ambiguous"}
         or any(issue.severity == "error" for issue in row.issues)
     )
-    warnings = sum(
-        1 for row in rows for issue in row.issues if issue.severity == "warning"
-    )
+    warnings = sum(1 for row in rows for issue in row.issues if issue.severity == "warning")
     return errors, warnings
 
 

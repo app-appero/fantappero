@@ -336,9 +336,7 @@ def test_counter_proposal_flips_roles_and_supersedes_original(
     _add_member(db_session, league_id, recipient_id)
     proposer_athlete = _seed_athlete(db_session, 9630, "Offerto Iniziale")
     recipient_athlete = _seed_athlete(db_session, 9631, "Richiesto Iniziale")
-    proposer_team_id = _own_athlete_at_slot(
-        client, league_id, proposer_token, 0, proposer_athlete
-    )
+    proposer_team_id = _own_athlete_at_slot(client, league_id, proposer_token, 0, proposer_athlete)
     recipient_team_id = _own_athlete_at_slot(
         client, league_id, recipient_token, 0, recipient_athlete
     )

@@ -448,11 +448,18 @@ def _fill_goalkeeper_quota(
     seed_offset: int,
 ) -> tuple[str, list[Athlete]]:
     """Force the bidder's team to the default 3-goalkeeper quota (EP08-09 swap prompt)."""
-    rosa = client.get(f"/leagues/{league_id}/rosa", headers={"Authorization": f"Bearer {bidder_token}"})
+    rosa = client.get(
+        f"/leagues/{league_id}/rosa", headers={"Authorization": f"Bearer {bidder_token}"}
+    )
     assert rosa.status_code == 200
     team_id = rosa.json()["id"]
     keepers = [
-        _seed_athlete(db_session, seed_offset + index, f"Portiere Pieno {seed_offset}.{index}", role=FantasyRole.P)
+        _seed_athlete(
+            db_session,
+            seed_offset + index,
+            f"Portiere Pieno {seed_offset}.{index}",
+            role=FantasyRole.P,
+        )
         for index in range(3)
     ]
     for index, athlete in enumerate(keepers):
@@ -687,17 +694,26 @@ def test_raise_allowed_with_physically_full_roster_and_prompts_swap_on_win(
     league_id = _create_league(client, admin_token, competition_ids, "Lega Rosa Fisicamente Piena")
     _add_member(db_session, league_id, bidder_id)
 
-    rosa = client.get(f"/leagues/{league_id}/rosa", headers={"Authorization": f"Bearer {bidder_token}"})
+    rosa = client.get(
+        f"/leagues/{league_id}/rosa", headers={"Authorization": f"Bearer {bidder_token}"}
+    )
     assert rosa.status_code == 200
     team_id = rosa.json()["id"]
 
     # Default quotas: 3 P, 11 D, 11 C, 10 A — exactly fills the default 35-slot roster.
-    role_counts = [(FantasyRole.P, 3), (FantasyRole.D, 11), (FantasyRole.C, 11), (FantasyRole.A, 10)]
+    role_counts = [
+        (FantasyRole.P, 3),
+        (FantasyRole.D, 11),
+        (FantasyRole.C, 11),
+        (FantasyRole.A, 10),
+    ]
     slot_index = 0
     seed_offset = 93500
     for role, count in role_counts:
         for i in range(count):
-            athlete = _seed_athlete(db_session, seed_offset, f"Roster Pieno {seed_offset}", role=role)
+            athlete = _seed_athlete(
+                db_session, seed_offset, f"Roster Pieno {seed_offset}", role=role
+            )
             seed_offset += 1
             response = client.put(
                 f"/leagues/{league_id}/amministrazione/squadre/{team_id}/slot/{slot_index}",
@@ -707,7 +723,9 @@ def test_raise_allowed_with_physically_full_roster_and_prompts_swap_on_win(
             assert response.status_code == 200, response.json()
             slot_index += 1
 
-    extra_forward = _seed_athlete(db_session, seed_offset + 1, "Attaccante Extra", role=FantasyRole.A)
+    extra_forward = _seed_athlete(
+        db_session, seed_offset + 1, "Attaccante Extra", role=FantasyRole.A
+    )
 
     session_id = _start_manual_session(client, admin_token, league_id)
     lot = _nominate(client, admin_token, league_id, session_id, extra_forward.id)

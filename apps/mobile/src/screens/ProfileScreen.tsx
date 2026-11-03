@@ -1,3 +1,4 @@
+import type { RootStackParamList } from "../navigation/types";
 import { lazyStyles } from "../theme/lazyStyles";
 import {
   DELETE_ACCOUNT_CONFIRMATION_PHRASE,
@@ -8,6 +9,8 @@ import {
 import { theme } from "@fantappero/ui/theme";
 import * as ImagePicker from "expo-image-picker";
 import { useCallback, useState } from "react";
+import { useNavigation } from "@react-navigation/core";
+import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { Image, Pressable, Share, StyleSheet, Switch, Text, View } from "react-native";
 import { AppTextInput as TextInput } from "../components/AppTextInput";
 import { deleteAccount, exportAccountData } from "../api/privacy";
@@ -73,6 +76,7 @@ function ThemePreferenceSection() {
 
 /** Profilo utente — preferenze e privacy via API (EP02-02). */
 export function ProfileScreen() {
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { accessToken, logout, updateDisplayName } = useAuthSession();
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
@@ -560,10 +564,19 @@ export function ProfileScreen() {
       <View style={styles.section} testID="profile-policy-pending">
         <Text style={styles.sectionTitle}>Privacy</Text>
         <Text style={styles.hint}>
-          Policy versione {profile.currentPolicyVersion}. Accetta per continuare.
+          Informativa privacy versione {profile.currentPolicyVersion}. Leggila e accetta per continuare.
         </Text>
+        <Pressable
+          accessibilityRole="link"
+          accessibilityLabel="Leggi l'informativa privacy"
+          onPress={() => navigation.navigate("Privacy")}
+          style={styles.secondaryButton}
+          testID="profile-privacy-link"
+        >
+          <Text style={styles.secondaryButtonLabel}>Leggi l'informativa</Text>
+        </Pressable>
         <View style={styles.switchRow}>
-          <Text style={styles.label}>Accetto la policy</Text>
+          <Text style={styles.label}>Ho letto e accetto l'informativa</Text>
           <Switch
             value={policyAccepted}
             onValueChange={setPolicyAccepted}
