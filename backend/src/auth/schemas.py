@@ -60,3 +60,9 @@ class AuthTokensResponse(ApiModel):
 
 class MessageResponse(ApiModel):
     message: str
+
+
+class AuthOptionsResponse(ApiModel):
+    """Opzioni di accesso attive (pubbliche): leggono le schermate di login e registrazione."""
+
+    email_registration_enabled: bool = Field(alias="emailRegistrationEnabled")

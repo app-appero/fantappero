@@ -9,6 +9,7 @@ from auth.dependencies import get_auth_service, get_client_ip, get_current_user
 from auth.exceptions import AuthError, RateLimitExceededError
 from auth.models.user import User
 from auth.schemas import (
+    AuthOptionsResponse,
     AuthTokensResponse,
     ForgotPasswordRequest,
     GoogleLoginRequest,
@@ -22,6 +23,7 @@ from auth.schemas import (
     TokenPayloadRequest,
 )
 from auth.service import AuthService
+from config.settings.loader import get_api_settings
 from database.enums import platform_role_to_global_role
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -31,13 +33,21 @@ def _error_response(exc: AuthError) -> JSONResponse:
     status_code = status.HTTP_400_BAD_REQUEST
     if exc.code in ("invalid_credentials", "google_auth_failed"):
         status_code = status.HTTP_401_UNAUTHORIZED
-    elif exc.code == "email_not_verified":
+    elif exc.code in ("email_not_verified", "email_registration_disabled"):
         status_code = status.HTTP_403_FORBIDDEN
     elif exc.code == "rate_limit_exceeded":
         status_code = status.HTTP_429_TOO_MANY_REQUESTS
     return JSONResponse(
         status_code=status_code,
         content={"message": exc.message, "code": exc.code},
+    )
+
+
+@router.get("/options", response_model=AuthOptionsResponse)
+def auth_options() -> AuthOptionsResponse:
+    """Cosa è attivo per accedere/registrarsi: pubblico, serve alle schermate di accesso."""
+    return AuthOptionsResponse(
+        emailRegistrationEnabled=get_api_settings().auth_email_registration_enabled,
     )
 
 

@@ -20,6 +20,15 @@ class AuthSettingsMixin:
         default=30,
         validation_alias="JWT_REFRESH_TOKEN_EXPIRE_DAYS",
     )
+    auth_email_registration_enabled: bool = Field(
+        default=True,
+        validation_alias="AUTH_EMAIL_REGISTRATION_ENABLED",
+        description=(
+            "Permette di creare un account con email e password. Con `false` (pilota) si "
+            "registra solo con Google; chi ha già un account con password continua ad accedere "
+            "e il codice della registrazione con email resta, spento."
+        ),
+    )
     auth_email_verification_expire_hours: int = Field(
         default=24,
         validation_alias="AUTH_EMAIL_VERIFICATION_EXPIRE_HOURS",

@@ -9,6 +9,7 @@ export {
 export type {
   AuthErrorResponse,
   AuthMessageResponse,
+  AuthOptions,
   AuthTokensResponse,
   ForgotPasswordRequest,
   GlobalRole,

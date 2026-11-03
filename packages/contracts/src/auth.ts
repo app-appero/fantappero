@@ -72,6 +72,11 @@ export interface ResendVerificationRequest {
   email: string;
 }
 
+/** Opzioni di accesso attive sul server (pubbliche): per il pilota la registrazione è solo con Google. */
+export interface AuthOptions {
+  emailRegistrationEnabled: boolean;
+}
+
 export interface AuthMessageResponse {
   message: string;
 }

@@ -11,6 +11,7 @@ import { googleAppHandoffUrl, googleAppReturnUrl } from "../../auth/googleAppRet
 import { renderGoogleButton } from "../../auth/googleIdentity";
 import { clearLastUser, initialsOf, readLastUser, writeLastUser, type LastUser } from "../../auth/lastUser";
 import { loadStoredSession } from "../../auth/sessionStorage";
+import { useAuthOptions } from "../../auth/useAuthOptions";
 import { getWebEnv } from "../../config/env";
 import { Link, useLocation, useNavigate } from "../../router/simpleRouter";
 
@@ -88,12 +89,12 @@ function AppleSignInPlaceholder({ label }: { label: string }) {
   );
 }
 
-function SocialLogins({ onError, appleLabel, dividerLabel }: { onError: (message: string) => void; appleLabel: string; dividerLabel: string }) {
+function SocialLogins({ onError, appleLabel, dividerLabel }: { onError: (message: string) => void; appleLabel: string; dividerLabel: string | null }) {
   return (
     <div className="fa-auth-social">
       <GoogleSignInButton onError={onError} />
       <AppleSignInPlaceholder label={appleLabel} />
-      <p className="fa-auth-layout__divider">{dividerLabel}</p>
+      {dividerLabel ? <p className="fa-auth-layout__divider">{dividerLabel}</p> : null}
     </div>
   );
 }
@@ -127,6 +128,9 @@ function AuthSplit({
 }
 
 export function AuthRegisterPage() {
+  const authOptions = useAuthOptions();
+  // Finché il server non ha risposto non si mostra il modulo con email: nel pilota è spento.
+  const googleOnly = !authOptions.loaded || !authOptions.emailRegistrationEnabled;
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -169,7 +173,7 @@ export function AuthRegisterPage() {
           </h1>
         </div>
         <ol className="fa-login__steps" aria-label="Come funziona">
-          {REGISTER_STEPS.map((step, index) => (
+          {(googleOnly ? REGISTER_STEPS_GOOGLE : REGISTER_STEPS).map((step, index) => (
             <li key={step.title} className="fa-login__step">
               <span className="fa-login__step-n" aria-hidden="true">
                 {index + 1}
@@ -193,6 +197,16 @@ export function AuthRegisterPage() {
             />
             <p className="fa-auth-layout__register">
               <Link to="/accedi">Torna al login</Link>
+            </p>
+          </>
+        ) : googleOnly ? (
+          <>
+            <SocialLogins onError={setError} appleLabel="Registrati con Apple" dividerLabel={null} />
+            {error ? <UiStatePanel state="error" title="Registrazione non riuscita" message={error} testId="auth-register-error" /> : null}
+            <p className="fa-auth-layout__register" data-testid="register-google-only">
+              In questa fase la registrazione è solo con Google.
+              <br />
+              Hai già un account? <Link to="/accedi">Accedi</Link>
             </p>
           </>
         ) : (
@@ -232,6 +246,11 @@ export function AuthRegisterPage() {
 const REGISTER_STEPS = [
   { title: "Crea l'account", detail: "Nome, email e password" },
   { title: "Conferma l'email", detail: "Ti scriviamo un codice" },
+  { title: "Entra in lega", detail: "Crea la tua o usa un invito" },
+] as const;
+
+const REGISTER_STEPS_GOOGLE = [
+  { title: "Continua con Google", detail: "Un solo tocco, nessuna password" },
   { title: "Entra in lega", detail: "Crea la tua o usa un invito" },
 ] as const;
 

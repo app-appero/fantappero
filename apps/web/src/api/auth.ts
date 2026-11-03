@@ -1,5 +1,6 @@
 import type {
   AuthMessageResponse,
+  AuthOptions,
   AuthTokensResponse,
   ForgotPasswordRequest,
   GoogleLoginRequest,
@@ -12,6 +13,11 @@ import type {
   VerifyEmailRequest,
 } from "@fantappero/contracts";
 import { apiRequest } from "./client";
+
+/** Cosa è attivo per accedere/registrarsi (pubblico, senza token). */
+export function fetchAuthOptions(): Promise<AuthOptions> {
+  return apiRequest<AuthOptions>("/auth/options", { method: "GET" });
+}
 
 export function register(body: RegisterRequest): Promise<AuthMessageResponse> {
   return apiRequest<AuthMessageResponse>("/auth/register", { body });

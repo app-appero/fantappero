@@ -60,10 +60,13 @@ describe("EP02-01 auth pages", () => {
     expect(html).toContain('href="fantappero://google-auth?id_token=header.payload.sig"');
   });
 
-  it("renders register form at /accedi/registrati", () => {
+  it("renders the Google-only registration before the server options are known", () => {
+    // Nel pilota la registrazione con email è spenta: finché le opzioni non arrivano dal server
+    // non si mostra il modulo. Il modulo completo, quando attivo, è coperto da AuthRegisterPage.test.tsx.
     const html = renderAuth("/accedi/registrati");
-    expect(html).toContain("Crea account");
-    expect(html).toContain('name="displayName"');
+    expect(html).toContain('data-testid="register-google-only"');
+    expect(html).toContain("solo con Google");
+    expect(html).not.toContain('name="displayName"');
   });
 
   it("renders forgot password form at /accedi/recupera", () => {

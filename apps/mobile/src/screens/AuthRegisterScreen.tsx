@@ -6,6 +6,7 @@ import { Pressable, Text, View } from "react-native";
 import { AppTextInput as TextInput } from "../components/AppTextInput";
 import { register as registerApi } from "../api/auth";
 import { AuthShell } from "../auth/AuthShell";
+import { useAuthOptions } from "../auth/useAuthOptions";
 import { useGoogleAuth } from "../auth/useGoogleAuth";
 import { UiStatePanel } from "../components/UiStatePanel";
 import type { RootStackParamList } from "../navigation/types";
@@ -23,6 +24,9 @@ export function AuthRegisterScreen() {
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const { loginWithGoogle } = useAuthSession();
+  const authOptions = useAuthOptions();
+  // Finché il server non ha risposto non si mostra il modulo con email: nel pilota è spento.
+  const googleOnly = !authOptions.loaded || !authOptions.emailRegistrationEnabled;
   const [googleSubmitting, setGoogleSubmitting] = useState(false);
   const googleAuth = useGoogleAuth((idToken) => {
     setError(null);
@@ -67,7 +71,7 @@ export function AuthRegisterScreen() {
       badge={
         successMessage ? undefined : (
           <View style={styles.stepBadge}>
-            <Text style={styles.stepBadgeLabel}>Passo 1 di 3</Text>
+            <Text style={styles.stepBadgeLabel}>{googleOnly ? "Passo 1 di 2" : "Passo 1 di 3"}</Text>
           </View>
         )
       }
@@ -97,6 +101,12 @@ export function AuthRegisterScreen() {
               <Ionicons name="logo-apple" size={22} color="#FFFFFF" />
               <Text style={styles.appleLabel}>Registrati con Apple</Text>
             </View>
+            {googleOnly ? (
+              <Text style={[styles.muted, { textAlign: "center", marginTop: 12 }]} testID="auth-register-google-only">
+                In questa fase la registrazione è solo con Google.
+              </Text>
+            ) : (
+              <>
             <View style={styles.orRow}>
               <View style={styles.orLine} />
               <Text style={styles.muted}>oppure con email</Text>
@@ -156,6 +166,8 @@ export function AuthRegisterScreen() {
             >
               <Text style={styles.emailButtonLabel}>{submitting ? "Registrazione…" : "Crea account con email"}</Text>
             </Pressable>
+              </>
+            )}
             <Pressable
               accessibilityRole="button"
               onPress={() => navigation.navigate("Auth")}

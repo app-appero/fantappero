@@ -15,6 +15,7 @@ from auth.exceptions import (
     GoogleAuthError,
     InvalidCredentialsError,
     InvalidTokenError,
+    ValidationAuthError,
 )
 from auth.models.auth_session import AuthSession
 from auth.models.auth_token import AuthToken
@@ -68,6 +69,11 @@ class AuthService:
         display_name: str,
         client_ip: str,
     ) -> MessageResponse:
+        if not self._settings.auth_email_registration_enabled:
+            raise ValidationAuthError(
+                "In questa fase la registrazione è solo con Google: usa «Continua con Google».",
+                code="email_registration_disabled",
+            )
         normalized_email = validate_email(email)
         validated_password = validate_password(password)
         validated_name = validate_display_name(display_name)
