@@ -209,22 +209,20 @@ export function AuthScreen() {
             </Pressable>
           ) : null}
             </>
-          ) : (
-            <Text style={[styles.muted, { textAlign: "center" }]} testID="auth-google-only">
-              In questa fase si accede solo con Google.
-            </Text>
-          )}
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Crea un account"
-            onPress={() => navigation.navigate("AuthRegister")}
-            style={styles.centerLink}
-            testID="auth-register-link"
-          >
-            <Text style={styles.muted}>
-              Nuovo qui? <Text style={styles.linkStrong}>Crea un account</Text>
-            </Text>
-          </Pressable>
+          ) : null}
+          {showEmailLogin ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Crea un account"
+              onPress={() => navigation.navigate("AuthRegister")}
+              style={styles.centerLink}
+              testID="auth-register-link"
+            >
+              <Text style={styles.muted}>
+                Nuovo qui? <Text style={styles.linkStrong}>Crea un account</Text>
+              </Text>
+            </Pressable>
+          ) : null}
         </>
       }
     >

@@ -59,7 +59,9 @@ describe("AuthRegisterPage — registrazione solo con Google nel pilota", () => 
     fetchAuthOptionsMock.mockResolvedValue({ emailRegistrationEnabled: false });
     await render();
     expect(container.querySelector('[data-testid="register-google-only"]')).not.toBeNull();
-    expect(text()).toContain("solo con Google");
+    // Nessun testo né link: con Google si accede e ci si registra nello stesso gesto.
+    expect(text()).not.toContain("solo con Google");
+    expect(text()).not.toContain("Hai già un account");
     // Il tasto «Continua con Apple» è nascosto finché non c'è la versione iPhone.
     expect(container.querySelector('[data-testid="auth-apple-disabled"]')).toBeNull();
     expect(container.textContent).not.toContain("Apple");
@@ -69,7 +71,7 @@ describe("AuthRegisterPage — registrazione solo con Google nel pilota", () => 
     expect(hasField("Crea account con email")).toBe(false);
     // I passi non parlano più di email da confermare.
     expect(text()).not.toContain("Conferma l'email");
-    expect(container.querySelector('a[href="/accedi"]')).not.toBeNull();
+    expect(container.querySelector('a[href="/accedi"]')).toBeNull();
   });
 
   it("non mostra il modulo con email nemmeno mentre il server non ha ancora risposto", async () => {

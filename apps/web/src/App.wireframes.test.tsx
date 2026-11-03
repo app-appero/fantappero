@@ -61,10 +61,10 @@ describe("EPUI-04 wireframes", () => {
 
   it("renders auth page without app shell", () => {
     const html = renderAt("/accedi", "?stato=success");
-    expect(html).toContain('data-testid="auth-form-layout"');
+    expect(html).toContain('data-testid="login-google-only"');
     expect(html).toContain('data-testid="brand-logo"');
     expect(html).toContain("FantApperò");
-    expect(html).toContain("fa-surface-pitch");
+    expect(html).toContain("fa-login");
     expect(html).not.toContain('data-testid="app-shell"');
   });
 

@@ -53,14 +53,16 @@ describe("AuthLoginPage — accesso solo con Google nel pilota", () => {
     fetchAuthOptionsMock.mockResolvedValue({ emailRegistrationEnabled: false });
     await render();
     expect(googleOnly()).not.toBeNull();
-    expect(container.textContent).toContain("si accede solo con Google");
+    // Con Google l'account si crea da solo: nessun testo esplicativo e nessun link «Registrati».
+    expect(container.textContent).not.toContain("solo con Google");
+    expect(container.textContent).not.toContain("Non hai un account");
+    expect(container.querySelector('a[href="/accedi/registrati"]')).toBeNull();
     // Il tasto «Continua con Apple» è nascosto finché non c'è la versione iPhone.
     expect(container.querySelector('[data-testid="auth-apple-disabled"]')).toBeNull();
     expect(container.textContent).not.toContain("Apple");
     expect(passwordField()).toBeNull();
     expect(container.querySelector("form")).toBeNull();
     expect(container.textContent).not.toContain("Password dimenticata");
-    expect(container.querySelector('a[href="/accedi/registrati"]')).not.toBeNull();
   });
 
   it("non mostra il modulo nemmeno mentre il server non ha ancora risposto", async () => {

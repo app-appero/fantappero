@@ -30,11 +30,13 @@ function renderAuth(path: string) {
 }
 
 describe("EP02-01 auth pages", () => {
-  it("renders login form at /accedi", () => {
+  it("renders the Google-only login before the server options are known", () => {
+    // Il modulo email e password compare solo se il server lo consente (nel pilota è spento):
+    // la sua presenza è coperta da AuthLoginPage.test.tsx.
     const html = renderAuth("/accedi");
-    expect(html).toContain('data-testid="auth-form-layout"');
-    expect(html).toContain("Accedi al tuo account");
-    expect(html).toContain("/accedi/recupera");
+    expect(html).toContain('data-testid="login-google-only"');
+    expect(html).not.toContain('data-testid="auth-form-layout"');
+    expect(html).not.toContain("/accedi/recupera");
     expect(html).not.toContain('data-testid="app-shell"');
   });
 
@@ -65,7 +67,7 @@ describe("EP02-01 auth pages", () => {
     // non si mostra il modulo. Il modulo completo, quando attivo, è coperto da AuthRegisterPage.test.tsx.
     const html = renderAuth("/accedi/registrati");
     expect(html).toContain('data-testid="register-google-only"');
-    expect(html).toContain("solo con Google");
+    expect(html).not.toContain("solo con Google");
     expect(html).not.toContain('name="displayName"');
   });
 

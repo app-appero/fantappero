@@ -75,9 +75,9 @@ export function AuthRegisterScreen() {
     <AuthShell
       testID="screen-auth-register"
       badge={
-        successMessage ? undefined : (
+        successMessage || googleOnly ? undefined : (
           <View style={styles.stepBadge}>
-            <Text style={styles.stepBadgeLabel}>{googleOnly ? "Passo 1 di 2" : "Passo 1 di 3"}</Text>
+            <Text style={styles.stepBadgeLabel}>Passo 1 di 3</Text>
           </View>
         )
       }
@@ -109,11 +109,7 @@ export function AuthRegisterScreen() {
                 <Text style={styles.appleLabel}>Registrati con Apple</Text>
               </View>
             ) : null}
-            {googleOnly ? (
-              <Text style={[styles.muted, { textAlign: "center", marginTop: 12 }]} testID="auth-register-google-only">
-                In questa fase la registrazione è solo con Google.
-              </Text>
-            ) : (
+            {googleOnly ? null : (
               <>
             <View style={styles.orRow}>
               <View style={styles.orLine} />
@@ -176,16 +172,18 @@ export function AuthRegisterScreen() {
             </Pressable>
               </>
             )}
-            <Pressable
-              accessibilityRole="button"
-              onPress={() => navigation.navigate("Auth")}
-              style={styles.centerLink}
-              testID="auth-register-login-link"
+            {googleOnly ? null : (
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => navigation.navigate("Auth")}
+                style={styles.centerLink}
+                testID="auth-register-login-link"
             >
-              <Text style={styles.muted}>
-                Hai già un account? <Text style={styles.linkStrong}>Accedi</Text>
-              </Text>
-            </Pressable>
+                <Text style={styles.muted}>
+                  Hai già un account? <Text style={styles.linkStrong}>Accedi</Text>
+                </Text>
+              </Pressable>
+            )}
           </>
         )
       }

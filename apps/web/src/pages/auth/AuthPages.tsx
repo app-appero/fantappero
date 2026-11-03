@@ -208,12 +208,10 @@ export function AuthRegisterPage() {
         ) : googleOnly ? (
           <>
             <SocialLogins onError={setError} appleLabel="Registrati con Apple" dividerLabel={null} />
-            {error ? <UiStatePanel state="error" title="Registrazione non riuscita" message={error} testId="auth-register-error" /> : null}
-            <p className="fa-auth-layout__register" data-testid="register-google-only">
-              In questa fase la registrazione è solo con Google.
-              <br />
-              Hai già un account? <Link to="/accedi">Accedi</Link>
-            </p>
+            {/* Solo Google: con Google si accede e ci si registra nello stesso gesto, nessun testo aggiuntivo. */}
+            <div data-testid="register-google-only">
+              {error ? <UiStatePanel state="error" title="Registrazione non riuscita" message={error} testId="auth-register-error" /> : null}
+            </div>
           </>
         ) : (
           <>
@@ -354,14 +352,10 @@ export function AuthLoginPage() {
       <section className="fa-login__panel">
         <SocialLogins onError={setError} appleLabel="Continua con Apple" dividerLabel={showEmailLogin ? (remembered ? "oppure con la password" : "oppure con email") : null} />
         {!showEmailLogin ? (
-          <>
+          // Solo Google: l'accesso crea l'account da solo, quindi nessun testo né link «Registrati».
+          <div data-testid="login-google-only">
             {error ? <UiStatePanel state="error" title="Accesso non riuscito" message={error} testId="auth-login-error" /> : null}
-            <p className="fa-auth-layout__register" data-testid="login-google-only">
-              In questa fase si accede solo con Google.
-              <br />
-              Non hai un account? <Link to="/accedi/registrati">Registrati</Link>
-            </p>
-          </>
+          </div>
         ) : (
         <AuthFormLayout
           brand={null}

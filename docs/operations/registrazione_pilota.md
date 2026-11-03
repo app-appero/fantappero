@@ -16,11 +16,11 @@ pubblico, risponde `{"emailRegistrationEnabled": false}`).
 ## Cosa cambia
 - `POST /auth/register` risponde **403** con codice `email_registration_disabled` e **non crea
   nessun account né invia email di verifica**.
-- Le schermate di **registrazione** (web e app) mostrano solo «Continua con Google» e la frase
-  «In questa fase la registrazione è solo con Google». Mentre il server non ha ancora risposto non
-  compare il modulo con email; se la richiesta fallisce si torna al modulo e decide il server.
-- La schermata di **accesso** (web e app) mostra solo «Continua con Google»: spariscono email,
-  password e «Password dimenticata?». Resta il link «Registrati» (che porta alla pagina solo Google).
+- Le schermate di **registrazione** e di **accesso** (web e app) mostrano solo «Continua con
+  Google», **senza altri testi né link**: con Google si accede e ci si registra nello stesso gesto,
+  quindi spariscono email, password, «Password dimenticata?», «Registrati» e «Hai già un account?».
+  Mentre il server non ha ancora risposto non compare il modulo con email; se la richiesta fallisce
+  si torna al modulo e decide il server.
 - **Account con password** (per esempio un operatore): sul web si apre
   **`/accedi?accesso=email`**, che mostra il modulo. L'app non ha questo ingresso: lì si usa Google.
   Chi entra con Google con lo stesso indirizzo email dell'account esistente accede allo stesso account.
