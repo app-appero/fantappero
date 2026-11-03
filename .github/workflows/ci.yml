@@ -166,6 +166,9 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Unit tests
+        env:
+          # Obbligatoria per la config web: i test di rendering delle pagine di accesso la leggono.
+          VITE_API_BASE_URL: http://localhost:8000
         run: |
           set -o pipefail
           mkdir -p artifacts
