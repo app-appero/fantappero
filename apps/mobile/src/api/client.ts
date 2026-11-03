@@ -4,7 +4,9 @@ import {
   getApiErrorMessage,
   type UnauthorizedRecovery,
 } from "@fantappero/api-client";
+import { File } from "expo-file-system";
 import { loadMobileEnv, MobileEnvError } from "../config/env";
+import { buildUploadFormValue } from "./uploadValue";
 
 export { ApiError, getApiErrorMessage };
 
@@ -47,12 +49,9 @@ const client = createApiClient<UploadFile>({
     }
     return recoverUnauthorized(input);
   },
+  // Con Expo 58 `{ uri, name, type }` da solo non basta: vedi `uploadValue.ts`.
   buildUploadValue: (file) =>
-    ({
-      uri: file.uri,
-      name: file.name,
-      type: file.type ?? "text/csv",
-    }) as unknown as Blob,
+    buildUploadFormValue(file, (uri) => new File(uri).bytes()) as unknown as Blob,
   networkErrorMessage: () => "Connessione non disponibile. Riprova tra poco.",
   invalidResponseMessage: () => "Risposta non valida. Riprova tra poco.",
   notFoundMessage: () => "Risorsa non trovata. Riprova tra poco.",
