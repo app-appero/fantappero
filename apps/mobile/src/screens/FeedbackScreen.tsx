@@ -19,6 +19,7 @@ import { AppTextInput as TextInput } from "../components/AppTextInput";
 import { UiStatePanel } from "../components/UiStatePanel";
 import { readLastScreen } from "../feedback/lastScreen";
 import { toPickedAttachment, type PickedAttachment } from "../feedback/pickedAsset";
+import { feedbackUploadErrorMessage, isLargeUpload } from "../feedback/uploadError";
 import { useScreenData } from "../hooks/useScreenData";
 import { PageContainer } from "../layout/PageContainer";
 import { getApiErrorMessage, useAuthSession } from "../session/DemoSessionContext";
@@ -137,7 +138,11 @@ export function FeedbackScreen() {
       setSent(true);
       void loadMine();
     } catch (submitError) {
-      setError(getApiErrorMessage(submitError, "Invio non riuscito. Riprova tra poco."));
+      setError(
+        feedbackUploadErrorMessage(submitError, {
+          hasVideo: picked.some((item) => feedbackAttachmentKind(item.mimeType) === "video"),
+        }),
+      );
     } finally {
       setSending(false);
     }
@@ -241,6 +246,11 @@ export function FeedbackScreen() {
         );
       })}
 
+      {isLargeUpload(picked.map((item) => item.sizeBytes)) ? (
+        <Text style={styles.hint} testID="feedback-large-upload-hint">
+          Gli allegati sono pesanti: con la rete mobile l'invio può non riuscire, meglio il Wi‑Fi.
+        </Text>
+      ) : null}
       {error ? (
         <UiStatePanel state="error" title="Segnalazione non inviata" message={error} testID="feedback-error" />
       ) : null}
