@@ -92,17 +92,14 @@ class LeagueListoneService:
             competition_ids={competition.id for competition in league.competitions},
         )
         overrides = {
-            row.athlete_id: row
-            for row in list_active_overrides(self._session, league_id=league.id)
+            row.athlete_id: row for row in list_active_overrides(self._session, league_id=league.id)
         }
         athlete_ids = [row.athlete_id for row in assignments]
         athletes: dict[UUID, Athlete] = {}
         if athlete_ids:
             athletes = {
                 row.id: row
-                for row in self._session.execute(
-                    select(Athlete).where(Athlete.id.in_(athlete_ids))
-                )
+                for row in self._session.execute(select(Athlete).where(Athlete.id.in_(athlete_ids)))
                 .scalars()
                 .all()
             }
@@ -345,6 +342,7 @@ class LeagueListoneService:
             errorCode=progress.error_code,
             result=result,
         )
+
     def set_override(
         self,
         league_access: LeagueAccess,

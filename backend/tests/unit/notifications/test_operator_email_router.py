@@ -55,7 +55,9 @@ def test_send_operator_email_returns_id_and_recipient_count(
     operator = SimpleNamespace(id=uuid4())
 
     result = admin_router.send_operator_email(
-        body, operator=operator, session=MagicMock()  # type: ignore[arg-type]
+        body,
+        operator=operator,
+        session=MagicMock(),  # type: ignore[arg-type]
     )
 
     assert isinstance(result, OperatorEmailSent)
@@ -74,7 +76,9 @@ def test_send_operator_email_maps_service_error_to_422(monkeypatch: pytest.Monke
     operator = SimpleNamespace(id=uuid4())
 
     result = admin_router.send_operator_email(
-        body, operator=operator, session=MagicMock()  # type: ignore[arg-type]
+        body,
+        operator=operator,
+        session=MagicMock(),  # type: ignore[arg-type]
     )
 
     assert isinstance(result, JSONResponse)
@@ -97,7 +101,10 @@ def test_list_operator_emails_maps_rows_to_history_items(monkeypatch: pytest.Mon
     )
 
     result = admin_router.list_operator_emails(
-        page=1, page_size=10, _operator=SimpleNamespace(), session=MagicMock()  # type: ignore[arg-type]
+        page=1,
+        page_size=10,
+        _operator=SimpleNamespace(),
+        session=MagicMock(),  # type: ignore[arg-type]
     )
 
     assert isinstance(result, OperatorEmailHistory)

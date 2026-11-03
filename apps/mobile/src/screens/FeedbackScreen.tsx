@@ -11,6 +11,8 @@ import {
   type FeedbackReportSummary,
 } from "@fantappero/contracts";
 import { theme } from "@fantappero/ui/theme";
+import { useNavigation } from "@react-navigation/core";
+import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import * as ImagePicker from "expo-image-picker";
 import { useCallback, useState } from "react";
 import { Image, Pressable, StyleSheet, Text, View } from "react-native";
@@ -23,6 +25,7 @@ import { feedbackUploadErrorMessage, isLargeUpload } from "../feedback/uploadErr
 import { useScreenData } from "../hooks/useScreenData";
 import { PageContainer } from "../layout/PageContainer";
 import { getApiErrorMessage, useAuthSession } from "../session/DemoSessionContext";
+import type { RootStackParamList } from "../navigation/types";
 import { lazyStyles } from "../theme/lazyStyles";
 
 const { colors, spacing, typography, radius } = theme;
@@ -50,6 +53,7 @@ function formatSize(bytes: number | null | undefined): string {
 
 /** «Segnala un problema»: testo + screenshot o video, per aiutare gli operatori a trovare i bug. */
 export function FeedbackScreen() {
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { accessToken } = useAuthSession();
   const [category, setCategory] = useState<FeedbackCategory>("bug");
   const [message, setMessage] = useState("");
@@ -200,6 +204,15 @@ export function FeedbackScreen() {
       <Text style={styles.hint}>
         {message.trim().length}/{FEEDBACK_MESSAGE_MAX_CHARS} caratteri (almeno {FEEDBACK_MESSAGE_MIN_CHARS})
       </Text>
+
+      <Pressable
+        accessibilityRole="link"
+        accessibilityLabel="Leggi l'informativa privacy"
+        onPress={() => navigation.navigate("Privacy")}
+        testID="feedback-privacy-link"
+      >
+        <Text style={styles.hint}>Come trattiamo testo e allegati: informativa privacy</Text>
+      </Pressable>
 
       <Text style={styles.label}>Immagine o video (facoltativo)</Text>
       <Pressable

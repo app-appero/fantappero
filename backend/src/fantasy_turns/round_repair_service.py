@@ -81,8 +81,7 @@ def find_rounds_needing_repair(
                 league_id=fantasy_round.league_id,
                 round_number=fantasy_round.number,
                 was_homologated=(
-                    fantasy_round.homologation_status
-                    == FantasyRoundHomologationStatus.HOMOLOGATED
+                    fantasy_round.homologation_status == FantasyRoundHomologationStatus.HOMOLOGATED
                 ),
             )
         )
@@ -97,7 +96,9 @@ def _round_is_fully_resolved(session: Session, fantasy_round: FantasyRound) -> b
         # Nessun calendario H2H per questa lega: niente da riparare qui.
         return True
 
-    round_numbers = h2h_round_numbers_for_round(session, calendar=calendar, fantasy_round=fantasy_round)
+    round_numbers = h2h_round_numbers_for_round(
+        session, calendar=calendar, fantasy_round=fantasy_round
+    )
     if not round_numbers:
         return True
 

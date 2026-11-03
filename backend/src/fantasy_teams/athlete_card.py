@@ -9,16 +9,16 @@ from sqlalchemy.orm import Session, selectinload
 
 from auth.exceptions import ValidationAuthError
 from authorization.context import LeagueAccess
+from fantasy_ratings.models import PlayerMatchRating
 from fantasy_teams.models import FantasyRosterSlot
 from fantasy_teams.schemas import (
     AthleteCardAssignmentResponse,
     AthleteCardLiveResponse,
-    AthleteCardSeasonStatsResponse,
     AthleteCardResponse,
     AthleteCardSeasonResponse,
+    AthleteCardSeasonStatsResponse,
     AthleteCardTransferResponse,
 )
-from fantasy_ratings.models import PlayerMatchRating
 from fantasy_turns.readiness import FINISHED_FIXTURE_STATUSES, LIVE_FIXTURE_STATUSES
 from sports_data.catalog.models import Club
 from sports_data.fixtures.models import Fixture, PlayerMatchStat
@@ -249,7 +249,9 @@ def _season_stats(
             goals=goals,
             assists=assists,
             averageRating=round(sum(ratings) / len(ratings), 2) if ratings else None,
-            fantasyAverage=round(sum(fantasy_scores) / len(fantasy_scores), 2) if fantasy_scores else None,
+            fantasyAverage=round(sum(fantasy_scores) / len(fantasy_scores), 2)
+            if fantasy_scores
+            else None,
         ),
         live,
     )

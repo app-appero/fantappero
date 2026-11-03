@@ -37,7 +37,9 @@ class AdminTransfersService:
     def __init__(self, session: Session) -> None:
         self._session = session
 
-    def list_pending_review(self, *, page: int, page_size: int) -> PaginatedAdminPendingTransfersResponse:
+    def list_pending_review(
+        self, *, page: int, page_size: int
+    ) -> PaginatedAdminPendingTransfersResponse:
         base = (
             select(Transfer)
             .where(

@@ -37,9 +37,16 @@ def _envelope(rows: list[dict]):
     return parse_envelope(payload, endpoint="/injuries", http_status=200)
 
 
-def _row(player_id: int, reason: str, fixture_id: int = 999001, status: str = "Missing Fixture") -> dict:
+def _row(
+    player_id: int, reason: str, fixture_id: int = 999001, status: str = "Missing Fixture"
+) -> dict:
     return {
-        "player": {"id": player_id, "name": f"Player {player_id}", "type": status, "reason": reason},
+        "player": {
+            "id": player_id,
+            "name": f"Player {player_id}",
+            "type": status,
+            "reason": reason,
+        },
         "team": {"id": 487, "name": "Example FC"},
         "fixture": {"id": fixture_id},
         "league": {"id": COMPETITION_ID, "season": SEASON_YEAR},

@@ -63,9 +63,7 @@ def _create_league(client: TestClient, token: str, competition_ids: list[str], n
 
 def _make_available(db_session: Session, user_id: UUID) -> None:
     """Un utente è invitabile solo se si è reso disponibile (default: no)."""
-    profile = db_session.scalars(
-        select(UserProfile).where(UserProfile.user_id == user_id)
-    ).one()
+    profile = db_session.scalars(select(UserProfile).where(UserProfile.user_id == user_id)).one()
     profile.available_for_invites = True
     db_session.commit()
 

@@ -30,9 +30,7 @@ class RoundReadiness:
     @property
     def final_data_ready(self) -> bool:
         return (
-            bool(self.fixture_ids)
-            and self.all_fixtures_finished
-            and self.all_statistics_available
+            bool(self.fixture_ids) and self.all_fixtures_finished and self.all_statistics_available
         )
 
 
@@ -71,9 +69,7 @@ def evaluate_round_readiness(session: Session, *, round_id: UUID) -> RoundReadin
                 stats_clubs_by_fixture.setdefault(fixture_id, set()).add(club_id)
 
     all_statistics_available = bool(rows) and all(
-        {row.home_club_id, row.away_club_id}.issubset(
-            stats_clubs_by_fixture.get(row.id, set())
-        )
+        {row.home_club_id, row.away_club_id}.issubset(stats_clubs_by_fixture.get(row.id, set()))
         for row in rows
     )
     return RoundReadiness(

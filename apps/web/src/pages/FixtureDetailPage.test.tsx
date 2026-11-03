@@ -155,7 +155,7 @@ describe("FixtureDetailBody (EP13-P04-quater)", () => {
   it("dichiara assente la formazione non pubblicata invece di mostrarla vuota", () => {
     const html = render(detail());
     expect(html).toContain('data-testid="fixture-lineup-empty-away"');
-    expect(html).toContain("non è ancora stata pubblicata");
+    expect(html).toContain("Formazione non disponibile");
   });
 
   it("rende una vera timeline verticale casa/ospite con minuto e assist", () => {

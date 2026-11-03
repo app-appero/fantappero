@@ -95,8 +95,13 @@ def test_image_and_video_have_separate_size_limits():
 
 def test_author_name_prefers_nickname_then_display_name_then_email():
     user = SimpleNamespace(email="mario@example.com")
-    assert author_name(user, SimpleNamespace(nickname="Mario", display_name="Mario Rossi")) == "Mario"
-    assert author_name(user, SimpleNamespace(nickname=" ", display_name="Mario Rossi")) == "Mario Rossi"
+    assert (
+        author_name(user, SimpleNamespace(nickname="Mario", display_name="Mario Rossi")) == "Mario"
+    )
+    assert (
+        author_name(user, SimpleNamespace(nickname=" ", display_name="Mario Rossi"))
+        == "Mario Rossi"
+    )
     assert author_name(user, None) == "mario@example.com"
 
 

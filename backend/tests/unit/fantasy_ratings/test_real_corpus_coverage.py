@@ -6,7 +6,6 @@ sintetiche come nel resto della suite fantasy_ratings.
 from __future__ import annotations
 
 import json
-from collections import defaultdict
 from pathlib import Path
 
 from fantasy_ratings.input import iter_players_from_payload

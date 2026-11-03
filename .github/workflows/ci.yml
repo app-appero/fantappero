@@ -73,6 +73,8 @@ jobs:
 
       - name: Pytest
         working-directory: backend
+        env:
+          AVATAR_STORAGE_PATH: ${{ runner.temp }}/avatars
         run: |
           set -o pipefail
           mkdir -p artifacts
@@ -104,8 +106,6 @@ jobs:
 
       - name: Set up pnpm
         uses: pnpm/action-setup@v4
-        with:
-          version: 9.15.0
 
       - name: Set up Node
         uses: actions/setup-node@v4
@@ -130,8 +130,6 @@ jobs:
 
       - name: Set up pnpm
         uses: pnpm/action-setup@v4
-        with:
-          version: 9.15.0
 
       - name: Set up Node
         uses: actions/setup-node@v4
@@ -156,8 +154,6 @@ jobs:
 
       - name: Set up pnpm
         uses: pnpm/action-setup@v4
-        with:
-          version: 9.15.0
 
       - name: Set up Node
         uses: actions/setup-node@v4
@@ -194,8 +190,6 @@ jobs:
 
       - name: Set up pnpm
         uses: pnpm/action-setup@v4
-        with:
-          version: 9.15.0
 
       - name: Set up Node
         uses: actions/setup-node@v4
@@ -277,10 +271,16 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Gitleaks
-        uses: gitleaks/gitleaks-action@v2
+      # gitleaks-action@v2 richiede una licenza a pagamento per le organizzazioni
+      # (GITLEAKS_LICENSE): si usa invece il binario open source, a versione fissa.
+      - name: Gitleaks (CLI open source)
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_VERSION: "8.18.4"
+        run: |
+          set -euo pipefail
+          curl -sSfL "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" \
+            | tar -xz -C "$RUNNER_TEMP" gitleaks
+          "$RUNNER_TEMP/gitleaks" detect --source . --redact --no-banner --verbose
 
   # ---------------------------------------------------------------------------
   # Informative — dependency audit (EP12-04 security review)
@@ -322,8 +322,6 @@ jobs:
       - name: Set up pnpm
         if: always()
         uses: pnpm/action-setup@v4
-        with:
-          version: 9.15.0
 
       - name: Set up Node
         if: always()

@@ -197,9 +197,7 @@ def test_trade_proposal_rejects_disabled_trades_and_insufficient_credits(
     league_id = _create_league(client, owner_token, competition_ids, "Lega Scambi Disattivati")
     _add_member(db_session, league_id, member_id)
     recipient_athlete = _seed_athlete(db_session, 9504, "Destinatario Player")
-    recipient_team_id = _own_athlete_at_slot(
-        client, league_id, member_token, 0, recipient_athlete
-    )
+    recipient_team_id = _own_athlete_at_slot(client, league_id, member_token, 0, recipient_athlete)
 
     rules = client.get(
         f"/leagues/{league_id}", headers={"Authorization": f"Bearer {owner_token}"}
@@ -306,9 +304,7 @@ def test_proposer_can_cancel_own_proposal_but_not_others(
     league_id = _create_league(client, owner_token, competition_ids, "Lega Annulla Scambio")
     _add_member(db_session, league_id, member_id)
     recipient_athlete = _seed_athlete(db_session, 9506, "Destinatario Annulla")
-    recipient_team_id = _own_athlete_at_slot(
-        client, league_id, member_token, 0, recipient_athlete
-    )
+    recipient_team_id = _own_athlete_at_slot(client, league_id, member_token, 0, recipient_athlete)
 
     proposal = client.post(
         f"/leagues/{league_id}/mercato/scambi/proposte",
@@ -354,9 +350,7 @@ def test_expired_proposal_reads_as_expired_without_a_write(
     league_id = _create_league(client, owner_token, competition_ids, "Lega Scambio Scaduto")
     _add_member(db_session, league_id, member_id)
     recipient_athlete = _seed_athlete(db_session, 9507, "Destinatario Scaduto")
-    recipient_team_id = _own_athlete_at_slot(
-        client, league_id, member_token, 0, recipient_athlete
-    )
+    recipient_team_id = _own_athlete_at_slot(client, league_id, member_token, 0, recipient_athlete)
 
     proposal = client.post(
         f"/leagues/{league_id}/mercato/scambi/proposte",
@@ -394,9 +388,7 @@ def test_trade_proposal_expiry_is_optional(
     league_id = _create_league(client, owner_token, competition_ids, "Lega Scambio Senza Scadenza")
     _add_member(db_session, league_id, member_id)
     recipient_athlete = _seed_athlete(db_session, 9509, "Destinatario Senza Scadenza")
-    recipient_team_id = _own_athlete_at_slot(
-        client, league_id, member_token, 0, recipient_athlete
-    )
+    recipient_team_id = _own_athlete_at_slot(client, league_id, member_token, 0, recipient_athlete)
 
     proposal = client.post(
         f"/leagues/{league_id}/mercato/scambi/proposte",
@@ -442,9 +434,7 @@ def test_concurrent_cancel_attempts_only_one_succeeds(
     league_id = _create_league(client, owner_token, competition_ids, "Lega Concorrenza Scambio")
     _add_member(db_session, league_id, member_id)
     recipient_athlete = _seed_athlete(db_session, 9508, "Destinatario Concorrenza")
-    recipient_team_id = _own_athlete_at_slot(
-        client, league_id, member_token, 0, recipient_athlete
-    )
+    recipient_team_id = _own_athlete_at_slot(client, league_id, member_token, 0, recipient_athlete)
 
     proposal = client.post(
         f"/leagues/{league_id}/mercato/scambi/proposte",

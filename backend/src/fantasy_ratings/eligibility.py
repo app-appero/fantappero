@@ -29,8 +29,7 @@ def coerce_minutes_threshold(value: int) -> int:
         raise ValueError("minutes_threshold must be an integer")
     if value < MIN_MINUTES_THRESHOLD or value > MAX_MINUTES_THRESHOLD:
         raise ValueError(
-            "minutes_threshold must be between "
-            f"{MIN_MINUTES_THRESHOLD} and {MAX_MINUTES_THRESHOLD}"
+            f"minutes_threshold must be between {MIN_MINUTES_THRESHOLD} and {MAX_MINUTES_THRESHOLD}"
         )
     return value
 

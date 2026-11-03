@@ -91,7 +91,10 @@ def import_season_task(*, job_id: str, actor_id: str | None) -> dict:
             )
         )
 
-        if fixtures_result.counters.fixtures_created > 0 or fixtures_result.counters.fixtures_updated > 0:
+        if (
+            fixtures_result.counters.fixtures_created > 0
+            or fixtures_result.counters.fixtures_updated > 0
+        ):
             try:
                 from fantasy_turns.tasks import ensure_upcoming_fantasy_turns_task
 

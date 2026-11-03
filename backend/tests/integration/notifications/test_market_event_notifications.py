@@ -153,7 +153,7 @@ def test_trade_proposal_notifies_recipient(
 
     league = db_session.get(League, league_id)
     proposer_user = db_session.get(User, proposer_id)
-    proposer_team = db_session.scalars(
+    proposer_team = db_session.scalars(  # noqa: F841
         select(FantasyTeam).where(FantasyTeam.league_id == league_id)
     ).one()
     recipient_team = _second_team(db_session, league_id, recipient_id)

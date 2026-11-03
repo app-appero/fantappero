@@ -13,10 +13,10 @@ from auth.exceptions import ValidationAuthError
 from auth.models.user import User
 from authorization.context import LeagueAccess
 from database.enums import (
+    FantasyTurnStatus,
     LeagueAuditAction,
     LeagueCalendarFormat,
     LeagueCalendarStatus,
-    FantasyTurnStatus,
 )
 from fantasy_teams.composition_service import league_rosters_complete
 from fantasy_turns.models import FantasyRound
@@ -130,7 +130,7 @@ class LeagueCalendarService:
                 labels={"result": "results_locked"},
             )
             raise ValidationAuthError(
-                "Il calendario ha già risultati calcolati: usa \"Aggiorna calendario\" "
+                'Il calendario ha già risultati calcolati: usa "Aggiorna calendario" '
                 "per aggiungere le giornate mancanti senza perdere lo storico.",
                 code="league_calendar_results_locked",
             )
@@ -181,9 +181,7 @@ class LeagueCalendarService:
             (row.window_start_at, row.window_end_at): row.number for row in european_rounds
         }
         local_to_absolute: dict[int, int] = {
-            planned.round_number: number_by_window[
-                (planned.window_start_at, planned.window_end_at)
-            ]
+            planned.round_number: number_by_window[(planned.window_start_at, planned.window_end_at)]
             for planned in plan.rounds
         }
 

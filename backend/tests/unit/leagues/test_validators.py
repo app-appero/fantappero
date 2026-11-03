@@ -267,8 +267,7 @@ def test_validate_second_leg_not_started_singular_message() -> None:
         validate_second_leg_not_started(["Serie A"])
     assert excinfo.value.code == "competition_second_leg_started"
     assert (
-        excinfo.value.message
-        == "Non è possibile creare la lega: il campionato 'Serie A' ha già "
+        excinfo.value.message == "Non è possibile creare la lega: il campionato 'Serie A' ha già "
         "iniziato il girone di ritorno."
     )
 

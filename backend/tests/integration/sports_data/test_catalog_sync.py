@@ -146,6 +146,5 @@ def test_catalog_sync_skips_national_clubs(session: Session) -> None:
         is not None
     )
     assert (
-        session.execute(select(Club).where(Club.provider_id == 900002)).scalar_one_or_none()
-        is None
+        session.execute(select(Club).where(Club.provider_id == 900002)).scalar_one_or_none() is None
     )

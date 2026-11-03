@@ -42,7 +42,9 @@ def read_market_open_map(
     except ProgrammingError:
         session.rollback()
         return {}
-    return {row.id: bool(row.market_open) if row.market_open is not None else default for row in rows}
+    return {
+        row.id: bool(row.market_open) if row.market_open is not None else default for row in rows
+    }
 
 
 def write_market_open(session: Session, league_id: UUID, open_flag: bool) -> None:

@@ -58,8 +58,7 @@ def process_live_fantasy_rounds(session: Session) -> LivePipelineResult:
             .join(FantasyRoundFixture, FantasyRoundFixture.round_id == FantasyRound.id)
             .join(Fixture, Fixture.id == FantasyRoundFixture.fixture_id)
             .where(
-                FantasyRound.homologation_status
-                == FantasyRoundHomologationStatus.PROVISIONAL,
+                FantasyRound.homologation_status == FantasyRoundHomologationStatus.PROVISIONAL,
                 FantasyRound.status != FantasyTurnStatus.SKIPPED,
                 FantasyRoundFixture.excluded_at.is_(None),
                 Fixture.status_short.in_(STARTED_FIXTURE_STATUSES),

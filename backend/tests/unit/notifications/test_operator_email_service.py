@@ -142,9 +142,7 @@ def test_one_recipient_failure_does_not_block_others_or_history(
     monkeypatch.setattr("mail.tasks.send_message_task", _FlakyTask())
     session = _session_with_users(users)
 
-    log = svc.send_operator_email(
-        session, created_by=uuid4(), subject="S", body="B", audience=ALL
-    )
+    log = svc.send_operator_email(session, created_by=uuid4(), subject="S", body="B", audience=ALL)
 
     assert len(sent) == 1
     assert sent[0]["to_email"] == "ok@example.com"

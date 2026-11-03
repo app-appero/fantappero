@@ -20,9 +20,7 @@ class NotificationsSettingsMixin:
     expo_push_access_token: SecretStr | None = Field(
         default=None,
         validation_alias="EXPO_PUSH_ACCESS_TOKEN",
-        description=(
-            "Optional enhanced-security token for Expo push. Never logged or returned."
-        ),
+        description=("Optional enhanced-security token for Expo push. Never logged or returned."),
     )
     expo_push_timeout_seconds: float = Field(
         default=10.0,

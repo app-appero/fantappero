@@ -531,3 +531,12 @@ export {
   LOGIN_SHOWCASE_PITCH,
 } from "./loginShowcase.js";
 export type { ShowcaseLeague, ShowcasePlayer, ShowcaseRole } from "./loginShowcase.js";
+
+export {
+  PRIVACY_CONTACT_EMAIL,
+  PRIVACY_NOTICE_INTRO,
+  PRIVACY_NOTICE_SECTIONS,
+  PRIVACY_NOTICE_TITLE,
+  PRIVACY_NOTICE_VERSION,
+} from "./privacyNotice.js";
+export type { PrivacyNoticeSection } from "./privacyNotice.js";

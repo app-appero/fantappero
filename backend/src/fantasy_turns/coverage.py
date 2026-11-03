@@ -64,9 +64,7 @@ def lineup_coverage(available_by_role: dict[FantasyRole, int]) -> float:
 
     best_outfield = 0
     for need_def, need_mid, need_fwd in MODULE_OUTFIELD.values():
-        filled = (
-            min(need_def, defenders) + min(need_mid, midfielders) + min(need_fwd, forwards)
-        )
+        filled = min(need_def, defenders) + min(need_mid, midfielders) + min(need_fwd, forwards)
         best_outfield = max(best_outfield, filled)
 
     return (goalkeepers + best_outfield) / STARTER_COUNT
@@ -115,9 +113,7 @@ def load_league_rosters(
     athlete_ids = [athlete_id for _, athlete_id in slots]
     competition_ids = set(
         session.scalars(
-            select(LeagueCompetition.competition_id).where(
-                LeagueCompetition.league_id == league.id
-            )
+            select(LeagueCompetition.competition_id).where(LeagueCompetition.league_id == league.id)
         ).all()
     )
     roles = resolve_effective_athlete_roles(

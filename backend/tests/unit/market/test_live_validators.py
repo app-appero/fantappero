@@ -89,4 +89,3 @@ def test_compute_turn_team_index_single_team_always_zero() -> None:
 
 def test_compute_turn_team_index_returns_none_without_teams() -> None:
     assert compute_turn_team_index(nominated_count=0, team_count=0) is None
-

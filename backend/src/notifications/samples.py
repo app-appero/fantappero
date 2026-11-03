@@ -1,4 +1,4 @@
-"""Notifiche di prova: un esempio per ogni tipo, per vedere testi, icone e push senza aspettare un evento."""
+"""Notifiche di prova: un esempio per ogni tipo, per vedere testi, icone e push senza aspettare un evento."""  # noqa: E501
 
 from __future__ import annotations
 

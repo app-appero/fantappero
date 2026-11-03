@@ -250,9 +250,7 @@ def test_dispatch_push_respects_quiet_hours(monkeypatch: pytest.MonkeyPatch) -> 
             sent.append(kwargs)
 
     monkeypatch.setattr("notifications.tasks.send_push_task", _FakeTask())
-    monkeypatch.setattr(
-        "notifications.push_dispatch.is_within_quiet_hours", lambda **kwargs: True
-    )
+    monkeypatch.setattr("notifications.push_dispatch.is_within_quiet_hours", lambda **kwargs: True)
     user = SimpleNamespace(id=uuid4())
 
     dispatch_notification_push(notification=_notification(), user=user, profile=_profile())
@@ -269,9 +267,7 @@ def test_dispatch_push_respects_global_kill_switch(monkeypatch: pytest.MonkeyPat
 
     monkeypatch.setattr("notifications.tasks.send_push_task", _FakeTask())
     fake_settings = SimpleNamespace(notifications_push_enabled=False)
-    monkeypatch.setattr(
-        "notifications.push_dispatch.get_api_settings", lambda: fake_settings
-    )
+    monkeypatch.setattr("notifications.push_dispatch.get_api_settings", lambda: fake_settings)
     user = SimpleNamespace(id=uuid4())
 
     dispatch_notification_push(notification=_notification(), user=user, profile=_profile())

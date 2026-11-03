@@ -1,4 +1,4 @@
-"""Integration tests for GET /leagues/{league_id}/formazione/prossimo-blocco (EP-turni-automazione)."""
+"""Integration tests for GET /leagues/{league_id}/formazione/prossimo-blocco (EP-turni-automazione)."""  # noqa: E501
 
 from __future__ import annotations
 
@@ -10,12 +10,6 @@ from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 from tests.integration.database.helpers import create_engine_for_url
-
-from database.enums import FantasyTurnKind, FantasyTurnStatus
-from database.session import create_session_factory
-from fantasy_turns.models import FantasyRound
-from leagues.models.competition import Competition
-from leagues.models.league_rules import LeagueRules
 from tests.integration.fantasy_lineups.test_fantasy_lineups import (
     _create_league,
     _create_open_round,
@@ -24,6 +18,12 @@ from tests.integration.fantasy_lineups.test_fantasy_lineups import (
     _seed_roster_athletes,
     _set_athlete_club,
 )
+
+from database.enums import FantasyTurnKind, FantasyTurnStatus
+from database.session import create_session_factory
+from fantasy_turns.models import FantasyRound
+from leagues.models.competition import Competition
+from leagues.models.league_rules import LeagueRules
 
 _ENDPOINT = "prossimo-blocco"
 
@@ -212,13 +212,9 @@ def test_turn_not_open_never_creates_a_team(
 
     owner_token, _ = _register_and_login(client, "countdown.lazyturn.owner@example.com")
     league_id = _create_league(client, owner_token, competition_ids, "Lega Countdown Turno Chiuso")
-    member_token, member_id = _register_and_login(
-        client, "countdown.lazyturn.member@example.com"
-    )
+    member_token, member_id = _register_and_login(client, "countdown.lazyturn.member@example.com")
     db_session.add(
-        LeagueMembership(
-            league_id=UUID(league_id), user_id=member_id, role=LeagueMemberRole.MEMBER
-        )
+        LeagueMembership(league_id=UUID(league_id), user_id=member_id, role=LeagueMemberRole.MEMBER)
     )
     db_session.commit()
 

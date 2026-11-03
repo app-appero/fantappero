@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from uuid import UUID
 
 import pytest
@@ -9,14 +10,12 @@ from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 from tests.integration.database.helpers import create_engine_for_url
-import re
 
 from auth.models.user import User
 from database.enums import PlatformRole
-from mail.capture import get_captured_emails
-
 from database.session import create_session_factory
 from feedback.models import FeedbackAttachment, FeedbackReport
+from mail.capture import get_captured_emails
 
 JPEG = b"\xff\xd8\xff\xe0" + b"jpeg-bytes" * 8
 MP4 = b"\x00\x00\x00\x18ftypmp42" + b"video-bytes" * 8
@@ -78,9 +77,7 @@ def _notifications(client: TestClient, token: str) -> list[dict]:
 
 
 def _feedback_titles(client: TestClient, token: str) -> list[str]:
-    return [
-        item["title"] for item in _notifications(client, token) if "Nuovo " in item["title"]
-    ]
+    return [item["title"] for item in _notifications(client, token) if "Nuovo " in item["title"]]
 
 
 def test_report_reaches_only_operators_with_private_media(
@@ -105,7 +102,10 @@ def test_report_reaches_only_operators_with_private_media(
             "platform": "web",
             "appVersion": "0.0.0",
         },
-        files=[("files", ("foto.jpg", JPEG, "image/jpeg")), ("files", ("clip.mp4", MP4, "video/mp4"))],
+        files=[
+            ("files", ("foto.jpg", JPEG, "image/jpeg")),
+            ("files", ("clip.mp4", MP4, "video/mp4")),
+        ],
     )
     assert response.status_code == 201, response.text
     created = response.json()
@@ -167,7 +167,7 @@ def test_report_reaches_only_operators_with_private_media(
     filtered = client.get("/admin/feedback", params={"status": "new"}, headers=_auth(op1_token))
     assert filtered.json()["total"] == 0 and filtered.json()["newCount"] == 0
 
-    # --- sul disco il file ha un nome neutro e il tipo è quello reale ------------------------------
+    # --- sul disco il file ha un nome neutro e il tipo è quello reale ------------------------
     stored = db_session.scalars(
         select(FeedbackAttachment).where(FeedbackAttachment.report_id == UUID(created["id"]))
     ).all()
@@ -217,7 +217,10 @@ def test_hourly_limit_blocks_spam(
     reset_settings_cache()
     token, _ = _register_and_login(client, db_session, "fb.spam@example.com")
     for _ in range(2):
-        assert client.post("/feedback", headers=_auth(token), data={"message": MESSAGE}).status_code == 201
+        assert (
+            client.post("/feedback", headers=_auth(token), data={"message": MESSAGE}).status_code
+            == 201
+        )
     blocked = client.post("/feedback", headers=_auth(token), data={"message": MESSAGE})
     assert blocked.status_code == 429
     assert blocked.json()["code"] == "feedback_rate_limited"
@@ -250,7 +253,10 @@ def test_export_includes_reports_and_account_deletion_removes_them_with_their_fi
     )
     assert deleted.status_code == 200, deleted.text
     db_session.expire_all()
-    assert db_session.scalars(select(FeedbackReport).where(FeedbackReport.user_id == user_id)).all() == []
+    assert (
+        db_session.scalars(select(FeedbackReport).where(FeedbackReport.user_id == user_id)).all()
+        == []
+    )
     assert (
         db_session.scalars(
             select(FeedbackAttachment).where(
@@ -317,7 +323,9 @@ def test_author_is_notified_of_status_changes_but_never_sees_internal_notes(
 
     # Gli altri utenti e gli operatori non ricevono mai gli avvisi dell'autore.
     assert [i for i in _notifications(client, other_token) if "segnalazione" in i["title"]] == []
-    assert [i for i in _notifications(client, op_token) if "La tua segnalazione" in i["title"]] == []
+    assert [
+        i for i in _notifications(client, op_token) if "La tua segnalazione" in i["title"]
+    ] == []
 
 
 def test_operator_can_physically_delete_a_report_with_its_files(
@@ -334,11 +342,16 @@ def test_operator_can_physically_delete_a_report_with_its_files(
     stored_dir = tmp_path / "feedback"
     assert len(list(stored_dir.iterdir())) == 2
     listing = client.get("/admin/feedback", headers=_auth(op_token)).json()
-    media_url = next(i for i in listing["items"] if i["id"] == created["id"])["attachments"][0]["url"]
+    media_url = next(i for i in listing["items"] if i["id"] == created["id"])["attachments"][0][
+        "url"
+    ]
     assert client.get(media_url).status_code == 200
 
     # Chi non è operatore non può eliminare; una segnalazione inesistente dà 404.
-    assert client.delete(f"/admin/feedback/{created['id']}", headers=_auth(author_token)).status_code == 403
+    assert (
+        client.delete(f"/admin/feedback/{created['id']}", headers=_auth(author_token)).status_code
+        == 403
+    )
     assert client.delete(f"/admin/feedback/{created['id']}").status_code == 401
     missing = client.delete(
         "/admin/feedback/00000000-0000-0000-0000-000000000000", headers=_auth(op_token)
@@ -360,4 +373,7 @@ def test_operator_can_physically_delete_a_report_with_its_files(
     assert list(stored_dir.iterdir()) == []
     assert client.get(media_url).status_code == 404
     assert client.get("/feedback/me", headers=_auth(author_token)).json() == []
-    assert client.delete(f"/admin/feedback/{created['id']}", headers=_auth(op_token)).status_code == 404
+    assert (
+        client.delete(f"/admin/feedback/{created['id']}", headers=_auth(op_token)).status_code
+        == 404
+    )

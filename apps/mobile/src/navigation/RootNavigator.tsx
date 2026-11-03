@@ -9,6 +9,7 @@ import { AuthResetPasswordScreen } from "../screens/AuthResetPasswordScreen";
 import { AuthVerifyEmailScreen } from "../screens/AuthVerifyEmailScreen";
 import { CreateLeagueScreen } from "../screens/CreateLeagueScreen";
 import { FeedbackScreen } from "../screens/FeedbackScreen";
+import { PrivacyScreen } from "../screens/PrivacyScreen";
 import { JoinLeagueScreen } from "../screens/JoinLeagueScreen";
 import { LeagueAdminScreen } from "../screens/LeagueAdminScreen";
 import { LeagueHomeScreen } from "../screens/LeagueHomeScreen";
@@ -76,6 +77,11 @@ export function RootNavigator() {
             options={{ title: "Accedi", headerShown: false }}
           />
           <Stack.Screen
+            name="Privacy"
+            component={PrivacyScreen}
+            options={{ title: "Privacy" }}
+          />
+          <Stack.Screen
             name="AuthRegister"
             component={AuthRegisterScreen}
             options={{ title: "Registrati", headerShown: false }}
@@ -132,6 +138,11 @@ export function RootNavigator() {
             name="Notifications"
             component={NotificationsWithCountdown}
             options={{ title: "Notifiche" }}
+          />
+          <Stack.Screen
+            name="Privacy"
+            component={PrivacyScreen}
+            options={{ title: "Privacy" }}
           />
           <Stack.Screen
             name="Feedback"

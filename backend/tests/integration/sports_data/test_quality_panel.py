@@ -113,11 +113,15 @@ def test_quality_scan_detects_missing_and_is_idempotent(session: Session) -> Non
     assert first.counters.findings >= 2
     assert first.counters.issues_created >= 2
 
-    open_issues = session.execute(
-        select(SportsDataQualityIssue).where(
-            SportsDataQualityIssue.status == QualityIssueStatus.OPEN.value,
-        ),
-    ).scalars().all()
+    open_issues = (
+        session.execute(
+            select(SportsDataQualityIssue).where(
+                SportsDataQualityIssue.status == QualityIssueStatus.OPEN.value,
+            ),
+        )
+        .scalars()
+        .all()
+    )
     codes = {row.code for row in open_issues}
     assert QualityIssueCode.MISSING_EVENTS.value in codes
     assert QualityIssueCode.MISSING_STATS.value in codes
@@ -125,16 +129,23 @@ def test_quality_scan_detects_missing_and_is_idempotent(session: Session) -> Non
     second = scan_quality(session, fixture_ids=[fixture.id])
     session.commit()
     assert second.counters.issues_created == 0
-    open_after = session.execute(
-        select(SportsDataQualityIssue).where(
-            SportsDataQualityIssue.status == QualityIssueStatus.OPEN.value,
-        ),
-    ).scalars().all()
+    open_after = (
+        session.execute(
+            select(SportsDataQualityIssue).where(
+                SportsDataQualityIssue.status == QualityIssueStatus.OPEN.value,
+            ),
+        )
+        .scalars()
+        .all()
+    )
     assert len(open_after) == len(open_issues)
-    assert get_metrics().get_counter(
-        QUALITY_SCAN_RUNS_TOTAL,
-        labels={"provider": "api-football-v3", "status": "ok"},
-    ) >= 2
+    assert (
+        get_metrics().get_counter(
+            QUALITY_SCAN_RUNS_TOTAL,
+            labels={"provider": "api-football-v3", "status": "ok"},
+        )
+        >= 2
+    )
 
 
 def test_retry_sync_offline_idempotent_and_resolves_gap(session: Session) -> None:

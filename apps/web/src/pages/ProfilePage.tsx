@@ -28,6 +28,7 @@ import {
 import { deleteAccount, exportAccountData } from "../api/privacy";
 import { getApiErrorMessage, useAuth } from "../auth/AuthContext";
 import { loadStoredSession } from "../auth/sessionStorage";
+import { Link } from "../router/simpleRouter";
 import { resolveAvatarUrl } from "../utils/avatar";
 import { writeThemePreference } from "../theme/colorScheme";
 import { useThemePreference } from "../theme/useThemePreference";
@@ -719,8 +720,11 @@ export function ProfilePage() {
             {needsPolicyConsent ? (
               <div className="fa-profile-policy" data-testid="profile-policy-pending">
                 <p>
-                  È disponibile una nuova versione della policy ({profile.currentPolicyVersion}).
-                  Accetta per continuare a usare FantApperò.
+                  È disponibile una nuova versione della{" "}
+                  <Link to="/privacy" data-testid="profile-privacy-link">
+                    informativa privacy
+                  </Link>{" "}
+                  ({profile.currentPolicyVersion}). Leggila e accetta per continuare a usare FantApperò.
                 </p>
                 <label className="fa-profile-checkbox">
                   <input
@@ -730,7 +734,7 @@ export function ProfilePage() {
                     disabled={saving}
                     data-testid="profile-policy-checkbox"
                   />
-                  Accetto la policy sulla privacy
+                  Ho letto e accetto l'informativa privacy
                 </label>
                 <Button
                   type="button"

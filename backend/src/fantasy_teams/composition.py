@@ -126,9 +126,7 @@ def evaluate_roster_composition(
             issues.append(
                 CompositionIssue(
                     code="role_quota_exceeded",
-                    message=(
-                        f"Troppi {ROLE_LABEL_IT[role]}: {current} su massimo {limit}."
-                    ),
+                    message=(f"Troppi {ROLE_LABEL_IT[role]}: {current} su massimo {limit}."),
                 )
             )
 
@@ -137,9 +135,7 @@ def evaluate_roster_composition(
             issues.append(
                 CompositionIssue(
                     code="roster_incomplete",
-                    message=(
-                        f"Rosa incompleta: {filled}/{limits.roster_size} calciatori."
-                    ),
+                    message=(f"Rosa incompleta: {filled}/{limits.roster_size} calciatori."),
                 )
             )
         for role in FantasyRole:
@@ -149,9 +145,7 @@ def evaluate_roster_composition(
                 issues.append(
                     CompositionIssue(
                         code="role_quota_underfilled",
-                        message=(
-                            f"Servono {limit} {ROLE_LABEL_IT[role]}, ne risultano {current}."
-                        ),
+                        message=(f"Servono {limit} {ROLE_LABEL_IT[role]}, ne risultano {current}."),
                     )
                 )
         if competition_count < MIN_ROSTER_COMPETITIONS:

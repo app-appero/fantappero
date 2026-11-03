@@ -153,9 +153,7 @@ def assert_schedule_invariants(schedule: GeneratedSchedule, membership_ids: list
     expected_matchups = len(membership_ids) * (len(membership_ids) - 1) // 2
     if schedule.matchup_count != expected_matchups:
         raise AssertionError("unexpected matchup count")
-    expected_rounds = (
-        len(membership_ids) if len(membership_ids) % 2 else len(membership_ids) - 1
-    )
+    expected_rounds = len(membership_ids) if len(membership_ids) % 2 else len(membership_ids) - 1
     if schedule.round_count != expected_rounds:
         raise AssertionError("unexpected round count")
 

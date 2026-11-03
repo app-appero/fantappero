@@ -10,13 +10,6 @@ from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 from tests.integration.database.helpers import create_engine_for_url
-
-from database.enums import FantasyModule, LineupSlotKind
-from database.session import create_session_factory
-from fantasy_lineups.fallback_service import ensure_lineup_submissions_for_round
-from fantasy_lineups.models import LineupDraft, LineupSubmission
-from fantasy_teams.models import FantasyTeam
-from leagues.models.competition import Competition
 from tests.integration.fantasy_lineups.test_fantasy_lineups import (
     _create_league,
     _create_open_round,
@@ -25,6 +18,13 @@ from tests.integration.fantasy_lineups.test_fantasy_lineups import (
     _register_and_login,
     _seed_roster_athletes,
 )
+
+from database.enums import FantasyModule, LineupSlotKind
+from database.session import create_session_factory
+from fantasy_lineups.fallback_service import ensure_lineup_submissions_for_round
+from fantasy_lineups.models import LineupDraft, LineupSubmission
+from fantasy_teams.models import FantasyTeam
+from leagues.models.competition import Competition
 
 
 @pytest.fixture

@@ -805,9 +805,7 @@ class FantasyTeamService:
                 account,
                 amount=-purchase_credits,
                 reason=CreditLedgerReason.ROSTER_PURCHASE,
-                transaction_id=(
-                    f"purchase:{team.id}:{slot_index}:{athlete_id}:{account.version}"
-                ),
+                transaction_id=(f"purchase:{team.id}:{slot_index}:{athlete_id}:{account.version}"),
                 actor_id=league_access.user.id,
                 note=f"Acquisto {athlete.canonical_name}",
             )
@@ -1159,9 +1157,7 @@ class FantasyTeamService:
             rows.append((athlete.canonical_name, slot.purchase_credits or 0))
         return rows_to_xlsx_bytes(rows)
 
-    def _coach_sheet_names(
-        self, teams: Sequence[FantasyTeam]
-    ) -> list[tuple[FantasyTeam, str]]:
+    def _coach_sheet_names(self, teams: Sequence[FantasyTeam]) -> list[tuple[FantasyTeam, str]]:
         """Ordine deterministico (squadra -> nome foglio) condiviso da export
         e import massivo: se due allenatori hanno lo stesso nome, i due lati
         devono applicare la stessa regola di disambiguazione per concordare."""

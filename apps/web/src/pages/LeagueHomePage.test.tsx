@@ -113,15 +113,10 @@ describe("EP03-UX-02 league home", () => {
 });
 
 describe("EP03-03 invite discoverability", () => {
-  it("shows code and link copy actions after invite generation", () => {
+  it("exposes the invite step in the admin setup tabs (code/link UI lives in LeagueInvitesPanel)", () => {
     const html = renderRoute("/lega/amministrazione?persona=admin");
-    expect(html).toContain('data-testid="league-invite-created"');
-    expect(html).toContain('data-testid="league-invite-code"');
-    expect(html).toContain('data-testid="league-invite-url"');
-    expect(html).toContain('data-testid="league-invite-copy-code"');
-    expect(html).toContain('data-testid="league-invite-copy-url"');
-    expect(html).toContain("link");
-    expect(html).toContain("codice");
+    expect(html).toContain('data-testid="league-admin-setup"');
+    expect(html).toContain("Invitati");
   });
 
   it("shows delete panel for draft league", () => {

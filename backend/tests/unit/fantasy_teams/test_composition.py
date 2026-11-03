@@ -45,12 +45,7 @@ def test_over_quota_rejected_even_when_incomplete_allowed() -> None:
 
 
 def test_season_start_requires_exact_composition_and_competitions() -> None:
-    roles = (
-        [FantasyRole.P] * 3
-        + [FantasyRole.D] * 11
-        + [FantasyRole.C] * 11
-        + [FantasyRole.A] * 10
-    )
+    roles = [FantasyRole.P] * 3 + [FantasyRole.D] * 11 + [FantasyRole.C] * 11 + [FantasyRole.A] * 10
     report = evaluate_roster_composition(
         limits=STANDARD,
         roles=roles,

@@ -118,6 +118,8 @@ def _exclusion_message(
     if recalculated:
         return f"{subject}. Giornata ricalcolata: il risultato resta provvisorio."
     return f"{subject}."
+
+
 _ = (User, Club)
 
 #: Stati provider di una partita conclusa.
@@ -228,9 +230,7 @@ class FantasyTurnService:
         by_round: dict[UUID, list[tuple[str | None, datetime | None]]] = {}
         for round_id, status_short, kickoff_at in fixture_rows:
             by_round.setdefault(round_id, []).append((status_short, kickoff_at))
-        entries = [
-            (row, aggregate_turn_status(by_round.get(row.id, []))) for row in rounds
-        ]
+        entries = [(row, aggregate_turn_status(by_round.get(row.id, []))) for row in rounds]
         return resolve_default_turn(entries)
 
     def list_pending_fixtures(self, league_access: LeagueAccess) -> list[PendingFixtureResponse]:
@@ -243,9 +243,7 @@ class FantasyTurnService:
         """
         league = league_access.league
         competition_ids = self._session.scalars(
-            select(LeagueCompetition.competition_id).where(
-                LeagueCompetition.league_id == league.id
-            )
+            select(LeagueCompetition.competition_id).where(LeagueCompetition.league_id == league.id)
         ).all()
         if not competition_ids:
             return []
@@ -491,7 +489,6 @@ class FantasyTurnService:
         )
         return EnsureFantasyTurnsResponse(
             leagueId=str(locked.id),
-
             created=created,
             opened=opened,
             upgraded=upgraded,
@@ -1737,9 +1734,7 @@ class FantasyTurnService:
         dei poll periodici PRE/LIVE/POST già esistenti (`sports_data.scheduler`).
         """
         competition_ids = self._session.scalars(
-            select(LeagueCompetition.competition_id).where(
-                LeagueCompetition.league_id == league.id
-            )
+            select(LeagueCompetition.competition_id).where(LeagueCompetition.league_id == league.id)
         ).all()
         if not competition_ids:
             return FixtureSyncResult(counters=FixtureSyncCounters())
@@ -1789,16 +1784,20 @@ class FantasyTurnService:
         season_ids = self._league_season_ids(league)
         if not season_ids:
             return 0
-        missing = self._session.execute(
-            select(Fixture.provider_id)
-            .where(
-                Fixture.sport_season_id.in_(season_ids),
-                Fixture.status_short.in_(FINISHED_FIXTURE_STATUSES),
-                ~exists().where(OfficialLineup.fixture_id == Fixture.id),
+        missing = (
+            self._session.execute(
+                select(Fixture.provider_id)
+                .where(
+                    Fixture.sport_season_id.in_(season_ids),
+                    Fixture.status_short.in_(FINISHED_FIXTURE_STATUSES),
+                    ~exists().where(OfficialLineup.fixture_id == Fixture.id),
+                )
+                .order_by(Fixture.kickoff_at.desc())
+                .limit(limit)
             )
-            .order_by(Fixture.kickoff_at.desc())
-            .limit(limit)
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
         if not missing:
             return 0
         if client is None:
@@ -1834,9 +1833,7 @@ class FantasyTurnService:
 
     def _league_season_ids(self, league: League) -> list[UUID]:
         competition_ids = self._session.scalars(
-            select(LeagueCompetition.competition_id).where(
-                LeagueCompetition.league_id == league.id
-            )
+            select(LeagueCompetition.competition_id).where(LeagueCompetition.league_id == league.id)
         ).all()
         if not competition_ids:
             return []
@@ -1860,9 +1857,7 @@ class FantasyTurnService:
 
     def _count_fixtures_needing_date(self, league: League) -> int:
         competition_ids = self._session.scalars(
-            select(LeagueCompetition.competition_id).where(
-                LeagueCompetition.league_id == league.id
-            )
+            select(LeagueCompetition.competition_id).where(LeagueCompetition.league_id == league.id)
         ).all()
         if not competition_ids:
             return 0
@@ -2025,8 +2020,7 @@ class FantasyTurnService:
                 select(FantasyRound)
                 .where(
                     FantasyRound.league_id == league.id,
-                    FantasyRound.homologation_status
-                    == FantasyRoundHomologationStatus.PROVISIONAL,
+                    FantasyRound.homologation_status == FantasyRoundHomologationStatus.PROVISIONAL,
                     ~exists().where(LineupSubmission.round_id == FantasyRound.id),
                     ~exists().where(EffectiveLineup.round_id == FantasyRound.id),
                 )

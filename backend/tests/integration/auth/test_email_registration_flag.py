@@ -62,7 +62,9 @@ def test_email_registration_is_refused_and_creates_nothing_when_disabled(
     assert "Google" in response.json()["message"]
     # Nessuna email di verifica e nessun account creato.
     assert len(get_captured_emails()) == emails_before
-    login = client.post("/auth/login", json={"email": "flag.spento@example.com", "password": PASSWORD})
+    login = client.post(
+        "/auth/login", json={"email": "flag.spento@example.com", "password": PASSWORD}
+    )
     assert login.status_code == 401
 
 
@@ -78,13 +80,18 @@ def test_google_registration_and_existing_password_logins_keep_working_when_disa
     _set_flag(monkeypatch, "false")
 
     # ...continua ad accedere con email e password,
-    login = client.post("/auth/login", json={"email": "flag.esistente@example.com", "password": PASSWORD})
+    login = client.post(
+        "/auth/login", json={"email": "flag.esistente@example.com", "password": PASSWORD}
+    )
     assert login.status_code == 200, login.text
 
     # ...e con Google si crea un account nuovo, già verificato, senza alcuna email.
     emails_before = len(get_captured_emails())
     identity = GoogleIdentity(
-        sub="google-sub-flag", email="flag.google@example.com", email_verified=True, name="Utente Google"
+        sub="google-sub-flag",
+        email="flag.google@example.com",
+        email_verified=True,
+        name="Utente Google",
     )
     monkeypatch.setattr(google_oauth, "verify_id_token", lambda *_a, **_k: identity)
     google = client.post("/auth/google", json={"idToken": "fake"})

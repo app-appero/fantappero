@@ -175,9 +175,7 @@ def generate_ai_lineup(
     # nulla. Il piano escluderebbe i bloccati, quindi ricostruirlo qui
     # significherebbe cancellarli dalla formazione.
     if existing is not None and existing.system_generated_ai:
-        locked_ids = {
-            candidate.athlete_id for candidate in candidates if candidate.kickoff_locked
-        }
+        locked_ids = {candidate.athlete_id for candidate in candidates if candidate.kickoff_locked}
         if any(player.athlete_id in locked_ids for player in existing.players):
             return AiLineupResult(
                 fantasy_team_id=fantasy_team_id,
@@ -506,11 +504,7 @@ def _persist(
         existing_starters = tuple(
             player.athlete_id
             for player in sorted(
-                (
-                    row
-                    for row in submission.players
-                    if row.slot_kind == LineupSlotKind.STARTER
-                ),
+                (row for row in submission.players if row.slot_kind == LineupSlotKind.STARTER),
                 key=lambda row: row.sort_order,
             )
         )

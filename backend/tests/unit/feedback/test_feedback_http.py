@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import os
 from types import SimpleNamespace
 from uuid import uuid4
 
@@ -79,7 +78,12 @@ def test_multipart_report_with_image_reaches_the_service(client):
     http, service = client
     response = http.post(
         "/feedback",
-        data={"message": "Il pulsante salva non risponde.", "category": "bug", "pageContext": "/formazione", "platform": "web"},
+        data={
+            "message": "Il pulsante salva non risponde.",
+            "category": "bug",
+            "pageContext": "/formazione",
+            "platform": "web",
+        },
         files=[("files", ("screen.png", JPEG, "image/png"))],
     )
     assert response.status_code == 201, response.text
@@ -114,9 +118,7 @@ def test_a_20_mib_video_passes_on_the_feedback_path_but_not_elsewhere(client):
 
 def test_media_link_requires_a_valid_token(client, tmp_path):
     http, service = client
-    attachment = SimpleNamespace(
-        id=uuid4(), stored_name="clip.mp4", content_type="video/mp4"
-    )
+    attachment = SimpleNamespace(id=uuid4(), stored_name="clip.mp4", content_type="video/mp4")
     service.attachment = attachment
     (tmp_path / "clip.mp4").write_bytes(MP4)
     secret = get_api_settings().resolved_jwt_secret()

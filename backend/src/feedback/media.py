@@ -54,7 +54,9 @@ def _sign(secret: str, attachment_id: UUID, expires_at: int) -> str:
     return base64.urlsafe_b64encode(digest).decode().rstrip("=")
 
 
-def make_media_token(secret: str, attachment_id: UUID, *, ttl_seconds: int, now: float | None = None) -> str:
+def make_media_token(
+    secret: str, attachment_id: UUID, *, ttl_seconds: int, now: float | None = None
+) -> str:
     """Token a scadenza che autorizza la lettura di UN allegato (vedi `verify_media_token`)."""
     expires_at = int((time.time() if now is None else now) + ttl_seconds)
     return f"{expires_at}.{_sign(secret, attachment_id, expires_at)}"

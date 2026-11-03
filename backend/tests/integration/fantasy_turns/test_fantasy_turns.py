@@ -117,9 +117,7 @@ def _seed_weekend_fixtures(
     clubs: list[Club] = []
     seasons: list[SportSeason] = []
     for i in range(count * 2):
-        club = db_session.scalars(
-            select(Club).where(Club.provider_id == club_base + i)
-        ).first()
+        club = db_session.scalars(select(Club).where(Club.provider_id == club_base + i)).first()
         if club is None:
             club = Club(provider_id=club_base + i, name=f"Club {club_base}-{i}")
             db_session.add(club)
@@ -205,9 +203,7 @@ def _stock_rosters_for_window(
             )
         ).first()
         if exists_link is None:
-            db_session.add(
-                CompetitionSeasonClub(sport_season_id=season.id, club_id=club.id)
-            )
+            db_session.add(CompetitionSeasonClub(sport_season_id=season.id, club_id=club.id))
     db_session.flush()
 
     teams = db_session.scalars(
@@ -241,9 +237,7 @@ def _stock_rosters_for_window(
             for _ in range(needed):
                 if cursor >= len(free_slots):
                     break
-                athlete = Athlete(
-                    provider_id=provider_id, canonical_name=f"Player {provider_id}"
-                )
+                athlete = Athlete(provider_id=provider_id, canonical_name=f"Player {provider_id}")
                 db_session.add(athlete)
                 db_session.flush()
                 db_session.add(
@@ -281,8 +275,13 @@ def test_generate_turn_success_and_permissions(
     _set_min_fixtures(db_session, league_id, 10)
     kickoff = datetime(2026, 8, 15, 14, 0, tzinfo=UTC)
     _seed_weekend_fixtures(
-        db_session, competition_ids, count=12, kickoff=kickoff, id_offset=910_000
-    , league_id=league_id)
+        db_session,
+        competition_ids,
+        count=12,
+        kickoff=kickoff,
+        id_offset=910_000,
+        league_id=league_id,
+    )
 
     forbidden = client.get(
         f"/leagues/{league_id}/turni",
@@ -345,7 +344,14 @@ def test_generate_skipped_when_threshold_not_met(
     league_id = _create_league(client, token, competition_ids, "Lega Skip")
     _set_min_fixtures(db_session, league_id, 40)
     kickoff = datetime(2026, 9, 12, 16, 0, tzinfo=UTC)  # Saturday in a fresh weekend
-    _seed_weekend_fixtures(db_session, competition_ids, count=3, kickoff=kickoff, id_offset=920_000, league_id=league_id)
+    _seed_weekend_fixtures(
+        db_session,
+        competition_ids,
+        count=3,
+        kickoff=kickoff,
+        id_offset=920_000,
+        league_id=league_id,
+    )
 
     created = client.post(
         f"/leagues/{league_id}/turni",
@@ -374,8 +380,13 @@ def test_exclude_before_open_and_reject_after_open(
     saturday = today + timedelta(days=days_until_saturday or 7)
     kickoff = datetime(saturday.year, saturday.month, saturday.day, 18, 0, tzinfo=UTC)
     fixture_ids = _seed_weekend_fixtures(
-        db_session, competition_ids, count=12, kickoff=kickoff, id_offset=930_000
-    , league_id=league_id)
+        db_session,
+        competition_ids,
+        count=12,
+        kickoff=kickoff,
+        id_offset=930_000,
+        league_id=league_id,
+    )
 
     created = client.post(
         f"/leagues/{league_id}/turni",
@@ -424,8 +435,13 @@ def test_recalculate_cutoff_after_kickoff_change(
     _set_min_fixtures(db_session, league_id, 10)
     kickoff = datetime(2026, 8, 15, 12, 0, tzinfo=UTC)
     fixture_ids = _seed_weekend_fixtures(
-        db_session, competition_ids, count=10, kickoff=kickoff, id_offset=940_000
-    , league_id=league_id)
+        db_session,
+        competition_ids,
+        count=10,
+        kickoff=kickoff,
+        id_offset=940_000,
+        league_id=league_id,
+    )
 
     created = client.post(
         f"/leagues/{league_id}/turni",
@@ -467,8 +483,13 @@ def test_fixture_cannot_belong_to_two_active_turns(
     _set_min_fixtures(db_session, league_id, 10)
     kickoff = datetime(2026, 8, 15, 15, 0, tzinfo=UTC)
     _seed_weekend_fixtures(
-        db_session, competition_ids, count=10, kickoff=kickoff, id_offset=950_000
-    , league_id=league_id)
+        db_session,
+        competition_ids,
+        count=10,
+        kickoff=kickoff,
+        id_offset=950_000,
+        league_id=league_id,
+    )
 
     first = client.post(
         f"/leagues/{league_id}/turni",
@@ -506,8 +527,13 @@ def test_ensure_sincronizza_creates_and_is_idempotent(
     saturday = today + timedelta(days=days_until_saturday or 7)
     kickoff = datetime(saturday.year, saturday.month, saturday.day, 15, 0, tzinfo=UTC)
     _seed_weekend_fixtures(
-        db_session, competition_ids, count=12, kickoff=kickoff, id_offset=960_000
-    , league_id=league_id)
+        db_session,
+        competition_ids,
+        count=12,
+        kickoff=kickoff,
+        id_offset=960_000,
+        league_id=league_id,
+    )
 
     first = client.post(
         f"/leagues/{league_id}/turni/sincronizza",
@@ -632,11 +658,21 @@ def test_round_numbering_stays_chronological_when_generated_out_of_order(
     later_kickoff = datetime(2026, 9, 5, 15, 0, tzinfo=UTC)
     earlier_kickoff = datetime(2026, 8, 15, 15, 0, tzinfo=UTC)
     _seed_weekend_fixtures(
-        db_session, competition_ids, count=10, kickoff=later_kickoff, id_offset=985_000
-    , league_id=league_id)
+        db_session,
+        competition_ids,
+        count=10,
+        kickoff=later_kickoff,
+        id_offset=985_000,
+        league_id=league_id,
+    )
     _seed_weekend_fixtures(
-        db_session, competition_ids, count=10, kickoff=earlier_kickoff, id_offset=986_000
-    , league_id=league_id)
+        db_session,
+        competition_ids,
+        count=10,
+        kickoff=earlier_kickoff,
+        id_offset=986_000,
+        league_id=league_id,
+    )
 
     # Generated out of order: the chronologically later window first.
     later = client.post(
@@ -831,8 +867,13 @@ def test_ensure_sincronizza_reconciles_existing_cutoff_after_time_change(
     saturday = today + timedelta(days=days_until_saturday or 7)
     kickoff = datetime(saturday.year, saturday.month, saturday.day, 15, 0, tzinfo=UTC)
     fixture_ids = _seed_weekend_fixtures(
-        db_session, competition_ids, count=12, kickoff=kickoff, id_offset=982_000
-    , league_id=league_id)
+        db_session,
+        competition_ids,
+        count=12,
+        kickoff=kickoff,
+        id_offset=982_000,
+        league_id=league_id,
+    )
     target_id = str(fixture_ids[0])
 
     synced = client.post(
@@ -897,13 +938,16 @@ def test_prune_invalid_rounds_removes_phantom_turns_and_renumbers(
     sincronizzazioni precedenti alla correzione che smette di materializzare
     finestre vuote — vengono rimossi, e i numeri restanti si richiudono senza
     buchi (EP-turni-numerazione: "mi ritrovo con 86 turni")."""
+    from database.enums import (
+        FantasyRoundFixtureReason,
+        FantasyTurnKind,
+        FantasyTurnStatus,
+        LeagueState,
+    )
+    from fantasy_teams.factory import ensure_team_for_membership
     from fantasy_turns.models import FantasyRoundFixture
     from fantasy_turns.service import FantasyTurnService
-    from database.enums import LeagueState
-    from database.enums import FantasyRoundFixtureReason, FantasyTurnKind, FantasyTurnStatus
     from leagues.models.league import League
-
-    from fantasy_teams.factory import ensure_team_for_membership
     from leagues.models.league_competition import LeagueCompetition
 
     token, user_id = _register_and_login(client, "turn.phantom@example.com")
@@ -911,12 +955,8 @@ def test_prune_invalid_rounds_removes_phantom_turns_and_renumbers(
     db_session.add(league)
     db_session.flush()
     for competition_id in competition_ids:
-        db_session.add(
-            LeagueCompetition(league_id=league.id, competition_id=UUID(competition_id))
-        )
-    membership = LeagueMembership(
-        league_id=league.id, user_id=user_id, role=LeagueMemberRole.OWNER
-    )
+        db_session.add(LeagueCompetition(league_id=league.id, competition_id=UUID(competition_id)))
+    membership = LeagueMembership(league_id=league.id, user_id=user_id, role=LeagueMemberRole.OWNER)
     db_session.add(membership)
     db_session.flush()
     # Serve una rosa reale: con la regola di copertura un turno sopravvive

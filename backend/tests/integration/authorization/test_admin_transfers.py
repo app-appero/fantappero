@@ -59,7 +59,9 @@ def _promote(db_session: Session, user_id: UUID) -> None:
 
 def _seed_pending_transfer(db_session: Session, *, suffix: str) -> UUID:
     club = Club(provider_id=900_000 + hash(suffix) % 1000, name=f"Club {suffix}")
-    athlete = Athlete(provider_id=900_000 + hash(suffix) % 1000 + 1, canonical_name=f"Player {suffix}")
+    athlete = Athlete(
+        provider_id=900_000 + hash(suffix) % 1000 + 1, canonical_name=f"Player {suffix}"
+    )
     db_session.add_all([club, athlete])
     db_session.flush()
     transfer = Transfer(
@@ -81,9 +83,7 @@ def test_pending_transfers_requires_authentication(client: TestClient) -> None:
     assert response.status_code == 401
 
 
-def test_pending_transfers_denied_for_non_operator(
-    client: TestClient, db_session: Session
-) -> None:
+def test_pending_transfers_denied_for_non_operator(client: TestClient, db_session: Session) -> None:
     token, _ = _register_and_login(client, "transfers.member@example.com")
     response = client.get(
         "/admin/transfers/pending-review",
@@ -141,9 +141,7 @@ def test_reviewing_twice_is_rejected(client: TestClient, db_session: Session) ->
     assert second.json()["code"] == "admin_transfer_already_reviewed"
 
 
-def test_reviewing_unknown_transfer_is_not_found(
-    client: TestClient, db_session: Session
-) -> None:
+def test_reviewing_unknown_transfer_is_not_found(client: TestClient, db_session: Session) -> None:
     token, operator_id = _register_and_login(client, "transfers.operator.three@example.com")
     _promote(db_session, operator_id)
 

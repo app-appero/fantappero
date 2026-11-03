@@ -212,7 +212,10 @@ def get_calendar_refresh_progress(
     if progress is None or progress.league_id != str(league_access.league.id):
         return JSONResponse(
             status_code=status.HTTP_404_NOT_FOUND,
-            content={"message": "Job di aggiornamento non trovato.", "code": "calendar_refresh_job_not_found"},
+            content={
+                "message": "Job di aggiornamento non trovato.",
+                "code": "calendar_refresh_job_not_found",
+            },
         )
     result = None
     if progress.result is not None:

@@ -192,7 +192,9 @@ class FeedbackService:
         )
         profile = self._session.get(UserProfile, author.id)
         name = author_name(author, profile)
-        excerpt = report.message[:_EXCERPT_CHARS] + ("…" if len(report.message) > _EXCERPT_CHARS else "")
+        excerpt = report.message[:_EXCERPT_CHARS] + (
+            "…" if len(report.message) > _EXCERPT_CHARS else ""
+        )
         service = NotificationService(self._session)
         for operator_id in operator_ids:
             service.create_notification(
@@ -268,7 +270,9 @@ class FeedbackService:
         )
         return rows, total, new_count
 
-    def authors(self, reports: Sequence[FeedbackReport]) -> dict[UUID, tuple[User, UserProfile | None]]:
+    def authors(
+        self, reports: Sequence[FeedbackReport]
+    ) -> dict[UUID, tuple[User, UserProfile | None]]:
         ids = {report.user_id for report in reports}
         if not ids:
             return {}
@@ -335,7 +339,9 @@ class FeedbackService:
         """
         if report.status not in AUTHOR_NOTIFIED_STATUSES:
             return
-        excerpt = report.message[:_EXCERPT_CHARS] + ("…" if len(report.message) > _EXCERPT_CHARS else "")
+        excerpt = report.message[:_EXCERPT_CHARS] + (
+            "…" if len(report.message) > _EXCERPT_CHARS else ""
+        )
         NotificationService(self._session).create_notification(
             user_id=report.user_id,
             category=NotificationCategory.SISTEMA,

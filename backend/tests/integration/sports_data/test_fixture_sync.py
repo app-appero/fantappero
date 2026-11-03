@@ -169,13 +169,17 @@ def test_event_correction_and_retraction_detected(session: Session) -> None:
     assert result.counters.events_retracted >= 1
     assert result.counters.events_corrected >= 1
 
-    retracted = session.execute(
-        select(MatchEvent).where(
-            MatchEvent.is_active.is_(False),
-            MatchEvent.event_detail == "Yellow Card",
-            MatchEvent.minute_elapsed == 13,
-        ),
-    ).scalars().all()
+    retracted = (
+        session.execute(
+            select(MatchEvent).where(
+                MatchEvent.is_active.is_(False),
+                MatchEvent.event_detail == "Yellow Card",
+                MatchEvent.minute_elapsed == 13,
+            ),
+        )
+        .scalars()
+        .all()
+    )
     assert len(retracted) == 1
     assert retracted[0].retracted_at is not None
 

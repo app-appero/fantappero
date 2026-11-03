@@ -231,20 +231,12 @@ def test_history_filters_by_fantasy_team_id(
     assert _bid(client, league_id, session_id, member_token, athlete.id, 100).status_code == 200
     assert _close_and_resolve(client, league_id, session_id, admin_token).status_code == 200
 
-    winner_history = _history(
-        client, league_id, admin_token, fantasyTeamId=admin_team_id
-    ).json()
-    assert any(
-        item["action"] == "market_session_resolved" for item in winner_history["items"]
-    )
+    winner_history = _history(client, league_id, admin_token, fantasyTeamId=admin_team_id).json()
+    assert any(item["action"] == "market_session_resolved" for item in winner_history["items"])
     assert any(item["action"] == "market_bid_submitted" for item in winner_history["items"])
 
-    loser_history = _history(
-        client, league_id, admin_token, fantasyTeamId=member_team_id
-    ).json()
-    assert not any(
-        item["action"] == "market_session_resolved" for item in loser_history["items"]
-    )
+    loser_history = _history(client, league_id, admin_token, fantasyTeamId=member_team_id).json()
+    assert not any(item["action"] == "market_session_resolved" for item in loser_history["items"])
     assert any(item["action"] == "market_bid_submitted" for item in loser_history["items"])
 
 

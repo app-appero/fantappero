@@ -224,9 +224,7 @@ def test_assign_random_ai_roster_fills_complete_composition(
     assert body["filledSlots"] == 35
     assert body["composition"]["counts"] == {"P": 3, "D": 11, "C": 11, "A": 10}
     assert all(
-        slot["purchaseCredits"] == 1
-        for slot in body["slots"]
-        if slot["athleteId"] is not None
+        slot["purchaseCredits"] == 1 for slot in body["slots"] if slot["athleteId"] is not None
     )
 
     credits = client.get(
@@ -283,9 +281,7 @@ def test_assign_random_ai_roster_ignores_athletes_outside_league_competitions(
         headers={"Authorization": f"Bearer {token}"},
     )
     assert ensured.status_code == 200
-    ai_team = next(
-        team for team in ensured.json()["teams"] if team["userId"] == str(ai_user.id)
-    )
+    ai_team = next(team for team in ensured.json()["teams"] if team["userId"] == str(ai_user.id))
 
     response = client.post(
         f"/leagues/{league_id}/amministrazione/squadre/{ai_team['id']}/rosa/random",
@@ -297,9 +293,7 @@ def test_assign_random_ai_roster_ignores_athletes_outside_league_competitions(
     assert body["composition"]["counts"] == {"P": 3, "D": 11, "C": 11, "A": 10}
 
     assigned_ids = {
-        str(slot["athleteId"])
-        for slot in body["slots"]
-        if slot["athleteId"] is not None
+        str(slot["athleteId"]) for slot in body["slots"] if slot["athleteId"] is not None
     }
     assert assigned_ids.isdisjoint(decoy_ids)
 

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
 
+from sports_data.provider.constants import MVP_LEAGUE_IDS
 from sports_data.provider.types import ProviderRateLimit
 from sports_data.scheduler.locks import InMemoryJobLock, hold_job_lock
 from sports_data.scheduler.policy import (
@@ -17,7 +18,6 @@ from sports_data.scheduler.quota import (
     max_fixtures_for_mode,
     resolve_quota_mode,
 )
-from sports_data.provider.constants import MVP_LEAGUE_IDS
 from sports_data.scheduler.runner import competition_calendar_queries
 from sports_data.scheduler.windows import PollWindow, classify_fixture_window, stale_result_rank
 

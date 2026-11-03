@@ -468,8 +468,7 @@ def get_league_h2h_calendar(
 ) -> H2HCalendarResponse | None:
     """Calendario H2H: confermato per tutti; bozza solo per admin (anteprima post-genera)."""
     include_draft = (
-        league_access.operator_bypass
-        or league_access.api_role == LeagueRole.LEAGUE_ADMIN
+        league_access.operator_bypass or league_access.api_role == LeagueRole.LEAGUE_ADMIN
     )
     return get_h2h_calendar(
         session,
@@ -729,8 +728,7 @@ def get_league_standings(
         user.id: user.profile.nickname if user.profile is not None else None for user in owners
     }
     manager_avatars = {
-        user.id: user.profile.avatar_url if user.profile is not None else None
-        for user in owners
+        user.id: user.profile.avatar_url if user.profile is not None else None for user in owners
     }
     return [
         LeagueStandingResponse(

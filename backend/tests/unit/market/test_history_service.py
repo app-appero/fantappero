@@ -71,9 +71,10 @@ def test_team_ids_for_direct_keys() -> None:
     assert team_ids_for({"fantasyTeamId": team_id}, {}) == {team_id}
     proposer = str(uuid4())
     recipient = str(uuid4())
-    assert team_ids_for(
-        {"proposerTeamId": proposer, "recipientTeamId": recipient}, {}
-    ) == {proposer, recipient}
+    assert team_ids_for({"proposerTeamId": proposer, "recipientTeamId": recipient}, {}) == {
+        proposer,
+        recipient,
+    }
 
 
 def test_team_ids_for_team_ids_list_and_winners() -> None:

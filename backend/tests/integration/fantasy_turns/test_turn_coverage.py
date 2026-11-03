@@ -70,9 +70,7 @@ def _season_for(db_session: Session, competition_id: UUID) -> SportSeason:
     return season
 
 
-def _make_club(
-    db_session: Session, provider_id: int, name: str, *, season: SportSeason
-) -> Club:
+def _make_club(db_session: Session, provider_id: int, name: str, *, season: SportSeason) -> Club:
     club = Club(provider_id=provider_id, name=name)
     db_session.add(club)
     db_session.flush()
@@ -198,7 +196,9 @@ def _build_league(
         provider_id=offset + 5_001,
     )
     # Serve superare anche il pre-filtro sul numero minimo di partite.
-    filler = [_make_club(db_session, offset + 100 + i, f"Filler {i}", season=season) for i in range(20)]
+    filler = [
+        _make_club(db_session, offset + 100 + i, f"Filler {i}", season=season) for i in range(20)
+    ]
     for index in range(10):
         _fixture(
             db_session,
@@ -229,9 +229,7 @@ def test_only_windows_where_everyone_can_field_a_lineup_become_turns(
     client: TestClient,
     db_session: Session,
 ) -> None:
-    league_id, token, _ = _build_league(
-        client, db_session, prefix="coverage", offset=800_000
-    )
+    league_id, token, _ = _build_league(client, db_session, prefix="coverage", offset=800_000)
 
     covered = client.post(
         f"/leagues/{league_id}/turni",
@@ -261,14 +259,10 @@ def test_a_league_without_rosters_generates_no_turns(
     db_session: Session,
 ) -> None:
     """Niente turni prima dell'asta: senza rose non si schiera nulla."""
-    league_id, token, _ = _build_league(
-        client, db_session, prefix="norosters", offset=830_000
-    )
+    league_id, token, _ = _build_league(client, db_session, prefix="norosters", offset=830_000)
 
     db_session.execute(
-        FantasyRosterSlot.__table__.delete().where(
-            FantasyRosterSlot.league_id == UUID(league_id)
-        )
+        FantasyRosterSlot.__table__.delete().where(FantasyRosterSlot.league_id == UUID(league_id))
     )
     db_session.commit()
 
@@ -284,4 +278,3 @@ def test_a_league_without_rosters_generates_no_turns(
         select(FantasyRound).where(FantasyRound.league_id == UUID(league_id))
     ).all()
     assert rounds == []
-
