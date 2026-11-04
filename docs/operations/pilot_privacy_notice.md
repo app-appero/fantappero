@@ -1,8 +1,8 @@
 # Informativa privacy — pilota FantApperò
 
-**Stato: BOZZA v. 2026-11 in attesa di approvazione del privacy contact (Rosario Trotta —
-trottarosario@gmail.com).** La versione precedente (2026-01, approvata il 28/09/2026) parlava
-di email e password e non copriva accesso con Google, segnalazioni con allegati e notifiche.
+**Stato: v. 2026-11 APPROVATA dal privacy contact (Rosario Trotta) il 04/11/2026.** Contatto
+per le richieste: info@globetrotta.it. La versione precedente (2026-01, approvata il 28/09/2026)
+parlava di email e password e non copriva accesso con Google, segnalazioni con allegati e notifiche.
 Testo minimale, pensato per un pilota piccolo tra conoscenti (non un lancio commerciale).
 Se il pilota crescerà o diventerà pubblico va rivisto, idealmente con una consulenza legale.
 
@@ -19,7 +19,7 @@ Il testo qui sotto è la fonte unica: è mostrato in app e sul web alla pagina `
 > perdita di dati non recuperabile.
 >
 > **Chi tratta i dati**: il progetto FantApperò, gestito da Rosario Trotta
-> (trottarosario@gmail.com), che è anche il tuo contatto per qualsiasi richiesta.
+> (info@globetrotta.it), che è anche il tuo contatto per qualsiasi richiesta.
 >
 > **Cosa raccogliamo**
 > - *Account*: l'indirizzo email e il nome del tuo account Google (accedi con Google; non
@@ -43,13 +43,13 @@ Il testo qui sotto è la fonte unica: è mostrato in app e sul web alla pagina `
 > all'account o su tua richiesta.
 >
 > **I tuoi diritti**
-> - *Chiedere una copia di tutti i tuoi dati* (comprese le segnalazioni) scrivendo a trottarosario@gmail.com.
+> - *Chiedere una copia di tutti i tuoi dati* (comprese le segnalazioni) scrivendo a info@globetrotta.it.
 > - *Cancellare il tuo account*: l'email viene sostituita con un valore anonimo, profilo,
 >   avatar, segnalazioni e relativi file vengono eliminati, le sessioni chiuse. Il nome che
 >   avevi scelto resta solo nelle classifiche storiche delle leghe (così i compagni non perdono
 >   la storia della stagione), scollegato dalla tua identità.
 >
-> Per qualsiasi domanda o richiesta scrivi a **trottarosario@gmail.com**. Non inviare mai
+> Per qualsiasi domanda o richiesta scrivi a **info@globetrotta.it**. Non inviare mai
 > password o codici di accesso: non ne abbiamo bisogno per aiutarti.
 >
 > **Età minima**: il pilota non è aperto a persone minorenni.
@@ -58,6 +58,6 @@ Il testo qui sotto è la fonte unica: è mostrato in app e sul web alla pagina `
 
 - **Minorenni**: esclusi dal pilota; nessuna verifica automatica dell'età, regola di
   ammissione manuale applicata in fase di selezione dei partecipanti.
-- **Archivio richieste/ticket**: la casella `trottarosario@gmail.com` funge anche da archivio.
+- **Archivio richieste/ticket**: la casella `info@globetrotta.it` funge anche da archivio.
 - **Consenso**: l'accesso con Google vale come accettazione (frase con link sotto il tasto); il server salva versione e data al login e il profilo le mostra con il link all'informativa. A ogni nuova versione (`PROFILE_POLICY_VERSION`) l'accettazione si registra al prossimo accesso.
 - Coerente con `pilot_support_process.md` (stesso canale, divieto di inviare password/token).

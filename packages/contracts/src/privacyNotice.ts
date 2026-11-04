@@ -4,7 +4,7 @@
  * incrementa `PROFILE_POLICY_VERSION` (backend) così a tutti viene richiesto un nuovo consenso.
  */
 export const PRIVACY_NOTICE_VERSION = "2026-11";
-export const PRIVACY_CONTACT_EMAIL = "trottarosario@gmail.com";
+export const PRIVACY_CONTACT_EMAIL = "info@globetrotta.it";
 
 export type PrivacyNoticeSection = {
   id: string;

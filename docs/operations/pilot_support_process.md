@@ -8,7 +8,7 @@ pilota. Confermato il 28/09/2026 per un pilota piccolo gestito da una sola perso
 
 | Decisione | Proposta Beta | Stato |
 | --- | --- | --- |
-| Canale partecipanti | un indirizzo email o form condiviso, non DM personali | **Confermato**: trottarosario@gmail.com |
+| Canale partecipanti | un indirizzo email o form condiviso, non DM personali | **Confermato**: info@globetrotta.it |
 | Canale urgenze interne | un unico canale del team con reperibile nominato | **Confermato**: nessun team interno separato per un pilota di una persona — stesso indirizzo email, nessuna reperibilità H24 garantita |
 | Copertura | giorni feriali 09:00–18:00 Europe/Rome; P0 fuori fascia via escalation | **Confermato come obiettivo, non garanzia**: senza backup (vedi F1) i P0 fuori orario restano a discrezione/disponibilità del responsabile unico |
 | Coordinatore incidente primario/backup | due persone nominate | Rosario Trotta — trottarosario@gmail.com (unico, nessun backup — rischio accettato il 28/09/2026) |
