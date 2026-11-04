@@ -21,10 +21,13 @@ Stato aggiornato al 04/11/2026.
 
 - [x] `AUTH_EMAIL_REGISTRATION_ENABLED=false` sull'API (solo Google). — Rosario
 - [x] Client ID Google valido per web **e** app (accesso riuscito da entrambi). — Rosario
-- [ ] Volume persistente collegato al servizio API con **mount path `/data`** (oppure
-  `/data/avatars`): lì stanno avatar e allegati delle segnalazioni. La variabile
-  `AVATAR_STORAGE_PATH` **non serve** se si usa il default `/data/avatars`; si imposta solo se il
-  volume è montato altrove. — Rosario
+- [x] Volume persistente collegato all'API: `api-volume`, mount path `/data/avatars`, 5 GB, regione
+  US West (verificato da Rosario su Railway il 04/11/2026). `AVATAR_STORAGE_PATH` non serve
+  (default `/data/avatars`); gli allegati delle segnalazioni vanno in `feedback-private` dentro
+  lo stesso volume.
+- [ ] (Facoltativo) Backup del volume `api-volume`: oggi nessuna copia e nessuna pianificazione;
+  avatar e allegati sono persistenti ma non copiati. Rientra nel rischio «restore non dimostrato»
+  accettato per il pilota. — Rosario
 - [x] `API_FOOTBALL_KEY` presente sul backend e quota giornaliera sufficiente per il periodo. —
   Rosario
 - [ ] Notifiche push funzionanti sull'app Android (notifica di prova ricevuta). — Rosario
