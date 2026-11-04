@@ -622,3 +622,10 @@ Controllando la configurazione reale del `worker` è emerso che `MAIL_FROM=onboa
 Il privacy contact (Rosario Trotta) ha letto e approvato esplicitamente il testo proposto in `docs/operations/pilot_privacy_notice.md`, senza richiedere modifiche. Aggiornato lo stato del documento da "bozza in attesa" ad "approvato". **Blocco F ora chiuso al 100%, nessun loose end residuo.**
 
 **Con questo, tutti i blocchi A-F del piano di chiusura Fase 1 sono chiusi (o esplicitamente spostati in Fase 2 dove pertinente). Resta solo il Blocco G — il pilota reale — mai iniziato, l'unico pezzo davvero mancante per dichiarare la Fase 1 completa.**
+### Blocco E2 — Restore non dimostrato: rischio accettato per il pilota (04/11/2026)
+
+Il decision owner (Rosario Trotta) accetta esplicitamente, **solo per il pilota**, il rischio di non avere un restore dimostrato su ambiente isolato. Stato reale invariato: PITR Railway attivo e archiviazione continua sana, ma il ripristino non è mai stato provato fino in fondo (drill del 01/10 fallito per spazio disco del servizio gemello da 5 GB).
+
+- **Rischio**: in caso di perdita o corruzione del database, il ripristino potrebbe non riuscire o richiedere più tempo del previsto; possibile perdita di dati di gioco.
+- **Mitigazione**: l'informativa privacy avverte i partecipanti di possibili interruzioni e perdita di dati non recuperabile; il pilota è piccolo e composto da conoscenti.
+- **Da rifare prima di qualsiasi apertura oltre il pilota**: restore drill con volume più grande (almeno il doppio dei GB logici di WAL archiviati) e misura del tempo impiegato.
