@@ -31,10 +31,11 @@ Stato aggiornato al 04/11/2026 (commit `53c2ee1`).
 
 ## 3. Email e contatto
 
-- [ ] Dominio verificato su Resend **oppure** decisione scritta di partire senza email
-  (finché non è verificato nessun tester riceve email vere). — Rosario
-- [ ] La casella **info@globetrotta.it** riceve davvero (invio di prova da un altro indirizzo):
-  è il contatto dell'informativa per copia dati ed eliminazione. — Rosario
+- [x] Decisione del 04/11/2026: **il pilota parte senza email** (dominio Resend non verificato).
+  Nessun tester riceve email; restano le notifiche in app e le push Android. Verificare la
+  verifica dominio Resend prima di riattivare registrazione/recupero con email. — Rosario
+- [x] La casella **info@globetrotta.it** riceve (confermato da Rosario il 04/11/2026): è il
+  contatto dell'informativa per copia dati ed eliminazione.
 
 ## 4. Prova completa con un account Google nuovo
 
