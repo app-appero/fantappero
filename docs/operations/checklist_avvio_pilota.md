@@ -80,12 +80,17 @@ Prova completata e confermata da Rosario il 04/11/2026 (web e app).
 
 ## 7. Dopo il lancio
 
-- [ ] Chi guarda i log di Railway (API e worker) e con che frequenza. — Rosario
-- [ ] Canale per i tester: info@globetrotta.it; tempo di risposta dichiarato. — Rosario
-- [ ] Piano se qualcosa si rompe: sospendere gli inviti, avvisare i tester, tornare al tag
-  precedente (vedi `pilot_incident_runbooks.md`). — Rosario
-- [ ] Controllo a 24 ore dal primo invito: errori nei log, segnalazioni arrivate, push consegnate.
-  — Rosario
+- [x] Log di Railway (API e worker): li guardano **insieme Rosario e Claude** (decisione del
+  04/11/2026). Claude controlla solo quando Rosario lo chiede (o con un controllo pianificato,
+  se attivato): serve concordare i momenti, per esempio a fine giornata e dopo ogni segnalazione.
+- [x] Canale per i tester: info@globetrotta.it; risposta **entro 2 giorni lavorativi** (decisione
+  del 04/11/2026). Da comunicare ai tester insieme all'invito.
+- [x] Piano se qualcosa si rompe: sospendere gli inviti, avvisare i tester, **tornare al tag
+  precedente** (decisione del 04/11/2026; vedi `pilot_incident_runbooks.md`). Con il primo tag
+  `pilota-1` non esiste ancora un precedente: in quel caso si sospendono gli inviti e si corregge
+  in avanti.
+- [x] Controllo a 24 ore dal primo invito: lo fanno insieme Rosario e Claude (errori nei log,
+  segnalazioni arrivate, push consegnate).
 
 ## Limiti noti da dire ai tester
 
