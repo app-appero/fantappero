@@ -428,7 +428,6 @@ function BenchOrderRow({
   athleteId,
   index,
   canEnter,
-  maxSubs,
   name,
   role,
   locked,
@@ -445,7 +444,6 @@ function BenchOrderRow({
   athleteId: string;
   index: number;
   canEnter: boolean;
-  maxSubs: number;
   name: string;
   role: LineupRole | null;
   locked: boolean;
@@ -510,9 +508,6 @@ function BenchOrderRow({
             {scoreLabel}
           </strong>
         ) : null}
-        <span className="fa-bench-order__hint">
-          {canEnter ? "può subentrare" : `oltre i ${maxSubs} cambi`}
-        </span>
       </span>
       <div className="fa-bench-order__assign">
         <button
@@ -1961,7 +1956,6 @@ export function FormationPage() {
                             athleteId={athleteId}
                             index={index}
                             canEnter
-                            maxSubs={maxSubs}
                             name={`${playerName(roster, athleteId)}${probableMark(roster, athleteId)}`}
                             role={playerRole(roster, athleteId)}
                             locked={playerLocked(roster, athleteId, clock, lockMarginMinutes)}
@@ -2000,7 +1994,6 @@ export function FormationPage() {
                             athleteId={athleteId}
                             index={index}
                             canEnter={false}
-                            maxSubs={maxSubs}
                             name={`${playerName(roster, athleteId)}${probableMark(roster, athleteId)}`}
                             role={playerRole(roster, athleteId)}
                             locked={playerLocked(roster, athleteId, clock, lockMarginMinutes)}

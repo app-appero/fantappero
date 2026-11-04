@@ -1158,8 +1158,7 @@ export function FormationScreen() {
                     </View>
                     <Text style={styles.meta}>
                       {locked ? "🔒 " : ""}
-                      può subentrare
-                      {playerScoreLabel(id) ? ` · ${playerScoreLabel(id)}` : ""}
+                      {playerScoreLabel(id) ?? ""}
                     </Text>
                   </View>
                   {editable ? (

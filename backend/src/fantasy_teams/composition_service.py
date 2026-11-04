@@ -25,8 +25,10 @@ from leagues.models.league_rules import LeagueRules
 from leagues.validators import LifecycleBlocker
 from sports_data.catalog.models import CompetitionSeasonClub, SportSeason
 from sports_data.listone.generate import get_role_assignment, list_role_assignments
+from sports_data.listone.mapping import map_provider_position_to_role
 from sports_data.listone.models import LeagueRoleOverride, RoleAssignment
 from sports_data.listone.overrides import effective_role_for_athlete, get_active_override
+from sports_data.roster.models import SquadMembership
 
 
 @dataclass(frozen=True)
@@ -93,6 +95,30 @@ def resolve_effective_athlete_roles(
                     current_round=current_round,
                 ),
                 club_id=row.club_id,
+            )
+        missing = [athlete_id for athlete_id in missing if athlete_id not in resolved]
+    if missing:
+        # Calciatori entrati in rosa dopo l'ultima generazione del listone: hanno già la scheda
+        # (posizione del provider) ma nessuna assegnazione di ruolo. Il ruolo si ricava dalla
+        # posizione della loro appartenenza alla squadra in stagione (stesso mapping del listone).
+        memberships = session.execute(
+            select(SquadMembership)
+            .join(SportSeason, SquadMembership.sport_season_id == SportSeason.id)
+            .where(
+                SquadMembership.athlete_id.in_(missing),
+                SportSeason.year == season_year,
+            )
+            .order_by(SquadMembership.is_active.desc(), SquadMembership.updated_at.desc())
+        ).scalars()
+        for membership in memberships:
+            if membership.athlete_id in resolved:
+                continue
+            role = map_provider_position_to_role(membership.provider_position_raw)
+            if role is None:
+                continue
+            resolved[membership.athlete_id] = EffectiveAthleteRole(
+                role=role,
+                club_id=membership.club_id,
             )
     return resolved
 
