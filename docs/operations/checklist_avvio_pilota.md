@@ -30,7 +30,7 @@ Stato aggiornato al 04/11/2026.
   accettato per il pilota. — Rosario
 - [x] `API_FOOTBALL_KEY` presente sul backend e quota giornaliera sufficiente per il periodo. —
   Rosario
-- [ ] Notifiche push funzionanti sull'app Android (notifica di prova ricevuta). — Rosario
+- [x] Notifiche push funzionanti sull'app Android (ricevute, confermato da Rosario il 04/11/2026).
 - [x] Nessun segreto nel repository: i soli ritrovamenti sono i falsi positivi in
   `.gitleaksignore`; il valore di `API_FOOTBALL_KEY=` in `infra/local/.env.example` è un testo
   segnaposto, non una chiave (verificato il 04/11/2026). Confermato da Rosario.
@@ -47,14 +47,16 @@ Stato aggiornato al 04/11/2026.
 
 Da fare sia sul **web** sia nell'**app**:
 
-- [ ] Accesso con Google; nel profilo risulta «Hai accettato l'informativa privacy». — Rosario
-- [ ] Ingresso in una lega con un invito. — Rosario
-- [ ] Mercato e formazione. — Rosario
-- [ ] Partita con voti visibili. — Rosario
-- [ ] «Segnala un problema» con una foto; la segnalazione compare nel pannello operatore. —
+- [x] Accesso con Google; nel profilo risulta «Hai accettato l'informativa privacy». — Rosario
+- [x] Ingresso in una lega con un invito. — Rosario
+- [x] Mercato e formazione. — Rosario
+- [x] Partita con voti visibili. — Rosario
+- [x] «Segnala un problema» con una foto; la segnalazione compare nel pannello operatore. —
   Rosario
-- [ ] Pannello operatore → «Torna all'app» esce correttamente (fix del 03/11). — Rosario
-- [ ] Eliminazione account scrivendo `ELIMINA`. — Rosario
+- [x] Pannello operatore → «Torna all'app» esce correttamente (fix del 03/11). — Rosario
+- [x] Eliminazione account scrivendo `ELIMINA`. — Rosario
+
+Prova completata e confermata da Rosario il 04/11/2026 (web e app).
 
 ## 5. Dati e leghe
 
