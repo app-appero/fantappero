@@ -61,7 +61,11 @@ Prova completata e confermata da Rosario il 04/11/2026 (web e app).
 ## 5. Dati e leghe
 
 - [x] Voti dei turni calcolati (ricalcolo eseguito). — Rosario
-- [ ] Leghe dei tester create, partecipanti invitati, calendario pronto. — Rosario
+- [ ] Le leghe le creano e le configurano i **tester stessi** (l'amministratore di ogni lega:
+  crea la lega, invita i partecipanti, completa rose e calendario; la stagione parte in
+  automatico). Compito di Rosario solo **scegliere gli amministratori** e verificare, dopo gli
+  inviti, che le leghe rientrino nel protocollo (3-5 leghe, 6-12 partecipanti ciascuna, un
+  amministratore ciascuna). — Rosario
 - [x] Protocollo del pilota (dimensione e durata: 3-5 leghe da 6-12 partecipanti, almeno 28 giorni
   e 4 turni per lega, una sola coorte) ratificato dal decision owner il 04/11/2026, senza
   modifiche. Le **soglie di successo** (sezione metriche di `beta_pilot_gate.md`) restano da
