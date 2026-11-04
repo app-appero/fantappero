@@ -1063,12 +1063,32 @@ export function FormationPage() {
     return context?.lineup?.bench.map((player) => player.athleteId) ?? displayBench;
   }
 
+  /**
+   * «Cambia»: il calciatore scelto prende questo posto e chi lo occupava prende il suo (scambio).
+   * Niente scorrimento degli altri, così nessun calciatore finisce spostato senza volerlo.
+   */
   function assignBenchPlayer(slotIndex: number, athleteId: string) {
     const fromIndex = displayBench.indexOf(athleteId);
-    if (fromIndex < 0) {
+    if (fromIndex < 0 || fromIndex === slotIndex || slotIndex < 0 || slotIndex >= displayBench.length) {
       return;
     }
-    moveBenchTo(fromIndex, slotIndex);
+    const next = [...displayBench];
+    const current = next[slotIndex];
+    if (current === undefined) {
+      return;
+    }
+    next[slotIndex] = athleteId;
+    next[fromIndex] = current;
+    const orderIssues = evaluateBenchOrderLock({
+      previousBench: previousBenchIds(),
+      proposedBench: next,
+      lockedAthleteIds,
+    });
+    if (orderIssues.length > 0) {
+      pushToast({ title: orderIssues[0]?.message ?? KICKOFF_LOCK_MESSAGE, variant: "danger" });
+      return;
+    }
+    setBenchIds(next);
   }
 
   function moveBenchTo(fromIndex: number, toIndex: number) {

@@ -1660,32 +1660,32 @@ a.fa-member-list__identity:focus-visible {
   font-size: var(--fa-text-sm);
 }
 
-@media (max-width: 767px) {
-  .fa-bench-order__position {
-    display: none;
-  }
+/* Panchina/tribuna: si cambia sempre con «Cambia» + lista dei calciatori del ruolo (niente
+   menu di posizione, che su desktop sposta gli altri e fa perdere i calciatori appena inseriti). */
+.fa-bench-order__position {
+  display: none;
+}
 
-  .fa-bench-touch-hint {
-    display: block;
-    margin: 0;
-    color: var(--fa-color-foreground-muted);
-    font-size: var(--fa-text-sm);
-  }
+.fa-bench-touch-hint {
+  display: block;
+  margin: 0;
+  color: var(--fa-color-foreground-muted);
+  font-size: var(--fa-text-sm);
+}
 
-  .fa-bench-order__assign {
-    display: flex;
-    margin-left: auto;
-  }
+.fa-bench-order__assign {
+  display: flex;
+  margin-left: auto;
+}
 
-  .fa-bench-picker {
-    display: grid;
-    flex: 1 1 100%;
-    gap: var(--fa-space-xs);
-  }
+.fa-bench-picker {
+  display: grid;
+  flex: 1 1 100%;
+  gap: var(--fa-space-xs);
+}
 
-  .fa-bench-order__row {
-    flex-wrap: wrap;
-  }
+.fa-bench-order__row {
+  flex-wrap: wrap;
 }
 
 .fa-visually-hidden {
