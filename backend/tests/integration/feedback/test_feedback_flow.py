@@ -249,7 +249,7 @@ def test_export_includes_reports_and_account_deletion_removes_them_with_their_fi
     deleted = client.post(
         "/profile/me/delete",
         headers=_auth(token),
-        json={"password": "Password123!", "confirmPhrase": "ELIMINA"},
+        json={"confirmPhrase": "ELIMINA"},
     )
     assert deleted.status_code == 200, deleted.text
     db_session.expire_all()

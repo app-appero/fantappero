@@ -122,7 +122,7 @@ def test_delete_anonymizes_account_and_preserves_league_history(
     delete = client.post(
         "/profile/me/delete",
         headers=headers,
-        json={"password": "Password123!", "confirmPhrase": "ELIMINA"},
+        json={"confirmPhrase": "ELIMINA"},
     )
     assert delete.status_code == 200
     assert "eliminato" in delete.json()["message"].lower()
@@ -163,21 +163,14 @@ def test_delete_anonymizes_account_and_preserves_league_history(
     assert len(audit) == 1
 
 
-def test_delete_requires_valid_password_and_confirmation(client: TestClient) -> None:
+def test_delete_requires_the_typed_confirmation(client: TestClient) -> None:
     session = _register_and_login(client, "guard@example.com", "Guard User")
     headers = {"Authorization": f"Bearer {session['access']}"}
-
-    wrong_password = client.post(
-        "/profile/me/delete",
-        headers=headers,
-        json={"password": "WrongPass123!", "confirmPhrase": "ELIMINA"},
-    )
-    assert wrong_password.status_code == 401
 
     wrong_phrase = client.post(
         "/profile/me/delete",
         headers=headers,
-        json={"password": "Password123!", "confirmPhrase": "elimina"},
+        json={"confirmPhrase": "elimina"},
     )
     assert wrong_phrase.status_code == 400
     assert wrong_phrase.json()["code"] == "invalid_delete_confirmation"
@@ -189,6 +182,6 @@ def test_privacy_endpoints_require_authentication(client: TestClient) -> None:
 
     delete = client.post(
         "/profile/me/delete",
-        json={"password": "Password123!", "confirmPhrase": "ELIMINA"},
+        json={"confirmPhrase": "ELIMINA"},
     )
     assert delete.status_code == 401

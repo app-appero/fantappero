@@ -100,7 +100,6 @@ export function ProfileScreen() {
   const [saving, setSaving] = useState(false);
   const [avatarBusy, setAvatarBusy] = useState(false);
   const [deletePhrase, setDeletePhrase] = useState("");
-  const [deletePassword, setDeletePassword] = useState("");
 
   const applyProfile = useCallback((next: UserProfile) => {
     setProfile(next);
@@ -269,10 +268,6 @@ export function ProfileScreen() {
       setFormError(`Digita ${DELETE_ACCOUNT_CONFIRMATION_PHRASE} per confermare.`);
       return;
     }
-    if (!deletePassword.trim()) {
-      setFormError("Inserisci la password per eliminare l'account.");
-      return;
-    }
     if (!accessToken) {
       setFormError("Sessione non disponibile. Accedi di nuovo.");
       return;
@@ -281,7 +276,6 @@ export function ProfileScreen() {
     try {
       await deleteAccount(accessToken, {
         confirmPhrase: deletePhrase,
-        password: deletePassword,
       });
       await logout();
     } catch (error) {
@@ -503,8 +497,7 @@ export function ProfileScreen() {
         <Text style={styles.sectionTitle}>I tuoi dati</Text>
         <Text style={styles.hint}>Puoi eliminare il tuo account in qualsiasi momento.</Text>
         <Text style={styles.hint}>
-          Per eliminare l&apos;account digita {DELETE_ACCOUNT_CONFIRMATION_PHRASE} e conferma con la
-          password.
+          Per eliminare l&apos;account digita {DELETE_ACCOUNT_CONFIRMATION_PHRASE} e conferma.
         </Text>
         <TextInput
           value={deletePhrase}
@@ -514,15 +507,6 @@ export function ProfileScreen() {
           placeholder={DELETE_ACCOUNT_CONFIRMATION_PHRASE}
           placeholderTextColor={colors.foregroundMuted}
           testID="profile-delete-phrase"
-        />
-        <TextInput
-          value={deletePassword}
-          onChangeText={setDeletePassword}
-          style={styles.input}
-          secureTextEntry
-          placeholder="Password"
-          placeholderTextColor={colors.foregroundMuted}
-          testID="profile-delete-password"
         />
         <Pressable
           accessibilityRole="button"

@@ -130,7 +130,6 @@ def delete_my_account(
     try:
         return service.delete_account(
             current_user,
-            password=body.password,
             confirm_phrase=body.confirm_phrase,
         )
     except AuthError as exc:

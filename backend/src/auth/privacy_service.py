@@ -18,11 +18,10 @@ from auth.models.user_profile import UserProfile
 from auth.privacy_schemas import PrivacyMessageResponse
 from auth.privacy_validators import (
     build_anonymized_email,
-    require_matching_password,
     resolve_historical_display_name,
     validate_delete_confirmation,
 )
-from auth.security import hash_password, utc_now, verify_password
+from auth.security import hash_password, utc_now
 from config.settings.api import ApiSettings
 from database.enums import PrivacyAuditAction
 from feedback.models import FeedbackAttachment, FeedbackReport
@@ -56,7 +55,6 @@ class PrivacyService:
         self,
         user: User,
         *,
-        password: str,
         confirm_phrase: str,
     ) -> PrivacyMessageResponse:
         validate_delete_confirmation(confirm_phrase)
@@ -66,10 +64,6 @@ class PrivacyService:
                 "Questo account è già stato eliminato.",
                 code="account_already_deleted",
             )
-
-        require_matching_password(
-            password_valid=verify_password(loaded.password_hash, password),
-        )
 
         historical_label = resolve_historical_display_name(
             profile_name=loaded.profile.display_name if loaded.profile else None,

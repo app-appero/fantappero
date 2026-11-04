@@ -131,7 +131,6 @@ export function ProfilePage() {
   const [availableForInvites, setAvailableForInvites] = useState(
     demoProfile ? profileInviteAvailability(demoProfile) : true,
   );
-  const [deletePassword, setDeletePassword] = useState("");
   const [deleteConfirmPhrase, setDeleteConfirmPhrase] = useState("");
   const [privacyError, setPrivacyError] = useState<string | null>(null);
   const [privacySuccess, setPrivacySuccess] = useState<string | null>(null);
@@ -362,11 +361,9 @@ export function ProfilePage() {
     setDeleting(true);
     try {
       const result = await deleteAccount(stored.accessToken, {
-        password: deletePassword,
         confirmPhrase: deleteConfirmPhrase.trim(),
       });
       setPrivacySuccess(result.message);
-      setDeletePassword("");
       setDeleteConfirmPhrase("");
       await logout();
     } catch (deleteError) {
@@ -621,15 +618,6 @@ export function ProfilePage() {
                 nome anonimo. L&apos;operazione è irreversibile.
               </p>
               <Input
-                label="Password attuale"
-                name="deletePassword"
-                type="password"
-                value={deletePassword}
-                onChange={(event) => setDeletePassword(event.target.value)}
-                disabled={deleting || isDemoMode}
-                autoComplete="current-password"
-              />
-              <Input
                 label={`Conferma digitando ${DELETE_ACCOUNT_CONFIRMATION_PHRASE}`}
                 name="deleteConfirmPhrase"
                 value={deleteConfirmPhrase}
@@ -642,7 +630,6 @@ export function ProfilePage() {
                 disabled={
                   deleting ||
                   isDemoMode ||
-                  !deletePassword ||
                   deleteConfirmPhrase.trim() !== DELETE_ACCOUNT_CONFIRMATION_PHRASE
                 }
                 onClick={() => void handleDeleteAccount()}

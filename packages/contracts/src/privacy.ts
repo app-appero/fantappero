@@ -1,7 +1,6 @@
 /** Privacy and account data rights contracts (EP02-04). */
 
 export interface DeleteAccountRequest {
-  password: string;
   confirmPhrase: string;
 }
 

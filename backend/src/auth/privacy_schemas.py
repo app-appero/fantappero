@@ -8,7 +8,6 @@ from auth.profile_schemas import ApiModel
 
 
 class DeleteAccountRequest(ApiModel):
-    password: str = Field(min_length=1)
     confirm_phrase: str = Field(alias="confirmPhrase", min_length=1)
 
 
