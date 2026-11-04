@@ -21,8 +21,10 @@ Stato aggiornato al 04/11/2026.
 
 - [x] `AUTH_EMAIL_REGISTRATION_ENABLED=false` sull'API (solo Google). — Rosario
 - [x] Client ID Google valido per web **e** app (accesso riuscito da entrambi). — Rosario
-- [ ] Volume persistente collegato all'API; `AVATAR_STORAGE_PATH` punta al volume (avatar e
-  allegati delle segnalazioni). — Rosario
+- [ ] Volume persistente collegato al servizio API con **mount path `/data`** (oppure
+  `/data/avatars`): lì stanno avatar e allegati delle segnalazioni. La variabile
+  `AVATAR_STORAGE_PATH` **non serve** se si usa il default `/data/avatars`; si imposta solo se il
+  volume è montato altrove. — Rosario
 - [x] `API_FOOTBALL_KEY` presente sul backend e quota giornaliera sufficiente per il periodo. —
   Rosario
 - [ ] Notifiche push funzionanti sull'app Android (notifica di prova ricevuta). — Rosario
