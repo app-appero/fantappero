@@ -1436,23 +1436,25 @@ export function FormationScreen() {
               </View>
             </View>
           ) : null}
-          <Pressable
-            accessibilityRole="button"
-            disabled={toolDisabled || !context.copyAvailable}
-            onPress={() => {
-              setToolsOpen(false);
-              void copyFromPrevious();
-            }}
-            style={[styles.tool, toolDisabled || !context.copyAvailable ? styles.disabled : null]}
-            testID="formation-copy-tool"
-          >
-            <Text style={styles.toolTitle}>Copia formazione precedente</Text>
-            <Text style={styles.meta} testID="formation-previous-hint">
-              {context.previousLineup
-                ? `Turno ${context.previousLineup.roundNumber} · ${context.previousLineup.module}. Viene rivalidata su rosa e disponibilità correnti.`
-                : "Nessuna formazione precedente da copiare."}
-            </Text>
-          </Pressable>
+          {context.copyAvailable ? (
+            <Pressable
+              accessibilityRole="button"
+              disabled={toolDisabled || !context.copyAvailable}
+              onPress={() => {
+                setToolsOpen(false);
+                void copyFromPrevious();
+              }}
+              style={[styles.tool, toolDisabled || !context.copyAvailable ? styles.disabled : null]}
+              testID="formation-copy-tool"
+            >
+              <Text style={styles.toolTitle}>Copia formazione precedente</Text>
+              <Text style={styles.meta} testID="formation-previous-hint">
+                {context.previousLineup
+                  ? `Turno ${context.previousLineup.roundNumber} · ${context.previousLineup.module}. Viene rivalidata su rosa e disponibilità correnti.`
+                  : "Nessuna formazione precedente da copiare."}
+              </Text>
+            </Pressable>
+          ) : null}
           <Pressable
             accessibilityRole="button"
             disabled={toolDisabled}

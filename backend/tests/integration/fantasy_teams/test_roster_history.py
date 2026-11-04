@@ -258,6 +258,8 @@ def test_turn_snapshot_idempotent_and_survives_release(
     assert detail.status_code == 200
     assert detail.json()["entryCount"] >= 1
     assert any(entry["athleteId"] == str(athlete.id) for entry in detail.json()["entries"])
+    # Senza formazione inviata per quel turno la collocazione resta vuota (= «non schierati»).
+    assert all(entry["lineupSection"] is None for entry in detail.json()["entries"])
 
     forbidden = client.post(
         f"/leagues/{league_id}/amministrazione/rosa/snapshot-turni",

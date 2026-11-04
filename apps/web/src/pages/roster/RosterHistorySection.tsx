@@ -1,14 +1,21 @@
-import type {
-  CreditLedgerList,
-  RosterOwnershipHistory,
-  RosterTurnSnapshotDetail,
-  RosterTurnSnapshotSummary,
+import {
+  type CreditLedgerList,
+  type RosterOwnershipHistory,
+  type RosterTurnSnapshotDetail,
+  type RosterTurnSnapshotSummary,
+  SNAPSHOT_SECTIONS,
+  groupSnapshotByTeam,
 } from "@fantappero/contracts";
 import {
   Button,
   Card,
   CardBody,
   CardHeader,
+  Select,
+  Tab,
+  TabList,
+  TabPanel,
+  Tabs,
   Table,
   TableBody,
   TableCell,
@@ -17,6 +24,7 @@ import {
   TableRow,
   UiStatePanel,
 } from "@fantappero/ui";
+import { useMemo, useState } from "react";
 import { AthleteName } from "../../athletes/AthleteCard";
 import { formatLedgerEntry, LEDGER_PAGE_SIZE, roleLabel } from "./rosterHelpers";
 
@@ -255,10 +263,54 @@ export function RosterHistorySection({
                 {new Date(snapshotDetail.capturedAt).toLocaleString("it-IT")} ·{" "}
                 {snapshotDetail.entryCount} assegnazioni
               </p>
+              <SnapshotByTeam entries={snapshotDetail.entries} />
+            </div>
+          )}
+        </CardBody>
+      </Card>
+      ) : null}
+    </div>
+  );
+}
+
+
+/** Snapshot di un turno: una squadra alla volta, con tab Titolari / Panchina / Tribuna. */
+function SnapshotByTeam({ entries }: { entries: RosterTurnSnapshotDetail["entries"] }) {
+  const groups = useMemo(() => groupSnapshotByTeam(entries), [entries]);
+  const [teamId, setTeamId] = useState<string>("");
+  const group = groups.find((item) => item.fantasyTeamId === teamId) ?? groups[0];
+  if (!group) {
+    return null;
+  }
+  const sections = SNAPSHOT_SECTIONS.filter(
+    (section) => section.id !== "unused" || group.sections.unused.length > 0,
+  );
+  return (
+    <div data-testid="roster-snapshot-by-team">
+      <Select
+        label="Squadra"
+        name="snapshotTeam"
+        value={group.fantasyTeamId}
+        options={groups.map((item) => ({ value: item.fantasyTeamId, label: item.teamName }))}
+        onChange={(event) => setTeamId(event.target.value)}
+        data-testid="roster-snapshot-team"
+      />
+      <Tabs key={group.fantasyTeamId} defaultValue="starter" aria-label={`Rosa di ${group.teamName}`}>
+        <TabList>
+          {sections.map((section) => (
+            <Tab key={section.id} value={section.id}>
+              {`${section.label} (${group.sections[section.id].length})`}
+            </Tab>
+          ))}
+        </TabList>
+        {sections.map((section) => (
+          <TabPanel key={section.id} value={section.id}>
+            {group.sections[section.id].length === 0 ? (
+              <p>Nessun calciatore.</p>
+            ) : (
               <Table compact>
                 <TableHead>
                   <TableRow>
-                    <TableHeaderCell>Squadra</TableHeaderCell>
                     <TableHeaderCell>Calciatore</TableHeaderCell>
                     <TableHeaderCell>Ruolo</TableHeaderCell>
                     <TableHeaderCell>Crediti</TableHeaderCell>
@@ -266,9 +318,8 @@ export function RosterHistorySection({
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {snapshotDetail.entries.map((entry) => (
+                  {group.sections[section.id].map((entry) => (
                     <TableRow key={`${entry.fantasyTeamId}-${entry.slotIndex}-${entry.athleteId}`}>
-                      <TableCell>{entry.teamName}</TableCell>
                       <TableCell>
                         <AthleteName athleteId={entry.athleteId}>
                           {entry.athleteName ?? entry.athleteId}
@@ -281,11 +332,10 @@ export function RosterHistorySection({
                   ))}
                 </TableBody>
               </Table>
-            </div>
-          )}
-        </CardBody>
-      </Card>
-      ) : null}
+            )}
+          </TabPanel>
+        ))}
+      </Tabs>
     </div>
   );
 }

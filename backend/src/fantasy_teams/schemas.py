@@ -257,6 +257,9 @@ class RosterTurnSnapshotEntryResponse(ApiModel):
     athlete_name: str | None = Field(default=None, alias="athleteName")
     purchase_credits: int = Field(alias="purchaseCredits")
     role: str | None = None
+    #: Collocazione nella formazione di quel turno: "starter" | "bench" | "tribuna";
+    #: None se la squadra non ha schierato il calciatore (o non ha inviato la formazione).
+    lineup_section: str | None = Field(default=None, alias="lineupSection")
 
 
 class RosterTurnSnapshotDetailResponse(ApiModel):

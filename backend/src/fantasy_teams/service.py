@@ -1762,6 +1762,7 @@ class FantasyTeamService:
         entries = snapshot.entries
         if team_id is not None:
             entries = [row for row in entries if row.fantasy_team_id == team_id]
+        sections = self._lineup_sections(snapshot.league_id, snapshot.round_number)
         return RosterTurnSnapshotDetailResponse(
             id=str(snapshot.id),
             leagueId=str(snapshot.league_id),
@@ -1779,10 +1780,42 @@ class FantasyTeamService:
                     athleteName=row.athlete.canonical_name if row.athlete is not None else None,
                     purchaseCredits=row.purchase_credits,
                     role=row.role,
+                    lineupSection=sections.get((row.fantasy_team_id, row.athlete_id)),
                 )
                 for row in entries
             ],
         )
+
+    def _lineup_sections(self, league_id: UUID, round_number: int) -> dict[tuple[UUID, UUID], str]:
+        """Per ogni (squadra, calciatore): titolare, panchina (primi 10 posti) o tribuna."""
+        from fantasy_lineups.models import LineupPlayer, LineupSubmission
+        from fantasy_lineups.rules import BENCH_ACTIVE_SIZE
+        from fantasy_turns.models import FantasyRound
+
+        rows = self._session.execute(
+            select(
+                LineupSubmission.fantasy_team_id,
+                LineupPlayer.athlete_id,
+                LineupPlayer.slot_kind,
+                LineupPlayer.sort_order,
+            )
+            .join(LineupPlayer, LineupPlayer.submission_id == LineupSubmission.id)
+            .join(FantasyRound, LineupSubmission.round_id == FantasyRound.id)
+            .where(
+                FantasyRound.league_id == league_id,
+                FantasyRound.number == round_number,
+            )
+        ).all()
+        sections: dict[tuple[UUID, UUID], str] = {}
+        for team_id, athlete_id, slot_kind, sort_order in rows:
+            if slot_kind.value == "starter":
+                section = "starter"
+            elif sort_order < BENCH_ACTIVE_SIZE:
+                section = "bench"
+            else:
+                section = "tribuna"
+            sections[(team_id, athlete_id)] = section
+        return sections
 
     def _assert_can_edit_team(self, league_access: LeagueAccess, team: FantasyTeam) -> None:
         if self._is_league_admin(league_access):

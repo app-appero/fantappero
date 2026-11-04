@@ -1678,9 +1678,7 @@ export function FormationPage() {
                   {context.previousLineup.module}). La copia viene rivalidata su rosa e disponibilità
                   correnti.
                 </p>
-              ) : (
-                <p data-testid="formation-previous-empty">Nessuna formazione precedente da copiare.</p>
-              )}
+              ) : null}
               {context.draft ? (
                 <p data-testid="formation-draft-hint">
                   Bozza salvata
@@ -1738,15 +1736,17 @@ export function FormationPage() {
           ) : null}
 
           <div className="fa-formation-layout__actions">
-            <Button
-              type="button"
-              variant="secondary"
-              disabled={busy || !context.modificationAllowed || !canEdit || !context.copyAvailable}
-              onClick={() => void copyFromPrevious()}
-              data-testid="formation-copy"
-            >
-              Copia formazione precedente
-            </Button>
+            {context.copyAvailable ? (
+              <Button
+                type="button"
+                variant="secondary"
+                disabled={busy || !context.modificationAllowed || !canEdit}
+                onClick={() => void copyFromPrevious()}
+                data-testid="formation-copy"
+              >
+                Copia formazione precedente
+              </Button>
+            ) : null}
             <Button
               type="button"
               variant="secondary"

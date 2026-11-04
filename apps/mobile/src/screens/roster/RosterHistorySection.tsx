@@ -1,11 +1,16 @@
-import type {
-  CreditLedgerList,
-  RosterOwnershipHistory,
-  RosterTurnSnapshotDetail,
-  RosterTurnSnapshotSummary,
+import {
+  type CreditLedgerList,
+  type RosterOwnershipHistory,
+  type RosterTurnSnapshotDetail,
+  type RosterTurnSnapshotSummary,
+  type SnapshotSectionId,
+  SNAPSHOT_SECTIONS,
+  groupSnapshotByTeam,
 } from "@fantappero/contracts";
 import { theme } from "@fantappero/ui/theme";
+import { useMemo, useState } from "react";
 import { Pressable, Text, View } from "react-native";
+import { ScreenTabs } from "../../components/ScreenTabs";
 import { AppTextInput as TextInput } from "../../components/AppTextInput";
 import { UiStatePanel } from "../../components/UiStatePanel";
 import { AthleteName } from "../../athletes/AthleteCard";
@@ -209,18 +214,7 @@ export function RosterHistorySection({
             <Text style={styles.meta}>
               Turno {snapshotDetail.roundNumber} · {snapshotDetail.entryCount} assegnazioni
             </Text>
-            {snapshotDetail.entries.map((entry) => (
-              <View
-                key={`${entry.fantasyTeamId}-${entry.slotIndex}-${entry.athleteId}`}
-                style={{ flexDirection: "row", flexWrap: "wrap" }}
-              >
-                <Text style={styles.meta}>{entry.teamName}: </Text>
-                <AthleteName athleteId={entry.athleteId} style={styles.meta}>
-                  {entry.athleteName ?? entry.athleteId}
-                </AthleteName>
-                <Text style={styles.meta}> ({entry.role ?? "—"})</Text>
-              </View>
-            ))}
+            <SnapshotByTeam entries={snapshotDetail.entries} />
             {snapshots.length > 0 ? (
               <Text style={styles.meta}>
                 Snapshot disponibili: {snapshots.map((row) => row.roundNumber).join(", ")}
@@ -230,6 +224,56 @@ export function RosterHistorySection({
         )}
       </View>
       ) : null}
+    </View>
+  );
+}
+
+
+/** Snapshot di un turno: una squadra alla volta, con tab Titolari / Panchina / Tribuna. */
+function SnapshotByTeam({ entries }: { entries: RosterTurnSnapshotDetail["entries"] }) {
+  const groups = useMemo(() => groupSnapshotByTeam(entries), [entries]);
+  const [teamId, setTeamId] = useState("");
+  const [sectionId, setSectionId] = useState<SnapshotSectionId>("starter");
+  const group = groups.find((item) => item.fantasyTeamId === teamId) ?? groups[0];
+  if (!group) {
+    return null;
+  }
+  const sections = SNAPSHOT_SECTIONS.filter(
+    (section) => section.id !== "unused" || group.sections.unused.length > 0,
+  );
+  const activeSection = sections.some((section) => section.id === sectionId) ? sectionId : "starter";
+  return (
+    <View testID="roster-snapshot-by-team">
+      <ScreenTabs
+        items={groups.map((item) => ({ id: item.fantasyTeamId, label: item.teamName }))}
+        activeId={group.fantasyTeamId}
+        onSelect={setTeamId}
+        testID="roster-snapshot-teams"
+      />
+      <ScreenTabs
+        items={sections.map((section) => ({
+          id: section.id,
+          label: `${section.label} (${group.sections[section.id].length})`,
+        }))}
+        activeId={activeSection}
+        onSelect={(id) => setSectionId(id as SnapshotSectionId)}
+        testID="roster-snapshot-sections"
+      />
+      {group.sections[activeSection].length === 0 ? (
+        <Text style={styles.meta}>Nessun calciatore.</Text>
+      ) : (
+        group.sections[activeSection].map((entry) => (
+          <View
+            key={`${entry.fantasyTeamId}-${entry.slotIndex}-${entry.athleteId}`}
+            style={{ flexDirection: "row", flexWrap: "wrap" }}
+          >
+            <AthleteName athleteId={entry.athleteId} style={styles.meta}>
+              {entry.athleteName ?? entry.athleteId}
+            </AthleteName>
+            <Text style={styles.meta}> ({entry.role ?? "—"})</Text>
+          </View>
+        ))
+      )}
     </View>
   );
 }

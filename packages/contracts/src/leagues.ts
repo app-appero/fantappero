@@ -1002,6 +1002,48 @@ export interface RosterTurnSnapshotEntry {
   athleteName: string | null;
   purchaseCredits: number;
   role: string | null;
+  /** Collocazione nella formazione di quel turno; null = non schierato / formazione non inviata. */
+  lineupSection?: "starter" | "bench" | "tribuna" | null;
+}
+
+export type SnapshotSectionId = "starter" | "bench" | "tribuna" | "unused";
+
+export const SNAPSHOT_SECTIONS: ReadonlyArray<{ id: SnapshotSectionId; label: string }> = [
+  { id: "starter", label: "Titolari" },
+  { id: "bench", label: "Panchina" },
+  { id: "tribuna", label: "Tribuna" },
+  { id: "unused", label: "Non schierati" },
+];
+
+export interface SnapshotTeamGroup {
+  fantasyTeamId: string;
+  teamName: string;
+  sections: Record<SnapshotSectionId, RosterTurnSnapshotEntry[]>;
+}
+
+/** Raggruppa le voci di uno snapshot per squadra e, dentro ogni squadra, per titolari/panchina/tribuna. */
+export function groupSnapshotByTeam(entries: readonly RosterTurnSnapshotEntry[]): SnapshotTeamGroup[] {
+  const byTeam = new Map<string, SnapshotTeamGroup>();
+  for (const entry of entries) {
+    let group = byTeam.get(entry.fantasyTeamId);
+    if (!group) {
+      group = {
+        fantasyTeamId: entry.fantasyTeamId,
+        teamName: entry.teamName,
+        sections: { starter: [], bench: [], tribuna: [], unused: [] },
+      };
+      byTeam.set(entry.fantasyTeamId, group);
+    }
+    group.sections[entry.lineupSection ?? "unused"].push(entry);
+  }
+  const groups = [...byTeam.values()];
+  groups.sort((a, b) => a.teamName.localeCompare(b.teamName, "it"));
+  for (const group of groups) {
+    for (const id of Object.keys(group.sections) as SnapshotSectionId[]) {
+      group.sections[id].sort((a, b) => a.slotIndex - b.slotIndex);
+    }
+  }
+  return groups;
 }
 
 export interface RosterTurnSnapshotDetail {
