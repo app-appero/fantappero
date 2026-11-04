@@ -5,7 +5,7 @@ Da percorrere **in ordine, prima di invitare il primo tester**. Ogni voce ha un 
 Chi controlla: **Claude** = si verifica dal codice/CI · **Rosario** = serve accesso a
 Railway, Google, Resend, telefono o casella email.
 
-Stato aggiornato al 04/11/2026 (commit `53c2ee1`).
+Stato aggiornato al 04/11/2026.
 
 ## 1. Codice e versione
 
@@ -19,15 +19,16 @@ Stato aggiornato al 04/11/2026 (commit `53c2ee1`).
 
 ## 2. Configurazione in produzione (Railway)
 
-- [ ] `AUTH_EMAIL_REGISTRATION_ENABLED=false` sull'API (solo Google). — Rosario
-- [ ] Client ID Google valido per web **e** app (accesso riuscito da entrambi). — Rosario
+- [x] `AUTH_EMAIL_REGISTRATION_ENABLED=false` sull'API (solo Google). — Rosario
+- [x] Client ID Google valido per web **e** app (accesso riuscito da entrambi). — Rosario
 - [ ] Volume persistente collegato all'API; `AVATAR_STORAGE_PATH` punta al volume (avatar e
   allegati delle segnalazioni). — Rosario
-- [ ] `API_FOOTBALL_KEY` presente sul backend e quota giornaliera sufficiente per il periodo. —
+- [x] `API_FOOTBALL_KEY` presente sul backend e quota giornaliera sufficiente per il periodo. —
   Rosario
 - [ ] Notifiche push funzionanti sull'app Android (notifica di prova ricevuta). — Rosario
-- [ ] Nessun segreto nel repository oltre ai falsi positivi già in `.gitleaksignore` (verificare
-  che i valori `API_FOOTBALL_KEY=` in `infra/local/.env.example` siano segnaposto). — Rosario
+- [x] Nessun segreto nel repository: i soli ritrovamenti sono i falsi positivi in
+  `.gitleaksignore`; il valore di `API_FOOTBALL_KEY=` in `infra/local/.env.example` è un testo
+  segnaposto, non una chiave (verificato il 04/11/2026). Confermato da Rosario.
 
 ## 3. Email e contatto
 
