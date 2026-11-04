@@ -545,6 +545,18 @@ class FantasyLineupService:
             get_metrics().incr("fantasy_lineup_copied_total", labels={"result": exc.code})
             logger.info("fantasy_lineup_copy_rejected", extra={"result": exc.code})
             raise
+        if not any(item not in {None, ""} for item in copied.starter_ids):
+            # Nessun titolare del turno precedente è ancora in rosa (o la formazione era vuota):
+            # copiarla produrrebbe una bozza vuota.
+            get_metrics().incr(
+                "fantasy_lineup_copied_total",
+                labels={"result": "previous_lineup_empty"},
+            )
+            raise ValidationAuthError(
+                "Nella formazione precedente non c'è nessun calciatore ancora in rosa: "
+                "niente da copiare.",
+                code="previous_lineup_empty",
+            )
 
         self._upsert_draft(
             league_id=league_access.league.id,
@@ -938,6 +950,15 @@ class FantasyLineupService:
 
         filled_starters = [item for item in starter_ids if item]
         filled_bench = [item for item in bench_ids if item]
+        if not filled_starters:
+            get_metrics().incr(
+                "fantasy_lineup_draft_saved_total",
+                labels={"result": "draft_empty"},
+            )
+            raise ValidationAuthError(
+                "La formazione è vuota: scegli almeno un titolare per salvare una bozza.",
+                code="draft_empty",
+            )
         try:
             assert_progressive_lock(
                 previous_slots=self._slots_from_submission(submission),
@@ -1159,6 +1180,10 @@ class FantasyLineupService:
         locked_ids = [str(row.athlete_id) for row in roster if locked_flags[row.athlete_id]]
         previous = self._load_previous_submission(fantasy_team_id, fantasy_round)
         draft = self._load_draft(fantasy_round.id, fantasy_team_id)
+        if draft is not None and not any(item for item in draft.starter_athlete_ids):
+            # Bozza senza nessun titolare (es. copia di una formazione non più in rosa): non è una
+            # formazione, la si ignora invece di mostrarla come «bozza salvata».
+            draft = None
         copy_preview = None
         if previous is not None:
             copy_preview = copy_previous_lineup(
@@ -1184,6 +1209,11 @@ class FantasyLineupService:
             and turn_editable
             and any_unlocked
             and (copy_preview is None or not copy_preview.blocked)
+            # Con nessun titolare ancora in rosa la copia darebbe una bozza vuota: non si offre.
+            and (
+                copy_preview is None
+                or any(item not in {None, ""} for item in copy_preview.starter_ids)
+            )
         )
         loaded_team = self._session.get(FantasyTeam, fantasy_team_id)
         probable = self._probable_hints(

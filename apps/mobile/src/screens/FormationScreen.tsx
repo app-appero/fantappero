@@ -1282,15 +1282,18 @@ export function FormationScreen() {
           >
             <Text style={styles.moreText}>•••</Text>
           </Pressable>
-          <Pressable
-            accessibilityRole="button"
-            disabled={toolDisabled}
-            onPress={() => void saveDraft()}
-            style={[styles.draftButton, toolDisabled ? styles.disabled : null]}
-            testID="formation-draft"
-          >
-            <Text style={styles.buttonSecondaryLabel}>Bozza</Text>
-          </Pressable>
+          {/* Con la formazione tutta vuota non c'è nulla da salvare in bozza. */}
+          {filledCount > 0 ? (
+            <Pressable
+              accessibilityRole="button"
+              disabled={toolDisabled}
+              onPress={() => void saveDraft()}
+              style={[styles.draftButton, toolDisabled ? styles.disabled : null]}
+              testID="formation-draft"
+            >
+              <Text style={styles.buttonSecondaryLabel}>Bozza</Text>
+            </Pressable>
+          ) : null}
           <Pressable
             accessibilityRole="button"
             disabled={toolDisabled || missing > 0 || tacticalSaveBlocked}

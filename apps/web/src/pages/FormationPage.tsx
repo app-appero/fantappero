@@ -1821,15 +1821,18 @@ export function FormationPage() {
             >
               Annulla modifiche
             </Button>
-            <Button
-              type="button"
-              variant="secondary"
-              disabled={busy || !context.modificationAllowed || !canEdit}
-              onClick={() => void saveDraft()}
-              data-testid="formation-draft"
-            >
-              Salva bozza
-            </Button>
+            {/* Con la formazione tutta vuota non c'è nulla da salvare in bozza. */}
+            {displayStarters.some(Boolean) ? (
+              <Button
+                type="button"
+                variant="secondary"
+                disabled={busy || !context.modificationAllowed || !canEdit}
+                onClick={() => void saveDraft()}
+                data-testid="formation-draft"
+              >
+                Salva bozza
+              </Button>
+            ) : null}
             <Button
               type="button"
               variant="primary"

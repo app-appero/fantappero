@@ -1165,6 +1165,18 @@ def test_lineup_draft_allows_incomplete_and_rejects_out_of_time(
     assert body["draft"]["starterAthleteIds"].count("") >= 7
     assert body["tacticalMovesUsed"] == 0
 
+    empty = client.put(
+        f"/leagues/{league_id}/turni/{fantasy_round.id}/formazione/bozza",
+        headers={"Authorization": f"Bearer {token}"},
+        json={
+            "module": "4-3-3",
+            "starterAthleteIds": [""] * 11,
+            "benchAthleteIds": payload["benchAthleteIds"][:3],
+        },
+    )
+    assert empty.status_code == 400
+    assert empty.json()["code"] == "draft_empty"
+
     duplicate = client.put(
         f"/leagues/{league_id}/turni/{fantasy_round.id}/formazione/bozza",
         headers={"Authorization": f"Bearer {token}"},
