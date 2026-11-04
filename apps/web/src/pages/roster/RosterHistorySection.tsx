@@ -182,6 +182,8 @@ export function RosterHistorySection({
         </Card>
       ) : null}
 
+      {/* Gli snapshot sono uno strumento da amministratore di lega: ai fantallenatori non servono. */}
+      {isAdmin ? (
       <Card style={{ marginTop: "1rem" }} data-testid="roster-snapshots">
         <CardHeader title="Snapshot per turno" />
         <CardBody>
@@ -283,6 +285,7 @@ export function RosterHistorySection({
           )}
         </CardBody>
       </Card>
+      ) : null}
     </div>
   );
 }

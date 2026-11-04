@@ -25,7 +25,7 @@ from leagues.models.league_rules import LeagueRules
 from leagues.validators import LifecycleBlocker
 from sports_data.catalog.models import CompetitionSeasonClub, SportSeason
 from sports_data.listone.generate import get_role_assignment, list_role_assignments
-from sports_data.listone.models import LeagueRoleOverride
+from sports_data.listone.models import LeagueRoleOverride, RoleAssignment
 from sports_data.listone.overrides import effective_role_for_athlete, get_active_override
 
 
@@ -62,7 +62,7 @@ def resolve_effective_athlete_roles(
         )
     ).all()
     overrides_by_athlete = {row.athlete_id: row for row in overrides}
-    return {
+    resolved = {
         assignment.athlete_id: EffectiveAthleteRole(
             role=effective_role_for_athlete(
                 official_role=assignment.role,
@@ -73,6 +73,28 @@ def resolve_effective_athlete_roles(
         )
         for assignment in assignments
     }
+    # Un calciatore in rosa senza ruolo per la stagione corrente (es. listone rigenerato senza di
+    # lui) resterebbe senza ruolo in formazione e bloccherebbe il salvataggio: si ricade sull'ultimo
+    # ruolo ufficiale noto, di qualsiasi stagione.
+    missing = [athlete_id for athlete_id in unique_ids if athlete_id not in resolved]
+    if missing:
+        fallback_rows = session.scalars(
+            select(RoleAssignment)
+            .where(RoleAssignment.athlete_id.in_(missing))
+            .order_by(RoleAssignment.season_year.desc())
+        ).all()
+        for row in fallback_rows:
+            if row.athlete_id in resolved:
+                continue
+            resolved[row.athlete_id] = EffectiveAthleteRole(
+                role=effective_role_for_athlete(
+                    official_role=row.role,
+                    override=overrides_by_athlete.get(row.athlete_id),
+                    current_round=current_round,
+                ),
+                club_id=row.club_id,
+            )
+    return resolved
 
 
 def resolve_league_rules_limits(session: Session, league_id: UUID) -> RosterCompositionLimits:

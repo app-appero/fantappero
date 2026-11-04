@@ -176,8 +176,8 @@ describe("EP05-01/02/03 roster, credits and manual assignment", () => {
     expect(html).toContain('data-testid="roster-credits-ledger"');
     expect(html).toContain('data-testid="roster-history-success"');
     expect(html).toContain("Intervalli di possesso");
-    expect(html).toContain('data-testid="roster-snapshots"');
-    expect(html).toContain('data-testid="roster-snapshot-detail"');
+    // Gli snapshot sono solo per l'amministratore di lega.
+    expect(html).not.toContain('data-testid="roster-snapshots"');
     expect(html).not.toContain('data-testid="roster-snapshot-create"');
   });
 
@@ -185,7 +185,7 @@ describe("EP05-01/02/03 roster, credits and manual assignment", () => {
     const html = renderRoute("/rosa?persona=member&stato=empty&sezione=storico");
     expect(html).toContain('data-testid="roster-history-empty"');
     expect(html).toContain("Nessun possesso registrato");
-    expect(html).toContain('data-testid="roster-snapshot-empty"');
+    expect(html).not.toContain('data-testid="roster-snapshot-empty"');
   });
 
   it("keeps forbidden state without history panel", () => {

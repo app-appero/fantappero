@@ -1069,25 +1069,27 @@ export function FormationScreen() {
                   Formazione migliore
                 </Text>
               </Pressable>
-              <Pressable
-                accessibilityRole="button"
-                disabled={toolDisabled || !context.copyAvailable}
-                onPress={() => void copyFromPrevious()}
-                style={[
-                  styles.startButton,
-                  toolDisabled || !context.copyAvailable ? styles.disabled : null,
-                ]}
-                testID="formation-copy"
-              >
-                <Text
-                  style={styles.startButtonLabelSecondary}
-                  numberOfLines={1}
-                  adjustsFontSizeToFit
-                  minimumFontScale={0.75}
+              {context.copyAvailable ? (
+                <Pressable
+                  accessibilityRole="button"
+                  disabled={toolDisabled || !context.copyAvailable}
+                  onPress={() => void copyFromPrevious()}
+                  style={[
+                    styles.startButton,
+                    toolDisabled || !context.copyAvailable ? styles.disabled : null,
+                  ]}
+                  testID="formation-copy"
                 >
-                  {context.previousLineup ? `Copia turno ${context.previousLineup.roundNumber}` : "Copia precedente"}
-                </Text>
-              </Pressable>
+                  <Text
+                    style={styles.startButtonLabelSecondary}
+                    numberOfLines={1}
+                    adjustsFontSizeToFit
+                    minimumFontScale={0.75}
+                  >
+                    {context.previousLineup ? `Copia turno ${context.previousLineup.roundNumber}` : "Copia precedente"}
+                  </Text>
+                </Pressable>
+              ) : null}
             </View>
           </View>
         ) : null}

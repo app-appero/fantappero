@@ -171,16 +171,19 @@ export function AuctionScreen() {
         marketOpen={marketOpen}
       />
 
-      <AuctionListone
-        entries={entries}
-        loading={loading}
-        loadError={loadError}
-        onRetry={() => void loadListone()}
-        activeLeagueId={activeLeagueId}
-        activeLeague={activeLeague}
-        ownedAthleteIds={ownedAthleteIds}
-        bidding={marketOpen && flow.currentSession?.status === "open"}
-      />
+      {/* Il listone si vede solo quando l'asta a buste chiuse è stata aperta dall'operatore. */}
+      {marketOpen && flow.currentSession?.status === "open" ? (
+        <AuctionListone
+          entries={entries}
+          loading={loading}
+          loadError={loadError}
+          onRetry={() => void loadListone()}
+          activeLeagueId={activeLeagueId}
+          activeLeague={activeLeague}
+          ownedAthleteIds={ownedAthleteIds}
+          bidding
+        />
+      ) : null}
     </>
   );
 }

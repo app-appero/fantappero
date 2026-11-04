@@ -583,6 +583,9 @@ export function AuctionPage() {
           ) : null}
         </WireframeSection>
 
+        {/* Il listone si vede solo quando l'asta a buste chiuse è stata aperta dall'operatore. */}
+        {isDemoMode || (marketOpen && flow.currentSession?.status === "open") ? (
+          <>
         <Card className="fa-auction-listone-card" data-testid="auction-listone-card">
           <CardHeader>
             <div className="fa-auction-listone__header">
@@ -755,6 +758,8 @@ export function AuctionPage() {
             ) : null}
           </CardBody>
       </Card>
+          </>
+        ) : null}
     </div>
   );
 }
