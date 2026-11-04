@@ -14,6 +14,10 @@ import {
   Input,
   PageContainer,
   Select,
+  Tab,
+  TabList,
+  TabPanel,
+  Tabs,
   UiStatePanel,
 } from "@fantappero/ui";
 import { type ChangeEvent, type FormEvent, useCallback, useEffect, useState } from "react";
@@ -24,7 +28,7 @@ import {
   updateProfile,
   uploadAvatar,
 } from "../api/profile";
-import { deleteAccount, exportAccountData } from "../api/privacy";
+import { deleteAccount } from "../api/privacy";
 import { getApiErrorMessage, useAuth } from "../auth/AuthContext";
 import { loadStoredSession } from "../auth/sessionStorage";
 import { Link } from "../router/simpleRouter";
@@ -122,7 +126,6 @@ export function ProfilePage() {
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [avatarUploading, setAvatarUploading] = useState(false);
-  const [exporting, setExporting] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [savingInviteAvailability, setSavingInviteAvailability] = useState(false);
   const [availableForInvites, setAvailableForInvites] = useState(
@@ -336,41 +339,6 @@ export function ProfilePage() {
     }
   }
 
-  async function handleExportData() {
-    setPrivacyError(null);
-    setPrivacySuccess(null);
-
-    if (isDemoMode) {
-      setPrivacySuccess("Modalità demo: esportazione simulata.");
-      return;
-    }
-
-    const stored = loadStoredSession();
-    if (!stored?.accessToken) {
-      setPrivacyError("Sessione scaduta. Accedi di nuovo.");
-      return;
-    }
-
-    setExporting(true);
-    try {
-      const payload = await exportAccountData(stored.accessToken);
-      const blob = new Blob([JSON.stringify(payload, null, 2)], {
-        type: "application/json;charset=utf-8",
-      });
-      const url = URL.createObjectURL(blob);
-      const anchor = document.createElement("a");
-      anchor.href = url;
-      anchor.download = `fantappero-export-${payload.exportedAt.slice(0, 10)}.json`;
-      anchor.click();
-      URL.revokeObjectURL(url);
-      setPrivacySuccess("Esportazione completata. Il file JSON è stato scaricato.");
-    } catch (exportError) {
-      setPrivacyError(getApiErrorMessage(exportError, "Esportazione non riuscita."));
-    } finally {
-      setExporting(false);
-    }
-  }
-
   async function handleDeleteAccount() {
     setPrivacyError(null);
     setPrivacySuccess(null);
@@ -461,7 +429,14 @@ export function ProfilePage() {
         />
       ) : null}
 
-      <div className="fa-profile-grid">
+      <Tabs defaultValue="utente" aria-label="Sezioni del profilo">
+        <TabList>
+          <Tab value="utente">Utente</Tab>
+          <Tab value="notifiche">Notifiche</Tab>
+        </TabList>
+
+        <TabPanel value="utente">
+          <div className="fa-profile-grid">
         <Card>
           <CardHeader title="Identità" />
           <CardBody>
@@ -506,13 +481,6 @@ export function ProfilePage() {
               </div>
             </div>
             <p className="fa-field__hint">JPEG, PNG o WebP — massimo 5 MB.</p>
-          </CardBody>
-        </Card>
-
-        <Card>
-          <CardHeader title="Centro notifiche" />
-          <CardBody>
-            <NotificationEventSettings />
           </CardBody>
         </Card>
 
@@ -577,56 +545,6 @@ export function ProfilePage() {
                 onChange={(event) => setTimezone(event.target.value)}
                 disabled={saving}
               />
-              <fieldset className="fa-profile-notifications">
-                <legend className="fa-field__label">Notifiche</legend>
-                <label className="fa-profile-checkbox">
-                  <input
-                    type="checkbox"
-                    checked={notificationsEmail}
-                    onChange={(event) => setNotificationsEmail(event.target.checked)}
-                    disabled={saving}
-                    data-testid="profile-notifications-email"
-                  />
-                  Email
-                </label>
-                <label className="fa-profile-checkbox">
-                  <input
-                    type="checkbox"
-                    checked={notificationsPush}
-                    onChange={(event) => setNotificationsPush(event.target.checked)}
-                    disabled={saving}
-                    data-testid="profile-notifications-push"
-                  />
-                  Push
-                </label>
-              </fieldset>
-
-              <fieldset className="fa-profile-notifications">
-                <legend className="fa-field__label">Silenzio notifiche (email/push)</legend>
-                <Input
-                  label="Dalle ore"
-                  name="quietHoursStartHour"
-                  type="number"
-                  min={0}
-                  max={23}
-                  value={quietHoursStartHour}
-                  onChange={(event) => setQuietHoursStartHour(event.target.value)}
-                  disabled={saving}
-                  data-testid="profile-quiet-hours-start"
-                />
-                <Input
-                  label="Alle ore"
-                  name="quietHoursEndHour"
-                  type="number"
-                  min={0}
-                  max={23}
-                  value={quietHoursEndHour}
-                  onChange={(event) => setQuietHoursEndHour(event.target.value)}
-                  disabled={saving}
-                  data-testid="profile-quiet-hours-end"
-                />
-              </fieldset>
-
               <fieldset className="fa-profile-notifications">
                 <legend className="fa-field__label">Inviti nominativi</legend>
                 <label className="fa-profile-checkbox">
@@ -695,21 +613,6 @@ export function ProfilePage() {
             </div>
 
             <div className="fa-profile-privacy-actions" data-testid="profile-privacy-actions">
-              <h3 className="fa-profile-privacy-actions__title">I tuoi dati</h3>
-              <p className="fa-field__hint">
-                Scarica una copia leggibile dei dati del tuo account. L&apos;operazione viene
-                registrata per audit.
-              </p>
-              <Button
-                type="button"
-                variant="secondary"
-                disabled={exporting || deleting || isDemoMode}
-                onClick={() => void handleExportData()}
-                data-testid="profile-export-data"
-              >
-                {exporting ? "Esportazione…" : "Esporta i miei dati"}
-              </Button>
-
               <h3 className="fa-profile-privacy-actions__title fa-profile-privacy-actions__title--danger">
                 Elimina account
               </h3>
@@ -750,7 +653,87 @@ export function ProfilePage() {
             </div>
           </CardBody>
         </Card>
-      </div>
+          </div>
+        </TabPanel>
+
+        <TabPanel value="notifiche">
+          <div className="fa-profile-grid">
+        <Card>
+          <CardHeader title="Centro notifiche" />
+          <CardBody>
+            <NotificationEventSettings />
+          </CardBody>
+        </Card>
+
+        <Card>
+          <CardHeader title="Preferenze notifiche" />
+          <CardBody>
+            <form className="fa-profile-form" onSubmit={handleSubmit} data-testid="profile-notifications-form">
+              <fieldset className="fa-profile-notifications">
+                <legend className="fa-field__label">Notifiche</legend>
+                <label className="fa-profile-checkbox">
+                  <input
+                    type="checkbox"
+                    checked={notificationsEmail}
+                    onChange={(event) => setNotificationsEmail(event.target.checked)}
+                    disabled={saving}
+                    data-testid="profile-notifications-email"
+                  />
+                  Email
+                </label>
+                <label className="fa-profile-checkbox">
+                  <input
+                    type="checkbox"
+                    checked={notificationsPush}
+                    onChange={(event) => setNotificationsPush(event.target.checked)}
+                    disabled={saving}
+                    data-testid="profile-notifications-push"
+                  />
+                  Push
+                </label>
+              </fieldset>
+
+              <fieldset className="fa-profile-notifications">
+                <legend className="fa-field__label">Silenzio notifiche (email/push)</legend>
+                <Input
+                  label="Dalle ore"
+                  name="quietHoursStartHour"
+                  type="number"
+                  min={0}
+                  max={23}
+                  value={quietHoursStartHour}
+                  onChange={(event) => setQuietHoursStartHour(event.target.value)}
+                  disabled={saving}
+                  data-testid="profile-quiet-hours-start"
+                />
+                <Input
+                  label="Alle ore"
+                  name="quietHoursEndHour"
+                  type="number"
+                  min={0}
+                  max={23}
+                  value={quietHoursEndHour}
+                  onChange={(event) => setQuietHoursEndHour(event.target.value)}
+                  disabled={saving}
+                  data-testid="profile-quiet-hours-end"
+                />
+              </fieldset>
+
+              {formError ? (
+                <p className="fa-field__error" role="alert" data-testid="profile-form-error">
+                  {formError}
+                </p>
+              ) : null}
+
+              <Button type="submit" disabled={saving} data-testid="profile-save">
+                {saving ? "Salvataggio…" : "Salva preferenze"}
+              </Button>
+            </form>
+          </CardBody>
+        </Card>
+          </div>
+        </TabPanel>
+      </Tabs>
     </PageContainer>
   );
 }

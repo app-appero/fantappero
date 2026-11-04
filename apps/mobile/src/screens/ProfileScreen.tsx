@@ -11,9 +11,9 @@ import * as ImagePicker from "expo-image-picker";
 import { useCallback, useState } from "react";
 import { useNavigation } from "@react-navigation/core";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { Image, Pressable, Share, StyleSheet, Switch, Text, View } from "react-native";
+import { Image, Pressable, StyleSheet, Switch, Text, View } from "react-native";
 import { AppTextInput as TextInput } from "../components/AppTextInput";
-import { deleteAccount, exportAccountData } from "../api/privacy";
+import { deleteAccount } from "../api/privacy";
 import {
   AVATAR_MAX_BYTES,
   fetchProfile,
@@ -23,6 +23,7 @@ import {
   uploadAvatar,
 } from "../api/profile";
 import { NotificationEventSettings } from "../components/NotificationEventSettings";
+import { ScreenTabs } from "../components/ScreenTabs";
 import { UiStatePanel } from "../components/UiStatePanel";
 import { useScreenData } from "../hooks/useScreenData";
 import { PageContainer } from "../layout/PageContainer";
@@ -47,6 +48,11 @@ function parseQuietHour(value: string): number | null | undefined {
   }
   return parsed;
 }
+
+const PROFILE_TABS = [
+  { id: "utente", label: "Utente" },
+  { id: "notifiche", label: "Notifiche" },
+] as const;
 
 function ThemePreferenceSection() {
   const { preference, setPreference } = useAppTheme();
@@ -75,6 +81,7 @@ function ThemePreferenceSection() {
 
 /** Profilo utente — preferenze e privacy via API (EP02-02). */
 export function ProfileScreen() {
+  const [activeTab, setActiveTab] = useState<"utente" | "notifiche">("utente");
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { accessToken, logout, updateDisplayName } = useAuthSession();
   const [profile, setProfile] = useState<UserProfile | null>(null);
@@ -255,28 +262,6 @@ export function ProfileScreen() {
     }
   }
 
-  async function handleExportData() {
-    setFormError(null);
-    setSuccessMessage(null);
-    if (!accessToken) {
-      setFormError("Sessione non disponibile. Accedi di nuovo.");
-      return;
-    }
-    setSaving(true);
-    try {
-      const payload = await exportAccountData(accessToken);
-      await Share.share({
-        message: JSON.stringify(payload, null, 2),
-        title: `fantappero-export-${payload.exportedAt.slice(0, 10)}.json`,
-      });
-      setSuccessMessage("Esportazione completata. Condividi o salva il JSON.");
-    } catch (error) {
-      setFormError(getApiErrorMessage(error, "Esportazione non riuscita."));
-    } finally {
-      setSaving(false);
-    }
-  }
-
   async function handleDeleteAccount() {
     setFormError(null);
     setSuccessMessage(null);
@@ -365,6 +350,15 @@ export function ProfileScreen() {
         <UiStatePanel state="error" title="Errore" message={formError} testID="profile-error" />
       ) : null}
 
+      <ScreenTabs
+        items={PROFILE_TABS}
+        activeId={activeTab}
+        onSelect={(id) => setActiveTab(id as "utente" | "notifiche")}
+        testID="profile-tabs"
+      />
+
+      {activeTab === "utente" ? (
+        <>
       <ThemePreferenceSection />
 
       <View style={styles.section} testID="profile-avatar-section">
@@ -452,6 +446,97 @@ export function ProfileScreen() {
           ))}
         </View>
 
+        <Pressable
+          accessibilityRole="button"
+          disabled={saving}
+          onPress={() => void handleSave()}
+          style={[styles.primaryButton, saving && styles.disabled]}
+          testID="profile-save"
+        >
+          <Text style={styles.primaryButtonLabel}>
+            {saving ? "Salvataggio…" : "Salva preferenze"}
+          </Text>
+        </Pressable>
+      </View>
+
+      <View style={styles.section} testID="profile-directory-availability-section">
+        <Text style={styles.sectionTitle}>Directory fantallenatori</Text>
+        <Text style={styles.hint}>
+          Se attivo, gli amministratori di lega possono invitarti dalla directory.
+        </Text>
+        <View style={styles.switchRow}>
+          <Text style={styles.label}>
+            {availableForInvites ? "Disponibile per inviti" : "Non disponibile"}
+          </Text>
+          <Switch
+            value={availableForInvites}
+            disabled={saving || profile.userType === "ai"}
+            onValueChange={(available) => void handleInviteAvailabilityChange(available)}
+            testID="profile-directory-availability"
+          />
+        </View>
+      </View>
+
+      <View style={styles.section} testID="profile-policy-accepted">
+        <Text style={styles.sectionTitle}>Informativa privacy</Text>
+        <Text style={styles.hint}>
+          {profile.policyVersion === profile.currentPolicyVersion
+            ? `Hai accettato l'informativa privacy (versione ${profile.policyVersion}) il ${
+                profile.policyConsentAt
+                  ? new Date(profile.policyConsentAt).toLocaleString("it-IT")
+                  : "—"
+              }.`
+            : "L'informativa è stata aggiornata: accedendo di nuovo la accetti."}
+        </Text>
+        <Pressable
+          accessibilityRole="link"
+          accessibilityLabel="Leggi l'informativa privacy"
+          onPress={() => navigation.navigate("Privacy")}
+          style={styles.secondaryButton}
+          testID="profile-privacy-link"
+        >
+          <Text style={styles.secondaryButtonLabel}>Leggi l'informativa</Text>
+        </Pressable>
+      </View>
+
+      <View style={styles.section} testID="profile-privacy-actions">
+        <Text style={styles.sectionTitle}>I tuoi dati</Text>
+        <Text style={styles.hint}>Puoi eliminare il tuo account in qualsiasi momento.</Text>
+        <Text style={styles.hint}>
+          Per eliminare l&apos;account digita {DELETE_ACCOUNT_CONFIRMATION_PHRASE} e conferma con la
+          password.
+        </Text>
+        <TextInput
+          value={deletePhrase}
+          onChangeText={setDeletePhrase}
+          style={styles.input}
+          autoCapitalize="characters"
+          placeholder={DELETE_ACCOUNT_CONFIRMATION_PHRASE}
+          placeholderTextColor={colors.foregroundMuted}
+          testID="profile-delete-phrase"
+        />
+        <TextInput
+          value={deletePassword}
+          onChangeText={setDeletePassword}
+          style={styles.input}
+          secureTextEntry
+          placeholder="Password"
+          placeholderTextColor={colors.foregroundMuted}
+          testID="profile-delete-password"
+        />
+        <Pressable
+          accessibilityRole="button"
+          disabled={saving}
+          onPress={() => void handleDeleteAccount()}
+          style={styles.dangerButton}
+          testID="profile-delete-submit"
+        >
+          <Text style={styles.dangerButtonLabel}>Elimina il mio account</Text>
+        </Pressable>
+      </View>
+        </>
+      ) : (
+        <View style={styles.section} testID="profile-notifications-section">
         <View style={styles.switchRow}>
           <Text style={styles.label}>Notifiche email</Text>
           <Switch
@@ -512,105 +597,8 @@ export function ProfileScreen() {
             {saving ? "Salvataggio…" : "Salva preferenze"}
           </Text>
         </Pressable>
-      </View>
-
-      <View style={styles.section} testID="profile-directory-availability-section">
-        <Text style={styles.sectionTitle}>Directory fantallenatori</Text>
-        <Text style={styles.hint}>
-          Se attivo, gli amministratori di lega possono invitarti dalla directory.
-        </Text>
-        <View style={styles.switchRow}>
-          <Text style={styles.label}>
-            {availableForInvites ? "Disponibile per inviti" : "Non disponibile"}
-          </Text>
-          <Switch
-            value={availableForInvites}
-            disabled={saving || profile.userType === "ai"}
-            onValueChange={(available) => void handleInviteAvailabilityChange(available)}
-            testID="profile-directory-availability"
-          />
         </View>
-      </View>
-
-      <View style={styles.section} testID="profile-policy-accepted">
-        <Text style={styles.sectionTitle}>Informativa privacy</Text>
-        <Text style={styles.hint}>
-          {profile.policyVersion === profile.currentPolicyVersion
-            ? `Hai accettato l'informativa privacy (versione ${profile.policyVersion}) il ${
-                profile.policyConsentAt
-                  ? new Date(profile.policyConsentAt).toLocaleString("it-IT")
-                  : "—"
-              }.`
-            : "L'informativa è stata aggiornata: accedendo di nuovo la accetti."}
-        </Text>
-        <Pressable
-          accessibilityRole="link"
-          accessibilityLabel="Leggi l'informativa privacy"
-          onPress={() => navigation.navigate("Privacy")}
-          style={styles.secondaryButton}
-          testID="profile-privacy-link"
-        >
-          <Text style={styles.secondaryButtonLabel}>Leggi l'informativa</Text>
-        </Pressable>
-      </View>
-
-      <View style={styles.section} testID="profile-privacy-actions">
-        <Text style={styles.sectionTitle}>I tuoi dati</Text>
-        <Text style={styles.hint}>Esporta o elimina l&apos;account.</Text>
-        <Pressable
-          accessibilityRole="button"
-          disabled={saving}
-          onPress={() => void handleExportData()}
-          style={styles.secondaryButton}
-          testID="profile-export-data"
-        >
-          <Text style={styles.secondaryButtonLabel}>Esporta i miei dati</Text>
-        </Pressable>
-        <Text style={styles.hint}>
-          Per eliminare l&apos;account digita {DELETE_ACCOUNT_CONFIRMATION_PHRASE} e conferma con la
-          password.
-        </Text>
-        <TextInput
-          value={deletePhrase}
-          onChangeText={setDeletePhrase}
-          style={styles.input}
-          autoCapitalize="characters"
-          placeholder={DELETE_ACCOUNT_CONFIRMATION_PHRASE}
-          placeholderTextColor={colors.foregroundMuted}
-          testID="profile-delete-phrase"
-        />
-        <TextInput
-          value={deletePassword}
-          onChangeText={setDeletePassword}
-          style={styles.input}
-          secureTextEntry
-          placeholder="Password"
-          placeholderTextColor={colors.foregroundMuted}
-          testID="profile-delete-password"
-        />
-        <Pressable
-          accessibilityRole="button"
-          disabled={saving}
-          onPress={() => void handleDeleteAccount()}
-          style={styles.dangerButton}
-          testID="profile-delete-submit"
-        >
-          <Text style={styles.dangerButtonLabel}>Elimina il mio account</Text>
-        </Pressable>
-      </View>
-
-      <View style={styles.section} testID="profile-session-actions">
-        <Text style={styles.sectionTitle}>Sessione</Text>
-        <Text style={styles.hint}>Termina la sessione corrente e torna alla schermata di accesso.</Text>
-        <Pressable
-          accessibilityRole="button"
-          onPress={() => void logout()}
-          style={styles.logoutButton}
-          testID="profile-logout"
-        >
-          <Text style={styles.logoutButtonLabel}>Logout</Text>
-        </Pressable>
-      </View>
+      )}
     </PageContainer>
   );
 }
@@ -744,19 +732,6 @@ const styles = lazyStyles(() => StyleSheet.create({
   },
   dangerButtonLabel: {
     color: colors.danger,
-    fontWeight: typography.fontWeight.semibold,
-  },
-  logoutButton: {
-    marginTop: spacing.sm,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.pill,
-    paddingVertical: spacing.md,
-    alignItems: "center",
-    backgroundColor: colors.backgroundElevated,
-  },
-  logoutButtonLabel: {
-    color: colors.foreground,
     fontWeight: typography.fontWeight.semibold,
   },
   disabled: {

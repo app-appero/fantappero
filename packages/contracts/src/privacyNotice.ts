@@ -55,9 +55,9 @@ export const PRIVACY_NOTICE_SECTIONS: readonly PrivacyNoticeSection[] = [
   },
   {
     id: "diritti",
-    title: "I tuoi diritti, direttamente dal profilo",
+    title: "I tuoi diritti",
     bullets: [
-      "Scaricare una copia di tutti i tuoi dati (comprese le segnalazioni) in un file leggibile.",
+      `Chiedere una copia di tutti i tuoi dati (comprese le segnalazioni) scrivendo a ${PRIVACY_CONTACT_EMAIL}.`,
       "Cancellare il tuo account: l'email viene sostituita con un valore anonimo, profilo, avatar, segnalazioni e relativi file vengono eliminati, le sessioni chiuse. Il nome che avevi scelto resta solo nelle classifiche storiche delle leghe (così i compagni non perdono la storia della stagione), scollegato dalla tua identità.",
     ],
   },

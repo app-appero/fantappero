@@ -42,8 +42,8 @@ Il testo qui sotto è la fonte unica: è mostrato in app e sul web alla pagina `
 > **Per quanto tempo**: finché il tuo account esiste. Le segnalazioni si cancellano insieme
 > all'account o su tua richiesta.
 >
-> **I tuoi diritti, da solo dal tuo profilo**
-> - *Scaricare una copia di tutti i tuoi dati* (comprese le segnalazioni) in un file leggibile.
+> **I tuoi diritti**
+> - *Chiedere una copia di tutti i tuoi dati* (comprese le segnalazioni) scrivendo a trottarosario@gmail.com.
 > - *Cancellare il tuo account*: l'email viene sostituita con un valore anonimo, profilo,
 >   avatar, segnalazioni e relativi file vengono eliminati, le sessioni chiuse. Il nome che
 >   avevi scelto resta solo nelle classifiche storiche delle leghe (così i compagni non perdono

@@ -55,7 +55,10 @@ describe("EP02-02 profile page", () => {
     expect(html).toContain("Chiaro");
     expect(html).toContain("Scuro");
     expect(html).toContain("Sistema");
-    expect(html).toContain('data-testid="profile-notifications-email"');
+    // Le notifiche stanno nella seconda tab: nella prima non compaiono.
+    expect(html).toContain("Utente");
+    expect(html).toContain("Notifiche");
+    expect(html).not.toContain('data-testid="profile-notifications-email"');
   });
 
   it("shows accepted policy in demo mode", () => {
@@ -66,9 +69,9 @@ describe("EP02-02 profile page", () => {
   it("renders privacy data rights controls in demo mode", () => {
     const html = renderProfile();
     expect(html).toContain('data-testid="profile-privacy-actions"');
-    expect(html).toContain('data-testid="profile-export-data"');
+    expect(html).not.toContain('data-testid="profile-export-data"');
     expect(html).toContain('data-testid="profile-delete-submit"');
-    expect(html).toContain("Esporta i miei dati");
+    expect(html).not.toContain("Esporta i miei dati");
     expect(html).toContain("Elimina il mio account");
   });
 
