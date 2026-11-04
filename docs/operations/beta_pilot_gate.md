@@ -37,7 +37,12 @@ inventati nel repo perché dipendono dall'organizzazione e dal deployment reali.
 
 ## 2. Protocollo proposto
 
-### Dimensione e durata (`PROPOSTA`, da ratificare)
+### Dimensione e durata (`RATIFICATO` dal decision owner il 04/11/2026)
+
+Il decision owner (Rosario Trotta) ha ratificato **senza modifiche** i valori seguenti. La
+ratifica riguarda solo questa sezione (dimensione, durata, coorte, ambiente): le soglie della
+sezione sulle metriche restano `PROPOSTA` finché non ratificate a parte.
+
 
 - 3–5 leghe, ciascuna con 6–12 partecipanti attivi e un league admin;
 - almeno 28 giorni **e** almeno 4 turni fantacalcistici completi per ogni lega;

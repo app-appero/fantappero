@@ -54,8 +54,10 @@ Da fare sia sul **web** sia nell'**app**:
 
 - [x] Voti dei turni calcolati (ricalcolo eseguito). — Rosario
 - [ ] Leghe dei tester create, partecipanti invitati, calendario pronto. — Rosario
-- [ ] Protocollo del pilota (28 giorni, 4 turni per lega) ratificato dal decision owner **prima**
-  degli inviti. — Rosario
+- [x] Protocollo del pilota (dimensione e durata: 3-5 leghe da 6-12 partecipanti, almeno 28 giorni
+  e 4 turni per lega, una sola coorte) ratificato dal decision owner il 04/11/2026, senza
+  modifiche. Le **soglie di successo** (sezione metriche di `beta_pilot_gate.md`) restano da
+  ratificare. — Rosario
 
 ## 6. Decisioni già prese
 
