@@ -991,3 +991,16 @@ export function saveLineupDraft(
     },
   );
 }
+
+/** Sostituisce un fantallenatore: chi subentra eredita squadra, rosa, formazioni e punti. */
+export function replaceLeagueMember(
+  accessToken: string,
+  leagueId: string,
+  userId: string,
+  newUserId: string,
+): Promise<LeagueMember> {
+  return apiRequest<LeagueMember>(
+    `/leagues/${leagueId}/amministrazione/partecipanti/${userId}/sostituzione`,
+    { method: "POST", accessToken, body: { newUserId } },
+  );
+}

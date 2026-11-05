@@ -159,6 +159,12 @@ class LeagueMemberResponse(ApiModel):
     email: str | None = None
 
 
+class ReplaceLeagueMemberRequest(ApiModel):
+    """Chi subentra al posto del fantallenatore da sostituire."""
+
+    new_user_id: UUID = Field(alias="newUserId")
+
+
 class CreateLeagueInviteRequest(ApiModel):
     expires_in_days: int = Field(default=7, alias="expiresInDays")
 

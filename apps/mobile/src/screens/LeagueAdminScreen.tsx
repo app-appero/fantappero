@@ -4,6 +4,7 @@ import type {
   LeagueCalendar,
   LeagueInvite,
   LeagueLifecycle,
+  FantasyCoachDirectoryItem,
   LeagueMember,
   LeagueRules,
   UpdateLeagueRulesRequest,
@@ -27,10 +28,13 @@ import {
   fetchLeagueMembers,
   generateLeagueCalendar,
   removeLeagueMember,
+  replaceLeagueMember,
   revokeLeagueInvite,
   transferLeagueAdmin,
   updateLeagueRules,
 } from "../api/leagues";
+import { fetchManagerDirectory } from "../api/managerInvites";
+import { AppTextInput } from "../components/AppTextInput";
 import { CoachDirectoryPanel } from "../components/CoachDirectoryPanel";
 import { ScreenTabs } from "../components/ScreenTabs";
 import { UiStatePanel } from "../components/UiStatePanel";
@@ -102,6 +106,11 @@ export function LeagueAdminScreen() {
   const [rules, setRules] = useState<LeagueRules | null>(null);
   const [lifecycle, setLifecycle] = useState<LeagueLifecycle | null>(null);
   const [members, setMembers] = useState<LeagueMember[]>([]);
+  // Sostituzione fantallenatore: chi si sostituisce, ricerca e candidati dal catalogo.
+  const [replaceTarget, setReplaceTarget] = useState<LeagueMember | null>(null);
+  const [replaceQuery, setReplaceQuery] = useState("");
+  const [candidates, setCandidates] = useState<FantasyCoachDirectoryItem[]>([]);
+  const [candidatesLoading, setCandidatesLoading] = useState(false);
   const [invites, setInvites] = useState<LeagueInvite[]>([]);
   const [createdInvite, setCreatedInvite] = useState<CreatedLeagueInvite | null>(null);
   const [calendar, setCalendar] = useState<LeagueCalendar | null>(null);
@@ -296,6 +305,44 @@ export function LeagueAdminScreen() {
       setActionError(
         getApiErrorMessage(error, `Impossibile trasferire il ruolo a ${displayName}.`),
       );
+    } finally {
+      setWorkingId(null);
+    }
+  }
+
+  useEffect(() => {
+    if (!replaceTarget || !leagueId || !accessToken) {
+      return;
+    }
+    const timer = setTimeout(() => {
+      setCandidatesLoading(true);
+      void fetchManagerDirectory(accessToken, leagueId, {
+        query: replaceQuery.trim() || undefined,
+        available: true,
+        pageSize: 8,
+      })
+        .then((result) =>
+          setCandidates(result.items.filter((item) => !item.inLeague && !item.isSelf)),
+        )
+        .catch(() => setCandidates([]))
+        .finally(() => setCandidatesLoading(false));
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [replaceTarget, replaceQuery, leagueId, accessToken]);
+
+  async function onReplace(candidate: FantasyCoachDirectoryItem) {
+    setActionError(null);
+    if (!replaceTarget || !leagueId || !accessToken) {
+      return;
+    }
+    setWorkingId(`replace-${replaceTarget.userId}`);
+    try {
+      await replaceLeagueMember(accessToken, leagueId, replaceTarget.userId, candidate.userId);
+      setReplaceTarget(null);
+      setReplaceQuery("");
+      await loadAll({ silent: true });
+    } catch (error) {
+      setActionError(getApiErrorMessage(error, "Impossibile sostituire il fantallenatore."));
     } finally {
       setWorkingId(null);
     }
@@ -735,6 +782,18 @@ export function LeagueAdminScreen() {
                   <View style={styles.row}>
                     <Pressable
                       accessibilityRole="button"
+                      onPress={() => {
+                        setReplaceTarget(member);
+                        setReplaceQuery("");
+                        setCandidates([]);
+                      }}
+                      style={styles.secondaryButton}
+                      testID={`league-member-replace-${member.userId}`}
+                    >
+                      <Text style={styles.secondaryLabel}>Sostituisci</Text>
+                    </Pressable>
+                    <Pressable
+                      accessibilityRole="button"
                       onPress={() => void onTransfer(member.userId, member.displayName)}
                       style={styles.secondaryButton}
                       testID={`league-member-transfer-${member.userId}`}
@@ -754,6 +813,55 @@ export function LeagueAdminScreen() {
               </View>
             ))}
           </View>
+
+          {replaceTarget ? (
+            <View style={styles.memberList} testID="league-members-replace-panel">
+              <Text style={styles.heading}>Sostituisci {replaceTarget.displayName}</Text>
+              <Text style={styles.body}>
+                Scegli chi subentra tra i fantallenatori disponibili: erediterà squadra, rosa,
+                formazioni e punti.
+              </Text>
+              <AppTextInput
+                value={replaceQuery}
+                onChangeText={setReplaceQuery}
+                placeholder="Cerca per nome o email"
+                autoCapitalize="none"
+                autoCorrect={false}
+                testID="league-members-replace-query"
+              />
+              {candidatesLoading ? <Text style={styles.body}>Ricerca in corso…</Text> : null}
+              {!candidatesLoading && candidates.length === 0 ? (
+                <Text style={styles.body} testID="league-members-replace-empty">
+                  Nessun fantallenatore disponibile.
+                </Text>
+              ) : (
+                candidates.map((candidate) => (
+                  <View key={candidate.userId} style={styles.inviteRow}>
+                    <View style={styles.flex}>
+                      <Text style={styles.inviteTitle}>{candidate.displayName}</Text>
+                      <Text style={styles.body}>{candidate.email}</Text>
+                    </View>
+                    <Pressable
+                      accessibilityRole="button"
+                      disabled={workingId !== null}
+                      onPress={() => void onReplace(candidate)}
+                      style={styles.secondaryButton}
+                      testID={`league-members-replace-pick-${candidate.userId}`}
+                    >
+                      <Text style={styles.secondaryLabel}>Scegli</Text>
+                    </Pressable>
+                  </View>
+                ))
+              )}
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => setReplaceTarget(null)}
+                style={styles.secondaryButton}
+              >
+                <Text style={styles.secondaryLabel}>Annulla</Text>
+              </Pressable>
+            </View>
+          ) : null}
 
           <Text style={styles.heading}>Directory fantallenatori</Text>
           {leagueId ? (

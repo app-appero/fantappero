@@ -13,6 +13,8 @@ from tests.integration.database.helpers import create_engine_for_url
 
 from database.enums import LeagueAuditAction, LeagueMemberRole, LeagueState
 from database.session import create_session_factory
+from fantasy_teams.factory import create_team_with_empty_slots
+from fantasy_teams.models import FantasyTeam
 from leagues.models.competition import Competition
 from leagues.models.league import League
 from leagues.models.league_audit_event import LeagueAuditEvent
@@ -326,3 +328,83 @@ def test_transfer_admin_is_atomic_idempotent_and_draft_only(
     )
     assert blocked.status_code == 400
     assert blocked.json()["code"] == "league_not_draft"
+
+
+def test_replace_coach_keeps_the_team_and_checks_the_candidate(
+    client: TestClient,
+    db_session: Session,
+    competition_ids: list[str],
+) -> None:
+    owner_token, owner_id = _register_and_login(client, "replace.owner@example.com")
+    _old_token, old_id = _register_and_login(client, "replace.vecchio@example.com")
+    _new_token, new_id = _register_and_login(client, "replace.nuovo@example.com")
+    league_id = _create_league(client, owner_token, competition_ids, "Lega Sostituzione")
+    _add_member(db_session, league_id, old_id)
+    headers = {"Authorization": f"Bearer {owner_token}"}
+    base = f"/leagues/{league_id}/amministrazione/partecipanti"
+
+    # La squadra del vecchio allenatore segue la membership (rosa, formazioni, punti).
+    old_membership = db_session.scalars(
+        select(LeagueMembership).where(
+            LeagueMembership.league_id == UUID(league_id), LeagueMembership.user_id == old_id
+        )
+    ).one()
+    team = create_team_with_empty_slots(
+        db_session, membership=old_membership, name="Squadra Vecchio", roster_size=3
+    )
+    db_session.commit()
+    team_id = team.id
+
+    # Non si sostituisce l'amministratore, né con se stessi, né con chi è già in lega.
+    admin_attempt = client.post(
+        f"{base}/{owner_id}/sostituzione", headers=headers, json={"newUserId": str(new_id)}
+    )
+    assert admin_attempt.status_code == 400
+    assert admin_attempt.json()["code"] == "cannot_replace_admin"
+    already = client.post(
+        f"{base}/{old_id}/sostituzione", headers=headers, json={"newUserId": str(owner_id)}
+    )
+    assert already.json()["code"] == "already_member"
+    same = client.post(
+        f"{base}/{old_id}/sostituzione", headers=headers, json={"newUserId": str(old_id)}
+    )
+    assert same.json()["code"] == "same_coach"
+    unknown = client.post(
+        f"{base}/{old_id}/sostituzione",
+        headers=headers,
+        json={"newUserId": "00000000-0000-0000-0000-000000000001"},
+    )
+    assert unknown.json()["code"] == "coach_not_found"
+
+    replaced = client.post(
+        f"{base}/{old_id}/sostituzione", headers=headers, json={"newUserId": str(new_id)}
+    )
+    assert replaced.status_code == 200, replaced.text
+    assert replaced.json()["userId"] == str(new_id)
+    assert replaced.json()["role"] == "member"
+
+    members = client.get(base, headers=headers).json()
+    assert {row["userId"] for row in members} == {str(owner_id), str(new_id)}
+    db_session.expire_all()
+    event = db_session.scalars(
+        select(LeagueAuditEvent).where(
+            LeagueAuditEvent.league_id == UUID(league_id),
+            LeagueAuditEvent.action == LeagueAuditAction.LEAGUE_MEMBER_JOINED,
+        )
+    ).all()
+    assert any((row.details or {}).get("source") == "coach_replaced" for row in event)
+    # La stessa squadra (stesso id, stessa membership) ora appartiene al nuovo allenatore.
+    kept = db_session.get(FantasyTeam, team_id)
+    assert kept is not None
+    assert kept.membership_id == old_membership.id
+    assert kept.name == "replace.nuovo"
+    # Il vecchio non è più in lega.
+    assert (
+        db_session.scalar(
+            select(func.count(LeagueMembership.id)).where(
+                LeagueMembership.league_id == UUID(league_id),
+                LeagueMembership.user_id == old_id,
+            )
+        )
+        == 0
+    )

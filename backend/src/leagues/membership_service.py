@@ -9,6 +9,7 @@ from uuid import UUID
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
 
+from auth.blocklist import BlockList
 from auth.exceptions import ValidationAuthError
 from auth.models.user import User
 from authorization.context import LeagueAccess
@@ -17,8 +18,10 @@ from database.enums import (
     LeagueCalendarStatus,
     LeagueMemberRole,
     NamedInviteStatus,
+    UserType,
     league_member_role_to_league_role,
 )
+from fantasy_teams.models import FantasyTeam
 from leagues.models.league import League
 from leagues.models.league_audit_event import LeagueAuditEvent
 from leagues.models.league_calendar import LeagueCalendar
@@ -108,6 +111,108 @@ class LeagueMembershipService:
         get_metrics().incr("league_member_removed_total", labels={"result": "success"})
         logger.info("league_member_removed", extra={"result": "success"})
         return response
+
+    def replace(
+        self,
+        league_access: LeagueAccess,
+        target_user_id: UUID,
+        new_user_id: UUID,
+    ) -> LeagueMemberResponse:
+        """Sostituisce un fantallenatore con un altro, mantenendo squadra, rosa, formazioni e punti.
+
+        Serve, ad esempio, quando l'account di un partecipante è stato eliminato: chi subentra
+        eredita la squadra così com'è. Vale in qualsiasi fase della lega.
+        """
+        metric = "league_member_replaced_total"
+        league = self._lock_league(league_access.league.id)
+        membership = self._get_membership(league.id, target_user_id)
+        if membership is None:
+            self._fail(
+                "Partecipante non trovato.",
+                code="member_not_found",
+                metric=metric,
+                result="not_found",
+            )
+        if membership.role == LeagueMemberRole.OWNER:
+            self._fail(
+                "Per sostituire l'amministratore trasferisci prima il ruolo di amministratore.",
+                code="cannot_replace_admin",
+                metric=metric,
+                result="cannot_replace_admin",
+            )
+        if new_user_id == target_user_id:
+            self._fail(
+                "Scegli un fantallenatore diverso da quello da sostituire.",
+                code="same_coach",
+                metric=metric,
+                result="same_coach",
+            )
+        new_user = self._session.scalars(
+            select(User)
+            .where(User.id == new_user_id, User.deleted_at.is_(None))
+            .options(selectinload(User.profile))
+        ).first()
+        if new_user is None:
+            self._fail(
+                "Fantallenatore non trovato.",
+                code="coach_not_found",
+                metric=metric,
+                result="coach_not_found",
+            )
+        already = self._session.scalar(
+            select(LeagueMembership.id).where(
+                LeagueMembership.league_id == league.id,
+                LeagueMembership.user_id == new_user_id,
+            )
+        )
+        if already is not None:
+            self._fail(
+                "Questo fantallenatore è già in lega.",
+                code="already_member",
+                metric=metric,
+                result="already_member",
+            )
+        available = new_user.user_type == UserType.AI or bool(
+            new_user.profile is not None and new_user.profile.available_for_invites
+        )
+        if not available or BlockList(self._session).is_blocked(new_user.email):
+            self._fail(
+                "Questo fantallenatore non è disponibile.",
+                code="coach_not_available",
+                metric=metric,
+                result="coach_not_available",
+            )
+
+        old_name = membership.user.display_name
+        membership.user_id = new_user.id
+        membership.historical_display_name = None
+        self._session.flush()
+        self._session.refresh(membership)
+        # La squadra segue la membership (rosa, formazioni, punti); il nome mostrato è quello nuovo.
+        team = self._session.scalars(
+            select(FantasyTeam).where(FantasyTeam.membership_id == membership.id)
+        ).first()
+        if team is not None:
+            team.name = new_user.display_name
+        self._release_accepted_named_invites(league.id, target_user_id)
+        self._session.add(
+            LeagueAuditEvent(
+                league_id=league.id,
+                actor_id=league_access.user.id,
+                action=LeagueAuditAction.LEAGUE_MEMBER_JOINED,
+                correlation_id=get_correlation_id(),
+                details={
+                    "source": "coach_replaced",
+                    "replacedUserId": str(target_user_id),
+                    "replacedDisplayName": old_name,
+                    "newUserId": str(new_user.id),
+                },
+            )
+        )
+        self._session.commit()
+        get_metrics().incr(metric, labels={"result": "success"})
+        logger.info("league_member_replaced", extra={"result": "success"})
+        return self._to_response(membership, include_email=True)
 
     def transfer_admin(
         self,

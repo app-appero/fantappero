@@ -27,3 +27,12 @@ Funzioni del pannello operatore (pagina **Utenti**, web e app), decise il 05/11/
 - Database: tabella `blocked_accounts` (migrazione `d6f2a9c1e385`).
 - API (solo operatori): `POST /admin/users/{id}/delete`, `GET/POST /admin/blocklist`,
   `DELETE /admin/blocklist/{id}`.
+
+## Cosa succede se un utente eliminato era in una lega
+Il partecipante resta in lega con un nome anonimo («deleted+…»), con la sua squadra, rosa e punti.
+L'**amministratore di lega** lo sostituisce da **Amministrazione lega → Partecipanti → Sostituisci**:
+sceglie un fantallenatore dal catalogo (solo quelli disponibili e non già in lega) e questo
+**subentra** ereditando squadra, rosa, formazioni e punti. Vale in qualsiasi fase della lega.
+- Non si sostituisce l'amministratore (prima si trasferisce il ruolo), né con chi è già in lega,
+  né con chi non è disponibile o è in lista nera.
+- API: `POST /leagues/{id}/amministrazione/partecipanti/{userId}/sostituzione` con `{newUserId}`.

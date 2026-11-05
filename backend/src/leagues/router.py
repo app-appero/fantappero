@@ -65,6 +65,7 @@ from leagues.schemas import (
     LeagueSummaryResponse,
     NamedLeagueInviteResponse,
     PendingInviteCountResponse,
+    ReplaceLeagueMemberRequest,
     RespondNamedLeagueInviteResponse,
     SetLeagueRoleOverrideRequest,
     TransitionLeagueStateRequest,
@@ -614,6 +615,23 @@ def transfer_league_admin(
     """Atomically transfer league administration to another participant."""
     try:
         return service.transfer_admin(league_access, user_id)
+    except AuthError as exc:
+        return _error_response(exc)
+
+
+@router.post(
+    "/{league_id}/amministrazione/partecipanti/{user_id}/sostituzione",
+    response_model=LeagueMemberResponse,
+)
+def replace_league_member(
+    user_id: UUID,
+    body: ReplaceLeagueMemberRequest,
+    league_access: LeagueAccess = Depends(require_league_permissions(Permission.LEAGUE_ADMIN)),
+    service: LeagueMembershipService = Depends(get_league_membership_service),
+) -> LeagueMemberResponse | JSONResponse:
+    """Sostituisce un fantallenatore con un altro, mantenendone squadra, rosa e punti."""
+    try:
+        return service.replace(league_access, user_id, body.new_user_id)
     except AuthError as exc:
         return _error_response(exc)
 
