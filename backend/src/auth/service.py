@@ -180,6 +180,12 @@ class AuthService:
         self._assert_not_blocked(identity.email)
 
         user = self._session.scalar(select(User).where(User.google_sub == identity.sub))
+        if user is not None and user.deleted_at is not None:
+            # Account eliminato prima che l'identificativo Google venisse liberato: lo si libera
+            # ora, così la stessa persona può registrarsi di nuovo (se non è in lista nera).
+            user.google_sub = None
+            self._session.flush()
+            user = None
         if user is None:
             user = self._session.scalar(
                 select(User).where(User.email == identity.email, User.deleted_at.is_(None))

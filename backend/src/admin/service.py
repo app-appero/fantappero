@@ -156,8 +156,10 @@ class AdminService:
         return user.email.strip().lower() in self._protected_emails()
 
     # --- eliminazione utente e lista nera ----------------------------------------------------
-    def delete_user(self, *, actor: User, target_user_id: UUID) -> AdminDeleteUserResponse:
-        """Elimina (anonimizza) un utente e ne mette l'email in lista nera."""
+    def delete_user(
+        self, *, actor: User, target_user_id: UUID, block: bool = True
+    ) -> AdminDeleteUserResponse:
+        """Elimina (anonimizza) un utente; con `block` ne mette l'email in lista nera."""
         user = self._get_user_or_raise(target_user_id)
         if user.id == actor.id:
             raise CannotDeleteSelfError()
@@ -167,15 +169,18 @@ class AdminService:
             raise CannotModifyOperatorError()
         # Prima il blocco dell'indirizzo originale, poi l'anonimizzazione (che lo sostituisce).
         email = user.email
-        BlockList(self._session).add(
-            email, reason="Account eliminato dall'operatore", actor_id=actor.id
-        )
+        if block:
+            BlockList(self._session).add(
+                email, reason="Account eliminato dall'operatore", actor_id=actor.id
+            )
         PrivacyService(self._session, self._settings).delete_account_by_operator(actor, user.id)
         _logger.info(
             "admin_user_deleted_and_blocked",
             extra={"actor_id": str(actor.id), "target_user_id": str(target_user_id)},
         )
-        return AdminDeleteUserResponse(deletedUserId=str(target_user_id), blockedEmail=email)
+        return AdminDeleteUserResponse(
+            deletedUserId=str(target_user_id), blockedEmail=email if block else None
+        )
 
     def blocklist(self) -> AdminBlocklistResponse:
         return AdminBlocklistResponse(

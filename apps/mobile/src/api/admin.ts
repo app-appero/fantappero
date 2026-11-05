@@ -430,9 +430,14 @@ export function removeBlocked(accessToken: string, entryId: string): Promise<Adm
   });
 }
 
-export function deleteUser(accessToken: string, userId: string): Promise<AdminDeleteUserResult> {
+export function deleteUser(
+  accessToken: string,
+  userId: string,
+  block: boolean,
+): Promise<AdminDeleteUserResult> {
   return apiRequest<AdminDeleteUserResult>(`/admin/users/${userId}/delete`, {
     accessToken,
     method: "POST",
+    body: { block },
   });
 }

@@ -10,7 +10,7 @@ Funzioni del pannello operatore (pagina **Utenti**, web e app), decise il 05/11/
 - Per cambiare chi è protetto si modifica la variabile su Railway (API).
 
 ## Elimina utente
-- Pulsante **Elimina** accanto a ogni utente non operatore; chiede conferma («Sei sicuro…»).
+- Pulsante **Elimina** accanto a ogni utente non operatore; chiede conferma («Sei sicuro…») con due scelte: **Elimina** (solo eliminazione: la persona potrà registrarsi di nuovo) ed **Elimina e lista nera** (elimina e blocca l'email).
 - L'account viene **anonimizzato** (come l'eliminazione fatta dall'utente: dati personali, avatar e
   segnalazioni rimossi, storici di lega preservati con un nome anonimo) e l'indirizzo email finisce
   in **lista nera**.

@@ -351,6 +351,12 @@ class AdminAddBlockedRequest(ApiModel):
     reason: str | None = Field(default=None, max_length=500)
 
 
+class AdminDeleteUserRequest(ApiModel):
+    #: True = elimina e mette l'email in lista nera; False = elimina e basta.
+    block: bool = True
+
+
 class AdminDeleteUserResponse(ApiModel):
     deleted_user_id: str = Field(alias="deletedUserId")
-    blocked_email: str = Field(alias="blockedEmail")
+    #: Email messa in lista nera; None se l'utente è stato eliminato senza bloccarlo.
+    blocked_email: str | None = Field(default=None, alias="blockedEmail")

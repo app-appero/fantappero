@@ -147,8 +147,10 @@ def test_deleting_a_user_blocks_the_address_for_good(
     assert removed.status_code == 200
     assert removed.json()["items"] == []
     assert client.delete(f"/admin/blocklist/{entry_id}", headers=operator).status_code == 404
-    reopened = _google(client, monkeypatch, "bl.recidivo@example.com", "sub-recidivo-2")
+    # Stesso account Google di prima: ottiene un nuovo account (era il bug «accesso non riuscito»).
+    reopened = _google(client, monkeypatch, "bl.recidivo@example.com", "sub-recidivo")
     assert reopened.status_code == 200
+    assert reopened.json()["user"]["id"] != target_id
 
 
 def test_manual_blocklist_entry_stops_existing_users_at_refresh(
@@ -180,3 +182,24 @@ def test_manual_blocklist_entry_stops_existing_users_at_refresh(
         "/admin/blocklist", headers=operator, json={"email": "bl.op3@example.com"}
     )
     assert op_block.status_code == 409
+
+
+def test_delete_without_blocking_lets_the_person_register_again(
+    client: TestClient, db_session: Session, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    operator, _ = _operator(client, db_session, "bl.op4@example.com")
+    first = _google(client, monkeypatch, "bl.semplice@example.com", "sub-semplice")
+    assert first.status_code == 200
+    target_id = first.json()["user"]["id"]
+
+    deleted = client.post(
+        f"/admin/users/{target_id}/delete", headers=operator, json={"block": False}
+    )
+    assert deleted.status_code == 200, deleted.text
+    assert deleted.json()["blockedEmail"] is None
+    assert client.get("/admin/blocklist", headers=operator).json()["items"] == []
+
+    # Stesso account Google, nessun blocco: rientra con un account nuovo.
+    again = _google(client, monkeypatch, "bl.semplice@example.com", "sub-semplice")
+    assert again.status_code == 200
+    assert again.json()["user"]["id"] != target_id

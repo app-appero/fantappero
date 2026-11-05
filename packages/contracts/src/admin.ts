@@ -46,7 +46,8 @@ export interface AdminBlocklist {
 
 export interface AdminDeleteUserResult {
   deletedUserId: string;
-  blockedEmail: string;
+  /** Email messa in lista nera; null se eliminato senza bloccarlo. */
+  blockedEmail: string | null;
 }
 
 export interface AdminTester {

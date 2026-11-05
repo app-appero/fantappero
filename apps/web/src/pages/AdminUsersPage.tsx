@@ -167,7 +167,7 @@ export function AdminUsersPage() {
     void load();
   }, [load]);
 
-  async function confirmAction() {
+  async function confirmAction(block = true) {
     if (!pending) {
       return;
     }
@@ -188,8 +188,12 @@ export function AdminUsersPage() {
         return;
       }
       if (pending.kind === "delete") {
-        const deleted = await deleteUser(session.accessToken, pending.user.id);
-        setSuccess(`${pending.user.displayName} è stato eliminato e ${deleted.blockedEmail} è in lista nera.`);
+        const deleted = await deleteUser(session.accessToken, pending.user.id, block);
+        setSuccess(
+          deleted.blockedEmail
+            ? `${pending.user.displayName} è stato eliminato e ${deleted.blockedEmail} è in lista nera.`
+            : `${pending.user.displayName} è stato eliminato.`,
+        );
         setBlocklist(await fetchBlocklist(session.accessToken));
         await load();
         return;
@@ -578,14 +582,35 @@ export function AdminUsersPage() {
             <Button type="button" variant="ghost" onClick={() => setPending(null)}>
               Annulla
             </Button>
-            <Button
-              type="button"
-              variant="primary"
-              onClick={() => void confirmAction()}
-              data-testid="admin-user-confirm"
-            >
-              Conferma
-            </Button>
+            {pending?.kind === "delete" ? (
+              <>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={() => void confirmAction(false)}
+                  data-testid="admin-user-delete-only"
+                >
+                  Elimina
+                </Button>
+                <Button
+                  type="button"
+                  variant="primary"
+                  onClick={() => void confirmAction(true)}
+                  data-testid="admin-user-delete-and-block"
+                >
+                  Elimina e lista nera
+                </Button>
+              </>
+            ) : (
+              <Button
+                type="button"
+                variant="primary"
+                onClick={() => void confirmAction()}
+                data-testid="admin-user-confirm"
+              >
+                Conferma
+              </Button>
+            )}
           </>
         }
       >
@@ -595,7 +620,7 @@ export function AdminUsersPage() {
             : pending?.kind === "impersonate"
               ? `Accederai come ${pending.user.displayName} per qualche minuto, a scopo di assistenza. L'operazione viene registrata nell'audit log.`
               : pending?.kind === "delete"
-                ? `Sei sicuro di voler eliminare ${pending.user.displayName} (${pending.user.email})? I suoi dati personali vengono rimossi e l'indirizzo finisce in lista nera: non potrà più accedere né registrarsi. Potrai toglierlo dalla lista nera in seguito.`
+                ? `Sei sicuro di voler eliminare ${pending.user.displayName} (${pending.user.email})? I suoi dati personali vengono rimossi. Scegli «Elimina» per eliminare e basta (potrà registrarsi di nuovo), oppure «Elimina e lista nera» per bloccare anche l'indirizzo: non potrà più accedere né registrarsi.`
                 : `Confermi di voler revocare il ruolo di operatore a ${pending?.user.displayName}?`}
         </p>
       </Modal>

@@ -14,6 +14,7 @@ from admin.schemas import (
     AdminAddBlockedRequest,
     AdminAddTesterRequest,
     AdminBlocklistResponse,
+    AdminDeleteUserRequest,
     AdminDeleteUserResponse,
     AdminImpersonateResponse,
     AdminListoneEntryResponse,
@@ -137,12 +138,15 @@ def remove_tester(
 @router.post("/users/{user_id}/delete", response_model=AdminDeleteUserResponse)
 def delete_user(
     user_id: UUID,
+    body: AdminDeleteUserRequest | None = None,
     operator: User = Depends(require_permissions(Permission.GLOBAL_OPERATE)),
     service: AdminService = Depends(get_admin_service),
 ) -> AdminDeleteUserResponse | JSONResponse:
-    """Elimina l'utente (dati personali rimossi) e ne blocca l'indirizzo email."""
+    """Elimina l'utente (dati personali rimossi); con `block` ne blocca anche l'email."""
     try:
-        return service.delete_user(actor=operator, target_user_id=user_id)
+        return service.delete_user(
+            actor=operator, target_user_id=user_id, block=body.block if body else True
+        )
     except AdminError as exc:
         return _error_response(exc)
     except AuthError as exc:

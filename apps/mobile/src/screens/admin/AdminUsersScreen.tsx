@@ -181,7 +181,7 @@ export function AdminUsersScreen() {
     }
   }
 
-  async function confirmAction() {
+  async function confirmAction(block = true) {
     if (!pending) {
       return;
     }
@@ -203,8 +203,12 @@ export function AdminUsersScreen() {
         return;
       }
       if (pending.kind === "delete") {
-        const deleted = await deleteUser(accessToken, pending.user.id);
-        setSuccess(`${pending.user.displayName} è stato eliminato e ${deleted.blockedEmail} è in lista nera.`);
+        const deleted = await deleteUser(accessToken, pending.user.id, block);
+        setSuccess(
+          deleted.blockedEmail
+            ? `${pending.user.displayName} è stato eliminato e ${deleted.blockedEmail} è in lista nera.`
+            : `${pending.user.displayName} è stato eliminato.`,
+        );
         setBlocklist(await fetchBlocklist(accessToken));
         await load({ silent: true });
         return;
@@ -607,7 +611,7 @@ export function AdminUsersScreen() {
                   : pending.kind === "impersonate"
                     ? `Accederai come ${pending.user.displayName} per qualche minuto, a scopo di assistenza.`
                     : pending.kind === "delete"
-                      ? `Sei sicuro di voler eliminare ${pending.user.displayName} (${pending.user.email})? I suoi dati personali vengono rimossi e l'indirizzo finisce in lista nera: non potrà più accedere né registrarsi.`
+                      ? `Sei sicuro di voler eliminare ${pending.user.displayName} (${pending.user.email})? I suoi dati personali vengono rimossi. «Elimina» elimina e basta (potrà registrarsi di nuovo); «Elimina e lista nera» blocca anche l'indirizzo: non potrà più accedere né registrarsi.`
                       : `Confermi di voler revocare il ruolo di operatore a ${pending.user.displayName}?`}
               </Text>
               <View style={styles.rowActions}>
@@ -618,13 +622,32 @@ export function AdminUsersScreen() {
                 >
                   <Text style={styles.secondaryButtonLabel}>Annulla</Text>
                 </Pressable>
-                <Pressable
-                  style={styles.button}
-                  onPress={() => void confirmAction()}
-                  testID="admin-user-confirm"
-                >
-                  <Text style={styles.buttonLabel}>Conferma</Text>
-                </Pressable>
+                {pending.kind === "delete" ? (
+                  <>
+                    <Pressable
+                      style={styles.secondaryButton}
+                      onPress={() => void confirmAction(false)}
+                      testID="admin-user-delete-only"
+                    >
+                      <Text style={styles.secondaryButtonLabel}>Elimina</Text>
+                    </Pressable>
+                    <Pressable
+                      style={styles.button}
+                      onPress={() => void confirmAction(true)}
+                      testID="admin-user-delete-and-block"
+                    >
+                      <Text style={styles.buttonLabel}>Elimina e lista nera</Text>
+                    </Pressable>
+                  </>
+                ) : (
+                  <Pressable
+                    style={styles.button}
+                    onPress={() => void confirmAction()}
+                    testID="admin-user-confirm"
+                  >
+                    <Text style={styles.buttonLabel}>Conferma</Text>
+                  </Pressable>
+                )}
               </View>
             </View>
           ) : null}
