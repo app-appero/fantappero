@@ -11,8 +11,8 @@ Stato aggiornato al 04/11/2026.
 
 - [x] CI verde su `main` (run sul commit del 03/11 in success: lint, test Python e JS, migrazioni,
   gitleaks, SAST). — Claude. *Ricontrollare sul commit che si congela.*
-- [ ] Scelto il commit da congelare (`6599eb2`, CI verde) e creato il tag `pilota-1` (creato in locale il 05/11/2026; da pubblicare su GitHub dal proprietario del repository); da lì le modifiche entrano
-  in produzione solo se decise. — Claude + Rosario
+- [x] Commit congelato `6599eb2` (CI verde) e tag **`pilota-1`** pubblicato su GitHub da Rosario il
+  05/11/2026. Regole dei prossimi tag: vedi `release_pilota_regole.md`. — Claude + Rosario
 - [x] Backend su Railway (API **e** worker) alla versione del tag. Confermato da Rosario il 05/11/2026. — Rosario
 - [x] Sito web alla stessa versione del backend. Confermato da Rosario il 05/11/2026. — Rosario
 - [ ] App Android costruita da quel commit e installata sul telefono di prova. — Rosario
