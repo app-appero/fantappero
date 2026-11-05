@@ -400,6 +400,8 @@ export type {
   AdminTurniSyncResult,
   SystemJob,
   SystemJobUpdate,
+  AdminTester,
+  AdminTestMode,
   AdminUser,
   PaginatedAdminLeagues,
   PaginatedAdminUsers,

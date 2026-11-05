@@ -1,4 +1,5 @@
 import type {
+  AdminTestMode,
   AdminAiLineupsSyncResult,
   AdminCalendarSyncJob,
   AdminCalendarSyncProgress,
@@ -375,4 +376,31 @@ export async function repairHistoricalRounds(
       setTimeout(resolve, pollIntervalMs);
     });
   }
+}
+
+export function fetchTestMode(accessToken: string): Promise<AdminTestMode> {
+  return apiRequest<AdminTestMode>("/admin/test-mode", { accessToken });
+}
+
+export function setTestMode(accessToken: string, enabled: boolean): Promise<AdminTestMode> {
+  return apiRequest<AdminTestMode>("/admin/test-mode", {
+    accessToken,
+    method: "PUT",
+    body: { enabled },
+  });
+}
+
+export function addTester(accessToken: string, email: string): Promise<AdminTestMode> {
+  return apiRequest<AdminTestMode>("/admin/test-mode/testers", {
+    accessToken,
+    method: "POST",
+    body: { email },
+  });
+}
+
+export function removeTester(accessToken: string, testerId: string): Promise<AdminTestMode> {
+  return apiRequest<AdminTestMode>(`/admin/test-mode/testers/${testerId}`, {
+    accessToken,
+    method: "DELETE",
+  });
 }

@@ -1,10 +1,19 @@
-import type { AdminUser, PaginatedAdminUsers } from "@fantappero/contracts";
+import type { AdminTestMode, AdminUser, PaginatedAdminUsers } from "@fantappero/contracts";
 import { useNavigation } from "@react-navigation/core";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useCallback, useEffect, useState } from "react";
 import { Modal, Pressable, Text, View } from "react-native";
 import { AppTextInput as TextInput } from "../../components/AppTextInput";
-import { fetchAdminUsers, impersonateUser, promoteOperator, revokeOperator } from "../../api/admin";
+import {
+  addTester,
+  fetchAdminUsers,
+  fetchTestMode,
+  impersonateUser,
+  promoteOperator,
+  removeTester,
+  revokeOperator,
+  setTestMode,
+} from "../../api/admin";
 import { ApiError } from "../../api/client";
 import { adminUiStyles as styles } from "../../admin/adminUiStyles";
 import { UiStatePanel } from "../../components/UiStatePanel";
@@ -30,6 +39,18 @@ export function AdminUsersScreen() {
   const [workingId, setWorkingId] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [testMode, setTestModeState] = useState<AdminTestMode | null>(null);
+  const [testModeBusy, setTestModeBusy] = useState(false);
+  const [newTesterEmail, setNewTesterEmail] = useState("");
+
+  useEffect(() => {
+    if (!accessToken) {
+      return;
+    }
+    void fetchTestMode(accessToken)
+      .then(setTestModeState)
+      .catch(() => setTestModeState(null));
+  }, [accessToken]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -83,6 +104,32 @@ export function AdminUsersScreen() {
       setRefreshing(false);
     }
   }, [load]);
+
+  /** Esegue una modifica alla modalità test e aggiorna stato e messaggi. */
+  async function runTestModeAction(
+    action: (token: string) => Promise<AdminTestMode>,
+    message: string,
+    refreshUsers = false,
+  ) {
+    if (!accessToken) {
+      setError("Sessione non disponibile. Accedi di nuovo.");
+      return;
+    }
+    setTestModeBusy(true);
+    setError(null);
+    setSuccess(null);
+    try {
+      setTestModeState(await action(accessToken));
+      setSuccess(message);
+      if (refreshUsers) {
+        await load({ silent: true });
+      }
+    } catch (actionError) {
+      setError(getApiErrorMessage(actionError, "Operazione sulla modalità test non riuscita."));
+    } finally {
+      setTestModeBusy(false);
+    }
+  }
 
   async function confirmAction() {
     if (!pending) {
@@ -145,6 +192,89 @@ export function AdminUsersScreen() {
       refreshing={refreshing}
       onRefresh={onRefresh}
     >
+      <View style={styles.listRow} testID="admin-testmode">
+        <Text style={styles.sectionTitle}>Modalità test</Text>
+        {testMode ? (
+          <>
+            <Text style={styles.meta}>
+              {testMode.enabled
+                ? "Attiva: possono accedere solo i tester e gli operatori. Gli altri vedono «Non autorizzato»."
+                : "Spenta: chiunque abbia il link può accedere con Google."}
+            </Text>
+            <Pressable
+              style={[testMode.enabled ? styles.secondaryButton : styles.button, testModeBusy && styles.disabled]}
+              disabled={testModeBusy}
+              onPress={() =>
+                void runTestModeAction(
+                  (token) => setTestMode(token, !testMode.enabled),
+                  testMode.enabled ? "Modalità test disattivata." : "Modalità test attivata.",
+                )
+              }
+              testID="admin-testmode-toggle"
+            >
+              <Text style={testMode.enabled ? styles.secondaryButtonLabel : styles.buttonLabel}>
+                {testMode.enabled ? "Disattiva modalità test" : "Attiva modalità test"}
+              </Text>
+            </Pressable>
+            <TextInput
+              style={styles.input}
+              value={newTesterEmail}
+              onChangeText={setNewTesterEmail}
+              placeholder="Aggiungi un tester (email Google)"
+              autoCapitalize="none"
+              autoCorrect={false}
+              keyboardType="email-address"
+              testID="admin-tester-email"
+            />
+            <Pressable
+              style={[styles.button, testModeBusy && styles.disabled]}
+              disabled={testModeBusy || !newTesterEmail.trim()}
+              onPress={() => {
+                const email = newTesterEmail.trim();
+                void runTestModeAction(
+                  (token) => addTester(token, email),
+                  `${email} è ora tester.`,
+                  true,
+                ).then(() => setNewTesterEmail(""));
+              }}
+              testID="admin-tester-add"
+            >
+              <Text style={styles.buttonLabel}>Aggiungi tester</Text>
+            </Pressable>
+            {testMode.testers.length === 0 ? (
+              <Text style={styles.meta} testID="admin-testers-empty">
+                Nessun tester in lista (gli operatori sono sempre abilitati).
+              </Text>
+            ) : (
+              testMode.testers.map((tester) => (
+                <View key={tester.id} style={styles.identityRow} testID={`admin-tester-${tester.id}`}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.name}>{tester.displayName ?? "Non ha ancora acceduto"}</Text>
+                    <Text style={styles.meta}>{tester.email}</Text>
+                  </View>
+                  <Pressable
+                    style={[styles.secondaryButton, testModeBusy && styles.disabled]}
+                    disabled={testModeBusy}
+                    onPress={() =>
+                      void runTestModeAction(
+                        (token) => removeTester(token, tester.id),
+                        `${tester.email} non è più tester.`,
+                        true,
+                      )
+                    }
+                    testID={`admin-tester-remove-${tester.id}`}
+                  >
+                    <Text style={styles.secondaryButtonLabel}>Rimuovi</Text>
+                  </Pressable>
+                </View>
+              ))
+            )}
+          </>
+        ) : (
+          <Text style={styles.meta}>Stato della modalità test non disponibile.</Text>
+        )}
+      </View>
+
       <TextInput
         style={styles.input}
         value={query}
@@ -198,8 +328,38 @@ export function AdminUsersScreen() {
                 </View>
                 <Text style={styles.meta}>
                   {row.platformRole === "operator" ? "Operatore" : "Utente"}
+                  {row.isTester ? " · Tester" : ""}
                 </Text>
               </View>
+              {row.platformRole !== "operator" ? (
+                <Pressable
+                  style={[row.isTester ? styles.secondaryButton : styles.button, testModeBusy && styles.disabled]}
+                  disabled={testModeBusy}
+                  onPress={() => {
+                    const existing = testMode?.testers.find(
+                      (tester) => tester.email.toLowerCase() === row.email.toLowerCase(),
+                    );
+                    if (row.isTester && existing) {
+                      void runTestModeAction(
+                        (token) => removeTester(token, existing.id),
+                        `${row.displayName} non è più tester.`,
+                        true,
+                      );
+                    } else if (!row.isTester) {
+                      void runTestModeAction(
+                        (token) => addTester(token, row.email),
+                        `${row.displayName} è ora tester.`,
+                        true,
+                      );
+                    }
+                  }}
+                  testID={`admin-user-tester-${row.id}`}
+                >
+                  <Text style={row.isTester ? styles.secondaryButtonLabel : styles.buttonLabel}>
+                    {row.isTester ? "Revoca tester" : "Abilita tester"}
+                  </Text>
+                </Pressable>
+              ) : null}
               <Pressable
                 style={[styles.secondaryButton, workingId === row.id && styles.disabled]}
                 disabled={workingId === row.id}

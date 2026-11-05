@@ -43,6 +43,13 @@ Stato aggiornato al 04/11/2026.
 - [x] La casella **info@globetrotta.it** riceve (confermato da Rosario il 04/11/2026): è il
   contatto dell'informativa per copia dati ed eliminazione.
 
+## 3b. Accesso riservato ai tester
+
+- [ ] Rilascio `pilota-2` con la modalità test (backend con migrazione `c4d8e1a7b932`, sito, app) e
+  prova: con la modalità attiva un account Google non in lista vede «Non autorizzato». — Claude + Rosario
+- [ ] Aggiunti i tester (email Google) e **attivata la modalità test** prima di mandare gli inviti.
+  Vedi `modalita_test.md`. — Rosario
+
 ## 4. Prova completa con un account Google nuovo
 
 Da fare sia sul **web** sia nell'**app**:

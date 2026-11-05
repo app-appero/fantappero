@@ -1,7 +1,16 @@
-import type { AdminUser, PaginatedAdminUsers } from "@fantappero/contracts";
+import type { AdminTestMode, AdminUser, PaginatedAdminUsers } from "@fantappero/contracts";
 import { Badge, Breadcrumb, Button, Input, Modal, PageContainer, UiStatePanel } from "@fantappero/ui";
 import { useCallback, useEffect, useState } from "react";
-import { fetchAdminUsers, impersonateUser, promoteOperator, revokeOperator } from "../api/admin";
+import {
+  addTester,
+  fetchAdminUsers,
+  fetchTestMode,
+  impersonateUser,
+  promoteOperator,
+  removeTester,
+  revokeOperator,
+  setTestMode,
+} from "../api/admin";
 import { ApiError } from "../api/client";
 import { getApiErrorMessage, useAuth } from "../auth/AuthContext";
 import { loadStoredSession } from "../auth/sessionStorage";
@@ -21,6 +30,46 @@ export function AdminUsersPage() {
   const [pending, setPending] = useState<PendingAction | null>(null);
   const [workingId, setWorkingId] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [testMode, setTestModeState] = useState<AdminTestMode | null>(null);
+  const [testModeBusy, setTestModeBusy] = useState(false);
+  const [newTesterEmail, setNewTesterEmail] = useState("");
+
+  useEffect(() => {
+    const session = loadStoredSession();
+    if (!session?.accessToken) {
+      return;
+    }
+    void fetchTestMode(session.accessToken)
+      .then(setTestModeState)
+      .catch(() => setTestModeState(null));
+  }, []);
+
+  /** Esegue una modifica alla modalità test e aggiorna stato e messaggi. */
+  async function runTestModeAction(
+    action: (token: string) => Promise<AdminTestMode>,
+    message: string,
+    refreshUsers = false,
+  ) {
+    const session = loadStoredSession();
+    if (!session?.accessToken) {
+      setError("Sessione non disponibile. Accedi di nuovo.");
+      return;
+    }
+    setTestModeBusy(true);
+    setError(null);
+    setSuccess(null);
+    try {
+      setTestModeState(await action(session.accessToken));
+      setSuccess(message);
+      if (refreshUsers) {
+        await load();
+      }
+    } catch (actionError) {
+      setError(getApiErrorMessage(actionError, "Operazione sulla modalità test non riuscita."));
+    } finally {
+      setTestModeBusy(false);
+    }
+  }
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -122,6 +171,93 @@ export function AdminUsersPage() {
         <Breadcrumb items={[{ label: "Operazioni", href: "/admin" }, { label: "Utenti" }]} />
       }
     >
+      <section className="fa-admin-testmode" data-testid="admin-testmode">
+        <h2>Modalità test</h2>
+        {testMode ? (
+          <>
+            <p>
+              {testMode.enabled
+                ? "Attiva: possono accedere solo i tester e gli operatori. Gli altri vedono «Non autorizzato»."
+                : "Spenta: chiunque abbia il link può accedere con Google."}
+            </p>
+            <Button
+              type="button"
+              variant={testMode.enabled ? "secondary" : "primary"}
+              loading={testModeBusy}
+              onClick={() =>
+                void runTestModeAction(
+                  (token) => setTestMode(token, !testMode.enabled),
+                  testMode.enabled ? "Modalità test disattivata." : "Modalità test attivata.",
+                )
+              }
+              data-testid="admin-testmode-toggle"
+            >
+              {testMode.enabled ? "Disattiva modalità test" : "Attiva modalità test"}
+            </Button>
+            <form
+              className="fa-admin-testmode__add"
+              onSubmit={(event) => {
+                event.preventDefault();
+                const email = newTesterEmail.trim();
+                if (!email) {
+                  return;
+                }
+                void runTestModeAction(
+                  (token) => addTester(token, email),
+                  `${email} è ora tester.`,
+                  true,
+                ).then(() => setNewTesterEmail(""));
+              }}
+            >
+              <Input
+                label="Aggiungi un tester (email Google)"
+                name="admin-tester-email"
+                type="email"
+                value={newTesterEmail}
+                onChange={(event) => setNewTesterEmail(event.target.value)}
+              />
+              <Button type="submit" variant="primary" loading={testModeBusy} data-testid="admin-tester-add">
+                Aggiungi
+              </Button>
+            </form>
+            {testMode.testers.length === 0 ? (
+              <p data-testid="admin-testers-empty">Nessun tester in lista (gli operatori sono sempre abilitati).</p>
+            ) : (
+              <ul className="fa-admin-users__list" data-testid="admin-testers-list">
+                {testMode.testers.map((tester) => (
+                  <li key={tester.id} className="fa-admin-users__item">
+                    <span className="fa-admin-users__identity">
+                      <strong>{tester.displayName ?? "Non ha ancora acceduto"}</strong>
+                      <small>{tester.email}</small>
+                    </span>
+                    <span className="fa-admin-users__actions">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        loading={testModeBusy}
+                        onClick={() =>
+                          void runTestModeAction(
+                            (token) => removeTester(token, tester.id),
+                            `${tester.email} non è più tester.`,
+                            true,
+                          )
+                        }
+                        data-testid={`admin-tester-remove-${tester.id}`}
+                      >
+                        Rimuovi
+                      </Button>
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </>
+        ) : (
+          <p>Stato della modalità test non disponibile.</p>
+        )}
+      </section>
+
       <Input
         label="Cerca per email o nome"
         name="admin-users-query"
@@ -175,7 +311,41 @@ export function AdminUsersPage() {
               >
                 {row.platformRole === "operator" ? "Operatore" : "Utente"}
               </Badge>
+              {row.isTester ? (
+                <Badge variant="success" data-testid={`admin-user-tester-badge-${row.id}`}>
+                  Tester
+                </Badge>
+              ) : null}
               <span className="fa-admin-users__actions">
+                {row.platformRole !== "operator" ? (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant={row.isTester ? "secondary" : "primary"}
+                    loading={testModeBusy}
+                    onClick={() => {
+                      const existing = testMode?.testers.find(
+                        (tester) => tester.email.toLowerCase() === row.email.toLowerCase(),
+                      );
+                      if (row.isTester && existing) {
+                        void runTestModeAction(
+                          (token) => removeTester(token, existing.id),
+                          `${row.displayName} non è più tester.`,
+                          true,
+                        );
+                      } else if (!row.isTester) {
+                        void runTestModeAction(
+                          (token) => addTester(token, row.email),
+                          `${row.displayName} è ora tester.`,
+                          true,
+                        );
+                      }
+                    }}
+                    data-testid={`admin-user-tester-${row.id}`}
+                  >
+                    {row.isTester ? "Revoca tester" : "Abilita tester"}
+                  </Button>
+                ) : null}
                 <Button
                   type="button"
                   size="sm"

@@ -5125,3 +5125,19 @@ h2 {
 @media (max-width: 640px) {
   .fa-feedback-admin__head time { margin-left: 0; width: 100%; }
 }
+
+.fa-admin-testmode {
+  display: grid;
+  gap: var(--fa-space-sm);
+  margin-bottom: var(--fa-space-md);
+  padding: var(--fa-space-md);
+  border: 1px solid var(--fa-color-border);
+  border-radius: var(--fa-radius-md);
+}
+
+.fa-admin-testmode__add {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--fa-space-sm);
+}

@@ -34,3 +34,4 @@ schema dei dati va valutata prima del rilascio.
 | Tag | Commit | Data | Contenuto |
 | --- | --- | --- | --- |
 | `pilota-1` | `6599eb2` | 05/11/2026 | Prima versione per i tester |
+| `pilota-2` | da assegnare | — | Modalità test: accesso riservato ai tester (eccezione decisa da Rosario il 05/11/2026) |

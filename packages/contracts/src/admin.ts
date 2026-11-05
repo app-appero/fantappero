@@ -27,6 +27,21 @@ export interface AdminUser {
   displayName: string;
   platformRole: PlatformRole;
   createdAt: string;
+  /** Autorizzato in modalità test (in lista oppure operatore). */
+  isTester?: boolean;
+}
+
+export interface AdminTester {
+  id: string;
+  email: string;
+  /** Nome dell'account, se la persona ha già acceduto. */
+  displayName: string | null;
+  createdAt: string;
+}
+
+export interface AdminTestMode {
+  enabled: boolean;
+  testers: AdminTester[];
 }
 
 export interface PaginatedAdminUsers {
