@@ -49,6 +49,16 @@ class GoogleAuthError(AuthError):
         )
 
 
+class TesterOnlyError(AuthError):
+    """Modalità test attiva: l'account non è tra i tester autorizzati."""
+
+    def __init__(self) -> None:
+        super().__init__(
+            "Non autorizzato: l'accesso è riservato ai tester del pilota.",
+            code="tester_only",
+        )
+
+
 class RateLimitExceededError(AuthError):
     def __init__(self) -> None:
         super().__init__(

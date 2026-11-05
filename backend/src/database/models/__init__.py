@@ -4,6 +4,7 @@ from ai_assistant.models import AiInteraction
 from auth.models.auth_session import AuthSession
 from auth.models.auth_token import AuthToken
 from auth.models.privacy_audit_event import PrivacyAuditEvent
+from auth.models.tester_allowlist import TesterAllowlistEntry
 from auth.models.user import User
 from auth.models.user_profile import UserProfile
 from billing.models import SubscriptionPayment, UserEntitlement
@@ -75,6 +76,7 @@ __all__ = [
     "AiInteraction",
     "Athlete",
     "AuthSession",
+    "TesterAllowlistEntry",
     "AuthToken",
     "Club",
     "Competition",

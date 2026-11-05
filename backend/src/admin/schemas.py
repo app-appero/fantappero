@@ -26,6 +26,29 @@ class AdminUserResponse(ApiModel):
     display_name: str = Field(alias="displayName")
     platform_role: PlatformRole = Field(alias="platformRole")
     created_at: datetime = Field(alias="createdAt")
+    #: Autorizzato in modalità test (in lista, oppure operatore: tester di default).
+    is_tester: bool = Field(default=False, alias="isTester")
+
+
+class AdminTesterResponse(ApiModel):
+    id: str
+    email: str
+    #: Nome dell'account se la persona ha già acceduto.
+    display_name: str | None = Field(default=None, alias="displayName")
+    created_at: datetime = Field(alias="createdAt")
+
+
+class AdminTestModeResponse(ApiModel):
+    enabled: bool
+    testers: list[AdminTesterResponse]
+
+
+class AdminTestModeUpdateRequest(ApiModel):
+    enabled: bool
+
+
+class AdminAddTesterRequest(ApiModel):
+    email: str = Field(min_length=3, max_length=320)
 
 
 class AdminImpersonateResponse(ApiModel):

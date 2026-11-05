@@ -15,6 +15,7 @@ from auth.exceptions import (
     GoogleAuthError,
     InvalidCredentialsError,
     InvalidTokenError,
+    TesterOnlyError,
     ValidationAuthError,
 )
 from auth.models.auth_session import AuthSession
@@ -31,6 +32,7 @@ from auth.security import (
     utc_now,
     verify_password,
 )
+from auth.tester_access import TesterAccess
 from auth.validators import validate_display_name, validate_email, validate_password
 from config.settings.api import ApiSettings
 from database.enums import AuthTokenType, PlatformRole, UserType, platform_role_to_global_role
@@ -142,6 +144,7 @@ class AuthService:
             get_metrics().incr("auth_login_total", labels={"result": "unverified"})
             raise EmailNotVerifiedError()
 
+        self._assert_tester_allowed(user.email, user.platform_role)
         tokens = self._create_session(user)
         self._session.commit()
         get_metrics().incr("auth_login_total", labels={"result": "success"})
@@ -176,6 +179,10 @@ class AuthService:
             user = self._session.scalar(
                 select(User).where(User.email == identity.email, User.deleted_at.is_(None))
             )
+            # Modalità test: chi non è autorizzato non lascia nessun account.
+            self._assert_tester_allowed(
+                identity.email, user.platform_role if user is not None else None
+            )
             if user is not None:
                 user.google_sub = identity.sub
                 if not user.email_verified:
@@ -199,11 +206,20 @@ class AuthService:
             get_metrics().incr("auth_google_login_total", labels={"result": "failure"})
             raise GoogleAuthError()
 
+        # Account già collegato a Google (ricerca per `sub`): stesso controllo.
+        self._assert_tester_allowed(user.email, user.platform_role)
         self._record_policy_acceptance(user)
         tokens = self._create_session(user)
         self._session.commit()
         get_metrics().incr("auth_google_login_total", labels={"result": "success"})
         return tokens
+
+    def _assert_tester_allowed(self, email: str, platform_role: PlatformRole | None) -> None:
+        try:
+            TesterAccess(self._session).assert_allowed(email=email, platform_role=platform_role)
+        except TesterOnlyError:
+            get_metrics().incr("auth_tester_only_blocked_total")
+            raise
 
     def _record_policy_acceptance(self, user: User) -> None:
         """L'accesso con Google vale come accettazione dell'informativa mostrata sotto il tasto.
@@ -233,6 +249,7 @@ class AuthService:
         user = self._session.get(User, session_row.user_id)
         if user is None or user.deleted_at is not None or user.user_type == UserType.AI:
             raise InvalidCredentialsError()
+        self._assert_tester_allowed(user.email, user.platform_role)
 
         session_row.revoked_at = utc_now()
         tokens = self._create_session(user)

@@ -11,11 +11,14 @@ from sqlalchemy.orm import Session
 from admin.exceptions import AdminError
 from admin.listone_service import AdminListoneService
 from admin.schemas import (
+    AdminAddTesterRequest,
     AdminImpersonateResponse,
     AdminListoneEntryResponse,
     AdminListoneRefreshJobResponse,
     AdminListoneRefreshProgressResponse,
     AdminOverviewResponse,
+    AdminTestModeResponse,
+    AdminTestModeUpdateRequest,
     AdminTransferReviewedResponse,
     AdminUserResponse,
     PaginatedAdminLeaguesResponse,
@@ -25,7 +28,7 @@ from admin.schemas import (
 from admin.service import AdminService
 from admin.transfers_service import AdminTransfersService
 from auth.dependencies import get_db_session
-from auth.exceptions import ValidationAuthError
+from auth.exceptions import AuthError, ValidationAuthError
 from auth.models.user import User
 from authorization.dependencies import require_permissions
 from config.settings.api import ApiSettings
@@ -84,6 +87,48 @@ def list_users(
     service: AdminService = Depends(get_admin_service),
 ) -> PaginatedAdminUsersResponse:
     return service.list_users(query=query, page=page)
+
+
+@router.get("/test-mode", response_model=AdminTestModeResponse)
+def get_test_mode(
+    _operator: User = Depends(require_permissions(Permission.GLOBAL_OPERATE)),
+    service: AdminService = Depends(get_admin_service),
+) -> AdminTestModeResponse:
+    """Stato della modalità test (accesso solo ai tester) e lista dei tester."""
+    return service.test_mode_state()
+
+
+@router.put("/test-mode", response_model=AdminTestModeResponse)
+def set_test_mode(
+    body: AdminTestModeUpdateRequest,
+    operator: User = Depends(require_permissions(Permission.GLOBAL_OPERATE)),
+    service: AdminService = Depends(get_admin_service),
+) -> AdminTestModeResponse:
+    return service.set_test_mode(actor=operator, enabled=body.enabled)
+
+
+@router.post("/test-mode/testers", response_model=AdminTestModeResponse)
+def add_tester(
+    body: AdminAddTesterRequest,
+    operator: User = Depends(require_permissions(Permission.GLOBAL_OPERATE)),
+    service: AdminService = Depends(get_admin_service),
+) -> AdminTestModeResponse | JSONResponse:
+    try:
+        return service.add_tester(actor=operator, email=body.email)
+    except AuthError as exc:
+        return JSONResponse(status_code=400, content={"message": exc.message, "code": exc.code})
+
+
+@router.delete("/test-mode/testers/{tester_id}", response_model=AdminTestModeResponse)
+def remove_tester(
+    tester_id: UUID,
+    operator: User = Depends(require_permissions(Permission.GLOBAL_OPERATE)),
+    service: AdminService = Depends(get_admin_service),
+) -> AdminTestModeResponse | JSONResponse:
+    try:
+        return service.remove_tester(actor=operator, tester_id=tester_id)
+    except AuthError as exc:
+        return JSONResponse(status_code=404, content={"message": exc.message, "code": exc.code})
 
 
 @router.post("/users/{user_id}/promote", response_model=AdminUserResponse)

@@ -17,6 +17,8 @@ from admin.schemas import (
     AdminImpersonateResponse,
     AdminLeagueResponse,
     AdminOverviewResponse,
+    AdminTesterResponse,
+    AdminTestModeResponse,
     AdminUserResponse,
     PaginatedAdminLeaguesResponse,
     PaginatedAdminUsersResponse,
@@ -25,6 +27,7 @@ from auth.models.user import User
 from auth.models.user_profile import UserProfile
 from auth.schemas import SessionUserResponse
 from auth.security import create_access_token
+from auth.tester_access import TesterAccess
 from config.settings.api import ApiSettings
 from database.enums import (
     LeagueAuditAction,
@@ -46,13 +49,19 @@ def _escape_ilike(term: str) -> str:
     return term.strip().replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
 
 
-def _to_user_response(user: User) -> AdminUserResponse:
+def _to_user_response(
+    user: User, tester_emails: frozenset[str] | set[str] | None = None
+) -> AdminUserResponse:
+    is_tester = user.platform_role == PlatformRole.OPERATOR or (
+        tester_emails is not None and user.email.strip().lower() in tester_emails
+    )
     return AdminUserResponse(
         id=str(user.id),
         email=user.email,
         displayName=user.display_name,
         platformRole=user.platform_role,
         createdAt=user.created_at,
+        isTester=is_tester,
     )
 
 
@@ -108,6 +117,7 @@ class AdminService:
             self._session.scalar(select(func.count()).select_from(base.order_by(None).subquery()))
             or 0
         )
+        tester_emails = TesterAccess(self._session).listed_emails()
         rows = self._session.scalars(
             base.options(selectinload(User.profile))
             .order_by(User.created_at.desc(), User.id.asc())
@@ -115,11 +125,59 @@ class AdminService:
             .limit(page_size)
         ).all()
         return PaginatedAdminUsersResponse(
-            items=[_to_user_response(user) for user in rows],
+            items=[_to_user_response(user, tester_emails) for user in rows],
             page=page,
             pageSize=page_size,
             total=total,
             totalPages=_total_pages(total, page_size),
+        )
+
+    # --- modalità test (accesso riservato ai tester) -----------------------------------------
+    def test_mode_state(self) -> AdminTestModeResponse:
+        access = TesterAccess(self._session)
+        entries = access.list_entries()
+        names = {
+            email: name
+            for email, name in self._session.execute(
+                select(User.email, UserProfile.display_name)
+                .outerjoin(UserProfile, UserProfile.user_id == User.id)
+                .where(User.deleted_at.is_(None))
+            ).all()
+        }
+        return AdminTestModeResponse(
+            enabled=access.is_test_mode(),
+            testers=[
+                AdminTesterResponse(
+                    id=str(entry.id),
+                    email=entry.email,
+                    displayName=names.get(entry.email),
+                    createdAt=entry.created_at,
+                )
+                for entry in entries
+            ],
+        )
+
+    def set_test_mode(self, *, actor: User, enabled: bool) -> AdminTestModeResponse:
+        TesterAccess(self._session).set_test_mode(enabled)
+        self._audit_test_mode(actor, "test_mode_on" if enabled else "test_mode_off", {})
+        self._session.commit()
+        return self.test_mode_state()
+
+    def add_tester(self, *, actor: User, email: str) -> AdminTestModeResponse:
+        entry = TesterAccess(self._session).add(email, actor_id=actor.id)
+        self._audit_test_mode(actor, "tester_added", {"testerId": str(entry.id)})
+        self._session.commit()
+        return self.test_mode_state()
+
+    def remove_tester(self, *, actor: User, tester_id: UUID) -> AdminTestModeResponse:
+        TesterAccess(self._session).remove(tester_id)
+        self._audit_test_mode(actor, "tester_removed", {"testerId": str(tester_id)})
+        self._session.commit()
+        return self.test_mode_state()
+
+    def _audit_test_mode(self, actor: User, event: str, details: dict[str, str]) -> None:
+        _logger.info(
+            "admin_test_mode_changed", extra={"event": event, "actor_id": str(actor.id), **details}
         )
 
     def promote_operator(self, *, actor: User, target_user_id: UUID) -> AdminUserResponse:
