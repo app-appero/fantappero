@@ -7,7 +7,9 @@ import type {
 import { useNavigation } from "@react-navigation/core";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useCallback, useEffect, useState } from "react";
-import { Modal, Pressable, Text, View } from "react-native";
+import { Modal, Pressable, StyleSheet, Text, View } from "react-native";
+import { theme } from "@fantappero/ui/theme";
+import { lazyStyles } from "../../theme/lazyStyles";
 import { AppTextInput as TextInput } from "../../components/AppTextInput";
 import {
   addBlocked,
@@ -65,6 +67,7 @@ export function AdminUsersScreen() {
   const [blockEmail, setBlockEmail] = useState("");
   const [blockReason, setBlockReason] = useState("");
   const [blockBusy, setBlockBusy] = useState(false);
+  const [menuFor, setMenuFor] = useState<string | null>(null);
 
   useEffect(() => {
     if (!accessToken) {
@@ -319,13 +322,18 @@ export function AdminUsersScreen() {
           </Text>
         ) : (
           blocklist.items.map((entry) => (
-            <View key={entry.id} style={styles.identityRow} testID={`admin-blocked-${entry.id}`}>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.name}>{entry.email}</Text>
-                <Text style={styles.meta}>
-                  {new Date(entry.createdAt).toLocaleDateString("it-IT")}
-                  {entry.reason ? ` · ${entry.reason}` : ""}
-                </Text>
+            <View key={entry.id} style={local.blockCard} testID={`admin-blocked-${entry.id}`}>
+              <View style={local.userHead}>
+                <View style={[local.avatar, local.avatarBlock]}>
+                  <Text style={local.avatarLabel}>⛔</Text>
+                </View>
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <Text style={styles.name}>{entry.email}</Text>
+                  <Text style={styles.meta}>
+                    {new Date(entry.createdAt).toLocaleDateString("it-IT")}
+                    {entry.reason ? ` · ${entry.reason}` : ""}
+                  </Text>
+                </View>
               </View>
               <Pressable
                 style={[styles.secondaryButton, blockBusy && styles.disabled]}
@@ -338,7 +346,7 @@ export function AdminUsersScreen() {
                 }
                 testID={`admin-block-remove-${entry.id}`}
               >
-                <Text style={styles.secondaryButtonLabel}>Togli</Text>
+                <Text style={styles.secondaryButtonLabel}>Togli dalla lista nera</Text>
               </Pressable>
             </View>
           ))
@@ -351,6 +359,11 @@ export function AdminUsersScreen() {
         <Text style={styles.sectionTitle}>Modalità test</Text>
         {testMode ? (
           <>
+            <View style={[local.pill, testMode.enabled ? local.pillOn : local.pillOff]}>
+              <Text style={[local.pillLabel, testMode.enabled ? local.pillLabelOn : null]}>
+                {testMode.enabled ? "ATTIVA" : "SPENTA"}
+              </Text>
+            </View>
             <Text style={styles.meta}>
               {testMode.enabled
                 ? "Attiva: possono accedere solo i tester e gli operatori. Gli altri vedono «Non autorizzato»."
@@ -394,35 +407,38 @@ export function AdminUsersScreen() {
               }}
               testID="admin-tester-add"
             >
-              <Text style={styles.buttonLabel}>Aggiungi tester</Text>
+              <Text style={styles.buttonLabel}>Aggiungi</Text>
             </Pressable>
             {testMode.testers.length === 0 ? (
               <Text style={styles.meta} testID="admin-testers-empty">
                 Nessun tester in lista (gli operatori sono sempre abilitati).
               </Text>
             ) : (
-              testMode.testers.map((tester) => (
-                <View key={tester.id} style={styles.identityRow} testID={`admin-tester-${tester.id}`}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.name}>{tester.displayName ?? "Non ha ancora acceduto"}</Text>
-                    <Text style={styles.meta}>{tester.email}</Text>
+              <View style={local.chips}>
+                {testMode.testers.map((tester) => (
+                  <View key={tester.id} style={local.chip} testID={`admin-tester-${tester.id}`}>
+                    <Text style={local.chipLabel} numberOfLines={1}>
+                      {tester.email}
+                    </Text>
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel={`Rimuovi ${tester.email} dai tester`}
+                      style={[local.chipX, testModeBusy && styles.disabled]}
+                      disabled={testModeBusy}
+                      onPress={() =>
+                        void runTestModeAction(
+                          (token) => removeTester(token, tester.id),
+                          `${tester.email} non è più tester.`,
+                          true,
+                        )
+                      }
+                      testID={`admin-tester-remove-${tester.id}`}
+                    >
+                      <Text style={local.chipXLabel}>✕</Text>
+                    </Pressable>
                   </View>
-                  <Pressable
-                    style={[styles.secondaryButton, testModeBusy && styles.disabled]}
-                    disabled={testModeBusy}
-                    onPress={() =>
-                      void runTestModeAction(
-                        (token) => removeTester(token, tester.id),
-                        `${tester.email} non è più tester.`,
-                        true,
-                      )
-                    }
-                    testID={`admin-tester-remove-${tester.id}`}
-                  >
-                    <Text style={styles.secondaryButtonLabel}>Rimuovi</Text>
-                  </Pressable>
-                </View>
-              ))
+                ))}
+              </View>
             )}
           </>
         ) : (
@@ -476,21 +492,38 @@ export function AdminUsersScreen() {
         <View testID="admin-users-list">
           {result.items.map((row) => (
             <View key={row.id} style={styles.listRow} testID={`admin-user-${row.id}`}>
-              <View style={styles.identityRow}>
-                <View>
+              <View style={local.userHead}>
+                <View style={local.avatar}>
+                  <Text style={local.avatarLabel}>{initialsOf(row.displayName)}</Text>
+                </View>
+                <View style={{ flex: 1, minWidth: 0 }}>
                   <Text style={styles.name}>{row.displayName}</Text>
                   <Text style={styles.meta}>{row.email}</Text>
                 </View>
-                <Text style={styles.meta}>
-                  {row.platformRole === "operator" ? "Operatore" : "Utente"}
-                  {row.isTester ? " · Tester" : ""}
-                </Text>
               </View>
-              {row.platformRole !== "operator" ? (
-                <Pressable
-                  style={[row.isTester ? styles.secondaryButton : styles.button, testModeBusy && styles.disabled]}
-                  disabled={testModeBusy}
-                  onPress={() => {
+              <View style={local.chips}>
+                <View style={[local.badge, row.platformRole === "operator" ? local.badgeOp : null]}>
+                  <Text style={[local.badgeLabel, row.platformRole === "operator" ? local.badgeOpLabel : null]}>
+                    {row.platformRole === "operator" ? "Operatore" : "Utente"}
+                  </Text>
+                </View>
+                {row.isTester ? (
+                  <View style={[local.badge, local.badgeOk]}>
+                    <Text style={[local.badgeLabel, local.badgeOkLabel]}>Tester</Text>
+                  </View>
+                ) : null}
+                {row.isProtected ? (
+                  <View style={local.badge} testID={`admin-user-protected-${row.id}`}>
+                    <Text style={local.badgeLabel}>🔒 Protetto</Text>
+                  </View>
+                ) : null}
+              </View>
+              <View style={local.actions}>
+                {row.platformRole !== "operator" ? (
+                  <Pressable
+                    style={[row.isTester ? styles.secondaryButton : styles.button, local.flex, testModeBusy && styles.disabled]}
+                    disabled={testModeBusy}
+                    onPress={() => {
                     const existing = testMode?.testers.find(
                       (tester) => tester.email.toLowerCase() === row.email.toLowerCase(),
                     );
@@ -508,53 +541,65 @@ export function AdminUsersScreen() {
                       );
                     }
                   }}
-                  testID={`admin-user-tester-${row.id}`}
-                >
-                  <Text style={row.isTester ? styles.secondaryButtonLabel : styles.buttonLabel}>
-                    {row.isTester ? "Revoca tester" : "Abilita tester"}
-                  </Text>
-                </Pressable>
-              ) : null}
-              <Pressable
-                style={[styles.secondaryButton, workingId === row.id && styles.disabled]}
-                disabled={workingId === row.id}
-                onPress={() => setPending({ user: row, kind: "impersonate" })}
-                testID={`admin-user-impersonate-${row.id}`}
-              >
-                <Text style={styles.secondaryButtonLabel}>Impersona</Text>
-              </Pressable>
-              {row.isProtected ? (
-                <Text style={styles.meta} testID={`admin-user-protected-${row.id}`}>
-                  Operatore protetto
-                </Text>
-              ) : row.platformRole === "operator" ? (
+                    testID={`admin-user-tester-${row.id}`}
+                  >
+                    <Text style={row.isTester ? styles.secondaryButtonLabel : styles.buttonLabel}>
+                      {row.isTester ? "Revoca tester" : "Abilita tester"}
+                    </Text>
+                  </Pressable>
+                ) : null}
                 <Pressable
-                  style={[styles.secondaryButton, workingId === row.id && styles.disabled]}
+                  style={[styles.secondaryButton, local.flex, workingId === row.id && styles.disabled]}
                   disabled={workingId === row.id}
-                  onPress={() => setPending({ user: row, kind: "revoke" })}
-                  testID={`admin-user-revoke-${row.id}`}
+                  onPress={() => setPending({ user: row, kind: "impersonate" })}
+                  testID={`admin-user-impersonate-${row.id}`}
                 >
-                  <Text style={styles.secondaryButtonLabel}>Revoca operator</Text>
+                  <Text style={styles.secondaryButtonLabel}>Impersona</Text>
                 </Pressable>
-              ) : (
-                <Pressable
-                  style={[styles.button, workingId === row.id && styles.disabled]}
-                  disabled={workingId === row.id}
-                  onPress={() => setPending({ user: row, kind: "promote" })}
-                  testID={`admin-user-promote-${row.id}`}
-                >
-                  <Text style={styles.buttonLabel}>Promuovi a operator</Text>
-                </Pressable>
-              )}
-              {row.platformRole !== "operator" ? (
-                <Pressable
-                  style={[styles.secondaryButton, workingId === row.id && styles.disabled]}
-                  disabled={workingId === row.id}
-                  onPress={() => setPending({ user: row, kind: "delete" })}
-                  testID={`admin-user-delete-${row.id}`}
-                >
-                  <Text style={styles.secondaryButtonLabel}>Elimina</Text>
-                </Pressable>
+                {!row.isProtected ? (
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel={`Altre azioni per ${row.displayName}`}
+                    style={local.more}
+                    onPress={() => setMenuFor((current) => (current === row.id ? null : row.id))}
+                    testID={`admin-user-more-${row.id}`}
+                  >
+                    <Text style={local.moreLabel}>⋯</Text>
+                  </Pressable>
+                ) : null}
+              </View>
+              {menuFor === row.id && !row.isProtected ? (
+                <View style={local.actions}>
+                  {row.platformRole === "operator" ? (
+                    <Pressable
+                      style={[styles.secondaryButton, local.flex, workingId === row.id && styles.disabled]}
+                      disabled={workingId === row.id}
+                      onPress={() => setPending({ user: row, kind: "revoke" })}
+                      testID={`admin-user-revoke-${row.id}`}
+                    >
+                      <Text style={styles.secondaryButtonLabel}>Revoca operator</Text>
+                    </Pressable>
+                  ) : (
+                    <>
+                      <Pressable
+                        style={[styles.button, local.flex, workingId === row.id && styles.disabled]}
+                        disabled={workingId === row.id}
+                        onPress={() => setPending({ user: row, kind: "promote" })}
+                        testID={`admin-user-promote-${row.id}`}
+                      >
+                        <Text style={styles.buttonLabel}>Promuovi a operator</Text>
+                      </Pressable>
+                      <Pressable
+                        style={[styles.secondaryButton, local.flex, workingId === row.id && styles.disabled]}
+                        disabled={workingId === row.id}
+                        onPress={() => setPending({ user: row, kind: "delete" })}
+                        testID={`admin-user-delete-${row.id}`}
+                      >
+                        <Text style={styles.secondaryButtonLabel}>Elimina</Text>
+                      </Pressable>
+                    </>
+                  )}
+                </View>
               ) : null}
             </View>
           ))}
@@ -656,3 +701,59 @@ export function AdminUsersScreen() {
     </PageContainer>
   );
 }
+
+function initialsOf(name: string): string {
+  return name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part.charAt(0).toUpperCase())
+    .join("");
+}
+
+const local = lazyStyles(() => StyleSheet.create({
+  chips: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  chip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    maxWidth: "100%",
+    paddingVertical: 4,
+    paddingLeft: 12,
+    paddingRight: 4,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    backgroundColor: "rgba(255,255,255,0.08)",
+  },
+  chipLabel: { flexShrink: 1, color: theme.colors.foreground, fontSize: 13 },
+  chipX: { width: 24, height: 24, borderRadius: 12, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(255,255,255,0.14)" },
+  chipXLabel: { color: theme.colors.foreground, fontSize: 11 },
+  pill: { alignSelf: "flex-start", paddingHorizontal: 12, paddingVertical: 3, borderRadius: 999, backgroundColor: "rgba(255,255,255,0.1)" },
+  pillOn: { backgroundColor: "rgba(52,211,153,0.18)" },
+  pillOff: {},
+  pillLabel: { color: theme.colors.foregroundMuted, fontSize: 12, fontWeight: "800", letterSpacing: 1 },
+  pillLabelOn: { color: "#34D399" },
+  userHead: { flexDirection: "row", alignItems: "center", gap: 12 },
+  avatar: { width: 42, height: 42, borderRadius: 21, alignItems: "center", justifyContent: "center", backgroundColor: "#5B4DE8" },
+  avatarBlock: { backgroundColor: "rgba(255,107,138,0.22)" },
+  avatarLabel: { color: "#ffffff", fontWeight: "800", fontStyle: "italic" },
+  badge: { paddingHorizontal: 12, paddingVertical: 4, borderRadius: 999, backgroundColor: "rgba(255,255,255,0.1)" },
+  badgeLabel: { color: theme.colors.foregroundMuted, fontSize: 13, fontWeight: "600" },
+  badgeOp: { backgroundColor: "rgba(255,210,63,0.2)" },
+  badgeOpLabel: { color: "#FFD23F" },
+  badgeOk: { backgroundColor: "rgba(52,211,153,0.18)" },
+  badgeOkLabel: { color: "#34D399" },
+  actions: { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 4 },
+  flex: { flex: 1 },
+  more: { width: 44, height: 44, borderRadius: 22, borderWidth: 1, borderColor: theme.colors.border, alignItems: "center", justifyContent: "center" },
+  moreLabel: { color: theme.colors.foreground, fontSize: 20, fontWeight: "800", lineHeight: 22 },
+  blockCard: {
+    gap: 10,
+    padding: 14,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    backgroundColor: theme.colors.background,
+  },
+}));

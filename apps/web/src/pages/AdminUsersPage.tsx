@@ -378,25 +378,39 @@ export function AdminUsersPage() {
         />
       ) : null}
       {!loading && !error && result && result.items.length > 0 ? (
-        <ul className="fa-admin-users__list" data-testid="admin-users-list">
+        <ul className="fa-admin-users__list fa-admin-users__list--table" data-testid="admin-users-list">
+          <li className="fa-admin-users__head" aria-hidden="true">
+            <span>Utente</span>
+            <span>Ruolo</span>
+            <span>Tester</span>
+            <span>Accesso</span>
+            <span>Assistenza</span>
+            <span />
+          </li>
           {result.items.map((row) => (
-            <li key={row.id} className="fa-admin-users__item">
+            <li key={row.id} className="fa-admin-users__item fa-admin-users__item--user">
               <span className="fa-admin-users__identity">
                 <strong>{row.displayName}</strong>
                 <small>{row.email}</small>
               </span>
-              <Badge
-                variant={row.platformRole === "operator" ? "accent" : "neutral"}
-                className="fa-admin-users__role"
-              >
-                {row.platformRole === "operator" ? "Operatore" : "Utente"}
-              </Badge>
-              {row.isTester ? (
-                <Badge variant="success" data-testid={`admin-user-tester-badge-${row.id}`}>
-                  Tester
+              <span className="fa-admin-users__col">
+                <Badge
+                  variant={row.platformRole === "operator" ? "accent" : "neutral"}
+                  className="fa-admin-users__role"
+                >
+                  {row.platformRole === "operator" ? "Operatore" : "Utente"}
                 </Badge>
-              ) : null}
-              <span className="fa-admin-users__actions">
+              </span>
+              <span className="fa-admin-users__col">
+                {row.isTester ? (
+                  <Badge variant="success" data-testid={`admin-user-tester-badge-${row.id}`}>
+                    Tester
+                  </Badge>
+                ) : (
+                  <span className="fa-admin-users__none" aria-hidden="true">—</span>
+                )}
+              </span>
+              <span className="fa-admin-users__col fa-admin-users__col--access">
                 {row.platformRole !== "operator" ? (
                   <Button
                     type="button"
@@ -426,6 +440,8 @@ export function AdminUsersPage() {
                     {row.isTester ? "Revoca tester" : "Abilita tester"}
                   </Button>
                 ) : null}
+              </span>
+              <span className="fa-admin-users__col fa-admin-users__col--assist">
                 <Button
                   type="button"
                   size="sm"
@@ -436,45 +452,54 @@ export function AdminUsersPage() {
                 >
                   Impersona
                 </Button>
+              </span>
+              <span className="fa-admin-users__col fa-admin-users__col--more">
                 {row.isProtected ? (
                   <Badge variant="accent" data-testid={`admin-user-protected-${row.id}`}>
-                    Protetto
+                    🔒
                   </Badge>
-                ) : row.platformRole === "operator" ? (
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="secondary"
-                    loading={workingId === row.id}
-                    onClick={() => setPending({ user: row, kind: "revoke" })}
-                    data-testid={`admin-user-revoke-${row.id}`}
-                  >
-                    Revoca operator
-                  </Button>
                 ) : (
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="primary"
-                    loading={workingId === row.id}
-                    onClick={() => setPending({ user: row, kind: "promote" })}
-                    data-testid={`admin-user-promote-${row.id}`}
-                  >
-                    Promuovi a operator
-                  </Button>
+                  <details className="fa-admin-users__more">
+                    <summary aria-label={`Altre azioni per ${row.displayName}`}>⋯</summary>
+                    <div className="fa-admin-users__menu">
+                      {row.platformRole === "operator" ? (
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="secondary"
+                          loading={workingId === row.id}
+                          onClick={() => setPending({ user: row, kind: "revoke" })}
+                          data-testid={`admin-user-revoke-${row.id}`}
+                        >
+                          Revoca operator
+                        </Button>
+                      ) : (
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="primary"
+                          loading={workingId === row.id}
+                          onClick={() => setPending({ user: row, kind: "promote" })}
+                          data-testid={`admin-user-promote-${row.id}`}
+                        >
+                          Promuovi a operator
+                        </Button>
+                      )}
+                      {row.platformRole !== "operator" ? (
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="ghost"
+                          loading={workingId === row.id}
+                          onClick={() => setPending({ user: row, kind: "delete" })}
+                          data-testid={`admin-user-delete-${row.id}`}
+                        >
+                          Elimina
+                        </Button>
+                      ) : null}
+                    </div>
+                  </details>
                 )}
-                {row.platformRole !== "operator" ? (
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="ghost"
-                    loading={workingId === row.id}
-                    onClick={() => setPending({ user: row, kind: "delete" })}
-                    data-testid={`admin-user-delete-${row.id}`}
-                  >
-                    Elimina
-                  </Button>
-                ) : null}
               </span>
             </li>
           ))}
@@ -530,17 +555,23 @@ export function AdminUsersPage() {
             ) : blocklist.items.length === 0 ? (
               <p data-testid="admin-blocklist-empty">La lista nera è vuota.</p>
             ) : (
-              <ul className="fa-admin-users__list" data-testid="admin-blocklist-list">
+              <ul className="fa-admin-users__list fa-admin-users__list--table" data-testid="admin-blocklist-list">
+                <li className="fa-admin-users__head fa-admin-users__head--block" aria-hidden="true">
+                  <span>Email</span>
+                  <span>Motivo</span>
+                  <span>Data</span>
+                  <span />
+                </li>
                 {blocklist.items.map((entry) => (
-                  <li key={entry.id} className="fa-admin-users__item">
+                  <li key={entry.id} className="fa-admin-users__item fa-admin-users__item--block">
                     <span className="fa-admin-users__identity">
                       <strong>{entry.email}</strong>
-                      <small>
-                        {new Date(entry.createdAt).toLocaleDateString("it-IT")}
-                        {entry.reason ? ` · ${entry.reason}` : ""}
-                      </small>
                     </span>
-                    <span className="fa-admin-users__actions">
+                    <span className="fa-admin-users__reason">{entry.reason || "—"}</span>
+                    <span className="fa-admin-users__date">
+                      {new Date(entry.createdAt).toLocaleDateString("it-IT")}
+                    </span>
+                    <span className="fa-admin-users__col fa-admin-users__col--more">
                       <Button
                         type="button"
                         size="sm"
