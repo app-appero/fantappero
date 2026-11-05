@@ -711,6 +711,7 @@ export function LeagueAdminPage() {
                       reloadToken={membersReloadToken}
                       onMembersLoaded={setMemberCount}
                       onMembersChanged={refreshAfterMembershipChange}
+                      canEditMembers={canConfigure}
                     />
                     <LeagueInvitesPanel
                       leagueId={activeLeagueId}

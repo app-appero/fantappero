@@ -61,6 +61,7 @@ def _to_user_response(
     user: User,
     tester_emails: frozenset[str] | set[str] | None = None,
     protected_emails: frozenset[str] | None = None,
+    league_count: int = 0,
 ) -> AdminUserResponse:
     is_tester = user.platform_role == PlatformRole.OPERATOR or (
         tester_emails is not None and user.email.strip().lower() in tester_emails
@@ -72,6 +73,7 @@ def _to_user_response(
         platformRole=user.platform_role,
         createdAt=user.created_at,
         isTester=is_tester,
+        leagueCount=league_count,
         isProtected=(
             protected_emails is not None
             and user.platform_role == PlatformRole.OPERATOR
@@ -139,9 +141,19 @@ class AdminService:
             .offset((page - 1) * page_size)
             .limit(page_size)
         ).all()
+        league_counts = dict(
+            self._session.execute(
+                select(LeagueMembership.user_id, func.count(LeagueMembership.id))
+                .where(LeagueMembership.user_id.in_([user.id for user in rows]))
+                .group_by(LeagueMembership.user_id)
+            ).all()
+        )
         return PaginatedAdminUsersResponse(
             items=[
-                _to_user_response(user, tester_emails, self._protected_emails()) for user in rows
+                _to_user_response(
+                    user, tester_emails, self._protected_emails(), league_counts.get(user.id, 0)
+                )
+                for user in rows
             ],
             page=page,
             pageSize=page_size,

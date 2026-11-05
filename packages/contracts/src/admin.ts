@@ -31,6 +31,8 @@ export interface AdminUser {
   isTester?: boolean;
   /** Operatore protetto: non declassabile, eliminabile né bloccabile. */
   isProtected?: boolean;
+  /** Numero di leghe a cui partecipa. */
+  leagueCount?: number;
 }
 
 export interface AdminBlockedAccount {

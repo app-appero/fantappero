@@ -651,7 +651,7 @@ export function AdminUsersPage() {
             : pending?.kind === "impersonate"
               ? `Accederai come ${pending.user.displayName} per qualche minuto, a scopo di assistenza. L'operazione viene registrata nell'audit log.`
               : pending?.kind === "delete"
-                ? `Sei sicuro di voler eliminare ${pending.user.displayName} (${pending.user.email})? I suoi dati personali vengono rimossi. Scegli «Elimina» per eliminare e basta (potrà registrarsi di nuovo), oppure «Elimina e lista nera» per bloccare anche l'indirizzo: non potrà più accedere né registrarsi.`
+                ? `Sei sicuro di voler eliminare ${pending.user.displayName} (${pending.user.email})? ${(pending.user.leagueCount ?? 0) > 0 ? `Partecipa a ${pending.user.leagueCount} ${pending.user.leagueCount === 1 ? 'lega' : 'leghe'}: ci resterà come partecipante anonimo con la sua squadra, finché l'amministratore di lega non lo sostituisce. ` : ''}I suoi dati personali vengono rimossi. Scegli «Elimina» per eliminare e basta (potrà registrarsi di nuovo), oppure «Elimina e lista nera» per bloccare anche l'indirizzo: non potrà più accedere né registrarsi.`
                 : `Confermi di voler revocare il ruolo di operatore a ${pending?.user.displayName}?`}
         </p>
       </Modal>

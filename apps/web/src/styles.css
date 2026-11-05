@@ -5305,3 +5305,30 @@ h2 {
     margin-top: var(--fa-space-xs);
   }
 }
+
+/* Partecipanti: nomi ed email non devono spezzarsi lettera per lettera su schermi stretti. */
+.fa-member-list__item {
+  flex-wrap: wrap;
+}
+
+.fa-member-list__identity {
+  flex: 1 1 14rem;
+}
+
+.fa-member-list__text {
+  flex: 1 1 8rem;
+  overflow-wrap: anywhere;
+}
+
+.fa-member-list__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--fa-space-xs);
+  margin-left: auto;
+}
+
+.fa-members__toolbar {
+  display: flex;
+  justify-content: flex-start;
+  margin: var(--fa-space-sm) 0;
+}

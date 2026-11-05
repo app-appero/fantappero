@@ -30,6 +30,8 @@ class AdminUserResponse(ApiModel):
     is_tester: bool = Field(default=False, alias="isTester")
     #: Operatore protetto: non può essere declassato, eliminato o bloccato.
     is_protected: bool = Field(default=False, alias="isProtected")
+    #: A quante leghe partecipa (serve ad avvisare prima di eliminare l'utente).
+    league_count: int = Field(default=0, alias="leagueCount")
 
 
 class AdminTesterResponse(ApiModel):

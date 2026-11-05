@@ -14,7 +14,7 @@ import { theme } from "@fantappero/ui/theme";
 import { useNavigation, useRoute, type RouteProp } from "@react-navigation/core";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useCallback, useEffect, useState } from "react";
-import { Pressable, StyleSheet, Switch, Text, View } from "react-native";
+import { Modal, Pressable, ScrollView, StyleSheet, Switch, Text, View } from "react-native";
 import { AppTextInput as TextInput } from "../components/AppTextInput";
 import { ApiError } from "../api/client";
 import {
@@ -106,9 +106,12 @@ export function LeagueAdminScreen() {
   const [rules, setRules] = useState<LeagueRules | null>(null);
   const [lifecycle, setLifecycle] = useState<LeagueLifecycle | null>(null);
   const [members, setMembers] = useState<LeagueMember[]>([]);
-  // Sostituzione fantallenatore: chi si sostituisce, ricerca e candidati dal catalogo.
-  const [replaceTarget, setReplaceTarget] = useState<LeagueMember | null>(null);
+  // Sostituzione fantallenatore: finestra a due passi (chi togliere, chi mettere).
+  const [replaceOpen, setReplaceOpen] = useState(false);
+  const [replaceFromId, setReplaceFromId] = useState("");
+  const [replaceToId, setReplaceToId] = useState("");
   const [replaceQuery, setReplaceQuery] = useState("");
+  const [replaceError, setReplaceError] = useState<string | null>(null);
   const [candidates, setCandidates] = useState<FantasyCoachDirectoryItem[]>([]);
   const [candidatesLoading, setCandidatesLoading] = useState(false);
   const [invites, setInvites] = useState<LeagueInvite[]>([]);
@@ -311,7 +314,7 @@ export function LeagueAdminScreen() {
   }
 
   useEffect(() => {
-    if (!replaceTarget || !leagueId || !accessToken) {
+    if (!replaceOpen || !leagueId || !accessToken) {
       return;
     }
     const timer = setTimeout(() => {
@@ -328,21 +331,29 @@ export function LeagueAdminScreen() {
         .finally(() => setCandidatesLoading(false));
     }, 250);
     return () => clearTimeout(timer);
-  }, [replaceTarget, replaceQuery, leagueId, accessToken]);
+  }, [replaceOpen, replaceQuery, leagueId, accessToken]);
 
-  async function onReplace(candidate: FantasyCoachDirectoryItem) {
-    setActionError(null);
-    if (!replaceTarget || !leagueId || !accessToken) {
+  function openReplace() {
+    setReplaceFromId("");
+    setReplaceToId("");
+    setReplaceQuery("");
+    setReplaceError(null);
+    setCandidates([]);
+    setReplaceOpen(true);
+  }
+
+  async function onReplace() {
+    if (!replaceFromId || !replaceToId || !leagueId || !accessToken) {
       return;
     }
-    setWorkingId(`replace-${replaceTarget.userId}`);
+    setReplaceError(null);
+    setWorkingId("replace");
     try {
-      await replaceLeagueMember(accessToken, leagueId, replaceTarget.userId, candidate.userId);
-      setReplaceTarget(null);
-      setReplaceQuery("");
+      await replaceLeagueMember(accessToken, leagueId, replaceFromId, replaceToId);
+      setReplaceOpen(false);
       await loadAll({ silent: true });
     } catch (error) {
-      setActionError(getApiErrorMessage(error, "Impossibile sostituire il fantallenatore."));
+      setReplaceError(getApiErrorMessage(error, "Impossibile sostituire il fantallenatore."));
     } finally {
       setWorkingId(null);
     }
@@ -753,7 +764,23 @@ export function LeagueAdminScreen() {
           ) : null}
           {setupTab === "invitati" ? (
             <>
-          <Text style={styles.heading}>Partecipanti iscritti</Text>
+          <View style={styles.row}>
+            <Text style={[styles.heading, styles.flex]}>Partecipanti iscritti</Text>
+            <Pressable
+              accessibilityRole="button"
+              onPress={openReplace}
+              style={styles.secondaryButton}
+              testID="league-members-replace-open"
+            >
+              <Text style={styles.secondaryLabel}>Sostituisci</Text>
+            </Pressable>
+          </View>
+          {!canConfigure ? (
+            <Text style={styles.body} testID="league-members-locked-hint">
+              A stagione avviata si può solo sostituire un fantallenatore: ruolo di amministratore e
+              rimozioni sono possibili solo prima dell&apos;avvio.
+            </Text>
+          ) : null}
           <Text style={styles.body} testID="league-members-capacity">
             Iscritti: {members.length} / Previsti: {rules.participantCount}
           </Text>
@@ -778,20 +805,8 @@ export function LeagueAdminScreen() {
                     {member.role === "league_admin" ? "Amministratore" : "Partecipante"}
                   </Text>
                 </View>
-                {member.role === "member" ? (
+                {member.role === "member" && canConfigure ? (
                   <View style={styles.row}>
-                    <Pressable
-                      accessibilityRole="button"
-                      onPress={() => {
-                        setReplaceTarget(member);
-                        setReplaceQuery("");
-                        setCandidates([]);
-                      }}
-                      style={styles.secondaryButton}
-                      testID={`league-member-replace-${member.userId}`}
-                    >
-                      <Text style={styles.secondaryLabel}>Sostituisci</Text>
-                    </Pressable>
                     <Pressable
                       accessibilityRole="button"
                       onPress={() => void onTransfer(member.userId, member.displayName)}
@@ -813,55 +828,6 @@ export function LeagueAdminScreen() {
               </View>
             ))}
           </View>
-
-          {replaceTarget ? (
-            <View style={styles.memberList} testID="league-members-replace-panel">
-              <Text style={styles.heading}>Sostituisci {replaceTarget.displayName}</Text>
-              <Text style={styles.body}>
-                Scegli chi subentra tra i fantallenatori disponibili: erediterà squadra, rosa,
-                formazioni e punti.
-              </Text>
-              <AppTextInput
-                value={replaceQuery}
-                onChangeText={setReplaceQuery}
-                placeholder="Cerca per nome o email"
-                autoCapitalize="none"
-                autoCorrect={false}
-                testID="league-members-replace-query"
-              />
-              {candidatesLoading ? <Text style={styles.body}>Ricerca in corso…</Text> : null}
-              {!candidatesLoading && candidates.length === 0 ? (
-                <Text style={styles.body} testID="league-members-replace-empty">
-                  Nessun fantallenatore disponibile.
-                </Text>
-              ) : (
-                candidates.map((candidate) => (
-                  <View key={candidate.userId} style={styles.inviteRow}>
-                    <View style={styles.flex}>
-                      <Text style={styles.inviteTitle}>{candidate.displayName}</Text>
-                      <Text style={styles.body}>{candidate.email}</Text>
-                    </View>
-                    <Pressable
-                      accessibilityRole="button"
-                      disabled={workingId !== null}
-                      onPress={() => void onReplace(candidate)}
-                      style={styles.secondaryButton}
-                      testID={`league-members-replace-pick-${candidate.userId}`}
-                    >
-                      <Text style={styles.secondaryLabel}>Scegli</Text>
-                    </Pressable>
-                  </View>
-                ))
-              )}
-              <Pressable
-                accessibilityRole="button"
-                onPress={() => setReplaceTarget(null)}
-                style={styles.secondaryButton}
-              >
-                <Text style={styles.secondaryLabel}>Annulla</Text>
-              </Pressable>
-            </View>
-          ) : null}
 
           <Text style={styles.heading}>Directory fantallenatori</Text>
           {leagueId ? (
@@ -1055,6 +1021,104 @@ export function LeagueAdminScreen() {
           )}
         </View>
       ) : null}
+      <Modal
+        visible={replaceOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setReplaceOpen(false)}
+      >
+        <View style={styles.replaceOverlay}>
+          <View style={styles.replaceBox} testID="league-members-replace-panel">
+            <ScrollView>
+              <Text style={styles.heading}>Sostituisci fantallenatore</Text>
+              <Text style={styles.label}>1. Chi vuoi togliere</Text>
+              {members
+                .filter((member) => member.role === "member")
+                .map((member) => (
+                  <Pressable
+                    key={member.userId}
+                    accessibilityRole="radio"
+                    accessibilityState={{ selected: replaceFromId === member.userId }}
+                    onPress={() => setReplaceFromId(member.userId)}
+                    style={[
+                      styles.replaceOption,
+                      replaceFromId === member.userId && styles.replaceOptionSelected,
+                    ]}
+                    testID={`league-members-replace-from-${member.userId}`}
+                  >
+                    <Text style={styles.inviteTitle}>{member.displayName}</Text>
+                  </Pressable>
+                ))}
+              <Text style={styles.label}>2. Chi vuoi mettere</Text>
+              <AppTextInput
+                value={replaceQuery}
+                onChangeText={setReplaceQuery}
+                placeholder="Cerca per nome o email"
+                autoCapitalize="none"
+                autoCorrect={false}
+                testID="league-members-replace-query"
+              />
+              {candidatesLoading ? <Text style={styles.body}>Ricerca in corso…</Text> : null}
+              {!candidatesLoading && candidates.length === 0 ? (
+                <Text style={styles.body} testID="league-members-replace-empty">
+                  Nessun fantallenatore disponibile: chi vuoi aggiungere deve aver già fatto
+                  l&apos;accesso ed essere disponibile agli inviti.
+                </Text>
+              ) : (
+                candidates.map((candidate) => (
+                  <Pressable
+                    key={candidate.userId}
+                    accessibilityRole="radio"
+                    accessibilityState={{ selected: replaceToId === candidate.userId }}
+                    onPress={() => setReplaceToId(candidate.userId)}
+                    style={[
+                      styles.replaceOption,
+                      replaceToId === candidate.userId && styles.replaceOptionSelected,
+                    ]}
+                    testID={`league-members-replace-pick-${candidate.userId}`}
+                  >
+                    <Text style={styles.inviteTitle}>{candidate.displayName}</Text>
+                    <Text style={styles.body}>{candidate.email}</Text>
+                  </Pressable>
+                ))
+              )}
+              {replaceFromId && replaceToId ? (
+                <Text style={styles.body}>
+                  Chi subentra eredita squadra, rosa, formazioni e punti di chi viene tolto.
+                </Text>
+              ) : null}
+              {replaceError ? (
+                <Text style={[styles.body, styles.replaceError]} testID="league-members-replace-error">
+                  {replaceError}
+                </Text>
+              ) : null}
+            </ScrollView>
+            <View style={styles.row}>
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => setReplaceOpen(false)}
+                style={styles.secondaryButton}
+              >
+                <Text style={styles.secondaryLabel}>Annulla</Text>
+              </Pressable>
+              <Pressable
+                accessibilityRole="button"
+                disabled={!replaceFromId || !replaceToId || workingId === "replace"}
+                onPress={() => void onReplace()}
+                style={[
+                  styles.primaryButton,
+                  (!replaceFromId || !replaceToId || workingId === "replace") && styles.disabled,
+                ]}
+                testID="league-members-replace-confirm"
+              >
+                <Text style={styles.primaryLabel}>
+                  {workingId === "replace" ? "Sostituzione…" : "Sostituisci"}
+                </Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </PageContainer>
   );
 }
@@ -1110,6 +1174,35 @@ const styles = lazyStyles(() => StyleSheet.create({
   },
   memberList: {
     gap: spacing.sm,
+  },
+  replaceOverlay: {
+    flex: 1,
+    justifyContent: "center",
+    padding: spacing.lg,
+    backgroundColor: "rgba(0,0,0,0.6)",
+  },
+  replaceBox: {
+    maxHeight: "90%",
+    gap: spacing.sm,
+    padding: spacing.lg,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.backgroundElevated,
+  },
+  replaceOption: {
+    marginTop: spacing.xs,
+    padding: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+  },
+  replaceError: {
+    color: colors.danger,
+  },
+  replaceOptionSelected: {
+    borderColor: colors.accent,
+    borderWidth: 2,
   },
   primaryButton: {
     minHeight: 44,

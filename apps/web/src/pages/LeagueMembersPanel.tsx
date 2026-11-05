@@ -1,5 +1,5 @@
 import type { FantasyCoachDirectoryItem, LeagueMember } from "@fantappero/contracts";
-import { Button, Input, UiStatePanel } from "@fantappero/ui";
+import { Button, Input, Modal, Select, UiStatePanel } from "@fantappero/ui";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   assignRandomAiRoster,
@@ -54,6 +54,8 @@ type LeagueMembersPanelProps = {
   onMembersLoaded?: (count: number) => void;
   /** Ricarica regolamento/lifecycle dopo rimozione (il backend può abbassare il target). */
   onMembersChanged?: () => void;
+  /** Trasferimento admin e rimozione sono possibili solo in bozza o configurazione. */
+  canEditMembers?: boolean;
 };
 
 export function LeagueMembersPanel({
@@ -64,6 +66,7 @@ export function LeagueMembersPanel({
   reloadToken = 0,
   onMembersLoaded,
   onMembersChanged,
+  canEditMembers = true,
 }: LeagueMembersPanelProps) {
   const { user } = useAuth();
   const demoState = new URLSearchParams(search).get("partecipanti");
@@ -78,9 +81,12 @@ export function LeagueMembersPanel({
   );
   const [success, setSuccess] = useState<string | null>(null);
   const [workingId, setWorkingId] = useState<string | null>(null);
-  // Sostituzione fantallenatore: chi si sostituisce, ricerca e candidati dal catalogo.
-  const [replaceTarget, setReplaceTarget] = useState<LeagueMember | null>(null);
+  // Sostituzione fantallenatore: finestra a due passi (chi togliere, chi mettere).
+  const [replaceOpen, setReplaceOpen] = useState(false);
+  const [replaceFromId, setReplaceFromId] = useState("");
+  const [replaceToId, setReplaceToId] = useState("");
   const [replaceQuery, setReplaceQuery] = useState("");
+  const [replaceError, setReplaceError] = useState<string | null>(null);
   const [candidates, setCandidates] = useState<FantasyCoachDirectoryItem[]>([]);
   const [candidatesLoading, setCandidatesLoading] = useState(false);
   const onMembersLoadedRef = useRef(onMembersLoaded);
@@ -202,7 +208,7 @@ export function LeagueMembersPanel({
   }
 
   useEffect(() => {
-    if (!replaceTarget || isDemoMode || !leagueId) {
+    if (!replaceOpen || isDemoMode || !leagueId) {
       return;
     }
     const session = loadStoredSession();
@@ -223,36 +229,48 @@ export function LeagueMembersPanel({
         .finally(() => setCandidatesLoading(false));
     }, 250);
     return () => window.clearTimeout(timer);
-  }, [replaceTarget, replaceQuery, leagueId, isDemoMode]);
+  }, [replaceOpen, replaceQuery, leagueId, isDemoMode]);
 
-  async function onReplace(candidate: FantasyCoachDirectoryItem) {
-    if (!replaceTarget) {
+  function openReplace() {
+    setReplaceFromId("");
+    setReplaceToId("");
+    setReplaceQuery("");
+    setReplaceError(null);
+    setCandidates([]);
+    setReplaceOpen(true);
+  }
+
+  async function onReplace() {
+    const from = members.find((member) => member.userId === replaceFromId);
+    const to = candidates.find((candidate) => candidate.userId === replaceToId);
+    if (!from || !to) {
       return;
     }
-    setError(null);
+    setReplaceError(null);
     setSuccess(null);
     const session = loadStoredSession();
     if (!leagueId || !session?.accessToken) {
-      setError("Sessione non disponibile. Accedi di nuovo.");
+      setReplaceError("Sessione non disponibile. Accedi di nuovo.");
       return;
     }
-    setWorkingId(`replace-${replaceTarget.userId}`);
+    setWorkingId("replace");
     try {
       const joined = await replaceLeagueMember(
         session.accessToken,
         leagueId,
-        replaceTarget.userId,
-        candidate.userId,
+        from.userId,
+        to.userId,
       );
       setSuccess(
-        `${joined.displayName} è subentrato a ${replaceTarget.displayName}: squadra, rosa e punti restano invariati.`,
+        `${joined.displayName} è subentrato a ${from.displayName}: squadra, rosa e punti restano invariati.`,
       );
-      setReplaceTarget(null);
-      setReplaceQuery("");
+      setReplaceOpen(false);
       await loadMembers();
       onMembersChanged?.();
-    } catch (replaceError) {
-      setError(getApiErrorMessage(replaceError, "Impossibile sostituire il fantallenatore."));
+    } catch (replaceFailure) {
+      setReplaceError(
+        getApiErrorMessage(replaceFailure, "Impossibile sostituire il fantallenatore."),
+      );
     } finally {
       setWorkingId(null);
     }
@@ -302,10 +320,25 @@ export function LeagueMembersPanel({
       data-testid="league-members-panel"
     >
       <h2 id="league-members-title">Partecipanti iscritti</h2>
-      <p>
-        Trasferisci il ruolo admin, sostituisci un fantallenatore (in qualsiasi momento) o
-        rimuovi un partecipante prima dell’avvio.
-      </p>
+      <p>Sostituisci un fantallenatore in qualsiasi momento; ruolo admin e rimozioni prima dell’avvio.</p>
+      <div className="fa-members__toolbar">
+        <Button
+          type="button"
+          variant="primary"
+          size="sm"
+          onClick={openReplace}
+          disabled={isDemoMode || members.filter((member) => member.role === "member").length === 0}
+          data-testid="league-members-replace-open"
+        >
+          Sostituisci fantallenatore
+        </Button>
+      </div>
+      {!canEditMembers ? (
+        <p className="fa-field__hint" data-testid="league-members-locked-hint">
+          A stagione avviata si può solo sostituire un fantallenatore: trasferire il ruolo di
+          amministratore e rimuovere partecipanti è possibile solo prima dell&apos;avvio.
+        </p>
+      ) : null}
       {!loading && !error && participantCount != null ? (
         <p data-testid="league-members-capacity">
           Iscritti: <strong>{members.length}</strong>
@@ -407,8 +440,8 @@ export function LeagueMembersPanel({
               ) : (
                 <span className="fa-member-list__identity">{identity}</span>
               )}
-              {member.role === "member" ? (
-                <span className="fa-ds-showcase__row">
+              {member.role === "member" && canEditMembers ? (
+                <span className="fa-ds-showcase__row fa-member-list__actions">
                   {member.userType === "ai" ? (
                     <Button
                       type="button"
@@ -422,20 +455,6 @@ export function LeagueMembersPanel({
                       Assegna rosa random
                     </Button>
                   ) : null}
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    size="sm"
-                    data-testid={`league-member-replace-${member.userId}`}
-                    disabled={workingId !== null}
-                    onClick={() => {
-                      setReplaceTarget(member);
-                      setReplaceQuery("");
-                      setCandidates([]);
-                    }}
-                  >
-                    Sostituisci
-                  </Button>
                   <Button
                     type="button"
                     variant="secondary"
@@ -463,50 +482,6 @@ export function LeagueMembersPanel({
           })}
         </ul>
       ) : null}
-      {replaceTarget ? (
-        <div className="fa-members__replace" data-testid="league-members-replace-panel">
-          <h3>Sostituisci {replaceTarget.displayName}</h3>
-          <p>
-            Scegli chi subentra tra i fantallenatori disponibili: erediterà squadra, rosa,
-            formazioni e punti di {replaceTarget.displayName}.
-          </p>
-          <Input
-            label="Cerca per nome o email"
-            name="replace-coach-query"
-            value={replaceQuery}
-            onChange={(event) => setReplaceQuery(event.target.value)}
-          />
-          {candidatesLoading ? <p>Ricerca in corso…</p> : null}
-          {!candidatesLoading && candidates.length === 0 ? (
-            <p data-testid="league-members-replace-empty">Nessun fantallenatore disponibile.</p>
-          ) : (
-            <ul className="fa-member-list" data-testid="league-members-replace-list">
-              {candidates.map((candidate) => (
-                <li key={candidate.userId} className="fa-member-list__item">
-                  <span className="fa-member-list__text">
-                    <strong>{candidate.displayName}</strong>
-                    <span className="fa-member-list__email">{candidate.email}</span>
-                  </span>
-                  <Button
-                    type="button"
-                    variant="primary"
-                    size="sm"
-                    loading={workingId === `replace-${replaceTarget.userId}`}
-                    disabled={workingId !== null}
-                    onClick={() => void onReplace(candidate)}
-                    data-testid={`league-members-replace-pick-${candidate.userId}`}
-                  >
-                    Scegli
-                  </Button>
-                </li>
-              ))}
-            </ul>
-          )}
-          <Button type="button" variant="ghost" onClick={() => setReplaceTarget(null)}>
-            Annulla
-          </Button>
-        </div>
-      ) : null}
       {success ? (
         <UiStatePanel
           state="success"
@@ -515,6 +490,86 @@ export function LeagueMembersPanel({
           testId="league-members-success"
         />
       ) : null}
+      <Modal
+        open={replaceOpen}
+        onClose={() => setReplaceOpen(false)}
+        title="Sostituisci fantallenatore"
+        footer={
+          <>
+            <Button type="button" variant="ghost" onClick={() => setReplaceOpen(false)}>
+              Annulla
+            </Button>
+            <Button
+              type="button"
+              variant="primary"
+              disabled={!replaceFromId || !replaceToId}
+              loading={workingId === "replace"}
+              onClick={() => void onReplace()}
+              data-testid="league-members-replace-confirm"
+            >
+              Sostituisci
+            </Button>
+          </>
+        }
+      >
+        <div data-testid="league-members-replace-panel">
+          <Select
+            label="1. Chi vuoi togliere"
+            name="replace-from"
+            value={replaceFromId}
+            placeholder="Scegli il fantallenatore"
+            options={members
+              .filter((member) => member.role === "member")
+              .map((member) => ({ value: member.userId, label: member.displayName }))}
+            onChange={(event) => setReplaceFromId(event.target.value)}
+            data-testid="league-members-replace-from"
+          />
+          <h3>2. Chi vuoi mettere</h3>
+          <Input
+            label="Cerca per nome o email"
+            name="replace-coach-query"
+            value={replaceQuery}
+            onChange={(event) => setReplaceQuery(event.target.value)}
+          />
+          {candidatesLoading ? <p>Ricerca in corso…</p> : null}
+          {!candidatesLoading && candidates.length === 0 ? (
+            <p data-testid="league-members-replace-empty">
+              Nessun fantallenatore disponibile: chi vuoi aggiungere deve aver già fatto l&apos;accesso
+              ed essere disponibile agli inviti.
+            </p>
+          ) : (
+            <ul className="fa-member-list" data-testid="league-members-replace-list">
+              {candidates.map((candidate) => (
+                <li key={candidate.userId} className="fa-member-list__item">
+                  <label className="fa-member-list__identity">
+                    <input
+                      type="radio"
+                      name="replace-to"
+                      checked={replaceToId === candidate.userId}
+                      onChange={() => setReplaceToId(candidate.userId)}
+                      data-testid={`league-members-replace-pick-${candidate.userId}`}
+                    />
+                    <span className="fa-member-list__text">
+                      <strong>{candidate.displayName}</strong>
+                      <span className="fa-member-list__email">{candidate.email}</span>
+                    </span>
+                  </label>
+                </li>
+              ))}
+            </ul>
+          )}
+          {replaceFromId && replaceToId ? (
+            <p className="fa-field__hint">
+              Chi subentra eredita squadra, rosa, formazioni e punti di chi viene tolto.
+            </p>
+          ) : null}
+          {replaceError ? (
+            <p className="fa-field__error" role="alert" data-testid="league-members-replace-error">
+              {replaceError}
+            </p>
+          ) : null}
+        </div>
+      </Modal>
     </section>
   );
 }
