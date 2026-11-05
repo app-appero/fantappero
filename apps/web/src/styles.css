@@ -5141,3 +5141,167 @@ h2 {
   align-items: flex-end;
   gap: var(--fa-space-sm);
 }
+
+/* ── Operatore · Utenti e lista nera: colonne allineate ─────────────── */
+.fa-admin-testmode {
+  padding: var(--fa-space-lg);
+  border-radius: var(--fa-radius-lg);
+  background: var(--fa-color-background-elevated);
+  gap: var(--fa-space-md);
+}
+
+.fa-admin-testmode h2 {
+  margin: 0;
+}
+
+.fa-admin-testmode__add > :first-child {
+  flex: 1 1 16rem;
+}
+
+.fa-admin-users__list--table {
+  gap: 0;
+  border: 1px solid var(--fa-color-border);
+  border-radius: var(--fa-radius-lg);
+  background: var(--fa-color-background-elevated);
+  overflow: visible;
+}
+
+.fa-admin-users__head,
+.fa-admin-users__item--user {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 7rem 6rem 9.5rem 7rem 3rem;
+  align-items: center;
+  gap: var(--fa-space-md);
+}
+
+.fa-admin-users__head {
+  padding: var(--fa-space-sm) var(--fa-space-md);
+  color: var(--fa-color-foreground-muted);
+  font-size: var(--fa-text-xs, 0.75rem);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.fa-admin-users__list--table > .fa-admin-users__item--user {
+  border: 0;
+  border-top: 1px solid var(--fa-color-border);
+  border-radius: 0;
+  box-shadow: none;
+  background: transparent;
+}
+
+.fa-admin-users__col {
+  display: flex;
+  align-items: center;
+}
+
+.fa-admin-users__col--more {
+  justify-content: flex-end;
+}
+
+.fa-admin-users__col .fa-btn {
+  width: 100%;
+  justify-content: center;
+}
+
+.fa-admin-users__none {
+  color: var(--fa-color-foreground-muted);
+}
+
+.fa-admin-users__more {
+  position: relative;
+}
+
+.fa-admin-users__more > summary {
+  list-style: none;
+  width: 2.5rem;
+  height: 2.5rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--fa-color-border);
+  border-radius: 999px;
+  cursor: pointer;
+  font-size: 1.25rem;
+  line-height: 1;
+}
+
+.fa-admin-users__more > summary::-webkit-details-marker {
+  display: none;
+}
+
+.fa-admin-users__menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 0.25rem);
+  z-index: 5;
+  min-width: 12rem;
+  display: grid;
+  gap: var(--fa-space-xs);
+  padding: var(--fa-space-sm);
+  border: 1px solid var(--fa-color-border);
+  border-radius: var(--fa-radius-md);
+  background: var(--fa-color-background-elevated);
+  box-shadow: var(--fa-shadow-lg);
+}
+
+@media (max-width: 899px) {
+  .fa-admin-users__head {
+    display: none;
+  }
+
+  .fa-admin-users__item--user {
+    grid-template-columns: auto auto 1fr auto;
+    grid-template-areas:
+      "id id id id"
+      "role tester . ."
+      "access assist assist more";
+  }
+
+  .fa-admin-users__item--user > .fa-admin-users__identity { grid-area: id; }
+  .fa-admin-users__item--user > :nth-child(2) { grid-area: role; }
+  .fa-admin-users__item--user > :nth-child(3) { grid-area: tester; }
+  .fa-admin-users__item--user > .fa-admin-users__col--access { grid-area: access; }
+  .fa-admin-users__item--user > .fa-admin-users__col--assist { grid-area: assist; }
+  .fa-admin-users__item--user > .fa-admin-users__col--more { grid-area: more; }
+  .fa-admin-users__none { display: none; }
+}
+
+.fa-admin-users__head--block,
+.fa-admin-users__item--block {
+  display: grid;
+  grid-template-columns: minmax(0, 1.3fr) minmax(0, 1.2fr) 7rem 13rem;
+  align-items: center;
+  gap: var(--fa-space-md);
+}
+
+.fa-admin-users__head--block {
+  padding: var(--fa-space-sm) var(--fa-space-md);
+}
+
+.fa-admin-users__list--table > .fa-admin-users__item--block {
+  padding: var(--fa-space-md);
+  border: 0;
+  border-top: 1px solid var(--fa-color-border);
+  border-radius: 0;
+  box-shadow: none;
+  background: transparent;
+}
+
+.fa-admin-users__reason,
+.fa-admin-users__date {
+  color: var(--fa-color-foreground-muted);
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 899px) {
+  .fa-admin-users__item--block {
+    grid-template-columns: 1fr;
+    gap: var(--fa-space-xs);
+  }
+
+  .fa-admin-users__item--block .fa-admin-users__col--more {
+    justify-content: stretch;
+    margin-top: var(--fa-space-xs);
+  }
+}
