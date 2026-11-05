@@ -29,6 +29,24 @@ export interface AdminUser {
   createdAt: string;
   /** Autorizzato in modalità test (in lista oppure operatore). */
   isTester?: boolean;
+  /** Operatore protetto: non declassabile, eliminabile né bloccabile. */
+  isProtected?: boolean;
+}
+
+export interface AdminBlockedAccount {
+  id: string;
+  email: string;
+  reason: string | null;
+  createdAt: string;
+}
+
+export interface AdminBlocklist {
+  items: AdminBlockedAccount[];
+}
+
+export interface AdminDeleteUserResult {
+  deletedUserId: string;
+  blockedEmail: string;
 }
 
 export interface AdminTester {

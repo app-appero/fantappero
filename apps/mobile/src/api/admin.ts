@@ -1,4 +1,6 @@
 import type {
+  AdminBlocklist,
+  AdminDeleteUserResult,
   AdminTestMode,
   AdminAiLineupsSyncResult,
   AdminCalendarSyncJob,
@@ -402,5 +404,35 @@ export function removeTester(accessToken: string, testerId: string): Promise<Adm
   return apiRequest<AdminTestMode>(`/admin/test-mode/testers/${testerId}`, {
     accessToken,
     method: "DELETE",
+  });
+}
+
+export function fetchBlocklist(accessToken: string): Promise<AdminBlocklist> {
+  return apiRequest<AdminBlocklist>("/admin/blocklist", { accessToken });
+}
+
+export function addBlocked(
+  accessToken: string,
+  email: string,
+  reason?: string,
+): Promise<AdminBlocklist> {
+  return apiRequest<AdminBlocklist>("/admin/blocklist", {
+    accessToken,
+    method: "POST",
+    body: { email, reason: reason || null },
+  });
+}
+
+export function removeBlocked(accessToken: string, entryId: string): Promise<AdminBlocklist> {
+  return apiRequest<AdminBlocklist>(`/admin/blocklist/${entryId}`, {
+    accessToken,
+    method: "DELETE",
+  });
+}
+
+export function deleteUser(accessToken: string, userId: string): Promise<AdminDeleteUserResult> {
+  return apiRequest<AdminDeleteUserResult>(`/admin/users/${userId}/delete`, {
+    accessToken,
+    method: "POST",
   });
 }

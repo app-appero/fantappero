@@ -48,6 +48,10 @@ vi.mock("./api/admin", () => ({
   setTestMode: vi.fn(),
   addTester: vi.fn(),
   removeTester: vi.fn(),
+  fetchBlocklist: vi.fn().mockResolvedValue({ items: [] }),
+  addBlocked: vi.fn(),
+  removeBlocked: vi.fn(),
+  deleteUser: vi.fn(),
 }));
 
 import { ToastProvider } from "@fantappero/ui";

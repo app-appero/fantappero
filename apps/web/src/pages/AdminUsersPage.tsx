@@ -1,12 +1,33 @@
-import type { AdminTestMode, AdminUser, PaginatedAdminUsers } from "@fantappero/contracts";
-import { Badge, Breadcrumb, Button, Input, Modal, PageContainer, UiStatePanel } from "@fantappero/ui";
+import type {
+  AdminBlocklist,
+  AdminTestMode,
+  AdminUser,
+  PaginatedAdminUsers,
+} from "@fantappero/contracts";
+import {
+  Badge,
+  Breadcrumb,
+  Button,
+  Input,
+  Modal,
+  PageContainer,
+  Tab,
+  TabList,
+  TabPanel,
+  Tabs,
+  UiStatePanel,
+} from "@fantappero/ui";
 import { useCallback, useEffect, useState } from "react";
 import {
+  addBlocked,
   addTester,
+  deleteUser,
   fetchAdminUsers,
+  fetchBlocklist,
   fetchTestMode,
   impersonateUser,
   promoteOperator,
+  removeBlocked,
   removeTester,
   revokeOperator,
   setTestMode,
@@ -16,7 +37,10 @@ import { getApiErrorMessage, useAuth } from "../auth/AuthContext";
 import { loadStoredSession } from "../auth/sessionStorage";
 import { useNavigate } from "../router/simpleRouter";
 
-type PendingAction = { user: AdminUser; kind: "promote" | "revoke" | "impersonate" };
+type PendingAction = {
+  user: AdminUser;
+  kind: "promote" | "revoke" | "impersonate" | "delete";
+};
 
 export function AdminUsersPage() {
   const { startImpersonation } = useAuth();
@@ -33,6 +57,10 @@ export function AdminUsersPage() {
   const [testMode, setTestModeState] = useState<AdminTestMode | null>(null);
   const [testModeBusy, setTestModeBusy] = useState(false);
   const [newTesterEmail, setNewTesterEmail] = useState("");
+  const [blocklist, setBlocklist] = useState<AdminBlocklist | null>(null);
+  const [blockEmail, setBlockEmail] = useState("");
+  const [blockReason, setBlockReason] = useState("");
+  const [blockBusy, setBlockBusy] = useState(false);
 
   useEffect(() => {
     const session = loadStoredSession();
@@ -42,7 +70,35 @@ export function AdminUsersPage() {
     void fetchTestMode(session.accessToken)
       .then(setTestModeState)
       .catch(() => setTestModeState(null));
+    void fetchBlocklist(session.accessToken)
+      .then(setBlocklist)
+      .catch(() => setBlocklist(null));
   }, []);
+
+  /** Modifica alla lista nera (aggiungi/rimuovi) con messaggi di esito. */
+  async function runBlocklistAction(
+    action: (token: string) => Promise<AdminBlocklist>,
+    message: string,
+  ): Promise<boolean> {
+    const session = loadStoredSession();
+    if (!session?.accessToken) {
+      setError("Sessione non disponibile. Accedi di nuovo.");
+      return false;
+    }
+    setBlockBusy(true);
+    setError(null);
+    setSuccess(null);
+    try {
+      setBlocklist(await action(session.accessToken));
+      setSuccess(message);
+      return true;
+    } catch (actionError) {
+      setError(getApiErrorMessage(actionError, "Operazione sulla lista nera non riuscita."));
+      return false;
+    } finally {
+      setBlockBusy(false);
+    }
+  }
 
   /** Esegue una modifica alla modalità test e aggiorna stato e messaggi. */
   async function runTestModeAction(
@@ -131,6 +187,13 @@ export function AdminUsersPage() {
         navigate("/leghe");
         return;
       }
+      if (pending.kind === "delete") {
+        const deleted = await deleteUser(session.accessToken, pending.user.id);
+        setSuccess(`${pending.user.displayName} è stato eliminato e ${deleted.blockedEmail} è in lista nera.`);
+        setBlocklist(await fetchBlocklist(session.accessToken));
+        await load();
+        return;
+      }
       const updated =
         pending.kind === "promote"
           ? await promoteOperator(session.accessToken, pending.user.id)
@@ -151,6 +214,13 @@ export function AdminUsersPage() {
     } catch (actionError) {
       if (actionError instanceof ApiError && actionError.code === "last_operator") {
         setError("Non puoi revocare l'ultimo operatore rimasto sulla piattaforma.");
+      } else if (actionError instanceof ApiError && actionError.code === "protected_operator") {
+        setError("Questo operatore è protetto: non può essere declassato, eliminato o bloccato.");
+      } else if (
+        actionError instanceof ApiError &&
+        actionError.code === "operator_must_be_revoked_first"
+      ) {
+        setError("Per eliminare o bloccare un operatore revoca prima il suo ruolo.");
       } else if (actionError instanceof ApiError && actionError.code === "cannot_impersonate_self") {
         setError("Non puoi impersonare te stesso.");
       } else if (actionError instanceof ApiError && actionError.status === 403) {
@@ -171,6 +241,12 @@ export function AdminUsersPage() {
         <Breadcrumb items={[{ label: "Operazioni", href: "/admin" }, { label: "Utenti" }]} />
       }
     >
+      <Tabs defaultValue="utenti" aria-label="Utenti e lista nera">
+        <TabList>
+          <Tab value="utenti">Utenti</Tab>
+          <Tab value="lista-nera">{`Lista nera${blocklist ? ` (${blocklist.items.length})` : ""}`}</Tab>
+        </TabList>
+        <TabPanel value="utenti">
       <section className="fa-admin-testmode" data-testid="admin-testmode">
         <h2>Modalità test</h2>
         {testMode ? (
@@ -356,7 +432,11 @@ export function AdminUsersPage() {
                 >
                   Impersona
                 </Button>
-                {row.platformRole === "operator" ? (
+                {row.isProtected ? (
+                  <Badge variant="accent" data-testid={`admin-user-protected-${row.id}`}>
+                    Protetto
+                  </Badge>
+                ) : row.platformRole === "operator" ? (
                   <Button
                     type="button"
                     size="sm"
@@ -379,11 +459,107 @@ export function AdminUsersPage() {
                     Promuovi a operator
                   </Button>
                 )}
+                {row.platformRole !== "operator" ? (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    loading={workingId === row.id}
+                    onClick={() => setPending({ user: row, kind: "delete" })}
+                    data-testid={`admin-user-delete-${row.id}`}
+                  >
+                    Elimina
+                  </Button>
+                ) : null}
               </span>
             </li>
           ))}
         </ul>
       ) : null}
+
+        </TabPanel>
+        <TabPanel value="lista-nera">
+          <section className="fa-admin-testmode" data-testid="admin-blocklist">
+            <h2>Lista nera</h2>
+            <p>
+              Chi è in lista nera non può accedere né registrarsi di nuovo, nemmeno con un altro
+              dispositivo. Gli utenti eliminati dall&apos;operatore finiscono qui in automatico.
+            </p>
+            <form
+              className="fa-admin-testmode__add"
+              onSubmit={(event) => {
+                event.preventDefault();
+                const email = blockEmail.trim();
+                if (!email) {
+                  return;
+                }
+                void runBlocklistAction(
+                  (token) => addBlocked(token, email, blockReason.trim()),
+                  `${email} è stato aggiunto alla lista nera.`,
+                ).then((ok) => {
+                  if (ok) {
+                    setBlockEmail("");
+                    setBlockReason("");
+                  }
+                });
+              }}
+            >
+              <Input
+                label="Email da bloccare"
+                name="admin-block-email"
+                type="email"
+                value={blockEmail}
+                onChange={(event) => setBlockEmail(event.target.value)}
+              />
+              <Input
+                label="Motivo (facoltativo)"
+                name="admin-block-reason"
+                value={blockReason}
+                onChange={(event) => setBlockReason(event.target.value)}
+              />
+              <Button type="submit" variant="primary" loading={blockBusy} data-testid="admin-block-add">
+                Aggiungi alla lista nera
+              </Button>
+            </form>
+            {blocklist === null ? (
+              <p>Lista nera non disponibile.</p>
+            ) : blocklist.items.length === 0 ? (
+              <p data-testid="admin-blocklist-empty">La lista nera è vuota.</p>
+            ) : (
+              <ul className="fa-admin-users__list" data-testid="admin-blocklist-list">
+                {blocklist.items.map((entry) => (
+                  <li key={entry.id} className="fa-admin-users__item">
+                    <span className="fa-admin-users__identity">
+                      <strong>{entry.email}</strong>
+                      <small>
+                        {new Date(entry.createdAt).toLocaleDateString("it-IT")}
+                        {entry.reason ? ` · ${entry.reason}` : ""}
+                      </small>
+                    </span>
+                    <span className="fa-admin-users__actions">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="secondary"
+                        loading={blockBusy}
+                        onClick={() =>
+                          void runBlocklistAction(
+                            (token) => removeBlocked(token, entry.id),
+                            `${entry.email} è stato tolto dalla lista nera.`,
+                          )
+                        }
+                        data-testid={`admin-block-remove-${entry.id}`}
+                      >
+                        Togli dalla lista nera
+                      </Button>
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+        </TabPanel>
+      </Tabs>
 
       <Modal
         open={pending !== null}
@@ -393,7 +569,9 @@ export function AdminUsersPage() {
             ? "Promuovi a operator"
             : pending?.kind === "impersonate"
               ? "Impersona utente"
-              : "Revoca operator"
+              : pending?.kind === "delete"
+                ? "Elimina utente"
+                : "Revoca operator"
         }
         footer={
           <>
@@ -416,7 +594,9 @@ export function AdminUsersPage() {
             ? `Confermi di voler promuovere ${pending.user.displayName} a operatore globale? Otterrà accesso al pannello /admin.`
             : pending?.kind === "impersonate"
               ? `Accederai come ${pending.user.displayName} per qualche minuto, a scopo di assistenza. L'operazione viene registrata nell'audit log.`
-              : `Confermi di voler revocare il ruolo di operatore a ${pending?.user.displayName}?`}
+              : pending?.kind === "delete"
+                ? `Sei sicuro di voler eliminare ${pending.user.displayName} (${pending.user.email})? I suoi dati personali vengono rimossi e l'indirizzo finisce in lista nera: non potrà più accedere né registrarsi. Potrai toglierlo dalla lista nera in seguito.`
+                : `Confermi di voler revocare il ruolo di operatore a ${pending?.user.displayName}?`}
         </p>
       </Modal>
     </PageContainer>
