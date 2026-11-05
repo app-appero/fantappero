@@ -11,7 +11,10 @@ from sqlalchemy.orm import Session
 from admin.exceptions import AdminError
 from admin.listone_service import AdminListoneService
 from admin.schemas import (
+    AdminAddBlockedRequest,
     AdminAddTesterRequest,
+    AdminBlocklistResponse,
+    AdminDeleteUserResponse,
     AdminImpersonateResponse,
     AdminListoneEntryResponse,
     AdminListoneRefreshJobResponse,
@@ -127,6 +130,55 @@ def remove_tester(
 ) -> AdminTestModeResponse | JSONResponse:
     try:
         return service.remove_tester(actor=operator, tester_id=tester_id)
+    except AuthError as exc:
+        return JSONResponse(status_code=404, content={"message": exc.message, "code": exc.code})
+
+
+@router.post("/users/{user_id}/delete", response_model=AdminDeleteUserResponse)
+def delete_user(
+    user_id: UUID,
+    operator: User = Depends(require_permissions(Permission.GLOBAL_OPERATE)),
+    service: AdminService = Depends(get_admin_service),
+) -> AdminDeleteUserResponse | JSONResponse:
+    """Elimina l'utente (dati personali rimossi) e ne blocca l'indirizzo email."""
+    try:
+        return service.delete_user(actor=operator, target_user_id=user_id)
+    except AdminError as exc:
+        return _error_response(exc)
+    except AuthError as exc:
+        return JSONResponse(status_code=400, content={"message": exc.message, "code": exc.code})
+
+
+@router.get("/blocklist", response_model=AdminBlocklistResponse)
+def get_blocklist(
+    _operator: User = Depends(require_permissions(Permission.GLOBAL_OPERATE)),
+    service: AdminService = Depends(get_admin_service),
+) -> AdminBlocklistResponse:
+    return service.blocklist()
+
+
+@router.post("/blocklist", response_model=AdminBlocklistResponse)
+def add_blocked(
+    body: AdminAddBlockedRequest,
+    operator: User = Depends(require_permissions(Permission.GLOBAL_OPERATE)),
+    service: AdminService = Depends(get_admin_service),
+) -> AdminBlocklistResponse | JSONResponse:
+    try:
+        return service.add_blocked(actor=operator, email=body.email, reason=body.reason)
+    except AdminError as exc:
+        return _error_response(exc)
+    except AuthError as exc:
+        return JSONResponse(status_code=400, content={"message": exc.message, "code": exc.code})
+
+
+@router.delete("/blocklist/{entry_id}", response_model=AdminBlocklistResponse)
+def remove_blocked(
+    entry_id: UUID,
+    operator: User = Depends(require_permissions(Permission.GLOBAL_OPERATE)),
+    service: AdminService = Depends(get_admin_service),
+) -> AdminBlocklistResponse | JSONResponse:
+    try:
+        return service.remove_blocked(actor=operator, entry_id=entry_id)
     except AuthError as exc:
         return JSONResponse(status_code=404, content={"message": exc.message, "code": exc.code})
 

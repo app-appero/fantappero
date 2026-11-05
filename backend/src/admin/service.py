@@ -10,10 +10,16 @@ from sqlalchemy.orm import Session, selectinload
 
 from admin.exceptions import (
     AdminUserNotFoundError,
+    CannotDeleteSelfError,
     CannotImpersonateSelfError,
+    CannotModifyOperatorError,
     LastOperatorRevokeError,
+    ProtectedOperatorError,
 )
 from admin.schemas import (
+    AdminBlockedAccountResponse,
+    AdminBlocklistResponse,
+    AdminDeleteUserResponse,
     AdminImpersonateResponse,
     AdminLeagueResponse,
     AdminOverviewResponse,
@@ -23,8 +29,10 @@ from admin.schemas import (
     PaginatedAdminLeaguesResponse,
     PaginatedAdminUsersResponse,
 )
+from auth.blocklist import BlockList
 from auth.models.user import User
 from auth.models.user_profile import UserProfile
+from auth.privacy_service import PrivacyService
 from auth.schemas import SessionUserResponse
 from auth.security import create_access_token
 from auth.tester_access import TesterAccess
@@ -50,7 +58,9 @@ def _escape_ilike(term: str) -> str:
 
 
 def _to_user_response(
-    user: User, tester_emails: frozenset[str] | set[str] | None = None
+    user: User,
+    tester_emails: frozenset[str] | set[str] | None = None,
+    protected_emails: frozenset[str] | None = None,
 ) -> AdminUserResponse:
     is_tester = user.platform_role == PlatformRole.OPERATOR or (
         tester_emails is not None and user.email.strip().lower() in tester_emails
@@ -62,6 +72,11 @@ def _to_user_response(
         platformRole=user.platform_role,
         createdAt=user.created_at,
         isTester=is_tester,
+        isProtected=(
+            protected_emails is not None
+            and user.platform_role == PlatformRole.OPERATOR
+            and user.email.strip().lower() in protected_emails
+        ),
     )
 
 
@@ -125,12 +140,81 @@ class AdminService:
             .limit(page_size)
         ).all()
         return PaginatedAdminUsersResponse(
-            items=[_to_user_response(user, tester_emails) for user in rows],
+            items=[
+                _to_user_response(user, tester_emails, self._protected_emails()) for user in rows
+            ],
             page=page,
             pageSize=page_size,
             total=total,
             totalPages=_total_pages(total, page_size),
         )
+
+    def _protected_emails(self) -> frozenset[str]:
+        return self._settings.protected_operator_email_set()
+
+    def _is_protected(self, user: User) -> bool:
+        return user.email.strip().lower() in self._protected_emails()
+
+    # --- eliminazione utente e lista nera ----------------------------------------------------
+    def delete_user(self, *, actor: User, target_user_id: UUID) -> AdminDeleteUserResponse:
+        """Elimina (anonimizza) un utente e ne mette l'email in lista nera."""
+        user = self._get_user_or_raise(target_user_id)
+        if user.id == actor.id:
+            raise CannotDeleteSelfError()
+        if self._is_protected(user):
+            raise ProtectedOperatorError()
+        if user.platform_role == PlatformRole.OPERATOR:
+            raise CannotModifyOperatorError()
+        # Prima il blocco dell'indirizzo originale, poi l'anonimizzazione (che lo sostituisce).
+        email = user.email
+        BlockList(self._session).add(
+            email, reason="Account eliminato dall'operatore", actor_id=actor.id
+        )
+        PrivacyService(self._session, self._settings).delete_account_by_operator(actor, user.id)
+        _logger.info(
+            "admin_user_deleted_and_blocked",
+            extra={"actor_id": str(actor.id), "target_user_id": str(target_user_id)},
+        )
+        return AdminDeleteUserResponse(deletedUserId=str(target_user_id), blockedEmail=email)
+
+    def blocklist(self) -> AdminBlocklistResponse:
+        return AdminBlocklistResponse(
+            items=[
+                AdminBlockedAccountResponse(
+                    id=str(entry.id),
+                    email=entry.email,
+                    reason=entry.reason,
+                    createdAt=entry.created_at,
+                )
+                for entry in BlockList(self._session).list_entries()
+            ]
+        )
+
+    def add_blocked(self, *, actor: User, email: str, reason: str | None) -> AdminBlocklistResponse:
+        normalized = email.strip().lower()
+        if normalized in self._protected_emails():
+            raise ProtectedOperatorError()
+        existing_operator = self._session.scalar(
+            select(User.id).where(
+                User.email == normalized,
+                User.deleted_at.is_(None),
+                User.platform_role == PlatformRole.OPERATOR,
+            )
+        )
+        if existing_operator is not None:
+            raise CannotModifyOperatorError()
+        BlockList(self._session).add(email, reason=reason, actor_id=actor.id)
+        self._session.commit()
+        return self.blocklist()
+
+    def remove_blocked(self, *, actor: User, entry_id: UUID) -> AdminBlocklistResponse:
+        BlockList(self._session).remove(entry_id)
+        self._session.commit()
+        _logger.info(
+            "admin_blocklist_entry_removed",
+            extra={"actor_id": str(actor.id), "entry_id": str(entry_id)},
+        )
+        return self.blocklist()
 
     # --- modalità test (accesso riservato ai tester) -----------------------------------------
     def test_mode_state(self) -> AdminTestModeResponse:
@@ -206,6 +290,8 @@ class AdminService:
 
     def revoke_operator(self, *, actor: User, target_user_id: UUID) -> AdminUserResponse:
         user = self._get_user_or_raise(target_user_id)
+        if self._is_protected(user):
+            raise ProtectedOperatorError()
         if user.platform_role == PlatformRole.OPERATOR:
             operators_count = (
                 self._session.scalar(

@@ -28,6 +28,8 @@ class AdminUserResponse(ApiModel):
     created_at: datetime = Field(alias="createdAt")
     #: Autorizzato in modalità test (in lista, oppure operatore: tester di default).
     is_tester: bool = Field(default=False, alias="isTester")
+    #: Operatore protetto: non può essere declassato, eliminato o bloccato.
+    is_protected: bool = Field(default=False, alias="isProtected")
 
 
 class AdminTesterResponse(ApiModel):
@@ -331,3 +333,24 @@ class AdminPredictedHintDiagnosisResponse(ApiModel):
     ]
     detail: str
     similar_unmatched_names: list[str] = Field(default_factory=list, alias="similarUnmatchedNames")
+
+
+class AdminBlockedAccountResponse(ApiModel):
+    id: str
+    email: str
+    reason: str | None = None
+    created_at: datetime = Field(alias="createdAt")
+
+
+class AdminBlocklistResponse(ApiModel):
+    items: list[AdminBlockedAccountResponse]
+
+
+class AdminAddBlockedRequest(ApiModel):
+    email: str = Field(min_length=3, max_length=320)
+    reason: str | None = Field(default=None, max_length=500)
+
+
+class AdminDeleteUserResponse(ApiModel):
+    deleted_user_id: str = Field(alias="deletedUserId")
+    blocked_email: str = Field(alias="blockedEmail")

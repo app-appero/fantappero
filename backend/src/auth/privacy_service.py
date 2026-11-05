@@ -59,6 +59,26 @@ class PrivacyService:
     ) -> PrivacyMessageResponse:
         validate_delete_confirmation(confirm_phrase)
         loaded = self._load_user_bundle(user.id)
+        self._anonymize_and_delete(loaded, actor_id=loaded.id)
+        return PrivacyMessageResponse(
+            message=(
+                "Account eliminato. I dati personali sono stati rimossi "
+                "e gli storici di lega sono stati preservati."
+            ),
+        )
+
+    def delete_account_by_operator(self, operator: User, target_user_id: UUID) -> str:
+        """Elimina (anonimizza) l'account di un altro utente su richiesta di un operatore.
+
+        Restituisce l'indirizzo email originale, che il chiamante può mettere in lista nera
+        prima che venga sostituito da un valore anonimo.
+        """
+        loaded = self._load_user_bundle(target_user_id)
+        original_email = loaded.email
+        self._anonymize_and_delete(loaded, actor_id=operator.id)
+        return original_email
+
+    def _anonymize_and_delete(self, loaded: User, *, actor_id: UUID) -> None:
         if loaded.deleted_at is not None:
             raise ValidationAuthError(
                 "Questo account è già stato eliminato.",
@@ -78,17 +98,11 @@ class PrivacyService:
 
         self._record_audit_event(
             user_id=loaded.id,
-            actor_id=loaded.id,
+            actor_id=actor_id,
             action=PrivacyAuditAction.ACCOUNT_DELETE,
         )
         self._session.commit()
         get_metrics().incr("privacy_delete_total", labels={"result": "success"})
-        return PrivacyMessageResponse(
-            message=(
-                "Account eliminato. I dati personali sono stati rimossi "
-                "e gli storici di lega sono stati preservati."
-            ),
-        )
 
     def _load_user_bundle(self, user_id: UUID) -> User:
         loaded = self._session.scalar(

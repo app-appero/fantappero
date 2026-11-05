@@ -3,6 +3,7 @@
 from ai_assistant.models import AiInteraction
 from auth.models.auth_session import AuthSession
 from auth.models.auth_token import AuthToken
+from auth.models.blocked_account import BlockedAccount
 from auth.models.privacy_audit_event import PrivacyAuditEvent
 from auth.models.tester_allowlist import TesterAllowlistEntry
 from auth.models.user import User
@@ -76,6 +77,7 @@ __all__ = [
     "AiInteraction",
     "Athlete",
     "AuthSession",
+    "BlockedAccount",
     "TesterAllowlistEntry",
     "AuthToken",
     "Club",

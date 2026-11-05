@@ -29,6 +29,14 @@ class AuthSettingsMixin:
             "e il codice della registrazione con email resta, spento."
         ),
     )
+    protected_operator_emails: str = Field(
+        default="trottarosario@gmail.com",
+        validation_alias="PROTECTED_OPERATOR_EMAILS",
+        description=(
+            "Indirizzi (separati da virgola) di operatori che non possono mai essere declassati, "
+            "eliminati o messi in lista nera, nemmeno da un altro operatore."
+        ),
+    )
     auth_email_verification_expire_hours: int = Field(
         default=24,
         validation_alias="AUTH_EMAIL_VERIFICATION_EXPIRE_HOURS",
@@ -82,6 +90,13 @@ class AuthSettingsMixin:
 
     def resolved_jwt_secret(self) -> str:
         return self.jwt_secret_key.get_secret_value()
+
+    def protected_operator_email_set(self) -> frozenset[str]:
+        return frozenset(
+            item.strip().lower()
+            for item in self.protected_operator_emails.split(",")
+            if item.strip()
+        )
 
     def resolved_google_client_ids(self) -> list[str]:
         return [item.strip() for item in self.google_oauth_client_ids.split(",") if item.strip()]

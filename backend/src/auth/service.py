@@ -10,7 +10,9 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from auth import google_oauth
+from auth.blocklist import BlockList
 from auth.exceptions import (
+    AccountBlockedError,
     EmailNotVerifiedError,
     GoogleAuthError,
     InvalidCredentialsError,
@@ -79,6 +81,7 @@ class AuthService:
         normalized_email = validate_email(email)
         validated_password = validate_password(password)
         validated_name = validate_display_name(display_name)
+        self._assert_not_blocked(normalized_email)
 
         if self._rate_limiter is not None:
             self._rate_limiter.check(
@@ -120,6 +123,7 @@ class AuthService:
     ) -> AuthTokensResponse:
         del user_agent
         normalized_email = validate_email(email)
+        self._assert_not_blocked(normalized_email)
 
         if self._rate_limiter is not None:
             self._rate_limiter.check(
@@ -173,6 +177,7 @@ class AuthService:
         if not identity.email_verified:
             get_metrics().incr("auth_google_login_total", labels={"result": "unverified"})
             raise GoogleAuthError()
+        self._assert_not_blocked(identity.email)
 
         user = self._session.scalar(select(User).where(User.google_sub == identity.sub))
         if user is None:
@@ -214,6 +219,13 @@ class AuthService:
         get_metrics().incr("auth_google_login_total", labels={"result": "success"})
         return tokens
 
+    def _assert_not_blocked(self, email: str) -> None:
+        try:
+            BlockList(self._session).assert_not_blocked(email)
+        except AccountBlockedError:
+            get_metrics().incr("auth_blocked_account_total")
+            raise
+
     def _assert_tester_allowed(self, email: str, platform_role: PlatformRole | None) -> None:
         try:
             TesterAccess(self._session).assert_allowed(email=email, platform_role=platform_role)
@@ -249,6 +261,7 @@ class AuthService:
         user = self._session.get(User, session_row.user_id)
         if user is None or user.deleted_at is not None or user.user_type == UserType.AI:
             raise InvalidCredentialsError()
+        self._assert_not_blocked(user.email)
         self._assert_tester_allowed(user.email, user.platform_role)
 
         session_row.revoked_at = utc_now()

@@ -41,3 +41,24 @@ class AdminTransferAlreadyReviewedError(AdminError):
             "Questo trasferimento è già stato revisionato.",
             code="admin_transfer_already_reviewed",
         )
+
+
+class ProtectedOperatorError(AdminError):
+    def __init__(self) -> None:
+        super().__init__(
+            "Questo operatore è protetto: non può essere declassato, eliminato o bloccato.",
+            code="protected_operator",
+        )
+
+
+class CannotModifyOperatorError(AdminError):
+    def __init__(self) -> None:
+        super().__init__(
+            "Per eliminare o bloccare un operatore revoca prima il suo ruolo.",
+            code="operator_must_be_revoked_first",
+        )
+
+
+class CannotDeleteSelfError(AdminError):
+    def __init__(self) -> None:
+        super().__init__("Non puoi eliminare te stesso.", code="cannot_delete_self")

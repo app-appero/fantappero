@@ -59,6 +59,16 @@ class TesterOnlyError(AuthError):
         )
 
 
+class AccountBlockedError(AuthError):
+    """L'indirizzo è in lista nera: nessun accesso e nessuna nuova registrazione."""
+
+    def __init__(self) -> None:
+        super().__init__(
+            "Accesso non consentito: questo account è stato bloccato.",
+            code="account_blocked",
+        )
+
+
 class RateLimitExceededError(AuthError):
     def __init__(self) -> None:
         super().__init__(

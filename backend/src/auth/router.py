@@ -33,7 +33,12 @@ def _error_response(exc: AuthError) -> JSONResponse:
     status_code = status.HTTP_400_BAD_REQUEST
     if exc.code in ("invalid_credentials", "google_auth_failed"):
         status_code = status.HTTP_401_UNAUTHORIZED
-    elif exc.code in ("email_not_verified", "email_registration_disabled", "tester_only"):
+    elif exc.code in (
+        "email_not_verified",
+        "email_registration_disabled",
+        "tester_only",
+        "account_blocked",
+    ):
         status_code = status.HTTP_403_FORBIDDEN
     elif exc.code == "rate_limit_exceeded":
         status_code = status.HTTP_429_TOO_MANY_REQUESTS
