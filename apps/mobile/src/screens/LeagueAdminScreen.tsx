@@ -14,6 +14,7 @@ import { theme } from "@fantappero/ui/theme";
 import { useNavigation, useRoute, type RouteProp } from "@react-navigation/core";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useCallback, useEffect, useState } from "react";
+import type { ReactNode } from "react";
 import { Modal, Pressable, ScrollView, StyleSheet, Switch, Text, View } from "react-native";
 import { AppTextInput as TextInput } from "../components/AppTextInput";
 import { ApiError } from "../api/client";
@@ -1110,105 +1111,91 @@ export function LeagueAdminScreen() {
         animationType="fade"
         onRequestClose={() => setAdminOpen(false)}
       >
-        <View style={styles.replaceOverlay}>
-          <View style={styles.replaceBox} testID="league-members-admin-panel">
-            <ScrollView>
-              <Text style={styles.heading}>Amministratori della lega</Text>
-              <Text style={styles.label}>Amministratori attuali</Text>
-              {members
-                .filter((member) => member.role === "league_admin")
-                .map((admin) => {
-                  const admins = members.filter((member) => member.role === "league_admin");
-                  const isMe = !!user && admin.userId === user.id;
-                  return (
-                    <View key={admin.userId} style={styles.inviteRow}>
-                      <View style={styles.flex}>
-                        <Text style={styles.inviteTitle}>
-                          {admin.displayName}
-                          {isMe ? " (tu)" : ""}
-                        </Text>
-                      </View>
-                      {admins.length > 1 && !isMe ? (
-                        <Pressable
-                          accessibilityRole="button"
-                          disabled={workingId !== null}
-                          onPress={() => void onRevokeAdmin(admin.userId)}
-                          style={styles.secondaryButton}
-                          testID={`league-members-admin-revoke-${admin.userId}`}
-                        >
-                          <Text style={styles.secondaryLabel}>Togli ruolo</Text>
-                        </Pressable>
-                      ) : null}
-                    </View>
-                  );
-                })}
-              <Text style={styles.label}>Chi diventa amministratore</Text>
-              {members
-                .filter((member) => member.role === "member")
-                .map((member) => (
-                  <Pressable
-                    key={member.userId}
-                    accessibilityRole="radio"
-                    accessibilityState={{ selected: adminTargetId === member.userId }}
-                    onPress={() => setAdminTargetId(member.userId)}
-                    style={[
-                      styles.replaceOption,
-                      adminTargetId === member.userId && styles.replaceOptionSelected,
-                    ]}
-                    testID={`league-members-admin-target-${member.userId}`}
-                  >
-                    <Text style={styles.inviteTitle}>{member.displayName}</Text>
-                  </Pressable>
-                ))}
-              <Text style={styles.label}>Come</Text>
-              <Pressable
-                accessibilityRole="radio"
-                accessibilityState={{ selected: adminMode === "co_admin" }}
-                onPress={() => setAdminMode("co_admin")}
-                style={[styles.replaceOption, adminMode === "co_admin" && styles.replaceOptionSelected]}
-                testID="league-members-admin-mode-co"
-              >
-                <Text style={styles.inviteTitle}>Condividi il controllo</Text>
-                <Text style={styles.body}>Restate entrambi amministratori.</Text>
-              </Pressable>
-              <Pressable
-                accessibilityRole="radio"
-                accessibilityState={{ selected: adminMode === "transfer" }}
-                onPress={() => setAdminMode("transfer")}
-                style={[styles.replaceOption, adminMode === "transfer" && styles.replaceOptionSelected]}
-                testID="league-members-admin-mode-transfer"
-              >
-                <Text style={styles.inviteTitle}>Passa il controllo</Text>
-                <Text style={styles.body}>Tu torni a essere un partecipante.</Text>
-              </Pressable>
-              {adminError ? (
-                <Text style={[styles.body, styles.replaceError]} testID="league-members-admin-error">
-                  {adminError}
-                </Text>
-              ) : null}
-            </ScrollView>
-            <View style={styles.row}>
+        <DialogFrame
+          title="Amministratori della lega"
+          onClose={() => setAdminOpen(false)}
+          testID="league-members-admin-panel"
+          footer={
+            <>
               <Pressable
                 accessibilityRole="button"
                 onPress={() => setAdminOpen(false)}
-                style={styles.secondaryButton}
+                style={styles.dialogGhost}
               >
-                <Text style={styles.secondaryLabel}>Chiudi</Text>
+                <Text style={styles.dialogGhostLabel}>Chiudi</Text>
               </Pressable>
               <Pressable
                 accessibilityRole="button"
                 disabled={!adminTargetId || workingId === "admin"}
                 onPress={() => void onConfirmAdmin()}
-                style={[styles.primaryButton, (!adminTargetId || workingId === "admin") && styles.disabled]}
+                style={[styles.dialogPrimary, (!adminTargetId || workingId === "admin") && styles.disabled]}
                 testID="league-members-admin-confirm"
               >
-                <Text style={styles.primaryLabel}>
-                  {workingId === "admin" ? "Salvataggio…" : "Conferma"}
-                </Text>
+                <Text style={styles.primaryLabel}>{workingId === "admin" ? "Salvataggio…" : "Conferma"}</Text>
               </Pressable>
-            </View>
-          </View>
-        </View>
+            </>
+          }
+        >
+          <Text style={styles.dialogSection}>Amministratori attuali</Text>
+          {members
+            .filter((member) => member.role === "league_admin")
+            .map((admin) => {
+              const admins = members.filter((member) => member.role === "league_admin");
+              const isMe = !!user && admin.userId === user.id;
+              return (
+                <View key={admin.userId} style={styles.dialogRow}>
+                  <Text style={[styles.inviteTitle, styles.flex]} numberOfLines={1}>
+                    {admin.displayName}
+                    {isMe ? " (tu)" : ""}
+                  </Text>
+                  {admins.length > 1 && !isMe ? (
+                    <Pressable
+                      accessibilityRole="button"
+                      disabled={workingId !== null}
+                      onPress={() => void onRevokeAdmin(admin.userId)}
+                      style={styles.dialogSmall}
+                      testID={`league-members-admin-revoke-${admin.userId}`}
+                    >
+                      <Text style={styles.secondaryLabel}>Togli ruolo</Text>
+                    </Pressable>
+                  ) : null}
+                </View>
+              );
+            })}
+          <Text style={styles.dialogSection}>Aggiungi o passa il ruolo</Text>
+          <Text style={styles.label}>Chi diventa amministratore</Text>
+          {members
+            .filter((member) => member.role === "member")
+            .map((member) => (
+              <RadioRow
+                key={member.userId}
+                selected={adminTargetId === member.userId}
+                onPress={() => setAdminTargetId(member.userId)}
+                title={member.displayName}
+                testID={`league-members-admin-target-${member.userId}`}
+              />
+            ))}
+          <Text style={styles.label}>Come</Text>
+          <RadioRow
+            selected={adminMode === "co_admin"}
+            onPress={() => setAdminMode("co_admin")}
+            title="Condividi il controllo"
+            subtitle="Restate entrambi amministratori."
+            testID="league-members-admin-mode-co"
+          />
+          <RadioRow
+            selected={adminMode === "transfer"}
+            onPress={() => setAdminMode("transfer")}
+            title="Passa il controllo"
+            subtitle="Tu torni a essere un partecipante."
+            testID="league-members-admin-mode-transfer"
+          />
+          {adminError ? (
+            <Text style={[styles.body, styles.replaceError]} testID="league-members-admin-error">
+              {adminError}
+            </Text>
+          ) : null}
+        </DialogFrame>
       </Modal>
 
       <Modal
@@ -1217,86 +1204,25 @@ export function LeagueAdminScreen() {
         animationType="fade"
         onRequestClose={() => setReplaceOpen(false)}
       >
-        <View style={styles.replaceOverlay}>
-          <View style={styles.replaceBox} testID="league-members-replace-panel">
-            <ScrollView>
-              <Text style={styles.heading}>Sostituisci fantallenatore</Text>
-              <Text style={styles.label}>1. Chi vuoi togliere</Text>
-              {members
-                .filter((member) => member.role === "member")
-                .map((member) => (
-                  <Pressable
-                    key={member.userId}
-                    accessibilityRole="radio"
-                    accessibilityState={{ selected: replaceFromId === member.userId }}
-                    onPress={() => setReplaceFromId(member.userId)}
-                    style={[
-                      styles.replaceOption,
-                      replaceFromId === member.userId && styles.replaceOptionSelected,
-                    ]}
-                    testID={`league-members-replace-from-${member.userId}`}
-                  >
-                    <Text style={styles.inviteTitle}>{member.displayName}</Text>
-                  </Pressable>
-                ))}
-              <Text style={styles.label}>2. Chi vuoi mettere</Text>
-              <AppTextInput
-                value={replaceQuery}
-                onChangeText={setReplaceQuery}
-                placeholder="Cerca per nome o email"
-                autoCapitalize="none"
-                autoCorrect={false}
-                testID="league-members-replace-query"
-              />
-              {candidatesLoading ? <Text style={styles.body}>Ricerca in corso…</Text> : null}
-              {!candidatesLoading && candidates.length === 0 ? (
-                <Text style={styles.body} testID="league-members-replace-empty">
-                  Nessun fantallenatore disponibile: chi vuoi aggiungere deve aver già fatto
-                  l&apos;accesso ed essere disponibile agli inviti.
-                </Text>
-              ) : (
-                candidates.map((candidate) => (
-                  <Pressable
-                    key={candidate.userId}
-                    accessibilityRole="radio"
-                    accessibilityState={{ selected: replaceToId === candidate.userId }}
-                    onPress={() => setReplaceToId(candidate.userId)}
-                    style={[
-                      styles.replaceOption,
-                      replaceToId === candidate.userId && styles.replaceOptionSelected,
-                    ]}
-                    testID={`league-members-replace-pick-${candidate.userId}`}
-                  >
-                    <Text style={styles.inviteTitle}>{candidate.displayName}</Text>
-                    <Text style={styles.body}>{candidate.email}</Text>
-                  </Pressable>
-                ))
-              )}
-              {replaceFromId && replaceToId ? (
-                <Text style={styles.body}>
-                  Chi subentra eredita squadra, rosa, formazioni e punti di chi viene tolto.
-                </Text>
-              ) : null}
-              {replaceError ? (
-                <Text style={[styles.body, styles.replaceError]} testID="league-members-replace-error">
-                  {replaceError}
-                </Text>
-              ) : null}
-            </ScrollView>
-            <View style={styles.row}>
+        <DialogFrame
+          title="Sostituisci fantallenatore"
+          onClose={() => setReplaceOpen(false)}
+          testID="league-members-replace-panel"
+          footer={
+            <>
               <Pressable
                 accessibilityRole="button"
                 onPress={() => setReplaceOpen(false)}
-                style={styles.secondaryButton}
+                style={styles.dialogGhost}
               >
-                <Text style={styles.secondaryLabel}>Annulla</Text>
+                <Text style={styles.dialogGhostLabel}>Annulla</Text>
               </Pressable>
               <Pressable
                 accessibilityRole="button"
                 disabled={!replaceFromId || !replaceToId || workingId === "replace"}
                 onPress={() => void onReplace()}
                 style={[
-                  styles.primaryButton,
+                  styles.dialogPrimary,
                   (!replaceFromId || !replaceToId || workingId === "replace") && styles.disabled,
                 ]}
                 testID="league-members-replace-confirm"
@@ -1305,11 +1231,137 @@ export function LeagueAdminScreen() {
                   {workingId === "replace" ? "Sostituzione…" : "Sostituisci"}
                 </Text>
               </Pressable>
-            </View>
-          </View>
-        </View>
+            </>
+          }
+        >
+          <Text style={styles.dialogSection}>1. Chi vuoi togliere</Text>
+          {members
+            .filter((member) => member.role === "member")
+            .map((member) => (
+              <RadioRow
+                key={member.userId}
+                selected={replaceFromId === member.userId}
+                onPress={() => setReplaceFromId(member.userId)}
+                title={member.displayName}
+                testID={`league-members-replace-from-${member.userId}`}
+              />
+            ))}
+          <Text style={styles.dialogSection}>2. Chi vuoi mettere</Text>
+          <AppTextInput
+            value={replaceQuery}
+            onChangeText={setReplaceQuery}
+            placeholder="Cerca per nome o email"
+            autoCapitalize="none"
+            autoCorrect={false}
+            testID="league-members-replace-query"
+          />
+          {candidatesLoading ? <Text style={styles.body}>Ricerca in corso…</Text> : null}
+          {!candidatesLoading && candidates.length === 0 ? (
+            <Text style={styles.body} testID="league-members-replace-empty">
+              Nessun fantallenatore disponibile: chi vuoi aggiungere deve aver già fatto
+              l&apos;accesso ed essere disponibile agli inviti.
+            </Text>
+          ) : (
+            candidates.map((candidate) => (
+              <RadioRow
+                key={candidate.userId}
+                selected={replaceToId === candidate.userId}
+                onPress={() => setReplaceToId(candidate.userId)}
+                title={candidate.displayName}
+                subtitle={candidate.email}
+                testID={`league-members-replace-pick-${candidate.userId}`}
+              />
+            ))
+          )}
+          {replaceFromId && replaceToId ? (
+            <Text style={styles.body}>
+              Chi subentra eredita squadra, rosa, formazioni e punti di chi viene tolto.
+            </Text>
+          ) : null}
+          {replaceError ? (
+            <Text style={[styles.body, styles.replaceError]} testID="league-members-replace-error">
+              {replaceError}
+            </Text>
+          ) : null}
+        </DialogFrame>
       </Modal>
     </PageContainer>
+  );
+}
+
+/** Finestra come la modale del web: intestazione con titolo e chiusura, corpo scorrevole, piè di pagina con i bottoni. */
+function DialogFrame({
+  title,
+  onClose,
+  footer,
+  children,
+  testID,
+}: {
+  title: string;
+  onClose: () => void;
+  footer: ReactNode;
+  children: ReactNode;
+  testID?: string;
+}) {
+  return (
+    <View style={styles.replaceOverlay}>
+      <View style={styles.dialogBox} testID={testID}>
+        <View style={styles.dialogHeader}>
+          <Text style={styles.dialogTitle} numberOfLines={2}>
+            {title}
+          </Text>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Chiudi"
+            onPress={onClose}
+            style={styles.dialogClose}
+            hitSlop={8}
+          >
+            <Text style={styles.dialogCloseLabel}>✕</Text>
+          </Pressable>
+        </View>
+        <ScrollView style={styles.dialogScroll} contentContainerStyle={styles.dialogBody} keyboardShouldPersistTaps="handled">
+          {children}
+        </ScrollView>
+        <View style={styles.dialogFooter}>{footer}</View>
+      </View>
+    </View>
+  );
+}
+
+function RadioRow({
+  selected,
+  onPress,
+  title,
+  subtitle,
+  testID,
+}: {
+  selected: boolean;
+  onPress: () => void;
+  title: string;
+  subtitle?: string;
+  testID?: string;
+}) {
+  return (
+    <Pressable
+      accessibilityRole="radio"
+      accessibilityState={{ selected }}
+      onPress={onPress}
+      style={[styles.dialogRow, selected && styles.dialogRowSelected]}
+      testID={testID}
+    >
+      <View style={[styles.radio, selected && styles.radioOn]}>{selected ? <View style={styles.radioDot} /> : null}</View>
+      <View style={styles.flex}>
+        <Text style={styles.inviteTitle} numberOfLines={1}>
+          {title}
+        </Text>
+        {subtitle ? (
+          <Text style={styles.body} numberOfLines={1}>
+            {subtitle}
+          </Text>
+        ) : null}
+      </View>
+    </Pressable>
   );
 }
 
@@ -1452,6 +1504,102 @@ const styles = lazyStyles(() => StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
     backgroundColor: colors.backgroundElevated,
+  },
+  dialogBox: {
+    maxHeight: "92%",
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.backgroundElevated,
+    overflow: "hidden",
+  },
+  dialogHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: spacing.md,
+    padding: spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  dialogTitle: {
+    flex: 1,
+    color: colors.foreground,
+    fontSize: typography.fontSize.lg,
+    fontWeight: typography.fontWeight.semibold,
+  },
+  dialogClose: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  dialogCloseLabel: { color: colors.foreground, fontSize: 14 },
+  dialogScroll: { flexGrow: 0 },
+  dialogBody: { padding: spacing.md, gap: spacing.xs },
+  dialogSection: {
+    marginTop: spacing.sm,
+    color: colors.foreground,
+    fontSize: typography.fontSize.md,
+    fontWeight: typography.fontWeight.semibold,
+  },
+  dialogRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+  },
+  dialogRowSelected: { borderColor: colors.accent, borderWidth: 2 },
+  radio: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    borderWidth: 2,
+    borderColor: colors.border,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  radioOn: { borderColor: colors.accent },
+  radioDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: colors.accent },
+  dialogSmall: {
+    minHeight: 36,
+    paddingHorizontal: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.pill,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  dialogFooter: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    gap: spacing.sm,
+    padding: spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+  },
+  dialogGhost: {
+    minHeight: 44,
+    paddingHorizontal: spacing.lg,
+    borderRadius: radius.pill,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  dialogGhostLabel: { color: colors.foreground, fontWeight: typography.fontWeight.semibold },
+  dialogPrimary: {
+    minHeight: 44,
+    paddingHorizontal: spacing.lg,
+    borderRadius: radius.pill,
+    backgroundColor: colors.brand,
+    alignItems: "center",
+    justifyContent: "center",
   },
   replaceOption: {
     marginTop: spacing.xs,
