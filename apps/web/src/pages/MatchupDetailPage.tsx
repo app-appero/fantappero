@@ -10,6 +10,7 @@ import {
   formatFantasyGoals,
   formatFantasyPoints,
   layoutFromModule,
+  probableToneOf,
 } from "@fantappero/contracts";
 import {
   Badge,
@@ -131,6 +132,13 @@ function toFantasyPitchPlayers(players: readonly H2HPlayerScore[], now: number):
     // il countdown al calcio d'inizio, come già succede nella panchina.
     scoreLabel: playerScoreLabel(player) ?? kickoffCountdown(player, now),
     photoUrl: player.photoUrl,
+    ...(() => {
+      const tone = probableToneOf(player);
+      return {
+        probableStarter: tone === "starter",
+        probableState: tone === "bench" || tone === "expelled" || tone === "unavailable" ? tone : null,
+      };
+    })(),
     live: playerVoteState(player).live,
     voteKind: (() => {
       const kind = playerVoteState(player).kind;

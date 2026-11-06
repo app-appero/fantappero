@@ -550,3 +550,6 @@ export {
   PRIVACY_NOTICE_VERSION,
 } from "./privacyNotice.js";
 export type { PrivacyNoticeSection } from "./privacyNotice.js";
+
+export { probableToneOf } from "./probableTone.js";
+export type { ProbableTone } from "./probableTone.js";

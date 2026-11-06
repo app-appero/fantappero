@@ -66,6 +66,45 @@ export const TONE_LABEL_BG: Record<ProbableTone, string> = {
   unavailable: "#6b7280",
 };
 
+function hexToRgb(hex: string): string {
+  const n = parseInt(hex.slice(1), 16);
+  return `${(n >> 16) & 255},${(n >> 8) & 255},${n & 255}`;
+}
+
+/**
+ * Alone colorato attorno al pallino (titolare verde, panchina gialla, espulso rosso,
+ * indisponibile grigio). Sono anelli semitrasparenti concentrici: a differenza di
+ * shadow/elevation si vedono uguali su iOS e Android, come l'alone del web.
+ * `offset` = spessore del bordo del pallino, `width` = spessore di ogni anello.
+ */
+export function ToneHalo({ tone, offset, width = 3 }: { tone: ProbableTone; offset: number; width?: number }) {
+  const rgb = hexToRgb(TONE_COLOR[tone]);
+  const alphas = tone === "unavailable" ? [0.5, 0.3, 0.15] : [0.95, 0.6, 0.3];
+  return (
+    <>
+      {alphas.map((alpha, k) => {
+        const inset = -(offset + width * (k + 1));
+        return (
+          <View
+            key={k}
+            pointerEvents="none"
+            style={{
+              position: "absolute",
+              top: inset,
+              left: inset,
+              right: inset,
+              bottom: inset,
+              borderRadius: 999,
+              borderWidth: width,
+              borderColor: `rgba(${rgb},${alpha})`,
+            }}
+          />
+        );
+      })}
+    </>
+  );
+}
+
 /** Stato di un calciatore dalle formazioni probabili, per colorare campo, panchina e scelta. */
 export function probableTone(row: {
   probableHint?: "starter" | "bench" | "unavailable" | null;
@@ -171,13 +210,15 @@ export function FormationPitch({
             style={[
               styles.circle,
               { borderColor: roleRingColor(slot.role) },
-              slot.probable ? styles.probableRing : null,
               slot.sv ? styles.svRing : null,
               slot.final ? styles.finalRing : null,
-              slot.probableState ? toneRing(slot.probableState) : null,
+              slot.probableState === "unavailable" ? { opacity: 0.7 } : null,
               selected ? styles.selectedRing : null,
             ]}
           >
+            {slot.probableState ?? (slot.probable ? "starter" : null) ? (
+              <ToneHalo tone={(slot.probableState ?? "starter") as ProbableTone} offset={4} />
+            ) : null}
             {slot.photoUrl ? (
               <Image source={{ uri: slot.photoUrl }} style={styles.photo} />
             ) : (
@@ -244,17 +285,6 @@ export function FormationPitch({
       })}
     </View>
   );
-}
-
-function toneRing(tone: ProbableTone) {
-  return {
-    shadowColor: TONE_COLOR[tone],
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: tone === "unavailable" ? 0 : 1,
-    shadowRadius: 8,
-    elevation: tone === "unavailable" ? 0 : 6,
-    opacity: tone === "unavailable" ? 0.7 : 1,
-  } as const;
 }
 
 function surname(name: string | null): string {
