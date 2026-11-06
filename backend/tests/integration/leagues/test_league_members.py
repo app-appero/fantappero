@@ -408,3 +408,66 @@ def test_replace_coach_keeps_the_team_and_checks_the_candidate(
         )
         == 0
     )
+
+
+def test_admin_can_be_shared_or_passed_at_any_time_and_co_admin_can_be_revoked(
+    client: TestClient,
+    db_session: Session,
+    competition_ids: list[str],
+) -> None:
+    owner_token, owner_id = _register_and_login(client, "coadmin.owner@example.com")
+    second_token, second_id = _register_and_login(client, "coadmin.second@example.com")
+    third_token, third_id = _register_and_login(client, "coadmin.third@example.com")
+    league_id = _create_league(client, owner_token, competition_ids, "Lega Co-admin")
+    _add_member(db_session, league_id, second_id)
+    _add_member(db_session, league_id, third_id)
+    league = db_session.get(League, UUID(league_id))
+    assert league is not None
+    league.state = LeagueState.ACTIVE  # a stagione avviata
+    db_session.commit()
+    base = f"/leagues/{league_id}/amministrazione/partecipanti"
+    owner = {"Authorization": f"Bearer {owner_token}"}
+    second = {"Authorization": f"Bearer {second_token}"}
+
+    # Co-amministratore: restano in due, con gli stessi poteri.
+    shared = client.post(
+        f"{base}/{second_id}/trasferimento-admin", headers=owner, json={"keepCurrent": True}
+    )
+    assert shared.status_code == 200, shared.text
+    assert shared.json()["role"] == "league_admin"
+    assert client.get(base, headers=owner).status_code == 200
+    assert client.get(base, headers=second).status_code == 200
+    db_session.expire_all()
+    roles = dict(
+        db_session.execute(
+            select(LeagueMembership.user_id, LeagueMembership.role).where(
+                LeagueMembership.league_id == UUID(league_id)
+            )
+        ).all()
+    )
+    assert roles[owner_id] == LeagueMemberRole.OWNER
+    assert roles[second_id] == LeagueMemberRole.OWNER
+
+    # Il secondo amministratore può a sua volta passare il controllo e tornare partecipante.
+    passed = client.post(f"{base}/{third_id}/trasferimento-admin", headers=second)
+    assert passed.status_code == 200
+    db_session.expire_all()
+    assert (
+        db_session.scalar(
+            select(LeagueMembership.role).where(
+                LeagueMembership.league_id == UUID(league_id),
+                LeagueMembership.user_id == second_id,
+            )
+        )
+        == LeagueMemberRole.MEMBER
+    )
+    assert client.get(base, headers=second).status_code == 403
+
+    # Si toglie il ruolo a un co-amministratore, ma non all'ultimo.
+    third = {"Authorization": f"Bearer {third_token}"}
+    revoked = client.post(f"{base}/{owner_id}/revoca-admin", headers=third)
+    assert revoked.status_code == 200
+    assert revoked.json()["role"] == "member"
+    last = client.post(f"{base}/{third_id}/revoca-admin", headers=third)
+    assert last.status_code == 400
+    assert last.json()["code"] == "last_league_admin"

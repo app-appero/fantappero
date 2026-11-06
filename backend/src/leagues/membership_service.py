@@ -218,12 +218,20 @@ class LeagueMembershipService:
         self,
         league_access: LeagueAccess,
         target_user_id: UUID,
+        *,
+        keep_current: bool = False,
     ) -> LeagueMemberResponse:
+        """Passa il ruolo di amministratore a un altro partecipante, in qualsiasi fase della lega.
+
+        Con ``keep_current`` chi lo fa resta amministratore: la lega ha due (o più) amministratori
+        con gli stessi poteri («co-amministratore»). Senza, il ruolo passa e chi lo fa torna
+        partecipante.
+        """
+        metric = "league_admin_transferred_total"
         league = self._lock_league(league_access.league.id)
-        self._require_configurable(league, metric="league_admin_transferred_total")
         memberships = self._load_memberships(league.id, for_update=True)
-        owner = next(
-            (row for row in memberships if row.role == LeagueMemberRole.OWNER),
+        actor = next(
+            (row for row in memberships if row.user_id == league_access.user.id),
             None,
         )
         target = next((row for row in memberships if row.user_id == target_user_id), None)
@@ -231,39 +239,88 @@ class LeagueMembershipService:
             self._fail(
                 "Partecipante non trovato.",
                 code="member_not_found",
-                metric="league_admin_transferred_total",
+                metric=metric,
                 result="not_found",
             )
-        if owner is None:
+        if actor is None or actor.role != LeagueMemberRole.OWNER:
             self._fail(
                 "La lega deve avere un amministratore.",
                 code="league_admin_required",
-                metric="league_admin_transferred_total",
+                metric=metric,
                 result="admin_missing",
             )
-        if target.id == owner.id:
-            get_metrics().incr("league_admin_transferred_total", labels={"result": "noop"})
+        if target.role == LeagueMemberRole.OWNER:
+            # Già amministratore (anche se è chi sta facendo la richiesta): nessuna modifica.
+            get_metrics().incr(metric, labels={"result": "noop"})
             return self._to_response(target, include_email=True)
 
         try:
             validate_admin_transfer_target(target.role)
         except ValidationAuthError:
-            get_metrics().incr(
-                "league_admin_transferred_total",
-                labels={"result": "invalid_target"},
-            )
+            get_metrics().incr(metric, labels={"result": "invalid_target"})
             raise
 
-        owner.role = LeagueMemberRole.MEMBER
         target.role = LeagueMemberRole.OWNER
-        self._add_audit(
-            league.id,
-            league_access.user.id,
-            LeagueAuditAction.LEAGUE_ADMIN_TRANSFERRED,
+        if not keep_current:
+            actor.role = LeagueMemberRole.MEMBER
+        self._session.add(
+            LeagueAuditEvent(
+                league_id=league.id,
+                actor_id=league_access.user.id,
+                action=LeagueAuditAction.LEAGUE_ADMIN_TRANSFERRED,
+                correlation_id=get_correlation_id(),
+                details={
+                    "mode": "co_admin" if keep_current else "transfer",
+                    "targetUserId": str(target_user_id),
+                },
+            )
         )
         self._session.commit()
-        get_metrics().incr("league_admin_transferred_total", labels={"result": "success"})
+        get_metrics().incr(metric, labels={"result": "success"})
         logger.info("league_admin_transferred", extra={"result": "success"})
+        return self._to_response(target, include_email=True)
+
+    def revoke_admin(
+        self,
+        league_access: LeagueAccess,
+        target_user_id: UUID,
+    ) -> LeagueMemberResponse:
+        """Toglie il ruolo di amministratore a un co-amministratore (ne resta almeno uno)."""
+        metric = "league_admin_revoked_total"
+        league = self._lock_league(league_access.league.id)
+        memberships = self._load_memberships(league.id, for_update=True)
+        target = next((row for row in memberships if row.user_id == target_user_id), None)
+        if target is None:
+            self._fail(
+                "Partecipante non trovato.",
+                code="member_not_found",
+                metric=metric,
+                result="not_found",
+            )
+        if target.role != LeagueMemberRole.OWNER:
+            get_metrics().incr(metric, labels={"result": "noop"})
+            return self._to_response(target, include_email=True)
+        admins = [row for row in memberships if row.role == LeagueMemberRole.OWNER]
+        if len(admins) <= 1:
+            self._fail(
+                "La lega deve avere almeno un amministratore.",
+                code="last_league_admin",
+                metric=metric,
+                result="last_admin",
+            )
+        target.role = LeagueMemberRole.MEMBER
+        self._session.add(
+            LeagueAuditEvent(
+                league_id=league.id,
+                actor_id=league_access.user.id,
+                action=LeagueAuditAction.LEAGUE_ADMIN_TRANSFERRED,
+                correlation_id=get_correlation_id(),
+                details={"mode": "revoke", "targetUserId": str(target_user_id)},
+            )
+        )
+        self._session.commit()
+        get_metrics().incr(metric, labels={"result": "success"})
+        logger.info("league_admin_revoked", extra={"result": "success"})
         return self._to_response(target, include_email=True)
 
     def _sync_participant_count_after_removal(

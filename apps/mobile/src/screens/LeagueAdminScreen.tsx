@@ -29,6 +29,7 @@ import {
   generateLeagueCalendar,
   removeLeagueMember,
   replaceLeagueMember,
+  revokeLeagueAdmin,
   revokeLeagueInvite,
   transferLeagueAdmin,
   updateLeagueRules,
@@ -93,6 +94,7 @@ export function LeagueAdminScreen() {
     setActiveLeagueId,
     unregisterLeague,
     refreshMemberships,
+    user,
   } = useAuthSession();
 
   const leagueId = route.params?.leagueId ?? activeLeagueId;
@@ -295,22 +297,51 @@ export function LeagueAdminScreen() {
     }
   }
 
-  async function onTransfer(userId: string, displayName: string) {
-    setActionError(null);
-    if (!leagueId || !accessToken) {
-      return;
-    }
-    setWorkingId(`transfer-${userId}`);
+  // Amministratori: passare il controllo, condividerlo (co-admin) o toglierlo a un co-admin.
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [adminOpen, setAdminOpen] = useState(false);
+  const [adminTargetId, setAdminTargetId] = useState("");
+  const [adminMode, setAdminMode] = useState<"co_admin" | "transfer">("co_admin");
+  const [adminError, setAdminError] = useState<string | null>(null);
+
+  function openAdmin() {
+    setAdminTargetId("");
+    setAdminMode("co_admin");
+    setAdminError(null);
+    setAdminOpen(true);
+  }
+
+  async function onAdminChange(action: () => Promise<void>) {
+    setAdminError(null);
+    setWorkingId("admin");
     try {
-      await transferLeagueAdmin(accessToken, leagueId, userId);
-      setMembers(await fetchLeagueMembers(accessToken, leagueId));
+      await action();
+      setAdminOpen(false);
+      await loadAll({ silent: true });
     } catch (error) {
-      setActionError(
-        getApiErrorMessage(error, `Impossibile trasferire il ruolo a ${displayName}.`),
-      );
+      setAdminError(getApiErrorMessage(error, "Impossibile modificare gli amministratori."));
     } finally {
       setWorkingId(null);
     }
+  }
+
+  async function onConfirmAdmin() {
+    if (!adminTargetId || !leagueId || !accessToken) {
+      return;
+    }
+    const keepCurrent = adminMode === "co_admin";
+    await onAdminChange(async () => {
+      await transferLeagueAdmin(accessToken, leagueId, adminTargetId, keepCurrent);
+    });
+  }
+
+  async function onRevokeAdmin(userId: string) {
+    if (!leagueId || !accessToken) {
+      return;
+    }
+    await onAdminChange(async () => {
+      await revokeLeagueAdmin(accessToken, leagueId, userId);
+    });
   }
 
   useEffect(() => {
@@ -764,21 +795,29 @@ export function LeagueAdminScreen() {
           ) : null}
           {setupTab === "invitati" ? (
             <>
-          <View style={styles.row}>
-            <Text style={[styles.heading, styles.flex]}>Partecipanti iscritti</Text>
+          <View style={styles.membersHeader}>
+            <Text
+              style={[styles.heading, styles.membersTitle]}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.7}
+            >
+              Partecipanti iscritti
+            </Text>
             <Pressable
               accessibilityRole="button"
-              onPress={openReplace}
-              style={styles.secondaryButton}
-              testID="league-members-replace-open"
+              accessibilityLabel="Opzioni partecipanti"
+              onPress={() => setMenuOpen(true)}
+              style={styles.menuButton}
+              testID="league-members-menu-open"
             >
-              <Text style={styles.secondaryLabel}>Sostituisci</Text>
+              <Text style={styles.menuButtonGlyph}>⋯</Text>
             </Pressable>
           </View>
           {!canConfigure ? (
             <Text style={styles.body} testID="league-members-locked-hint">
-              A stagione avviata si può solo sostituire un fantallenatore: ruolo di amministratore e
-              rimozioni sono possibili solo prima dell&apos;avvio.
+              A stagione avviata si possono sostituire i fantallenatori e gestire gli
+              amministratori; rimuovere un partecipante è possibile solo prima dell&apos;avvio.
             </Text>
           ) : null}
           <Text style={styles.body} testID="league-members-capacity">
@@ -807,14 +846,6 @@ export function LeagueAdminScreen() {
                 </View>
                 {member.role === "member" && canConfigure ? (
                   <View style={styles.row}>
-                    <Pressable
-                      accessibilityRole="button"
-                      onPress={() => void onTransfer(member.userId, member.displayName)}
-                      style={styles.secondaryButton}
-                      testID={`league-member-transfer-${member.userId}`}
-                    >
-                      <Text style={styles.secondaryLabel}>Trasferisci admin</Text>
-                    </Pressable>
                     <Pressable
                       accessibilityRole="button"
                       onPress={() => void onRemove(member.userId, member.displayName)}
@@ -1022,6 +1053,165 @@ export function LeagueAdminScreen() {
         </View>
       ) : null}
       <Modal
+        visible={menuOpen}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setMenuOpen(false)}
+      >
+        <Pressable style={styles.sheetOverlay} onPress={() => setMenuOpen(false)}>
+          <Pressable style={styles.sheet} onPress={() => undefined} testID="league-members-menu">
+            <View style={styles.sheetHandle} />
+            <Text style={styles.inviteTitle}>Gestisci partecipanti</Text>
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => {
+                setMenuOpen(false);
+                openReplace();
+              }}
+              style={styles.sheetOption}
+              testID="league-members-replace-open"
+            >
+              <View style={styles.sheetIcon}>
+                <Text style={styles.sheetIconGlyph}>⇄</Text>
+              </View>
+              <View style={styles.flex}>
+                <Text style={styles.inviteTitle}>Sostituisci fantallenatore</Text>
+                <Text style={styles.body}>
+                  Al posto di chi lascia entra un altro, con squadra, rosa e punti.
+                </Text>
+              </View>
+            </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => {
+                setMenuOpen(false);
+                openAdmin();
+              }}
+              style={styles.sheetOption}
+              testID="league-members-admin-open"
+            >
+              <View style={styles.sheetIcon}>
+                <Text style={styles.sheetIconGlyph}>★</Text>
+              </View>
+              <View style={styles.flex}>
+                <Text style={styles.inviteTitle}>Amministratori</Text>
+                <Text style={styles.body}>
+                  Passa il controllo a un altro o condividilo come co-amministratore.
+                </Text>
+              </View>
+            </Pressable>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      <Modal
+        visible={adminOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setAdminOpen(false)}
+      >
+        <View style={styles.replaceOverlay}>
+          <View style={styles.replaceBox} testID="league-members-admin-panel">
+            <ScrollView>
+              <Text style={styles.heading}>Amministratori della lega</Text>
+              <Text style={styles.label}>Amministratori attuali</Text>
+              {members
+                .filter((member) => member.role === "league_admin")
+                .map((admin) => {
+                  const admins = members.filter((member) => member.role === "league_admin");
+                  const isMe = !!user && admin.userId === user.id;
+                  return (
+                    <View key={admin.userId} style={styles.inviteRow}>
+                      <View style={styles.flex}>
+                        <Text style={styles.inviteTitle}>
+                          {admin.displayName}
+                          {isMe ? " (tu)" : ""}
+                        </Text>
+                      </View>
+                      {admins.length > 1 && !isMe ? (
+                        <Pressable
+                          accessibilityRole="button"
+                          disabled={workingId !== null}
+                          onPress={() => void onRevokeAdmin(admin.userId)}
+                          style={styles.secondaryButton}
+                          testID={`league-members-admin-revoke-${admin.userId}`}
+                        >
+                          <Text style={styles.secondaryLabel}>Togli ruolo</Text>
+                        </Pressable>
+                      ) : null}
+                    </View>
+                  );
+                })}
+              <Text style={styles.label}>Chi diventa amministratore</Text>
+              {members
+                .filter((member) => member.role === "member")
+                .map((member) => (
+                  <Pressable
+                    key={member.userId}
+                    accessibilityRole="radio"
+                    accessibilityState={{ selected: adminTargetId === member.userId }}
+                    onPress={() => setAdminTargetId(member.userId)}
+                    style={[
+                      styles.replaceOption,
+                      adminTargetId === member.userId && styles.replaceOptionSelected,
+                    ]}
+                    testID={`league-members-admin-target-${member.userId}`}
+                  >
+                    <Text style={styles.inviteTitle}>{member.displayName}</Text>
+                  </Pressable>
+                ))}
+              <Text style={styles.label}>Come</Text>
+              <Pressable
+                accessibilityRole="radio"
+                accessibilityState={{ selected: adminMode === "co_admin" }}
+                onPress={() => setAdminMode("co_admin")}
+                style={[styles.replaceOption, adminMode === "co_admin" && styles.replaceOptionSelected]}
+                testID="league-members-admin-mode-co"
+              >
+                <Text style={styles.inviteTitle}>Condividi il controllo</Text>
+                <Text style={styles.body}>Restate entrambi amministratori.</Text>
+              </Pressable>
+              <Pressable
+                accessibilityRole="radio"
+                accessibilityState={{ selected: adminMode === "transfer" }}
+                onPress={() => setAdminMode("transfer")}
+                style={[styles.replaceOption, adminMode === "transfer" && styles.replaceOptionSelected]}
+                testID="league-members-admin-mode-transfer"
+              >
+                <Text style={styles.inviteTitle}>Passa il controllo</Text>
+                <Text style={styles.body}>Tu torni a essere un partecipante.</Text>
+              </Pressable>
+              {adminError ? (
+                <Text style={[styles.body, styles.replaceError]} testID="league-members-admin-error">
+                  {adminError}
+                </Text>
+              ) : null}
+            </ScrollView>
+            <View style={styles.row}>
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => setAdminOpen(false)}
+                style={styles.secondaryButton}
+              >
+                <Text style={styles.secondaryLabel}>Chiudi</Text>
+              </Pressable>
+              <Pressable
+                accessibilityRole="button"
+                disabled={!adminTargetId || workingId === "admin"}
+                onPress={() => void onConfirmAdmin()}
+                style={[styles.primaryButton, (!adminTargetId || workingId === "admin") && styles.disabled]}
+                testID="league-members-admin-confirm"
+              >
+                <Text style={styles.primaryLabel}>
+                  {workingId === "admin" ? "Salvataggio…" : "Conferma"}
+                </Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal
         visible={replaceOpen}
         transparent
         animationType="fade"
@@ -1174,6 +1364,79 @@ const styles = lazyStyles(() => StyleSheet.create({
   },
   memberList: {
     gap: spacing.sm,
+  },
+  membersHeader: {
+    marginTop: spacing.lg,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: spacing.sm,
+  },
+  membersTitle: {
+    flex: 1,
+    marginTop: 0,
+  },
+  menuButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.backgroundElevated,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  menuButtonGlyph: {
+    color: colors.accent,
+    fontSize: 24,
+    lineHeight: 26,
+    fontWeight: typography.fontWeight.semibold,
+  },
+  sheetOverlay: {
+    flex: 1,
+    justifyContent: "flex-end",
+    backgroundColor: "rgba(0,0,0,0.55)",
+  },
+  sheet: {
+    gap: spacing.sm,
+    padding: spacing.lg,
+    paddingBottom: spacing.xl,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.backgroundElevated,
+  },
+  sheetHandle: {
+    alignSelf: "center",
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    marginBottom: spacing.sm,
+    backgroundColor: colors.border,
+  },
+  sheetOption: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.md,
+    padding: spacing.md,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.background,
+  },
+  sheetIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.brand,
+  },
+  sheetIconGlyph: {
+    color: colors.onBrand,
+    fontSize: 20,
+    fontWeight: typography.fontWeight.semibold,
   },
   replaceOverlay: {
     flex: 1,

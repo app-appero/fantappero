@@ -36,3 +36,15 @@ sceglie un fantallenatore dal catalogo (solo quelli disponibili e non già in le
 - Non si sostituisce l'amministratore (prima si trasferisce il ruolo), né con chi è già in lega,
   né con chi non è disponibile o è in lista nera.
 - API: `POST /leagues/{id}/amministrazione/partecipanti/{userId}/sostituzione` con `{newUserId}`.
+
+## Amministratori di lega: passare o condividere il controllo
+In **Partecipanti** (web: pulsante «Amministratori»; app: menu ⋯ → «Amministratori»), in **qualsiasi
+fase della lega**, anche a stagione avviata:
+- **Condividi il controllo** (co-amministratore): il nuovo amministratore ha gli stessi poteri e chi
+  lo nomina resta amministratore. La lega può avere più amministratori.
+- **Passa il controllo**: chi lo fa torna partecipante.
+- **Togli ruolo** a un co-amministratore (ne resta sempre almeno uno; non si toglie a se stessi).
+- Sono possibili solo tra i partecipanti già in lega. Le rimozioni di partecipanti restano
+  possibili solo in bozza/configurazione.
+- API: `POST .../partecipanti/{userId}/trasferimento-admin` con `{keepCurrent}` e
+  `POST .../partecipanti/{userId}/revoca-admin`. Le operazioni sono registrate nell'audit della lega.

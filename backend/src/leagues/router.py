@@ -68,6 +68,7 @@ from leagues.schemas import (
     ReplaceLeagueMemberRequest,
     RespondNamedLeagueInviteResponse,
     SetLeagueRoleOverrideRequest,
+    TransferLeagueAdminRequest,
     TransitionLeagueStateRequest,
     UpdateLeagueRulesRequest,
 )
@@ -609,12 +610,31 @@ def list_league_members(
 )
 def transfer_league_admin(
     user_id: UUID,
+    body: TransferLeagueAdminRequest | None = None,
     league_access: LeagueAccess = Depends(require_league_permissions(Permission.LEAGUE_ADMIN)),
     service: LeagueMembershipService = Depends(get_league_membership_service),
 ) -> LeagueMemberResponse | JSONResponse:
-    """Atomically transfer league administration to another participant."""
+    """Passa l'amministrazione a un altro partecipante, o la condivide (`keepCurrent`)."""
     try:
-        return service.transfer_admin(league_access, user_id)
+        return service.transfer_admin(
+            league_access, user_id, keep_current=bool(body and body.keep_current)
+        )
+    except AuthError as exc:
+        return _error_response(exc)
+
+
+@router.post(
+    "/{league_id}/amministrazione/partecipanti/{user_id}/revoca-admin",
+    response_model=LeagueMemberResponse,
+)
+def revoke_league_admin(
+    user_id: UUID,
+    league_access: LeagueAccess = Depends(require_league_permissions(Permission.LEAGUE_ADMIN)),
+    service: LeagueMembershipService = Depends(get_league_membership_service),
+) -> LeagueMemberResponse | JSONResponse:
+    """Toglie il ruolo di amministratore a un co-amministratore (ne resta almeno uno)."""
+    try:
+        return service.revoke_admin(league_access, user_id)
     except AuthError as exc:
         return _error_response(exc)
 

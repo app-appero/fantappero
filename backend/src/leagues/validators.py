@@ -319,11 +319,11 @@ def configuration_blockers(
                 action_hint="members",
             )
         )
-    if owner_count != 1:
+    if owner_count < 1:
         blockers.append(
             LifecycleBlocker(
                 code="league_admin_required",
-                message="La lega deve avere esattamente un amministratore.",
+                message="La lega deve avere almeno un amministratore.",
                 action_hint="members",
             )
         )

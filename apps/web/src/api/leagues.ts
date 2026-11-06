@@ -182,13 +182,27 @@ export function fetchLeagueMembers(
   });
 }
 
+/** Passa l'amministrazione a un altro partecipante; con `keepCurrent` la condivide (co-admin). */
 export function transferLeagueAdmin(
+  accessToken: string,
+  leagueId: string,
+  userId: string,
+  keepCurrent = false,
+): Promise<LeagueMember> {
+  return apiRequest<LeagueMember>(
+    `/leagues/${leagueId}/amministrazione/partecipanti/${userId}/trasferimento-admin`,
+    { method: "POST", accessToken, body: { keepCurrent } },
+  );
+}
+
+/** Toglie il ruolo di amministratore a un co-amministratore (ne resta almeno uno). */
+export function revokeLeagueAdmin(
   accessToken: string,
   leagueId: string,
   userId: string,
 ): Promise<LeagueMember> {
   return apiRequest<LeagueMember>(
-    `/leagues/${leagueId}/amministrazione/partecipanti/${userId}/trasferimento-admin`,
+    `/leagues/${leagueId}/amministrazione/partecipanti/${userId}/revoca-admin`,
     { method: "POST", accessToken },
   );
 }

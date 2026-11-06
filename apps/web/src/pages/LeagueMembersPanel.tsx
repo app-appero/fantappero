@@ -7,6 +7,7 @@ import {
   fetchLeagueMembers,
   removeLeagueMember,
   replaceLeagueMember,
+  revokeLeagueAdmin,
   transferLeagueAdmin,
 } from "../api/leagues";
 import { fetchManagerDirectory } from "../api/managerInvites";
@@ -135,43 +136,64 @@ export function LeagueMembersPanel({
     void loadMembers();
   }, [loadMembers, reloadToken]);
 
-  async function onTransfer(target: LeagueMember) {
-    setError(null);
+  // Amministratori: passare il controllo, condividerlo (co-admin) o toglierlo a un co-admin.
+  const [adminOpen, setAdminOpen] = useState(false);
+  const [adminTargetId, setAdminTargetId] = useState("");
+  const [adminMode, setAdminMode] = useState<"co_admin" | "transfer">("co_admin");
+  const [adminError, setAdminError] = useState<string | null>(null);
+
+  function openAdmin() {
+    setAdminTargetId("");
+    setAdminMode("co_admin");
+    setAdminError(null);
+    setAdminOpen(true);
+  }
+
+  async function onAdminChange(action: () => Promise<string>) {
+    setAdminError(null);
     setSuccess(null);
-    if (isDemoMode) {
-      setMembers((current) =>
-        current.map((member) => ({
-          ...member,
-          role: member.userId === target.userId ? "league_admin" : "member",
-        })),
-      );
-      setSuccess(`Ruolo di amministratore trasferito a ${target.displayName}.`);
-      return;
-    }
-    const session = loadStoredSession();
-    if (!leagueId || !session?.accessToken) {
-      setError("Sessione non disponibile. Accedi di nuovo.");
-      return;
-    }
-    setWorkingId(`transfer-${target.userId}`);
+    setWorkingId("admin");
     try {
-      const transferred = await transferLeagueAdmin(
-        session.accessToken,
-        leagueId,
-        target.userId,
-      );
-      setMembers((current) =>
-        current.map((member) => ({
-          ...member,
-          role: member.userId === transferred.userId ? "league_admin" : "member",
-        })),
-      );
-      setSuccess(`Ruolo di amministratore trasferito a ${transferred.displayName}.`);
-    } catch (transferError) {
-      setError(getApiErrorMessage(transferError, "Impossibile trasferire il ruolo."));
+      setSuccess(await action());
+      setAdminOpen(false);
+      await loadMembers();
+      onMembersChanged?.();
+    } catch (adminFailure) {
+      setAdminError(getApiErrorMessage(adminFailure, "Impossibile modificare gli amministratori."));
     } finally {
       setWorkingId(null);
     }
+  }
+
+  async function onConfirmAdmin() {
+    const target = members.find((member) => member.userId === adminTargetId);
+    const session = loadStoredSession();
+    if (!target) {
+      return;
+    }
+    if (!leagueId || !session?.accessToken) {
+      setAdminError("Sessione non disponibile. Accedi di nuovo.");
+      return;
+    }
+    const keepCurrent = adminMode === "co_admin";
+    await onAdminChange(async () => {
+      await transferLeagueAdmin(session.accessToken, leagueId, target.userId, keepCurrent);
+      return keepCurrent
+        ? `${target.displayName} è ora co-amministratore insieme a te.`
+        : `Hai passato il controllo della lega a ${target.displayName}: ora sei un partecipante.`;
+    });
+  }
+
+  async function onRevokeAdmin(target: LeagueMember) {
+    const session = loadStoredSession();
+    if (!leagueId || !session?.accessToken) {
+      setAdminError("Sessione non disponibile. Accedi di nuovo.");
+      return;
+    }
+    await onAdminChange(async () => {
+      await revokeLeagueAdmin(session.accessToken, leagueId, target.userId);
+      return `${target.displayName} non è più amministratore.`;
+    });
   }
 
   async function onRemove(target: LeagueMember) {
@@ -320,7 +342,7 @@ export function LeagueMembersPanel({
       data-testid="league-members-panel"
     >
       <h2 id="league-members-title">Partecipanti iscritti</h2>
-      <p>Sostituisci un fantallenatore in qualsiasi momento; ruolo admin e rimozioni prima dell’avvio.</p>
+      <p>Sostituisci i fantallenatori e gestisci gli amministratori in qualsiasi momento; le rimozioni solo prima dell’avvio.</p>
       <div className="fa-members__toolbar">
         <Button
           type="button"
@@ -332,11 +354,21 @@ export function LeagueMembersPanel({
         >
           Sostituisci fantallenatore
         </Button>
+        <Button
+          type="button"
+          variant="secondary"
+          size="sm"
+          onClick={openAdmin}
+          disabled={isDemoMode}
+          data-testid="league-members-admin-open"
+        >
+          Amministratori
+        </Button>
       </div>
       {!canEditMembers ? (
         <p className="fa-field__hint" data-testid="league-members-locked-hint">
-          A stagione avviata si può solo sostituire un fantallenatore: trasferire il ruolo di
-          amministratore e rimuovere partecipanti è possibile solo prima dell&apos;avvio.
+          A stagione avviata si possono sostituire i fantallenatori e gestire gli amministratori;
+          rimuovere un partecipante è possibile solo prima dell&apos;avvio.
         </p>
       ) : null}
       {!loading && !error && participantCount != null ? (
@@ -457,16 +489,6 @@ export function LeagueMembersPanel({
                   ) : null}
                   <Button
                     type="button"
-                    variant="secondary"
-                    size="sm"
-                    loading={workingId === `transfer-${member.userId}`}
-                    disabled={workingId !== null}
-                    onClick={() => void onTransfer(member)}
-                  >
-                    Trasferisci admin
-                  </Button>
-                  <Button
-                    type="button"
                     variant="danger"
                     size="sm"
                     loading={workingId === `remove-${member.userId}`}
@@ -490,6 +512,95 @@ export function LeagueMembersPanel({
           testId="league-members-success"
         />
       ) : null}
+      <Modal
+        open={adminOpen}
+        onClose={() => setAdminOpen(false)}
+        title="Amministratori della lega"
+        footer={
+          <>
+            <Button type="button" variant="ghost" onClick={() => setAdminOpen(false)}>
+              Chiudi
+            </Button>
+            <Button
+              type="button"
+              variant="primary"
+              disabled={!adminTargetId}
+              loading={workingId === "admin"}
+              onClick={() => void onConfirmAdmin()}
+              data-testid="league-members-admin-confirm"
+            >
+              Conferma
+            </Button>
+          </>
+        }
+      >
+        <div data-testid="league-members-admin-panel">
+          <h3>Amministratori attuali</h3>
+          <ul className="fa-member-list">
+            {members
+              .filter((member) => member.role === "league_admin")
+              .map((admin) => (
+                <li key={admin.userId} className="fa-member-list__item">
+                  <span className="fa-member-list__text">
+                    <strong>{admin.displayName}</strong>
+                    {user && admin.userId === user.id ? <span> (tu)</span> : null}
+                  </span>
+                  {members.filter((member) => member.role === "league_admin").length > 1 &&
+                  !(user && admin.userId === user.id) ? (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      disabled={workingId !== null}
+                      onClick={() => void onRevokeAdmin(admin)}
+                      data-testid={`league-members-admin-revoke-${admin.userId}`}
+                    >
+                      Togli ruolo
+                    </Button>
+                  ) : null}
+                </li>
+              ))}
+          </ul>
+          <h3>Aggiungi o passa il ruolo</h3>
+          <Select
+            label="Chi diventa amministratore"
+            name="admin-target"
+            value={adminTargetId}
+            placeholder="Scegli un partecipante"
+            options={members
+              .filter((member) => member.role === "member")
+              .map((member) => ({ value: member.userId, label: member.displayName }))}
+            onChange={(event) => setAdminTargetId(event.target.value)}
+            data-testid="league-members-admin-target"
+          />
+          <fieldset className="fa-profile-notifications">
+            <legend className="fa-field__label">Come</legend>
+            <label className="fa-profile-checkbox">
+              <input
+                type="radio"
+                name="admin-mode"
+                checked={adminMode === "co_admin"}
+                onChange={() => setAdminMode("co_admin")}
+              />
+              Condividi il controllo: restiamo entrambi amministratori
+            </label>
+            <label className="fa-profile-checkbox">
+              <input
+                type="radio"
+                name="admin-mode"
+                checked={adminMode === "transfer"}
+                onChange={() => setAdminMode("transfer")}
+              />
+              Passa il controllo: io divento un partecipante
+            </label>
+          </fieldset>
+          {adminError ? (
+            <p className="fa-field__error" role="alert" data-testid="league-members-admin-error">
+              {adminError}
+            </p>
+          ) : null}
+        </div>
+      </Modal>
       <Modal
         open={replaceOpen}
         onClose={() => setReplaceOpen(false)}

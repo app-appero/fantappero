@@ -159,6 +159,12 @@ class LeagueMemberResponse(ApiModel):
     email: str | None = None
 
 
+class TransferLeagueAdminRequest(ApiModel):
+    """`keepCurrent=true`: chi trasferisce resta amministratore (co-amministratore)."""
+
+    keep_current: bool = Field(default=False, alias="keepCurrent")
+
+
 class ReplaceLeagueMemberRequest(ApiModel):
     """Chi subentra al posto del fantallenatore da sostituire."""
 
