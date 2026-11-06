@@ -3,7 +3,7 @@ import { resolvePitchRole, type MatchBadge, type PitchPosition } from "@fantappe
 import { theme } from "@fantappero/ui/theme";
 import { useEffect, useRef } from "react";
 import { Animated, Easing, Image, Pressable, StyleSheet, Text, View } from "react-native";
-import { TONE_COLOR, type ProbableTone } from "../../screens/formation/FormationParts";
+import { ToneHalo, TONE_COLOR, type ProbableTone } from "../../screens/formation/FormationParts";
 import { EventBadges } from "./EventBadges";
 import { RoleBadge } from "./RoleBadge";
 
@@ -34,11 +34,6 @@ function probableCardStyle(tone: ProbableTone) {
   return {
     borderColor: TONE_COLOR[tone],
     borderWidth: 2,
-    shadowColor: TONE_COLOR[tone],
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: tone === "unavailable" ? 0 : 1,
-    shadowRadius: 8,
-    elevation: tone === "unavailable" ? 0 : 6,
     opacity: tone === "unavailable" ? 0.7 : 1,
   } as const;
 }
@@ -154,6 +149,7 @@ function PitchPlayerBody({
         player.probable ? probableCardStyle(player.probable) : null,
       ]}
     >
+      {player.probable ? <ToneHalo tone={player.probable} offset={2} width={2} /> : null}
       {player.live ? <LiveGlow /> : null}
       {player.voteKind === "sv" ? <View pointerEvents="none" style={styles.svGlow} /> : null}
       {player.photoUrl ? (

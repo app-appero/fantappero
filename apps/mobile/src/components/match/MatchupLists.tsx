@@ -32,7 +32,12 @@ const TONE_ROW_BG: Record<ProbableTone, string> = {
 };
 
 function probableRowStyle(tone: ProbableTone) {
-  return { borderColor: TONE_COLOR[tone], backgroundColor: TONE_ROW_BG[tone] } as const;
+  return {
+    borderColor: TONE_COLOR[tone],
+    borderWidth: 2,
+    backgroundColor: TONE_ROW_BG[tone],
+    ...(tone === "unavailable" ? {} : { boxShadow: `0 0 12px ${TONE_COLOR[tone]}` }),
+  } as const;
 }
 
 /** Orologio che scatta ogni secondo, per i countdown ai calci d'inizio. */

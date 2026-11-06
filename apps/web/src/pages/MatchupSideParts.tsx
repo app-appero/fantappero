@@ -9,6 +9,7 @@ import {
   formatFantasyPoints,
   formatCountdown,
   playerVoteState,
+  probableToneOf,
 } from "@fantappero/contracts";
 import { EventBadges } from "@fantappero/ui";
 import { useEffect, useState, type ReactElement } from "react";
@@ -63,6 +64,7 @@ export function MatchupPlayerRow({ player, order, dim, compact, now, testIdPrefi
     vote.live ? "fa-mrow--live" : "",
     vote.kind === "sv" ? "fa-mrow--sv" : "",
     vote.kind === "voted" ? "fa-mrow--final" : "",
+    !vote.live && vote.kind !== "sv" && vote.kind !== "voted" && probableToneOf(player) ? `fa-mrow--tone-${probableToneOf(player)}` : "",
   ]
     .filter(Boolean)
     .join(" ");
@@ -180,6 +182,7 @@ function VersusCell({ player, dim, now }: { player: H2HPlayerScore | undefined; 
     vote.live ? "fa-mrow--live" : "",
     vote.kind === "sv" ? "fa-mrow--sv" : "",
     vote.kind === "voted" ? "fa-mrow--final" : "",
+    !vote.live && vote.kind !== "sv" && vote.kind !== "voted" && probableToneOf(player) ? `fa-mrow--tone-${probableToneOf(player)}` : "",
   ]
     .filter(Boolean)
     .join(" ");
