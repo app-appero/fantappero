@@ -44,8 +44,14 @@ class LineupLockReminderService:
         self._notifications = NotificationService(session)
 
     def send_due_reminders(self, *, now: datetime, window_minutes: int) -> dict[str, int]:
+        # Un turno passa da OPEN a LOCKED al primo kickoff (cutoff), ma il blocco è progressivo:
+        # le partite successive dello stesso turno hanno ancora i loro istanti di blocco. Perciò
+        # contano anche i turni LOCKED, purché la finestra sia recente (niente scansione storica).
         rounds = self._session.scalars(
-            select(FantasyRound).where(FantasyRound.status == FantasyTurnStatus.OPEN)
+            select(FantasyRound).where(
+                FantasyRound.status.in_((FantasyTurnStatus.OPEN, FantasyTurnStatus.LOCKED)),
+                FantasyRound.window_end_at >= now - timedelta(days=2),
+            )
         ).all()
 
         teams_checked = 0

@@ -306,7 +306,7 @@ def test_lock_reminder_skips_teams_with_an_empty_roster(
     _create_round_with_two_fixtures(
         db_session,
         league_id,
-        id_offset=9_300_000,
+        id_offset=9_400_000,
         competition_ids=competition_ids,
         late_kickoff=datetime.now(UTC) + timedelta(hours=1),
     )
@@ -321,3 +321,42 @@ def test_lock_reminder_skips_teams_with_an_empty_roster(
         )
     )
     assert notification is None
+
+
+def test_lock_reminder_also_covers_rounds_already_locked_by_the_first_kickoff(
+    client: TestClient, db_session: Session, competition_ids: list[str]
+) -> None:
+    """Il turno è LOCKED dal primo kickoff, ma i blocchi successivi vanno avvisati lo stesso."""
+    token, user_id = _register_and_login(client, "lock-reminder-locked@example.com")
+    league_id = _create_league(client, token, competition_ids, "Lega Blocco Turno Chiuso")
+    late_kickoff = datetime.now(UTC) + timedelta(hours=1)
+    fantasy_round, early_club_id, late_club_id = _create_round_with_two_fixtures(
+        db_session,
+        league_id,
+        id_offset=9_500_000,
+        competition_ids=competition_ids,
+        late_kickoff=late_kickoff,
+    )
+    fantasy_round.status = FantasyTurnStatus.LOCKED
+    db_session.commit()
+    athletes = _seed_roster(
+        db_session,
+        id_offset=9_500_100,
+        early_club_id=early_club_id,
+        late_club_id=late_club_id,
+        late_count=2,
+    )
+    _assign_roster(db_session, league_id, athletes)
+
+    LineupLockReminderService(db_session).send_due_reminders(
+        now=datetime.now(UTC), window_minutes=180
+    )
+    db_session.commit()
+    notification = db_session.scalar(
+        select(Notification).where(
+            Notification.user_id == user_id,
+            Notification.template_key == "formazione.blocco_imminente",
+        )
+    )
+    assert notification is not None
+    assert "2 calciatori" in notification.body
