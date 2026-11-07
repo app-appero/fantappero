@@ -1,3 +1,4 @@
+import { Alert } from "react-native";
 import {
   hasPermissions,
   type AdminImpersonateResult,
@@ -32,6 +33,7 @@ import {
   saveImpersonatorSession,
   saveStoredActiveLeagueId,
   saveStoredSession,
+  sessionPersistenceFailed,
   setMemorySession,
   type StoredSession,
 } from "./sessionStorage";
@@ -103,6 +105,12 @@ export function AuthSessionProvider({ children }: { children: ReactNode }) {
     setAccessToken(session.accessToken);
     setUser(session.user);
     await saveStoredSession(session);
+    if (sessionPersistenceFailed()) {
+      Alert.alert(
+        "Accesso non memorizzato",
+        "Il telefono non permette di ricordare l'accesso: dovrai rifare il login a ogni apertura. Se succede sempre, segnalacelo da «Segnala un problema» o scrivi a info@globetrotta.it.",
+      );
+    }
   }, []);
 
   useEffect(() => {

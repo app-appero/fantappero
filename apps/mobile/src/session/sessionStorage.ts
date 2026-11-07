@@ -84,13 +84,28 @@ export async function loadStoredSession(): Promise<StoredSession | null> {
   }
 }
 
+let persistenceFailed = false;
+
+/** True se l'ultimo salvataggio sul telefono è fallito: la sessione vive solo finché l'app resta aperta. */
+export function sessionPersistenceFailed(): boolean {
+  return persistenceFailed;
+}
+
 export async function saveStoredSession(session: StoredSession): Promise<void> {
-  await Promise.all([
-    setItem(ACCESS_TOKEN_KEY, session.accessToken),
-    setItem(REFRESH_TOKEN_KEY, session.refreshToken),
-    setItem(USER_KEY, JSON.stringify(session.user)),
-  ]);
+  // La sessione in memoria vale comunque; se l'archivio sicuro del telefono dà errore
+  // lo segnaliamo (log + flag) invece di far credere che il login sia stato salvato.
   memorySession = session;
+  try {
+    await Promise.all([
+      setItem(ACCESS_TOKEN_KEY, session.accessToken),
+      setItem(REFRESH_TOKEN_KEY, session.refreshToken),
+      setItem(USER_KEY, JSON.stringify(session.user)),
+    ]);
+    persistenceFailed = false;
+  } catch (error) {
+    persistenceFailed = true;
+    console.warn("session_persist_failed", error instanceof Error ? error.message : error);
+  }
 }
 
 export async function clearStoredSession(): Promise<void> {
