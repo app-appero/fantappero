@@ -74,7 +74,7 @@ class NotificationsSettingsMixin:
         validation_alias="NOTIFICATIONS_LINEUP_REMINDER_INTERVAL_SECONDS",
         ge=60,
         le=86400,
-        description="How often the reminder task is enqueued (default every 15 minutes).",
+        description="How often the reminder task is enqueued (default every 5 minutes).",
     )
     notifications_lineup_reminder_window_hours: int = Field(
         default=24,
@@ -93,14 +93,14 @@ class NotificationsSettingsMixin:
         ),
     )
     notifications_lineup_lock_reminder_interval_seconds: int = Field(
-        default=900,
+        default=300,
         validation_alias="NOTIFICATIONS_LINEUP_LOCK_REMINDER_INTERVAL_SECONDS",
         ge=60,
         le=86400,
-        description="How often the lock-reminder task is enqueued (default every 15 minutes).",
+        description="How often the lock-reminder task is enqueued (default every 5 minutes).",
     )
     notifications_lineup_lock_reminder_window_minutes: int = Field(
-        default=180,
+        default=60,
         validation_alias="NOTIFICATIONS_LINEUP_LOCK_REMINDER_WINDOW_MINUTES",
         ge=5,
         le=1440,

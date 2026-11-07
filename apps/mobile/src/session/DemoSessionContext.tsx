@@ -39,6 +39,7 @@ import {
   isTransientApiError,
   recoverAccessToken,
   refreshSessionIfExpiring,
+  refreshStoredSession,
   setSessionChangeListener,
 } from "./refreshAccessToken";
 
@@ -142,12 +143,17 @@ export function AuthSessionProvider({ children }: { children: ReactNode }) {
           await persistSession(session);
         } else {
           try {
-            const refreshed = await authApi.refresh({ refreshToken: session.refreshToken });
-            session = {
-              accessToken: refreshed.accessToken,
-              refreshToken: refreshed.refreshToken,
-              user: refreshed.user,
-            };
+            // Stessa corsia degli altri rinnovi: il refresh token è monouso, due
+            // rinnovi in parallelo ne brucerebbero uno e butterebbero fuori l'utente.
+            const renewedToken = await refreshStoredSession();
+            const renewedSession = getMemorySession();
+            if (!renewedToken || !renewedSession) {
+              if (!cancelled) {
+                clearToLoggedOut();
+              }
+              return;
+            }
+            session = renewedSession;
             await persistSession(session);
           } catch (refreshError) {
             if (!isTransientApiError(refreshError)) {

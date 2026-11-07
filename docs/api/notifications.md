@@ -210,8 +210,8 @@ job periodico senza un `LeagueAccess` autenticato).
 | `NOTIFICATIONS_LINEUP_REMINDER_INTERVAL_SECONDS` | worker | Ogni quanto gira il job (default 15 min). |
 | `NOTIFICATIONS_LINEUP_REMINDER_WINDOW_HOURS` | API e worker | Quanto in anticipo sul cutoff (default 24h). |
 | `NOTIFICATIONS_LINEUP_LOCK_REMINDER_ENABLED` | API e worker | Interruttore `blocco_imminente`, default acceso. |
-| `NOTIFICATIONS_LINEUP_LOCK_REMINDER_INTERVAL_SECONDS` | worker | Ogni quanto gira il job (default 15 min). |
-| `NOTIFICATIONS_LINEUP_LOCK_REMINDER_WINDOW_MINUTES` | API e worker | Quanto in anticipo sul prossimo istante di blocco (default 180 min). |
+| `NOTIFICATIONS_LINEUP_LOCK_REMINDER_INTERVAL_SECONDS` | worker | Ogni quanto gira il job (default 5 min). |
+| `NOTIFICATIONS_LINEUP_LOCK_REMINDER_WINDOW_MINUTES` | API e worker | Quanto in anticipo sul prossimo istante di blocco (default 60 min). |
 
 ## Push (EP09-05)
 
