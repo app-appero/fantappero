@@ -144,6 +144,20 @@ SYSTEM_JOBS: tuple[SystemJobSpec, ...] = (
         max_interval_seconds=86400,
     ),
     SystemJobSpec(
+        key="notifications-lineup-lock-reminders",
+        task="notifications.send_lineup_lock_reminders",
+        title="Promemoria blocco formazione",
+        description=(
+            "Avvisa in app e con push i fantallenatori prima di ogni prossimo "
+            "blocco della formazione (un avviso per blocco)."
+        ),
+        enabled_attr="notifications_lineup_lock_reminder_enabled",
+        interval_attr="notifications_lineup_lock_reminder_interval_seconds",
+        default_interval_seconds=300,
+        min_interval_seconds=60,
+        max_interval_seconds=86400,
+    ),
+    SystemJobSpec(
         key="notifications-broadcast-dispatch",
         task="notifications.dispatch_broadcasts",
         title="Avvisi programmati",
