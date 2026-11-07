@@ -76,7 +76,9 @@ def send_lineup_lock_reminders_task() -> dict[str, int]:
     from system_jobs.service import allow_periodic
 
     if not allow_periodic("notifications-lineup-lock-reminders", enabled):
-        logger.info("notifications_lineup_lock_reminder_skipped_disabled")
+        logger.info(
+            "notifications_lineup_lock_reminder_skipped_disabled (job spento o disattivato)"
+        )
         return {"rounds_checked": 0, "teams_checked": 0, "reminders_sent": 0}
 
     settings = get_api_settings()
@@ -90,7 +92,13 @@ def send_lineup_lock_reminders_task() -> dict[str, int]:
             )
     finally:
         engine.dispose()
-    logger.info("notifications_lineup_lock_reminder_task_done", extra=totals)
+    # I campi extra non compaiono nei log del worker: i numeri vanno nel testo del messaggio.
+    logger.info(
+        "notifications_lineup_lock_reminder_task_done "
+        f"rounds_checked={totals['rounds_checked']} teams_checked={totals['teams_checked']} "
+        f"reminders_sent={totals['reminders_sent']}",
+        extra=totals,
+    )
     return totals
 
 

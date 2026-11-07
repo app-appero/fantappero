@@ -9,8 +9,9 @@ export type AuthOptionsState = {
 
 /**
  * Opzioni di accesso del server (per il pilota la registrazione è solo con Google).
- * Se la richiesta fallisce si ripiega sul modulo con email: è il server a rifiutare,
- * con un messaggio chiaro, e nessuno resta bloccato per un errore di rete.
+ * Se la richiesta fallisce (server irraggiungibile) si ripiega sul solo accesso con Google:
+ * mostrare il modulo con email farebbe credere che sia ancora previsto, e comunque senza
+ * server nessun accesso può riuscire.
  */
 export function useAuthOptions(): AuthOptionsState {
   const [state, setState] = useState<AuthOptionsState>({ loaded: false, emailRegistrationEnabled: false });
@@ -25,7 +26,7 @@ export function useAuthOptions(): AuthOptionsState {
       })
       .catch(() => {
         if (!cancelled) {
-          setState({ loaded: true, emailRegistrationEnabled: true });
+          setState({ loaded: true, emailRegistrationEnabled: false });
         }
       });
     return () => {

@@ -144,7 +144,7 @@ def allow_periodic(key: str, env_default: bool) -> bool:
         logger.exception("system_job_gate_failed", extra={"job_key": key})
         return env_default
     if not enabled:
-        logger.info("system_job_skipped_disabled", extra={"job_key": key})
+        logger.info(f"system_job_skipped_disabled job_key={key}", extra={"job_key": key})
     return enabled
 
 

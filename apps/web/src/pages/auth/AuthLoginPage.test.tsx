@@ -88,9 +88,10 @@ describe("AuthLoginPage — accesso solo con Google nel pilota", () => {
     expect(googleOnly()).toBeNull();
   });
 
-  it("se non riesce a leggere le opzioni ripiega sul modulo (nessuno resta bloccato)", async () => {
+  it("se non riesce a leggere le opzioni (server irraggiungibile) resta il solo accesso con Google", async () => {
     fetchAuthOptionsMock.mockRejectedValue(new Error("rete assente"));
     await render();
-    expect(passwordField()).not.toBeNull();
+    expect(passwordField()).toBeNull();
+    expect(googleOnly()).not.toBeNull();
   });
 });

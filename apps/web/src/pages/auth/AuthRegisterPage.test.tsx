@@ -90,9 +90,10 @@ describe("AuthRegisterPage — registrazione solo con Google nel pilota", () => 
     expect(container.querySelector('[data-testid="register-google-only"]')).toBeNull();
   });
 
-  it("se non riesce a leggere le opzioni ripiega sul modulo con email (decide il server)", async () => {
+  it("se non riesce a leggere le opzioni (server irraggiungibile) resta il solo Google", async () => {
     fetchAuthOptionsMock.mockRejectedValue(new Error("rete assente"));
     await render();
-    expect(container.querySelector("form")).not.toBeNull();
+    expect(container.querySelector("form")).toBeNull();
+    expect(container.querySelector('[data-testid="register-google-only"]')).not.toBeNull();
   });
 });
