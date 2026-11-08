@@ -561,6 +561,46 @@ def test_bench_order_lock_rejects_crossing_locked_player() -> None:
     assert locked.value.code == "bench_order_locked"
 
 
+def test_bench_order_lock_allows_same_role_one_for_one_swap() -> None:
+    # Titolare "x" scambiato con il panchinaro "y" (stesso ruolo): x prende il posto di y.
+    previous = ["u1", "y", "locked-b", "u2"]
+    proposed = ["u1", "x", "locked-b", "u2"]
+    same_role = {"x": "A", "y": "A", "u1": "D", "u2": "C", "locked-b": "C"}
+    assert (
+        evaluate_bench_order_lock(
+            previous_bench=previous,
+            proposed_bench=proposed,
+            locked_athlete_ids=["locked-b"],
+            role_by_athlete_id=same_role,
+        )
+        == ()
+    )
+
+    other_role = {**same_role, "x": "D"}
+    rejected = evaluate_bench_order_lock(
+        previous_bench=previous,
+        proposed_bench=proposed,
+        locked_athlete_ids=["locked-b"],
+        role_by_athlete_id=other_role,
+    )
+    assert any(issue.code == "bench_order_locked" for issue in rejected)
+
+    without_roles = evaluate_bench_order_lock(
+        previous_bench=previous,
+        proposed_bench=proposed,
+        locked_athlete_ids=["locked-b"],
+    )
+    assert any(issue.code == "bench_order_locked" for issue in without_roles)
+
+    shifted = evaluate_bench_order_lock(
+        previous_bench=previous,
+        proposed_bench=["x", "u1", "locked-b", "u2"],
+        locked_athlete_ids=["locked-b"],
+        role_by_athlete_id=same_role,
+    )
+    assert any(issue.code == "bench_order_locked" for issue in shifted)
+
+
 def test_automatic_substitutions_respect_role_module_order_and_cap() -> None:
     roster, starters, bench = _valid_433()
     first_defender = next(player.athlete_id for player in starters if player.role == FantasyRole.D)

@@ -332,6 +332,34 @@ describe("fantasyLineups rules", () => {
     assert.deepEqual(moveBenchToIndex(["a", "b", "c"], 1, 1), ["a", "b", "c"]);
   });
 
+  it("allows a same-role one-for-one starter/bench swap before a locked bench player", () => {
+    const previous = ["u1", "y", "locked-b", "u2"];
+    const proposed = ["u1", "x", "locked-b", "u2"];
+    const sameRole = { x: "A", y: "A", u1: "D", u2: "C", "locked-b": "C" };
+    assert.deepEqual(
+      evaluateBenchOrderLock({
+        previousBench: previous,
+        proposedBench: proposed,
+        lockedAthleteIds: ["locked-b"],
+        roleByAthleteId: sameRole,
+      }),
+      [],
+    );
+    const otherRole = evaluateBenchOrderLock({
+      previousBench: previous,
+      proposedBench: proposed,
+      lockedAthleteIds: ["locked-b"],
+      roleByAthleteId: { ...sameRole, x: "D" },
+    });
+    assert.ok(otherRole.some((item) => item.code === "bench_order_locked"));
+    const withoutRoles = evaluateBenchOrderLock({
+      previousBench: previous,
+      proposedBench: proposed,
+      lockedAthleteIds: ["locked-b"],
+    });
+    assert.ok(withoutRoles.some((item) => item.code === "bench_order_locked"));
+  });
+
   it("locks bench order around players whose kickoff has started", () => {
     const previous = ["u1", "locked-b", "u2"];
     const crossed = evaluateBenchOrderLock({

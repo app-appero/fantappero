@@ -114,6 +114,9 @@ export function FormationScreen() {
   const [teams, setTeams] = useState<FantasyTeamSummary[]>([]);
   /** Vuoto = la propria formazione. Un operatore può schierare al posto di un altro fantallenatore (EP-operatore-test). */
   const [targetTeamId, setTargetTeamId] = useState("");
+  // Le mosse contano per chi schiera la propria squadra (operatore compreso), non quando
+  // l'operatore interviene sulla squadra di un altro fantallenatore.
+  const movesApply = !isOperator || !targetTeamId;
   const targetTeamIdRef = useRef("");
   const lineupRequest = useRef(0);
   const [context, setContext] = useState<LineupContext | null>(null);
@@ -401,6 +404,9 @@ export function FormationScreen() {
     ...orderedBench.filter((athleteId) => !(playerBlocked(athleteId) && !savedBench.includes(athleteId))),
     ...orderedBench.filter((athleteId) => playerBlocked(athleteId) && !savedBench.includes(athleteId)),
   ];
+  const roleByAthleteId: Record<string, string | null | undefined> = Object.fromEntries(
+    roster.map((row) => [row.athleteId, row.role]),
+  );
   const lockedAthleteIds = roster.filter((row) => playerLocked(row.athleteId)).map((row) => row.athleteId);
   // Modifiche non salvate: confronto con ciò che il server ha (bozza se c'è, altrimenti formazione).
   const savedEditor = (() => {
@@ -579,6 +585,7 @@ export function FormationScreen() {
           previousBench: context?.lineup?.bench.map((player) => player.athleteId) ?? [],
           proposedBench: displayBench,
           lockedAthleteIds,
+          roleByAthleteId,
         }),
       ],
       tacticalIssues: tacticalEvaluation.issues,
@@ -590,7 +597,7 @@ export function FormationScreen() {
     if (!accessToken || !activeLeagueId || !selectedRoundId) {
       return;
     }
-    const predictedMove = tacticalEvaluation.wouldConsume && !isOperator;
+    const predictedMove = tacticalEvaluation.wouldConsume && movesApply;
     const movesUsedBefore = movesUsed;
     setBusy(true);
     try {
@@ -703,6 +710,7 @@ export function FormationScreen() {
         previousBench: context?.lineup?.bench.map((player) => player.athleteId) ?? [],
         proposedBench: displayBench,
         lockedAthleteIds,
+        roleByAthleteId,
       }),
     ];
     if (lockIssues.length > 0) {
@@ -1067,7 +1075,7 @@ export function FormationScreen() {
               Mosse usate {movesUsed}/{maxMoves}
             </Text>
           </View>
-          {tacticalEvaluation.wouldConsume && !isOperator ? (
+          {tacticalEvaluation.wouldConsume && movesApply ? (
             <View style={[styles.movesChip, styles.movesChipDraft]} testID="formation-moves-draft">
               <Text style={styles.movesText}>
                 Mossa in bozza → {Math.min(movesUsed + 1, maxMoves)}/{maxMoves}
@@ -1684,13 +1692,13 @@ export function FormationScreen() {
             </View>
           ) : null}
           <Text style={styles.meta} testID="formation-moves-hint">
-            {tacticalEvaluation.wouldConsume
+            {tacticalEvaluation.wouldConsume && movesApply
               ? "Questo salvataggio consumerà 1 mossa tattica."
               : `Questo salvataggio non consuma mosse${
                   unsavedChangeCount === 0
                     ? ""
-                    : isOperator
-                      ? " (sei operatore)"
+                    : !movesApply
+                      ? " (stai schierando per un altro fantallenatore)"
                       : !context.lineup
                         ? " (è la prima formazione salvata)"
                         : lockedAthleteIds.length === 0

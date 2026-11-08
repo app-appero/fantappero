@@ -648,8 +648,14 @@ def evaluate_bench_order_lock(
     previous_bench: Sequence[object],
     proposed_bench: Sequence[object],
     locked_athlete_ids: Iterable[object],
+    role_by_athlete_id: Mapping[object, object] | None = None,
 ) -> tuple[LineupIssue, ...]:
-    """Reject bench-order changes that cross a locked player (no retroactive advantage)."""
+    """Reject bench-order changes that cross a locked player (no retroactive advantage).
+
+    Eccezione: uno scambio 1:1 titolare <-> panchina. Chi entra in panchina prende il
+    posto esatto di chi ne esce, con lo stesso ruolo, e ogni calciatore bloccato resta
+    nella sua posizione: nessun vantaggio retroattivo (sono entrambi non bloccati).
+    """
     locked = {item for item in locked_athlete_ids if item not in {None, ""}}
     previous = [item for item in previous_bench if item not in {None, ""}]
     proposed = [item for item in proposed_bench if item not in {None, ""}]
@@ -682,14 +688,44 @@ def evaluate_bench_order_lock(
 
     if locked_remaining and not issues:
         last_locked_proposed = max(proposed.index(item) for item in locked_remaining)
-        for athlete_id in proposed:
-            if athlete_id not in previous_set and proposed.index(athlete_id) < last_locked_proposed:
-                issues.append(
-                    LineupIssue(code="bench_order_locked", message=BENCH_ORDER_LOCKED_MESSAGE)
-                )
-                break
+        locked_keep_position = all(
+            previous.index(item) == proposed.index(item) for item in locked_remaining
+        )
+        for index, athlete_id in enumerate(proposed):
+            if athlete_id in previous_set or index >= last_locked_proposed:
+                continue
+            if locked_keep_position and _replaces_same_role_slot(
+                index=index,
+                athlete_id=athlete_id,
+                previous=previous,
+                proposed_set=proposed_set,
+                role_by_athlete_id=role_by_athlete_id,
+            ):
+                continue
+            issues.append(
+                LineupIssue(code="bench_order_locked", message=BENCH_ORDER_LOCKED_MESSAGE)
+            )
+            break
 
     return _dedupe_issues(issues)
+
+
+def _replaces_same_role_slot(
+    *,
+    index: int,
+    athlete_id: object,
+    previous: Sequence[object],
+    proposed_set: set[object],
+    role_by_athlete_id: Mapping[object, object] | None,
+) -> bool:
+    """True se `athlete_id` prende il posto di un pari ruolo uscito dalla panchina."""
+    if role_by_athlete_id is None or index >= len(previous):
+        return False
+    departed = previous[index]
+    if departed in proposed_set:
+        return False
+    incoming_role = role_by_athlete_id.get(athlete_id)
+    return incoming_role is not None and incoming_role == role_by_athlete_id.get(departed)
 
 
 def assert_bench_order_lock(
@@ -697,6 +733,7 @@ def assert_bench_order_lock(
     previous_bench: Sequence[object],
     proposed_bench: Sequence[object],
     locked_athlete_ids: Iterable[object],
+    role_by_athlete_id: Mapping[object, object] | None = None,
 ) -> None:
     from auth.exceptions import ValidationAuthError
 
@@ -704,6 +741,7 @@ def assert_bench_order_lock(
         previous_bench=previous_bench,
         proposed_bench=proposed_bench,
         locked_athlete_ids=locked_athlete_ids,
+        role_by_athlete_id=role_by_athlete_id,
     )
     if not issues:
         return

@@ -787,10 +787,15 @@ export function moveBenchItem(
  * Locked bench players are fences: remaining players cannot cross them, and
  * newcomers must stay after every locked player still on the bench.
  */
+/**
+ * Eccezione allo scavalcamento: scambio 1:1 titolare <-> panchina. Chi entra prende il
+ * posto esatto di un pari ruolo uscito dalla panchina e i bloccati non si spostano.
+ */
 export function evaluateBenchOrderLock(input: {
   previousBench: readonly string[];
   proposedBench: readonly string[];
   lockedAthleteIds: readonly string[];
+  roleByAthleteId?: Readonly<Record<string, string | null | undefined>>;
 }): LineupIssue[] {
   const locked = new Set(input.lockedAthleteIds.filter(Boolean));
   const previous = input.previousBench.filter(Boolean);
@@ -831,11 +836,28 @@ export function evaluateBenchOrderLock(input: {
 
   if (lockedRemaining.length > 0 && issues.length === 0) {
     const lastLockedProposed = Math.max(...lockedRemaining.map((athleteId) => proposed.indexOf(athleteId)));
-    for (const athleteId of proposed) {
-      if (!previousSet.has(athleteId) && proposed.indexOf(athleteId) < lastLockedProposed) {
-        issues.push(issue("bench_order_locked", BENCH_ORDER_LOCKED_MESSAGE));
-        break;
+    const lockedKeepPosition = lockedRemaining.every(
+      (athleteId) => previous.indexOf(athleteId) === proposed.indexOf(athleteId),
+    );
+    const roles = input.roleByAthleteId;
+    for (const [index, athleteId] of proposed.entries()) {
+      if (previousSet.has(athleteId) || index >= lastLockedProposed) {
+        continue;
       }
+      const departed = index < previous.length ? previous[index] : undefined;
+      const incomingRole = roles?.[athleteId];
+      const sameRoleSlot =
+        lockedKeepPosition &&
+        roles !== undefined &&
+        departed !== undefined &&
+        !proposedSet.has(departed) &&
+        incomingRole != null &&
+        incomingRole === roles[departed];
+      if (sameRoleSlot) {
+        continue;
+      }
+      issues.push(issue("bench_order_locked", BENCH_ORDER_LOCKED_MESSAGE));
+      break;
     }
   }
 

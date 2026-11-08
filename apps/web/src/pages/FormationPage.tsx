@@ -611,6 +611,9 @@ export function FormationPage() {
   /** Vuoto = la propria formazione. Un operatore può schierare al posto di un altro fantallenatore (EP-operatore-test). */
   const [targetTeamId, setTargetTeamId] = useState("");
   const targetTeamIdRef = useRef("");
+  // Le mosse contano per chi schiera la propria squadra (operatore compreso), non quando
+  // l'operatore interviene sulla squadra di un altro fantallenatore.
+  const movesApply = !isOperator || !targetTeamId;
   /** Le risposte più vecchie (doppio mount in dev, cambio allenatore a caricamento ancora in corso) non devono riscrivere la formazione appena scelta. */
   const lineupRequest = useRef(0);
   const [selectedRoundId, setSelectedRoundId] = useState(() =>
@@ -670,6 +673,9 @@ export function FormationPage() {
       (athleteId) => playerBlocked(roster, athleteId) && !savedBench.includes(athleteId),
     ),
   ];
+  const roleByAthleteId: Record<string, string | null | undefined> = Object.fromEntries(
+    roster.map((row) => [row.athleteId, row.role]),
+  );
   const lockedAthleteIds = roster
     .filter((row) => playerLocked(roster, row.athleteId, clock, lockMarginMinutes))
     .map((row) => row.athleteId);
@@ -1170,6 +1176,7 @@ export function FormationPage() {
           previousBench: context?.lineup?.bench.map((player) => player.athleteId) ?? [],
           proposedBench: displayBench,
           lockedAthleteIds,
+          roleByAthleteId,
         }),
       ],
       tacticalIssues: tacticalEvaluation.issues,
@@ -1199,7 +1206,7 @@ export function FormationPage() {
       return;
     }
     const requestId = startLineupRequest();
-    const predictedMove = tacticalEvaluation.wouldConsume && !isOperator;
+    const predictedMove = tacticalEvaluation.wouldConsume && movesApply;
     const movesUsedBefore = movesUsed;
     setBusy(true);
     try {
@@ -1403,6 +1410,7 @@ export function FormationPage() {
         previousBench: context?.lineup?.bench.map((player) => player.athleteId) ?? [],
         proposedBench: displayBench,
         lockedAthleteIds,
+        roleByAthleteId,
       }),
     ];
     if (lockIssues.length > 0) {
@@ -1787,11 +1795,11 @@ export function FormationPage() {
             </div>
           ) : null}
 
-          {hasUnsavedChanges && !tacticalEvaluation.wouldConsume ? (
+          {hasUnsavedChanges && !(tacticalEvaluation.wouldConsume && movesApply) ? (
             <p data-testid="formation-moves-reason" className="fa-formation-layout__moves-hint">
               Questo salvataggio non consuma mosse:{" "}
-              {isOperator
-                ? "sei operatore, le tue modifiche non contano."
+              {!movesApply
+                ? "stai schierando per un altro fantallenatore come operatore."
                 : !context.lineup
                   ? "è la prima formazione salvata."
                   : lockedAthleteIds.length === 0
@@ -1800,7 +1808,7 @@ export function FormationPage() {
             </p>
           ) : null}
 
-          {tacticalEvaluation.wouldConsume ? (
+          {tacticalEvaluation.wouldConsume && movesApply ? (
             <p data-testid="formation-moves-hint" className="fa-formation-layout__moves-hint">
               Questo salvataggio consumerà 1 mossa tattica ({movesRemaining} di {maxMoves}{" "}
               disponibili). Le sostituzioni automatiche non consumano mosse.
@@ -1948,7 +1956,7 @@ export function FormationPage() {
             >
               Mosse usate {movesUsed}/{maxMoves}
             </Badge>
-            {tacticalEvaluation.wouldConsume && !isOperator ? (
+            {tacticalEvaluation.wouldConsume && movesApply ? (
               <Badge
                 variant="accent"
                 data-testid="formation-moves-draft-badge"

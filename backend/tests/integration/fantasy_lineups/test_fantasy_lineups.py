@@ -1589,3 +1589,82 @@ def test_saving_the_lineup_discards_the_older_draft(
     assert saved.status_code == 200
     assert saved.json()["draft"] is None
     assert client.get(base, headers=headers).json()["draft"] is None
+
+
+def test_starter_bench_swap_with_a_locked_player_lower_on_the_bench_counts_one_move(
+    client: TestClient,
+    db_session: Session,
+    competition_ids: list[str],
+) -> None:
+    """Caso reale del pilota: scambio attaccante titolare <-> attaccante in panchina mentre
+    più in basso c'è un panchinaro la cui partita è già iniziata. Prima veniva rifiutato
+    (`bench_order_locked`); ora passa e consuma una mossa, anche per l'operatore."""
+    token, user_id = _register_and_login(client, "lineup.swap.locked@example.com")
+    league_id = _create_league(client, token, competition_ids, "Lega Scambio Bloccati")
+    client.get(f"/leagues/{league_id}/rosa", headers={"Authorization": f"Bearer {token}"})
+    grouped = _seed_roster_athletes(db_session, id_offset=9_720_000)
+    athletes = _fill_validated_roster(db_session, league_id, grouped)
+    # Con il DB condiviso la lega può avere già turni generati dalle partite di altri test.
+    existing_rounds = db_session.scalar(
+        select(func.max(FantasyRound.number)).where(FantasyRound.league_id == UUID(league_id))
+    )
+    fantasy_round, clubs = _create_open_round(
+        db_session,
+        league_id,
+        cutoff=datetime.now(UTC) + timedelta(hours=2),
+        extra_kickoff=datetime.now(UTC) + timedelta(hours=5),
+        id_offset=9_730_000,
+        competition_ids=competition_ids,
+        number=(existing_rounds or 0) + 1,
+    )
+    headers = {"Authorization": f"Bearer {token}"}
+    base = f"/leagues/{league_id}/turni/{fantasy_round.id}/formazione"
+    payload = _lineup_payload(athletes, "4-3-3")
+    by_id = {str(athlete.id): athlete for athlete in athletes}
+
+    starter_forward = payload["starterAthleteIds"][-1]
+    bench_forwards = [
+        item for item in payload["benchAthleteIds"] if by_id[item].canonical_name.startswith("A")
+    ]
+    locked_tail = next(
+        by_id[item]
+        for item in reversed(payload["benchAthleteIds"])
+        if not by_id[item].canonical_name.startswith("A")
+    )
+    assert payload["benchAthleteIds"].index(str(locked_tail.id)) > payload["benchAthleteIds"].index(
+        bench_forwards[0]
+    )
+    _set_athlete_club(db_session, locked_tail, clubs[0])
+    for item in [starter_forward, *bench_forwards]:
+        _set_athlete_club(db_session, by_id[item], clubs[2])
+
+    saved = client.put(base, headers=headers, json=payload)
+    assert saved.status_code == 200
+    assert saved.json()["tacticalMovesUsed"] == 0
+
+    first_fixture = next(
+        item
+        for item in _round_fixtures(db_session, fantasy_round.id)
+        if item.home_club_id == clubs[0].id
+    )
+    first_fixture.kickoff_at = datetime.now(UTC) - timedelta(minutes=5)
+    first_fixture.status_short = "1H"
+    db_session.commit()
+
+    swapped = _swap_starter_with_bench(payload, starter_forward, bench_forwards[0])
+    response = client.put(base, headers=headers, json=swapped)
+    assert response.status_code == 200, response.json()
+    assert response.json()["tacticalMovesUsed"] == 1
+
+    from auth.models.user import User
+    from database.enums import PlatformRole
+
+    operator = db_session.get(User, UUID(user_id) if isinstance(user_id, str) else user_id)
+    assert operator is not None
+    operator.platform_role = PlatformRole.OPERATOR
+    db_session.commit()
+
+    again = _swap_starter_with_bench(swapped, bench_forwards[0], bench_forwards[1])
+    as_operator = client.put(base, headers=headers, json=again)
+    assert as_operator.status_code == 200, as_operator.json()
+    assert as_operator.json()["tacticalMovesUsed"] == 2

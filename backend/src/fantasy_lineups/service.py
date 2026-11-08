@@ -50,6 +50,7 @@ from fantasy_lineups.rules import (
     assert_tactical_move,
     copy_previous_lineup,
     evaluate_lineup,
+    evaluate_tactical_move,
     is_athlete_kickoff_locked,
     is_lineup_modification_allowed,
     lineup_signature,
@@ -272,15 +273,19 @@ class FantasyLineupService:
             for_update=True,
         )
         lock_margin = self._lineup_lock_margin_for_league(league_access.league.id)
-        locked_ids = (
-            []
-            if self._actor_bypasses_kickoff_lock(league_access)
-            else [
-                str(row.athlete_id)
-                for row in roster
-                if self._is_row_locked(row.athlete_id, kickoffs, now, lock_margin)
-            ]
+        operator_bypass = self._actor_bypasses_kickoff_lock(league_access)
+        kickoff_locked_ids = [
+            str(row.athlete_id)
+            for row in roster
+            if self._is_row_locked(row.athlete_id, kickoffs, now, lock_margin)
+        ]
+        # L'operatore non è fermato dai blocchi (EP-operatore-test), ma quando schiera la
+        # propria squadra le mosse si contano come per tutti: è un fantallenatore della lega.
+        locked_ids = [] if operator_bypass else kickoff_locked_ids
+        operator_own_team = operator_bypass and (
+            target_team_id is None or self._team_belongs_to(team, league_access.user.id)
         )
+        move_locked_ids = kickoff_locked_ids if operator_own_team else locked_ids
         submission = self._load_submission(fantasy_round.id, team.id, for_update=True)
         self._reject_newly_blocked_starters(
             round_id=fantasy_round.id,
@@ -326,11 +331,16 @@ class FantasyLineupService:
                 previous_bench=self._bench_order_from_submission(submission),
                 proposed_bench=[str(athlete_id) for athlete_id in bench_ids],
                 locked_athlete_ids=locked_ids,
+                role_by_athlete_id={str(row.athlete_id): row.role for row in roster},
             )
-            move_evaluation = assert_tactical_move(
+            moves_used = len(submission.tactical_moves) if submission is not None else 0
+            # L'operatore non viene mai rifiutato per mosse esaurite: oltre la terza
+            # semplicemente non se ne registrano altre.
+            check_move = evaluate_tactical_move if operator_bypass else assert_tactical_move
+            move_evaluation = check_move(
                 has_saved_lineup=submission is not None,
-                any_athlete_locked=bool(locked_ids),
-                moves_used=len(submission.tactical_moves) if submission is not None else 0,
+                any_athlete_locked=bool(move_locked_ids),
+                moves_used=moves_used,
                 proposed_module=module_code,
                 proposed_starter_ids=[str(athlete_id) for athlete_id in starter_ids],
                 proposed_bench_ids=[str(athlete_id) for athlete_id in bench_ids],
@@ -338,6 +348,7 @@ class FantasyLineupService:
                 previous_starter_ids=self._starter_order_from_submission(submission),
                 previous_bench_ids=self._bench_order_from_submission(submission),
             )
+            record_move = move_evaluation.would_consume and moves_used < MAX_TACTICAL_MOVES
         except ValidationAuthError as exc:
             get_metrics().incr(
                 "fantasy_lineup_saved_total",
@@ -418,7 +429,7 @@ class FantasyLineupService:
                 LineupDraft.fantasy_team_id == team.id,
             )
         )
-        if move_evaluation.would_consume:
+        if record_move:
             sequence = len(submission.tactical_moves) + 1
             self._session.add(
                 TacticalMove(
@@ -457,7 +468,7 @@ class FantasyLineupService:
                 "module": module.value,
                 "revision": submission.revision,
                 "previousModule": previous_module,
-                "tacticalMoveConsumed": move_evaluation.would_consume,
+                "tacticalMoveConsumed": record_move,
             },
         )
         self._session.execute(
@@ -980,6 +991,7 @@ class FantasyLineupService:
                 previous_bench=self._bench_order_from_submission(submission),
                 proposed_bench=filled_bench,
                 locked_athlete_ids=locked_ids,
+                role_by_athlete_id={str(row.athlete_id): row.role for row in roster},
             )
         except ValidationAuthError as exc:
             get_metrics().incr(
@@ -1715,6 +1727,10 @@ class FantasyLineupService:
         if team is None:
             raise ValidationAuthError("Squadra non trovata.", code="fantasy_team_not_found")
         return team
+
+    def _team_belongs_to(self, team: FantasyTeam, user_id: UUID) -> bool:
+        membership = self._session.get(LeagueMembership, team.membership_id)
+        return membership is not None and membership.user_id == user_id
 
     def _resolve_lineup_team(
         self,
