@@ -342,7 +342,15 @@ const AUTO_RESOLUTION_MESSAGE: Record<"draft" | "previous_round" | "zero_fallbac
     "Nessuna formazione disponibile per questo turno: il punteggio fantasy è stato impostato a 0.",
 };
 
-type StarterSlotOption = { value: string; label: string };
+type StarterSlotOption = {
+  value: string;
+  label: string;
+  name?: string;
+  tone?: ProbableState;
+  locked?: boolean;
+  countdown?: string | null;
+  note?: string | null;
+};
 
 function StarterSlotField({
   label,
@@ -380,42 +388,35 @@ function StarterSlotField({
 
   return (
     <div className="fa-field fa-starter-field">
-      <div className={`fa-starter-row${toneClass}${locked ? " fa-starter-row--locked" : ""}`}>
+      <button
+        type="button"
+        className={`fa-starter-row${toneClass}${locked ? " fa-starter-row--locked" : ""}`}
+        data-testid={testId}
+        disabled={disabled || locked}
+        aria-expanded={open}
+        aria-haspopup="listbox"
+        aria-label={`${label}: ${displayLabel}`}
+        title={locked ? hint : undefined}
+        onClick={() => {
+          if (!disabled && !locked) {
+            setOpen((current) => !current);
+          }
+        }}
+      >
         <Badge variant={roleBadgeVariant(role)}>{role}</Badge>
-        <span className="fa-starter-row__text">
-          <strong className="fa-starter-row__name">{name || placeholder}</strong>
-          <span className="fa-starter-row__a11y">{displayLabel}</span>
-          <span className="fa-starter-row__meta">
-            <span className="fa-starter-row__slot">{label}</span>
-            {tone === "starter" ? <span className="fa-starter-row__chip fa-starter-row__chip--starter">Titolare probabile</span> : null}
-            {tone === "bench" ? <span className="fa-starter-row__chip fa-starter-row__chip--bench">Panchina probabile</span> : null}
-            {tone === "expelled" ? <span className="fa-starter-row__chip fa-starter-row__chip--expelled">Squalificato</span> : null}
-            {tone === "unavailable" ? <span className="fa-starter-row__chip fa-starter-row__chip--unavailable">Indisponibile</span> : null}
-            {countdown ? <span className="fa-starter-row__count">{countdown}</span> : null}
-          </span>
-        </span>
+        <strong className="fa-starter-row__name">{name || placeholder}</strong>
+        <span className="fa-starter-row__a11y">{displayLabel}</span>
+        {countdown ? <span className="fa-starter-row__count">{countdown}</span> : null}
         {locked ? (
-          <span className="fa-starter-row__lock" role="img" aria-label="Bloccato" title={hint ?? "Bloccato"}>
+          <span className="fa-starter-row__lock" role="img" aria-label="Bloccato">
             🔒
           </span>
-        ) : null}
-        <button
-          type="button"
-          className="fa-starter-slot__trigger fa-starter-row__change"
-          data-testid={testId}
-          disabled={disabled}
-          aria-expanded={open}
-          aria-haspopup="listbox"
-          aria-label={`Cambia: ${displayLabel}`}
-          onClick={() => {
-            if (!disabled) {
-              setOpen((current) => !current);
-            }
-          }}
-        >
-          Cambia
-        </button>
-      </div>
+        ) : (
+          <span className="fa-starter-row__chev" aria-hidden="true">
+            ▾
+          </span>
+        )}
+      </button>
       {open && !disabled ? (
         <ul className="fa-starter-slot__list" role="listbox" data-testid={`${testId}-options`}>
           {options.map((option) => (
@@ -424,14 +425,27 @@ function StarterSlotField({
                 type="button"
                 role="option"
                 aria-selected={option.value === value}
-                className="fa-starter-slot__option"
+                className={`fa-starter-slot__option fa-starter-row${option.tone ? ` fa-starter-row--${option.tone}` : ""}${option.locked ? " fa-starter-row--locked" : ""}`}
                 data-testid={`${testId}-option-${option.value}`}
+                disabled={option.locked && option.value !== value}
                 onClick={() => {
                   setOpen(false);
                   onSelect(option.value);
                 }}
               >
-                {option.label}
+                <strong className="fa-starter-row__name">{option.name ?? option.label}</strong>
+                <span className="fa-starter-row__a11y">{option.label}</span>
+                {option.note ? <span className="fa-starter-row__count">{option.note}</span> : null}
+                {option.countdown ? <span className="fa-starter-row__count">{option.countdown}</span> : null}
+                {option.locked ? (
+                  <span className="fa-starter-row__lock" role="img" aria-label="Bloccato">
+                    🔒
+                  </span>
+                ) : option.value === value ? (
+                  <span className="fa-starter-row__chev" aria-hidden="true">
+                    ✓
+                  </span>
+                ) : null}
               </button>
             </li>
           ))}
@@ -1609,6 +1623,16 @@ export function FormationPage() {
         return {
           value: row.athleteId,
           label: notes.length > 0 ? `${row.athleteName} (${notes.join(", ")})` : row.athleteName,
+          name: row.athleteName,
+          tone: probableState(roster, row.athleteId),
+          locked: playerLocked(roster, row.athleteId, clock, lockMarginMinutes),
+          countdown: lockLabel(row.athleteId),
+          note:
+            displayBench.includes(row.athleteId) && row.athleteId !== currentId
+              ? displayBench.indexOf(row.athleteId) < benchActive
+                ? `Panchina ${displayBench.indexOf(row.athleteId) + 1}°`
+                : "Tribuna"
+              : null,
         };
       });
   };
