@@ -1560,13 +1560,13 @@ def test_saving_the_lineup_discards_the_older_draft(
     token, _ = _register_and_login(client, "lineup.draft.discard@example.com")
     league_id = _create_league(client, token, competition_ids, "Lega Bozza Scartata")
     client.get(f"/leagues/{league_id}/rosa", headers={"Authorization": f"Bearer {token}"})
-    grouped = _seed_roster_athletes(db_session, id_offset=3_200_000)
+    grouped = _seed_roster_athletes(db_session, id_offset=9_700_000)
     athletes = _fill_validated_roster(db_session, league_id, grouped)
     fantasy_round, _clubs = _create_open_round(
         db_session,
         league_id,
         cutoff=datetime.now(UTC) + timedelta(hours=5),
-        id_offset=3_210_000,
+        id_offset=9_710_000,
         competition_ids=competition_ids,
     )
     payload = _lineup_payload(athletes, "4-3-3")
