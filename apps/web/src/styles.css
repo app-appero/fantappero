@@ -5630,3 +5630,38 @@ button.fa-starter-row:disabled {
 .fa-starter-slot__option.fa-starter-row--expelled { border-color: #f87171; background: rgba(239, 68, 68, 0.12); box-shadow: 0 0 12px rgba(239, 68, 68, 0.45); }
 .fa-starter-slot__option.fa-starter-row--locked { opacity: 0.55; }
 .fa-starter-slot__option[aria-selected="true"] { outline: 2px solid var(--fa-color-accent, #9db8ff); }
+
+/* Panchina e tribuna: stesse righe dei titolari. */
+.fa-bench-order__row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  gap: var(--fa-space-sm);
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.fa-bench-order__main {
+  min-width: 0;
+  margin: 0;
+}
+
+.fa-bench-order__row {
+  grid-template-columns: 2.2rem minmax(0, 1fr);
+  align-items: start;
+}
+
+.fa-bench-order__number {
+  padding-top: 0.55rem;
+  font-family: var(--fa-font-display, inherit);
+  font-style: italic;
+  font-weight: 800;
+  font-size: 1.2rem;
+  color: var(--fa-color-accent, #9db8ff);
+}
+
+.fa-bench-order__main {
+  width: 100%;
+}
