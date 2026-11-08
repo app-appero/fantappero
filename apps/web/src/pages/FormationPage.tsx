@@ -54,6 +54,7 @@ import {
   roleBadgeVariant,
   useToast,
   type PitchPlayer,
+  EventBadges,
 } from "@fantappero/ui";
 import { useAthleteCard } from "../athletes/AthleteCard";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -477,6 +478,7 @@ function BenchOrderRow({
   probable,
   state,
   lockCountdown,
+  badges = [],
 }: {
   athleteId: string;
   index: number;
@@ -502,6 +504,8 @@ function BenchOrderRow({
   probable?: boolean;
   state?: ProbableState;
   lockCountdown?: string | null;
+  /** Bonus e malus del turno, solo per conoscenza (anche in tribuna). */
+  badges?: ReturnType<typeof playerBadges>;
 }) {
   const [pickerOpen, setPickerOpen] = useState(false);
   const tone: ProbableState = state ?? (probable ? "starter" : null);
@@ -551,6 +555,7 @@ function BenchOrderRow({
               {scoreLabel}
             </strong>
           ) : null}
+          <EventBadges badges={badges} size={12} />
           {locked ? (
             <span className="fa-starter-row__lock" role="img" aria-label="Bloccato">
               🔒
@@ -2287,6 +2292,7 @@ export function FormationPage() {
                             probable={isProbableStarter(athleteId)}
                             state={probableState(roster, athleteId)}
                             lockCountdown={lockLabel(athleteId)}
+                            badges={playerBadges(roster, athleteId)}
                           />
                         ) : null,
                       )}
@@ -2325,6 +2331,7 @@ export function FormationPage() {
                             probable={isProbableStarter(athleteId)}
                             state={probableState(roster, athleteId)}
                             lockCountdown={lockLabel(athleteId)}
+                            badges={playerBadges(roster, athleteId)}
                           />
                         ) : null,
                       )}

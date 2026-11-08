@@ -32,6 +32,7 @@ import {
   starterTemplate,
   lineupSignature,
   planModuleChange,
+  fantasyBadgesFromBonusMalus,
 } from "@fantappero/contracts";
 import { theme } from "@fantappero/ui/theme";
 import { useIsFocused } from "@react-navigation/core";
@@ -51,6 +52,7 @@ import {
 } from "../api/leagues";
 import { BottomSheet, FormationLegend, FormationPitch, PlayerPickerSheet, TONE_COLOR, probableTone, roleRingColor, type Candidate, type PitchSlot } from "./formation/FormationParts";
 import { LockCountdown } from "../components/LockCountdown";
+import { EventBadges } from "../components/match/EventBadges";
 import { setMovesDock } from "../layout/movesDock";
 import { OptionPicker } from "../components/OptionPicker";
 import { UiStatePanel } from "../components/UiStatePanel";
@@ -1402,10 +1404,13 @@ export function FormationScreen() {
                       </AthleteName>
                       {lockLabel(id) ? <Text style={styles.benchLock}>{lockLabel(id)}</Text> : null}
                     </View>
-                    <Text style={styles.meta}>
-                      {locked ? "🔒 " : ""}
-                      {playerScoreLabel(id) ?? ""}
-                    </Text>
+                    <View style={styles.benchMetaRow}>
+                      <Text style={styles.meta}>
+                        {locked ? "🔒 " : ""}
+                        {playerScoreLabel(id) ?? ""}
+                      </Text>
+                      <EventBadges badges={fantasyBadgesFromBonusMalus(row?.bonusMalus ?? [])} size={11} />
+                    </View>
                   </View>
                   {editable && !locked ? (
                     <Pressable
@@ -1468,7 +1473,14 @@ export function FormationScreen() {
                           </AthleteName>
                           {lockLabel(id) ? <Text style={styles.benchLock}>{lockLabel(id)}</Text> : null}
                         </View>
-                        <Text style={styles.meta}>tribuna</Text>
+                        {/* Solo per conoscenza: chi è in tribuna non entra mai nei cambi automatici. */}
+                        <View style={styles.benchMetaRow}>
+                          <Text style={styles.meta}>
+                            tribuna{playerLocked(id) ? " · 🔒" : ""}
+                            {playerScoreLabel(id) ? ` · ${playerScoreLabel(id)}` : ""}
+                          </Text>
+                          <EventBadges badges={fantasyBadgesFromBonusMalus(row?.bonusMalus ?? [])} size={11} />
+                        </View>
                       </View>
                       {editable && !playerLocked(id) ? (
                         <Pressable
@@ -2167,6 +2179,7 @@ const styles = lazyStyles(() => StyleSheet.create({
     justifyContent: "center",
   },
   unsavedButtonLabel: { color: colors.foreground, fontWeight: "700", fontSize: 14 },
+  benchMetaRow: { flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: 6 },
   savingRow: { flexDirection: "row", alignItems: "center", gap: spacing.xs },
   actionBar: {
     flexDirection: "row",
