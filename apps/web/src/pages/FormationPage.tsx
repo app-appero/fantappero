@@ -54,7 +54,7 @@ import {
   useToast,
   type PitchPlayer,
 } from "@fantappero/ui";
-import { AthleteName, useAthleteCard } from "../athletes/AthleteCard";
+import { useAthleteCard } from "../athletes/AthleteCard";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   fetchFantasyTeams,
@@ -481,7 +481,16 @@ function BenchOrderRow({
   disabled: boolean;
   options: Array<{ value: string; label: string; disabled: boolean }>;
   onMove: (target: number) => void;
-  choices: Array<{ athleteId: string; name: string; role: LineupRole | null; disabled?: boolean }>;
+  choices: Array<{
+    athleteId: string;
+    name: string;
+    plainName?: string;
+    note?: string;
+    tone?: ProbableState;
+    countdown?: string | null;
+    role: LineupRole | null;
+    disabled?: boolean;
+  }>;
   onAssign: (athleteId: string) => void;
   scoreLabel?: string | null;
   probable?: boolean;
@@ -489,24 +498,20 @@ function BenchOrderRow({
   lockCountdown?: string | null;
 }) {
   const [pickerOpen, setPickerOpen] = useState(false);
-  // Solo lo stesso ruolo e solo chi non è bloccato: le scelte arrivano già filtrate.
-  const visibleChoices = choices;
+  const tone: ProbableState = state ?? (probable ? "starter" : null);
+  const toneClass = tone ? ` fa-starter-row--${tone}` : "";
 
   return (
     <li
       key={athleteId}
-      className={
-        [
-          "fa-bench-order__row",
-          canEnter ? "" : "fa-bench-order__row--overflow",
-          probable ? "fa-bench-order__row--probable" : "",
-          state === "bench" || state === "expelled" || state === "unavailable"
-            ? `fa-bench-order__row--${state}`
-            : "",
-        ]
-          .filter(Boolean)
-          .join(" ")
-      }
+      className={[
+        "fa-bench-order__row",
+        canEnter ? "" : "fa-bench-order__row--overflow",
+        probable ? "fa-bench-order__row--probable" : "",
+        state === "bench" || state === "expelled" || state === "unavailable" ? `fa-bench-order__row--${state}` : "",
+      ]
+        .filter(Boolean)
+        .join(" ")}
     >
       <span className="fa-bench-order__position">
         <Select
@@ -519,53 +524,53 @@ function BenchOrderRow({
           data-testid={`formation-bench-position-${index}`}
         />
       </span>
-      <span className="fa-bench-order__player">
-        <Badge variant={roleBadgeVariant(role)}>{role ?? "?"}</Badge>
-        <AthleteName athleteId={athleteId}>{name}</AthleteName>
-        {lockCountdown ? <span className="fa-bench-order__lock">{lockCountdown}</span> : null}
-        {locked ? (
-          <span className="fa-bench-order__lockicon" role="img" aria-label="Bloccato" title="Bloccato">
-            {" 🔒"}
-          </span>
-        ) : null}
-        {scoreLabel ? (
-          <strong
-            className="fa-bench-order__score"
-            data-testid={`formation-bench-score-${athleteId}`}
-          >
-            {" "}
-            {scoreLabel}
-          </strong>
-        ) : null}
+      <span className="fa-bench-order__number" aria-hidden="true">
+        {index + 1}°
       </span>
-      <div className="fa-bench-order__assign">
+      <div className="fa-field fa-starter-field fa-bench-order__main">
         <button
           type="button"
-          className="fa-bench-order__change"
+          className={`fa-starter-row${toneClass}${locked ? " fa-starter-row--locked" : ""}`}
           disabled={disabled || locked}
           aria-expanded={pickerOpen}
           aria-label={`Cambia ${name}, ${index + 1}° in panchina`}
           data-testid={`formation-bench-change-${index}`}
           onClick={() => setPickerOpen((open) => !open)}
         >
-          Cambia
+          <Badge variant={roleBadgeVariant(role)}>{role ?? "?"}</Badge>
+          <strong className="fa-starter-row__name">{name}</strong>
+          {lockCountdown ? <span className="fa-starter-row__count fa-bench-order__lock">{lockCountdown}</span> : null}
+          {scoreLabel ? (
+            <strong className="fa-starter-row__count" data-testid={`formation-bench-score-${athleteId}`}>
+              {scoreLabel}
+            </strong>
+          ) : null}
+          {locked ? (
+            <span className="fa-starter-row__lock" role="img" aria-label="Bloccato">
+              🔒
+            </span>
+          ) : (
+            <span className="fa-starter-row__chev" aria-hidden="true">
+              ▾
+            </span>
+          )}
         </button>
-      </div>
-      {pickerOpen && !disabled && !locked ? (
-        <div className="fa-bench-picker" data-testid={`formation-bench-picker-${index}`}>
-          <ul className="fa-bench-picker__list">
-            {visibleChoices.length === 0 ? (
+        {pickerOpen && !disabled && !locked ? (
+          <ul
+            className="fa-starter-slot__list"
+            role="listbox"
+            data-testid={`formation-bench-picker-${index}`}
+          >
+            {choices.length === 0 ? (
               <li className="fa-bench-picker__empty">Nessun calciatore dello stesso ruolo disponibile.</li>
             ) : (
-              visibleChoices.map((choice) => (
+              choices.map((choice) => (
                 <li key={choice.athleteId}>
                   <button
                     type="button"
-                    className={
-                      choice.athleteId === athleteId
-                        ? "fa-bench-picker__option fa-bench-picker__option--current"
-                        : "fa-bench-picker__option"
-                    }
+                    role="option"
+                    aria-selected={choice.athleteId === athleteId}
+                    className={`fa-starter-slot__option fa-starter-row${choice.tone ? ` fa-starter-row--${choice.tone}` : ""}`}
                     disabled={choice.disabled && choice.athleteId !== athleteId}
                     data-testid={`formation-bench-pick-${index}-${choice.athleteId}`}
                     onClick={() => {
@@ -576,15 +581,17 @@ function BenchOrderRow({
                       onAssign(choice.athleteId);
                     }}
                   >
-                    <span className="fa-bench-picker__role">{choice.role ?? "?"}</span>
-                    {choice.name}
+                    <strong className="fa-starter-row__name">{choice.plainName ?? choice.name}</strong>
+                    <span className="fa-starter-row__a11y">{choice.name}</span>
+                    {choice.note ? <span className="fa-starter-row__count">{choice.note}</span> : null}
+                    {choice.countdown ? <span className="fa-starter-row__count">{choice.countdown}</span> : null}
                   </button>
                 </li>
               ))
             )}
           </ul>
-        </div>
-      ) : null}
+        ) : null}
+      </div>
     </li>
   );
 }
@@ -1574,6 +1581,10 @@ export function FormationPage() {
         return {
           athleteId: row.athleteId,
           name: `${playerName(roster, row.athleteId)}${probableMark(roster, row.athleteId)} · ${where}`,
+          plainName: playerName(roster, row.athleteId),
+          note: where,
+          tone: probableState(roster, row.athleteId),
+          countdown: lockLabel(row.athleteId),
           role: playerRole(roster, row.athleteId),
           disabled: false,
         };
@@ -2057,8 +2068,8 @@ export function FormationPage() {
               tribuna.
             </p>
             <p className="fa-bench-touch-hint">
-              Tocca Cambia per scambiare il calciatore con un altro dello stesso ruolo (i bloccati non
-              compaiono); il nome apre la scheda.
+              Tocca un calciatore per scambiarlo con un altro dello stesso ruolo (i bloccati non
+              compaiono); il numero a sinistra è l&apos;ordine di ingresso.
             </p>
             {displayBench.length === 0 ? (
               <p data-testid="formation-bench-empty">Nessun panchinaro: tutti i calciatori sono titolari.</p>
@@ -2079,7 +2090,7 @@ export function FormationPage() {
                             athleteId={athleteId}
                             index={index}
                             canEnter
-                            name={`${playerName(roster, athleteId)}${probableMark(roster, athleteId)}`}
+                            name={playerName(roster, athleteId)}
                             role={playerRole(roster, athleteId)}
                             locked={playerLocked(roster, athleteId, clock, lockMarginMinutes)}
                             disabled={!context.modificationAllowed || !canEdit}
@@ -2117,7 +2128,7 @@ export function FormationPage() {
                             athleteId={athleteId}
                             index={index}
                             canEnter={false}
-                            name={`${playerName(roster, athleteId)}${probableMark(roster, athleteId)}`}
+                            name={playerName(roster, athleteId)}
                             role={playerRole(roster, athleteId)}
                             locked={playerLocked(roster, athleteId, clock, lockMarginMinutes)}
                             disabled={!context.modificationAllowed || !canEdit}
