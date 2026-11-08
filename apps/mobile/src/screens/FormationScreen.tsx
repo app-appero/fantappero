@@ -30,6 +30,7 @@ import {
   resolveDefaultEuropeanTurn,
   slotsFromLineupIds,
   starterTemplate,
+  lineupSignature,
 } from "@fantappero/contracts";
 import { theme } from "@fantappero/ui/theme";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
@@ -298,6 +299,14 @@ export function FormationScreen() {
     }
   }
 
+  function revertChanges() {
+    if (!context) {
+      return;
+    }
+    applyEditor(context);
+    setActionMessage("Modifiche annullate.");
+  }
+
   function applyEditor(detail: LineupContext) {
     const draft = detail.draft;
     if (draft) {
@@ -393,6 +402,36 @@ export function FormationScreen() {
     ...orderedBench.filter((athleteId) => playerBlocked(athleteId) && !savedBench.includes(athleteId)),
   ];
   const lockedAthleteIds = roster.filter((row) => playerLocked(row.athleteId)).map((row) => row.athleteId);
+  // Modifiche non salvate: confronto con ciò che il server ha (bozza se c'è, altrimenti formazione).
+  const savedEditor = (() => {
+    const draft = context?.draft;
+    if (draft) {
+      return { module: draft.module, starters: draft.starterAthleteIds, bench: draft.benchAthleteIds };
+    }
+    if (context?.lineup) {
+      return {
+        module: context.lineup.module,
+        starters: context.lineup.starters.map((player) => player.athleteId),
+        bench: context.lineup.bench.map((player) => player.athleteId),
+      };
+    }
+    return { module: "4-3-3" as FantasyModule, starters: [] as string[], bench: [] as string[] };
+  })();
+  const unsavedChangeCount = (() => {
+    const template = starterTemplate(savedEditor.module);
+    const savedStarters = template.map((_, index) => savedEditor.starters[index] ?? "");
+    if (
+      lineupSignature({ module: moduleCode, starterIds: displayStarters, benchIds: displayBench }) ===
+      lineupSignature({ module: savedEditor.module, starterIds: savedStarters, benchIds: savedEditor.bench })
+    ) {
+      return 0;
+    }
+    let count = moduleCode !== savedEditor.module ? 1 : 0;
+    displayStarters.forEach((id, index) => {
+      if (id !== (savedStarters[index] ?? "")) count += 1;
+    });
+    return Math.max(count, 1);
+  })();
   const previousBenchIds =
     context?.lineup?.bench.map((player) => player.athleteId) ?? displayBench;
 
@@ -964,7 +1003,7 @@ export function FormationScreen() {
           </Text>
           <View style={styles.movesChip}>
             <Text style={styles.movesText} testID="formation-moves">
-              Mosse {movesUsed}/{maxMoves}
+              Mosse usate {movesUsed}/{maxMoves}
             </Text>
           </View>
         </View>
@@ -1269,6 +1308,23 @@ export function FormationScreen() {
           <Text style={[styles.ok, styles.bannerOk]} testID="formation-success">
             {actionMessage}
           </Text>
+        ) : null}
+
+        {unsavedChangeCount > 0 ? (
+          <View style={styles.unsavedBar} testID="formation-unsaved-bar">
+            <Text style={styles.unsavedText}>
+              {unsavedChangeCount === 1 ? "1 modifica non salvata" : `${unsavedChangeCount} modifiche non salvate`}
+            </Text>
+            <Pressable
+              accessibilityRole="button"
+              disabled={busy}
+              onPress={() => revertChanges()}
+              style={styles.unsavedButton}
+              testID="formation-revert"
+            >
+              <Text style={styles.unsavedButtonLabel}>Annulla modifiche</Text>
+            </Pressable>
+          </View>
         ) : null}
 
         <View style={styles.actionBar}>
@@ -1826,6 +1882,29 @@ const styles = lazyStyles(() => StyleSheet.create({
     padding: spacing.sm,
     overflow: "hidden",
   },
+  unsavedBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+    borderRadius: radius.md,
+    backgroundColor: colors.backgroundElevated,
+    borderWidth: 1,
+    borderColor: colors.brand,
+    marginTop: spacing.sm,
+  },
+  unsavedText: { flex: 1, color: colors.foreground, fontSize: 14 },
+  unsavedButton: {
+    minHeight: 44,
+    paddingHorizontal: spacing.md,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  unsavedButtonLabel: { color: colors.foreground, fontWeight: "700", fontSize: 14 },
   actionBar: {
     flexDirection: "row",
     alignItems: "center",

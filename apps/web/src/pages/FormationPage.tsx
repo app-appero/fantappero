@@ -1869,7 +1869,7 @@ export function FormationPage() {
               data-testid="formation-moves-badge"
               title={`Mosse tattiche: ${movesUsed}/${maxMoves} usate`}
             >
-              Mosse {movesRemaining}/{maxMoves}
+              Mosse usate {movesUsed}/{maxMoves}
             </Badge>
           </div>
 

@@ -94,7 +94,7 @@ describe("EP06-06 formation page", () => {
     expect(html).not.toContain("può subentrare");
     expect(html).toContain("Dal 11° in poi è tribuna");
     expect(html).toContain("Entrano al massimo 5 panchinari");
-    expect(html).toContain("Mosse 3/3");
+    expect(html).toContain("Mosse usate 0/3");
     expect(html).toContain("fa-badge--success");
     expect(html).toContain("fa-badge--warning");
     expect(html).toContain("Partita già iniziata");
