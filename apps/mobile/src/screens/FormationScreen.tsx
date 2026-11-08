@@ -762,6 +762,18 @@ export function FormationScreen() {
     }
   }
 
+  // Hook prima di ogni `return` anticipato (caricamento, errore, vuoto): altrimenti, quando
+  // arrivano i dati, React vede più hook del render precedente e l'app va in crash.
+  // Quando la riga delle mosse esce dalla vista, mosse e countdown si uniscono nella barra fissa in alto.
+  const isFocused = useIsFocused();
+  const [statusBottom, setStatusBottom] = useState<number | null>(null);
+  const [scrolledPast, setScrolledPast] = useState(false);
+  const draftMove = tacticalEvaluation.wouldConsume && movesApply ? Math.min(movesUsed + 1, maxMoves) : null;
+  useEffect(() => {
+    setMovesDock(scrolledPast && isFocused ? { used: movesUsed, max: maxMoves, draft: draftMove } : null);
+  }, [scrolledPast, isFocused, movesUsed, maxMoves, draftMove]);
+  useEffect(() => () => setMovesDock(null), []);
+
   if (!canView) {
     return (
       <PageContainer title="Formazione">
@@ -1073,16 +1085,6 @@ export function FormationScreen() {
             : "rgba(156, 163, 175, 0.16)",
     } as const;
   };
-
-  // Quando la riga delle mosse esce dalla vista, mosse e countdown si uniscono nella barra fissa in alto.
-  const isFocused = useIsFocused();
-  const [statusBottom, setStatusBottom] = useState<number | null>(null);
-  const [scrolledPast, setScrolledPast] = useState(false);
-  const draftMove = tacticalEvaluation.wouldConsume && movesApply ? Math.min(movesUsed + 1, maxMoves) : null;
-  useEffect(() => {
-    setMovesDock(scrolledPast && isFocused ? { used: movesUsed, max: maxMoves, draft: draftMove } : null);
-  }, [scrolledPast, isFocused, movesUsed, maxMoves, draftMove]);
-  useEffect(() => () => setMovesDock(null), []);
 
   return (
     <PageContainer title="Formazione" refreshing={pull.refreshing} onRefresh={pull.onRefresh}
