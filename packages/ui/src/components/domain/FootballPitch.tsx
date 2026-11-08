@@ -70,35 +70,53 @@ function PlayerScore({ player, above }: { player: PitchPlayer; above?: boolean }
 }
 
 function PlayerPillBody({ player }: { player: PitchPlayer }) {
-  // Il portiere sta in fondo al campo: il voto (con LIVE) va sopra la foto, dove si legge.
-  const scoreAbove = player.role === "P" || player.role === "G";
+  // Il portiere sta in fondo al campo: nome, countdown, voto e bonus/malus vanno
+  // a destra della foto (come nell'app), così non escono dal bordo.
+  const isGoalkeeper = player.role === "P" || player.role === "G";
+  const card = (
+    <div className="fa-pitch-player__card">
+      {player.photoUrl ? (
+        <img className="fa-pitch-player__photo" src={player.photoUrl} alt="" aria-hidden="true" />
+      ) : player.shirtNumber != null ? (
+        <span className="fa-pitch-player__number">{player.shirtNumber}</span>
+      ) : null}
+      {player.photoUrl && player.shirtNumber != null ? (
+        <span className="fa-pitch-player__number-badge">{player.shirtNumber}</span>
+      ) : null}
+      <RoleBadge code={player.role} className="fa-pitch-player__role" />
+      {player.locked ? (
+        <span className="fa-pitch-player__lockdot" role="img" aria-label="Bloccato">
+          🔒
+        </span>
+      ) : null}
+    </div>
+  );
+  if (isGoalkeeper) {
+    return (
+      <>
+        {card}
+        <div className="fa-pitch-player__gkside">
+          <span className="fa-pitch-player__name">{abbreviateName(player.name)}</span>
+          {player.lockCountdown ? <span className="fa-pitch-player__lock">{player.lockCountdown}</span> : null}
+          <PlayerScore player={player} />
+          <div className="fa-pitch-player__badges fa-pitch-player__badges--side">
+            <EventBadges badges={player.badges ?? []} size={12} />
+          </div>
+        </div>
+      </>
+    );
+  }
   return (
     <>
-      {scoreAbove ? <PlayerScore player={player} above /> : null}
       <div className="fa-pitch-player__badges">
         <EventBadges badges={player.badges ?? []} size={12} />
       </div>
-      <div className="fa-pitch-player__card">
-        {player.photoUrl ? (
-          <img className="fa-pitch-player__photo" src={player.photoUrl} alt="" aria-hidden="true" />
-        ) : player.shirtNumber != null ? (
-          <span className="fa-pitch-player__number">{player.shirtNumber}</span>
-        ) : null}
-        {player.photoUrl && player.shirtNumber != null ? (
-          <span className="fa-pitch-player__number-badge">{player.shirtNumber}</span>
-        ) : null}
-        <RoleBadge code={player.role} className="fa-pitch-player__role" />
-        {player.locked ? (
-          <span className="fa-pitch-player__lockdot" role="img" aria-label="Bloccato">
-            🔒
-          </span>
-        ) : null}
-      </div>
+      {card}
       <span className="fa-pitch-player__name">{abbreviateName(player.name)}</span>
       {player.lockCountdown ? (
         <span className="fa-pitch-player__lock">{player.lockCountdown}</span>
       ) : null}
-      {scoreAbove ? null : <PlayerScore player={player} />}
+      <PlayerScore player={player} />
     </>
   );
 }
@@ -112,6 +130,7 @@ function PlayerPill({
 }) {
   const className = classNames(
     "fa-pitch-player",
+    (player.role === "P" || player.role === "G") && "fa-pitch-player--gk",
     player.probableStarter && "fa-pitch-player--probable",
     player.live && "fa-pitch-player--live",
     player.voteKind === "sv" && "fa-pitch-player--sv",
