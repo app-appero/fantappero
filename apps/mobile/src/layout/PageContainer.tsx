@@ -4,6 +4,8 @@ import { DISPLAY_FONT } from "../theme/fonts";
 import {
   RefreshControl,
   ScrollView,
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
   StyleSheet,
   Text,
   View,
@@ -23,6 +25,8 @@ export type PageContainerProps = ViewProps & {
    * La classifica lo abbassa per usare quasi tutta la larghezza dello schermo.
    */
   contentInsetHorizontal?: number;
+  /** Scorrimento del contenuto (es. per far seguire la pagina a una barra fissa). */
+  onScroll?: (event: NativeSyntheticEvent<NativeScrollEvent>) => void;
 };
 
 /** Scrollable page body with title — mobile equivalent of web PageContainer. */
@@ -34,6 +38,7 @@ export function PageContainer({
   onRefresh,
   refreshing = false,
   contentInsetHorizontal = spacing.lg,
+  onScroll,
   ...rest
 }: PageContainerProps) {
   return (
@@ -42,6 +47,8 @@ export function PageContainer({
       contentContainerStyle={[styles.content, { paddingHorizontal: contentInsetHorizontal }]}
       testID={testID}
       keyboardShouldPersistTaps="handled"
+      onScroll={onScroll}
+      scrollEventThrottle={onScroll ? 32 : undefined}
       refreshControl={
         onRefresh ? (
           <RefreshControl

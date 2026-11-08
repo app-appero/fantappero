@@ -5731,3 +5731,31 @@ button.fa-starter-row:disabled {
 .fa-starter-slot__option.fa-starter-row .fa-starter-row__chev {
   grid-area: icon;
 }
+
+/* Mosse e blocco: scorrendo, la riga delle mosse si unisce al countdown in una barra fissa. */
+.fa-moves-docked .fa-lock-countdown-bar {
+  display: none;
+}
+
+.fa-moves-dock {
+  position: fixed;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: calc(var(--fa-z-sticky) + 2);
+  display: flex;
+  align-items: center;
+  gap: var(--fa-space-sm);
+  width: min(32rem, calc(100% - (var(--fa-space-md) * 2)));
+  padding: 0.3rem 0.4rem 0.3rem var(--fa-space-md);
+  border: 1px solid var(--fa-color-border);
+  border-radius: var(--fa-radius-pill);
+  background-color: var(--fa-color-background-elevated);
+  box-shadow: 0 8px 24px rgba(2, 6, 23, 0.35);
+  font-variant-numeric: tabular-nums;
+}
+
+.fa-moves-dock__moves {
+  display: inline-flex;
+  gap: var(--fa-space-xs);
+  margin-left: auto;
+}

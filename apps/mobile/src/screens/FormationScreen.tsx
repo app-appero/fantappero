@@ -33,6 +33,7 @@ import {
   lineupSignature,
 } from "@fantappero/contracts";
 import { theme } from "@fantappero/ui/theme";
+import { useIsFocused } from "@react-navigation/core";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Image, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { AthleteName } from "../athletes/AthleteCard";
@@ -48,6 +49,7 @@ import {
 } from "../api/leagues";
 import { BottomSheet, FormationLegend, FormationPitch, PlayerPickerSheet, TONE_COLOR, probableTone, roleRingColor, type Candidate, type PitchSlot } from "./formation/FormationParts";
 import { LockCountdown } from "../components/LockCountdown";
+import { setMovesDock } from "../layout/movesDock";
 import { OptionPicker } from "../components/OptionPicker";
 import { UiStatePanel } from "../components/UiStatePanel";
 import { PageContainer } from "../layout/PageContainer";
@@ -1072,10 +1074,28 @@ export function FormationScreen() {
     } as const;
   };
 
+  // Quando la riga delle mosse esce dalla vista, mosse e countdown si uniscono nella barra fissa in alto.
+  const isFocused = useIsFocused();
+  const [statusBottom, setStatusBottom] = useState<number | null>(null);
+  const [scrolledPast, setScrolledPast] = useState(false);
+  const draftMove = tacticalEvaluation.wouldConsume && movesApply ? Math.min(movesUsed + 1, maxMoves) : null;
+  useEffect(() => {
+    setMovesDock(scrolledPast && isFocused ? { used: movesUsed, max: maxMoves, draft: draftMove } : null);
+  }, [scrolledPast, isFocused, movesUsed, maxMoves, draftMove]);
+  useEffect(() => () => setMovesDock(null), []);
+
   return (
-    <PageContainer title="Formazione" refreshing={pull.refreshing} onRefresh={pull.onRefresh}>
+    <PageContainer title="Formazione" refreshing={pull.refreshing} onRefresh={pull.onRefresh}
+      onScroll={(event) => {
+        const past = statusBottom != null && event.nativeEvent.contentOffset.y > statusBottom;
+        setScrolledPast((current) => (current === past ? current : past));
+      }}
+    >
       <View style={styles.content}>
-        <View style={styles.statusRow}>
+        <View
+          style={styles.statusRow}
+          onLayout={(event) => setStatusBottom(event.nativeEvent.layout.y + event.nativeEvent.layout.height + 80)}
+        >
           <Text style={styles.turnTitle} testID="formation-cutoff">
             Turno {context.roundNumber} · cutoff {formatDateTime(context.cutoffAt)}
           </Text>
