@@ -959,6 +959,20 @@ export function applyBestLineup(
   );
 }
 
+/** Elimina la bozza del turno: torna la formazione confermata («Ripristina formazione salvata»). */
+export function discardLineupDraft(
+  accessToken: string,
+  leagueId: string,
+  roundId: string,
+  teamId?: string,
+): Promise<LineupContext> {
+  const query = teamId ? `?teamId=${teamId}` : "";
+  return apiRequest<LineupContext>(`/leagues/${leagueId}/turni/${roundId}/formazione/bozza${query}`, {
+    method: "DELETE",
+    accessToken,
+  });
+}
+
 export function saveLineupDraft(
   accessToken: string,
   leagueId: string,

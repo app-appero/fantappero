@@ -31,6 +31,7 @@ import {
   moveBenchToIndex,
   orderBenchForActiveRoles,
   orderedBenchFromRoster,
+  planModuleChange,
   preserveLockedStarters,
   labelFantasyTurnStatus,
   resolveDefaultEuropeanTurn,
@@ -62,6 +63,7 @@ import {
   fetchMyLineup,
   applyBestLineup,
   copyPreviousLineupToDraft,
+  discardLineupDraft,
   saveLineupDraft,
   saveMyLineup,
 } from "../api/leagues";
@@ -652,6 +654,8 @@ export function FormationPage() {
   );
   const [loading, setLoading] = useState(() => (isDemoMode ? demoState === "loading" : true));
   const [busy, setBusy] = useState(false);
+  /** Quale salvataggio è in corso: mostra il caricamento sul tasto giusto. */
+  const [pendingAction, setPendingAction] = useState<"save" | "draft" | "reset" | null>(null);
   const [bestModalOpen, setBestModalOpen] = useState(false);
   const [bestMode, setBestMode] = useState<"keep_module" | "best_module">("keep_module");
   const [loadError, setLoadError] = useState<string | null>(() =>
@@ -732,6 +736,9 @@ export function FormationPage() {
   });
   const maxMoves = context?.maxTacticalMoves ?? MAX_TACTICAL_MOVES;
   const movesUsed = context?.tacticalMovesUsed ?? 0;
+  // Mosse finite: ogni altro cambio verrebbe rifiutato, quindi la formazione non si tocca più.
+  const movesExhausted = movesApply && Boolean(context?.lineup) && movesUsed >= maxMoves;
+  const canModify = Boolean(context?.modificationAllowed) && canEdit && !movesExhausted;
   const tacticalEvaluation = evaluateTacticalMove({
     hasSavedLineup: Boolean(context?.lineup),
     anyAthleteLocked: lockedAthleteIds.length > 0,
@@ -1045,6 +1052,24 @@ export function FormationPage() {
   }
 
   function changeModule(next: FantasyModule) {
+    if (next === moduleCode) {
+      return;
+    }
+    // Formazione completa e bloccati presenti: i bloccati restano esattamente dove sono.
+    if (lockedAthleteIds.length > 0 && displayStarters.every(Boolean)) {
+      const plan = planForModule(next);
+      if (!plan) {
+        pushToast({
+          title: "Con i calciatori già bloccati questo modulo non è più possibile.",
+          variant: "danger",
+        });
+        return;
+      }
+      setModuleCode(next);
+      setStarterIds(plan.starterIds);
+      setBenchIds(plan.benchIds);
+      return;
+    }
     const now = context?.serverNow ? new Date(context.serverNow) : new Date();
     // Solo la bozza corrente come fonte, mai concatenata con
     // `context.lineup.starters` — stesso motivo del calcolo di `reservedIds`.
@@ -1256,6 +1281,7 @@ export function FormationPage() {
     const predictedMove = tacticalEvaluation.wouldConsume && movesApply;
     const movesUsedBefore = movesUsed;
     setBusy(true);
+    setPendingAction("save");
     try {
       const detail = await saveMyLineup(
         session.accessToken,
@@ -1295,6 +1321,7 @@ export function FormationPage() {
         variant: "danger",
       });
     } finally {
+      setPendingAction(null);
       if (isCurrentLineupRequest(requestId)) {
         setBusy(false);
       }
@@ -1389,6 +1416,78 @@ export function FormationPage() {
     }
     applyContext(context);
     pushToast({ title: "Modifiche annullate.", variant: "info" });
+  }
+
+  /** «Ripristina formazione salvata»: butta la bozza e torna alla formazione confermata del turno. */
+  async function resetToSavedLineup() {
+    if (!context) {
+      return;
+    }
+    const session = loadStoredSession();
+    if (!context.draft || isDemoMode || !session?.accessToken || !activeLeagueId || !selectedRoundId) {
+      applyContext(context);
+      pushToast({ title: "Formazione salvata ripristinata.", variant: "info" });
+      return;
+    }
+    const requestId = startLineupRequest();
+    setBusy(true);
+    setPendingAction("reset");
+    try {
+      const detail = await discardLineupDraft(
+        session.accessToken,
+        activeLeagueId,
+        selectedRoundId,
+        targetTeamIdRef.current || undefined,
+      );
+      if (!isCurrentLineupRequest(requestId)) {
+        return;
+      }
+      commitLineup(requestId, detail);
+      pushToast({
+        title: detail.lineup ? "Formazione salvata ripristinata." : "Bozza eliminata.",
+        variant: "success",
+      });
+    } catch (error) {
+      if (!isCurrentLineupRequest(requestId)) {
+        return;
+      }
+      pushToast({ title: getApiErrorMessage(error, "Ripristino non riuscito."), variant: "danger" });
+    } finally {
+      setPendingAction(null);
+      if (isCurrentLineupRequest(requestId)) {
+        setBusy(false);
+      }
+    }
+  }
+
+  /** Formazione incompleta: basta che i titolari bloccati entrino nel nuovo modulo. */
+  function lockedStartersFit(code: FantasyModule): boolean {
+    const now = context?.serverNow ? new Date(context.serverNow) : new Date();
+    const lockedIds = starterIds.filter((id) => id && playerLocked(roster, id, now, lockMarginMinutes));
+    const preserved = preserveLockedStarters({
+      template: starterTemplate(code),
+      currentStarters: [...lockedIds, ...starterIds],
+      roster,
+      now,
+    });
+    return !lockedIds.some((id) => id && !preserved.includes(id));
+  }
+
+  /** Cambio modulo con i bloccati fermi al loro posto (null = modulo non più raggiungibile). */
+  function planForModule(code: FantasyModule) {
+    return planModuleChange({
+      module: code,
+      starterIds: displayStarters,
+      benchIds: displayBench,
+      roleByAthleteId,
+      lockedAthleteIds,
+      unavailableAthleteIds: roster
+        .filter((row) => playerBlocked(roster, row.athleteId))
+        .map((row) => row.athleteId),
+      rosterAthleteIds: roster.map((row) => row.athleteId),
+      previousStarterIds: context?.lineup?.starters.map((player) => player.athleteId) ?? [],
+      previousBenchIds: context?.lineup?.bench.map((player) => player.athleteId) ?? [],
+    });
   }
 
   async function applyBestFormation(mode: "keep_module" | "best_module" = "keep_module") {
@@ -1501,6 +1600,7 @@ export function FormationPage() {
     }
     const requestId = startLineupRequest();
     setBusy(true);
+    setPendingAction("draft");
     try {
       const detail = await saveLineupDraft(
         session.accessToken,
@@ -1530,6 +1630,7 @@ export function FormationPage() {
         variant: "danger",
       });
     } finally {
+      setPendingAction(null);
       if (isCurrentLineupRequest(requestId)) {
         setBusy(false);
       }
@@ -1681,6 +1782,17 @@ export function FormationPage() {
         };
       });
   };
+
+  // Moduli non più raggiungibili senza spostare i bloccati: nel menu compaiono con il lucchetto.
+  const blockedModules = new Set<FantasyModule>(
+    canModify && lockedAthleteIds.length > 0
+      ? APPROVED_MODULES.filter(
+          (code) =>
+            code !== moduleCode &&
+            (displayStarters.every(Boolean) ? planForModule(code) === null : !lockedStartersFit(code)),
+        )
+      : [],
+  );
 
   return (
     <PageContainer
@@ -1877,7 +1989,7 @@ export function FormationPage() {
                   type="button"
                   variant="secondary"
                   size="sm"
-                  disabled={busy || !canEdit}
+                  disabled={busy || !canModify}
                   onClick={() => fixActiveBench()}
                   data-testid="formation-fix-bench"
                 >
@@ -1912,7 +2024,7 @@ export function FormationPage() {
               <Button
                 type="button"
                 variant="secondary"
-                disabled={busy || !context.modificationAllowed || !canEdit}
+                disabled={busy || !canModify}
                 onClick={() => void copyFromPrevious()}
                 data-testid="formation-copy"
               >
@@ -1922,7 +2034,7 @@ export function FormationPage() {
             <Button
               type="button"
               variant="secondary"
-              disabled={busy || !context.modificationAllowed || !canEdit}
+              disabled={busy || !canModify}
               onClick={() => setBestModalOpen(true)}
               data-testid="formation-apply-best"
             >
@@ -1993,13 +2105,27 @@ export function FormationPage() {
             >
               Annulla modifiche
             </Button>
+            {context.lineup && (context.draft || hasUnsavedChanges) ? (
+              <Button
+                type="button"
+                variant="ghost"
+                disabled={busy}
+                loading={pendingAction === "reset"}
+                onClick={() => void resetToSavedLineup()}
+                title={`Elimina bozza e modifiche e rimette la formazione confermata di questo turno (${context.lineup.module}).`}
+                data-testid="formation-reset"
+              >
+                Ripristina formazione salvata
+              </Button>
+            ) : null}
             {/* Con la formazione tutta vuota non c'è nulla da salvare in bozza. */}
             {displayStarters.some(Boolean) ? (
               <Button
                 type="button"
                 variant="secondary"
-                disabled={busy || !context.modificationAllowed || !canEdit}
+                disabled={busy || !canModify}
                 onClick={() => void saveDraft()}
+                loading={pendingAction === "draft"}
                 data-testid="formation-draft"
               >
                 Salva bozza
@@ -2010,15 +2136,15 @@ export function FormationPage() {
               variant="primary"
               disabled={
                 busy ||
-                !context.modificationAllowed ||
-                !canEdit ||
+                !canModify ||
                 tacticalSaveBlocked ||
                 !clientEvaluation.valid
               }
               onClick={() => void save()}
+              loading={pendingAction === "save"}
               data-testid="formation-save"
             >
-              Salva formazione
+              {pendingAction === "save" ? "Salvataggio…" : "Salva formazione"}
             </Button>
           </div>
           </aside>
@@ -2031,15 +2157,14 @@ export function FormationPage() {
               onChange={(event) => changeModule(event.target.value as FantasyModule)}
               options={APPROVED_MODULES.map((code) => {
                 const moduleMeta = context.modules.find((item) => item.code === code);
-                return {
-                  value: code,
-                  label: moduleMeta
-                    ? `${code} (1P–${moduleMeta.defenders}D–${moduleMeta.midfielders}C–${moduleMeta.forwards}A)`
-                    : code,
-                };
+                const label = moduleMeta
+                  ? `${code} (1P–${moduleMeta.defenders}D–${moduleMeta.midfielders}C–${moduleMeta.forwards}A)`
+                  : code;
+                const blocked = blockedModules.has(code);
+                return { value: code, label: blocked ? `🔒 ${label}` : label, disabled: blocked };
               })}
               data-testid="formation-module"
-              disabled={!context.modificationAllowed || !canEdit}
+              disabled={!canModify}
             />
             <Badge
               variant={movesRemaining === 0 ? "danger" : movesRemaining === 1 ? "warning" : "neutral"}
@@ -2048,6 +2173,11 @@ export function FormationPage() {
             >
               Mosse usate {movesUsed}/{maxMoves}
             </Badge>
+            {context.modificationAllowed && movesExhausted ? (
+              <span className="fa-formation-layout__moves-hint" data-testid="formation-moves-exhausted">
+                🔒 Hai usato tutte e {maxMoves} le mosse: la formazione resta questa fino alla fine del turno.
+              </span>
+            ) : null}
             {tacticalEvaluation.wouldConsume && movesApply ? (
               <Badge
                 variant="accent"
@@ -2103,7 +2233,7 @@ export function FormationPage() {
                   tone={currentId ? probableState(roster, currentId) : null}
                   countdown={currentId ? lockLabel(currentId) : null}
                   locked={lockedSlot}
-                  disabled={!context.modificationAllowed || !canEdit}
+                  disabled={!canModify}
                   hint={
                     lockedSlot
                       ? "Partita già iniziata: sostituirlo con un altro calciatore viene rifiutato."
@@ -2149,7 +2279,7 @@ export function FormationPage() {
                             name={playerName(roster, athleteId)}
                             role={playerRole(roster, athleteId)}
                             locked={playerLocked(roster, athleteId, clock, lockMarginMinutes)}
-                            disabled={!context.modificationAllowed || !canEdit}
+                            disabled={!canModify}
                             options={displayBench.map((_, target) => ({
                               value: String(target),
                               label: `${target + 1}°`,
@@ -2187,7 +2317,7 @@ export function FormationPage() {
                             name={playerName(roster, athleteId)}
                             role={playerRole(roster, athleteId)}
                             locked={playerLocked(roster, athleteId, clock, lockMarginMinutes)}
-                            disabled={!context.modificationAllowed || !canEdit}
+                            disabled={!canModify}
                             options={displayBench.map((_, target) => ({
                               value: String(target),
                               label: `${target + 1}°`,

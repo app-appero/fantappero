@@ -5,6 +5,7 @@ import {
   copyPreviousLineup,
   blockingLineupSaveIssue,
   evaluateBenchOrderLock,
+  planModuleChange,
   evaluateLineup,
   orderBenchForActiveRoles,
   benchActiveShortfall,
@@ -345,13 +346,22 @@ describe("fantasyLineups rules", () => {
       }),
       [],
     );
-    const otherRole = evaluateBenchOrderLock({
+    const sameRoleLockedAfter = evaluateBenchOrderLock({
       previousBench: previous,
       proposedBench: proposed,
       lockedAthleteIds: ["locked-b"],
-      roleByAthleteId: { ...sameRole, x: "D" },
+      roleByAthleteId: { ...sameRole, x: "D", "locked-b": "D" },
     });
-    assert.ok(otherRole.some((item) => item.code === "bench_order_locked"));
+    assert.ok(sameRoleLockedAfter.some((item) => item.code === "bench_order_locked"));
+    assert.deepEqual(
+      evaluateBenchOrderLock({
+        previousBench: previous,
+        proposedBench: proposed,
+        lockedAthleteIds: ["locked-b"],
+        roleByAthleteId: { ...sameRole, x: "D" },
+      }),
+      [],
+    );
     const withoutRoles = evaluateBenchOrderLock({
       previousBench: previous,
       proposedBench: proposed,
@@ -708,5 +718,70 @@ describe("fantasyLineups rules", () => {
     });
     assert.equal(blocked.blocked, true);
     assert.ok(blocked.issues.some((item) => item.code === "athlete_kickoff_locked"));
+  });
+
+  describe("planModuleChange", () => {
+    const ids = (prefix: string, count: number) => Array.from({ length: count }, (_, i) => `${prefix}${i + 1}`);
+    const P = ids("P", 3);
+    const D = ids("D", 8);
+    const C = ids("C", 8);
+    const A = ids("A", 6);
+    const roster = [...P, ...D, ...C, ...A];
+    const roles: Record<string, string> = Object.fromEntries(roster.map((id) => [id, id[0] as string]));
+    const starters = [P[0], ...D.slice(0, 4), ...C.slice(0, 3), ...A.slice(0, 3)] as string[];
+    // Panchina attiva 1P·3D·3C·3A, poi tribuna.
+    const bench = [P[1], D[4], D[5], D[6], C[3], C[4], C[5], A[3], A[4], A[5], P[2], D[7], C[6], C[7]] as string[];
+    const base = {
+      starterIds: starters,
+      benchIds: bench,
+      roleByAthleteId: roles,
+      rosterAthleteIds: roster,
+      previousStarterIds: starters,
+      previousBenchIds: bench,
+    };
+
+    it("keeps locked players exactly where they are when the module changes", () => {
+      const locked = ["D1", "A4", "C7"];
+      const plan = planModuleChange({ ...base, module: "4-4-2", lockedAthleteIds: locked });
+      assert.ok(plan);
+      assert.ok(plan.starterIds.includes("D1"));
+      assert.equal(plan.benchIds.indexOf("A4"), bench.indexOf("A4"));
+      assert.equal(plan.benchIds.indexOf("C7"), bench.indexOf("C7"));
+      assert.equal(plan.starterIds.filter((id) => roles[id] === "C").length, 4);
+      assert.equal(plan.starterIds.filter((id) => roles[id] === "A").length, 2);
+      const asPlayers = (list: string[]) => list.map((athleteId) => ({ athleteId, role: roles[athleteId] as "P" }));
+      assert.ok(
+        evaluateLineup({
+          module: "4-4-2",
+          starters: asPlayers(plan.starterIds),
+          bench: asPlayers(plan.benchIds),
+          rosterAthleteIds: roster,
+        }).valid,
+      );
+      assert.deepEqual(
+        evaluateBenchOrderLock({
+          previousBench: bench,
+          proposedBench: plan.benchIds,
+          lockedAthleteIds: locked,
+          roleByAthleteId: roles,
+        }),
+        [],
+      );
+    });
+
+    it("refuses a module that would push a locked starter off the pitch", () => {
+      const plan = planModuleChange({ ...base, module: "4-4-2", lockedAthleteIds: ["A1", "A2", "A3"] });
+      assert.equal(plan, null);
+    });
+
+    it("refuses a module that needs a locked bench player on the pitch", () => {
+      // 4-4-2 → serve un centrocampista in più, ma tutti quelli in panchina e tribuna sono bloccati.
+      const plan = planModuleChange({
+        ...base,
+        module: "4-4-2",
+        lockedAthleteIds: ["C4", "C5", "C6", "C7", "C8"],
+      });
+      assert.equal(plan, null);
+    });
   });
 });

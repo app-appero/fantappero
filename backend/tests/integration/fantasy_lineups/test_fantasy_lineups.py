@@ -1668,3 +1668,124 @@ def test_starter_bench_swap_with_a_locked_player_lower_on_the_bench_counts_one_m
     as_operator = client.put(base, headers=headers, json=again)
     assert as_operator.status_code == 200, as_operator.json()
     assert as_operator.json()["tacticalMovesUsed"] == 2
+
+
+def test_discarding_the_draft_restores_the_confirmed_lineup(
+    client: TestClient,
+    db_session: Session,
+    competition_ids: list[str],
+) -> None:
+    token, _ = _register_and_login(client, "lineup.draft.reset@example.com")
+    league_id = _create_league(client, token, competition_ids, "Lega Ripristino")
+    client.get(f"/leagues/{league_id}/rosa", headers={"Authorization": f"Bearer {token}"})
+    grouped = _seed_roster_athletes(db_session, id_offset=9_740_000)
+    athletes = _fill_validated_roster(db_session, league_id, grouped)
+    existing_rounds = db_session.scalar(
+        select(func.max(FantasyRound.number)).where(FantasyRound.league_id == UUID(league_id))
+    )
+    fantasy_round, _clubs = _create_open_round(
+        db_session,
+        league_id,
+        cutoff=datetime.now(UTC) + timedelta(hours=5),
+        id_offset=9_750_000,
+        competition_ids=competition_ids,
+        number=(existing_rounds or 0) + 1,
+    )
+    headers = {"Authorization": f"Bearer {token}"}
+    base = f"/leagues/{league_id}/turni/{fantasy_round.id}/formazione"
+    payload = _lineup_payload(athletes, "4-3-3")
+    assert client.put(base, headers=headers, json=payload).status_code == 200
+    draft = client.put(
+        f"{base}/bozza",
+        headers=headers,
+        json={
+            "module": "4-4-2",
+            "starterAthleteIds": [*payload["starterAthleteIds"][:4], *[""] * 7],
+            "benchAthleteIds": payload["benchAthleteIds"][:3],
+        },
+    )
+    assert draft.status_code == 200
+    assert draft.json()["draft"] is not None
+
+    reset = client.delete(f"{base}/bozza", headers=headers)
+    assert reset.status_code == 200
+    body = reset.json()
+    assert body["draft"] is None
+    assert body["lineup"]["module"] == "4-3-3"
+    assert client.get(base, headers=headers).json()["draft"] is None
+
+
+def test_module_change_after_kickoff_keeps_locked_players_in_place(
+    client: TestClient,
+    db_session: Session,
+    competition_ids: list[str],
+) -> None:
+    """4-3-3 -> 4-4-2 a turno iniziato: un difensore titolare, un attaccante in panchina e un
+    centrocampista in tribuna sono bloccati e restano dove sono. Sale un centrocampista dalla
+    tribuna e l'attaccante che esce ne prende il posto: il server accetta e conta una mossa."""
+    token, _ = _register_and_login(client, "lineup.module.locked@example.com")
+    league_id = _create_league(client, token, competition_ids, "Lega Modulo Bloccati")
+    client.get(f"/leagues/{league_id}/rosa", headers={"Authorization": f"Bearer {token}"})
+    grouped = _seed_roster_athletes(db_session, id_offset=9_760_000)
+    athletes = _fill_validated_roster(db_session, league_id, grouped)
+    existing_rounds = db_session.scalar(
+        select(func.max(FantasyRound.number)).where(FantasyRound.league_id == UUID(league_id))
+    )
+    fantasy_round, clubs = _create_open_round(
+        db_session,
+        league_id,
+        cutoff=datetime.now(UTC) + timedelta(hours=2),
+        extra_kickoff=datetime.now(UTC) + timedelta(hours=5),
+        id_offset=9_770_000,
+        competition_ids=competition_ids,
+        number=(existing_rounds or 0) + 1,
+    )
+    headers = {"Authorization": f"Bearer {token}"}
+    base = f"/leagues/{league_id}/turni/{fantasy_round.id}/formazione"
+    payload = _lineup_payload(athletes, "4-3-3")
+    by_id = {str(athlete.id): athlete for athlete in athletes}
+    role = {key: athlete.canonical_name[0] for key, athlete in by_id.items()}
+    bench = list(payload["benchAthleteIds"])
+    starters = list(payload["starterAthleteIds"])
+
+    locked_defender = next(item for item in starters if role[item] == "D")
+    locked_bench_forward = next(item for item in bench[:10] if role[item] == "A")
+    tribuna_mids = [item for item in bench[10:] if role[item] == "C"]
+    assert len(tribuna_mids) >= 2
+    locked_tribuna_mid, promoted_mid = tribuna_mids[0], tribuna_mids[-1]
+    for item in by_id:
+        club = (
+            clubs[0]
+            if item in {locked_defender, locked_bench_forward, locked_tribuna_mid}
+            else clubs[2]
+        )
+        _set_athlete_club(db_session, by_id[item], club)
+
+    assert client.put(base, headers=headers, json=payload).status_code == 200
+    first_fixture = next(
+        item
+        for item in _round_fixtures(db_session, fantasy_round.id)
+        if item.home_club_id == clubs[0].id
+    )
+    first_fixture.kickoff_at = datetime.now(UTC) - timedelta(minutes=5)
+    first_fixture.status_short = "1H"
+    db_session.commit()
+
+    demoted_forward = [item for item in starters if role[item] == "A"][-1]
+    new_starters = [
+        *[item for item in starters if role[item] in {"P", "D"}],
+        *[item for item in starters if role[item] == "C"],
+        promoted_mid,
+        *[item for item in starters if role[item] == "A" and item != demoted_forward],
+    ]
+    new_bench = [demoted_forward if item == promoted_mid else item for item in bench]
+    assert new_bench.index(locked_bench_forward) == bench.index(locked_bench_forward)
+
+    response = client.put(
+        base,
+        headers=headers,
+        json={"module": "4-4-2", "starterAthleteIds": new_starters, "benchAthleteIds": new_bench},
+    )
+    assert response.status_code == 200, response.json()
+    assert response.json()["lineup"]["module"] == "4-4-2"
+    assert response.json()["tacticalMovesUsed"] == 1

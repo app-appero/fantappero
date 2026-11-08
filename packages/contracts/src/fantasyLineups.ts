@@ -788,8 +788,9 @@ export function moveBenchItem(
  * newcomers must stay after every locked player still on the bench.
  */
 /**
- * Eccezione allo scavalcamento: scambio 1:1 titolare <-> panchina. Chi entra prende il
- * posto esatto di un pari ruolo uscito dalla panchina e i bloccati non si spostano.
+ * Eccezioni allo scavalcamento, purché i bloccati non si spostino: chi entra prende il posto
+ * esatto di un pari ruolo uscito (scambio 1:1), oppure dopo di lui non ci sono bloccati del
+ * suo ruolo (es. cambio modulo). I cambi automatici vanno solo a parità di ruolo.
  */
 export function evaluateBenchOrderLock(input: {
   previousBench: readonly string[];
@@ -847,13 +848,16 @@ export function evaluateBenchOrderLock(input: {
       const departed = index < previous.length ? previous[index] : undefined;
       const incomingRole = roles?.[athleteId];
       const sameRoleSlot =
-        lockedKeepPosition &&
         roles !== undefined &&
         departed !== undefined &&
         !proposedSet.has(departed) &&
         incomingRole != null &&
         incomingRole === roles[departed];
-      if (sameRoleSlot) {
+      const noLockedSameRoleAfter =
+        roles !== undefined &&
+        incomingRole != null &&
+        !proposed.slice(index + 1).some((other) => locked.has(other) && roles[other] === incomingRole);
+      if (lockedKeepPosition && (sameRoleSlot || noLockedSameRoleAfter)) {
         continue;
       }
       issues.push(issue("bench_order_locked", BENCH_ORDER_LOCKED_MESSAGE));
@@ -1130,4 +1134,186 @@ export interface AiLineupRun {
   dryRun: boolean;
   teams: AiLineupTeamResult[];
   summary: string;
+}
+
+export type ModuleChangePlan = { starterIds: string[]; benchIds: string[] };
+
+function combinations<T>(items: readonly T[], size: number, limit: number): T[][] {
+  const out: T[][] = [];
+  const walk = (start: number, picked: T[]) => {
+    if (out.length >= limit) {
+      return;
+    }
+    if (picked.length === size) {
+      out.push([...picked]);
+      return;
+    }
+    for (let index = start; index < items.length; index += 1) {
+      picked.push(items[index] as T);
+      walk(index + 1, picked);
+      picked.pop();
+    }
+  };
+  walk(0, []);
+  return out;
+}
+
+/**
+ * Cambio modulo a turno iniziato: i calciatori bloccati restano esattamente dove sono (titolari
+ * restano titolari, in panchina e in tribuna stessa posizione). Cerca una disposizione valida:
+ * tiene i titolari non bloccati finché il ruolo lo consente, fa salire dalla panchina chi manca
+ * (stesso ruolo, non bloccato, disponibile) e manda in panchina chi esce. Restituisce `null` se
+ * il modulo non è più raggiungibile: la UI lo mostra con il lucchetto.
+ */
+export function planModuleChange(input: {
+  module: FantasyModule;
+  starterIds: readonly string[];
+  benchIds: readonly string[];
+  roleByAthleteId: Readonly<Record<string, string | null | undefined>>;
+  lockedAthleteIds: readonly string[];
+  unavailableAthleteIds?: readonly string[];
+  rosterAthleteIds: readonly string[];
+  previousStarterIds: readonly string[];
+  previousBenchIds: readonly string[];
+}): ModuleChangePlan | null {
+  const roles = input.roleByAthleteId;
+  const locked = new Set(input.lockedAthleteIds.filter(Boolean));
+  const unavailable = new Set((input.unavailableAthleteIds ?? []).filter(Boolean));
+  const template = starterTemplate(input.module);
+  const need = emptyCounts();
+  for (const role of template) {
+    need[role] += 1;
+  }
+  const currentStarters = input.starterIds.filter(Boolean);
+  const bench = input.benchIds.filter(Boolean);
+  const keep: Record<LineupRole, string[]> = { P: [], D: [], C: [], A: [] };
+  const demoted: string[] = [];
+  const missing = emptyCounts();
+  const allRoles = ["P", "D", "C", "A"] as const;
+  for (const role of allRoles) {
+    const ofRole = currentStarters.filter((id) => roles[id] === role);
+    const lockedOfRole = ofRole.filter((id) => locked.has(id));
+    if (lockedOfRole.length > need[role]) {
+      return null;
+    }
+    const unlockedOfRole = ofRole.filter((id) => !locked.has(id));
+    const room = need[role] - lockedOfRole.length;
+    keep[role] = [...lockedOfRole, ...unlockedOfRole.slice(0, room)];
+    demoted.push(...unlockedOfRole.slice(room));
+    missing[role] = need[role] - keep[role].length;
+  }
+  // Titolari senza ruolo riconosciuto: non possono restare in un modulo per ruoli.
+  for (const id of currentStarters) {
+    const role = roles[id];
+    if (role !== "P" && role !== "D" && role !== "C" && role !== "A") {
+      if (locked.has(id)) {
+        return null;
+      }
+      demoted.push(id);
+    }
+  }
+
+  // Scelte di chi sale dalla panchina, ruolo per ruolo (poche combinazioni: bastano).
+  let choices: string[][] = [[]];
+  for (const role of allRoles) {
+    if (missing[role] === 0) {
+      continue;
+    }
+    const candidates = bench.filter((id) => roles[id] === role && !locked.has(id) && !unavailable.has(id));
+    if (candidates.length < missing[role]) {
+      return null;
+    }
+    const picks = combinations(candidates, missing[role], 40);
+    const next: string[][] = [];
+    for (const base of choices) {
+      for (const pick of picks) {
+        next.push([...base, ...pick]);
+        if (next.length >= 200) {
+          break;
+        }
+      }
+    }
+    choices = next;
+  }
+
+  const referenceBench = input.previousBenchIds.filter(Boolean).length > 0 ? input.previousBenchIds.filter(Boolean) : bench;
+  const previousStarters = input.previousStarterIds.filter(Boolean);
+  const isValid = (starters: string[], proposedBench: string[]): boolean => {
+    for (const id of locked) {
+      const before = referenceBench.indexOf(id);
+      if (before >= 0 && proposedBench.indexOf(id) !== before) {
+        return false;
+      }
+      if (previousStarters.includes(id) && !starters.includes(id)) {
+        return false;
+      }
+    }
+    const asPlayers = (ids: readonly string[]) =>
+      ids.map((athleteId) => ({ athleteId, role: (roles[athleteId] as LineupRole | undefined) ?? null }));
+    const evaluation = evaluateLineup({
+      module: input.module,
+      starters: asPlayers(starters),
+      bench: asPlayers(proposedBench),
+      rosterAthleteIds: input.rosterAthleteIds,
+    });
+    if (!evaluation.valid) {
+      return false;
+    }
+    if (previousStarters.length === 0 && input.previousBenchIds.length === 0) {
+      return true;
+    }
+    const lockIssues = evaluateProgressiveLock({
+      previousSlots: slotsFromLineupIds(previousStarters, input.previousBenchIds),
+      proposedSlots: slotsFromLineupIds(starters, proposedBench),
+      lockedAthleteIds: [...locked],
+    });
+    const orderIssues = evaluateBenchOrderLock({
+      previousBench: input.previousBenchIds,
+      proposedBench,
+      lockedAthleteIds: [...locked],
+      roleByAthleteId: roles,
+    });
+    return lockIssues.length === 0 && orderIssues.length === 0;
+  };
+
+  for (const promoted of choices) {
+    const promotedByRole: Record<LineupRole, string[]> = { P: [], D: [], C: [], A: [] };
+    for (const id of promoted) {
+      const role = roles[id] as LineupRole;
+      promotedByRole[role].push(id);
+    }
+    const queues: Record<LineupRole, string[]> = {
+      P: [...keep.P, ...promotedByRole.P],
+      D: [...keep.D, ...promotedByRole.D],
+      C: [...keep.C, ...promotedByRole.C],
+      A: [...keep.A, ...promotedByRole.A],
+    };
+    const starters = template.map((role) => queues[role].shift() ?? "");
+    const promotedSet = new Set(promoted);
+
+    // 1) chi scende prende i posti lasciati liberi (stesso ruolo prima), il resto in coda.
+    const holes: string[] = [];
+    const waiting = [...demoted];
+    for (const id of bench) {
+      if (!promotedSet.has(id)) {
+        holes.push(id);
+        continue;
+      }
+      const sameRole = waiting.findIndex((other) => roles[other] === roles[id]);
+      const takeIndex = sameRole >= 0 ? sameRole : waiting.length > 0 ? 0 : -1;
+      if (takeIndex >= 0) {
+        holes.push(waiting.splice(takeIndex, 1)[0] as string);
+      }
+    }
+    const filled = [...holes, ...waiting];
+    if (isValid(starters, filled)) {
+      return { starterIds: starters, benchIds: filled };
+    }
+    // 2) chi scende va in coda (tribuna), gli altri scorrono.
+    const tail = [...bench.filter((id) => !promotedSet.has(id)), ...demoted];
+    if (isValid(starters, tail)) {
+      return { starterIds: starters, benchIds: tail };
+    }
+  }
+  return null;
 }

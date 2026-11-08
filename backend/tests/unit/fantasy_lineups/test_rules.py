@@ -576,14 +576,23 @@ def test_bench_order_lock_allows_same_role_one_for_one_swap() -> None:
         == ()
     )
 
-    other_role = {**same_role, "x": "D"}
+    # Chi entra è un difensore e più in basso c'è un difensore bloccato: ne cambierebbe la priorità.
     rejected = evaluate_bench_order_lock(
         previous_bench=previous,
         proposed_bench=proposed,
         locked_athlete_ids=["locked-b"],
-        role_by_athlete_id=other_role,
+        role_by_athlete_id={**same_role, "x": "D", "locked-b": "D"},
     )
     assert any(issue.code == "bench_order_locked" for issue in rejected)
+
+    # Cambio modulo: entra un difensore, il bloccato più in basso è un centrocampista.
+    other_role_ok = evaluate_bench_order_lock(
+        previous_bench=previous,
+        proposed_bench=proposed,
+        locked_athlete_ids=["locked-b"],
+        role_by_athlete_id={**same_role, "x": "D"},
+    )
+    assert other_role_ok == ()
 
     without_roles = evaluate_bench_order_lock(
         previous_bench=previous,
@@ -592,11 +601,12 @@ def test_bench_order_lock_allows_same_role_one_for_one_swap() -> None:
     )
     assert any(issue.code == "bench_order_locked" for issue in without_roles)
 
+    # Due ingressi davanti: il bloccato scala di un posto, e questo non è mai ammesso.
     shifted = evaluate_bench_order_lock(
         previous_bench=previous,
-        proposed_bench=["x", "u1", "locked-b", "u2"],
+        proposed_bench=["x", "z", "u1", "locked-b", "u2"],
         locked_athlete_ids=["locked-b"],
-        role_by_athlete_id=same_role,
+        role_by_athlete_id={**same_role, "z": "D"},
     )
     assert any(issue.code == "bench_order_locked" for issue in shifted)
 

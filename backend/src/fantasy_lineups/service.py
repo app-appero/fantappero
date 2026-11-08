@@ -1035,6 +1035,25 @@ class FantasyLineupService:
             fantasy_team_id=team.id,
         )
 
+    def discard_my_draft(
+        self,
+        league_access: LeagueAccess,
+        round_id: UUID,
+        target_team_id: UUID | None = None,
+    ) -> LineupContextResponse:
+        """Elimina la bozza: l'editor torna alla formazione confermata del turno (se c'è)."""
+        fantasy_round = self._load_round(league_access.league.id, round_id, for_update=True)
+        team = self._resolve_lineup_team(league_access, target_team_id, for_update=True)
+        self._session.execute(
+            delete(LineupDraft).where(
+                LineupDraft.round_id == fantasy_round.id,
+                LineupDraft.fantasy_team_id == team.id,
+            )
+        )
+        self._session.commit()
+        logger.info("fantasy_lineup_draft_discarded")
+        return self.get_my_lineup(league_access, round_id, target_team_id)
+
     def _insert_players(
         self,
         *,

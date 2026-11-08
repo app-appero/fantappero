@@ -652,9 +652,10 @@ def evaluate_bench_order_lock(
 ) -> tuple[LineupIssue, ...]:
     """Reject bench-order changes that cross a locked player (no retroactive advantage).
 
-    Eccezione: uno scambio 1:1 titolare <-> panchina. Chi entra in panchina prende il
-    posto esatto di chi ne esce, con lo stesso ruolo, e ogni calciatore bloccato resta
-    nella sua posizione: nessun vantaggio retroattivo (sono entrambi non bloccati).
+    Eccezioni, purché ogni bloccato resti nella sua posizione: chi entra in panchina prende
+    il posto esatto di un pari ruolo uscito (scambio 1:1), oppure dopo di lui non ci sono
+    bloccati del suo stesso ruolo (es. cambio modulo). Nessun vantaggio retroattivo: i cambi
+    automatici vanno solo a parità di ruolo.
     """
     locked = {item for item in locked_athlete_ids if item not in {None, ""}}
     previous = [item for item in previous_bench if item not in {None, ""}]
@@ -694,12 +695,21 @@ def evaluate_bench_order_lock(
         for index, athlete_id in enumerate(proposed):
             if athlete_id in previous_set or index >= last_locked_proposed:
                 continue
-            if locked_keep_position and _replaces_same_role_slot(
-                index=index,
-                athlete_id=athlete_id,
-                previous=previous,
-                proposed_set=proposed_set,
-                role_by_athlete_id=role_by_athlete_id,
+            if locked_keep_position and (
+                _replaces_same_role_slot(
+                    index=index,
+                    athlete_id=athlete_id,
+                    previous=previous,
+                    proposed_set=proposed_set,
+                    role_by_athlete_id=role_by_athlete_id,
+                )
+                or _no_locked_same_role_after(
+                    index=index,
+                    athlete_id=athlete_id,
+                    proposed=proposed,
+                    locked=locked,
+                    role_by_athlete_id=role_by_athlete_id,
+                )
             ):
                 continue
             issues.append(
@@ -708,6 +718,29 @@ def evaluate_bench_order_lock(
             break
 
     return _dedupe_issues(issues)
+
+
+def _no_locked_same_role_after(
+    *,
+    index: int,
+    athlete_id: object,
+    proposed: Sequence[object],
+    locked: set[object],
+    role_by_athlete_id: Mapping[object, object] | None,
+) -> bool:
+    """True se dopo `index` non c'è un bloccato dello stesso ruolo di chi entra.
+
+    I cambi automatici vanno solo a parità di ruolo: chi entra davanti a bloccati di altri
+    ruoli non cambia la priorità di nessun bloccato (nessun vantaggio retroattivo).
+    """
+    if role_by_athlete_id is None:
+        return False
+    role = role_by_athlete_id.get(athlete_id)
+    if role is None:
+        return False
+    return not any(
+        item in locked and role_by_athlete_id.get(item) == role for item in proposed[index + 1 :]
+    )
 
 
 def _replaces_same_role_slot(

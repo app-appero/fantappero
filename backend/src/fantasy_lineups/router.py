@@ -177,6 +177,23 @@ def save_my_lineup_draft(
         return _error_response(exc)
 
 
+@router.delete(
+    "/{league_id}/turni/{round_id}/formazione/bozza",
+    response_model=LineupContextResponse,
+)
+def discard_my_lineup_draft(
+    round_id: UUID,
+    team_id: LineupTeamId = None,
+    league_access: LeagueAccess = Depends(require_league_permissions(Permission.ROSTER_EDIT)),
+    service: FantasyLineupService = Depends(get_fantasy_lineup_service),
+) -> LineupContextResponse | JSONResponse:
+    """Elimina la bozza e restituisce la formazione confermata del turno («Ripristina»)."""
+    try:
+        return service.discard_my_draft(league_access, round_id, team_id)
+    except AuthError as exc:
+        return _error_response(exc)
+
+
 def _to_effective_lineup_response(row: object) -> EffectiveLineupResponse:
     return EffectiveLineupResponse(
         id=str(row.id),

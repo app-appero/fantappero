@@ -31,11 +31,12 @@ import {
   slotsFromLineupIds,
   starterTemplate,
   lineupSignature,
+  planModuleChange,
 } from "@fantappero/contracts";
 import { theme } from "@fantappero/ui/theme";
 import { useIsFocused } from "@react-navigation/core";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { Image, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { AthleteName } from "../athletes/AthleteCard";
 import {
   fetchFantasyTeams,
@@ -44,6 +45,7 @@ import {
   applyBestLineup,
   copyPreviousLineupToDraft,
   runAiLineups,
+  discardLineupDraft,
   saveLineupDraft,
   saveMyLineup,
 } from "../api/leagues";
@@ -127,6 +129,8 @@ export function FormationScreen() {
   const [benchIds, setBenchIds] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
+  /** Quale salvataggio è in corso: serve a mostrare il caricamento sul tasto giusto. */
+  const [pendingAction, setPendingAction] = useState<"save" | "draft" | "reset" | null>(null);
   const [bestModalOpen, setBestModalOpen] = useState(false);
   const [bestSheetOpen, setBestSheetOpen] = useState(false);
   const [bestMode, setBestMode] = useState<"keep_module" | "best_module">("keep_module");
@@ -602,6 +606,7 @@ export function FormationScreen() {
     const predictedMove = tacticalEvaluation.wouldConsume && movesApply;
     const movesUsedBefore = movesUsed;
     setBusy(true);
+    setPendingAction("save");
     try {
       const detail = await saveMyLineup(
         accessToken,
@@ -627,6 +632,7 @@ export function FormationScreen() {
       setActionError(getApiErrorMessage(error, "Salvataggio formazione non riuscito."));
     } finally {
       setBusy(false);
+      setPendingAction(null);
     }
   }
 
@@ -740,6 +746,7 @@ export function FormationScreen() {
       return;
     }
     setBusy(true);
+    setPendingAction("draft");
     try {
       const detail = await saveLineupDraft(
         accessToken,
@@ -759,7 +766,62 @@ export function FormationScreen() {
       setActionError(getApiErrorMessage(error, "Salvataggio bozza non riuscito."));
     } finally {
       setBusy(false);
+      setPendingAction(null);
     }
+  }
+
+  /** «Ripristina formazione salvata»: butta la bozza e torna alla formazione confermata del turno. */
+  async function resetToSavedLineup() {
+    setActionError(null);
+    setActionMessage(null);
+    if (!accessToken || !activeLeagueId || !selectedRoundId || !context) {
+      return;
+    }
+    if (!context.draft) {
+      applyEditor(context);
+      setActionMessage("Formazione salvata ripristinata.");
+      return;
+    }
+    setBusy(true);
+    setPendingAction("reset");
+    try {
+      const detail = await discardLineupDraft(accessToken, activeLeagueId, selectedRoundId, targetTeamId || undefined);
+      setContext(detail);
+      applyEditor(detail);
+      setActionMessage(detail.lineup ? "Formazione salvata ripristinata." : "Bozza eliminata.");
+    } catch (error) {
+      setActionError(getApiErrorMessage(error, "Ripristino non riuscito."));
+    } finally {
+      setBusy(false);
+      setPendingAction(null);
+    }
+  }
+
+  /** Formazione incompleta: basta che i titolari bloccati entrino nel nuovo modulo. */
+  function lockedStartersFit(code: FantasyModule): boolean {
+    const lockedIds = starterIds.filter((id) => id && playerLocked(id));
+    const preserved = preserveLockedStarters({
+      template: starterTemplate(code),
+      currentStarters: [...lockedIds, ...starterIds],
+      roster,
+      now: clock,
+    });
+    return !lockedIds.some((id) => id && !preserved.includes(id));
+  }
+
+  /** Cambio modulo con i bloccati fermi al loro posto (null = modulo non più raggiungibile). */
+  function planForModule(code: FantasyModule) {
+    return planModuleChange({
+      module: code,
+      starterIds: displayStarters,
+      benchIds: displayBench,
+      roleByAthleteId,
+      lockedAthleteIds,
+      unavailableAthleteIds: roster.filter((row) => playerBlocked(row.athleteId)).map((row) => row.athleteId),
+      rosterAthleteIds: roster.map((row) => row.athleteId),
+      previousStarterIds: context?.lineup?.starters.map((player) => player.athleteId) ?? [],
+      previousBenchIds: context?.lineup?.bench.map((player) => player.athleteId) ?? [],
+    });
   }
 
   // Hook prima di ogni `return` anticipato (caricamento, errore, vuoto): altrimenti, quando
@@ -845,7 +907,18 @@ export function FormationScreen() {
   const filledCount = displayStarters.filter(Boolean).length;
   const totalSlots = template.length;
   const missing = totalSlots - filledCount;
-  const editable = context.modificationAllowed && canEdit;
+  // Mosse finite: ogni altro cambio verrebbe rifiutato, quindi la formazione non si tocca più.
+  const movesExhausted = movesApply && Boolean(context.lineup) && movesUsed >= maxMoves;
+  const editable = context.modificationAllowed && canEdit && !movesExhausted;
+  const blockedModules = new Set(
+    editable && lockedAthleteIds.length > 0
+      ? APPROVED_MODULES.filter(
+          (code) =>
+            code !== moduleCode &&
+            (displayStarters.every(Boolean) ? planForModule(code) === null : !lockedStartersFit(code)),
+        )
+      : [],
+  );
   const maxSubs = context.maxAutomaticSubstitutions ?? MAX_AUTOMATIC_SUBSTITUTIONS;
   // Panchina attiva: i primi 10 posti (1P·3D·3C·3A); oltre è tribuna. I cambi automatici restano `maxSubs`.
   const benchActive = context.benchActiveSize ?? BENCH_ACTIVE_SIZE;
@@ -892,6 +965,23 @@ export function FormationScreen() {
   });
 
   function changeModule(code: FantasyModule) {
+    if (code === moduleCode) {
+      return;
+    }
+    // Formazione completa e bloccati presenti: i bloccati restano esattamente dove sono.
+    if (lockedAthleteIds.length > 0 && displayStarters.every(Boolean)) {
+      const plan = planForModule(code);
+      if (!plan) {
+        setActionError("Con i calciatori già bloccati questo modulo non è più possibile.");
+        return;
+      }
+      setModuleCode(code);
+      setStarterIds(plan.starterIds);
+      setBenchIds(plan.benchIds);
+      setActionError(null);
+      setActionMessage(null);
+      return;
+    }
     // Solo la bozza corrente come fonte, mai concatenata con
     // `context.lineup.starters` — stesso motivo del calcolo di
     // `reservedIds` più sopra.
@@ -1129,6 +1219,11 @@ export function FormationScreen() {
             Nessun calciatore è più modificabile.
           </Text>
         ) : null}
+        {context.modificationAllowed && movesExhausted ? (
+          <Text style={styles.meta} testID="formation-moves-exhausted">
+            🔒 Hai usato tutte e {maxMoves} le mosse: la formazione resta questa fino alla fine del turno.
+          </Text>
+        ) : null}
         {context.lineup?.systemGeneratedAi ? (
           <Text style={styles.meta} testID="formation-ai-badge">
             Gestita automaticamente — formazione scelta dall'automazione IA
@@ -1162,9 +1257,15 @@ export function FormationScreen() {
             <Pressable
               key={code}
               accessibilityRole="button"
-              disabled={!editable}
+              accessibilityLabel={blockedModules.has(code) ? `${code}, bloccato` : code}
+              disabled={!editable || blockedModules.has(code)}
               onPress={() => changeModule(code)}
-              style={[styles.pill, moduleCode === code ? styles.pillActive : null]}
+              style={[
+                styles.pill,
+                moduleCode === code ? styles.pillActive : null,
+                blockedModules.has(code) ? styles.pillLocked : null,
+              ]}
+              testID={`formation-module-${code}`}
             >
               <Text
                 style={[styles.pillText, moduleCode === code ? styles.pillTextActive : null]}
@@ -1172,7 +1273,7 @@ export function FormationScreen() {
                 adjustsFontSizeToFit
                 minimumFontScale={0.7}
               >
-                {code}
+                {blockedModules.has(code) ? `🔒${code}` : code}
               </Text>
             </Pressable>
           ))}
@@ -1466,7 +1567,11 @@ export function FormationScreen() {
               style={[styles.draftButton, toolDisabled ? styles.disabled : null]}
               testID="formation-draft"
             >
-              <Text style={styles.buttonSecondaryLabel}>Bozza</Text>
+              {pendingAction === "draft" ? (
+                <ActivityIndicator size="small" color={colors.foreground} testID="formation-draft-loading" />
+              ) : (
+                <Text style={styles.buttonSecondaryLabel}>Bozza</Text>
+              )}
             </Pressable>
           ) : null}
           <Pressable
@@ -1479,9 +1584,16 @@ export function FormationScreen() {
             ]}
             testID="formation-save"
           >
-            <Text style={styles.buttonLabel}>
-              {missing > 0 ? `Mancano ${missing} titolari` : "Salva formazione"}
-            </Text>
+            {pendingAction === "save" ? (
+              <View style={styles.savingRow} testID="formation-save-loading">
+                <ActivityIndicator size="small" color={colors.onBrand} />
+                <Text style={styles.buttonLabel}>Salvataggio…</Text>
+              </View>
+            ) : (
+              <Text style={styles.buttonLabel}>
+                {missing > 0 ? `Mancano ${missing} titolari` : "Salva formazione"}
+              </Text>
+            )}
           </Pressable>
         </View>
       </View>
@@ -1631,6 +1743,24 @@ export function FormationScreen() {
                 {context.previousLineup
                   ? `Turno ${context.previousLineup.roundNumber} · ${context.previousLineup.module}. Viene rivalidata su rosa e disponibilità correnti.`
                   : "Nessuna formazione precedente da copiare."}
+              </Text>
+            </Pressable>
+          ) : null}
+          {context.lineup && (context.draft || unsavedChangeCount > 0) ? (
+            <Pressable
+              accessibilityRole="button"
+              disabled={busy}
+              onPress={() => {
+                setToolsOpen(false);
+                void resetToSavedLineup();
+              }}
+              style={[styles.tool, busy ? styles.disabled : null]}
+              testID="formation-reset-tool"
+            >
+              <Text style={styles.toolTitle}>Ripristina formazione salvata</Text>
+              <Text style={styles.meta}>
+                Elimina bozza e modifiche e rimette la formazione confermata di questo turno (modulo{" "}
+                {context.lineup.module}).
               </Text>
             </Pressable>
           ) : null}
@@ -1826,6 +1956,7 @@ const styles = lazyStyles(() => StyleSheet.create({
     justifyContent: "center",
   },
   pillActive: { backgroundColor: colors.brand, borderColor: colors.brand },
+  pillLocked: { opacity: 0.45 },
   pillText: {
     color: colors.foreground,
     fontWeight: "700",
@@ -2041,6 +2172,7 @@ const styles = lazyStyles(() => StyleSheet.create({
     justifyContent: "center",
   },
   unsavedButtonLabel: { color: colors.foreground, fontWeight: "700", fontSize: 14 },
+  savingRow: { flexDirection: "row", alignItems: "center", gap: spacing.xs },
   actionBar: {
     flexDirection: "row",
     alignItems: "center",
