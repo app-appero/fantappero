@@ -2984,3 +2984,29 @@ button.fa-app-header__league-action {
   font-weight: 700;
   text-decoration: underline;
 }
+
+/* Portiere: nome, countdown, voto e bonus/malus a destra della foto. */
+.fa-pitch-player--gk {
+  position: relative;
+}
+
+.fa-pitch-player__gkside {
+  position: absolute;
+  left: calc(50% + 2.2rem);
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  width: max-content;
+  max-width: 7.5rem;
+}
+
+.fa-pitch-player__gkside .fa-pitch-player__name {
+  max-width: 7.5rem;
+}
+
+.fa-pitch-player__badges--side {
+  min-height: 0;
+}
