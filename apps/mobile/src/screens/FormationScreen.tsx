@@ -1079,18 +1079,20 @@ export function FormationScreen() {
           <Text style={styles.turnTitle} testID="formation-cutoff">
             Turno {context.roundNumber} · cutoff {formatDateTime(context.cutoffAt)}
           </Text>
-          <View style={styles.movesChip}>
-            <Text style={styles.movesText} testID="formation-moves">
-              Mosse usate {movesUsed}/{maxMoves}
-            </Text>
-          </View>
-          {tacticalEvaluation.wouldConsume && movesApply ? (
-            <View style={[styles.movesChip, styles.movesChipDraft]} testID="formation-moves-draft">
-              <Text style={styles.movesText}>
-                Mossa in bozza → {Math.min(movesUsed + 1, maxMoves)}/{maxMoves}
+          <View style={styles.movesRow}>
+            <View style={styles.movesChip}>
+              <Text style={styles.movesText} testID="formation-moves">
+                Mosse usate {movesUsed}/{maxMoves}
               </Text>
             </View>
-          ) : null}
+            {tacticalEvaluation.wouldConsume && movesApply ? (
+              <View style={[styles.movesChip, styles.movesChipDraft]} testID="formation-moves-draft">
+                <Text style={styles.movesText}>
+                  Mossa in bozza → {Math.min(movesUsed + 1, maxMoves)}/{maxMoves}
+                </Text>
+              </View>
+            ) : null}
+          </View>
         </View>
         {countdown && countdown.roundId === context.roundId ? (
           <LockCountdown
@@ -1746,13 +1748,17 @@ const styles = lazyStyles(() => StyleSheet.create({
     paddingBottom: spacing.xl,
   },
   statusRow: {
+    flexDirection: "column",
+    alignItems: "stretch",
+    gap: spacing.xs,
+  },
+  movesRow: {
     flexDirection: "row",
+    flexWrap: "wrap",
     alignItems: "center",
-    justifyContent: "space-between",
-    gap: spacing.sm,
+    gap: spacing.xs,
   },
   turnTitle: {
-    flex: 1,
     color: colors.foreground,
     fontSize: typography.fontSize.md,
     fontWeight: "700",
@@ -1764,7 +1770,7 @@ const styles = lazyStyles(() => StyleSheet.create({
     paddingHorizontal: spacing.sm,
     paddingVertical: 2,
   },
-  movesChipDraft: { backgroundColor: colors.brand, marginLeft: spacing.xs },
+  movesChipDraft: { backgroundColor: colors.brand },
   movesText: { color: colors.foreground, fontSize: typography.fontSize.sm, fontWeight: "600" },
   meta: {
     color: colors.foregroundMuted,
