@@ -435,8 +435,12 @@ function StarterSlotField({
               >
                 <strong className="fa-starter-row__name">{option.name ?? option.label}</strong>
                 <span className="fa-starter-row__a11y">{option.label}</span>
-                {option.note ? <span className="fa-starter-row__count">{option.note}</span> : null}
-                {option.countdown ? <span className="fa-starter-row__count">{option.countdown}</span> : null}
+                {option.note || option.countdown ? (
+                  <span className="fa-starter-row__meta">
+                    {option.note ? <span className="fa-starter-row__tag">{option.note}</span> : null}
+                    {option.countdown ? <span className="fa-starter-row__count">{option.countdown}</span> : null}
+                  </span>
+                ) : null}
                 {option.locked ? (
                   <span className="fa-starter-row__lock" role="img" aria-label="Bloccato">
                     🔒
@@ -583,8 +587,12 @@ function BenchOrderRow({
                   >
                     <strong className="fa-starter-row__name">{choice.plainName ?? choice.name}</strong>
                     <span className="fa-starter-row__a11y">{choice.name}</span>
-                    {choice.note ? <span className="fa-starter-row__count">{choice.note}</span> : null}
-                    {choice.countdown ? <span className="fa-starter-row__count">{choice.countdown}</span> : null}
+                    {choice.note || choice.countdown ? (
+                      <span className="fa-starter-row__meta">
+                        {choice.note ? <span className="fa-starter-row__tag">{choice.note}</span> : null}
+                        {choice.countdown ? <span className="fa-starter-row__count">{choice.countdown}</span> : null}
+                      </span>
+                    ) : null}
                   </button>
                 </li>
               ))

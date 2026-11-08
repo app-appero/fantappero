@@ -5665,3 +5665,69 @@ button.fa-starter-row:disabled {
 .fa-bench-order__main {
   width: 100%;
 }
+
+/* Righe ordinate: nome a capo solo per parole, countdown a larghezza fissa. */
+.fa-starter-row__name {
+  flex: 1 1 7rem;
+  min-width: 0;
+  overflow-wrap: normal;
+  word-break: normal;
+  hyphens: none;
+}
+
+.fa-starter-row__count,
+.fa-starter-row__tag {
+  flex: 0 0 auto;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.fa-starter-row__count {
+  min-width: 6.6ch;
+  text-align: center;
+}
+
+.fa-starter-row__meta {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 0.3rem;
+  flex: 0 0 auto;
+}
+
+.fa-starter-row__tag {
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: rgba(8, 12, 30, 0.7);
+  color: var(--fa-color-foreground);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+/* Tendina: nome su una riga intera, etichetta e countdown sotto. */
+.fa-starter-slot__option.fa-starter-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas:
+    "name icon"
+    "meta icon";
+  align-items: center;
+  column-gap: var(--fa-space-sm);
+  row-gap: 0.25rem;
+}
+
+.fa-starter-slot__option.fa-starter-row .fa-starter-row__name {
+  grid-area: name;
+  flex: none;
+}
+
+.fa-starter-slot__option.fa-starter-row .fa-starter-row__meta {
+  grid-area: meta;
+  justify-content: flex-start;
+}
+
+.fa-starter-slot__option.fa-starter-row .fa-starter-row__lock,
+.fa-starter-slot__option.fa-starter-row .fa-starter-row__chev {
+  grid-area: icon;
+}
