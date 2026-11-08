@@ -779,7 +779,7 @@ export function FormationPage() {
   }, [movesDocked]);
   const tacticalSaveBlocked =
     blockingLineupSaveIssue({
-      isPlatformOperator: isOperator,
+      isPlatformOperator: isOperator && Boolean(targetTeamId),
       lockIssues: [],
       tacticalIssues: tacticalEvaluation.issues,
     }) != null;
@@ -1234,7 +1234,7 @@ export function FormationPage() {
       context?.lineup?.bench.map((player) => player.athleteId) ?? [],
     );
     const saveBlock = blockingLineupSaveIssue({
-      isPlatformOperator: isOperator,
+      isPlatformOperator: isOperator && Boolean(targetTeamId),
       lockIssues: [
         ...evaluateProgressiveLock({
           previousSlots,

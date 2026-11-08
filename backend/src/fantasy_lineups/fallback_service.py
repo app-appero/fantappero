@@ -73,8 +73,14 @@ def ensure_lineup_submissions_for_round(
     round_id: UUID,
     league_id: UUID,
     actor_id: UUID | None,
+    team_ids: set[UUID] | None = None,
 ) -> LineupFallbackResult:
-    """Garantisce una LineupSubmission per ogni squadra della lega in questo turno."""
+    """Garantisce una LineupSubmission per ogni squadra della lega in questo turno.
+
+    Con ``team_ids`` solo per quelle squadre: è il caso del primo blocco del turno, quando chi
+    non ha confermato una formazione riceve subito quella automatica (poi ogni cambio costa una
+    mossa). Altrimenti la bozza resterebbe modificabile senza limiti fino a fine turno.
+    """
     fantasy_round = session.get(FantasyRound, round_id)
     league = session.get(League, league_id)
     if fantasy_round is None or league is None:
@@ -98,7 +104,11 @@ def ensure_lineup_submissions_for_round(
             )
         ).all()
     )
-    missing_teams = [team for team in teams if team.id not in existing_team_ids]
+    missing_teams = [
+        team
+        for team in teams
+        if team.id not in existing_team_ids and (team_ids is None or team.id in team_ids)
+    ]
     if not missing_teams:
         return LineupFallbackResult(round_id=round_id, league_id=league_id)
 

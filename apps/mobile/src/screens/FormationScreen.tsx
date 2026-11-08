@@ -546,7 +546,7 @@ export function FormationScreen() {
   const movesRemaining = context?.tacticalMovesRemaining ?? maxMoves - movesUsed;
   const tacticalSaveBlocked =
     blockingLineupSaveIssue({
-      isPlatformOperator: isOperator,
+      isPlatformOperator: isOperator && Boolean(targetTeamId),
       lockIssues: [],
       tacticalIssues: tacticalEvaluation.issues,
     }) != null;
@@ -577,7 +577,7 @@ export function FormationScreen() {
       context?.lineup?.bench.map((player) => player.athleteId) ?? [],
     );
     const saveBlock = blockingLineupSaveIssue({
-      isPlatformOperator: isOperator,
+      isPlatformOperator: isOperator && Boolean(targetTeamId),
       lockIssues: [
         ...evaluateProgressiveLock({
           previousSlots,

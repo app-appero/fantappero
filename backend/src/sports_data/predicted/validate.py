@@ -17,7 +17,8 @@ RELIABILITY_PARTIAL = "partially_validated"
 RELIABILITY_UNVERIFIED = "unverified"
 RELIABILITY_REJECTED = "rejected"
 
-_HARD_ABSENCE = {"injury", "suspension", "suspended", "red", "red_card", "redcard"}
+#: Tipi che di per sé indicano un dubbio, non un'assenza certa.
+_UNCERTAIN_KINDS = {"doubtful", "questionable", "uncertain"}
 USABLE_RELIABILITY = frozenset({RELIABILITY_VALIDATED, RELIABILITY_PARTIAL})
 
 
@@ -131,11 +132,16 @@ def blocks_selection(
     expected_return_at: datetime | None,
     kickoff_at: datetime | None,
 ) -> bool:
-    """Blocca la scelta in formazione solo per un'assenza dura e già collegata alla rosa."""
+    """Blocca la scelta in formazione per un'assenza certa e già collegata alla rosa.
+
+    Ogni indisponibilità non «in dubbio» conta (infortunio, squalifica, espulsione, motivi
+    personali, impegni con la nazionale…): chi di sicuro non gioca non deve poter entrare tra
+    i titolari, altrimenti lo si usa per far entrare apposta un panchinaro già a voto.
+    """
     if not mapped or uncertain:
         return False
     kind = (unavailability_type or "").strip().lower()
-    if kind not in _HARD_ABSENCE:
+    if kind in _UNCERTAIN_KINDS:
         return False
     if expected_return_at is not None and kickoff_at is not None:
         if expected_return_at <= kickoff_at:

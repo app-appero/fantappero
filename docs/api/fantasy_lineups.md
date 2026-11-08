@@ -182,6 +182,28 @@ confrontati in UTC) aprono la finestra insieme.
 Ogni mossa applicata conserva `from_payload` / `to_payload` (modulo e liste), autore,
 istante UTC e `sequence` 1–3.
 
+## Regole contro il vantaggio a turno iniziato (pilota, 08/11/2026)
+
+Scopo: nessuno deve poter usare ciò che sa già (il voto di chi ha giocato) per far entrare un
+panchinaro o cambiare la formazione senza costo.
+
+- **Chi di sicuro non prende il voto non entra tra i titolari**: indisponibilità confermata
+  (qualsiasi tipo non «in dubbio», non solo infortunio/squalifica), nessuna partita nel turno,
+  partita rinviata o annullata. Le indisponibilità valgono sempre; «nessuna partita» e
+  «rinviata» dal primo blocco del turno. Vale su conferma e su bozza (`player_unavailable`).
+  Chi era già titolare resta: il cambio automatico in quel caso è legittimo. Nel contesto il
+  calciatore ha `selectionBlocked=true` e il motivo in `probableNote`.
+- **Formazione automatica al primo blocco**: appena un calciatore della rosa è bloccato, chi non
+  ha una formazione confermata riceve subito quella automatica (bozza valida → turno
+  precedente → vuota), alla prima lettura o modifica. Da lì la bozza non conta più e ogni cambio
+  confermato costa una mossa.
+- **Bloccati non presenti nella formazione precedente** (formazione automatica vuota, acquisto a
+  turno iniziato): solo in tribuna, mai nei primi 10 della panchina (`bench_order_locked`).
+- **Mosse della squadra, chiunque schieri**: a 3/3 la squadra è bloccata anche per l'operatore
+  con «Schiera per».
+- **Operatore**: ignora i blocchi dei singoli calciatori solo sulla squadra di un altro; sulla
+  propria segue le regole di tutti.
+
 ## Formazione automatica dei fantallenatori IA (EP13-P05)
 
 Decisione di riferimento: [`ADR-0005`](../adr/ADR-0005-ai-automatic-lineup.md).

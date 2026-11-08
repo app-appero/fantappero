@@ -81,7 +81,7 @@ from fantasy_teams.composition_service import resolve_effective_athlete_roles
 from fantasy_teams.factory import ensure_team_for_membership, find_team_for_membership
 from fantasy_teams.models import FantasyRosterSlot, FantasyTeam
 from fantasy_turns.models import FantasyRound, FantasyRoundFixture
-from fantasy_turns.rules import derive_effective_status
+from fantasy_turns.rules import INACTIVE_FIXTURE_STATUSES, derive_effective_status
 from fantasy_turns.service import FantasyTurnService
 from leagues.models.league_audit_event import LeagueAuditEvent
 from leagues.models.league_membership import LeagueMembership
@@ -111,6 +111,20 @@ class FantasyLineupService:
     def __init__(self, session: Session) -> None:
         self._session = session
 
+    def _bypasses_locks_for(self, league_access: LeagueAccess, team_id: UUID | None) -> bool:
+        """L'operatore ignora i blocchi solo quando schiera la squadra di un altro fantallenatore.
+
+        Sulla propria squadra segue le stesse regole di tutti: è un partecipante della lega.
+        """
+        if team_id is None or not self._actor_bypasses_kickoff_lock(league_access):
+            return False
+        owner = self._session.execute(
+            select(LeagueMembership.user_id)
+            .join(FantasyTeam, FantasyTeam.membership_id == LeagueMembership.id)
+            .where(FantasyTeam.id == team_id)
+        ).scalar_one_or_none()
+        return owner != league_access.user.id
+
     def _actor_bypasses_kickoff_lock(self, league_access: LeagueAccess) -> bool:
         """Operatori piattaforma restano sempre liberi dal lock formazione
         (EP-operatore-test): sia il lock per-calciatore a partita iniziata,
@@ -122,6 +136,44 @@ class FantasyLineupService:
         """
         context = PermissionContext.for_user(league_access.user, league_access=league_access)
         return has_permissions(context, (Permission.GLOBAL_OPERATE,))
+
+    def _materialize_if_started(
+        self,
+        *,
+        fantasy_round: FantasyRound,
+        team: FantasyTeam,
+        roster: list[_RosterRow],
+        season_year: int,
+        now: datetime,
+        kickoffs: dict[UUID, _KickoffRef] | None = None,
+    ) -> None:
+        """Primo blocco del turno senza formazione confermata: arriva subito quella automatica.
+
+        Bozza valida, poi formazione del turno precedente, poi vuota (come a fine turno). Da lì
+        ogni cambio costa una mossa: la bozza non resta un modo per cambiare senza limiti.
+        """
+        if self._load_submission(fantasy_round.id, team.id) is not None:
+            return
+        if kickoffs is None:
+            kickoffs = self._athlete_kickoffs(
+                round_id=fantasy_round.id,
+                season_year=season_year,
+                athlete_ids=[row.athlete_id for row in roster],
+            )
+        margin = self._lineup_lock_margin_for_league(fantasy_round.league_id)
+        if not any(self._is_row_locked(row.athlete_id, kickoffs, now, margin) for row in roster):
+            return
+        from fantasy_lineups.fallback_service import ensure_lineup_submissions_for_round
+
+        ensure_lineup_submissions_for_round(
+            self._session,
+            round_id=fantasy_round.id,
+            league_id=fantasy_round.league_id,
+            actor_id=None,
+            team_ids={team.id},
+        )
+        self._session.flush()
+        logger.info("fantasy_lineup_materialized_at_first_lock")
 
     def get_my_lineup(
         self,
@@ -139,6 +191,15 @@ class FantasyLineupService:
         )
         team = self._resolve_lineup_team(league_access, target_team_id, ensure_created=True)
         roster = self._roster_rows(league_access.league.season_year, team)
+        if self._load_submission(fantasy_round.id, team.id) is None:
+            self._materialize_if_started(
+                fantasy_round=fantasy_round,
+                team=team,
+                roster=roster,
+                season_year=league_access.league.season_year,
+                now=now,
+            )
+            self._session.commit()
         submission = self._load_submission(fantasy_round.id, team.id)
         return self._to_context(
             league_access=league_access,
@@ -229,7 +290,7 @@ class FantasyLineupService:
         bench_ids = validate_athlete_id_list(payload.bench_athlete_ids)
 
         fantasy_round = self._load_round(league_access.league.id, round_id, for_update=True)
-        if not self._actor_bypasses_kickoff_lock(league_access):
+        if not self._bypasses_locks_for(league_access, target_team_id):
             try:
                 assert_lineup_modification_allowed(stored=fantasy_round.status)
             except ValidationAuthError as exc:
@@ -272,7 +333,7 @@ class FantasyLineupService:
             for_update=True,
         )
         lock_margin = self._lineup_lock_margin_for_league(league_access.league.id)
-        operator_bypass = self._actor_bypasses_kickoff_lock(league_access)
+        operator_bypass = self._bypasses_locks_for(league_access, target_team_id)
         kickoff_locked_ids = [
             str(row.athlete_id)
             for row in roster
@@ -281,13 +342,15 @@ class FantasyLineupService:
         # L'operatore non è fermato dai blocchi dei singoli calciatori (EP-operatore-test), ma le
         # mosse si contano e si rispettano sulla squadra, chiunque la stia schierando.
         locked_ids = [] if operator_bypass else kickoff_locked_ids
-        submission = self._load_submission(fantasy_round.id, team.id, for_update=True)
-        self._reject_newly_blocked_starters(
-            round_id=fantasy_round.id,
-            roster_ids=[row.athlete_id for row in roster],
-            starter_ids=starter_ids,
-            submission=submission,
+        self._materialize_if_started(
+            fantasy_round=fantasy_round,
+            team=team,
+            roster=roster,
+            season_year=league_access.league.season_year,
+            now=now,
+            kickoffs=kickoffs,
         )
+        submission = self._load_submission(fantasy_round.id, team.id, for_update=True)
 
         roles_by_id = self._validation_roles(
             roster=roster,
@@ -327,6 +390,19 @@ class FantasyLineupService:
                 proposed_bench=[str(athlete_id) for athlete_id in bench_ids],
                 locked_athlete_ids=locked_ids,
                 role_by_athlete_id={str(row.athlete_id): row.role for row in roster},
+            )
+            self._reject_newly_blocked_starters(
+                round_id=fantasy_round.id,
+                roster_ids=[row.athlete_id for row in roster],
+                starter_ids=starter_ids,
+                kickoffs=kickoffs,
+                previous_starter_ids=self._starter_ids_of(submission),
+                round_started=bool(kickoff_locked_ids),
+            )
+            self._reject_locked_newcomers_in_active_bench(
+                submission=submission,
+                bench_ids=[str(athlete_id) for athlete_id in bench_ids],
+                locked_ids=locked_ids,
             )
             moves_used = len(submission.tactical_moves) if submission is not None else 0
             move_evaluation = assert_tactical_move(
@@ -492,7 +568,7 @@ class FantasyLineupService:
     ) -> LineupContextResponse:
         now = datetime.now(UTC)
         fantasy_round = self._load_round(league_access.league.id, round_id, for_update=True)
-        if not self._actor_bypasses_kickoff_lock(league_access):
+        if not self._bypasses_locks_for(league_access, target_team_id):
             try:
                 assert_lineup_modification_allowed(stored=fantasy_round.status)
             except ValidationAuthError as exc:
@@ -532,12 +608,20 @@ class FantasyLineupService:
         lock_margin = self._lineup_lock_margin_for_league(league_access.league.id)
         locked_ids = (
             []
-            if self._actor_bypasses_kickoff_lock(league_access)
+            if self._bypasses_locks_for(league_access, target_team_id)
             else [
                 str(row.athlete_id)
                 for row in roster
                 if self._is_row_locked(row.athlete_id, kickoffs, now, lock_margin)
             ]
+        )
+        self._materialize_if_started(
+            fantasy_round=fantasy_round,
+            team=team,
+            roster=roster,
+            season_year=league_access.league.season_year,
+            now=now,
+            kickoffs=kickoffs,
         )
         submission = self._load_submission(fantasy_round.id, team.id, for_update=True)
         copied = copy_previous_lineup(
@@ -646,7 +730,7 @@ class FantasyLineupService:
             )
         now = datetime.now(UTC)
         fantasy_round = self._load_round(league_access.league.id, round_id, for_update=True)
-        if not self._actor_bypasses_kickoff_lock(league_access):
+        if not self._bypasses_locks_for(league_access, target_team_id):
             try:
                 assert_lineup_modification_allowed(stored=fantasy_round.status)
             except ValidationAuthError as exc:
@@ -672,6 +756,13 @@ class FantasyLineupService:
             )
             raise
 
+        self._materialize_if_started(
+            fantasy_round=fantasy_round,
+            team=team,
+            roster=self._roster_rows(league_access.league.season_year, team),
+            season_year=league_access.league.season_year,
+            now=now,
+        )
         submission = self._load_submission(fantasy_round.id, team.id)
         draft = self._load_draft(fantasy_round.id, team.id)
         if submission is not None:
@@ -698,7 +789,7 @@ class FantasyLineupService:
         lock_margin = self._lineup_lock_margin_for_league(league_access.league.id)
         locked_ids = (
             set()
-            if self._actor_bypasses_kickoff_lock(league_access)
+            if self._bypasses_locks_for(league_access, target_team_id)
             else {
                 row.athlete_id
                 for row in roster
@@ -882,7 +973,7 @@ class FantasyLineupService:
         bench_ids = parse_optional_athlete_ids(payload.bench_athlete_ids)
 
         fantasy_round = self._load_round(league_access.league.id, round_id, for_update=True)
-        if not self._actor_bypasses_kickoff_lock(league_access):
+        if not self._bypasses_locks_for(league_access, target_team_id):
             try:
                 assert_lineup_modification_allowed(stored=fantasy_round.status)
             except ValidationAuthError as exc:
@@ -915,12 +1006,20 @@ class FantasyLineupService:
         lock_margin = self._lineup_lock_margin_for_league(league_access.league.id)
         locked_ids = (
             []
-            if self._actor_bypasses_kickoff_lock(league_access)
+            if self._bypasses_locks_for(league_access, target_team_id)
             else [
                 str(row.athlete_id)
                 for row in roster
                 if self._is_row_locked(row.athlete_id, kickoffs, now, lock_margin)
             ]
+        )
+        self._materialize_if_started(
+            fantasy_round=fantasy_round,
+            team=team,
+            roster=roster,
+            season_year=league_access.league.season_year,
+            now=now,
+            kickoffs=kickoffs,
         )
         submission = self._load_submission(fantasy_round.id, team.id, for_update=True)
 
@@ -984,6 +1083,20 @@ class FantasyLineupService:
                 proposed_bench=filled_bench,
                 locked_athlete_ids=locked_ids,
                 role_by_athlete_id={str(row.athlete_id): row.role for row in roster},
+            )
+            # Anche in bozza: la bozza diventa la formazione se non se ne conferma un'altra.
+            self._reject_newly_blocked_starters(
+                round_id=fantasy_round.id,
+                roster_ids=[row.athlete_id for row in roster],
+                starter_ids=[UUID(item) for item in filled_starters],
+                kickoffs=kickoffs,
+                previous_starter_ids=self._starter_ids_of(
+                    submission, self._load_draft(fantasy_round.id, team.id)
+                ),
+                round_started=any(
+                    self._is_row_locked(row.athlete_id, kickoffs, now, lock_margin)
+                    for row in roster
+                ),
             )
         except ValidationAuthError as exc:
             get_metrics().incr(
@@ -1163,7 +1276,7 @@ class FantasyLineupService:
             league_id=league_id,
         )
         lock_margin = self._lineup_lock_margin_for_league(league_id)
-        operator_bypass = self._actor_bypasses_kickoff_lock(league_access)
+        operator_bypass = self._bypasses_locks_for(league_access, fantasy_team_id)
         locked_flags = {
             row.athlete_id: (
                 False
@@ -1251,6 +1364,9 @@ class FantasyLineupService:
             fantasy_round.id,
             [row.athlete_id for row in roster],
         )
+        no_vote_reasons = self._no_vote_reasons(
+            [row.athlete_id for row in roster], kickoffs, probable
+        )
         return LineupContextResponse(
             leagueId=str(league_id),
             fantasyTeamId=str(fantasy_team_id),
@@ -1288,6 +1404,7 @@ class FantasyLineupService:
                     locked_flags=locked_flags,
                     scores_by_athlete=scores_by_athlete,
                     probable=probable.get(row.athlete_id),
+                    no_vote_reason=no_vote_reasons.get(row.athlete_id),
                 )
                 for row in roster
             ],
@@ -1481,30 +1598,106 @@ class FantasyLineupService:
             logger.warning("probable_lineup_hints_unavailable", exc_info=True)
             return {}
 
+    @staticmethod
+    def _no_vote_reasons(
+        athlete_ids: list[UUID],
+        kickoffs: dict[UUID, _KickoffRef],
+        probable: dict[UUID, AthleteProbable],
+        *,
+        include_schedule: bool = True,
+    ) -> dict[UUID, str]:
+        """Chi di sicuro non prende il voto in questo turno, con il motivo da mostrare.
+
+        Nessuna partita nel turno, partita rinviata o annullata, indisponibilità confermata.
+        Non può entrare tra i titolari: altrimenti lo si schiera apposta per far entrare un
+        panchinaro di cui si conosce già il voto.
+        """
+        reasons: dict[UUID, str] = {}
+        for athlete_id in athlete_ids:
+            ref = kickoffs.get(athlete_id)
+            if include_schedule and ref is None:
+                reasons[athlete_id] = "Nessuna partita in questo turno"
+            elif (
+                include_schedule
+                and ref is not None
+                and (ref.status_short or "").strip().upper() in INACTIVE_FIXTURE_STATUSES
+            ):
+                reasons[athlete_id] = "Partita rinviata o annullata"
+            else:
+                hint = probable.get(athlete_id)
+                if hint is not None and hint.blocked:
+                    reasons[athlete_id] = hint.note
+        return reasons
+
     def _reject_newly_blocked_starters(
         self,
         *,
         round_id: UUID,
         roster_ids: list[UUID],
         starter_ids: list[UUID],
-        submission: LineupSubmission | None,
+        kickoffs: dict[UUID, _KickoffRef],
+        previous_starter_ids: set[UUID],
+        round_started: bool,
     ) -> None:
-        hints = self._probable_hints(round_id, roster_ids)
-        blocked = {athlete_id for athlete_id, hint in hints.items() if hint.blocked}
-        if not blocked:
+        """Chi di sicuro non prende il voto non entra tra i titolari (chi c'era già resta).
+
+        Le indisponibilità confermate valgono sempre. «Nessuna partita» e «partita rinviata»
+        contano dal primo blocco del turno: prima nessun voto è noto, quindi non c'è vantaggio.
+        """
+        reasons = self._no_vote_reasons(
+            roster_ids,
+            kickoffs,
+            self._probable_hints(round_id, roster_ids),
+            include_schedule=round_started,
+        )
+        entering = [
+            item for item in starter_ids if item in reasons and item not in previous_starter_ids
+        ]
+        if entering:
+            raise ValidationAuthError(
+                "Non puoi mettere titolare chi non prenderà il voto in questo turno "
+                f"({reasons[entering[0]].lower()}).",
+                code="player_unavailable",
+            )
+
+    def _reject_locked_newcomers_in_active_bench(
+        self,
+        *,
+        submission: LineupSubmission | None,
+        bench_ids: list[str],
+        locked_ids: list[str],
+    ) -> None:
+        """Chi ha già giocato e non era in formazione non entra nei primi 10 della panchina.
+
+        Succede se la formazione automatica era vuota o se un calciatore è arrivato a turno
+        iniziato: metterlo in panchina attiva sapendo già come è andato sarebbe un vantaggio.
+        """
+        if submission is None or not locked_ids:
             return
-        previous = set()
+        previous = self._slots_from_submission(submission)
+        locked = set(locked_ids)
+        for athlete_id in bench_ids[:BENCH_ACTIVE_SIZE]:
+            if athlete_id in locked and athlete_id not in previous:
+                raise ValidationAuthError(
+                    "Chi ha già la partita iniziata e non era in formazione può andare solo "
+                    "in tribuna (dall'11° posto in poi).",
+                    code="bench_order_locked",
+                )
+
+    @staticmethod
+    def _starter_ids_of(
+        submission: LineupSubmission | None, draft: LineupDraft | None = None
+    ) -> set[UUID]:
+        previous: set[UUID] = set()
         if submission is not None:
-            previous = {
+            previous |= {
                 player.athlete_id
                 for player in submission.players
                 if player.slot_kind == LineupSlotKind.STARTER
             }
-        if (set(starter_ids) & blocked) - previous:
-            raise ValidationAuthError(
-                "Un calciatore indisponibile non può entrare tra i titolari.",
-                code="player_unavailable",
-            )
+        if draft is not None:
+            previous |= {UUID(str(item)) for item in draft.starter_athlete_ids if item}
+        return previous
 
     @staticmethod
     def _to_roster_player(
@@ -1514,6 +1707,7 @@ class FantasyLineupService:
         locked_flags: dict[UUID, bool],
         scores_by_athlete: dict[UUID, RoundAthleteScore],
         probable: AthleteProbable | None = None,
+        no_vote_reason: str | None = None,
     ) -> LineupRosterPlayerResponse:
         kickoff = kickoffs.get(row.athlete_id)
         score = scores_by_athlete.get(row.athlete_id)
@@ -1535,10 +1729,23 @@ class FantasyLineupService:
             substitutedOutMinute=score.substituted_out_minute if score is not None else None,
             substitutedInMinute=score.substituted_in_minute if score is not None else None,
             fixtureStatusLabel=score.fixture_status_label if score is not None else None,
-            probableHint=None if probable is None else probable.hint,
-            probableNote=None if probable is None else probable.note,
-            probableAbsence=None if probable is None else probable.absence,
-            selectionBlocked=False if probable is None else probable.blocked,
+            probableHint=(
+                "unavailable"
+                if no_vote_reason is not None
+                else None
+                if probable is None
+                else probable.hint
+            ),
+            probableNote=no_vote_reason or (None if probable is None else probable.note),
+            probableAbsence=(
+                (probable.absence if probable is not None and probable.blocked else "other")
+                if no_vote_reason is not None
+                else None
+                if probable is None
+                else probable.absence
+            ),
+            # Chi di sicuro non prende il voto non è selezionabile come titolare.
+            selectionBlocked=no_vote_reason is not None,
         )
 
     def _to_previous(self, submission: LineupSubmission) -> PreviousLineupResponse:

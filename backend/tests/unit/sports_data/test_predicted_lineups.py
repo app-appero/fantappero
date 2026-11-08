@@ -258,6 +258,25 @@ def test_duplicate_and_unavailable_starter_are_warnings() -> None:
     assert side_starters(parsed.home) == []
 
 
+def test_any_certain_absence_blocks_but_doubtful_does_not() -> None:
+    kickoff = datetime(2026, 10, 20, 18, 0, tzinfo=UTC)
+    for kind in ("other", "international duty", None):
+        assert blocks_selection(
+            mapped=True,
+            unavailability_type=kind,
+            uncertain=False,
+            expected_return_at=None,
+            kickoff_at=kickoff,
+        )
+    assert not blocks_selection(
+        mapped=True,
+        unavailability_type="doubtful",
+        uncertain=False,
+        expected_return_at=None,
+        kickoff_at=kickoff,
+    )
+
+
 def test_doubtful_does_not_block_and_suspension_does() -> None:
     kickoff = datetime(2026, 10, 20, 18, 0, tzinfo=UTC)
     assert not blocks_selection(

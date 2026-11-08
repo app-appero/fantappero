@@ -1801,3 +1801,249 @@ def test_module_change_after_kickoff_keeps_locked_players_in_place(
     assert response.status_code == 200, response.json()
     assert response.json()["lineup"]["module"] == "4-4-2"
     assert response.json()["tacticalMovesUsed"] == 1
+
+
+def _started_round_setup(
+    client: TestClient,
+    db_session: Session,
+    competition_ids: list[str],
+    *,
+    email: str,
+    league_name: str,
+    id_offset: int,
+    save_lineup: bool = True,
+) -> dict:
+    """Lega con rosa convalidata, turno con due partite; la prima (clubs[0]) è iniziata.
+
+    Tutti i calciatori giocano la seconda partita (clubs[2]) tranne il portiere titolare e
+    l'ultimo panchinaro, che giocano la prima e sono quindi bloccati.
+    """
+    token, user_id = _register_and_login(client, email)
+    league_id = _create_league(client, token, competition_ids, league_name)
+    client.get(f"/leagues/{league_id}/rosa", headers={"Authorization": f"Bearer {token}"})
+    grouped = _seed_roster_athletes(db_session, id_offset=id_offset)
+    athletes = _fill_validated_roster(db_session, league_id, grouped)
+    existing_rounds = db_session.scalar(
+        select(func.max(FantasyRound.number)).where(FantasyRound.league_id == UUID(league_id))
+    )
+    fantasy_round, clubs = _create_open_round(
+        db_session,
+        league_id,
+        cutoff=datetime.now(UTC) + timedelta(hours=2),
+        extra_kickoff=datetime.now(UTC) + timedelta(hours=5),
+        id_offset=id_offset + 10_000,
+        competition_ids=competition_ids,
+        number=(existing_rounds or 0) + 1,
+    )
+    headers = {"Authorization": f"Bearer {token}"}
+    base = f"/leagues/{league_id}/turni/{fantasy_round.id}/formazione"
+    payload = _lineup_payload(athletes, "4-3-3")
+    by_id = {str(athlete.id): athlete for athlete in athletes}
+    early = {payload["starterAthleteIds"][0], payload["benchAthleteIds"][-1]}
+    for key, athlete in by_id.items():
+        _set_athlete_club(db_session, athlete, clubs[0] if key in early else clubs[2])
+    if save_lineup:
+        assert client.put(base, headers=headers, json=payload).status_code == 200
+    first_fixture = next(
+        item
+        for item in _round_fixtures(db_session, fantasy_round.id)
+        if item.home_club_id == clubs[0].id
+    )
+    return {
+        "token": token,
+        "user_id": user_id,
+        "league_id": league_id,
+        "round": fantasy_round,
+        "clubs": clubs,
+        "headers": headers,
+        "base": base,
+        "payload": payload,
+        "by_id": by_id,
+        "first_fixture": first_fixture,
+    }
+
+
+def _start_first_fixture(db_session: Session, setup: dict) -> None:
+    setup["first_fixture"].kickoff_at = datetime.now(UTC) - timedelta(minutes=5)
+    setup["first_fixture"].status_short = "1H"
+    db_session.commit()
+
+
+def test_player_without_a_match_cannot_enter_the_starters_once_the_round_has_started(
+    client: TestClient,
+    db_session: Session,
+    competition_ids: list[str],
+) -> None:
+    setup = _started_round_setup(
+        client,
+        db_session,
+        competition_ids,
+        email="lineup.novote@example.com",
+        league_name="Lega Senza Voto",
+        id_offset=9_880_000,
+    )
+    payload = setup["payload"]
+    by_id = setup["by_id"]
+    # Un attaccante in panchina viene tolto da ogni partita del turno: non prenderà il voto.
+    no_match = next(
+        item for item in payload["benchAthleteIds"] if by_id[item].canonical_name.startswith("A")
+    )
+    assignment = db_session.scalars(
+        select(RoleAssignment).where(RoleAssignment.athlete_id == UUID(no_match))
+    ).one()
+    assignment.club_id = None
+    db_session.commit()
+    _start_first_fixture(db_session, setup)
+
+    context = client.get(setup["base"], headers=setup["headers"]).json()
+    row = next(item for item in context["roster"] if item["athleteId"] == no_match)
+    assert row["selectionBlocked"] is True
+    assert row["probableNote"] == "Nessuna partita in questo turno"
+
+    starter_forward = next(
+        item for item in payload["starterAthleteIds"] if by_id[item].canonical_name.startswith("A")
+    )
+    swapped = _swap_starter_with_bench(payload, starter_forward, no_match)
+    response = client.put(setup["base"], headers=setup["headers"], json=swapped)
+    assert response.status_code == 400
+    assert response.json()["code"] == "player_unavailable"
+
+    # Nemmeno in bozza.
+    draft = client.put(f"{setup['base']}/bozza", headers=setup["headers"], json=swapped)
+    assert draft.status_code == 400
+    assert draft.json()["code"] == "player_unavailable"
+
+
+def test_team_without_a_confirmed_lineup_gets_the_automatic_one_at_the_first_lock(
+    client: TestClient,
+    db_session: Session,
+    competition_ids: list[str],
+) -> None:
+    setup = _started_round_setup(
+        client,
+        db_session,
+        competition_ids,
+        email="lineup.firstlock@example.com",
+        league_name="Lega Primo Blocco",
+        id_offset=9_890_000,
+        save_lineup=False,
+    )
+    payload = setup["payload"]
+    headers = setup["headers"]
+    base = setup["base"]
+    # Solo una bozza completa prima dell'inizio, mai confermata.
+    assert client.put(f"{base}/bozza", headers=headers, json=payload).status_code == 200
+    assert client.get(base, headers=headers).json()["lineup"] is None
+    _start_first_fixture(db_session, setup)
+
+    context = client.get(base, headers=headers).json()
+    assert context["lineup"] is not None
+    assert context["lineup"]["starters"][0]["athleteId"] == payload["starterAthleteIds"][0]
+    assert context["tacticalMovesUsed"] == 0
+
+    # Da qui la bozza non cambia più la formazione e ogni cambio confermato costa una mossa.
+    by_id = setup["by_id"]
+    starter_forward = next(
+        item for item in payload["starterAthleteIds"] if by_id[item].canonical_name.startswith("A")
+    )
+    bench_forward = next(
+        item for item in payload["benchAthleteIds"] if by_id[item].canonical_name.startswith("A")
+    )
+    swapped = _swap_starter_with_bench(payload, starter_forward, bench_forward)
+    assert client.put(f"{base}/bozza", headers=headers, json=swapped).status_code == 200
+    assert (
+        client.get(base, headers=headers).json()["lineup"]["revision"]
+        == context["lineup"]["revision"]
+    )
+    confirmed = client.put(base, headers=headers, json=swapped)
+    assert confirmed.status_code == 200, confirmed.json()
+    assert confirmed.json()["tacticalMovesUsed"] == 1
+
+
+def test_locked_player_missing_from_the_automatic_lineup_cannot_enter_the_active_bench(
+    client: TestClient,
+    db_session: Session,
+    competition_ids: list[str],
+) -> None:
+    setup = _started_round_setup(
+        client,
+        db_session,
+        competition_ids,
+        email="lineup.zerofallback@example.com",
+        league_name="Lega Formazione Vuota",
+        id_offset=9_900_000,
+        save_lineup=False,
+    )
+    _start_first_fixture(db_session, setup)
+    # Nessuna bozza né turno precedente: la formazione automatica è vuota.
+    context = client.get(setup["base"], headers=setup["headers"]).json()
+    assert context["lineup"] is not None
+    assert context["lineup"]["starters"] == []
+
+    original = setup["payload"]
+    by_id = setup["by_id"]
+    # Il portiere titolare ha la partita iniziata: con una formazione automatica vuota non può
+    # entrare tra i titolari, quindi va in tribuna e gioca il portiere che era in panchina.
+    locked_goalkeeper = original["starterAthleteIds"][0]
+    bench = list(original["benchAthleteIds"])
+    goalkeepers = [item for item in bench if by_id[item].canonical_name.startswith("P")]
+    active_goalkeeper, tribuna_goalkeeper = goalkeepers[0], goalkeepers[-1]
+    bench[bench.index(active_goalkeeper)] = tribuna_goalkeeper
+    bench[bench.index(tribuna_goalkeeper, 10)] = locked_goalkeeper
+    payload = {
+        **original,
+        "starterAthleteIds": [active_goalkeeper, *original["starterAthleteIds"][1:]],
+        "benchAthleteIds": bench,
+    }
+    bench = list(bench)
+    locked_bench = bench[-1]
+    role = setup["by_id"][locked_bench].canonical_name[0]
+    same_role_active = next(
+        index
+        for index, item in enumerate(bench[:10])
+        if setup["by_id"][item].canonical_name[0] == role
+    )
+    bench[-1], bench[same_role_active] = bench[same_role_active], locked_bench
+    rejected = client.put(
+        setup["base"], headers=setup["headers"], json={**payload, "benchAthleteIds": bench}
+    )
+    assert rejected.status_code == 400
+    assert rejected.json()["code"] == "bench_order_locked"
+    in_tribuna = client.put(setup["base"], headers=setup["headers"], json=payload)
+    assert in_tribuna.status_code == 200, in_tribuna.json()
+
+
+def test_operator_follows_the_kickoff_locks_on_their_own_team(
+    client: TestClient,
+    db_session: Session,
+    competition_ids: list[str],
+) -> None:
+    setup = _started_round_setup(
+        client,
+        db_session,
+        competition_ids,
+        email="lineup.operator.own@example.com",
+        league_name="Lega Operatore Proprio",
+        id_offset=9_910_000,
+    )
+    from auth.models.user import User
+    from database.enums import PlatformRole
+
+    user_id = setup["user_id"]
+    operator = db_session.get(User, UUID(user_id) if isinstance(user_id, str) else user_id)
+    assert operator is not None
+    operator.platform_role = PlatformRole.OPERATOR
+    db_session.commit()
+    _start_first_fixture(db_session, setup)
+
+    payload = setup["payload"]
+    locked_goalkeeper = payload["starterAthleteIds"][0]
+    bench_goalkeeper = next(
+        item
+        for item in payload["benchAthleteIds"]
+        if setup["by_id"][item].canonical_name.startswith("P")
+    )
+    moved = _swap_starter_with_bench(payload, locked_goalkeeper, bench_goalkeeper)
+    response = client.put(setup["base"], headers=setup["headers"], json=moved)
+    assert response.status_code == 400
+    assert response.json()["code"] == "athlete_kickoff_locked"
