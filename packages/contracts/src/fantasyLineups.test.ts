@@ -230,7 +230,7 @@ describe("fantasyLineups rules", () => {
     assert.ok(firstSaveStarter.some((item) => item.code === "athlete_kickoff_locked"));
   });
 
-  it("lets only the platform operator confirm a lineup after kickoff and with no tactical moves left", () => {
+  it("lets the platform operator past kickoff locks but never past exhausted tactical moves", () => {
     const lockIssues = evaluateProgressiveLock({
       previousSlots: {},
       proposedSlots: slotsFromLineupIds(["locked-a"], []),
@@ -250,6 +250,14 @@ describe("fantasyLineups rules", () => {
         isPlatformOperator: true,
         lockIssues,
         tacticalIssues,
+      })?.code,
+      "tactical_moves_exhausted",
+    );
+    assert.equal(
+      blockingLineupSaveIssue({
+        isPlatformOperator: true,
+        lockIssues,
+        tacticalIssues: [],
       }),
       null,
     );

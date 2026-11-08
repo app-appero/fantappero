@@ -118,9 +118,6 @@ export function FormationScreen() {
   const [teams, setTeams] = useState<FantasyTeamSummary[]>([]);
   /** Vuoto = la propria formazione. Un operatore può schierare al posto di un altro fantallenatore (EP-operatore-test). */
   const [targetTeamId, setTargetTeamId] = useState("");
-  // Le mosse contano per chi schiera la propria squadra (operatore compreso), non quando
-  // l'operatore interviene sulla squadra di un altro fantallenatore.
-  const movesApply = !isOperator || !targetTeamId;
   const targetTeamIdRef = useRef("");
   const lineupRequest = useRef(0);
   const [context, setContext] = useState<LineupContext | null>(null);
@@ -603,7 +600,7 @@ export function FormationScreen() {
     if (!accessToken || !activeLeagueId || !selectedRoundId) {
       return;
     }
-    const predictedMove = tacticalEvaluation.wouldConsume && movesApply;
+    const predictedMove = tacticalEvaluation.wouldConsume;
     const movesUsedBefore = movesUsed;
     setBusy(true);
     setPendingAction("save");
@@ -830,7 +827,7 @@ export function FormationScreen() {
   const isFocused = useIsFocused();
   const [statusBottom, setStatusBottom] = useState<number | null>(null);
   const [scrolledPast, setScrolledPast] = useState(false);
-  const draftMove = tacticalEvaluation.wouldConsume && movesApply ? Math.min(movesUsed + 1, maxMoves) : null;
+  const draftMove = tacticalEvaluation.wouldConsume ? Math.min(movesUsed + 1, maxMoves) : null;
   useEffect(() => {
     setMovesDock(scrolledPast && isFocused ? { used: movesUsed, max: maxMoves, draft: draftMove } : null);
   }, [scrolledPast, isFocused, movesUsed, maxMoves, draftMove]);
@@ -908,7 +905,7 @@ export function FormationScreen() {
   const totalSlots = template.length;
   const missing = totalSlots - filledCount;
   // Mosse finite: ogni altro cambio verrebbe rifiutato, quindi la formazione non si tocca più.
-  const movesExhausted = movesApply && Boolean(context.lineup) && movesUsed >= maxMoves;
+  const movesExhausted = Boolean(context.lineup) && movesUsed >= maxMoves;
   const editable = context.modificationAllowed && canEdit && !movesExhausted;
   const blockedModules = new Set(
     editable && lockedAthleteIds.length > 0
@@ -1197,7 +1194,7 @@ export function FormationScreen() {
                 Mosse usate {movesUsed}/{maxMoves}
               </Text>
             </View>
-            {tacticalEvaluation.wouldConsume && movesApply ? (
+            {tacticalEvaluation.wouldConsume ? (
               <View style={[styles.movesChip, styles.movesChipDraft]} testID="formation-moves-draft">
                 <Text style={styles.movesText}>
                   Mossa in bozza → {Math.min(movesUsed + 1, maxMoves)}/{maxMoves}
@@ -1868,14 +1865,12 @@ export function FormationScreen() {
             </View>
           ) : null}
           <Text style={styles.meta} testID="formation-moves-hint">
-            {tacticalEvaluation.wouldConsume && movesApply
+            {tacticalEvaluation.wouldConsume
               ? "Questo salvataggio consumerà 1 mossa tattica."
               : `Questo salvataggio non consuma mosse${
                   unsavedChangeCount === 0
                     ? ""
-                    : !movesApply
-                      ? " (stai schierando per un altro fantallenatore)"
-                      : !context.lineup
+                    : !context.lineup
                         ? " (è la prima formazione salvata)"
                         : lockedAthleteIds.length === 0
                           ? " (nessuna partita della tua rosa è ancora iniziata)"

@@ -634,9 +634,6 @@ export function FormationPage() {
   /** Vuoto = la propria formazione. Un operatore può schierare al posto di un altro fantallenatore (EP-operatore-test). */
   const [targetTeamId, setTargetTeamId] = useState("");
   const targetTeamIdRef = useRef("");
-  // Le mosse contano per chi schiera la propria squadra (operatore compreso), non quando
-  // l'operatore interviene sulla squadra di un altro fantallenatore.
-  const movesApply = !isOperator || !targetTeamId;
   /** Le risposte più vecchie (doppio mount in dev, cambio allenatore a caricamento ancora in corso) non devono riscrivere la formazione appena scelta. */
   const lineupRequest = useRef(0);
   const [selectedRoundId, setSelectedRoundId] = useState(() =>
@@ -737,7 +734,7 @@ export function FormationPage() {
   const maxMoves = context?.maxTacticalMoves ?? MAX_TACTICAL_MOVES;
   const movesUsed = context?.tacticalMovesUsed ?? 0;
   // Mosse finite: ogni altro cambio verrebbe rifiutato, quindi la formazione non si tocca più.
-  const movesExhausted = movesApply && Boolean(context?.lineup) && movesUsed >= maxMoves;
+  const movesExhausted = Boolean(context?.lineup) && movesUsed >= maxMoves;
   const canModify = Boolean(context?.modificationAllowed) && canEdit && !movesExhausted;
   const tacticalEvaluation = evaluateTacticalMove({
     hasSavedLineup: Boolean(context?.lineup),
@@ -1278,7 +1275,7 @@ export function FormationPage() {
       return;
     }
     const requestId = startLineupRequest();
-    const predictedMove = tacticalEvaluation.wouldConsume && movesApply;
+    const predictedMove = tacticalEvaluation.wouldConsume;
     const movesUsedBefore = movesUsed;
     setBusy(true);
     setPendingAction("save");
@@ -1875,7 +1872,7 @@ export function FormationPage() {
                 <Badge variant={movesRemaining === 0 ? "danger" : movesRemaining === 1 ? "warning" : "neutral"}>
                   Mosse {movesUsed}/{maxMoves}
                 </Badge>
-                {tacticalEvaluation.wouldConsume && movesApply ? (
+                {tacticalEvaluation.wouldConsume ? (
                   <Badge variant="accent">→ {Math.min(movesUsed + 1, maxMoves)}/{maxMoves}</Badge>
                 ) : null}
               </span>
@@ -1999,12 +1996,10 @@ export function FormationPage() {
             </div>
           ) : null}
 
-          {hasUnsavedChanges && !(tacticalEvaluation.wouldConsume && movesApply) ? (
+          {hasUnsavedChanges && !(tacticalEvaluation.wouldConsume) ? (
             <p data-testid="formation-moves-reason" className="fa-formation-layout__moves-hint">
               Questo salvataggio non consuma mosse:{" "}
-              {!movesApply
-                ? "stai schierando per un altro fantallenatore come operatore."
-                : !context.lineup
+              {!context.lineup
                   ? "è la prima formazione salvata."
                   : lockedAthleteIds.length === 0
                     ? "nessuna partita della tua rosa è ancora iniziata."
@@ -2012,7 +2007,7 @@ export function FormationPage() {
             </p>
           ) : null}
 
-          {tacticalEvaluation.wouldConsume && movesApply ? (
+          {tacticalEvaluation.wouldConsume ? (
             <p data-testid="formation-moves-hint" className="fa-formation-layout__moves-hint">
               Questo salvataggio consumerà 1 mossa tattica ({movesRemaining} di {maxMoves}{" "}
               disponibili). Le sostituzioni automatiche non consumano mosse.
@@ -2178,7 +2173,7 @@ export function FormationPage() {
                 🔒 Hai usato tutte e {maxMoves} le mosse: la formazione resta questa fino alla fine del turno.
               </span>
             ) : null}
-            {tacticalEvaluation.wouldConsume && movesApply ? (
+            {tacticalEvaluation.wouldConsume ? (
               <Badge
                 variant="accent"
                 data-testid="formation-moves-draft-badge"

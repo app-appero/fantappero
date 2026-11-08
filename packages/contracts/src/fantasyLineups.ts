@@ -637,8 +637,10 @@ export function blockingLineupSaveIssue(input: {
   lockIssues: readonly LineupIssue[];
   tacticalIssues: readonly LineupIssue[];
 }): LineupIssue | null {
+  // L'operatore non è fermato dai blocchi dei singoli calciatori, ma le mosse finite valgono
+  // per la squadra chiunque la schieri.
   if (input.isPlatformOperator) {
-    return null;
+    return input.tacticalIssues[0] ?? null;
   }
   return input.lockIssues[0] ?? input.tacticalIssues[0] ?? null;
 }

@@ -1669,6 +1669,18 @@ def test_starter_bench_swap_with_a_locked_player_lower_on_the_bench_counts_one_m
     assert as_operator.status_code == 200, as_operator.json()
     assert as_operator.json()["tacticalMovesUsed"] == 2
 
+    # Anche con «Schiera per» (teamId esplicito) le mosse valgono per la squadra: terza ok,
+    # quarta rifiutata anche all'operatore.
+    team_id = as_operator.json()["fantasyTeamId"]
+    third = _swap_starter_with_bench(again, bench_forwards[1], bench_forwards[2])
+    third_response = client.put(f"{base}?teamId={team_id}", headers=headers, json=third)
+    assert third_response.status_code == 200, third_response.json()
+    assert third_response.json()["tacticalMovesUsed"] == 3
+    fourth = _swap_starter_with_bench(third, bench_forwards[2], starter_forward)
+    exhausted = client.put(f"{base}?teamId={team_id}", headers=headers, json=fourth)
+    assert exhausted.status_code == 400
+    assert exhausted.json()["code"] == "tactical_moves_exhausted"
+
 
 def test_discarding_the_draft_restores_the_confirmed_lineup(
     client: TestClient,
