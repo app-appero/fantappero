@@ -1920,6 +1920,15 @@ export function FormationPage() {
             >
               Mosse usate {movesUsed}/{maxMoves}
             </Badge>
+            {tacticalEvaluation.wouldConsume && !isOperator ? (
+              <Badge
+                variant="accent"
+                data-testid="formation-moves-draft-badge"
+                title="Mossa in bozza: si conta solo quando salvi. «Annulla modifiche» la toglie."
+              >
+                Mossa in bozza → {Math.min(movesUsed + 1, maxMoves)}/{maxMoves}
+              </Badge>
+            ) : null}
           </div>
 
           <div className="fa-formation-legend" data-testid="formation-legend" aria-label="Legenda formazioni probabili">

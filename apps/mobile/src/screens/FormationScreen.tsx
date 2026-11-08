@@ -1059,6 +1059,13 @@ export function FormationScreen() {
               Mosse usate {movesUsed}/{maxMoves}
             </Text>
           </View>
+          {tacticalEvaluation.wouldConsume && !isOperator ? (
+            <View style={[styles.movesChip, styles.movesChipDraft]} testID="formation-moves-draft">
+              <Text style={styles.movesText}>
+                Mossa in bozza → {Math.min(movesUsed + 1, maxMoves)}/{maxMoves}
+              </Text>
+            </View>
+          ) : null}
         </View>
         {countdown && countdown.roundId === context.roundId ? (
           <LockCountdown
@@ -1709,6 +1716,7 @@ const styles = lazyStyles(() => StyleSheet.create({
     paddingHorizontal: spacing.sm,
     paddingVertical: 2,
   },
+  movesChipDraft: { backgroundColor: colors.brand, marginLeft: spacing.xs },
   movesText: { color: colors.foreground, fontSize: typography.fontSize.sm, fontWeight: "600" },
   meta: {
     color: colors.foregroundMuted,
