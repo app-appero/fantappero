@@ -72,6 +72,7 @@ from fantasy_lineups.schemas import (
     TacticalMoveResponse,
 )
 from fantasy_lineups.validators import (
+    MAX_LINEUP_LOCK_MARGIN_MINUTES,
     parse_optional_athlete_ids,
     validate_athlete_id_list,
     validate_module_code,
@@ -152,6 +153,11 @@ class FantasyLineupService:
         Bozza valida, poi formazione del turno precedente, poi vuota (come a fine turno). Da lì
         ogni cambio costa una mossa: la bozza non resta un modo per cambiare senza limiti.
         """
+        # Nessuna query finché il primo blocco possibile del turno è ancora lontano.
+        if fantasy_round.cutoff_at is not None and now < fantasy_round.cutoff_at - timedelta(
+            minutes=MAX_LINEUP_LOCK_MARGIN_MINUTES
+        ):
+            return
         if self._load_submission(fantasy_round.id, team.id) is not None:
             return
         if kickoffs is None:
@@ -191,7 +197,11 @@ class FantasyLineupService:
         )
         team = self._resolve_lineup_team(league_access, target_team_id, ensure_created=True)
         roster = self._roster_rows(league_access.league.season_year, team)
-        if self._load_submission(fantasy_round.id, team.id) is None:
+        submission = self._load_submission(fantasy_round.id, team.id)
+        if submission is None and (
+            fantasy_round.cutoff_at is None
+            or now >= fantasy_round.cutoff_at - timedelta(minutes=MAX_LINEUP_LOCK_MARGIN_MINUTES)
+        ):
             self._materialize_if_started(
                 fantasy_round=fantasy_round,
                 team=team,
@@ -200,7 +210,7 @@ class FantasyLineupService:
                 now=now,
             )
             self._session.commit()
-        submission = self._load_submission(fantasy_round.id, team.id)
+            submission = self._load_submission(fantasy_round.id, team.id)
         return self._to_context(
             league_access=league_access,
             fantasy_round=fantasy_round,
