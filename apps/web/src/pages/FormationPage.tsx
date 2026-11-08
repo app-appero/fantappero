@@ -354,6 +354,10 @@ function StarterSlotField({
   testId,
   placeholder,
   onSelect,
+  name,
+  tone,
+  countdown,
+  locked,
 }: {
   label: string;
   role: LineupRole;
@@ -364,32 +368,54 @@ function StarterSlotField({
   testId: string;
   placeholder: string;
   onSelect: (athleteId: string) => void;
+  name?: string;
+  tone?: ProbableState;
+  countdown?: string | null;
+  locked?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const selected = options.find((option) => option.value === value);
   const displayLabel = selected?.label || placeholder;
+  const toneClass = tone ? ` fa-starter-row--${tone}` : "";
 
   return (
-    <div className="fa-field">
-      <span className="fa-field__label fa-starter-slot__label">
+    <div className="fa-field fa-starter-field">
+      <div className={`fa-starter-row${toneClass}${locked ? " fa-starter-row--locked" : ""}`}>
         <Badge variant={roleBadgeVariant(role)}>{role}</Badge>
-        {label}
-      </span>
-      <button
-        type="button"
-        className="fa-select fa-starter-slot__trigger"
-        data-testid={testId}
-        disabled={disabled}
-        aria-expanded={open}
-        aria-haspopup="listbox"
-        onClick={() => {
-          if (!disabled) {
-            setOpen((current) => !current);
-          }
-        }}
-      >
-        {displayLabel}
-      </button>
+        <span className="fa-starter-row__text">
+          <strong className="fa-starter-row__name">{name || placeholder}</strong>
+          <span className="fa-starter-row__a11y">{displayLabel}</span>
+          <span className="fa-starter-row__meta">
+            <span className="fa-starter-row__slot">{label}</span>
+            {tone === "starter" ? <span className="fa-starter-row__chip fa-starter-row__chip--starter">Titolare probabile</span> : null}
+            {tone === "bench" ? <span className="fa-starter-row__chip fa-starter-row__chip--bench">Panchina probabile</span> : null}
+            {tone === "expelled" ? <span className="fa-starter-row__chip fa-starter-row__chip--expelled">Squalificato</span> : null}
+            {tone === "unavailable" ? <span className="fa-starter-row__chip fa-starter-row__chip--unavailable">Indisponibile</span> : null}
+            {countdown ? <span className="fa-starter-row__count">{countdown}</span> : null}
+          </span>
+        </span>
+        {locked ? (
+          <span className="fa-starter-row__lock" role="img" aria-label="Bloccato" title={hint ?? "Bloccato"}>
+            🔒
+          </span>
+        ) : null}
+        <button
+          type="button"
+          className="fa-starter-slot__trigger fa-starter-row__change"
+          data-testid={testId}
+          disabled={disabled}
+          aria-expanded={open}
+          aria-haspopup="listbox"
+          aria-label={`Cambia: ${displayLabel}`}
+          onClick={() => {
+            if (!disabled) {
+              setOpen((current) => !current);
+            }
+          }}
+        >
+          Cambia
+        </button>
+      </div>
       {open && !disabled ? (
         <ul className="fa-starter-slot__list" role="listbox" data-testid={`${testId}-options`}>
           {options.map((option) => (
@@ -411,7 +437,6 @@ function StarterSlotField({
           ))}
         </ul>
       ) : null}
-      {hint ? <p className="fa-field__hint">{hint}</p> : null}
     </div>
   );
 }
@@ -1970,7 +1995,7 @@ export function FormationPage() {
             data-testid="formation-starters"
             className="fa-ds-showcase__stack fa-formation-layout__editor"
           >
-            <h3 className="fa-formation-layout__section-title">Modifica titolari</h3>
+            <h3 className="fa-formation-layout__section-title">Titolari</h3>
             {template.map((role, index) => {
               const currentId = displayStarters[index] ?? "";
               const lockedSlot = playerLocked(roster, currentId, clock, lockMarginMinutes);
@@ -1983,6 +2008,10 @@ export function FormationPage() {
                   placeholder="Seleziona calciatore"
                   options={optionsForSlot(index, role)}
                   testId={`formation-starter-${index}`}
+                  name={currentId ? playerName(roster, currentId) : undefined}
+                  tone={currentId ? probableState(roster, currentId) : null}
+                  countdown={currentId ? lockLabel(currentId) : null}
+                  locked={lockedSlot}
                   disabled={!context.modificationAllowed || !canEdit}
                   hint={
                     lockedSlot
