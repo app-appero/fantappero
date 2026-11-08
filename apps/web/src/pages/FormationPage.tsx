@@ -747,6 +747,32 @@ export function FormationPage() {
   // Mosse *già usate*, non un'anteprima di quante ne resterebbero dopo un
   // salvataggio non ancora avvenuto.
   const movesRemaining = context?.tacticalMovesRemaining ?? maxMoves - movesUsed;
+
+  // Quando la riga delle mosse esce dalla vista, mosse e countdown si uniscono in una barra fissa sotto l'header.
+  const movesRowRef = useRef<HTMLDivElement | null>(null);
+  const [movesDocked, setMovesDocked] = useState(false);
+  const [dockTop, setDockTop] = useState(72);
+  useEffect(() => {
+    const target = movesRowRef.current;
+    if (!target || typeof IntersectionObserver === "undefined") {
+      return;
+    }
+    const headerBottom = () => document.querySelector("header")?.getBoundingClientRect().bottom ?? 64;
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        const top = headerBottom();
+        setDockTop(Math.round(top) + 8);
+        setMovesDocked(entry !== undefined && !entry.isIntersecting && entry.boundingClientRect.bottom < top + 8);
+      },
+      { rootMargin: `-${Math.round(headerBottom())}px 0px 0px 0px`, threshold: [0, 1] },
+    );
+    observer.observe(target);
+    return () => observer.disconnect();
+  }, [context?.roundId]);
+  useEffect(() => {
+    document.body.classList.toggle("fa-moves-docked", movesDocked);
+    return () => document.body.classList.remove("fa-moves-docked");
+  }, [movesDocked]);
   const tacticalSaveBlocked =
     blockingLineupSaveIssue({
       isPlatformOperator: isOperator,
@@ -1721,6 +1747,28 @@ export function FormationPage() {
 
       {!showForbidden && !loading && !loadError && context ? (
         <div data-testid="wireframe-formation-success" className="fa-formation-layout">
+          {movesDocked ? (
+            <div className="fa-moves-dock" style={{ top: dockTop }} data-testid="formation-moves-dock">
+              <span className="fa-moves-dock__lock" aria-hidden="true">🔒</span>
+              {countdown && countdown.roundId === context.roundId ? (
+                <LockCountdown
+                  state={countdown.state}
+                  nextLockAt={countdown.nextLockAt}
+                  onExpire={refetchCountdown}
+                />
+              ) : (
+                <span className="fa-moves-dock__label">Blocco</span>
+              )}
+              <span className="fa-moves-dock__moves">
+                <Badge variant={movesRemaining === 0 ? "danger" : movesRemaining === 1 ? "warning" : "neutral"}>
+                  Mosse {movesUsed}/{maxMoves}
+                </Badge>
+                {tacticalEvaluation.wouldConsume && movesApply ? (
+                  <Badge variant="accent">→ {Math.min(movesUsed + 1, maxMoves)}/{maxMoves}</Badge>
+                ) : null}
+              </span>
+            </div>
+          ) : null}
           <aside className="fa-formation-layout__sidebar">
           <Card>
             <CardHeader title={`Turno ${context.roundNumber}`} />
@@ -1976,7 +2024,7 @@ export function FormationPage() {
           </aside>
 
           <div className="fa-formation-layout__main">
-          <div className="fa-formation-layout__module-row">
+          <div className="fa-formation-layout__module-row" ref={movesRowRef}>
             <Select
               label="Modulo"
               value={moduleCode}
