@@ -42,6 +42,19 @@ def _league_is_open(league: LeagueMarketGate) -> bool:
 
 
 def assert_market_open(league: LeagueMarketGate) -> None:
-    """Block roster moves and auction activity while the admin switch is off."""
+    """Block roster moves and auction activity while the admin switch is off.
+
+    Anche con l'interruttore acceso, a turno in corso il mercato resta chiuso
+    (``market.round_freeze``).
+    """
     if not _league_is_open(league):
         raise ValidationAuthError(MARKET_CLOSED_MESSAGE, code=MARKET_CLOSED_CODE)
+    league_id = getattr(league, "id", None)
+    try:
+        session = object_session(league)
+    except UnmappedInstanceError:
+        session = None
+    if session is not None and league_id is not None:
+        from market.round_freeze import assert_no_round_in_progress
+
+        assert_no_round_in_progress(session, league_id)

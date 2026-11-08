@@ -837,6 +837,29 @@ export function evaluateBenchOrderLock(input: {
     }
   }
 
+  // Il bloccato tiene il suo numero (panchina o tribuna) e davanti a lui non diminuiscono i pari
+  // ruolo: altrimenti, con un cambio modulo, guadagnerebbe priorità nei cambi automatici.
+  const sameRoleAhead = (list: readonly string[], index: number, athleteId: string): number => {
+    const role = input.roleByAthleteId?.[athleteId];
+    if (role == null) {
+      return 0;
+    }
+    return list.slice(0, index).filter((other) => input.roleByAthleteId?.[other] === role).length;
+  };
+  if (issues.length === 0) {
+    for (const lockedId of lockedRemaining) {
+      const previousIndex = previous.indexOf(lockedId);
+      const proposedIndex = proposed.indexOf(lockedId);
+      if (
+        previousIndex !== proposedIndex ||
+        sameRoleAhead(proposed, proposedIndex, lockedId) < sameRoleAhead(previous, previousIndex, lockedId)
+      ) {
+        issues.push(issue("bench_order_locked", BENCH_ORDER_LOCKED_MESSAGE));
+        break;
+      }
+    }
+  }
+
   if (lockedRemaining.length > 0 && issues.length === 0) {
     const lastLockedProposed = Math.max(...lockedRemaining.map((athleteId) => proposed.indexOf(athleteId)));
     const lockedKeepPosition = lockedRemaining.every(
@@ -895,7 +918,8 @@ export function resolveAutomaticSubstitutions(input: {
     }
   }
 
-  for (const benchPlayer of input.bench) {
+  // Solo i primi BENCH_ACTIVE_SIZE: chi è in tribuna resta fuori dal turno.
+  for (const benchPlayer of input.bench.slice(0, BENCH_ACTIVE_SIZE)) {
     if (substitutions.length >= MAX_AUTOMATIC_SUBSTITUTIONS) {
       break;
     }

@@ -30,6 +30,7 @@ from fantasy_ratings.models import PlayerMatchRating
 from fantasy_teams.models import FantasyRosterSlot, FantasyTeam
 from fantasy_turns.models import FantasyRound, FantasyRoundFixture
 from leagues.models.competition import Competition
+from leagues.models.league import League
 from leagues.models.league_audit_event import LeagueAuditEvent
 from mail.capture import get_captured_emails
 from sports_data.catalog.models import Club, SportSeason
@@ -2047,3 +2048,50 @@ def test_operator_follows_the_kickoff_locks_on_their_own_team(
     response = client.put(setup["base"], headers=setup["headers"], json=moved)
     assert response.status_code == 400
     assert response.json()["code"] == "athlete_kickoff_locked"
+
+
+def test_market_and_trades_are_closed_while_a_round_is_in_progress(
+    client: TestClient,
+    db_session: Session,
+    competition_ids: list[str],
+) -> None:
+    """Dal primo blocco all'omologazione niente svincoli, acquisti né scambi: un giocatore che
+    cambia squadra a metà turno conterebbe per due squadre."""
+    setup = _started_round_setup(
+        client,
+        db_session,
+        competition_ids,
+        email="lineup.market.freeze@example.com",
+        league_name="Lega Mercato Chiuso",
+        id_offset=9_920_000,
+    )
+    league = db_session.get(League, UUID(setup["league_id"]))
+    assert league is not None
+    league.market_open = True
+    db_session.commit()
+    team_id = client.get(setup["base"], headers=setup["headers"]).json()["fantasyTeamId"]
+    _start_first_fixture(db_session, setup)
+
+    release = client.delete(
+        f"/leagues/{setup['league_id']}/amministrazione/squadre/{team_id}/slot/0",
+        headers=setup["headers"],
+    )
+    assert release.status_code == 400
+    assert release.json()["code"] == "market_round_in_progress"
+
+    trade = client.post(
+        f"/leagues/{setup['league_id']}/mercato/scambi/proposte",
+        headers=setup["headers"],
+        json={"recipientTeamId": team_id, "requestedCredits": 1},
+    )
+    assert trade.status_code == 400
+    assert trade.json()["code"] == "market_round_in_progress"
+
+    # Omologato il turno, il mercato riapre (lo svincolo torna possibile).
+    setup["round"].homologated_at = datetime.now(UTC)
+    db_session.commit()
+    reopened = client.delete(
+        f"/leagues/{setup['league_id']}/amministrazione/squadre/{team_id}/slot/0",
+        headers=setup["headers"],
+    )
+    assert reopened.status_code == 200, reopened.json()

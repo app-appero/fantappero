@@ -652,6 +652,7 @@ def evaluate_bench_order_lock(
 ) -> tuple[LineupIssue, ...]:
     """Reject bench-order changes that cross a locked player (no retroactive advantage).
 
+    Ogni bloccato resta al suo numero e davanti a lui non diminuiscono i pari ruolo.
     Eccezioni, purché ogni bloccato resti nella sua posizione: chi entra in panchina prende
     il posto esatto di un pari ruolo uscito (scambio 1:1), oppure dopo di lui non ci sono
     bloccati del suo stesso ruolo (es. cambio modulo). Nessun vantaggio retroattivo: i cambi
@@ -682,6 +683,19 @@ def evaluate_bench_order_lock(
                 crossed = True
                 break
         if crossed:
+            issues.append(
+                LineupIssue(code="bench_order_locked", message=BENCH_ORDER_LOCKED_MESSAGE)
+            )
+            break
+
+    # Il bloccato tiene il suo numero (panchina o tribuna) e davanti a lui non diminuiscono i
+    # pari ruolo: altrimenti, con un cambio modulo, guadagnerebbe priorità nei cambi automatici.
+    for locked_id in locked_remaining if not issues else []:
+        previous_index = previous.index(locked_id)
+        proposed_index = proposed.index(locked_id)
+        if previous_index != proposed_index or _same_role_ahead(
+            proposed, proposed_index, locked_id, role_by_athlete_id
+        ) < _same_role_ahead(previous, previous_index, locked_id, role_by_athlete_id):
             issues.append(
                 LineupIssue(code="bench_order_locked", message=BENCH_ORDER_LOCKED_MESSAGE)
             )
@@ -718,6 +732,20 @@ def evaluate_bench_order_lock(
             break
 
     return _dedupe_issues(issues)
+
+
+def _same_role_ahead(
+    bench: Sequence[object],
+    index: int,
+    athlete_id: object,
+    role_by_athlete_id: Mapping[object, object] | None,
+) -> int:
+    if role_by_athlete_id is None:
+        return 0
+    role = role_by_athlete_id.get(athlete_id)
+    if role is None:
+        return 0
+    return sum(1 for item in bench[:index] if role_by_athlete_id.get(item) == role)
 
 
 def _no_locked_same_role_after(
@@ -799,6 +827,9 @@ def resolve_automatic_substitutions(
     ``skipped`` with the reason, so the result explains "chi è entrato, per
     chi e perché gli altri sono stati saltati".
     """
+    # Entrano solo i primi BENCH_ACTIVE_SIZE della panchina: chi è in tribuna resta fuori dal
+    # turno, come nel calcio reale (decisione del 08/11/2026).
+    bench = list(bench)[:BENCH_ACTIVE_SIZE]
     played = {item for item in played_athlete_ids if item not in {None, ""}}
     substitutions: list[AutomaticSubstitution] = []
     skipped: list[SkippedBenchCandidate] = []

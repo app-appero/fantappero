@@ -345,6 +345,72 @@ def test_hints_for_fixtures_infers_bench_when_fotmob_omits_it() -> None:
     assert hints[bench_one].note == "Possibile panchina (dedotta)"
 
 
+def test_official_lineup_marks_squad_players_left_out_as_not_called() -> None:
+    """Formazione ufficiale validata con panchina: chi della rosa del club non c'è non è
+    convocato, quindi non prenderà il voto e non può entrare tra i titolari. Se un lato ha
+    giocatori non collegati alla rosa, per prudenza non si esclude nessuno."""
+    fixture_id = uuid4()
+    home_club = uuid4()
+    away_club = uuid4()
+    season_id = uuid4()
+    starter_id = uuid4()
+    bench_id = uuid4()
+    not_called_id = uuid4()
+    away_starter_id = uuid4()
+
+    def row(athlete_id, side, *, starter, order):
+        return PredictedLineupPlayer(
+            athlete_id=athlete_id,
+            side=side,
+            display_name="Player",
+            is_starter=starter,
+            is_unavailable=False,
+            sort_order=order,
+        )
+
+    snapshot = PredictedLineupSnapshot(
+        fixture_id=fixture_id,
+        fotmob_match_id=None,
+        lineup_type="confirmed",
+        source="fotmob",
+        reliability="validated",
+        warning_codes=[],
+        fetched_at=datetime(2026, 10, 20, tzinfo=UTC),
+        home_formation="4-3-3",
+        away_formation="4-4-2",
+        players=[
+            row(starter_id, "home", starter=True, order=1),
+            row(bench_id, "home", starter=False, order=12),
+            row(away_starter_id, "away", starter=True, order=1),
+            # Panchinaro ospite non collegato: il lato ospite non esclude nessuno.
+            row(None, "away", starter=False, order=12),
+        ],
+    )
+    fixture = Fixture(
+        id=fixture_id,
+        provider_id=1,
+        sport_season_id=season_id,
+        home_club_id=home_club,
+        away_club_id=away_club,
+        status_short="NS",
+    )
+    session = MagicMock()
+    snapshots_scalars = MagicMock()
+    snapshots_scalars.all.return_value = [snapshot]
+    fixtures_scalars = MagicMock()
+    fixtures_scalars.all.return_value = [fixture]
+    home_squad = MagicMock()
+    home_squad.all.return_value = [starter_id, bench_id, not_called_id]
+    session.scalars.side_effect = [snapshots_scalars, fixtures_scalars, home_squad]
+
+    hints = hints_for_fixtures(session, [fixture_id], [starter_id, bench_id, not_called_id])
+
+    assert hints[not_called_id].note == "Non convocato"
+    assert hints[not_called_id].blocked is True
+    assert hints[starter_id].hint == "starter"
+    assert hints[bench_id].hint == "bench"
+
+
 def test_no_snapshot_returns_none() -> None:
     session = _session_with(snapshot=None, role_rows=[])
     assert latest_predicted_view(session, uuid4()) is None

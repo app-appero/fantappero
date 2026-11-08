@@ -203,6 +203,17 @@ panchinaro o cambiare la formazione senza costo.
   con «Schiera per».
 - **Operatore**: ignora i blocchi dei singoli calciatori solo sulla squadra di un altro; sulla
   propria segue le regole di tutti.
+- **Non convocati**: con formazione ufficiale validata e tutti i giocatori collegati alla rosa,
+  chi del club non è tra titolari e panchina è «Non convocato» e non entra tra i titolari. Se il
+  collegamento è incompleto non si esclude nessuno.
+- **Bloccati fermi al loro numero**: un bloccato in panchina o tribuna tiene la stessa posizione
+  e davanti a lui non diminuiscono i pari ruolo (altrimenti un cambio modulo gli darebbe
+  priorità nei cambi automatici). I moduli che lo richiederebbero hanno il lucchetto.
+- **Tribuna fuori dal turno**: i cambi automatici usano solo i primi 10 della panchina.
+- **Mercato chiuso a turno in corso** (`market_round_in_progress`): dal primo blocco
+  all'omologazione niente scambi (proposta, accettazione, approvazione, controproposta),
+  svincoli, acquisti o aste. Un turno mai omologato non tiene chiuso il mercato oltre 7 giorni
+  dalla fine della sua finestra.
 
 ## Formazione automatica dei fantallenatori IA (EP13-P05)
 

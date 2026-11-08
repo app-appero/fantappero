@@ -611,6 +611,35 @@ def test_bench_order_lock_allows_same_role_one_for_one_swap() -> None:
     assert any(issue.code == "bench_order_locked" for issue in shifted)
 
 
+def test_locked_bench_player_keeps_its_number_and_its_same_role_priority() -> None:
+    roles = {"a1": "A", "c1": "C", "locked-a": "A", "u2": "D", "x": "C"}
+    previous = ["a1", "c1", "locked-a", "u2"]
+    # Chi era davanti esce senza essere sostituito: il bloccato scalerebbe dal 3° al 2° posto.
+    shifted = evaluate_bench_order_lock(
+        previous_bench=previous,
+        proposed_bench=["c1", "locked-a", "u2"],
+        locked_athlete_ids=["locked-a"],
+        role_by_athlete_id=roles,
+    )
+    assert any(issue.code == "bench_order_locked" for issue in shifted)
+    # Resta 3° ma l'attaccante davanti diventa un centrocampista: sarebbe il primo attaccante.
+    fewer_same_role = evaluate_bench_order_lock(
+        previous_bench=previous,
+        proposed_bench=["x", "c1", "locked-a", "u2"],
+        locked_athlete_ids=["locked-a"],
+        role_by_athlete_id=roles,
+    )
+    assert any(issue.code == "bench_order_locked" for issue in fewer_same_role)
+    # Scambio 1:1 con un pari ruolo: tutto invariato per il bloccato.
+    same_role_swap = evaluate_bench_order_lock(
+        previous_bench=previous,
+        proposed_bench=["a9", "c1", "locked-a", "u2"],
+        locked_athlete_ids=["locked-a"],
+        role_by_athlete_id={**roles, "a9": "A"},
+    )
+    assert same_role_swap == ()
+
+
 def test_automatic_substitutions_respect_role_module_order_and_cap() -> None:
     roster, starters, bench = _valid_433()
     first_defender = next(player.athlete_id for player in starters if player.role == FantasyRole.D)
@@ -689,9 +718,29 @@ def test_automatic_substitutions_explain_skipped_bench_candidates() -> None:
     # other_defender non ha voto: non può entrare.
     assert reasons[other_defender] == "not_eligible"
     # I panchinari di ruolo diverso non hanno un titolare senza voto compatibile.
-    other_role_bench = [item for item in bench if item.role != FantasyRole.D]
+    active_bench = bench[:BENCH_ACTIVE_SIZE]
+    other_role_bench = [item for item in active_bench if item.role != FantasyRole.D]
     assert all(reasons[item.athlete_id] == "no_compatible_starter" for item in other_role_bench)
-    assert len(resolved.skipped) == len(bench) - 1
+    assert len(resolved.skipped) == len(active_bench) - 1
+    # Chi è in tribuna (dall'11° posto) resta fuori dal turno: non è nemmeno un candidato.
+    assert not any(item.athlete_id in reasons for item in bench[BENCH_ACTIVE_SIZE:])
+
+
+def test_automatic_substitutions_never_use_the_tribuna() -> None:
+    roster, starters, bench = _valid_433()
+    first_defender = next(player.athlete_id for player in starters if player.role == FantasyRole.D)
+    active_defenders = [
+        player.athlete_id for player in bench[:BENCH_ACTIVE_SIZE] if player.role == FantasyRole.D
+    ]
+    # Nessun difensore della panchina attiva ha voto: quello in tribuna non deve entrare.
+    played = set(roster) - {first_defender, *active_defenders}
+    resolved = resolve_automatic_substitutions(
+        module="4-3-3",
+        starters=starters,
+        bench=bench,
+        played_athlete_ids=list(played),
+    )
+    assert resolved.substitutions == ()
 
 
 def test_automatic_substitutions_respect_league_configurable_limit() -> None:

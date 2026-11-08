@@ -196,7 +196,53 @@ def hints_for_fixtures(
                         hint="bench", note="Possibile panchina (dedotta)", blocked=False
                     ),
                 )
+        for athlete_id in _not_in_squad_ids(session, snapshot, fixture) & wanted:
+            found.setdefault(
+                athlete_id,
+                AthleteProbable(
+                    hint="unavailable", note="Non convocato", blocked=True, absence="other"
+                ),
+            )
     return found
+
+
+def _not_in_squad_ids(
+    session: Session,
+    snapshot: PredictedLineupSnapshot,
+    fixture: Fixture | None,
+) -> set[UUID]:
+    """Chi della rosa reale non è tra i convocati della formazione ufficiale.
+
+    Solo con formazione ufficiale validata, panchina pubblicata e ogni giocatore elencato già
+    collegato alla rosa: se anche uno solo non è collegato non si esclude nessuno, per non
+    bloccare per errore chi in realtà è convocato. Chi non è convocato non prende il voto,
+    quindi non deve poter entrare tra i titolari.
+    """
+    if (
+        fixture is None
+        or snapshot.lineup_type != "confirmed"
+        or snapshot.reliability != RELIABILITY_VALIDATED
+    ):
+        return set()
+    excluded: set[UUID] = set()
+    for side, club_id in (("home", fixture.home_club_id), ("away", fixture.away_club_id)):
+        rows = [row for row in snapshot.players if row.side == side]
+        listed = [row for row in rows if not row.is_unavailable]
+        has_bench = any(not row.is_starter for row in listed)
+        if club_id is None or not has_bench or any(row.athlete_id is None for row in listed):
+            continue
+        known_ids = {row.athlete_id for row in rows if row.athlete_id is not None}
+        squad_ids = set(
+            session.scalars(
+                select(SquadMembership.athlete_id).where(
+                    SquadMembership.club_id == club_id,
+                    SquadMembership.sport_season_id == fixture.sport_season_id,
+                    SquadMembership.is_active.is_(True),
+                )
+            ).all()
+        )
+        excluded |= squad_ids - known_ids
+    return excluded
 
 
 def _inferred_bench_ids(

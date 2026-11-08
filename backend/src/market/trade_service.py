@@ -24,6 +24,7 @@ from leagues.models.league_audit_event import LeagueAuditEvent
 from leagues.models.league_membership import LeagueMembership
 from leagues.models.league_rules import LeagueRules
 from market.models import TradeProposal
+from market.round_freeze import assert_no_round_in_progress
 from market.trade_execution import execute_trade
 from market.trade_schemas import (
     CounterTradeProposalRequest,
@@ -84,6 +85,7 @@ class TradeService:
         payload: CreateTradeProposalRequest,
     ) -> TradeProposalResponse:
         league_id = league_access.league.id
+        assert_no_round_in_progress(self._session, league_id)
         proposer = self._my_team(league_access)
         try:
             recipient_team_id = UUID(payload.recipient_team_id)
@@ -266,6 +268,7 @@ class TradeService:
         league_access: LeagueAccess,
         proposal_id: UUID,
     ) -> TradeProposalResponse:
+        assert_no_round_in_progress(self._session, league_access.league.id)
         team = self._my_team(league_access)
         proposal = self._lock_actionable_proposal_as_recipient(proposal_id, league_access, team)
         league = self._session.get(League, league_access.league.id)
@@ -339,6 +342,7 @@ class TradeService:
         proposal_id: UUID,
     ) -> TradeProposalResponse:
         """Admin approval (EP08-07): re-validates and executes a pending trade."""
+        assert_no_round_in_progress(self._session, league_access.league.id)
         proposal = self._lock_pending_approval_proposal(proposal_id, league_access)
         league = self._session.get(League, league_access.league.id)
         assert league is not None
@@ -400,6 +404,7 @@ class TradeService:
         proposal_id: UUID,
         payload: CounterTradeProposalRequest,
     ) -> TradeProposalResponse:
+        assert_no_round_in_progress(self._session, league_access.league.id)
         team = self._my_team(league_access)
         original = self._lock_actionable_proposal_as_recipient(proposal_id, league_access, team)
         original_proposer = self._session.get(FantasyTeam, original.proposer_team_id)
