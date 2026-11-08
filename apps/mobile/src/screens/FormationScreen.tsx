@@ -455,14 +455,55 @@ export function FormationScreen() {
     return true;
   }
 
+  /** Scambio per ruolo: chi è toccato e chi viene scelto si scambiano di posto. */
   function assignBenchPlayer(slotIndex: number, athleteId: string) {
-    const fromIndex = displayBench.indexOf(athleteId);
-    if (fromIndex < 0) {
+    const currentId = displayBench[slotIndex];
+    if (!currentId || currentId === athleteId) {
+      setBenchPickerIndex(null);
       return;
     }
-    if (moveBenchTo(fromIndex, slotIndex)) {
+    if (playerLocked(currentId) || playerLocked(athleteId)) {
+      setActionError(KICKOFF_LOCK_MESSAGE);
       setBenchPickerIndex(null);
+      return;
     }
+    const starterSlot = displayStarters.indexOf(athleteId);
+    if (starterSlot >= 0) {
+      if (playerBlocked(currentId)) {
+        setActionError("Questo calciatore è indisponibile e non può essere schierato titolare.");
+        setBenchPickerIndex(null);
+        return;
+      }
+      const nextStarters = [...displayStarters];
+      nextStarters[starterSlot] = currentId;
+      const nextBench = [...displayBench];
+      nextBench[slotIndex] = athleteId;
+      setStarterIds(nextStarters);
+      setBenchIds(nextBench);
+    } else {
+      const otherIndex = displayBench.indexOf(athleteId);
+      if (otherIndex < 0) {
+        setBenchPickerIndex(null);
+        return;
+      }
+      const nextBench = [...displayBench];
+      nextBench[slotIndex] = athleteId;
+      nextBench[otherIndex] = currentId;
+      const orderIssues = evaluateBenchOrderLock({
+        previousBench: previousBenchIds,
+        proposedBench: nextBench,
+        lockedAthleteIds,
+      });
+      if (orderIssues.length > 0) {
+        setActionError(orderIssues[0]?.message ?? "Modifica fuori tempo.");
+        setBenchPickerIndex(null);
+        return;
+      }
+      setBenchIds(nextBench);
+    }
+    setActionError(null);
+    setActionMessage(null);
+    setBenchPickerIndex(null);
   }
   const evaluation = evaluateLineup({
     module: moduleCode,
@@ -880,13 +921,21 @@ export function FormationScreen() {
     }
     nextStarters[index] = athleteId;
     setStarterIds(nextStarters);
-    setBenchIds(
-      orderedBenchFromRoster(
-        roster.map((row) => row.athleteId),
-        nextStarters,
-        benchIds,
-      ),
-    );
+    const incomingBenchPos = athleteId ? displayBench.indexOf(athleteId) : -1;
+    if (currentId && incomingBenchPos >= 0) {
+      // Titolare <-> panchina/tribuna: il vecchio titolare prende il posto esatto di chi sale.
+      const swappedBench = [...displayBench];
+      swappedBench[incomingBenchPos] = currentId;
+      setBenchIds(swappedBench);
+    } else {
+      setBenchIds(
+        orderedBenchFromRoster(
+          roster.map((row) => row.athleteId),
+          nextStarters,
+          benchIds,
+        ),
+      );
+    }
     setActionError(null);
     setActionMessage(null);
     setPickerIndex(null);
@@ -915,10 +964,10 @@ export function FormationScreen() {
               stateLabel = "Bloccato · partita iniziata";
             } else if (slotOf >= 0) {
               state = "titolare";
-              stateLabel = `Schierato in ${pickerRole} ${slotOf + 1}`;
+              stateLabel = "Titolare";
             } else if (benchPos >= 0) {
               state = "panchina";
-              stateLabel = `In panchina · ${benchPos + 1}°`;
+              stateLabel = benchPos < benchActive ? `Panchina ${benchPos + 1}°` : "Tribuna";
             } else if (row.probableHint === "starter") {
               stateLabel = "Titolare probabile";
             } else if (row.probableHint === "bench") {
@@ -938,30 +987,34 @@ export function FormationScreen() {
 
   const panchinaIds = displayBench.slice(0, benchActive);
   const tribunaIds = displayBench.slice(benchActive);
-  const benchCandidates: Candidate[] =
+  const benchPickerRole =
     benchPickerIndex != null
+      ? (roster.find((row) => row.athleteId === displayBench[benchPickerIndex])?.role ?? null)
+      : null;
+  const benchCandidates: Candidate[] =
+    benchPickerIndex != null && benchPickerRole
       ? roster
-          .filter((row) => !displayStarters.includes(row.athleteId))
+          .filter((row) => row.role === benchPickerRole)
           .map((row) => {
             const benchPos = displayBench.indexOf(row.athleteId);
             const isCurrent = benchPos === benchPickerIndex;
-            const locked = playerLocked(row.athleteId);
             let state: Candidate["state"] = "libero";
-            let stateLabel = "Disponibile";
+            let stateLabel = "Tribuna";
             if (isCurrent) {
               state = "panchina";
               stateLabel = "Schierato qui";
+            } else if (playerLocked(row.athleteId)) {
+              state = "bloccato";
+              stateLabel = "Bloccato · partita iniziata";
+            } else if (displayStarters.includes(row.athleteId)) {
+              state = "titolare";
+              stateLabel = "Titolare";
             } else if (row.selectionBlocked || row.probableAbsence === "suspended") {
               state = "bloccato";
               stateLabel = row.probableNote ?? "Indisponibile";
-            } else if (locked) {
-              state = "bloccato";
-              stateLabel = "Bloccato · partita iniziata";
             } else if (benchPos >= 0 && benchPos < benchActive) {
               state = "panchina";
-              stateLabel = `In panchina · ${benchPos + 1}°`;
-            } else {
-              stateLabel = row.probableHint === "bench" ? "Panchina probabile" : "In tribuna";
+              stateLabel = `Panchina ${benchPos + 1}°`;
             }
             return {
               athleteId: row.athleteId,
@@ -1388,10 +1441,9 @@ export function FormationScreen() {
         slotNumber={(benchPickerIndex ?? 0) + 1}
         moduleCode={moduleCode}
         title={`Panchina ${(benchPickerIndex ?? 0) + 1}°`}
-        subtitle="Scegli chi inserire in questo posto"
+        subtitle="Scegli con chi scambiarlo"
         candidates={benchCandidates}
         hasCurrent={false}
-        showRoleTabs
         onPick={(athleteId) => benchPickerIndex != null && assignBenchPlayer(benchPickerIndex, athleteId)}
         onClear={() => setBenchPickerIndex(null)}
         onClose={() => setBenchPickerIndex(null)}

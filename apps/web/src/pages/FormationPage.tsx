@@ -1045,6 +1045,14 @@ export function FormationPage() {
     const nextStarters = [...starterIds];
     nextStarters[index] = athleteId;
     setStarterIds(nextStarters);
+    const incomingBenchPos = athleteId ? displayBench.indexOf(athleteId) : -1;
+    if (currentId && incomingBenchPos >= 0) {
+      // Titolare <-> panchina/tribuna: il vecchio titolare prende il posto esatto di chi sale.
+      const swappedBench = [...displayBench];
+      swappedBench[incomingBenchPos] = currentId;
+      setBenchIds(swappedBench);
+      return;
+    }
     setBenchIds(
       orderedBenchFromRoster(
         roster.map((row) => row.athleteId),
@@ -1063,15 +1071,37 @@ export function FormationPage() {
    * Niente scorrimento degli altri, così nessun calciatore finisce spostato senza volerlo.
    */
   function assignBenchPlayer(slotIndex: number, athleteId: string) {
+    const current = displayBench[slotIndex];
+    if (current === undefined || current === athleteId) {
+      return;
+    }
+    if (
+      playerLocked(roster, current, clock, lockMarginMinutes) ||
+      playerLocked(roster, athleteId, clock, lockMarginMinutes)
+    ) {
+      pushToast({ title: KICKOFF_LOCK_MESSAGE, variant: "danger" });
+      return;
+    }
+    const starterSlot = displayStarters.indexOf(athleteId);
+    if (starterSlot >= 0) {
+      // Scambio titolare <-> panchina/tribuna: stesso ruolo, ciascuno nel posto dell'altro.
+      if (playerBlocked(roster, current)) {
+        pushToast({ title: "Questo calciatore è indisponibile e non può essere schierato titolare.", variant: "danger" });
+        return;
+      }
+      const nextStarters = [...displayStarters];
+      nextStarters[starterSlot] = current;
+      const nextBench = [...displayBench];
+      nextBench[slotIndex] = athleteId;
+      setStarterIds(nextStarters);
+      setBenchIds(nextBench);
+      return;
+    }
     const fromIndex = displayBench.indexOf(athleteId);
-    if (fromIndex < 0 || fromIndex === slotIndex || slotIndex < 0 || slotIndex >= displayBench.length) {
+    if (fromIndex < 0 || fromIndex === slotIndex) {
       return;
     }
     const next = [...displayBench];
-    const current = next[slotIndex];
-    if (current === undefined) {
-      return;
-    }
     next[slotIndex] = athleteId;
     next[fromIndex] = current;
     const orderIssues = evaluateBenchOrderLock({
@@ -1495,12 +1525,26 @@ export function FormationPage() {
   // Panchina attiva: i primi 10 posti (1P·3D·3C·3A); oltre è tribuna. I cambi automatici restano `maxSubs`.
   const benchActive = context?.benchActiveSize ?? BENCH_ACTIVE_SIZE;
   const panchinaIds = displayBench.slice(0, benchActive);
-  const benchChoices = displayBench.map((athleteId) => ({
-    athleteId,
-    name: `${playerName(roster, athleteId)}${probableMark(roster, athleteId)}`,
-    role: playerRole(roster, athleteId),
-    disabled: playerBlocked(roster, athleteId),
-  }));
+  // Per ogni posto di panchina/tribuna: solo i calciatori dello stesso ruolo, con dove stanno ora.
+  const benchChoicesFor = (index: number) => {
+    const role = playerRole(roster, displayBench[index] ?? "");
+    return roster
+      .filter((row) => row.role === role && row.athleteId !== displayBench[index])
+      .map((row) => {
+        const pos = displayBench.indexOf(row.athleteId);
+        const where = displayStarters.includes(row.athleteId)
+          ? "Titolare"
+          : pos >= 0 && pos < benchActive
+            ? `Panchina ${pos + 1}°`
+            : "Tribuna";
+        return {
+          athleteId: row.athleteId,
+          name: `${playerName(roster, row.athleteId)}${probableMark(roster, row.athleteId)} · ${where}`,
+          role: playerRole(roster, row.athleteId),
+          disabled: playerLocked(roster, row.athleteId, clock, lockMarginMinutes),
+        };
+      });
+  };
   const tribunaIds = displayBench.slice(benchActive);
 
   const optionsForSlot = (index: number, role: LineupRole) => {
@@ -1529,6 +1573,11 @@ export function FormationPage() {
         const notes = [
           row.role && row.role !== role ? `ruolo ${row.role}, non compatibile` : null,
           playerLocked(roster, row.athleteId, clock, lockMarginMinutes) ? "bloccato" : null,
+          displayBench.includes(row.athleteId) && row.athleteId !== currentId
+            ? displayBench.indexOf(row.athleteId) < benchActive
+              ? `Panchina ${displayBench.indexOf(row.athleteId) + 1}°`
+              : "Tribuna"
+            : null,
           row.probableHint === "starter" ? "titolare probabile" : null,
           row.probableHint === "bench" ? "panchina probabile" : null,
           row.probableHint === "unavailable" ? row.probableNote ?? "indisponibile" : null,
@@ -1966,7 +2015,7 @@ export function FormationPage() {
                               disabled: !canMoveBenchTo(index, target),
                             }))}
                             onMove={(target) => moveBenchTo(index, target)}
-                            choices={benchChoices}
+                            choices={benchChoicesFor(index)}
                             onAssign={(athleteId) => assignBenchPlayer(index, athleteId)}
                             scoreLabel={playerScoreLabel(roster, athleteId)}
                             probable={isProbableStarter(athleteId)}
@@ -2004,7 +2053,7 @@ export function FormationPage() {
                               disabled: !canMoveBenchTo(index, target),
                             }))}
                             onMove={(target) => moveBenchTo(index, target)}
-                            choices={benchChoices}
+                            choices={benchChoicesFor(index)}
                             onAssign={(athleteId) => assignBenchPlayer(index, athleteId)}
                             scoreLabel={playerScoreLabel(roster, athleteId)}
                             probable={isProbableStarter(athleteId)}

@@ -1550,3 +1550,42 @@ def test_concurrent_identical_lineup_saves_produce_single_revision(
         )
     )
     assert saved_count == 1
+
+
+def test_saving_the_lineup_discards_the_older_draft(
+    client: TestClient,
+    db_session: Session,
+    competition_ids: list[str],
+) -> None:
+    token, _ = _register_and_login(client, "lineup.draft.discard@example.com")
+    league_id = _create_league(client, token, competition_ids, "Lega Bozza Scartata")
+    client.get(f"/leagues/{league_id}/rosa", headers={"Authorization": f"Bearer {token}"})
+    grouped = _seed_roster_athletes(db_session, id_offset=3_200_000)
+    athletes = _fill_validated_roster(db_session, league_id, grouped)
+    fantasy_round, _clubs = _create_open_round(
+        db_session,
+        league_id,
+        cutoff=datetime.now(UTC) + timedelta(hours=5),
+        id_offset=3_210_000,
+        competition_ids=competition_ids,
+    )
+    payload = _lineup_payload(athletes, "4-3-3")
+    headers = {"Authorization": f"Bearer {token}"}
+    base = f"/leagues/{league_id}/turni/{fantasy_round.id}/formazione"
+
+    draft = client.put(
+        f"{base}/bozza",
+        headers=headers,
+        json={
+            "module": "4-3-3",
+            "starterAthleteIds": [*payload["starterAthleteIds"][:4], *[""] * 7],
+            "benchAthleteIds": payload["benchAthleteIds"][:3],
+        },
+    )
+    assert draft.status_code == 200
+    assert draft.json()["draft"] is not None
+
+    saved = client.put(base, headers=headers, json=payload)
+    assert saved.status_code == 200
+    assert saved.json()["draft"] is None
+    assert client.get(base, headers=headers).json()["draft"] is None

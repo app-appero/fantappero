@@ -410,6 +410,14 @@ class FantasyLineupService:
             bench_ids=bench_ids,
             roles_by_id=roles_by_id,
         )
+        # La formazione confermata sostituisce la bozza: se restasse, l'editor la
+        # ricaricherebbe al posto di ciò che è appena stato salvato.
+        self._session.execute(
+            delete(LineupDraft).where(
+                LineupDraft.round_id == fantasy_round.id,
+                LineupDraft.fantasy_team_id == team.id,
+            )
+        )
         if move_evaluation.would_consume:
             sequence = len(submission.tactical_moves) + 1
             self._session.add(
