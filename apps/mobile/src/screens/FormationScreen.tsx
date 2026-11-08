@@ -590,6 +590,8 @@ export function FormationScreen() {
     if (!accessToken || !activeLeagueId || !selectedRoundId) {
       return;
     }
+    const predictedMove = tacticalEvaluation.wouldConsume && !isOperator;
+    const movesUsedBefore = movesUsed;
     setBusy(true);
     try {
       const detail = await saveMyLineup(
@@ -605,7 +607,13 @@ export function FormationScreen() {
       );
       setContext(detail);
       applyEditor(detail);
-      setActionMessage("Formazione salvata.");
+      setActionMessage(
+        (detail.tacticalMovesUsed ?? 0) > movesUsedBefore
+          ? `Formazione salvata. Mossa tattica ${detail.tacticalMovesUsed ?? 0}/${detail.maxTacticalMoves ?? 3} registrata.`
+          : predictedMove
+            ? "Formazione salvata, ma il server non ha registrato la mossa che ci aspettavamo. Segnalalo da «Segnala un problema»."
+            : "Formazione salvata.",
+      );
     } catch (error) {
       setActionError(getApiErrorMessage(error, "Salvataggio formazione non riuscito."));
     } finally {
@@ -1678,7 +1686,17 @@ export function FormationScreen() {
           <Text style={styles.meta} testID="formation-moves-hint">
             {tacticalEvaluation.wouldConsume
               ? "Questo salvataggio consumerà 1 mossa tattica."
-              : "Questo salvataggio non consuma mosse."}{" "}
+              : `Questo salvataggio non consuma mosse${
+                  unsavedChangeCount === 0
+                    ? ""
+                    : isOperator
+                      ? " (sei operatore)"
+                      : !context.lineup
+                        ? " (è la prima formazione salvata)"
+                        : lockedAthleteIds.length === 0
+                          ? " (nessuna partita della tua rosa è ancora iniziata)"
+                          : ""
+                }.`}{" "}
             Le sostituzioni automatiche non consumano mosse. Mosse tattiche: {movesUsed}/{maxMoves} usate — ne
             restano {movesRemaining}.
           </Text>

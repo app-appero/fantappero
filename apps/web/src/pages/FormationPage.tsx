@@ -1199,6 +1199,8 @@ export function FormationPage() {
       return;
     }
     const requestId = startLineupRequest();
+    const predictedMove = tacticalEvaluation.wouldConsume && !isOperator;
+    const movesUsedBefore = movesUsed;
     setBusy(true);
     try {
       const detail = await saveMyLineup(
@@ -1216,7 +1218,20 @@ export function FormationPage() {
         return;
       }
       commitLineup(requestId, detail);
-      pushToast({ title: "Formazione salvata.", variant: "success" });
+      if ((detail.tacticalMovesUsed ?? 0) > movesUsedBefore) {
+        pushToast({
+          title: `Formazione salvata. Mossa tattica ${detail.tacticalMovesUsed ?? 0}/${detail.maxTacticalMoves ?? 3} registrata.`,
+          variant: "success",
+        });
+      } else if (predictedMove) {
+        pushToast({
+          title:
+            "Formazione salvata, ma il server non ha registrato la mossa che ci aspettavamo. Segnalalo con «Segnala un problema».",
+          variant: "warning",
+        });
+      } else {
+        pushToast({ title: "Formazione salvata.", variant: "success" });
+      }
     } catch (error) {
       if (!isCurrentLineupRequest(requestId)) {
         return;
@@ -1770,6 +1785,19 @@ export function FormationPage() {
                 </Button>
               ) : null}
             </div>
+          ) : null}
+
+          {hasUnsavedChanges && !tacticalEvaluation.wouldConsume ? (
+            <p data-testid="formation-moves-reason" className="fa-formation-layout__moves-hint">
+              Questo salvataggio non consuma mosse:{" "}
+              {isOperator
+                ? "sei operatore, le tue modifiche non contano."
+                : !context.lineup
+                  ? "è la prima formazione salvata."
+                  : lockedAthleteIds.length === 0
+                    ? "nessuna partita della tua rosa è ancora iniziata."
+                    : "la formazione risulta uguale a quella salvata."}
+            </p>
           ) : null}
 
           {tacticalEvaluation.wouldConsume ? (
