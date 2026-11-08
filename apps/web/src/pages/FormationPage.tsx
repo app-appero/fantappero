@@ -54,7 +54,7 @@ import {
   useToast,
   type PitchPlayer,
 } from "@fantappero/ui";
-import { AthleteName, useAthleteCard } from "../athletes/AthleteCard";
+import { useAthleteCard } from "../athletes/AthleteCard";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   fetchFantasyTeams,
@@ -342,7 +342,15 @@ const AUTO_RESOLUTION_MESSAGE: Record<"draft" | "previous_round" | "zero_fallbac
     "Nessuna formazione disponibile per questo turno: il punteggio fantasy è stato impostato a 0.",
 };
 
-type StarterSlotOption = { value: string; label: string };
+type StarterSlotOption = {
+  value: string;
+  label: string;
+  name?: string;
+  tone?: ProbableState;
+  locked?: boolean;
+  countdown?: string | null;
+  note?: string | null;
+};
 
 function StarterSlotField({
   label,
@@ -354,6 +362,10 @@ function StarterSlotField({
   testId,
   placeholder,
   onSelect,
+  name,
+  tone,
+  countdown,
+  locked,
 }: {
   label: string;
   role: LineupRole;
@@ -364,31 +376,46 @@ function StarterSlotField({
   testId: string;
   placeholder: string;
   onSelect: (athleteId: string) => void;
+  name?: string;
+  tone?: ProbableState;
+  countdown?: string | null;
+  locked?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const selected = options.find((option) => option.value === value);
   const displayLabel = selected?.label || placeholder;
+  const toneClass = tone ? ` fa-starter-row--${tone}` : "";
 
   return (
-    <div className="fa-field">
-      <span className="fa-field__label fa-starter-slot__label">
-        <Badge variant={roleBadgeVariant(role)}>{role}</Badge>
-        {label}
-      </span>
+    <div className="fa-field fa-starter-field">
       <button
         type="button"
-        className="fa-select fa-starter-slot__trigger"
+        className={`fa-starter-row${toneClass}${locked ? " fa-starter-row--locked" : ""}`}
         data-testid={testId}
-        disabled={disabled}
+        disabled={disabled || locked}
         aria-expanded={open}
         aria-haspopup="listbox"
+        aria-label={`${label}: ${displayLabel}`}
+        title={locked ? hint : undefined}
         onClick={() => {
-          if (!disabled) {
+          if (!disabled && !locked) {
             setOpen((current) => !current);
           }
         }}
       >
-        {displayLabel}
+        <Badge variant={roleBadgeVariant(role)}>{role}</Badge>
+        <strong className="fa-starter-row__name">{name || placeholder}</strong>
+        <span className="fa-starter-row__a11y">{displayLabel}</span>
+        {countdown ? <span className="fa-starter-row__count">{countdown}</span> : null}
+        {locked ? (
+          <span className="fa-starter-row__lock" role="img" aria-label="Bloccato">
+            🔒
+          </span>
+        ) : (
+          <span className="fa-starter-row__chev" aria-hidden="true">
+            ▾
+          </span>
+        )}
       </button>
       {open && !disabled ? (
         <ul className="fa-starter-slot__list" role="listbox" data-testid={`${testId}-options`}>
@@ -398,20 +425,36 @@ function StarterSlotField({
                 type="button"
                 role="option"
                 aria-selected={option.value === value}
-                className="fa-starter-slot__option"
+                className={`fa-starter-slot__option fa-starter-row${option.tone ? ` fa-starter-row--${option.tone}` : ""}${option.locked ? " fa-starter-row--locked" : ""}`}
                 data-testid={`${testId}-option-${option.value}`}
+                disabled={option.locked && option.value !== value}
                 onClick={() => {
                   setOpen(false);
                   onSelect(option.value);
                 }}
               >
-                {option.label}
+                <strong className="fa-starter-row__name">{option.name ?? option.label}</strong>
+                <span className="fa-starter-row__a11y">{option.label}</span>
+                {option.note || option.countdown ? (
+                  <span className="fa-starter-row__meta">
+                    {option.note ? <span className="fa-starter-row__tag">{option.note}</span> : null}
+                    {option.countdown ? <span className="fa-starter-row__count">{option.countdown}</span> : null}
+                  </span>
+                ) : null}
+                {option.locked ? (
+                  <span className="fa-starter-row__lock" role="img" aria-label="Bloccato">
+                    🔒
+                  </span>
+                ) : option.value === value ? (
+                  <span className="fa-starter-row__chev" aria-hidden="true">
+                    ✓
+                  </span>
+                ) : null}
               </button>
             </li>
           ))}
         </ul>
       ) : null}
-      {hint ? <p className="fa-field__hint">{hint}</p> : null}
     </div>
   );
 }
@@ -442,7 +485,16 @@ function BenchOrderRow({
   disabled: boolean;
   options: Array<{ value: string; label: string; disabled: boolean }>;
   onMove: (target: number) => void;
-  choices: Array<{ athleteId: string; name: string; role: LineupRole | null; disabled?: boolean }>;
+  choices: Array<{
+    athleteId: string;
+    name: string;
+    plainName?: string;
+    note?: string;
+    tone?: ProbableState;
+    countdown?: string | null;
+    role: LineupRole | null;
+    disabled?: boolean;
+  }>;
   onAssign: (athleteId: string) => void;
   scoreLabel?: string | null;
   probable?: boolean;
@@ -450,24 +502,20 @@ function BenchOrderRow({
   lockCountdown?: string | null;
 }) {
   const [pickerOpen, setPickerOpen] = useState(false);
-  // Solo lo stesso ruolo e solo chi non è bloccato: le scelte arrivano già filtrate.
-  const visibleChoices = choices;
+  const tone: ProbableState = state ?? (probable ? "starter" : null);
+  const toneClass = tone ? ` fa-starter-row--${tone}` : "";
 
   return (
     <li
       key={athleteId}
-      className={
-        [
-          "fa-bench-order__row",
-          canEnter ? "" : "fa-bench-order__row--overflow",
-          probable ? "fa-bench-order__row--probable" : "",
-          state === "bench" || state === "expelled" || state === "unavailable"
-            ? `fa-bench-order__row--${state}`
-            : "",
-        ]
-          .filter(Boolean)
-          .join(" ")
-      }
+      className={[
+        "fa-bench-order__row",
+        canEnter ? "" : "fa-bench-order__row--overflow",
+        probable ? "fa-bench-order__row--probable" : "",
+        state === "bench" || state === "expelled" || state === "unavailable" ? `fa-bench-order__row--${state}` : "",
+      ]
+        .filter(Boolean)
+        .join(" ")}
     >
       <span className="fa-bench-order__position">
         <Select
@@ -480,53 +528,53 @@ function BenchOrderRow({
           data-testid={`formation-bench-position-${index}`}
         />
       </span>
-      <span className="fa-bench-order__player">
-        <Badge variant={roleBadgeVariant(role)}>{role ?? "?"}</Badge>
-        <AthleteName athleteId={athleteId}>{name}</AthleteName>
-        {lockCountdown ? <span className="fa-bench-order__lock">{lockCountdown}</span> : null}
-        {locked ? (
-          <span className="fa-bench-order__lockicon" role="img" aria-label="Bloccato" title="Bloccato">
-            {" 🔒"}
-          </span>
-        ) : null}
-        {scoreLabel ? (
-          <strong
-            className="fa-bench-order__score"
-            data-testid={`formation-bench-score-${athleteId}`}
-          >
-            {" "}
-            {scoreLabel}
-          </strong>
-        ) : null}
+      <span className="fa-bench-order__number" aria-hidden="true">
+        {index + 1}°
       </span>
-      <div className="fa-bench-order__assign">
+      <div className="fa-field fa-starter-field fa-bench-order__main">
         <button
           type="button"
-          className="fa-bench-order__change"
+          className={`fa-starter-row${toneClass}${locked ? " fa-starter-row--locked" : ""}`}
           disabled={disabled || locked}
           aria-expanded={pickerOpen}
           aria-label={`Cambia ${name}, ${index + 1}° in panchina`}
           data-testid={`formation-bench-change-${index}`}
           onClick={() => setPickerOpen((open) => !open)}
         >
-          Cambia
+          <Badge variant={roleBadgeVariant(role)}>{role ?? "?"}</Badge>
+          <strong className="fa-starter-row__name">{name}</strong>
+          {lockCountdown ? <span className="fa-starter-row__count fa-bench-order__lock">{lockCountdown}</span> : null}
+          {scoreLabel ? (
+            <strong className="fa-starter-row__count" data-testid={`formation-bench-score-${athleteId}`}>
+              {scoreLabel}
+            </strong>
+          ) : null}
+          {locked ? (
+            <span className="fa-starter-row__lock" role="img" aria-label="Bloccato">
+              🔒
+            </span>
+          ) : (
+            <span className="fa-starter-row__chev" aria-hidden="true">
+              ▾
+            </span>
+          )}
         </button>
-      </div>
-      {pickerOpen && !disabled && !locked ? (
-        <div className="fa-bench-picker" data-testid={`formation-bench-picker-${index}`}>
-          <ul className="fa-bench-picker__list">
-            {visibleChoices.length === 0 ? (
+        {pickerOpen && !disabled && !locked ? (
+          <ul
+            className="fa-starter-slot__list"
+            role="listbox"
+            data-testid={`formation-bench-picker-${index}`}
+          >
+            {choices.length === 0 ? (
               <li className="fa-bench-picker__empty">Nessun calciatore dello stesso ruolo disponibile.</li>
             ) : (
-              visibleChoices.map((choice) => (
+              choices.map((choice) => (
                 <li key={choice.athleteId}>
                   <button
                     type="button"
-                    className={
-                      choice.athleteId === athleteId
-                        ? "fa-bench-picker__option fa-bench-picker__option--current"
-                        : "fa-bench-picker__option"
-                    }
+                    role="option"
+                    aria-selected={choice.athleteId === athleteId}
+                    className={`fa-starter-slot__option fa-starter-row${choice.tone ? ` fa-starter-row--${choice.tone}` : ""}`}
                     disabled={choice.disabled && choice.athleteId !== athleteId}
                     data-testid={`formation-bench-pick-${index}-${choice.athleteId}`}
                     onClick={() => {
@@ -537,15 +585,21 @@ function BenchOrderRow({
                       onAssign(choice.athleteId);
                     }}
                   >
-                    <span className="fa-bench-picker__role">{choice.role ?? "?"}</span>
-                    {choice.name}
+                    <strong className="fa-starter-row__name">{choice.plainName ?? choice.name}</strong>
+                    <span className="fa-starter-row__a11y">{choice.name}</span>
+                    {choice.note || choice.countdown ? (
+                      <span className="fa-starter-row__meta">
+                        {choice.note ? <span className="fa-starter-row__tag">{choice.note}</span> : null}
+                        {choice.countdown ? <span className="fa-starter-row__count">{choice.countdown}</span> : null}
+                      </span>
+                    ) : null}
                   </button>
                 </li>
               ))
             )}
           </ul>
-        </div>
-      ) : null}
+        ) : null}
+      </div>
     </li>
   );
 }
@@ -693,6 +747,32 @@ export function FormationPage() {
   // Mosse *già usate*, non un'anteprima di quante ne resterebbero dopo un
   // salvataggio non ancora avvenuto.
   const movesRemaining = context?.tacticalMovesRemaining ?? maxMoves - movesUsed;
+
+  // Quando la riga delle mosse esce dalla vista, mosse e countdown si uniscono in una barra fissa sotto l'header.
+  const movesRowRef = useRef<HTMLDivElement | null>(null);
+  const [movesDocked, setMovesDocked] = useState(false);
+  const [dockTop, setDockTop] = useState(72);
+  useEffect(() => {
+    const target = movesRowRef.current;
+    if (!target || typeof IntersectionObserver === "undefined") {
+      return;
+    }
+    const headerBottom = () => document.querySelector("header")?.getBoundingClientRect().bottom ?? 64;
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        const top = headerBottom();
+        setDockTop(Math.round(top) + 8);
+        setMovesDocked(entry !== undefined && !entry.isIntersecting && entry.boundingClientRect.bottom < top + 8);
+      },
+      { rootMargin: `-${Math.round(headerBottom())}px 0px 0px 0px`, threshold: [0, 1] },
+    );
+    observer.observe(target);
+    return () => observer.disconnect();
+  }, [context?.roundId]);
+  useEffect(() => {
+    document.body.classList.toggle("fa-moves-docked", movesDocked);
+    return () => document.body.classList.remove("fa-moves-docked");
+  }, [movesDocked]);
   const tacticalSaveBlocked =
     blockingLineupSaveIssue({
       isPlatformOperator: isOperator,
@@ -1535,6 +1615,10 @@ export function FormationPage() {
         return {
           athleteId: row.athleteId,
           name: `${playerName(roster, row.athleteId)}${probableMark(roster, row.athleteId)} · ${where}`,
+          plainName: playerName(roster, row.athleteId),
+          note: where,
+          tone: probableState(roster, row.athleteId),
+          countdown: lockLabel(row.athleteId),
           role: playerRole(roster, row.athleteId),
           disabled: false,
         };
@@ -1584,6 +1668,16 @@ export function FormationPage() {
         return {
           value: row.athleteId,
           label: notes.length > 0 ? `${row.athleteName} (${notes.join(", ")})` : row.athleteName,
+          name: row.athleteName,
+          tone: probableState(roster, row.athleteId),
+          locked: playerLocked(roster, row.athleteId, clock, lockMarginMinutes),
+          countdown: lockLabel(row.athleteId),
+          note:
+            displayBench.includes(row.athleteId) && row.athleteId !== currentId
+              ? displayBench.indexOf(row.athleteId) < benchActive
+                ? `Panchina ${displayBench.indexOf(row.athleteId) + 1}°`
+                : "Tribuna"
+              : null,
         };
       });
   };
@@ -1653,6 +1747,28 @@ export function FormationPage() {
 
       {!showForbidden && !loading && !loadError && context ? (
         <div data-testid="wireframe-formation-success" className="fa-formation-layout">
+          {movesDocked ? (
+            <div className="fa-moves-dock" style={{ top: dockTop }} data-testid="formation-moves-dock">
+              <span className="fa-moves-dock__lock" aria-hidden="true">🔒</span>
+              {countdown && countdown.roundId === context.roundId ? (
+                <LockCountdown
+                  state={countdown.state}
+                  nextLockAt={countdown.nextLockAt}
+                  onExpire={refetchCountdown}
+                />
+              ) : (
+                <span className="fa-moves-dock__label">Blocco</span>
+              )}
+              <span className="fa-moves-dock__moves">
+                <Badge variant={movesRemaining === 0 ? "danger" : movesRemaining === 1 ? "warning" : "neutral"}>
+                  Mosse {movesUsed}/{maxMoves}
+                </Badge>
+                {tacticalEvaluation.wouldConsume && movesApply ? (
+                  <Badge variant="accent">→ {Math.min(movesUsed + 1, maxMoves)}/{maxMoves}</Badge>
+                ) : null}
+              </span>
+            </div>
+          ) : null}
           <aside className="fa-formation-layout__sidebar">
           <Card>
             <CardHeader title={`Turno ${context.roundNumber}`} />
@@ -1908,7 +2024,7 @@ export function FormationPage() {
           </aside>
 
           <div className="fa-formation-layout__main">
-          <div className="fa-formation-layout__module-row">
+          <div className="fa-formation-layout__module-row" ref={movesRowRef}>
             <Select
               label="Modulo"
               value={moduleCode}
@@ -1970,7 +2086,7 @@ export function FormationPage() {
             data-testid="formation-starters"
             className="fa-ds-showcase__stack fa-formation-layout__editor"
           >
-            <h3 className="fa-formation-layout__section-title">Modifica titolari</h3>
+            <h3 className="fa-formation-layout__section-title">Titolari</h3>
             {template.map((role, index) => {
               const currentId = displayStarters[index] ?? "";
               const lockedSlot = playerLocked(roster, currentId, clock, lockMarginMinutes);
@@ -1983,6 +2099,10 @@ export function FormationPage() {
                   placeholder="Seleziona calciatore"
                   options={optionsForSlot(index, role)}
                   testId={`formation-starter-${index}`}
+                  name={currentId ? playerName(roster, currentId) : undefined}
+                  tone={currentId ? probableState(roster, currentId) : null}
+                  countdown={currentId ? lockLabel(currentId) : null}
+                  locked={lockedSlot}
                   disabled={!context.modificationAllowed || !canEdit}
                   hint={
                     lockedSlot
@@ -2004,8 +2124,8 @@ export function FormationPage() {
               tribuna.
             </p>
             <p className="fa-bench-touch-hint">
-              Tocca Cambia per scambiare il calciatore con un altro dello stesso ruolo (i bloccati non
-              compaiono); il nome apre la scheda.
+              Tocca un calciatore per scambiarlo con un altro dello stesso ruolo (i bloccati non
+              compaiono); il numero a sinistra è l&apos;ordine di ingresso.
             </p>
             {displayBench.length === 0 ? (
               <p data-testid="formation-bench-empty">Nessun panchinaro: tutti i calciatori sono titolari.</p>
@@ -2026,7 +2146,7 @@ export function FormationPage() {
                             athleteId={athleteId}
                             index={index}
                             canEnter
-                            name={`${playerName(roster, athleteId)}${probableMark(roster, athleteId)}`}
+                            name={playerName(roster, athleteId)}
                             role={playerRole(roster, athleteId)}
                             locked={playerLocked(roster, athleteId, clock, lockMarginMinutes)}
                             disabled={!context.modificationAllowed || !canEdit}
@@ -2064,7 +2184,7 @@ export function FormationPage() {
                             athleteId={athleteId}
                             index={index}
                             canEnter={false}
-                            name={`${playerName(roster, athleteId)}${probableMark(roster, athleteId)}`}
+                            name={playerName(roster, athleteId)}
                             role={playerRole(roster, athleteId)}
                             locked={playerLocked(roster, athleteId, clock, lockMarginMinutes)}
                             disabled={!context.modificationAllowed || !canEdit}
