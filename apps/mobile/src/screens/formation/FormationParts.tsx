@@ -304,14 +304,6 @@ export type Candidate = {
   tone?: ProbableTone | null;
 };
 
-type Filter = "tutti" | "libero" | "titolare" | "panchina";
-const FILTERS: { id: Filter; label: string }[] = [
-  { id: "tutti", label: "Tutti" },
-  { id: "libero", label: "Liberi" },
-  { id: "titolare", label: "Schierati" },
-  { id: "panchina", label: "In panchina" },
-];
-
 type RoleFilter = "tutti" | LineupRole;
 const ROLE_FILTERS: { id: RoleFilter; label: string; a11y: string }[] = [
   { id: "tutti", label: "Tutti", a11y: "Tutti i ruoli" },
@@ -390,18 +382,15 @@ export function PlayerPickerSheet({
   showRoleTabs?: boolean;
 }) {
   const [query, setQuery] = useState("");
-  const [filter, setFilter] = useState<Filter>("tutti");
   const [roleFilter, setRoleFilter] = useState<RoleFilter>(showRoleTabs ? role : "tutti");
   const shown = useMemo(() => {
     const q = query.trim().toLowerCase();
     return candidates.filter((c) => {
       if (q && !c.name.toLowerCase().includes(q)) return false;
       if (showRoleTabs && roleFilter !== "tutti" && c.role !== roleFilter) return false;
-      if (filter === "tutti") return true;
-      if (filter === "libero") return c.state === "libero";
-      return c.state === filter;
+      return true;
     });
-  }, [candidates, query, filter, roleFilter, showRoleTabs]);
+  }, [candidates, query, roleFilter, showRoleTabs]);
   return (
     <BottomSheet
       visible={visible}
@@ -441,18 +430,6 @@ export function PlayerPickerSheet({
           ))}
         </HScroll>
       ) : null}
-      <HScroll>
-        {FILTERS.map((f) => (
-          <Pressable
-            key={f.id}
-            accessibilityRole="button"
-            onPress={() => setFilter(f.id)}
-            style={[styles.filter, filter === f.id ? styles.filterActive : null]}
-          >
-            <Text style={styles.filterText}>{f.label}</Text>
-          </Pressable>
-        ))}
-      </HScroll>
       <ScrollView style={styles.list} contentContainerStyle={styles.listContent}>
         {shown.length === 0 ? <Text style={styles.empty}>Nessun calciatore corrisponde.</Text> : null}
         {shown.map((c) => (

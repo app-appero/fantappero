@@ -961,7 +961,12 @@ export function FormationScreen() {
   const candidates: Candidate[] =
     pickerIndex != null && pickerRole
       ? roster
-          .filter((row) => row.role === pickerRole)
+          .filter(
+            (row) =>
+              row.role === pickerRole &&
+              // I bloccati (partita iniziata) non si propongono, tranne chi occupa lo slot.
+              (row.athleteId === (displayStarters[pickerIndex] ?? "") || !playerLocked(row.athleteId)),
+          )
           .map((row) => {
             const currentId = displayStarters[pickerIndex] ?? "";
             const slotOf = displayStarters.indexOf(row.athleteId);
@@ -1010,7 +1015,11 @@ export function FormationScreen() {
   const benchCandidates: Candidate[] =
     benchPickerIndex != null && benchPickerRole
       ? roster
-          .filter((row) => row.role === benchPickerRole)
+          .filter(
+            (row) =>
+              row.role === benchPickerRole &&
+              (row.athleteId === displayBench[benchPickerIndex] || !playerLocked(row.athleteId)),
+          )
           .map((row) => {
             const benchPos = displayBench.indexOf(row.athleteId);
             const isCurrent = benchPos === benchPickerIndex;
@@ -1276,7 +1285,7 @@ export function FormationScreen() {
                       {playerScoreLabel(id) ?? ""}
                     </Text>
                   </View>
-                  {editable ? (
+                  {editable && !locked ? (
                     <Pressable
                       accessibilityRole="button"
                       accessibilityLabel={`Cambia ${name}, ${index + 1}° in panchina`}
@@ -1339,6 +1348,17 @@ export function FormationScreen() {
                         </View>
                         <Text style={styles.meta}>tribuna</Text>
                       </View>
+                      {editable && !playerLocked(id) ? (
+                        <Pressable
+                          accessibilityRole="button"
+                          accessibilityLabel={`Cambia ${name}, in tribuna`}
+                          onPress={() => setBenchPickerIndex(index)}
+                          style={styles.benchChange}
+                          testID={`formation-bench-change-${index}`}
+                        >
+                          <Text style={styles.benchChangeLabel}>Cambia</Text>
+                        </Pressable>
+                      ) : null}
                     </View>
                   );
                 })
@@ -1458,12 +1478,14 @@ export function FormationScreen() {
       <PlayerPickerSheet
         key={benchPickerIndex ?? "bench-closed"}
         visible={benchPickerIndex != null}
-        role={
-          roster.find((row) => row.athleteId === panchinaIds[benchPickerIndex ?? -1])?.role ?? "C"
-        }
+        role={benchPickerRole ?? "C"}
         slotNumber={(benchPickerIndex ?? 0) + 1}
         moduleCode={moduleCode}
-        title={`Panchina ${(benchPickerIndex ?? 0) + 1}°`}
+        title={
+          (benchPickerIndex ?? 0) < benchActive
+            ? `Panchina ${(benchPickerIndex ?? 0) + 1}°`
+            : "Tribuna"
+        }
         subtitle="Scegli con chi scambiarlo"
         candidates={benchCandidates}
         hasCurrent={false}

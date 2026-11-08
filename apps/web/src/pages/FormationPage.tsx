@@ -416,14 +416,6 @@ function StarterSlotField({
   );
 }
 
-const BENCH_ROLE_TABS: Array<{ id: "tutti" | LineupRole; label: string; a11y: string }> = [
-  { id: "tutti", label: "Tutti", a11y: "Tutti i ruoli" },
-  { id: "P", label: "P", a11y: "Portieri" },
-  { id: "D", label: "D", a11y: "Difensori" },
-  { id: "C", label: "C", a11y: "Centrocampisti" },
-  { id: "A", label: "A", a11y: "Attaccanti" },
-];
-
 function BenchOrderRow({
   athleteId,
   index,
@@ -458,10 +450,8 @@ function BenchOrderRow({
   lockCountdown?: string | null;
 }) {
   const [pickerOpen, setPickerOpen] = useState(false);
-  const [roleFilter, setRoleFilter] = useState<"tutti" | LineupRole>(role ?? "tutti");
-  const visibleChoices = choices.filter(
-    (choice) => roleFilter === "tutti" || choice.role === roleFilter,
-  );
+  // Solo lo stesso ruolo e solo chi non è bloccato: le scelte arrivano già filtrate.
+  const visibleChoices = choices;
 
   return (
     <li
@@ -513,43 +503,20 @@ function BenchOrderRow({
         <button
           type="button"
           className="fa-bench-order__change"
-          disabled={disabled}
+          disabled={disabled || locked}
           aria-expanded={pickerOpen}
           aria-label={`Cambia ${name}, ${index + 1}° in panchina`}
           data-testid={`formation-bench-change-${index}`}
-          onClick={() => {
-            setRoleFilter(role ?? "tutti");
-            setPickerOpen((open) => !open);
-          }}
+          onClick={() => setPickerOpen((open) => !open)}
         >
           Cambia
         </button>
       </div>
-      {pickerOpen && !disabled ? (
+      {pickerOpen && !disabled && !locked ? (
         <div className="fa-bench-picker" data-testid={`formation-bench-picker-${index}`}>
-          <div className="fa-bench-picker__tabs" role="tablist" aria-label="Filtra per ruolo">
-            {BENCH_ROLE_TABS.map((tab) => (
-              <button
-                key={tab.id}
-                type="button"
-                role="tab"
-                aria-selected={roleFilter === tab.id}
-                aria-label={tab.a11y}
-                className={
-                  roleFilter === tab.id
-                    ? "fa-bench-picker__tab fa-bench-picker__tab--active"
-                    : "fa-bench-picker__tab"
-                }
-                data-testid={`formation-bench-role-${index}-${tab.id}`}
-                onClick={() => setRoleFilter(tab.id)}
-              >
-                {tab.label}
-              </button>
-            ))}
-          </div>
           <ul className="fa-bench-picker__list">
             {visibleChoices.length === 0 ? (
-              <li className="fa-bench-picker__empty">Nessun calciatore con questo ruolo.</li>
+              <li className="fa-bench-picker__empty">Nessun calciatore dello stesso ruolo disponibile.</li>
             ) : (
               visibleChoices.map((choice) => (
                 <li key={choice.athleteId}>
@@ -1552,7 +1519,12 @@ export function FormationPage() {
   const benchChoicesFor = (index: number) => {
     const role = playerRole(roster, displayBench[index] ?? "");
     return roster
-      .filter((row) => row.role === role && row.athleteId !== displayBench[index])
+      .filter(
+        (row) =>
+          row.role === role &&
+          row.athleteId !== displayBench[index] &&
+          !playerLocked(roster, row.athleteId, clock, lockMarginMinutes),
+      )
       .map((row) => {
         const pos = displayBench.indexOf(row.athleteId);
         const where = displayStarters.includes(row.athleteId)
@@ -1564,7 +1536,7 @@ export function FormationPage() {
           athleteId: row.athleteId,
           name: `${playerName(roster, row.athleteId)}${probableMark(roster, row.athleteId)} · ${where}`,
           role: playerRole(roster, row.athleteId),
-          disabled: playerLocked(roster, row.athleteId, clock, lockMarginMinutes),
+          disabled: false,
         };
       });
   };
@@ -1588,6 +1560,10 @@ export function FormationPage() {
           return false;
         }
         if ((row.selectionBlocked || row.probableAbsence === "suspended") && row.athleteId !== currentId) {
+          return false;
+        }
+        // Chi ha la partita già iniziata non può entrare: non lo si propone.
+        if (playerLocked(roster, row.athleteId, clock, lockMarginMinutes)) {
           return false;
         }
         return true;
@@ -2028,8 +2004,8 @@ export function FormationPage() {
               tribuna.
             </p>
             <p className="fa-bench-touch-hint">
-              Tocca Cambia per sostituire il calciatore. I tab filtrano per ruolo; il nome apre la
-              scheda.
+              Tocca Cambia per scambiare il calciatore con un altro dello stesso ruolo (i bloccati non
+              compaiono); il nome apre la scheda.
             </p>
             {displayBench.length === 0 ? (
               <p data-testid="formation-bench-empty">Nessun panchinaro: tutti i calciatori sono titolari.</p>
