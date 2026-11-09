@@ -1,6 +1,7 @@
 import { Alert } from "react-native";
 import {
   hasPermissions,
+  PRIVACY_CONTACT_EMAIL,
   type AdminImpersonateResult,
   type AuthTokensResponse,
   type LeagueSummary,
@@ -109,7 +110,7 @@ export function AuthSessionProvider({ children }: { children: ReactNode }) {
     if (sessionPersistenceFailed()) {
       Alert.alert(
         "Accesso non memorizzato",
-        "Il telefono non permette di ricordare l'accesso: dovrai rifare il login a ogni apertura. Se succede sempre, segnalacelo da «Segnala un problema» o scrivi a info@globetrotta.it.",
+        `Il telefono non permette di ricordare l'accesso: dovrai rifare il login a ogni apertura. Se succede sempre, segnalacelo da «Segnala un problema» o scrivi a ${PRIVACY_CONTACT_EMAIL}.`,
       );
     }
   }, []);

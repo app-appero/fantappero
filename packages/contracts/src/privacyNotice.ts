@@ -3,8 +3,8 @@
  * Allinea sempre `docs/operations/pilot_privacy_notice.md` e, quando il testo cambia,
  * incrementa `PROFILE_POLICY_VERSION` (backend) così a tutti viene richiesto un nuovo consenso.
  */
-export const PRIVACY_NOTICE_VERSION = "2026-11";
-export const PRIVACY_CONTACT_EMAIL = "info@globetrotta.it";
+export const PRIVACY_NOTICE_VERSION = "2026-11b";
+export const PRIVACY_CONTACT_EMAIL = "info@fantappero.it";
 
 export type PrivacyNoticeSection = {
   id: string;

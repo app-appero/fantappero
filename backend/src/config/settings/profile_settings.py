@@ -19,7 +19,7 @@ class ProfileSettingsMixin:
         description="Maximum avatar upload size in bytes (default 5 MiB).",
     )
     profile_policy_version: str = Field(
-        default="2026-11",
+        default="2026-11b",
         validation_alias="PROFILE_POLICY_VERSION",
         description="Current privacy policy version users must accept.",
     )

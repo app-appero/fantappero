@@ -9,10 +9,10 @@ import { expoLaunchSpec, resolveMobileProfile } from "./start-with-env.mjs";
 
 const appRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
 
-test("pilota points at the Railway pilot API and the public Google client", () => {
+test("pilota points at the fantappero.it pilot API and the public Google client", () => {
   const resolved = resolveMobileProfile(appRoot, "pilota");
-  assert.equal(resolved.apiUrl, "https://api-pilota.up.railway.app");
-  assert.equal(resolved.env.EXPO_PUBLIC_WEB_BASE_URL, "https://fantappero-web-pilot.up.railway.app");
+  assert.equal(resolved.apiUrl, "https://api-pilota.fantappero.it");
+  assert.equal(resolved.env.EXPO_PUBLIC_WEB_BASE_URL, "https://pilota.fantappero.it");
   assert.match(resolved.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID_WEB, /\.apps\.googleusercontent\.com$/);
 });
 

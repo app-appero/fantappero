@@ -11,7 +11,7 @@ Da inviare **solo dopo** aver completato `checklist_avvio_pilota.md`. Sostituire
 > tra pochi amici. Ti chiedo di giocarci per circa un mese e di dirmi cosa non va.
 >
 > **Come entrare**
-> - **Sito (funziona da telefono e da computer, anche iPhone):** https://fantappero-web-pilot.up.railway.app/
+> - **Sito (funziona da telefono e da computer, anche iPhone):** https://pilota.fantappero.it/
 > - **App Android:** te la mando io nel gruppo WhatsApp (è un file da installare: ti scrivo come fare)
 > - Si accede con il tuo **account Google**, non serve creare una password.
 > - Nella tua lega: [CODICE O LINK DI INVITO ALLA LEGA]
@@ -23,13 +23,13 @@ Da inviare **solo dopo** aver completato `checklist_avvio_pilota.md`. Sostituire
 > - Il pilota è per **maggiorenni**.
 > - Non ci sono premi né soldi in gioco.
 > - La privacy: accedendo accetti l'informativa, che puoi leggere nell'app e al link
->   https://fantappero-web-pilot.up.railway.app/privacy. Puoi chiedere la cancellazione del tuo account in qualsiasi momento
+>   https://pilota.fantappero.it/privacy. Puoi chiedere la cancellazione del tuo account in qualsiasi momento
 >   dal tuo profilo.
 >
 > **Come segnalare un problema (la cosa più utile che puoi fare)**
 > Nell'app o sul sito vai su **«Segnala un problema»**: scegli il tipo, descrivi cosa è
 > successo e, se puoi, allega uno screenshot o un breve video. Per altre domande scrivi a
-> **info@globetrotta.it** (rispondo entro 2 giorni lavorativi).
+> **info@fantappero.it** (rispondo entro 2 giorni lavorativi).
 >
 > Non mandarmi mai password o codici di accesso: non servono.
 >
@@ -44,7 +44,7 @@ Da inviare **solo dopo** aver completato `checklist_avvio_pilota.md`. Sostituire
 
 ## Da controllare prima di inviare
 
-- [ ] `https://fantappero-web-pilot.up.railway.app/` apre la pagina di accesso e `/privacy` mostra l'informativa.
+- [ ] `https://pilota.fantappero.it/` apre la pagina di accesso e `/privacy` mostra l'informativa.
 - [ ] Il file dell'app Android, inviato nel gruppo WhatsApp con le istruzioni di installazione, si installa su un telefono che non è il tuo.
 - [ ] Il codice/link di invito alla lega è valido e non scaduto.
-- [ ] info@globetrotta.it riceve (già confermato il 04/11/2026).
+- [ ] info@fantappero.it riceve (confermato il 09/11/2026, sostituisce info@globetrotta.it).
