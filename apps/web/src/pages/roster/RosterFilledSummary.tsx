@@ -1,3 +1,4 @@
+import { playerAvatarUrl } from "@fantappero/contracts";
 import type { FantasyRole, FantasyTeam } from "@fantappero/contracts";
 import {
   Badge,
@@ -150,10 +151,10 @@ function RosterRoleTable({
                 <TableRow key={slot.id}>
                   <TableCell className="fa-roster-col fa-roster-col--name">
                     <span className="fa-auction-player">
-                      {slot.photoUrl ? (
+                      {slot.athleteId ? (
                         <PlayerPhotoBadge
                           className="fa-auction-player__role"
-                          photoUrl={slot.photoUrl}
+                          photoUrl={playerAvatarUrl(slot.athleteId, slot.clubName)}
                           role={slot.role}
                         />
                       ) : slot.role ? (

@@ -57,6 +57,8 @@ export interface LineupRosterPlayer {
   kickoffAt?: string | null;
   fixtureStatus?: string | null;
   photoUrl?: string | null;
+  /** Squadra reale del calciatore (per la maglia dell'avatar). */
+  realTeamName?: string | null;
   /** Voto fantacalcistico del turno corrente, se già disponibile (EP-formazione-voti). */
   fantasyScore?: number | null;
   /** Voto statistico prima dei bonus/malus. */

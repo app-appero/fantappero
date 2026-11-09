@@ -90,6 +90,7 @@ from leagues.models.league_rules import LeagueRules
 from observability.context import get_correlation_id
 from observability.logging import get_logger
 from observability.metrics import get_metrics
+from sports_data.catalog.models import Club
 from sports_data.predicted.read import AthleteProbable, hints_for_fixtures
 
 logger = get_logger(__name__)
@@ -106,6 +107,7 @@ class _RosterRow:
     role: FantasyRole | None
     slot_index: int
     photo_url: str | None = None
+    real_team_name: str | None = None
 
 
 class FantasyLineupService:
@@ -1242,6 +1244,17 @@ class FantasyLineupService:
             athlete_ids=athlete_ids,
             season_year=season_year,
         )
+        club_ids = {item.club_id for item in effective_roles.values() if item.club_id is not None}
+        club_names: dict[UUID, str] = (
+            {
+                club_id: name
+                for club_id, name in self._session.execute(
+                    select(Club.id, Club.name).where(Club.id.in_(club_ids))
+                ).all()
+            }
+            if club_ids
+            else {}
+        )
         rows: list[_RosterRow] = []
         for slot in sorted(team.slots, key=lambda item: item.slot_index):
             if slot.athlete_id is None or slot.athlete is None:
@@ -1254,6 +1267,9 @@ class FantasyLineupService:
                     role=resolved.role if resolved is not None else None,
                     slot_index=slot.slot_index,
                     photo_url=slot.athlete.photo_url,
+                    real_team_name=(
+                        club_names.get(resolved.club_id) if resolved is not None else None
+                    ),
                 )
             )
         return rows
@@ -1731,6 +1747,7 @@ class FantasyLineupService:
             kickoffAt=kickoff.kickoff_at if kickoff is not None else None,
             fixtureStatus=kickoff.status_short if kickoff is not None else None,
             photoUrl=row.photo_url,
+            realTeamName=row.real_team_name,
             fantasyScore=score.fantasy_score if score is not None else None,
             baseScore=score.base_score if score is not None else None,
             bonusTotal=score.bonus_total if score is not None else 0.0,

@@ -1,3 +1,4 @@
+import { playerAvatarUrl } from "@fantappero/contracts";
 import type { FantasyRole, FantasyTeam } from "@fantappero/contracts";
 import { useEffect, useState } from "react";
 import { Pressable, ScrollView, Text, View } from "react-native";
@@ -158,8 +159,8 @@ function RosterRoleSection({
                   testID={`roster-admin-release-${slot.athleteId}`}
                 >
                   <View style={[styles.playerCard, { marginBottom: 0 }]}>
-                    {slot.photoUrl ? (
-                      <PlayerPhotoRing photoUrl={slot.photoUrl} role={slot.role} size={34} />
+                    {slot.athleteId ? (
+                      <PlayerPhotoRing photoUrl={playerAvatarUrl(slot.athleteId, slot.clubName)} role={slot.role} size={34} />
                     ) : (
                       <View style={[styles.playerDot, { backgroundColor: dot.backgroundColor }]}>
                         <Text style={[styles.roleBadgeText, { color: dot.color }]}>{slot.role ?? "?"}</Text>
