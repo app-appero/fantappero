@@ -7,7 +7,9 @@ import type {
   MatchBadge,
   ProviderFeedState,
 } from "@fantappero/contracts";
-import { layoutFromGrid, layoutFromRoles, mapFixtureMatchStatus, pitchRoleCodeFromGrid, realMatchBadgesByAthlete } from "@fantappero/contracts";
+import { layoutFromGrid, layoutFromRoles, mapFixtureMatchStatus, pitchRoleCodeFromGrid, realMatchBadgesByAthlete,
+  playerAvatarUrl,
+} from "@fantappero/contracts";
 import type { TimelineEntry } from "@fantappero/ui";
 import {
   AssistIcon,
@@ -94,6 +96,7 @@ function toPitchPlayers(
   players: readonly FixtureLineupPlayer[],
   badgesByAthlete: Map<string, MatchBadge[]>,
   assignedRoles: ReadonlyMap<string, string> | null,
+  clubName: string,
 ) {
   // Se il layout è costruito dai ruoli reali (vedi `layoutFromRoles`) il
   // badge mostra il ruolo assegnato. Altrimenti si ricade sul grid, che decide la riga
@@ -108,7 +111,7 @@ function toPitchPlayers(
       ? (assignedRoles.get(pitchPlayerId(player)) ?? player.position ?? null)
       : (pitchRoleCodeFromGrid(player.grid, allGrids) ?? player.position),
     badges: player.athleteId ? badgesByAthlete.get(player.athleteId) : undefined,
-    photoUrl: player.photoUrl,
+    photoUrl: playerAvatarUrl(player.athleteId ?? `${clubName}-${player.name}-${player.shirtNumber ?? ""}`, clubName),
   }));
 }
 
@@ -340,7 +343,7 @@ function LineupBlock({
       {positions.length > 0 ? (
         <FootballPitch
           title={title}
-          players={toPitchPlayers(lineup.starters, badgesByAthlete, roleLayout?.roles ?? null)}
+          players={toPitchPlayers(lineup.starters, badgesByAthlete, roleLayout?.roles ?? null, lineup.clubName)}
           positions={positions}
           pitchAriaLabel={`Titolari ${lineup.clubName}`}
           onAthletePress={athleteCard?.open}

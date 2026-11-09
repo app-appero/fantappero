@@ -1,3 +1,4 @@
+import { playerAvatarUrl } from "@fantappero/contracts";
 import type {
   FantasyRole,
   FantasyTeam,
@@ -58,8 +59,8 @@ function ListoneAssignRow({
       testID={owner ? `roster-admin-release-${entry.athleteId}` : `roster-admin-assign-${entry.athleteId}`}
     >
       <View style={[styles.playerCard, { marginBottom: 0 }, owner ? { opacity: 0.7 } : null]}>
-        {entry.photoUrl ? (
-          <PlayerPhotoRing photoUrl={entry.photoUrl} role={entry.effectiveRole} size={34} />
+        {entry.athleteId ? (
+          <PlayerPhotoRing photoUrl={playerAvatarUrl(entry.athleteId, entry.clubName)} role={entry.effectiveRole} size={34} />
         ) : (
           <View style={[styles.playerDot, { backgroundColor: roleColors.backgroundColor }]}>
             <Text style={[styles.roleBadgeText, { color: roleColors.color }]}>{entry.effectiveRole}</Text>

@@ -1,5 +1,5 @@
 import type { AthleteCard } from "@fantappero/contracts";
-import { formatFantasyPoints } from "@fantappero/contracts";
+import { formatFantasyPoints, playerAvatarUrl } from "@fantappero/contracts";
 import { Modal, UiStatePanel } from "@fantappero/ui";
 import {
   createContext,
@@ -143,8 +143,8 @@ export function AthleteCardView({ card }: { card: AthleteCard }) {
   return (
     <div className="fa-athlete-card" data-testid="athlete-card">
       <div className="fa-athlete-card__hero">
-        {card.photoUrl ? (
-          <img className="fa-athlete-card__photo" src={card.photoUrl} alt="" />
+        {card.athleteId ? (
+          <img className="fa-athlete-card__photo" src={playerAvatarUrl(card.athleteId, card.clubName)} alt="" />
         ) : (
           <div className="fa-athlete-card__photo fa-athlete-card__photo--empty" aria-hidden="true">
             {initials(card.canonicalName)}

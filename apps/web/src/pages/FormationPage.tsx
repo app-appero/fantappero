@@ -36,7 +36,7 @@ import {
   labelFantasyTurnStatus,
   resolveDefaultEuropeanTurn,
   slotsFromLineupIds,
-  starterTemplate,
+  starterTemplate, playerAvatarUrl
 } from "@fantappero/contracts";
 import {
   Breadcrumb,
@@ -251,7 +251,8 @@ function playerRole(roster: LineupRosterPlayer[], athleteId: string): LineupRole
 }
 
 function playerPhotoUrl(roster: LineupRosterPlayer[], athleteId: string): string | null {
-  return roster.find((row) => row.athleteId === athleteId)?.photoUrl ?? null;
+  const row = roster.find((entry) => entry.athleteId === athleteId);
+  return row ? playerAvatarUrl(athleteId, row.realTeamName) : null;
 }
 
 /** `"7.5"`, `"7.5 LIVE"` mentre la partita reale è in corso, o `null` se non ancora giocata. */
