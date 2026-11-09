@@ -44,6 +44,8 @@ class LineupRosterPlayerResponse(ApiModel):
     kickoff_at: datetime | None = Field(default=None, alias="kickoffAt")
     fixture_status: str | None = Field(default=None, alias="fixtureStatus")
     photo_url: str | None = Field(default=None, alias="photoUrl")
+    # Squadra reale (nome del club): serve al client per la maglia dell'avatar.
+    real_team_name: str | None = Field(default=None, alias="realTeamName")
     # Voto fantacalcistico del turno corrente (EP-formazione-voti): stesso
     # shape di `H2HPlayerScoreResponse` per riuso diretto degli helper di
     # rendering condivisi tra Formazione e Turni.

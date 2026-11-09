@@ -6,6 +6,7 @@ import { Animated, Easing, Image, Pressable, StyleSheet, Text, View } from "reac
 import { ToneHalo, TONE_COLOR, type ProbableTone } from "../../screens/formation/FormationParts";
 import { EventBadges } from "./EventBadges";
 import { RoleBadge } from "./RoleBadge";
+import { AvatarImage } from "../AvatarImage";
 
 const { colors, spacing, typography, radius } = theme;
 
@@ -153,7 +154,7 @@ function PitchPlayerBody({
       {player.live ? <LiveGlow /> : null}
       {player.voteKind === "sv" ? <View pointerEvents="none" style={styles.svGlow} /> : null}
       {player.photoUrl ? (
-        <Image source={{ uri: player.photoUrl }} style={styles.photo} />
+        <AvatarImage uri={player.photoUrl} style={styles.photo} size={26} />
       ) : player.shirtNumber != null ? (
         <Text style={styles.number}>{player.shirtNumber}</Text>
       ) : null}

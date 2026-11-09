@@ -1,3 +1,4 @@
+import { playerAvatarUrl } from "@fantappero/contracts";
 import type { FantasyRole, LeagueListoneEntry } from "@fantappero/contracts";
 import { useEffect, useMemo, useState } from "react";
 import { Pressable, Text, View } from "react-native";
@@ -117,8 +118,8 @@ export function AthleteChooser({
                   {active ? <Text style={styles.pillLabelActive}>{single ? "✓" : position}</Text> : null}
                 </View>
               )}
-              {entry.photoUrl ? (
-                <PlayerPhotoRing photoUrl={entry.photoUrl} role={entry.effectiveRole} size={30} />
+              {entry.athleteId ? (
+                <PlayerPhotoRing photoUrl={playerAvatarUrl(entry.athleteId, entry.clubName)} role={entry.effectiveRole} size={30} />
               ) : (
                 <View style={[styles.proposalAvatar, { width: 30, height: 30, borderRadius: 15, backgroundColor: dot.backgroundColor }]}>
                   <Text style={[styles.proposalAvatarLabel, { color: dot.color }]}>{entry.effectiveRole}</Text>
