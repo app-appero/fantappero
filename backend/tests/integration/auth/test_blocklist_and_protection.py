@@ -105,6 +105,31 @@ def test_protected_operator_cannot_be_revoked_deleted_or_blocked(
     assert client.post(f"/admin/users/{other_id}/revoke", headers=protected).status_code == 200
 
 
+def test_protected_operator_cannot_be_impersonated_but_can_impersonate(
+    client: TestClient, db_session: Session, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Email propria (il modulo riusa il DB tra i test di questo file: PROTECTED è già
+    # registrato dal test precedente) con lo stesso indirizzo marcato protetto.
+    protected_email = "bl.protetto.impersona@example.com"
+    monkeypatch.setenv("PROTECTED_OPERATOR_EMAILS", f"{PROTECTED},{protected_email}")
+    reset_settings_cache()
+
+    protected, protected_id = _operator(client, db_session, protected_email)
+    other, other_id = _operator(client, db_session, "bl.impersona@example.com")
+
+    # Un altro operatore (anche uno appena promosso: promote non ha alcun filtro) non può
+    # prendere un token come l'account protetto: vanificherebbe la protezione da
+    # declassamento/eliminazione sopra testata.
+    takeover = client.post(f"/admin/users/{protected_id}/impersonate", headers=other)
+    assert takeover.status_code == 409
+    assert takeover.json()["code"] == "protected_operator"
+
+    # L'account protetto resta comunque libero di impersonare chiunque altro.
+    impersonate_other = client.post(f"/admin/users/{other_id}/impersonate", headers=protected)
+    assert impersonate_other.status_code == 200
+    assert impersonate_other.json()["user"]["id"] == str(other_id)
+
+
 def test_deleting_a_user_blocks_the_address_for_good(
     client: TestClient, db_session: Session, monkeypatch: pytest.MonkeyPatch
 ) -> None:

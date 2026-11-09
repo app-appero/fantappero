@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -64,11 +65,22 @@ async def lifespan(_app: FastAPI):
     yield
 
 
+# Read directly from the environment (not via get_api_settings): this decides whether the docs
+# routes exist at all, before anything else has validated the rest of the configuration, and
+# must not fail just because some other secret isn't set yet. Same normalization as
+# config.settings.base.FantapperoEnv (strip + lowercase); unknown values fall back to
+# "leave docs on", matching the FantapperoEnv default of development.
+_env_name = os.environ.get("FANTAPPERO_ENV", "development").strip().lower()
+_docs_enabled = _env_name not in {"staging", "production"}
+
 app = FastAPI(
     title="FantApperò API",
     version="0.0.0",
     description="Scaffold health surface — local stack wires Postgres/Redis (EP01-02).",
     lifespan=lifespan,
+    docs_url="/docs" if _docs_enabled else None,
+    redoc_url="/redoc" if _docs_enabled else None,
+    openapi_url="/openapi.json" if _docs_enabled else None,
 )
 install_correlation_middleware(app)
 install_range_header_guard(app)

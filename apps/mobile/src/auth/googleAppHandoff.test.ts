@@ -1,26 +1,30 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { claimGoogleIdToken, readGoogleIdToken, releaseGoogleIdToken } from "./googleAppHandoff.ts";
+import {
+  claimGoogleHandoffCode,
+  readGoogleHandoffCode,
+  releaseGoogleHandoffCode,
+} from "./googleAppHandoff.ts";
 
-test("readGoogleIdToken reads the handoff query", () => {
+test("readGoogleHandoffCode reads the handoff query", () => {
   assert.equal(
-    readGoogleIdToken("exp://10.0.0.2:8081/--/google-auth?id_token=header.payload.sig"),
-    "header.payload.sig",
+    readGoogleHandoffCode("exp://10.0.0.2:8081/--/google-auth?code=one-time-code"),
+    "one-time-code",
   );
 });
 
-test("readGoogleIdToken ignores a return without a token", () => {
-  assert.equal(readGoogleIdToken("fantappero://google-auth"), null);
-  assert.equal(readGoogleIdToken("not a url"), null);
+test("readGoogleHandoffCode ignores a return without a code", () => {
+  assert.equal(readGoogleHandoffCode("fantappero://google-auth"), null);
+  assert.equal(readGoogleHandoffCode("not a url"), null);
 });
 
-test("claimGoogleIdToken keeps a single in-flight token and allows a retry", () => {
-  const claim = { token: null };
-  const url = "exp://10.0.0.2:8081/--/google-auth?id_token=header.payload.sig";
-  assert.equal(claimGoogleIdToken(url, claim), "header.payload.sig");
-  assert.equal(claimGoogleIdToken(url, claim), null);
-  assert.equal(claimGoogleIdToken(null, claim), null);
-  releaseGoogleIdToken("header.payload.sig", claim);
-  assert.equal(claimGoogleIdToken(url, claim), "header.payload.sig");
+test("claimGoogleHandoffCode keeps a single in-flight code and allows a retry", () => {
+  const claim = { code: null };
+  const url = "exp://10.0.0.2:8081/--/google-auth?code=one-time-code";
+  assert.equal(claimGoogleHandoffCode(url, claim), "one-time-code");
+  assert.equal(claimGoogleHandoffCode(url, claim), null);
+  assert.equal(claimGoogleHandoffCode(null, claim), null);
+  releaseGoogleHandoffCode("one-time-code", claim);
+  assert.equal(claimGoogleHandoffCode(url, claim), "one-time-code");
 });

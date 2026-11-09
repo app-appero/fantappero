@@ -52,6 +52,15 @@ class BaseAppSettings(BaseSettings):
         """When true, DATABASE_URL / REDIS_URL / Celery URLs must be present."""
         return self.fantappero_env is not FantapperoEnv.TEST
 
+    @property
+    def secrets_must_be_explicit(self) -> bool:
+        """When true, a secret still on its convenience default must fail startup.
+
+        Only staging/production: development and test keep the default so a fresh
+        checkout runs without configuring secrets no one needs there.
+        """
+        return self.fantappero_env in (FantapperoEnv.STAGING, FantapperoEnv.PRODUCTION)
+
     @field_validator("fantappero_env", mode="before")
     @classmethod
     def _normalize_env(cls, value: object) -> object:

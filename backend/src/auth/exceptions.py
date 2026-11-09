@@ -49,6 +49,14 @@ class GoogleAuthError(AuthError):
         )
 
 
+class MobileHandoffExpiredError(AuthError):
+    def __init__(self) -> None:
+        super().__init__(
+            "Il collegamento con l'app è scaduto. Torna all'app e riprova.",
+            code="mobile_handoff_expired",
+        )
+
+
 class TesterOnlyError(AuthError):
     """Modalità test attiva: l'account non è tra i tester autorizzati."""
 

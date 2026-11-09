@@ -46,7 +46,8 @@ class AdminTransferAlreadyReviewedError(AdminError):
 class ProtectedOperatorError(AdminError):
     def __init__(self) -> None:
         super().__init__(
-            "Questo operatore è protetto: non può essere declassato, eliminato o bloccato.",
+            "Questo operatore è protetto: non può essere declassato, eliminato, bloccato "
+            "o impersonato.",
             code="protected_operator",
         )
 

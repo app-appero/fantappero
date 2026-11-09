@@ -12,6 +12,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session, sessionmaker
 
 from auth.exceptions import InvalidCredentialsError
+from auth.mobile_handoff import MobileHandoffStore
 from auth.models.user import User
 from auth.privacy_service import PrivacyService
 from auth.profile_service import ProfileService
@@ -67,6 +68,15 @@ def get_rate_limiter() -> AuthRateLimiter | None:
     if not settings.redis_url:
         return None
     return AuthRateLimiter(settings.redis_url)
+
+
+@lru_cache(maxsize=1)
+def get_mobile_handoff_store() -> MobileHandoffStore:
+    settings = get_api_settings()
+    if not settings.redis_url:
+        msg = "REDIS_URL is required for the mobile Google login handoff"
+        raise RuntimeError(msg)
+    return MobileHandoffStore(settings.redis_url)
 
 
 def get_auth_service(

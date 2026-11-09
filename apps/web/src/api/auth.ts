@@ -3,6 +3,7 @@ import type {
   AuthOptions,
   AuthTokensResponse,
   ForgotPasswordRequest,
+  GoogleHandoffStartResponse,
   GoogleLoginRequest,
   LoginRequest,
   RefreshRequest,
@@ -29,6 +30,17 @@ export function login(body: LoginRequest): Promise<AuthTokensResponse> {
 
 export function loginWithGoogle(body: GoogleLoginRequest): Promise<AuthTokensResponse> {
   return apiRequest<AuthTokensResponse>("/auth/google", { body });
+}
+
+/**
+ * Mobile handoff page only: exchanges the Google ID token for a real session right here, in
+ * the browser, and gets back a one-time code to hand the app instead of a token (see
+ * `auth.mobile_handoff` on the backend for why).
+ */
+export function startGoogleHandoff(
+  body: GoogleLoginRequest,
+): Promise<GoogleHandoffStartResponse> {
+  return apiRequest<GoogleHandoffStartResponse>("/auth/google/handoff", { body });
 }
 
 export function refresh(body: RefreshRequest): Promise<AuthTokensResponse> {

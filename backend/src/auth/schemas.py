@@ -24,6 +24,16 @@ class GoogleLoginRequest(ApiModel):
     id_token: str = Field(min_length=1, alias="idToken")
 
 
+class GoogleHandoffStartResponse(ApiModel):
+    """One-time code the web handoff page hands the app instead of a usable token."""
+
+    code: str
+
+
+class GoogleHandoffClaimRequest(ApiModel):
+    code: str = Field(min_length=1)
+
+
 class RefreshRequest(ApiModel):
     refresh_token: str = Field(min_length=1, alias="refreshToken")
 

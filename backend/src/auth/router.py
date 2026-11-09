@@ -5,13 +5,21 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, Request, Response, status
 from fastapi.responses import JSONResponse
 
-from auth.dependencies import get_auth_service, get_client_ip, get_current_user
-from auth.exceptions import AuthError, RateLimitExceededError
+from auth.dependencies import (
+    get_auth_service,
+    get_client_ip,
+    get_current_user,
+    get_mobile_handoff_store,
+)
+from auth.exceptions import AuthError, MobileHandoffExpiredError, RateLimitExceededError
+from auth.mobile_handoff import MobileHandoffStore
 from auth.models.user import User
 from auth.schemas import (
     AuthOptionsResponse,
     AuthTokensResponse,
     ForgotPasswordRequest,
+    GoogleHandoffClaimRequest,
+    GoogleHandoffStartResponse,
     GoogleLoginRequest,
     LoginRequest,
     MessageResponse,
@@ -104,6 +112,43 @@ def login_with_google(
         )
     except AuthError as exc:
         return _error_response(exc)
+
+
+@router.post("/google/handoff", response_model=GoogleHandoffStartResponse)
+def start_google_handoff(
+    body: GoogleLoginRequest,
+    request: Request,
+    service: AuthService = Depends(get_auth_service),
+    store: MobileHandoffStore = Depends(get_mobile_handoff_store),
+) -> GoogleHandoffStartResponse | JSONResponse:
+    """Called by the web handoff page (`/accedi/google-app`), never by the app directly.
+
+    Exchanges the Google ID token for a real session right here, in the browser, over HTTPS,
+    then hands back a one-time pickup code instead of the session itself — the deep link back
+    to the app carries only that code (see `auth.mobile_handoff`).
+    """
+    try:
+        tokens = service.login_with_google(
+            id_token=body.id_token,
+            client_ip=get_client_ip(request),
+            user_agent=request.headers.get("User-Agent"),
+        )
+    except AuthError as exc:
+        return _error_response(exc)
+    code = store.put(tokens.model_dump(by_alias=True))
+    return GoogleHandoffStartResponse(code=code)
+
+
+@router.post("/google/handoff/claim", response_model=AuthTokensResponse)
+def claim_google_handoff(
+    body: GoogleHandoffClaimRequest,
+    store: MobileHandoffStore = Depends(get_mobile_handoff_store),
+) -> AuthTokensResponse | JSONResponse:
+    """Called by the app after the deep link from `/accedi/google-app` delivers the code."""
+    payload = store.claim(body.code)
+    if payload is None:
+        return _error_response(MobileHandoffExpiredError())
+    return AuthTokensResponse.model_validate(payload)
 
 
 @router.post("/refresh", response_model=AuthTokensResponse)

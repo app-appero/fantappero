@@ -5,6 +5,7 @@ import {
   forgotPassword,
   register as registerApi,
   resetPassword,
+  startGoogleHandoff,
   verifyEmail,
 } from "../../api/auth";
 import { getApiErrorMessage, useAuth } from "../../auth/AuthContext";
@@ -535,20 +536,41 @@ export function GoogleAppHandoffLink({ href }: { href: string }) {
   );
 }
 
-/** Mobile handoff: Google button on this origin, then return the ID token to the app. */
+/**
+ * Mobile handoff: Google button on this origin, then return a one-time pickup code to the app.
+ *
+ * The ID token never crosses the deep link: it is exchanged for a real session right here, in
+ * the browser, over HTTPS (`startGoogleHandoff`), and only the resulting single-use code is
+ * handed to `fantappero://...` — see `auth.mobile_handoff` on the backend for why.
+ */
 export function AuthGoogleAppPage() {
   const { search } = useLocation();
   const returnTo = googleAppReturnUrl(new URLSearchParams(search).get("return"));
   const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
   const [handoffUrl, setHandoffUrl] = useState<string | null>(null);
+  const busyRef = useRef(false);
   const handoff = useCallback(
     (idToken: string) => {
-      if (!returnTo) {
+      if (!returnTo || busyRef.current) {
         return;
       }
-      const next = googleAppHandoffUrl(returnTo, idToken);
-      setHandoffUrl(next);
-      window.location.replace(next);
+      busyRef.current = true;
+      setError(null);
+      setBusy(true);
+      startGoogleHandoff({ idToken })
+        .then(({ code }) => {
+          const next = googleAppHandoffUrl(returnTo, code);
+          setHandoffUrl(next);
+          window.location.replace(next);
+        })
+        .catch((handoffError: unknown) => {
+          setError(getApiErrorMessage(handoffError, "Accesso con Google non riuscito."));
+        })
+        .finally(() => {
+          busyRef.current = false;
+          setBusy(false);
+        });
     },
     [returnTo],
   );
@@ -564,6 +586,8 @@ export function AuthGoogleAppPage() {
             ) : null}
             {handoffUrl ? (
               <GoogleAppHandoffLink href={handoffUrl} />
+            ) : busy ? (
+              <p>Accesso in corso…</p>
             ) : (
               <GoogleSignInButton onError={setError} onCredential={handoff} />
             )}

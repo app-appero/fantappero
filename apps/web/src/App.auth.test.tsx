@@ -52,14 +52,14 @@ describe("EP02-01 auth pages", () => {
     expect(html).not.toContain("Collegamento non valido");
   });
 
-  it("offers a link back to the app after the Google credential", () => {
+  it("offers a link back to the app after the one-time pickup code", () => {
     const html = renderToStaticMarkup(
       createElement(GoogleAppHandoffLink, {
-        href: "fantappero://google-auth?id_token=header.payload.sig",
+        href: "fantappero://google-auth?code=one-time-code",
       }),
     );
     expect(html).toContain("Apri FantApperò");
-    expect(html).toContain('href="fantappero://google-auth?id_token=header.payload.sig"');
+    expect(html).toContain('href="fantappero://google-auth?code=one-time-code"');
   });
 
   it("renders the Google-only registration before the server options are known", () => {

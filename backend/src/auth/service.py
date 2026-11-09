@@ -132,6 +132,10 @@ class AuthService:
                 limit=self._settings.auth_rate_limit_login_per_minute,
                 window_seconds=60,
             )
+            # Per account, on top of the per-IP window above: guesses spread across many
+            # IPs would otherwise never trip it. Keyed by the email either way (whether or
+            # not it belongs to a real account), so nothing here leaks account existence.
+            self._rate_limiter.check_login_backoff(normalized_email)
 
         user = self._session.scalar(
             select(User).where(User.email == normalized_email, User.deleted_at.is_(None))
@@ -141,6 +145,8 @@ class AuthService:
             or user.user_type == UserType.AI
             or not verify_password(user.password_hash, password)
         ):
+            if self._rate_limiter is not None:
+                self._rate_limiter.record_login_failure(normalized_email)
             get_metrics().incr("auth_login_total", labels={"result": "failure"})
             raise InvalidCredentialsError()
 
@@ -151,6 +157,8 @@ class AuthService:
         self._assert_tester_allowed(user.email, user.platform_role)
         tokens = self._create_session(user)
         self._session.commit()
+        if self._rate_limiter is not None:
+            self._rate_limiter.record_login_success(normalized_email)
         get_metrics().incr("auth_login_total", labels={"result": "success"})
         return tokens
 

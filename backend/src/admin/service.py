@@ -346,7 +346,12 @@ class AdminService:
         impersonated session expires on its own after
         `jwt_access_token_expire_minutes`, exactly like a normal access token,
         and cannot be silently renewed. Operators can target other operators
-        too (EP-operatore-test) — only impersonating yourself is blocked.
+        too (EP-operatore-test), except a protected one (`_is_protected`):
+        without this, any operator — including one just promoted by another
+        operator, with no extra check on who may promote — could mint a
+        valid token for the protected account and fully take it over, which
+        defeats the point of protecting it from demotion/deletion in the
+        first place. Only impersonating yourself is blocked besides that.
         Every start is audited (`league_id=None`, same pattern as
         promote/revoke) — there is no "end" event since the token simply
         expires.
@@ -354,6 +359,8 @@ class AdminService:
         user = self._get_user_or_raise(target_user_id)
         if user.id == actor.id:
             raise CannotImpersonateSelfError()
+        if self._is_protected(user):
+            raise ProtectedOperatorError()
 
         access_token, expires_in = create_access_token(
             user_id=user.id,

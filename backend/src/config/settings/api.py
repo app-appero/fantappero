@@ -5,9 +5,9 @@ from __future__ import annotations
 from pydantic import Field, HttpUrl, SecretStr, field_validator, model_validator
 from pydantic_settings import SettingsConfigDict
 
-from config.settings.auth_settings import AuthSettingsMixin
+from config.settings.auth_settings import DEFAULT_JWT_SECRET, AuthSettingsMixin
 from config.settings.base import BaseAppSettings, require_non_empty
-from config.settings.billing_settings import BillingSettingsMixin
+from config.settings.billing_settings import DEFAULT_BILLING_WEBHOOK_SECRET, BillingSettingsMixin
 from config.settings.fantasy_turns_settings import FantasyTurnsSettingsMixin
 from config.settings.feedback_settings import FeedbackSettingsMixin
 from config.settings.mail import MailSettingsMixin
@@ -111,6 +111,24 @@ class ApiSettings(
             return self
         require_non_empty("DATABASE_URL", self.database_url)
         require_non_empty("REDIS_URL", self.redis_url)
+        return self
+
+    @model_validator(mode="after")
+    def _require_explicit_secrets_in_staging_or_production(self) -> ApiSettings:
+        if not self.secrets_must_be_explicit:
+            return self
+        if self.jwt_secret_key.get_secret_value() == DEFAULT_JWT_SECRET:
+            msg = (
+                "JWT_SECRET_KEY is still the development default — set a real secret "
+                "before running in staging or production."
+            )
+            raise ValueError(msg)
+        if self.billing_webhook_secret == DEFAULT_BILLING_WEBHOOK_SECRET:
+            msg = (
+                "BILLING_WEBHOOK_SECRET is still the development default — set a real "
+                "secret before running in staging or production."
+            )
+            raise ValueError(msg)
         return self
 
     def resolved_api_football_key(self) -> str | None:

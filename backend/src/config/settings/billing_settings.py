@@ -4,6 +4,9 @@ from __future__ import annotations
 
 from pydantic import Field
 
+#: See ``AuthSettingsMixin.DEFAULT_JWT_SECRET`` — same reasoning, different header.
+DEFAULT_BILLING_WEBHOOK_SECRET = "fantappero_local_billing_webhook_dev_only"
+
 
 class BillingSettingsMixin:
     """Env knobs for the subscription payment webhook.
@@ -14,7 +17,7 @@ class BillingSettingsMixin:
     """
 
     billing_webhook_secret: str = Field(
-        default="fantappero_local_billing_webhook_dev_only",
+        default=DEFAULT_BILLING_WEBHOOK_SECRET,
         validation_alias="BILLING_WEBHOOK_SECRET",
         description="Shared secret checked against the X-Webhook-Secret header.",
     )

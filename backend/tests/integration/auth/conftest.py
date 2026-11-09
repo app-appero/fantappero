@@ -59,8 +59,9 @@ def _auth_test_env(monkeypatch: pytest.MonkeyPatch, db_url: str, redis_url: str)
 @pytest.fixture(autouse=True)
 def _clear_auth_rate_limits(redis_url: str) -> None:
     client = redis.Redis.from_url(redis_url, decode_responses=True)
-    for key in client.scan_iter("auth:rl:*"):
-        client.delete(key)
+    for pattern in ("auth:rl:*", "auth:login_backoff:*", "auth:mobile_handoff:*"):
+        for key in client.scan_iter(pattern):
+            client.delete(key)
 
 
 @pytest.fixture

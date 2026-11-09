@@ -13,6 +13,8 @@ export type {
   AuthTokensResponse,
   ForgotPasswordRequest,
   GlobalRole,
+  GoogleHandoffClaimRequest,
+  GoogleHandoffStartResponse,
   GoogleLoginRequest,
   LeagueRole,
   LeagueSummary,

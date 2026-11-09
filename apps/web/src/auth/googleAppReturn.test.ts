@@ -16,9 +16,9 @@ describe("googleAppReturnUrl", () => {
     expect(googleAppReturnUrl("exp://user:pass@host/google-auth")).toBeNull();
   });
 
-  it("appends the id token on the allowed return url", () => {
-    expect(googleAppHandoffUrl("fantappero://google-auth", "header.payload.sig")).toBe(
-      "fantappero://google-auth?id_token=header.payload.sig",
+  it("appends the one-time pickup code, not a token, on the allowed return url", () => {
+    expect(googleAppHandoffUrl("fantappero://google-auth", "one-time-code")).toBe(
+      "fantappero://google-auth?code=one-time-code",
     );
   });
 });

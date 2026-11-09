@@ -38,7 +38,7 @@ function devApiHost(): string {
 /** Login — allineato a web /accedi. */
 export function AuthScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
-  const { login, loginWithGoogle } = useAuthSession();
+  const { login, claimGoogleHandoff } = useAuthSession();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -62,10 +62,10 @@ export function AuthScreen() {
     setError(null);
     void clearLastUser();
   }
-  const googleAuth = useGoogleAuth((idToken) => {
+  const googleAuth = useGoogleAuth((code) => {
     setError(null);
     setGoogleSubmitting(true);
-    return loginWithGoogle(idToken)
+    return claimGoogleHandoff(code)
       .catch((googleError: unknown) => {
         setError(getApiErrorMessage(googleError, "Accesso con Google non riuscito."));
       })

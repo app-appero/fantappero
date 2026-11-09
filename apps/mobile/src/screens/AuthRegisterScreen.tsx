@@ -29,15 +29,15 @@ export function AuthRegisterScreen() {
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  const { loginWithGoogle } = useAuthSession();
+  const { claimGoogleHandoff } = useAuthSession();
   const authOptions = useAuthOptions();
   // Finché il server non ha risposto non si mostra il modulo con email: nel pilota è spento.
   const googleOnly = !authOptions.loaded || !authOptions.emailRegistrationEnabled;
   const [googleSubmitting, setGoogleSubmitting] = useState(false);
-  const googleAuth = useGoogleAuth((idToken) => {
+  const googleAuth = useGoogleAuth((code) => {
     setError(null);
     setGoogleSubmitting(true);
-    return loginWithGoogle(idToken)
+    return claimGoogleHandoff(code)
       .catch((googleError: unknown) => {
         setError(getApiErrorMessage(googleError, "Accesso con Google non riuscito."));
       })

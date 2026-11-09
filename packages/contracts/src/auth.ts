@@ -51,6 +51,15 @@ export interface GoogleLoginRequest {
   idToken: string;
 }
 
+/** One-time pickup code the web handoff page hands the app instead of a usable token. */
+export interface GoogleHandoffStartResponse {
+  code: string;
+}
+
+export interface GoogleHandoffClaimRequest {
+  code: string;
+}
+
 export interface RefreshRequest {
   refreshToken: string;
 }

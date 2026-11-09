@@ -30,6 +30,13 @@ segreto reale rimasto nella cronologia Git (#20, **rischio accettato in via defi
 su decisione esplicita**, 28/09/2026) e una CVE Starlette recente su limiti form-data
 (#21, **corretto il 28/09/2026** con una guardia globale sulla dimensione del corpo).
 Dettaglio in fondo al documento, sezione "D4".
+**Aggiornamento pre-pilota (09/11/2026)**: review mirata su richiesta del responsabile
+della card ("analizza a fondo tutto il progetto in cerca di bug e possibili buchi di
+sicurezza"), focalizzata su superficie non coperta dalle chiusure precedenti (gestione
+segreti a tempo di avvio, percorso di impersonazione admin, handoff Google su mobile,
+esposizione della documentazione API). 6 nuovi finding, **tutti corretti nella stessa
+sessione** su conferma esplicita del responsabile della card ("parti con tutte e 6 le
+correzioni"): #22–#27. Dettaglio in fondo al documento, sezione "Pre-pilota 09/11".
 
 ### Riepilogo finding
 
@@ -56,6 +63,12 @@ Dettaglio in fondo al documento, sezione "D4".
 | 19 | Trust incondizionato di `X-Forwarded-For` nel rate limit login | Media | **Corretto — peer ASGI trusted-only + test dinamico** |
 | 20 | Valore reale di `API_FOOTBALL_KEY` rimasto in 4 commit della cronologia Git (fix #1 aveva pulito solo il file corrente) | Media (segreto recuperabile dalla storia, non dal codice attuale) | **Rischio accettato in via definitiva su decisione esplicita (28/09/2026)** |
 | 21 | Starlette: limiti `max_fields`/`max_part_size` su `request.form()` ignorati per corpi `application/x-www-form-urlencoded` (PYSEC-2026-249) | Bassa-Media (solo 2 endpoint autenticati: upload avatar, import CSV rosa; limiti comunque non configurati oggi) | **Corretto — guardia globale sulla dimensione del corpo (413) + test dedicati** |
+| 22 | `JWT_SECRET_KEY` e `BILLING_WEBHOOK_SECRET` hanno un default pubblico (nel sorgente) e nessun controllo impediva di avviare il server in produzione senza averli impostati esplicitamente — chi conoscesse il default poteva forgiare un JWT valido per qualsiasi utente | Alta | **Corretto** — `secrets_must_be_explicit` rifiuta l'avvio in staging/produzione se uno dei due è rimasto sul valore di default |
+| 23 | Un operatore poteva impersonare qualsiasi altro operatore, incluso l'account protetto (`PROTECTED_OPERATOR_EMAILS`): la protezione copriva solo revoca/eliminazione, non l'impersonazione — un operatore promosso da un altro (nessun filtro su chi può promuovere chi) poteva così prendere il controllo dell'account protetto | Alta | **Corretto** — `impersonate()` rifiuta un target protetto, chiunque sia a chiamarlo |
+| 24 | Webhook di fatturazione: confronto del segreto con `!=` (non a tempo costante) | Bassa (nessun fornitore di pagamento reale ancora integrato) | **Corretto** — `hmac.compare_digest`; stesso meccanismo del finding #22 per il default |
+| 25 | `/docs`, `/redoc`, `/openapi.json` pubblicamente raggiungibili senza autenticazione anche in produzione (ricognizione gratuita della superficie API, endpoint admin inclusi) | Bassa-Media | **Corretto** — disattivati fuori da development/test |
+| 26 | Login: rate limit solo per IP (5/min), nessun limite per singolo account — un attacco a dizionario distribuito su più IP non veniva mai rallentato sull'account bersaglio | Bassa (il pilota registra solo via Google; resta aperto per chi ha già un account con password) | **Corretto** — rallentamento crescente per account (`AuthRateLimiter.check_login_backoff`), in aggiunta al limite per IP esistente |
+| 27 | Login Google su mobile: il deep link `fantappero://...` (schema custom, nessun Android App Link / iOS Universal Link verificato) portava il token ID di Google grezzo in query string, intercettabile in teoria da un'altra app registrata sullo stesso schema | Media | **Mitigato** — il token non attraversa più il deep link: la pagina web di handoff lo scambia subito, server-side, con una sessione reale, e passa all'app solo un codice monouso a vita brevissima (`auth.mobile_handoff`, 90s, invalidato alla prima lettura). La correzione completa resta la migrazione a deep link verificati, non coperta da questa sessione (richiede dominio HTTPS verificato, firma, hosting di `assetlinks.json`/`apple-app-site-association`) |
 
 ### 1. Dependency audit — Python (`pip-audit`)
 
@@ -721,3 +734,148 @@ Contro lo stack Docker reale sul commit attuale:
 entrambi con decisione esplicita del responsabile della card: #20 (segreto in
 cronologia, rotazione rimandata) e #21 (limiti form-data, rischio accettato per la
 Beta). Nessuna regressione su alcun controllo precedentemente chiuso.
+
+## Pre-pilota 09/11
+
+Review mirata, non una rivalidazione completa come D4: il responsabile della card ha
+chiesto un'analisi a fondo dell'intero progetto alla ricerca di bug e buchi di
+sicurezza, senza partire da un trigger specifico (nessun load test o CVE). Copertura:
+gestione dei segreti a tempo di avvio (`config/settings`), percorsi di amministrazione
+(`admin/service.py`: promozione, revoca, eliminazione, impersonazione), il flusso di
+login Google su mobile end-to-end (pagina web di handoff → deep link → app), webhook
+di fatturazione, esposizione di `/docs`/`/redoc`, e rate limiting del login. Le aree
+già chiuse in D4 (CORS, guardia Range, upload, privacy, pannello operatore turni, asta
+live, storage sessione mobile) non sono state ripetute: nessun commit le tocca da
+allora.
+
+### 22 — Segreti di default non forzati in produzione (Alta)
+
+`jwt_secret_key` (`config/settings/auth_settings.py`) e `billing_webhook_secret`
+(`config/settings/billing_settings.py`) hanno un valore di convenienza per uno
+sviluppo locale senza configurazione, visibile a chiunque legga il sorgente su
+GitHub. `_require_infra_when_strict` obbligava solo `DATABASE_URL`/`REDIS_URL` a
+essere presenti fuori dall'ambiente di test — non impediva di avviare l'API in
+staging o produzione lasciando questi due segreti sul default pubblico. Con il
+default noto, chiunque può forgiare un JWT valido per qualsiasi `user_id` (algoritmo
+e claim sono fissi, `auth/security.py`) e ottenere un accesso completo, operatore
+incluso, senza credenziali: bypass totale dell'autenticazione.
+
+**Corretto**: `BaseAppSettings.secrets_must_be_explicit` (vero solo in
+`staging`/`production`, mai in `development`/`test`, così un checkout pulito continua
+a funzionare senza inventare segreti) più un `model_validator` su `ApiSettings` che
+rifiuta l'avvio (`ConfigurationError`) se uno dei due segreti è ancora il valore di
+default in quegli ambienti. Test: `tests/unit/config/test_settings_validation.py`
+(accetta in `development` col default, rifiuta in `staging`/`production` col
+default, accetta ovunque con un valore esplicito).
+
+### 23 — Un operatore poteva impersonare l'account protetto (Alta)
+
+`admin/service.py::impersonate` emetteva un token di accesso per qualunque
+`target_user_id` (tranne se stesso), **operatori compresi** — per design
+(`EP-operatore-test`), ma senza eccezione per `_is_protected`, il controllo che già
+impedisce di retrocedere/eliminare/bloccare l'account in `PROTECTED_OPERATOR_EMAILS`.
+Combinato con `promote_operator`, che non ha alcun filtro su chi può promuovere chi
+a operatore, qualunque operatore (anche uno promosso di recente) poteva ottenere un
+token valido come l'account protetto con una sola chiamata — aggirando del tutto la
+protezione pensata per impedire esattamente questo.
+
+**Corretto**: `impersonate()` solleva `ProtectedOperatorError` se il bersaglio è
+protetto, indipendentemente da chi chiama (il messaggio dell'errore ora cita anche
+"o impersonato"). L'account protetto resta libero di impersonare chiunque altro; solo
+l'essere *bersaglio* è bloccato. Test:
+`tests/integration/auth/test_blocklist_and_protection.py::test_protected_operator_cannot_be_impersonated_but_can_impersonate`.
+
+### 24 — Confronto non a tempo costante sul webhook di fatturazione (Bassa)
+
+`billing/router.py` confrontava il segreto con `x_webhook_secret !=
+settings.billing_webhook_secret`, un canale laterale di temporizzazione teorico. Non
+c'è ancora un fornitore di pagamento reale collegato (vedi `billing/webhook_service.py`)
+e il webhook non è mai chiamato dal client oggi (`apps/web` chiama solo `GET
+/billing/me`, sola lettura), quindi il rischio pratico è basso — corretto comunque
+perché a costo quasi zero farlo ora, prima che un fornitore reale sia collegato.
+
+**Corretto**: `hmac.compare_digest`. Il default pubblico di
+`BILLING_WEBHOOK_SECRET` è coperto dallo stesso controllo del finding #22.
+
+### 25 — Swagger/ReDoc/OpenAPI pubblici anche in produzione (Bassa-Media)
+
+`/docs`, `/redoc`, `/openapi.json` erano raggiungibili senza autenticazione in ogni
+ambiente (configurazione di default di FastAPI, mai sovrascritta). Non è di per sé
+una falla, ma regala a chiunque l'intera superficie dell'API — ogni rotta, parametro
+e schema, endpoint admin inclusi — utile per la ricognizione prima di altri attacchi.
+
+**Corretto**: `app/main.py` legge `FANTAPPERO_ENV` direttamente dall'ambiente (non
+tramite `get_api_settings()`, per non far dipendere la visibilità della
+documentazione dalla validazione dell'intera configurazione) e passa
+`docs_url=None`/`redoc_url=None`/`openapi_url=None` quando l'ambiente è
+`staging`/`production`. Test: `tests/unit/app/test_docs_visibility.py` (200 in
+development/test, 404 in staging/produzione per tutti e tre i percorsi).
+
+### 26 — Login: nessun limite per singolo account (Bassa)
+
+Il rate limit sul login (`AuthRateLimiter.check`, 5/min) è applicato solo per
+indirizzo IP. Un attacco a dizionario distribuito su molti IP (o anche solo lento)
+contro un singolo account non veniva mai rallentato specificamente su
+quell'account. Rischio basso oggi (il pilota registra solo via Google), resta aperto
+per chi ha già un account con password.
+
+**Corretto**: `AuthRateLimiter.check_login_backoff`/`record_login_failure`/
+`record_login_success`, un rallentamento crescente **per account** (chiave email,
+non IP) in aggiunta al limite per IP esistente, non in sostituzione — un vero blocco
+secco per account sarebbe sfruttabile come denial-of-service mirato (basta conoscere
+l'email della vittima e sbagliare la password di proposito). Schema: i primi 5
+tentativi falliti restano liberi (nessun rallentamento per chi sbaglia la password
+una volta), poi l'attesa richiesta prima del tentativo successivo cresce (30s, 2min,
+10min, poi resta fissa a 10min); un accesso riuscito azzera il contatore. La verifica
+avviene **prima** di leggere l'utente dal database, con la stessa chiave (email
+normalizzata, hash SHA-256) sia che l'account esista sia che non esista, così i tempi
+di risposta non rivelano mai se un indirizzo è registrato. Fallisce aperto se Redis
+non risponde (stessa scelta del limite per IP esistente: disponibilità sopra un
+rate-limiting rigido). Test: `tests/unit/auth/test_rate_limit.py` (contro un Redis
+reale: le prime 5 restano libere, la 6ª blocca, l'attesa cresce con ulteriori
+fallimenti, un successo azzera tutto).
+
+### 27 — Google ID token grezzo nel deep link del login mobile (Media)
+
+`apps/mobile/app.json` registra solo lo schema custom `fantappero://`, senza Android
+App Link / iOS Universal Link con dominio verificato (nessun `intentFilters` con
+`autoVerify`, nessun `associatedDomains`). Il flusso di login Google su mobile
+funzionava così: la pagina web `/accedi/google-app` apriva il bottone Google in un
+vero browser (necessario: un browser in-app blocca la finestra di Google), otteneva
+l'ID token e lo appendeva **in chiaro** al link di ritorno
+(`fantappero://...?id_token=...`); l'app lo leggeva dal deep link e lo scambiava
+*lei stessa* con `/auth/google` per una sessione reale. Su Android, un'altra app
+installata sullo stesso telefono e registrata per lo stesso schema custom potrebbe in
+teoria intercettare questo link prima dell'app vera, catturare l'ID token di Google e
+scambiarlo lei per accedere come la vittima, nella finestra di validità del token
+(tipicamente fino a un'ora, riusabile più volte in quella finestra).
+
+**Mitigato, non risolto alla radice**: la correzione completa è migrare a deep link
+verificati (Android App Links/iOS Universal Links), che richiede infrastruttura non
+disponibile in questa sessione (dominio HTTPS verificato, firma dell'app, hosting di
+`assetlinks.json`/`apple-app-site-association`) — resta un'azione aperta, da
+pianificare separatamente. Quello che si poteva correggere subito: **togliere
+qualunque token utile dal deep link**. La pagina web ora scambia l'ID token con una
+sessione reale **subito, lato browser, via HTTPS** (`POST /auth/google/handoff`,
+nuovo endpoint che richiama la stessa `AuthService.login_with_google` già validata),
+e passa all'app solo un **codice monouso casuale** (`secrets.token_urlsafe(32)`,
+256 bit), mai la sessione stessa. L'app lo scambia con `POST
+/auth/google/handoff/claim`, che lo consuma atomicamente (`GETDEL` su Redis — due
+tentativi quasi simultanei non possono mai avere entrambi successo) e restituisce la
+sessione già creata; il codice è salvato hashato (SHA-256, come i refresh token
+opachi altrove in questo modulo) con TTL di 90 secondi. Un link intercettato oggi è
+quindi utile al più per 90 secondi e una sola volta, invece che fino a un'ora e
+riusabile — riduce sostanzialmente la finestra di rischio senza eliminarla del
+tutto. Nuovo modulo: `auth/mobile_handoff.py`. Test:
+`tests/integration/auth/test_google_mobile_handoff.py` (il codice non è un token
+riconoscibile, il claim restituisce la stessa sessione che darebbe l'endpoint
+diretto, un codice si può reclamare una sola volta, un codice indovinato/sconosciuto
+è rifiutato).
+
+### Esito pre-pilota 09/11
+
+**Nessun finding Critico/Alto aperto**, tutti i 6 nuovi finding chiusi nella stessa
+sessione. Il finding #27 resta parzialmente aperto nella sua causa di fondo (deep
+link non verificato): mitigato in modo sostanziale, non eliminato — la migrazione a
+App Links/Universal Links va pianificata come lavoro a sé, con accesso al dominio e
+alla firma delle app. Nessuna regressione sui controlli precedentemente chiusi.

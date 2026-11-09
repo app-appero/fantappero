@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hmac
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Header, status
@@ -53,7 +54,11 @@ def receive_subscription_webhook(
     session: Session = Depends(get_db_session),
     settings: ApiSettings = Depends(get_api_settings),
 ) -> SubscriptionWebhookResponse | JSONResponse:
-    if x_webhook_secret != settings.billing_webhook_secret:
+    # Confronto a tempo costante: `!=` perderebbe tempo proporzionale al numero di
+    # caratteri corretti indovinati, un canale laterale per chi prova a indovinare il segreto.
+    if x_webhook_secret is None or not hmac.compare_digest(
+        x_webhook_secret, settings.billing_webhook_secret
+    ):
         return JSONResponse(
             status_code=status.HTTP_401_UNAUTHORIZED,
             content={"message": "Firma webhook non valida.", "code": "invalid_webhook_signature"},

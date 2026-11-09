@@ -62,6 +62,7 @@ export type AuthSessionContextValue = {
   patchLeague: (leagueId: string, patch: Partial<LeagueSummary>) => void;
   login: (email: string, password: string) => Promise<void>;
   loginWithGoogle: (idToken: string) => Promise<void>;
+  claimGoogleHandoff: (code: string) => Promise<void>;
   logout: () => Promise<void>;
   isImpersonating: boolean;
   startImpersonation: (result: AdminImpersonateResult) => Promise<void>;
@@ -318,6 +319,33 @@ export function AuthSessionProvider({ children }: { children: ReactNode }) {
     [applySession],
   );
 
+  /**
+   * One-time pickup code from the web Google handoff page — never the Google ID token or a
+   * usable session token on its own (see `auth/googleAppHandoff.ts`). The code claims the
+   * session the web page already created server-side.
+   */
+  const claimGoogleHandoff = useCallback(
+    async (code: string) => {
+      const tokens = await authApi.claimGoogleHandoff({ code });
+      await applySession(tokens);
+      try {
+        const memberships = await fetchMyLeagues(tokens.accessToken);
+        const storedLeagueId = await loadStoredActiveLeagueId();
+        const nextLeagueId = resolvePreferredLeagueId(memberships, storedLeagueId);
+        setLeagues(memberships);
+        setActiveLeagueIdState(nextLeagueId);
+        if (nextLeagueId) {
+          await saveStoredActiveLeagueId(nextLeagueId);
+        } else {
+          await clearStoredActiveLeagueId();
+        }
+      } catch {
+        // Keep memberships already in memory.
+      }
+    },
+    [applySession],
+  );
+
   const replaceMemberships = useCallback(async (token: string) => {
     const memberships = await fetchMyLeagues(token);
     setLeagues(memberships);
@@ -480,6 +508,7 @@ export function AuthSessionProvider({ children }: { children: ReactNode }) {
       patchLeague,
       login,
       loginWithGoogle,
+      claimGoogleHandoff,
       logout,
       isImpersonating: impersonator !== null,
       startImpersonation,
@@ -503,6 +532,7 @@ export function AuthSessionProvider({ children }: { children: ReactNode }) {
       patchLeague,
       login,
       loginWithGoogle,
+      claimGoogleHandoff,
       logout,
       impersonator,
       startImpersonation,

@@ -3,6 +3,7 @@ import type {
   AuthOptions,
   AuthTokensResponse,
   ForgotPasswordRequest,
+  GoogleHandoffClaimRequest,
   GoogleLoginRequest,
   LoginRequest,
   RefreshRequest,
@@ -28,6 +29,11 @@ export function login(body: LoginRequest): Promise<AuthTokensResponse> {
 
 export function loginWithGoogle(body: GoogleLoginRequest): Promise<AuthTokensResponse> {
   return apiRequest<AuthTokensResponse>("/auth/google", { body });
+}
+
+/** Claims the session the web handoff page already created from the one-time pickup code. */
+export function claimGoogleHandoff(body: GoogleHandoffClaimRequest): Promise<AuthTokensResponse> {
+  return apiRequest<AuthTokensResponse>("/auth/google/handoff/claim", { body });
 }
 
 export function refresh(body: RefreshRequest): Promise<AuthTokensResponse> {

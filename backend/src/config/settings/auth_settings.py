@@ -4,12 +4,18 @@ from __future__ import annotations
 
 from pydantic import Field, SecretStr, field_validator
 
+#: Convenience default for a fresh local checkout — never valid outside dev/test
+#: (see ``BaseAppSettings.secrets_must_be_explicit``). Used to sign access tokens
+#: and the feedback-media links, so leaving it unchanged in production would let
+#: anyone who reads this source forge a valid token for any user.
+DEFAULT_JWT_SECRET = "fantappero_local_jwt_dev_only_change_in_production"
+
 
 class AuthSettingsMixin:
     """JWT, token expiry, and rate-limit knobs."""
 
     jwt_secret_key: SecretStr = Field(
-        default=SecretStr("fantappero_local_jwt_dev_only_change_in_production"),
+        default=SecretStr(DEFAULT_JWT_SECRET),
         validation_alias="JWT_SECRET_KEY",
     )
     jwt_access_token_expire_minutes: int = Field(
