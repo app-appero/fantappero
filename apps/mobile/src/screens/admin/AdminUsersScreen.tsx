@@ -47,7 +47,7 @@ const USERS_TABS = [
 /** Elenco utenti + promuovi/revoca operatore — mobile port of `apps/web/src/pages/AdminUsersPage.tsx` (EP11-04b). */
 export function AdminUsersScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
-  const { accessToken, startImpersonation } = useAuthSession();
+  const { accessToken, startImpersonation, user: currentUser } = useAuthSession();
 
   const [query, setQuery] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
@@ -548,14 +548,16 @@ export function AdminUsersScreen() {
                     </Text>
                   </Pressable>
                 ) : null}
-                <Pressable
-                  style={[styles.secondaryButton, local.flex, workingId === row.id && styles.disabled]}
-                  disabled={workingId === row.id}
-                  onPress={() => setPending({ user: row, kind: "impersonate" })}
-                  testID={`admin-user-impersonate-${row.id}`}
-                >
-                  <Text style={styles.secondaryButtonLabel}>Impersona</Text>
-                </Pressable>
+                {row.id !== currentUser?.id ? (
+                  <Pressable
+                    style={[styles.secondaryButton, local.flex, workingId === row.id && styles.disabled]}
+                    disabled={workingId === row.id}
+                    onPress={() => setPending({ user: row, kind: "impersonate" })}
+                    testID={`admin-user-impersonate-${row.id}`}
+                  >
+                    <Text style={styles.secondaryButtonLabel}>Impersona</Text>
+                  </Pressable>
+                ) : null}
                 {!row.isProtected ? (
                   <Pressable
                     accessibilityRole="button"

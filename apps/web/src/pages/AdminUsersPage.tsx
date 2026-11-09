@@ -43,7 +43,7 @@ type PendingAction = {
 };
 
 export function AdminUsersPage() {
-  const { startImpersonation } = useAuth();
+  const { startImpersonation, user: currentUser } = useAuth();
   const navigate = useNavigate();
   const [query, setQuery] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
@@ -442,16 +442,18 @@ export function AdminUsersPage() {
                 ) : null}
               </span>
               <span className="fa-admin-users__col fa-admin-users__col--assist">
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="ghost"
-                  loading={workingId === row.id}
-                  onClick={() => setPending({ user: row, kind: "impersonate" })}
-                  data-testid={`admin-user-impersonate-${row.id}`}
-                >
-                  Impersona
-                </Button>
+                {row.id !== currentUser?.id ? (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    loading={workingId === row.id}
+                    onClick={() => setPending({ user: row, kind: "impersonate" })}
+                    data-testid={`admin-user-impersonate-${row.id}`}
+                  >
+                    Impersona
+                  </Button>
+                ) : null}
               </span>
               <span className="fa-admin-users__col fa-admin-users__col--more">
                 {row.isProtected ? (
