@@ -1,3 +1,4 @@
+import { leagueBadgeUrl } from "@fantappero/contracts";
 import { lazyStyles } from "../theme/lazyStyles";
 import type { CompetitionSummary } from "@fantappero/contracts";
 import { theme } from "@fantappero/ui/theme";
@@ -12,6 +13,7 @@ import { useScreenData } from "../hooks/useScreenData";
 import { PageContainer } from "../layout/PageContainer";
 import type { RootStackParamList } from "../navigation/types";
 import { getApiErrorMessage, useAuthSession } from "../session/DemoSessionContext";
+import { AvatarImage } from "../components/AvatarImage";
 
 const { colors, spacing, typography, radius } = theme;
 
@@ -240,6 +242,7 @@ export function CreateLeagueScreen() {
                   trackColor={{ false: colors.border, true: colors.accent }}
                   pointerEvents="none"
                 />
+                <AvatarImage uri={leagueBadgeUrl(competition.name)} size={30} />
                 <View style={styles.competitionText}>
                   <Text style={styles.competitionLabel}>{competition.name}</Text>
                   <Text style={styles.competitionCountry}>

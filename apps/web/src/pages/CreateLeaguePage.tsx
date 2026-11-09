@@ -1,3 +1,4 @@
+import { leagueBadgeUrl } from "@fantappero/contracts";
 import type { CompetitionSummary, LeagueDetail, LeagueRules } from "@fantappero/contracts";
 import {
   Breadcrumb,
@@ -399,6 +400,7 @@ export function CreateLeaguePage() {
                         disabled={competition.selectable === false}
                         onChange={() => toggleCompetition(competition.id)}
                       />
+                      <img className="fa-league-badge" src={leagueBadgeUrl(competition.name)} alt="" aria-hidden="true" />
                       <span className="fa-competition-picker__label">
                         <span className="fa-competition-picker__name">{competition.name}</span>
                         <span className="fa-competition-picker__country">

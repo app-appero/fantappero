@@ -568,3 +568,11 @@ export {
   playerAvatarUrl,
 } from "./playerAvatar.js";
 export type { AvatarSpec, ClubKit, KitPattern } from "./playerAvatar.js";
+
+export {
+  clubAbbreviation,
+  clubCrestSvg,
+  clubCrestUrl,
+  leagueBadgeSvg,
+  leagueBadgeUrl,
+} from "./playerAvatar.js";
