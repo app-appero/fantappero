@@ -12,6 +12,8 @@ import {
   mapFixtureMatchStatus,
   resolveDefaultEuropeanTurn,
   resolveTurnDisplayStates,
+  clubCrestUrl,
+  leagueBadgeUrl,
 } from "@fantappero/contracts";
 import { theme } from "@fantappero/ui/theme";
 import { liveStringMap } from "../theme/liveColors";
@@ -44,6 +46,7 @@ import { useLockCountdown } from "../matchday/useLockCountdown";
 import type { RootStackParamList } from "../navigation/types";
 import { MatchdayH2HPanel } from "./matchday/MatchdayH2HPanel";
 import { getApiErrorMessage, useAuthSession } from "../session/DemoSessionContext";
+import { AvatarImage } from "../components/AvatarImage";
 
 const { colors, spacing, typography, radius } = theme;
 
@@ -440,6 +443,7 @@ export function MatchdayScreen() {
                     onPress={() => setCompetitionTab(competition)}
                     testID={`matchday-competition-tab-${competition}`}
                   >
+                    <AvatarImage uri={leagueBadgeUrl(competition)} size={18} />
                     <Text style={styles.chipLabel}>{competition}</Text>
                   </Pressable>
                 ))}
@@ -472,15 +476,21 @@ export function MatchdayScreen() {
                     testID={`matchday-fixture-link-${fixture.fixtureId}`}
                   >
                     <View style={styles.fixtureTeams}>
-                      <Text style={styles.fixtureTeam} numberOfLines={2}>
-                        {fixture.homeClubName}
-                      </Text>
+                      <View style={styles.fixtureTeamWrap}>
+                        <AvatarImage uri={clubCrestUrl(fixture.homeClubName)} size={26} />
+                        <Text style={styles.fixtureTeam} numberOfLines={2}>
+                          {fixture.homeClubName}
+                        </Text>
+                      </View>
                       <Text style={styles.fixtureScore}>
                         {played ? `${fixture.homeGoals} - ${fixture.awayGoals}` : "vs"}
                       </Text>
-                      <Text style={[styles.fixtureTeam, styles.fixtureTeamAway]} numberOfLines={2}>
-                        {fixture.awayClubName}
-                      </Text>
+                      <View style={[styles.fixtureTeamWrap, styles.fixtureTeamWrapAway]}>
+                        <Text style={[styles.fixtureTeam, styles.fixtureTeamAway]} numberOfLines={2}>
+                          {fixture.awayClubName}
+                        </Text>
+                        <AvatarImage uri={clubCrestUrl(fixture.awayClubName)} size={26} />
+                      </View>
                     </View>
                     <View style={styles.fixtureMeta}>
                       <Text style={styles.hint}>
@@ -586,6 +596,9 @@ const styles = lazyStyles(() => StyleSheet.create({
     fontSize: typography.fontSize.sm,
   },
   chip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.xs,
     borderWidth: 1,
     borderColor: colors.border,
     borderRadius: radius.pill,
@@ -654,6 +667,16 @@ const styles = lazyStyles(() => StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: spacing.sm,
+  },
+  fixtureTeamWrap: {
+    flex: 1,
+    minWidth: 0,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.xs,
+  },
+  fixtureTeamWrapAway: {
+    justifyContent: "flex-end",
   },
   fixtureTeam: {
     flex: 1,

@@ -12,6 +12,8 @@ import {
   mapFixtureMatchStatus,
   resolveDefaultEuropeanTurn,
   resolveTurnDisplayStates,
+  clubCrestUrl,
+  leagueBadgeUrl,
 } from "@fantappero/contracts";
 import {
   Badge,
@@ -671,8 +673,8 @@ export function MatchdayPage() {
             kickoffLabel={formatDateTime(fixture.kickoffAt)}
             status={mapFixtureMatchStatus(fixture.statusShort, fixture.kickoffAt)}
             statusLabel={matchCardStatusLabel(fixture)}
-            homeLogoUrl={fixture.homeClubLogoUrl}
-            awayLogoUrl={fixture.awayClubLogoUrl}
+            homeLogoUrl={clubCrestUrl(fixture.homeClubName)}
+            awayLogoUrl={clubCrestUrl(fixture.awayClubName)}
             score={
               fixture.homeGoals !== null && fixture.awayGoals !== null
                 ? { home: fixture.homeGoals, away: fixture.awayGoals }
@@ -944,6 +946,12 @@ export function MatchdayPage() {
                     <TabList>
                       {competitionGroups.map(([competitionName]) => (
                         <Tab key={competitionName} value={competitionName}>
+                          <img
+                            className="fa-league-badge"
+                            src={leagueBadgeUrl(competitionName)}
+                            alt=""
+                            aria-hidden="true"
+                          />{" "}
                           {competitionName}
                         </Tab>
                       ))}

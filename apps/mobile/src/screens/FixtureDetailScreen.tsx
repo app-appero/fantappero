@@ -11,6 +11,7 @@ import type {
 } from "@fantappero/contracts";
 import { layoutFromGrid, layoutFromRoles, mapFixtureMatchStatus, pitchRoleCodeFromGrid, realMatchBadgesByAthlete,
   playerAvatarUrl,
+  clubCrestUrl,
 } from "@fantappero/contracts";
 import { theme } from "@fantappero/ui/theme";
 import { liveStringMap } from "../theme/liveColors";
@@ -29,6 +30,7 @@ import { PageContainer } from "../layout/PageContainer";
 import { useLiveFixturePolling } from "../matchday/useLiveFixturePolling";
 import type { RootStackParamList } from "../navigation/types";
 import { getApiErrorMessage, useAuthSession } from "../session/DemoSessionContext";
+import { AvatarImage } from "../components/AvatarImage";
 
 const { colors, spacing, typography, radius } = theme;
 
@@ -613,16 +615,12 @@ export function FixtureDetailScreen() {
       {!loading && !loadError && detail ? (
         <View style={styles.stack} testID="fixture-detail">
           <View style={styles.scoreRow}>
-            {detail.homeClubLogoUrl ? (
-              <Image source={{ uri: detail.homeClubLogoUrl }} style={styles.clubLogo} />
-            ) : null}
+            <AvatarImage uri={clubCrestUrl(detail.homeClubName)} style={styles.clubLogo} size={26} />
             <Text style={styles.score} testID="fixture-score">
               {detail.homeClubName} {detail.homeGoals ?? "—"} – {detail.awayGoals ?? "—"}{" "}
               {detail.awayClubName}
             </Text>
-            {detail.awayClubLogoUrl ? (
-              <Image source={{ uri: detail.awayClubLogoUrl }} style={styles.clubLogo} />
-            ) : null}
+            <AvatarImage uri={clubCrestUrl(detail.awayClubName)} style={styles.clubLogo} size={26} />
           </View>
           <View style={styles.badgeRow}>
             <StatusBadge
