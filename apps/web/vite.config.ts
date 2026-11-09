@@ -32,7 +32,13 @@ export default defineConfig({
     port: 5174,
     strictPort: true,
     host: true,
-    allowedHosts: ["fantappero-web-dev.up.railway.app", "fantappero-web-pilot.up.railway.app"],
+    // ".fantappero.it" (prefisso punto) copre ogni sottodominio presente e futuro
+    // (dev., pilota., ...) senza dover toccare questo file a ogni nuovo ambiente.
+    allowedHosts: [
+      "fantappero-web-dev.up.railway.app",
+      "fantappero-web-pilot.up.railway.app",
+      ".fantappero.it",
+    ],
     proxy: Object.fromEntries(
       API_PROXY_PREFIXES.map((prefix) => [
         prefix,
