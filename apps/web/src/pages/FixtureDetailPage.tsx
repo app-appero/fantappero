@@ -9,6 +9,7 @@ import type {
 } from "@fantappero/contracts";
 import { layoutFromGrid, layoutFromRoles, mapFixtureMatchStatus, pitchRoleCodeFromGrid, realMatchBadgesByAthlete,
   playerAvatarUrl,
+  clubCrestUrl,
 } from "@fantappero/contracts";
 import type { TimelineEntry } from "@fantappero/ui";
 import {
@@ -537,17 +538,13 @@ export function FixtureDetailBody({ detail }: { detail: FixtureLiveDetail }) {
   return (
     <div className="fa-ds-showcase__stack" data-testid="fixture-detail">
       <p>
-        {detail.homeClubLogoUrl ? (
-          <img className="fa-match-card__team-logo" src={detail.homeClubLogoUrl} alt="" aria-hidden="true" />
-        ) : null}{" "}
+        <img className="fa-match-card__team-logo" src={clubCrestUrl(detail.homeClubName)} alt="" aria-hidden="true" />{" "}
         <strong>{detail.homeClubName}</strong>{" "}
         <span data-testid="fixture-score">
           {detail.homeGoals ?? "—"} – {detail.awayGoals ?? "—"}
         </span>{" "}
         <strong>{detail.awayClubName}</strong>{" "}
-        {detail.awayClubLogoUrl ? (
-          <img className="fa-match-card__team-logo" src={detail.awayClubLogoUrl} alt="" aria-hidden="true" />
-        ) : null}
+        <img className="fa-match-card__team-logo" src={clubCrestUrl(detail.awayClubName)} alt="" aria-hidden="true" />
       </p>
       <p>
         <Badge

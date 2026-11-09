@@ -5759,3 +5759,23 @@ button.fa-starter-row:disabled {
   gap: var(--fa-space-xs);
   margin-left: auto;
 }
+
+/* Distintivi dei campionati (SVG generati, non loghi ufficiali). */
+.fa-league-badge {
+  width: 1.25rem;
+  height: 1.25rem;
+  vertical-align: -0.25rem;
+  flex-shrink: 0;
+}
+
+.fa-competition-picker__option .fa-league-badge {
+  width: 1.75rem;
+  height: 1.75rem;
+  vertical-align: middle;
+}
+
+.fa-match-card__team-logo {
+  width: 1.75rem;
+  height: 1.75rem;
+  object-fit: contain;
+}

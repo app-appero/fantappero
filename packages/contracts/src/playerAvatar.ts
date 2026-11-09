@@ -321,3 +321,231 @@ export function playerAvatarSvg(athleteId: string, teamName?: string | null): st
 export function playerAvatarUrl(athleteId: string, teamName?: string | null): string {
   return `data:image/svg+xml;utf8,${encodeURIComponent(playerAvatarSvg(athleteId, teamName))}`;
 }
+
+// ── Stemmi dei club e distintivi dei campionati ─────────────────────────
+/**
+ * Stemmi dei club e distintivi dei campionati: grafica originale generata in SVG.
+ * Non sono gli stemmi ufficiali (marchi registrati): scudo con i colori e il disegno
+ * della maglia del club e la sigla a tre lettere.
+ */
+
+const CLUB_ABBR: Record<string, string> = {
+  "inter": "INT",
+  "milan": "MIL",
+  "juventus": "JUV",
+  "hellas verona": "VER",
+  "verona": "VER",
+  "roma": "ROM",
+  "lazio": "LAZ",
+  "napoli": "NAP",
+  "manchester city": "MCI",
+  "man city": "MCI",
+  "manchester united": "MUN",
+  "man united": "MUN",
+  "newcastle": "NEW",
+  "newcastle united": "NEW",
+  "nottingham forest": "NFO",
+  "crystal palace": "CRY",
+  "aston villa": "AVL",
+  "west ham": "WHU",
+  "tottenham": "TOT",
+  "brighton": "BHA",
+  "athletic club": "ATH",
+  "atletico madrid": "ATM",
+  "real madrid": "RMA",
+  "real betis": "BET",
+  "betis": "BET",
+  "real sociedad": "RSO",
+  "real oviedo": "OVI",
+  "rayo vallecano": "RAY",
+  "celta vigo": "CEL",
+  "fc augsburg": "AUG",
+  "augsburg": "AUG",
+  "union berlin": "UNB",
+  "werder bremen": "SVW",
+  "borussia dortmund": "BVB",
+  "dortmund": "BVB",
+  "eintracht frankfurt": "SGE",
+  "sc freiburg": "SCF",
+  "freiburg": "SCF",
+  "hamburger sv": "HSV",
+  "fc heidenheim": "HDH",
+  "heidenheim": "HDH",
+  "hoffenheim": "TSG",
+  "fc koln": "KOE",
+  "koln": "KOE",
+  "mainz": "M05",
+  "borussia monchengladbach": "BMG",
+  "gladbach": "BMG",
+  "bayern munich": "FCB",
+  "bayern": "FCB",
+  "rb leipzig": "RBL",
+  "leipzig": "RBL",
+  "st pauli": "STP",
+  "vfb stuttgart": "VFB",
+  "stuttgart": "VFB",
+  "vfl wolfsburg": "WOB",
+  "wolfsburg": "WOB",
+  "bayer leverkusen": "B04",
+  "leverkusen": "B04",
+  "paris saint germain": "PSG",
+  "psg": "PSG",
+  "paris fc": "PFC",
+  "le havre": "HAC",
+  "lyon": "OL",
+  "marseille": "OM",
+  "monaco": "ASM",
+  "strasbourg": "RCS",
+  "toulouse": "TFC",
+  "nantes": "FCN",
+  "rennes": "SRFC",
+  "lille": "LOSC",
+  "lens": "RCL",
+  "brest": "SB29",
+  "auxerre": "AJA",
+  "angers": "SCO",
+  "lorient": "FCL",
+  "metz": "FCM",
+  "nice": "OGC",
+  "barcelona": "BAR",
+  "sevilla": "SEV",
+  "valencia": "VAL",
+  "villarreal": "VIL",
+  "girona": "GIR",
+  "getafe": "GET",
+  "espanyol": "ESP",
+  "levante": "LEV",
+  "mallorca": "MLL",
+  "osasuna": "OSA",
+  "alaves": "ALA",
+  "elche": "ELC",
+  "como": "COM",
+  "cremonese": "CRE",
+  "sassuolo": "SAS",
+  "torino": "TOR",
+  "udinese": "UDI",
+  "bologna": "BOL",
+  "cagliari": "CAG",
+  "fiorentina": "FIO",
+  "genoa": "GEN",
+  "lecce": "LEC",
+  "parma": "PAR",
+  "pisa": "PIS",
+  "atalanta": "ATA",
+  "arsenal": "ARS",
+  "bournemouth": "BOU",
+  "brentford": "BRE",
+  "burnley": "BUR",
+  "chelsea": "CHE",
+  "everton": "EVE",
+  "fulham": "FUL",
+  "leeds": "LEE",
+  "liverpool": "LIV",
+  "sunderland": "SUN",
+  "wolves": "WOL",
+};
+
+function luminance(hex: string): number {
+  const h = hex.replace("#", "");
+  const [r, g, b] = [0, 2, 4].map((i) => parseInt(h.slice(i, i + 2), 16));
+  return (0.299 * (r ?? 0) + 0.587 * (g ?? 0) + 0.114 * (b ?? 0)) / 255;
+}
+
+function darken(hex: string, factor = 0.55): string {
+  const h = hex.replace("#", "");
+  const [r, g, b] = [0, 2, 4].map((i) => Math.round(parseInt(h.slice(i, i + 2), 16) * factor));
+  return `#${[r, g, b].map((v) => (v ?? 0).toString(16).padStart(2, "0")).join("")}`;
+}
+
+function hashId(text: string): string {
+  let h = 2166136261;
+  for (let i = 0; i < text.length; i += 1) {
+    h ^= text.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return (h >>> 0).toString(36);
+}
+
+/** Sigla a tre lettere del club (per quelli non mappati, le prime lettere del nome). */
+export function clubAbbreviation(teamName?: string | null): string {
+  if (!teamName) {
+    return "—";
+  }
+  const key = normalizeClubName(teamName);
+  const direct = CLUB_ABBR[key];
+  if (direct) {
+    return direct;
+  }
+  const words = key.split(" ").filter((word) => word.length > 1 && !/^(fc|cf|afc|ac|as|sc|ssc|us|ud|cd|rc|ca)$/.test(word));
+  const base = (words[0] ?? key).replace(/ /g, "");
+  return base.slice(0, 3).toUpperCase() || "—";
+}
+
+const SHIELD = "M12 8 H88 V56 Q88 90 50 106 Q12 90 12 56 Z";
+
+function crestPattern(pattern: string, color: string): string {
+  switch (pattern) {
+    case "stripes":
+      return [14, 36, 58, 80].map((x) => `<rect x="${x}" y="0" width="11" height="120" fill="${color}"/>`).join("");
+    case "halves":
+      return `<rect x="50" y="0" width="50" height="120" fill="${color}"/>`;
+    case "sash":
+      return `<polygon points="0,20 30,0 100,90 100,120 70,120" fill="${color}"/>`;
+    case "sleeves":
+      return `<rect x="0" y="0" width="30" height="120" fill="${color}"/><rect x="70" y="0" width="30" height="120" fill="${color}"/>`;
+    case "band":
+      return `<rect x="0" y="30" width="100" height="16" fill="${color}"/>`;
+    case "hoops":
+      return [30, 50, 70, 90].map((y) => `<rect x="0" y="${y}" width="100" height="10" fill="${color}"/>`).join("");
+    default:
+      return "";
+  }
+}
+
+/** SVG (stringa) dello stemma originale del club. */
+export function clubCrestSvg(teamName?: string | null): string {
+  const kit = clubKit(teamName);
+  const abbr = clubAbbreviation(teamName);
+  const id = `cr${hashId(teamName ?? "-")}`;
+  const light = luminance(kit.primary) > 0.4;
+  const bannerBg = light ? "rgba(8,12,30,.88)" : "rgba(255,255,255,.92)";
+  const bannerFg = light ? "#FFFFFF" : "#0B0F1E";
+  const fontSize = abbr.length <= 3 ? 22 : 17;
+  return (
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 114"><defs><clipPath id="${id}"><path d="${SHIELD}"/></clipPath></defs>` +
+    `<path d="${SHIELD}" fill="${kit.primary}"/><g clip-path="url(#${id})">${crestPattern(kit.pattern, kit.secondary)}<circle cx="50" cy="20" r="26" fill="rgba(255,255,255,.12)"/></g>` +
+    `<path d="${SHIELD}" fill="none" stroke="${kit.trim}" stroke-width="4"/><path d="${SHIELD}" fill="none" stroke="${darken(kit.primary)}" stroke-width="1.6" opacity=".7"/>` +
+    `<rect x="22" y="42" width="56" height="26" rx="8" fill="${bannerBg}"/>` +
+    `<text x="50" y="62" text-anchor="middle" font-family="sans-serif" font-style="italic" font-weight="800" font-size="${fontSize}" fill="${bannerFg}">${abbr}</text></svg>`
+  );
+}
+
+export function clubCrestUrl(teamName?: string | null): string {
+  return `data:image/svg+xml;utf8,${encodeURIComponent(clubCrestSvg(teamName))}`;
+}
+
+
+const LEAGUE_STYLE: Record<string, readonly [string, string, string, string]> = {
+  "serie a": ["#0F8F4F", "#FFFFFF", "#D01F2E", "A"],
+  "premier league": ["#3D195B", "#00FF85", "#FFFFFF", "PL"],
+  laliga: ["#D01F2E", "#F2C400", "#FFFFFF", "LL"],
+  "la liga": ["#D01F2E", "#F2C400", "#FFFFFF", "LL"],
+  bundesliga: ["#0B0F1E", "#D01F2E", "#F2C400", "BL"],
+  "ligue 1": ["#1F3FA0", "#F6F6F6", "#D01F2E", "L1"],
+};
+const LEAGUE_NEUTRAL: readonly [string, string, string, string] = ["#2B3A7A", "#9DB8FF", "#FFFFFF", "★"];
+
+/** SVG del distintivo tondo del campionato (colori del paese, sigla). */
+export function leagueBadgeSvg(competitionName?: string | null): string {
+  const [a, b, c, label] = LEAGUE_STYLE[normalizeClubName(competitionName ?? "")] ?? LEAGUE_NEUTRAL;
+  return (
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="50" cy="50" r="46" fill="${a}"/>` +
+    `<circle cx="50" cy="50" r="46" fill="none" stroke="${b}" stroke-width="4"/>` +
+    `<rect x="12" y="66" width="76" height="6" rx="3" fill="${b}"/><rect x="12" y="74" width="76" height="6" rx="3" fill="${c}"/>` +
+    `<text x="50" y="52" text-anchor="middle" font-family="sans-serif" font-style="italic" font-weight="800" font-size="34" fill="#FFFFFF">${label}</text></svg>`
+  );
+}
+
+export function leagueBadgeUrl(competitionName?: string | null): string {
+  return `data:image/svg+xml;utf8,${encodeURIComponent(leagueBadgeSvg(competitionName))}`;
+}
