@@ -4,7 +4,7 @@ import { theme } from "@fantappero/ui/theme";
 import { useState } from "react";
 import { Modal, Pressable, StyleSheet, Text, View } from "react-native";
 import { BrandLogo } from "../components/BrandLogo";
-import { LeagueSelector } from "../components/LeagueSelector";
+import { LeagueSelector, type LeagueOption } from "../components/LeagueSelector";
 import { NavIcon } from "../navigation/NavIcons";
 
 const { colors, spacing, typography, radius } = theme;
@@ -13,7 +13,7 @@ export type AppHeaderProps = {
   surface?: "app" | "admin";
   userDisplayName: string;
   showLeagueSelector?: boolean;
-  leagues?: readonly { value: string; label: string }[];
+  leagues?: readonly LeagueOption[];
   activeLeagueId?: string | null;
   onLeagueChange?: (leagueId: string) => void;
   /** Crea lega / Unisciti con codice — il + dell'header apre il modale (EP13-P01). */

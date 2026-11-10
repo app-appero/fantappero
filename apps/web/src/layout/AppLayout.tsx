@@ -1,7 +1,6 @@
 import {
   AppHeader,
   AppShell,
-  Badge,
   BrandLogo,
   LeagueSelector,
   LockCountdown,
@@ -13,7 +12,7 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from "react"
 import { Link, useLocation } from "../router/simpleRouter";
 import { useAuth } from "../auth/AuthContext";
 import { LogoutButton } from "../auth/LogoutButton";
-import { leagueStateLabel } from "../leagues/leagueLabels";
+import { leagueNameWithStateDot } from "../leagues/leagueLabels";
 import { useLockCountdown } from "../matchday/useLockCountdown";
 import { usePendingInviteCount } from "./usePendingInviteCount";
 import {
@@ -274,9 +273,6 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   );
 
   const canSeeLeagueContext = can(["league:view"]);
-  const activeLeagueSummary = leagues.find(
-    (league) => league.id === (activeLeagueId ?? leagues[0]?.id),
-  );
   const { countdown, refetch: refetchCountdown } = useLockCountdown(
     canSeeLeagueContext && leagues.length > 0
       ? (activeLeagueId ?? leagues[0]?.id ?? null)
@@ -308,21 +304,11 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                       label="Lega attiva"
                       leagues={leagues.map((league) => ({
                         value: league.id,
-                        label: league.name,
+                        label: leagueNameWithStateDot(league.name, league.state),
                       }))}
                       value={activeLeagueId ?? leagues[0]?.id ?? ""}
                       onChange={setActiveLeagueId}
                       placeholder="Seleziona lega"
-                      accessory={
-                        activeLeagueSummary ? (
-                          <Badge
-                            variant="neutral"
-                            data-testid="active-league-status"
-                          >
-                            {leagueStateLabel(activeLeagueSummary.state)}
-                          </Badge>
-                        ) : null
-                      }
                     />
                   ) : null}
                   <HeaderLeagueActions />

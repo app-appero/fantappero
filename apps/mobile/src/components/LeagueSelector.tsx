@@ -5,13 +5,30 @@ import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from "react-nati
 import { AppTextInput as TextInput } from "./AppTextInput";
 import Feather from "@expo/vector-icons/Feather";
 import { theme } from "@fantappero/ui/theme";
+import { LEAGUE_STATE_DOT_COLOR, type LeagueState } from "@fantappero/contracts";
 
 const { colors, spacing, typography, radius } = theme;
 
 export type LeagueOption = {
   value: string;
   label: string;
+  /** Pallino colorato al posto di un badge testuale (vedi StateDot sotto). */
+  state?: LeagueState;
 };
+
+/** Pallino colorato per lo stato della lega — sostituisce un badge testuale. */
+function StateDot({ state, style }: { state: LeagueState | undefined; style?: object }) {
+  if (!state) {
+    return null;
+  }
+  return (
+    <View
+      accessibilityElementsHidden
+      importantForAccessibility="no-hide-descendants"
+      style={[styles.stateDot, { backgroundColor: LEAGUE_STATE_DOT_COLOR[state] }, style]}
+    />
+  );
+}
 
 export type LeagueSelectorProps = {
   label: string;
@@ -77,6 +94,7 @@ export function LeagueSelector({
         style={styles.pill}
         testID={`${testID}-trigger`}
       >
+        <StateDot state={current?.state} style={styles.pillDot} />
         <Text style={styles.pillLabel} numberOfLines={1}>
           {current?.label ?? placeholder}
         </Text>
@@ -127,6 +145,7 @@ export function LeagueSelector({
                   >
                     <View style={styles.avatar}>
                       <Text style={styles.avatarLabel}>{league.label.slice(0, 2).toUpperCase()}</Text>
+                      <StateDot state={league.state} style={styles.avatarDot} />
                     </View>
                     <Text style={styles.rowLabel} numberOfLines={1}>
                       {league.label}
@@ -262,6 +281,25 @@ const styles = lazyStyles(() => StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: colors.brand,
+    position: "relative",
+  },
+  stateDot: {
+    width: 9,
+    height: 9,
+    borderRadius: 5,
+  },
+  pillDot: {
+    flexShrink: 0,
+  },
+  avatarDot: {
+    position: "absolute",
+    bottom: -2,
+    right: -2,
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    borderWidth: 2,
+    borderColor: colors.backgroundElevated,
   },
   avatarLabel: { color: colors.onBrand, fontWeight: "800", fontStyle: "italic" },
   rowLabel: { flex: 1, color: colors.foreground, fontWeight: typography.fontWeight.semibold },

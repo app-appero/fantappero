@@ -31,6 +31,32 @@ export interface TransitionLeagueStateRequest {
 }
 
 /**
+ * Colore associato a ogni stato lega, per un pallino al posto di un badge
+ * testuale (occupa troppo spazio in header). Fonte unica per web e mobile:
+ * il mobile lo usa come colore di sfondo di un pallino vero, il web come
+ * carattere emoji a cerchio pieno (nessun modo affidabile di colorare una
+ * `<option>` nativa via CSS su ogni browser — vedi `LEAGUE_STATE_DOT_EMOJI`).
+ */
+export const LEAGUE_STATE_DOT_COLOR: Record<LeagueState, string> = {
+  draft: "#9CA3AF",
+  configuring: "#FBBF24",
+  auction: "#FB923C",
+  active: "#34D399",
+  concluded: "#60A5FA",
+  archived: "#6B7280",
+};
+
+/** Stesso colore di `LEAGUE_STATE_DOT_COLOR`, come emoji a cerchio pieno. */
+export const LEAGUE_STATE_DOT_EMOJI: Record<LeagueState, string> = {
+  draft: "⚪",
+  configuring: "🟡",
+  auction: "🟠",
+  active: "🟢",
+  concluded: "🔵",
+  archived: "⚫",
+};
+
+/**
  * Percorso "a tappe" mostrato all'admin (fase 1 semplificata):
  * Impostazione (include asta opzionale) → Campionato → Conclusa.
  */

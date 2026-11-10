@@ -240,7 +240,11 @@ function AppTabShell({
         unreadNotifications={unreadNotifications}
         onNotificationsPress={() => navigation.navigate("Notifications")}
         showLeagueSelector={leagues.length > 0}
-        leagues={leagues.map((league) => ({ value: league.id, label: league.name }))}
+        leagues={leagues.map((league) => ({
+          value: league.id,
+          label: league.name,
+          state: league.state,
+        }))}
         activeLeagueId={activeLeagueId}
         onLeagueChange={(leagueId) => {
           setActiveLeagueId(leagueId);

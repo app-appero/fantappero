@@ -61,9 +61,13 @@ describe("EP03-UX-01 leghe: selettore e azioni sempre in header", () => {
     expect(html).not.toContain("Amministrazione lega");
   });
 
-  it("shows the active league status next to the selector", () => {
+  it("shows the active league's state as a colored dot inside the selector", () => {
     const html = renderRoute("/leghe?persona=admin");
-    expect(html).toContain('data-testid="active-league-status"');
+    expect(html).toContain('data-testid="league-selector"');
+    // Pallino colorato davanti al nome, non più un badge testuale separato
+    // (che in header occupava troppo spazio) — vedi leagueNameWithStateDot.
+    expect(html).not.toContain('data-testid="active-league-status"');
+    expect(html).toMatch(/<option value="[^"]+" selected="">[🟢🟡🟠🔵⚫⚪] /u);
   });
 
   it("shows Amministrazione lega directly for admin persona (no Home duplication)", () => {
