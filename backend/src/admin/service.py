@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import math
+import secrets
 from uuid import UUID
 
 from sqlalchemy import func, select
@@ -21,6 +22,7 @@ from admin.schemas import (
     AdminBlocklistResponse,
     AdminDeleteUserResponse,
     AdminImpersonateResponse,
+    AdminImpersonationRevokeResponse,
     AdminLeagueResponse,
     AdminOverviewResponse,
     AdminTesterResponse,
@@ -30,6 +32,7 @@ from admin.schemas import (
     PaginatedAdminUsersResponse,
 )
 from auth.blocklist import BlockList
+from auth.impersonation import ImpersonationStore
 from auth.models.user import User
 from auth.models.user_profile import UserProfile
 from auth.privacy_service import PrivacyService
@@ -93,9 +96,15 @@ class AdminService:
     only the operator role toggle and read-only listings needed for M1/M4.
     """
 
-    def __init__(self, session: Session, settings: ApiSettings) -> None:
+    def __init__(
+        self,
+        session: Session,
+        settings: ApiSettings,
+        impersonation_store: ImpersonationStore | None = None,
+    ) -> None:
         self._session = session
         self._settings = settings
+        self._impersonation_store = impersonation_store
 
     def overview(self, operator: User) -> AdminOverviewResponse:
         users_count = self._session.scalar(select(func.count(User.id))) or 0
@@ -344,8 +353,11 @@ class AdminService:
 
         No refresh token is issued and no `AuthSession` row is created: the
         impersonated session expires on its own after
-        `jwt_access_token_expire_minutes`, exactly like a normal access token,
-        and cannot be silently renewed. Operators can target other operators
+        `impersonation_token_expire_minutes` (deliberately much shorter than a
+        normal session's `jwt_access_token_expire_minutes`) and cannot be
+        silently renewed. Its `jti` is also recorded in `ImpersonationStore`
+        (Redis) so it can be cut off early with `revoke_impersonation`, instead
+        of only ever expiring on its own. Operators can target other operators
         too (EP-operatore-test), except a protected one (`_is_protected`):
         without this, any operator — including one just promoted by another
         operator, with no extra check on who may promote — could mint a
@@ -362,11 +374,15 @@ class AdminService:
         if self._is_protected(user):
             raise ProtectedOperatorError()
 
+        jti = secrets.token_urlsafe(16)
         access_token, expires_in = create_access_token(
             user_id=user.id,
             secret=self._settings.resolved_jwt_secret(),
-            expire_minutes=self._settings.jwt_access_token_expire_minutes,
+            expire_minutes=self._settings.impersonation_token_expire_minutes,
+            impersonation_jti=jti,
         )
+        if self._impersonation_store is not None:
+            self._impersonation_store.start(jti=jti, target_user_id=user.id, ttl_seconds=expires_in)
         self._session.add(
             LeagueAuditEvent(
                 league_id=None,
@@ -393,6 +409,33 @@ class AdminService:
                 globalRole=platform_role_to_global_role(user.platform_role).value,
             ),
         )
+
+    def revoke_impersonation(
+        self, *, actor: User, target_user_id: UUID
+    ) -> AdminImpersonationRevokeResponse:
+        """Kill switch for `impersonate`: invalidates every impersonation access
+        token currently active for `target_user_id`, immediately — not just the
+        next one that would expire on its own. No-op (``revoked=0``) if none
+        are active, or if Redis is unavailable (ImpersonationStore degrades
+        open, same as elsewhere); the target's own session is never touched,
+        only tokens carrying the ``imp`` claim.
+        """
+        user = self._get_user_or_raise(target_user_id)
+        revoked = (
+            self._impersonation_store.revoke_all_for_user(user.id)
+            if self._impersonation_store is not None
+            else 0
+        )
+        _logger.info(
+            "admin user impersonation revoked",
+            extra={
+                "event": "admin_user_impersonation_revoked",
+                "actor_id": str(actor.id),
+                "target_user_id": str(user.id),
+                "revoked_count": revoked,
+            },
+        )
+        return AdminImpersonationRevokeResponse(revokedCount=revoked)
 
     def list_leagues(
         self, *, query: str | None, page: int, page_size: int = PAGE_SIZE

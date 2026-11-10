@@ -21,6 +21,43 @@ _LOGIN_BACKOFF_SCHEDULE_SECONDS = (30, 120, 600)
 #: The failure counter forgets itself if nobody retries for this long.
 _LOGIN_BACKOFF_RESET_SECONDS = 3600
 
+#: KEYS[1] = the account's hash key.
+#: ARGV[1] = free attempts, ARGV[2] = reset TTL seconds, ARGV[3] = now (unix time),
+#: ARGV[4..] = the wait schedule, in order, capped at the last entry.
+#: Reads the counter and treats *this* attempt as the one being reserved (so "free
+#: attempts" also covers the one making the request), only mutating state when it is
+#: actually allowed through — a call made while still inside the wait leaves the
+#: counter and timestamp untouched, so repeated polling against a blocked account
+#: never pushes it into a longer tier on its own.
+_LOGIN_BACKOFF_SCRIPT = """
+local key = KEYS[1]
+local free_attempts = tonumber(ARGV[1])
+local reset_seconds = tonumber(ARGV[2])
+local now = tonumber(ARGV[3])
+local schedule_len = #ARGV - 3
+
+local count = tonumber(redis.call('HGET', key, 'count') or '0')
+local last_at = tonumber(redis.call('HGET', key, 'last_failure_at') or '0')
+
+local extra = (count + 1) - free_attempts
+local wait = 0
+if extra > 0 then
+    local idx = extra
+    if idx > schedule_len then idx = schedule_len end
+    wait = tonumber(ARGV[3 + idx])
+end
+
+local elapsed = now - last_at
+if wait > 0 and elapsed < wait then
+    return tostring(wait - elapsed)
+end
+
+redis.call('HINCRBY', key, 'count', 1)
+redis.call('HSET', key, 'last_failure_at', now)
+redis.call('EXPIRE', key, reset_seconds)
+return '0'
+"""
+
 
 class AuthRateLimiter:
     """Fixed-window counters in Redis, plus a per-account login backoff."""
@@ -43,40 +80,41 @@ class AuthRateLimiter:
             )
 
     def check_login_backoff(self, email: str) -> None:
-        """Reject a login attempt still inside the wait earned by recent failures on this account.
+        """Reject a login attempt still inside the wait earned by recent attempts on this
+        account, and otherwise atomically reserve this one as the next attempt.
 
         Per-account, on top of the per-IP window in ``check``: an attacker spreading guesses
         across many IPs (or a slow, patient one) never trips the IP limit but would otherwise
         get unlimited tries against a single account. Keyed by the email regardless of whether
         the account exists, and with the same generic error either way, so the timing never
         tells an attacker an account is real before `InvalidCredentialsError` would.
+
+        The check and the reservation used to be two separate Redis round trips (read the
+        counter here, increment it later in ``record_login_failure`` once the password turned
+        out wrong) — a burst of concurrent requests for the same account would all read the
+        same low counter before any of them got around to recording a failure, sailing straight
+        through the backoff it exists to stop. A single Lua script run inside Redis closes that
+        gap: this account's counter and wait decision happen as one atomic step, so even a
+        flood of simultaneous attempts gets serialized against it one at a time. A blocked
+        attempt here never got to try a password, so it leaves the counter untouched; only a
+        reserved one does — undone on an eventual successful login via ``record_login_success``.
         """
         redis_key = f"auth:login_backoff:{self.email_key(email)}"
         try:
-            raw = self._client.hgetall(redis_key)
+            remaining = self._client.eval(
+                _LOGIN_BACKOFF_SCRIPT,
+                1,
+                redis_key,
+                _LOGIN_BACKOFF_FREE_ATTEMPTS,
+                _LOGIN_BACKOFF_RESET_SECONDS,
+                time.time(),
+                *_LOGIN_BACKOFF_SCHEDULE_SECONDS,
+            )
         except redis.RedisError:
             logger.warning("auth_rate_limit_unavailable", extra={"endpoint": "login_backoff"})
             return
-        if not raw:
-            return
-        count = int(raw.get("count", 0))
-        last_failure_at = float(raw.get("last_failure_at", 0))
-        wait_seconds = self._login_backoff_wait_seconds(count)
-        if wait_seconds <= 0:
-            return
-        if time.time() - last_failure_at < wait_seconds:
+        if float(remaining) > 0:
             raise RateLimitExceededError()
-
-    def record_login_failure(self, email: str) -> None:
-        redis_key = f"auth:login_backoff:{self.email_key(email)}"
-        try:
-            with self._client.pipeline() as pipe:
-                pipe.hincrby(redis_key, "count", 1)
-                pipe.hset(redis_key, "last_failure_at", time.time())
-                pipe.expire(redis_key, _LOGIN_BACKOFF_RESET_SECONDS)
-                pipe.execute()
-        except redis.RedisError:
-            logger.warning("auth_rate_limit_unavailable", extra={"endpoint": "login_backoff"})
 
     def record_login_success(self, email: str) -> None:
         redis_key = f"auth:login_backoff:{self.email_key(email)}"
@@ -84,14 +122,6 @@ class AuthRateLimiter:
             self._client.delete(redis_key)
         except redis.RedisError:
             logger.warning("auth_rate_limit_unavailable", extra={"endpoint": "login_backoff"})
-
-    @staticmethod
-    def _login_backoff_wait_seconds(count: int) -> int:
-        extra_failures = count - _LOGIN_BACKOFF_FREE_ATTEMPTS
-        if extra_failures <= 0:
-            return 0
-        index = min(extra_failures - 1, len(_LOGIN_BACKOFF_SCHEDULE_SECONDS) - 1)
-        return _LOGIN_BACKOFF_SCHEDULE_SECONDS[index]
 
     @staticmethod
     def email_key(email: str) -> str:

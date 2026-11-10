@@ -17,6 +17,7 @@ from admin.schemas import (
     AdminDeleteUserRequest,
     AdminDeleteUserResponse,
     AdminImpersonateResponse,
+    AdminImpersonationRevokeResponse,
     AdminListoneEntryResponse,
     AdminListoneRefreshJobResponse,
     AdminListoneRefreshProgressResponse,
@@ -31,8 +32,9 @@ from admin.schemas import (
 )
 from admin.service import AdminService
 from admin.transfers_service import AdminTransfersService
-from auth.dependencies import get_db_session
+from auth.dependencies import get_db_session, get_impersonation_store
 from auth.exceptions import AuthError, ValidationAuthError
+from auth.impersonation import ImpersonationStore
 from auth.models.user import User
 from authorization.dependencies import require_permissions
 from config.settings.api import ApiSettings
@@ -45,8 +47,9 @@ router = APIRouter(prefix="/admin", tags=["admin"])
 def get_admin_service(
     session: Session = Depends(get_db_session),
     settings: ApiSettings = Depends(get_api_settings),
+    impersonation_store: ImpersonationStore | None = Depends(get_impersonation_store),
 ) -> AdminService:
-    return AdminService(session, settings)
+    return AdminService(session, settings, impersonation_store)
 
 
 def get_admin_listone_service(
@@ -219,6 +222,18 @@ def impersonate_user(
 ) -> AdminImpersonateResponse | JSONResponse:
     try:
         return service.impersonate(actor=operator, target_user_id=user_id)
+    except AdminError as exc:
+        return _error_response(exc)
+
+
+@router.post("/users/{user_id}/impersonate/revoke", response_model=AdminImpersonationRevokeResponse)
+def revoke_impersonation(
+    user_id: UUID,
+    operator: User = Depends(require_permissions(Permission.GLOBAL_OPERATE)),
+    service: AdminService = Depends(get_admin_service),
+) -> AdminImpersonationRevokeResponse | JSONResponse:
+    try:
+        return service.revoke_impersonation(actor=operator, target_user_id=user_id)
     except AdminError as exc:
         return _error_response(exc)
 

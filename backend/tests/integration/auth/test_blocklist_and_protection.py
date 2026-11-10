@@ -130,6 +130,41 @@ def test_protected_operator_cannot_be_impersonated_but_can_impersonate(
     assert impersonate_other.json()["user"]["id"] == str(other_id)
 
 
+def test_impersonation_token_is_short_lived_and_revocable_on_demand(
+    client: TestClient, db_session: Session, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Un token di impersonazione non deve avere la stessa scadenza di una sessione
+    normale (12h di default), e deve poter essere chiuso subito dall'operatore
+    invece che solo scadere da solo — vedi `admin/service.py::impersonate`."""
+    from config.settings.loader import get_api_settings
+
+    operator, _ = _operator(client, db_session, "bl.op6@example.com")
+    other, other_id = _operator(client, db_session, "bl.impersona2@example.com")
+
+    started = client.post(f"/admin/users/{other_id}/impersonate", headers=operator)
+    assert started.status_code == 200
+    body = started.json()
+    settings = get_api_settings()
+    assert body["expiresIn"] == settings.impersonation_token_expire_minutes * 60
+    assert body["expiresIn"] < settings.jwt_access_token_expire_minutes * 60
+
+    impersonated_headers = {"Authorization": f"Bearer {body['accessToken']}"}
+    assert client.get("/auth/me", headers=impersonated_headers).status_code == 200
+
+    revoked = client.post(f"/admin/users/{other_id}/impersonate/revoke", headers=operator)
+    assert revoked.status_code == 200
+    assert revoked.json()["revokedCount"] == 1
+
+    assert client.get("/auth/me", headers=impersonated_headers).status_code == 401
+    # Il bersaglio continua a usare la sua sessione normale senza nessun impatto.
+    assert client.get("/auth/me", headers=other).status_code == 200
+
+    # Niente da revocare una seconda volta.
+    again = client.post(f"/admin/users/{other_id}/impersonate/revoke", headers=operator)
+    assert again.status_code == 200
+    assert again.json()["revokedCount"] == 0
+
+
 def test_deleting_a_user_blocks_the_address_for_good(
     client: TestClient, db_session: Session, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -207,6 +242,32 @@ def test_manual_blocklist_entry_stops_existing_users_at_refresh(
         "/admin/blocklist", headers=operator, json={"email": "bl.op3@example.com"}
     )
     assert op_block.status_code == 409
+
+
+def test_manual_blocklist_entry_stops_an_already_issued_access_token(
+    client: TestClient, db_session: Session, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Bloccare un account deve tagliare fuori anche l'access token già in mano
+    all'utente, non solo il prossimo login/refresh — altrimenti l'operatore crede
+    di aver tolto l'accesso ma l'utente resta dentro fino alla scadenza del JWT."""
+    operator, _ = _operator(client, db_session, "bl.op5@example.com")
+    session = _google(client, monkeypatch, "bl.accesstoken@example.com", "sub-accesstoken")
+    assert session.status_code == 200
+    access_token = session.json()["accessToken"]
+    headers = {"Authorization": f"Bearer {access_token}"}
+
+    assert client.get("/auth/me", headers=headers).status_code == 200
+
+    added = client.post(
+        "/admin/blocklist",
+        headers=operator,
+        json={"email": "bl.accesstoken@example.com"},
+    )
+    assert added.status_code == 200
+
+    blocked = client.get("/auth/me", headers=headers)
+    assert blocked.status_code == 403
+    assert blocked.json()["code"] == "account_blocked"
 
 
 def test_delete_without_blocking_lets_the_person_register_again(

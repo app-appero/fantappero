@@ -11,7 +11,9 @@ from fastapi import Depends, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session, sessionmaker
 
-from auth.exceptions import InvalidCredentialsError
+from auth.blocklist import BlockList
+from auth.exceptions import AccountBlockedError, InvalidCredentialsError
+from auth.impersonation import ImpersonationStore
 from auth.mobile_handoff import MobileHandoffStore
 from auth.models.user import User
 from auth.privacy_service import PrivacyService
@@ -71,6 +73,14 @@ def get_rate_limiter() -> AuthRateLimiter | None:
 
 
 @lru_cache(maxsize=1)
+def get_impersonation_store() -> ImpersonationStore | None:
+    settings = get_api_settings()
+    if not settings.redis_url:
+        return None
+    return ImpersonationStore(settings.redis_url)
+
+
+@lru_cache(maxsize=1)
 def get_mobile_handoff_store() -> MobileHandoffStore:
     settings = get_api_settings()
     if not settings.redis_url:
@@ -119,6 +129,7 @@ def get_current_user(
     credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
     session: Session = Depends(get_db_session),
     settings: ApiSettings = Depends(get_api_settings),
+    impersonation_store: ImpersonationStore | None = Depends(get_impersonation_store),
 ) -> User:
     if credentials is None or credentials.scheme.lower() != "bearer":
         raise InvalidCredentialsError()
@@ -132,8 +143,14 @@ def get_current_user(
         raise InvalidCredentialsError() from exc
     if payload.get("type") != "access":
         raise InvalidCredentialsError()
+    if payload.get("imp") is True:
+        jti = payload.get("jti")
+        if not jti or (impersonation_store is not None and not impersonation_store.is_active(jti)):
+            raise InvalidCredentialsError()
     user_id = UUID(str(payload["sub"]))
     user = session.get(User, user_id)
     if user is None or user.deleted_at is not None:
         raise InvalidCredentialsError()
+    if BlockList(session).is_blocked(user.email):
+        raise AccountBlockedError()
     return user

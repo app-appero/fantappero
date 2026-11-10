@@ -26,6 +26,14 @@ class AuthSettingsMixin:
         default=30,
         validation_alias="JWT_REFRESH_TOKEN_EXPIRE_DAYS",
     )
+    impersonation_token_expire_minutes: int = Field(
+        default=30,
+        validation_alias="IMPERSONATION_TOKEN_EXPIRE_MINUTES",
+        description=(
+            "Scadenza dell'access token emesso da /admin/users/{id}/impersonate — "
+            "deliberatamente molto più breve di jwt_access_token_expire_minutes."
+        ),
+    )
     auth_email_registration_enabled: bool = Field(
         default=True,
         validation_alias="AUTH_EMAIL_REGISTRATION_ENABLED",

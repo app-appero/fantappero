@@ -145,8 +145,8 @@ class AuthService:
             or user.user_type == UserType.AI
             or not verify_password(user.password_hash, password)
         ):
-            if self._rate_limiter is not None:
-                self._rate_limiter.record_login_failure(normalized_email)
+            # check_login_backoff already reserved this attempt atomically above —
+            # nothing left to record here (see its docstring for why).
             get_metrics().incr("auth_login_total", labels={"result": "failure"})
             raise InvalidCredentialsError()
 

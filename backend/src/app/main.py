@@ -168,7 +168,7 @@ def auth_error_handler(_request: object, exc: AuthError) -> JSONResponse:
     status_code = 400
     if exc.code == "invalid_credentials":
         status_code = 401
-    elif exc.code in ("email_not_verified", "email_registration_disabled"):
+    elif exc.code in ("email_not_verified", "email_registration_disabled", "account_blocked"):
         status_code = 403
     elif exc.code == "rate_limit_exceeded":
         status_code = 429

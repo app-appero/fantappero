@@ -37,6 +37,12 @@ segreti a tempo di avvio, percorso di impersonazione admin, handoff Google su mo
 esposizione della documentazione API). 6 nuovi finding, **tutti corretti nella stessa
 sessione** su conferma esplicita del responsabile della card ("parti con tutte e 6 le
 correzioni"): #22–#27. Dettaglio in fondo al documento, sezione "Pre-pilota 09/11".
+**Aggiornamento 10/11/2026**: nuova analisi analoga, in 4 verifiche parallele su
+auth/admin, billing/leghe/mercato/formazioni/voti, app web, app mobile e
+config/infra. 9 nuovi finding; **5 corretti nella stessa sessione** su conferma
+esplicita del responsabile della card ("fai i primi 5 per ora"): #28–#32. I
+restanti 4 (#33–#36) sono a bassa severità o richiedono un intervento più ampio,
+rimandati di proposito. Dettaglio in fondo al documento, sezione "Analisi 10/11".
 
 ### Riepilogo finding
 
@@ -69,6 +75,15 @@ correzioni"): #22–#27. Dettaglio in fondo al documento, sezione "Pre-pilota 09
 | 25 | `/docs`, `/redoc`, `/openapi.json` pubblicamente raggiungibili senza autenticazione anche in produzione (ricognizione gratuita della superficie API, endpoint admin inclusi) | Bassa-Media | **Corretto** — disattivati fuori da development/test |
 | 26 | Login: rate limit solo per IP (5/min), nessun limite per singolo account — un attacco a dizionario distribuito su più IP non veniva mai rallentato sull'account bersaglio | Bassa (il pilota registra solo via Google; resta aperto per chi ha già un account con password) | **Corretto** — rallentamento crescente per account (`AuthRateLimiter.check_login_backoff`), in aggiunta al limite per IP esistente |
 | 27 | Login Google su mobile: il deep link `fantappero://...` (schema custom, nessun Android App Link / iOS Universal Link verificato) portava il token ID di Google grezzo in query string, intercettabile in teoria da un'altra app registrata sullo stesso schema | Media | **Mitigato** — il token non attraversa più il deep link: la pagina web di handoff lo scambia subito, server-side, con una sessione reale, e passa all'app solo un codice monouso a vita brevissima (`auth.mobile_handoff`, 90s, invalidato alla prima lettura). La correzione completa resta la migrazione a deep link verificati, non coperta da questa sessione (richiede dominio HTTPS verificato, firma, hosting di `assetlinks.json`/`apple-app-site-association`) |
+| 28 | Bloccare un account non revocava i token già emessi: `get_current_user` controllava solo `deleted_at`, mai la lista nera | Media | **Corretto** — controllo blocklist aggiunto a ogni richiesta autenticata |
+| 29 | Token di impersonazione: stessa scadenza di una sessione normale (12h) nonostante il docstring dichiarasse "short-lived", e nessun modo di revocarlo prima della scadenza | Media | **Corretto** — scadenza dedicata molto più breve (`IMPERSONATION_TOKEN_EXPIRE_MINUTES`, 30 min) + marcatore Redis revocabile (`auth/impersonation.py`) + endpoint `POST /admin/users/{id}/impersonate/revoke` |
+| 30 | Race condition nel rallentamento del login per-account: check e registrazione del fallimento non erano atomici insieme, bypassabile con un burst concorrente da più IP sullo stesso account | Media | **Corretto** — check-e-prenotazione atomici in un unico script Lua Redis |
+| 31 | Access/refresh token web salvati in `localStorage` in chiaro (nessun vettore XSS concreto trovato) | Media | Aperto — raggio d'azione troppo ampio (129 punti di lettura diretta) per un intervento rapido, rimandato a un passaggio dedicato |
+| 32 | Il servizio web su Railway (dev e pilota) eseguiva il dev server Vite grezzo invece di una build di produzione: sorgente TypeScript e valori `VITE_*` risolti leggibili da chiunque | Media | **Corretto lato codice** (`vite preview` di produzione pronto, verificato manualmente) — resta da cambiare lo start command su Railway (fuori dal repo) |
+| 33 | `/auth/refresh` e `/auth/google/handoff/claim` senza rate limit dedicato | Bassa | Aperto, non corretto |
+| 34 | Webhook di fatturazione: `user_id` libero nel payload, non legato a un cliente verificato dal provider | Bassa (nessun provider reale integrato) | Aperto, da sistemare quando si collegherà un vero payment provider |
+| 35 | Il mercato si riapre dopo 7 giorni di turno bloccato senza avvisare l'operatore (valvola di sicurezza intenzionale, silenziosa) | Bassa | Aperto, non corretto |
+| 36 | Container Docker eseguiti come root (nessuna direttiva `USER`) | Bassa | Aperto, non corretto |
 
 ### 1. Dependency audit — Python (`pip-audit`)
 
@@ -879,3 +894,144 @@ sessione. Il finding #27 resta parzialmente aperto nella sua causa di fondo (dee
 link non verificato): mitigato in modo sostanziale, non eliminato — la migrazione a
 App Links/Universal Links va pianificata come lavoro a sé, con accesso al dominio e
 alla firma delle app. Nessuna regressione sui controlli precedentemente chiusi.
+
+## Analisi 10/11
+
+Richiesta analoga alla precedente (bug e buchi di sicurezza su tutto il progetto),
+condotta in 4 verifiche parallele mirate ad aree non ancora coperte: auth/admin,
+billing/leghe/mercato/formazioni/voti, app web, app mobile e config/infra. Le aree
+già chiuse in D4 e nella review pre-pilota 09/11 non sono state ripetute. 9 finding
+nuovi; 5 corretti in questa stessa sessione (#28-#32), 4 rimandati per bassa severità
+o perché richiedono una decisione/un intervento più ampio (#33-#36).
+
+### 28 — Bloccare un account non revocava i token già emessi (Media)
+
+`auth/dependencies.py::get_current_user` verificava solo `deleted_at`, mai la lista
+nera: `admin/service.py::add_blocked` aggiunge l'email alla blocklist ma non tocca
+le sessioni/access token già in circolazione. Un operatore che blocca un account
+abusivo o compromesso si aspetta un effetto immediato, non "entro
+`jwt_access_token_expire_minutes`" (720 minuti di default).
+
+**Fix**: `get_current_user` ora controlla anche `BlockList.is_blocked(user.email)`
+a ogni richiesta autenticata, non solo a login/refresh. Test:
+`test_manual_blocklist_entry_stops_an_already_issued_access_token`
+(`tests/integration/auth/test_blocklist_and_protection.py`) — emette un access
+token, lo usa con successo, blocca l'account, verifica che lo stesso token dia
+403 `account_blocked` sulla richiesta successiva.
+
+### 29 — Token di impersonazione non a vita breve e non revocabile (Media)
+
+Il docstring di `admin/service.py::impersonate` dichiarava un token "short-lived,
+access-only", ma usava la stessa scadenza di una sessione normale
+(`jwt_access_token_expire_minutes`, 12h di default) ed era stateless: nessun modo
+di chiuderlo prima della scadenza naturale in caso di dubbio sull'uso che se ne sta
+facendo.
+
+**Fix**: nuova variabile `IMPERSONATION_TOKEN_EXPIRE_MINUTES` (default 30 minuti,
+`config/settings/auth_settings.py`), distinta da quella delle sessioni normali.
+Il token porta ora i claim `imp`/`jti`; `auth/impersonation.py` (nuovo modulo)
+registra il `jti` su Redis con lo stesso TTL del token e lo rende revocabile.
+`get_current_user` rifiuta un token di impersonazione il cui `jti` non risulta più
+attivo. Nuovo endpoint `POST /admin/users/{id}/impersonate/revoke` (kill switch:
+chiude tutte le impersonazioni attive su un utente, prima della scadenza naturale).
+Se Redis non è raggiungibile il controllo degrada in modo aperto (si logga un
+warning, non si blocca l'intera piattaforma), stesso comportamento del rate
+limiter esistente. Test: `test_impersonation_token_is_short_lived_and_revocable_on_demand`.
+
+### 30 — Race condition nel rallentamento del login per-account (Media)
+
+`auth/rate_limit.py::check_login_backoff` leggeva il contatore e
+`record_login_failure` lo incrementava solo dopo la verifica della password
+(Argon2, non istantanea) — due passaggi Redis separati, non atomici insieme. Un
+attacco a raffica sullo stesso account da IP diversi (per non toccare il limite
+per-IP) poteva vedere più richieste leggere lo stesso contatore basso prima che
+una qualsiasi registrasse il fallimento, bypassando per quel burst la mitigazione
+introdotta apposta per questo scenario (finding #26).
+
+**Fix**: `check_login_backoff` ora fa un solo giro di Redis, con uno script Lua
+che legge il contatore e — solo se il tentativo è ammesso — lo incrementa
+atomicamente nello stesso passaggio: dato che Redis esegue lo script
+single-threaded, un burst concorrente viene serializzato invece di leggere tutto
+lo stesso stato stantio. `record_login_failure` non serve più (la prenotazione
+avviene già al check) ed è stata rimossa; `record_login_success` resta per
+cancellare il contatore dopo un login riuscito. Test:
+`test_login_backoff_does_not_double_count_concurrent_attempts` (20 thread
+concorrenti sullo stesso account: esattamente i tentativi gratuiti passano,
+tutti gli altri nello stesso istante vengono bloccati) più la riscrittura dei
+test esistenti sulla progressione dell'attesa (`tests/unit/auth/test_rate_limit.py`).
+
+### 31 — Token di sessione web in `localStorage` in chiaro (Media, non ancora corretto)
+
+`apps/web/src/auth/sessionStorage.ts` salva access e refresh token in
+`localStorage`, non in memoria né in storage protetto: una XSS futura (anche in
+una dipendenza di terze parti) potrebbe leggere `localStorage` e rubare la
+sessione per intero, persistente tra riavvii del browser. Nessun vettore XSS
+concreto trovato in `apps/web/src` in questa sessione (niente
+`dangerouslySetInnerHTML`/`innerHTML`), quindi è un gap difensivo, non uno
+sfruttabile oggi.
+
+**Non corretto in questa sessione**: `loadStoredSession()` viene letto
+direttamente in 129 punti del codice web fuori da `AuthContext`/
+`sessionStorage.ts` — spostare l'access token in sola memoria richiede
+ristrutturare quella catena di chiamate, rischio di regressione non proporzionato
+per chiudere un gap solo difensivo. L'alternativa "pulita" (refresh token in
+cookie `HttpOnly`) riaprirebbe la scelta `allow_credentials=False` del finding #6
+(già chiuso, motivata). Merita un passaggio dedicato, non un intervento rapido.
+
+### 32 — Il servizio web su Railway (dev e pilota) esponeva il dev server Vite grezzo (Media)
+
+Lo start command configurato su Railway esegue `vite` (il "dev" script di
+`apps/web/package.json`), non una build di produzione: il sorgente TypeScript non
+minificato — incluso il valore risolto di `import.meta.env`, cioè
+`VITE_API_BASE_URL`/`VITE_GOOGLE_CLIENT_ID` — era leggibile da chiunque visitasse
+il sito (`curl https://dev.fantappero.it/src/main.tsx` restituiva il sorgente).
+Il WebSocket HMR restava aperto, e il dev server di Vite ha una storia ricorrente
+di CVE "lettura file arbitraria" (una già corretta in questo stesso progetto, vedi
+D4).
+
+**Fix**: aggiunto `preview` a `apps/web/vite.config.ts` (porta da `$PORT`, host,
+stesso `allowedHosts` del dev server) e script `"start": "vite preview"` in
+`apps/web/package.json`. Verificato manualmente: `pnpm build && PORT=4321 pnpm
+start` serve la build compilata (non il sorgente), rispetta `allowedHosts`
+(403 su host sconosciuti), e il fallback SPA funziona per le rotte client-side.
+**Resta da fare manualmente su Railway** (fuori dal repo): cambiare lo start
+command dei servizi web dev e pilota da `pnpm --filter @fantappero/web dev` a
+`pnpm --filter @fantappero/web build && pnpm --filter @fantappero/web start` (o
+equivalente) — finché non viene fatto, Railway continua a eseguire il dev server
+nonostante il codice sia pronto.
+
+### 33 — `/auth/refresh` e `/auth/google/handoff/claim` senza rate limit dedicato (Bassa)
+
+Difesa in profondità mancante rispetto a login/register. Impatto pratico basso:
+entrambi richiedono possedere un token opaco a 256 bit, non indovinabile. Non
+corretto in questa sessione.
+
+### 34 — Webhook di fatturazione: `user_id` non legato a un cliente verificato (Bassa)
+
+`billing/webhook_service.py::process_payment_event` accetta `user_id` dal body
+della richiesta e attiva il PRO per quell'utente — non sfruttabile oggi (serve
+comunque `BILLING_WEBHOOK_SECRET`, nessun provider di pagamento reale integrato),
+ma quando si collegherà un vero payment provider il legame utente↔pagamento
+dovrebbe passare per un identificativo cliente verificato dal provider stesso, non
+restare un campo libero nel payload. Da sistemare in quel momento, non prima.
+
+### 35 — Il mercato si riapre dopo 7 giorni di turno bloccato senza avvisare l'operatore (Bassa)
+
+`market/round_freeze.py` (`STUCK_ROUND_GRACE`) è una valvola di sicurezza
+intenzionale contro un turno mai omologato per sempre, ma scatta in silenzio: vale
+la pena un log/alert quando succede, così non passa inosservato. Non corretto in
+questa sessione.
+
+### 36 — I container Docker girano come root (Bassa)
+
+`infra/local/Dockerfile` e `Dockerfile.web` non hanno una direttiva `USER`:
+hardening standard (riduce il danno in caso di RCE nel processo applicativo), non
+legato a una vulnerabilità sfruttabile oggi. Non corretto in questa sessione.
+
+### Esito analisi 10/11
+
+**Nessun finding Critico/Alto.** 5 dei 9 nuovi finding chiusi (#28-#32); #31
+(storage token web) rimandato di proposito a un passaggio dedicato per via del
+suo raggio d'azione; #33-#36 rimandati per bassa severità. Nessuna regressione
+sui controlli precedentemente chiusi (suite auth/admin/web rieseguita per
+intero).

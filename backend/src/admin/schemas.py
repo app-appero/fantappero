@@ -64,6 +64,12 @@ class AdminImpersonateResponse(ApiModel):
     user: SessionUserResponse
 
 
+class AdminImpersonationRevokeResponse(ApiModel):
+    """Esito della revoca immediata: quanti token di impersonazione attivi sono stati chiusi."""
+
+    revoked_count: int = Field(alias="revokedCount")
+
+
 class PaginatedAdminUsersResponse(ApiModel):
     items: list[AdminUserResponse]
     page: int

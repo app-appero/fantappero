@@ -26,19 +26,21 @@ const API_PROXY_PREFIXES = [
 
 const apiProxyTarget = process.env.VITE_API_PROXY_TARGET?.trim() || "http://127.0.0.1:8001";
 
+// ".fantappero.it" (prefisso punto) copre ogni sottodominio presente e futuro
+// (dev., pilota., ...) senza dover toccare questo file a ogni nuovo ambiente.
+const ALLOWED_HOSTS = [
+  "fantappero-web-dev.up.railway.app",
+  "fantappero-web-pilot.up.railway.app",
+  ".fantappero.it",
+];
+
 export default defineConfig({
   plugins: [react()],
   server: {
     port: 5174,
     strictPort: true,
     host: true,
-    // ".fantappero.it" (prefisso punto) copre ogni sottodominio presente e futuro
-    // (dev., pilota., ...) senza dover toccare questo file a ogni nuovo ambiente.
-    allowedHosts: [
-      "fantappero-web-dev.up.railway.app",
-      "fantappero-web-pilot.up.railway.app",
-      ".fantappero.it",
-    ],
+    allowedHosts: ALLOWED_HOSTS,
     proxy: Object.fromEntries(
       API_PROXY_PREFIXES.map((prefix) => [
         prefix,
@@ -49,6 +51,17 @@ export default defineConfig({
       usePolling: true,
       interval: 300,
     },
+  },
+  // Serve la build di produzione (`pnpm start`, dopo `pnpm build`): a differenza del
+  // dev server sopra, qui non gira codice sorgente non compilato né il WebSocket HMR —
+  // è quello che Railway deve eseguire per dev/pilota invece del dev server grezzo
+  // (vedi docs/operations/beta_readiness/ep12-04_security_review.md, finding nuovo
+  // "dev server Vite esposto in produzione").
+  preview: {
+    host: true,
+    port: Number(process.env.PORT) || 4173,
+    strictPort: true,
+    allowedHosts: ALLOWED_HOSTS,
   },
   test: {
     environment: "jsdom",

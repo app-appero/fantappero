@@ -45,14 +45,21 @@ def create_access_token(
     user_id: UUID,
     secret: str,
     expire_minutes: int,
+    impersonation_jti: str | None = None,
 ) -> tuple[str, int]:
     expires_in = expire_minutes * 60
-    payload = {
+    payload: dict[str, Any] = {
         "sub": str(user_id),
         "type": "access",
         "exp": datetime.now(UTC) + timedelta(seconds=expires_in),
         "iat": datetime.now(UTC),
     }
+    if impersonation_jti is not None:
+        # Marks this as an impersonation token so get_current_user can check it
+        # against ImpersonationStore (auth/impersonation.py) — revocable on demand,
+        # unlike a normal access token.
+        payload["imp"] = True
+        payload["jti"] = impersonation_jti
     token = jwt.encode(payload, secret, algorithm="HS256")
     return token, expires_in
 
