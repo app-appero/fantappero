@@ -91,6 +91,12 @@ class FantasyRosterSlot(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     """Fixed roster slot; exclusivity is league-scoped on assigned athletes."""
 
     __tablename__ = "fantasy_roster_slots"
+    #: Non recuperare i default lato server nella RETURNING dell'INSERT: durante
+    #: un deploy a rotazione una riga può essere creata mentre la migrazione che
+    #: aggiunge una colonna con server_default (es. exceeds_role_quota) non è
+    #: ancora applicata su quel nodo — con eager_defaults attivo la RETURNING
+    #: includerebbe anche quella colonna e l'INSERT fallirebbe.
+    __mapper_args__ = {"eager_defaults": False}
     __table_args__ = (
         UniqueConstraint(
             "fantasy_team_id",
@@ -132,7 +138,13 @@ class FantasyRosterSlot(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     #: rosa del suo ruolo (uno scambio accettato nonostante il ruolo fosse già
     #: al completo, EP08-10): fuori rosa — non schierabile — finché
     #: l'allenatore non libera uno slot per quel ruolo svincolando qualcuno.
-    exceeds_role_quota: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    #: deferred: durante un deploy a rotazione una query generica su questa
+    #: tabella molto trafficata può eseguire prima che questa colonna esista
+    #: ancora sul nodo DB — non facendola parte della SELECT implicita, solo
+    #: chi la legge esplicitamente paga una query lazy in più.
+    exceeds_role_quota: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default=text("false"), deferred=True
+    )
 
     fantasy_team: Mapped[FantasyTeam] = relationship(back_populates="slots")
     athlete: Mapped[Athlete | None] = relationship()

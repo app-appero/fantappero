@@ -31,7 +31,7 @@ def upgrade() -> None:
             "exceeds_role_quota",
             sa.Boolean(),
             nullable=False,
-            server_default=sa.false(),
+            server_default=sa.text("false"),
         ),
     )
 
