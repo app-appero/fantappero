@@ -34,10 +34,16 @@ const ALLOWED_HOSTS = [
   ".fantappero.it",
 ];
 
+// Railway instrada il traffico verso questo servizio su una porta fissa
+// (configurata nel pannello Networking, non tramite $PORT dinamico): va
+// condivisa identica da dev server e preview, altrimenti il processo parte
+// ma su una porta che da fuori nessuno raggiunge (502).
+const PORT = 5174;
+
 export default defineConfig({
   plugins: [react()],
   server: {
-    port: 5174,
+    port: PORT,
     strictPort: true,
     host: true,
     allowedHosts: ALLOWED_HOSTS,
@@ -59,7 +65,7 @@ export default defineConfig({
   // "dev server Vite esposto in produzione").
   preview: {
     host: true,
-    port: Number(process.env.PORT) || 4173,
+    port: PORT,
     strictPort: true,
     allowedHosts: ALLOWED_HOSTS,
   },
