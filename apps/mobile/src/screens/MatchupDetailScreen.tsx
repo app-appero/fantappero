@@ -11,6 +11,7 @@ import {
   formatFantasyGoals,
   formatFantasyPoints,
   layoutFromModule,
+  playerAvatarUrl,
 } from "@fantappero/contracts";
 import { theme } from "@fantappero/ui/theme";
 import { useNavigation, useRoute, type RouteProp } from "@react-navigation/core";
@@ -47,7 +48,7 @@ function toFantasyPitchPlayers(players: readonly H2HPlayerScore[], now: number) 
     // Finché il titolare non è sceso in campo, al posto del voto si mostra
     // il countdown al calcio d'inizio, come già succede nella panchina.
     scoreLabel: playerScoreLabel(player) ?? kickoffCountdown(player, now),
-    photoUrl: player.photoUrl,
+    photoUrl: playerAvatarUrl(player.athleteId, player.realTeamName),
     probable: probableTone(player),
     live: playerVoteState(player).live,
     voteKind: (() => {

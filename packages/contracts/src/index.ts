@@ -557,3 +557,22 @@ export type { PrivacyNoticeSection } from "./privacyNotice.js";
 
 export { probableToneOf } from "./probableTone.js";
 export type { ProbableTone } from "./probableTone.js";
+
+export {
+  KNOWN_CLUB_KEYS,
+  avatarSpec,
+  clubKit,
+  hasClubKit,
+  normalizeClubName,
+  playerAvatarSvg,
+  playerAvatarUrl,
+} from "./playerAvatar.js";
+export type { AvatarSpec, ClubKit, KitPattern } from "./playerAvatar.js";
+
+export {
+  clubAbbreviation,
+  clubCrestSvg,
+  clubCrestUrl,
+  leagueBadgeSvg,
+  leagueBadgeUrl,
+} from "./playerAvatar.js";

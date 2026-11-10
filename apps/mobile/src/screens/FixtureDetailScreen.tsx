@@ -9,7 +9,10 @@ import type {
   MatchBadge,
   ProviderFeedState,
 } from "@fantappero/contracts";
-import { layoutFromGrid, layoutFromRoles, mapFixtureMatchStatus, pitchRoleCodeFromGrid, realMatchBadgesByAthlete } from "@fantappero/contracts";
+import { layoutFromGrid, layoutFromRoles, mapFixtureMatchStatus, pitchRoleCodeFromGrid, realMatchBadgesByAthlete,
+  playerAvatarUrl,
+  clubCrestUrl,
+} from "@fantappero/contracts";
 import { theme } from "@fantappero/ui/theme";
 import { liveStringMap } from "../theme/liveColors";
 import { useRoute, type RouteProp } from "@react-navigation/core";
@@ -27,6 +30,7 @@ import { PageContainer } from "../layout/PageContainer";
 import { useLiveFixturePolling } from "../matchday/useLiveFixturePolling";
 import type { RootStackParamList } from "../navigation/types";
 import { getApiErrorMessage, useAuthSession } from "../session/DemoSessionContext";
+import { AvatarImage } from "../components/AvatarImage";
 
 const { colors, spacing, typography, radius } = theme;
 
@@ -88,6 +92,7 @@ function toPitchPlayers(
   players: readonly FixtureLineupPlayer[],
   badgesByAthlete: Map<string, MatchBadge[]>,
   assignedRoles: ReadonlyMap<string, string> | null,
+  clubName: string,
 ) {
   // Se il layout è costruito dai ruoli reali (vedi `layoutFromRoles`) il
   // badge mostra il ruolo assegnato. Altrimenti si ricade sul grid, che decide la riga
@@ -102,7 +107,7 @@ function toPitchPlayers(
       ? (assignedRoles.get(pitchPlayerId(player)) ?? player.position ?? null)
       : (pitchRoleCodeFromGrid(player.grid, allGrids) ?? player.position),
     badges: player.athleteId ? badgesByAthlete.get(player.athleteId) : undefined,
-    photoUrl: player.photoUrl,
+    photoUrl: playerAvatarUrl(player.athleteId ?? `${clubName}-${player.name}-${player.shirtNumber ?? ""}`, clubName),
   }));
 }
 
@@ -322,7 +327,7 @@ function LineupBlock({
       {positions.length > 0 ? (
         <PitchView
           title={title}
-          players={toPitchPlayers(lineup.starters, badgesByAthlete, roleLayout?.roles ?? null)}
+          players={toPitchPlayers(lineup.starters, badgesByAthlete, roleLayout?.roles ?? null, lineup.clubName)}
           positions={positions}
           testID={`fixture-pitch-${side}`}
           onAthletePress={athleteCard?.open}
@@ -610,16 +615,12 @@ export function FixtureDetailScreen() {
       {!loading && !loadError && detail ? (
         <View style={styles.stack} testID="fixture-detail">
           <View style={styles.scoreRow}>
-            {detail.homeClubLogoUrl ? (
-              <Image source={{ uri: detail.homeClubLogoUrl }} style={styles.clubLogo} />
-            ) : null}
+            <AvatarImage uri={clubCrestUrl(detail.homeClubName)} style={styles.clubLogo} size={26} />
             <Text style={styles.score} testID="fixture-score">
               {detail.homeClubName} {detail.homeGoals ?? "—"} – {detail.awayGoals ?? "—"}{" "}
               {detail.awayClubName}
             </Text>
-            {detail.awayClubLogoUrl ? (
-              <Image source={{ uri: detail.awayClubLogoUrl }} style={styles.clubLogo} />
-            ) : null}
+            <AvatarImage uri={clubCrestUrl(detail.awayClubName)} style={styles.clubLogo} size={26} />
           </View>
           <View style={styles.badgeRow}>
             <StatusBadge

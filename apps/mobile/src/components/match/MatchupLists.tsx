@@ -11,6 +11,7 @@ import {
   formatFantasyPoints,
   formatCountdown,
   playerVoteState,
+  playerAvatarUrl,
 } from "@fantappero/contracts";
 import { theme } from "@fantappero/ui/theme";
 import { useEffect, useRef, useState, type ReactElement } from "react";
@@ -116,8 +117,8 @@ export function MatchupPlayerRow({
     >
       {vote.live ? <LivePulse /> : null}
       {order != null ? <Text style={styles.order}>{order}°</Text> : null}
-      {player.photoUrl ? (
-        <PlayerPhotoRing photoUrl={player.photoUrl} role={player.role} size={compact ? 20 : 26} />
+      {player.athleteId ? (
+        <PlayerPhotoRing photoUrl={playerAvatarUrl(player.athleteId, player.realTeamName)} role={player.role} size={compact ? 20 : 26} />
       ) : (
         <View style={[styles.role, compact ? styles.roleCompact : null, { backgroundColor: ROLE_COLOR[player.role] ?? colors.border }]}>
           <Text style={styles.roleText}>{player.role}</Text>
@@ -244,8 +245,8 @@ function VersusCell({ player, dim, now }: { player: H2HPlayerScore | undefined; 
       testID={`matchup-versus-player-${player.athleteId}`}
     >
       {vote.live ? <LivePulse /> : null}
-      {player.photoUrl ? (
-        <PlayerPhotoRing photoUrl={player.photoUrl} role={player.role} size={20} />
+      {player.athleteId ? (
+        <PlayerPhotoRing photoUrl={playerAvatarUrl(player.athleteId, player.realTeamName)} role={player.role} size={20} />
       ) : (
         <View style={[styles.role, styles.roleCompact, { backgroundColor: ROLE_COLOR[player.role] ?? colors.border }]}>
           <Text style={styles.roleText}>{player.role}</Text>

@@ -1,4 +1,5 @@
-import { Image, View, type StyleProp, type ViewStyle } from "react-native";
+import { View, type StyleProp, type ViewStyle } from "react-native";
+import { AvatarImage } from "./AvatarImage";
 import { roleRingColor } from "../screens/formation/FormationParts";
 
 /**
@@ -36,7 +37,7 @@ export function PlayerPhotoRing({
         style,
       ]}
     >
-      <Image source={{ uri: photoUrl }} style={{ width: "100%", height: "100%" }} />
+      <AvatarImage uri={photoUrl} style={{ width: "100%", height: "100%" }} size={size - 4} />
     </View>
   );
 }

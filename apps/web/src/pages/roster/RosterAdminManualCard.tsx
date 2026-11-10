@@ -1,3 +1,4 @@
+import { playerAvatarUrl } from "@fantappero/contracts";
 import type {
   FantasyRole,
   FantasyTeam,
@@ -62,10 +63,10 @@ function ListoneAssignRow({
     <TableRow>
       <TableCell className="fa-roster-col fa-roster-col--name">
         <span className="fa-auction-player">
-          {entry.photoUrl ? (
+          {entry.athleteId ? (
             <PlayerPhotoBadge
               className="fa-auction-player__role"
-              photoUrl={entry.photoUrl}
+              photoUrl={playerAvatarUrl(entry.athleteId, entry.clubName)}
               role={entry.effectiveRole}
             />
           ) : null}

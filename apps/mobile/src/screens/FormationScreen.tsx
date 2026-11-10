@@ -33,6 +33,7 @@ import {
   lineupSignature,
   planModuleChange,
   fantasyBadgesFromBonusMalus,
+  playerAvatarUrl,
 } from "@fantappero/contracts";
 import { theme } from "@fantappero/ui/theme";
 import { useIsFocused } from "@react-navigation/core";
@@ -60,6 +61,7 @@ import { PageContainer } from "../layout/PageContainer";
 import { usePullRefresh } from "../hooks/usePullRefresh";
 import { useLockCountdown } from "../matchday/useLockCountdown";
 import { getApiErrorMessage, useAuthSession } from "../session/DemoSessionContext";
+import { AvatarImage } from "../components/AvatarImage";
 
 const { colors, spacing, typography, radius } = theme;
 
@@ -957,7 +959,7 @@ export function FormationScreen() {
         const tone = probableTone(row);
         return tone === "starter" ? null : tone;
       })() : null,
-      photoUrl: row?.photoUrl ?? null,
+      photoUrl: row ? playerAvatarUrl(row.athleteId, row.realTeamName) : null,
       lockCountdown: athleteId ? lockLabel(athleteId) : null,
       scoreLabel: athleteId ? playerScoreLabel(athleteId) : null,
     };
@@ -1390,8 +1392,10 @@ export function FormationScreen() {
                   testID={`formation-bench-${index}`}
                 >
                   <Text style={styles.benchOrder} numberOfLines={1}>{index + 1}°</Text>
-                  {row?.photoUrl ? (
-                    <Image source={{ uri: row.photoUrl }} style={[styles.benchPhoto, { borderColor: roleRingColor(role) }]} />
+                  {row ? (
+                    <View style={[styles.benchPhoto, { borderColor: roleRingColor(role), overflow: "hidden" }]}>
+                      <AvatarImage uri={playerAvatarUrl(row.athleteId, row.realTeamName)} style={styles.benchPhoto} size={32} />
+                    </View>
                   ) : (
                     <View style={[styles.benchRole, { backgroundColor: roleRingColor(role) }]}>
                       <Text style={styles.benchRoleText}>{role}</Text>
@@ -1459,8 +1463,10 @@ export function FormationScreen() {
                       testID={`formation-bench-${index}`}
                     >
                       <Text style={styles.benchOrder} numberOfLines={1}>{index + 1}°</Text>
-                      {row?.photoUrl ? (
-                        <Image source={{ uri: row.photoUrl }} style={[styles.benchPhoto, { borderColor: roleRingColor(role) }]} />
+                      {row ? (
+                        <View style={[styles.benchPhoto, { borderColor: roleRingColor(role), overflow: "hidden" }]}>
+                          <AvatarImage uri={playerAvatarUrl(row.athleteId, row.realTeamName)} style={styles.benchPhoto} size={32} />
+                        </View>
                       ) : (
                         <View style={[styles.benchRole, { backgroundColor: roleRingColor(role) }]}>
                           <Text style={styles.benchRoleText}>{role}</Text>

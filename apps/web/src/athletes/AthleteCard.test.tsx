@@ -50,7 +50,9 @@ const CARD: AthleteCard = {
 describe("AthleteCardView", () => {
   it("mostra foto, anagrafica, stagione, media, gol e assist; niente fantallenatore né trasferimenti", () => {
     const html = renderToStaticMarkup(createElement(AthleteCardView, { card: CARD }));
-    expect(html).toContain("https://example.test/thuram.png");
+    // La foto non si mostra più: c'è l'avatar SVG con la maglia del club.
+    expect(html).not.toContain("https://example.test/thuram.png");
+    expect(html).toContain("data:image/svg+xml");
     expect(html).toContain("Khéphren Thuram");
     expect(html).toContain("Nice");
     expect(html).toContain("France");

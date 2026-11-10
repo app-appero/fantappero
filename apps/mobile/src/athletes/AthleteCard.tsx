@@ -1,5 +1,7 @@
 import type { AthleteCard } from "@fantappero/contracts";
-import { formatFantasyPoints } from "@fantappero/contracts";
+import { formatFantasyPoints,
+  playerAvatarUrl,
+} from "@fantappero/contracts";
 import { theme } from "@fantappero/ui/theme";
 import {
   createContext,
@@ -25,6 +27,7 @@ import { fetchAthleteCard } from "../api/leagues";
 import { UiStatePanel } from "../components/UiStatePanel";
 import { getApiErrorMessage, useAuthSession } from "../session/DemoSessionContext";
 import { lazyStyles } from "../theme/lazyStyles";
+import { AvatarImage } from "../components/AvatarImage";
 
 const { colors, spacing, radius, typography } = theme;
 
@@ -175,8 +178,10 @@ function AthleteCardView({ card }: { card: AthleteCard }) {
   return (
     <View testID="athlete-card">
       <View style={styles.hero}>
-        {card.photoUrl ? (
-          <Image source={{ uri: card.photoUrl }} style={styles.photo} />
+        {card.athleteId ? (
+          <View style={styles.photo}>
+            <AvatarImage uri={playerAvatarUrl(card.athleteId, card.clubName)} style={styles.photo} size={72} />
+          </View>
         ) : (
           <View style={[styles.photo, styles.photoEmpty]}>
             <Text style={styles.initials}>{initials(card.canonicalName)}</Text>

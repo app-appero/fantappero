@@ -6,6 +6,7 @@ import { useMemo, useState, type ReactNode } from "react";
 import { Image, Modal, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { AppTextInput as TextInput } from "../../components/AppTextInput";
 import { lazyStyles } from "../../theme/lazyStyles";
+import { AvatarImage } from "../../components/AvatarImage";
 
 const { colors, spacing, typography, radius } = theme;
 
@@ -220,7 +221,7 @@ export function FormationPitch({
               <ToneHalo tone={(slot.probableState ?? "starter") as ProbableTone} offset={4} />
             ) : null}
             {slot.photoUrl ? (
-              <Image source={{ uri: slot.photoUrl }} style={styles.photo} />
+              <AvatarImage uri={slot.photoUrl} style={styles.photo} size={38} />
             ) : (
               <Text style={styles.initial}>{(slot.name ?? "?").trim().charAt(0).toUpperCase()}</Text>
             )}

@@ -1,3 +1,4 @@
+import { playerAvatarUrl } from "@fantappero/contracts";
 import type {
   FantasyRole,
   LeagueListoneEntry,
@@ -693,10 +694,10 @@ export function AuctionPage() {
                             <TableRow key={entry.athleteId}>
                               <TableCell className="fa-roster-col fa-roster-col--name">
                                 <span className="fa-auction-player">
-                                  {entry.photoUrl ? (
+                                  {entry.athleteId ? (
                                     <PlayerPhotoBadge
                                       className="fa-auction-player__role"
-                                      photoUrl={entry.photoUrl}
+                                      photoUrl={playerAvatarUrl(entry.athleteId, entry.clubName)}
                                       role={entry.effectiveRole}
                                     />
                                   ) : (
