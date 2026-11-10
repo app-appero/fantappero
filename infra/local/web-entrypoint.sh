@@ -8,4 +8,13 @@ if [ ! -e apps/web/node_modules/@fantappero/ui ] || [ ! -e apps/web/node_modules
   CI=true pnpm install --prefer-offline
 fi
 
+# Railway imposta sempre le proprie variabili RAILWAY_* su ogni servizio; lo
+# stack locale (docker-compose) no. Su Railway si serve sempre la build già
+# pronta (pnpm --filter @fantappero/web start, vedi Dockerfile.web), a
+# prescindere dal CMD/Custom Start Command impostato nel pannello — niente da
+# configurare a mano lì. In locale resta il CMD di default (dev server live).
+if [ -n "$RAILWAY_ENVIRONMENT_NAME" ]; then
+  exec pnpm --filter @fantappero/web start
+fi
+
 exec "$@"
