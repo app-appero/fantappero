@@ -1,6 +1,9 @@
 import { applyColorScheme, colors, getActiveColorScheme } from "./tokens/colors.js";
 import {
+  darkColors,
+  lightColors,
   resolveColorScheme,
+  type AppColors,
   type ResolvedColorScheme,
   type ThemePreference,
 } from "./tokens/colorSchemes.js";
@@ -17,8 +20,11 @@ import { visualPrinciples } from "./tokens/principles.js";
 
 export {
   applyColorScheme,
+  darkColors,
   getActiveColorScheme,
+  lightColors,
   resolveColorScheme,
+  type AppColors,
   type ResolvedColorScheme,
   type ThemePreference,
 };

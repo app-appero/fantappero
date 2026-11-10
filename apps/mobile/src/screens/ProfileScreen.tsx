@@ -8,7 +8,7 @@ import {
 } from "@fantappero/contracts";
 import { theme } from "@fantappero/ui/theme";
 import * as ImagePicker from "expo-image-picker";
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useNavigation } from "@react-navigation/core";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { Image, Pressable, StyleSheet, Switch, Text, View } from "react-native";
@@ -55,23 +55,76 @@ const PROFILE_TABS = [
 ] as const;
 
 function ThemePreferenceSection() {
-  const { preference, setPreference } = useAppTheme();
+  const { preference, setPreference, resolvedColors } = useAppTheme();
+  // Stili calcolati qui con useMemo, legati a resolvedColors (a sua volta
+  // legato a `scheme` in AppTheme.tsx), invece di leggerli dall'oggetto
+  // `colors` condiviso e mutato altrove (lazyStyles/styles.* più sotto): è
+  // proprio questa sezione quella che restava con i colori vecchi nonostante
+  // si colleghi già al contesto del tema — qui il colore arriva da React
+  // stesso (props → render), non da una lettura al volo di uno stato esterno
+  // mutabile, quindi non può restare incoerente col resto in nessun caso.
+  const own = useMemo(
+    () =>
+      StyleSheet.create({
+        section: {
+          gap: spacing.sm,
+          marginBottom: spacing.lg,
+          padding: spacing.lg,
+          borderRadius: radius.xl,
+          borderWidth: 1,
+          borderColor: resolvedColors.border,
+          backgroundColor: resolvedColors.backgroundElevated,
+        },
+        sectionTitle: {
+          fontSize: typography.fontSize.xl,
+          fontStyle: "italic",
+          fontWeight: "800",
+          textTransform: "uppercase",
+          color: resolvedColors.foreground,
+        },
+        label: {
+          fontSize: typography.fontSize.sm,
+          fontWeight: typography.fontWeight.medium,
+          color: resolvedColors.foregroundMuted,
+        },
+        hint: {
+          fontSize: typography.fontSize.sm,
+          color: resolvedColors.foregroundMuted,
+        },
+        optionList: { gap: spacing.xs },
+        option: {
+          borderWidth: 1,
+          borderColor: resolvedColors.border,
+          borderRadius: radius.md,
+          padding: spacing.sm,
+        },
+        optionSelected: {
+          borderColor: resolvedColors.accent,
+          backgroundColor: resolvedColors.backgroundElevated,
+        },
+        optionLabel: {
+          color: resolvedColors.foreground,
+          fontSize: typography.fontSize.sm,
+        },
+      }),
+    [resolvedColors],
+  );
   return (
-    <View style={styles.section} testID="profile-theme-section">
-      <Text style={styles.sectionTitle}>Aspetto</Text>
-      <Text style={styles.label}>Tema</Text>
-      <Text style={styles.hint}>Chiaro, scuro oppure lo stesso del sistema.</Text>
-      <View style={styles.timezoneList}>
+    <View style={own.section} testID="profile-theme-section">
+      <Text style={own.sectionTitle}>Aspetto</Text>
+      <Text style={own.label}>Tema</Text>
+      <Text style={own.hint}>Chiaro, scuro oppure lo stesso del sistema.</Text>
+      <View style={own.optionList}>
         {THEME_OPTIONS.map((option) => (
           <Pressable
             key={option.value}
             accessibilityRole="button"
             accessibilityState={{ selected: preference === option.value }}
             onPress={() => setPreference(option.value)}
-            style={[styles.timezoneOption, preference === option.value && styles.timezoneSelected]}
+            style={[own.option, preference === option.value && own.optionSelected]}
             testID={`profile-theme-${option.value}`}
           >
-            <Text style={styles.timezoneLabel}>{option.label}</Text>
+            <Text style={own.optionLabel}>{option.label}</Text>
           </Pressable>
         ))}
       </View>
