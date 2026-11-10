@@ -8,7 +8,7 @@ from typing import Literal
 from uuid import UUID
 
 from sqlalchemy import delete, select
-from sqlalchemy.orm import Session, selectinload
+from sqlalchemy.orm import Session, selectinload, undefer
 
 from auth.exceptions import ValidationAuthError
 from auth.models.user import User
@@ -1973,6 +1973,7 @@ class FantasyLineupService:
                 FantasyTeam.membership_id == membership_id,
             )
             .with_for_update()
+            .options(selectinload(FantasyTeam.slots).undefer(FantasyRosterSlot.exceeds_role_quota))
         ).first()
         if team is None:
             raise ValidationAuthError("Squadra non trovata.", code="fantasy_team_not_found")
@@ -2008,7 +2009,8 @@ class FantasyLineupService:
             if for_update:
                 query = query.with_for_update()
             query = query.options(
-                selectinload(FantasyTeam.slots).selectinload(FantasyRosterSlot.athlete)
+                selectinload(FantasyTeam.slots).selectinload(FantasyRosterSlot.athlete),
+                selectinload(FantasyTeam.slots).undefer(FantasyRosterSlot.exceeds_role_quota),
             )
             team = self._session.scalars(query).first()
             if team is None:

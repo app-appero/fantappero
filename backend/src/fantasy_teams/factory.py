@@ -5,7 +5,7 @@ from __future__ import annotations
 from uuid import UUID
 
 from sqlalchemy import select
-from sqlalchemy.orm import Session, selectinload
+from sqlalchemy.orm import Session, selectinload, undefer
 
 from fantasy_teams.ledger import ensure_credit_account_for_team
 from fantasy_teams.models import FantasyRosterSlot, FantasyTeam
@@ -30,6 +30,7 @@ def find_team_for_membership(
     if with_slots:
         stmt = stmt.options(
             selectinload(FantasyTeam.slots).selectinload(FantasyRosterSlot.athlete),
+            selectinload(FantasyTeam.slots).undefer(FantasyRosterSlot.exceeds_role_quota),
             selectinload(FantasyTeam.membership).selectinload(LeagueMembership.user),
         )
     else:
@@ -53,6 +54,7 @@ def find_team_by_id(
     if with_slots:
         stmt = stmt.options(
             selectinload(FantasyTeam.slots).selectinload(FantasyRosterSlot.athlete),
+            selectinload(FantasyTeam.slots).undefer(FantasyRosterSlot.exceeds_role_quota),
             selectinload(FantasyTeam.membership).selectinload(LeagueMembership.user),
         )
     else:
