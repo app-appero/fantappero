@@ -38,6 +38,13 @@ COPY packages/api-client/src packages/api-client/src
 # reale dell'immagine, stavolta relativi e corretti.
 RUN pnpm install && pnpm install --force
 
+# Build di produzione pre-compilata nell'immagine, non ad ogni avvio del
+# container: "pnpm start" (Railway, dev/pilota) si limita a servire questa
+# cartella già pronta — veloce e leggero. Lo sviluppo locale continua a usare
+# il CMD di default (dev server live) e non la tocca; qui costa solo qualche
+# secondo in più alla build dell'immagine.
+RUN pnpm --filter @fantappero/web build
+
 COPY infra/local/web-entrypoint.sh /usr/local/bin/web-entrypoint.sh
 RUN sed -i 's/\r$//' /usr/local/bin/web-entrypoint.sh \
     && chmod +x /usr/local/bin/web-entrypoint.sh
