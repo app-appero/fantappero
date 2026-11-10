@@ -3942,12 +3942,12 @@ h2 {
   gap: 10px;
   padding: 10px 12px;
   border-radius: 14px;
-  border: 1px solid var(--fa-border, rgba(255, 255, 255, 0.12));
-  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--fa-color-border);
+  background: var(--fa-color-background-elevated);
   min-width: 0;
 }
 .fa-mrow--dim { opacity: 0.6; }
-.fa-mrow__order { font-style: italic; font-weight: 800; color: #9db8ff; min-width: 26px; }
+.fa-mrow__order { font-style: italic; font-weight: 800; color: var(--fa-color-accent); min-width: 26px; }
 .fa-mrow__role {
   flex: 0 0 auto;
   width: 26px;
@@ -3970,7 +3970,7 @@ h2 {
 .fa-mrow__countdown {
   padding: 2px 8px;
   border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  border: 1px solid var(--fa-color-border);
   font-size: 11px;
   font-weight: 700;
   font-family: ui-monospace, monospace;
@@ -3979,13 +3979,14 @@ h2 {
 .fa-mrow__vote {
   padding: 3px 10px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.12);
+  background: var(--fa-color-background-subtle);
+  color: var(--fa-color-foreground);
   font-size: 12px;
   font-weight: 700;
   white-space: nowrap;
 }
 .fa-mrow__vote--live { background: linear-gradient(135deg, #2563eb, #3b82f6); color: #fff; }
-.fa-mrow__vote--provisional { border: 1.5px dashed rgba(255, 255, 255, 0.75); }
+.fa-mrow__vote--provisional { border: 1.5px dashed var(--fa-color-border-strong); }
 .fa-mrow__vote--sv { background: linear-gradient(135deg, #6d28d9, #a855f7); color: #fff; box-shadow: 0 0 10px rgba(168, 85, 247, 0.7); }
 .fa-mrow--live {
   border-color: #60a5fa;
@@ -3998,9 +3999,7 @@ h2 {
   box-shadow: 0 0 12px rgba(168, 85, 247, 0.45);
 }
 .fa-mrow--final {
-  border-color: #ffffff;
-  background: #454f7d;
-  box-shadow: 0 0 14px rgba(255, 255, 255, 0.28);
+  border-color: var(--fa-color-border-strong);
 }
 .fa-mrow__vote--final { background: #ffffff; color: #11162b; }
 /* Illuminazione da formazione probabile: titolare, panchina, espulso, indisponibile. */
