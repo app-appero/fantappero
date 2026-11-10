@@ -44,6 +44,20 @@ RUN pnpm install && pnpm install --force
 # configurare nel pannello Railway. Lo sviluppo locale continua a usare il CMD
 # di default (dev server live) e non la tocca; qui costa solo qualche secondo
 # in più alla build dell'immagine.
+#
+# Le variabili VITE_* finiscono incorporate nel bundle in questo momento
+# (sostituzione statica di Vite), non lette a runtime dal container: a
+# differenza delle altre variabili d'ambiente del servizio, Docker isola la
+# build dal resto per sicurezza e NON le passa qui da solo. Vanno dichiarate
+# esplicitamente con ARG — Railway le riconosce per nome tra le variabili già
+# impostate sul servizio e le passa in automatico alla build
+# (https://docs.railway.com/guides/build-time-vs-runtime-secrets). Senza
+# questo le variabili risultano vuote nel bundle compilato, e l'app va in
+# crash al primo render (schermata "Qualcosa è andato storto").
+ARG VITE_API_BASE_URL
+ARG VITE_GOOGLE_CLIENT_ID
+ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
+ENV VITE_GOOGLE_CLIENT_ID=$VITE_GOOGLE_CLIENT_ID
 RUN pnpm --filter @fantappero/web build
 
 COPY infra/local/web-entrypoint.sh /usr/local/bin/web-entrypoint.sh
