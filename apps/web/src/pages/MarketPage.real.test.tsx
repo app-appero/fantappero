@@ -120,6 +120,7 @@ const TEAM_WITH_PLAYER: FantasyTeam = {
     {
       id: "slot-1",
       slotIndex: 0,
+      exceedsRoleQuota: false,
       athleteId: "athlete-1",
       athleteName: "Giocatore Svincolabile",
       photoUrl: null,
@@ -302,17 +303,17 @@ describe("Mercato — scambi collegati alle API reali (EP08-05/06)", () => {
     expect(container.innerHTML).toContain('data-testid="market-trade-empty-roster"');
     expect(container.innerHTML).toContain("Nessun calciatore in rosa");
     const select = container.querySelector('select[name="trade-recipient"]') as HTMLSelectElement | null;
-    const offered = container.querySelector('input[name="trade-offered-credits"]') as HTMLInputElement | null;
-    const requested = container.querySelector(
-      'input[name="trade-requested-credits"]',
-    ) as HTMLInputElement | null;
+    const credits = container.querySelector('input[name="trade-credits"]') as HTMLInputElement | null;
+    const creditsDirection = container.querySelector(
+      'fieldset:has(input[name="trade-credits-direction"])',
+    ) as HTMLFieldSetElement | null;
     const expiry = container.querySelector('input[name="trade-has-expires-at"]') as HTMLInputElement | null;
     const submit = container.querySelector(
       '[data-testid="market-trade-create-form"] button[type="submit"]',
     ) as HTMLButtonElement | null;
     expect(select?.disabled).toBe(true);
-    expect(offered?.disabled).toBe(true);
-    expect(requested?.disabled).toBe(true);
+    expect(credits?.disabled).toBe(true);
+    expect(creditsDirection?.disabled).toBe(true);
     expect(expiry?.disabled).toBe(true);
     expect(submit?.disabled).toBe(true);
     unmount();

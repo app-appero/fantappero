@@ -173,6 +173,11 @@ function RosterRoleSection({
                       <Text style={styles.playerClub} numberOfLines={1}>
                         {slot.clubName ?? "—"} · slot {slot.slotIndex + 1}
                       </Text>
+                      {slot.exceedsRoleQuota ? (
+                        <Text style={styles.playerPendingBadge} numberOfLines={1}>
+                          In attesa (oltre quota ruolo)
+                        </Text>
+                      ) : null}
                     </View>
                     <View style={styles.playerPrice}>
                       <PurchaseCreditsCell

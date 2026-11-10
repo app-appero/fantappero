@@ -121,7 +121,7 @@ export function usePushNotifications(accessToken: string | null | undefined): vo
       } else if (route?.kind === "stack") {
         navigation.navigate(route.name as never);
       } else if (route?.kind === "tab") {
-        navigation.navigate("MainTabs", { screen: route.screen });
+        navigation.navigate("MainTabs", { screen: route.screen, params: route.params });
       } else if (route?.kind === "admin") {
         openAdminScreen(route.screen);
         navigation.navigate("AdminPanel");

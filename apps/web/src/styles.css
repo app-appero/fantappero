@@ -3127,6 +3127,13 @@ h2 {
   margin: 0;
 }
 
+/* Proposta aperta da una notifica (?scambio=<id>): la mette in evidenza
+   così non tocca più cercarla a mano nell'elenco. */
+.fa-trade-card--highlighted {
+  border-color: var(--fa-color-accent);
+  box-shadow: 0 0 0 2px var(--fa-color-accent);
+}
+
 .fa-trade-card__head {
   display: flex;
   align-items: center;
@@ -3960,9 +3967,9 @@ h2 {
   font-weight: 800;
   color: #11162b;
 }
-.fa-mrow__role--gk { background: #ffd23f; }
-.fa-mrow__role--def { background: #38bdf8; }
-.fa-mrow__role--mid { background: #b58cff; }
+.fa-mrow__role--gk { background: #4ade80; }
+.fa-mrow__role--def { background: #ffd23f; }
+.fa-mrow__role--mid { background: #38bdf8; }
 .fa-mrow__role--fwd { background: #ff6b8a; }
 .fa-mrow__body { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .fa-mrow__name { font-weight: 600; display: inline-flex; align-items: center; gap: 6px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -4324,9 +4331,9 @@ h2 {
   font-size: 0.85rem;
 }
 
-.fa-trade-role[data-role="P"] .fa-trade-role__dot { background: #ffd23f; }
-.fa-trade-role[data-role="D"] .fa-trade-role__dot { background: #38bdf8; }
-.fa-trade-role[data-role="C"] .fa-trade-role__dot { background: #b58cff; }
+.fa-trade-role[data-role="P"] .fa-trade-role__dot { background: #4ade80; }
+.fa-trade-role[data-role="D"] .fa-trade-role__dot { background: #ffd23f; }
+.fa-trade-role[data-role="C"] .fa-trade-role__dot { background: #38bdf8; }
 .fa-trade-role[data-role="A"] .fa-trade-role__dot { background: #ff6b8a; }
 
 .fa-trade-role__title {
@@ -4540,9 +4547,9 @@ h2 {
   font-style: italic;
 }
 
-.fa-athlete-chooser__dot--P { background: #ffd23f; }
-.fa-athlete-chooser__dot--D { background: #38bdf8; }
-.fa-athlete-chooser__dot--C { background: #b58cff; }
+.fa-athlete-chooser__dot--P { background: #4ade80; }
+.fa-athlete-chooser__dot--D { background: #ffd23f; }
+.fa-athlete-chooser__dot--C { background: #38bdf8; }
 .fa-athlete-chooser__dot--A { background: #ff6b8a; }
 
 .fa-athlete-chooser__name {

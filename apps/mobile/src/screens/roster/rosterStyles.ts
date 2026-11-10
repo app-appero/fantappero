@@ -376,6 +376,11 @@ export const rosterStyles = lazyStyles(() => StyleSheet.create({
     fontSize: typography.fontSize.xs,
     color: colors.foregroundMuted,
   },
+  playerPendingBadge: {
+    fontSize: typography.fontSize.xs,
+    fontWeight: typography.fontWeight.semibold,
+    color: colors.warning,
+  },
   rowActionBadge: {
     width: 28,
     height: 28,

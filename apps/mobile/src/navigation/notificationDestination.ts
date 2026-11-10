@@ -4,7 +4,7 @@ import type { AdminStackParamList, AppTabParamList, RootStackParamList } from ".
 export type NotificationRoute =
   | { kind: "stack"; name: keyof RootStackParamList }
   | { kind: "matchup"; slotId: string }
-  | { kind: "tab"; screen: keyof AppTabParamList }
+  | { kind: "tab"; screen: keyof AppTabParamList; params?: Record<string, string> }
   | { kind: "admin"; screen: keyof AdminStackParamList };
 
 const TRADE_TITLES = new Set([
@@ -25,6 +25,18 @@ const AUCTION_TITLES = new Set([
   "Sei stato sorpassato",
   "Asta a rilanci iniziata",
 ]);
+
+/** Valore di un parametro di query nel deep link (es. "?scambio=<id>"), o `null`. */
+function extractQueryParam(deepLink: string | null | undefined, key: string): string | null {
+  const link = (deepLink ?? "").trim();
+  const queryIndex = link.indexOf("?");
+  if (queryIndex === -1) {
+    return null;
+  }
+  const params = new URLSearchParams(link.slice(queryIndex + 1));
+  const value = params.get(key);
+  return value ? value : null;
+}
 
 /** Percorsi web (deep link del payload) → schermata mobile equivalente. */
 const PATH_ROUTES: Array<[RegExp, NotificationRoute]> = [
@@ -50,7 +62,10 @@ export function resolveNotificationRoute(
 ): NotificationRoute | null {
   // Gli scambi e le aste condividono il percorso web «/mercato»: sull'app hanno schermate diverse.
   if (TRADE_TITLES.has(item.title)) {
-    return { kind: "tab", screen: "Market" };
+    const proposalId = extractQueryParam(item.deepLink, "scambio");
+    return proposalId
+      ? { kind: "tab", screen: "Market", params: { scambio: proposalId } }
+      : { kind: "tab", screen: "Market" };
   }
   if (AUCTION_TITLES.has(item.title)) {
     return { kind: "tab", screen: "Auction" };

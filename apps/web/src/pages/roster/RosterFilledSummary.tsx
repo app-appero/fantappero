@@ -163,6 +163,14 @@ function RosterRoleTable({
                       <AthleteName className="fa-auction-player__name" athleteId={slot.athleteId}>
                         {slot.athleteName ?? "Calciatore"}
                       </AthleteName>
+                      {slot.exceedsRoleQuota ? (
+                        <Badge
+                          variant="warning"
+                          title="Oltre la quota di ruolo: svincola un giocatore dello stesso ruolo per schierarlo."
+                        >
+                          In attesa
+                        </Badge>
+                      ) : null}
                     </span>
                   </TableCell>
                   <TableCell className="fa-roster-col fa-roster-col--club">{slot.clubName ?? "—"}</TableCell>

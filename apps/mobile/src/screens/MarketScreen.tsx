@@ -7,7 +7,7 @@ import type {
   RosterOccupancyEntry,
   TeamRosterPlayer,
 } from "@fantappero/contracts";
-import { useNavigation, type NavigationProp } from "@react-navigation/core";
+import { useNavigation, useRoute, type NavigationProp, type RouteProp } from "@react-navigation/core";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Pressable, Text, View } from "react-native";
 import {
@@ -46,8 +46,11 @@ const SHOW_MARKET_HISTORY = false;
  */
 export function MarketScreen() {
   const navigation = useNavigation<NavigationProp<AppTabParamList>>();
+  const route = useRoute<RouteProp<AppTabParamList, "Market">>();
   const { can, accessToken, activeLeagueId } = useAuthSession();
   const canManageMarket = can(["market:manage"]);
+  // Apertura da una notifica di scambio (vedi notificationDestination.ts).
+  const highlightedProposalId = route.params?.scambio ?? null;
 
   const [team, setTeam] = useState<FantasyTeam | null>(null);
   const [balance, setBalance] = useState<number | null>(null);
@@ -217,8 +220,10 @@ export function MarketScreen() {
   const [recipientRosterError, setRecipientRosterError] = useState<string | null>(null);
   const [offeredAthleteIds, setOfferedAthleteIds] = useState<string[]>([]);
   const [requestedAthleteIds, setRequestedAthleteIds] = useState<string[]>([]);
-  const [offeredCredits, setOfferedCredits] = useState("0");
-  const [requestedCredits, setRequestedCredits] = useState("0");
+  // Un solo campo "Crediti" + verso (offri/chiedi): raramente si offre E si chiede
+  // credito nella stessa proposta, avere due campi impilati era confusionario.
+  const [creditsDirection, setCreditsDirection] = useState<"offer" | "request">("offer");
+  const [creditsAmount, setCreditsAmount] = useState("0");
   const [expiresAt, setExpiresAt] = useState("");
 
   const recipientOptions = useMemo(
@@ -272,27 +277,34 @@ export function MarketScreen() {
     setRecipientRosterError(null);
     setOfferedAthleteIds([]);
     setRequestedAthleteIds([]);
-    setOfferedCredits("0");
-    setRequestedCredits("0");
+    setCreditsDirection("offer");
+    setCreditsAmount("0");
     setExpiresAt("");
   }
 
   function handleCreateProposal() {
-    if (ownedSlots.length === 0 || !recipientTeamId || !expiresAt.trim()) {
+    // La scadenza è facoltativa (come sul web): senza, la proposta resta valida
+    // finché non viene decisa o annullata — non blocca più l'invio.
+    if (ownedSlots.length === 0 || !recipientTeamId) {
       return;
     }
-    const parsed = new Date(expiresAt.trim().replace(" ", "T"));
-    if (Number.isNaN(parsed.getTime())) {
-      return;
+    let expiresIso: string | null = null;
+    if (expiresAt.trim()) {
+      const parsed = new Date(expiresAt.trim().replace(" ", "T"));
+      if (Number.isNaN(parsed.getTime())) {
+        return;
+      }
+      expiresIso = parsed.toISOString();
     }
+    const credits = Number(creditsAmount) || 0;
     void trade
       .createProposal({
         recipientTeamId,
         offeredAthleteIds,
         requestedAthleteIds,
-        offeredCredits: Number(offeredCredits) || 0,
-        requestedCredits: Number(requestedCredits) || 0,
-        expiresAt: parsed.toISOString(),
+        offeredCredits: creditsDirection === "offer" ? credits : 0,
+        requestedCredits: creditsDirection === "request" ? credits : 0,
+        expiresAt: expiresIso,
       })
       .then(() => {
         resetTradeForm();
@@ -416,10 +428,10 @@ export function MarketScreen() {
           onRetryRecipientRoster={() => void loadRecipientRoster(recipientTeamId)}
           requestedAthleteIds={requestedAthleteIds}
           onToggleRequested={(id) => setRequestedAthleteIds((prev) => toggleAthleteId(prev, id))}
-          offeredCredits={offeredCredits}
-          onOfferedCreditsChange={setOfferedCredits}
-          requestedCredits={requestedCredits}
-          onRequestedCreditsChange={setRequestedCredits}
+          creditsDirection={creditsDirection}
+          onCreditsDirectionChange={setCreditsDirection}
+          creditsAmount={creditsAmount}
+          onCreditsAmountChange={setCreditsAmount}
           expiresAt={expiresAt}
           onExpiresAtChange={setExpiresAt}
           createError={trade.createError}
@@ -435,9 +447,11 @@ export function MarketScreen() {
           selfTeamId={team?.id}
           teams={teams}
           occupancy={occupancy}
+          highlightedProposalId={highlightedProposalId}
           athleteNameById={athleteNameById}
           ownedSlots={ownedSlots}
           canManageMarket={canManageMarket}
+          athleteMeta={athleteMeta}
         />
       ) : null}
 

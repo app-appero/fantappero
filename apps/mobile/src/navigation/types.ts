@@ -33,6 +33,11 @@ export type MatchupDetailParams = {
   slotId: string;
 };
 
+/** Apertura da una notifica di scambio: evidenzia la proposta invece di lasciarla cercare a mano. */
+export type MarketParams = WireframeParams & {
+  scambio?: string;
+};
+
 /** Dettaglio partita del turno europeo (EP13-P04). */
 export type FixtureDetailParams = {
   turnId: string;
@@ -46,12 +51,12 @@ export type AppTabParamList = {
   Formation: WireframeParams | undefined;
   Auction: WireframeParams | undefined;
   Waiver: WireframeParams | undefined;
-  Market: WireframeParams | undefined;
+  Market: MarketParams | undefined;
   Profile: undefined;
 };
 
 export type RootStackParamList = {
-  MainTabs: undefined | { screen?: keyof AppTabParamList };
+  MainTabs: undefined | { screen?: keyof AppTabParamList; params?: Record<string, string> };
   Auth: WireframeParams | undefined;
   AuthRegister: undefined;
   AuthForgotPassword: undefined;

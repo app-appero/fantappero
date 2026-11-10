@@ -221,7 +221,9 @@ _TRADE_STATUS_MESSAGES: dict[str, tuple[str, str]] = {
 def _render_mercato_scambio(params: NotificationParams) -> NotificationContent:
     status = str(params.get("status"))
     title, body = _TRADE_STATUS_MESSAGES.get(status, ("Aggiornamento scambio", "Stato aggiornato."))
-    return NotificationContent(title=title, body=body, deep_link="/mercato")
+    proposal_id = params.get("proposal_id")
+    deep_link = f"/mercato?scambio={proposal_id}" if proposal_id else "/mercato"
+    return NotificationContent(title=title, body=body, deep_link=deep_link)
 
 
 @register_template("risultati.omologazione", 1)
@@ -410,10 +412,12 @@ def _render_mercato_scambio_v2(params: NotificationParams) -> NotificationConten
         if status == "proposed" and params.get("expires_label")
         else "",
     )
+    proposal_id = params.get("proposal_id")
+    deep_link = f"/mercato?scambio={proposal_id}" if proposal_id else "/mercato"
     return NotificationContent(
         title=title,
         body=body or "Apri Scambi per i dettagli.",
-        deep_link="/mercato",
+        deep_link=deep_link,
     )
 
 

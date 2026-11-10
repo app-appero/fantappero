@@ -619,6 +619,7 @@ class TradeService:
         if proposal is None:
             return {}
         params: dict[str, object] = {
+            "proposal_id": str(proposal.id),
             "offered": [row.name for row in self._athlete_labels(proposal.offered_athlete_ids)],
             "requested": [row.name for row in self._athlete_labels(proposal.requested_athlete_ids)],
             "offered_credits": proposal.offered_credits,

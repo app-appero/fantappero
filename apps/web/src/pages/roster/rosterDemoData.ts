@@ -119,6 +119,7 @@ export const DEMO_TEAM: FantasyTeam = {
       clubName: "Inter",
       role: "A",
       purchaseCredits: 50,
+      exceedsRoleQuota: false,
     },
     {
       id: "slot-1",
@@ -129,6 +130,7 @@ export const DEMO_TEAM: FantasyTeam = {
       clubName: "Inter",
       role: "C",
       purchaseCredits: 35,
+      exceedsRoleQuota: false,
     },
     ...Array.from({ length: 33 }, (_, index) => ({
       id: `slot-${index + 2}`,
@@ -139,6 +141,7 @@ export const DEMO_TEAM: FantasyTeam = {
       clubName: null,
       role: null,
       purchaseCredits: null,
+      exceedsRoleQuota: false,
     })),
   ],
 };

@@ -437,6 +437,8 @@ export const marketUiStyles = lazyStyles(() => StyleSheet.create({
     backgroundColor: colors.backgroundElevated,
   },
   proposalCardMine: { borderColor: colors.brand },
+  /** Proposta aperta da una notifica (vedi notificationDestination.ts). */
+  proposalCardHighlighted: { borderColor: colors.accent, borderWidth: 2 },
   proposalHead: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
   proposalTitle: { flex: 1, color: colors.foreground, fontWeight: "700" },
   sideLabel: { color: colors.foregroundMuted, fontSize: 11, letterSpacing: 1.4, textTransform: "uppercase" },

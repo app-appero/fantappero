@@ -1864,15 +1864,15 @@ button.fa-app-header__league-action {
 }
 
 .fa-login__role--p {
-  background: #ffd23f;
+  background: #4ade80;
 }
 
 .fa-login__role--d {
-  background: #38bdf8;
+  background: #ffd23f;
 }
 
 .fa-login__role--c {
-  background: #b58cff;
+  background: #38bdf8;
 }
 
 .fa-login__role--a {
@@ -2445,9 +2445,9 @@ button.fa-app-header__league-action {
   font-weight: 800;
 }
 
-.fa-login__pill-role--p { background: #ffd23f; }
-.fa-login__pill-role--d { background: #38bdf8; }
-.fa-login__pill-role--c { background: #b58cff; }
+.fa-login__pill-role--p { background: #4ade80; }
+.fa-login__pill-role--d { background: #ffd23f; }
+.fa-login__pill-role--c { background: #38bdf8; }
 .fa-login__pill-role--a { background: #ff6b8a; }
 
 .fa-login__mini-pitch {
@@ -2504,9 +2504,9 @@ button.fa-app-header__league-action {
   box-shadow: 0 0 0 3px var(--role, #fff);
 }
 
-.fa-login__mini-player--p { --role: #ffd23f; }
-.fa-login__mini-player--d { --role: #38bdf8; }
-.fa-login__mini-player--c { --role: #b58cff; }
+.fa-login__mini-player--p { --role: #4ade80; }
+.fa-login__mini-player--d { --role: #ffd23f; }
+.fa-login__mini-player--c { --role: #38bdf8; }
 .fa-login__mini-player--a { --role: #ff6b8a; }
 
 .fa-login__mini-player--final i {

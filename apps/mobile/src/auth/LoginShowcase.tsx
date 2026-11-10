@@ -4,7 +4,7 @@ import { StyleSheet, Text, View } from "react-native";
 
 const { colors, spacing, radius } = theme;
 
-const ROLE_COLOR: Record<ShowcaseRole, string> = { P: "#FFD23F", D: "#38BDF8", C: "#B58CFF", A: "#FF6B8A" };
+const ROLE_COLOR: Record<ShowcaseRole, string> = { P: "#4ADE80", D: "#FFD23F", C: "#38BDF8", A: "#FF6B8A" };
 
 /** Accesso: campo con top player di campionati diversi e una riga per campionato. */
 export function LoginShowcase() {

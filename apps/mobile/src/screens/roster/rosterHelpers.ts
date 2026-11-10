@@ -113,9 +113,9 @@ export function roleLabel(role: string | null): string {
 }
 
 const ROLE_COLOR: Record<string, string> = {
-  P: "#FFD23F",
-  D: "#38BDF8",
-  C: "#B58CFF",
+  P: "#4ADE80",
+  D: "#FFD23F",
+  C: "#38BDF8",
   A: "#FF6B8A",
 };
 

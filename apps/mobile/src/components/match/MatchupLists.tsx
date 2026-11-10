@@ -23,7 +23,7 @@ import { EventBadges } from "./EventBadges";
 
 const { colors, spacing, typography, radius } = theme;
 
-const ROLE_COLOR: Record<string, string> = { P: "#ffd23f", D: "#38bdf8", C: "#b58cff", A: "#ff6b8a" };
+const ROLE_COLOR: Record<string, string> = { P: "#4ade80", D: "#ffd23f", C: "#38bdf8", A: "#ff6b8a" };
 
 const TONE_ROW_BG: Record<ProbableTone, string> = {
   starter: "rgba(34,197,94,0.14)",

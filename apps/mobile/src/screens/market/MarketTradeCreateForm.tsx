@@ -61,8 +61,12 @@ function AthleteCheckRow({
 
 const PREVIEW_LIMIT = 6;
 
-/** Pannello di scelta giocatori (tuoi o dell'altra squadra) con ricerca e filtro per ruolo. */
-function PickPanel({
+/**
+ * Pannello di scelta giocatori (tuoi o dell'altra squadra) con ricerca e filtro per ruolo.
+ * Esportato: lo riusa anche il form della controproposta in MarketTradeList.tsx, per la
+ * stessa esperienza di selezione dell'invio di una nuova proposta (non più checkbox).
+ */
+export function PickPanel({
   title,
   hint,
   rows,
@@ -156,6 +160,66 @@ function PickPanel({
   );
 }
 
+export type CreditsDirection = "offer" | "request";
+
+/**
+ * Un solo campo numerico "Crediti" + un verso (offri/chiedi): la proposta ha quasi
+ * sempre credito in un verso solo, avere due campi "che dai"/"che ricevi" impilati
+ * era confusionario quando uno dei due restava sempre a 0. Stesso componente usato
+ * anche dal form della controproposta (MarketTradeList.tsx).
+ */
+export function CreditsDirectionField({
+  direction,
+  amount,
+  disabled,
+  onDirectionChange,
+  onAmountChange,
+  testIDPrefix,
+}: {
+  direction: CreditsDirection;
+  amount: string;
+  disabled?: boolean;
+  onDirectionChange: (direction: CreditsDirection) => void;
+  onAmountChange: (amount: string) => void;
+  testIDPrefix: string;
+}) {
+  return (
+    <>
+      <Text style={styles.fieldLabel}>Crediti</Text>
+      <View accessibilityRole="radiogroup" style={{ flexDirection: "row", gap: 8, marginBottom: 6 }}>
+        <Pressable
+          style={[styles.pill, direction === "offer" && styles.pillActive]}
+          disabled={disabled}
+          onPress={() => onDirectionChange("offer")}
+          accessibilityRole="radio"
+          accessibilityState={{ selected: direction === "offer" }}
+          testID={`${testIDPrefix}-credits-direction-offer`}
+        >
+          <Text style={[styles.pillLabel, direction === "offer" && styles.pillLabelActive]}>Offri</Text>
+        </Pressable>
+        <Pressable
+          style={[styles.pill, direction === "request" && styles.pillActive]}
+          disabled={disabled}
+          onPress={() => onDirectionChange("request")}
+          accessibilityRole="radio"
+          accessibilityState={{ selected: direction === "request" }}
+          testID={`${testIDPrefix}-credits-direction-request`}
+        >
+          <Text style={[styles.pillLabel, direction === "request" && styles.pillLabelActive]}>Chiedi</Text>
+        </Pressable>
+      </View>
+      <TextInput
+        style={[styles.input, disabled && styles.disabled]}
+        value={amount}
+        onChangeText={onAmountChange}
+        keyboardType="numeric"
+        editable={!disabled}
+        testID={`${testIDPrefix}-credits-amount`}
+      />
+    </>
+  );
+}
+
 /** Nuova proposta di scambio: giocatori offerti/richiesti, crediti e scadenza (EP08-05/06). */
 export function MarketTradeCreateForm({
   recipientOptions,
@@ -170,10 +234,10 @@ export function MarketTradeCreateForm({
   onRetryRecipientRoster,
   requestedAthleteIds,
   onToggleRequested,
-  offeredCredits,
-  onOfferedCreditsChange,
-  requestedCredits,
-  onRequestedCreditsChange,
+  creditsDirection,
+  onCreditsDirectionChange,
+  creditsAmount,
+  onCreditsAmountChange,
   expiresAt,
   onExpiresAtChange,
   createError,
@@ -193,10 +257,10 @@ export function MarketTradeCreateForm({
   onRetryRecipientRoster: () => void;
   requestedAthleteIds: string[];
   onToggleRequested: (athleteId: string) => void;
-  offeredCredits: string;
-  onOfferedCreditsChange: (value: string) => void;
-  requestedCredits: string;
-  onRequestedCreditsChange: (value: string) => void;
+  creditsDirection: CreditsDirection;
+  onCreditsDirectionChange: (direction: CreditsDirection) => void;
+  creditsAmount: string;
+  onCreditsAmountChange: (value: string) => void;
   expiresAt: string;
   onExpiresAtChange: (value: string) => void;
   createError: string | null;
@@ -211,10 +275,17 @@ export function MarketTradeCreateForm({
     ownedSlots.find((slot) => slot.athleteId === id)?.athleteName ??
     recipientPlayers.find((player) => player.athleteId === id)?.athleteName ??
     fallback;
-  const giveText = [...offeredAthleteIds.map((id) => nameOf(id, "Giocatore")), Number(offeredCredits) > 0 ? `${offeredCredits} cr.` : ""]
+  const creditsLabel = Number(creditsAmount) > 0 ? `${creditsAmount} cr.` : "";
+  const giveText = [
+    ...offeredAthleteIds.map((id) => nameOf(id, "Giocatore")),
+    creditsDirection === "offer" ? creditsLabel : "",
+  ]
     .filter(Boolean)
     .join(" + ");
-  const getText = [...requestedAthleteIds.map((id) => nameOf(id, "Giocatore")), Number(requestedCredits) > 0 ? `${requestedCredits} cr.` : ""]
+  const getText = [
+    ...requestedAthleteIds.map((id) => nameOf(id, "Giocatore")),
+    creditsDirection === "request" ? creditsLabel : "",
+  ]
     .filter(Boolean)
     .join(" + ");
   return (
@@ -289,24 +360,14 @@ export function MarketTradeCreateForm({
       </View>
 
       <View style={styles.proposalCard}>
-        <Text style={styles.sideLabel}>4 · Crediti (facoltativi)</Text>
-        <Text style={styles.fieldLabel}>Crediti che dai</Text>
-        <TextInput
-          style={[styles.input, !canPropose && styles.disabled]}
-          value={offeredCredits}
-          onChangeText={onOfferedCreditsChange}
-          keyboardType="numeric"
-          editable={canPropose}
-          testID="market-trade-offered-credits"
-        />
-        <Text style={styles.fieldLabel}>Crediti che ricevi</Text>
-        <TextInput
-          style={[styles.input, !canPropose && styles.disabled]}
-          value={requestedCredits}
-          onChangeText={onRequestedCreditsChange}
-          keyboardType="numeric"
-          editable={canPropose}
-          testID="market-trade-requested-credits"
+        <Text style={styles.sideLabel}>4 · Crediti e scadenza (facoltativi)</Text>
+        <CreditsDirectionField
+          direction={creditsDirection}
+          amount={creditsAmount}
+          disabled={!canPropose}
+          onDirectionChange={onCreditsDirectionChange}
+          onAmountChange={onCreditsAmountChange}
+          testIDPrefix="market-trade"
         />
         <DateTimeField
           label="Scadenza"

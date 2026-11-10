@@ -87,6 +87,7 @@ const DEMO_TEAM: FantasyTeam = {
     {
       id: "demo-slot-0",
       slotIndex: 0,
+      exceedsRoleQuota: false,
       athleteId: "demo-athlete-1",
       athleteName: "P. Fagioli",
       photoUrl: null,
@@ -105,12 +106,78 @@ const DEMO_TEAM: FantasyTeam = {
 const SHOW_VOLUNTARY_RELEASE = false;
 const SHOW_MARKET_HISTORY = false;
 
+type CreditsDirection = "offer" | "request";
+
+/**
+ * Un solo campo numerico "Crediti" + un verso (offri/chiedi): la proposta ha quasi
+ * sempre credito in un verso solo (in aggiunta ai giocatori offerti o richiesti), avere
+ * due campi "offerti"/"richiesti" impilati era confusionario quando uno dei due restava
+ * sempre a 0. Il valore finisce in offeredCredits o requestedCredits a seconda del verso
+ * scelto — il contratto/backend restano invariati, supportano ancora entrambi i versi
+ * valorizzati insieme se mai servisse in futuro.
+ */
+function CreditsDirectionField({
+  idPrefix,
+  direction,
+  amount,
+  disabled,
+  onDirectionChange,
+  onAmountChange,
+}: {
+  idPrefix: string;
+  direction: CreditsDirection;
+  amount: string;
+  disabled?: boolean;
+  onDirectionChange: (direction: CreditsDirection) => void;
+  onAmountChange: (amount: string) => void;
+}) {
+  return (
+    <fieldset className="fa-field" disabled={disabled}>
+      <legend className="fa-field__label">Crediti</legend>
+      <div role="radiogroup" aria-label="Verso dei crediti" style={{ display: "flex", gap: "0.5rem" }}>
+        <label>
+          <input
+            type="radio"
+            name={`${idPrefix}-credits-direction`}
+            value="offer"
+            checked={direction === "offer"}
+            onChange={() => onDirectionChange("offer")}
+          />
+          {" Offri"}
+        </label>
+        <label>
+          <input
+            type="radio"
+            name={`${idPrefix}-credits-direction`}
+            value="request"
+            checked={direction === "request"}
+            onChange={() => onDirectionChange("request")}
+          />
+          {" Chiedi"}
+        </label>
+      </div>
+      <Input
+        label={direction === "offer" ? "Crediti offerti" : "Crediti richiesti"}
+        name={`${idPrefix}-credits`}
+        type="number"
+        min={0}
+        value={amount}
+        disabled={disabled}
+        onChange={(event) => onAmountChange(event.target.value)}
+      />
+    </fieldset>
+  );
+}
+
 /** Schermata Scambi (ex "Mercato"): proposte di scambio tra squadre (EP08-05/06/07). */
 export function MarketPage() {
   const { isDemoMode, activeLeagueId, can } = useAuth();
   const canManageMarket = can(["market:manage"]);
   const { search } = useLocation();
   const demoState = isDemoMode ? parseWireframeStateFromSearch(search) : null;
+  // Notifica di scambio (?scambio=<id>): apre direttamente la proposta giusta
+  // invece di lasciare l'utente a cercarla a mano nell'elenco.
+  const highlightedProposalId = new URLSearchParams(search).get("scambio");
 
   const [team, setTeam] = useState<FantasyTeam | null>(isDemoMode ? DEMO_TEAM : null);
   const [balance, setBalance] = useState<number | null>(isDemoMode ? 200 : null);
@@ -286,8 +353,10 @@ export function MarketPage() {
   const [recipientRosterError, setRecipientRosterError] = useState<string | null>(null);
   const [offeredAthleteIds, setOfferedAthleteIds] = useState<string[]>([]);
   const [requestedAthleteIds, setRequestedAthleteIds] = useState<string[]>([]);
-  const [offeredCredits, setOfferedCredits] = useState("0");
-  const [requestedCredits, setRequestedCredits] = useState("0");
+  // Un solo campo "Crediti" + verso (offri/chiedi): raramente si offre E si chiede
+  // credito nella stessa proposta, avere due campi impilati era confusionario.
+  const [creditsDirection, setCreditsDirection] = useState<"offer" | "request">("offer");
+  const [creditsAmount, setCreditsAmount] = useState("0");
   // Scadenza opzionale (EP08-05/FR-MKT-03): senza spunta la proposta non scade mai da sola.
   const [hasExpiry, setHasExpiry] = useState(false);
   const [expiresAt, setExpiresAt] = useState("");
@@ -342,8 +411,8 @@ export function MarketPage() {
     setRecipientRosterError(null);
     setOfferedAthleteIds([]);
     setRequestedAthleteIds([]);
-    setOfferedCredits("0");
-    setRequestedCredits("0");
+    setCreditsDirection("offer");
+    setCreditsAmount("0");
     setHasExpiry(false);
     setExpiresAt("");
   }
@@ -353,13 +422,14 @@ export function MarketPage() {
     if (ownedSlots.length === 0 || !recipientTeamId || (hasExpiry && !expiresAt)) {
       return;
     }
+    const credits = Number(creditsAmount) || 0;
     void trade
       .createProposal({
         recipientTeamId,
         offeredAthleteIds,
         requestedAthleteIds,
-        offeredCredits: Number(offeredCredits) || 0,
-        requestedCredits: Number(requestedCredits) || 0,
+        offeredCredits: creditsDirection === "offer" ? credits : 0,
+        requestedCredits: creditsDirection === "request" ? credits : 0,
         expiresAt: hasExpiry && expiresAt ? new Date(expiresAt).toISOString() : null,
       })
       .then(resetTradeForm);
@@ -369,17 +439,27 @@ export function MarketPage() {
   const [counteringProposalId, setCounteringProposalId] = useState<string | null>(null);
   const [counterOfferedAthleteIds, setCounterOfferedAthleteIds] = useState<string[]>([]);
   const [counterRequestedAthleteIds, setCounterRequestedAthleteIds] = useState<string[]>([]);
-  const [counterOfferedCredits, setCounterOfferedCredits] = useState("0");
-  const [counterRequestedCredits, setCounterRequestedCredits] = useState("0");
+  const [counterCreditsDirection, setCounterCreditsDirection] = useState<"offer" | "request">("offer");
+  const [counterCreditsAmount, setCounterCreditsAmount] = useState("0");
   const [counterHasExpiry, setCounterHasExpiry] = useState(false);
   const [counterExpiresAt, setCounterExpiresAt] = useState("");
+
+  useEffect(() => {
+    if (!highlightedProposalId || trade.loading) {
+      return;
+    }
+    const node = document.querySelector(
+      `[data-testid="market-trade-proposal-${highlightedProposalId}"]`,
+    );
+    node?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, [highlightedProposalId, trade.loading, trade.proposals]);
 
   function startCounter(proposalId: string) {
     setCounteringProposalId(proposalId);
     setCounterOfferedAthleteIds([]);
     setCounterRequestedAthleteIds([]);
-    setCounterOfferedCredits("0");
-    setCounterRequestedCredits("0");
+    setCounterCreditsDirection("offer");
+    setCounterCreditsAmount("0");
     setCounterHasExpiry(false);
     setCounterExpiresAt("");
   }
@@ -389,12 +469,13 @@ export function MarketPage() {
     if (counterHasExpiry && !counterExpiresAt) {
       return;
     }
+    const credits = Number(counterCreditsAmount) || 0;
     void trade
       .counterProposal(proposalId, {
         offeredAthleteIds: counterOfferedAthleteIds,
         requestedAthleteIds: counterRequestedAthleteIds,
-        offeredCredits: Number(counterOfferedCredits) || 0,
-        requestedCredits: Number(counterRequestedCredits) || 0,
+        offeredCredits: counterCreditsDirection === "offer" ? credits : 0,
+        requestedCredits: counterCreditsDirection === "request" ? credits : 0,
         expiresAt: counterHasExpiry && counterExpiresAt ? new Date(counterExpiresAt).toISOString() : null,
       })
       .then(() => setCounteringProposalId(null));
@@ -698,23 +779,13 @@ export function MarketPage() {
                 </div>
               </div>
 
-              <Input
-                label="Crediti offerti"
-                name="trade-offered-credits"
-                type="number"
-                min={0}
-                value={offeredCredits}
+              <CreditsDirectionField
+                idPrefix="trade"
+                direction={creditsDirection}
+                amount={creditsAmount}
                 disabled={ownedSlots.length === 0}
-                onChange={(event) => setOfferedCredits(event.target.value)}
-              />
-              <Input
-                label="Crediti richiesti"
-                name="trade-requested-credits"
-                type="number"
-                min={0}
-                value={requestedCredits}
-                disabled={ownedSlots.length === 0}
-                onChange={(event) => setRequestedCredits(event.target.value)}
+                onDirectionChange={setCreditsDirection}
+                onAmountChange={setCreditsAmount}
               />
               <label>
                 <input
@@ -833,7 +904,15 @@ export function MarketPage() {
                   const isRecipient = proposal.recipientTeamId === team?.id;
                   const pending = trade.actionPendingId === proposal.id;
                   return (
-                    <li key={proposal.id} data-testid={`market-trade-proposal-${proposal.id}`} className="fa-trade-card">
+                    <li
+                      key={proposal.id}
+                      data-testid={`market-trade-proposal-${proposal.id}`}
+                      className={
+                        proposal.id === highlightedProposalId
+                          ? "fa-trade-card fa-trade-card--highlighted"
+                          : "fa-trade-card"
+                      }
+                    >
                       <p className="fa-trade-card__head">
                         {teamNameFor(proposal.proposerTeamId)} → {teamNameFor(proposal.recipientTeamId)}{" "}
                         <Badge variant={TRADE_STATUS_VARIANT[proposal.status] ?? "neutral"}>
@@ -895,7 +974,12 @@ export function MarketPage() {
                             variant="secondary"
                             size="sm"
                             disabled={pending}
-                            onClick={() => void trade.rejectProposal(proposal.id)}
+                            onClick={() => {
+                              setCounteringProposalId((current) =>
+                                current === proposal.id ? null : current,
+                              );
+                              void trade.rejectProposal(proposal.id);
+                            }}
                           >
                             Rifiuta
                           </Button>
@@ -960,21 +1044,12 @@ export function MarketPage() {
                               </fieldset>
                             </div>
                           </div>
-                          <Input
-                            label="Crediti offerti"
-                            name="counter-offered-credits"
-                            type="number"
-                            min={0}
-                            value={counterOfferedCredits}
-                            onChange={(event) => setCounterOfferedCredits(event.target.value)}
-                          />
-                          <Input
-                            label="Crediti richiesti"
-                            name="counter-requested-credits"
-                            type="number"
-                            min={0}
-                            value={counterRequestedCredits}
-                            onChange={(event) => setCounterRequestedCredits(event.target.value)}
+                          <CreditsDirectionField
+                            idPrefix="counter"
+                            direction={counterCreditsDirection}
+                            amount={counterCreditsAmount}
+                            onDirectionChange={setCounterCreditsDirection}
+                            onAmountChange={setCounterCreditsAmount}
                           />
                           <label>
                             <input

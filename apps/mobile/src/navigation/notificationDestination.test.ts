@@ -6,6 +6,13 @@ test("le notifiche di scambio aprono Scambi", () => {
   assert.deepEqual(resolveNotificationRoute({ title: "Nuova proposta di scambio", deepLink: "/mercato" }), { kind: "tab", screen: "Market" });
 });
 
+test("le notifiche di scambio con l'id della proposta aprono quella specifica", () => {
+  assert.deepEqual(
+    resolveNotificationRoute({ title: "Controproposta ricevuta", deepLink: "/mercato?scambio=abc-123" }),
+    { kind: "tab", screen: "Market", params: { scambio: "abc-123" } },
+  );
+});
+
 test("le notifiche d'asta aprono Asta", () => {
   assert.deepEqual(resolveNotificationRoute({ title: "Sei stato sorpassato", deepLink: "/mercato" }), { kind: "tab", screen: "Auction" });
 });

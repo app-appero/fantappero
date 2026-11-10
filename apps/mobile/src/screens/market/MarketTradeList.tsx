@@ -15,6 +15,7 @@ import { UiStatePanel } from "../../components/UiStatePanel";
 import { TRADE_STATUS_COLOR, TRADE_STATUS_LABEL } from "../../market/marketLabels";
 import { marketUiStyles as styles } from "../../market/marketUiStyles";
 import type { useTradeFlow } from "../../market/useTradeFlow";
+import { CreditsDirectionField, PickPanel, type CreditsDirection, type TradeAthleteMeta } from "./MarketTradeCreateForm";
 
 type TradeTab = "all" | "received" | "sent" | "done";
 const OPEN_STATUSES = new Set(["proposed", "countered", "accepted", "pending_approval"]);
@@ -61,6 +62,8 @@ export function MarketTradeList({
   athleteNameById,
   ownedSlots,
   canManageMarket,
+  athleteMeta,
+  highlightedProposalId,
 }: {
   trade: ReturnType<typeof useTradeFlow>;
   selfTeamId: string | undefined;
@@ -69,13 +72,17 @@ export function MarketTradeList({
   athleteNameById: Map<string, string>;
   ownedSlots: FantasyRosterSlot[];
   canManageMarket: boolean;
+  /** Ruolo e squadra di ogni calciatore, per il pannello di scelta nella controproposta. */
+  athleteMeta: Map<string, TradeAthleteMeta>;
+  /** Proposta aperta da una notifica: evidenziata invece di lasciarla cercare a mano. */
+  highlightedProposalId?: string | null;
 }) {
   const [tab, setTab] = useState<TradeTab>("all");
   const [counteringProposalId, setCounteringProposalId] = useState<string | null>(null);
   const [counterOfferedAthleteIds, setCounterOfferedAthleteIds] = useState<string[]>([]);
   const [counterRequestedAthleteIds, setCounterRequestedAthleteIds] = useState<string[]>([]);
-  const [counterOfferedCredits, setCounterOfferedCredits] = useState("0");
-  const [counterRequestedCredits, setCounterRequestedCredits] = useState("0");
+  const [counterCreditsDirection, setCounterCreditsDirection] = useState<CreditsDirection>("offer");
+  const [counterCreditsAmount, setCounterCreditsAmount] = useState("0");
   const [counterExpiresAt, setCounterExpiresAt] = useState("");
 
   function teamNameFor(teamId: string): string {
@@ -89,26 +96,29 @@ export function MarketTradeList({
     setCounteringProposalId(proposalId);
     setCounterOfferedAthleteIds([]);
     setCounterRequestedAthleteIds([]);
-    setCounterOfferedCredits("0");
-    setCounterRequestedCredits("0");
+    setCounterCreditsDirection("offer");
+    setCounterCreditsAmount("0");
     setCounterExpiresAt("");
   }
 
   function handleCounterSubmit(proposalId: string) {
-    if (!counterExpiresAt.trim()) {
-      return;
+    // Scadenza facoltativa, come il form della proposta iniziale (e come sul web).
+    let expiresIso: string | null = null;
+    if (counterExpiresAt.trim()) {
+      const parsed = new Date(counterExpiresAt.trim().replace(" ", "T"));
+      if (Number.isNaN(parsed.getTime())) {
+        return;
+      }
+      expiresIso = parsed.toISOString();
     }
-    const parsed = new Date(counterExpiresAt.trim().replace(" ", "T"));
-    if (Number.isNaN(parsed.getTime())) {
-      return;
-    }
+    const credits = Number(counterCreditsAmount) || 0;
     void trade
       .counterProposal(proposalId, {
         offeredAthleteIds: counterOfferedAthleteIds,
         requestedAthleteIds: counterRequestedAthleteIds,
-        offeredCredits: Number(counterOfferedCredits) || 0,
-        requestedCredits: Number(counterRequestedCredits) || 0,
-        expiresAt: parsed.toISOString(),
+        offeredCredits: counterCreditsDirection === "offer" ? credits : 0,
+        requestedCredits: counterCreditsDirection === "request" ? credits : 0,
+        expiresAt: expiresIso,
       })
       .then(() => setCounteringProposalId(null));
   }
@@ -197,7 +207,11 @@ export function MarketTradeList({
             return (
               <View
                 key={proposal.id}
-                style={[styles.proposalCard, isRecipient && proposal.status === "proposed" && styles.proposalCardMine]}
+                style={[
+                  styles.proposalCard,
+                  isRecipient && proposal.status === "proposed" && styles.proposalCardMine,
+                  proposal.id === highlightedProposalId && styles.proposalCardHighlighted,
+                ]}
                 testID={`market-trade-proposal-${proposal.id}`}
               >
                 <View style={styles.proposalHead}>
@@ -293,61 +307,44 @@ export function MarketTradeList({
 
                 {counteringProposalId === proposal.id ? (
                   <View style={styles.field} testID={`market-trade-counter-form-${proposal.id}`}>
-                    <Text style={styles.fieldLabel}>Giocatori offerti nella controproposta</Text>
-                    {ownedSlots.map((slot) => {
-                      const checked = counterOfferedAthleteIds.includes(slot.athleteId as string);
-                      return (
-                        <Pressable
-                          key={slot.id}
-                          style={styles.optionRow}
-                          onPress={() =>
-                            setCounterOfferedAthleteIds((prev) =>
-                              toggleId(prev, slot.athleteId as string),
-                            )
-                          }
-                        >
-                          <AthleteName athleteId={slot.athleteId} style={styles.optionLabel}>
-                            {slot.athleteName ?? "Giocatore"}
-                          </AthleteName>
-                          <Text style={styles.meta}>{checked ? "☑" : "☐"}</Text>
-                        </Pressable>
-                      );
-                    })}
-
-                    <Text style={styles.fieldLabel}>Giocatori richiesti nella controproposta</Text>
-                    {occupancy
-                      .filter((entry) => entry.fantasyTeamId === proposal.proposerTeamId)
-                      .map((entry) => {
-                        const checked = counterRequestedAthleteIds.includes(entry.athleteId);
-                        return (
-                          <Pressable
-                            key={entry.athleteId}
-                            style={styles.optionRow}
-                            onPress={() =>
-                              setCounterRequestedAthleteIds((prev) => toggleId(prev, entry.athleteId))
-                            }
-                          >
-                            <AthleteName athleteId={entry.athleteId} style={styles.optionLabel}>
-                              {entry.athleteName ?? athleteNameById.get(entry.athleteId) ?? "Giocatore"}
-                            </AthleteName>
-                            <Text style={styles.meta}>{checked ? "☑" : "☐"}</Text>
-                          </Pressable>
-                        );
-                      })}
-
-                    <Text style={styles.fieldLabel}>Crediti offerti</Text>
-                    <TextInput
-                      style={styles.input}
-                      value={counterOfferedCredits}
-                      onChangeText={setCounterOfferedCredits}
-                      keyboardType="numeric"
+                    <PickPanel
+                      testID={`market-trade-counter-offered-${proposal.id}`}
+                      title="Tu dai (controproposta)"
+                      hint="Scegli uno o più giocatori della tua rosa"
+                      rows={ownedSlots.map((slot) => ({
+                        athleteId: slot.athleteId as string,
+                        name: slot.athleteName ?? "Giocatore",
+                        price: slot.purchaseCredits ?? null,
+                      }))}
+                      selected={counterOfferedAthleteIds}
+                      onToggle={(id) => setCounterOfferedAthleteIds((prev) => toggleId(prev, id))}
+                      meta={athleteMeta}
+                      emptyText="Nessun giocatore in rosa da offrire."
                     />
-                    <Text style={styles.fieldLabel}>Crediti richiesti</Text>
-                    <TextInput
-                      style={styles.input}
-                      value={counterRequestedCredits}
-                      onChangeText={setCounterRequestedCredits}
-                      keyboardType="numeric"
+
+                    <PickPanel
+                      testID={`market-trade-counter-requested-${proposal.id}`}
+                      title="Tu ricevi (controproposta)"
+                      hint={`Scegli uno o più giocatori di ${teamNameFor(proposal.proposerTeamId)}`}
+                      rows={occupancy
+                        .filter((entry) => entry.fantasyTeamId === proposal.proposerTeamId)
+                        .map((entry) => ({
+                          athleteId: entry.athleteId,
+                          name: entry.athleteName ?? athleteNameById.get(entry.athleteId) ?? "Giocatore",
+                          price: entry.purchaseCredits,
+                        }))}
+                      selected={counterRequestedAthleteIds}
+                      onToggle={(id) => setCounterRequestedAthleteIds((prev) => toggleId(prev, id))}
+                      meta={athleteMeta}
+                      emptyText="Questa squadra non ha ancora giocatori in rosa."
+                    />
+
+                    <CreditsDirectionField
+                      direction={counterCreditsDirection}
+                      amount={counterCreditsAmount}
+                      onDirectionChange={setCounterCreditsDirection}
+                      onAmountChange={setCounterCreditsAmount}
+                      testIDPrefix="market-trade-counter"
                     />
                     <DateTimeField
                       label="Scadenza"
