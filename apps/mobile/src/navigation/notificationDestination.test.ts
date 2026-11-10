@@ -13,6 +13,23 @@ test("le notifiche di scambio con l'id della proposta aprono quella specifica", 
   );
 });
 
+test("le notifiche di scambio col titolo dinamico (v2, nome squadra) aprono comunque Scambi", () => {
+  assert.deepEqual(
+    resolveNotificationRoute({
+      title: "Squadra Sfidante ti propone uno scambio",
+      deepLink: "/mercato?scambio=abc-123",
+    }),
+    { kind: "tab", screen: "Market", params: { scambio: "abc-123" } },
+  );
+  assert.deepEqual(
+    resolveNotificationRoute({
+      title: "Squadra Sfidante ha rifiutato lo scambio",
+      deepLink: "/mercato?scambio=xyz-789",
+    }),
+    { kind: "tab", screen: "Market", params: { scambio: "xyz-789" } },
+  );
+});
+
 test("le notifiche d'asta aprono Asta", () => {
   assert.deepEqual(resolveNotificationRoute({ title: "Sei stato sorpassato", deepLink: "/mercato" }), { kind: "tab", screen: "Auction" });
 });

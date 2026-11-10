@@ -79,6 +79,8 @@ export interface LineupRosterPlayer {
   probableAbsence?: "suspended" | "injured" | "other" | null;
   /** Non può essere aggiunto tra i titolari. Chi è già schierato resta finché non lo si toglie. */
   selectionBlocked?: boolean;
+  /** In rosa ma oltre la quota di ruolo dopo uno scambio: non schierabile finché non si libera uno slot. */
+  exceedsRoleQuota?: boolean;
 }
 
 /**

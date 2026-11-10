@@ -1778,6 +1778,7 @@ class FantasyLineupService:
             ),
             # Chi di sicuro non prende il voto non è selezionabile come titolare.
             selectionBlocked=no_vote_reason is not None,
+            exceedsRoleQuota=row.exceeds_role_quota,
         )
 
     def _to_previous(self, submission: LineupSubmission) -> PreviousLineupResponse:

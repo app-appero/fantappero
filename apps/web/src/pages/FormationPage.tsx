@@ -310,7 +310,9 @@ function playerBlocked(roster: LineupRosterPlayer[], athleteId: string): boolean
   return roster.some(
     (row) =>
       row.athleteId === athleteId &&
-      (row.selectionBlocked === true || row.probableAbsence === "suspended"),
+      (row.selectionBlocked === true ||
+        row.exceedsRoleQuota === true ||
+        row.probableAbsence === "suspended"),
   );
 }
 
@@ -1724,7 +1726,8 @@ export function FormationPage() {
           tone: probableState(roster, row.athleteId),
           countdown: lockLabel(row.athleteId),
           role: playerRole(roster, row.athleteId),
-          disabled: false,
+          // Fuori quota ruolo dopo uno scambio: visibile ma non selezionabile (EP08-10).
+          disabled: row.exceedsRoleQuota === true,
         };
       });
   };
@@ -1760,6 +1763,9 @@ export function FormationPage() {
         const notes = [
           row.role && row.role !== role ? `ruolo ${row.role}, non compatibile` : null,
           playerLocked(roster, row.athleteId, clock, lockMarginMinutes) ? "bloccato" : null,
+          // Scambio accettato col ruolo già al completo: resta visibile in rosa (altrimenti
+          // sembra "scomparso") ma non selezionabile finché non si libera uno slot (EP08-10).
+          row.exceedsRoleQuota ? "fuori quota ruolo, in attesa" : null,
           displayBench.includes(row.athleteId) && row.athleteId !== currentId
             ? displayBench.indexOf(row.athleteId) < benchActive
               ? `Panchina ${displayBench.indexOf(row.athleteId) + 1}°`
@@ -1774,7 +1780,7 @@ export function FormationPage() {
           label: notes.length > 0 ? `${row.athleteName} (${notes.join(", ")})` : row.athleteName,
           name: row.athleteName,
           tone: probableState(roster, row.athleteId),
-          locked: playerLocked(roster, row.athleteId, clock, lockMarginMinutes),
+          locked: playerLocked(roster, row.athleteId, clock, lockMarginMinutes) || row.exceedsRoleQuota === true,
           countdown: lockLabel(row.athleteId),
           note:
             displayBench.includes(row.athleteId) && row.athleteId !== currentId

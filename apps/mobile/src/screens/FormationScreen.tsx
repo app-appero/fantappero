@@ -381,7 +381,9 @@ export function FormationScreen() {
     roster.some(
       (row) =>
         row.athleteId === athleteId &&
-        (row.selectionBlocked === true || row.probableAbsence === "suspended"),
+        (row.selectionBlocked === true ||
+          row.exceedsRoleQuota === true ||
+          row.probableAbsence === "suspended"),
     );
   const playerScoreLabel = (athleteId: string): string | null => {
     const player = roster.find((row) => row.athleteId === athleteId);
@@ -1082,6 +1084,9 @@ export function FormationScreen() {
             if (isCurrent) {
               state = "titolare";
               stateLabel = "Schierato qui";
+            } else if (row.exceedsRoleQuota) {
+              state = "bloccato";
+              stateLabel = "Fuori quota ruolo, in attesa";
             } else if (row.selectionBlocked || row.probableAbsence === "suspended") {
               state = "bloccato";
               stateLabel = row.probableNote ?? "Indisponibile";
@@ -1139,6 +1144,9 @@ export function FormationScreen() {
             } else if (displayStarters.includes(row.athleteId)) {
               state = "titolare";
               stateLabel = "Titolare";
+            } else if (row.exceedsRoleQuota) {
+              state = "bloccato";
+              stateLabel = "Fuori quota ruolo, in attesa";
             } else if (row.selectionBlocked || row.probableAbsence === "suspended") {
               state = "bloccato";
               stateLabel = row.probableNote ?? "Indisponibile";

@@ -67,6 +67,9 @@ class LineupRosterPlayerResponse(ApiModel):
         alias="probableAbsence",
     )
     selection_blocked: bool = Field(default=False, alias="selectionBlocked")
+    # EP08-10: scambio accettato col ruolo già al completo — resta in rosa ma
+    # non è schierabile finché l'allenatore non libera uno slot per quel ruolo.
+    exceeds_role_quota: bool = Field(default=False, alias="exceedsRoleQuota")
 
 
 class LineupPlayerResponse(ApiModel):

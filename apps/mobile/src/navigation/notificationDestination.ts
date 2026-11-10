@@ -61,8 +61,12 @@ export function resolveNotificationRoute(
   item: Pick<NotificationItem, "deepLink" | "title">,
 ): NotificationRoute | null {
   // Gli scambi e le aste condividono il percorso web «/mercato»: sull'app hanno schermate diverse.
-  if (TRADE_TITLES.has(item.title)) {
-    const proposalId = extractQueryParam(item.deepLink, "scambio");
+  // Il titolo v2 è dinamico (interpola il nome della squadra avversaria, es. "Squadra X ti
+  // propone uno scambio") e non combacia mai con TRADE_TITLES: il segnale affidabile è il
+  // parametro ?scambio= nel deep link, presente su ogni notifica di scambio reale; il titolo
+  // statico resta un fallback per eventuali notifiche più vecchie già in coda senza quel parametro.
+  const proposalId = extractQueryParam(item.deepLink, "scambio");
+  if (proposalId || TRADE_TITLES.has(item.title)) {
     return proposalId
       ? { kind: "tab", screen: "Market", params: { scambio: proposalId } }
       : { kind: "tab", screen: "Market" };

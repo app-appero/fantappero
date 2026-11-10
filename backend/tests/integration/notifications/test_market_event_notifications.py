@@ -182,7 +182,9 @@ def test_trade_proposal_notifies_recipient(
         )
     )
     assert notification is not None
-    assert notification.title == "Nuova proposta di scambio"
+    # Titolo v2 dinamico: interpola il nome della squadra proponente
+    # (es. "Squadra X ti propone uno scambio"), non un testo fisso.
+    assert "ti propone uno scambio" in notification.title
 
     # Proposer must not get a self-notification on create.
     proposer_notes = db_session.scalars(
@@ -233,7 +235,9 @@ def test_trade_rejection_notifies_proposer(
         )
     )
     assert notification is not None
-    assert notification.title == "Scambio rifiutato"
+    # Titolo v2 dinamico: interpola il nome della squadra che ha rifiutato
+    # (es. "Squadra X ha rifiutato lo scambio"), non un testo fisso.
+    assert "ha rifiutato lo scambio" in notification.title
 
     # Idempotent replay (e.g. a retried request) must not duplicate the notification.
     again = db_session.scalars(
