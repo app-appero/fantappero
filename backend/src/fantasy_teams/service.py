@@ -29,6 +29,7 @@ from fantasy_teams.composition import RosterCompositionReport
 from fantasy_teams.composition_service import (
     assert_assignment_respects_role_quota,
     evaluate_team_composition,
+    reconcile_role_quota_overflow,
     resolve_effective_athlete_role,
     resolve_effective_athlete_roles,
     resolve_league_rules_limits,
@@ -689,6 +690,7 @@ class FantasyTeamService:
                     athleteName=athlete.canonical_name if athlete is not None else "Giocatore",
                     slotIndex=slot.slot_index,
                     purchaseCredits=slot.purchase_credits,
+                    exceedsRoleQuota=slot.exceeds_role_quota,
                 )
             )
         return players
@@ -943,11 +945,16 @@ class FantasyTeamService:
 
         slot.athlete_id = None
         slot.purchase_credits = None
+        slot.exceeds_role_quota = False
         closed = sync_ownership_on_release(
             self._session,
             fantasy_team_id=team.id,
             slot_index=slot_index,
         )
+        # Svincolare chiunque di quel ruolo (anche un acquisto appena fatto da uno
+        # scambio) può liberare la quota per un calciatore dello stesso ruolo
+        # rimasto fuori rosa in attesa (EP08-10) — non solo se è lui stesso.
+        reconcile_role_quota_overflow(self._session, league=league, team=team)
         if closed is not None:
             self._add_audit(
                 league.id,
@@ -2057,6 +2064,7 @@ class FantasyTeamService:
             clubName=club_name,
             role=role,
             purchaseCredits=slot.purchase_credits,
+            exceedsRoleQuota=slot.exceeds_role_quota,
         )
 
     def _to_ledger_entry(self, entry: CreditLedgerEntry) -> CreditLedgerEntryResponse:

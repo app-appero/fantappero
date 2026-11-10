@@ -230,11 +230,14 @@ def test_accept_swaps_players_and_credits_atomically(
     assert len(sent_entries) == 2
 
 
-def test_accept_fails_and_rolls_back_when_role_quota_exceeded(
+def test_accept_queues_player_instead_of_failing_when_role_quota_exceeded(
     client: TestClient,
     db_session: Session,
     competition_ids: list[str],
 ) -> None:
+    """EP08-10: a role-quota overflow no longer blocks the trade; the incoming
+    player is assigned but flagged as exceeding the quota, in attesa until the
+    coach releases someone of that role."""
     proposer_token, proposer_id = _register_and_login(client, "decide.q.p@example.com")
     recipient_token, recipient_id = _register_and_login(client, "decide.q.r@example.com")
     league_id = _create_league(client, proposer_token, competition_ids, "Lega Scambio Quota")
@@ -256,29 +259,31 @@ def test_accept_fails_and_rolls_back_when_role_quota_exceeded(
         requested_athlete_ids=[str(fourth_gk.id)],
     )
 
-    failed = client.post(
+    accepted = client.post(
         f"/leagues/{league_id}/mercato/scambi/proposte/{proposal['id']}/accetta",
         headers={"Authorization": f"Bearer {recipient_token}"},
     )
-    assert failed.status_code == 400
-    assert failed.json()["code"] == "role_quota_exceeded"
+    assert accepted.status_code == 200
+    assert accepted.json()["status"] == "accepted"
 
-    # Nothing changed: the goalkeeper stays with the recipient, no credits moved.
-    recipient_slot = db_session.scalar(
+    # The goalkeeper moved to the proposer, flagged as over the role quota (in attesa).
+    proposer_slot = db_session.scalar(
         select(FantasyRosterSlot).where(
-            FantasyRosterSlot.fantasy_team_id == UUID(recipient_team_id),
-            FantasyRosterSlot.slot_index == 0,
+            FantasyRosterSlot.fantasy_team_id == UUID(proposer_team_id),
+            FantasyRosterSlot.athlete_id == fourth_gk.id,
         )
     )
-    assert recipient_slot.athlete_id == fourth_gk.id
+    assert proposer_slot is not None
+    assert proposer_slot.exceeds_role_quota is True
+
     proposer_account = db_session.scalar(
         select(CreditAccount).where(CreditAccount.fantasy_team_id == UUID(proposer_team_id))
     )
-    assert proposer_account.balance == 1000
+    assert proposer_account.balance == 1000 - 50
 
     row = db_session.get(TradeProposal, UUID(proposal["id"]))
     assert row is not None
-    assert row.status.value == "proposed"
+    assert row.status.value == "accepted"
 
 
 def test_reject_marks_terminal_and_is_visible_to_both_sides(

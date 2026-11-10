@@ -284,6 +284,9 @@ def collect_candidates_for_team(
             .where(
                 FantasyRosterSlot.fantasy_team_id == team_id,
                 FantasyRosterSlot.athlete_id.is_not(None),
+                # Fuori rosa finché l'allenatore non libera uno slot per il
+                # ruolo (scambio accettato col ruolo già al completo, EP08-10).
+                FantasyRosterSlot.exceeds_role_quota.is_(False),
             )
             .options(selectinload(FantasyRosterSlot.athlete))
         ).all()

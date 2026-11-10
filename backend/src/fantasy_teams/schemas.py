@@ -16,6 +16,7 @@ class FantasyRosterSlotResponse(ApiModel):
     club_name: str | None = Field(default=None, alias="clubName")
     role: str | None = None
     purchase_credits: int | None = Field(default=None, alias="purchaseCredits")
+    exceeds_role_quota: bool = Field(default=False, alias="exceedsRoleQuota")
 
 
 class RosterCompositionLimitsResponse(ApiModel):
@@ -102,6 +103,7 @@ class TeamRosterPlayerResponse(ApiModel):
     athlete_name: str = Field(alias="athleteName")
     slot_index: int = Field(alias="slotIndex")
     purchase_credits: int | None = Field(default=None, alias="purchaseCredits")
+    exceeds_role_quota: bool = Field(default=False, alias="exceedsRoleQuota")
 
 
 class CreditAccountResponse(ApiModel):

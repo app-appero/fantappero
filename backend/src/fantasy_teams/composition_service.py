@@ -344,6 +344,91 @@ def assert_assignment_respects_role_quota(
     return new_role
 
 
+def assign_allowing_role_quota_overflow(
+    session: Session,
+    *,
+    league: League,
+    team: FantasyTeam,
+    athlete_id: UUID,
+    slot_index: int,
+) -> tuple[FantasyRole, bool]:
+    """Like `assert_assignment_respects_role_quota`, but a quota overflow is allowed
+    through instead of rejected — for trade acceptance only (EP08-10): the system
+    revalidates everything else at acceptance time ("nessuna operazione parziale"),
+    but a role already at its cap must not sink an otherwise-agreed trade. Returns
+    `(role, exceeds_quota)`; the caller marks the slot so the player counts as
+    owned but stays unavailable to field until released.
+    """
+    from auth.exceptions import ValidationAuthError
+
+    try:
+        role = assert_assignment_respects_role_quota(
+            session,
+            league=league,
+            team=team,
+            athlete_id=athlete_id,
+            slot_index=slot_index,
+        )
+        return role, False
+    except ValidationAuthError as exc:
+        if exc.code != "role_quota_exceeded":
+            raise
+        role = resolve_effective_athlete_role(
+            session,
+            league_id=league.id,
+            athlete_id=athlete_id,
+            season_year=league.season_year,
+            competition_ids={competition.id for competition in league.competitions},
+        )
+        if role is None:
+            raise
+        return role, True
+
+
+def reconcile_role_quota_overflow(session: Session, *, league: League, team: FantasyTeam) -> None:
+    """Clear `exceeds_role_quota` on any slot whose role is no longer actually over
+    quota — called after anything that can change a team's roster composition
+    (releasing a player, a trade). A role can stop being over quota either because
+    the flagged player's own role was released, or because a *different* player of
+    that same role left, freeing the limit for the one still flagged.
+    """
+    limits = resolve_league_rules_limits(session, league.id)
+    slots = list(
+        session.scalars(
+            select(FantasyRosterSlot).where(
+                FantasyRosterSlot.fantasy_team_id == team.id,
+                FantasyRosterSlot.athlete_id.isnot(None),
+            )
+        ).all()
+    )
+    if not slots:
+        return
+    athlete_ids = [slot.athlete_id for slot in slots if slot.athlete_id is not None]
+    roles = resolve_effective_athlete_roles(
+        session,
+        league_id=league.id,
+        athlete_ids=athlete_ids,
+        season_year=league.season_year,
+        competition_ids={competition.id for competition in league.competitions},
+    )
+    role_counts: dict[FantasyRole, int] = {}
+    flagged_by_role: dict[FantasyRole, list[FantasyRosterSlot]] = {}
+    for slot in slots:
+        resolved = roles.get(slot.athlete_id)
+        if resolved is None:
+            continue
+        role_counts[resolved.role] = role_counts.get(resolved.role, 0) + 1
+        if slot.exceeds_role_quota:
+            flagged_by_role.setdefault(resolved.role, []).append(slot)
+    for role, flagged_slots in flagged_by_role.items():
+        over = max(0, role_counts.get(role, 0) - limits.for_role(role))
+        # Keep exactly `over` flagged (still genuinely in excess); clear the rest —
+        # the role count caught up with the quota for those, even if another
+        # player of the same role is still queued behind them.
+        for slot in flagged_slots[over:]:
+            slot.exceeds_role_quota = False
+
+
 def activation_roster_and_credit_blockers(
     session: Session,
     league: League,

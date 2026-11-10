@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 from uuid import UUID
 
 from sqlalchemy import (
+    Boolean,
     CheckConstraint,
     Enum,
     ForeignKey,
@@ -127,6 +128,11 @@ class FantasyRosterSlot(Base, UUIDPrimaryKeyMixin, TimestampMixin):
         index=True,
     )
     purchase_credits: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    #: True quando questo calciatore ha portato la squadra oltre la quota di
+    #: rosa del suo ruolo (uno scambio accettato nonostante il ruolo fosse già
+    #: al completo, EP08-10): fuori rosa — non schierabile — finché
+    #: l'allenatore non libera uno slot per quel ruolo svincolando qualcuno.
+    exceeds_role_quota: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 
     fantasy_team: Mapped[FantasyTeam] = relationship(back_populates="slots")
     athlete: Mapped[Athlete | None] = relationship()

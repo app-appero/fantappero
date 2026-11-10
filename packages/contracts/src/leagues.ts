@@ -811,6 +811,8 @@ export interface FantasyRosterSlot {
   clubName: string | null;
   role: string | null;
   purchaseCredits: number | null;
+  /** EP08-10: in rosa ma oltre la quota di ruolo, in attesa che l'allenatore svincoli qualcuno. */
+  exceedsRoleQuota: boolean;
 }
 
 export interface FantasyTeam {
@@ -865,6 +867,8 @@ export interface TeamRosterPlayer {
   athleteName: string;
   slotIndex: number;
   purchaseCredits: number | null;
+  /** EP08-10: in rosa ma oltre la quota di ruolo, in attesa che l'allenatore svincoli qualcuno. */
+  exceedsRoleQuota: boolean;
 }
 
 /** Credit ledger (EP05-02 / EP05-03). */

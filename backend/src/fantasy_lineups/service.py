@@ -108,6 +108,10 @@ class _RosterRow:
     slot_index: int
     photo_url: str | None = None
     real_team_name: str | None = None
+    #: True se questo calciatore ha portato la rosa oltre la quota del suo
+    #: ruolo (scambio accettato col ruolo già al completo, EP08-10): resta in
+    #: rosa ma non è schierabile finché l'allenatore non libera uno slot.
+    exceeds_role_quota: bool = False
 
 
 class FantasyLineupService:
@@ -331,7 +335,7 @@ class FantasyLineupService:
             )
 
         roster = self._roster_rows(league_access.league.season_year, team)
-        roster_ids = [str(row.athlete_id) for row in roster]
+        roster_ids = [str(row.athlete_id) for row in roster if not row.exceeds_role_quota]
 
         # Chi è bloccato e con quale ruolo è stato schierato va saputo *prima*
         # di validare il modulo (vedi `_validation_roles`). `for_update=True`
@@ -640,7 +644,7 @@ class FantasyLineupService:
             previous_module=previous.module.value,
             previous_starter_ids=self._starter_order_from_submission(previous),
             previous_bench_ids=self._bench_order_from_submission(previous),
-            roster_athlete_ids=[str(row.athlete_id) for row in roster],
+            roster_athlete_ids=[str(row.athlete_id) for row in roster if not row.exceeds_role_quota],
             locked_athlete_ids=locked_ids,
             current_confirmed_slots=self._slots_from_submission(submission),
             current_confirmed_bench=self._bench_order_from_submission(submission),
@@ -1006,7 +1010,7 @@ class FantasyLineupService:
             raise
 
         roster = self._roster_rows(league_access.league.season_year, team)
-        roster_ids = [str(row.athlete_id) for row in roster]
+        roster_ids = [str(row.athlete_id) for row in roster if not row.exceeds_role_quota]
 
         # Come in `save_my_lineup`: serve sapere chi è bloccato prima di
         # validare, per usare il ruolo di schieramento (vedi `_validation_roles`).
@@ -1270,6 +1274,7 @@ class FantasyLineupService:
                     real_team_name=(
                         club_names.get(resolved.club_id) if resolved is not None else None
                     ),
+                    exceeds_role_quota=slot.exceeds_role_quota,
                 )
             )
         return rows
@@ -1337,7 +1342,7 @@ class FantasyLineupService:
                 module=saved.module,
                 starters=starters,
                 bench=bench,
-                roster_athlete_ids=[str(row.athlete_id) for row in roster],
+                roster_athlete_ids=[str(row.athlete_id) for row in roster if not row.exceeds_role_quota],
             )
             issues = [
                 LineupIssueResponse(code=item.code, message=item.message)
@@ -1360,7 +1365,7 @@ class FantasyLineupService:
                 previous_module=previous.module.value,
                 previous_starter_ids=self._starter_order_from_submission(previous),
                 previous_bench_ids=self._bench_order_from_submission(previous),
-                roster_athlete_ids=[str(row.athlete_id) for row in roster],
+                roster_athlete_ids=[str(row.athlete_id) for row in roster if not row.exceeds_role_quota],
                 locked_athlete_ids=locked_ids,
                 current_confirmed_slots=self._slots_from_submission(submission),
                 current_confirmed_bench=self._bench_order_from_submission(submission),

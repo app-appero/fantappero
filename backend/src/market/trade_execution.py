@@ -16,7 +16,7 @@ from sqlalchemy.orm import Session
 from auth.exceptions import ValidationAuthError
 from database.enums import CreditLedgerReason, RosterOwnershipSource
 from fantasy_teams.composition_service import (
-    assert_assignment_respects_role_quota,
+    assign_allowing_role_quota_overflow,
     sync_team_composition_status,
 )
 from fantasy_teams.ledger import apply_ledger_movement, find_account_for_team
@@ -140,12 +140,14 @@ def execute_trade(
         for slot in proposer_out_slots:
             slot.athlete_id = None
             slot.purchase_credits = None
+            slot.exceeds_role_quota = False
             sync_ownership_on_release(
                 session, fantasy_team_id=proposer_team.id, slot_index=slot.slot_index
             )
         for slot in recipient_out_slots:
             slot.athlete_id = None
             slot.purchase_credits = None
+            slot.exceeds_role_quota = False
             sync_ownership_on_release(
                 session, fantasy_team_id=recipient_team.id, slot_index=slot.slot_index
             )
@@ -155,7 +157,7 @@ def execute_trade(
         # cumulative effect of the steps already applied within this savepoint.
         for athlete_id in requested_ids:
             slot = _next_free_slot(session, team_id=proposer_team.id)
-            assert_assignment_respects_role_quota(
+            _, exceeds_quota = assign_allowing_role_quota_overflow(
                 session,
                 league=league,
                 team=proposer_team,
@@ -164,6 +166,7 @@ def execute_trade(
             )
             slot.athlete_id = athlete_id
             slot.purchase_credits = 0
+            slot.exceeds_role_quota = exceeds_quota
             session.flush()
             sync_ownership_on_assign(
                 session,
@@ -177,7 +180,7 @@ def execute_trade(
             )
         for athlete_id in offered_ids:
             slot = _next_free_slot(session, team_id=recipient_team.id)
-            assert_assignment_respects_role_quota(
+            _, exceeds_quota = assign_allowing_role_quota_overflow(
                 session,
                 league=league,
                 team=recipient_team,
@@ -186,6 +189,7 @@ def execute_trade(
             )
             slot.athlete_id = athlete_id
             slot.purchase_credits = 0
+            slot.exceeds_role_quota = exceeds_quota
             session.flush()
             sync_ownership_on_assign(
                 session,
