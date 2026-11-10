@@ -6,6 +6,7 @@ import { Modal, Pressable, StyleSheet, Text, View } from "react-native";
 import { BrandLogo } from "../components/BrandLogo";
 import { LeagueSelector, type LeagueOption } from "../components/LeagueSelector";
 import { NavIcon } from "../navigation/NavIcons";
+import { useAppTheme } from "../theme/AppTheme";
 
 const { colors, spacing, typography, radius } = theme;
 
@@ -52,6 +53,12 @@ export function AppHeader({
   onLogoutPress,
   showLogout = false,
 }: AppHeaderProps) {
+  // Sottoscrizione esplicita al tema: l'header vive fuori dalla schermata
+  // Profilo che cambia la preferenza, quindi non si re-renderizza mai solo
+  // perché il contesto del tema cambia altrove — senza questa chiamata
+  // restava con i colori vecchi finché qualcos'altro non lo faceva
+  // ridisegnare (es. cambio schermata).
+  useAppTheme();
   const isAdmin = surface === "admin";
   const [leagueMenuOpen, setLeagueMenuOpen] = useState(false);
   const canAddLeague = Boolean(onCreateLeaguePress || onJoinLeaguePress);

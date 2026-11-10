@@ -1557,7 +1557,8 @@ a.fa-member-list__identity:focus-visible {
   font-size: 0.75rem;
   font-weight: 700;
   color: var(--fa-color-foreground);
-  background: rgba(8, 12, 30, 0.72);
+  background: var(--fa-color-background-elevated);
+  border: 1px solid var(--fa-color-border);
   border-radius: var(--fa-radius-pill);
   padding: 0 6px;
 }
@@ -4607,8 +4608,9 @@ h2 {
   gap: var(--fa-space-md);
   padding: var(--fa-space-lg);
   border-radius: 24px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  background: rgba(20, 26, 52, 0.7);
+  border: 1px solid var(--fa-color-border);
+  background: var(--fa-color-background-elevated);
+  color: var(--fa-color-foreground);
 }
 
 .fa-nop-card__head h3 {
@@ -4644,8 +4646,8 @@ h2 {
   color: inherit;
   font: inherit;
   cursor: pointer;
-  background: rgba(8, 12, 30, 0.5);
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: var(--fa-color-background);
+  border: 1px solid var(--fa-color-border);
 }
 
 .fa-nop-radio--on {
@@ -4694,8 +4696,8 @@ h2 {
   box-sizing: border-box;
   padding: 12px 16px;
   border-radius: 14px;
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  background: rgba(8, 12, 30, 0.7);
+  border: 1px solid var(--fa-color-input-border);
+  background: var(--fa-color-input-bg);
   color: inherit;
   font: inherit;
   resize: vertical;
@@ -4792,8 +4794,9 @@ h2 {
 .fa-nop-pickfoot {
   padding: 14px 16px;
   border-radius: 20px;
-  background: rgba(8, 12, 30, 0.85);
+  background: var(--fa-color-background-elevated);
   border: 1px solid rgba(109, 141, 255, 0.4);
+  color: var(--fa-color-foreground);
 }
 
 .fa-nop-check {
@@ -4841,8 +4844,8 @@ h2 {
   color: inherit;
   font: inherit;
   cursor: pointer;
-  background: rgba(8, 12, 30, 0.4);
-  border: 1px solid rgba(255, 255, 255, 0.07);
+  background: var(--fa-color-background);
+  border: 1px solid var(--fa-color-border);
 }
 
 .fa-nop-user--on {
@@ -5469,7 +5472,8 @@ h2 {
 .fa-starter-row__count {
   padding: 1px 8px;
   border-radius: 999px;
-  background: rgba(8, 12, 30, 0.7);
+  background: var(--fa-color-background-elevated);
+  border: 1px solid var(--fa-color-border);
   color: var(--fa-color-foreground);
   font-weight: 700;
 }
@@ -5699,7 +5703,8 @@ button.fa-starter-row:disabled {
 .fa-starter-row__tag {
   padding: 1px 8px;
   border-radius: 999px;
-  background: rgba(8, 12, 30, 0.7);
+  background: var(--fa-color-background-elevated);
+  border: 1px solid var(--fa-color-border);
   color: var(--fa-color-foreground);
   font-size: 0.78rem;
   font-weight: 700;

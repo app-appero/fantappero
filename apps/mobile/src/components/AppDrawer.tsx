@@ -14,6 +14,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { BrandLogo } from "./BrandLogo";
 import { NavIcon } from "../navigation/NavIcons";
 import { buildMobileNavSections, type ResolvedMobileNavItem } from "../navigation/navConfig";
+import { useAppTheme } from "../theme/AppTheme";
 
 const { colors, spacing, typography, radius } = theme;
 
@@ -57,6 +58,10 @@ export function AppDrawer({
   onBackToAppPress,
   onLogout,
 }: AppDrawerProps) {
+  // Vedi lo stesso commento in AppHeader.tsx: componente sempre montato fuori
+  // dalla schermata Profilo, serve una sottoscrizione esplicita al tema per
+  // non restare con i colori vecchi finché qualcos'altro non lo ridisegna.
+  useAppTheme();
   const insets = useSafeAreaInsets();
   const sections = useMemo(() => buildMobileNavSections(items), [items]);
   const isExpanded = (groupId: string) =>
