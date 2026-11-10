@@ -502,7 +502,7 @@ const styles = lazyStyles(() => StyleSheet.create({
     paddingVertical: 3,
     borderRadius: 999,
     overflow: "hidden",
-    backgroundColor: "rgba(255,255,255,0.1)",
+    backgroundColor: colors.backgroundSubtle,
   },
   chipOk: { backgroundColor: "rgba(52,211,153,0.22)", color: colors.success },
   chipMuted: { backgroundColor: "rgba(156,163,175,0.2)" },

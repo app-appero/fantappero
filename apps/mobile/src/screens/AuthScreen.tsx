@@ -136,7 +136,7 @@ export function AuthScreen() {
           ) : null}
           {SHOW_APPLE_SIGN_IN ? (
             <View style={styles.appleDisabled} accessibilityRole="button" accessibilityState={{ disabled: true }} accessibilityLabel="Continua con Apple, disponibile presto" testID="auth-apple-disabled">
-              <Ionicons name="logo-apple" size={22} color="#FFFFFF" />
+              <Ionicons name="logo-apple" size={22} color={colors.foreground} />
               <Text style={styles.appleLabel}>Continua con Apple</Text>
             </View>
           ) : null}
@@ -427,8 +427,8 @@ export const authFormStyles = lazyStyles(() => StyleSheet.create({
     backgroundColor: colors.backgroundElevated,
     opacity: 0.5,
   },
-  appleGlyph: { color: "#fff", fontSize: 20 },
-  appleLabel: { color: "#fff", fontWeight: "700", fontSize: typography.fontSize.md },
+  appleGlyph: { color: colors.foreground, fontSize: 20 },
+  appleLabel: { color: colors.foreground, fontWeight: "700", fontSize: typography.fontSize.md },
   emailButton: {
     minHeight: 54,
     alignItems: "center",
@@ -438,7 +438,7 @@ export const authFormStyles = lazyStyles(() => StyleSheet.create({
     borderColor: "#7A4DFF",
     backgroundColor: "rgba(122,77,255,0.12)",
   },
-  emailButtonLabel: { color: "#E7DDFF", fontWeight: "700", fontSize: typography.fontSize.md },
+  emailButtonLabel: { color: colors.accentSecondary, fontWeight: "700", fontSize: typography.fontSize.md },
   googleButton: {
     minHeight: 54,
     flexDirection: "row",

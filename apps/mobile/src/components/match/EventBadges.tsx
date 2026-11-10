@@ -9,11 +9,11 @@ const { colors } = theme;
 type IconSpec = { name: keyof typeof MaterialCommunityIcons.glyphMap; color: string };
 
 const ICON_BY_KIND: Record<MatchBadgeKind, IconSpec> = {
-  goal: { name: "soccer", color: "#fff" },
+  goal: { name: "soccer", color: colors.foreground },
   ownGoal: { name: "soccer", color: colors.danger },
-  penaltyScored: { name: "soccer", color: "#fff" },
+  penaltyScored: { name: "soccer", color: colors.foreground },
   penaltyMissed: { name: "close-circle", color: colors.danger },
-  penaltySaved: { name: "hand-back-right", color: "#fff" },
+  penaltySaved: { name: "hand-back-right", color: colors.foreground },
   assist: { name: "shoe-print", color: colors.accent },
   yellowCard: { name: "card", color: colors.warning },
   redCard: { name: "card", color: colors.danger },

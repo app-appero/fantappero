@@ -267,7 +267,6 @@ function VersusCell({ player, dim, now }: { player: H2HPlayerScore | undefined; 
         <Text
           style={[
             styles.vote,
-            styles.voteWhite,
             vote.live ? styles.voteLive : null,
             vote.kind === "provisional" ? styles.voteProvisional : null,
             vote.kind === "sv" ? styles.voteSv : null,
@@ -365,11 +364,11 @@ const styles = lazyStyles(() =>
     dim: { opacity: 0.6 },
     rowLive: { borderColor: "#60a5fa", backgroundColor: "rgba(59,130,246,0.14)" },
     rowSv: { borderColor: "#c084fc", backgroundColor: "rgba(168,85,247,0.14)" },
-    // Riempimento pieno e opaco: su Android un fondo trasparente con elevation mostra un'ombra scura dentro la riga.
+    // Riempimento pieno e opaco (eredita quello di "row", già a tema): su Android un fondo
+    // trasparente con elevation mostra un'ombra scura dentro la riga.
     rowFinal: {
-      borderColor: "#ffffff",
+      borderColor: colors.borderStrong,
       borderWidth: 1.5,
-      backgroundColor: "#454F7D",
     },
     livePulse: {
       position: "absolute",
@@ -393,8 +392,8 @@ const styles = lazyStyles(() =>
     team: { color: colors.foregroundMuted, fontSize: typography.fontSize.xs },
     countdown: { color: colors.foregroundMuted, fontSize: 11, fontWeight: "700" },
     vote: {
-      color: "#ffffff",
-      backgroundColor: "rgba(255,255,255,0.12)",
+      color: colors.foreground,
+      backgroundColor: colors.backgroundSubtle,
       borderRadius: 999,
       paddingHorizontal: 8,
       paddingVertical: 2,
@@ -403,7 +402,7 @@ const styles = lazyStyles(() =>
       overflow: "hidden",
     },
     voteLive: { backgroundColor: "#2563eb", color: "#ffffff" },
-    voteProvisional: { borderWidth: 1, borderStyle: "dashed", borderColor: "rgba(255,255,255,0.8)" },
+    voteProvisional: { borderWidth: 1, borderStyle: "dashed", borderColor: colors.borderStrong },
     voteSv: { backgroundColor: "#7c3aed", color: "#fff" },
     voteFinal: { backgroundColor: "#ffffff", color: "#11162B" },
     tabs: { gap: spacing.xs },
@@ -432,8 +431,7 @@ const styles = lazyStyles(() =>
     },
     vmain: { flex: 1, minWidth: 0, gap: 3, alignItems: "flex-start" },
     vname: { color: colors.foreground, fontWeight: "700", fontSize: typography.fontSize.sm },
-    vcd: { color: "#c9d2f0", fontSize: 11, fontWeight: "700" },
-    voteWhite: { color: "#ffffff" },
+    vcd: { color: colors.foregroundMuted, fontSize: 11, fontWeight: "700" },
     versus: { gap: 6 },
     vempty: {
       minHeight: 56,

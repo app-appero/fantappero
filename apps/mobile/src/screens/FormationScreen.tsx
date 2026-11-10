@@ -2081,10 +2081,10 @@ const styles = lazyStyles(() => StyleSheet.create({
   benchPhoto: { width: 38, height: 38, borderRadius: 19, borderWidth: 3 },
   benchNameRow: { flexDirection: "row", alignItems: "center", gap: spacing.xs, flexWrap: "wrap" },
   benchLock: {
-    color: "#ffffff",
+    color: colors.foreground,
     fontSize: 11,
     fontWeight: "700",
-    backgroundColor: "rgba(8,12,30,0.82)",
+    backgroundColor: colors.backgroundSubtle,
     borderRadius: 999,
     paddingHorizontal: 6,
     overflow: "hidden",
