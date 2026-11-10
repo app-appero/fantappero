@@ -353,8 +353,6 @@ export function ProfileScreen() {
 
       {activeTab === "utente" ? (
         <>
-      <ThemePreferenceSection />
-
       <View style={styles.section} testID="profile-avatar-section">
         <Text style={styles.sectionTitle}>Avatar</Text>
         {resolveAvatarUrl(profile.avatarUrl) ? (
@@ -452,6 +450,8 @@ export function ProfileScreen() {
           </Text>
         </Pressable>
       </View>
+
+      <ThemePreferenceSection />
 
       <View style={styles.section} testID="profile-directory-availability-section">
         <Text style={styles.sectionTitle}>Directory fantallenatori</Text>
