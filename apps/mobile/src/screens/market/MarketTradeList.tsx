@@ -18,7 +18,12 @@ import type { useTradeFlow } from "../../market/useTradeFlow";
 import { CreditsDirectionField, PickPanel, type CreditsDirection, type TradeAthleteMeta } from "./MarketTradeCreateForm";
 
 type TradeTab = "received" | "sent" | "open" | "done" | "all";
-const OPEN_STATUSES = new Set(["proposed", "countered", "accepted", "pending_approval"]);
+// "accepted" è già uno stato finale (execute_trade sposta subito giocatori e
+// crediti quando non serve l'approvazione dell'amministratore). "countered"
+// è altrettanto finale: segna la proposta ORIGINALE come superata — la vera
+// proposta ancora da decidere è quella nuova (ruoli invertiti, stato
+// "proposed") creata dalla controproposta, non questa riga storica.
+const OPEN_STATUSES = new Set(["proposed", "pending_approval"]);
 
 function TradeSide({
   title,

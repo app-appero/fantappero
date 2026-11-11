@@ -131,7 +131,9 @@ export function MarketScreen() {
     onBalanceAffectingAction: () => void loadTeam(),
   });
   const [showForm, setShowForm] = useState(false);
-  const openStatuses = ["proposed", "countered", "accepted", "pending_approval"];
+  // "accepted" e "countered" sono già stati finali — vedi la stessa nota in
+  // MarketTradeList.tsx.
+  const openStatuses = ["proposed", "pending_approval"];
   const pendingForMe = trade.proposals.filter(
     (row) => row.recipientTeamId === team?.id && row.status === "proposed",
   ).length;

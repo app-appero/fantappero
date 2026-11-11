@@ -511,7 +511,12 @@ export function MarketPage() {
     );
   }
 
-  const OPEN_TRADE_STATUSES = ["proposed", "countered", "accepted", "pending_approval"];
+  // "accepted" è già uno stato finale (execute_trade sposta subito giocatori e
+  // crediti quando non serve l'approvazione dell'amministratore). "countered"
+  // è altrettanto finale: segna la proposta ORIGINALE come superata — la vera
+  // proposta ancora da decidere è quella nuova (ruoli invertiti, stato
+  // "proposed") creata dalla controproposta, non questa riga storica.
+  const OPEN_TRADE_STATUSES = ["proposed", "pending_approval"];
   const receivedTrades = trade.proposals.filter(
     (row) => row.recipientTeamId === team?.id && OPEN_TRADE_STATUSES.includes(row.status),
   );
