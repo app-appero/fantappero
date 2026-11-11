@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { Pressable, Text, View } from "react-native";
 import type { LeagueListoneEntry } from "@fantappero/contracts";
+import { formatDateTimeValue } from "../../components/DateTimeField";
 import { AthleteChooser } from "../../components/AthleteChooser";
 import { AppTextInput as TextInput } from "../../components/AppTextInput";
 import { OptionPicker, type OptionPickerOption } from "../../components/OptionPicker";
@@ -64,7 +65,9 @@ export function AuctionBidPanel({
           message={
             !marketOpen
               ? "L'amministratore ha chiuso il mercato. Restano disponibili solo gli scambi."
-              : notOpenMessage
+              : flow.currentSession?.status === "scheduled"
+                ? `La sessione è programmata: si apre ${formatDateTimeValue(new Date(flow.currentSession.opensAt))} e chiude ${formatDateTimeValue(new Date(flow.currentSession.closesAt))}.`
+                : notOpenMessage
           }
           testID={`${testIdPrefix}-bid-not-open`}
         />

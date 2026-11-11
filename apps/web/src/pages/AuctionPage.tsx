@@ -74,6 +74,10 @@ const SESSION_STATUS_LABEL: Record<MarketSessionStatus, string> = {
   resolved: "Risolta",
 };
 
+function formatSessionDate(iso: string): string {
+  return new Date(iso).toLocaleString("it-IT", { dateStyle: "medium", timeStyle: "short" });
+}
+
 const SESSION_STATUS_VARIANT: Record<
   MarketSessionStatus,
   "success" | "warning" | "accent" | "danger" | "neutral"
@@ -390,6 +394,10 @@ export function AuctionPage() {
                   </Badge>{" "}
                   · Offerte: {flow.currentSession.bidCount ?? "—"}
                 </p>
+                <p data-testid="auction-admin-window">
+                  Apre {formatSessionDate(flow.currentSession.opensAt)} · chiude{" "}
+                  {formatSessionDate(flow.currentSession.closesAt)}
+                </p>
                 <div className="fa-ds-showcase__row">
                   <Button
                     variant="secondary"
@@ -494,7 +502,9 @@ export function AuctionPage() {
               title={marketOpen ? "Asta non aperta" : "Mercato chiuso"}
               message={
                 marketOpen
-                  ? "Le offerte si possono inviare solo mentre la sessione è aperta."
+                  ? flow.currentSession?.status === "scheduled"
+                    ? `La sessione è programmata: si apre ${formatSessionDate(flow.currentSession.opensAt)} e chiude ${formatSessionDate(flow.currentSession.closesAt)}.`
+                    : "Le offerte si possono inviare solo mentre la sessione è aperta."
                   : "L'amministratore ha chiuso il mercato. Restano disponibili solo gli scambi."
               }
               testId={marketOpen ? "auction-bid-not-open" : "auction-bid-market-closed"}
