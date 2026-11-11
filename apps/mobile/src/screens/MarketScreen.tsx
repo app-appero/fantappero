@@ -132,10 +132,15 @@ export function MarketScreen() {
   });
   const [showForm, setShowForm] = useState(false);
   const openStatuses = ["proposed", "countered", "accepted", "pending_approval"];
-  const openTotal = trade.proposals.filter((row) => openStatuses.includes(row.status)).length;
   const pendingForMe = trade.proposals.filter(
     (row) => row.recipientTeamId === team?.id && row.status === "proposed",
   ).length;
+  // Stesse 4 statistiche del web (Crediti residui / Da gestire / Inviate in
+  // corso / Scambi conclusi), per non mostrare numeri diversi tra le piattaforme.
+  const sentOpenCount = trade.proposals.filter(
+    (row) => row.proposerTeamId === team?.id && openStatuses.includes(row.status),
+  ).length;
+  const doneCount = trade.proposals.filter((row) => !openStatuses.includes(row.status)).length;
   const history = useMarketHistory({ leagueId: activeLeagueId, accessToken, active: true });
 
   const ownedSlots = useMemo(
@@ -397,18 +402,26 @@ export function MarketScreen() {
 
       {!loading && !loadError && activeLeagueId ? (
         <View style={{ gap: 12 }}>
-          <View style={styles.statRow} testID="market-trade-stats">
-            <View style={styles.statTile}>
-              <Text style={styles.heroLabel}>Crediti</Text>
-              <Text style={styles.heroValue}>{balance ?? "—"}</Text>
+          <View style={{ gap: 8 }} testID="market-trade-stats">
+            <View style={styles.statRow}>
+              <View style={styles.statTile}>
+                <Text style={styles.heroLabel}>Crediti residui</Text>
+                <Text style={styles.heroValue}>{balance ?? "—"}</Text>
+              </View>
+              <View style={styles.statTile}>
+                <Text style={styles.heroLabel}>Da gestire</Text>
+                <Text style={styles.heroValue}>{pendingForMe}</Text>
+              </View>
             </View>
-            <View style={styles.statTile}>
-              <Text style={styles.heroLabel}>Da gestire</Text>
-              <Text style={styles.heroValue}>{pendingForMe}</Text>
-            </View>
-            <View style={styles.statTile}>
-              <Text style={styles.heroLabel}>Aperte</Text>
-              <Text style={styles.heroValue}>{openTotal}</Text>
+            <View style={styles.statRow}>
+              <View style={styles.statTile}>
+                <Text style={styles.heroLabel}>Inviate in corso</Text>
+                <Text style={styles.heroValue}>{sentOpenCount}</Text>
+              </View>
+              <View style={styles.statTile}>
+                <Text style={styles.heroLabel}>Scambi conclusi</Text>
+                <Text style={styles.heroValue}>{doneCount}</Text>
+              </View>
             </View>
           </View>
           <Pressable

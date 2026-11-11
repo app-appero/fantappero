@@ -145,7 +145,7 @@ export function MarketTradeList({
   const tabs: Array<{ id: TradeTab; label: string; count: number }> = [
     { id: "received", label: "Ricevute", count: received.length },
     { id: "sent", label: "Inviate", count: sent.length },
-    { id: "open", label: "Aperte", count: open.length },
+    { id: "open", label: "In corso", count: open.length },
     { id: "done", label: "Concluse", count: done.length },
     { id: "all", label: "Tutte", count: trade.proposals.length },
   ];

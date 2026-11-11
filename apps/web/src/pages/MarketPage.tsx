@@ -679,7 +679,7 @@ export function MarketPage() {
               <strong>{balance ?? "—"}</strong>
             </div>
             <div className="fa-trade-stat">
-              <span>In attesa di te</span>
+              <span>Da gestire</span>
               <strong>{pendingForMe}</strong>
             </div>
             <div className="fa-trade-stat">
@@ -869,7 +869,7 @@ export function MarketPage() {
                 [
                   ["received", "Ricevute", receivedTrades.length],
                   ["sent", "Inviate", sentTrades.length],
-                  ["open", "Aperte", openTrades.length],
+                  ["open", "In corso", openTrades.length],
                   ["done", "Concluse", doneTrades.length],
                   ["all", "Tutte", trade.proposals.length],
                 ] as const
