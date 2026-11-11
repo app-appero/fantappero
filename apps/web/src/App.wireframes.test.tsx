@@ -77,7 +77,7 @@ describe("EPUI-04 wireframes", () => {
     const html = renderAt("/asta", "?persona=admin&stato=success");
     expect(html).toContain('data-testid="auction-bid-panel"');
     expect(html).toContain('data-testid="wireframe-region-auction-bid"');
-    expect(html).toContain('data-testid="auction-listone-card"');
+    expect(html).not.toContain('data-testid="auction-listone-card"');
   });
 
   it("shows admin auction controls for admin persona", () => {

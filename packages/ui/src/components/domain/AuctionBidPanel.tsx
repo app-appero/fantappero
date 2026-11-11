@@ -28,6 +28,8 @@ export type AuctionBidPanelProps = {
   onSubmit?: (event: FormEvent<HTMLFormElement>) => void;
   submitting?: boolean;
   disabled?: boolean;
+  /** Custom player picker (e.g. a searchable list) replacing the select/text field. */
+  playerField?: ReactNode;
   /** Extra field rendered between the bid amount and the status line (e.g. release-athlete picker for waivers). */
   extraField?: ReactNode;
   errorMessage?: string;
@@ -54,6 +56,7 @@ export function AuctionBidPanel({
   onSubmit,
   submitting = false,
   disabled = false,
+  playerField,
   extraField,
   errorMessage,
 }: AuctionBidPanelProps) {
@@ -63,7 +66,9 @@ export function AuctionBidPanel({
         <span className="fa-auction-panel__budget-label">{budgetLabel}</span>
         <strong>{budgetValue}</strong>
       </p>
-      {playerOptions ? (
+      {playerField ? (
+        playerField
+      ) : playerOptions ? (
         <Select
           label={playerLabel}
           placeholder={playerPlaceholder}

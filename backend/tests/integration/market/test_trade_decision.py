@@ -301,7 +301,12 @@ def test_accept_creates_overflow_slot_instead_of_failing_when_roster_has_no_free
     _add_member(db_session, league_id, recipient_id)
 
     # Standard preset: 3 P, 11 D, 11 C, 10 A — fill the proposer's roster completely.
-    role_counts = ((FantasyRole.P, 3), (FantasyRole.D, 11), (FantasyRole.C, 11), (FantasyRole.A, 10))
+    role_counts = (
+        (FantasyRole.P, 3),
+        (FantasyRole.D, 11),
+        (FantasyRole.C, 11),
+        (FantasyRole.A, 10),
+    )
     provider_id = 9700
     slot_index = 0
     offered_athlete: Athlete | None = None
@@ -309,7 +314,9 @@ def test_accept_creates_overflow_slot_instead_of_failing_when_roster_has_no_free
     for role, count in role_counts:
         for position in range(count):
             athlete = _seed_athlete(db_session, provider_id, f"{role.value}{position}", role=role)
-            proposer_team_id = _own_athlete_at_slot(client, league_id, proposer_token, slot_index, athlete)
+            proposer_team_id = _own_athlete_at_slot(
+                client, league_id, proposer_token, slot_index, athlete
+            )
             if role is FantasyRole.D and position == 0:
                 offered_athlete = athlete
             provider_id += 1

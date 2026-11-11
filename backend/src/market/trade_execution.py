@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from auth.exceptions import ValidationAuthError
@@ -24,6 +24,7 @@ from fantasy_teams.ledger import apply_ledger_movement, find_account_for_team
 from fantasy_teams.models import FantasyRosterSlot, FantasyTeam
 from fantasy_teams.ownership import sync_ownership_on_assign, sync_ownership_on_release
 from leagues.models.league import League
+from market.assignment import next_free_slot_or_overflow
 from market.models import TradeProposal
 
 
@@ -47,39 +48,6 @@ def _locked_slots_for_athletes(
             code="trade_stale_assets",
         )
     return list(slots)
-
-
-def _next_free_slot(
-    session: Session, *, team_id: UUID, league_id: UUID
-) -> tuple[FantasyRosterSlot, bool]:
-    """Returns `(slot, created_new)`. A genuinely free slot is reused when one
-    exists; otherwise (EP08-10 bis: rosa già al completo, scambio sbilanciato)
-    an extra slot is created rather than blocking the trade — the incoming
-    player stays in the squad but blocked until the coach releases someone."""
-    slot = session.scalar(
-        select(FantasyRosterSlot)
-        .where(
-            FantasyRosterSlot.fantasy_team_id == team_id,
-            FantasyRosterSlot.athlete_id.is_(None),
-        )
-        .order_by(FantasyRosterSlot.slot_index.asc())
-        .with_for_update()
-    )
-    if slot is not None:
-        return slot, False
-    max_index = session.scalar(
-        select(func.max(FantasyRosterSlot.slot_index)).where(
-            FantasyRosterSlot.fantasy_team_id == team_id
-        )
-    )
-    new_slot = FantasyRosterSlot(
-        fantasy_team_id=team_id,
-        league_id=league_id,
-        slot_index=(max_index if max_index is not None else -1) + 1,
-    )
-    session.add(new_slot)
-    session.flush()
-    return new_slot, True
 
 
 def execute_trade(
@@ -147,7 +115,7 @@ def execute_trade(
         # Assign incoming players one at a time; each role-quota check sees the
         # cumulative effect of the steps already applied within this savepoint.
         for athlete_id in requested_ids:
-            slot, overflow_capacity = _next_free_slot(
+            slot, overflow_capacity = next_free_slot_or_overflow(
                 session, team_id=proposer_team.id, league_id=league.id
             )
             _, exceeds_quota = assign_allowing_role_quota_overflow(
@@ -172,7 +140,7 @@ def execute_trade(
                 previous_athlete_id=None,
             )
         for athlete_id in offered_ids:
-            slot, overflow_capacity = _next_free_slot(
+            slot, overflow_capacity = next_free_slot_or_overflow(
                 session, team_id=recipient_team.id, league_id=league.id
             )
             _, exceeds_quota = assign_allowing_role_quota_overflow(

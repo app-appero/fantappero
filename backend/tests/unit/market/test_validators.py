@@ -14,7 +14,6 @@ from market.validators import (
     validate_bid_amount,
     validate_session_window,
     validate_slot_has_athlete,
-    validate_team_has_free_slot,
 )
 
 
@@ -52,12 +51,6 @@ def test_validate_amount_within_balance_rejects_overdraw() -> None:
 
 def test_validate_amount_within_balance_accepts_equal_balance() -> None:
     validate_amount_within_balance(amount_credits=100, balance=100)
-
-
-def test_validate_team_has_free_slot_rejects_full_roster() -> None:
-    with pytest.raises(ValidationAuthError) as exc:
-        validate_team_has_free_slot(has_free_slot=False)
-    assert exc.value.code == "roster_full"
 
 
 def test_validate_athlete_is_free_agent_rejects_owned() -> None:

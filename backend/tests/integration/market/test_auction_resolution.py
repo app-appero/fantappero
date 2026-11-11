@@ -361,3 +361,40 @@ def test_concurrent_resolve_calls_charge_exactly_once(
     ).all()
     assert len(ledger_entries) == 1
     assert account.balance == 1000 - 90
+
+
+def test_winning_a_fourth_goalkeeper_enters_the_roster_flagged_instead_of_losing_the_bid(
+    client: TestClient,
+    db_session: Session,
+    competition_ids: list[str],
+) -> None:
+    """EP08-10 bis: a role quota already full no longer loses the sealed bid —
+    the player joins the roster flagged "in attesa" until the coach releases someone."""
+    admin_token, _ = _register_and_login(client, "res.ovf.admin@example.com")
+    league_id = _create_league(client, admin_token, competition_ids, "Lega Esubero Asta")
+    team_id = client.get(
+        f"/leagues/{league_id}/rosa", headers={"Authorization": f"Bearer {admin_token}"}
+    ).json()["id"]
+    for index, provider_id in enumerate((9301, 9302, 9303)):
+        gk = _seed_athlete(db_session, provider_id, f"Portiere {index}", role=FantasyRole.P)
+        placed = client.put(
+            f"/leagues/{league_id}/amministrazione/squadre/{team_id}/slot/{index}",
+            headers={"Authorization": f"Bearer {admin_token}"},
+            json={"athleteId": str(gk.id), "purchaseCredits": 0},
+        )
+        assert placed.status_code == 200
+    fourth = _seed_athlete(db_session, 9304, "Quarto Portiere", role=FantasyRole.P)
+
+    session_id = _create_open_session(client, admin_token, league_id)
+    assert _bid(client, league_id, session_id, admin_token, fourth.id, 40).status_code == 200
+
+    resolution = _close_and_resolve(client, league_id, session_id, admin_token)
+    assert resolution.status_code == 200
+    assert resolution.json()["outcomes"][0]["outcome"] == "assigned"
+
+    won_slot = db_session.scalar(
+        select(FantasyRosterSlot).where(FantasyRosterSlot.athlete_id == fourth.id)
+    )
+    assert won_slot is not None
+    assert won_slot.exceeds_role_quota is True
+    assert won_slot.purchase_credits == 40

@@ -33,14 +33,6 @@ def validate_amount_within_balance(*, amount_credits: int, balance: int) -> None
         )
 
 
-def validate_team_has_free_slot(*, has_free_slot: bool) -> None:
-    if not has_free_slot:
-        raise ValidationAuthError(
-            "La rosa non ha slot liberi per accogliere un nuovo calciatore.",
-            code="roster_full",
-        )
-
-
 def validate_athlete_is_free_agent(*, owner_team_id: object | None) -> None:
     if owner_team_id is not None:
         raise ValidationAuthError(

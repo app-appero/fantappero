@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -12,12 +12,46 @@ from auth.exceptions import ValidationAuthError
 from database.enums import CreditLedgerReason, RosterOwnershipSource
 from fantasy_teams.composition_service import (
     assert_assignment_respects_role_quota,
+    assign_allowing_role_quota_overflow,
     sync_team_composition_status,
 )
 from fantasy_teams.ledger import apply_ledger_movement, find_account_for_team
 from fantasy_teams.models import FantasyRosterSlot, FantasyTeam
 from fantasy_teams.ownership import sync_ownership_on_assign
 from leagues.models.league import League
+
+
+def next_free_slot_or_overflow(
+    session: Session, *, team_id: UUID, league_id: UUID
+) -> tuple[FantasyRosterSlot, bool]:
+    """Returns `(slot, created_new)`. A genuinely free slot is reused when one
+    exists; otherwise (EP08-10 bis: rosa già al completo) an extra slot is
+    created rather than refusing the acquisition — the incoming player stays in
+    the squad but blocked until the coach releases someone."""
+    slot = session.scalar(
+        select(FantasyRosterSlot)
+        .where(
+            FantasyRosterSlot.fantasy_team_id == team_id,
+            FantasyRosterSlot.athlete_id.is_(None),
+        )
+        .order_by(FantasyRosterSlot.slot_index.asc())
+        .with_for_update()
+    )
+    if slot is not None:
+        return slot, False
+    max_index = session.scalar(
+        select(func.max(FantasyRosterSlot.slot_index)).where(
+            FantasyRosterSlot.fantasy_team_id == team_id
+        )
+    )
+    new_slot = FantasyRosterSlot(
+        fantasy_team_id=team_id,
+        league_id=league_id,
+        slot_index=(max_index if max_index is not None else -1) + 1,
+    )
+    session.add(new_slot)
+    session.flush()
+    return new_slot, True
 
 
 def _finalize_slot_assignment(
@@ -33,19 +67,31 @@ def _finalize_slot_assignment(
     transaction_id: str,
     actor_id: UUID | None,
     note: str,
+    allow_overflow: bool = False,
+    force_overflow_flag: bool = False,
 ) -> FantasyRosterSlot | None:
     account = find_account_for_team(session, team.id, for_update=True)
     if account is None or account.balance < amount_credits:
         return None
 
+    exceeds_quota = False
     try:
-        assert_assignment_respects_role_quota(
-            session,
-            league=league,
-            team=team,
-            athlete_id=acquire_athlete_id,
-            slot_index=slot.slot_index,
-        )
+        if allow_overflow:
+            _, exceeds_quota = assign_allowing_role_quota_overflow(
+                session,
+                league=league,
+                team=team,
+                athlete_id=acquire_athlete_id,
+                slot_index=slot.slot_index,
+            )
+        else:
+            assert_assignment_respects_role_quota(
+                session,
+                league=league,
+                team=team,
+                athlete_id=acquire_athlete_id,
+                slot_index=slot.slot_index,
+            )
     except ValidationAuthError:
         return None
 
@@ -53,6 +99,7 @@ def _finalize_slot_assignment(
         with session.begin_nested():
             slot.athlete_id = acquire_athlete_id
             slot.purchase_credits = amount_credits
+            slot.exceeds_role_quota = exceeds_quota or force_overflow_flag
             session.flush()
     except IntegrityError:
         return None
@@ -89,6 +136,7 @@ def assign_winning_bid(
     amount_credits: int,
     transaction_id: str,
     actor_id: UUID | None,
+    allow_overflow: bool = False,
 ) -> FantasyRosterSlot | None:
     """Assign an auction-won athlete to the team's first free slot.
 
@@ -96,7 +144,37 @@ def assign_winning_bid(
     cannot be honored (no free slot, insufficient credits, or role quota
     exceeded) — those are legitimate "lost bid" outcomes per FR-AST-01
     ("segnala le rose ancora incomplete"), not fatal errors.
+
+    With ``allow_overflow`` (sealed-bid auction, EP08-10 bis) a full roster or
+    an exceeded role quota no longer loses the bid: the player is assigned,
+    flagged as in excess, and waits for the coach to release someone.
     """
+    if allow_overflow:
+        try:
+            with session.begin_nested():
+                overflow_slot, created_new = next_free_slot_or_overflow(
+                    session, team_id=team.id, league_id=league.id
+                )
+                result = _finalize_slot_assignment(
+                    session,
+                    league=league,
+                    team=team,
+                    slot=overflow_slot,
+                    acquire_athlete_id=athlete_id,
+                    previous_athlete_id=None,
+                    amount_credits=amount_credits,
+                    reason=CreditLedgerReason.MARKET_AUCTION_WIN,
+                    transaction_id=transaction_id,
+                    actor_id=actor_id,
+                    note="Assegnazione da asta a buste",
+                    allow_overflow=True,
+                    force_overflow_flag=created_new,
+                )
+                if result is None:
+                    raise _SwapNotHonored
+        except _SwapNotHonored:
+            return None
+        return result
     slot = session.scalar(
         select(FantasyRosterSlot)
         .where(

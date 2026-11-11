@@ -5,7 +5,7 @@ from __future__ import annotations
 from uuid import UUID
 
 from sqlalchemy import select
-from sqlalchemy.orm import Session, selectinload, undefer
+from sqlalchemy.orm import Session, selectinload
 
 from fantasy_teams.ledger import ensure_credit_account_for_team
 from fantasy_teams.models import FantasyRosterSlot, FantasyTeam

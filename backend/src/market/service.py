@@ -58,7 +58,6 @@ from market.validators import (
     validate_session_window,
     validate_slot_has_athlete,
     validate_team_eligible_for_session,
-    validate_team_has_free_slot,
 )
 from market.windows import effective_status, is_open_for_bids
 from notifications.recipients import user_ids_for_teams
@@ -341,6 +340,7 @@ class MarketService:
                     amount_credits=bid.amount_credits,
                     transaction_id=transaction_id,
                     actor_id=league_access.user.id,
+                    allow_overflow=True,
                 )
             bid.status = MarketBidStatus.WON if slot is not None else MarketBidStatus.LOST
 
@@ -546,16 +546,9 @@ class MarketService:
         else:
             validate_release_athlete_not_allowed(payload.release_athlete_id)
             release_athlete_id = None
-            has_free_slot = (
-                self._session.scalar(
-                    select(FantasyRosterSlot).where(
-                        FantasyRosterSlot.fantasy_team_id == team.id,
-                        FantasyRosterSlot.athlete_id.is_(None),
-                    )
-                )
-                is not None
-            )
-            validate_team_has_free_slot(has_free_slot=has_free_slot)
+            # Rosa piena o ruolo al completo non bloccano più l'offerta: se la
+            # vinci, il calciatore entra in rosa bloccato finché non liberi
+            # spazio (EP08-10 bis), come per gli scambi.
 
         existing_bid = self._session.scalar(
             select(MarketBid)

@@ -1,30 +1,20 @@
-import { playerAvatarUrl } from "@fantappero/contracts";
 import type {
-  FantasyRole,
   LeagueListoneEntry,
   MarketBidStatus,
   MarketSessionStatus,
+  RosterOccupancyEntry,
 } from "@fantappero/contracts";
 import {
   AuctionBidPanel,
   Badge,
   Button,
-  Card,
-  CardBody,
-  CardHeader,
   Input,
-  PlayerPhotoBadge,
-  RoleBadge,
-  Tab,
   Table,
   TableBody,
   TableCell,
   TableHead,
   TableHeaderCell,
   TableRow,
-  TabList,
-  TabPanel,
-  Tabs,
   UiStatePanel,
   WireframeSection,
 } from "@fantappero/ui";
@@ -40,32 +30,14 @@ import {
   submitAuctionBid,
   withdrawAuctionBid,
 } from "../api/market";
-import { fetchLeagueListone, fetchMyCredits } from "../api/leagues";
+import { fetchLeagueListone, fetchMyCredits, fetchRosterOccupancy } from "../api/leagues";
+import { AthleteChooser } from "../components/AthleteChooser";
 import { getApiErrorMessage, useAuth } from "../auth/AuthContext";
 import { loadStoredSession } from "../auth/sessionStorage";
 import { useMarketGate } from "../market/MarketGateContext";
 import { useMarketSessionFlow } from "../market/useMarketSessionFlow";
 import { useLocation } from "../router/simpleRouter";
 import { parseWireframeStateFromSearch } from "../wireframes/useWireframeState";
-
-type RoleTab = "all" | FantasyRole;
-
-const LISTONE_PAGE_SIZE = 30;
-
-const ROLE_TABS: Array<{ value: RoleTab; label: string }> = [
-  { value: "all", label: "Tutti" },
-  { value: "P", label: "Portieri" },
-  { value: "D", label: "Difensori" },
-  { value: "C", label: "Centrocampisti" },
-  { value: "A", label: "Attaccanti" },
-];
-
-const ROLE_LABEL: Record<FantasyRole, string> = {
-  P: "Portiere",
-  D: "Difensore",
-  C: "Centrocampista",
-  A: "Attaccante",
-};
 
 const SESSION_STATUS_LABEL: Record<MarketSessionStatus, string> = {
   scheduled: "Programmata",
@@ -156,13 +128,6 @@ const DEMO_LISTONE: LeagueListoneEntry[] = [
   },
 ];
 
-function filterByTab(entries: LeagueListoneEntry[], tab: RoleTab): LeagueListoneEntry[] {
-  if (tab === "all") {
-    return entries;
-  }
-  return entries.filter((entry) => entry.effectiveRole === tab);
-}
-
 function initialDemoEntries(
   isDemoMode: boolean,
   demoState: ReturnType<typeof parseWireframeStateFromSearch> | null,
@@ -181,9 +146,9 @@ function initialDemoEntries(
   return DEMO_LISTONE;
 }
 
-/** Schermata Asta: sessione a buste chiuse collegata alle API reali (EP08-01/02) + listone ufficiale. */
+/** Schermata Asta: sessione a buste chiuse collegata alle API reali (EP08-01/02); i calciatori si scelgono dal selettore in «Nuova offerta». */
 export function AuctionPage() {
-  const { isDemoMode, activeLeagueId, activeLeague, can } = useAuth();
+  const { isDemoMode, activeLeagueId, can } = useAuth();
   const { search } = useLocation();
   const demoState = isDemoMode ? parseWireframeStateFromSearch(search) : null;
   const canManageSession = can(["market:manage"]);
@@ -192,9 +157,7 @@ export function AuctionPage() {
   const [entries, setEntries] = useState<LeagueListoneEntry[]>(() =>
     initialDemoEntries(isDemoMode, demoState),
   );
-  const [activeTab, setActiveTab] = useState<RoleTab>("all");
-  const [query, setQuery] = useState("");
-  const [listonePage, setListonePage] = useState(0);
+  const [occupancy, setOccupancy] = useState<RosterOccupancyEntry[]>([]);
   const [loading, setLoading] = useState(() => (isDemoMode ? demoState === "loading" : true));
   const [loadError, setLoadError] = useState<string | null>(() =>
     isDemoMode && demoState === "error" ? "Impossibile caricare il listone (demo)." : null,
@@ -246,11 +209,13 @@ export function AuctionPage() {
     setLoading(true);
     setLoadError(null);
     try {
-      const [rows, credits] = await Promise.all([
+      const [rows, credits, owned] = await Promise.all([
         fetchLeagueListone(stored.accessToken, activeLeagueId),
         fetchMyCredits(stored.accessToken, activeLeagueId).catch(() => null),
+        fetchRosterOccupancy(stored.accessToken, activeLeagueId).catch(() => []),
       ]);
       setEntries(rows);
+      setOccupancy(owned);
       if (credits) {
         setBalance(credits.balance);
       }
@@ -266,26 +231,9 @@ export function AuctionPage() {
     void loadListone();
   }, [loadListone]);
 
-  const visibleEntries = useMemo(() => {
-    const byTab = filterByTab(entries, activeTab);
-    const needle = query.trim().toLocaleLowerCase("it-IT");
-    if (!needle) {
-      return byTab;
-    }
-    return byTab.filter((entry) =>
-      `${entry.canonicalName} ${entry.clubName ?? ""}`.toLocaleLowerCase("it-IT").includes(needle),
-    );
-  }, [activeTab, entries, query]);
-
-  useEffect(() => {
-    setListonePage(0);
-  }, [activeTab, query]);
-
-  const listonePageCount = Math.max(1, Math.ceil(visibleEntries.length / LISTONE_PAGE_SIZE));
-  const safeListonePage = Math.min(listonePage, listonePageCount - 1);
-  const pagedEntries = visibleEntries.slice(
-    safeListonePage * LISTONE_PAGE_SIZE,
-    safeListonePage * LISTONE_PAGE_SIZE + LISTONE_PAGE_SIZE,
+  const ownedAthleteIds = useMemo(
+    () => new Set(occupancy.map((row) => row.athleteId)),
+    [occupancy],
   );
 
   const flow = useMarketSessionFlow(
@@ -329,11 +277,6 @@ export function AuctionPage() {
       setBidAmount("");
     });
   }
-
-  const playerOptions = useMemo(
-    () => entries.map((entry) => ({ value: entry.athleteId, label: entry.canonicalName })),
-    [entries],
-  );
 
   const athleteNameById = useMemo(() => {
     const map = new Map<string, string>();
@@ -516,9 +459,30 @@ export function AuctionPage() {
               budgetValue={balance !== null ? `${balance} crediti` : "—"}
               playerLabel="Giocatore"
               playerPlaceholder="Scegli un giocatore…"
-              playerOptions={isDemoMode ? undefined : playerOptions}
-              playerValue={isDemoMode ? undefined : bidAthleteId}
-              onPlayerChange={isDemoMode ? undefined : (event) => setBidAthleteId(event.target.value)}
+              playerField={
+                isDemoMode ? undefined : (
+                  <div className="fa-auction-panel__chooser">
+                    <p className="fa-athlete-chooser__count">{loading ? "Caricamento calciatori…" : "Giocatore"}</p>
+                    {loadError ? (
+                      <UiStatePanel
+                        state="error"
+                        title="Listone non disponibile"
+                        message={loadError}
+                        testId="auction-listone-error"
+                      />
+                    ) : (
+                      <AthleteChooser
+                        testId="auction-bid-player"
+                        entries={entries}
+                        ownedAthleteIds={ownedAthleteIds}
+                        selected={bidAthleteId ? [bidAthleteId] : []}
+                        onToggle={(id) => setBidAthleteId(id === bidAthleteId ? "" : id)}
+                        single
+                      />
+                    )}
+                  </div>
+                )
+              }
               bidLabel="Offerta (crediti)"
               bidPlaceholder="Es. 45"
               bidValue={isDemoMode ? undefined : bidAmount}
@@ -594,183 +558,6 @@ export function AuctionPage() {
           ) : null}
         </WireframeSection>
 
-        {/* Il listone si vede solo quando l'asta a buste chiuse è stata aperta dall'operatore. */}
-        {isDemoMode || (marketOpen && flow.currentSession?.status === "open") ? (
-          <>
-        <Card className="fa-auction-listone-card" data-testid="auction-listone-card">
-          <CardHeader>
-            <div className="fa-auction-listone__header">
-              <div>
-                <h2 className="fa-auction-listone__title">Listone ufficiale</h2>
-                <p className="fa-auction-listone__subtitle">
-                  {activeLeague
-                    ? `Lega: ${activeLeague.name} · Stagione ${entries[0]?.seasonYear ?? "—"}`
-                    : "Seleziona una lega dal selettore in alto."}
-                </p>
-              </div>
-            </div>
-          </CardHeader>
-          <CardBody>
-            {loading ? (
-              <UiStatePanel
-                state="loading"
-                title="Caricamento listone"
-                message="Recupero calciatori e ruoli…"
-                testId="auction-listone-loading"
-              />
-            ) : null}
-
-            {!loading && loadError ? (
-              <>
-                <UiStatePanel
-                  state="error"
-                  title="Listone non disponibile"
-                  message={loadError}
-                  testId="auction-listone-error"
-                />
-                <Button variant="secondary" onClick={() => void loadListone()}>
-                  Ricarica
-                </Button>
-              </>
-            ) : null}
-
-            {!loading && !loadError && !activeLeagueId && !isDemoMode ? (
-              <UiStatePanel
-                state="empty"
-                title="Nessuna lega selezionata"
-                message="Scegli una lega per consultare il listone."
-                testId="auction-listone-no-league"
-              />
-            ) : null}
-
-            {!loading && !loadError && (isDemoMode || activeLeagueId) ? (
-              <input
-                type="search"
-                className="fa-athlete-chooser__search"
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
-                placeholder="Cerca per nome o squadra"
-                aria-label="Cerca calciatore"
-                data-testid="auction-listone-search"
-              />
-            ) : null}
-
-            {!loading && !loadError && (isDemoMode || activeLeagueId) ? (
-              <Tabs
-                value={activeTab}
-                onValueChange={(value) => setActiveTab(value as RoleTab)}
-                aria-label="Filtra listone per ruolo"
-              >
-                <TabList>
-                  {ROLE_TABS.map((tab) => (
-                    <Tab key={tab.value} value={tab.value}>
-                      {tab.label}
-                    </Tab>
-                  ))}
-                </TabList>
-                {ROLE_TABS.map((tab) => (
-                  <TabPanel key={tab.value} value={tab.value}>
-                    {visibleEntries.length === 0 ? (
-                      <UiStatePanel
-                        state="empty"
-                        title="Nessun calciatore"
-                        message={
-                          query.trim()
-                            ? "Nessun calciatore trovato per questa ricerca."
-                            : tab.value === "all"
-                              ? "Il listone è vuoto. Verrà popolato dagli operatori della piattaforma."
-                              : `Nessun ${ROLE_LABEL[tab.value as FantasyRole].toLowerCase()} nel listone.`
-                        }
-                        testId={`auction-listone-empty-${tab.value}`}
-                      />
-                    ) : (
-                      <Table
-                        compact
-                        className="fa-roster-table fa-auction-listone-table"
-                        data-testid={`auction-listone-table-${tab.value}`}
-                      >
-                        <TableHead>
-                          <TableRow>
-                            <TableHeaderCell className="fa-roster-col fa-roster-col--name">
-                              <RosterColLabel full="Calciatore" short="Nome" />
-                            </TableHeaderCell>
-                            <TableHeaderCell className="fa-roster-col fa-roster-col--club">Club</TableHeaderCell>
-                            <TableHeaderCell className="fa-auction-col--extra">Posizione provider</TableHeaderCell>
-                            <TableHeaderCell className="fa-auction-col--extra">Note</TableHeaderCell>
-                          </TableRow>
-                        </TableHead>
-                        <TableBody>
-                          {pagedEntries.map((entry) => (
-                            <TableRow key={entry.athleteId}>
-                              <TableCell className="fa-roster-col fa-roster-col--name">
-                                <span className="fa-auction-player">
-                                  {entry.athleteId ? (
-                                    <PlayerPhotoBadge
-                                      className="fa-auction-player__role"
-                                      photoUrl={playerAvatarUrl(entry.athleteId, entry.clubName)}
-                                      role={entry.effectiveRole}
-                                    />
-                                  ) : (
-                                    <RoleBadge
-                                      className="fa-auction-player__role"
-                                      code={entry.effectiveRole}
-                                    />
-                                  )}
-                                  <span className="fa-auction-player__role-name">
-                                    {ROLE_LABEL[entry.effectiveRole]}
-                                  </span>
-                                  <AthleteName className="fa-auction-player__name" athleteId={entry.athleteId}>
-                                    {entry.canonicalName}
-                                  </AthleteName>
-                                </span>
-                              </TableCell>
-                              <TableCell className="fa-roster-col fa-roster-col--club">{entry.clubName ?? "—"}</TableCell>
-                              <TableCell className="fa-auction-col--extra">{entry.providerPositionRaw ?? "—"}</TableCell>
-                              <TableCell className="fa-auction-col--extra">
-                                {entry.override ? (
-                                  <Badge variant="warning">
-                                    {entry.override.pending
-                                      ? `Override dal turno ${entry.override.effectiveFromRound ?? "?"}`
-                                      : "Override attivo"}
-                                  </Badge>
-                                ) : (
-                                  "—"
-                                )}
-                              </TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                    )}
-                    {listonePageCount > 1 ? (
-                      <div className="fa-athlete-chooser__pager" data-testid={`auction-listone-pager-${tab.value}`}>
-                        <button
-                          type="button"
-                          disabled={safeListonePage === 0}
-                          onClick={() => setListonePage(safeListonePage - 1)}
-                        >
-                          Precedente
-                        </button>
-                        <span>
-                          Pagina {safeListonePage + 1} di {listonePageCount}
-                        </span>
-                        <button
-                          type="button"
-                          disabled={safeListonePage >= listonePageCount - 1}
-                          onClick={() => setListonePage(safeListonePage + 1)}
-                        >
-                          Successiva
-                        </button>
-                      </div>
-                    ) : null}
-                  </TabPanel>
-                ))}
-              </Tabs>
-            ) : null}
-          </CardBody>
-      </Card>
-          </>
-        ) : null}
     </div>
   );
 }

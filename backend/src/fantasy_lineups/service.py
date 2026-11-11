@@ -8,7 +8,7 @@ from typing import Literal
 from uuid import UUID
 
 from sqlalchemy import delete, select
-from sqlalchemy.orm import Session, selectinload, undefer
+from sqlalchemy.orm import Session, selectinload
 
 from auth.exceptions import ValidationAuthError
 from auth.models.user import User
@@ -647,7 +647,9 @@ class FantasyLineupService:
             previous_module=previous.module.value,
             previous_starter_ids=self._starter_order_from_submission(previous),
             previous_bench_ids=self._bench_order_from_submission(previous),
-            roster_athlete_ids=[str(row.athlete_id) for row in roster if not row.exceeds_role_quota],
+            roster_athlete_ids=[
+                str(row.athlete_id) for row in roster if not row.exceeds_role_quota
+            ],
             locked_athlete_ids=locked_ids,
             current_confirmed_slots=self._slots_from_submission(submission),
             current_confirmed_bench=self._bench_order_from_submission(submission),
@@ -1345,7 +1347,9 @@ class FantasyLineupService:
                 module=saved.module,
                 starters=starters,
                 bench=bench,
-                roster_athlete_ids=[str(row.athlete_id) for row in roster if not row.exceeds_role_quota],
+                roster_athlete_ids=[
+                    str(row.athlete_id) for row in roster if not row.exceeds_role_quota
+                ],
             )
             issues = [
                 LineupIssueResponse(code=item.code, message=item.message)
@@ -1368,7 +1372,9 @@ class FantasyLineupService:
                 previous_module=previous.module.value,
                 previous_starter_ids=self._starter_order_from_submission(previous),
                 previous_bench_ids=self._bench_order_from_submission(previous),
-                roster_athlete_ids=[str(row.athlete_id) for row in roster if not row.exceeds_role_quota],
+                roster_athlete_ids=[
+                    str(row.athlete_id) for row in roster if not row.exceeds_role_quota
+                ],
                 locked_athlete_ids=locked_ids,
                 current_confirmed_slots=self._slots_from_submission(submission),
                 current_confirmed_bench=self._bench_order_from_submission(submission),
@@ -2041,13 +2047,9 @@ class FantasyLineupService:
         assert team is not None
         if not for_update and any(slot.exceeds_role_quota for slot in team.slots):
             # Auto-riparazione di un esubero (EP08-10) ormai risolto.
-            if reconcile_roster_overflow(
-                self._session, league=league_access.league, team=team
-            ):
+            if reconcile_roster_overflow(self._session, league=league_access.league, team=team):
                 self._session.commit()
-                healed = find_team_for_membership(
-                    self._session, membership.id, with_slots=True
-                )
+                healed = find_team_for_membership(self._session, membership.id, with_slots=True)
                 assert healed is not None
                 team = healed
         return team

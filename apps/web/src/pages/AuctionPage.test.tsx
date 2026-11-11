@@ -24,6 +24,7 @@ vi.mock("../api/leagues", () => ({
   fetchLeagueListone: vi.fn(),
   refreshLeagueListone: vi.fn(),
   fetchMyCredits: vi.fn(),
+  fetchRosterOccupancy: vi.fn(),
 }));
 
 vi.mock("../api/market", () => ({
@@ -70,39 +71,25 @@ function renderRoute(path: string) {
   );
 }
 
-describe("AuctionPage layout + listone", () => {
-  it("admin: sessione + offerta + listone senza Aggiorna", () => {
+describe("AuctionPage layout", () => {
+  it("admin: sessione + offerta, senza listone a parte", () => {
     const html = renderRoute("/asta?persona=admin");
     expect(html).toContain('data-testid="wireframe-region-auction-admin"');
     expect(html).toContain("Apri asta");
     expect(html).toContain('data-testid="wireframe-region-auction-bid"');
     expect(html).toContain('data-testid="auction-bid-panel"');
-    expect(html).toContain('data-testid="auction-listone-card"');
-    expect(html).toContain("Listone ufficiale");
-    expect(html).toContain("Rui Patrício");
-    expect(html).toContain("Portieri");
-    expect(html).toContain("Difensori");
-    expect(html).toContain("Centrocampisti");
-    expect(html).toContain("Attaccanti");
-    expect(html).not.toContain('data-testid="auction-listone-refresh"');
+    expect(html).not.toContain('data-testid="auction-listone-card"');
+    expect(html).not.toContain("Listone ufficiale");
     expect(html).toContain('data-testid="market-gate-switch"');
   });
 
-  it("member: offerta + listone senza admin e senza Aggiorna", () => {
+  it("member: offerta senza admin e senza listone a parte", () => {
     const html = renderRoute("/asta?persona=member");
     expect(html).not.toContain('data-testid="wireframe-region-auction-admin"');
     expect(html).toContain('data-testid="wireframe-region-auction-bid"');
     expect(html).toContain('data-testid="auction-bid-panel"');
-    expect(html).toContain('data-testid="auction-listone-card"');
-    expect(html).not.toContain('data-testid="auction-listone-refresh"');
+    expect(html).not.toContain('data-testid="auction-listone-card"');
     expect(html).toContain('data-testid="market-gate-bar"');
     expect(html).not.toContain('data-testid="market-gate-switch"');
-  });
-
-  it("mostra empty state demo sul listone", () => {
-    const html = renderRoute("/asta?persona=admin&stato=empty");
-    expect(html).toContain('data-testid="wireframe-region-auction-bid"');
-    expect(html).toContain('data-testid="auction-listone-empty-all"');
-    expect(html).toContain("Il listone è vuoto");
   });
 });
