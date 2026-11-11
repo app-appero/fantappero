@@ -385,14 +385,23 @@ def assign_allowing_role_quota_overflow(
         return role, True
 
 
-def reconcile_role_quota_overflow(session: Session, *, league: League, team: FantasyTeam) -> None:
-    """Clear `exceeds_role_quota` on any slot whose role is no longer actually over
-    quota — called after anything that can change a team's roster composition
-    (releasing a player, a trade). A role can stop being over quota either because
-    the flagged player's own role was released, or because a *different* player of
-    that same role left, freeing the limit for the one still flagged.
+def reconcile_roster_overflow(session: Session, *, league: League, team: FantasyTeam) -> None:
+    """Clear `exceeds_role_quota` on any slot that is no longer actually in excess —
+    called after anything that can change a team's roster composition (releasing a
+    player, a trade). A slot can be flagged for two different reasons (EP08-10):
+
+    - its role is over the per-role quota (e.g. a 4th goalkeeper);
+    - the team's total headcount is over the roster size (an unbalanced trade with
+      no free slot creates one extra slot rather than blocking the trade).
+
+    Either reason can stop applying because the flagged player's own slot was
+    released, or because a *different* player (of that role, or anywhere in the
+    roster) left, freeing the limit for the one still flagged.
     """
+    from fantasy_teams.factory import resolve_roster_size
+
     limits = resolve_league_rules_limits(session, league.id)
+    roster_size = resolve_roster_size(session, league.id)
     slots = list(
         session.scalars(
             select(FantasyRosterSlot).where(
@@ -420,13 +429,26 @@ def reconcile_role_quota_overflow(session: Session, *, league: League, team: Fan
         role_counts[resolved.role] = role_counts.get(resolved.role, 0) + 1
         if slot.exceeds_role_quota:
             flagged_by_role.setdefault(resolved.role, []).append(slot)
+
+    # Step 1: role-quota reason. Keep exactly `over` flagged per role (still
+    # genuinely in excess); the rest stay candidates for the capacity reason below.
+    still_flagged_ids: set[UUID] = set()
+    capacity_candidates: list[FantasyRosterSlot] = []
     for role, flagged_slots in flagged_by_role.items():
         over = max(0, role_counts.get(role, 0) - limits.for_role(role))
-        # Keep exactly `over` flagged (still genuinely in excess); clear the rest —
-        # the role count caught up with the quota for those, even if another
-        # player of the same role is still queued behind them.
-        for slot in flagged_slots[over:]:
-            slot.exceeds_role_quota = False
+        for slot in flagged_slots[:over]:
+            still_flagged_ids.add(slot.id)
+        capacity_candidates.extend(flagged_slots[over:])
+
+    # Step 2: total-capacity reason. Keep exactly as many of the remaining
+    # flagged slots as the team is still over its roster size (regardless of role).
+    capacity_over = max(0, len(slots) - roster_size)
+    for slot in capacity_candidates[:capacity_over]:
+        still_flagged_ids.add(slot.id)
+
+    for flagged_slots in flagged_by_role.values():
+        for slot in flagged_slots:
+            slot.exceeds_role_quota = slot.id in still_flagged_ids
 
 
 def activation_roster_and_credit_blockers(

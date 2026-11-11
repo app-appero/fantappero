@@ -1086,7 +1086,7 @@ export function FormationScreen() {
               stateLabel = "Schierato qui";
             } else if (row.exceedsRoleQuota) {
               state = "bloccato";
-              stateLabel = "Fuori quota ruolo, in attesa";
+              stateLabel = "Fuori rosa, in attesa";
             } else if (row.selectionBlocked || row.probableAbsence === "suspended") {
               state = "bloccato";
               stateLabel = row.probableNote ?? "Indisponibile";
@@ -1146,7 +1146,7 @@ export function FormationScreen() {
               stateLabel = "Titolare";
             } else if (row.exceedsRoleQuota) {
               state = "bloccato";
-              stateLabel = "Fuori quota ruolo, in attesa";
+              stateLabel = "Fuori rosa, in attesa";
             } else if (row.selectionBlocked || row.probableAbsence === "suspended") {
               state = "bloccato";
               stateLabel = row.probableNote ?? "Indisponibile";

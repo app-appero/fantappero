@@ -17,7 +17,7 @@ import { marketUiStyles as styles } from "../../market/marketUiStyles";
 import type { useTradeFlow } from "../../market/useTradeFlow";
 import { CreditsDirectionField, PickPanel, type CreditsDirection, type TradeAthleteMeta } from "./MarketTradeCreateForm";
 
-type TradeTab = "all" | "received" | "sent" | "done";
+type TradeTab = "received" | "sent" | "open" | "done" | "all";
 const OPEN_STATUSES = new Set(["proposed", "countered", "accepted", "pending_approval"]);
 
 function TradeSide({
@@ -77,7 +77,7 @@ export function MarketTradeList({
   /** Proposta aperta da una notifica: evidenziata invece di lasciarla cercare a mano. */
   highlightedProposalId?: string | null;
 }) {
-  const [tab, setTab] = useState<TradeTab>("all");
+  const [tab, setTab] = useState<TradeTab>("open");
   const [counteringProposalId, setCounteringProposalId] = useState<string | null>(null);
   const [counterOfferedAthleteIds, setCounterOfferedAthleteIds] = useState<string[]>([]);
   const [counterRequestedAthleteIds, setCounterRequestedAthleteIds] = useState<string[]>([]);
@@ -130,13 +130,24 @@ export function MarketTradeList({
     (row) => row.proposerTeamId === selfTeamId && OPEN_STATUSES.has(row.status),
   );
   const done = trade.proposals.filter((row) => !OPEN_STATUSES.has(row.status));
+  // Ancora da decidere, indipendentemente da chi l'ha proposta.
+  const open = trade.proposals.filter((row) => OPEN_STATUSES.has(row.status));
   const visible =
-    tab === "all" ? trade.proposals : tab === "received" ? received : tab === "sent" ? sent : done;
+    tab === "received"
+      ? received
+      : tab === "sent"
+        ? sent
+        : tab === "open"
+          ? open
+          : tab === "done"
+            ? done
+            : trade.proposals;
   const tabs: Array<{ id: TradeTab; label: string; count: number }> = [
-    { id: "all", label: "Tutte", count: trade.proposals.length },
     { id: "received", label: "Ricevute", count: received.length },
     { id: "sent", label: "Inviate", count: sent.length },
+    { id: "open", label: "Aperte", count: open.length },
     { id: "done", label: "Concluse", count: done.length },
+    { id: "all", label: "Tutte", count: trade.proposals.length },
   ];
 
   return (
@@ -264,7 +275,12 @@ export function MarketTradeList({
                     <Pressable
                       style={[styles.secondaryButton, styles.tradeAction, pending && styles.disabled]}
                       disabled={pending}
-                      onPress={() => void trade.rejectProposal(proposal.id)}
+                      onPress={() => {
+                        setCounteringProposalId((current) =>
+                          current === proposal.id ? null : current,
+                        );
+                        void trade.rejectProposal(proposal.id);
+                      }}
                       testID={`market-trade-reject-${proposal.id}`}
                     >
                       <Text style={styles.secondaryButtonLabel} numberOfLines={1} adjustsFontSizeToFit>Rifiuta</Text>

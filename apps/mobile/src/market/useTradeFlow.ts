@@ -21,10 +21,20 @@ export interface UseTradeFlowOptions {
   leagueId: string | null;
   accessToken: string | null;
   active: boolean;
+  /** Chiamato dopo ogni azione che può aver spostato crediti o calciatori
+   * (accetta/controproponi/approva), così il chiamante può aggiornare il
+   * saldo e la rosa mostrati altrove nella schermata subito, non solo dopo
+   * un refresh manuale. */
+  onBalanceAffectingAction?: () => void;
 }
 
 /** Mobile port of `apps/web/src/market/useTradeFlow.ts`: create/list/cancel/accept/reject/counter (EP08-05/06). */
-export function useTradeFlow({ leagueId, accessToken, active }: UseTradeFlowOptions) {
+export function useTradeFlow({
+  leagueId,
+  accessToken,
+  active,
+  onBalanceAffectingAction,
+}: UseTradeFlowOptions) {
   const [proposals, setProposals] = useState<TradeProposal[]>([]);
   const [loading, setLoading] = useState(active);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -118,6 +128,7 @@ export function useTradeFlow({ leagueId, accessToken, active }: UseTradeFlowOpti
         try {
           await action(accessToken, leagueId, proposalId);
           await loadProposals();
+          onBalanceAffectingAction?.();
         } catch (error) {
           setActionError(getApiErrorMessage(error, fallbackMessage));
         } finally {
@@ -125,7 +136,7 @@ export function useTradeFlow({ leagueId, accessToken, active }: UseTradeFlowOpti
         }
       };
     },
-    [accessToken, leagueId, loadProposals],
+    [accessToken, leagueId, loadProposals, onBalanceAffectingAction],
   );
 
   const cancelProposal = withProposalAction(cancelTradeProposal, "Impossibile annullare la proposta.");
@@ -154,13 +165,14 @@ export function useTradeFlow({ leagueId, accessToken, active }: UseTradeFlowOpti
       try {
         await counterTradeProposal(accessToken, leagueId, proposalId, body);
         await loadProposals();
+        onBalanceAffectingAction?.();
       } catch (error) {
         setActionError(getApiErrorMessage(error, "Impossibile inviare la controproposta."));
       } finally {
         setActionPendingId(null);
       }
     },
-    [accessToken, leagueId, loadProposals],
+    [accessToken, leagueId, loadProposals, onBalanceAffectingAction],
   );
 
   return {

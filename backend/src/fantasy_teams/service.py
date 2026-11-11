@@ -29,7 +29,7 @@ from fantasy_teams.composition import RosterCompositionReport
 from fantasy_teams.composition_service import (
     assert_assignment_respects_role_quota,
     evaluate_team_composition,
-    reconcile_role_quota_overflow,
+    reconcile_roster_overflow,
     resolve_effective_athlete_role,
     resolve_effective_athlete_roles,
     resolve_league_rules_limits,
@@ -903,8 +903,8 @@ class FantasyTeamService:
         assert_market_open(league)
         team = self._get_team_for_update(league.id, team_id)
         self._assert_can_edit_team(league_access, team)
-        roster_size = resolve_roster_size(self._session, league.id)
-        validate_slot_index(slot_index=slot_index, roster_size=roster_size)
+        if slot_index < 0:
+            raise ValidationAuthError("Slot non trovato.", code="slot_not_found")
 
         slot = self._session.scalar(
             select(FantasyRosterSlot)
@@ -954,7 +954,7 @@ class FantasyTeamService:
         # Svincolare chiunque di quel ruolo (anche un acquisto appena fatto da uno
         # scambio) può liberare la quota per un calciatore dello stesso ruolo
         # rimasto fuori rosa in attesa (EP08-10) — non solo se è lui stesso.
-        reconcile_role_quota_overflow(self._session, league=league, team=team)
+        reconcile_roster_overflow(self._session, league=league, team=team)
         if closed is not None:
             self._add_audit(
                 league.id,

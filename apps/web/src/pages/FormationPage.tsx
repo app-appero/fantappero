@@ -1726,7 +1726,7 @@ export function FormationPage() {
           tone: probableState(roster, row.athleteId),
           countdown: lockLabel(row.athleteId),
           role: playerRole(roster, row.athleteId),
-          // Fuori quota ruolo dopo uno scambio: visibile ma non selezionabile (EP08-10).
+          // Fuori rosa dopo uno scambio (ruolo o totale al completo): visibile ma non selezionabile (EP08-10).
           disabled: row.exceedsRoleQuota === true,
         };
       });
@@ -1765,7 +1765,7 @@ export function FormationPage() {
           playerLocked(roster, row.athleteId, clock, lockMarginMinutes) ? "bloccato" : null,
           // Scambio accettato col ruolo già al completo: resta visibile in rosa (altrimenti
           // sembra "scomparso") ma non selezionabile finché non si libera uno slot (EP08-10).
-          row.exceedsRoleQuota ? "fuori quota ruolo, in attesa" : null,
+          row.exceedsRoleQuota ? "fuori rosa, in attesa" : null,
           displayBench.includes(row.athleteId) && row.athleteId !== currentId
             ? displayBench.indexOf(row.athleteId) < benchActive
               ? `Panchina ${displayBench.indexOf(row.athleteId) + 1}°`

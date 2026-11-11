@@ -48,19 +48,13 @@ def _locked_slots_for_athletes(
     return list(slots)
 
 
-def _free_slot_count(session: Session, *, team_id: UUID) -> int:
-    return (
-        session.scalar(
-            select(func.count(FantasyRosterSlot.id)).where(
-                FantasyRosterSlot.fantasy_team_id == team_id,
-                FantasyRosterSlot.athlete_id.is_(None),
-            )
-        )
-        or 0
-    )
-
-
-def _next_free_slot(session: Session, *, team_id: UUID) -> FantasyRosterSlot:
+def _next_free_slot(
+    session: Session, *, team_id: UUID, league_id: UUID
+) -> tuple[FantasyRosterSlot, bool]:
+    """Returns `(slot, created_new)`. A genuinely free slot is reused when one
+    exists; otherwise (EP08-10 bis: rosa già al completo, scambio sbilanciato)
+    an extra slot is created rather than blocking the trade — the incoming
+    player stays in the squad but blocked until the coach releases someone."""
     slot = session.scalar(
         select(FantasyRosterSlot)
         .where(
@@ -70,12 +64,21 @@ def _next_free_slot(session: Session, *, team_id: UUID) -> FantasyRosterSlot:
         .order_by(FantasyRosterSlot.slot_index.asc())
         .with_for_update()
     )
-    if slot is None:
-        raise ValidationAuthError(
-            "La rosa non ha più slot liberi per completare lo scambio.",
-            code="trade_roster_full",
+    if slot is not None:
+        return slot, False
+    max_index = session.scalar(
+        select(func.max(FantasyRosterSlot.slot_index)).where(
+            FantasyRosterSlot.fantasy_team_id == team_id
         )
-    return slot
+    )
+    new_slot = FantasyRosterSlot(
+        fantasy_team_id=team_id,
+        league_id=league_id,
+        slot_index=(max_index if max_index is not None else -1) + 1,
+    )
+    session.add(new_slot)
+    session.flush()
+    return new_slot, True
 
 
 def execute_trade(
@@ -117,19 +120,6 @@ def execute_trade(
             code="insufficient_credits",
         )
 
-    proposer_extra_needed = max(0, len(requested_ids) - len(offered_ids))
-    recipient_extra_needed = max(0, len(offered_ids) - len(requested_ids))
-    if _free_slot_count(session, team_id=proposer_team.id) < proposer_extra_needed:
-        raise ValidationAuthError(
-            "La rosa del proponente non ha spazio per completare lo scambio.",
-            code="trade_roster_full",
-        )
-    if _free_slot_count(session, team_id=recipient_team.id) < recipient_extra_needed:
-        raise ValidationAuthError(
-            "La rosa del destinatario non ha spazio per completare lo scambio.",
-            code="trade_roster_full",
-        )
-
     # Everything below actually mutates state. It runs inside a savepoint so that a
     # mid-sequence failure (e.g. role quota on a later incoming player) rolls back
     # cleanly on its own — callers in this codebase catch ValidationAuthError at the
@@ -156,7 +146,9 @@ def execute_trade(
         # Assign incoming players one at a time; each role-quota check sees the
         # cumulative effect of the steps already applied within this savepoint.
         for athlete_id in requested_ids:
-            slot = _next_free_slot(session, team_id=proposer_team.id)
+            slot, overflow_capacity = _next_free_slot(
+                session, team_id=proposer_team.id, league_id=league.id
+            )
             _, exceeds_quota = assign_allowing_role_quota_overflow(
                 session,
                 league=league,
@@ -166,7 +158,7 @@ def execute_trade(
             )
             slot.athlete_id = athlete_id
             slot.purchase_credits = 0
-            slot.exceeds_role_quota = exceeds_quota
+            slot.exceeds_role_quota = exceeds_quota or overflow_capacity
             session.flush()
             sync_ownership_on_assign(
                 session,
@@ -179,7 +171,9 @@ def execute_trade(
                 previous_athlete_id=None,
             )
         for athlete_id in offered_ids:
-            slot = _next_free_slot(session, team_id=recipient_team.id)
+            slot, overflow_capacity = _next_free_slot(
+                session, team_id=recipient_team.id, league_id=league.id
+            )
             _, exceeds_quota = assign_allowing_role_quota_overflow(
                 session,
                 league=league,
@@ -189,7 +183,7 @@ def execute_trade(
             )
             slot.athlete_id = athlete_id
             slot.purchase_credits = 0
-            slot.exceeds_role_quota = exceeds_quota
+            slot.exceeds_role_quota = exceeds_quota or overflow_capacity
             session.flush()
             sync_ownership_on_assign(
                 session,

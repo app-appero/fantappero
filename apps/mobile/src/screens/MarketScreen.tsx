@@ -122,7 +122,14 @@ export function MarketScreen() {
 
   const otherTeams = useMemo(() => teams.filter((row) => row.id !== team?.id), [teams, team]);
 
-  const trade = useTradeFlow({ leagueId: activeLeagueId, accessToken, active: true });
+  const trade = useTradeFlow({
+    leagueId: activeLeagueId,
+    accessToken,
+    active: true,
+    // Accettare/controproporre uno scambio può spostare crediti e calciatori:
+    // ricarica saldo e rosa così restano aggiornati subito.
+    onBalanceAffectingAction: () => void loadTeam(),
+  });
   const [showForm, setShowForm] = useState(false);
   const openStatuses = ["proposed", "countered", "accepted", "pending_approval"];
   const openTotal = trade.proposals.filter((row) => openStatuses.includes(row.status)).length;

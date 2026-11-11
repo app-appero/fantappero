@@ -21,10 +21,15 @@ import { loadStoredSession } from "../auth/sessionStorage";
 export interface UseTradeFlowOptions {
   leagueId: string | null;
   active: boolean;
+  /** Chiamato dopo ogni azione che può aver spostato crediti o calciatori
+   * (accetta/controproponi/approva), così il chiamante può aggiornare il
+   * saldo e la rosa mostrati altrove nella pagina senza attendere un
+   * ricaricamento manuale. */
+  onBalanceAffectingAction?: () => void;
 }
 
 /** Trade proposal lifecycle: create/list/cancel/accept/reject/counter (EP08-05/06). */
-export function useTradeFlow({ leagueId, active }: UseTradeFlowOptions) {
+export function useTradeFlow({ leagueId, active, onBalanceAffectingAction }: UseTradeFlowOptions) {
   const [proposals, setProposals] = useState<TradeProposal[]>([]);
   const [loading, setLoading] = useState(active);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -125,6 +130,7 @@ export function useTradeFlow({ leagueId, active }: UseTradeFlowOptions) {
       try {
         await action(accessToken, leagueId, proposalId);
         await loadProposals();
+        onBalanceAffectingAction?.();
       } catch (error) {
         setActionError(getApiErrorMessage(error, fallbackMessage));
       } finally {
@@ -160,6 +166,7 @@ export function useTradeFlow({ leagueId, active }: UseTradeFlowOptions) {
       try {
         await counterTradeProposal(accessToken, leagueId, proposalId, body);
         await loadProposals();
+        onBalanceAffectingAction?.();
       } catch (error) {
         setActionError(getApiErrorMessage(error, "Impossibile inviare la controproposta."));
       } finally {

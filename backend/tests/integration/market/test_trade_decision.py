@@ -286,6 +286,105 @@ def test_accept_queues_player_instead_of_failing_when_role_quota_exceeded(
     assert row.status.value == "accepted"
 
 
+def test_accept_creates_overflow_slot_instead_of_failing_when_roster_has_no_free_space(
+    client: TestClient,
+    db_session: Session,
+    competition_ids: list[str],
+) -> None:
+    """EP08-10 bis: an unbalanced trade (give fewer than you receive) no longer
+    fails with "la rosa non ha spazio" when the proposer's roster is already
+    full — an extra slot is created for the incoming player instead, flagged
+    as in excess, in attesa until the coach releases someone."""
+    proposer_token, proposer_id = _register_and_login(client, "decide.cap.p@example.com")
+    recipient_token, recipient_id = _register_and_login(client, "decide.cap.r@example.com")
+    league_id = _create_league(client, proposer_token, competition_ids, "Lega Scambio Capienza")
+    _add_member(db_session, league_id, recipient_id)
+
+    # Standard preset: 3 P, 11 D, 11 C, 10 A — fill the proposer's roster completely.
+    role_counts = ((FantasyRole.P, 3), (FantasyRole.D, 11), (FantasyRole.C, 11), (FantasyRole.A, 10))
+    provider_id = 9700
+    slot_index = 0
+    offered_athlete: Athlete | None = None
+    proposer_team_id = ""
+    for role, count in role_counts:
+        for position in range(count):
+            athlete = _seed_athlete(db_session, provider_id, f"{role.value}{position}", role=role)
+            proposer_team_id = _own_athlete_at_slot(client, league_id, proposer_token, slot_index, athlete)
+            if role is FantasyRole.D and position == 0:
+                offered_athlete = athlete
+            provider_id += 1
+            slot_index += 1
+    assert offered_athlete is not None
+
+    requested_athletes = [
+        _seed_athlete(db_session, provider_id + i, f"RichiestoA{i}", role=FantasyRole.A)
+        for i in range(2)
+    ]
+    recipient_team_id = _own_athlete_at_slot(
+        client, league_id, recipient_token, 0, requested_athletes[0]
+    )
+    _own_athlete_at_slot(client, league_id, recipient_token, 1, requested_athletes[1])
+
+    proposal = _propose(
+        client,
+        league_id,
+        proposer_token,
+        recipient_team_id=recipient_team_id,
+        offered_athlete_ids=[str(offered_athlete.id)],
+        requested_athlete_ids=[str(athlete.id) for athlete in requested_athletes],
+    )
+
+    accepted = client.post(
+        f"/leagues/{league_id}/mercato/scambi/proposte/{proposal['id']}/accetta",
+        headers={"Authorization": f"Bearer {recipient_token}"},
+    )
+    assert accepted.status_code == 200
+    assert accepted.json()["status"] == "accepted"
+
+    proposer_slots = list(
+        db_session.scalars(
+            select(FantasyRosterSlot).where(
+                FantasyRosterSlot.fantasy_team_id == UUID(proposer_team_id),
+            )
+        ).all()
+    )
+    # 35 original + 1 extra created for the player with nowhere left to go.
+    assert len(proposer_slots) == 36
+    occupied = [slot for slot in proposer_slots if slot.athlete_id is not None]
+    assert len(occupied) == 36
+    flagged = [slot for slot in occupied if slot.exceeds_role_quota]
+    # Forwards go from 10 (at cap) to 12: both incoming attackers are in excess.
+    assert len(flagged) == 2
+    assert {slot.athlete_id for slot in flagged} == {athlete.id for athlete in requested_athletes}
+
+    row = db_session.get(TradeProposal, UUID(proposal["id"]))
+    assert row is not None
+    assert row.status.value == "accepted"
+
+    # Releasing one flagged attacker resolves both the capacity overflow (back to
+    # 35 occupied slots) and one unit of the role overflow (forwards: 12 -> 11,
+    # still one over the cap of 10) — exactly one of the two stays flagged.
+    released_slot_index = flagged[0].slot_index
+    released = client.delete(
+        f"/leagues/{league_id}/amministrazione/squadre/{proposer_team_id}/slot/{released_slot_index}",
+        headers={"Authorization": f"Bearer {proposer_token}"},
+    )
+    assert released.status_code == 200
+
+    db_session.expire_all()
+    remaining_slots = list(
+        db_session.scalars(
+            select(FantasyRosterSlot).where(
+                FantasyRosterSlot.fantasy_team_id == UUID(proposer_team_id),
+            )
+        ).all()
+    )
+    occupied_after = [slot for slot in remaining_slots if slot.athlete_id is not None]
+    assert len(occupied_after) == 35
+    flagged_after = [slot for slot in occupied_after if slot.exceeds_role_quota]
+    assert len(flagged_after) == 1
+
+
 def test_reject_marks_terminal_and_is_visible_to_both_sides(
     client: TestClient,
     db_session: Session,

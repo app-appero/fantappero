@@ -175,7 +175,7 @@ function RosterRoleSection({
                       </Text>
                       {slot.exceedsRoleQuota ? (
                         <Text style={styles.playerPendingBadge} numberOfLines={1}>
-                          In attesa (oltre quota ruolo)
+                          In attesa (fuori rosa)
                         </Text>
                       ) : null}
                     </View>

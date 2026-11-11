@@ -166,7 +166,7 @@ function RosterRoleTable({
                       {slot.exceedsRoleQuota ? (
                         <Badge
                           variant="warning"
-                          title="Oltre la quota di ruolo: svincola un giocatore dello stesso ruolo per schierarlo."
+                          title="Scambio accettato con la rosa già al completo (per ruolo o nel totale): svincola qualcuno per schierarlo."
                         >
                           In attesa
                         </Badge>

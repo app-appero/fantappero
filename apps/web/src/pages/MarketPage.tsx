@@ -259,7 +259,14 @@ export function MarketPage() {
 
   const otherTeams = useMemo(() => teams.filter((row) => row.id !== team?.id), [teams, team]);
 
-  const trade = useTradeFlow({ leagueId: activeLeagueId, active: !isDemoMode });
+  const trade = useTradeFlow({
+    leagueId: activeLeagueId,
+    active: !isDemoMode,
+    // Accettare/controproporre uno scambio può spostare crediti e calciatori:
+    // ricarica saldo e rosa così restano aggiornati subito, non solo dopo un
+    // refresh manuale della pagina.
+    onBalanceAffectingAction: () => void loadTeam(),
+  });
   const history = useMarketHistory({ leagueId: activeLeagueId, active: !isDemoMode });
 
   const ownedSlots = useMemo(
@@ -435,7 +442,7 @@ export function MarketPage() {
       .then(resetTradeForm);
   }
 
-  const [tradeTab, setTradeTab] = useState<"all" | "received" | "sent" | "done">("all");
+  const [tradeTab, setTradeTab] = useState<"received" | "sent" | "open" | "done" | "all">("open");
   const [counteringProposalId, setCounteringProposalId] = useState<string | null>(null);
   const [counterOfferedAthleteIds, setCounterOfferedAthleteIds] = useState<string[]>([]);
   const [counterRequestedAthleteIds, setCounterRequestedAthleteIds] = useState<string[]>([]);
@@ -512,6 +519,9 @@ export function MarketPage() {
     (row) => row.proposerTeamId === team?.id && OPEN_TRADE_STATUSES.includes(row.status),
   );
   const doneTrades = trade.proposals.filter((row) => !OPEN_TRADE_STATUSES.includes(row.status));
+  // Ancora da decidere, indipendentemente da chi l'ha proposta: non "inviate"
+  // o "ricevute" separate, ma tutte quelle che richiedono ancora un esito.
+  const openTrades = trade.proposals.filter((row) => OPEN_TRADE_STATUSES.includes(row.status));
   const visibleTrades =
     tradeTab === "all"
       ? trade.proposals
@@ -519,7 +529,9 @@ export function MarketPage() {
         ? receivedTrades
         : tradeTab === "sent"
           ? sentTrades
-          : doneTrades;
+          : tradeTab === "open"
+            ? openTrades
+            : doneTrades;
   const pendingForMe = receivedTrades.filter((row) => row.status === "proposed").length;
 
   return (
@@ -671,7 +683,7 @@ export function MarketPage() {
               <strong>{pendingForMe}</strong>
             </div>
             <div className="fa-trade-stat">
-              <span>Inviate aperte</span>
+              <span>Inviate in corso</span>
               <strong>{sentTrades.length}</strong>
             </div>
             <div className="fa-trade-stat">
@@ -855,10 +867,11 @@ export function MarketPage() {
             <div className="fa-trade-tabs" role="tablist" data-testid="market-trade-tabs">
               {(
                 [
-                  ["all", "Tutte", trade.proposals.length],
                   ["received", "Ricevute", receivedTrades.length],
                   ["sent", "Inviate", sentTrades.length],
+                  ["open", "Aperte", openTrades.length],
                   ["done", "Concluse", doneTrades.length],
+                  ["all", "Tutte", trade.proposals.length],
                 ] as const
               ).map(([id, label, count]) => (
                 <button
