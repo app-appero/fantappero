@@ -385,7 +385,7 @@ def assign_allowing_role_quota_overflow(
         return role, True
 
 
-def reconcile_roster_overflow(session: Session, *, league: League, team: FantasyTeam) -> None:
+def reconcile_roster_overflow(session: Session, *, league: League, team: FantasyTeam) -> bool:
     """Clear `exceeds_role_quota` on any slot that is no longer actually in excess —
     called after anything that can change a team's roster composition (releasing a
     player, a trade). A slot can be flagged for two different reasons (EP08-10):
@@ -411,7 +411,7 @@ def reconcile_roster_overflow(session: Session, *, league: League, team: Fantasy
         ).all()
     )
     if not slots:
-        return
+        return False
     athlete_ids = [slot.athlete_id for slot in slots if slot.athlete_id is not None]
     roles = resolve_effective_athlete_roles(
         session,
@@ -420,6 +420,7 @@ def reconcile_roster_overflow(session: Session, *, league: League, team: Fantasy
         season_year=league.season_year,
         competition_ids={competition.id for competition in league.competitions},
     )
+    changed = False
     role_counts: dict[FantasyRole, int] = {}
     flagged_by_role: dict[FantasyRole, list[FantasyRosterSlot]] = {}
     for slot in slots:
@@ -448,7 +449,11 @@ def reconcile_roster_overflow(session: Session, *, league: League, team: Fantasy
 
     for flagged_slots in flagged_by_role.values():
         for slot in flagged_slots:
-            slot.exceeds_role_quota = slot.id in still_flagged_ids
+            keep = slot.id in still_flagged_ids
+            if slot.exceeds_role_quota != keep:
+                slot.exceeds_role_quota = keep
+                changed = True
+    return changed
 
 
 def activation_roster_and_credit_blockers(

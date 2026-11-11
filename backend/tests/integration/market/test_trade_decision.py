@@ -385,6 +385,36 @@ def test_accept_creates_overflow_slot_instead_of_failing_when_roster_has_no_free
     assert len(flagged_after) == 1
 
 
+def test_stale_overflow_flag_is_cleared_when_the_team_is_back_within_quota(
+    client: TestClient,
+    db_session: Session,
+    competition_ids: list[str],
+) -> None:
+    """EP08-10: a slot still flagged "in attesa" after the team is back within
+    its role quota (3 goalkeepers out of 3) is healed on the next roster read."""
+    token, _ = _register_and_login(client, "decide.stale.p@example.com")
+    league_id = _create_league(client, token, competition_ids, "Lega Flag Stantio")
+    team_id = ""
+    athletes = []
+    for index, provider_id in enumerate((9810, 9811, 9812)):
+        gk = _seed_athlete(db_session, provider_id, f"Portiere S{index}", role=FantasyRole.P)
+        athletes.append(gk)
+        team_id = _own_athlete_at_slot(client, league_id, token, index, gk)
+    stale = db_session.scalar(
+        select(FantasyRosterSlot).where(
+            FantasyRosterSlot.fantasy_team_id == UUID(team_id),
+            FantasyRosterSlot.athlete_id == athletes[1].id,
+        )
+    )
+    stale.exceeds_role_quota = True
+    db_session.commit()
+
+    rosa = client.get(f"/leagues/{league_id}/rosa", headers={"Authorization": f"Bearer {token}"})
+    assert rosa.status_code == 200
+    flags = [slot["exceedsRoleQuota"] for slot in rosa.json()["slots"] if slot["athleteId"]]
+    assert flags == [False, False, False]
+
+
 def test_reject_marks_terminal_and_is_visible_to_both_sides(
     client: TestClient,
     db_session: Session,

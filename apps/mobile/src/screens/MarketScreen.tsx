@@ -60,7 +60,8 @@ export function MarketScreen() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
 
-  const loadTeam = useCallback(async () => {
+  const loadTeam = useCallback(async (options?: { silent?: boolean }) => {
+    const silent = options?.silent ?? false;
     if (!activeLeagueId) {
       setLoading(false);
       setTeam(null);
@@ -72,8 +73,10 @@ export function MarketScreen() {
       setLoadError("Sessione non disponibile. Accedi di nuovo.");
       return;
     }
-    setLoading(true);
-    setLoadError(null);
+    if (!silent) {
+      setLoading(true);
+      setLoadError(null);
+    }
     try {
       const [myTeam, credits, allTeams, allOccupancy, listone] = await Promise.all([
         fetchMyFantasyTeam(accessToken, activeLeagueId),
@@ -90,8 +93,10 @@ export function MarketScreen() {
       setOccupancy(allOccupancy);
       setListoneEntries(listone);
     } catch (error) {
-      setTeam(null);
-      setLoadError(getApiErrorMessage(error, "Impossibile caricare la rosa."));
+      if (!silent) {
+        setTeam(null);
+        setLoadError(getApiErrorMessage(error, "Impossibile caricare la rosa."));
+      }
     } finally {
       setLoading(false);
     }
@@ -128,7 +133,7 @@ export function MarketScreen() {
     active: true,
     // Accettare/controproporre uno scambio può spostare crediti e calciatori:
     // ricarica saldo e rosa così restano aggiornati subito.
-    onBalanceAffectingAction: () => void loadTeam(),
+    onBalanceAffectingAction: () => void loadTeam({ silent: true }),
   });
   const [showForm, setShowForm] = useState(false);
   // "accepted" e "countered" sono già stati finali — vedi la stessa nota in

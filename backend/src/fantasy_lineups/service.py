@@ -78,7 +78,10 @@ from fantasy_lineups.validators import (
     validate_module_code,
 )
 from fantasy_ratings.round_scores import RoundAthleteScore, compute_round_athlete_scores
-from fantasy_teams.composition_service import resolve_effective_athlete_roles
+from fantasy_teams.composition_service import (
+    reconcile_roster_overflow,
+    resolve_effective_athlete_roles,
+)
 from fantasy_teams.factory import ensure_team_for_membership, find_team_for_membership
 from fantasy_teams.models import FantasyRosterSlot, FantasyTeam
 from fantasy_turns.models import FantasyRound, FantasyRoundFixture
@@ -2036,6 +2039,17 @@ class FantasyLineupService:
             else find_team_for_membership(self._session, membership.id, with_slots=True)
         )
         assert team is not None
+        if not for_update and any(slot.exceeds_role_quota for slot in team.slots):
+            # Auto-riparazione di un esubero (EP08-10) ormai risolto.
+            if reconcile_roster_overflow(
+                self._session, league=league_access.league, team=team
+            ):
+                self._session.commit()
+                healed = find_team_for_membership(
+                    self._session, membership.id, with_slots=True
+                )
+                assert healed is not None
+                team = healed
         return team
 
     def _default_team_name(self, league_access: LeagueAccess) -> str:

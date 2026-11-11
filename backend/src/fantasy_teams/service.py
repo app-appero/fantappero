@@ -175,6 +175,14 @@ class FantasyTeamService:
         self._session.commit()
         team = find_team_for_membership(self._session, membership.id, with_slots=True)
         assert team is not None
+        # Auto-riparazione: un esubero (EP08-10) già risolto non deve restare
+        # segnato "in attesa" solo perché la rosa è cambiata per altre vie.
+        if any(slot.exceeds_role_quota for slot in team.slots) and reconcile_roster_overflow(
+            self._session, league=league_access.league, team=team
+        ):
+            self._session.commit()
+            team = find_team_for_membership(self._session, membership.id, with_slots=True)
+            assert team is not None
         return self._to_team_response(team)
 
     def list_teams(self, league_access: LeagueAccess) -> list[FantasyTeamSummaryResponse]:

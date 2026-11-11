@@ -80,6 +80,9 @@ export function useTradeFlow({ leagueId, active, onBalanceAffectingAction }: Use
   useRealtimeEvent((event) => {
     if (event.type === "market.updated" && event.kind === "trades" && event.leagueId === leagueId) {
       void loadProposals(true);
+      // L'altra squadra può aver accettato/approvato: crediti e rosa cambiano
+      // anche senza un'azione fatta da questo dispositivo.
+      onBalanceAffectingAction?.();
     }
   }, active && !!leagueId);
 

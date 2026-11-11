@@ -17,6 +17,7 @@ from auth.exceptions import ValidationAuthError
 from database.enums import CreditLedgerReason, RosterOwnershipSource
 from fantasy_teams.composition_service import (
     assign_allowing_role_quota_overflow,
+    reconcile_roster_overflow,
     sync_team_composition_status,
 )
 from fantasy_teams.ledger import apply_ledger_movement, find_account_for_team
@@ -235,5 +236,10 @@ def execute_trade(
                 note="Crediti ricevuti da scambio",
             )
 
+        # Chi ha ceduto giocatori può essere rientrato nei limiti: sblocca chi
+        # era in attesa solo per un esubero ormai risolto (EP08-10).
+        session.flush()
+        reconcile_roster_overflow(session, league=league, team=proposer_team)
+        reconcile_roster_overflow(session, league=league, team=recipient_team)
         sync_team_composition_status(session, proposer_team, league=league)
         sync_team_composition_status(session, recipient_team, league=league)

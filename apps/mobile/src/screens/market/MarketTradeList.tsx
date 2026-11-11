@@ -17,7 +17,7 @@ import { marketUiStyles as styles } from "../../market/marketUiStyles";
 import type { useTradeFlow } from "../../market/useTradeFlow";
 import { CreditsDirectionField, PickPanel, type CreditsDirection, type TradeAthleteMeta } from "./MarketTradeCreateForm";
 
-type TradeTab = "received" | "sent" | "open" | "done" | "all";
+type TradeTab = "received" | "sent" | "open" | "all";
 // "accepted" è già uno stato finale (execute_trade sposta subito giocatori e
 // crediti quando non serve l'approvazione dell'amministratore). "countered"
 // è altrettanto finale: segna la proposta ORIGINALE come superata — la vera
@@ -134,7 +134,6 @@ export function MarketTradeList({
   const sent = trade.proposals.filter(
     (row) => row.proposerTeamId === selfTeamId && OPEN_STATUSES.has(row.status),
   );
-  const done = trade.proposals.filter((row) => !OPEN_STATUSES.has(row.status));
   // Ancora da decidere, indipendentemente da chi l'ha proposta.
   const open = trade.proposals.filter((row) => OPEN_STATUSES.has(row.status));
   const visible =
@@ -144,14 +143,11 @@ export function MarketTradeList({
         ? sent
         : tab === "open"
           ? open
-          : tab === "done"
-            ? done
-            : trade.proposals;
+          : trade.proposals;
   const tabs: Array<{ id: TradeTab; label: string; count: number }> = [
     { id: "received", label: "Ricevute", count: received.length },
     { id: "sent", label: "Inviate", count: sent.length },
     { id: "open", label: "In corso", count: open.length },
-    { id: "done", label: "Concluse", count: done.length },
     { id: "all", label: "Tutte", count: trade.proposals.length },
   ];
 

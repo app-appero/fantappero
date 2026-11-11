@@ -189,7 +189,7 @@ export function MarketPage() {
     isDemoMode && demoState === "error" ? "Impossibile caricare la rosa (demo)." : null,
   );
 
-  const loadTeam = useCallback(async () => {
+  const loadTeam = useCallback(async (silent = false) => {
     if (isDemoMode) {
       setTeam(
         demoState === "empty" || demoState === "error" || demoState === "forbidden"
@@ -212,8 +212,10 @@ export function MarketPage() {
       setLoadError("Sessione non disponibile. Accedi di nuovo.");
       return;
     }
-    setLoading(true);
-    setLoadError(null);
+    if (!silent) {
+      setLoading(true);
+      setLoadError(null);
+    }
     try {
       const [myTeam, credits, allTeams, allOccupancy, listone] = await Promise.all([
         fetchMyFantasyTeam(stored.accessToken, activeLeagueId),
@@ -230,8 +232,10 @@ export function MarketPage() {
       setOccupancy(allOccupancy);
       setListoneEntries(listone);
     } catch (error) {
-      setTeam(null);
-      setLoadError(getApiErrorMessage(error, "Impossibile caricare la rosa."));
+      if (!silent) {
+        setTeam(null);
+        setLoadError(getApiErrorMessage(error, "Impossibile caricare la rosa."));
+      }
     } finally {
       setLoading(false);
     }
@@ -265,7 +269,7 @@ export function MarketPage() {
     // Accettare/controproporre uno scambio può spostare crediti e calciatori:
     // ricarica saldo e rosa così restano aggiornati subito, non solo dopo un
     // refresh manuale della pagina.
-    onBalanceAffectingAction: () => void loadTeam(),
+    onBalanceAffectingAction: () => void loadTeam(true),
   });
   const history = useMarketHistory({ leagueId: activeLeagueId, active: !isDemoMode });
 
@@ -442,7 +446,7 @@ export function MarketPage() {
       .then(resetTradeForm);
   }
 
-  const [tradeTab, setTradeTab] = useState<"received" | "sent" | "open" | "done" | "all">("open");
+  const [tradeTab, setTradeTab] = useState<"received" | "sent" | "open" | "all">("open");
   const [counteringProposalId, setCounteringProposalId] = useState<string | null>(null);
   const [counterOfferedAthleteIds, setCounterOfferedAthleteIds] = useState<string[]>([]);
   const [counterRequestedAthleteIds, setCounterRequestedAthleteIds] = useState<string[]>([]);
@@ -534,9 +538,7 @@ export function MarketPage() {
         ? receivedTrades
         : tradeTab === "sent"
           ? sentTrades
-          : tradeTab === "open"
-            ? openTrades
-            : doneTrades;
+          : openTrades;
   const pendingForMe = receivedTrades.filter((row) => row.status === "proposed").length;
 
   return (
@@ -875,7 +877,6 @@ export function MarketPage() {
                   ["received", "Ricevute", receivedTrades.length],
                   ["sent", "Inviate", sentTrades.length],
                   ["open", "In corso", openTrades.length],
-                  ["done", "Concluse", doneTrades.length],
                   ["all", "Tutte", trade.proposals.length],
                 ] as const
               ).map(([id, label, count]) => (
