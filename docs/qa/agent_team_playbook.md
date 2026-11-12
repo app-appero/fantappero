@@ -30,6 +30,9 @@ Per contenere il consumo, ogni esecuzione copre le aree **4 e 5 (mercato) sempre
 Così ogni area non di mercato viene riesaminata ogni 4 giorni. Il rapporto indica quale rotazione è stata eseguita. I bug già in `known_issues.md` si rivalutano solo se l'area del giorno li riguarda.
 Una volta alla settimana (di domenica) il coordinatore fa un controllo a campione su tutte le aree e verifica che le correzioni già pubblicate non si siano rotte.
 
+## Scenario "turno vivo" (solo quando serve)
+Se su dev c'è un turno con cutoff nelle prossime 24 ore, il coordinatore, oltre alla corsa normale, programma con `send_later` 2 o 3 controlli mirati (indicativamente a −2h, −10 minuti e +5 minuti dal cutoff). Ogni controllo riprende le leghe/formazioni create nella corsa del giorno e verifica: mosse tattiche e relativo conteggio a ridosso del blocco, blocco progressivo per partita, formazione automatica al primo blocco, cutoff e ricalcolo, notifiche di turno. Dove manca il dato sportivo scrive "non verificabile". Nei giorni senza turno vicino non si programma nulla. Ogni controllo finisce nel rapporto del giorno.
+
 ## Preparazione di ogni esecuzione
 1. Accedi con gli otto account `qa-01..08@test.fantappero.it`, password fissa `QaAgenti!2026x`. Se il login fallisce con credenziali errate, registra l'account (`POST /auth/register`) e riprova. Se risponde `tester_only`, fermati e segnala: la modalità test è stata riaccesa.
 2. Crea le leghe necessarie alle aree del giorno (se la rotazione non tocca turni/calendario, la lega B non serve) (le intestazioni dei percorsi sono nei router `backend/src/*/router.py` e nei client `apps/web/src/api/`):
@@ -54,7 +57,7 @@ Proposta (offri/chiedi, solo giocatori, solo crediti, scadenza facoltativa, dest
 Asta a buste: sessione (finestra, una sola attiva), offerta (importo, saldo, ritiro, rosa piena o ruolo pieno ammessi), chiusura, risoluzione (vincitore, spareggio con sessione figlia, idempotenza, crediti addebitati una volta), esiti visibili. Asta live: tutte le modalità di chiamata, rilanci, timer, passaggio, aggiudicazione, scambio immediato a rosa piena. Svincolati (waiver): offerta con calciatore da svincolare, risoluzione. Interruttore apri/chiudi mercato (effetto su asta e scambi, scambi sempre disponibili).
 
 ### 6. Formazione
-Moduli approvati, selezione titolari e panchina, ordine panchina, calciatori bloccati/indisponibili/fuori rosa (visibili ma non selezionabili), blocco progressivo per partita, mosse tattiche (massimo e conteggio), bozza e salvataggio, copia formazione precedente, formazione automatica al primo blocco, validazioni server (ruolo, duplicati, non in rosa), formazione di altri partecipanti negata, operatore.
+Moduli approvati, selezione titolari e panchina, ordine panchina, calciatori bloccati/indisponibili/fuori rosa (visibili ma non selezionabili), blocco progressivo per partita, mosse tattiche (massimo e conteggio), bozza e salvataggio, copia formazione precedente, formazione automatica al primo blocco, validazioni server (ruolo, duplicati, non in rosa), formazioni degli altri partecipanti leggibili (scelta di Rosario, non è un difetto: non segnalarlo), operatore.
 
 ### 7. Turni, calendario, classifica
 Generazione calendario (partecipanti pari/dispari, giornate, scontri diretti), attivazione lega (blocchi: rose complete, crediti), turni e finestre europee, cutoff e ricalcolo, partite del turno e orari, risultati e voti (se i dati sportivi di dev li hanno), classifica e fantapunti, scontro diretto, omologazione e correzioni, notifiche di turno. Dove mancano dati sportivi (nessuna partita giocata) registra "non verificabile" invece di inventare.
