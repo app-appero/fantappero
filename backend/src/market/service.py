@@ -14,6 +14,7 @@ from authorization.context import LeagueAccess
 from database.enums import (
     CreditLedgerReason,
     LeagueAuditAction,
+    LeagueMemberRole,
     MarketBidStatus,
     MarketReleaseReason,
     MarketSessionKind,
@@ -691,7 +692,7 @@ class MarketService:
         reason_raw: str,
     ) -> MarketReleasePreviewResponse:
         team = self._my_team(league_access)
-        reason, percent = self._resolve_release_reason(league_access.league.id, reason_raw)
+        reason, percent = self._resolve_release_reason(league_access, reason_raw)
         slot = self._session.scalar(
             select(FantasyRosterSlot).where(
                 FantasyRosterSlot.fantasy_team_id == team.id,
@@ -725,7 +726,7 @@ class MarketService:
         league = self._lock_league(league_access.league.id)
         assert_market_open(league)
         team = self._my_team(league_access)
-        reason, percent = self._resolve_release_reason(league.id, reason_raw)
+        reason, percent = self._resolve_release_reason(league_access, reason_raw)
 
         slot = self._session.scalar(
             select(FantasyRosterSlot)
@@ -795,8 +796,9 @@ class MarketService:
         )
 
     def _resolve_release_reason(
-        self, league_id: UUID, reason_raw: str
+        self, league_access: LeagueAccess, reason_raw: str
     ) -> tuple[MarketReleaseReason, int]:
+        league_id = league_access.league.id
         try:
             reason = MarketReleaseReason(reason_raw)
         except ValueError as exc:
@@ -804,6 +806,14 @@ class MarketService:
                 "Causa dello svincolo non valida.",
                 code="invalid_release_reason",
             ) from exc
+        if reason == MarketReleaseReason.LEAGUE_EXIT and not (
+            league_access.operator_bypass or league_access.membership_role == LeagueMemberRole.OWNER
+        ):
+            # N6: lo svincolo "uscita dai 5 campionati" è una decisione dell'amministratore.
+            raise ValidationAuthError(
+                "Solo l'amministratore può svincolare per uscita dai 5 campionati.",
+                code="release_reason_forbidden",
+            )
         rules = self._session.scalar(select(LeagueRules).where(LeagueRules.league_id == league_id))
         if reason == MarketReleaseReason.LEAGUE_EXIT:
             percent = rules.league_exit_refund_percent if rules else 100

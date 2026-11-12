@@ -662,7 +662,6 @@ export function LeagueMembersPanel({
                     />
                     <span className="fa-member-list__text">
                       <strong>{candidate.displayName}</strong>
-                      <span className="fa-member-list__email">{candidate.email}</span>
                     </span>
                   </label>
                 </li>

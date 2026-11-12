@@ -24,6 +24,7 @@ from sqlalchemy.orm import Session, selectinload
 from auth.exceptions import ValidationAuthError
 from authorization.context import LeagueAccess
 from authorization.exceptions import ForbiddenError
+from database.atomic import rollback_on_error
 from database.enums import (
     LeagueAuditAction,
     LeagueRole,
@@ -121,6 +122,7 @@ class LiveMarketService:
 
     # -- session lifecycle --------------------------------------------------
 
+    @rollback_on_error
     def create_session(
         self,
         league_access: LeagueAccess,
@@ -349,6 +351,7 @@ class LiveMarketService:
 
     # -- lots -----------------------------------------------------------------
 
+    @rollback_on_error
     def nominate_lot(
         self,
         league_access: LeagueAccess,
@@ -381,15 +384,26 @@ class LiveMarketService:
 
         queue_entry: MarketLiveNominationQueueEntry | None = None
         if market_session.nomination_mode in _QUEUE_BASED_MODES:
-            queue_entry = self._session.scalar(
+            pending_entries = self._session.scalars(
                 select(MarketLiveNominationQueueEntry)
                 .where(
                     MarketLiveNominationQueueEntry.session_id == market_session.id,
                     MarketLiveNominationQueueEntry.consumed_at.is_(None),
                 )
                 .order_by(MarketLiveNominationQueueEntry.position.asc())
-            )
+            ).all()
+            occupied = self._occupied_athlete_ids(market_session.league_id)
+            skip_now = datetime.now(UTC)
+            for candidate in pending_entries:
+                # Chi nel frattempo è già in una rosa non si può più chiamare: la voce
+                # viene saltata e consumata, altrimenti bloccherebbe la coda per sempre.
+                if candidate.athlete_id in occupied:
+                    candidate.consumed_at = skip_now
+                    continue
+                queue_entry = candidate
+                break
             if queue_entry is None:
+                self._session.commit()
                 raise ValidationAuthError(
                     "Non ci sono altri calciatori nella lista di chiamata.",
                     code="market_live_queue_empty",
@@ -1029,7 +1043,7 @@ class LiveMarketService:
             )
         )
         seen: set[UUID] = set()
-        position = 0
+        ordered_ids: list[UUID] = []
         for raw in athlete_ids_raw:
             try:
                 athlete_id = UUID(raw)
@@ -1041,6 +1055,18 @@ class LiveMarketService:
             if athlete_id in seen:
                 continue
             seen.add(athlete_id)
+            ordered_ids.append(athlete_id)
+        if ordered_ids:
+            known = set(
+                self._session.scalars(select(Athlete.id).where(Athlete.id.in_(ordered_ids))).all()
+            )
+            if len(known) != len(ordered_ids):
+                raise ValidationAuthError(
+                    "Uno o più calciatori della lista di chiamata non esistono.",
+                    code="nomination_athlete_not_found",
+                )
+        position = 0
+        for athlete_id in ordered_ids:
             self._session.add(
                 MarketLiveNominationQueueEntry(
                     session_id=session_id, athlete_id=athlete_id, position=position

@@ -116,7 +116,6 @@ describe("directory fantallenatori", () => {
     const accepted: FantasyCoachDirectoryItem = {
       userId: "user-accepted",
       displayName: "Rosario Trotta",
-      email: "appero.app@gmail.com",
       avatarUrl: null,
       userType: "human",
       availableForInvites: true,
@@ -163,7 +162,6 @@ describe("directory fantallenatori", () => {
     expect(button?.textContent).toBe("Invita");
     expect(button?.hasAttribute("disabled")).toBe(false);
     expect(host.textContent).not.toContain("Aggiunto");
-    expect(host.textContent).toContain("appero.app@gmail.com");
 
     await act(async () => {
       renderDirectoryTree(1);
@@ -184,7 +182,6 @@ describe("directory fantallenatori", () => {
     const member: FantasyCoachDirectoryItem = {
       userId: "user-member",
       displayName: "Già Iscritto",
-      email: "iscritto@example.com",
       avatarUrl: null,
       userType: "human",
       availableForInvites: false,

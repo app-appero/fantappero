@@ -16,10 +16,23 @@ Questo file è il manuale che ogni esecuzione programmata legge all'inizio. Vale
 - **Coordinatore** (la sessione principale): prepara account e leghe, assegna le aree ai tester, deduplica con `docs/qa/known_issues.md`, assegna ai fixer solo i bug confermati e riproducibili, scrive il rapporto.
 - **Tester** (un agente per area): eseguono le checklist qui sotto, per ogni problema registrano: passi, atteso, ottenuto, richiesta e risposta HTTP (senza segreti), gravità (bloccante / alta / media / bassa), area.
 - **Fixer** (uno per bug confermato, solo se il bug è nel codice): trova la causa, scrive la correzione minima con test, la prova in locale (Postgres/Redis locali, vedi `docs/development/local_environment.md`) e consegna al coordinatore causa + diff + test eseguiti. Non applica nulla.
+  - **Ogni fixer lavora in una copia sua**, mai nella cartella condivisa: `git worktree add /tmp/fix-<id> HEAD` (o `git clone` locale) e un database di test con nome proprio (`fantappero_fix_<id>_test`, il nome deve finire con `_test`). Vietato `git stash`, `git checkout` o `git reset` nella cartella condivisa: si pestano i piedi a vicenda e i test diventano inaffidabili.
+  - Il confronto "prima/dopo" si fa con due worktree (uno senza la correzione, uno con), non con lo stash.
+  - Mai due `pytest` sullo stesso database nello stesso momento.
+  - Il diff consegnato deve essere un file `.patch` applicabile con `git apply` sul ramo `main`.
+
+## Rotazione delle aree (una esecuzione al giorno)
+Per contenere il consumo, ogni esecuzione copre le aree **4 e 5 (mercato) sempre**, più **due gruppi a rotazione** secondo il giorno dell'anno (`oggi.timetuple().tm_yday % 4`):
+- `0` → aree 1 e 2 (accesso/profilo, leghe/inviti)
+- `1` → aree 3 e 6 (rosa/crediti, formazione)
+- `2` → aree 7 e 8 (turni/calendario/classifica, notifiche)
+- `3` → aree 9, 10 e 11 (web, coerenza web/mobile, salute)
+Così ogni area non di mercato viene riesaminata ogni 4 giorni. Il rapporto indica quale rotazione è stata eseguita. I bug già in `known_issues.md` si rivalutano solo se l'area del giorno li riguarda.
+Una volta alla settimana (di domenica) il coordinatore fa un controllo a campione su tutte le aree e verifica che le correzioni già pubblicate non si siano rotte.
 
 ## Preparazione di ogni esecuzione
 1. Accedi con gli otto account `qa-01..08@test.fantappero.it`, password fissa `QaAgenti!2026x`. Se il login fallisce con credenziali errate, registra l'account (`POST /auth/register`) e riprova. Se risponde `tester_only`, fermati e segnala: la modalità test è stata riaccesa.
-2. Crea due leghe (le intestazioni dei percorsi sono nei router `backend/src/*/router.py` e nei client `apps/web/src/api/`):
+2. Crea le leghe necessarie alle aree del giorno (se la rotazione non tocca turni/calendario, la lega B non serve) (le intestazioni dei percorsi sono nei router `backend/src/*/router.py` e nei client `apps/web/src/api/`):
    - **QA-…-A (mercato)**: 6 partecipanti (qa-01 proprietario, qa-02..06 con invito o codice), regole standard.
    - **QA-…-B (ciclo di vita)**: 4 partecipanti (minimo consentito), usata per attivazione, calendario e turni.
 3. Alla fine prova a eliminare le due leghe; se non è possibile lasciale, il nome le rende riconoscibili.

@@ -1268,7 +1268,6 @@ export function LeagueAdminScreen() {
                 selected={replaceToId === candidate.userId}
                 onPress={() => setReplaceToId(candidate.userId)}
                 title={candidate.displayName}
-                subtitle={candidate.email}
                 testID={`league-members-replace-pick-${candidate.userId}`}
               />
             ))

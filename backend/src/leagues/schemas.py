@@ -214,10 +214,8 @@ class PendingInviteCountResponse(ApiModel):
 class FantasyCoachDirectoryItem(ApiModel):
     user_id: str = Field(alias="userId")
     display_name: str = Field(alias="displayName")
-    # Visibile solo a chi amministra la lega (perimetro già protetto da
-    # `league:admin`): serve a distinguere account diversi con lo stesso nome
-    # mostrato (EP13-P06bis).
-    email: str
+    # L'email non è mai esposta nell'elenco: tutti gli utenti della piattaforma sono
+    # candidati e la directory è raggiungibile da chiunque crei una lega.
     avatar_url: str | None = Field(default=None, alias="avatarUrl")
     nickname: str | None = None
     user_type: Literal["human", "ai"] = Field(alias="userType")

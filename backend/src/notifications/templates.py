@@ -390,6 +390,7 @@ _TRADE_V2_TITLES: dict[str, str] = {
     "rejected": "{team} ha rifiutato lo scambio",
     "countered": "{team} ti ha fatto una controproposta",
     "pending_approval": "Scambio con {team} in attesa dell'amministratore",
+    "admin_review": "Scambio tra {team} e {second_team} da approvare",
     "executed": "Scambio con {team} approvato",
     "rejected_by_admin": "Scambio con {team} rifiutato dall'amministratore",
 }
@@ -399,7 +400,10 @@ _TRADE_V2_TITLES: dict[str, str] = {
 def _render_mercato_scambio_v2(params: NotificationParams) -> NotificationContent:
     status = str(params.get("status"))
     team = str(params.get("other_team", "Un altro fantallenatore"))
-    title = _TRADE_V2_TITLES.get(status, "Aggiornamento scambio").format(team=team)
+    second_team = str(params.get("second_team", "un altro fantallenatore"))
+    title = _TRADE_V2_TITLES.get(status, "Aggiornamento scambio").format(
+        team=team, second_team=second_team
+    )
     gives = _join(_names(params.get("offered")), _credits(params.get("offered_credits")), sep=" + ")
     asks = _join(
         _names(params.get("requested")), _credits(params.get("requested_credits")), sep=" + "

@@ -337,7 +337,6 @@ export function CoachDirectoryPanel({
                 <View style={styles.identity}>
                   <Text style={styles.name}>{coach.nickname?.trim() || coach.displayName}</Text>
                   {coach.nickname ? <Text style={styles.nickname}>{coach.displayName}</Text> : null}
-                  <Text style={styles.email}>{coach.email}</Text>
                 </View>
               </Pressable>
               <View style={styles.chips}>

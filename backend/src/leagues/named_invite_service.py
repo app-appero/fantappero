@@ -110,7 +110,6 @@ class NamedLeagueInviteService:
                 pattern = f"%{escaped}%"
                 conditions.append(
                     or_(
-                        User.email.ilike(pattern, escape="\\"),
                         UserProfile.display_name.ilike(pattern, escape="\\"),
                         UserProfile.nickname.ilike(pattern, escape="\\"),
                     )
@@ -150,7 +149,6 @@ class NamedLeagueInviteService:
                     if profile is not None and profile.display_name
                     else (user.email.split("@", 1)[0] or user.email)
                 ),
-                email=user.email,
                 avatarUrl=profile.avatar_url if profile is not None else None,
                 nickname=profile.nickname if profile is not None else None,
                 userType=user.user_type.value,

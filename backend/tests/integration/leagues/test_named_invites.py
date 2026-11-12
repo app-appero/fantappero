@@ -129,10 +129,8 @@ def test_directory_pagination_filters_and_excludes_members(
     assert payload["total"] >= 1
     assert all(row["userType"] == "human" for row in payload["items"])
     assert all(row["availableForInvites"] is True for row in payload["items"])
-    # Visibile solo qui: la directory è un endpoint amministrativo
-    # (`league:admin`), serve a distinguere account diversi con lo stesso
-    # nome mostrato (EP13-P06bis).
-    assert all(row["email"] for row in payload["items"])
+    # N2: l'email non è mai esposta, nemmeno agli amministratori di lega.
+    assert all("email" not in row for row in payload["items"])
 
     search = client.get(
         f"/leagues/{league_id}/amministrazione/fantallenatori",
@@ -197,12 +195,8 @@ def test_directory_pagination_filters_and_excludes_members(
         params={"search": "dir.unverified@example.com"},
     )
     assert by_email.status_code == 200
-    matched = [
-        row for row in by_email.json()["items"] if row["email"] == "dir.unverified@example.com"
-    ]
-    assert len(matched) == 1
-    assert matched[0]["emailVerified"] is False
-    assert matched[0]["inLeague"] is False
+    # N2: la ricerca per email non deve rivelare se un indirizzo è registrato.
+    assert by_email.json()["items"] == []
 
 
 def test_named_invite_rejects_unavailable_duplicate_and_member(
@@ -400,7 +394,6 @@ def test_removed_member_is_invitable_again_and_sees_the_new_invite(
     rows = [row for row in directory.json()["items"] if row["userId"] == str(recipient_id)]
     assert len(rows) == 1
     assert rows[0]["namedInviteStatus"] == "revoked"
-    assert rows[0]["email"] == "reinvite.recipient@example.com"
 
     inbox = client.get(
         "/leagues/inviti-ricevuti",

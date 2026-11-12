@@ -15,6 +15,7 @@ from sqlalchemy.orm import Session, selectinload
 from auth.exceptions import ValidationAuthError
 from auth.models.user import User
 from authorization.context import LeagueAccess
+from database.atomic import rollback_on_error
 from database.enums import (
     CreditLedgerReason,
     FantasyRole,
@@ -310,6 +311,7 @@ class FantasyTeamService:
         )
         return EnsureFantasyTeamsResponse(created=created, existing=existing, teams=summaries)
 
+    @rollback_on_error
     def assign_random_ai_roster(
         self,
         league_access: LeagueAccess,
@@ -703,6 +705,7 @@ class FantasyTeamService:
             )
         return players
 
+    @rollback_on_error
     def assign_slot(
         self,
         league_access: LeagueAccess,
@@ -901,6 +904,7 @@ class FantasyTeamService:
         assert refreshed is not None
         return self._to_team_response(refreshed, composition=report)
 
+    @rollback_on_error
     def release_slot(
         self,
         league_access: LeagueAccess,
@@ -1350,6 +1354,7 @@ class FantasyTeamService:
         )
         return self._to_import_preview(session)
 
+    @rollback_on_error
     def confirm_csv_import(
         self,
         league_access: LeagueAccess,

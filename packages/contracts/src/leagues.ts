@@ -356,8 +356,6 @@ export interface FantasyCoachDirectoryItem {
   userId: string;
   displayName: string;
   nickname?: string | null;
-  /** Visibile solo a chi amministra la lega (EP13-P06bis). */
-  email: string;
   avatarUrl: string | null;
   userType: import("./profile.js").UserType;
   availableForInvites: boolean;
@@ -390,8 +388,8 @@ export interface FantasyCoachProfile {
   userId: string;
   displayName: string;
   nickname?: string | null;
-  /** Visibile solo a chi amministra la lega (EP13-P06bis). */
-  email: string;
+  /** Visibile solo a chi amministra la lega (EP13-P06bis); `null` per gli altri. */
+  email?: string | null;
   avatarUrl: string | null;
   userType: import("./profile.js").UserType;
   availableForInvites: boolean;

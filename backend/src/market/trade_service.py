@@ -11,7 +11,12 @@ from sqlalchemy.orm import Session
 
 from auth.exceptions import ValidationAuthError
 from authorization.context import LeagueAccess
-from database.enums import LeagueAuditAction, NotificationCategory, TradeStatus
+from database.enums import (
+    LeagueAuditAction,
+    LeagueMemberRole,
+    NotificationCategory,
+    TradeStatus,
+)
 from fantasy_teams.factory import (
     ensure_team_for_membership,
     find_team_by_id,
@@ -298,6 +303,7 @@ class TradeService:
                 status=TradeStatus.PENDING_APPROVAL,
                 team_ids=[proposer_team.id],
             )
+            self._notify_admins_trade_pending(proposal, proposer_team, recipient_team)
             self._session.commit()
             get_metrics().incr("trade_proposal_accepted_total", labels={"result": "pending"})
             return self._to_response(proposal)
@@ -447,16 +453,26 @@ class TradeService:
         return self._to_response(counter)
 
     def list_proposals(self, league_access: LeagueAccess) -> TradeProposalListResponse:
-        team = self._my_team(league_access)
-        rows = self._session.scalars(
-            select(TradeProposal)
-            .where(
-                TradeProposal.league_id == league_access.league.id,
-                or_(
+        team = self._my_team_or_none(league_access)
+        conditions = []
+        if team is not None:
+            conditions.extend(
+                [
                     TradeProposal.proposer_team_id == team.id,
                     TradeProposal.recipient_team_id == team.id,
-                ),
+                ]
             )
+        if self._can_review_trades(league_access):
+            # N3: chi deve approvare vede gli scambi in attesa, anche se non sono suoi.
+            conditions.append(TradeProposal.status == TradeStatus.PENDING_APPROVAL)
+        if not conditions:
+            raise ValidationAuthError(
+                "Devi essere partecipante della lega per operare sul mercato.",
+                code="membership_required",
+            )
+        rows = self._session.scalars(
+            select(TradeProposal)
+            .where(TradeProposal.league_id == league_access.league.id, or_(*conditions))
             .order_by(TradeProposal.created_at.desc())
         ).all()
         return TradeProposalListResponse(proposals=[self._to_response(row) for row in rows])
@@ -466,16 +482,37 @@ class TradeService:
         league_access: LeagueAccess,
         proposal_id: UUID,
     ) -> TradeProposalResponse:
-        team = self._my_team(league_access)
+        team = self._my_team_or_none(league_access)
         proposal = self._session.get(TradeProposal, proposal_id)
         if proposal is None or proposal.league_id != league_access.league.id:
             raise ValidationAuthError("Proposta non trovata.", code="trade_proposal_not_found")
-        if proposal.proposer_team_id != team.id and proposal.recipient_team_id != team.id:
+        is_party = team is not None and team.id in (
+            proposal.proposer_team_id,
+            proposal.recipient_team_id,
+        )
+        is_reviewer = (
+            self._can_review_trades(league_access)
+            and proposal.status == TradeStatus.PENDING_APPROVAL
+        )
+        if not is_party and not is_reviewer:
             raise ValidationAuthError(
                 "Non hai accesso a questa proposta di scambio.",
                 code="trade_access_forbidden",
             )
         return self._to_response(proposal)
+
+    def _can_review_trades(self, league_access: LeagueAccess) -> bool:
+        return (
+            league_access.operator_bypass or league_access.membership_role == LeagueMemberRole.OWNER
+        )
+
+    def _my_team_or_none(self, league_access: LeagueAccess) -> FantasyTeam | None:
+        try:
+            return self._my_team(league_access)
+        except ValidationAuthError:
+            if self._can_review_trades(league_access):
+                return None
+            raise
 
     # -- helpers ----------------------------------------------------------------
 
@@ -582,6 +619,36 @@ class TradeService:
             LeagueAuditEvent(league_id=league_id, actor_id=actor_id, action=action, details=details)
         )
         self._session.flush()
+
+    def _notify_admins_trade_pending(
+        self,
+        proposal: TradeProposal,
+        proposer_team: FantasyTeam,
+        recipient_team: FantasyTeam,
+    ) -> None:
+        """N3: avvisa l'amministratore che c'è uno scambio da approvare."""
+        owner_ids = self._session.scalars(
+            select(LeagueMembership.user_id).where(
+                LeagueMembership.league_id == proposal.league_id,
+                LeagueMembership.role == LeagueMemberRole.OWNER,
+            )
+        ).all()
+        notifications = NotificationService(self._session)
+        shared = self._trade_notification_params(proposal)
+        for user_id in owner_ids:
+            notifications.create_notification(
+                user_id=user_id,
+                category=NotificationCategory.MERCATO,
+                template_key="mercato.scambio",
+                template_version=2,
+                params={
+                    "status": "admin_review",
+                    "other_team": proposer_team.name,
+                    "second_team": recipient_team.name,
+                    **shared,
+                },
+                dedup_key=f"trade_status:{proposal.id}:admin_review:{user_id}",
+            )
 
     def _notify_trade_status(
         self,

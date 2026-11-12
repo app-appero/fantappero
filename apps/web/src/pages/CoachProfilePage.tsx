@@ -14,7 +14,7 @@ function demoProfileFor(userId: string): FantasyCoachProfile | null {
   return {
     userId: manager.userId,
     displayName: manager.displayName,
-    email: manager.email,
+    email: null,
     avatarUrl: manager.avatarUrl,
     userType: manager.userType,
     availableForInvites: manager.availableForInvites,
