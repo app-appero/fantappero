@@ -58,6 +58,14 @@ def competition_ids(db_session: Session) -> list[str]:
     return [str(row.id) for row in rows[:3]]
 
 
+_OWNER_TOKENS: dict[str, str] = {}
+
+
+def _owner_headers(league_id: str, fallback_token: str) -> dict[str, str]:
+    """N12: solo l'amministratore assegna calciatori a mano; i test lo fanno a suo nome."""
+    return {"Authorization": f"Bearer {_OWNER_TOKENS.get(league_id, fallback_token)}"}
+
+
 def _create_league(client: TestClient, token: str, competition_ids: list[str], name: str) -> str:
     response = client.post(
         "/leagues",
@@ -65,6 +73,7 @@ def _create_league(client: TestClient, token: str, competition_ids: list[str], n
         json={"name": name, "seasonYear": 2026, "competitionIds": competition_ids},
     )
     assert response.status_code == 201
+    _OWNER_TOKENS[response.json()["id"]] = token
     return response.json()["id"]
 
 
@@ -120,7 +129,7 @@ def _own_athlete_at_slot(
     team_id = rosa["id"]
     response = client.put(
         f"/leagues/{league_id}/amministrazione/squadre/{team_id}/slot/{slot_index}",
-        headers={"Authorization": f"Bearer {token}"},
+        headers=_owner_headers(league_id, token),
         json={"athleteId": str(athlete.id), "purchaseCredits": purchase_credits},
     )
     assert response.status_code == 200

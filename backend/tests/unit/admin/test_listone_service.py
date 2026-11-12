@@ -62,11 +62,13 @@ def test_platform_refresh_syncs_catalog_then_roster_listone(
     monkeypatch.setattr("admin.listone_service.sync_mvp_roster_with_client", fake_roster)
     monkeypatch.setattr(
         "admin.listone_service.generate_official_listone",
-        lambda *_a, **_k: calls.append("listone")
-        or ListoneGenerateResult(
-            season_year=2026,
-            mapping_version="v1.0.0",
-            counters=ListoneGenerateCounters(created=1, unchanged=0),
+        lambda *_a, **_k: (
+            calls.append("listone")
+            or ListoneGenerateResult(
+                season_year=2026,
+                mapping_version="v1.0.0",
+                counters=ListoneGenerateCounters(created=1, unchanged=0),
+            )
         ),
     )
 

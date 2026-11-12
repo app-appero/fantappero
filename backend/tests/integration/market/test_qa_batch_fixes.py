@@ -57,6 +57,14 @@ def competition_ids(db_session: Session) -> list[str]:
     return [str(row.id) for row in rows[:3]]
 
 
+_OWNER_TOKENS: dict[str, str] = {}
+
+
+def _owner_headers(league_id: str, fallback_token: str) -> dict[str, str]:
+    """N12: solo l'amministratore assegna calciatori a mano; i test lo fanno a suo nome."""
+    return {"Authorization": f"Bearer {_OWNER_TOKENS.get(league_id, fallback_token)}"}
+
+
 def _create_league(client: TestClient, token: str, competition_ids: list[str], name: str) -> str:
     response = client.post(
         "/leagues",
@@ -64,6 +72,7 @@ def _create_league(client: TestClient, token: str, competition_ids: list[str], n
         json={"name": name, "seasonYear": 2026, "competitionIds": competition_ids},
     )
     assert response.status_code == 201
+    _OWNER_TOKENS[response.json()["id"]] = token
     return response.json()["id"]
 
 
@@ -108,7 +117,7 @@ def _own_athlete_at_slot(
     team_id = rosa["id"]
     response = client.put(
         f"/leagues/{league_id}/amministrazione/squadre/{team_id}/slot/{slot_index}",
-        headers={"Authorization": f"Bearer {token}"},
+        headers=_owner_headers(league_id, token),
         json={"athleteId": str(athlete.id), "purchaseCredits": 0},
     )
     assert response.status_code == 200
@@ -288,3 +297,43 @@ def test_failed_slot_assignment_leaves_no_partial_write(
     )
     assert account is not None
     assert account.balance == 1000
+
+
+def test_second_live_auction_in_same_league_is_rejected(
+    client: TestClient, db_session: Session, competition_ids: list[str]
+) -> None:
+    admin_token, _ = _register_and_login(client, "n19.admin@example.com")
+    league_id = _create_league(client, admin_token, competition_ids, "Lega N19")
+    now = datetime.now(UTC)
+    payload = {
+        "opensAt": now.isoformat(),
+        "closesAt": (now + timedelta(hours=2)).isoformat(),
+        "nominationMode": "random",
+        "minIncrementCredits": 10,
+        "softCloseSeconds": 5,
+        "lotDurationSeconds": 30,
+    }
+    url = f"/leagues/{league_id}/mercato/asta-live/sessioni"
+    first = client.post(url, headers=_hdr(admin_token), json=payload)
+    assert first.status_code == 201
+    second = client.post(url, headers=_hdr(admin_token), json=payload)
+    assert second.status_code == 400
+    assert second.json()["code"] == "market_session_already_active"
+
+
+def test_member_cannot_assign_roster_slot_even_at_zero_price(
+    client: TestClient, db_session: Session, competition_ids: list[str]
+) -> None:
+    admin_token, _ = _register_and_login(client, "n12.admin@example.com")
+    member_token, member_id = _register_and_login(client, "n12.member@example.com")
+    league_id = _create_league(client, admin_token, competition_ids, "Lega N12")
+    _add_member(db_session, league_id, member_id)
+    athlete = _seed_athlete(db_session, 9804, "Gratis Vietato")
+    team_id = client.get(f"/leagues/{league_id}/rosa", headers=_hdr(member_token)).json()["id"]
+    response = client.put(
+        f"/leagues/{league_id}/amministrazione/squadre/{team_id}/slot/0",
+        headers=_hdr(member_token),
+        json={"athleteId": str(athlete.id), "purchaseCredits": 0},
+    )
+    assert response.status_code == 400
+    assert response.json()["code"] == "roster_assign_forbidden"

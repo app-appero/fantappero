@@ -162,6 +162,7 @@ class LiveMarketService:
 
         operator_user_id = self._resolve_operator(league.id, payload.operator_user_id)
         self._assert_no_conflicting_initial_auction(league.id)
+        self._assert_no_other_live_session(league.id)
 
         market_session = MarketSession(
             league_id=league.id,
@@ -1238,6 +1239,26 @@ class LiveMarketService:
         ) in (MarketSessionStatus.SCHEDULED, MarketSessionStatus.OPEN):
             raise ValidationAuthError(
                 "Esiste già un'asta iniziale a buste chiuse attiva per questa lega.",
+                code="market_session_already_active",
+            )
+
+    def _assert_no_other_live_session(self, league_id: UUID) -> None:
+        """N19: una sola asta live attiva (programmata o in corso) per lega."""
+        rows = self._session.scalars(
+            select(MarketSession).where(
+                MarketSession.league_id == league_id,
+                MarketSession.kind == MarketSessionKind.LIVE_AUCTION,
+                MarketSession.status.in_((MarketSessionStatus.SCHEDULED, MarketSessionStatus.OPEN)),
+            )
+        ).all()
+        now = datetime.now(UTC)
+        if any(
+            effective_status(row, now=now)
+            in (MarketSessionStatus.SCHEDULED, MarketSessionStatus.OPEN)
+            for row in rows
+        ):
+            raise ValidationAuthError(
+                "Esiste già un'asta live programmata o in corso per questa lega.",
                 code="market_session_already_active",
             )
 

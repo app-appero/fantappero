@@ -455,6 +455,22 @@ export function MarketPage() {
   const [counterHasExpiry, setCounterHasExpiry] = useState(false);
   const [counterExpiresAt, setCounterExpiresAt] = useState("");
 
+  // N15: il link di una notifica deve mostrare lo scambio anche se è già concluso, ma la
+  // scheda predefinita è "In corso": passa a "Tutte" una volta sola, se serve.
+  const [highlightTabHandled, setHighlightTabHandled] = useState(false);
+  useEffect(() => {
+    if (!highlightedProposalId || trade.loading || highlightTabHandled) {
+      return;
+    }
+    const target = trade.proposals.find((row) => row.id === highlightedProposalId);
+    if (target) {
+      setHighlightTabHandled(true);
+      if (!OPEN_TRADE_STATUSES.includes(target.status)) {
+        setTradeTab("all");
+      }
+    }
+  }, [highlightedProposalId, trade.loading, trade.proposals, highlightTabHandled]);
+
   useEffect(() => {
     if (!highlightedProposalId || trade.loading) {
       return;

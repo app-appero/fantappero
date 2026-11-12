@@ -717,6 +717,14 @@ class FantasyTeamService:
         assert_market_open(league)
         team = self._get_team_for_update(league.id, team_id)
         self._assert_can_edit_team(league_access, team)
+        if not self._is_league_admin(league_access):
+            # N12: un membro non assegna calciatori a mano (nemmeno a prezzo 0): si entra
+            # in rosa solo da asta, scambi o decisione dell'amministratore.
+            raise ValidationAuthError(
+                "Solo l'amministratore può assegnare calciatori direttamente: "
+                "usa l'asta o gli scambi.",
+                code="roster_assign_forbidden",
+            )
         roster_size = resolve_roster_size(self._session, league.id)
         validate_slot_index(slot_index=slot_index, roster_size=roster_size)
         purchase_credits = validate_purchase_credits(payload.purchase_credits)

@@ -6,7 +6,7 @@ import type {
 } from "@fantappero/contracts";
 import { HScroll } from "../../components/HScroll";
 import { DateTimeField, formatDateTimeValue } from "../../components/DateTimeField";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Pressable, Text, View } from "react-native";
 import { AthleteName } from "../../athletes/AthleteCard";
 import { AppTextInput as TextInput } from "../../components/AppTextInput";
@@ -127,6 +127,21 @@ export function MarketTradeList({
       })
       .then(() => setCounteringProposalId(null));
   }
+
+  // N15: il link di una notifica mostra anche uno scambio già concluso ("Tutte"), una volta sola.
+  const [highlightTabHandled, setHighlightTabHandled] = useState(false);
+  useEffect(() => {
+    if (!highlightedProposalId || highlightTabHandled) {
+      return;
+    }
+    const target = trade.proposals.find((row) => row.id === highlightedProposalId);
+    if (target) {
+      setHighlightTabHandled(true);
+      if (!OPEN_STATUSES.has(target.status)) {
+        setTab("all");
+      }
+    }
+  }, [highlightedProposalId, highlightTabHandled, trade.proposals]);
 
   const received = trade.proposals.filter(
     (row) => row.recipientTeamId === selfTeamId && OPEN_STATUSES.has(row.status),
