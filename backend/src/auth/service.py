@@ -108,7 +108,10 @@ class AuthService:
         self._session.add(user)
         self._session.flush()
         self._session.add(UserProfile(user_id=user.id, display_name=validated_name))
-        self._issue_email_verification(user)
+        if self._settings.auth_email_verification_required:
+            self._issue_email_verification(user)
+        else:
+            user.email_verified_at = utc_now()
         self._session.commit()
         get_metrics().incr("auth_register_total", labels={"result": "success"})
         return MessageResponse(message=GENERIC_REGISTER_MESSAGE)
@@ -151,8 +154,11 @@ class AuthService:
             raise InvalidCredentialsError()
 
         if not user.email_verified:
-            get_metrics().incr("auth_login_total", labels={"result": "unverified"})
-            raise EmailNotVerifiedError()
+            if self._settings.auth_email_verification_required:
+                get_metrics().incr("auth_login_total", labels={"result": "unverified"})
+                raise EmailNotVerifiedError()
+            user.email_verified_at = utc_now()
+            self._session.flush()
 
         self._assert_tester_allowed(user.email, user.platform_role)
         tokens = self._create_session(user)

@@ -40,3 +40,12 @@ profilo (`notifications_push`, acceso di default; `NOTIFICATIONS_PUSH_ENABLED=tr
 - **Web**: solo in app (il sito non ha notifiche push del browser).
 - **iPhone**: oggi solo web (nessuna build iOS nel pilota), quindi solo in app.
 Un tester che non apre mai l'app o che ha negato il permesso alle notifiche non riceve la push.
+
+## Verifica email facoltativa (solo dev)
+| Variabile | Dove | Default | Dev | Pilota |
+| --- | --- | --- | --- | --- |
+| `AUTH_EMAIL_VERIFICATION_REQUIRED` | servizio **api** | `true` | `false` | **`true`** (non toccare) |
+
+Con `false` i nuovi account con email e password nascono già verificati (nessuna email inviata)
+e un account non ancora verificato viene verificato al primo accesso. Serve ai test automatici su
+dev con indirizzi inventati. Il valore predefinito resta `true`: senza la variabile nulla cambia.
