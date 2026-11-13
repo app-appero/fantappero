@@ -1,9 +1,11 @@
 // Genera la pagina «Lavori in corso» (public/index.html) e le immagini SVG (public/img).
 // Avatar, stemmi e distintivi vengono dagli stessi generatori dell'app (packages/contracts),
 // così la pagina resta coerente con il gioco. Uso: node --experimental-strip-types build.mjs
-import { mkdirSync, writeFileSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { clubCrestSvg, leagueBadgeSvg, playerAvatarSvg } from "../../packages/contracts/src/playerAvatar.ts";
 
+const CSS_VER = createHash("sha1").update(readFileSync(new URL("./public/styles.css", import.meta.url))).digest("hex").slice(0, 8);
 const PILOTA_URL = "https://pilota.fantappero.it";
 const OUT = new URL("./public/", import.meta.url);
 mkdirSync(new URL("./img/", OUT), { recursive: true });
@@ -134,7 +136,7 @@ const html = `<!doctype html>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Condensed:ital,wght@1,700;1,800&display=swap">
-<link rel="stylesheet" href="styles.css">
+<link rel="stylesheet" href="styles.css?v=${CSS_VER}">
 </head>
 <body>
 <header class="nav">

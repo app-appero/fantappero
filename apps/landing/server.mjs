@@ -26,7 +26,7 @@ createServer((req, res) => {
   const ext = extname(file);
   res.writeHead(200, {
     "content-type": TYPES[ext] ?? "application/octet-stream",
-    "cache-control": ext === ".html" ? "no-cache" : "public, max-age=3600",
+    "cache-control": ext === ".html" || ext === ".css" ? "no-cache" : "public, max-age=3600",
     "x-content-type-options": "nosniff",
   });
   createReadStream(file).pipe(res);
