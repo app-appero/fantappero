@@ -239,7 +239,11 @@ class TradeService:
                 code="trade_cancel_forbidden",
             )
         now = datetime.now(UTC)
-        if effective_trade_status(proposal, now=now) != TradeStatus.PROPOSED:
+        current = effective_trade_status(proposal, now=now)
+        # In attesa dell'amministratore il proponente non può ritirarsi, salvo che lo scambio
+        # non sia più eseguibile (calciatori spostati): allora toglierlo di mezzo è l'unica via.
+        stale_pending = current == TradeStatus.PENDING_APPROVAL and self._is_stale(proposal)
+        if current != TradeStatus.PROPOSED and not stale_pending:
             raise ValidationAuthError(
                 "La proposta non è più annullabile.",
                 code="trade_not_cancellable",
@@ -635,6 +639,14 @@ class TradeService:
             LeagueAuditEvent(league_id=league_id, actor_id=actor_id, action=action, details=details)
         )
         self._session.flush()
+
+    def _is_stale(self, proposal: TradeProposal) -> bool:
+        """True se i calciatori della proposta non sono più nelle rose attese."""
+        offered = {UUID(value) for value in proposal.offered_athlete_ids}
+        requested = {UUID(value) for value in proposal.requested_athlete_ids}
+        return not offered <= set(self._roster_athlete_ids(proposal.proposer_team_id)) or (
+            not requested <= set(self._roster_athlete_ids(proposal.recipient_team_id))
+        )
 
     def expire_overdue_proposals(self, *, now: datetime | None = None, limit: int = 500) -> int:
         """Segna come scadute le proposte oltre la scadenza e avvisa i due allenatori.

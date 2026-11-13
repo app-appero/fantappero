@@ -1010,10 +1010,13 @@ export function MarketPage() {
                             size="sm"
                             disabled={pending}
                             onClick={() => {
-                              setCounteringProposalId((current) =>
-                                current === proposal.id ? null : current,
-                              );
-                              void trade.rejectProposal(proposal.id);
+                              void trade.rejectProposal(proposal.id).then((ok) => {
+                                if (ok) {
+                                  setCounteringProposalId((current) =>
+                                    current === proposal.id ? null : current,
+                                  );
+                                }
+                              });
                             }}
                           >
                             Rifiuta

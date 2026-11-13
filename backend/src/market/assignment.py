@@ -13,6 +13,7 @@ from database.enums import CreditLedgerReason, RosterOwnershipSource
 from fantasy_teams.composition_service import (
     assert_assignment_respects_role_quota,
     assign_allowing_role_quota_overflow,
+    resolve_effective_athlete_role,
     sync_team_composition_status,
 )
 from fantasy_teams.ledger import apply_ledger_movement, find_account_for_team
@@ -244,6 +245,25 @@ def resolve_live_swap(
         return None
     refund_credits = slot.purchase_credits or 0
 
+    # Scambio dello stesso ruolo: non peggiora la composizione, quindi non può essere
+    # respinto per quota anche se il ruolo è già in sovrannumero (il flag resta acceso).
+    competition_ids = {competition.id for competition in league.competitions}
+    released_role = resolve_effective_athlete_role(
+        session,
+        league_id=league.id,
+        athlete_id=release_athlete_id,
+        season_year=league.season_year,
+        competition_ids=competition_ids,
+    )
+    acquired_role = resolve_effective_athlete_role(
+        session,
+        league_id=league.id,
+        athlete_id=acquire_athlete_id,
+        season_year=league.season_year,
+        competition_ids=competition_ids,
+    )
+    same_role = released_role is not None and released_role == acquired_role
+
     try:
         with session.begin_nested():
             if refund_credits > 0:
@@ -268,6 +288,7 @@ def resolve_live_swap(
                 transaction_id=transaction_id,
                 actor_id=actor_id,
                 note="Scambio da asta a rilanci (rosa al completo)",
+                allow_overflow=same_role,
             )
             if updated is None:
                 raise _SwapNotHonored

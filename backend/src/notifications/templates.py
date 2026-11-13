@@ -159,9 +159,14 @@ def _render_mercato_esito_busta(params: NotificationParams) -> NotificationConte
             body=_league_body(f"Hai aggiudicato {athlete_name} per {amount} crediti.", params),
             deep_link=_league_link("/mercato", params),
         )
+    reason = (
+        "non è stato possibile assegnarlo (crediti insufficienti o rosa non valida)"
+        if params.get("not_assignable")
+        else "offerta inferiore"
+    )
     return NotificationContent(
         title="Busta non aggiudicata",
-        body=_league_body(f"Non hai aggiudicato {athlete_name}: offerta inferiore.", params),
+        body=_league_body(f"Non hai aggiudicato {athlete_name}: {reason}.", params),
         deep_link=_league_link("/mercato", params),
     )
 

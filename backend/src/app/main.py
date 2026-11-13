@@ -7,6 +7,8 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI
+from fastapi.encoders import jsonable_encoder
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, PlainTextResponse
 from starlette.types import ASGIApp, Receive, Scope, Send
@@ -161,6 +163,19 @@ class AvatarCacheControlMiddleware:
 
 
 app.add_middleware(AvatarCacheControlMiddleware)
+
+
+@app.exception_handler(RequestValidationError)
+def request_validation_error_handler(_request: object, exc: RequestValidationError) -> JSONResponse:
+    """422 nel formato `{message, code}` degli altri errori, con `detail` per i client esistenti."""
+    errors = jsonable_encoder(exc.errors())
+    first = errors[0] if errors else {}
+    location = ".".join(str(part) for part in first.get("loc", ()) if part != "body")
+    message = "Dati non validi" + (f": {location}" if location else "") + "."
+    return JSONResponse(
+        status_code=422,
+        content={"message": message, "code": "validation_error", "detail": errors},
+    )
 
 
 @app.exception_handler(AuthError)

@@ -72,13 +72,14 @@
   background-color: var(--fa-pitch-700);
 }
 
+/* Colori fissi (non dipendono dal tema): testo bianco su rosso scuro, contrasto >= 4.5 */
 .fa-btn--danger {
-  background-color: var(--fa-color-danger);
-  color: var(--fa-ivory-50);
+  background-color: var(--fa-danger-600);
+  color: #ffffff;
 }
 
 .fa-btn--danger:hover:not(:disabled):not([aria-disabled="true"]) {
-  background-color: var(--fa-danger-400);
+  background-color: #a61f1f;
 }
 
 .fa-btn--sm {
@@ -277,19 +278,20 @@ textarea::placeholder,
   color: var(--fa-color-accent-contrast);
 }
 
+/* Colori di testo fissi: in tema chiaro i token ivory/pitch si invertono e il contrasto crollava. */
 .fa-badge--success {
-  background-color: var(--fa-success-600);
-  color: var(--fa-ivory-50);
+  background-color: #0a7a5f;
+  color: #ffffff;
 }
 
 .fa-badge--warning {
   background-color: var(--fa-warning-600);
-  color: var(--fa-pitch-900);
+  color: #06121f;
 }
 
 .fa-badge--danger {
   background-color: var(--fa-danger-600);
-  color: var(--fa-ivory-50);
+  color: #ffffff;
 }
 
 /* ── Tabs ───────────────────────────────────────────────────────────── */
@@ -1494,6 +1496,19 @@ select option,
 
 .fa-podium__card--3 .fa-podium__rank {
   color: #e0a06a;
+}
+
+/* Tema chiaro: argento, bronzo e oro scuri (i colori chiari sparivano su sfondo chiaro). */
+[data-color-scheme="light"] .fa-podium__card--1 .fa-podium__rank {
+  color: #8a6508;
+}
+
+[data-color-scheme="light"] .fa-podium__card--2 .fa-podium__rank {
+  color: #5b6578;
+}
+
+[data-color-scheme="light"] .fa-podium__card--3 .fa-podium__rank {
+  color: #8a5a2b;
 }
 
 .fa-podium__avatar {

@@ -11,3 +11,4 @@ Aggiornato da Rosario/Claude dopo ogni rapporto. I tester non ripetono i dettagl
 | 2026-11-13 | Mercato | Codici 400 invece di 403/404 per azioni vietate sugli scambi | Aperto, stile: nessuna fuga di dati |
 | 2026-11-13 | Mercato | Mobile: il tocco su una notifica non cambia ancora la lega attiva (il web sì, con `?lega=`) | Aperto |
 | 2026-11-13 | Test | Falliti già prima del lavoro QA: `test_named_invites` (2), `test_update_league_rules_is_idempotent_for_same_payload`, notifiche omologazione e scambio | Aperto, test vecchi da riallineare |
+| 2026-11-13 | Web | Contrasto tema chiaro/scuro di badge, podio, tab e pulsante elimina | Corretto, da verificare a vista a 1280 e 390 |

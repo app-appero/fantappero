@@ -119,14 +119,16 @@ export function useTradeFlow({ leagueId, active, onBalanceAffectingAction }: Use
     action: (accessToken: string, leagueId: string, proposalId: string) => Promise<TradeProposal>,
     fallbackMessage: string,
   ) {
-    return async (proposalId: string) => {
+    // Restituisce true solo se l'azione è riuscita, così la pagina può chiudere i pannelli
+    // (es. la controproposta) dopo l'esito e non prima.
+    return async (proposalId: string): Promise<boolean> => {
       if (!leagueId) {
-        return;
+        return false;
       }
       const accessToken = requireToken();
       if (!accessToken) {
         setActionError("Sessione non disponibile. Accedi di nuovo.");
-        return;
+        return false;
       }
       setActionPendingId(proposalId);
       setActionError(null);
@@ -134,8 +136,10 @@ export function useTradeFlow({ leagueId, active, onBalanceAffectingAction }: Use
         await action(accessToken, leagueId, proposalId);
         await loadProposals();
         onBalanceAffectingAction?.();
+        return true;
       } catch (error) {
         setActionError(getApiErrorMessage(error, fallbackMessage));
+        return false;
       } finally {
         setActionPendingId(null);
       }

@@ -22,6 +22,7 @@ from database.enums import (
     NotificationCategory,
 )
 from fantasy_teams.composition_service import (
+    reconcile_roster_overflow,
     resolve_effective_athlete_role,
     sync_team_composition_status,
 )
@@ -333,6 +334,9 @@ class MarketService:
         # team that wins several athletes spends on its most valuable bids first.
         candidates.sort(key=lambda row: (-row.amount_credits, row.submitted_at))
 
+        # Offerte più alte che non si sono potute assegnare (crediti, rosa o ruolo): la notifica
+        # non deve dire "offerta inferiore".
+        unassignable_bid_ids: set[UUID] = set()
         for bid in candidates:
             transaction_id = f"market:{market_session.id}:{bid.fantasy_team_id}:{bid.athlete_id}"
             if market_session.kind == MarketSessionKind.WAIVER:
@@ -362,6 +366,8 @@ class MarketService:
                     allow_overflow=True,
                 )
             bid.status = MarketBidStatus.WON if slot is not None else MarketBidStatus.LOST
+            if slot is None:
+                unassignable_bid_ids.add(bid.id)
 
         tiebreak_count = 0
         for athlete_id, tied_bids in tie_groups.items():
@@ -412,6 +418,7 @@ class MarketService:
                     "outcome": "assigned" if bid.status == MarketBidStatus.WON else "lost",
                     "athlete_name": bid.athlete.canonical_name,
                     "amount_credits": bid.amount_credits,
+                    "not_assignable": bid.id in unassignable_bid_ids,
                     **league_params(self._session, market_session.league_id),
                 },
                 dedup_key=f"market_bid_outcome:{bid.id}",
@@ -809,6 +816,8 @@ class MarketService:
                 actor_id=league_access.user.id,
                 note=f"Svincolo {athlete.canonical_name} ({reason.value}, {percent}%)",
             )
+        # Chi era in esubero (di ruolo o di rosa) può rientrare: ripulisce i flag e gli slot extra.
+        reconcile_roster_overflow(self._session, league=league, team=team)
         sync_team_composition_status(self._session, team, league=league)
         self._add_audit(
             league.id,

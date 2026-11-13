@@ -748,3 +748,185 @@ def test_overflow_extra_slot_is_compacted_when_a_free_slot_exists(
     moved = next(slot for slot in slots if slot.athlete_id == guest.id)
     assert moved.slot_index <= top_index
     assert moved.purchase_credits == 7
+
+
+def _seed_role_athletes(db_session: Session, start: int, count: int, role) -> list:
+    from sports_data.listone.models import RoleAssignment
+    from sports_data.roster.models import Athlete
+
+    rows = []
+    for offset in range(count):
+        athlete = Athlete(provider_id=start + offset, canonical_name=f"Ruolo {role.value} {offset}")
+        db_session.add(athlete)
+        db_session.flush()
+        db_session.add(
+            RoleAssignment(
+                athlete_id=athlete.id,
+                season_year=2026,
+                role=role,
+                mapping_version="v1.0.0",
+                provider_position_raw=role.value,
+            )
+        )
+        rows.append(athlete)
+    db_session.commit()
+    return rows
+
+
+def test_live_swap_of_same_role_is_honored_even_if_role_is_over_quota(
+    client: TestClient, db_session: Session, competition_ids: list[str]
+) -> None:
+    from database.enums import FantasyRole
+    from fantasy_teams.models import FantasyTeam
+    from leagues.models.league import League
+    from market.assignment import resolve_live_swap
+
+    admin_token, _ = _register_and_login(client, "live.swap.admin@example.com")
+    league_id = _create_league(client, admin_token, competition_ids, "Lega Scambio Live")
+    team_id = UUID(client.get(f"/leagues/{league_id}/rosa", headers=_hdr(admin_token)).json()["id"])
+    mids = _seed_role_athletes(db_session, 95000, 13, FantasyRole.C)
+    owned, newcomer = mids[:12], mids[12]
+    for index, athlete in enumerate(owned):
+        slot = db_session.scalar(
+            select(FantasyRosterSlot).where(
+                FantasyRosterSlot.fantasy_team_id == team_id,
+                FantasyRosterSlot.slot_index == index,
+            )
+        )
+        slot.athlete_id = athlete.id
+        slot.purchase_credits = 5
+        slot.exceeds_role_quota = index == 11
+    db_session.commit()
+
+    league = db_session.get(League, UUID(league_id))
+    team = db_session.get(FantasyTeam, team_id)
+    result = resolve_live_swap(
+        db_session,
+        league=league,
+        team=team,
+        release_athlete_id=owned[0].id,
+        acquire_athlete_id=newcomer.id,
+        amount_credits=5,
+        transaction_id="qa-live-swap-acquire",
+        refund_transaction_id="qa-live-swap-release",
+        actor_id=None,
+    )
+    assert result is not None
+    assert result.athlete_id == newcomer.id
+
+
+def test_voluntary_release_clears_the_excess_flag(
+    client: TestClient, db_session: Session, competition_ids: list[str]
+) -> None:
+    from database.enums import FantasyRole
+
+    admin_token, _ = _register_and_login(client, "rel.flag.admin@example.com")
+    member_token, member_id = _register_and_login(client, "rel.flag.member@example.com")
+    league_id = _create_league(client, admin_token, competition_ids, "Lega Flag Svincolo")
+    _add_member(db_session, league_id, member_id)
+    team_id = UUID(
+        client.get(f"/leagues/{league_id}/rosa", headers=_hdr(member_token)).json()["id"]
+    )
+    keepers = _seed_role_athletes(db_session, 95100, 4, FantasyRole.P)
+    for index, athlete in enumerate(keepers):
+        slot = db_session.scalar(
+            select(FantasyRosterSlot).where(
+                FantasyRosterSlot.fantasy_team_id == team_id,
+                FantasyRosterSlot.slot_index == index,
+            )
+        )
+        slot.athlete_id = athlete.id
+        slot.purchase_credits = 10
+        slot.exceeds_role_quota = index == 3
+    db_session.commit()
+
+    released = client.post(
+        f"/leagues/{league_id}/mercato/svincolo/0",
+        headers=_hdr(member_token),
+        json={"reason": "voluntary"},
+    )
+    assert released.status_code == 200, released.json()
+    db_session.expire_all()
+    flagged = db_session.scalar(
+        select(FantasyRosterSlot).where(
+            FantasyRosterSlot.fantasy_team_id == team_id,
+            FantasyRosterSlot.athlete_id == keepers[3].id,
+        )
+    )
+    assert flagged is not None
+    assert flagged.exceeds_role_quota is False
+
+
+def test_proposer_can_withdraw_a_pending_approval_trade_that_went_stale(
+    client: TestClient, db_session: Session, competition_ids: list[str]
+) -> None:
+    admin_token, _ = _register_and_login(client, "stale.pend.admin@example.com")
+    a_token, a_id = _register_and_login(client, "stale.pend.a@example.com")
+    b_token, b_id = _register_and_login(client, "stale.pend.b@example.com")
+    league_id = _create_league(client, admin_token, competition_ids, "Lega Pendente Obsoleta")
+    _add_member(db_session, league_id, a_id)
+    _add_member(db_session, league_id, b_id)
+    prize = _seed_athlete(db_session, 9820, "Pendente Obsoleto")
+    client.get(f"/leagues/{league_id}/rosa", headers=_hdr(a_token))
+    team_b = client.get(f"/leagues/{league_id}/rosa", headers=_hdr(b_token)).json()["id"]
+    _assign_priced(client, league_id, admin_token, team_b, 0, prize, 1)
+    _set_league_rules(client, league_id, admin_token, require_trade_approval=True)
+    created = client.post(
+        f"/leagues/{league_id}/mercato/scambi/proposte",
+        headers=_hdr(a_token),
+        json={
+            "recipientTeamId": team_b,
+            "requestedAthleteIds": [str(prize.id)],
+            "offeredCredits": 3,
+            "expiresAt": _future_iso(),
+        },
+    )
+    assert created.status_code == 201, created.json()
+    pid = created.json()["id"]
+    accepted = client.post(
+        f"/leagues/{league_id}/mercato/scambi/proposte/{pid}/accetta", headers=_hdr(b_token)
+    )
+    assert accepted.json()["status"] == "pending_approval"
+
+    # Finché lo scambio è eseguibile il proponente non può ritirarsi.
+    blocked = client.post(
+        f"/leagues/{league_id}/mercato/scambi/proposte/{pid}/annulla", headers=_hdr(a_token)
+    )
+    assert blocked.json()["code"] == "trade_not_cancellable"
+
+    # Il calciatore richiesto lascia la squadra: ora la proposta è obsoleta.
+    released = client.delete(
+        f"/leagues/{league_id}/amministrazione/squadre/{team_b}/slot/0",
+        headers=_hdr(admin_token),
+    )
+    assert released.status_code == 200
+    withdrawn = client.post(
+        f"/leagues/{league_id}/mercato/scambi/proposte/{pid}/annulla", headers=_hdr(a_token)
+    )
+    assert withdrawn.status_code == 200, withdrawn.json()
+    assert withdrawn.json()["status"] == "cancelled"
+
+
+def test_validation_errors_use_the_message_and_code_format(client: TestClient) -> None:
+    response = client.post("/auth/login", json={})
+    assert response.status_code == 422
+    body = response.json()
+    assert body["code"] == "validation_error"
+    assert body["message"].startswith("Dati non validi")
+    assert isinstance(body["detail"], list)
+
+
+def test_lost_bid_notification_explains_unassignable_offers() -> None:
+    from notifications.templates import render_notification
+
+    lower = render_notification(
+        "mercato.esito_busta", 1, {"outcome": "lost", "athlete_name": "Rossi"}
+    )
+    assert "offerta inferiore" in lower.body
+    unassignable = render_notification(
+        "mercato.esito_busta",
+        1,
+        {"outcome": "lost", "athlete_name": "Rossi", "not_assignable": True},
+    )
+    assert "offerta inferiore" not in unassignable.body
+    assert "crediti insufficienti" in unassignable.body
