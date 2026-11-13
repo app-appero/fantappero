@@ -1,0 +1,11 @@
+{
+  "name": "@fantappero/landing",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "description": "Pagina «Lavori in corso» (branch produzione) con invito a diventare tester su pilota.fantappero.it",
+  "scripts": {
+    "build": "node --experimental-strip-types build.mjs",
+    "start": "node server.mjs"
+  }
+}
