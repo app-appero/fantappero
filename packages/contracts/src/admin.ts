@@ -301,3 +301,22 @@ export interface AdminHistoricalRepairProgress {
   errorCode?: string | null;
   result?: AdminHistoricalRepairResult | null;
 }
+
+export type AdminTesterRequestStatus = "pending" | "approved" | "rejected";
+
+export interface AdminTesterRequest {
+  id: string;
+  email: string;
+  firstName: string;
+  lastName: string;
+  phone: string;
+  motivation?: string | null;
+  status: AdminTesterRequestStatus;
+  createdAt: string;
+  decidedAt?: string | null;
+  decisionNote?: string | null;
+}
+
+export interface AdminTesterRequestList {
+  requests: AdminTesterRequest[];
+}

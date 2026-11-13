@@ -368,3 +368,30 @@ class AdminDeleteUserResponse(ApiModel):
     deleted_user_id: str = Field(alias="deletedUserId")
     #: Email messa in lista nera; None se l'utente è stato eliminato senza bloccarlo.
     blocked_email: str | None = Field(default=None, alias="blockedEmail")
+
+
+class AdminTesterRequestResponse(ApiModel):
+    id: str
+    email: str
+    first_name: str = Field(alias="firstName")
+    last_name: str = Field(alias="lastName")
+    phone: str
+    motivation: str | None = None
+    status: str
+    created_at: datetime = Field(alias="createdAt")
+    decided_at: datetime | None = Field(default=None, alias="decidedAt")
+    decision_note: str | None = Field(default=None, alias="decisionNote")
+
+
+class AdminTesterRequestListResponse(ApiModel):
+    requests: list[AdminTesterRequestResponse]
+
+
+class AdminTesterRequestDecisionRequest(ApiModel):
+    note: str | None = Field(default=None, max_length=500)
+
+
+class AdminTesterRequestBulkRequest(ApiModel):
+    ids: list[str] = Field(min_length=1, max_length=200)
+    action: str = Field(pattern="^(approve|reject)$")
+    note: str | None = Field(default=None, max_length=500)

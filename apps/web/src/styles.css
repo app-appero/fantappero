@@ -5790,3 +5790,31 @@ button.fa-starter-row:disabled {
   height: 1.75rem;
   object-fit: contain;
 }
+
+/* Richiesta di accesso al pilota (chi non è ancora tester) */
+.fa-tester-request {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fa-space-md);
+  padding: var(--fa-space-lg);
+  border: 1px solid var(--fa-color-border);
+  border-radius: var(--fa-radius-lg, 12px);
+  text-align: left;
+}
+
+.fa-tester-request h2 {
+  margin: 0;
+}
+
+.fa-tester-request__consent {
+  display: flex;
+  gap: var(--fa-space-sm);
+  align-items: flex-start;
+  font-size: var(--fa-text-sm, 0.875rem);
+}
+
+.fa-tester-request__actions {
+  display: flex;
+  gap: var(--fa-space-sm);
+  flex-wrap: wrap;
+}

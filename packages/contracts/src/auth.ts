@@ -51,6 +51,19 @@ export interface GoogleLoginRequest {
   idToken: string;
 }
 
+/** Modulo di richiesta di accesso al pilota (chi non è ancora tester). */
+export interface TesterRequestBody {
+  requestToken: string;
+  firstName: string;
+  lastName: string;
+  phone: string;
+  motivation?: string | null;
+  consent: boolean;
+}
+
+/** Cosa dice il rifiuto `tester_only` dell'accesso con Google: a che punto è la richiesta. */
+export type TesterRequestStatus = "none" | "pending" | "rejected";
+
 /** One-time pickup code the web handoff page hands the app instead of a usable token. */
 export interface GoogleHandoffStartResponse {
   code: string;

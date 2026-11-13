@@ -21,6 +21,7 @@ import type {
   AdminSeasonImportJob,
   AdminSeasonImportProgress,
   AdminSeasonImportResult,
+  AdminTesterRequestList,
   AdminTestMode,
   AdminTurniSyncResult,
   PredictedLineupSyncResult,
@@ -439,5 +440,24 @@ export function deleteUser(
     accessToken,
     method: "POST",
     body: { block },
+  });
+}
+
+export function fetchTesterRequests(
+  accessToken: string,
+  status?: "pending" | "approved" | "rejected",
+): Promise<AdminTesterRequestList> {
+  const query = status ? `?status=${status}` : "";
+  return apiRequest<AdminTesterRequestList>(`/admin/tester-requests${query}`, { accessToken });
+}
+
+export function decideTesterRequests(
+  accessToken: string,
+  body: { ids: string[]; action: "approve" | "reject"; note?: string },
+): Promise<AdminTesterRequestList> {
+  return apiRequest<AdminTesterRequestList>("/admin/tester-requests/decisione", {
+    method: "POST",
+    accessToken,
+    body,
   });
 }

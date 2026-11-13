@@ -6,10 +6,14 @@ from __future__ import annotations
 class AuthError(Exception):
     """Base auth error with user-facing Italian message."""
 
-    def __init__(self, message: str, *, code: str = "auth_error") -> None:
+    def __init__(
+        self, message: str, *, code: str = "auth_error", extra: dict[str, object] | None = None
+    ) -> None:
         super().__init__(message)
         self.message = message
         self.code = code
+        # Campi in più per il client (es. il gettone per inviare la richiesta tester).
+        self.extra = extra or {}
 
 
 class InvalidCredentialsError(AuthError):
@@ -67,10 +71,11 @@ class MobileHandoffExpiredError(AuthError):
 class TesterOnlyError(AuthError):
     """Modalità test attiva: l'account non è tra i tester autorizzati."""
 
-    def __init__(self) -> None:
+    def __init__(self, extra: dict[str, object] | None = None) -> None:
         super().__init__(
             "Non autorizzato: l'accesso è riservato ai tester del pilota.",
             code="tester_only",
+            extra=extra,
         )
 
 

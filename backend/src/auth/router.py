@@ -28,6 +28,7 @@ from auth.schemas import (
     ResendVerificationRequest,
     ResetPasswordRequest,
     SessionUserResponse,
+    TesterRequestSubmit,
     TokenPayloadRequest,
 )
 from auth.service import AuthService
@@ -52,7 +53,7 @@ def _error_response(exc: AuthError) -> JSONResponse:
         status_code = status.HTTP_429_TOO_MANY_REQUESTS
     return JSONResponse(
         status_code=status_code,
-        content={"message": exc.message, "code": exc.code},
+        content={"message": exc.message, "code": exc.code, **getattr(exc, "extra", {})},
     )
 
 
@@ -112,6 +113,30 @@ def login_with_google(
         )
     except AuthError as exc:
         return _error_response(exc)
+
+
+@router.post(
+    "/tester-requests", response_model=MessageResponse, status_code=status.HTTP_201_CREATED
+)
+def submit_tester_request(
+    body: TesterRequestSubmit,
+    request: Request,
+    service: AuthService = Depends(get_auth_service),
+) -> MessageResponse | JSONResponse:
+    """Richiesta di accesso al pilota di chi non è tester (modalità test accesa)."""
+    try:
+        service.submit_tester_request(
+            request_token=body.request_token,
+            first_name=body.first_name,
+            last_name=body.last_name,
+            phone=body.phone,
+            motivation=body.motivation,
+            consent=body.consent,
+            client_ip=get_client_ip(request),
+        )
+    except AuthError as exc:
+        return _error_response(exc)
+    return MessageResponse(message="Richiesta inviata: ti faremo sapere.")
 
 
 @router.post("/google/handoff", response_model=GoogleHandoffStartResponse)

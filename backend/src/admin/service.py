@@ -25,6 +25,8 @@ from admin.schemas import (
     AdminImpersonationRevokeResponse,
     AdminLeagueResponse,
     AdminOverviewResponse,
+    AdminTesterRequestListResponse,
+    AdminTesterRequestResponse,
     AdminTesterResponse,
     AdminTestModeResponse,
     AdminUserResponse,
@@ -33,12 +35,14 @@ from admin.schemas import (
 )
 from auth.blocklist import BlockList
 from auth.impersonation import ImpersonationStore
+from auth.models.tester_request import TesterAccessRequest
 from auth.models.user import User
 from auth.models.user_profile import UserProfile
 from auth.privacy_service import PrivacyService
 from auth.schemas import SessionUserResponse
 from auth.security import create_access_token
 from auth.tester_access import TesterAccess
+from auth.tester_requests import TesterRequestService
 from config.settings.api import ApiSettings
 from database.enums import (
     LeagueAuditAction,
@@ -284,6 +288,44 @@ class AdminService:
         self._audit_test_mode(actor, "tester_removed", {"testerId": str(tester_id)})
         self._session.commit()
         return self.test_mode_state()
+
+    # --- richieste di accesso dei non tester --------------------------------------------------
+    def list_tester_requests(self, status: str | None) -> AdminTesterRequestListResponse:
+        service = TesterRequestService(self._session)
+        rows = service.list_requests(status)
+        self._session.commit()  # la lettura ripulisce le richieste rifiutate scadute
+        return AdminTesterRequestListResponse(
+            requests=[self._tester_request_response(row) for row in rows]
+        )
+
+    def decide_tester_requests(
+        self, *, actor: User, ids: list[UUID], action: str, note: str | None
+    ) -> AdminTesterRequestListResponse:
+        service = TesterRequestService(self._session)
+        for request_id in ids:
+            if action == "approve":
+                entry = service.approve(request_id, actor_id=actor.id)
+                self._audit_test_mode(actor, "tester_request_approved", {"id": str(entry.id)})
+            else:
+                entry = service.reject(request_id, actor_id=actor.id, note=note)
+                self._audit_test_mode(actor, "tester_request_rejected", {"id": str(entry.id)})
+        self._session.commit()
+        return self.list_tester_requests(None)
+
+    @staticmethod
+    def _tester_request_response(row: TesterAccessRequest) -> AdminTesterRequestResponse:
+        return AdminTesterRequestResponse(
+            id=str(row.id),
+            email=row.email,
+            firstName=row.first_name,
+            lastName=row.last_name,
+            phone=row.phone,
+            motivation=row.motivation,
+            status=row.status,
+            createdAt=row.created_at,
+            decidedAt=row.decided_at,
+            decisionNote=row.decision_note,
+        )
 
     def _audit_test_mode(self, actor: User, event: str, details: dict[str, str]) -> None:
         _logger.info(

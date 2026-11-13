@@ -189,7 +189,7 @@ def auth_error_handler(_request: object, exc: AuthError) -> JSONResponse:
         status_code = 429
     return JSONResponse(
         status_code=status_code,
-        content={"message": exc.message, "code": exc.code},
+        content={"message": exc.message, "code": exc.code, **getattr(exc, "extra", {})},
     )
 
 

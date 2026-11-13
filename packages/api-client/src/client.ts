@@ -22,12 +22,15 @@
 export class ApiError extends Error {
   readonly status: number;
   readonly code: string;
+  /** Corpo JSON dell'errore, per i campi in più (es. il gettone della richiesta tester). */
+  readonly payload: Record<string, unknown>;
 
-  constructor(message: string, status: number, code: string) {
+  constructor(message: string, status: number, code: string, payload: Record<string, unknown> = {}) {
     super(message);
     this.name = "ApiError";
     this.status = status;
     this.code = code;
+    this.payload = payload;
   }
 }
 
@@ -196,7 +199,12 @@ export function createApiClient<TFile = unknown>(config: ApiClientConfig<TFile>)
         body: payload,
       });
     }
-    return new ApiError(message, response.status, payload.code ?? "unknown_error");
+    return new ApiError(
+      message,
+      response.status,
+      payload.code ?? "unknown_error",
+      payload as Record<string, unknown>,
+    );
   }
 
   function sessionExpiredError(): ApiError {

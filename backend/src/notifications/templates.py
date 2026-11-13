@@ -462,6 +462,16 @@ def _render_mercato_scambio_v2(params: NotificationParams) -> NotificationConten
     )
 
 
+@register_template("sistema.richiesta_tester", 1)
+def _render_sistema_richiesta_tester(params: NotificationParams) -> NotificationContent:
+    """Nuova richiesta di accesso al pilota: arriva SOLO agli operatori."""
+    return NotificationContent(
+        title="Nuova richiesta di accesso al pilota",
+        body=f"{params.get('name') or 'Qualcuno'} ({params.get('email')}) chiede di partecipare.",
+        deep_link="/admin/utenti",
+    )
+
+
 @register_template("sistema.feedback_utente", 1)
 def _render_sistema_feedback_utente(params: NotificationParams) -> NotificationContent:
     """Nuova segnalazione utente: arriva SOLO agli operatori (vedi `feedback.service`)."""

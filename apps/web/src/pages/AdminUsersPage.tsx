@@ -33,6 +33,7 @@ import {
   setTestMode,
 } from "../api/admin";
 import { ApiError } from "../api/client";
+import { AdminTesterRequestsPanel } from "./AdminTesterRequestsPanel";
 import { getApiErrorMessage, useAuth } from "../auth/AuthContext";
 import { loadStoredSession } from "../auth/sessionStorage";
 import { useNavigate } from "../router/simpleRouter";
@@ -57,6 +58,7 @@ export function AdminUsersPage() {
   const [testMode, setTestModeState] = useState<AdminTestMode | null>(null);
   const [testModeBusy, setTestModeBusy] = useState(false);
   const [newTesterEmail, setNewTesterEmail] = useState("");
+  const [pendingRequests, setPendingRequests] = useState(0);
   const [blocklist, setBlocklist] = useState<AdminBlocklist | null>(null);
   const [blockEmail, setBlockEmail] = useState("");
   const [blockReason, setBlockReason] = useState("");
@@ -248,8 +250,12 @@ export function AdminUsersPage() {
       <Tabs defaultValue="utenti" aria-label="Utenti e lista nera">
         <TabList>
           <Tab value="utenti">Utenti</Tab>
+          <Tab value="richieste">{`Richieste tester${pendingRequests > 0 ? ` (${pendingRequests})` : ""}`}</Tab>
           <Tab value="lista-nera">{`Lista nera${blocklist ? ` (${blocklist.items.length})` : ""}`}</Tab>
         </TabList>
+        <TabPanel value="richieste">
+          <AdminTesterRequestsPanel onPendingCount={setPendingRequests} />
+        </TabPanel>
         <TabPanel value="utenti">
       <section className="fa-admin-testmode" data-testid="admin-testmode">
         <h2>Modalità test</h2>

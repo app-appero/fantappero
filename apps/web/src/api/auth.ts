@@ -10,6 +10,7 @@ import type {
   RegisterRequest,
   ResendVerificationRequest,
   ResetPasswordRequest,
+  TesterRequestBody,
   SessionUser,
   VerifyEmailRequest,
 } from "@fantappero/contracts";
@@ -41,6 +42,10 @@ export function startGoogleHandoff(
   body: GoogleLoginRequest,
 ): Promise<GoogleHandoffStartResponse> {
   return apiRequest<GoogleHandoffStartResponse>("/auth/google/handoff", { body });
+}
+
+export function submitTesterRequest(body: TesterRequestBody): Promise<{ message: string }> {
+  return apiRequest<{ message: string }>("/auth/tester-requests", { body });
 }
 
 export function refresh(body: RefreshRequest): Promise<AuthTokensResponse> {

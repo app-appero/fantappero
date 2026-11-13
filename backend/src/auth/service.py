@@ -35,6 +35,7 @@ from auth.security import (
     verify_password,
 )
 from auth.tester_access import TesterAccess
+from auth.tester_requests import TesterRequestService, make_request_token, read_request_token
 from auth.validators import validate_display_name, validate_email, validate_password
 from config.settings.api import ApiSettings
 from database.enums import AuthTokenType, PlatformRole, UserType, platform_role_to_global_role
@@ -205,8 +206,8 @@ class AuthService:
                 select(User).where(User.email == identity.email, User.deleted_at.is_(None))
             )
             # Modalità test: chi non è autorizzato non lascia nessun account.
-            self._assert_tester_allowed(
-                identity.email, user.platform_role if user is not None else None
+            self._assert_tester_allowed_google(
+                identity, user.platform_role if user is not None else None
             )
             if user is not None:
                 user.google_sub = identity.sub
@@ -232,7 +233,7 @@ class AuthService:
             raise GoogleAuthError()
 
         # Account già collegato a Google (ricerca per `sub`): stesso controllo.
-        self._assert_tester_allowed(user.email, user.platform_role)
+        self._assert_tester_allowed_google(identity, user.platform_role)
         self._record_policy_acceptance(user)
         tokens = self._create_session(user)
         self._session.commit()
@@ -245,6 +246,89 @@ class AuthService:
         except AccountBlockedError:
             get_metrics().incr("auth_blocked_account_total")
             raise
+
+    def _assert_tester_allowed_google(
+        self, identity: google_oauth.GoogleIdentity, platform_role: PlatformRole | None
+    ) -> None:
+        """Come `_assert_tester_allowed`, ma per chi accede con Google a un non tester.
+
+        Invece del solo rifiuto, dice a che punto è la richiesta di accesso: `none` con il
+        gettone per inviarla, `pending` (in valutazione) o `rejected` (già valutata).
+        """
+        try:
+            self._assert_tester_allowed(identity.email, platform_role)
+        except TesterOnlyError as exc:
+            requests = TesterRequestService(self._session)
+            existing = requests.status_for(identity.email)
+            extra: dict[str, object] = {"requestStatus": existing.status if existing else "none"}
+            if existing is None:
+                extra["requestToken"] = make_request_token(
+                    secret=self._settings.resolved_jwt_secret(),
+                    email=identity.email,
+                    name=identity.name,
+                )
+            else:
+                extra["requestSubmittedAt"] = existing.created_at.isoformat()
+            self._session.commit()  # eventuale pulizia delle richieste rifiutate scadute
+            raise TesterOnlyError(extra=extra) from exc
+
+    def submit_tester_request(
+        self,
+        *,
+        request_token: str,
+        first_name: str,
+        last_name: str,
+        phone: str,
+        motivation: str | None,
+        consent: bool,
+        client_ip: str,
+    ) -> None:
+        if self._rate_limiter is not None:
+            self._rate_limiter.check(
+                endpoint="tester_request",
+                key=client_ip,
+                limit=self._settings.auth_rate_limit_google_login_per_minute,
+                window_seconds=60,
+            )
+        claims = read_request_token(
+            secret=self._settings.resolved_jwt_secret(), token=request_token
+        )
+        self._assert_not_blocked(claims["email"])
+        entry = TesterRequestService(self._session).submit(
+            email=claims["email"],
+            first_name=first_name,
+            last_name=last_name,
+            phone=phone,
+            motivation=motivation,
+            consent=consent,
+        )
+        self._notify_operators_of_request(entry)
+        self._session.commit()
+        get_metrics().incr("auth_tester_request_submitted_total")
+
+    def _notify_operators_of_request(self, entry: object) -> None:
+        from auth.models.tester_request import TesterAccessRequest
+        from database.enums import NotificationCategory
+        from notifications.service import NotificationService
+
+        assert isinstance(entry, TesterAccessRequest)
+        operator_ids = list(
+            self._session.scalars(
+                select(User.id).where(User.platform_role == PlatformRole.OPERATOR)
+            ).all()
+        )
+        service = NotificationService(self._session)
+        for operator_id in operator_ids:
+            service.create_notification(
+                user_id=operator_id,
+                category=NotificationCategory.SISTEMA,
+                template_key="sistema.richiesta_tester",
+                template_version=1,
+                params={"name": f"{entry.first_name} {entry.last_name}", "email": entry.email},
+                dedup_key=f"tester_request:{entry.id}",
+                push=True,
+                email=False,
+            )
 
     def _assert_tester_allowed(self, email: str, platform_role: PlatformRole | None) -> None:
         try:

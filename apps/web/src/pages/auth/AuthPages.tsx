@@ -8,9 +8,11 @@ import {
   startGoogleHandoff,
   verifyEmail,
 } from "../../api/auth";
+import { ApiError } from "../../api/client";
 import { getApiErrorMessage, useAuth } from "../../auth/AuthContext";
 import { googleAppHandoffUrl, googleAppReturnUrl } from "../../auth/googleAppReturn";
 import { renderGoogleButton } from "../../auth/googleIdentity";
+import { TesterRequestPanel, type TesterGateInfo } from "./TesterRequestPanel";
 import { clearLastUser, initialsOf, readLastUser, writeLastUser, type LastUser } from "../../auth/lastUser";
 import { loadStoredSession } from "../../auth/sessionStorage";
 import { useAuthOptions } from "../../auth/useAuthOptions";
@@ -30,6 +32,7 @@ function GoogleSignInButton({
   const navigate = useNavigate();
   const containerRef = useRef<HTMLDivElement>(null);
   const { viteGoogleClientId } = getWebEnv();
+  const [testerGate, setTesterGate] = useState<TesterGateInfo | null>(null);
 
   useEffect(() => {
     if (!viteGoogleClientId || !containerRef.current) {
@@ -45,6 +48,20 @@ function GoogleSignInButton({
         loginWithGoogle(idToken)
           .then(() => navigate("/leghe"))
           .catch((error: unknown) => {
+            // Pilota in modalità test: chi non è tester può chiedere di partecipare.
+            if (error instanceof ApiError && error.code === "tester_only") {
+              const status = error.payload.requestStatus;
+              setTesterGate({
+                status: status === "pending" || status === "rejected" ? status : "none",
+                requestToken:
+                  typeof error.payload.requestToken === "string" ? error.payload.requestToken : undefined,
+                submittedAt:
+                  typeof error.payload.requestSubmittedAt === "string"
+                    ? error.payload.requestSubmittedAt
+                    : undefined,
+              });
+              return;
+            }
             onError(getApiErrorMessage(error, "Accesso con Google non riuscito."));
           });
       }).catch(() => {
@@ -67,7 +84,15 @@ function GoogleSignInButton({
 
   return (
     <div className="fa-auth-layout__google fa-auth-layout__google--main">
-      <div ref={containerRef} className="fa-auth-layout__google-button" data-testid="auth-google-button" />
+      {testerGate ? (
+        <TesterRequestPanel info={testerGate} onBack={() => setTesterGate(null)} />
+      ) : null}
+      <div
+        ref={containerRef}
+        className="fa-auth-layout__google-button"
+        data-testid="auth-google-button"
+        hidden={testerGate !== null}
+      />
     </div>
   );
 }

@@ -14,6 +14,7 @@ from tests.integration.database.helpers import create_engine_for_url
 from auth import google_oauth
 from auth.google_oauth import GoogleIdentity
 from auth.models.tester_allowlist import TesterAllowlistEntry
+from auth.models.tester_request import TesterAccessRequest
 from auth.models.user import User
 from config.settings.loader import reset_settings_cache
 from database.enums import PlatformRole
@@ -45,11 +46,13 @@ def db_session(db_url: str) -> Session:
 def _reset_test_mode(db_session: Session):
     """Il database è condiviso dal modulo: la modalità test non deve restare accesa."""
     db_session.execute(delete(TesterAllowlistEntry))
+    db_session.execute(delete(TesterAccessRequest))
     db_session.commit()
     yield
     db_session.rollback()
     db_session.execute(delete(SystemFlag).where(SystemFlag.key == "test_mode"))
     db_session.execute(delete(TesterAllowlistEntry))
+    db_session.execute(delete(TesterAccessRequest))
     db_session.commit()
 
 
@@ -168,3 +171,151 @@ def test_users_list_marks_testers_and_testers_can_be_removed(
     token = plain.json()["accessToken"]
     forbidden = client.get("/admin/test-mode", headers={"Authorization": f"Bearer {token}"})
     assert forbidden.status_code == 403
+
+
+FORM = {
+    "firstName": "Mario",
+    "lastName": "Rossi",
+    "phone": "+39 333 1234567",
+    "motivation": "Mi piace il fantacalcio",
+    "consent": True,
+}
+
+
+def test_non_tester_can_request_access_and_operator_approves(
+    client: TestClient, db_session: Session, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    operator = _operator(client, db_session, "req.operator@example.com")
+    client.put("/admin/test-mode", headers=operator, json={"enabled": True})
+
+    blocked = _google(client, monkeypatch, "req.nuovo@example.com", "sub-req-nuovo")
+    assert blocked.status_code == 403
+    body = blocked.json()
+    assert body["code"] == "tester_only"
+    assert body["requestStatus"] == "none"
+    token = body["requestToken"]
+
+    # Senza consenso la richiesta non parte.
+    no_consent = client.post(
+        "/auth/tester-requests", json={**FORM, "consent": False, "requestToken": token}
+    )
+    assert no_consent.status_code == 400
+    assert no_consent.json()["code"] == "consent_required"
+    # Telefono non valido.
+    bad_phone = client.post(
+        "/auth/tester-requests", json={**FORM, "phone": "abc-def", "requestToken": token}
+    )
+    assert bad_phone.status_code == 400
+
+    sent = client.post("/auth/tester-requests", json={**FORM, "requestToken": token})
+    assert sent.status_code == 201, sent.json()
+    again = client.post("/auth/tester-requests", json={**FORM, "requestToken": token})
+    assert again.json()["code"] == "tester_request_pending"
+
+    # Nessun account creato, e riprovando l'accesso si vede "in valutazione".
+    assert db_session.scalar(select(User).where(User.email == "req.nuovo@example.com")) is None
+    pending = _google(client, monkeypatch, "req.nuovo@example.com", "sub-req-nuovo").json()
+    assert pending["requestStatus"] == "pending"
+    assert "requestToken" not in pending
+
+    listed = client.get("/admin/tester-requests?status=pending", headers=operator)
+    assert listed.status_code == 200
+    rows = [row for row in listed.json()["requests"] if row["email"] == "req.nuovo@example.com"]
+    assert len(rows) == 1
+    assert rows[0]["firstName"] == "Mario"
+    assert rows[0]["phone"] == "+39 333 1234567"
+
+    approved = client.post(
+        "/admin/tester-requests/decisione",
+        headers=operator,
+        json={"ids": [rows[0]["id"]], "action": "approve"},
+    )
+    assert approved.status_code == 200
+    assert client.get("/admin/test-mode", headers=operator).json()["testers"][0]["email"] == (
+        "req.nuovo@example.com"
+    )
+    # Ora entra con Google come qualunque tester.
+    assert _google(client, monkeypatch, "req.nuovo@example.com", "sub-req-nuovo").status_code == 200
+
+
+def test_rejected_request_blocks_resubmission_and_member_cannot_decide(
+    client: TestClient, db_session: Session, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    operator = _operator(client, db_session, "req2.operator@example.com")
+    client.put("/admin/test-mode", headers=operator, json={"enabled": True})
+    token = _google(client, monkeypatch, "req2.nuovo@example.com", "sub-req2").json()[
+        "requestToken"
+    ]
+    assert (
+        client.post("/auth/tester-requests", json={**FORM, "requestToken": token}).status_code
+        == 201
+    )
+    row = db_session.scalar(
+        select(TesterAccessRequest).where(TesterAccessRequest.email == "req2.nuovo@example.com")
+    )
+
+    # Un utente qualunque non può decidere.
+    client.post(
+        "/auth/register",
+        json={"email": "req2.member@example.com", "password": PASSWORD, "displayName": "Membro"},
+    )
+    match = re.search(r"token=([A-Za-z0-9_-]+)", get_captured_emails()[-1].message.text_body)
+    client.post("/auth/verify-email", json={"token": match.group(1)})
+    login = client.post(
+        "/auth/login", json={"email": "req2.member@example.com", "password": PASSWORD}
+    )
+    # (con modalità test accesa un non tester non entra: il rifiuto basta come prova)
+    assert login.status_code in (401, 403)
+    forbidden = client.post(
+        "/admin/tester-requests/decisione", json={"ids": [str(row.id)], "action": "approve"}
+    )
+    assert forbidden.status_code in (401, 403)
+
+    rejected = client.post(
+        "/admin/tester-requests/decisione",
+        headers=operator,
+        json={"ids": [str(row.id)], "action": "reject", "note": "gruppo al completo"},
+    )
+    assert rejected.status_code == 200
+    status = _google(client, monkeypatch, "req2.nuovo@example.com", "sub-req2").json()
+    assert status["requestStatus"] == "rejected"
+    assert db_session.scalar(select(User).where(User.email == "req2.nuovo@example.com")) is None
+
+
+def test_request_token_is_required_and_form_is_closed_when_test_mode_is_off(
+    client: TestClient, db_session: Session, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    operator = _operator(client, db_session, "req3.operator@example.com")
+    client.put("/admin/test-mode", headers=operator, json={"enabled": True})
+    token = _google(client, monkeypatch, "req3.nuovo@example.com", "sub-req3").json()[
+        "requestToken"
+    ]
+    fake = client.post("/auth/tester-requests", json={**FORM, "requestToken": "falso"})
+    assert fake.status_code == 400
+    assert fake.json()["code"] == "tester_request_token_invalid"
+
+    client.put("/admin/test-mode", headers=operator, json={"enabled": False})
+    closed = client.post("/auth/tester-requests", json={**FORM, "requestToken": token})
+    assert closed.json()["code"] == "test_mode_off"
+
+
+def test_old_rejected_requests_are_purged(db_session: Session) -> None:
+    from datetime import UTC, datetime, timedelta
+
+    from auth.tester_requests import TesterRequestService
+
+    old = datetime.now(UTC) - timedelta(days=40)
+    db_session.add(
+        TesterAccessRequest(
+            email="vecchia@example.com",
+            first_name="A",
+            last_name="B",
+            phone="+39 333 0000000",
+            status="rejected",
+            consent_at=old,
+            decided_at=old,
+        )
+    )
+    db_session.commit()
+    assert TesterRequestService(db_session).purge_old_rejected() == 1
+    db_session.commit()

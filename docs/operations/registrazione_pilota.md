@@ -49,3 +49,21 @@ Un tester che non apre mai l'app o che ha negato il permesso alle notifiche non 
 Con `false` i nuovi account con email e password nascono già verificati (nessuna email inviata)
 e un account non ancora verificato viene verificato al primo accesso. Serve ai test automatici su
 dev con indirizzi inventati. Il valore predefinito resta `true`: senza la variabile nulla cambia.
+
+## Richiesta di accesso per chi non è ancora tester (solo web)
+Con la **modalità test** accesa, chi entra con Google e non è tester non crea nessun account: il web
+gli mostra un modulo (nome, cognome, **telefono**, motivo facoltativo, consenso).
+- Il **telefono** serve solo per aggiungere la persona al **gruppo WhatsApp dei tester**: lo dice il
+  modulo ed è l'unico uso previsto.
+- Le richieste stanno nella tabella `tester_access_requests` (non sono utenti). Una richiesta per
+  indirizzo email, verificato da Google. Il modulo si invia con un gettone firmato valido 30 minuti.
+- **Pannello operatore → Utenti → scheda «Richieste tester»**: elenco con quello che hanno scritto;
+  Approva (anche più richieste insieme) aggiunge l'email alla lista tester, Rifiuta no.
+  Chi approvi non riceve email: al successivo accesso con Google entra da solo. Scrivigli tu, e
+  aggiungilo al gruppo WhatsApp.
+- Gli operatori ricevono una notifica in app e push a ogni nuova richiesta.
+- Le richieste **rifiutate si cancellano dopo 30 giorni** (poi la persona può chiedere di nuovo).
+- Con la modalità test **spenta** il modulo non compare e l'invio è rifiutato.
+- L'accesso con email e password resta bloccato per tutti nel pilota.
+- Il modulo c'è **solo sul web**: l'app (APK) non ha questa schermata, quindi un non tester che prova
+  da lì vede il solito «Non autorizzato».

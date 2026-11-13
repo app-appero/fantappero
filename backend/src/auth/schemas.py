@@ -24,6 +24,17 @@ class GoogleLoginRequest(ApiModel):
     id_token: str = Field(min_length=1, alias="idToken")
 
 
+class TesterRequestSubmit(ApiModel):
+    """Modulo di richiesta di accesso al pilota (dopo l'accesso con Google di un non tester)."""
+
+    request_token: str = Field(min_length=1, alias="requestToken")
+    first_name: str = Field(min_length=1, max_length=80, alias="firstName")
+    last_name: str = Field(min_length=1, max_length=80, alias="lastName")
+    phone: str = Field(min_length=6, max_length=30)
+    motivation: str | None = Field(default=None, max_length=1000)
+    consent: bool = False
+
+
 class GoogleHandoffStartResponse(ApiModel):
     """One-time code the web handoff page hands the app instead of a usable token."""
 

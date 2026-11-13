@@ -22,6 +22,8 @@ from admin.schemas import (
     AdminListoneRefreshJobResponse,
     AdminListoneRefreshProgressResponse,
     AdminOverviewResponse,
+    AdminTesterRequestBulkRequest,
+    AdminTesterRequestListResponse,
     AdminTestModeResponse,
     AdminTestModeUpdateRequest,
     AdminTransferReviewedResponse,
@@ -124,6 +126,38 @@ def add_tester(
         return service.add_tester(actor=operator, email=body.email)
     except AuthError as exc:
         return JSONResponse(status_code=400, content={"message": exc.message, "code": exc.code})
+
+
+@router.get("/tester-requests", response_model=AdminTesterRequestListResponse)
+def list_tester_requests(
+    status: str | None = Query(default=None, pattern="^(pending|approved|rejected)$"),
+    _operator: User = Depends(require_permissions(Permission.GLOBAL_OPERATE)),
+    service: AdminService = Depends(get_admin_service),
+) -> AdminTesterRequestListResponse:
+    """Richieste di accesso di chi non è ancora tester (modalità test)."""
+    return service.list_tester_requests(status)
+
+
+@router.post("/tester-requests/decisione", response_model=AdminTesterRequestListResponse)
+def decide_tester_requests(
+    body: AdminTesterRequestBulkRequest,
+    operator: User = Depends(require_permissions(Permission.GLOBAL_OPERATE)),
+    service: AdminService = Depends(get_admin_service),
+) -> AdminTesterRequestListResponse | JSONResponse:
+    """Approva o rifiuta una o più richieste. Approvare aggiunge l'email ai tester."""
+    try:
+        ids = [UUID(value) for value in body.ids]
+    except ValueError:
+        return JSONResponse(
+            status_code=400,
+            content={"message": "Identificativo non valido.", "code": "invalid_request_id"},
+        )
+    try:
+        return service.decide_tester_requests(
+            actor=operator, ids=ids, action=body.action, note=body.note
+        )
+    except AuthError as exc:
+        return JSONResponse(status_code=404, content={"message": exc.message, "code": exc.code})
 
 
 @router.delete("/test-mode/testers/{tester_id}", response_model=AdminTestModeResponse)
