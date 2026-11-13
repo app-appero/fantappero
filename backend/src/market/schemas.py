@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from pydantic import Field
+from pydantic import Field, StrictInt
 
 from auth.schemas import ApiModel
 
@@ -33,7 +33,7 @@ class MarketSessionResponse(ApiModel):
 
 
 class SubmitMarketBidRequest(ApiModel):
-    amount_credits: int = Field(alias="amountCredits", ge=1)
+    amount_credits: StrictInt = Field(alias="amountCredits", ge=1)
     # Required for waiver bids (FR-MKT-01): the roster player to release if won.
     # Must be omitted for initial-auction bids.
     release_athlete_id: str | None = Field(default=None, alias="releaseAthleteId")

@@ -10,12 +10,13 @@ from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
 from auth.dependencies import get_db_session
-from auth.exceptions import AuthError
+from auth.exceptions import AuthError, ValidationAuthError
 from authorization.context import LeagueAccess
 from authorization.dependencies import require_league_permissions
 from database.enums import MarketSessionKind, Permission
 from market.history_schemas import MarketHistoryListResponse
 from market.history_service import DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE, MarketHistoryService
+from market.models import MarketSession
 from market.schemas import (
     CreateMarketSessionRequest,
     MarketBidListResponse,
@@ -39,6 +40,31 @@ from market.trade_schemas import (
 from market.trade_service import TradeService
 
 router = APIRouter(prefix="/leagues", tags=["market"])
+
+
+def _session_kind_guard(*, waiver: bool):
+    """Le rotte /asta/ non servono sessioni degli svincoli e viceversa."""
+
+    def guard(
+        league_id: UUID,
+        session_id: UUID,
+        db: Session = Depends(get_db_session),
+    ) -> None:
+        market_session = db.get(MarketSession, session_id)
+        if (
+            market_session is not None
+            and market_session.league_id == league_id
+            and (market_session.kind == MarketSessionKind.WAIVER) != waiver
+        ):
+            raise ValidationAuthError(
+                "Sessione di mercato non trovata.", code="market_session_not_found"
+            )
+
+    return guard
+
+
+_auction_session_only = _session_kind_guard(waiver=False)
+_waiver_session_only = _session_kind_guard(waiver=True)
 
 
 def _error_response(exc: AuthError) -> JSONResponse:
@@ -112,6 +138,7 @@ def create_auction_session(
 
 @router.post(
     "/{league_id}/mercato/asta/sessioni/{session_id}/chiudi",
+    dependencies=[Depends(_auction_session_only)],
     response_model=MarketSessionResponse,
 )
 def close_auction_session(
@@ -128,6 +155,7 @@ def close_auction_session(
 
 @router.post(
     "/{league_id}/mercato/asta/sessioni/{session_id}/risolvi",
+    dependencies=[Depends(_auction_session_only)],
     response_model=MarketResolutionResponse,
 )
 def resolve_auction_session(
@@ -156,6 +184,7 @@ def list_auction_sessions(
 
 @router.get(
     "/{league_id}/mercato/asta/sessioni/{session_id}",
+    dependencies=[Depends(_auction_session_only)],
     response_model=MarketSessionResponse,
 )
 def get_auction_session(
@@ -171,6 +200,7 @@ def get_auction_session(
 
 @router.put(
     "/{league_id}/mercato/asta/sessioni/{session_id}/offerte/{athlete_id}",
+    dependencies=[Depends(_auction_session_only)],
     response_model=MarketBidResponse,
 )
 def submit_auction_bid(
@@ -189,6 +219,7 @@ def submit_auction_bid(
 
 @router.delete(
     "/{league_id}/mercato/asta/sessioni/{session_id}/offerte/{athlete_id}",
+    dependencies=[Depends(_auction_session_only)],
     status_code=status.HTTP_204_NO_CONTENT,
     response_model=None,
 )
@@ -208,6 +239,7 @@ def withdraw_auction_bid(
 
 @router.get(
     "/{league_id}/mercato/asta/sessioni/{session_id}/offerte",
+    dependencies=[Depends(_auction_session_only)],
     response_model=MarketBidListResponse,
 )
 def list_my_auction_bids(
@@ -246,6 +278,7 @@ def create_waiver_session(
 
 @router.post(
     "/{league_id}/mercato/svincoli/sessioni/{session_id}/chiudi",
+    dependencies=[Depends(_waiver_session_only)],
     response_model=MarketSessionResponse,
 )
 def close_waiver_session(
@@ -262,6 +295,7 @@ def close_waiver_session(
 
 @router.post(
     "/{league_id}/mercato/svincoli/sessioni/{session_id}/risolvi",
+    dependencies=[Depends(_waiver_session_only)],
     response_model=MarketResolutionResponse,
 )
 def resolve_waiver_session(
@@ -290,6 +324,7 @@ def list_waiver_sessions(
 
 @router.get(
     "/{league_id}/mercato/svincoli/sessioni/{session_id}",
+    dependencies=[Depends(_waiver_session_only)],
     response_model=MarketSessionResponse,
 )
 def get_waiver_session(
@@ -305,6 +340,7 @@ def get_waiver_session(
 
 @router.put(
     "/{league_id}/mercato/svincoli/sessioni/{session_id}/offerte/{athlete_id}",
+    dependencies=[Depends(_waiver_session_only)],
     response_model=MarketBidResponse,
 )
 def submit_waiver_bid(
@@ -323,6 +359,7 @@ def submit_waiver_bid(
 
 @router.delete(
     "/{league_id}/mercato/svincoli/sessioni/{session_id}/offerte/{athlete_id}",
+    dependencies=[Depends(_waiver_session_only)],
     status_code=status.HTTP_204_NO_CONTENT,
     response_model=None,
 )
@@ -342,6 +379,7 @@ def withdraw_waiver_bid(
 
 @router.get(
     "/{league_id}/mercato/svincoli/sessioni/{session_id}/offerte",
+    dependencies=[Depends(_waiver_session_only)],
     response_model=MarketBidListResponse,
 )
 def list_my_waiver_bids(

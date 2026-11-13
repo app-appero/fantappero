@@ -17,7 +17,7 @@ import random
 from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
-from sqlalchemy import delete, func, select
+from sqlalchemy import delete, func, insert, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
 
@@ -614,6 +614,15 @@ class LiveMarketService:
         now = datetime.now(UTC)
         lot.status = MarketLiveLotStatus.CANCELLED
         lot.closed_at = now
+        # Il calciatore di un lotto annullato non va perso: torna disponibile in coda.
+        for entry in self._session.scalars(
+            select(MarketLiveNominationQueueEntry).where(
+                MarketLiveNominationQueueEntry.session_id == market_session.id,
+                MarketLiveNominationQueueEntry.athlete_id == lot.athlete_id,
+                MarketLiveNominationQueueEntry.consumed_at.is_not(None),
+            )
+        ).all():
+            entry.consumed_at = None
         self._session.flush()
         self._add_audit(
             market_session.league_id,
@@ -1075,14 +1084,15 @@ class LiveMarketService:
                     "Uno o più calciatori della lista di chiamata non esistono.",
                     code="nomination_athlete_not_found",
                 )
-        position = 0
-        for athlete_id in ordered_ids:
-            self._session.add(
-                MarketLiveNominationQueueEntry(
-                    session_id=session_id, athlete_id=athlete_id, position=position
-                )
+        if ordered_ids:
+            # Inserimento in blocco: la coda completa dei liberi conta migliaia di righe.
+            self._session.execute(
+                insert(MarketLiveNominationQueueEntry),
+                [
+                    {"session_id": session_id, "athlete_id": athlete_id, "position": position}
+                    for position, athlete_id in enumerate(ordered_ids)
+                ],
             )
-            position += 1
         self._session.flush()
 
     def _occupied_athlete_ids(self, league_id: UUID) -> set[UUID]:
@@ -1107,10 +1117,17 @@ class LiveMarketService:
             season_year=league.season_year,
             competition_ids={competition.id for competition in league.competitions},
         )
+        free = [row for row in assignments if row.athlete_id not in occupied_ids]
+        # Nomi in una sola query (prima ogni riga ne faceva una: migliaia di accessi).
+        names = dict(
+            self._session.execute(
+                select(Athlete.id, Athlete.canonical_name).where(
+                    Athlete.id.in_([row.athlete_id for row in free])
+                )
+            ).all()
+        )
         candidates = [
-            (str(assignment.athlete_id), assignment.role.value, assignment.athlete.canonical_name)
-            for assignment in assignments
-            if assignment.athlete_id not in occupied_ids
+            (str(row.athlete_id), row.role.value, names.get(row.athlete_id, "")) for row in free
         ]
         return sort_athletes_alphabetical_by_role(candidates)
 

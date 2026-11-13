@@ -38,6 +38,38 @@ def find_account_for_team(
     return session.scalar(stmt)
 
 
+def order_ledger_entries(entries: list[CreditLedgerEntry]) -> list[CreditLedgerEntry]:
+    """Ordina i movimenti per data e, a parità di data (stessa transazione), nell'ordine
+    in cui il saldo si è davvero mosso, così ``balanceAfter`` scorre in modo coerente."""
+    ordered: list[CreditLedgerEntry] = []
+    i = 0
+    items = sorted(entries, key=lambda e: (e.created_at, str(e.id)))
+    while i < len(items):
+        j = i
+        while j < len(items) and items[j].created_at == items[i].created_at:
+            j += 1
+        group = items[i:j]
+        if len(group) > 1:
+            by_before: dict[int, list[CreditLedgerEntry]] = {}
+            for entry in group:
+                by_before.setdefault(entry.balance_after - entry.amount, []).append(entry)
+            afters = {entry.balance_after for entry in group}
+            starts = [e for e in group if (e.balance_after - e.amount) not in afters]
+            chain: list[CreditLedgerEntry] = []
+            seen: set[int] = set()
+            current = starts[0] if starts else group[0]
+            while current is not None and id(current) not in seen:
+                chain.append(current)
+                seen.add(id(current))
+                nxt = [e for e in by_before.get(current.balance_after, []) if id(e) not in seen]
+                current = nxt[0] if nxt else None
+            chain.extend(e for e in group if id(e) not in seen)
+            group = chain
+        ordered.extend(group)
+        i = j
+    return ordered
+
+
 def reconstruct_balance(session: Session, account_id: UUID) -> int:
     entries = session.scalars(
         select(CreditLedgerEntry)

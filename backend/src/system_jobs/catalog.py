@@ -158,6 +158,20 @@ SYSTEM_JOBS: tuple[SystemJobSpec, ...] = (
         max_interval_seconds=86400,
     ),
     SystemJobSpec(
+        key="market-trade-expiry",
+        task="notifications.expire_trade_proposals",
+        title="Scadenza proposte di scambio",
+        description=(
+            "Segna come scadute le proposte di scambio oltre la scadenza e avvisa "
+            "i due fantallenatori."
+        ),
+        enabled_attr="notifications_trade_expiry_enabled",
+        interval_attr="notifications_trade_expiry_interval_seconds",
+        default_interval_seconds=300,
+        min_interval_seconds=60,
+        max_interval_seconds=86400,
+    ),
+    SystemJobSpec(
         key="notifications-broadcast-dispatch",
         task="notifications.dispatch_broadcasts",
         title="Avvisi programmati",

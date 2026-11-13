@@ -13,8 +13,15 @@ class AuthError(Exception):
 
 
 class InvalidCredentialsError(AuthError):
+    def __init__(self, message: str = "Email o password non validi.") -> None:
+        super().__init__(message, code="invalid_credentials")
+
+
+class SessionRequiredError(InvalidCredentialsError):
+    """Richiesta autenticata senza token valido (stesso codice, messaggio chiaro)."""
+
     def __init__(self) -> None:
-        super().__init__("Email o password non validi.", code="invalid_credentials")
+        super().__init__("Accesso richiesto: sessione mancante o scaduta.")
 
 
 class EmailNotVerifiedError(AuthError):

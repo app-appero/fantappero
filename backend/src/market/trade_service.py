@@ -252,6 +252,11 @@ class TradeService:
             LeagueAuditAction.MARKET_TRADE_CANCELLED,
             details={"proposalId": str(proposal.id)},
         )
+        self._notify_trade_status(
+            proposal_id=proposal.id,
+            status=TradeStatus.CANCELLED,
+            team_ids=[proposal.recipient_team_id],
+        )
         self._session.commit()
         get_metrics().incr("trade_proposal_cancelled_total")
         return self._to_response(proposal)
@@ -630,6 +635,36 @@ class TradeService:
             LeagueAuditEvent(league_id=league_id, actor_id=actor_id, action=action, details=details)
         )
         self._session.flush()
+
+    def expire_overdue_proposals(self, *, now: datetime | None = None, limit: int = 500) -> int:
+        """Segna come scadute le proposte oltre la scadenza e avvisa i due allenatori.
+
+        Lo stato "scaduta" è già calcolato in lettura; qui diventa anche persistente così la
+        notifica parte una volta sola, anche se nessuno apre l'app.
+        """
+        moment = now or datetime.now(UTC)
+        rows = self._session.scalars(
+            select(TradeProposal)
+            .where(
+                TradeProposal.status == TradeStatus.PROPOSED,
+                TradeProposal.expires_at.is_not(None),
+                TradeProposal.expires_at <= moment,
+            )
+            .order_by(TradeProposal.expires_at.asc())
+            .limit(limit)
+            .with_for_update(skip_locked=True)
+        ).all()
+        for proposal in rows:
+            proposal.status = TradeStatus.EXPIRED
+            proposal.decided_at = moment
+            self._session.flush()
+            self._notify_trade_status(
+                proposal_id=proposal.id,
+                status=TradeStatus.EXPIRED,
+                team_ids=[proposal.proposer_team_id, proposal.recipient_team_id],
+            )
+        self._session.commit()
+        return len(rows)
 
     def _execute_or_expire(
         self,

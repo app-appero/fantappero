@@ -413,6 +413,8 @@ _TRADE_V2_TITLES: dict[str, str] = {
     "countered": "{team} ti ha fatto una controproposta",
     "pending_approval": "Scambio con {team} in attesa dell'amministratore",
     "admin_review": "Scambio tra {team} e {second_team} da approvare",
+    "cancelled": "{team} ha annullato la proposta di scambio",
+    "expired": "La proposta di scambio con {team} è scaduta",
     "executed": "Scambio con {team} approvato",
     "rejected_by_admin": "Scambio con {team} rifiutato dall'amministratore",
 }
@@ -431,13 +433,21 @@ def _render_mercato_scambio_v2(params: NotificationParams) -> NotificationConten
         _names(params.get("requested")), _credits(params.get("requested_credits")), sep=" + "
     )
     # «offered» è ciò che dà chi ha proposto: per chi riceve è ciò che riceve.
-    body = _join(
-        f"Offre {gives}" if gives else "",
-        f"chiede {asks}" if asks else "",
-        f"scade {params['expires_label']}"
-        if status == "proposed" and params.get("expires_label")
-        else "",
-    )
+    if status in ("proposed", "countered"):
+        body = _join(
+            f"Offre {gives}" if gives else "",
+            f"chiede {asks}" if asks else "",
+            f"scade {params['expires_label']}"
+            if status == "proposed" and params.get("expires_label")
+            else "",
+        )
+    else:
+        # Esiti (accettato, rifiutato, annullato, scaduto…): il testo deve valere per
+        # entrambe le parti, quindi non dice chi offre e chi chiede.
+        body = _join(
+            f"Scambio: {gives}" if gives else "",
+            f"contro {asks}" if asks else "",
+        )
     proposal_id = params.get("proposal_id")
     deep_link = f"/mercato?scambio={proposal_id}" if proposal_id else "/mercato"
     return NotificationContent(

@@ -57,6 +57,10 @@ _beat_schedule.update(
         lock_reminder_interval_seconds=(
             _worker_settings.notifications_lineup_lock_reminder_interval_seconds
         ),
+        trade_expiry_enabled=_worker_settings.notifications_trade_expiry_enabled,
+        trade_expiry_interval_seconds=(
+            _worker_settings.notifications_trade_expiry_interval_seconds
+        ),
     )
 )
 _beat_schedule.update(

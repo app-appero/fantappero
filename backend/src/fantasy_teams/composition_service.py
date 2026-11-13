@@ -453,6 +453,69 @@ def reconcile_roster_overflow(session: Session, *, league: League, team: Fantasy
             if slot.exceeds_role_quota != keep:
                 slot.exceeds_role_quota = keep
                 changed = True
+    if _compact_extra_slots(session, team=team, roster_size=roster_size):
+        changed = True
+    return changed
+
+
+def _compact_extra_slots(session: Session, *, team: FantasyTeam, roster_size: int) -> bool:
+    """Rimette la rosa alla sua misura quando l'esubero è rientrato.
+
+    Gli slot oltre ``roster_size`` nascono solo per ospitare un calciatore in più. Quando
+    non è più in esubero (flag tolto) si sposta nel primo slot libero entro la misura
+    della rosa, portandosi dietro prezzo e storico di possesso, e lo slot extra sparisce.
+    """
+    from fantasy_teams.ownership import find_active_interval_for_slot
+
+    extras = list(
+        session.scalars(
+            select(FantasyRosterSlot)
+            .where(
+                FantasyRosterSlot.fantasy_team_id == team.id,
+                FantasyRosterSlot.slot_index >= roster_size,
+            )
+            .order_by(FantasyRosterSlot.slot_index.asc())
+            .with_for_update()
+        ).all()
+    )
+    if not extras:
+        return False
+    free_slots = list(
+        session.scalars(
+            select(FantasyRosterSlot)
+            .where(
+                FantasyRosterSlot.fantasy_team_id == team.id,
+                FantasyRosterSlot.slot_index < roster_size,
+                FantasyRosterSlot.athlete_id.is_(None),
+            )
+            .order_by(FantasyRosterSlot.slot_index.asc())
+            .with_for_update()
+        ).all()
+    )
+    changed = False
+    for extra in extras:
+        if extra.athlete_id is None:
+            session.delete(extra)
+            changed = True
+            continue
+        if extra.exceeds_role_quota or not free_slots:
+            continue
+        target = free_slots.pop(0)
+        interval = find_active_interval_for_slot(
+            session, fantasy_team_id=team.id, slot_index=extra.slot_index, for_update=True
+        )
+        athlete_id, purchase = extra.athlete_id, extra.purchase_credits
+        extra.athlete_id = None
+        extra.purchase_credits = None
+        session.flush()
+        target.athlete_id = athlete_id
+        target.purchase_credits = purchase
+        target.exceeds_role_quota = False
+        if interval is not None:
+            interval.slot_index = target.slot_index
+        session.delete(extra)
+        changed = True
+    session.flush()
     return changed
 
 

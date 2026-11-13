@@ -178,3 +178,31 @@ def dispatch_broadcasts_task() -> int:
     if sent:
         logger.info("notifications_broadcasts_dispatched", extra={"count": sent})
     return sent
+
+
+@celery_app.task(name="notifications.expire_trade_proposals")
+def expire_trade_proposals_task() -> dict[str, int]:
+    """Segna le proposte di scambio scadute e manda la notifica di scadenza."""
+    try:
+        enabled = validate_worker_settings().notifications_trade_expiry_enabled
+    except Exception:
+        enabled = get_api_settings().notifications_trade_expiry_enabled
+
+    from system_jobs.service import allow_periodic
+
+    if not allow_periodic("market-trade-expiry", enabled):
+        logger.info("market_trade_expiry_skipped_disabled (job spento o disattivato)")
+        return {"expired": 0}
+
+    from market.trade_service import TradeService
+
+    settings = get_api_settings()
+    engine = create_engine_from_url(settings.database_url)
+    factory = create_session_factory(engine)
+    try:
+        with session_scope(factory) as session:
+            expired = TradeService(session).expire_overdue_proposals()
+    finally:
+        engine.dispose()
+    logger.info(f"market_trade_expiry_task_done expired={expired}", extra={"expired": expired})
+    return {"expired": expired}

@@ -107,12 +107,26 @@ class NotificationsSettingsMixin:
         description="How far ahead of the next lock instant a team is warned.",
     )
 
+    notifications_trade_expiry_enabled: bool = Field(
+        default=True,
+        validation_alias="NOTIFICATIONS_TRADE_EXPIRY_ENABLED",
+        description="When true, Celery beat marks overdue trade proposals as expired and notifies.",
+    )
+    notifications_trade_expiry_interval_seconds: int = Field(
+        default=300,
+        validation_alias="NOTIFICATIONS_TRADE_EXPIRY_INTERVAL_SECONDS",
+        ge=60,
+        le=86400,
+        description="How often overdue trade proposals are swept (default every 5 minutes).",
+    )
+
     @field_validator(
         "notifications_push_enabled",
         "notifications_routine_email_enabled",
         "notifications_broadcast_dispatch_enabled",
         "notifications_lineup_reminder_enabled",
         "notifications_lineup_lock_reminder_enabled",
+        "notifications_trade_expiry_enabled",
         mode="before",
     )
     @classmethod

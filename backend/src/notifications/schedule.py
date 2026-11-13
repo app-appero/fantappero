@@ -11,6 +11,8 @@ def notifications_beat_schedule(
     broadcast_interval_seconds: int = 60,
     lock_reminder_enabled: bool = False,
     lock_reminder_interval_seconds: int = 900,
+    trade_expiry_enabled: bool = False,
+    trade_expiry_interval_seconds: int = 300,
 ) -> dict[str, dict]:
     schedule: dict[str, dict] = {}
     if broadcast_enabled:
@@ -24,6 +26,12 @@ def notifications_beat_schedule(
             "task": "notifications.send_lineup_lock_reminders",
             "schedule": float(lock_reminder_interval_seconds),
             "options": {"expires": float(lock_reminder_interval_seconds)},
+        }
+    if trade_expiry_enabled:
+        schedule["market-trade-expiry"] = {
+            "task": "notifications.expire_trade_proposals",
+            "schedule": float(trade_expiry_interval_seconds),
+            "options": {"expires": float(trade_expiry_interval_seconds)},
         }
     if not enabled:
         return schedule

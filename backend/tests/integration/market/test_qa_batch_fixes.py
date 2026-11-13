@@ -18,6 +18,7 @@ from fantasy_teams.models import CreditAccount, FantasyRosterSlot
 from leagues.models.competition import Competition
 from leagues.models.league_membership import LeagueMembership
 from mail.capture import get_captured_emails
+from market.models import TradeProposal
 from notifications.models import Notification
 from sports_data.listone.models import RoleAssignment
 from sports_data.roster.models import Athlete
@@ -576,3 +577,174 @@ def test_market_notifications_carry_league_name_and_link() -> None:
         {"status": "proposed", "proposal_id": "p1", "league_id": "abc-123", "league_name": "X"},
     )
     assert scambio.deep_link == "/mercato?scambio=p1&lega=abc-123"
+
+
+def test_cancelled_live_lot_returns_the_player_to_the_queue(
+    client: TestClient, db_session: Session, competition_ids: list[str]
+) -> None:
+    admin_token, _ = _register_and_login(client, "low1.admin@example.com")
+    league_id = _create_league(client, admin_token, competition_ids, "Lega Annullo")
+    _seed_athlete(db_session, 9810, "Aaa Annullato")
+    now = datetime.now(UTC)
+    created = client.post(
+        f"/leagues/{league_id}/mercato/asta-live/sessioni",
+        headers=_hdr(admin_token),
+        json={
+            "opensAt": now.isoformat(),
+            "closesAt": (now + timedelta(hours=2)).isoformat(),
+            "nominationMode": "alphabetical_by_role",
+            "minIncrementCredits": 10,
+            "softCloseSeconds": 5,
+            "lotDurationSeconds": 30,
+        },
+    )
+    assert created.status_code == 201, created.json()
+    session_id = created.json()["id"]
+    base = f"/leagues/{league_id}/mercato/asta-live/sessioni/{session_id}"
+    assert client.post(f"{base}/avvia", headers=_hdr(admin_token)).status_code == 200
+    first = client.post(f"{base}/lotti/nomina", headers=_hdr(admin_token), json={})
+    assert first.status_code == 201, first.json()
+    cancelled = client.post(f"{base}/lotti/{first.json()['id']}/annulla", headers=_hdr(admin_token))
+    assert cancelled.status_code == 200
+    again = client.post(f"{base}/lotti/nomina", headers=_hdr(admin_token), json={})
+    assert again.status_code == 201, again.json()
+    assert again.json()["athleteId"] == first.json()["athleteId"]
+
+
+def test_cancel_and_expiry_notify_the_other_coach(
+    client: TestClient, db_session: Session, competition_ids: list[str]
+) -> None:
+    from market.trade_service import TradeService
+
+    admin_token, _ = _register_and_login(client, "low2.admin@example.com")
+    a_token, a_id = _register_and_login(client, "low2.a@example.com")
+    b_token, b_id = _register_and_login(client, "low2.b@example.com")
+    league_id = _create_league(client, admin_token, competition_ids, "Lega Scadenze")
+    _add_member(db_session, league_id, a_id)
+    _add_member(db_session, league_id, b_id)
+    mine = _seed_athlete(db_session, 9811, "Offerto Notifica")
+    team_a = client.get(f"/leagues/{league_id}/rosa", headers=_hdr(a_token)).json()["id"]
+    team_b = client.get(f"/leagues/{league_id}/rosa", headers=_hdr(b_token)).json()["id"]
+    _assign_priced(client, league_id, admin_token, team_a, 0, mine, 1)
+
+    def propose() -> str:
+        created = client.post(
+            f"/leagues/{league_id}/mercato/scambi/proposte",
+            headers=_hdr(a_token),
+            json={
+                "recipientTeamId": team_b,
+                "offeredAthleteIds": [str(mine.id)],
+                "requestedCredits": 1,
+                "expiresAt": _future_iso(),
+            },
+        )
+        assert created.status_code == 201, created.json()
+        return created.json()["id"]
+
+    cancelled_id = propose()
+    client.post(
+        f"/leagues/{league_id}/mercato/scambi/proposte/{cancelled_id}/annulla",
+        headers=_hdr(a_token),
+    )
+    expiring_id = propose()
+    proposal = db_session.get(TradeProposal, UUID(expiring_id))
+    proposal.expires_at = datetime.now(UTC) - timedelta(minutes=1)
+    db_session.commit()
+    assert TradeService(db_session).expire_overdue_proposals() == 1
+
+    db_session.expire_all()
+    titles_b = [
+        row.title
+        for row in db_session.scalars(
+            select(Notification).where(Notification.user_id == b_id)
+        ).all()
+    ]
+    titles_a = [
+        row.title
+        for row in db_session.scalars(
+            select(Notification).where(Notification.user_id == a_id)
+        ).all()
+    ]
+    assert any("annullato la proposta" in title for title in titles_b)
+    assert any("è scaduta" in title for title in titles_b)
+    assert any("è scaduta" in title for title in titles_a)
+    assert db_session.get(TradeProposal, UUID(expiring_id)).status.value == "expired"
+
+
+def test_small_validation_fixes() -> None:
+    import pytest as _pytest
+    from pydantic import ValidationError
+
+    from fantasy_teams.ledger import order_ledger_entries
+    from market.schemas import SubmitMarketBidRequest
+    from notifications.schemas import RegisterPushDeviceRequest
+
+    with _pytest.raises(ValidationError):
+        SubmitMarketBidRequest.model_validate({"amountCredits": True})
+    with _pytest.raises(ValidationError):
+        RegisterPushDeviceRequest.model_validate({"token": "t", "platform": "zz"})
+
+    class Entry:
+        def __init__(self, amount: int, after: int, when: datetime, key: str) -> None:
+            self.amount, self.balance_after, self.created_at, self.id = amount, after, when, key
+
+    when = datetime.now(UTC)
+    first, second, third = (
+        Entry(-40, 960, when, "z"),
+        Entry(+20, 980, when, "a"),
+        Entry(-10, 970, when, "m"),
+    )
+    ordered = order_ledger_entries([second, third, first])
+    assert [e.balance_after for e in ordered] == [960, 980, 970]
+
+
+def test_unauthenticated_request_gets_a_clear_message(client: TestClient) -> None:
+    response = client.get("/notifications")
+    assert response.status_code == 401
+    assert "Accesso richiesto" in response.json()["message"]
+    assert response.json()["code"] == "invalid_credentials"
+
+
+def test_overflow_extra_slot_is_compacted_when_a_free_slot_exists(
+    client: TestClient, db_session: Session, competition_ids: list[str]
+) -> None:
+    from fantasy_teams.composition_service import reconcile_roster_overflow
+    from fantasy_teams.models import FantasyTeam
+    from leagues.models.league import League
+
+    admin_token, _ = _register_and_login(client, "low3.admin@example.com")
+    league_id = _create_league(client, admin_token, competition_ids, "Lega Slot Extra")
+    guest = _seed_athlete(db_session, 9812, "Ospite In Piu")
+    team_id = UUID(client.get(f"/leagues/{league_id}/rosa", headers=_hdr(admin_token)).json()["id"])
+    team = db_session.get(FantasyTeam, team_id)
+    league = db_session.get(League, UUID(league_id))
+    top_index = max(
+        slot.slot_index
+        for slot in db_session.scalars(
+            select(FantasyRosterSlot).where(FantasyRosterSlot.fantasy_team_id == team_id)
+        )
+    )
+    db_session.add(
+        FantasyRosterSlot(
+            fantasy_team_id=team_id,
+            league_id=UUID(league_id),
+            slot_index=top_index + 1,
+            athlete_id=guest.id,
+            purchase_credits=7,
+        )
+    )
+    db_session.commit()
+
+    reconcile_roster_overflow(db_session, league=league, team=team)
+    db_session.commit()
+
+    db_session.expire_all()
+    slots = list(
+        db_session.scalars(
+            select(FantasyRosterSlot).where(FantasyRosterSlot.fantasy_team_id == team_id)
+        )
+    )
+    assert len(slots) == top_index + 1
+    moved = next(slot for slot in slots if slot.athlete_id == guest.id)
+    assert moved.slot_index <= top_index
+    assert moved.purchase_credits == 7

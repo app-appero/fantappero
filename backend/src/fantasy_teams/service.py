@@ -60,6 +60,7 @@ from fantasy_teams.ledger import (
     apply_ledger_movement,
     ensure_credit_account_for_team,
     find_account_for_team,
+    order_ledger_entries,
     reconstruct_balance,
 )
 from fantasy_teams.models import (
@@ -242,7 +243,7 @@ class FantasyTeamService:
             fantasyTeamId=str(team.id),
             balance=account.balance,
             version=account.version,
-            entries=[self._to_ledger_entry(entry) for entry in entries],
+            entries=[self._to_ledger_entry(entry) for entry in order_ledger_entries(list(entries))],
         )
 
     def ensure_all_teams(self, league_access: LeagueAccess) -> EnsureFantasyTeamsResponse:
@@ -563,7 +564,7 @@ class FantasyTeamService:
             fantasyTeamId=str(team.id),
             balance=account.balance,
             version=account.version,
-            entries=[self._to_ledger_entry(entry) for entry in entries],
+            entries=[self._to_ledger_entry(entry) for entry in order_ledger_entries(list(entries))],
         )
 
     def admin_post_credit_movement(
@@ -643,7 +644,7 @@ class FantasyTeamService:
             fantasyTeamId=str(team.id),
             balance=account.balance,
             version=account.version,
-            entries=[self._to_ledger_entry(row) for row in entries],
+            entries=[self._to_ledger_entry(row) for row in order_ledger_entries(list(entries))],
         )
 
     def list_roster_occupancy(

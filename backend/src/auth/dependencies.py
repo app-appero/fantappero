@@ -12,7 +12,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session, sessionmaker
 
 from auth.blocklist import BlockList
-from auth.exceptions import AccountBlockedError, InvalidCredentialsError
+from auth.exceptions import AccountBlockedError, SessionRequiredError
 from auth.impersonation import ImpersonationStore
 from auth.mobile_handoff import MobileHandoffStore
 from auth.models.user import User
@@ -132,7 +132,7 @@ def get_current_user(
     impersonation_store: ImpersonationStore | None = Depends(get_impersonation_store),
 ) -> User:
     if credentials is None or credentials.scheme.lower() != "bearer":
-        raise InvalidCredentialsError()
+        raise SessionRequiredError()
     try:
         payload = jwt.decode(
             credentials.credentials,
@@ -140,17 +140,17 @@ def get_current_user(
             algorithms=["HS256"],
         )
     except jwt.PyJWTError as exc:
-        raise InvalidCredentialsError() from exc
+        raise SessionRequiredError() from exc
     if payload.get("type") != "access":
-        raise InvalidCredentialsError()
+        raise SessionRequiredError()
     if payload.get("imp") is True:
         jti = payload.get("jti")
         if not jti or (impersonation_store is not None and not impersonation_store.is_active(jti)):
-            raise InvalidCredentialsError()
+            raise SessionRequiredError()
     user_id = UUID(str(payload["sub"]))
     user = session.get(User, user_id)
     if user is None or user.deleted_at is not None:
-        raise InvalidCredentialsError()
+        raise SessionRequiredError()
     if BlockList(session).is_blocked(user.email):
         raise AccountBlockedError()
     return user

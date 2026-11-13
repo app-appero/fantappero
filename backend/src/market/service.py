@@ -448,7 +448,11 @@ class MarketService:
         bids = self._session.scalars(
             select(MarketBid)
             .options(selectinload(MarketBid.athlete))
-            .where(MarketBid.session_id == market_session.id)
+            .where(
+                MarketBid.session_id == market_session.id,
+                # Un'offerta ritirata non fa parte dell'esito: non compare come "non assegnata".
+                MarketBid.status != MarketBidStatus.CANCELLED,
+            )
         ).all()
         children = self._session.scalars(
             select(MarketSession).where(MarketSession.parent_session_id == market_session.id)
