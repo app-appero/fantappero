@@ -12,7 +12,8 @@ vi.mock("../../auth/AuthContext", () => ({
     error instanceof Error ? error.message : fallback,
 }));
 
-import { TesterRequestPanel } from "./TesterRequestPanel";
+import { ApiError } from "../../api/client";
+import { TesterRequestPanel, testerGateFromError } from "./TesterRequestPanel";
 
 describe("TesterRequestPanel — richiesta di accesso al pilota", () => {
   let container: HTMLDivElement;
@@ -50,5 +51,19 @@ describe("TesterRequestPanel — richiesta di accesso al pilota", () => {
     expect(container.querySelector("form")).toBeNull();
     await render({ status: "rejected" });
     expect(container.querySelector('[data-testid="tester-request-rejected"]')).not.toBeNull();
+  });
+
+  it("riconosce il rifiuto tester_only e ne estrae il gettone", () => {
+    const error = new ApiError("Non autorizzato", 403, "tester_only", {
+      requestStatus: "none",
+      requestToken: "tok",
+    });
+    expect(testerGateFromError(error)).toEqual({
+      status: "none",
+      requestToken: "tok",
+      submittedAt: undefined,
+    });
+    expect(testerGateFromError(new ApiError("x", 400, "altro"))).toBeNull();
+    expect(testerGateFromError(new Error("rete"))).toBeNull();
   });
 });

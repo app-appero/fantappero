@@ -65,5 +65,8 @@ gli mostra un modulo (nome, cognome, **telefono**, motivo facoltativo, consenso)
 - Le richieste **rifiutate si cancellano dopo 30 giorni** (poi la persona può chiedere di nuovo).
 - Con la modalità test **spenta** il modulo non compare e l'invio è rifiutato.
 - L'accesso con email e password resta bloccato per tutti nel pilota.
-- Il modulo c'è **solo sul web**: l'app (APK) non ha questa schermata, quindi un non tester che prova
-  da lì vede il solito «Non autorizzato».
+- **App (APK)**: «Continua con Google» apre già la pagina web di accesso nel browser del telefono;
+  se chi accede non è tester, lo stesso modulo compare lì (stesso testo, stesso invio). Dopo
+  l'invio torna all'app e al successivo accesso vale la stessa risposta della richiesta.
+- **Gestione**: la scheda «Richieste tester» c'è sia sul web (Utenti) sia nell'app (Amministrazione →
+  Utenti). Nell'app il telefono si tocca per aprire WhatsApp.

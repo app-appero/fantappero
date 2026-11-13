@@ -24,6 +24,7 @@ import {
   deleteUser,
   fetchAdminUsers,
   fetchBlocklist,
+  fetchTesterRequests,
   fetchTestMode,
   impersonateUser,
   promoteOperator,
@@ -72,6 +73,9 @@ export function AdminUsersPage() {
     void fetchTestMode(session.accessToken)
       .then(setTestModeState)
       .catch(() => setTestModeState(null));
+    void fetchTesterRequests(session.accessToken, "pending")
+      .then((result) => setPendingRequests(result.requests.length))
+      .catch(() => setPendingRequests(0));
     void fetchBlocklist(session.accessToken)
       .then(setBlocklist)
       .catch(() => setBlocklist(null));

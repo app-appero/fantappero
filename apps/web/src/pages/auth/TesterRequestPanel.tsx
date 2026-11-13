@@ -1,6 +1,7 @@
 import { Button, Input, Textarea } from "@fantappero/ui";
 import { type FormEvent, useState } from "react";
 import { submitTesterRequest } from "../../api/auth";
+import { ApiError } from "../../api/client";
 import { getApiErrorMessage } from "../../auth/AuthContext";
 
 /** Cosa ha risposto l'accesso con Google a chi non è ancora tester. */
@@ -9,6 +10,23 @@ export type TesterGateInfo = {
   requestToken?: string;
   submittedAt?: string;
 };
+
+/** Se l'errore è il rifiuto `tester_only` dell'accesso con Google, dice a che punto è la richiesta. */
+export function testerGateFromError(error: unknown): TesterGateInfo | null {
+  if (!(error instanceof ApiError) || error.code !== "tester_only") {
+    return null;
+  }
+  const status = error.payload.requestStatus;
+  return {
+    status: status === "pending" || status === "rejected" ? status : "none",
+    requestToken:
+      typeof error.payload.requestToken === "string" ? error.payload.requestToken : undefined,
+    submittedAt:
+      typeof error.payload.requestSubmittedAt === "string"
+        ? error.payload.requestSubmittedAt
+        : undefined,
+  };
+}
 
 function formatDate(iso?: string): string {
   if (!iso) {

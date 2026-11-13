@@ -17,6 +17,7 @@ import {
   deleteUser,
   fetchAdminUsers,
   fetchBlocklist,
+  fetchTesterRequests,
   fetchTestMode,
   impersonateUser,
   promoteOperator,
@@ -28,6 +29,7 @@ import {
 import { ApiError } from "../../api/client";
 import { adminUiStyles as styles } from "../../admin/adminUiStyles";
 import { ScreenTabs } from "../../components/ScreenTabs";
+import { AdminTesterRequestsSection } from "./AdminTesterRequestsSection";
 import { UiStatePanel } from "../../components/UiStatePanel";
 import { PageContainer } from "../../layout/PageContainer";
 import { leaveAdminForApp } from "../../navigation/adminEntry";
@@ -39,10 +41,7 @@ type PendingAction = {
   kind: "promote" | "revoke" | "impersonate" | "delete";
 };
 
-const USERS_TABS = [
-  { id: "utenti", label: "Utenti" },
-  { id: "lista-nera", label: "Lista nera" },
-] as const;
+type UsersTab = "utenti" | "richieste" | "lista-nera";
 
 /** Elenco utenti + promuovi/revoca operatore — mobile port of `apps/web/src/pages/AdminUsersPage.tsx` (EP11-04b). */
 export function AdminUsersScreen() {
@@ -62,7 +61,8 @@ export function AdminUsersScreen() {
   const [testMode, setTestModeState] = useState<AdminTestMode | null>(null);
   const [testModeBusy, setTestModeBusy] = useState(false);
   const [newTesterEmail, setNewTesterEmail] = useState("");
-  const [tab, setTab] = useState<"utenti" | "lista-nera">("utenti");
+  const [tab, setTab] = useState<UsersTab>("utenti");
+  const [pendingRequests, setPendingRequests] = useState(0);
   const [blocklist, setBlocklist] = useState<AdminBlocklist | null>(null);
   const [blockEmail, setBlockEmail] = useState("");
   const [blockReason, setBlockReason] = useState("");
@@ -76,6 +76,9 @@ export function AdminUsersScreen() {
     void fetchTestMode(accessToken)
       .then(setTestModeState)
       .catch(() => setTestModeState(null));
+    void fetchTesterRequests(accessToken, "pending")
+      .then((result) => setPendingRequests(result.requests.length))
+      .catch(() => setPendingRequests(0));
     void fetchBlocklist(accessToken)
       .then(setBlocklist)
       .catch(() => setBlocklist(null));
@@ -264,13 +267,22 @@ export function AdminUsersScreen() {
       onRefresh={onRefresh}
     >
       <ScreenTabs
-        items={USERS_TABS}
+        items={[
+          { id: "utenti", label: "Utenti" },
+          {
+            id: "richieste",
+            label: pendingRequests > 0 ? `Richieste tester (${pendingRequests})` : "Richieste tester",
+          },
+          { id: "lista-nera", label: "Lista nera" },
+        ]}
         activeId={tab}
-        onSelect={(id) => setTab(id as "utenti" | "lista-nera")}
+        onSelect={(id) => setTab(id as UsersTab)}
         testID="admin-users-tabs"
       />
 
-      {tab === "lista-nera" ? (
+      {tab === "richieste" ? (
+        <AdminTesterRequestsSection onPendingCount={setPendingRequests} />
+      ) : tab === "lista-nera" ? (
         <>
       <View style={styles.listRow} testID="admin-blocklist">
         <Text style={styles.sectionTitle}>Lista nera</Text>
