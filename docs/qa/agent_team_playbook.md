@@ -31,10 +31,12 @@ Le corse partono solo di notte (ora di Roma) per lasciare i token del mattino a 
 | 02:23 | Secondo gruppo a rotazione |
 | 04:23 | Facoltativa: ripete i difetti trovati nella notte per escludere falsi positivi e controlla che i fixer abbiano consegnato `.patch` validi |
 
-Rotazione dei gruppi (A = aree 1 e 2; B = aree 3 e 6; C = aree 7 e 8; D = aree 9, 10 e 11), in base al giorno dell'anno della data della notte (`tm_yday % 2`):
+**Data del piano.** Dal 13/11/2026 le corse notturne anticipano il piano del giorno dopo: la data del piano è la data della notte **più un giorno** (il piano del 13/11 è stato eseguito nel pomeriggio di quel giorno). Per esempio la notte iniziata il 13/11 esegue il piano del 14/11, quella del 14/11 il piano del 15/11 (domenica: controllo a campione).
+
+Rotazione dei gruppi (A = aree 1 e 2; B = aree 3 e 6; C = aree 7 e 8; D = aree 9, 10 e 11), in base al giorno dell'anno della data del piano (`tm_yday % 2`):
 - pari → 00:23 gruppo A, 02:23 gruppo B
 - dispari → 00:23 gruppo C, 02:23 gruppo D
-- notte che inizia di domenica → controllo a campione: 00:23 aree 1-6, 02:23 aree 7-11, e verifica che le correzioni già pubblicate non si siano rotte.
+- piano di domenica → controllo a campione: 00:23 aree 1-6, 02:23 aree 7-11, e verifica che le correzioni già pubblicate non si siano rotte.
 Così ogni area è rivista ogni 2 notti.
 
 Regole di consumo: se una corsa trova un limite d'uso o un errore di quota, si ferma e lo scrive nel rapporto; la corsa delle 04:23 si salta se una precedente ha incontrato limiti. Nessuna corsa parte fuori dalla fascia 22-5. Il rapporto indica corsa e gruppo eseguiti. I bug già in `known_issues.md` si rivalutano solo se l'area della corsa li riguarda.
