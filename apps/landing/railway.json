@@ -1,0 +1,9 @@
+{
+  "$schema": "https://railway.com/railway.schema.json",
+  "build": { "buildCommand": "echo landing statica gia' pronta in apps/landing/public" },
+  "deploy": {
+    "startCommand": "node server.mjs",
+    "healthcheckPath": "/health",
+    "restartPolicyType": "ON_FAILURE"
+  }
+}
