@@ -51,6 +51,7 @@ from market.trade_validators import (
     validate_trades_enabled,
 )
 from market.windows import effective_trade_status
+from notifications.league_context import league_params
 from notifications.recipients import user_ids_for_teams
 from notifications.service import NotificationService
 from observability.metrics import get_metrics
@@ -68,7 +69,13 @@ def _parse_required_datetime(value: str, *, field: str) -> datetime:
         ) from exc
     if parsed.tzinfo is None:
         parsed = parsed.replace(tzinfo=UTC)
-    return parsed.astimezone(UTC)
+    try:
+        return parsed.astimezone(UTC)
+    except (OverflowError, ValueError) as exc:
+        raise ValidationAuthError(
+            f"Il campo {field} non è una data valida.",
+            code="invalid_datetime",
+        ) from exc
 
 
 def _parse_optional_datetime(value: str | None, *, field: str) -> datetime | None:
@@ -314,8 +321,7 @@ class TradeService:
             get_metrics().incr("trade_proposal_accepted_total", labels={"result": "pending"})
             return self._to_response(proposal)
 
-        execute_trade(
-            self._session,
+        self._execute_or_expire(
             league=league,
             proposal=proposal,
             proposer_team=proposer_team,
@@ -362,8 +368,7 @@ class TradeService:
         recipient_team = self._session.get(FantasyTeam, proposal.recipient_team_id)
         assert proposer_team is not None and recipient_team is not None
 
-        execute_trade(
-            self._session,
+        self._execute_or_expire(
             league=league,
             proposal=proposal,
             proposer_team=proposer_team,
@@ -626,6 +631,33 @@ class TradeService:
         )
         self._session.flush()
 
+    def _execute_or_expire(
+        self,
+        *,
+        league: League,
+        proposal: TradeProposal,
+        proposer_team: FantasyTeam,
+        recipient_team: FantasyTeam,
+        actor_id: UUID,
+    ) -> None:
+        """Esegue lo scambio; se i calciatori si sono mossi la proposta non resta in sospeso."""
+        try:
+            execute_trade(
+                self._session,
+                league=league,
+                proposal=proposal,
+                proposer_team=proposer_team,
+                recipient_team=recipient_team,
+                actor_id=actor_id,
+            )
+        except ValidationAuthError as exc:
+            if exc.code == "trade_stale_assets":
+                # 2.4: non più eseguibile per sempre: esce da "Da gestire" e libera il limite.
+                proposal.status = TradeStatus.EXPIRED
+                proposal.decided_at = datetime.now(UTC)
+                self._session.commit()
+            raise
+
     def _notify_admins_trade_pending(
         self,
         proposal: TradeProposal,
@@ -697,6 +729,7 @@ class TradeService:
             "requested": [row.name for row in self._athlete_labels(proposal.requested_athlete_ids)],
             "offered_credits": proposal.offered_credits,
             "requested_credits": proposal.requested_credits,
+            **league_params(self._session, proposal.league_id),
         }
         if proposal.expires_at is not None:
             local = proposal.expires_at.astimezone(ZoneInfo("Europe/Rome"))

@@ -436,3 +436,143 @@ def test_requested_credits_cannot_exceed_other_teams_balance_or_overflow(
         },
     )
     assert huge.status_code == 422
+
+
+def test_repeated_release_of_same_player_and_slot_refunds_every_time(
+    client: TestClient, db_session: Session, competition_ids: list[str]
+) -> None:
+    admin_token, _ = _register_and_login(client, "r21.admin@example.com")
+    member_token, member_id = _register_and_login(client, "r21.member@example.com")
+    league_id = _create_league(client, admin_token, competition_ids, "Lega Rimborsi")
+    _add_member(db_session, league_id, member_id)
+    athlete = _seed_athlete(db_session, 9808, "Rimborso Doppio")
+    team_id = client.get(f"/leagues/{league_id}/rosa", headers=_hdr(member_token)).json()["id"]
+
+    def balance() -> int:
+        return client.get(f"/leagues/{league_id}/crediti", headers=_hdr(member_token)).json()[
+            "balance"
+        ]
+
+    start = balance()
+    for round_number in (1, 2):
+        _assign_priced(client, league_id, admin_token, team_id, 0, athlete, 40)
+        released = client.post(
+            f"/leagues/{league_id}/mercato/svincolo/0",
+            headers=_hdr(member_token),
+            json={"reason": "voluntary"},
+        )
+        assert released.status_code == 200
+        refund = released.json()["refundCredits"]
+        assert refund == 20
+        assert balance() == start - 20 * round_number
+
+
+def test_extreme_inputs_return_4xx_not_500(
+    client: TestClient, db_session: Session, competition_ids: list[str]
+) -> None:
+    admin_token, _ = _register_and_login(client, "r22.admin@example.com")
+    league_id = _create_league(client, admin_token, competition_ids, "Lega Estremi")
+    team_id = client.get(f"/leagues/{league_id}/rosa", headers=_hdr(admin_token)).json()["id"]
+
+    big_slot = client.get(
+        f"/leagues/{league_id}/mercato/svincolo/99999999999/anteprima",
+        headers=_hdr(admin_token),
+        params={"causa": "voluntary"},
+    )
+    assert big_slot.status_code == 400
+    assert big_slot.json()["code"] == "slot_not_found"
+
+    bad_date = client.post(
+        f"/leagues/{league_id}/mercato/asta-live/sessioni",
+        headers=_hdr(admin_token),
+        json={
+            "opensAt": "0001-01-01T00:00:00+14:00",
+            "closesAt": "2030-01-01T00:00:00Z",
+            "nominationMode": "random",
+            "minIncrementCredits": 10,
+            "softCloseSeconds": 5,
+            "lotDurationSeconds": 30,
+        },
+    )
+    assert bad_date.status_code == 400
+    assert bad_date.json()["code"] == "invalid_datetime"
+
+    huge_credit = client.post(
+        f"/leagues/{league_id}/amministrazione/crediti/movimenti",
+        headers=_hdr(admin_token),
+        json={"fantasyTeamId": team_id, "amount": 2**63 - 1, "transactionId": "qa-huge-1"},
+    )
+    assert huge_credit.status_code == 422
+
+
+def test_stale_trade_proposal_is_expired_instead_of_staying_open(
+    client: TestClient, db_session: Session, competition_ids: list[str]
+) -> None:
+    admin_token, _ = _register_and_login(client, "r24.admin@example.com")
+    a_token, a_id = _register_and_login(client, "r24.a@example.com")
+    b_token, b_id = _register_and_login(client, "r24.b@example.com")
+    c_token, c_id = _register_and_login(client, "r24.c@example.com")
+    league_id = _create_league(client, admin_token, competition_ids, "Lega Obsolete")
+    for user_id in (a_id, b_id, c_id):
+        _add_member(db_session, league_id, user_id)
+    star = _seed_athlete(db_session, 9809, "Offerto Due Volte")
+    team_a = client.get(f"/leagues/{league_id}/rosa", headers=_hdr(a_token)).json()["id"]
+    team_b = client.get(f"/leagues/{league_id}/rosa", headers=_hdr(b_token)).json()["id"]
+    team_c = client.get(f"/leagues/{league_id}/rosa", headers=_hdr(c_token)).json()["id"]
+    _assign_priced(client, league_id, admin_token, team_a, 0, star, 1)
+
+    ids = []
+    for target in (team_b, team_c):
+        created = client.post(
+            f"/leagues/{league_id}/mercato/scambi/proposte",
+            headers=_hdr(a_token),
+            json={
+                "recipientTeamId": target,
+                "offeredAthleteIds": [str(star.id)],
+                "requestedCredits": 5,
+                "offeredCredits": 0,
+                "expiresAt": _future_iso(),
+            },
+        )
+        assert created.status_code == 201, created.json()
+        ids.append(created.json()["id"])
+
+    first = client.post(
+        f"/leagues/{league_id}/mercato/scambi/proposte/{ids[0]}/accetta",
+        headers=_hdr(b_token),
+    )
+    assert first.status_code == 200, first.json()
+    second = client.post(
+        f"/leagues/{league_id}/mercato/scambi/proposte/{ids[1]}/accetta",
+        headers=_hdr(c_token),
+    )
+    assert second.status_code == 400
+    assert second.json()["code"] == "trade_stale_assets"
+    detail = client.get(
+        f"/leagues/{league_id}/mercato/scambi/proposte/{ids[1]}", headers=_hdr(c_token)
+    )
+    assert detail.json()["status"] == "expired"
+
+
+def test_market_notifications_carry_league_name_and_link() -> None:
+    from notifications.templates import render_notification
+
+    content = render_notification(
+        "mercato.esito_busta",
+        1,
+        {
+            "outcome": "assigned",
+            "athlete_name": "Rossi",
+            "amount_credits": 10,
+            "league_id": "abc-123",
+            "league_name": "Lega Amici",
+        },
+    )
+    assert content.body.startswith("«Lega Amici» ·")
+    assert content.deep_link == "/mercato?lega=abc-123"
+    scambio = render_notification(
+        "mercato.scambio",
+        2,
+        {"status": "proposed", "proposal_id": "p1", "league_id": "abc-123", "league_name": "X"},
+    )
+    assert scambio.deep_link == "/mercato?scambio=p1&lega=abc-123"

@@ -48,6 +48,21 @@ def render_notification(
     return renderer(params)
 
 
+def _league_link(path: str, params: NotificationParams) -> str:
+    """Aggiunge ``lega=<id>`` al link, così chi è in più leghe apre quella giusta."""
+    league_id = params.get("league_id")
+    if not league_id:
+        return path
+    separator = "&" if "?" in path else "?"
+    return f"{path}{separator}lega={league_id}"
+
+
+def _league_body(body: str, params: NotificationParams) -> str:
+    """Prefissa il nome della lega al testo: «Lega» · …"""
+    name = params.get("league_name")
+    return f"«{name}» · {body}" if name and body else body
+
+
 @register_template("sistema.generico", 1)
 def _render_sistema_generico(params: NotificationParams) -> NotificationContent:
     title = str(params.get("title", "Notifica"))
@@ -141,13 +156,13 @@ def _render_mercato_esito_busta(params: NotificationParams) -> NotificationConte
         amount = params.get("amount_credits")
         return NotificationContent(
             title="Busta aggiudicata",
-            body=f"Hai aggiudicato {athlete_name} per {amount} crediti.",
-            deep_link="/mercato",
+            body=_league_body(f"Hai aggiudicato {athlete_name} per {amount} crediti.", params),
+            deep_link=_league_link("/mercato", params),
         )
     return NotificationContent(
         title="Busta non aggiudicata",
-        body=f"Non hai aggiudicato {athlete_name}: offerta inferiore.",
-        deep_link="/mercato",
+        body=_league_body(f"Non hai aggiudicato {athlete_name}: offerta inferiore.", params),
+        deep_link=_league_link("/mercato", params),
     )
 
 
@@ -157,8 +172,8 @@ def _render_mercato_asta_live_aggiudicato(params: NotificationParams) -> Notific
     amount = params.get("amount_credits")
     return NotificationContent(
         title="Lotto aggiudicato",
-        body=f"Hai aggiudicato {athlete_name} per {amount} crediti.",
-        deep_link="/mercato",
+        body=_league_body(f"Hai aggiudicato {athlete_name} per {amount} crediti.", params),
+        deep_link=_league_link("/mercato", params),
     )
 
 
@@ -170,8 +185,8 @@ def _render_mercato_asta_live_sorpassato(params: NotificationParams) -> Notifica
     athlete_name = params.get("athlete_name", "un giocatore")
     return NotificationContent(
         title="Sei stato sorpassato",
-        body=f"Un altro fantallenatore ha rilanciato su {athlete_name}.",
-        deep_link="/mercato",
+        body=_league_body(f"Un altro fantallenatore ha rilanciato su {athlete_name}.", params),
+        deep_link=_league_link("/mercato", params),
     )
 
 
@@ -180,11 +195,12 @@ def _render_mercato_asta_live_scambio_richiesto(params: NotificationParams) -> N
     athlete_name = params.get("athlete_name", "un giocatore")
     return NotificationContent(
         title="Scelta richiesta: rosa al completo",
-        body=(
+        body=_league_body(
             f"Hai aggiudicato {athlete_name} ma la tua rosa in quel ruolo è al completo: "
-            "scegli chi scambiare."
+            "scegli chi scambiare.",
+            params,
         ),
-        deep_link="/mercato",
+        deep_link=_league_link("/mercato", params),
     )
 
 
@@ -192,8 +208,10 @@ def _render_mercato_asta_live_scambio_richiesto(params: NotificationParams) -> N
 def _render_mercato_asta_live_iniziata(params: NotificationParams) -> NotificationContent:
     return NotificationContent(
         title="Asta a rilanci iniziata",
-        body="La sessione d'asta a rilanci è aperta: raggiungi la lega per partecipare.",
-        deep_link="/mercato",
+        body=_league_body(
+            "La sessione d'asta a rilanci è aperta: raggiungi la lega per partecipare.", params
+        ),
+        deep_link=_league_link("/mercato", params),
     )
 
 
@@ -223,7 +241,11 @@ def _render_mercato_scambio(params: NotificationParams) -> NotificationContent:
     title, body = _TRADE_STATUS_MESSAGES.get(status, ("Aggiornamento scambio", "Stato aggiornato."))
     proposal_id = params.get("proposal_id")
     deep_link = f"/mercato?scambio={proposal_id}" if proposal_id else "/mercato"
-    return NotificationContent(title=title, body=body, deep_link=deep_link)
+    return NotificationContent(
+        title=title,
+        body=_league_body(body, params),
+        deep_link=_league_link(deep_link, params),
+    )
 
 
 @register_template("risultati.omologazione", 1)
@@ -420,8 +442,8 @@ def _render_mercato_scambio_v2(params: NotificationParams) -> NotificationConten
     deep_link = f"/mercato?scambio={proposal_id}" if proposal_id else "/mercato"
     return NotificationContent(
         title=title,
-        body=body or "Apri Scambi per i dettagli.",
-        deep_link=deep_link,
+        body=_league_body(body or "Apri Scambi per i dettagli.", params),
+        deep_link=_league_link(deep_link, params),
     )
 
 

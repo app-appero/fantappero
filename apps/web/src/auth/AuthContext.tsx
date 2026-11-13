@@ -165,6 +165,18 @@ export function AuthProvider({ children }: AuthProviderProps) {
     saveStoredMyLeagues(user.id, leaguesState);
   }, [isDemoMode, leaguesState, user]);
 
+  // Un link di notifica con "?lega=<id>" apre la lega giusta, se l'utente ne fa parte.
+  const requestedLeagueId = searchParams.get("lega");
+  useEffect(() => {
+    if (isDemoMode || !requestedLeagueId) {
+      return;
+    }
+    if (leaguesState.some((league) => league.id === requestedLeagueId)) {
+      saveStoredActiveLeagueId(requestedLeagueId);
+      setActiveLeagueIdState(requestedLeagueId);
+    }
+  }, [isDemoMode, leaguesState, requestedLeagueId]);
+
   useEffect(() => {
     if (isDemoMode) {
       setUser(demoUser);

@@ -133,7 +133,7 @@ class CreditLedgerListResponse(ApiModel):
 
 class AdminCreditMovementRequest(ApiModel):
     fantasy_team_id: str = Field(alias="fantasyTeamId", min_length=1)
-    amount: int
+    amount: int = Field(ge=-10_000_000, le=10_000_000)
     transaction_id: str = Field(alias="transactionId", min_length=1, max_length=128)
     note: str | None = Field(default=None, max_length=255)
 

@@ -42,7 +42,7 @@ export const TRADE_STATUS_LABEL: Record<TradeStatus, string> = {
   expired: "Scaduta",
   accepted: "Accettata",
   rejected: "Rifiutata",
-  countered: "Controproposta ricevuta",
+  countered: "Superata da controproposta",
   pending_approval: "In attesa di approvazione",
   executed: "Eseguita",
   rejected_by_admin: "Rifiutata dall'amministratore",

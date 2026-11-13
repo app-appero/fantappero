@@ -13,12 +13,13 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 from tests.integration.database.helpers import create_engine_for_url
 
-from database.enums import LeagueMemberRole
+from database.enums import FantasyRole, LeagueMemberRole
 from database.session import create_session_factory
 from leagues.models.competition import Competition
 from leagues.models.league_membership import LeagueMembership
 from mail.capture import get_captured_emails
 from market.models import MarketBid
+from sports_data.listone.models import RoleAssignment
 from sports_data.roster.models import Athlete
 
 
@@ -81,6 +82,17 @@ def _add_member(db_session: Session, league_id: str, user_id: UUID) -> LeagueMem
 def _seed_athlete(db_session: Session, provider_id: int, name: str) -> Athlete:
     athlete = Athlete(provider_id=provider_id, canonical_name=name)
     db_session.add(athlete)
+    db_session.flush()
+    # Senza ruolo nel listone l'offerta viene rifiutata (role_unresolved).
+    db_session.add(
+        RoleAssignment(
+            athlete_id=athlete.id,
+            season_year=2026,
+            role=FantasyRole.D,
+            mapping_version="v1.0.0",
+            provider_position_raw=FantasyRole.D.value,
+        )
+    )
     db_session.commit()
     db_session.refresh(athlete)
     return athlete

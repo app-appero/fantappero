@@ -85,6 +85,7 @@ from market.validators import (
     validate_session_window,
 )
 from market.windows import effective_status
+from notifications.league_context import league_params
 from notifications.recipients import user_ids_for_league, user_ids_for_teams
 from notifications.service import NotificationService
 from observability.metrics import get_metrics
@@ -113,7 +114,13 @@ def _parse_required_datetime(value: str, *, field: str) -> datetime:
         ) from exc
     if parsed.tzinfo is None:
         parsed = parsed.replace(tzinfo=UTC)
-    return parsed.astimezone(UTC)
+    try:
+        return parsed.astimezone(UTC)
+    except (OverflowError, ValueError) as exc:  # es. 0001-01-01T00:00:00+14:00
+        raise ValidationAuthError(
+            f"Il campo {field} non è una data valida.",
+            code="invalid_datetime",
+        ) from exc
 
 
 class LiveMarketService:
@@ -563,6 +570,8 @@ class LiveMarketService:
     def force_sell_lot(
         self, league_access: LeagueAccess, session_id: UUID, lot_id: UUID
     ) -> LiveLotResponse:
+        league = self._lock_league(league_access.league.id)
+        assert_market_open(league)
         market_session = self._get_session_for_update(league_access.league.id, session_id)
         self._assert_is_live(market_session)
         lot = self._get_open_lot_for_update(market_session.id, lot_id)
@@ -1355,6 +1364,12 @@ class LiveMarketService:
             or 0
         )
 
+    def _lot_league_params(self, lot: MarketLiveLot) -> dict[str, object]:
+        market_session = self._session.get(MarketSession, lot.session_id)
+        if market_session is None:
+            return {}
+        return league_params(self._session, market_session.league_id)
+
     def _notify_session_started(self, market_session: MarketSession) -> None:
         notifications = NotificationService(self._session)
         for _team_id, user_id in user_ids_for_league(self._session, market_session.league_id):
@@ -1363,7 +1378,7 @@ class LiveMarketService:
                 category=NotificationCategory.MERCATO,
                 template_key="mercato.asta_live_iniziata",
                 template_version=1,
-                params={},
+                params=league_params(self._session, market_session.league_id),
                 dedup_key=f"market_live_session_started:{market_session.id}:{user_id}",
             )
 
@@ -1379,6 +1394,7 @@ class LiveMarketService:
             params={
                 "athlete_name": athlete.canonical_name,
                 "amount_credits": lot.current_amount_credits,
+                **self._lot_league_params(lot),
             },
             dedup_key=f"market_live_lot_sold:{lot.id}",
         )
@@ -1394,7 +1410,10 @@ class LiveMarketService:
             category=NotificationCategory.MERCATO,
             template_key="mercato.asta_live_scambio_richiesto",
             template_version=1,
-            params={"athlete_name": athlete.canonical_name},
+            params={
+                "athlete_name": athlete.canonical_name,
+                **self._lot_league_params(lot),
+            },
             dedup_key=f"market_live_lot_swap_pending:{lot.id}",
         )
 
@@ -1410,7 +1429,10 @@ class LiveMarketService:
             category=NotificationCategory.MERCATO,
             template_key="mercato.asta_live_sorpassato",
             template_version=1,
-            params={"athlete_name": athlete.canonical_name if athlete else "un giocatore"},
+            params={
+                "athlete_name": athlete.canonical_name if athlete else "un giocatore",
+                **self._lot_league_params(lot),
+            },
             dedup_key=f"market_live_outbid:{lot.id}:{previous_leader_team_id}:{lot.current_amount_credits}",
         )
 

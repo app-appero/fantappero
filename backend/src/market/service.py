@@ -21,7 +21,10 @@ from database.enums import (
     MarketSessionStatus,
     NotificationCategory,
 )
-from fantasy_teams.composition_service import sync_team_composition_status
+from fantasy_teams.composition_service import (
+    resolve_effective_athlete_role,
+    sync_team_composition_status,
+)
 from fantasy_teams.factory import ensure_team_for_membership, find_team_for_membership
 from fantasy_teams.ledger import apply_ledger_movement, find_account_for_team
 from fantasy_teams.models import FantasyRosterSlot, FantasyTeam
@@ -61,6 +64,7 @@ from market.validators import (
     validate_team_eligible_for_session,
 )
 from market.windows import effective_status, is_open_for_bids
+from notifications.league_context import league_params
 from notifications.recipients import user_ids_for_teams
 from notifications.service import NotificationService
 from observability.logging import get_logger
@@ -75,6 +79,9 @@ logger = get_logger(__name__)
 TIEBREAK_WINDOW = timedelta(hours=24)
 
 
+MAX_SLOT_INDEX = 1000  # oltre non esiste nessuna rosa: evita int fuori range nel database
+
+
 def _parse_required_datetime(value: str, *, field: str) -> datetime:
     raw = value.strip()
     try:
@@ -86,7 +93,13 @@ def _parse_required_datetime(value: str, *, field: str) -> datetime:
         ) from exc
     if parsed.tzinfo is None:
         parsed = parsed.replace(tzinfo=UTC)
-    return parsed.astimezone(UTC)
+    try:
+        return parsed.astimezone(UTC)
+    except (OverflowError, ValueError) as exc:  # es. 0001-01-01T00:00:00+14:00
+        raise ValidationAuthError(
+            f"Il campo {field} non è una data valida.",
+            code="invalid_datetime",
+        ) from exc
 
 
 class MarketService:
@@ -273,6 +286,11 @@ class MarketService:
         market_session = self._get_session_for_update(league.id, session_id)
         now = datetime.now(UTC)
 
+        if market_session.status != MarketSessionStatus.RESOLVED:
+            # N-2.8: a mercato chiuso non si assegna né si addebita nulla. Una sessione già
+            # risolta continua a restituire l'esito salvato (replay idempotente).
+            assert_market_open(league)
+
         if market_session.status == MarketSessionStatus.RESOLVED:
             return self._resolution_summary(market_session)
 
@@ -394,6 +412,7 @@ class MarketService:
                     "outcome": "assigned" if bid.status == MarketBidStatus.WON else "lost",
                     "athlete_name": bid.athlete.canonical_name,
                     "amount_credits": bid.amount_credits,
+                    **league_params(self._session, market_session.league_id),
                 },
                 dedup_key=f"market_bid_outcome:{bid.id}",
             )
@@ -507,6 +526,23 @@ class MarketService:
         athlete = self._session.get(Athlete, athlete_id)
         if athlete is None:
             raise ValidationAuthError("Calciatore non trovato.", code="athlete_not_found")
+
+        # 2.7: senza ruolo nel listone l'offerta non potrebbe mai essere assegnata.
+        bid_league = league_access.league
+        if (
+            resolve_effective_athlete_role(
+                self._session,
+                league_id=bid_league.id,
+                athlete_id=athlete_id,
+                season_year=bid_league.season_year,
+                competition_ids={competition.id for competition in bid_league.competitions},
+            )
+            is None
+        ):
+            raise ValidationAuthError(
+                "Il calciatore non ha un ruolo valido nel listone: non si può fare un'offerta.",
+                code="role_unresolved",
+            )
 
         owner_slot = self._session.scalar(
             select(FantasyRosterSlot).where(
@@ -691,6 +727,8 @@ class MarketService:
         slot_index: int,
         reason_raw: str,
     ) -> MarketReleasePreviewResponse:
+        if not 0 <= slot_index <= MAX_SLOT_INDEX:
+            raise ValidationAuthError("Slot non trovato.", code="slot_not_found")
         team = self._my_team(league_access)
         reason, percent = self._resolve_release_reason(league_access, reason_raw)
         slot = self._session.scalar(
@@ -723,6 +761,8 @@ class MarketService:
         slot_index: int,
         reason_raw: str,
     ) -> MarketReleaseResultResponse:
+        if not 0 <= slot_index <= MAX_SLOT_INDEX:
+            raise ValidationAuthError("Slot non trovato.", code="slot_not_found")
         league = self._lock_league(league_access.league.id)
         assert_market_open(league)
         team = self._my_team(league_access)
@@ -761,7 +801,7 @@ class MarketService:
                 account,
                 amount=refund,
                 reason=CreditLedgerReason.MARKET_RELEASE_REFUND,
-                transaction_id=f"release:{team.id}:{slot_index}:{athlete_id}",
+                transaction_id=f"release:{team.id}:{slot_index}:{athlete_id}:v{account.version}",
                 actor_id=league_access.user.id,
                 note=f"Svincolo {athlete.canonical_name} ({reason.value}, {percent}%)",
             )

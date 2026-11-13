@@ -17,6 +17,7 @@ from database.enums import (
     LeagueAuditAction,
     LeagueCalendarFormat,
     LeagueCalendarStatus,
+    LeagueState,
 )
 from fantasy_teams.composition_service import league_rosters_complete
 from fantasy_turns.models import FantasyRound
@@ -133,6 +134,24 @@ class LeagueCalendarService:
                 'Il calendario ha già risultati calcolati: usa "Aggiorna calendario" '
                 "per aggiungere le giornate mancanti senza perdere lo storico.",
                 code="league_calendar_results_locked",
+            )
+
+        if (
+            existing_calendar is not None
+            and existing_calendar.status == LeagueCalendarStatus.CONFIRMED
+            and league.state == LeagueState.ACTIVE
+        ):
+            # 2.11: rigenerare da zero un calendario già confermato in una lega attiva lo
+            # riporterebbe in bozza e scollegherebbe i turni già aperti: si usa
+            # "Aggiorna calendario" per aggiungere le giornate mancanti.
+            get_metrics().incr(
+                "league_calendar_generated_total",
+                labels={"result": "already_confirmed"},
+            )
+            raise ValidationAuthError(
+                'Il calendario è già confermato e la lega è attiva: usa "Aggiorna calendario" '
+                "per aggiungere le giornate mancanti senza perdere lo storico.",
+                code="league_calendar_already_confirmed",
             )
 
         membership_ids = [row.id for row in memberships]

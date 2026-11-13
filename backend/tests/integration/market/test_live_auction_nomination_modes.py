@@ -218,12 +218,15 @@ def test_random_mode_generates_full_queue_and_empties_it(
         json=_session_payload(nomination_mode="random"),
     )
     assert created.status_code == 201
-    assert created.json()["queueRemaining"] == 5
+    # Il database è condiviso dai test del modulo: nella coda ci sono anche i calciatori
+    # creati da altri test, quindi si verifica "almeno i miei 5" e si svuota tutta la coda.
+    total = created.json()["queueRemaining"]
+    assert total >= 5
     session_id = created.json()["id"]
     _start(client, admin_token, league_id, session_id)
 
     nominated_ids: set[str] = set()
-    for _ in range(5):
+    for _ in range(total):
         lot = client.post(
             f"/leagues/{league_id}/mercato/asta-live/sessioni/{session_id}/lotti/nomina",
             headers={"Authorization": f"Bearer {admin_token}"},
@@ -233,7 +236,8 @@ def test_random_mode_generates_full_queue_and_empties_it(
         nominated_ids.add(lot.json()["athleteId"])
         _pass(client, admin_token, league_id, session_id, lot.json()["id"])
 
-    assert nominated_ids == {str(athlete.id) for athlete in athletes}
+    assert len(nominated_ids) == total
+    assert {str(athlete.id) for athlete in athletes} <= nominated_ids
 
     exhausted = client.post(
         f"/leagues/{league_id}/mercato/asta-live/sessioni/{session_id}/lotti/nomina",
