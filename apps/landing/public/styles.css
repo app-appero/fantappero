@@ -181,3 +181,27 @@ em{font-style:italic;background:var(--grad);-webkit-background-clip:text;backgro
 
 .brand--2 span{line-height:.95;white-space:normal}
 .ticket__top{gap:12px;align-items:center}
+/* Adattamento a qualsiasi schermo: niente elemento più largo della pagina */
+html,body{max-width:100%;overflow-x:clip}
+.hero,.sec,.final__g,.hero__txt,.hero__vis,.feat,.top{min-width:0}
+@media (max-width:900px){
+  .hero{grid-template-columns:minmax(0,1fr)}
+  .btn,.btn--xl,.btn--ghost{white-space:normal;text-align:center;flex-wrap:wrap;max-width:100%}
+  .btn--xl{font-size:clamp(17px,5vw,20px);gap:6px 10px;padding:18px 16px}
+  .btn--xl .arrow{display:none}
+  .btn--xl .host{flex-basis:100%;font-size:.9em}
+  .cta{width:100%}
+  .lead,.sub{overflow-wrap:break-word}
+  .hero__vis{width:100%;max-width:440px;overflow:visible}
+  .hero h1{font-size:clamp(44px,13.4vw,84px)}
+  .tops__g,.feats{grid-template-columns:minmax(0,1fr)}
+}
+@media (max-width:400px){
+  .ticks{font-size:14px;gap:6px 14px}
+  .nav .brand span{font-size:.92em}
+}
+@media (max-width:900px){
+  .hero__vis{height:calc(min(100vw,440px)*1.2 + 96px)}
+  .pcards{display:none}
+  .live{right:auto;left:50%;bottom:0;transform:translateX(-50%) scale(.92);transform-origin:center bottom;animation:none;white-space:nowrap}
+}
