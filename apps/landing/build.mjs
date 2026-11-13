@@ -124,10 +124,10 @@ const html = `<!doctype html>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>FantApperò · Lavori in corso — il fantacalcio che si gioca ogni minuto</title>
+<title>FantApperò Calcio · Lavori in corso — il fantacalcio che si gioca ogni minuto</title>
 <meta name="description" content="Il fantacalcio che si gioca ogni minuto: 5 campionati, una sola lega, formazione a step e live. Stiamo finendo il cantiere: diventa tester della fase pilota.">
 <meta name="theme-color" content="#0A0F22">
-<meta property="og:title" content="FantApperò · Lavori in corso">
+<meta property="og:title" content="FantApperò Calcio · Lavori in corso">
 <meta property="og:description" content="5 campionati, una sola lega. Diventa tester della fase pilota su pilota.fantappero.it.">
 <meta property="og:type" content="website">
 <link rel="icon" href="${FAVICON}">
@@ -138,7 +138,7 @@ const html = `<!doctype html>
 </head>
 <body>
 <header class="nav">
-  <a class="brand" href="#top" aria-label="FantApperò">${logo(44)}<span>FantApperò</span></a>
+  <a class="brand" href="#top" aria-label="FantApperò">${logo(44)}<span>FantApperò Calcio</span></a>
   <div class="nav__r"><span class="chip chip--wip"><i class="cone" aria-hidden="true">🚧</i> Lavori in corso</span><a class="btn btn--sm" href="${PILOTA_URL}">Diventa tester</a></div>
 </header>
 <main id="top">
@@ -154,7 +154,7 @@ const html = `<!doctype html>
   <div class="hero__vis">
     <div class="dock" role="img" aria-label="Blocco tra 01:00:18, mosse usate 2 su 3">${lockIcon(18)}<span class="dock__t"><small>BLOCCO</small><b>01:00:18</b></span><span class="dock__m"><span class="chip chip--out">Mosse 2/3</span><span class="chip chip--fill">→ 3/3</span></span></div>
     <div class="pitch" role="img" aria-label="Formazione di esempio con campioni dei cinque campionati"><div class="pitch__in"><i class="pl-h"></i><i class="pl-c"></i><i class="pl-a"></i><i class="pl-b"></i>${players}</div></div>
-    <div class="live"><span class="live__i">⚽</span><div><small>FantApperò · ora</small><b>Gol di Mbappé!</b><span>+3 nel tuo Leo FC</span></div></div>
+    <div class="live"><span class="live__i">⚽</span><div><small>FantApperò Calcio · ora</small><b>Gol di Mbappé!</b><span>+3 nel tuo Leo FC</span></div></div>
     ${CARDS}
   </div>
   <div class="strip" aria-hidden="true"><div class="strip__in">${stripImgs}${stripImgs}</div></div>
@@ -191,7 +191,7 @@ const html = `<!doctype html>
       <ol class="steps">${STEPS}</ol>
     </div>
     <div class="ticket">
-      <div class="ticket__top"><span class="brand">${logo(40)}<span>FantApperò</span></span><b class="tag">TESTER</b></div>
+      <div class="ticket__top"><span class="brand">${logo(40)}<span>FantApperò Calcio</span></span><b class="tag">TESTER</b></div>
       <p class="ticket__t">Ingresso<br><em>fase pilota</em></p>
       <dl><div><dt>SETTORE</dt><dd>5 CAMPIONATI</dd></div><div><dt>POSTO</dt><dd>LA TUA LEGA</dd></div></dl>
       <div class="ticket__cut" aria-hidden="true"></div>
@@ -201,7 +201,7 @@ const html = `<!doctype html>
   </div>
 </section>
 </main>
-<footer class="foot"><a class="brand" href="#top">${logo(34)}<span>FantApperò</span></a><span class="foot__l"><a href="${PILOTA_URL}">pilota.fantappero.it</a><a href="${PILOTA_URL}/privacy">Informativa privacy</a><span>© FantApperò</span></span></footer>
+<footer class="foot"><a class="brand" href="#top">${logo(34)}<span>FantApperò Calcio</span></a><span class="foot__l"><a href="${PILOTA_URL}">pilota.fantappero.it</a><a href="${PILOTA_URL}/privacy">Informativa privacy</a><span>© FantApperò Calcio</span></span></footer>
 </body>
 </html>
 `;

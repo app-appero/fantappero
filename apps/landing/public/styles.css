@@ -15,7 +15,7 @@ em{font-style:italic;background:var(--grad);-webkit-background-clip:text;backgro
 .sub--l{text-align:left;margin-left:0}
 /* nav */
 .nav{position:absolute;z-index:20;left:0;right:0;top:0;display:flex;align-items:center;justify-content:space-between;padding:20px clamp(18px,5vw,72px)}
-.brand{display:inline-flex;align-items:center;gap:12px;text-decoration:none;font-family:var(--cond);font-style:italic;font-weight:800;text-transform:uppercase;font-size:clamp(24px,2.4vw,32px)}
+.brand{display:inline-flex;align-items:center;gap:12px;text-decoration:none;font-family:var(--cond);font-style:italic;font-weight:800;text-transform:uppercase;font-size:clamp(22px,2.2vw,30px);white-space:nowrap}
 .nav__r{display:flex;align-items:center;gap:14px}
 .chip{display:inline-flex;align-items:center;gap:8px;padding:8px 16px;border-radius:999px;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.16);font-weight:700;font-size:15px;white-space:nowrap}
 .chip--wip{background:rgba(255,210,63,.16);color:var(--gold);font-size:14px}
@@ -127,7 +127,7 @@ em{font-style:italic;background:var(--grad);-webkit-background-clip:text;backgro
 .steps strong{display:block;font-size:20px}.steps span{display:block;color:var(--muted);font-size:15px;margin-top:3px}
 .ticket{width:min(380px,100%);border-radius:34px;background:linear-gradient(160deg,#1a2250,#141a3e);border:1px solid rgba(255,255,255,.18);box-shadow:0 50px 100px rgba(2,6,23,.7),0 0 90px rgba(124,90,255,.4);transform:rotate(-4deg);overflow:hidden;padding:26px 28px 28px;position:relative}
 .ticket__top{display:flex;align-items:center;justify-content:space-between}
-.ticket .brand{font-size:26px}
+.ticket .brand{font-size:22px}
 .tag{background:var(--gold);color:#1b1f3a;font-weight:800;font-size:13px;letter-spacing:.14em;padding:5px 12px;border-radius:999px}
 .ticket__t{margin:18px 0 0;font-family:var(--cond);font-style:italic;font-weight:800;text-transform:uppercase;font-size:46px;line-height:.95}
 .ticket dl{display:flex;gap:18px;margin:18px 0 0}.ticket dt{font-size:11px;color:var(--dim);letter-spacing:.14em}.ticket dd{margin:0;font-weight:800;font-size:18px}
@@ -177,3 +177,4 @@ em{font-style:italic;background:var(--grad);-webkit-background-clip:text;backgro
   .btn--block .arrow{display:none}
   .btn--block .host{font-size:15px}
 }
+@media (max-width:420px){.nav .brand{font-size:19px;gap:8px}.nav .logo{width:38px;height:38px}.btn--sm{padding:10px 16px;font-size:15px}}
