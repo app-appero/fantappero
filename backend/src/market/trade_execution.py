@@ -94,6 +94,13 @@ def execute_trade(
     # cleanly on its own — callers in this codebase catch ValidationAuthError at the
     # router layer and return a normal response, so nothing further up the stack is
     # guaranteed to roll back the outer transaction for us.
+    # Il prezzo d'acquisto segue il calciatore: lo scambio non muove crediti per i giocatori.
+    price_by_athlete: dict[UUID, int] = {
+        slot.athlete_id: slot.purchase_credits or 0
+        for slot in (*proposer_out_slots, *recipient_out_slots)
+        if slot.athlete_id is not None
+    }
+
     with session.begin_nested():
         # Release every outgoing player first, freeing slots for both sides.
         for slot in proposer_out_slots:
@@ -126,7 +133,7 @@ def execute_trade(
                 slot_index=slot.slot_index,
             )
             slot.athlete_id = athlete_id
-            slot.purchase_credits = 0
+            slot.purchase_credits = price_by_athlete.get(athlete_id, 0)
             slot.exceeds_role_quota = exceeds_quota or overflow_capacity
             session.flush()
             sync_ownership_on_assign(
@@ -135,7 +142,7 @@ def execute_trade(
                 fantasy_team_id=proposer_team.id,
                 slot_index=slot.slot_index,
                 athlete_id=athlete_id,
-                purchase_credits=0,
+                purchase_credits=price_by_athlete.get(athlete_id, 0),
                 source=RosterOwnershipSource.MARKET,
                 previous_athlete_id=None,
             )
@@ -151,7 +158,7 @@ def execute_trade(
                 slot_index=slot.slot_index,
             )
             slot.athlete_id = athlete_id
-            slot.purchase_credits = 0
+            slot.purchase_credits = price_by_athlete.get(athlete_id, 0)
             slot.exceeds_role_quota = exceeds_quota or overflow_capacity
             session.flush()
             sync_ownership_on_assign(
@@ -160,7 +167,7 @@ def execute_trade(
                 fantasy_team_id=recipient_team.id,
                 slot_index=slot.slot_index,
                 athlete_id=athlete_id,
-                purchase_credits=0,
+                purchase_credits=price_by_athlete.get(athlete_id, 0),
                 source=RosterOwnershipSource.MARKET,
                 previous_athlete_id=None,
             )

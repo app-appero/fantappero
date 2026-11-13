@@ -45,6 +45,7 @@ from market.trade_validators import (
     validate_distinct_teams,
     validate_no_athlete_overlap,
     validate_offered_credits_within_balance,
+    validate_requested_credits_within_balance,
     validate_trade_expiry,
     validate_trade_sides_not_empty,
     validate_trades_enabled,
@@ -191,6 +192,11 @@ class TradeService:
         account = find_account_for_team(self._session, proposer.id)
         balance = account.balance if account is not None else 0
         validate_offered_credits_within_balance(offered_credits=offered_credits, balance=balance)
+        recipient_account = find_account_for_team(self._session, recipient.id)
+        validate_requested_credits_within_balance(
+            requested_credits=requested_credits,
+            balance=recipient_account.balance if recipient_account is not None else 0,
+        )
 
         now = datetime.now(UTC)
         expires_at = _parse_optional_datetime(expires_at_raw, field="expiresAt")

@@ -6,13 +6,16 @@ from pydantic import Field
 
 from auth.schemas import ApiModel
 
+# Tetto tecnico (colonne a 32 bit): oltre, la richiesta è respinta con 422.
+MAX_TRADE_CREDITS = 1_000_000
+
 
 class CreateTradeProposalRequest(ApiModel):
     recipient_team_id: str = Field(alias="recipientTeamId", min_length=1)
     offered_athlete_ids: list[str] = Field(default_factory=list, alias="offeredAthleteIds")
     requested_athlete_ids: list[str] = Field(default_factory=list, alias="requestedAthleteIds")
-    offered_credits: int = Field(default=0, alias="offeredCredits", ge=0)
-    requested_credits: int = Field(default=0, alias="requestedCredits", ge=0)
+    offered_credits: int = Field(default=0, alias="offeredCredits", ge=0, le=MAX_TRADE_CREDITS)
+    requested_credits: int = Field(default=0, alias="requestedCredits", ge=0, le=MAX_TRADE_CREDITS)
     # Optional: omit or send null for a proposal that never expires on its own.
     expires_at: str | None = Field(default=None, alias="expiresAt")
 
@@ -22,8 +25,8 @@ class CounterTradeProposalRequest(ApiModel):
 
     offered_athlete_ids: list[str] = Field(default_factory=list, alias="offeredAthleteIds")
     requested_athlete_ids: list[str] = Field(default_factory=list, alias="requestedAthleteIds")
-    offered_credits: int = Field(default=0, alias="offeredCredits", ge=0)
-    requested_credits: int = Field(default=0, alias="requestedCredits", ge=0)
+    offered_credits: int = Field(default=0, alias="offeredCredits", ge=0, le=MAX_TRADE_CREDITS)
+    requested_credits: int = Field(default=0, alias="requestedCredits", ge=0, le=MAX_TRADE_CREDITS)
     expires_at: str | None = Field(default=None, alias="expiresAt")
 
 

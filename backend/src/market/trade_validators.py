@@ -104,3 +104,12 @@ def validate_offered_credits_within_balance(*, offered_credits: int, balance: in
             "I crediti offerti superano il saldo disponibile.",
             code="insufficient_credits",
         )
+
+
+def validate_requested_credits_within_balance(*, requested_credits: int, balance: int) -> None:
+    """N7: non si possono chiedere più crediti di quelli che l'altro allenatore ha."""
+    if requested_credits > balance:
+        raise ValidationAuthError(
+            "I crediti richiesti superano il saldo disponibile dell'altro allenatore.",
+            code="requested_credits_exceed_balance",
+        )

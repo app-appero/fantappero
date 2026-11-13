@@ -337,3 +337,102 @@ def test_member_cannot_assign_roster_slot_even_at_zero_price(
     )
     assert response.status_code == 400
     assert response.json()["code"] == "roster_assign_forbidden"
+
+
+def _assign_priced(
+    client: TestClient, league_id: str, admin_token: str, team_id: str, slot: int, athlete, price
+) -> None:
+    response = client.put(
+        f"/leagues/{league_id}/amministrazione/squadre/{team_id}/slot/{slot}",
+        headers=_hdr(admin_token),
+        json={"athleteId": str(athlete.id), "purchaseCredits": price},
+    )
+    assert response.status_code == 200, response.json()
+
+
+def test_trade_keeps_each_players_purchase_price_and_moves_no_credits(
+    client: TestClient, db_session: Session, competition_ids: list[str]
+) -> None:
+    admin_token, _ = _register_and_login(client, "n6b.admin@example.com")
+    a_token, a_id = _register_and_login(client, "n6b.a@example.com")
+    b_token, b_id = _register_and_login(client, "n6b.b@example.com")
+    league_id = _create_league(client, admin_token, competition_ids, "Lega Prezzi")
+    _add_member(db_session, league_id, a_id)
+    _add_member(db_session, league_id, b_id)
+    cheap = _seed_athlete(db_session, 9805, "Pagato Uno")
+    dear = _seed_athlete(db_session, 9806, "Pagato Cinquecento")
+    team_a = client.get(f"/leagues/{league_id}/rosa", headers=_hdr(a_token)).json()["id"]
+    team_b = client.get(f"/leagues/{league_id}/rosa", headers=_hdr(b_token)).json()["id"]
+    _assign_priced(client, league_id, admin_token, team_a, 0, cheap, 1)
+    _assign_priced(client, league_id, admin_token, team_b, 0, dear, 500)
+    balance_a = client.get(f"/leagues/{league_id}/crediti", headers=_hdr(a_token)).json()["balance"]
+
+    proposal = client.post(
+        f"/leagues/{league_id}/mercato/scambi/proposte",
+        headers=_hdr(a_token),
+        json={
+            "recipientTeamId": team_b,
+            "offeredAthleteIds": [str(cheap.id)],
+            "requestedAthleteIds": [str(dear.id)],
+            "expiresAt": _future_iso(),
+        },
+    )
+    assert proposal.status_code == 201, proposal.json()
+    accepted = client.post(
+        f"/leagues/{league_id}/mercato/scambi/proposte/{proposal.json()['id']}/accetta",
+        headers=_hdr(b_token),
+    )
+    assert accepted.status_code == 200, accepted.json()
+
+    db_session.expire_all()
+    prices = {
+        slot.athlete_id: (slot.fantasy_team_id, slot.purchase_credits)
+        for slot in db_session.scalars(
+            select(FantasyRosterSlot).where(FantasyRosterSlot.athlete_id.in_([cheap.id, dear.id]))
+        )
+    }
+    assert prices[cheap.id] == (UUID(team_b), 1)
+    assert prices[dear.id] == (UUID(team_a), 500)
+    after = client.get(f"/leagues/{league_id}/crediti", headers=_hdr(a_token)).json()["balance"]
+    assert after == balance_a
+
+
+def test_requested_credits_cannot_exceed_other_teams_balance_or_overflow(
+    client: TestClient, db_session: Session, competition_ids: list[str]
+) -> None:
+    admin_token, _ = _register_and_login(client, "n7.admin@example.com")
+    a_token, a_id = _register_and_login(client, "n7.a@example.com")
+    b_token, b_id = _register_and_login(client, "n7.b@example.com")
+    league_id = _create_league(client, admin_token, competition_ids, "Lega N7")
+    _add_member(db_session, league_id, a_id)
+    _add_member(db_session, league_id, b_id)
+    mine = _seed_athlete(db_session, 9807, "Mio Giocatore")
+    team_a = client.get(f"/leagues/{league_id}/rosa", headers=_hdr(a_token)).json()["id"]
+    team_b = client.get(f"/leagues/{league_id}/rosa", headers=_hdr(b_token)).json()["id"]
+    _assign_priced(client, league_id, admin_token, team_a, 0, mine, 1)
+    url = f"/leagues/{league_id}/mercato/scambi/proposte"
+
+    too_much = client.post(
+        url,
+        headers=_hdr(a_token),
+        json={
+            "recipientTeamId": team_b,
+            "offeredAthleteIds": [str(mine.id)],
+            "requestedCredits": 5000,
+            "expiresAt": _future_iso(),
+        },
+    )
+    assert too_much.status_code == 400
+    assert too_much.json()["code"] == "requested_credits_exceed_balance"
+
+    huge = client.post(
+        url,
+        headers=_hdr(a_token),
+        json={
+            "recipientTeamId": team_b,
+            "offeredAthleteIds": [str(mine.id)],
+            "requestedCredits": 2**31,
+            "expiresAt": _future_iso(),
+        },
+    )
+    assert huge.status_code == 422
