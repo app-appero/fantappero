@@ -191,7 +191,7 @@ const html = `<!doctype html>
       <ol class="steps">${STEPS}</ol>
     </div>
     <div class="ticket">
-      <div class="ticket__top"><span class="brand">${logo(40)}<span>FantApperò Calcio</span></span><b class="tag">TESTER</b></div>
+      <div class="ticket__top"><span class="brand brand--2">${logo(40)}<span>FantApperò<br>Calcio</span></span><b class="tag">TESTER</b></div>
       <p class="ticket__t">Ingresso<br><em>fase pilota</em></p>
       <dl><div><dt>SETTORE</dt><dd>5 CAMPIONATI</dd></div><div><dt>POSTO</dt><dd>LA TUA LEGA</dd></div></dl>
       <div class="ticket__cut" aria-hidden="true"></div>
