@@ -70,3 +70,10 @@ gli mostra un modulo (nome, cognome, **telefono**, motivo facoltativo, consenso)
   l'invio torna all'app e al successivo accesso vale la stessa risposta della richiesta.
 - **Gestione**: la scheda «Richieste tester» c'è sia sul web (Utenti) sia nell'app (Amministrazione →
   Utenti). Nell'app il telefono si tocca per aprire WhatsApp.
+
+## Eliminazione account e accesso tester
+
+Quando un account viene eliminato (dall'operatore o dall'utente stesso) la sua email viene tolta
+anche dalla lista dei tester e la sua richiesta di accesso viene cancellata. Lo stesso accade se
+l'operatore toglie un tester dalla lista. Chi si registra di nuovo non entra come tester: deve
+rifare la richiesta.

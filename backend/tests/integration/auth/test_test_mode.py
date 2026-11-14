@@ -319,3 +319,106 @@ def test_old_rejected_requests_are_purged(db_session: Session) -> None:
     db_session.commit()
     assert TesterRequestService(db_session).purge_old_rejected() == 1
     db_session.commit()
+
+
+def _approved_tester(
+    client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+    operator: dict[str, str],
+    email: str,
+    sub: str,
+) -> dict[str, str]:
+    token = _google(client, monkeypatch, email, sub).json()["requestToken"]
+    assert (
+        client.post("/auth/tester-requests", json={**FORM, "requestToken": token}).status_code
+        == 201
+    )
+    rows = client.get("/admin/tester-requests?status=pending", headers=operator).json()["requests"]
+    row = next(item for item in rows if item["email"] == email)
+    client.post(
+        "/admin/tester-requests/decisione",
+        headers=operator,
+        json={"ids": [row["id"]], "action": "approve"},
+    )
+    login = _google(client, monkeypatch, email, sub)
+    assert login.status_code == 200
+    return {"Authorization": f"Bearer {login.json()['accessToken']}"}
+
+
+def test_operator_deleting_user_removes_tester_access_everywhere(
+    client: TestClient, db_session: Session, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    operator = _operator(client, db_session, "del.operator@example.com")
+    client.put("/admin/test-mode", headers=operator, json={"enabled": True})
+    email = "del.tester@example.com"
+    _approved_tester(client, monkeypatch, operator, email, "sub-del-tester")
+    user = db_session.scalar(select(User).where(User.email == email))
+    assert user is not None
+
+    deleted = client.post(f"/admin/users/{user.id}/delete", headers=operator, json={"block": False})
+    assert deleted.status_code == 200, deleted.json()
+
+    db_session.expire_all()
+    assert (
+        db_session.scalar(select(TesterAllowlistEntry).where(TesterAllowlistEntry.email == email))
+        is None
+    )
+    assert (
+        db_session.scalar(select(TesterAccessRequest).where(TesterAccessRequest.email == email))
+        is None
+    )
+    assert client.get("/admin/test-mode", headers=operator).json()["testers"] == []
+
+    # Registrandosi di nuovo non entra più: deve rifare la richiesta.
+    again = _google(client, monkeypatch, email, "sub-del-tester")
+    assert again.status_code == 403
+    assert again.json()["code"] == "tester_only"
+    assert again.json()["requestStatus"] == "none"
+
+
+def test_self_deleting_tester_loses_access(
+    client: TestClient, db_session: Session, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    operator = _operator(client, db_session, "del2.operator@example.com")
+    client.put("/admin/test-mode", headers=operator, json={"enabled": True})
+    email = "del2.tester@example.com"
+    headers = _approved_tester(client, monkeypatch, operator, email, "sub-del2-tester")
+
+    response = client.post("/profile/me/delete", headers=headers, json={"confirmPhrase": "ELIMINA"})
+    assert response.status_code == 200, response.text
+
+    db_session.expire_all()
+    assert (
+        db_session.scalar(select(TesterAllowlistEntry).where(TesterAllowlistEntry.email == email))
+        is None
+    )
+    assert (
+        db_session.scalar(select(TesterAccessRequest).where(TesterAccessRequest.email == email))
+        is None
+    )
+    again = _google(client, monkeypatch, email, "sub-del2-tester")
+    assert again.status_code == 403
+    assert again.json()["requestStatus"] == "none"
+
+
+def test_removing_tester_from_list_lets_them_ask_again(
+    client: TestClient, db_session: Session, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    operator = _operator(client, db_session, "del3.operator@example.com")
+    client.put("/admin/test-mode", headers=operator, json={"enabled": True})
+    email = "del3.tester@example.com"
+    _approved_tester(client, monkeypatch, operator, email, "sub-del3-tester")
+    entry = client.get("/admin/test-mode", headers=operator).json()["testers"][0]
+
+    assert (
+        client.delete(f"/admin/test-mode/testers/{entry['id']}", headers=operator).status_code
+        == 200
+    )
+    db_session.expire_all()
+    assert (
+        db_session.scalar(select(TesterAccessRequest).where(TesterAccessRequest.email == email))
+        is None
+    )
+    blocked = _google(client, monkeypatch, email, "sub-del3-tester")
+    assert blocked.status_code == 403
+    assert blocked.json()["requestStatus"] == "none"
