@@ -194,7 +194,7 @@ export function TesterRequestPanel({
   async function onSubmit(event: FormEvent) {
     event.preventDefault();
     if (!info.requestToken) {
-      setError("Sessione scaduta: accedi di nuovo con Google.");
+      setError("Non riesco a inviare la richiesta da questa schermata: torna indietro e accedi di nuovo con Google.");
       return;
     }
     setSending(true);
