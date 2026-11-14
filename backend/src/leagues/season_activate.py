@@ -92,6 +92,9 @@ def try_advance_league_lifecycle(
             actor_id=audit_actor_id,
             source="auto_season_start",
         )
+        from notifications.league_events import notify_league_activated
+
+        notify_league_activated(session, league=league)
         return LeagueState.ACTIVE
 
     return changed_to

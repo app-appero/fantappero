@@ -27,6 +27,8 @@ _EXPECTED_SISTEMA_EVENTS = {
     "sistema.asta",
     "sistema.formazione",
     "sistema.turno_omologato",
+    "sistema.lega",
+    "sistema.turno_aperto",
     "sistema.avvisi_operatori",
 }
 

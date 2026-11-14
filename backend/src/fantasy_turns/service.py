@@ -80,6 +80,7 @@ from leagues.models.league_audit_event import LeagueAuditEvent
 from leagues.models.league_competition import LeagueCompetition
 from leagues.models.league_membership import LeagueMembership
 from leagues.models.league_rules import LeagueRules
+from notifications.league_events import notify_turn_opened
 from observability.context import get_correlation_id
 from observability.logging import get_logger
 from observability.metrics import get_metrics
@@ -1400,6 +1401,14 @@ class FantasyTurnService:
                 "trigger": trigger,
             },
         )
+        notify_turn_opened(
+            self._session,
+            league_id=fantasy_round.league_id,
+            round_id=fantasy_round.id,
+            number=fantasy_round.number,
+            cutoff_at=fantasy_round.cutoff_at,
+            now=now,
+        )
         get_metrics().incr("fantasy_turn_opened_total", labels={"result": "auto"})
         return True
 
@@ -1480,6 +1489,14 @@ class FantasyTurnService:
             actor_id=actor_id,
             action=LeagueAuditAction.FANTASY_TURN_OPENED,
             details={"roundId": str(fantasy_round.id), "number": fantasy_round.number},
+        )
+        notify_turn_opened(
+            self._session,
+            league_id=fantasy_round.league_id,
+            round_id=fantasy_round.id,
+            number=fantasy_round.number,
+            cutoff_at=fantasy_round.cutoff_at,
+            now=now,
         )
 
     def _reconcile_cutoff(

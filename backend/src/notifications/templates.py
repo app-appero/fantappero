@@ -12,8 +12,12 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass
+from datetime import datetime
+from zoneinfo import ZoneInfo
 
 NotificationParams = dict[str, object]
+
+_MONTHS_IT = ("gen", "feb", "mar", "apr", "mag", "giu", "lug", "ago", "set", "ott", "nov", "dic")
 
 
 @dataclass(frozen=True)
@@ -152,6 +156,15 @@ def _render_formazione_blocco_imminente(params: NotificationParams) -> Notificat
 @register_template("mercato.esito_busta", 1)
 def _render_mercato_esito_busta(params: NotificationParams) -> NotificationContent:
     athlete_name = params.get("athlete_name", "un giocatore")
+    if params.get("outcome") == "tiebreak":
+        return NotificationContent(
+            title="Spareggio aperto",
+            body=_league_body(
+                f"Parità su {athlete_name}: sei ammesso allo spareggio, hai 24 ore per rilanciare.",
+                params,
+            ),
+            deep_link=_league_link("/mercato", params),
+        )
     if params.get("outcome") == "assigned":
         amount = params.get("amount_credits")
         return NotificationContent(
@@ -459,6 +472,45 @@ def _render_mercato_scambio_v2(params: NotificationParams) -> NotificationConten
         title=title,
         body=_league_body(body or "Apri Scambi per i dettagli.", params),
         deep_link=_league_link(deep_link, params),
+    )
+
+
+@register_template("lega.nuovo_membro", 1)
+def _render_lega_nuovo_membro(params: NotificationParams) -> NotificationContent:
+    """Un partecipante è entrato nella lega: arriva ai proprietari."""
+    return NotificationContent(
+        title="Nuovo partecipante in lega",
+        body=_league_body(f"{params.get('member_name') or 'Qualcuno'} è entrato in lega.", params),
+        deep_link=_league_link("/fantallenatori", params),
+    )
+
+
+@register_template("lega.attivata", 1)
+def _render_lega_attivata(params: NotificationParams) -> NotificationContent:
+    """La lega è partita: arriva a tutti i partecipanti."""
+    return NotificationContent(
+        title="La lega è partita",
+        body=_league_body("La stagione è iniziata: controlla la rosa e la formazione.", params),
+        deep_link=_league_link("/", params),
+    )
+
+
+@register_template("turni.aperto", 1)
+def _render_turni_aperto(params: NotificationParams) -> NotificationContent:
+    """Un turno si è aperto: si può schierare la formazione."""
+    number = params.get("number")
+    cutoff = params.get("cutoff_iso")
+    suffix = ""
+    if isinstance(cutoff, str) and cutoff:
+        try:
+            local = datetime.fromisoformat(cutoff).astimezone(ZoneInfo("Europe/Rome"))
+            suffix = f" Blocco il {local.day} {_MONTHS_IT[local.month - 1]} alle {local:%H:%M}."
+        except ValueError:
+            suffix = ""
+    return NotificationContent(
+        title=f"Turno {number} aperto" if number is not None else "Nuovo turno aperto",
+        body=_league_body(f"Schiera la formazione.{suffix}", params),
+        deep_link=_league_link("/formazione", params),
     )
 
 

@@ -56,6 +56,8 @@ EVENT_DEFINITIONS: tuple[NotificationEventDefinition, ...] = (
     NotificationEventDefinition(
         "sistema.turno_omologato", EVENT_CATEGORY_SISTEMA, "Turno omologato"
     ),
+    NotificationEventDefinition("sistema.lega", EVENT_CATEGORY_SISTEMA, "Lega e partecipanti"),
+    NotificationEventDefinition("sistema.turno_aperto", EVENT_CATEGORY_SISTEMA, "Turno aperto"),
     NotificationEventDefinition(
         "sistema.avvisi_operatori", EVENT_CATEGORY_SISTEMA, "Avvisi operatori"
     ),
@@ -83,6 +85,9 @@ EVENT_KEY_BY_TEMPLATE_KEY: dict[str, str] = {
     "mercato.asta_live_aggiudicato": "sistema.asta",
     "mercato.asta_live_sorpassato": "sistema.asta",
     "mercato.asta_live_scambio_richiesto": "sistema.asta",
+    "lega.nuovo_membro": "sistema.lega",
+    "lega.attivata": "sistema.lega",
+    "turni.aperto": "sistema.turno_aperto",
     "formazione.scadenza_turno": "sistema.formazione",
     "formazione.blocco_imminente": "sistema.formazione",
     "risultati.omologazione": "sistema.turno_omologato",

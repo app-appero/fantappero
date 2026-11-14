@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timedelta
 from uuid import UUID
 
 from auth.exceptions import ValidationAuthError
@@ -16,10 +16,18 @@ def validate_trades_enabled(*, allow_trades: bool) -> None:
         )
 
 
+MAX_TRADE_EXPIRY = timedelta(days=366)
+
+
 def validate_trade_expiry(expires_at: datetime, *, now: datetime) -> None:
     if expires_at <= now:
         raise ValidationAuthError(
             "La scadenza della proposta deve essere futura.",
+            code="invalid_trade_expiry",
+        )
+    if expires_at > now + MAX_TRADE_EXPIRY:
+        raise ValidationAuthError(
+            "La scadenza della proposta non può superare 1 anno da oggi.",
             code="invalid_trade_expiry",
         )
 

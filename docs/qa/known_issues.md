@@ -23,3 +23,7 @@ Aggiornato da Rosario/Claude dopo ogni rapporto. I tester non ripetono i dettagl
 | 2026-11-14 | Mercato | Waiver: il calciatore svincolato per fare posto non viene rimborsato | Da decidere |
 | 2026-11-14 | Mercato | "Scambi conclusi" conta anche annullati, rifiutati, scaduti; "Da gestire" non conta le approvazioni dell'admin | Da decidere |
 | 2026-11-14 | Notifiche | Mancano le notifiche di turno e di lega (invito accettato, attivazione, turno aperto) | Da decidere |
+| 2026-11-14 | Mercato | CORRETTI il 14/11 (non segnalare): più sessioni a buste attive insieme; finestra già passata o oltre 2 anni; 500 su importi oltre 2^31 e scadenze oltre 1 anno; rotte /asta/ che accettavano sessioni live; svincolo che rimuove un altro calciatore (ora c'è l'id); lotto live scaduto non chiuso; notifica di spareggio; link "Scambio da approvare" dopo la decisione; bidCount con ritirate; coda sequenziale svuotabile; messaggio dei 422 | Corretto |
+| 2026-11-14 | Scambi | Proposta con crediti non sufficienti: resta aperta ma "in attesa di crediti" (Accetta disabilitato, non conta nel limite, si riattiva da sola) | Voluto |
+| 2026-11-14 | Notifiche | Aggiunte notifiche di nuovo partecipante, lega attivata e turno aperto (entro 10 giorni dal blocco) | Corretto |
+| 2026-11-14 | Test | Falliti già prima del 14/11 (dipendono dalla data): `test_kickoff_time_shift_before_elapsed_can_delay_cutoff`, `test_recalculate_cutoff_does_not_move_later_after_elapsed_postponement`, `test_a_league_without_rosters_generates_no_turns` | Aperto, test da riallineare |

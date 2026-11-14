@@ -271,6 +271,15 @@ class LeagueInviteService:
                 LeagueAuditAction.NAMED_INVITE_ACCEPTED,
             )
         self._add_audit(league.id, user.id, LeagueAuditAction.LEAGUE_MEMBER_JOINED)
+        from notifications.league_events import notify_member_joined
+
+        notify_member_joined(
+            self._session,
+            league=league,
+            membership_id=membership.id,
+            member_name=user.display_name,
+            member_user_id=user.id,
+        )
         from leagues.season_activate import try_advance_league_lifecycle
 
         try_advance_league_lifecycle(self._session, league.id, actor_id=user.id)

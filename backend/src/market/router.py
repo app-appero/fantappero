@@ -51,11 +51,14 @@ def _session_kind_guard(*, waiver: bool):
         db: Session = Depends(get_db_session),
     ) -> None:
         market_session = db.get(MarketSession, session_id)
-        if (
-            market_session is not None
-            and market_session.league_id == league_id
-            and (market_session.kind == MarketSessionKind.WAIVER) != waiver
-        ):
+        if market_session is not None and market_session.league_id == league_id:
+            is_waiver = market_session.kind == MarketSessionKind.WAIVER
+            is_live = market_session.kind == MarketSessionKind.LIVE_AUCTION
+            # Le rotte degli svincoli servono solo gli svincoli; quelle dell'asta a buste non
+            # servono né gli svincoli né l'asta a rilanci (che ha i suoi comandi, es. "termina").
+            wrong = (not is_waiver) if waiver else (is_waiver or is_live)
+            if not wrong:
+                return
             raise ValidationAuthError(
                 "Sessione di mercato non trovata.", code="market_session_not_found"
             )
@@ -426,7 +429,9 @@ def apply_voluntary_release(
 ) -> MarketReleaseResultResponse | JSONResponse:
     """Release the caller's own player and apply the percentage-based credit refund."""
     try:
-        return service.apply_release(league_access, slot_index, body.reason)
+        return service.apply_release(
+            league_access, slot_index, body.reason, expected_athlete_id=body.athlete_id
+        )
     except AuthError as exc:
         return _error_response(exc)
 

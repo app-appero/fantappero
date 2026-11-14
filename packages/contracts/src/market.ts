@@ -83,6 +83,8 @@ export interface MarketResolution {
 
 export interface MarketReleaseRequest {
   reason: MarketReleaseReason;
+  /** Il calciatore che si vuole svincolare: se lo slot ne contiene un altro nessuno viene svincolato. */
+  athleteId?: string;
 }
 
 export interface MarketReleasePreview {
@@ -136,6 +138,8 @@ export interface TradeProposal {
   expiresAt: string | null;
   createdAt: string;
   counterOfId: string | null;
+  /** I saldi non coprono i crediti della proposta: non si può accettare finché non bastano. */
+  awaitingCredits?: boolean;
 }
 
 export interface TradeProposalList {

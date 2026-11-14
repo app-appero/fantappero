@@ -166,20 +166,21 @@ class MarketService:
         assert_market_open(league)
         opens_at = _parse_required_datetime(payload.opens_at, field="opensAt")
         closes_at = _parse_required_datetime(payload.closes_at, field="closesAt")
-        validate_session_window(opens_at=opens_at, closes_at=closes_at)
+        validate_session_window(opens_at=opens_at, closes_at=closes_at, now=datetime.now(UTC))
 
-        existing = self._session.scalar(
+        now = datetime.now(UTC)
+        active_states = (MarketSessionStatus.SCHEDULED, MarketSessionStatus.OPEN)
+        # Si guardano TUTTE le righe ancora "aperte" nel database: una sessione scaduta ma non
+        # chiusa a mano non deve nascondere quelle davvero attive.
+        same_kind = self._session.scalars(
             select(MarketSession).where(
                 MarketSession.league_id == league.id,
                 MarketSession.kind == kind,
                 MarketSession.parent_session_id.is_(None),
-                MarketSession.status.in_((MarketSessionStatus.SCHEDULED, MarketSessionStatus.OPEN)),
+                MarketSession.status.in_(active_states),
             )
-        )
-        if existing is not None and effective_status(existing, now=datetime.now(UTC)) in (
-            MarketSessionStatus.SCHEDULED,
-            MarketSessionStatus.OPEN,
-        ):
+        ).all()
+        if any(effective_status(row, now=now) in active_states for row in same_kind):
             raise ValidationAuthError(
                 "Esiste già una sessione di questo tipo attiva per questa lega.",
                 code="market_session_already_active",
@@ -187,16 +188,14 @@ class MarketService:
         if kind == MarketSessionKind.INITIAL_AUCTION:
             # A league cannot run both auction mechanisms for the initial auction
             # at once (EP08-09): reject sealed creation while a live session is active.
-            conflicting_live = self._session.scalar(
+            live_rows = self._session.scalars(
                 select(MarketSession).where(
                     MarketSession.league_id == league.id,
                     MarketSession.kind == MarketSessionKind.LIVE_AUCTION,
-                    MarketSession.status.in_(
-                        (MarketSessionStatus.SCHEDULED, MarketSessionStatus.OPEN)
-                    ),
+                    MarketSession.status.in_(active_states),
                 )
-            )
-            if conflicting_live is not None:
+            ).all()
+            if any(effective_status(row, now=now) in active_states for row in live_rows):
                 raise ValidationAuthError(
                     "Esiste già una sessione d'asta a rilanci attiva per questa lega.",
                     code="market_session_already_active",
@@ -404,18 +403,29 @@ class MarketService:
         bidder_user_ids = user_ids_for_teams(self._session, (bid.fantasy_team_id for bid in bids))
         notifications = NotificationService(self._session)
         for bid in bids:
-            if bid.status not in (MarketBidStatus.WON, MarketBidStatus.LOST):
+            # Le offerte in parità (EXPIRED) vanno allo spareggio: anche loro vanno avvisate.
+            if bid.status not in (
+                MarketBidStatus.WON,
+                MarketBidStatus.LOST,
+                MarketBidStatus.EXPIRED,
+            ):
                 continue
             recipient_id = bidder_user_ids.get(bid.fantasy_team_id)
             if recipient_id is None:
                 continue
+            if bid.status == MarketBidStatus.WON:
+                outcome = "assigned"
+            elif bid.status == MarketBidStatus.EXPIRED:
+                outcome = "tiebreak"
+            else:
+                outcome = "lost"
             notifications.create_notification(
                 user_id=recipient_id,
                 category=NotificationCategory.MERCATO,
                 template_key="mercato.esito_busta",
                 template_version=1,
                 params={
-                    "outcome": "assigned" if bid.status == MarketBidStatus.WON else "lost",
+                    "outcome": outcome,
                     "athlete_name": bid.athlete.canonical_name,
                     "amount_credits": bid.amount_credits,
                     "not_assignable": bid.id in unassignable_bid_ids,
@@ -771,6 +781,8 @@ class MarketService:
         league_access: LeagueAccess,
         slot_index: int,
         reason_raw: str,
+        *,
+        expected_athlete_id: str | None = None,
     ) -> MarketReleaseResultResponse:
         if not 0 <= slot_index <= MAX_SLOT_INDEX:
             raise ValidationAuthError("Slot non trovato.", code="slot_not_found")
@@ -790,6 +802,12 @@ class MarketService:
         if slot is None:
             raise ValidationAuthError("Slot non trovato.", code="slot_not_found")
         athlete_id = validate_slot_has_athlete(slot.athlete_id)
+        if expected_athlete_id is not None and expected_athlete_id != str(athlete_id):
+            # La rosa si è riordinata (o la richiesta è stata ripetuta): nessuno svincolo.
+            raise ValidationAuthError(
+                "Nello slot c'è un altro calciatore: ricarica la rosa e riprova.",
+                code="release_athlete_mismatch",
+            )
         athlete = self._session.get(Athlete, athlete_id)
         assert athlete is not None
         purchase_credits = slot.purchase_credits or 0
@@ -960,7 +978,9 @@ class MarketService:
             bid_count = int(
                 self._session.scalar(
                     select(func.count(MarketBid.id)).where(
-                        MarketBid.session_id == market_session.id
+                        MarketBid.session_id == market_session.id,
+                        # Le offerte ritirate non contano.
+                        MarketBid.status != MarketBidStatus.CANCELLED,
                     )
                 )
                 or 0

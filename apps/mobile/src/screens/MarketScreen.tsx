@@ -147,7 +147,11 @@ export function MarketScreen() {
   const sentOpenCount = trade.proposals.filter(
     (row) => row.proposerTeamId === team?.id && openStatuses.includes(row.status),
   ).length;
-  const doneCount = trade.proposals.filter((row) => !openStatuses.includes(row.status)).length;
+  // Solo gli scambi davvero eseguiti (accettati senza approvazione o approvati), come sul web.
+  const doneCount = trade.proposals.filter(
+    (row) => row.status === "accepted" || row.status === "executed",
+  ).length;
+  const toApproveCount = trade.proposals.filter((row) => row.status === "pending_approval").length;
   const history = useMarketHistory({ leagueId: activeLeagueId, accessToken, active: true });
 
   const ownedSlots = useMemo(
@@ -218,6 +222,7 @@ export function MarketScreen() {
         activeLeagueId,
         Number(selectedSlotIndex),
         reason,
+        preview?.athleteId,
       );
       setBalance(result.balance);
       setApplySuccess(`${result.athleteName} svincolato: rimborsati ${result.refundCredits} crediti.`);
@@ -420,6 +425,14 @@ export function MarketScreen() {
                 <Text style={styles.heroValue}>{pendingForMe}</Text>
               </View>
             </View>
+            {canManageMarket ? (
+              <View style={styles.statRow}>
+                <View style={styles.statTile} testID="market-trade-stat-to-approve">
+                  <Text style={styles.heroLabel}>Da approvare</Text>
+                  <Text style={styles.heroValue}>{toApproveCount}</Text>
+                </View>
+              </View>
+            ) : null}
             <View style={styles.statRow}>
               <View style={styles.statTile}>
                 <Text style={styles.heroLabel}>Inviate in corso</Text>

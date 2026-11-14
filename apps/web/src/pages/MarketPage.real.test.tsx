@@ -495,6 +495,52 @@ describe("Mercato — scambi collegati alle API reali (EP08-05/06)", () => {
     unmount();
   });
 
+  it("proposta in attesa di crediti: Accetta è sospeso, e le statistiche contano gli scambi eseguiti", async () => {
+    const base = {
+      leagueId: "league-1",
+      offeredAthletes: [],
+      requestedAthletes: [],
+      offeredCredits: 0,
+      requestedCredits: 0,
+      expiresAt: null,
+      createdAt: "2026-08-19T00:00:00Z",
+      counterOfId: null,
+    };
+    fetchTradeProposalsMock.mockReset().mockResolvedValue({
+      proposals: [
+        {
+          ...base,
+          id: "p-wait",
+          proposerTeamId: "team-2",
+          recipientTeamId: "team-1",
+          offeredCredits: 500,
+          status: "proposed",
+          awaitingCredits: true,
+        },
+        { ...base, id: "p-done", proposerTeamId: "team-1", recipientTeamId: "team-2", status: "executed" },
+        { ...base, id: "p-acc", proposerTeamId: "team-1", recipientTeamId: "team-2", status: "accepted" },
+        { ...base, id: "p-no", proposerTeamId: "team-1", recipientTeamId: "team-2", status: "cancelled" },
+        { ...base, id: "p-rej", proposerTeamId: "team-1", recipientTeamId: "team-2", status: "rejected" },
+      ],
+    });
+    const adminLeague: LeagueSummary = { id: "league-1", name: "Lega Test", role: "league_admin" };
+    const { html, container, unmount } = await renderAppAt("/mercato", [adminLeague]);
+    expect(html).toContain("In attesa di crediti");
+    const wait = container.querySelector('[data-testid="market-trade-proposal-p-wait"]');
+    const acceptButton = [...(wait?.querySelectorAll("button") ?? [])].find((b) =>
+      (b.textContent ?? "").includes("In attesa di crediti"),
+    );
+    expect(acceptButton?.hasAttribute("disabled")).toBe(true);
+    const stats = container.querySelector('[data-testid="market-trade-stats"]');
+    const statText = (label: string) =>
+      [...(stats?.querySelectorAll(".fa-trade-stat") ?? [])]
+        .find((node) => (node.textContent ?? "").includes(label))
+        ?.querySelector("strong")?.textContent;
+    expect(statText("Scambi conclusi")).toBe("2");
+    expect(statText("Da approvare")).toBe("0");
+    unmount();
+  });
+
   it("membro non vede le azioni admin su una proposta in attesa di approvazione", async () => {
     fetchTradeProposalsMock.mockReset().mockResolvedValue({
       proposals: [

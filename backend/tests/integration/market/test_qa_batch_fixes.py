@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import re
 from datetime import UTC, datetime, timedelta
-from uuid import UUID
+from uuid import UUID, uuid4
 
 import pytest
 from fastapi.testclient import TestClient
@@ -930,3 +930,403 @@ def test_lost_bid_notification_explains_unassignable_offers() -> None:
     )
     assert "offerta inferiore" not in unassignable.body
     assert "crediti insufficienti" in unassignable.body
+
+
+def _sealed_payload(*, opens_delta: timedelta, closes_delta: timedelta) -> dict:
+    now = datetime.now(UTC)
+    return {
+        "opensAt": (now + opens_delta).isoformat(),
+        "closesAt": (now + closes_delta).isoformat(),
+    }
+
+
+def test_sealed_sessions_one_active_only_and_window_validated(
+    client: TestClient, db_session: Session, competition_ids: list[str]
+) -> None:
+    from database.enums import MarketSessionKind, MarketSessionStatus
+    from market.models import MarketSession
+
+    admin_token, admin_id = _register_and_login(client, "sess.admin@example.com")
+    league_id = _create_league(client, admin_token, competition_ids, "Lega Sessioni")
+    url = f"/leagues/{league_id}/mercato/asta/sessioni"
+
+    # Una sessione scaduta ma non chiusa (stato "open" nel database) esiste già.
+    now = datetime.now(UTC)
+    db_session.add(
+        MarketSession(
+            league_id=UUID(league_id),
+            kind=MarketSessionKind.INITIAL_AUCTION,
+            status=MarketSessionStatus.OPEN,
+            opens_at=now - timedelta(days=2),
+            closes_at=now - timedelta(days=1),
+            created_by=admin_id,
+        )
+    )
+    db_session.commit()
+
+    first = client.post(
+        url,
+        headers=_hdr(admin_token),
+        json=_sealed_payload(opens_delta=timedelta(minutes=-1), closes_delta=timedelta(hours=1)),
+    )
+    assert first.status_code == 201, first.json()
+    second = client.post(
+        url,
+        headers=_hdr(admin_token),
+        json=_sealed_payload(opens_delta=timedelta(minutes=-1), closes_delta=timedelta(hours=2)),
+    )
+    assert second.status_code == 400
+    assert second.json()["code"] == "market_session_already_active"
+
+    # Finestra già passata o troppo lontana: rifiutata.
+    past = client.post(
+        url,
+        headers=_hdr(admin_token),
+        json=_sealed_payload(opens_delta=timedelta(days=-3), closes_delta=timedelta(days=-2)),
+    )
+    assert past.status_code == 400
+    assert past.json()["code"] == "invalid_session_window"
+    far = client.post(
+        url,
+        headers=_hdr(admin_token),
+        json=_sealed_payload(opens_delta=timedelta(minutes=-1), closes_delta=timedelta(days=4000)),
+    )
+    assert far.status_code == 400
+
+
+def test_sealed_routes_reject_live_sessions_and_huge_numbers(
+    client: TestClient, db_session: Session, competition_ids: list[str]
+) -> None:
+    admin_token, _ = _register_and_login(client, "guard.admin@example.com")
+    league_id = _create_league(client, admin_token, competition_ids, "Lega Guardia")
+    now = datetime.now(UTC)
+    live = client.post(
+        f"/leagues/{league_id}/mercato/asta-live/sessioni",
+        headers=_hdr(admin_token),
+        json={
+            "opensAt": now.isoformat(),
+            "closesAt": (now + timedelta(hours=2)).isoformat(),
+            "nominationMode": "random",
+            "minIncrementCredits": 10,
+            "softCloseSeconds": 5,
+            "lotDurationSeconds": 30,
+        },
+    )
+    assert live.status_code == 201
+    live_id = live.json()["id"]
+    closed = client.post(
+        f"/leagues/{league_id}/mercato/asta/sessioni/{live_id}/chiudi", headers=_hdr(admin_token)
+    )
+    assert closed.status_code == 400
+    assert closed.json()["code"] == "market_session_not_found"
+
+    too_big = client.post(
+        f"/leagues/{league_id}/mercato/asta-live/sessioni",
+        headers=_hdr(admin_token),
+        json={
+            "opensAt": now.isoformat(),
+            "closesAt": (now + timedelta(hours=2)).isoformat(),
+            "nominationMode": "random",
+            "minIncrementCredits": 2**31,
+            "softCloseSeconds": 5,
+            "lotDurationSeconds": 30,
+        },
+    )
+    assert too_big.status_code == 422
+
+    far_expiry = client.post(
+        f"/leagues/{league_id}/mercato/scambi/proposte",
+        headers=_hdr(admin_token),
+        json={
+            "recipientTeamId": str(uuid4()),
+            "offeredCredits": 1,
+            "expiresAt": "9999-12-31T23:59:59Z",
+        },
+    )
+    assert far_expiry.status_code in (400, 404)
+    assert far_expiry.status_code != 500
+
+
+def test_release_with_wrong_athlete_id_releases_nobody(
+    client: TestClient, db_session: Session, competition_ids: list[str]
+) -> None:
+    admin_token, _ = _register_and_login(client, "relid.admin@example.com")
+    member_token, member_id = _register_and_login(client, "relid.member@example.com")
+    league_id = _create_league(client, admin_token, competition_ids, "Lega Svincolo Id")
+    _add_member(db_session, league_id, member_id)
+    first = _seed_athlete(db_session, 9830, "Primo Svincolo")
+    second = _seed_athlete(db_session, 9831, "Secondo Svincolo")
+    team_id = client.get(f"/leagues/{league_id}/rosa", headers=_hdr(member_token)).json()["id"]
+    _assign_priced(client, league_id, admin_token, team_id, 0, first, 10)
+
+    wrong = client.post(
+        f"/leagues/{league_id}/mercato/svincolo/0",
+        headers=_hdr(member_token),
+        json={"reason": "voluntary", "athleteId": str(second.id)},
+    )
+    assert wrong.status_code == 400
+    assert wrong.json()["code"] == "release_athlete_mismatch"
+    right = client.post(
+        f"/leagues/{league_id}/mercato/svincolo/0",
+        headers=_hdr(member_token),
+        json={"reason": "voluntary", "athleteId": str(first.id)},
+    )
+    assert right.status_code == 200, right.json()
+
+
+def test_expired_live_lot_is_closed_by_listing_and_by_ending(
+    client: TestClient, db_session: Session, competition_ids: list[str]
+) -> None:
+    from database.enums import MarketLiveLotStatus
+    from market.live_models import MarketLiveLot
+
+    admin_token, _ = _register_and_login(client, "tick.admin@example.com")
+    league_id = _create_league(client, admin_token, competition_ids, "Lega Tick")
+    _seed_athlete(db_session, 9832, "Lotto Che Scade")
+    now = datetime.now(UTC)
+    created = client.post(
+        f"/leagues/{league_id}/mercato/asta-live/sessioni",
+        headers=_hdr(admin_token),
+        json={
+            "opensAt": now.isoformat(),
+            "closesAt": (now + timedelta(hours=2)).isoformat(),
+            "nominationMode": "alphabetical_by_role",
+            "minIncrementCredits": 10,
+            "softCloseSeconds": 5,
+            "lotDurationSeconds": 30,
+        },
+    )
+    session_id = created.json()["id"]
+    base = f"/leagues/{league_id}/mercato/asta-live/sessioni/{session_id}"
+    client.post(f"{base}/avvia", headers=_hdr(admin_token))
+    lot = client.post(f"{base}/lotti/nomina", headers=_hdr(admin_token), json={})
+    assert lot.status_code == 201, lot.json()
+
+    # Il lotto scade (nessuno ha guardato lo stato): "termina" non deve restare bloccato.
+    row = db_session.get(MarketLiveLot, UUID(lot.json()["id"]))
+    row.closes_at = datetime.now(UTC) - timedelta(minutes=1)
+    db_session.commit()
+    ended = client.post(f"{base}/termina", headers=_hdr(admin_token))
+    assert ended.status_code == 200, ended.json()
+    db_session.expire_all()
+    assert db_session.get(MarketLiveLot, UUID(lot.json()["id"])).status != MarketLiveLotStatus.OPEN
+
+
+def test_owner_can_open_a_decided_trade_and_pending_credits_are_flagged(
+    client: TestClient, db_session: Session, competition_ids: list[str]
+) -> None:
+    admin_token, _ = _register_and_login(client, "lnk.admin@example.com")
+    a_token, a_id = _register_and_login(client, "lnk.a@example.com")
+    b_token, b_id = _register_and_login(client, "lnk.b@example.com")
+    league_id = _create_league(client, admin_token, competition_ids, "Lega Link Scambio")
+    _add_member(db_session, league_id, a_id)
+    _add_member(db_session, league_id, b_id)
+    prize = _seed_athlete(db_session, 9833, "Scambio Deciso")
+    client.get(f"/leagues/{league_id}/rosa", headers=_hdr(a_token))
+    team_b = client.get(f"/leagues/{league_id}/rosa", headers=_hdr(b_token)).json()["id"]
+    _assign_priced(client, league_id, admin_token, team_b, 0, prize, 1)
+    _set_league_rules(client, league_id, admin_token, require_trade_approval=True)
+    created = client.post(
+        f"/leagues/{league_id}/mercato/scambi/proposte",
+        headers=_hdr(a_token),
+        json={
+            "recipientTeamId": team_b,
+            "requestedAthleteIds": [str(prize.id)],
+            "offeredCredits": 3,
+            "expiresAt": _future_iso(),
+        },
+    )
+    pid = created.json()["id"]
+    assert created.json()["awaitingCredits"] is False
+    client.post(
+        f"/leagues/{league_id}/mercato/scambi/proposte/{pid}/accetta", headers=_hdr(b_token)
+    )
+    client.post(
+        f"/leagues/{league_id}/mercato/scambi/proposte/{pid}/amministrazione/approva",
+        headers=_hdr(admin_token),
+    )
+    # Dopo la decisione l'owner (che non è parte in causa) apre ancora il dettaglio.
+    detail = client.get(
+        f"/leagues/{league_id}/mercato/scambi/proposte/{pid}", headers=_hdr(admin_token)
+    )
+    assert detail.status_code == 200, detail.json()
+    assert detail.json()["status"] == "executed"
+
+    # Un estraneo non owner continua a non vederlo.
+    stranger_token, stranger_id = _register_and_login(client, "lnk.s@example.com")
+    _add_member(db_session, league_id, stranger_id)
+    client.get(f"/leagues/{league_id}/rosa", headers=_hdr(stranger_token))
+    hidden = client.get(
+        f"/leagues/{league_id}/mercato/scambi/proposte/{pid}", headers=_hdr(stranger_token)
+    )
+    assert hidden.json()["code"] == "trade_access_forbidden"
+
+
+def test_proposal_awaiting_credits_is_disabled_and_not_counted(
+    client: TestClient, db_session: Session, competition_ids: list[str]
+) -> None:
+    admin_token, _ = _register_and_login(client, "wait.admin@example.com")
+    a_token, a_id = _register_and_login(client, "wait.a@example.com")
+    b_token, b_id = _register_and_login(client, "wait.b@example.com")
+    league_id = _create_league(client, admin_token, competition_ids, "Lega Attesa Crediti")
+    _add_member(db_session, league_id, a_id)
+    _add_member(db_session, league_id, b_id)
+    mine = _seed_athlete(db_session, 9834, "Offro In Attesa")
+    team_a = client.get(f"/leagues/{league_id}/rosa", headers=_hdr(a_token)).json()["id"]
+    team_b = client.get(f"/leagues/{league_id}/rosa", headers=_hdr(b_token)).json()["id"]
+    _assign_priced(client, league_id, admin_token, team_a, 0, mine, 1)
+    created = client.post(
+        f"/leagues/{league_id}/mercato/scambi/proposte",
+        headers=_hdr(a_token),
+        json={
+            "recipientTeamId": team_b,
+            "offeredAthleteIds": [str(mine.id)],
+            "requestedCredits": 100,
+            "expiresAt": _future_iso(),
+        },
+    )
+    assert created.status_code == 201, created.json()
+    pid = created.json()["id"]
+    assert created.json()["awaitingCredits"] is False
+
+    # Il destinatario spende i crediti (movimento admin negativo): la proposta si sospende.
+    ledger = client.post(
+        f"/leagues/{league_id}/amministrazione/crediti/movimenti",
+        headers=_hdr(admin_token),
+        json={"fantasyTeamId": team_b, "amount": -950, "transactionId": "wait-spend-1"},
+    )
+    assert ledger.status_code == 200, ledger.json()
+    shown = client.get(
+        f"/leagues/{league_id}/mercato/scambi/proposte/{pid}", headers=_hdr(a_token)
+    ).json()
+    assert shown["status"] == "proposed"
+    assert shown["awaitingCredits"] is True
+    blocked = client.post(
+        f"/leagues/{league_id}/mercato/scambi/proposte/{pid}/accetta", headers=_hdr(b_token)
+    )
+    assert blocked.json()["code"] == "insufficient_credits"
+
+    # Rimessi i crediti, si riattiva da sola e si può accettare.
+    client.post(
+        f"/leagues/{league_id}/amministrazione/crediti/movimenti",
+        headers=_hdr(admin_token),
+        json={"fantasyTeamId": team_b, "amount": 950, "transactionId": "wait-back-1"},
+    )
+    back = client.get(
+        f"/leagues/{league_id}/mercato/scambi/proposte/{pid}", headers=_hdr(a_token)
+    ).json()
+    assert back["awaitingCredits"] is False
+    accepted = client.post(
+        f"/leagues/{league_id}/mercato/scambi/proposte/{pid}/accetta", headers=_hdr(b_token)
+    )
+    assert accepted.status_code == 200, accepted.json()
+
+
+def test_small_fixes_empty_queue_bid_count_and_error_message(
+    client: TestClient, db_session: Session, competition_ids: list[str]
+) -> None:
+    admin_token, _ = _register_and_login(client, "small.admin@example.com")
+    league_id = _create_league(client, admin_token, competition_ids, "Lega Piccole Cose")
+    seq = _seed_athlete(db_session, 9835, "Lista Uno")
+    now = datetime.now(UTC)
+    created = client.post(
+        f"/leagues/{league_id}/mercato/asta-live/sessioni",
+        headers=_hdr(admin_token),
+        json={
+            "opensAt": now.isoformat(),
+            "closesAt": (now + timedelta(hours=2)).isoformat(),
+            "nominationMode": "sequential",
+            "nominationQueueAthleteIds": [str(seq.id)],
+            "minIncrementCredits": 10,
+            "softCloseSeconds": 5,
+            "lotDurationSeconds": 30,
+        },
+    )
+    assert created.status_code == 201, created.json()
+    emptied = client.put(
+        f"/leagues/{league_id}/mercato/asta-live/sessioni/{created.json()['id']}/configurazione",
+        headers=_hdr(admin_token),
+        json={"nominationQueueAthleteIds": []},
+    )
+    assert emptied.status_code == 400
+    assert emptied.json()["code"] == "nomination_queue_required"
+
+    malformed = client.post(
+        "/auth/login", content="{non json", headers={"content-type": "application/json"}
+    )
+    assert malformed.status_code == 422
+    assert "JSON" in malformed.json()["message"]
+    assert "1" not in malformed.json()["message"].replace("JSON", "")
+
+
+def test_league_events_are_notified_to_members() -> None:
+    from notifications.templates import render_notification
+
+    joined = render_notification(
+        "lega.nuovo_membro",
+        1,
+        {"member_name": "Luca", "league_name": "Lega X", "league_id": "L1"},
+    )
+    assert "Luca" in joined.body
+    assert joined.deep_link.endswith("lega=L1")
+    started = render_notification("lega.attivata", 1, {"league_name": "Lega X", "league_id": "L1"})
+    assert started.title == "La lega è partita"
+    opened = render_notification(
+        "turni.aperto",
+        1,
+        {
+            "league_name": "Lega X",
+            "league_id": "L1",
+            "number": 5,
+            "cutoff_iso": "2026-11-20T18:00:00+00:00",
+        },
+    )
+    assert opened.title == "Turno 5 aperto"
+    assert "Blocco il 20 nov" in opened.body
+
+
+def test_league_event_notifications_reach_the_right_people(
+    client: TestClient, db_session: Session, competition_ids: list[str]
+) -> None:
+    from leagues.models.league import League
+    from notifications.league_events import (
+        notify_league_activated,
+        notify_member_joined,
+        notify_turn_opened,
+    )
+
+    owner_token, owner_id = _register_and_login(client, "evt.owner@example.com")
+    member_token, member_id = _register_and_login(client, "evt.member@example.com")
+    league_id = _create_league(client, owner_token, competition_ids, "Lega Eventi")
+    membership = _add_member(db_session, league_id, member_id)
+    league = db_session.get(League, UUID(league_id))
+
+    notify_member_joined(
+        db_session,
+        league=league,
+        membership_id=membership.id,
+        member_name="Luca",
+        member_user_id=member_id,
+    )
+    notify_league_activated(db_session, league=league)
+    # Turno lontano (oltre 10 giorni): niente avviso; turno vicino: avviso a tutti.
+    far = datetime.now(UTC) + timedelta(days=60)
+    soon = datetime.now(UTC) + timedelta(days=3)
+    notify_turn_opened(db_session, league_id=league.id, round_id=uuid4(), number=9, cutoff_at=far)
+    notify_turn_opened(db_session, league_id=league.id, round_id=uuid4(), number=10, cutoff_at=soon)
+    db_session.commit()
+
+    def titles(user_id: UUID) -> list[str]:
+        return [
+            row.title
+            for row in db_session.scalars(
+                select(Notification).where(Notification.user_id == user_id)
+            ).all()
+        ]
+
+    assert "Nuovo partecipante in lega" in titles(owner_id)
+    assert "Nuovo partecipante in lega" not in titles(member_id)
+    for user_id in (owner_id, member_id):
+        assert "La lega è partita" in titles(user_id)
+        assert "Turno 10 aperto" in titles(user_id)
+        assert "Turno 9 aperto" not in titles(user_id)

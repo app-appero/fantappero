@@ -2,18 +2,33 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timedelta
 from uuid import UUID
 
 from auth.exceptions import ValidationAuthError
 
+MAX_SESSION_AHEAD = timedelta(days=366 * 2)
 
-def validate_session_window(*, opens_at: datetime, closes_at: datetime) -> None:
+
+def validate_session_window(
+    *, opens_at: datetime, closes_at: datetime, now: datetime | None = None
+) -> None:
     if closes_at <= opens_at:
         raise ValidationAuthError(
             "La scadenza della sessione deve essere successiva all'apertura.",
             code="invalid_session_window",
         )
+    if now is not None:
+        if closes_at <= now:
+            raise ValidationAuthError(
+                "La scadenza della sessione è già passata: scegli una data futura.",
+                code="invalid_session_window",
+            )
+        if closes_at > now + MAX_SESSION_AHEAD:
+            raise ValidationAuthError(
+                "La scadenza della sessione è troppo lontana (massimo 2 anni).",
+                code="invalid_session_window",
+            )
 
 
 def validate_bid_amount(amount_credits: int) -> int:

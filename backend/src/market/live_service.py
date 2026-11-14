@@ -42,6 +42,7 @@ from fantasy_teams.composition_service import (
 from fantasy_teams.factory import ensure_team_for_membership, find_team_for_membership
 from fantasy_teams.ledger import find_account_for_team
 from fantasy_teams.models import FantasyRosterSlot, FantasyTeam
+from leagues.market_open import read_market_open
 from leagues.models.league import League
 from leagues.models.league_audit_event import LeagueAuditEvent
 from leagues.models.league_membership import LeagueMembership
@@ -251,6 +252,11 @@ class LiveMarketService:
                     "La lista di chiamata è prevista solo in modalità sequenziale.",
                     code="nomination_queue_not_allowed",
                 )
+            if not payload.nomination_queue_athlete_ids:
+                raise ValidationAuthError(
+                    "Indica l'elenco dei calciatori per la modalità a lista.",
+                    code="nomination_queue_required",
+                )
             self._set_nomination_queue(market_session.id, payload.nomination_queue_athlete_ids)
 
         self._session.flush()
@@ -307,6 +313,10 @@ class LiveMarketService:
         self._assert_is_live(market_session)
         if market_session.status == MarketSessionStatus.RESOLVED:
             return self._to_session_response(market_session)
+        # Un lotto con il tempo finito va chiuso prima di terminare, anche se nessuno ha
+        # aperto la schermata di stato (il tick fa commit: si ri-prende il blocco).
+        if self._tick_current_lot(league_access, market_session):
+            market_session = self._get_session_for_update(league_access.league.id, session_id)
         open_lot = self._session.scalar(
             select(MarketLiveLot).where(
                 MarketLiveLot.session_id == market_session.id,
@@ -848,6 +858,7 @@ class LiveMarketService:
     def list_lots(self, league_access: LeagueAccess, session_id: UUID) -> LiveLotListResponse:
         market_session = self._find_session(league_access.league.id, session_id)
         self._assert_is_live(market_session)
+        self._tick_current_lot(league_access, market_session)
         rows = self._session.scalars(
             select(MarketLiveLot)
             .options(
@@ -865,7 +876,13 @@ class LiveMarketService:
     # -- internal: lazy finalization -------------------------------------------
 
     def _tick_current_lot(self, league_access: LeagueAccess, market_session: MarketSession) -> bool:
-        """Finalize the current lot if its window has passed. Returns True if it did."""
+        """Finalize the current lot if its window has passed. Returns True if it did.
+
+        A mercato chiuso non si assegna né si addebita nulla: il lotto resta com'è e viene
+        chiuso al primo controllo dopo la riapertura (e una lettura non scrive niente).
+        """
+        if not read_market_open(self._session, market_session.league_id):
+            return False
         now = datetime.now(UTC)
         lot = self._session.scalars(
             select(MarketLiveLot)

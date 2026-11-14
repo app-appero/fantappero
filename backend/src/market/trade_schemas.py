@@ -52,6 +52,9 @@ class TradeProposalResponse(ApiModel):
     expires_at: str | None = Field(default=None, alias="expiresAt")
     created_at: str = Field(alias="createdAt")
     counter_of_id: str | None = Field(default=None, alias="counterOfId")
+    # True se uno dei due saldi non copre i crediti della proposta: non si può accettare finché i
+    # crediti non bastano (si riattiva da sola) e non conta nel limite delle proposte attive.
+    awaiting_credits: bool = Field(default=False, alias="awaitingCredits")
 
 
 class TradeProposalListResponse(ApiModel):

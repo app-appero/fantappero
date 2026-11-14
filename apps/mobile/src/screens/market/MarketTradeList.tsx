@@ -281,12 +281,18 @@ export function MarketTradeList({
                 {proposal.status === "proposed" && isRecipient ? (
                   <View style={styles.tradeActions}>
                     <Pressable
-                      style={[styles.button, styles.tradeAction, pending && styles.disabled]}
-                      disabled={pending}
+                      style={[
+                        styles.button,
+                        styles.tradeAction,
+                        (pending || proposal.awaitingCredits) && styles.disabled,
+                      ]}
+                      disabled={pending || proposal.awaitingCredits === true}
                       onPress={() => void trade.acceptProposal(proposal.id)}
                       testID={`market-trade-accept-${proposal.id}`}
                     >
-                      <Text style={styles.buttonLabel} numberOfLines={1} adjustsFontSizeToFit>Accetta</Text>
+                      <Text style={styles.buttonLabel} numberOfLines={1} adjustsFontSizeToFit>
+                        {proposal.awaitingCredits ? "In attesa di crediti" : "Accetta"}
+                      </Text>
                     </Pressable>
                     <Pressable
                       style={[styles.secondaryButton, styles.tradeAction, pending && styles.disabled]}

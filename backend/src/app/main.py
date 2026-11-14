@@ -170,8 +170,14 @@ def request_validation_error_handler(_request: object, exc: RequestValidationErr
     """422 nel formato `{message, code}` degli altri errori, con `detail` per i client esistenti."""
     errors = jsonable_encoder(exc.errors())
     first = errors[0] if errors else {}
-    location = ".".join(str(part) for part in first.get("loc", ()) if part != "body")
-    message = "Dati non validi" + (f": {location}" if location else "") + "."
+    # Solo i nomi dei campi: le posizioni numeriche (es. "1") non dicono nulla.
+    location = ".".join(
+        str(part) for part in first.get("loc", ()) if isinstance(part, str) and part != "body"
+    )
+    if "json" in str(first.get("type", "")):
+        message = "Il corpo della richiesta non è un JSON valido."
+    else:
+        message = "Dati non validi" + (f": {location}" if location else "") + "."
     return JSONResponse(
         status_code=422,
         content={"message": message, "code": "validation_error", "detail": errors},

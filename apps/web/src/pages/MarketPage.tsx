@@ -341,6 +341,7 @@ export function MarketPage() {
         activeLeagueId,
         Number(selectedSlotIndex),
         reason,
+        preview?.athleteId,
       );
       setBalance(result.balance);
       setApplySuccess(
@@ -543,7 +544,13 @@ export function MarketPage() {
   const sentTrades = trade.proposals.filter(
     (row) => row.proposerTeamId === team?.id && OPEN_TRADE_STATUSES.includes(row.status),
   );
-  const doneTrades = trade.proposals.filter((row) => !OPEN_TRADE_STATUSES.includes(row.status));
+  // "Scambi conclusi": solo quelli davvero eseguiti (accettati senza approvazione o approvati),
+  // non annullati, rifiutati, scaduti o superati da una controproposta.
+  const doneTrades = trade.proposals.filter(
+    (row) => row.status === "accepted" || row.status === "executed",
+  );
+  // Chi può approvare ha un lavoro in più: gli scambi accettati che attendono la sua decisione.
+  const toApproveCount = trade.proposals.filter((row) => row.status === "pending_approval").length;
   // Ancora da decidere, indipendentemente da chi l'ha proposta: non "inviate"
   // o "ricevute" separate, ma tutte quelle che richiedono ancora un esito.
   const openTrades = trade.proposals.filter((row) => OPEN_TRADE_STATUSES.includes(row.status));
@@ -709,6 +716,12 @@ export function MarketPage() {
               <span>Inviate in corso</span>
               <strong>{sentTrades.length}</strong>
             </div>
+            {canManageMarket ? (
+              <div className="fa-trade-stat" data-testid="market-trade-stat-to-approve">
+                <span>Da approvare</span>
+                <strong>{toApproveCount}</strong>
+              </div>
+            ) : null}
             <div className="fa-trade-stat">
               <span>Scambi conclusi</span>
               <strong>{doneTrades.length}</strong>
@@ -1000,10 +1013,10 @@ export function MarketPage() {
                           <Button
                             variant="primary"
                             size="sm"
-                            disabled={pending}
+                            disabled={pending || proposal.awaitingCredits === true}
                             onClick={() => void trade.acceptProposal(proposal.id)}
                           >
-                            Accetta
+                            {proposal.awaitingCredits ? "In attesa di crediti" : "Accetta"}
                           </Button>
                           <Button
                             variant="secondary"

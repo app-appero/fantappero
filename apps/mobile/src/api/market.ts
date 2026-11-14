@@ -237,11 +237,12 @@ export function applyVoluntaryRelease(
   leagueId: string,
   slotIndex: number,
   reason: MarketReleaseReason,
+  athleteId?: string,
 ): Promise<MarketReleaseResult> {
   return apiRequest<MarketReleaseResult>(`/leagues/${leagueId}/mercato/svincolo/${slotIndex}`, {
     accessToken,
     method: "POST",
-    body: { reason },
+    body: athleteId ? { reason, athleteId } : { reason },
   });
 }
 

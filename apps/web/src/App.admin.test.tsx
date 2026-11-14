@@ -45,6 +45,7 @@ vi.mock("./api/admin", () => ({
   revokeOperator: vi.fn(),
   impersonateUser: vi.fn(),
   fetchTestMode: vi.fn().mockResolvedValue({ enabled: false, testers: [] }),
+  fetchTesterRequests: vi.fn().mockResolvedValue({ requests: [] }),
   setTestMode: vi.fn(),
   addTester: vi.fn(),
   removeTester: vi.fn(),

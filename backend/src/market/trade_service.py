@@ -510,10 +510,9 @@ class TradeService:
             proposal.proposer_team_id,
             proposal.recipient_team_id,
         )
-        is_reviewer = (
-            self._can_review_trades(league_access)
-            and proposal.status == TradeStatus.PENDING_APPROVAL
-        )
+        # Chi approva gli scambi può aprirli sempre (anche dopo la decisione): serve al link
+        # della notifica "Scambio da approvare".
+        is_reviewer = self._can_review_trades(league_access)
         if not is_party and not is_reviewer:
             raise ValidationAuthError(
                 "Non hai accesso a questa proposta di scambio.",
@@ -625,7 +624,23 @@ class TradeService:
                 or_(TradeProposal.expires_at.is_(None), TradeProposal.expires_at > now),
             )
         ).all()
-        return len(rows)
+        # Le proposte in attesa di crediti non occupano il limite.
+        return sum(1 for row in rows if not self._awaiting_credits(row))
+
+    def _awaiting_credits(self, proposal: TradeProposal) -> bool:
+        """True se il saldo di chi offre o di chi riceve non copre i crediti della proposta."""
+        if proposal.status != TradeStatus.PROPOSED:
+            return False
+        if proposal.offered_credits <= 0 and proposal.requested_credits <= 0:
+            return False
+        proposer = find_account_for_team(self._session, proposal.proposer_team_id)
+        recipient = find_account_for_team(self._session, proposal.recipient_team_id)
+        proposer_balance = proposer.balance if proposer is not None else 0
+        recipient_balance = recipient.balance if recipient is not None else 0
+        return (
+            proposal.offered_credits > proposer_balance
+            or proposal.requested_credits > recipient_balance
+        )
 
     def _add_audit(
         self,
@@ -802,6 +817,7 @@ class TradeService:
             expiresAt=proposal.expires_at.isoformat() if proposal.expires_at else None,
             createdAt=proposal.created_at.isoformat(),
             counterOfId=str(proposal.counter_of_id) if proposal.counter_of_id else None,
+            awaitingCredits=self._awaiting_credits(proposal),
         )
 
     def _athlete_labels(self, raw_ids: list[str]) -> list[TradeAthleteResponse]:

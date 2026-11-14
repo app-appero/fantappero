@@ -6,13 +6,16 @@ from pydantic import Field
 
 from auth.schemas import ApiModel
 
+# Le colonne dei crediti sono interi a 32 bit: oltre questo valore la richiesta è respinta (422).
+MAX_CREDITS_VALUE = 2**31 - 1
+
 
 class CreateLiveAuctionSessionRequest(ApiModel):
     opens_at: str = Field(alias="opensAt", min_length=1)
     closes_at: str = Field(alias="closesAt", min_length=1)
     # "manual" | "sequential" | "turn_based" | "alphabetical_by_role" | "random"
     nomination_mode: str = Field(alias="nominationMode")
-    min_increment_credits: int = Field(alias="minIncrementCredits", ge=1)
+    min_increment_credits: int = Field(alias="minIncrementCredits", ge=1, le=MAX_CREDITS_VALUE)
     soft_close_seconds: int = Field(alias="softCloseSeconds", ge=5, le=120)
     lot_duration_seconds: int = Field(alias="lotDurationSeconds", ge=10, le=300)
     operator_user_id: str | None = Field(default=None, alias="operatorUserId")
@@ -25,7 +28,9 @@ class CreateLiveAuctionSessionRequest(ApiModel):
 
 
 class ConfigureLiveAuctionSessionRequest(ApiModel):
-    min_increment_credits: int | None = Field(default=None, alias="minIncrementCredits", ge=1)
+    min_increment_credits: int | None = Field(
+        default=None, alias="minIncrementCredits", ge=1, le=MAX_CREDITS_VALUE
+    )
     soft_close_seconds: int | None = Field(default=None, alias="softCloseSeconds", ge=5, le=120)
     lot_duration_seconds: int | None = Field(
         default=None, alias="lotDurationSeconds", ge=10, le=300
@@ -70,7 +75,7 @@ class NominateLotRequest(ApiModel):
 
 
 class PlaceRaiseRequest(ApiModel):
-    amount_credits: int = Field(alias="amountCredits", ge=1)
+    amount_credits: int = Field(alias="amountCredits", ge=1, le=MAX_CREDITS_VALUE)
 
 
 class LiveLotResponse(ApiModel):

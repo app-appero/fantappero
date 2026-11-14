@@ -1470,6 +1470,12 @@ select option,
   border-color: rgba(155, 107, 255, 0.45);
 }
 
+/* Tema chiaro: il gradiente del 1° è pensato per il tema scuro e abbassava il contrasto del
+   testo piccolo sotto 4,5. Qui sfondo più tenue. */
+[data-color-scheme="light"] .fa-podium__card--1 {
+  background: linear-gradient(160deg, rgba(53, 96, 240, 0.1), rgba(122, 77, 255, 0.08));
+}
+
 .fa-podium__card--2 {
   order: 1;
 }

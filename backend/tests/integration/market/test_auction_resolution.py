@@ -20,6 +20,7 @@ from leagues.models.competition import Competition
 from leagues.models.league_membership import LeagueMembership
 from mail.capture import get_captured_emails
 from market.models import MarketBid, MarketSession
+from notifications.models import Notification
 from sports_data.listone.models import RoleAssignment
 from sports_data.roster.models import Athlete
 
@@ -258,6 +259,23 @@ def test_tied_bids_open_a_tiebreak_session(
     # A tied team can now rebid inside the tiebreak session.
     rebid = _bid(client, league_id, tiebreak_id, admin_token, athlete.id, 120)
     assert rebid.status_code == 200
+
+    # Le due squadre in parità sono avvisate dello spareggio; chi non c'entra no.
+    for user_id in (admin_id, member_id):
+        titles = [
+            row.title
+            for row in db_session.scalars(
+                select(Notification).where(Notification.user_id == user_id)
+            ).all()
+        ]
+        assert "Spareggio aperto" in titles
+    outsider_titles = [
+        row.title
+        for row in db_session.scalars(
+            select(Notification).where(Notification.user_id == outsider_id)
+        ).all()
+    ]
+    assert "Spareggio aperto" not in outsider_titles
 
 
 def test_resolution_is_idempotent_and_atomic(
