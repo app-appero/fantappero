@@ -244,7 +244,7 @@ def test_lock_reminder_counts_every_player_sharing_the_next_kickoff(
         )
     )
     assert notification is not None
-    assert notification.deep_link == "/formazione"
+    assert notification.deep_link.startswith("/formazione?lega=")
     # I 3 difensori "late" bloccano insieme, non il portiere già bloccato
     # ("early") prima del giro: nessuna colonna params separata, il testo
     # è già renderizzato al momento della creazione.

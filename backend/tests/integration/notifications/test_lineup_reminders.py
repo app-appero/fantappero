@@ -96,7 +96,7 @@ def test_reminder_sent_once_for_team_without_lineup(
         )
     )
     assert notification is not None
-    assert notification.deep_link == "/formazione"
+    assert notification.deep_link.startswith("/formazione?lega=")
 
     # Re-running before the cutoff must not duplicate the reminder.
     again = LineupReminderService(db_session).send_due_reminders(

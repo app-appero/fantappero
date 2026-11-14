@@ -466,7 +466,8 @@ def test_member_can_edit_own_roster_not_others_and_purchase_is_tracked(
         f"/leagues/{league_id}/crediti",
         headers={"Authorization": f"Bearer {member_token}"},
     )
-    assert credits_refunded.json()["balance"] == balance_before
+    # Rimborso del 50% (percentuale di lega) arrotondato per difetto: 15 -> 7.
+    assert credits_refunded.json()["balance"] == balance_before - 15 + 7
 
 
 def test_purchase_price_edit_applies_credits_even_when_revisiting_a_prior_price(

@@ -126,7 +126,7 @@ def test_homologation_and_correction_notify_league_members(
         )
     )
     assert homolog_notification is not None
-    assert homolog_notification.deep_link == "/classifica"
+    assert homolog_notification.deep_link.startswith("/classifica?lega=")
 
     apply_round_correction(
         db_session, round_id=fantasy_round.id, actor_id=owner_id, reason="Errore voto arbitro"
