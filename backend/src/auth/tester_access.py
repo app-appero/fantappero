@@ -81,11 +81,27 @@ class TesterAccess:
         return entry
 
     def remove(self, entry_id: UUID) -> None:
-        result = self._session.execute(
-            delete(TesterAllowlistEntry).where(TesterAllowlistEntry.id == entry_id)
-        )
-        if result.rowcount == 0:
+        entry = self._session.get(TesterAllowlistEntry, entry_id)
+        if entry is None:
             raise ValidationAuthError("Tester non trovato.", code="tester_not_found")
+        self.remove_email(entry.email)
+
+    def remove_email(self, email: str) -> None:
+        """Toglie un indirizzo dai tester e cancella le sue richieste di accesso.
+
+        Serve quando un tester viene tolto dalla lista o l'account viene eliminato: senza questo
+        l'indirizzo resterebbe abilitato e chi si registra di nuovo entrerebbe come tester.
+        """
+        from auth.models.tester_request import TesterAccessRequest
+
+        normalized = normalize_tester_email(email)
+        self._session.execute(
+            delete(TesterAllowlistEntry).where(TesterAllowlistEntry.email == normalized)
+        )
+        self._session.execute(
+            delete(TesterAccessRequest).where(TesterAccessRequest.email == normalized)
+        )
+        self._session.flush()
 
     # --- controllo all'accesso ----------------------------------------------------------------
     def assert_allowed(self, *, email: str, platform_role: PlatformRole | None) -> None:
