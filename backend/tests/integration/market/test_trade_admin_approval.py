@@ -294,6 +294,9 @@ def test_max_active_trade_proposals_per_team_is_enforced(
         f"/leagues/{league_id}/rosa", headers={"Authorization": f"Bearer {member_token}"}
     ).json()["id"]
 
+    offered = _seed_athlete(db_session, 9951, "Giocatore Limite Scambi")
+    _own_athlete_at_slot(client, league_id, admin_token, 0, offered)
+
     rules = _set_league_rules(client, league_id, admin_token, max_active_trade_proposals_per_team=2)
     assert rules["maxActiveTradeProposalsPerTeam"] == 2
 
@@ -303,7 +306,8 @@ def test_max_active_trade_proposals_per_team_is_enforced(
             headers={"Authorization": f"Bearer {admin_token}"},
             json={
                 "recipientTeamId": recipient_team_id,
-                "offeredCredits": 5,
+                "offeredAthleteIds": [str(offered.id)],
+                "offeredCredits": 0,
                 "requestedCredits": 5,
                 "expiresAt": _future_iso(),
             },
@@ -315,7 +319,8 @@ def test_max_active_trade_proposals_per_team_is_enforced(
         headers={"Authorization": f"Bearer {admin_token}"},
         json={
             "recipientTeamId": recipient_team_id,
-            "offeredCredits": 5,
+            "offeredAthleteIds": [str(offered.id)],
+            "offeredCredits": 0,
             "requestedCredits": 5,
             "expiresAt": _future_iso(),
         },
