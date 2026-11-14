@@ -384,7 +384,7 @@ def test_self_deleting_tester_loses_access(
     email = "del2.tester@example.com"
     headers = _approved_tester(client, monkeypatch, operator, email, "sub-del2-tester")
 
-    response = client.post("/me/delete", headers=headers, json={"confirmPhrase": "ELIMINA"})
+    response = client.post("/profile/me/delete", headers=headers, json={"confirmPhrase": "ELIMINA"})
     assert response.status_code == 200, response.text
 
     db_session.expire_all()

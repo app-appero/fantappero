@@ -22,8 +22,11 @@ import { Link, useLocation, useNavigate } from "../../router/simpleRouter";
 function GoogleSignInButton({
   onError,
   onCredential,
+  onTesterGate,
 }: {
   onError: (message: string) => void;
+  /** Quando c'è, la richiesta di accesso la mostra la pagina intera (non questa colonna). */
+  onTesterGate?: (info: TesterGateInfo) => void;
   /** When set, the token is handed to the caller instead of starting a web session. */
   onCredential?: (idToken: string) => void;
 }) {
@@ -50,7 +53,11 @@ function GoogleSignInButton({
             // Pilota in modalità test: chi non è tester può chiedere di partecipare.
             const gate = testerGateFromError(error);
             if (gate) {
-              setTesterGate(gate);
+              if (onTesterGate) {
+                onTesterGate(gate);
+              } else {
+                setTesterGate(gate);
+              }
               return;
             }
             onError(getApiErrorMessage(error, "Accesso con Google non riuscito."));
@@ -67,7 +74,7 @@ function GoogleSignInButton({
       attributeFilter: ["data-color-scheme"],
     });
     return () => observer.disconnect();
-  }, [viteGoogleClientId, loginWithGoogle, navigate, onError, onCredential]);
+  }, [viteGoogleClientId, loginWithGoogle, navigate, onError, onCredential, onTesterGate]);
 
   if (!viteGoogleClientId) {
     return null;
@@ -113,10 +120,10 @@ function AppleSignInPlaceholder({ label }: { label: string }) {
   );
 }
 
-function SocialLogins({ onError, appleLabel, dividerLabel }: { onError: (message: string) => void; appleLabel: string; dividerLabel: string | null }) {
+function SocialLogins({ onError, appleLabel, dividerLabel, onTesterGate }: { onError: (message: string) => void; appleLabel: string; dividerLabel: string | null; onTesterGate?: (info: TesterGateInfo) => void }) {
   return (
     <div className="fa-auth-social">
-      <GoogleSignInButton onError={onError} />
+      <GoogleSignInButton onError={onError} onTesterGate={onTesterGate} />
       {SHOW_APPLE_SIGN_IN ? <AppleSignInPlaceholder label={appleLabel} /> : null}
       {dividerLabel ? <p className="fa-auth-layout__divider">{dividerLabel}</p> : null}
     </div>
@@ -349,7 +356,7 @@ function LoginFeatures() {
 }
 
 /** Accesso solo Google: carte giocatore + titolo + un solo bottone. */
-function LoginCardsPage({ firstName, error, onError }: { firstName: string; error: string | null; onError: (message: string) => void }) {
+function LoginCardsPage({ firstName, error, onError, onTesterGate }: { firstName: string; error: string | null; onError: (message: string) => void; onTesterGate: (info: TesterGateInfo) => void }) {
   return (
     <div className="fa-auth-page fa-login fa-login-cards" data-testid="login-page">
       <div className="fa-login-cards__pitch" aria-hidden="true" />
@@ -388,7 +395,7 @@ function LoginCardsPage({ firstName, error, onError }: { firstName: string; erro
           ))}
         </ul>
         <div className="fa-login-cards__cta" data-testid="login-google-only">
-          <SocialLogins onError={onError} appleLabel="Continua con Apple" dividerLabel={null} />
+          <SocialLogins onError={onError} appleLabel="Continua con Apple" dividerLabel={null} onTesterGate={onTesterGate} />
           {error ? <UiStatePanel state="error" title="Accesso non riuscito" message={error} testId="auth-login-error" /> : null}
           <p className="fa-login-cards__note">Niente password: un tocco e sei dentro</p>
           <p className="fa-login-cards__note" data-testid="login-privacy-link">
@@ -416,6 +423,7 @@ export function AuthLoginPage() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [testerGate, setTesterGate] = useState<TesterGateInfo | null>(null);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -447,8 +455,12 @@ export function AuthLoginPage() {
 
   const firstName = remembered?.displayName.trim().split(/\s+/)[0] ?? "";
 
+  if (testerGate) {
+    return <TesterRequestPanel info={testerGate} onBack={() => setTesterGate(null)} />;
+  }
+
   if (!showEmailLogin) {
-    return <LoginCardsPage firstName={firstName} error={error} onError={setError} />;
+    return <LoginCardsPage firstName={firstName} error={error} onError={setError} onTesterGate={setTesterGate} />;
   }
 
   return (
@@ -479,7 +491,7 @@ export function AuthLoginPage() {
         <LoginShowcase />
       </section>
       <section className="fa-login__panel">
-        <SocialLogins onError={setError} appleLabel="Continua con Apple" dividerLabel={showEmailLogin ? (remembered ? "oppure con la password" : "oppure con email") : null} />
+        <SocialLogins onError={setError} appleLabel="Continua con Apple" dividerLabel={showEmailLogin ? (remembered ? "oppure con la password" : "oppure con email") : null} onTesterGate={setTesterGate} />
         {!showEmailLogin ? (
           // Solo Google: l'accesso crea l'account da solo, quindi nessun testo né link «Registrati».
           <div data-testid="login-google-only">
@@ -597,6 +609,10 @@ export function AuthGoogleAppPage() {
     },
     [returnTo],
   );
+
+  if (testerGate) {
+    return <TesterRequestPanel info={testerGate} onBack={() => setTesterGate(null)} />;
+  }
 
   return (
     <div className="fa-auth-page fa-surface-pitch">

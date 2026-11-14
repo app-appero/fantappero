@@ -148,6 +148,19 @@ class TesterRequestService:
                     code="tester_request_pending",
                 )
         now = datetime.now(UTC)
+        if existing is not None:
+            # Richiesta precedente già accolta, ma l'indirizzo non è più tester: la si riapre.
+            existing.first_name = first
+            existing.last_name = last
+            existing.phone = phone_clean
+            existing.motivation = note or None
+            existing.status = STATUS_PENDING
+            existing.consent_at = now
+            existing.decided_at = None
+            existing.decided_by_user_id = None
+            existing.decision_note = None
+            self._session.flush()
+            return existing
         entry = TesterAccessRequest(
             email=normalized,
             first_name=first,
