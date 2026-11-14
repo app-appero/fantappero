@@ -260,7 +260,12 @@ class AuthService:
         except TesterOnlyError as exc:
             requests = TesterRequestService(self._session)
             existing = requests.status_for(identity.email)
-            extra: dict[str, object] = {"requestStatus": existing.status if existing else "none"}
+            extra: dict[str, object] = {
+                "requestStatus": existing.status if existing else "none",
+                # Per mostrare a quale account Google si riferisce la richiesta e precompilare il nome.
+                "requestEmail": identity.email,
+                "requestName": identity.name,
+            }
             if existing is None:
                 extra["requestToken"] = make_request_token(
                     secret=self._settings.resolved_jwt_secret(),
