@@ -284,3 +284,48 @@ def test_list_live_sessions_excludes_sealed_sessions(
     )
     assert sealed_list.status_code == 200
     assert sealed_list.json() == []
+
+
+def test_live_session_window_is_validated_and_expired_session_cannot_start(
+    client: TestClient, db_session: Session, competition_ids: list[str]
+) -> None:
+    admin_token, _ = _register_and_login(client, "live.session.window@example.com")
+    league_id = _create_league(client, admin_token, competition_ids, "Lega Asta Live Finestra")
+    headers = {"Authorization": f"Bearer {admin_token}"}
+    url = f"/leagues/{league_id}/mercato/asta-live/sessioni"
+    now = datetime.now(UTC)
+
+    for opens, closes in (
+        (datetime(2020, 1, 1, tzinfo=UTC), datetime(2020, 1, 2, tzinfo=UTC)),
+        (now, datetime(9000, 1, 1, tzinfo=UTC)),
+        (now - timedelta(days=2), now - timedelta(days=1)),
+    ):
+        response = client.post(
+            url,
+            headers=headers,
+            json={
+                **_manual_session_payload(),
+                "opensAt": opens.isoformat(),
+                "closesAt": closes.isoformat(),
+            },
+        )
+        assert response.status_code == 400, (opens, closes)
+        assert response.json()["code"] == "invalid_session_window"
+
+    # Una sessione valida che scade senza essere avviata non si può più avviare.
+    created = client.post(
+        url,
+        headers=headers,
+        json={
+            **_manual_session_payload(),
+            "opensAt": now.isoformat(),
+            "closesAt": (now + timedelta(seconds=1)).isoformat(),
+        },
+    )
+    assert created.status_code == 201
+    import time
+
+    time.sleep(1.5)
+    started = client.post(f"{url}/{created.json()['id']}/avvia", headers=headers)
+    assert started.status_code == 400
+    assert started.json()["code"] == "invalid_session_window"

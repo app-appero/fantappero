@@ -30,3 +30,7 @@ Aggiornato da Rosario/Claude dopo ogni rapporto. I tester non ripetono i dettagl
 | 2026-11-14 | Rosa | Un partecipante assegna calciatori solo alla PROPRIA rosa con prezzo di almeno 1 credito (addebitato); l'admin può assegnare a tutte le squadre della lega, anche a prezzo 0 | Voluto: non segnalare |
 | 2026-11-14 | Mercato | Rimborso dello svincolo: arrotondato per difetto (50% di 1 credito = 0) | Voluto: non segnalare |
 | 2026-11-14 | Test | `test_saving_the_lineup_discards_the_older_draft` fallisce quando gira con gli altri test della cartella (turno numero 1 duplicato), passa da solo | Aperto, test da riallineare |
+| 2026-11-14 | Mercato | CORRETTI il 14/11 sera (non segnalare): storico mercato che mostrava buste e proposte altrui; asta live con finestra non validata e sessione scaduta avviabile; salta/annulla lotto a mercato chiuso; nomina live di un calciatore senza ruolo; 500 su crediti oltre 2^31, `provider_id` enorme e byte NUL nel CSV; deadlock fra scambi incrociati (blocchi in ordine fisso); link delle notifiche senza `?lega=` | Corretto |
+| 2026-11-14 | Scambi | Uno scambio senza nessun calciatore (solo crediti) è rifiutato (`trade_credits_only`) | Voluto: non segnalare |
+| 2026-11-14 | Rosa | Svincolo o sostituzione dalla propria rosa: l'allenatore riceve la percentuale "Rimborso svincolo volontario" della lega (arrotondata per difetto); l'admin che corregge una rosa restituisce l'intero prezzo | Voluto: non segnalare |
+| 2026-11-14 | Lega | Il partecipante non può uscire da solo dalla lega | Voluto: non segnalare |

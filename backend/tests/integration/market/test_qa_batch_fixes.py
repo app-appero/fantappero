@@ -1346,3 +1346,127 @@ def test_league_event_notifications_reach_the_right_people(
         assert "La lega è partita" in titles(user_id)
         assert "Turno 10 aperto" in titles(user_id)
         assert "Turno 9 aperto" not in titles(user_id)
+
+
+def test_roster_release_refund_follows_league_percent_for_coaches_only(
+    client: TestClient, db_session: Session, competition_ids: list[str]
+) -> None:
+    admin_token, _ = _register_and_login(client, "refund.admin@example.com")
+    member_token, member_id = _register_and_login(client, "refund.member@example.com")
+    league_id = _create_league(client, admin_token, competition_ids, "Lega Rimborso Percentuale")
+    _add_member(db_session, league_id, member_id)
+    first = _seed_athlete(db_session, 9871, "Rimborso Uno")
+    second = _seed_athlete(db_session, 9872, "Rimborso Due")
+    third = _seed_athlete(db_session, 9873, "Rimborso Tre")
+    team_id = client.get(f"/leagues/{league_id}/rosa", headers=_hdr(member_token)).json()["id"]
+
+    def balance() -> int:
+        return client.get(f"/leagues/{league_id}/crediti", headers=_hdr(member_token)).json()[
+            "balance"
+        ]
+
+    def set_percent(value: int) -> None:
+        rules = client.get(f"/leagues/{league_id}/amministrazione", headers=_hdr(admin_token))
+        assert rules.status_code == 200
+        body = rules.json()["rules"]
+        body["voluntaryReleaseRefundPercent"] = value
+        saved = client.put(
+            f"/leagues/{league_id}/amministrazione/regolamento",
+            headers=_hdr(admin_token),
+            json=body,
+        )
+        assert saved.status_code == 200, saved.json()
+
+    set_percent(50)
+    start = balance()
+    # L'allenatore acquista a 25 e poi svincola dalla propria rosa: torna il 50%, per difetto.
+    put = client.put(
+        f"/leagues/{league_id}/amministrazione/squadre/{team_id}/slot/0",
+        headers=_hdr(member_token),
+        json={"athleteId": str(first.id), "purchaseCredits": 25},
+    )
+    assert put.status_code == 200, put.json()
+    assert balance() == start - 25
+    released = client.delete(
+        f"/leagues/{league_id}/amministrazione/squadre/{team_id}/slot/0",
+        headers=_hdr(member_token),
+    )
+    assert released.status_code == 200, released.json()
+    assert balance() == start - 25 + 12  # floor(25 * 50 / 100)
+
+    # Sostituire uno slot occupato rimborsa il vecchio calciatore con la stessa regola.
+    set_percent(40)
+    before = balance()
+    assert (
+        client.put(
+            f"/leagues/{league_id}/amministrazione/squadre/{team_id}/slot/1",
+            headers=_hdr(member_token),
+            json={"athleteId": str(second.id), "purchaseCredits": 10},
+        ).status_code
+        == 200
+    )
+    assert (
+        client.put(
+            f"/leagues/{league_id}/amministrazione/squadre/{team_id}/slot/1",
+            headers=_hdr(member_token),
+            json={"athleteId": str(third.id), "purchaseCredits": 10},
+        ).status_code
+        == 200
+    )
+    assert balance() == before - 10 + 4 - 10  # acquisto, rimborso 40% di 10, nuovo acquisto
+
+    # L'amministratore che corregge la rosa restituisce l'intero prezzo.
+    before_admin = balance()
+    assert (
+        client.delete(
+            f"/leagues/{league_id}/amministrazione/squadre/{team_id}/slot/1",
+            headers=_hdr(admin_token),
+        ).status_code
+        == 200
+    )
+    assert balance() == before_admin + 10
+
+
+def test_trade_with_credits_only_is_rejected(
+    client: TestClient, db_session: Session, competition_ids: list[str]
+) -> None:
+    admin_token, _ = _register_and_login(client, "credonly.admin@example.com")
+    a_token, a_id = _register_and_login(client, "credonly.a@example.com")
+    b_token, b_id = _register_and_login(client, "credonly.b@example.com")
+    league_id = _create_league(client, admin_token, competition_ids, "Lega Scambi Solo Crediti")
+    _add_member(db_session, league_id, a_id)
+    _add_member(db_session, league_id, b_id)
+    player = _seed_athlete(db_session, 9881, "Scambio Con Giocatore")
+    team_a = client.get(f"/leagues/{league_id}/rosa", headers=_hdr(a_token)).json()["id"]
+    team_b = client.get(f"/leagues/{league_id}/rosa", headers=_hdr(b_token)).json()["id"]
+    _assign_priced(client, league_id, admin_token, team_a, 0, player, 5)
+
+    url = f"/leagues/{league_id}/mercato/scambi/proposte"
+    only_credits = client.post(
+        url,
+        headers=_hdr(a_token),
+        json={
+            "recipientTeamId": team_b,
+            "offeredAthleteIds": [],
+            "requestedAthleteIds": [],
+            "offeredCredits": 3,
+            "requestedCredits": 2,
+            "expiresAt": _future_iso(),
+        },
+    )
+    assert only_credits.status_code == 400, only_credits.json()
+    assert only_credits.json()["code"] == "trade_credits_only"
+
+    with_player = client.post(
+        url,
+        headers=_hdr(a_token),
+        json={
+            "recipientTeamId": team_b,
+            "offeredAthleteIds": [str(player.id)],
+            "requestedAthleteIds": [],
+            "offeredCredits": 0,
+            "requestedCredits": 2,
+            "expiresAt": _future_iso(),
+        },
+    )
+    assert with_player.status_code == 201, with_player.json()

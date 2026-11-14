@@ -398,3 +398,51 @@ def test_history_requires_league_membership(
 
     response = _history(client, league_id, outsider_token)
     assert response.status_code == 403
+
+
+def test_history_hides_sealed_bids_of_others_while_session_is_open(
+    client: TestClient,
+    db_session: Session,
+    competition_ids: list[str],
+) -> None:
+    admin_token, _ = _register_and_login(client, "hist.sealed.admin@example.com")
+    member_token, member_id = _register_and_login(client, "hist.sealed.member@example.com")
+    league_id = _create_league(client, admin_token, competition_ids, "Lega Storico Buste")
+    _add_member(db_session, league_id, member_id)
+    athlete = _seed_athlete(db_session, 9811, "Giocatore Busta Segreta")
+    member_team_id = _team_id(client, league_id, member_token)
+
+    session_id = _create_open_session(client, admin_token, league_id)
+    assert _bid(client, league_id, session_id, member_token, athlete.id, 77).status_code == 200
+
+    def bid_events(token: str, **params):
+        items = _history(client, league_id, token, **params).json()["items"]
+        return [item for item in items if item["action"] == "market_bid_submitted"]
+
+    assert len(bid_events(member_token)) == 1  # l'autore vede la propria busta
+    assert bid_events(admin_token) == []  # nemmeno l'admin vede le buste altrui
+    assert bid_events(admin_token, fantasyTeamId=member_team_id) == []
+
+    _close_and_resolve(client, league_id, session_id, admin_token)
+    assert len(bid_events(admin_token)) == 1  # dopo la chiusura le buste sono pubbliche
+
+
+def test_history_private_trade_events_visible_only_to_parties_and_reviewers() -> None:
+    from types import SimpleNamespace
+
+    from database.enums import LeagueAuditAction
+    from market.history_service import MarketHistoryService
+
+    row = SimpleNamespace(
+        action=LeagueAuditAction.MARKET_TRADE_PROPOSED,
+        details={"proposalId": "p1"},
+    )
+    teams = {"p1": ("team-a", "team-b")}
+    visible = MarketHistoryService._is_visible
+    assert visible(row, "team-a", False, set(), teams)
+    assert visible(row, "team-b", False, set(), teams)
+    assert not visible(row, "team-c", False, set(), teams)
+    assert not visible(row, None, False, set(), teams)
+    assert visible(row, "team-c", True, set(), teams)  # proprietario/operatore
+    executed = SimpleNamespace(action=LeagueAuditAction.MARKET_TRADE_ACCEPTED, details={})
+    assert visible(executed, "team-c", False, set(), teams)  # scambi eseguiti: pubblici

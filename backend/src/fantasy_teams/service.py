@@ -130,8 +130,10 @@ from fantasy_teams.xlsx_roster import (
 from leagues.models.league import League
 from leagues.models.league_audit_event import LeagueAuditEvent
 from leagues.models.league_membership import LeagueMembership
+from leagues.models.league_rules import LeagueRules
 from leagues.standings_service import compute_league_standings
 from market.gate import assert_market_open
+from market.validators import compute_release_refund
 from observability.context import get_correlation_id
 from observability.logging import get_logger
 from observability.metrics import get_metrics
@@ -801,7 +803,9 @@ class FantasyTeamService:
                 slot_index=slot_index,
                 athlete_id=previous_athlete_id,
                 athlete_name=previous.canonical_name if previous is not None else "Calciatore",
-                purchase_credits=previous_purchase,
+                purchase_credits=self._release_refund_credits(
+                    league_access, league.id, previous_purchase
+                ),
                 actor_id=league_access.user.id,
             )
 
@@ -953,13 +957,14 @@ class FantasyTeamService:
         assert account is not None
         athlete = self._session.get(Athlete, previous_athlete_id)
         athlete_name = athlete.canonical_name if athlete is not None else "Calciatore"
+        refund_credits = self._release_refund_credits(league_access, league.id, previous_purchase)
         self._refund_purchase(
             account,
             team_id=team.id,
             slot_index=slot_index,
             athlete_id=previous_athlete_id,
             athlete_name=athlete_name,
-            purchase_credits=previous_purchase,
+            purchase_credits=refund_credits,
             actor_id=league_access.user.id,
         )
 
@@ -1000,7 +1005,7 @@ class FantasyTeamService:
                 "fantasyTeamId": str(team.id),
                 "slotIndex": slot_index,
                 "athleteId": str(previous_athlete_id),
-                "refundedCredits": previous_purchase,
+                "refundedCredits": refund_credits,
             },
         )
         report = self._sync_composition(team, league, actor_id=league_access.user.id)
@@ -1696,6 +1701,22 @@ class FantasyTeamService:
                 if isinstance(name, str)
             ],
         )
+
+    def _release_refund_credits(
+        self, league_access: LeagueAccess, league_id: UUID, purchase_credits: int | None
+    ) -> int:
+        """Quanto torna in cassa quando un calciatore lascia la rosa.
+
+        L'amministratore che corregge una rosa restituisce l'intero prezzo; l'allenatore che
+        svincola o sostituisce dalla propria rosa riceve la percentuale di "svincolo volontario"
+        scelta nella configurazione della lega (arrotondata per difetto).
+        """
+        paid = purchase_credits or 0
+        if paid <= 0 or self._is_league_admin(league_access):
+            return max(paid, 0)
+        rules = self._session.scalar(select(LeagueRules).where(LeagueRules.league_id == league_id))
+        percent = rules.voluntary_release_refund_percent if rules is not None else 100
+        return compute_release_refund(purchase_credits=paid, refund_percent=percent)
 
     def _refund_purchase(
         self,

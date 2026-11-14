@@ -612,6 +612,7 @@ class NamedLeagueInviteService:
             template_key="sistema.invito_lega_esito",
             template_version=1,
             params={
+                "league_id": str(league.id),
                 "league_name": league.name,
                 "coach_name": coach_name,
                 "outcome": "accepted" if action == "accept" else "declined",

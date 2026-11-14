@@ -109,12 +109,12 @@ def _render_sistema_invito_lega_esito(params: NotificationParams) -> Notificatio
         return NotificationContent(
             title="Invito accettato",
             body=f"{coach_name} ha accettato l'invito a «{league_name}».",
-            deep_link="/fantallenatori",
+            deep_link=_league_link("/fantallenatori", params),
         )
     return NotificationContent(
         title="Invito rifiutato",
         body=f"{coach_name} ha rifiutato l'invito a «{league_name}».",
-        deep_link="/fantallenatori",
+        deep_link=_league_link("/fantallenatori", params),
     )
 
 
@@ -124,11 +124,12 @@ def _render_formazione_scadenza_turno(params: NotificationParams) -> Notificatio
     cutoff_local = params.get("cutoff_local")
     return NotificationContent(
         title="Scadenza formazione in arrivo",
-        body=(
+        body=_league_body(
             f"Il turno {round_number} chiude alle {cutoff_local}. "
-            "Salva la formazione prima del fischio d'inizio."
+            "Salva la formazione prima del fischio d'inizio.",
+            params,
         ),
-        deep_link="/formazione",
+        deep_link=_league_link("/formazione", params),
     )
 
 
@@ -145,11 +146,12 @@ def _render_formazione_blocco_imminente(params: NotificationParams) -> Notificat
     pronoun = "il suo" if player_count == 1 else "il loro"
     return NotificationContent(
         title="Blocco formazione in arrivo",
-        body=(
+        body=_league_body(
             f"Tra poco {verb} {subject} della tua formazione: "
-            f"{pronoun} turno inizia alle {kickoff_local}."
+            f"{pronoun} turno inizia alle {kickoff_local}.",
+            params,
         ),
-        deep_link="/formazione",
+        deep_link=_league_link("/formazione", params),
     )
 
 
@@ -271,8 +273,10 @@ def _render_risultati_omologazione(params: NotificationParams) -> NotificationCo
     round_number = params.get("round_number")
     return NotificationContent(
         title="Turno omologato",
-        body=f"Il turno {round_number} è stato omologato: il risultato è definitivo.",
-        deep_link="/classifica",
+        body=_league_body(
+            f"Il turno {round_number} è stato omologato: il risultato è definitivo.", params
+        ),
+        deep_link=_league_link("/classifica", params),
     )
 
 
@@ -281,11 +285,12 @@ def _render_risultati_correzione(params: NotificationParams) -> NotificationCont
     round_number = params.get("round_number")
     return NotificationContent(
         title="Correzione al turno omologato",
-        body=(
+        body=_league_body(
             f"Il turno {round_number} è stato riaperto per una correzione: "
-            "il punteggio sarà ricalcolato."
+            "il punteggio sarà ricalcolato.",
+            params,
         ),
-        deep_link="/classifica",
+        deep_link=_league_link("/classifica", params),
     )
 
 
@@ -296,7 +301,7 @@ def _live_content(title_fmt: str, body_fmt: str, params: NotificationParams) -> 
     return NotificationContent(
         title=title_fmt,
         body=body_fmt.format(player=player, suffix=suffix),
-        deep_link="/turni",
+        deep_link=_league_link("/turni", params),
     )
 
 
@@ -354,7 +359,9 @@ def _live_content_v2(
         _team_note(params),
     )
     resolved = params.get("deep_link")
-    final_deep_link = str(resolved) if isinstance(resolved, str) and resolved else deep_link
+    final_deep_link = _league_link(
+        str(resolved) if isinstance(resolved, str) and resolved else deep_link, params
+    )
     return NotificationContent(title=title, body=body, deep_link=final_deep_link)
 
 

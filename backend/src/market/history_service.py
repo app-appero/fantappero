@@ -14,7 +14,7 @@ operation to leave partial).
 from __future__ import annotations
 
 import math
-from datetime import datetime
+from datetime import UTC, datetime
 from uuid import UUID
 
 from sqlalchemy import select
@@ -22,10 +22,13 @@ from sqlalchemy.orm import Session
 
 from auth.exceptions import ValidationAuthError
 from authorization.context import LeagueAccess
-from database.enums import LeagueAuditAction
+from database.enums import LeagueAuditAction, LeagueMemberRole, MarketSessionStatus
+from fantasy_teams.models import FantasyTeam
 from leagues.models.league_audit_event import LeagueAuditEvent
+from leagues.models.league_membership import LeagueMembership
 from market.history_schemas import MarketHistoryEntryResponse, MarketHistoryListResponse
-from market.models import TradeProposal
+from market.models import MarketSession, TradeProposal
+from market.windows import effective_status
 
 # Every audit action that can appear in the market history, grouped by the
 # category the card asks the feed to distinguish ("acquisti, svincoli,
@@ -44,6 +47,20 @@ _ACQUISTO_ACTIONS = frozenset(
         LeagueAuditAction.MARKET_BID_WITHDRAWN,
         LeagueAuditAction.MARKET_SESSION_RESOLVED,
         LeagueAuditAction.MARKET_TIEBREAK_OPENED,
+    }
+)
+# Eventi che riguardano solo le squadre coinvolte (buste e proposte di scambio non ancora decise):
+# gli altri membri non devono vederli, altrimenti l'asta a buste chiuse non è più segreta.
+_SEALED_BID_ACTIONS = frozenset(
+    {LeagueAuditAction.MARKET_BID_SUBMITTED, LeagueAuditAction.MARKET_BID_WITHDRAWN}
+)
+_PRIVATE_TRADE_ACTIONS = frozenset(
+    {
+        LeagueAuditAction.MARKET_TRADE_PROPOSED,
+        LeagueAuditAction.MARKET_TRADE_CANCELLED,
+        LeagueAuditAction.MARKET_TRADE_REJECTED,
+        LeagueAuditAction.MARKET_TRADE_COUNTERED,
+        LeagueAuditAction.MARKET_TRADE_REJECTED_BY_ADMIN,
     }
 )
 _SCAMBIO_ACTIONS = frozenset(
@@ -141,6 +158,60 @@ class MarketHistoryService:
     def __init__(self, session: Session) -> None:
         self._session = session
 
+    def _viewer_team_id(self, league_access: LeagueAccess) -> str | None:
+        team_id = self._session.scalar(
+            select(FantasyTeam.id)
+            .join(LeagueMembership, LeagueMembership.id == FantasyTeam.membership_id)
+            .where(
+                LeagueMembership.league_id == league_access.league.id,
+                LeagueMembership.user_id == league_access.user.id,
+            )
+        )
+        return str(team_id) if team_id is not None else None
+
+    def _open_session_ids(self, league_id: UUID) -> set[str]:
+        """Sessioni a buste non ancora chiuse: le loro buste sono segrete."""
+        now = datetime.now(UTC)
+        rows = self._session.scalars(
+            select(MarketSession).where(MarketSession.league_id == league_id)
+        ).all()
+        return {
+            str(row.id)
+            for row in rows
+            if effective_status(row, now=now)
+            not in (MarketSessionStatus.CLOSED, MarketSessionStatus.RESOLVED)
+        }
+
+    @staticmethod
+    def _is_visible(
+        row: LeagueAuditEvent,
+        viewer_team_id: str | None,
+        reviewer: bool,
+        open_sessions: set[str],
+        proposal_teams: dict[str, tuple[str, str]],
+    ) -> bool:
+        details = row.details or {}
+        if row.action in _SEALED_BID_ACTIONS:
+            session_id = details.get("sessionId")
+            if isinstance(session_id, str) and session_id not in open_sessions:
+                return True  # sessione chiusa: le buste diventano pubbliche
+            return viewer_team_id is not None and details.get("fantasyTeamId") == viewer_team_id
+        if row.action in _PRIVATE_TRADE_ACTIONS:
+            if reviewer:
+                return True
+            if viewer_team_id is None:
+                return False
+            teams: set[str] = set()
+            for proposal_id in proposal_ids_in(details):
+                teams.update(proposal_teams.get(proposal_id, ()))
+            teams.update(
+                value
+                for key in ("proposerTeamId", "recipientTeamId")
+                if isinstance(value := details.get(key), str)
+            )
+            return viewer_team_id in teams
+        return True
+
     def list_history(
         self,
         league_access: LeagueAccess,
@@ -193,10 +264,18 @@ class MarketHistoryService:
                     str(recipient_team_id),
                 )
 
+        viewer_team_id = self._viewer_team_id(league_access)
+        reviewer = (
+            league_access.operator_bypass or league_access.membership_role == LeagueMemberRole.OWNER
+        )
+        open_sessions = self._open_session_ids(league_access.league.id)
+
         filtered: list[tuple[LeagueAuditEvent, str]] = []
         for row in rows:
             row_category = category_for(row.action, row.details)
             if row_category is None:
+                continue
+            if not self._is_visible(row, viewer_team_id, reviewer, open_sessions, proposal_teams):
                 continue
             if category is not None and row_category != category:
                 continue

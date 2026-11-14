@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session
 
 from database.enums import NotificationCategory
 from fantasy_teams.models import FantasyRosterSlot, FantasyTeam
+from notifications.league_context import league_params
 from notifications.matchup_links import resolve_matchup_deep_link
 from notifications.recipients import user_ids_for_teams
 from notifications.service import NotificationService
@@ -78,9 +79,11 @@ def _notify_owners(
         deep_link = resolve_matchup_deep_link(
             session, team_id=team_id, fixture_id=fixture_id, fallback=deep_link_fallback
         )
+        team_league_id = getattr(team, "league_id", None)
         recipient_params = {
             **params,
             **({"team_name": team_name} if team_name else {}),
+            **(league_params(session, team_league_id) if team_league_id else {}),
             "deep_link": deep_link,
         }
         with session.begin_nested():

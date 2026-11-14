@@ -1120,3 +1120,24 @@ def test_create_league_enqueue_failure_does_not_rollback_league(
     assert created.status_code == 201
     league_id = created.json()["id"]
     assert db_session.get(League, UUID(league_id)) is not None
+
+
+def test_rules_total_credits_above_int32_is_rejected_not_500(
+    client: TestClient, competition_ids: list[str]
+) -> None:
+    token, _ = _register_and_login(client, "rules.credits@example.com")
+    headers = {"Authorization": f"Bearer {token}"}
+    created = client.post(
+        "/leagues",
+        headers=headers,
+        json={"name": "Lega Crediti Enormi", "seasonYear": 2026, "competitionIds": competition_ids},
+    )
+    assert created.status_code == 201
+    url = f"/leagues/{created.json()['id']}/amministrazione/regolamento"
+    payload = _standard_rules_payload(4)
+
+    too_big = client.put(url, headers=headers, json={**payload, "totalCredits": 2**31})
+    assert too_big.status_code == 400
+    assert too_big.json()["code"] == "invalid_total_credits"
+    ok = client.put(url, headers=headers, json={**payload, "totalCredits": 2**31 - 1})
+    assert ok.status_code == 200
