@@ -322,22 +322,38 @@ def test_second_live_auction_in_same_league_is_rejected(
     assert second.json()["code"] == "market_session_already_active"
 
 
-def test_member_cannot_assign_roster_slot_even_at_zero_price(
+def test_member_assigns_only_own_roster_and_never_at_zero_price(
     client: TestClient, db_session: Session, competition_ids: list[str]
 ) -> None:
     admin_token, _ = _register_and_login(client, "n12.admin@example.com")
     member_token, member_id = _register_and_login(client, "n12.member@example.com")
+    other_token, other_id = _register_and_login(client, "n12.other@example.com")
     league_id = _create_league(client, admin_token, competition_ids, "Lega N12")
     _add_member(db_session, league_id, member_id)
-    athlete = _seed_athlete(db_session, 9804, "Gratis Vietato")
+    _add_member(db_session, league_id, other_id)
+    athlete = _seed_athlete(db_session, 9804, "Prezzo Minimo")
+    other_athlete = _seed_athlete(db_session, 9813, "Altra Rosa")
     team_id = client.get(f"/leagues/{league_id}/rosa", headers=_hdr(member_token)).json()["id"]
-    response = client.put(
-        f"/leagues/{league_id}/amministrazione/squadre/{team_id}/slot/0",
-        headers=_hdr(member_token),
-        json={"athleteId": str(athlete.id), "purchaseCredits": 0},
-    )
-    assert response.status_code == 400
-    assert response.json()["code"] == "roster_assign_forbidden"
+    other_team = client.get(f"/leagues/{league_id}/rosa", headers=_hdr(other_token)).json()["id"]
+
+    def put(token: str, team: str, who, price: int):
+        return client.put(
+            f"/leagues/{league_id}/amministrazione/squadre/{team}/slot/0",
+            headers=_hdr(token),
+            json={"athleteId": str(who.id), "purchaseCredits": price},
+        )
+
+    zero = put(member_token, team_id, athlete, 0)
+    assert zero.status_code == 400
+    assert zero.json()["code"] == "purchase_credits_required"
+    foreign = put(member_token, other_team, other_athlete, 5)
+    assert foreign.status_code == 400
+    assert foreign.json()["code"] == "roster_edit_forbidden"
+    own = put(member_token, team_id, athlete, 5)
+    assert own.status_code == 200, own.json()
+    # L'admin può assegnare a qualunque squadra della lega.
+    by_admin = put(admin_token, other_team, other_athlete, 5)
+    assert by_admin.status_code == 200, by_admin.json()
 
 
 def _assign_priced(

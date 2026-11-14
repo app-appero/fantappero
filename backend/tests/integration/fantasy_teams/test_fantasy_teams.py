@@ -404,23 +404,24 @@ def test_member_can_edit_own_roster_not_others_and_purchase_is_tracked(
     assert credits_before.status_code == 200
     balance_before = credits_before.json()["balance"]
 
-    # N12: un membro non assegna calciatori nemmeno alla propria rosa.
-    self_assign = client.put(
+    # Un partecipante non si assegna un calciatore a prezzo 0.
+    zero_price = client.put(
         f"/leagues/{league_id}/amministrazione/squadre/{member_team}/slot/0",
         headers={"Authorization": f"Bearer {member_token}"},
         json={"athleteId": str(athlete.id), "purchaseCredits": 0},
     )
-    assert self_assign.status_code == 400
-    assert self_assign.json()["code"] == "roster_assign_forbidden"
+    assert zero_price.status_code == 400
+    assert zero_price.json()["code"] == "purchase_credits_required"
     unchanged = client.get(
         f"/leagues/{league_id}/crediti",
         headers={"Authorization": f"Bearer {member_token}"},
     )
     assert unchanged.json()["balance"] == balance_before
 
+    # Con almeno 1 credito la assegna alla propria squadra e il costo viene addebitato.
     assigned = client.put(
         f"/leagues/{league_id}/amministrazione/squadre/{member_team}/slot/0",
-        headers={"Authorization": f"Bearer {owner_token}"},
+        headers={"Authorization": f"Bearer {member_token}"},
         json={"athleteId": str(athlete.id), "purchaseCredits": 15},
     )
     assert assigned.status_code == 200

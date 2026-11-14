@@ -718,17 +718,16 @@ class FantasyTeamService:
         assert_market_open(league)
         team = self._get_team_for_update(league.id, team_id)
         self._assert_can_edit_team(league_access, team)
-        if not self._is_league_admin(league_access):
-            # N12: un membro non assegna calciatori a mano (nemmeno a prezzo 0): si entra
-            # in rosa solo da asta, scambi o decisione dell'amministratore.
-            raise ValidationAuthError(
-                "Solo l'amministratore può assegnare calciatori direttamente: "
-                "usa l'asta o gli scambi.",
-                code="roster_assign_forbidden",
-            )
         roster_size = resolve_roster_size(self._session, league.id)
         validate_slot_index(slot_index=slot_index, roster_size=roster_size)
         purchase_credits = validate_purchase_credits(payload.purchase_credits)
+        if purchase_credits < 1 and not self._is_league_admin(league_access):
+            # Un partecipante non si assegna un calciatore a prezzo 0: costa almeno 1 credito.
+            # Il partecipante agisce solo sulla propria rosa (vedi `_assert_can_edit_team`).
+            raise ValidationAuthError(
+                "Il prezzo d'acquisto deve essere di almeno 1 credito.",
+                code="purchase_credits_required",
+            )
 
         try:
             athlete_id = UUID(payload.athlete_id)
