@@ -75,6 +75,17 @@ def validate_trade_sides_not_empty(
         )
 
 
+def validate_trade_involves_athletes(
+    *, offered_athlete_ids: list[UUID], requested_athlete_ids: list[UUID]
+) -> None:
+    """Uno scambio di soli crediti, senza nessun calciatore, non è uno scambio."""
+    if not offered_athlete_ids and not requested_athlete_ids:
+        raise ValidationAuthError(
+            "Uno scambio deve coinvolgere almeno un calciatore: i soli crediti non bastano.",
+            code="trade_credits_only",
+        )
+
+
 def validate_no_athlete_overlap(
     *, offered_athlete_ids: list[UUID], requested_athlete_ids: list[UUID]
 ) -> None:

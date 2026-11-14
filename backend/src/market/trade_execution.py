@@ -39,6 +39,7 @@ def _locked_slots_for_athletes(
             FantasyRosterSlot.fantasy_team_id == team_id,
             FantasyRosterSlot.athlete_id.in_(athlete_ids),
         )
+        .order_by(FantasyRosterSlot.slot_index)
         .with_for_update()
     ).all()
     found_ids = {slot.athlete_id for slot in slots}
@@ -63,21 +64,26 @@ def execute_trade(
     offered_ids = [UUID(value) for value in proposal.offered_athlete_ids]
     requested_ids = [UUID(value) for value in proposal.requested_athlete_ids]
 
-    proposer_out_slots = _locked_slots_for_athletes(
-        session,
-        team_id=proposer_team.id,
-        athlete_ids=offered_ids,
-        side_label="offerti dal proponente",
-    )
-    recipient_out_slots = _locked_slots_for_athletes(
-        session,
-        team_id=recipient_team.id,
-        athlete_ids=requested_ids,
-        side_label="richiesti al destinatario",
-    )
+    # Ordine dei blocchi sempre uguale (per id squadra): due scambi che si incrociano
+    # sulle stesse due squadre non si bloccano a vicenda (deadlock).
+    accounts = {}
+    for team in sorted((proposer_team, recipient_team), key=lambda item: str(item.id)):
+        accounts[team.id] = find_account_for_team(session, team.id, for_update=True)
+    proposer_account = accounts[proposer_team.id]
+    recipient_account = accounts[recipient_team.id]
 
-    proposer_account = find_account_for_team(session, proposer_team.id, for_update=True)
-    recipient_account = find_account_for_team(session, recipient_team.id, for_update=True)
+    slots_by_team: dict[UUID, list[FantasyRosterSlot]] = {}
+    sides = (
+        (proposer_team.id, offered_ids, "offerti dal proponente"),
+        (recipient_team.id, requested_ids, "richiesti al destinatario"),
+    )
+    for team_id, athlete_ids, side_label in sorted(sides, key=lambda item: str(item[0])):
+        slots_by_team[team_id] = _locked_slots_for_athletes(
+            session, team_id=team_id, athlete_ids=athlete_ids, side_label=side_label
+        )
+    proposer_out_slots = slots_by_team[proposer_team.id]
+    recipient_out_slots = slots_by_team[recipient_team.id]
+
     if proposer_account is None or proposer_account.balance < proposal.offered_credits:
         raise ValidationAuthError(
             "Il proponente non ha più crediti sufficienti per lo scambio.",

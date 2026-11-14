@@ -150,10 +150,18 @@ def validate_participant_count(participant_count: int) -> int:
     return participant_count
 
 
+MAX_TOTAL_CREDITS = 2**31 - 1  # la colonna è a 32 bit
+
+
 def validate_total_credits(total_credits: int) -> int:
     if total_credits <= 0:
         raise ValidationAuthError(
             "I crediti devono essere maggiori di zero.",
+            code="invalid_total_credits",
+        )
+    if total_credits > MAX_TOTAL_CREDITS:
+        raise ValidationAuthError(
+            "I crediti totali sono troppo alti.",
             code="invalid_total_credits",
         )
     return total_credits

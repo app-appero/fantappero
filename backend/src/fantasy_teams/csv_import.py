@@ -138,6 +138,9 @@ def parse_roster_csv(data: bytes) -> list[ParsedCsvRow]:
         if provider_raw:
             try:
                 provider_id = int(provider_raw)
+                if abs(provider_id) > _INT32_MAX:
+                    provider_id = None
+                    raw["_provider_id_invalid"] = provider_raw
             except ValueError:
                 raw["_provider_id_invalid"] = provider_raw
 
@@ -145,6 +148,9 @@ def parse_roster_csv(data: bytes) -> list[ParsedCsvRow]:
         if crediti_raw:
             try:
                 crediti = int(crediti_raw)
+                if abs(crediti) > _INT32_MAX:
+                    crediti = None
+                    raw["_crediti_invalid"] = crediti_raw
             except ValueError:
                 raw["_crediti_invalid"] = crediti_raw
 
@@ -167,7 +173,16 @@ def parse_roster_csv(data: bytes) -> list[ParsedCsvRow]:
     return rows
 
 
+_INT32_MAX = 2**31 - 1
+
+
 def _decode_csv(data: bytes) -> str:
+    if b"\x00" in data:
+        # Il byte NUL non è testo valido e Postgres lo rifiuta: meglio un 400 che un 500.
+        raise ValidationAuthError(
+            "Il file contiene caratteri non validi.",
+            code="csv_invalid_encoding",
+        )
     if data.startswith(b"\xef\xbb\xbf"):
         data = data[3:]
     for encoding in ("utf-8", "utf-8-sig", "cp1252", "latin-1"):

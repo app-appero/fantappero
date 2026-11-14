@@ -267,3 +267,39 @@ def test_csv_preview_row_errors_and_member_forbidden(
     ).all()
     assert len(sessions) >= 1
     assert all(row.status.value == "draft" for row in sessions)
+
+
+def test_csv_preview_oversized_numbers_and_nul_byte_are_errors_not_500(
+    client: TestClient,
+    db_session: Session,
+    competition_ids: list[str],
+) -> None:
+    owner_token, _ = _register_and_login(client, "csv.huge@example.com")
+    league_id = _create_league(client, owner_token, competition_ids, "Lega CSV Enormi")
+    headers = {"Authorization": f"Bearer {owner_token}"}
+    url = f"/leagues/{league_id}/amministrazione/import-csv/anteprima"
+
+    huge = client.post(
+        url,
+        headers=headers,
+        files={
+            "file": (
+                "huge.csv",
+                b"squadra,provider_id,nome,crediti\nA,99999999999999999999,B,5\nA,1,B,99999999999\n",
+                "text/csv",
+            )
+        },
+    )
+    assert huge.status_code == 200
+    assert huge.json()["canConfirm"] is False
+    assert all(row["status"] == "error" for row in huge.json()["rows"])
+
+    nul = client.post(
+        url,
+        headers=headers,
+        files={
+            "file": ("nul.csv", b"squadra,provider_id,nome,crediti\nA,1,B\x00C,1\n", "text/csv")
+        },
+    )
+    assert nul.status_code == 400
+    assert nul.json()["code"] == "csv_invalid_encoding"

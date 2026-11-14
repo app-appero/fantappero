@@ -32,6 +32,7 @@ from fantasy_turns.models import FantasyRound
 from leagues.models.league import League
 from leagues.models.league_membership import LeagueMembership
 from leagues.models.league_rules import LeagueRules
+from notifications.league_context import league_params
 from notifications.reminder_service import _format_local
 from notifications.service import NotificationService
 
@@ -120,6 +121,7 @@ class LineupLockReminderService:
                         "round_number": round_.number,
                         "kickoff_local": _format_local(next_lock, tz_name),
                         "player_count": player_count,
+                        **league_params(self._session, round_.league_id),
                     },
                     dedup_key=f"lineup_lock_reminder:{round_.id}:{team_id}:{next_lock.isoformat()}",
                 )

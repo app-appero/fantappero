@@ -786,3 +786,56 @@ def test_concurrent_raises_leave_one_leader_and_correct_amount(
     assert db_row is not None
     assert db_row.current_amount_credits == 10
     assert db_row.current_leader_team_id is not None
+
+
+def test_pass_and_cancel_lot_blocked_when_market_closed(
+    client: TestClient, db_session: Session, competition_ids: list[str]
+) -> None:
+    admin_token, _ = _register_and_login(client, "live.lot.closed.admin@example.com")
+    bidder_token, bidder_id = _register_and_login(client, "live.lot.closed.bidder@example.com")
+    league_id = _create_league(client, admin_token, competition_ids, "Lega Lotti Mercato Chiuso")
+    _add_member(db_session, league_id, bidder_id)
+    athlete = _seed_athlete(db_session, 92501, "Calciatore Mercato Chiuso")
+    base = f"/leagues/{league_id}/mercato/asta-live/sessioni"
+
+    session_id = _start_manual_session(client, admin_token, league_id)
+    lot = _nominate(client, admin_token, league_id, session_id, athlete.id)
+    headers = {"Authorization": f"Bearer {admin_token}"}
+    assert (
+        client.put(
+            f"{base}/{session_id}/lotti/{lot['id']}/rilanci",
+            headers={"Authorization": f"Bearer {bidder_token}"},
+            json={"amountCredits": 10},
+        ).status_code
+        == 200
+    )
+    client.post(f"/leagues/{league_id}/mercato/stato", headers=headers, json={"open": False})
+
+    for action in ("salta", "annulla"):
+        blocked = client.post(f"{base}/{session_id}/lotti/{lot['id']}/{action}", headers=headers)
+        assert blocked.status_code == 400, action
+        assert blocked.json()["code"] == "market_closed", action
+
+    client.post(f"/leagues/{league_id}/mercato/stato", headers=headers, json={"open": True})
+    passed = client.post(f"{base}/{session_id}/lotti/{lot['id']}/salta", headers=headers)
+    assert passed.status_code == 200
+
+
+def test_live_nomination_rejected_for_athlete_without_valid_role(
+    client: TestClient, db_session: Session, competition_ids: list[str]
+) -> None:
+    admin_token, _ = _register_and_login(client, "live.lot.norole.admin@example.com")
+    league_id = _create_league(client, admin_token, competition_ids, "Lega Lotti Senza Ruolo")
+    no_role = Athlete(provider_id=92510, canonical_name="Calciatore Senza Ruolo")
+    db_session.add(no_role)
+    db_session.commit()
+    db_session.refresh(no_role)
+
+    session_id = _start_manual_session(client, admin_token, league_id)
+    response = client.post(
+        f"/leagues/{league_id}/mercato/asta-live/sessioni/{session_id}/lotti/nomina",
+        headers={"Authorization": f"Bearer {admin_token}"},
+        json={"athleteId": str(no_role.id)},
+    )
+    assert response.status_code == 400
+    assert response.json()["code"] == "role_unresolved"

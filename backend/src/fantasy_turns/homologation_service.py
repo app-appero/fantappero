@@ -22,6 +22,7 @@ from fantasy_ratings.config import default_formula_config
 from fantasy_turns.models import FantasyRound
 from fantasy_turns.readiness import evaluate_round_readiness
 from leagues.models.league_audit_event import LeagueAuditEvent
+from notifications.league_context import league_params
 from notifications.recipients import user_ids_for_league
 from notifications.service import NotificationService
 from observability.context import get_correlation_id
@@ -108,7 +109,10 @@ def homologate_round(
             category=NotificationCategory.RISULTATI,
             template_key="risultati.omologazione",
             template_version=1,
-            params={"round_number": fantasy_round.number},
+            params={
+                "round_number": fantasy_round.number,
+                **league_params(session, fantasy_round.league_id),
+            },
             dedup_key=f"round_homologated:{round_id}:{now.isoformat()}:{user_id}",
         )
     session.flush()
@@ -220,7 +224,10 @@ def apply_round_correction(
             category=NotificationCategory.RISULTATI,
             template_key="risultati.correzione",
             template_version=1,
-            params={"round_number": fantasy_round.number},
+            params={
+                "round_number": fantasy_round.number,
+                **league_params(session, fantasy_round.league_id),
+            },
             dedup_key=f"round_correction:{round_id}:{corrected_homologation}:{user_id}",
         )
     session.flush()

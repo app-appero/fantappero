@@ -140,7 +140,7 @@ class LiveMarketService:
         assert_market_open(league)
         opens_at = _parse_required_datetime(payload.opens_at, field="opensAt")
         closes_at = _parse_required_datetime(payload.closes_at, field="closesAt")
-        validate_session_window(opens_at=opens_at, closes_at=closes_at)
+        validate_session_window(opens_at=opens_at, closes_at=closes_at, now=datetime.now(UTC))
         validate_live_session_config(
             min_increment_credits=payload.min_increment_credits,
             soft_close_seconds=payload.soft_close_seconds,
@@ -293,6 +293,11 @@ class LiveMarketService:
                 "La sessione è già avviata.",
                 code="market_live_session_already_started",
             )
+        if market_session.closes_at <= datetime.now(UTC):
+            raise ValidationAuthError(
+                "La finestra della sessione è già scaduta: creane una nuova.",
+                code="invalid_session_window",
+            )
         market_session.status = MarketSessionStatus.OPEN
         self._session.flush()
         self._add_audit(
@@ -444,6 +449,24 @@ class LiveMarketService:
         athlete = self._session.get(Athlete, athlete_id)
         if athlete is None:
             raise ValidationAuthError("Calciatore non trovato.", code="athlete_not_found")
+
+        if (
+            resolve_effective_athlete_role(
+                self._session,
+                league_id=league.id,
+                athlete_id=athlete_id,
+                season_year=league.season_year,
+                competition_ids={competition.id for competition in league.competitions},
+            )
+            is None
+        ):
+            if queue_entry is not None:
+                queue_entry.consumed_at = datetime.now(UTC)
+                self._session.commit()
+            raise ValidationAuthError(
+                "Il calciatore non ha un ruolo valido nel listone: non si può chiamare.",
+                code="role_unresolved",
+            )
 
         owner_slot = self._session.scalar(
             select(FantasyRosterSlot).where(
@@ -600,6 +623,8 @@ class LiveMarketService:
     def pass_lot(
         self, league_access: LeagueAccess, session_id: UUID, lot_id: UUID
     ) -> LiveLotResponse:
+        league = self._lock_league(league_access.league.id)
+        assert_market_open(league)
         market_session = self._get_session_for_update(league_access.league.id, session_id)
         self._assert_is_live(market_session)
         lot = self._get_open_lot_for_update(market_session.id, lot_id)
@@ -613,6 +638,8 @@ class LiveMarketService:
     def cancel_lot(
         self, league_access: LeagueAccess, session_id: UUID, lot_id: UUID
     ) -> LiveLotResponse:
+        league = self._lock_league(league_access.league.id)
+        assert_market_open(league)
         market_session = self._get_session_for_update(league_access.league.id, session_id)
         self._assert_is_live(market_session)
         lot = self._get_open_lot_for_update(market_session.id, lot_id)

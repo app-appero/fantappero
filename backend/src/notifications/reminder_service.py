@@ -20,6 +20,7 @@ from fantasy_lineups.models import LineupSubmission
 from fantasy_teams.models import FantasyTeam
 from fantasy_turns.models import FantasyRound
 from leagues.models.league_membership import LeagueMembership
+from notifications.league_context import league_params
 from notifications.service import NotificationService
 
 DEFAULT_TIMEZONE = "Europe/Rome"
@@ -86,6 +87,7 @@ class LineupReminderService:
                     params={
                         "round_number": round_.number,
                         "cutoff_local": _format_local(round_.cutoff_at, tz_name),
+                        **league_params(self._session, round_.league_id),
                     },
                     dedup_key=f"lineup_reminder:{round_.id}:{team_id}",
                 )

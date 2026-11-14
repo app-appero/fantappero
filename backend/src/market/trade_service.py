@@ -47,6 +47,7 @@ from market.trade_validators import (
     validate_offered_credits_within_balance,
     validate_requested_credits_within_balance,
     validate_trade_expiry,
+    validate_trade_involves_athletes,
     validate_trade_sides_not_empty,
     validate_trades_enabled,
 )
@@ -179,6 +180,10 @@ class TradeService:
             offered_credits=offered_credits,
             requested_athlete_ids=requested_athlete_ids,
             requested_credits=requested_credits,
+        )
+        validate_trade_involves_athletes(
+            offered_athlete_ids=offered_athlete_ids,
+            requested_athlete_ids=requested_athlete_ids,
         )
         validate_athletes_owned_by_team(
             athlete_ids=offered_athlete_ids,
