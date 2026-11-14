@@ -260,6 +260,10 @@ class AuthService:
         except TesterOnlyError as exc:
             requests = TesterRequestService(self._session)
             existing = requests.status_for(identity.email)
+            # Richiesta già accolta ma l'indirizzo non è più tra i tester (tolto a mano): si può
+            # chiedere di nuovo, come per chi non ha mai chiesto.
+            if existing is not None and existing.status == "approved":
+                existing = None
             extra: dict[str, object] = {
                 "requestStatus": existing.status if existing else "none",
                 # Per mostrare a quale account Google si riferisce la richiesta e precompilare il nome.
