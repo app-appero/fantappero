@@ -22,6 +22,7 @@ from auth.privacy_validators import (
     validate_delete_confirmation,
 )
 from auth.security import hash_password, utc_now
+from auth.tester_access import TesterAccess
 from config.settings.api import ApiSettings
 from database.enums import PrivacyAuditAction
 from feedback.models import FeedbackAttachment, FeedbackReport
@@ -90,6 +91,9 @@ class PrivacyService:
             email=loaded.email,
         )
         self._anonymize_competitive_records(loaded.id, historical_label)
+        # Account eliminato (dall'utente o dall'operatore): l'indirizzo non resta tester, altrimenti
+        # chi si registra di nuovo entrerebbe senza richiesta.
+        TesterAccess(self._session).remove_email(loaded.email)
         self._scrub_personal_data(loaded)
         self._revoke_all_sessions(loaded.id)
         self._invalidate_all_tokens(loaded.id)

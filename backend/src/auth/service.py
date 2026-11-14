@@ -260,6 +260,8 @@ class AuthService:
         except TesterOnlyError as exc:
             requests = TesterRequestService(self._session)
             existing = requests.status_for(identity.email)
+            if existing is not None and existing.status == "approved":
+                existing = None  # approvata ma non più tester: può chiedere di nuovo
             extra: dict[str, object] = {"requestStatus": existing.status if existing else "none"}
             if existing is None:
                 extra["requestToken"] = make_request_token(

@@ -131,6 +131,11 @@ class TesterRequestService:
 
         self.purge_old_rejected()
         existing = self.find(normalized)
+        if existing is not None and existing.status == STATUS_APPROVED:
+            # Approvata ma non più in lista (tolto dai tester): la richiesta è da rifare.
+            self._session.delete(existing)
+            self._session.flush()
+            existing = None
         if existing is not None:
             if existing.status == STATUS_REJECTED:
                 raise ValidationAuthError(
