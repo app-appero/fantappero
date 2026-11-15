@@ -144,6 +144,7 @@ def _create_open_round(
     id_offset: int,
     competition_ids: list[str],
     number: int = 1,
+    map_unmapped: bool = True,
 ) -> tuple[FantasyRound, list[Club]]:
     now = datetime.now(UTC)
     fantasy_round = FantasyRound(
@@ -201,6 +202,18 @@ def _create_open_round(
                 observed_kickoff_at=kickoff,
             )
         )
+    # Chi non è assegnato a un club di prova gioca comunque nell'ultima partita del turno:
+    # il server non accetta titolari senza partita, e questi test non riguardano quella regola.
+    for assignment in (
+        db_session.scalars(
+            select(RoleAssignment).where(
+                RoleAssignment.season_year == 2026, RoleAssignment.club_id.is_(None)
+            )
+        ).all()
+        if map_unmapped
+        else []
+    ):
+        assignment.club_id = clubs[-1].id
     db_session.commit()
     db_session.refresh(fantasy_round)
     return fantasy_round, clubs
@@ -563,15 +576,16 @@ def test_server_rejects_scheduled_turn_unmapped_players_stay_editable(
         extra_kickoff=past_local,
         id_offset=2_510_000,
         competition_ids=competition_ids,
+        map_unmapped=False,
     )
-    # No club mapping → no per-player kickoff → still editable after first cutoff.
+    # Senza club non c'è partita nel turno: chi non gioca non può essere titolare.
     late = client.put(
         f"/leagues/{league_id}/turni/{past_round.id}/formazione",
         headers={"Authorization": f"Bearer {token}"},
         json=_lineup_payload(athletes),
     )
-    assert late.status_code == 200
-    assert late.json()["lineup"]["revision"] == 1
+    assert late.status_code == 400
+    assert late.json()["code"] == "player_unavailable"
 
     scheduled = FantasyRound(
         league_id=UUID(league_id),
@@ -2095,3 +2109,58 @@ def test_market_and_trades_are_closed_while_a_round_is_in_progress(
         headers=setup["headers"],
     )
     assert reopened.status_code == 200, reopened.json()
+
+
+def test_identical_lineup_discards_draft_and_oversized_lists_are_rejected(
+    client: TestClient,
+    db_session: Session,
+    competition_ids: list[str],
+) -> None:
+    token, _ = _register_and_login(client, "lineup.identical@example.com")
+    league_id = _create_league(client, token, competition_ids, "Lega Formazione Identica")
+    client.get(f"/leagues/{league_id}/rosa", headers={"Authorization": f"Bearer {token}"})
+    grouped = _seed_roster_athletes(db_session, id_offset=9_800_000)
+    athletes = _fill_validated_roster(db_session, league_id, grouped)
+    fantasy_round, _clubs = _create_open_round(
+        db_session,
+        league_id,
+        cutoff=datetime.now(UTC) + timedelta(hours=5),
+        id_offset=9_810_000,
+        competition_ids=competition_ids,
+    )
+    payload = _lineup_payload(athletes, "4-3-3")
+    headers = {"Authorization": f"Bearer {token}"}
+    base = f"/leagues/{league_id}/turni/{fantasy_round.id}/formazione"
+
+    first = client.put(base, headers=headers, json=payload)
+    assert first.status_code == 200
+    revision = first.json()["lineup"]["revision"]
+    draft = client.put(
+        f"{base}/bozza",
+        headers=headers,
+        json={
+            "module": "4-3-3",
+            "starterAthleteIds": payload["starterAthleteIds"][:4],
+            "benchAthleteIds": payload["benchAthleteIds"][:3],
+        },
+    )
+    assert draft.status_code == 200
+    assert draft.json()["draft"] is not None
+
+    same = client.put(base, headers=headers, json=payload)
+    assert same.status_code == 200
+    assert same.json()["draft"] is None
+    assert same.json()["lineup"]["revision"] == revision
+    assert client.get(base, headers=headers).json()["draft"] is None
+
+    too_many = ["x"] * 41
+    for url, body in (
+        (base, {**payload, "starterAthleteIds": [payload["starterAthleteIds"][0]] * 41}),
+        (
+            f"{base}/bozza",
+            {"module": "4-3-3", "starterAthleteIds": too_many, "benchAthleteIds": []},
+        ),
+    ):
+        response = client.put(url, headers=headers, json=body)
+        assert response.status_code == 422, response.text
+        assert response.json()["code"] == "validation_error"
