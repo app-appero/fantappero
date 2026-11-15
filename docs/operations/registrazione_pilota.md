@@ -77,3 +77,16 @@ Quando un account viene eliminato (dall'operatore o dall'utente stesso) la sua e
 anche dalla lista dei tester e la sua richiesta di accesso viene cancellata. Lo stesso accade se
 l'operatore toglie un tester dalla lista. Chi si registra di nuovo non entra come tester: deve
 rifare la richiesta.
+
+## Limiti per IP dietro Railway (`FORWARDED_ALLOW_IPS`)
+
+Su Railway il server vede come mittente gli indirizzi interni dei proxy (`100.64.0.x`, una
+quindicina, diversi a ogni richiesta), non quello di chi si collega. Senza correzione i limiti per
+IP di login (5 al minuto) e registrazione (10 all'ora) si spargono su quei contatori e non
+scattano mai, e utenti diversi condividono gli stessi contatori.
+
+Impostare sul servizio `api` di ogni ambiente `FORWARDED_ALLOW_IPS=100.64.0.0/10`: Uvicorn si fida
+dell'intestazione `X-Forwarded-For` solo se la richiesta arriva da quella rete, quindi un utente non
+può scegliersi l'IP. Verifica: 30 login sbagliati con email diverse dallo stesso IP devono dare
+risposte 429 dopo i primi 5. Il blocco progressivo per singolo account funziona già senza questa
+impostazione. Impostata su dev il 15/11; da impostare su pilota e produzione.
