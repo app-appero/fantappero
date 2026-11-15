@@ -1470,3 +1470,88 @@ def test_trade_with_credits_only_is_rejected(
         },
     )
     assert with_player.status_code == 201, with_player.json()
+
+
+def test_nan_json_and_nul_bytes_are_validation_errors_not_500(
+    client: TestClient, db_session: Session, competition_ids: list[str]
+) -> None:
+    nan = client.post(
+        "/auth/login",
+        content='{"email": NaN, "password": "x"}',
+        headers={"Content-Type": "application/json"},
+    )
+    assert nan.status_code == 422
+    assert nan.json()["code"] == "validation_error"
+    huge = client.post(
+        "/auth/login",
+        content='{"email": 1e400, "password": "x"}',
+        headers={"Content-Type": "application/json"},
+    )
+    assert huge.status_code == 422
+
+    admin_token, _ = _register_and_login(client, "nul.admin@example.com")
+    league_id = _create_league(client, admin_token, competition_ids, "Lega Byte Nul")
+    team_id = client.get(f"/leagues/{league_id}/rosa", headers=_hdr(admin_token)).json()["id"]
+    for field in ("transactionId", "note"):
+        body = {"fantasyTeamId": team_id, "amount": 1, "transactionId": "ok-1", "note": "x"}
+        body[field] = "a\x00b"
+        response = client.post(
+            f"/leagues/{league_id}/amministrazione/crediti/movimenti",
+            headers=_hdr(admin_token),
+            json=body,
+        )
+        assert response.status_code == 422, (field, response.text)
+    bad_league = client.post(
+        "/leagues",
+        headers=_hdr(admin_token),
+        json={"name": "Lega\x00Nome", "seasonYear": 2026, "competitionIds": competition_ids},
+    )
+    assert bad_league.status_code == 422
+    bad_register = client.post(
+        "/auth/register",
+        json={"email": "nul.reg@example.com", "password": "Password123!", "displayName": "A\x00B"},
+    )
+    assert bad_register.status_code == 422
+
+
+def test_stale_proposed_trade_reads_as_expired_and_frees_the_limit(
+    client: TestClient, db_session: Session, competition_ids: list[str]
+) -> None:
+    admin_token, _ = _register_and_login(client, "stale.admin@example.com")
+    a_token, a_id = _register_and_login(client, "stale.a@example.com")
+    b_token, b_id = _register_and_login(client, "stale.b@example.com")
+    league_id = _create_league(client, admin_token, competition_ids, "Lega Proposte Obsolete")
+    _add_member(db_session, league_id, a_id)
+    _add_member(db_session, league_id, b_id)
+    mine = _seed_athlete(db_session, 9891, "Obsoleto Mio")
+    theirs = _seed_athlete(db_session, 9892, "Obsoleto Loro")
+    team_a = client.get(f"/leagues/{league_id}/rosa", headers=_hdr(a_token)).json()["id"]
+    team_b = client.get(f"/leagues/{league_id}/rosa", headers=_hdr(b_token)).json()["id"]
+    _assign_priced(client, league_id, admin_token, team_a, 0, mine, 3)
+    _assign_priced(client, league_id, admin_token, team_b, 0, theirs, 3)
+
+    created = client.post(
+        f"/leagues/{league_id}/mercato/scambi/proposte",
+        headers=_hdr(a_token),
+        json={
+            "recipientTeamId": team_b,
+            "offeredAthleteIds": [str(mine.id)],
+            "requestedAthleteIds": [str(theirs.id)],
+            "expiresAt": _future_iso(),
+        },
+    )
+    assert created.status_code == 201, created.json()
+    proposal_id = created.json()["id"]
+    assert created.json()["status"] == "proposed"
+
+    # Il calciatore richiesto lascia la rosa: la proposta non è più eseguibile.
+    released = client.delete(
+        f"/leagues/{league_id}/amministrazione/squadre/{team_b}/slot/0",
+        headers=_hdr(admin_token),
+    )
+    assert released.status_code == 200
+    detail = client.get(
+        f"/leagues/{league_id}/mercato/scambi/proposte/{proposal_id}", headers=_hdr(b_token)
+    )
+    assert detail.status_code == 200
+    assert detail.json()["status"] == "expired"

@@ -374,6 +374,15 @@ class LiveMarketService:
 
     # -- lots -----------------------------------------------------------------
 
+    @staticmethod
+    def _assert_window_open(market_session: MarketSession) -> None:
+        """Dopo `closesAt` la sessione non accetta più nomine né rilanci."""
+        if market_session.closes_at <= datetime.now(UTC):
+            raise ValidationAuthError(
+                "La sessione non è aperta.",
+                code="market_live_session_not_open",
+            )
+
     @rollback_on_error
     def nominate_lot(
         self,
@@ -386,6 +395,7 @@ class LiveMarketService:
         market_session = self._get_session_for_update(league_access.league.id, session_id)
         self._assert_is_live(market_session)
         self._tick_current_lot(league_access, market_session)
+        self._assert_window_open(market_session)
         if market_session.status != MarketSessionStatus.OPEN:
             raise ValidationAuthError(
                 "La sessione non è aperta.",
@@ -539,6 +549,7 @@ class LiveMarketService:
         self._tick_current_lot(league_access, market_session)
 
         team = self._my_team(league_access)
+        self._assert_window_open(market_session)
 
         lot = self._session.scalars(
             select(MarketLiveLot)
@@ -672,6 +683,46 @@ class LiveMarketService:
         assert athlete is not None
         return self._to_lot_response(lot, athlete=athlete)
 
+    def _raise_swap_failure(
+        self, team: FantasyTeam, release_athlete_id: UUID, lot: MarketLiveLot
+    ) -> None:
+        """Dice il motivo vero del rifiuto invece di un messaggio unico e fuorviante."""
+        slot = self._session.scalar(
+            select(FantasyRosterSlot).where(
+                FantasyRosterSlot.fantasy_team_id == team.id,
+                FantasyRosterSlot.athlete_id == release_athlete_id,
+            )
+        )
+        if slot is None:
+            raise ValidationAuthError(
+                "Il calciatore scelto non è nella tua rosa.",
+                code="market_live_swap_athlete_not_in_roster",
+            )
+        league = self._session.get(League, team.league_id)
+        if league is not None:
+            roles = resolve_effective_athlete_roles(
+                self._session,
+                league_id=team.league_id,
+                athlete_ids=[release_athlete_id, lot.athlete_id],
+                season_year=league.season_year,
+                competition_ids={competition.id for competition in league.competitions},
+            )
+            released_role = roles.get(release_athlete_id)
+            won_role = roles.get(lot.athlete_id)
+            if (
+                released_role is not None
+                and won_role is not None
+                and released_role.role != won_role.role
+            ):
+                raise ValidationAuthError(
+                    "Puoi scambiare solo con un calciatore dello stesso ruolo.",
+                    code="market_live_swap_role_mismatch",
+                )
+        raise ValidationAuthError(
+            "Impossibile completare lo scambio: la rosa è cambiata nel frattempo.",
+            code="market_live_swap_failed",
+        )
+
     def resolve_swap(
         self,
         league_access: LeagueAccess,
@@ -679,12 +730,12 @@ class LiveMarketService:
         lot_id: UUID,
         payload: ResolveSwapRequest,
     ) -> LiveLotResponse:
+        league = self._lock_league(league_access.league.id)
+        assert_market_open(league)
         market_session = self._get_session_for_update(league_access.league.id, session_id)
         self._assert_is_live(market_session)
         lot = self._get_pending_swap_lot_for_update(market_session.id, lot_id)
         team = self._assert_swap_owner(league_access, lot)
-        league = self._session.get(League, market_session.league_id)
-        assert league is not None
         try:
             release_athlete_id = UUID(payload.release_athlete_id)
         except ValueError as exc:
@@ -709,10 +760,7 @@ class LiveMarketService:
             actor_id=league_access.user.id,
         )
         if updated is None:
-            raise ValidationAuthError(
-                "Impossibile completare lo scambio: la rosa è cambiata nel frattempo.",
-                code="market_live_swap_failed",
-            )
+            self._raise_swap_failure(team, release_athlete_id, lot)
         lot.status = MarketLiveLotStatus.SOLD
         lot.closed_at = now
         self._session.flush()

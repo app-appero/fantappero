@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
+from app.text_validation import NoNulStr
+
 
 class ApiModel(BaseModel):
     model_config = ConfigDict(populate_by_name=True, serialize_by_alias=True)
@@ -12,7 +14,7 @@ class ApiModel(BaseModel):
 class RegisterRequest(ApiModel):
     email: EmailStr
     password: str = Field(min_length=8, max_length=128)
-    display_name: str = Field(min_length=1, max_length=120, alias="displayName")
+    display_name: NoNulStr = Field(min_length=1, max_length=120, alias="displayName")
 
 
 class LoginRequest(ApiModel):

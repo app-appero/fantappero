@@ -255,6 +255,27 @@ def test_withdraw_bid_and_only_own_team_can_manage_it(
     )
     assert listing.json()["bids"][0]["status"] == "cancelled"
 
+    # Un secondo DELETE è idempotente: 204 e nessun secondo evento nello storico.
+    again = client.delete(
+        f"/leagues/{league_id}/mercato/asta/sessioni/{session_id}/offerte/{athlete.id}",
+        headers={"Authorization": f"Bearer {member_token}"},
+    )
+    assert again.status_code == 204
+    from sqlalchemy import func
+
+    from database.enums import LeagueAuditAction
+    from leagues.models.league_audit_event import LeagueAuditEvent
+
+    withdrawn_events = db_session.scalar(
+        select(func.count())
+        .select_from(LeagueAuditEvent)
+        .where(
+            LeagueAuditEvent.league_id == UUID(league_id),
+            LeagueAuditEvent.action == LeagueAuditAction.MARKET_BID_WITHDRAWN,
+        )
+    )
+    assert withdrawn_events == 1
+
 
 def test_market_manage_required_to_create_or_close_session(
     client: TestClient,

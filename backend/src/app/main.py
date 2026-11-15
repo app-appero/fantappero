@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 import os
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -165,10 +166,22 @@ class AvatarCacheControlMiddleware:
 app.add_middleware(AvatarCacheControlMiddleware)
 
 
+def _json_safe(value: object) -> object:
+    """NaN e Infinity non sono JSON valido: nel dettaglio dell'errore diventano testo."""
+    if isinstance(value, float) and not math.isfinite(value):
+        return str(value)
+    if isinstance(value, dict):
+        return {key: _json_safe(item) for key, item in value.items()}
+    if isinstance(value, list | tuple):
+        return [_json_safe(item) for item in value]
+    return value
+
+
 @app.exception_handler(RequestValidationError)
 def request_validation_error_handler(_request: object, exc: RequestValidationError) -> JSONResponse:
     """422 nel formato `{message, code}` degli altri errori, con `detail` per i client esistenti."""
-    errors = jsonable_encoder(exc.errors())
+    errors = _json_safe(jsonable_encoder(exc.errors()))
+    assert isinstance(errors, list)
     first = errors[0] if errors else {}
     # Solo i nomi dei campi: le posizioni numeriche (es. "1") non dicono nulla.
     location = ".".join(
