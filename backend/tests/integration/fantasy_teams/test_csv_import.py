@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import random
 import re
 from uuid import UUID
 
@@ -303,3 +304,107 @@ def test_csv_preview_oversized_numbers_and_nul_byte_are_errors_not_500(
     )
     assert nul.status_code == 400
     assert nul.json()["code"] == "csv_invalid_encoding"
+
+
+def test_slot_edge_values_are_clean_errors_not_500(
+    client: TestClient,
+    db_session: Session,
+    competition_ids: list[str],
+) -> None:
+    owner_token, _ = _register_and_login(client, "csv.edge@example.com")
+    league_id = _create_league(client, owner_token, competition_ids, "Lega Valori Limite")
+    headers = {"Authorization": f"Bearer {owner_token}"}
+    team_id = client.get(f"/leagues/{league_id}/rosa", headers=headers).json()["id"]
+    base = f"/leagues/{league_id}/amministrazione/squadre/{team_id}/slot"
+
+    too_costly = client.put(
+        f"{base}/0", headers=headers, json={"athleteId": "x", "purchaseCredits": 3_000_000_000}
+    )
+    assert too_costly.status_code == 422
+    huge_index = client.delete(f"{base}/99999999999", headers=headers)
+    assert huge_index.status_code == 400
+    assert huge_index.json()["code"] == "slot_not_found"
+
+
+def test_csv_reimport_after_release_charges_again_and_preview_flags_role_quota(
+    client: TestClient,
+    db_session: Session,
+    competition_ids: list[str],
+) -> None:
+    token, _ = _register_and_login(client, "csv.reimport@example.com")
+    league_id = _create_league(client, token, competition_ids, "Lega CSV Reimport")
+    headers = {"Authorization": f"Bearer {token}"}
+    rosa = client.get(f"/leagues/{league_id}/rosa", headers=headers)
+    team_name = rosa.json()["name"]
+    team_id = rosa.json()["id"]
+    player = _seed_athlete(db_session, 9301, "Reimport One")
+    csv_body = (
+        f"squadra,provider_id,nome,crediti\n{team_name},{player.provider_id},"
+        f"{player.canonical_name},10\n"
+    ).encode()
+
+    def import_once() -> None:
+        preview = client.post(
+            f"/leagues/{league_id}/amministrazione/import-csv/anteprima",
+            headers=headers,
+            files={"file": ("rose.csv", csv_body, "text/csv")},
+        )
+        assert preview.status_code == 200, preview.text
+        confirm = client.post(
+            f"/leagues/{league_id}/amministrazione/import-csv/{preview.json()['importId']}/conferma",
+            headers=headers,
+            json={"resolutions": []},
+        )
+        assert confirm.status_code == 200, confirm.text
+
+    def balance() -> int:
+        return client.get(f"/leagues/{league_id}/crediti", headers=headers).json()["balance"]
+
+    start = balance()
+    import_once()
+    assert balance() == start - 10
+    slot_index = db_session.scalar(
+        select(FantasyRosterSlot.slot_index).where(FantasyRosterSlot.athlete_id == player.id)
+    )
+    released = client.delete(
+        f"/leagues/{league_id}/amministrazione/squadre/{team_id}/slot/{slot_index}",
+        headers=headers,
+    )
+    assert released.status_code == 200
+    assert balance() == start  # l'admin restituisce l'intero prezzo
+    import_once()
+    assert balance() == start - 10  # il secondo import addebita di nuovo
+
+
+def test_csv_preview_flags_rows_over_the_role_quota(
+    client: TestClient,
+    db_session: Session,
+    competition_ids: list[str],
+) -> None:
+    token, _ = _register_and_login(client, "csv.quota@example.com")
+    league_id = _create_league(client, token, competition_ids, "Lega CSV Quota")
+    headers = {"Authorization": f"Bearer {token}"}
+    team_name = client.get(f"/leagues/{league_id}/rosa", headers=headers).json()["name"]
+    lines = ["squadra,provider_id,nome,crediti"]
+    for index in range(4):  # il limite di portieri è 3
+        keeper = _seed_athlete(
+            db_session,
+            random.randint(100_000_000, 2_000_000_000),
+            f"Portiere Quota {index}",
+            role=FantasyRole.P,
+        )
+        lines.append(f"{team_name},{keeper.provider_id},{keeper.canonical_name},5")
+    preview = client.post(
+        f"/leagues/{league_id}/amministrazione/import-csv/anteprima",
+        headers=headers,
+        files={"file": ("rose.csv", "\n".join(lines).encode(), "text/csv")},
+    )
+    assert preview.status_code == 200, preview.text
+    body = preview.json()
+    assert body["canConfirm"] is False
+    flagged = [
+        row
+        for row in body["rows"]
+        if any(i["code"] == "role_quota_exceeded" for i in row["issues"])
+    ]
+    assert len(flagged) == 1
