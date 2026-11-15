@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import random
 import re
 from datetime import UTC, datetime, timedelta
 from uuid import UUID
@@ -561,6 +562,18 @@ def test_ensure_sincronizza_creates_and_is_idempotent(
     assert second.json()["duplicates"] >= 1
 
 
+def _future_saturday() -> datetime:
+    """Un sabato alle 16:00 UTC nei prossimi anni, scelto a caso.
+
+    I test non dipendono dalla data di oggi, e due test (o due prove) non condividono lo stesso
+    weekend: le partite di prova restano nel database e entrerebbero nel turno dell'altro.
+    """
+    day = datetime.now(UTC).replace(hour=16, minute=0, second=0, microsecond=0) + timedelta(
+        weeks=random.randint(3, 150)
+    )
+    return day + timedelta(days=(5 - day.weekday()) % 7)
+
+
 def test_recalculate_cutoff_does_not_move_later_after_elapsed_postponement(
     client: TestClient,
     db_session: Session,
@@ -570,9 +583,9 @@ def test_recalculate_cutoff_does_not_move_later_after_elapsed_postponement(
     league_id = _create_league(client, token, competition_ids, "Lega Rinvii")
     _set_min_fixtures(db_session, league_id, 10)
     rome = ZoneInfo("Europe/Rome")
-    first_kickoff_utc = datetime(2026, 10, 17, 16, 0, tzinfo=UTC)
-    first_kickoff_rome = datetime(2026, 10, 17, 18, 0, tzinfo=rome)
-    assert first_kickoff_rome.astimezone(UTC) == first_kickoff_utc
+    first_kickoff_utc = _future_saturday()
+    first_kickoff_rome = first_kickoff_utc.astimezone(rome)
+    anchor = first_kickoff_utc.strftime("%Y-%m-%d")
     fixture_ids = _seed_weekend_fixtures(
         db_session,
         competition_ids,
@@ -589,11 +602,11 @@ def test_recalculate_cutoff_does_not_move_later_after_elapsed_postponement(
     created = client.post(
         f"/leagues/{league_id}/turni",
         headers={"Authorization": f"Bearer {token}"},
-        json={"kind": "weekend", "anchorDate": "2026-10-17"},
+        json={"kind": "weekend", "anchorDate": anchor},
     )
     assert created.status_code == 201
     round_id = created.json()["id"]
-    assert created.json()["cutoffAt"].startswith("2026-10-17T16:00:00")
+    assert created.json()["cutoffAt"].startswith(f"{anchor}T16:00:00")
 
     fixture = db_session.get(Fixture, fixture_ids[0])
     assert fixture is not None
@@ -747,7 +760,8 @@ def test_kickoff_time_shift_before_elapsed_can_delay_cutoff(
     token, user_id = _register_and_login(client, "turn.timeshift.before@example.com")
     league_id = _create_league(client, token, competition_ids, "Lega Orario Prima")
     _set_min_fixtures(db_session, league_id, 10)
-    first_kickoff = datetime(2026, 11, 7, 16, 0, tzinfo=UTC)
+    first_kickoff = _future_saturday()
+    anchor = first_kickoff.strftime("%Y-%m-%d")
     fixture_ids = _seed_weekend_fixtures(
         db_session,
         competition_ids,
@@ -760,11 +774,11 @@ def test_kickoff_time_shift_before_elapsed_can_delay_cutoff(
     created = client.post(
         f"/leagues/{league_id}/turni",
         headers={"Authorization": f"Bearer {token}"},
-        json={"kind": "weekend", "anchorDate": "2026-11-07"},
+        json={"kind": "weekend", "anchorDate": anchor},
     )
     assert created.status_code == 201
     round_id = created.json()["id"]
-    assert created.json()["cutoffAt"].startswith("2026-11-07T16:00:00")
+    assert created.json()["cutoffAt"].startswith(f"{anchor}T16:00:00")
 
     db_session.expire_all()
     for fixture_id in fixture_ids:
@@ -784,7 +798,7 @@ def test_kickoff_time_shift_before_elapsed_can_delay_cutoff(
     body = recalculated.json()
     ours = _owned_fixture_rows(body, fixture_ids)
     assert len(ours) == 10
-    assert body["cutoffAt"].startswith("2026-11-07T18:00:00")
+    assert body["cutoffAt"].startswith(f"{anchor}T18:00:00")
     assert all(row["lockLatchedAt"] is None for row in ours)
 
 

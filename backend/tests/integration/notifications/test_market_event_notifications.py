@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import random
 import re
 from datetime import UTC, datetime, timedelta
 from uuid import UUID
@@ -20,7 +21,7 @@ from database.enums import (
     NotificationCategory,
 )
 from fantasy_teams.factory import ensure_team_for_membership
-from fantasy_teams.models import FantasyTeam
+from fantasy_teams.models import FantasyRosterSlot, FantasyTeam
 from leagues.models.competition import Competition
 from leagues.models.league import League
 from leagues.models.league_membership import LeagueMembership
@@ -157,6 +158,20 @@ def test_trade_proposal_notifies_recipient(
         select(FantasyTeam).where(FantasyTeam.league_id == league_id)
     ).one()
     recipient_team = _second_team(db_session, league_id, recipient_id)
+    # Uno scambio deve coinvolgere almeno un calciatore: il destinatario ne ha uno in rosa.
+    requested = Athlete(
+        provider_id=random.randint(100_000_000, 2_000_000_000), canonical_name="Chiesto"
+    )
+    db_session.add(requested)
+    db_session.flush()
+    slot = db_session.scalars(
+        select(FantasyRosterSlot)
+        .where(FantasyRosterSlot.fantasy_team_id == recipient_team.id)
+        .order_by(FantasyRosterSlot.slot_index)
+    ).first()
+    slot.athlete_id = requested.id
+    slot.purchase_credits = 1
+    db_session.commit()
 
     league_access = LeagueAccess(
         league=league, user=proposer_user, membership_role=LeagueMemberRole.OWNER
@@ -168,7 +183,7 @@ def test_trade_proposal_notifies_recipient(
         CreateTradeProposalRequest(
             recipientTeamId=str(recipient_team.id),
             offeredAthleteIds=[],
-            requestedAthleteIds=[],
+            requestedAthleteIds=[str(requested.id)],
             offeredCredits=5,
             requestedCredits=0,
             expiresAt=(datetime.now(UTC) + timedelta(days=1)).isoformat(),

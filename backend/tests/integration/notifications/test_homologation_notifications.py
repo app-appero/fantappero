@@ -18,7 +18,7 @@ from leagues.models.competition import Competition
 from mail.capture import get_captured_emails
 from notifications.models import Notification
 from sports_data.catalog.models import Club, SportSeason
-from sports_data.fixtures.models import Fixture
+from sports_data.fixtures.models import Fixture, PlayerMatchStat
 
 
 def _register_and_login(client: TestClient, email: str) -> tuple[str, UUID]:
@@ -103,6 +103,18 @@ def _create_finished_round(
             observed_kickoff_at=fixture.kickoff_at,
         )
     )
+    # L'omologazione richiede le statistiche giocatore definitive di entrambe le squadre.
+    for index, club in enumerate((home, away)):
+        db_session.add(
+            PlayerMatchStat(
+                fixture_id=fixture.id,
+                athlete_provider_id=id_offset + 700 + index,
+                club_id=club.id,
+                minutes=90,
+                stats_json={},
+                stats_hash=f"omo-{id_offset}-{index}",
+            )
+        )
     db_session.commit()
     db_session.refresh(fantasy_round)
     return fantasy_round

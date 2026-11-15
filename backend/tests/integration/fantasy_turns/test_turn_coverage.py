@@ -254,11 +254,15 @@ def test_only_windows_where_everyone_can_field_a_lineup_become_turns(
     assert rounds[0].window_start_at < datetime(2026, 8, 18, tzinfo=UTC)
 
 
-def test_a_league_without_rosters_generates_no_turns(
+def test_a_league_without_rosters_still_gets_its_structural_turns(
     client: TestClient,
     db_session: Session,
 ) -> None:
-    """Niente turni prima dell'asta: senza rose non si schiera nulla."""
+    """Rose ancora vuote: la copertura non è valutabile e non blocca i turni strutturali.
+
+    Il calendario stagionale si materializza dalle partite (EP13-P04); la generazione e la
+    conferma degli scontri restano protette da `league_rosters_complete`.
+    """
     league_id, token, _ = _build_league(client, db_session, prefix="norosters", offset=830_000)
 
     db_session.execute(
@@ -271,10 +275,9 @@ def test_a_league_without_rosters_generates_no_turns(
         headers={"Authorization": f"Bearer {token}"},
         json={"kind": "weekend", "anchorDate": "2026-08-15"},
     )
-    assert response.status_code == 400
-    assert response.json()["code"] == "turn_coverage_not_met"
+    assert response.status_code == 201, response.text
 
     rounds = db_session.scalars(
         select(FantasyRound).where(FantasyRound.league_id == UUID(league_id))
     ).all()
-    assert rounds == []
+    assert len(rounds) == 1

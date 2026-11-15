@@ -670,7 +670,10 @@ def test_update_league_rules_is_idempotent_for_same_payload(
             LeagueAuditEvent.action == LeagueAuditAction.LEAGUE_RULES_UPDATED,
         )
     ).all()
-    assert len(audit) == 1
+    # Anche un salvataggio senza modifiche conferma la configurazione (sblocca la tab Inviti):
+    # lascia un evento marcato come invariato, ma il regolamento non cambia.
+    assert len(audit) == 2
+    assert sum(1 for event in audit if (event.details or {}).get("unchanged")) == 1
 
 
 def test_update_league_rules_requires_admin_role(
