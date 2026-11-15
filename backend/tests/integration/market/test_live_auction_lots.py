@@ -102,6 +102,13 @@ def _seed_athlete(
     return athlete
 
 
+def _unique_id() -> int:
+    """Identificativo calciatore mai riusato (il database di test non si svuota tra le prove)."""
+    import random
+
+    return random.randint(100_000_000, 2_000_000_000)
+
+
 def _start_manual_session(
     client: TestClient,
     admin_token: str,
@@ -849,7 +856,7 @@ def test_resolve_swap_blocked_when_market_closed_and_reports_specific_errors(
     league_id = _create_league(client, admin_token, competition_ids, "Lega Scambio Chiuso")
     _add_member(db_session, league_id, bidder_id)
     session_id, lot_id, _ = _win_lot_against_full_quota(
-        client, db_session, admin_token, bidder_token, league_id, seed_offset=93400
+        client, db_session, admin_token, bidder_token, league_id, seed_offset=_unique_id()
     )
     url = f"/leagues/{league_id}/mercato/asta-live/sessioni/{session_id}/lotti/{lot_id}/scambia"
     bidder = {"Authorization": f"Bearer {bidder_token}"}
@@ -865,7 +872,7 @@ def test_resolve_swap_blocked_when_market_closed_and_reports_specific_errors(
     assert blocked.json()["code"] == "market_closed"
     client.post(f"/leagues/{league_id}/mercato/stato", headers=admin, json={"open": True})
 
-    stranger = _seed_athlete(db_session, 93499, "Fuori Rosa", role=FantasyRole.P)
+    stranger = _seed_athlete(db_session, _unique_id(), "Fuori Rosa", role=FantasyRole.P)
     not_mine = client.post(url, headers=bidder, json={"releaseAthleteId": str(stranger.id)})
     assert not_mine.status_code == 400
     assert not_mine.json()["code"] == "market_live_swap_athlete_not_in_roster"
@@ -878,8 +885,8 @@ def test_expired_live_window_rejects_nomination_and_raise(
     bidder_token, bidder_id = _register_and_login(client, "live.lot.window.bidder@example.com")
     league_id = _create_league(client, admin_token, competition_ids, "Lega Finestra Scaduta")
     _add_member(db_session, league_id, bidder_id)
-    first = _seed_athlete(db_session, 93501, "Finestra Uno")
-    second = _seed_athlete(db_session, 93502, "Finestra Due")
+    first = _seed_athlete(db_session, _unique_id(), "Finestra Uno")
+    second = _seed_athlete(db_session, _unique_id(), "Finestra Due")
     session_id = _start_manual_session(client, admin_token, league_id)
     lot = _nominate(client, admin_token, league_id, session_id, first.id)
 
