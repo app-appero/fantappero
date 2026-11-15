@@ -105,7 +105,9 @@ class UpdateLeagueRulesRequest(ApiModel):
     roster: LeagueRosterConfig
     total_credits: int = Field(alias="totalCredits")
     min_fixtures_per_round: int | None = Field(default=None, alias="minFixturesPerRound")
-    turn_coverage_threshold: float | None = Field(default=None, alias="turnCoverageThreshold")
+    turn_coverage_threshold: float | None = Field(
+        default=None, alias="turnCoverageThreshold", allow_inf_nan=False
+    )
     lineup_lock_margin_minutes: int | None = Field(default=None, alias="lineupLockMarginMinutes")
     minutes_threshold: int | None = Field(default=None, alias="minutesThreshold")
     max_automatic_substitutions: int | None = Field(default=None, alias="maxAutomaticSubstitutions")

@@ -201,6 +201,7 @@ class PrivacyService:
         # L'identificativo Google è un dato personale e deve restare libero: chi viene eliminato
         # può poi accedere di nuovo con lo stesso account Google e ottenerne uno nuovo.
         user.google_sub = None
+        profile.nickname = None  # il soprannome torna libero per gli altri
         user.password_hash = hash_password(generate_unusable_secret())
         user.email_verified_at = None
         user.deleted_at = utc_now()
