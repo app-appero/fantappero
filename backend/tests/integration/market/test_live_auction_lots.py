@@ -588,8 +588,8 @@ def test_resolve_swap_refunds_released_player_and_charges_new_one(
     after_balance = client.get(
         f"/leagues/{league_id}/crediti", headers={"Authorization": f"Bearer {bidder_token}"}
     ).json()["balance"]
-    # Full refund (1) for the released goalkeeper minus the winning bid (10).
-    assert after_balance - before_balance == -9
+    # Rimborso del 50% (percentuale di lega, per difetto) di 1 credito = 0, meno l'offerta (10).
+    assert after_balance - before_balance == -10
 
     new_slot = db_session.scalar(
         select(FantasyRosterSlot).where(FantasyRosterSlot.athlete_id == UUID(won_athlete_id))

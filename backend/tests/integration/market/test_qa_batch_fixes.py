@@ -1600,7 +1600,9 @@ def test_nickname_is_free_again_after_account_deletion(client: TestClient) -> No
     taken = client.patch("/profile/me", headers=_hdr(second_token), json={"nickname": nick})
     assert taken.status_code == 400
     deleted = client.post(
-        "/profile/me/delete", headers=_hdr(first_token), json={"confirmPhrase": "ELIMINA"}
+        "/profile/me/delete",
+        headers=_hdr(first_token),
+        json={"confirmPhrase": "ELIMINA", "password": "Password123!"},
     )
     assert deleted.status_code == 200
     free = client.patch("/profile/me", headers=_hdr(second_token), json={"nickname": nick})

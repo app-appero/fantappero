@@ -21,7 +21,7 @@ from auth.privacy_validators import (
     resolve_historical_display_name,
     validate_delete_confirmation,
 )
-from auth.security import hash_password, utc_now
+from auth.security import hash_password, utc_now, verify_password
 from auth.tester_access import TesterAccess
 from config.settings.api import ApiSettings
 from database.enums import PrivacyAuditAction
@@ -57,8 +57,16 @@ class PrivacyService:
         user: User,
         *,
         confirm_phrase: str,
+        password: str | None = None,
     ) -> PrivacyMessageResponse:
         validate_delete_confirmation(confirm_phrase)
+        if user.password_hash is not None and not (
+            password and verify_password(user.password_hash, password)
+        ):
+            raise ValidationAuthError(
+                "Per eliminare l'account inserisci la tua password.",
+                code="invalid_password",
+            )
         loaded = self._load_user_bundle(user.id)
         self._anonymize_and_delete(loaded, actor_id=loaded.id)
         return PrivacyMessageResponse(
@@ -147,10 +155,14 @@ class PrivacyService:
             "profile": {
                 "displayName": profile.display_name or user.display_name,
                 "avatarUrl": profile.avatar_url,
+                "nickname": profile.nickname,
                 "language": profile.language,
                 "timezone": profile.timezone,
                 "notificationsEmail": profile.notifications_email,
                 "notificationsPush": profile.notifications_push,
+                "quietHoursStartHour": profile.quiet_hours_start_hour,
+                "quietHoursEndHour": profile.quiet_hours_end_hour,
+                "availableForInvites": profile.available_for_invites,
                 "policyConsentAt": consent_at.isoformat() if consent_at is not None else None,
                 "policyVersion": profile.policy_version,
             },
@@ -167,6 +179,8 @@ class PrivacyService:
                 }
                 for membership in user.league_memberships
             ],
+            "pushDevices": self._export_push_devices(user.id),
+            "teams": self._export_teams(user.id),
             # Segnalazioni scritte dall'utente (testo e metadati; gli allegati sono solo contati).
             "feedback": [
                 {
@@ -185,6 +199,140 @@ class PrivacyService:
                 ).all()
             ],
         }
+
+    def _export_push_devices(self, user_id: UUID) -> list[dict[str, Any]]:
+        from notifications.models import PushDevice
+
+        return [
+            {
+                "platform": device.platform,
+                "registeredAt": device.created_at.isoformat(),
+                "lastSeenAt": device.last_seen_at.isoformat(),
+            }
+            for device in self._session.scalars(
+                select(PushDevice).where(PushDevice.user_id == user_id)
+            ).all()
+        ]
+
+    def _export_teams(self, user_id: UUID) -> list[dict[str, Any]]:
+        """Rose, crediti, formazioni e scambi delle squadre dell'utente, lega per lega."""
+        from fantasy_lineups.models import LineupSubmission
+        from fantasy_teams.models import (
+            CreditAccount,
+            CreditLedgerEntry,
+            FantasyRosterSlot,
+            FantasyTeam,
+        )
+        from market.models import TradeProposal
+        from sports_data.roster.models import Athlete
+
+        teams = self._session.scalars(
+            select(FantasyTeam)
+            .join(LeagueMembership, LeagueMembership.id == FantasyTeam.membership_id)
+            .where(LeagueMembership.user_id == user_id)
+            .order_by(FantasyTeam.created_at)
+        ).all()
+        names: dict[UUID, str] = {}
+
+        def athlete_name(athlete_id: UUID | str | None) -> str | None:
+            if athlete_id is None:
+                return None
+            key = UUID(str(athlete_id))
+            if key not in names:
+                athlete = self._session.get(Athlete, key)
+                names[key] = athlete.canonical_name if athlete is not None else str(key)
+            return names[key]
+
+        exported: list[dict[str, Any]] = []
+        for team in teams:
+            slots = self._session.scalars(
+                select(FantasyRosterSlot)
+                .where(
+                    FantasyRosterSlot.fantasy_team_id == team.id,
+                    FantasyRosterSlot.athlete_id.is_not(None),
+                )
+                .order_by(FantasyRosterSlot.slot_index)
+            ).all()
+            account = self._session.scalar(
+                select(CreditAccount).where(CreditAccount.fantasy_team_id == team.id)
+            )
+            ledger = (
+                self._session.scalars(
+                    select(CreditLedgerEntry)
+                    .where(CreditLedgerEntry.account_id == account.id)
+                    .order_by(CreditLedgerEntry.created_at)
+                ).all()
+                if account is not None
+                else []
+            )
+            lineups = self._session.scalars(
+                select(LineupSubmission)
+                .where(LineupSubmission.fantasy_team_id == team.id)
+                .order_by(LineupSubmission.submitted_at)
+            ).all()
+            trades = self._session.scalars(
+                select(TradeProposal)
+                .where(
+                    (TradeProposal.proposer_team_id == team.id)
+                    | (TradeProposal.recipient_team_id == team.id)
+                )
+                .order_by(TradeProposal.created_at)
+            ).all()
+            exported.append(
+                {
+                    "teamId": str(team.id),
+                    "leagueId": str(team.league_id),
+                    "teamName": team.name,
+                    "roster": [
+                        {
+                            "slotIndex": slot.slot_index,
+                            "athleteName": athlete_name(slot.athlete_id),
+                            "purchaseCredits": slot.purchase_credits,
+                        }
+                        for slot in slots
+                    ],
+                    "credits": {
+                        "balance": account.balance if account is not None else None,
+                        "movements": [
+                            {
+                                "at": entry.created_at.isoformat(),
+                                "amount": entry.amount,
+                                "reason": entry.reason.value,
+                                "balanceAfter": entry.balance_after,
+                                "note": entry.note,
+                            }
+                            for entry in ledger
+                        ],
+                    },
+                    "lineups": [
+                        {
+                            "roundId": str(lineup.round_id),
+                            "module": getattr(lineup.module, "value", str(lineup.module)),
+                            "revision": lineup.revision,
+                            "submittedAt": lineup.submitted_at.isoformat(),
+                        }
+                        for lineup in lineups
+                    ],
+                    "trades": [
+                        {
+                            "proposalId": str(trade.id),
+                            "role": "proposer"
+                            if trade.proposer_team_id == team.id
+                            else "recipient",
+                            "status": trade.status.value,
+                            "offeredAthletes": [athlete_name(i) for i in trade.offered_athlete_ids],
+                            "requestedAthletes": [
+                                athlete_name(i) for i in trade.requested_athlete_ids
+                            ],
+                            "offeredCredits": trade.offered_credits,
+                            "requestedCredits": trade.requested_credits,
+                            "createdAt": trade.created_at.isoformat(),
+                        }
+                        for trade in trades
+                    ],
+                }
+            )
+        return exported
 
     def _anonymize_competitive_records(self, user_id: UUID, historical_label: str) -> None:
         memberships = self._session.scalars(

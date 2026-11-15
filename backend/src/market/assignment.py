@@ -20,6 +20,8 @@ from fantasy_teams.ledger import apply_ledger_movement, find_account_for_team
 from fantasy_teams.models import FantasyRosterSlot, FantasyTeam
 from fantasy_teams.ownership import sync_ownership_on_assign
 from leagues.models.league import League
+from leagues.models.league_rules import LeagueRules
+from market.validators import compute_release_refund
 
 
 def next_free_slot_or_overflow(
@@ -220,9 +222,9 @@ def resolve_live_swap(
 ) -> FantasyRosterSlot | None:
     """Resolve a live-auction roster-full swap prompt (EP08-09).
 
-    The coach releases ``release_athlete_id`` (refunded in full — this is a
-    forced choice created by winning a lot with no room, not a voluntary
-    release, so the usual partial-refund rule doesn't apply) and the newly
+    The coach releases ``release_athlete_id`` (refunded with the league's
+    "svincolo volontario" percentage, rounded down, like any release from
+    the roster) and the newly
     won ``acquire_athlete_id`` takes its slot. The refund is applied before
     the acquisition charge so a refund that covers the gap can fund the win;
     both happen in a savepoint so a failed swap (slot changed underneath,
@@ -243,7 +245,11 @@ def resolve_live_swap(
     account = find_account_for_team(session, team.id, for_update=True)
     if account is None:
         return None
-    refund_credits = slot.purchase_credits or 0
+    rules = session.scalar(select(LeagueRules).where(LeagueRules.league_id == league.id))
+    refund_percent = rules.voluntary_release_refund_percent if rules is not None else 100
+    refund_credits = compute_release_refund(
+        purchase_credits=slot.purchase_credits or 0, refund_percent=refund_percent
+    )
 
     # Scambio dello stesso ruolo: non peggiora la composizione, quindi non può essere
     # respinto per quota anche se il ruolo è già in sovrannumero (il flag resta acceso).

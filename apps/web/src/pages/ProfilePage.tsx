@@ -132,6 +132,7 @@ export function ProfilePage() {
     demoProfile ? profileInviteAvailability(demoProfile) : true,
   );
   const [deleteConfirmPhrase, setDeleteConfirmPhrase] = useState("");
+  const [deletePassword, setDeletePassword] = useState("");
   const [privacyError, setPrivacyError] = useState<string | null>(null);
   const [privacySuccess, setPrivacySuccess] = useState<string | null>(null);
 
@@ -362,9 +363,11 @@ export function ProfilePage() {
     try {
       const result = await deleteAccount(stored.accessToken, {
         confirmPhrase: deleteConfirmPhrase.trim(),
+        ...(deletePassword ? { password: deletePassword } : {}),
       });
       setPrivacySuccess(result.message);
       setDeleteConfirmPhrase("");
+      setDeletePassword("");
       await logout();
     } catch (deleteError) {
       setPrivacyError(getApiErrorMessage(deleteError, "Eliminazione account non riuscita."));
@@ -622,6 +625,15 @@ export function ProfilePage() {
                 name="deleteConfirmPhrase"
                 value={deleteConfirmPhrase}
                 onChange={(event) => setDeleteConfirmPhrase(event.target.value)}
+                disabled={deleting || isDemoMode}
+              />
+              <Input
+                label="Password (lascia vuoto se accedi solo con Google)"
+                name="deletePassword"
+                type="password"
+                autoComplete="current-password"
+                value={deletePassword}
+                onChange={(event) => setDeletePassword(event.target.value)}
                 disabled={deleting || isDemoMode}
               />
               <Button

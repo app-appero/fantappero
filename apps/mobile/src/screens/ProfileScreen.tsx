@@ -153,6 +153,7 @@ export function ProfileScreen() {
   const [saving, setSaving] = useState(false);
   const [avatarBusy, setAvatarBusy] = useState(false);
   const [deletePhrase, setDeletePhrase] = useState("");
+  const [deletePassword, setDeletePassword] = useState("");
 
   const applyProfile = useCallback((next: UserProfile) => {
     setProfile(next);
@@ -329,6 +330,7 @@ export function ProfileScreen() {
     try {
       await deleteAccount(accessToken, {
         confirmPhrase: deletePhrase,
+        ...(deletePassword ? { password: deletePassword } : {}),
       });
       await logout();
     } catch (error) {
@@ -560,6 +562,19 @@ export function ProfileScreen() {
           placeholder={DELETE_ACCOUNT_CONFIRMATION_PHRASE}
           placeholderTextColor={colors.foregroundMuted}
           testID="profile-delete-phrase"
+        />
+        <Text style={styles.hint}>
+          Inserisci anche la tua password (lascia vuoto se accedi solo con Google).
+        </Text>
+        <TextInput
+          value={deletePassword}
+          onChangeText={setDeletePassword}
+          style={styles.input}
+          secureTextEntry
+          autoCapitalize="none"
+          placeholder="Password"
+          placeholderTextColor={colors.foregroundMuted}
+          testID="profile-delete-password"
         />
         <Pressable
           accessibilityRole="button"

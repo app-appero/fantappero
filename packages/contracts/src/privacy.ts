@@ -2,6 +2,8 @@
 
 export interface DeleteAccountRequest {
   confirmPhrase: string;
+  /** Obbligatoria per chi ha una password; chi accede solo con Google non ne ha una. */
+  password?: string;
 }
 
 export interface PrivacyMessageResponse {

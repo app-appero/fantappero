@@ -97,7 +97,7 @@ def test_delete_only_affects_authenticated_user(client: TestClient) -> None:
     delete_b = client.post(
         "/profile/me/delete",
         headers={"Authorization": f"Bearer {token_b}"},
-        json={"confirmPhrase": "ELIMINA"},
+        json={"confirmPhrase": "ELIMINA", "password": "Password123!"},
     )
     assert delete_b.status_code == 200
 
@@ -120,7 +120,7 @@ def test_deleting_member_preserves_shared_league_for_owner(
     delete_member = client.post(
         "/profile/me/delete",
         headers={"Authorization": f"Bearer {member_token}"},
-        json={"confirmPhrase": "ELIMINA"},
+        json={"confirmPhrase": "ELIMINA", "password": "Password123!"},
     )
     assert delete_member.status_code == 200
 
