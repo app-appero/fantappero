@@ -34,3 +34,6 @@ Aggiornato da Rosario/Claude dopo ogni rapporto. I tester non ripetono i dettagl
 | 2026-11-14 | Scambi | Uno scambio senza nessun calciatore (solo crediti) è rifiutato (`trade_credits_only`) | Voluto: non segnalare |
 | 2026-11-14 | Rosa | Svincolo o sostituzione dalla propria rosa: l'allenatore riceve la percentuale "Rimborso svincolo volontario" della lega (arrotondata per difetto); l'admin che corregge una rosa restituisce l'intero prezzo | Voluto: non segnalare |
 | 2026-11-14 | Lega | Il partecipante non può uscire da solo dalla lega | Voluto: non segnalare |
+| 2026-11-15 | Account | CORRETTI il 15/11 (non segnalare): `displayName` oltre 80 caratteri (ora 422); `turnCoverageThreshold` NaN (422); nickname libero dopo l'eliminazione; avviso quando una proposta decade per calciatore svincolato; export dati completo (nickname, preferenze, dispositivi, rose, crediti, formazioni, scambi); l'eliminazione account chiede la password a chi ce l'ha (chi accede solo con Google no) | Corretto |
+| 2026-11-15 | Asta live | Lo scambio a rosa piena rimborsa la percentuale "svincolo volontario" della lega (per difetto), come ogni svincolo | Voluto: non segnalare |
+| 2026-11-15 | Dev | Job `market-trade-expiry` acceso su dev (beat e worker, `NOTIFICATIONS_TRADE_EXPIRY_ENABLED=true`) | Fatto |
