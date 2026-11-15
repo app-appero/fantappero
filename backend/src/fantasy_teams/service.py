@@ -26,7 +26,7 @@ from database.enums import (
     RosterOwnershipSource,
     UserType,
 )
-from fantasy_teams.composition import RosterCompositionReport
+from fantasy_teams.composition import ROLE_LABEL_IT, RosterCompositionReport
 from fantasy_teams.composition_service import (
     assert_assignment_respects_role_quota,
     evaluate_team_composition,
@@ -37,6 +37,8 @@ from fantasy_teams.composition_service import (
     sync_team_composition_status,
 )
 from fantasy_teams.csv_import import (
+    PreviewRow,
+    PreviewRowIssue,
     apply_resolutions,
     csv_template_bytes,
     parse_roster_csv,
@@ -927,7 +929,7 @@ class FantasyTeamService:
         assert_market_open(league)
         team = self._get_team_for_update(league.id, team_id)
         self._assert_can_edit_team(league_access, team)
-        if slot_index < 0:
+        if not 0 <= slot_index <= 1_000:
             raise ValidationAuthError("Slot non trovato.", code="slot_not_found")
 
         slot = self._session.scalar(
@@ -1335,6 +1337,7 @@ class FantasyTeamService:
         )
         if excel:
             skip_unmatched_excel_rows(rows)
+        self._flag_role_quota_overflow(league, rows)
         error_count, warning_count = count_preview_issues(rows)
         payload = {
             "rows": [preview_row_to_dict(row) for row in rows],
@@ -1366,6 +1369,61 @@ class FantasyTeamService:
             },
         )
         return self._to_import_preview(session)
+
+    def _flag_role_quota_overflow(self, league: League, rows: list[PreviewRow]) -> None:
+        """Segnala in anteprima le righe che farebbero superare il limite per ruolo.
+
+        Senza questo controllo l'anteprima direbbe "confermabile" e la conferma fallirebbe
+        con `role_quota_exceeded`.
+        """
+        candidates = [
+            row for row in rows if row.status == "ok" and row.athlete_id and row.fantasy_team_id
+        ]
+        if not candidates:
+            return
+        limits = resolve_league_rules_limits(self._session, league.id)
+        competition_ids = {competition.id for competition in league.competitions}
+        team_ids = {UUID(row.fantasy_team_id) for row in candidates if row.fantasy_team_id}
+        owned = self._session.execute(
+            select(FantasyRosterSlot.fantasy_team_id, FantasyRosterSlot.athlete_id).where(
+                FantasyRosterSlot.fantasy_team_id.in_(team_ids),
+                FantasyRosterSlot.athlete_id.is_not(None),
+            )
+        ).all()
+        athlete_ids = [UUID(row.athlete_id) for row in candidates if row.athlete_id]
+        athlete_ids += [athlete_id for _, athlete_id in owned if athlete_id is not None]
+        roles = resolve_effective_athlete_roles(
+            self._session,
+            league_id=league.id,
+            athlete_ids=athlete_ids,
+            season_year=league.season_year,
+            competition_ids=competition_ids,
+        )
+        counts: dict[str, dict[FantasyRole, int]] = {}
+        for team_id, athlete_id in owned:
+            effective = roles.get(athlete_id) if athlete_id is not None else None
+            if effective is None:
+                continue
+            per_team = counts.setdefault(str(team_id), {})
+            per_team[effective.role] = per_team.get(effective.role, 0) + 1
+        for row in candidates:
+            effective = roles.get(UUID(row.athlete_id)) if row.athlete_id else None
+            if effective is None or row.fantasy_team_id is None:
+                continue
+            per_team = counts.setdefault(row.fantasy_team_id, {})
+            per_team[effective.role] = per_team.get(effective.role, 0) + 1
+            if per_team[effective.role] > limits.for_role(effective.role):
+                row.status = "error"
+                row.issues.append(
+                    PreviewRowIssue(
+                        code="role_quota_exceeded",
+                        message=(
+                            f"Limite {ROLE_LABEL_IT[effective.role]} superato "
+                            f"({limits.for_role(effective.role)}) per questa squadra."
+                        ),
+                        severity="error",
+                    )
+                )
 
     @rollback_on_error
     def confirm_csv_import(
@@ -1603,7 +1661,9 @@ class FantasyTeamService:
                 account,
                 amount=-purchase_credits,
                 reason=CreditLedgerReason.ROSTER_PURCHASE,
-                transaction_id=f"{ledger_tx_prefix}:{team.id}:{slot_index}:{athlete_id}",
+                transaction_id=(
+                    f"{ledger_tx_prefix}:{team.id}:{slot_index}:{athlete_id}:{account.version}"
+                ),
                 actor_id=league_access.user.id,
                 note=f"Assegnazione {athlete.canonical_name}",
             )

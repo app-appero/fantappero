@@ -85,7 +85,7 @@ class EnsureFantasyTeamsResponse(ApiModel):
 
 class AssignRosterSlotRequest(ApiModel):
     athlete_id: str = Field(alias="athleteId", min_length=1)
-    purchase_credits: int = Field(alias="purchaseCredits", ge=0)
+    purchase_credits: int = Field(alias="purchaseCredits", ge=0, le=2_147_483_647)
 
 
 class RosterOccupancyEntryResponse(ApiModel):
