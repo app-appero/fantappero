@@ -207,6 +207,8 @@ def test_named_invite_rejects_unavailable_duplicate_and_member(
     recipient_token, recipient_id = _register_and_login(client, "rej.recipient@example.com")
     league_id = _create_league(client, owner_token, competition_ids, "Lega Reject")
 
+    # La disponibilità agli inviti è accesa di default: qui il destinatario la spegne.
+    _set_available(client, recipient_token, False)
     unavailable = client.post(
         f"/leagues/{league_id}/amministrazione/inviti-nominativi",
         headers={"Authorization": f"Bearer {owner_token}"},
@@ -448,5 +450,5 @@ def test_ai_availability_endpoint_is_immutable(
     human_token, _ = _register_and_login(client, "avail.human@example.com")
     default = client.get("/profile/me", headers={"Authorization": f"Bearer {human_token}"})
     assert default.status_code == 200
-    assert default.json()["availableForInvites"] is False
+    assert default.json()["availableForInvites"] is True  # acceso di default
     assert default.json()["userType"] == "human"
