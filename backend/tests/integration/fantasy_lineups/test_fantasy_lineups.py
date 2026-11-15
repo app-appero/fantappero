@@ -2127,6 +2127,7 @@ def test_identical_lineup_discards_draft_and_oversized_lists_are_rejected(
         cutoff=datetime.now(UTC) + timedelta(hours=5),
         id_offset=9_810_000,
         competition_ids=competition_ids,
+        number=99,  # in suite la lega ha già il turno 1 generato in automatico
     )
     payload = _lineup_payload(athletes, "4-3-3")
     headers = {"Authorization": f"Bearer {token}"}
