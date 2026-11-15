@@ -8,6 +8,7 @@ from uuid import UUID
 
 from pydantic import Field
 
+from app.text_validation import NoNulStr
 from auth.schemas import ApiModel
 from database.enums import LeagueState
 
@@ -93,7 +94,7 @@ class LeagueDetailResponse(ApiModel):
 
 
 class CreateLeagueRequest(ApiModel):
-    name: str = Field(min_length=1, max_length=120)
+    name: NoNulStr = Field(min_length=1, max_length=120)
     season_year: int = Field(alias="seasonYear")
     competition_ids: list[UUID] = Field(min_length=3, alias="competitionIds")
 

@@ -629,8 +629,8 @@ class TradeService:
                 or_(TradeProposal.expires_at.is_(None), TradeProposal.expires_at > now),
             )
         ).all()
-        # Le proposte in attesa di crediti non occupano il limite.
-        return sum(1 for row in rows if not self._awaiting_credits(row))
+        # Non occupano il limite né le proposte in attesa di crediti né quelle non più eseguibili.
+        return sum(1 for row in rows if not self._awaiting_credits(row) and not self._is_stale(row))
 
     def _awaiting_credits(self, proposal: TradeProposal) -> bool:
         """True se il saldo di chi offre o di chi riceve non copre i crediti della proposta."""
@@ -805,6 +805,13 @@ class TradeService:
             )
         return params
 
+    def _read_status(self, proposal: TradeProposal, now: datetime) -> TradeStatus:
+        """Stato mostrato: una proposta 'proposed' non più eseguibile si legge come scaduta."""
+        status = effective_trade_status(proposal, now=now)
+        if status == TradeStatus.PROPOSED and self._is_stale(proposal):
+            return TradeStatus.EXPIRED
+        return status
+
     def _to_response(self, proposal: TradeProposal) -> TradeProposalResponse:
         now = datetime.now(UTC)
         offered = self._athlete_labels(proposal.offered_athlete_ids)
@@ -818,7 +825,7 @@ class TradeService:
             requestedAthletes=requested,
             offeredCredits=proposal.offered_credits,
             requestedCredits=proposal.requested_credits,
-            status=effective_trade_status(proposal, now=now).value,
+            status=self._read_status(proposal, now).value,
             expiresAt=proposal.expires_at.isoformat() if proposal.expires_at else None,
             createdAt=proposal.created_at.isoformat(),
             counterOfId=str(proposal.counter_of_id) if proposal.counter_of_id else None,

@@ -839,3 +839,69 @@ def test_live_nomination_rejected_for_athlete_without_valid_role(
     )
     assert response.status_code == 400
     assert response.json()["code"] == "role_unresolved"
+
+
+def test_resolve_swap_blocked_when_market_closed_and_reports_specific_errors(
+    client: TestClient, db_session: Session, competition_ids: list[str]
+) -> None:
+    admin_token, _ = _register_and_login(client, "live.swap.closed.admin@example.com")
+    bidder_token, bidder_id = _register_and_login(client, "live.swap.closed.bidder@example.com")
+    league_id = _create_league(client, admin_token, competition_ids, "Lega Scambio Chiuso")
+    _add_member(db_session, league_id, bidder_id)
+    session_id, lot_id, _ = _win_lot_against_full_quota(
+        client, db_session, admin_token, bidder_token, league_id, seed_offset=93400
+    )
+    url = f"/leagues/{league_id}/mercato/asta-live/sessioni/{session_id}/lotti/{lot_id}/scambia"
+    bidder = {"Authorization": f"Bearer {bidder_token}"}
+    admin = {"Authorization": f"Bearer {admin_token}"}
+    state = client.get(
+        f"/leagues/{league_id}/mercato/asta-live/sessioni/{session_id}/stato", headers=bidder
+    ).json()
+    keeper_id = state["pendingSwap"]["candidates"][0]["athleteId"]
+
+    client.post(f"/leagues/{league_id}/mercato/stato", headers=admin, json={"open": False})
+    blocked = client.post(url, headers=bidder, json={"releaseAthleteId": keeper_id})
+    assert blocked.status_code == 400
+    assert blocked.json()["code"] == "market_closed"
+    client.post(f"/leagues/{league_id}/mercato/stato", headers=admin, json={"open": True})
+
+    stranger = _seed_athlete(db_session, 93499, "Fuori Rosa", role=FantasyRole.P)
+    not_mine = client.post(url, headers=bidder, json={"releaseAthleteId": str(stranger.id)})
+    assert not_mine.status_code == 400
+    assert not_mine.json()["code"] == "market_live_swap_athlete_not_in_roster"
+
+
+def test_expired_live_window_rejects_nomination_and_raise(
+    client: TestClient, db_session: Session, competition_ids: list[str]
+) -> None:
+    admin_token, _ = _register_and_login(client, "live.lot.window.admin@example.com")
+    bidder_token, bidder_id = _register_and_login(client, "live.lot.window.bidder@example.com")
+    league_id = _create_league(client, admin_token, competition_ids, "Lega Finestra Scaduta")
+    _add_member(db_session, league_id, bidder_id)
+    first = _seed_athlete(db_session, 93501, "Finestra Uno")
+    second = _seed_athlete(db_session, 93502, "Finestra Due")
+    session_id = _start_manual_session(client, admin_token, league_id)
+    lot = _nominate(client, admin_token, league_id, session_id, first.id)
+
+    from market.models import MarketSession
+
+    market_session = db_session.get(MarketSession, UUID(session_id))
+    market_session.opens_at = datetime.now(UTC) - timedelta(minutes=5)
+    market_session.closes_at = datetime.now(UTC) - timedelta(minutes=1)
+    db_session.commit()
+
+    base = f"/leagues/{league_id}/mercato/asta-live/sessioni/{session_id}"
+    raised = client.put(
+        f"{base}/lotti/{lot['id']}/rilanci",
+        headers={"Authorization": f"Bearer {bidder_token}"},
+        json={"amountCredits": 10},
+    )
+    assert raised.status_code == 400
+    assert raised.json()["code"] == "market_live_session_not_open"
+    nominated = client.post(
+        f"{base}/lotti/nomina",
+        headers={"Authorization": f"Bearer {admin_token}"},
+        json={"athleteId": str(second.id)},
+    )
+    assert nominated.status_code == 400
+    assert nominated.json()["code"] == "market_live_session_not_open"

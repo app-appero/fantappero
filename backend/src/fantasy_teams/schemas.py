@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from pydantic import Field
 
+from app.text_validation import NoNulStr
 from auth.schemas import ApiModel
 
 
@@ -134,8 +135,8 @@ class CreditLedgerListResponse(ApiModel):
 class AdminCreditMovementRequest(ApiModel):
     fantasy_team_id: str = Field(alias="fantasyTeamId", min_length=1)
     amount: int = Field(ge=-10_000_000, le=10_000_000)
-    transaction_id: str = Field(alias="transactionId", min_length=1, max_length=128)
-    note: str | None = Field(default=None, max_length=255)
+    transaction_id: NoNulStr = Field(alias="transactionId", min_length=1, max_length=128)
+    note: NoNulStr | None = Field(default=None, max_length=255)
 
 
 class RosterImportIssueResponse(ApiModel):

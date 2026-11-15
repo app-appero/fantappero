@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.text_validation import NoNulStr
+
 
 class ApiModel(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
@@ -28,11 +30,11 @@ class ProfileResponse(ApiModel):
 
 
 class UpdateProfileRequest(ApiModel):
-    display_name: str | None = Field(default=None, alias="displayName")
+    display_name: NoNulStr | None = Field(default=None, alias="displayName")
     # "" = rimuove il nickname.
-    nickname: str | None = None
-    language: str | None = None
-    timezone: str | None = None
+    nickname: NoNulStr | None = None
+    language: NoNulStr | None = None
+    timezone: NoNulStr | None = None
     notifications_email: bool | None = Field(default=None, alias="notificationsEmail")
     notifications_push: bool | None = Field(default=None, alias="notificationsPush")
     quiet_hours_start_hour: int | None = Field(default=None, alias="quietHoursStartHour")

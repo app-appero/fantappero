@@ -697,6 +697,8 @@ class MarketService:
         )
         if bid is None:
             raise ValidationAuthError("Offerta non trovata.", code="market_bid_not_found")
+        if bid.status == MarketBidStatus.CANCELLED:
+            return  # già ritirata: nessun secondo evento nello storico
         bid.status = MarketBidStatus.CANCELLED
         self._session.flush()
         self._add_audit(
