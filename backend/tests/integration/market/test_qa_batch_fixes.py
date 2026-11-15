@@ -1555,3 +1555,53 @@ def test_stale_proposed_trade_reads_as_expired_and_frees_the_limit(
     )
     assert detail.status_code == 200
     assert detail.json()["status"] == "expired"
+
+
+def test_long_display_name_nan_threshold_and_nickname_release(
+    client: TestClient, db_session: Session, competition_ids: list[str]
+) -> None:
+    too_long = client.post(
+        "/auth/register",
+        json={
+            "email": "longname@example.com",
+            "password": "Password123!",
+            "displayName": "N" * 81,
+        },
+    )
+    assert too_long.status_code == 422
+
+    admin_token, _ = _register_and_login(client, "nan.admin@example.com")
+    league_id = _create_league(client, admin_token, competition_ids, "Lega Soglia NaN")
+    rules = client.get(f"/leagues/{league_id}/amministrazione", headers=_hdr(admin_token))
+    body = rules.json()["rules"]
+    nan_put = client.put(
+        f"/leagues/{league_id}/amministrazione/regolamento",
+        headers={**_hdr(admin_token), "Content-Type": "application/json"},
+        content=json_with_nan(body),
+    )
+    assert nan_put.status_code == 422, nan_put.text
+
+
+def json_with_nan(body: dict) -> str:
+    import json
+
+    payload = json.dumps({**body, "turnCoverageThreshold": 0.5})
+    return payload.replace('"turnCoverageThreshold": 0.5', '"turnCoverageThreshold": NaN')
+
+
+def test_nickname_is_free_again_after_account_deletion(client: TestClient) -> None:
+    first_token, _ = _register_and_login(client, "nick.first@example.com")
+    second_token, _ = _register_and_login(client, "nick.second@example.com")
+    nick = f"Nick{uuid4().hex[:8]}"
+    assert (
+        client.patch("/profile/me", headers=_hdr(first_token), json={"nickname": nick}).status_code
+        == 200
+    )
+    taken = client.patch("/profile/me", headers=_hdr(second_token), json={"nickname": nick})
+    assert taken.status_code == 400
+    deleted = client.post(
+        "/profile/me/delete", headers=_hdr(first_token), json={"confirmPhrase": "ELIMINA"}
+    )
+    assert deleted.status_code == 200
+    free = client.patch("/profile/me", headers=_hdr(second_token), json={"nickname": nick})
+    assert free.status_code == 200, free.text

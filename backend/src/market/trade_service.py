@@ -722,6 +722,11 @@ class TradeService:
                 # 2.4: non più eseguibile per sempre: esce da "Da gestire" e libera il limite.
                 proposal.status = TradeStatus.EXPIRED
                 proposal.decided_at = datetime.now(UTC)
+                self._notify_trade_status(
+                    proposal_id=proposal.id,
+                    status=TradeStatus.EXPIRED,
+                    team_ids=[proposal.proposer_team_id, proposal.recipient_team_id],
+                )
                 self._session.commit()
             raise
 

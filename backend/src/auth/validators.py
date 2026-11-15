@@ -7,7 +7,7 @@ import re
 from auth.exceptions import ValidationAuthError
 
 _PASSWORD_MIN_LENGTH = 8
-_DISPLAY_NAME_MAX_LENGTH = 120
+_DISPLAY_NAME_MAX_LENGTH = 80
 _EMAIL_PATTERN = re.compile(r"^[^\s@]+@[^\s@]+\.[^\s@]+$")
 
 
