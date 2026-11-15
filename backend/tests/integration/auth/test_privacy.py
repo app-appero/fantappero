@@ -122,7 +122,7 @@ def test_delete_anonymizes_account_and_preserves_league_history(
     delete = client.post(
         "/profile/me/delete",
         headers=headers,
-        json={"confirmPhrase": "ELIMINA"},
+        json={"confirmPhrase": "ELIMINA", "password": "Password123!"},
     )
     assert delete.status_code == 200
     assert "eliminato" in delete.json()["message"].lower()
@@ -182,6 +182,49 @@ def test_privacy_endpoints_require_authentication(client: TestClient) -> None:
 
     delete = client.post(
         "/profile/me/delete",
-        json={"confirmPhrase": "ELIMINA"},
+        json={"confirmPhrase": "ELIMINA", "password": "Password123!"},
     )
     assert delete.status_code == 401
+
+
+def test_delete_requires_the_password_for_accounts_that_have_one(client: TestClient) -> None:
+    session = _register_and_login(client, "needpwd@example.com", "Need Pwd")
+    headers = {"Authorization": f"Bearer {session['access']}"}
+
+    missing = client.post("/profile/me/delete", headers=headers, json={"confirmPhrase": "ELIMINA"})
+    assert missing.status_code == 400
+    assert missing.json()["code"] == "invalid_password"
+    wrong = client.post(
+        "/profile/me/delete",
+        headers=headers,
+        json={"confirmPhrase": "ELIMINA", "password": "SbagliataPwd1!"},
+    )
+    assert wrong.status_code == 400
+    assert wrong.json()["code"] == "invalid_password"
+    ok = client.post(
+        "/profile/me/delete",
+        headers=headers,
+        json={"confirmPhrase": "ELIMINA", "password": "Password123!"},
+    )
+    assert ok.status_code == 200
+
+
+def test_export_includes_nickname_preferences_and_team_data(
+    client: TestClient, db_session: Session
+) -> None:
+    session = _register_and_login(client, "fullexport@example.com", "Full Export")
+    headers = {"Authorization": f"Bearer {session['access']}"}
+    patch = client.patch(
+        "/profile/me",
+        headers=headers,
+        json={"nickname": "ExpNick", "quietHoursStartHour": 22, "quietHoursEndHour": 7},
+    )
+    assert patch.status_code == 200, patch.text
+    payload = client.get("/profile/me/export", headers=headers).json()
+    profile = payload["profile"]
+    assert profile["nickname"] == "ExpNick"
+    assert profile["quietHoursStartHour"] == 22
+    assert profile["quietHoursEndHour"] == 7
+    assert "availableForInvites" in profile
+    assert payload["pushDevices"] == []
+    assert payload["teams"] == []
