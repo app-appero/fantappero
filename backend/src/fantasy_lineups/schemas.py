@@ -185,16 +185,21 @@ class LineupLockCountdownResponse(ApiModel):
     server_now: datetime = Field(alias="serverNow")
 
 
+# Una rosa ha al più 35 calciatori: liste più lunghe sono richieste anomale, da respingere
+# prima di prendere qualunque blocco sul database.
+MAX_LINEUP_IDS = 40
+
+
 class SaveLineupRequest(ApiModel):
     module: FantasyModuleLiteral
-    starter_athlete_ids: list[UUID] = Field(alias="starterAthleteIds")
-    bench_athlete_ids: list[UUID] = Field(alias="benchAthleteIds")
+    starter_athlete_ids: list[UUID] = Field(alias="starterAthleteIds", max_length=MAX_LINEUP_IDS)
+    bench_athlete_ids: list[UUID] = Field(alias="benchAthleteIds", max_length=MAX_LINEUP_IDS)
 
 
 class SaveLineupDraftRequest(ApiModel):
     module: FantasyModuleLiteral
-    starter_athlete_ids: list[str] = Field(alias="starterAthleteIds")
-    bench_athlete_ids: list[str] = Field(alias="benchAthleteIds")
+    starter_athlete_ids: list[str] = Field(alias="starterAthleteIds", max_length=MAX_LINEUP_IDS)
+    bench_athlete_ids: list[str] = Field(alias="benchAthleteIds", max_length=MAX_LINEUP_IDS)
 
 
 class ApplyBestLineupRequest(ApiModel):

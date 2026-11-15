@@ -453,6 +453,15 @@ class FantasyLineupService:
             starter_ids=self._starter_order_from_submission(submission),
             bench_ids=self._bench_order_from_submission(submission),
         ):
+            # Formazione identica alla confermata: nessuna nuova revisione, ma la bozza
+            # eventualmente aperta non ha più senso e va scartata.
+            self._session.execute(
+                delete(LineupDraft).where(
+                    LineupDraft.round_id == fantasy_round.id,
+                    LineupDraft.fantasy_team_id == team.id,
+                )
+            )
+            self._session.commit()
             return self._to_context(
                 league_access=league_access,
                 fantasy_round=fantasy_round,
@@ -1681,14 +1690,14 @@ class FantasyLineupService:
     ) -> None:
         """Chi di sicuro non prende il voto non entra tra i titolari (chi c'era già resta).
 
-        Le indisponibilità confermate valgono sempre. «Nessuna partita» e «partita rinviata»
-        contano dal primo blocco del turno: prima nessun voto è noto, quindi non c'è vantaggio.
+        Le indisponibilità confermate, «nessuna partita» e «partita rinviata» valgono sempre,
+        come nell'interfaccia (che li segnala non selezionabili già prima del primo blocco).
         """
         reasons = self._no_vote_reasons(
             roster_ids,
             kickoffs,
             self._probable_hints(round_id, roster_ids),
-            include_schedule=round_started,
+            include_schedule=True,
         )
         entering = [
             item for item in starter_ids if item in reasons and item not in previous_starter_ids
