@@ -50,27 +50,32 @@ export function AdminLeaguesPage() {
     }
   }, [debouncedQuery, page]);
 
-  const remove = useCallback(
-    async (leagueId: string, name: string) => {
-      const session = loadStoredSession();
-      if (!session?.accessToken) {
-        return;
-      }
-      const confirmed = window.confirm(
-        `Eliminare definitivamente la lega "${name}"? Gli allenatori riceveranno una notifica. L'azione non è reversibile.`,
-      );
-      if (!confirmed) {
-        return;
-      }
-      try {
-        await deleteAdminLeague(session.accessToken, leagueId);
-        await load();
-      } catch (deleteError) {
-        setError(getApiErrorMessage(deleteError, "Impossibile eliminare la lega."));
-      }
-    },
-    [load],
-  );
+  const [pendingDelete, setPendingDelete] = useState<{ id: string; name: string } | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [actionMessage, setActionMessage] = useState<string | null>(null);
+
+  const confirmDelete = useCallback(async () => {
+    if (!pendingDelete) {
+      return;
+    }
+    const session = loadStoredSession();
+    if (!session?.accessToken) {
+      setActionMessage("Sessione non disponibile. Accedi di nuovo.");
+      return;
+    }
+    setDeleting(true);
+    setActionMessage(null);
+    try {
+      await deleteAdminLeague(session.accessToken, pendingDelete.id);
+      setActionMessage(`Lega "${pendingDelete.name}" eliminata. Gli allenatori sono stati avvisati.`);
+      setPendingDelete(null);
+      await load();
+    } catch (deleteError) {
+      setActionMessage(getApiErrorMessage(deleteError, "Impossibile eliminare la lega."));
+    } finally {
+      setDeleting(false);
+    }
+  }, [pendingDelete, load]);
 
   useEffect(() => {
     void load();
@@ -89,6 +94,26 @@ export function AdminLeaguesPage() {
         value={query}
         onChange={(event) => setQuery(event.target.value)}
       />
+
+      {actionMessage ? (
+        <p role="status" data-testid="admin-leagues-action-message">
+          {actionMessage}
+        </p>
+      ) : null}
+      {pendingDelete ? (
+        <div role="alertdialog" aria-label="Conferma eliminazione lega" data-testid="admin-leagues-confirm">
+          <p>
+            Eliminare definitivamente la lega &quot;{pendingDelete.name}&quot;? Gli allenatori
+            riceveranno una notifica. L&apos;azione non è reversibile.
+          </p>
+          <Button variant="danger" size="sm" disabled={deleting} onClick={() => void confirmDelete()}>
+            {deleting ? "Eliminazione…" : "Conferma eliminazione"}
+          </Button>{" "}
+          <Button variant="secondary" size="sm" disabled={deleting} onClick={() => setPendingDelete(null)}>
+            Annulla
+          </Button>
+        </div>
+      ) : null}
 
       {loading ? (
         <UiStatePanel
@@ -124,7 +149,10 @@ export function AdminLeaguesPage() {
               <Button
                 variant="danger"
                 size="sm"
-                onClick={() => void remove(league.id, league.name)}
+                onClick={() => {
+                  setActionMessage(null);
+                  setPendingDelete({ id: league.id, name: league.name });
+                }}
               >
                 Elimina
               </Button>
