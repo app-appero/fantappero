@@ -448,3 +448,37 @@ def test_new_session_is_rejected_while_a_tiebreak_session_is_active(
     )
     assert blocked.status_code == 400
     assert blocked.json()["code"] == "market_session_already_active"
+
+
+def test_unassignable_top_bid_falls_to_the_runner_up_with_enough_credits(
+    client: TestClient,
+    db_session: Session,
+    competition_ids: list[str],
+) -> None:
+    """Il coach non ha più crediti per la seconda offerta vinta: l'atleta va al secondo offerente."""
+    admin_token, _ = _register_and_login(client, "res.runner.admin@example.com")
+    member_token, member_id = _register_and_login(client, "res.runner.member@example.com")
+    league_id = _create_league(client, admin_token, competition_ids, "Lega Seconda Offerta")
+    _add_member(db_session, league_id, member_id)
+    first = _seed_athlete(db_session, 9401, "Primo Colpo")
+    second = _seed_athlete(db_session, 9402, "Secondo Colpo")
+
+    session_id = _create_open_session(client, admin_token, league_id)
+    assert _bid(client, league_id, session_id, admin_token, first.id, 900).status_code == 200
+    assert _bid(client, league_id, session_id, admin_token, second.id, 800).status_code == 200
+    assert _bid(client, league_id, session_id, member_token, second.id, 120).status_code == 200
+
+    resolution = _close_and_resolve(client, league_id, session_id, admin_token)
+    assert resolution.status_code == 200
+
+    def owner_of(athlete_id) -> str | None:
+        slot = db_session.scalar(
+            select(FantasyRosterSlot).where(FantasyRosterSlot.athlete_id == athlete_id)
+        )
+        if slot is None:
+            return None
+        membership = db_session.get(LeagueMembership, slot.fantasy_team.membership_id)
+        return str(membership.user_id)
+
+    db_session.expire_all()
+    assert owner_of(second.id) == str(member_id)

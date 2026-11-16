@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 from uuid import UUID
 
 from sqlalchemy import delete, exists, func, select
@@ -1388,6 +1388,14 @@ class FantasyTurnService:
             fantasy_round.cutoff_at
         ):
             return False
+        if trigger == "schedule" and fantasy_round.cutoff_at is not None:
+            # Il batch e "sincronizza" aprono solo i turni vicini: quelli lontani restano
+            # modificabili (esclusione di partite rinviate) e si apriranno a loro tempo.
+            from config.settings.loader import get_api_settings
+
+            horizon = timedelta(days=get_api_settings().fantasy_turns_horizon_days)
+            if ensure_utc(fantasy_round.cutoff_at) - ensure_utc(now) > horizon:
+                return False
         fantasy_round.status = FantasyTurnStatus.OPEN
         fantasy_round.opens_at = now
         self._add_audit(

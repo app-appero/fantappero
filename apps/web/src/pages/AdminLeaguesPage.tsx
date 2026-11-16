@@ -1,7 +1,7 @@
 import type { PaginatedAdminLeagues } from "@fantappero/contracts";
-import { Breadcrumb, Input, PageContainer, UiStatePanel } from "@fantappero/ui";
+import { Breadcrumb, Button, Input, PageContainer, UiStatePanel } from "@fantappero/ui";
 import { useCallback, useEffect, useState } from "react";
-import { fetchAdminLeagues } from "../api/admin";
+import { deleteAdminLeague, fetchAdminLeagues } from "../api/admin";
 import { ApiError } from "../api/client";
 import { getApiErrorMessage } from "../auth/AuthContext";
 import { loadStoredSession } from "../auth/sessionStorage";
@@ -49,6 +49,28 @@ export function AdminLeaguesPage() {
       setLoading(false);
     }
   }, [debouncedQuery, page]);
+
+  const remove = useCallback(
+    async (leagueId: string, name: string) => {
+      const session = loadStoredSession();
+      if (!session?.accessToken) {
+        return;
+      }
+      const confirmed = window.confirm(
+        `Eliminare definitivamente la lega "${name}"? Gli allenatori riceveranno una notifica. L'azione non è reversibile.`,
+      );
+      if (!confirmed) {
+        return;
+      }
+      try {
+        await deleteAdminLeague(session.accessToken, leagueId);
+        await load();
+      } catch (deleteError) {
+        setError(getApiErrorMessage(deleteError, "Impossibile eliminare la lega."));
+      }
+    },
+    [load],
+  );
 
   useEffect(() => {
     void load();
@@ -99,6 +121,13 @@ export function AdminLeaguesPage() {
               <strong className="fa-admin-leagues__name">{league.name}</strong>
               <span className="fa-admin-leagues__state">{league.state}</span>
               <span className="fa-admin-leagues__owner">Admin: {league.ownerDisplayName ?? "—"}</span>
+              <Button
+                variant="danger"
+                size="sm"
+                onClick={() => void remove(league.id, league.name)}
+              >
+                Elimina
+              </Button>
             </li>
           ))}
         </ul>

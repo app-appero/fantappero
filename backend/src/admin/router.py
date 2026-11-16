@@ -5,6 +5,7 @@ from __future__ import annotations
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query
+from fastapi import Response
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
@@ -67,7 +68,9 @@ def get_admin_transfers_service(
     return AdminTransfersService(session)
 
 
-_NOT_FOUND_CODES = frozenset({"admin_user_not_found", "admin_transfer_not_found"})
+_NOT_FOUND_CODES = frozenset(
+    {"admin_user_not_found", "admin_transfer_not_found", "admin_league_not_found"}
+)
 
 
 def _error_response(exc: AdminError) -> JSONResponse:
@@ -280,6 +283,20 @@ def list_leagues(
     service: AdminService = Depends(get_admin_service),
 ) -> PaginatedAdminLeaguesResponse:
     return service.list_leagues(query=query, page=page)
+
+
+@router.delete("/leagues/{league_id}", status_code=204)
+def delete_league(
+    league_id: UUID,
+    operator: User = Depends(require_permissions(Permission.GLOBAL_OPERATE)),
+    service: AdminService = Depends(get_admin_service),
+) -> Response:
+    """Elimina una lega in qualsiasi stato e avvisa i partecipanti."""
+    try:
+        service.delete_league(actor=operator, league_id=league_id)
+    except AdminError as exc:
+        return _error_response(exc)
+    return Response(status_code=204)
 
 
 @router.get("/transfers/pending-review", response_model=PaginatedAdminPendingTransfersResponse)

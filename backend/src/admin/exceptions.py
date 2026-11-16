@@ -63,3 +63,8 @@ class CannotModifyOperatorError(AdminError):
 class CannotDeleteSelfError(AdminError):
     def __init__(self) -> None:
         super().__init__("Non puoi eliminare te stesso.", code="cannot_delete_self")
+
+
+class AdminLeagueNotFoundError(AdminError):
+    def __init__(self) -> None:
+        super().__init__("Lega non trovata.", code="admin_league_not_found")

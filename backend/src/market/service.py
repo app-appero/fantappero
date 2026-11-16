@@ -350,7 +350,8 @@ class MarketService:
         # Offerte più alte che non si sono potute assegnare (crediti, rosa o ruolo): la notifica
         # non deve dire "offerta inferiore".
         unassignable_bid_ids: set[UUID] = set()
-        for bid in candidates:
+
+        def try_assign(bid: MarketBid) -> bool:
             transaction_id = f"market:{market_session.id}:{bid.fantasy_team_id}:{bid.athlete_id}"
             if market_session.kind == MarketSessionKind.WAIVER:
                 slot = (
@@ -379,8 +380,25 @@ class MarketService:
                     allow_overflow=True,
                 )
             bid.status = MarketBidStatus.WON if slot is not None else MarketBidStatus.LOST
-            if slot is None:
+            return slot is not None
+
+        failed_top_bids: list[MarketBid] = []
+        for bid in candidates:
+            if not try_assign(bid):
                 unassignable_bid_ids.add(bid.id)
+                failed_top_bids.append(bid)
+
+        # Se l'offerta più alta non si può assegnare (crediti o rosa), il calciatore va alla
+        # seconda offerta più alta che ha crediti e posto; a parità vince chi ha offerto prima.
+        for failed in failed_top_bids:
+            runners_up = [
+                row
+                for row in by_athlete[failed.athlete_id]
+                if row.id != failed.id and row.status == MarketBidStatus.LOST
+            ]
+            for runner_up in runners_up:
+                if try_assign(runner_up):
+                    break
 
         tiebreak_count = 0
         for athlete_id, tied_bids in tie_groups.items():

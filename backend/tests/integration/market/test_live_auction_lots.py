@@ -898,13 +898,28 @@ def test_expired_live_window_rejects_nomination_and_raise(
     db_session.commit()
 
     base = f"/leagues/{league_id}/mercato/asta-live/sessioni/{session_id}"
+    # Tolleranza: il lotto già aperto alla fine della sessione si può ancora rilanciare.
     raised = client.put(
         f"{base}/lotti/{lot['id']}/rilanci",
         headers={"Authorization": f"Bearer {bidder_token}"},
         json={"amountCredits": 10},
     )
-    assert raised.status_code == 400
-    assert raised.json()["code"] == "market_live_session_not_open"
+    assert raised.status_code == 200, raised.text
+    # ...ma non si apre un nuovo lotto, né una seconda sessione mentre quello è aperto.
+    second_session = client.post(
+        f"/leagues/{league_id}/mercato/asta-live/sessioni",
+        headers={"Authorization": f"Bearer {admin_token}"},
+        json={
+            "opensAt": datetime.now(UTC).isoformat(),
+            "closesAt": (datetime.now(UTC) + timedelta(hours=1)).isoformat(),
+            "nominationMode": "manual",
+            "minIncrementCredits": 10,
+            "softCloseSeconds": 5,
+            "lotDurationSeconds": 30,
+        },
+    )
+    assert second_session.status_code == 400
+    assert second_session.json()["code"] == "market_session_already_active"
     nominated = client.post(
         f"{base}/lotti/nomina",
         headers={"Authorization": f"Bearer {admin_token}"},
