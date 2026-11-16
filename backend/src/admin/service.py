@@ -6,6 +6,7 @@ import math
 import secrets
 from uuid import UUID
 
+from sqlalchemy import delete as sa_delete
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
 
@@ -528,7 +529,10 @@ class AdminService:
             )
         )
         self._session.flush()
-        self._session.delete(league)
+        # DELETE diretto: i figli spariscono per ON DELETE CASCADE nel database, senza
+        # caricarli uno a uno nell'ORM (una lega attiva ne ha decine di migliaia).
+        self._session.expunge(league)
+        self._session.execute(sa_delete(League).where(League.id == league_id))
         self._session.commit()
         _logger.info("admin_league_deleted", extra=details)
 
