@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import random
 import re
 from datetime import UTC, datetime, timedelta
 from uuid import UUID
@@ -446,3 +447,40 @@ def test_history_private_trade_events_visible_only_to_parties_and_reviewers() ->
     assert visible(row, "team-c", True, set(), teams)  # proprietario/operatore
     executed = SimpleNamespace(action=LeagueAuditAction.MARKET_TRADE_ACCEPTED, details={})
     assert visible(executed, "team-c", False, set(), teams)  # scambi eseguiti: pubblici
+
+
+def test_league_audit_hides_sealed_bids_while_open_and_rejects_out_of_range_dates(
+    client: TestClient,
+    db_session: Session,
+    competition_ids: list[str],
+) -> None:
+    admin_token, _ = _register_and_login(client, "hist.audit.admin@example.com")
+    member_token, member_id = _register_and_login(client, "hist.audit.member@example.com")
+    league_id = _create_league(client, admin_token, competition_ids, "Lega Audit Buste")
+    _add_member(db_session, league_id, member_id)
+    athlete = _seed_athlete(db_session, random.randint(100_000_000, 2_000_000_000), "Busta Audit")
+    session_id = _create_open_session(client, admin_token, league_id)
+    assert _bid(client, league_id, session_id, member_token, athlete.id, 33).status_code == 200
+
+    def bid_events() -> list:
+        response = client.get(
+            f"/leagues/{league_id}/audit?pageSize=100",
+            headers={"Authorization": f"Bearer {admin_token}"},
+        )
+        assert response.status_code == 200, response.text
+        return [
+            item for item in response.json()["items"] if item["action"].startswith("market_bid")
+        ]
+
+    assert bid_events() == []  # sessione aperta: nemmeno l'admin vede la busta altrui
+    _close_and_resolve(client, league_id, session_id, admin_token)
+    assert len(bid_events()) == 1  # chiusa: l'evento è pubblico
+
+    for path in (f"/leagues/{league_id}/audit", f"/leagues/{league_id}/mercato/storico"):
+        far = client.get(
+            path,
+            headers={"Authorization": f"Bearer {admin_token}"},
+            params={"dateFrom": "0001-01-01T00:00:00+14:00"},
+        )
+        assert far.status_code == 400, (path, far.text)
+        assert far.json()["code"] == "invalid_date_filter"

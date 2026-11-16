@@ -185,6 +185,20 @@ class MarketService:
                 "Esiste già una sessione di questo tipo attiva per questa lega.",
                 code="market_session_already_active",
             )
+        # Uno spareggio ancora aperto (sessione figlia) blocca ogni nuova sessione: altrimenti
+        # un altro partecipante potrebbe vincere il calciatore contestato nel frattempo.
+        tiebreaks = self._session.scalars(
+            select(MarketSession).where(
+                MarketSession.league_id == league.id,
+                MarketSession.parent_session_id.is_not(None),
+                MarketSession.status.in_(active_states),
+            )
+        ).all()
+        if any(effective_status(row, now=now) in active_states for row in tiebreaks):
+            raise ValidationAuthError(
+                "C'è uno spareggio in corso: concludilo prima di creare una nuova sessione.",
+                code="market_session_already_active",
+            )
         if kind == MarketSessionKind.INITIAL_AUCTION:
             # A league cannot run both auction mechanisms for the initial auction
             # at once (EP08-09): reject sealed creation while a live session is active.
@@ -621,6 +635,8 @@ class MarketService:
             existing_bid.amount_credits = amount
             existing_bid.release_athlete_id = release_athlete_id
             existing_bid.status = MarketBidStatus.SUBMITTED
+            # A parità d'importo vince chi ha offerto prima: un nuovo invio riparte da adesso.
+            existing_bid.submitted_at = datetime.now(UTC)
             bid = existing_bid
             self._session.flush()
         else:
@@ -821,6 +837,7 @@ class MarketService:
 
         slot.athlete_id = None
         slot.purchase_credits = None
+        slot.exceeds_role_quota = False
         sync_ownership_on_release(
             self._session,
             fantasy_team_id=team.id,

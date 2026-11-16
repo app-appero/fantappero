@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends, Query, Response, status
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
+from app.text_validation import NoNulStr
 from auth.dependencies import get_db_session
 from auth.exceptions import AuthError
 from auth.models.user import User
@@ -47,7 +48,7 @@ def get_notification_service(session: Session = Depends(get_db_session)) -> Noti
 def list_notifications(
     category: NotificationCategory | None = Query(default=None),
     unread_only: bool = Query(default=False, alias="unreadOnly"),
-    page: int = Query(default=1, ge=1),
+    page: int = Query(default=1, ge=1, le=100_000),
     page_size: int = Query(default=DEFAULT_PAGE_SIZE, ge=1, le=MAX_PAGE_SIZE, alias="pageSize"),
     current_user: User = Depends(require_permissions(Permission.PROFILE_VIEW)),
     service: NotificationService = Depends(get_notification_service),
@@ -192,7 +193,7 @@ def register_push_device(
     response_class=Response,
 )
 def unregister_push_device(
-    token: str,
+    token: NoNulStr,
     current_user: User = Depends(require_permissions(Permission.PROFILE_VIEW)),
     service: NotificationService = Depends(get_notification_service),
 ) -> Response:

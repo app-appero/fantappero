@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import re
 from datetime import UTC, datetime, timedelta
-from uuid import UUID
+from uuid import UUID, uuid4
 
 import pytest
 from fastapi.testclient import TestClient
@@ -329,3 +329,46 @@ def test_live_session_window_is_validated_and_expired_session_cannot_start(
     started = client.post(f"{url}/{created.json()['id']}/avvia", headers=headers)
     assert started.status_code == 400
     assert started.json()["code"] == "invalid_session_window"
+
+
+def test_invalid_queue_in_configure_keeps_the_existing_queue_and_huge_queue_is_rejected(
+    client: TestClient, db_session: Session, competition_ids: list[str]
+) -> None:
+    import random
+
+    admin_token, _ = _register_and_login(client, "live.session.queuecfg@example.com")
+    league_id = _create_league(client, admin_token, competition_ids, "Lega Coda Live")
+    headers = {"Authorization": f"Bearer {admin_token}"}
+    athlete = _seed_athlete(db_session, random.randint(100_000_000, 2_000_000_000), "Coda Valida")
+    created = client.post(
+        f"/leagues/{league_id}/mercato/asta-live/sessioni",
+        headers=headers,
+        json={
+            **_manual_session_payload(),
+            "nominationMode": "sequential",
+            "nominationQueueAthleteIds": [str(athlete.id)],
+        },
+    )
+    assert created.status_code == 201, created.text
+    session_id = created.json()["id"]
+    url = f"/leagues/{league_id}/mercato/asta-live/sessioni/{session_id}/configurazione"
+
+    invalid = client.put(url, headers=headers, json={"nominationQueueAthleteIds": ["non-un-uuid"]})
+    assert invalid.status_code == 400
+    too_long = client.put(
+        url,
+        headers=headers,
+        json={"nominationQueueAthleteIds": [str(uuid4()) for _ in range(10_001)]},
+    )
+    assert too_long.status_code == 400
+    assert too_long.json()["code"] == "nomination_queue_too_long"
+
+    from market.live_models import MarketLiveNominationQueueEntry
+
+    db_session.expire_all()
+    remaining = db_session.scalars(
+        select(MarketLiveNominationQueueEntry).where(
+            MarketLiveNominationQueueEntry.session_id == UUID(session_id)
+        )
+    ).all()
+    assert [entry.athlete_id for entry in remaining] == [athlete.id]

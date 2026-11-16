@@ -222,3 +222,32 @@ def test_put_preferences_rejects_event_key_without_any_channel(client: TestClien
     )
     assert response.status_code == 400
     assert response.json()["code"] == "invalid_preference_request"
+
+
+def test_huge_page_and_nul_push_token_are_validation_errors(client, db_session) -> None:  # noqa: ANN001
+    import re
+
+    from mail.capture import get_captured_emails
+
+    email = "notif.edge@example.com"
+    client.post(
+        "/auth/register",
+        json={"email": email, "password": "Password123!", "displayName": "Notif Edge"},
+    )
+    match = re.search(r"token=([A-Za-z0-9_-]+)", get_captured_emails()[-1].message.text_body)
+    assert match
+    client.post("/auth/verify-email", json={"token": match.group(1)})
+    login = client.post("/auth/login", json={"email": email, "password": "Password123!"})
+    headers = {"Authorization": f"Bearer {login.json()['accessToken']}"}
+
+    huge = client.get("/notifications?page=99999999999999999999", headers=headers)
+    assert huge.status_code == 422
+    assert huge.json()["code"] == "validation_error"
+    posted = client.post(
+        "/notifications/push-devices",
+        headers=headers,
+        json={"token": "a\x00b", "platform": "android"},
+    )
+    assert posted.status_code == 422
+    deleted = client.delete("/notifications/push-devices/a%00b", headers=headers)
+    assert deleted.status_code == 422

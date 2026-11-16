@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import random
 import re
 from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime, timedelta
@@ -340,3 +341,38 @@ def test_concurrent_bid_updates_leave_single_consistent_row(
     ).all()
     assert len(rows) == 1
     assert rows[0].amount_credits in {50, 60, 70, 80}
+
+
+def test_resubmitting_a_bid_refreshes_its_submitted_at(
+    client: TestClient,
+    db_session: Session,
+    competition_ids: list[str],
+) -> None:
+    import time
+
+    from market.models import MarketBid
+
+    admin_token, _ = _register_and_login(client, "auction.resubmit.admin@example.com")
+    member_token, member_id = _register_and_login(client, "auction.resubmit.member@example.com")
+    league_id = _create_league(client, admin_token, competition_ids, "Lega Busta Riproposta")
+    _add_member(db_session, league_id, member_id)
+    athlete = _seed_athlete(
+        db_session, random.randint(100_000_000, 2_000_000_000), "Busta Riproposta"
+    )
+    session_id = _create_open_session(client, admin_token, league_id)
+    url = f"/leagues/{league_id}/mercato/asta/sessioni/{session_id}/offerte/{athlete.id}"
+    headers = {"Authorization": f"Bearer {member_token}"}
+
+    assert client.put(url, headers=headers, json={"amountCredits": 50}).status_code == 200
+    db_session.expire_all()
+    first = db_session.scalar(
+        select(MarketBid).where(MarketBid.session_id == UUID(session_id))
+    ).submitted_at
+    time.sleep(0.05)
+    assert client.delete(url, headers=headers).status_code == 204
+    assert client.put(url, headers=headers, json={"amountCredits": 50}).status_code == 200
+    db_session.expire_all()
+    second = db_session.scalar(
+        select(MarketBid).where(MarketBid.session_id == UUID(session_id))
+    ).submitted_at
+    assert second > first

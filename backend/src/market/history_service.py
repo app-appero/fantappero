@@ -20,6 +20,7 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.date_filters import checked_filter_date
 from auth.exceptions import ValidationAuthError
 from authorization.context import LeagueAccess
 from database.enums import LeagueAuditAction, LeagueMemberRole, MarketSessionStatus
@@ -229,6 +230,8 @@ class MarketHistoryService:
                 code="invalid_history_category",
             )
 
+        date_from = checked_filter_date(date_from)
+        date_to = checked_filter_date(date_to)
         query = (
             select(LeagueAuditEvent)
             .where(

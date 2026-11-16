@@ -6,6 +6,7 @@ from typing import Literal
 
 from pydantic import Field
 
+from app.text_validation import NoNulStr
 from auth.schemas import ApiModel
 
 
@@ -71,7 +72,7 @@ class UpdateNotificationPreferenceRequest(ApiModel):
 
 
 class RegisterPushDeviceRequest(ApiModel):
-    token: str = Field(min_length=1, max_length=255)
+    token: NoNulStr = Field(min_length=1, max_length=255)
     platform: Literal["ios", "android", "web"]
 
 

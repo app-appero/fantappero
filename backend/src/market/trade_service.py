@@ -813,7 +813,9 @@ class TradeService:
     def _read_status(self, proposal: TradeProposal, now: datetime) -> TradeStatus:
         """Stato mostrato: una proposta 'proposed' non più eseguibile si legge come scaduta."""
         status = effective_trade_status(proposal, now=now)
-        if status == TradeStatus.PROPOSED and self._is_stale(proposal):
+        if status in (TradeStatus.PROPOSED, TradeStatus.PENDING_APPROVAL) and self._is_stale(
+            proposal
+        ):
             return TradeStatus.EXPIRED
         return status
 

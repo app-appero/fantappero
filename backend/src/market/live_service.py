@@ -124,6 +124,10 @@ def _parse_required_datetime(value: str, *, field: str) -> datetime:
         ) from exc
 
 
+# Tetto alla lista di chiamata: oltre, la query supererebbe i parametri consentiti da Postgres.
+MAX_NOMINATION_QUEUE = 10_000
+
+
 class LiveMarketService:
     def __init__(self, session: Session) -> None:
         self._session = session
@@ -215,6 +219,7 @@ class LiveMarketService:
         get_metrics().incr("market_live_session_created_total")
         return self._to_session_response(market_session)
 
+    @rollback_on_error
     def configure_session(
         self,
         league_access: LeagueAccess,
@@ -1148,6 +1153,11 @@ class LiveMarketService:
         return operator_user_id
 
     def _set_nomination_queue(self, session_id: UUID, athlete_ids_raw: list[str]) -> None:
+        if len(athlete_ids_raw) > MAX_NOMINATION_QUEUE:
+            raise ValidationAuthError(
+                f"La lista di chiamata può avere al massimo {MAX_NOMINATION_QUEUE} calciatori.",
+                code="nomination_queue_too_long",
+            )
         self._session.execute(
             delete(MarketLiveNominationQueueEntry).where(
                 MarketLiveNominationQueueEntry.session_id == session_id
