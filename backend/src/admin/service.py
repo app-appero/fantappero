@@ -492,14 +492,41 @@ class AdminService:
         from sqlalchemy import text
         from sqlalchemy.exc import OperationalError
 
-        try:
-            self._session.execute(text("SET LOCAL lock_timeout = '8s'"))
-            self._session.execute(text("SET LOCAL statement_timeout = '60s'"))
-            self._delete_league_locked(actor=actor, league_id=league_id)
-        except OperationalError as exc:
-            self._session.rollback()
-            _logger.warning("admin_league_delete_busy", extra={"leagueId": str(league_id), "dbError": str(exc.orig)[:800]})
-            raise AdminLeagueBusyError() from exc
+        for attempt in (1, 2):
+            try:
+                self._session.execute(text("SET LOCAL lock_timeout = '8s'"))
+                self._session.execute(text("SET LOCAL statement_timeout = '60s'"))
+                self._delete_league_locked(actor=actor, league_id=league_id)
+                return
+            except OperationalError as exc:
+                self._session.rollback()
+                _logger.warning(
+                    "admin_league_delete_busy",
+                    extra={
+                        "leagueId": str(league_id),
+                        "attempt": attempt,
+                        "dbError": str(exc.orig)[:800],
+                    },
+                )
+                if attempt == 1:
+                    self._terminate_orphan_transactions()
+                    continue
+                raise AdminLeagueBusyError() from exc
+
+    def _terminate_orphan_transactions(self) -> None:
+        """Chiude le connessioni rimaste "in transaction" da oltre 2 minuti (orfane)."""
+        from sqlalchemy import text
+
+        terminated = self._session.execute(
+            text(
+                "SELECT pid, pg_terminate_backend(pid) FROM pg_stat_activity "
+                "WHERE datname = current_database() AND pid <> pg_backend_pid() "
+                "AND state = 'idle in transaction' "
+                "AND state_change < now() - interval '2 minutes'"
+            )
+        ).all()
+        self._session.commit()
+        _logger.warning("admin_orphan_transactions_terminated", extra={"count": len(terminated)})
 
     def _delete_league_locked(self, *, actor: User, league_id: UUID) -> None:
         """Eliminazione operatore: ammessa in ogni stato; avvisa i partecipanti."""
