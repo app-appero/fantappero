@@ -70,6 +70,10 @@ def process_live_fantasy_rounds(session: Session) -> LivePipelineResult:
     result = LivePipelineResult(rounds_considered=len(round_rows))
 
     for round_id, league_id in round_rows:
+        # Chiude la transazione della lega precedente: senza questo i blocchi sui turni
+        # restano tenuti fino alla fine di tutto il giro (minuti con molte leghe) e fermano
+        # chi li vuole toccare (es. eliminazione lega, azioni dell'admin).
+        session.commit()
         try:
             with session.begin_nested():
                 calculation = calculate_league_round(
@@ -95,6 +99,8 @@ def process_live_fantasy_rounds(session: Session) -> LivePipelineResult:
                 "fantasy_live_pipeline_round_failed",
                 extra={"round_id": str(round_id)},
             )
+
+    session.commit()
 
     get_metrics().incr(
         "fantasy_live_pipeline_runs_total",
