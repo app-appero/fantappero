@@ -517,6 +517,18 @@ class AdminService:
         """Chiude le connessioni rimaste "in transaction" da oltre 2 minuti (orfane)."""
         from sqlalchemy import text
 
+        activity = self._session.execute(
+            text(
+                "SELECT pid, state, wait_event_type, wait_event, "
+                "extract(epoch FROM now() - xact_start)::int AS xact_age, "
+                "left(query, 160) FROM pg_stat_activity "
+                "WHERE datname = current_database() AND pid <> pg_backend_pid() "
+                "AND state <> 'idle' ORDER BY xact_start NULLS LAST LIMIT 12"
+            )
+        ).all()
+        _logger.warning(
+            "admin_db_activity", extra={"rows": [[str(value) for value in row] for row in activity]}
+        )
         terminated = self._session.execute(
             text(
                 "SELECT pid, pg_terminate_backend(pid) FROM pg_stat_activity "
