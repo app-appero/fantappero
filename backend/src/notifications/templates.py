@@ -502,6 +502,19 @@ def _render_lega_attivata(params: NotificationParams) -> NotificationContent:
     )
 
 
+@register_template("lega.eliminata", 1)
+def _render_lega_eliminata(params: NotificationParams) -> NotificationContent:
+    """La lega è stata eliminata da un operatore."""
+    name = params.get("league_name")
+    return NotificationContent(
+        title="Lega eliminata",
+        body=f"La lega {name} è stata eliminata dall'amministrazione."
+        if name
+        else "Una tua lega è stata eliminata dall'amministrazione.",
+        deep_link="/",
+    )
+
+
 @register_template("turni.aperto", 1)
 def _render_turni_aperto(params: NotificationParams) -> NotificationContent:
     """Un turno si è aperto: si può schierare la formazione."""

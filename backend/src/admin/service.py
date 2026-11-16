@@ -10,6 +10,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
 
 from admin.exceptions import (
+    AdminLeagueNotFoundError,
     AdminUserNotFoundError,
     CannotDeleteSelfError,
     CannotImpersonateSelfError,
@@ -53,6 +54,7 @@ from database.enums import (
 from leagues.models.league import League
 from leagues.models.league_audit_event import LeagueAuditEvent
 from leagues.models.league_membership import LeagueMembership
+from observability.context import get_correlation_id
 from observability.logging import get_logger
 
 PAGE_SIZE = 20
@@ -478,6 +480,38 @@ class AdminService:
             },
         )
         return AdminImpersonationRevokeResponse(revokedCount=revoked)
+
+    def delete_league(self, *, actor: User, league_id: UUID) -> None:
+        """Eliminazione operatore: ammessa in ogni stato; avvisa i partecipanti."""
+        from database.enums import LeagueAuditAction
+        from notifications.league_events import notify_league_deleted
+
+        league = self._session.scalars(
+            select(League).where(League.id == league_id).with_for_update()
+        ).first()
+        if league is None:
+            raise AdminLeagueNotFoundError()
+        details = {
+            "leagueId": str(league.id),
+            "name": league.name,
+            "state": league.state.value,
+            "seasonYear": league.season_year,
+            "deletedByOperator": True,
+        }
+        notify_league_deleted(self._session, league=league)
+        self._session.add(
+            LeagueAuditEvent(
+                league_id=league.id,
+                actor_id=actor.id,
+                action=LeagueAuditAction.LEAGUE_DELETED,
+                correlation_id=get_correlation_id(),
+                details=details,
+            )
+        )
+        self._session.flush()
+        self._session.delete(league)
+        self._session.commit()
+        _logger.info("admin_league_deleted", extra=details)
 
     def list_leagues(
         self, *, query: str | None, page: int, page_size: int = PAGE_SIZE

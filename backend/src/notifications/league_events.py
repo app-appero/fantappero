@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 from database.enums import LeagueMemberRole, NotificationCategory
 from leagues.models.league import League
 from leagues.models.league_membership import LeagueMembership
+from leagues.models.league_rules import LeagueRules
 from notifications.service import NotificationService
 
 # Un turno si notifica solo se il blocco è vicino: la sincronizzazione può aprire mesi di turni
@@ -68,6 +69,20 @@ def notify_league_activated(session: Session, *, league: League) -> None:
         )
 
 
+def notify_league_deleted(session: Session, *, league: League) -> None:
+    """Un operatore ha eliminato la lega: avvisa tutti i partecipanti."""
+    service = NotificationService(session)
+    for user_id in _member_user_ids(session, league.id):
+        service.create_notification(
+            user_id=user_id,
+            category=NotificationCategory.SISTEMA,
+            template_key="lega.eliminata",
+            template_version=1,
+            params={"league_name": league.name},
+            dedup_key=f"league_deleted:{league.id}:{user_id}",
+        )
+
+
 def notify_turn_opened(
     session: Session,
     *,
@@ -84,6 +99,10 @@ def notify_turn_opened(
     league = session.get(League, league_id)
     if league is None:
         return
+    margin = session.scalar(
+        select(LeagueRules.lineup_lock_margin_minutes).where(LeagueRules.league_id == league_id)
+    )
+    lock_at = cutoff_at - timedelta(minutes=margin or 0) if cutoff_at is not None else None
     service = NotificationService(session)
     for user_id in _member_user_ids(session, league_id):
         service.create_notification(
@@ -95,7 +114,8 @@ def notify_turn_opened(
                 "league_name": league.name,
                 "league_id": str(league.id),
                 "number": number,
-                "cutoff_iso": cutoff_at.isoformat() if cutoff_at is not None else None,
+                # Il blocco vero arriva prima del calcio d'inizio, del margine scelto dalla lega.
+                "cutoff_iso": lock_at.isoformat() if lock_at is not None else None,
             },
             dedup_key=f"turn_opened:{round_id}:{user_id}",
         )

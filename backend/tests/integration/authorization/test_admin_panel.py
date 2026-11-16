@@ -199,6 +199,48 @@ def test_admin_leagues_list_shows_owner(client: TestClient, db_session: Session)
     assert "Lega Globale" in names
 
 
+def test_admin_can_delete_active_league_and_members_are_notified(
+    client: TestClient, db_session: Session
+) -> None:
+    from sqlalchemy import select
+
+    from notifications.models import Notification
+
+    token, op_id = _register_and_login(client, "admin.operator.del@example.com")
+    _promote(db_session, op_id)
+    _, owner_id = _register_and_login(client, "admin.league.owner.del@example.com")
+    league_id = _seed_league(db_session, name="Lega Da Eliminare", owner_id=owner_id)
+    db_session.execute(update(League).where(League.id == league_id).values(state=LeagueState.ACTIVE))
+    db_session.commit()
+
+    response = client.delete(
+        f"/admin/leagues/{league_id}", headers={"Authorization": f"Bearer {token}"}
+    )
+    assert response.status_code == 204
+    db_session.expire_all()
+    assert db_session.get(League, league_id) is None
+    notes = db_session.scalars(
+        select(Notification).where(
+            Notification.user_id == owner_id, Notification.template_key == "lega.eliminata"
+        )
+    ).all()
+    assert len(notes) == 1
+
+    again = client.delete(
+        f"/admin/leagues/{league_id}", headers={"Authorization": f"Bearer {token}"}
+    )
+    assert again.status_code == 404
+
+
+def test_admin_delete_league_denied_for_member(client: TestClient, db_session: Session) -> None:
+    token, _ = _register_and_login(client, "admin.member.del@example.com")
+    response = client.delete(
+        "/admin/leagues/00000000-0000-4000-8000-000000000099",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert response.status_code == 403
+
+
 def test_admin_listone_refresh_denied_for_member(client: TestClient, db_session: Session) -> None:
     token, _ = _register_and_login(client, "admin.listone.member@example.com")
     response = client.post(

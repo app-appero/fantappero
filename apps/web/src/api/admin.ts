@@ -107,6 +107,10 @@ export function fetchAdminLeagues(
   return apiRequest<PaginatedAdminLeagues>(`/admin/leagues${qs ? `?${qs}` : ""}`, { accessToken });
 }
 
+export function deleteAdminLeague(accessToken: string, leagueId: string): Promise<void> {
+  return apiRequest<void>(`/admin/leagues/${leagueId}`, { accessToken, method: "DELETE" });
+}
+
 export function fetchAdminListone(
   accessToken: string,
   seasonYear: number,

@@ -554,7 +554,8 @@ class LiveMarketService:
         self._tick_current_lot(league_access, market_session)
 
         team = self._my_team(league_access)
-        self._assert_window_open(market_session)
+        # Tolleranza: il lotto già aperto alla fine della sessione si chiude da sé (i rilanci
+        # restano accettati finché il lotto è aperto); solo le nuove chiamate sono rifiutate.
 
         lot = self._session.scalars(
             select(MarketLiveLot)
@@ -1181,6 +1182,16 @@ class LiveMarketService:
             known = set(
                 self._session.scalars(select(Athlete.id).where(Athlete.id.in_(ordered_ids))).all()
             )
+            owned = self._occupied_athlete_ids(
+                self._session.scalar(
+                    select(MarketSession.league_id).where(MarketSession.id == session_id)
+                )
+            )
+            if any(athlete_id in owned for athlete_id in ordered_ids):
+                raise ValidationAuthError(
+                    "Nella lista di chiamata c'è un calciatore già in una rosa.",
+                    code="athlete_already_owned",
+                )
             if len(known) != len(ordered_ids):
                 raise ValidationAuthError(
                     "Uno o più calciatori della lista di chiamata non esistono.",
@@ -1380,9 +1391,18 @@ class LiveMarketService:
             )
         ).all()
         now = datetime.now(UTC)
+        open_lot_session_ids = set(
+            self._session.scalars(
+                select(MarketLiveLot.session_id).where(
+                    MarketLiveLot.session_id.in_([row.id for row in rows]),
+                    MarketLiveLot.status == MarketLiveLotStatus.OPEN,
+                )
+            ).all()
+        )
         if any(
             effective_status(row, now=now)
             in (MarketSessionStatus.SCHEDULED, MarketSessionStatus.OPEN)
+            or row.id in open_lot_session_ids  # un lotto ancora aperto tiene viva la sessione
             for row in rows
         ):
             raise ValidationAuthError(
