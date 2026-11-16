@@ -498,7 +498,7 @@ class AdminService:
             self._delete_league_locked(actor=actor, league_id=league_id)
         except OperationalError as exc:
             self._session.rollback()
-            _logger.warning("admin_league_delete_busy", extra={"leagueId": str(league_id)})
+            _logger.warning("admin_league_delete_busy", extra={"leagueId": str(league_id), "dbError": str(exc.orig)[:800]})
             raise AdminLeagueBusyError() from exc
 
     def _delete_league_locked(self, *, actor: User, league_id: UUID) -> None:
