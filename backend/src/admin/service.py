@@ -10,6 +10,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
 
 from admin.exceptions import (
+    AdminLeagueBusyError,
     AdminLeagueNotFoundError,
     AdminUserNotFoundError,
     CannotDeleteSelfError,
@@ -482,6 +483,24 @@ class AdminService:
         return AdminImpersonationRevokeResponse(revokedCount=revoked)
 
     def delete_league(self, *, actor: User, league_id: UUID) -> None:
+        """Eliminazione operatore: ammessa in ogni stato; avvisa i partecipanti.
+
+        Con ``lock_timeout`` breve: se un'altra transazione tiene la lega (o un suo figlio) la
+        richiesta risponde 409 ``admin_league_busy`` invece di restare appesa.
+        """
+        from sqlalchemy import text
+        from sqlalchemy.exc import OperationalError
+
+        try:
+            self._session.execute(text("SET LOCAL lock_timeout = '8s'"))
+            self._session.execute(text("SET LOCAL statement_timeout = '60s'"))
+            self._delete_league_locked(actor=actor, league_id=league_id)
+        except OperationalError as exc:
+            self._session.rollback()
+            _logger.warning("admin_league_delete_busy", extra={"leagueId": str(league_id)})
+            raise AdminLeagueBusyError() from exc
+
+    def _delete_league_locked(self, *, actor: User, league_id: UUID) -> None:
         """Eliminazione operatore: ammessa in ogni stato; avvisa i partecipanti."""
         from database.enums import LeagueAuditAction
         from notifications.league_events import notify_league_deleted

@@ -68,3 +68,11 @@ class CannotDeleteSelfError(AdminError):
 class AdminLeagueNotFoundError(AdminError):
     def __init__(self) -> None:
         super().__init__("Lega non trovata.", code="admin_league_not_found")
+
+
+class AdminLeagueBusyError(AdminError):
+    def __init__(self) -> None:
+        super().__init__(
+            "La lega è occupata da un'altra operazione. Riprova fra qualche istante.",
+            code="admin_league_busy",
+        )
