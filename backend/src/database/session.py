@@ -46,6 +46,9 @@ def create_engine_from_url(url: str | None = None, *, echo: bool = False) -> Eng
         echo=echo,
         pool_pre_ping=True,
         future=True,
+        # Una transazione lasciata aperta e inattiva (connessione orfana dopo un riavvio)
+        # terrebbe i blocchi sulle righe per sempre: il database la chiude dopo 10 minuti.
+        connect_args={"options": "-c idle_in_transaction_session_timeout=600000"},
     )
 
 
