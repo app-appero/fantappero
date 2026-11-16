@@ -397,3 +397,60 @@ def test_concurrent_admin_approve_and_reject_only_one_transition_wins(
     row = db_session.scalar(select(TradeProposal).where(TradeProposal.id == UUID(proposal["id"])))
     assert row is not None
     assert row.status.value in {"executed", "rejected_by_admin"}
+
+
+def test_pending_approval_trade_with_moved_player_reads_as_expired(
+    client: TestClient,
+    db_session: Session,
+    competition_ids: list[str],
+) -> None:
+    import random
+
+    admin_token, _ = _register_and_login(client, "approve.stale.admin@example.com")
+    member_token, member_id = _register_and_login(client, "approve.stale.member@example.com")
+    league_id = _create_league(client, admin_token, competition_ids, "Lega Approvazione Obsoleta")
+    _add_member(db_session, league_id, member_id)
+    athlete = _seed_athlete(
+        db_session, random.randint(100_000_000, 2_000_000_000), "Doppio Scambio"
+    )
+    recipient_team_id = _own_athlete_at_slot(client, league_id, member_token, 0, athlete)
+    _set_league_rules(client, league_id, admin_token, require_trade_approval=True)
+
+    def propose() -> dict:
+        response = client.post(
+            f"/leagues/{league_id}/mercato/scambi/proposte",
+            headers={"Authorization": f"Bearer {admin_token}"},
+            json={
+                "recipientTeamId": recipient_team_id,
+                "offeredCredits": 5,
+                "requestedAthleteIds": [str(athlete.id)],
+                "expiresAt": _future_iso(),
+            },
+        )
+        assert response.status_code == 201, response.text
+        return response.json()
+
+    first, second = propose(), propose()
+    base = f"/leagues/{league_id}/mercato/scambi/proposte"
+    for proposal in (first, second):
+        accepted = client.post(
+            f"{base}/{proposal['id']}/accetta",
+            headers={"Authorization": f"Bearer {member_token}"},
+        )
+        assert accepted.status_code == 200
+        assert accepted.json()["status"] == "pending_approval"
+
+    approved = client.post(
+        f"{base}/{first['id']}/amministrazione/approva",
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+    assert approved.status_code == 200
+
+    detail = client.get(
+        f"{base}/{second['id']}", headers={"Authorization": f"Bearer {admin_token}"}
+    )
+    assert detail.status_code == 200
+    assert detail.json()["status"] == "expired"
+    listed = client.get(base, headers={"Authorization": f"Bearer {admin_token}"}).json()
+    rows = listed if isinstance(listed, list) else listed.get("proposals", listed.get("items", []))
+    assert all(row["status"] != "pending_approval" for row in rows)

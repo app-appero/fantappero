@@ -299,3 +299,36 @@ def test_concurrent_release_attempts_apply_refund_exactly_once(
         )
     ).all()
     assert len(ledger_entries) == 1
+
+
+def test_release_of_overflow_athlete_clears_the_flag_on_the_empty_slot(
+    client: TestClient, db_session: Session, competition_ids: list[str]
+) -> None:
+    import random
+
+    admin_token, _ = _register_and_login(client, "relflag.admin@example.com")
+    league_id = _create_league(client, admin_token, competition_ids, "Lega Segno Svincolo")
+    athlete = _seed_athlete(db_session, random.randint(100_000_000, 2_000_000_000), "Esubero Uno")
+    headers = {"Authorization": f"Bearer {admin_token}"}
+    team = client.get(f"/leagues/{league_id}/rosa", headers=headers).json()
+    assign = client.put(
+        f"/leagues/{league_id}/amministrazione/squadre/{team['id']}/slot/0",
+        headers=headers,
+        json={"athleteId": str(athlete.id), "purchaseCredits": 4},
+    )
+    assert assign.status_code == 200, assign.text
+    slot = db_session.scalar(
+        select(FantasyRosterSlot).where(FantasyRosterSlot.athlete_id == athlete.id)
+    )
+    slot.exceeds_role_quota = True
+    db_session.commit()
+
+    released = client.post(
+        f"/leagues/{league_id}/mercato/svincolo/0",
+        headers=headers,
+        json={"reason": "voluntary", "athleteId": str(athlete.id)},
+    )
+    assert released.status_code == 200, released.text
+    row = client.get(f"/leagues/{league_id}/rosa", headers=headers).json()["slots"][0]
+    assert row["athleteId"] is None
+    assert row["exceedsRoleQuota"] is False

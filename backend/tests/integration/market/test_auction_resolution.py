@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import random
 import re
 from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime, timedelta
@@ -416,3 +417,34 @@ def test_winning_a_fourth_goalkeeper_enters_the_roster_flagged_instead_of_losing
     assert won_slot is not None
     assert won_slot.exceeds_role_quota is True
     assert won_slot.purchase_credits == 40
+
+
+def test_new_session_is_rejected_while_a_tiebreak_session_is_active(
+    client: TestClient,
+    db_session: Session,
+    competition_ids: list[str],
+) -> None:
+    admin_token, _ = _register_and_login(client, "res.tie.block.admin@example.com")
+    member_token, member_id = _register_and_login(client, "res.tie.block.member@example.com")
+    league_id = _create_league(client, admin_token, competition_ids, "Lega Spareggio Bloccato")
+    _add_member(db_session, league_id, member_id)
+    athlete = _seed_athlete(
+        db_session, random.randint(100_000_000, 2_000_000_000), "Spareggio Aperto"
+    )
+
+    session_id = _create_open_session(client, admin_token, league_id)
+    assert _bid(client, league_id, session_id, admin_token, athlete.id, 100).status_code == 200
+    assert _bid(client, league_id, session_id, member_token, athlete.id, 100).status_code == 200
+    assert _close_and_resolve(client, league_id, session_id, admin_token).status_code == 200
+
+    now = datetime.now(UTC)
+    blocked = client.post(
+        f"/leagues/{league_id}/mercato/asta/sessioni",
+        headers={"Authorization": f"Bearer {admin_token}"},
+        json={
+            "opensAt": (now - timedelta(minutes=1)).isoformat(),
+            "closesAt": (now + timedelta(hours=1)).isoformat(),
+        },
+    )
+    assert blocked.status_code == 400
+    assert blocked.json()["code"] == "market_session_already_active"
