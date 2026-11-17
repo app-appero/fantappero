@@ -6,6 +6,7 @@ import type {
   RosterOccupancyEntry,
 } from "@fantappero/contracts";
 import { theme } from "@fantappero/ui/theme";
+import { reasonLabel } from "./ledgerReason";
 
 export {
   filterByTab,
@@ -15,6 +16,7 @@ export {
   ROSTER_PAGE_SIZE,
   type RoleTab,
 } from "./listoneFilter";
+export { reasonLabel };
 
 const { colors } = theme;
 
@@ -39,22 +41,6 @@ export const ROLE_SECTION_TITLE: Record<FantasyRole, string> = {
   C: "Centrocampisti",
   A: "Attaccanti",
 };
-
-export function reasonLabel(reason: string): string {
-  if (reason === "initial_allocation") {
-    return "Allocazione iniziale";
-  }
-  if (reason === "admin_adjustment") {
-    return "Aggiustamento admin";
-  }
-  if (reason === "roster_purchase") {
-    return "Acquisto rosa";
-  }
-  if (reason === "roster_release_refund") {
-    return "Rimborso rosa";
-  }
-  return reason;
-}
 
 export const LEDGER_PAGE_SIZE = 10;
 

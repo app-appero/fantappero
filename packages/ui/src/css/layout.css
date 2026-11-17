@@ -2092,9 +2092,10 @@ button.fa-app-header__league-action {
   font-weight: 600;
 }
 
+/* Tema chiaro: testo ocra scuro, il #b88a00 sul giallo tenue sopra l'hero era a 1,8:1. */
 .fa-lhome__chip--state {
   background: rgba(255, 210, 63, 0.2);
-  color: #b88a00;
+  color: #5c4300;
 }
 
 [data-color-scheme="dark"] .fa-lhome__chip--state,

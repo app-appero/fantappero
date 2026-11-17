@@ -56,6 +56,12 @@ export function googleButtonTheme(): "filled_black" | "outline" {
   return document.documentElement.dataset.colorScheme === "light" ? "outline" : "filled_black";
 }
 
+// GIS va inizializzato una sola volta per client_id: chiamarlo a ogni rendering (cambio tema,
+// nuovo montaggio) produce l'avviso "initialize() is called multiple times". Il callback
+// passato a GIS è fisso e inoltra il token all'ultimo gestore registrato.
+let initializedClientId: string | null = null;
+let currentOnIdToken: ((idToken: string) => void) | null = null;
+
 /** Loads GIS, then renders the official Google button into `container` with the given callback. */
 export async function renderGoogleButton(
   container: HTMLElement,
@@ -67,10 +73,14 @@ export async function renderGoogleButton(
   if (!accountsId) {
     throw new Error("Google Identity Services non disponibile.");
   }
-  accountsId.initialize({
-    client_id: clientId,
-    callback: (response) => onIdToken(response.credential),
-  });
+  currentOnIdToken = onIdToken;
+  if (initializedClientId !== clientId) {
+    accountsId.initialize({
+      client_id: clientId,
+      callback: (response) => currentOnIdToken?.(response.credential),
+    });
+    initializedClientId = clientId;
+  }
   // Match the surrounding form's width instead of Google's default intrinsic
   // size, capped at GIS's documented maximum (400px).
   const measuredWidth = Math.min(container.offsetWidth || 0, 400);

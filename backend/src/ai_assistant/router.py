@@ -31,6 +31,7 @@ from authorization.context import LeagueAccess
 from authorization.dependencies import require_league_permissions, require_permissions
 from billing.entitlement_service import EntitlementService
 from database.enums import AiFeedbackRating, FantasyRole, Permission
+from leagues.validators import validate_season_year
 
 router = APIRouter(prefix="/leagues", tags=["ai-assistant"])
 feedback_router = APIRouter(prefix="/assistente", tags=["ai-assistant"])
@@ -136,6 +137,7 @@ def suggest_free_agent_targets(
     session: Session = Depends(get_db_session),
 ) -> OsservatoreResultResponse | JSONResponse:
     try:
+        season_year = validate_season_year(season_year)
         _check_quota(session, league_access.user.id)
         result = OsservatoreService(session).suggest_free_agent_targets(
             league_access, role=role, season_year=season_year, limit=limit

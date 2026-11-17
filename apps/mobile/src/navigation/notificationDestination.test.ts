@@ -39,6 +39,19 @@ test("deep link interni mappati sulle schermate dell'app", () => {
   assert.deepEqual(resolveNotificationRoute({ title: "x", deepLink: "/inviti" }), { kind: "stack", name: "ReceivedInvites" });
 });
 
+test("esito invito e nuovo partecipante aprono la directory fantallenatori", () => {
+  for (const title of ["Invito accettato", "Invito rifiutato", "Nuovo partecipante in lega"]) {
+    assert.deepEqual(
+      resolveNotificationRoute({ title, deepLink: "/fantallenatori?lega=league-1" }),
+      { kind: "stack", name: "ManagerDirectory" },
+    );
+  }
+  assert.deepEqual(resolveNotificationRoute({ title: "x", deepLink: "/fantallenatori" }), {
+    kind: "stack",
+    name: "ManagerDirectory",
+  });
+});
+
 test("senza meta noto non naviga", () => {
   assert.equal(resolveNotificationRoute({ title: "x", deepLink: null }), null);
   assert.equal(resolveNotificationRoute({ title: "x", deepLink: "https://evil.example" }), null);

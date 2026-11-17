@@ -34,6 +34,7 @@ vi.mock("../api/managerInvites", () => ({
   declineReceivedNamedInvite: (...args: unknown[]) => declineReceivedNamedInviteMock(...args),
 }));
 
+import { ApiError } from "../api/client";
 import { AuthProvider } from "../auth/AuthContext";
 import { clearStoredSession, saveStoredSession } from "../auth/sessionStorage";
 import { usePendingInviteCount } from "../layout/usePendingInviteCount";
@@ -169,5 +170,29 @@ describe("ReceivedInvitesPage aggiorna il badge rosso", () => {
     expect(declineReceivedNamedInviteMock).toHaveBeenCalledWith("token-123", "invite-1");
     expect(badgeText(container)).toBe("0");
     expect(container.textContent).toContain("Invito rifiutato.");
+  });
+
+  it.each([
+    ["league_full", "La lega non ha posti disponibili.", "La lega ha raggiunto la capienza massima."],
+    [
+      "named_invite_already_processed",
+      "L'invito è già stato elaborato.",
+      "L'invito è già stato gestito o non è più valido.",
+    ],
+    ["named_invite_expired", "L'invito è scaduto.", "L'invito è già stato gestito o non è più valido."],
+  ])("traduce il codice di errore reale del backend %s", async (code, backendMessage, expected) => {
+    acceptReceivedNamedInviteMock.mockRejectedValue(new ApiError(backendMessage, 400, code));
+    await renderPage();
+
+    await act(async () => {
+      buttonByLabel(container, "Accetta").click();
+    });
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+
+    const panel = container.querySelector('[data-testid="received-invites-error"]');
+    expect(panel?.textContent).toContain(expected);
+    expect(panel?.textContent).not.toContain(backendMessage);
   });
 });

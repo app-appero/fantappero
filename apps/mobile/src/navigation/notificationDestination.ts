@@ -48,6 +48,8 @@ const PATH_ROUTES: Array<[RegExp, NotificationRoute]> = [
   [/^\/feedback/, { kind: "stack", name: "Feedback" }],
   [/^\/$/, { kind: "stack", name: "LeagueHome" }],
   [/^\/inviti/, { kind: "stack", name: "ReceivedInvites" }],
+  // Esito di un invito nominativo e nuovo partecipante: directory fantallenatori della lega.
+  [/^\/fantallenatori/, { kind: "stack", name: "ManagerDirectory" }],
   [/^\/formazione/, { kind: "tab", screen: "Formation" }],
   [/^\/classifica/, { kind: "tab", screen: "Standings" }],
   [/^\/turni/, { kind: "tab", screen: "Matchday" }],

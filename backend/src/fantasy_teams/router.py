@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, File, Path, Query, UploadFile, status
+from fastapi import APIRouter, Depends, File, Query, UploadFile, status
 from fastapi.responses import JSONResponse, Response
 from sqlalchemy.orm import Session
 
@@ -198,7 +198,7 @@ def list_roster_turn_snapshots(
     response_model=RosterTurnSnapshotDetailResponse,
 )
 def get_roster_turn_snapshot(
-    round_number: int = Path(le=2_147_483_647),  # la colonna è a 32 bit
+    round_number: int,
     team_id: UUID | None = Query(default=None, alias="teamId"),
     league_access: LeagueAccess = Depends(require_league_permissions(Permission.ROSTER_VIEW)),
     service: FantasyTeamService = Depends(get_fantasy_team_service),

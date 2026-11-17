@@ -1105,11 +1105,16 @@ class FantasyTeamService:
         *,
         team_id: UUID | None = None,
     ) -> RosterTurnSnapshotDetailResponse:
-        snapshot = find_snapshot(
-            self._session,
-            league_id=league_access.league.id,
-            round_number=round_number,
-            with_entries=True,
+        # La colonna è un INTEGER Postgres: fuori da int32 la query andrebbe in overflow (500).
+        snapshot = (
+            find_snapshot(
+                self._session,
+                league_id=league_access.league.id,
+                round_number=round_number,
+                with_entries=True,
+            )
+            if -(2**31) <= round_number <= 2**31 - 1
+            else None
         )
         if snapshot is None:
             raise ValidationAuthError(

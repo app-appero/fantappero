@@ -10,6 +10,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from ai_assistant.models import AiInteraction
 from ai_assistant.osservatore_service import OsservatoreService
 from auth.models.user import User
 from authorization.context import LeagueAccess
@@ -118,3 +119,30 @@ def test_free_agent_targets_exclude_occupied_and_filter_by_role(
 
     names = {row.name for row in result.rows}
     assert names == {"Svincolato Libero"}
+
+
+@pytest.mark.parametrize("season_year", ["2147483648", "-5", "1999"])
+def test_free_agent_targets_reject_invalid_season_year_without_interaction(
+    client: TestClient, db_session: Session, competition_ids: list[str], season_year: str
+) -> None:
+    token, user_id = _register_and_login(
+        client, f"osserv-season-{season_year.lstrip('-')}@example.com"
+    )
+    league_id = _create_league(client, token, competition_ids, "Lega Osservatore Stagione")
+
+    response = client.get(
+        f"/leagues/{league_id}/assistente/osservatore/obiettivi",
+        headers={"Authorization": f"Bearer {token}"},
+        params={"role": "A", "seasonYear": season_year},
+    )
+
+    assert response.status_code == 400
+    assert response.json() == {
+        "message": "Seleziona una stagione valida.",
+        "code": "invalid_season_year",
+    }
+    db_session.expire_all()
+    interactions = db_session.scalars(
+        select(AiInteraction).where(AiInteraction.user_id == user_id)
+    ).all()
+    assert interactions == []

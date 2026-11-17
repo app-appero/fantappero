@@ -32,8 +32,11 @@ const DEMO_INVITES: NamedLeagueInvite[] = [
 function actionError(error: unknown): string {
   if (error instanceof ApiError) {
     if (error.status === 403) return "Non puoi gestire questo invito.";
-    if (error.code === "league_capacity_reached") return "La lega ha raggiunto la capienza massima.";
-    if (error.code === "invite_not_pending") return "L'invito è già stato gestito o non è più valido.";
+    // Codici reali di NamedLeagueInviteService.accept/decline (backend/src/leagues/named_invite_service.py).
+    if (error.code === "league_full") return "La lega ha raggiunto la capienza massima.";
+    if (error.code === "named_invite_already_processed" || error.code === "named_invite_expired") {
+      return "L'invito è già stato gestito o non è più valido.";
+    }
   }
   return getApiErrorMessage(error, "Impossibile aggiornare l'invito.");
 }

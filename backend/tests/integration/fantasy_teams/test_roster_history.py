@@ -291,7 +291,7 @@ def test_turn_snapshot_idempotent_and_survives_release(
         f"/leagues/{league_id}/rosa/snapshot-turni/2147483648",
         headers={"Authorization": f"Bearer {member_token}"},
     )
-    assert huge_get.status_code == 422
+    assert huge_get.status_code == 400
 
     db_count = db_session.scalar(
         select(func.count(RosterTurnSnapshot.id)).where(
@@ -350,3 +350,25 @@ def test_active_ownership_unique_under_concurrent_assign(
         )
     )
     assert active == 1
+
+
+@pytest.mark.parametrize(
+    "round_number",
+    ["2147483648", "-2147483649", "99999999999999999999"],
+)
+def test_turn_snapshot_detail_rejects_round_outside_int32(
+    client: TestClient, competition_ids: list[str], round_number: str
+) -> None:
+    token, _ = _register_and_login(client, f"snap.overflow.{round_number.lstrip('-')}@example.com")
+    league_id = _create_league(client, token, competition_ids, "Lega Snapshot Overflow")
+
+    response = client.get(
+        f"/leagues/{league_id}/rosa/snapshot-turni/{round_number}",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
+    assert response.status_code == 400
+    assert response.json() == {
+        "message": "Snapshot del turno non trovato.",
+        "code": "roster_snapshot_not_found",
+    }
