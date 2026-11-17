@@ -97,7 +97,7 @@ const NOMINATION_MODE_HINT: Record<MarketLiveNominationMode, string> = {
   manual:
     "L'amministratore (o il delegato) sceglie liberamente, in qualsiasi momento della sessione, quale calciatore mettere all'asta.",
   turn_based:
-    "A ogni chiamata tocca a un fantallenatore diverso: l'ordine di turno viene estratto a sorte all'avvio della sessione e si ripete ciclicamente finché la sessione è aperta. L'admin/delegato può comunque chiamare in ogni momento, ad esempio se un fantallenatore non è disponibile.",
+    "A ogni chiamata tocca a un fantallenatore diverso: l'ordine di turno viene estratto a sorte all'avvio della sessione e si ripete ciclicamente finché la sessione è aperta. L'admin/delegato può comunque chiamare in ogni momento, ad esempio se un fantallenatore non è disponibile: la sua chiamata usa il turno di chi era di turno.",
   sequential:
     "Prepari tu l'elenco esatto e ordinato dei calciatori: verranno chiamati automaticamente uno dopo l'altro, nell'ordine scelto qui sotto.",
   alphabetical_by_role:
@@ -712,6 +712,15 @@ export function AuctionLivePage() {
                         single
                       />
                     </div>
+                  ) : null}
+                  {isOperator &&
+                  currentSession.nominationMode === "turn_based" &&
+                  currentTurnTeamId !== null &&
+                  currentTurnTeamId !== (myTeam?.id ?? null) ? (
+                    <p className="fa-field__hint" data-testid="auction-live-operator-turn-hint">
+                      Chiami al posto di {currentTurnTeamName ?? "chi è di turno"}: la chiamata
+                      usa il suo turno e poi tocca al successivo.
+                    </p>
                   ) : null}
                   <Button
                     variant="primary"

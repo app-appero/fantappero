@@ -409,6 +409,29 @@ def test_exclude_before_open_and_reject_after_open(
     assert excluded_body["turn"]["fixtureCount"] == created.json()["fixtureCount"] - 1
     assert "ricalcol" in excluded_body["message"].lower()
 
+    def exclude(fid: str):
+        return client.post(
+            f"/leagues/{league_id}/turni/{round_id}/escludi-fixture",
+            headers={"Authorization": f"Bearer {token}"},
+            json={"fixtureId": fid},
+        )
+
+    # 12 partite, minimo 10: dopo la seconda esclusione la terza è rifiutata.
+    assert exclude(str(fixture_ids[1])).status_code == 200
+    below = exclude(str(fixture_ids[2]))
+    assert below.status_code == 400
+    assert below.json()["code"] == "turn_below_min_fixtures"
+
+    # La partita esclusa si può rimettere nel turno.
+    reincluded = client.post(
+        f"/leagues/{league_id}/turni/{round_id}/reincludi-fixture",
+        headers={"Authorization": f"Bearer {token}"},
+        json={"fixtureId": str(fixture_ids[1])},
+    )
+    assert reincluded.status_code == 200, reincluded.text
+    assert reincluded.json()["turn"]["fixtureCount"] == created.json()["fixtureCount"] - 1
+    assert reincluded.json()["message"].startswith("Partita rimessa nel turno")
+
     _promote_to_operator(db_session, user_id)
     opened = client.post(
         f"/leagues/{league_id}/turni/{round_id}/apri",
@@ -420,7 +443,7 @@ def test_exclude_before_open_and_reject_after_open(
     rejected = client.post(
         f"/leagues/{league_id}/turni/{round_id}/escludi-fixture",
         headers={"Authorization": f"Bearer {token}"},
-        json={"fixtureId": str(fixture_ids[1])},
+        json={"fixtureId": str(fixture_ids[3])},
     )
     assert rejected.status_code == 400
     assert rejected.json()["code"] == "turn_already_open"

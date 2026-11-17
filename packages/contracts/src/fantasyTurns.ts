@@ -183,6 +183,8 @@ export interface FantasyTurnSummary {
 export interface FantasyTurnDetail extends FantasyTurnSummary {
   homologationStatus: FantasyRoundHomologationStatus;
   fixtures: FantasyTurnFixture[];
+  /** Partite escluse dall'admin, che si possono rimettere nel turno. */
+  excludedFixtures?: FantasyTurnFixture[];
 }
 
 export interface FantasyTurnPreview {

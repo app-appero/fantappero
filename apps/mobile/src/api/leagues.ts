@@ -889,6 +889,22 @@ export function excludeFantasyTurnFixture(
   );
 }
 
+export function reincludeFantasyTurnFixture(
+  accessToken: string,
+  leagueId: string,
+  roundId: string,
+  body: ExcludeFantasyTurnFixtureRequest,
+): Promise<FantasyTurnExclusionResult> {
+  return apiRequest<FantasyTurnExclusionResult>(
+    `/leagues/${leagueId}/turni/${roundId}/reincludi-fixture`,
+    {
+      method: "POST",
+      accessToken,
+      body,
+    },
+  );
+}
+
 export function excludeUnplayedFantasyTurnFixtures(
   accessToken: string,
   leagueId: string,

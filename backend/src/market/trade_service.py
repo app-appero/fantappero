@@ -752,6 +752,7 @@ class TradeService:
                 proposal_id=proposal.id,
                 status=TradeStatus.EXPIRED,
                 team_ids=[proposal.proposer_team_id, proposal.recipient_team_id],
+                no_longer_valid=True,
             )
             closed += 1
         self._session.commit()
@@ -785,6 +786,7 @@ class TradeService:
                     proposal_id=proposal.id,
                     status=TradeStatus.EXPIRED,
                     team_ids=[proposal.proposer_team_id, proposal.recipient_team_id],
+                    no_longer_valid=True,
                 )
                 self._session.commit()
             raise
@@ -833,6 +835,7 @@ class TradeService:
         status: TradeStatus,
         team_ids: list[UUID],
         exclude_user_ids: set[UUID] | None = None,
+        no_longer_valid: bool = False,
     ) -> None:
         recipients = user_ids_for_teams(self._session, team_ids)
         notifications = NotificationService(self._session)
@@ -842,6 +845,8 @@ class TradeService:
             if exclude_user_ids and user_id in exclude_user_ids:
                 continue
             params: dict[str, object] = {"status": status.value, **shared}
+            if no_longer_valid:
+                params["no_longer_valid"] = True
             if proposal is not None:
                 other_id = (
                     proposal.proposer_team_id
@@ -901,11 +906,16 @@ class TradeService:
             requestedAthletes=requested,
             offeredCredits=proposal.offered_credits,
             requestedCredits=proposal.requested_credits,
-            status=self._read_status(proposal, now).value,
+            status=(read_status := self._read_status(proposal, now)).value,
             expiresAt=proposal.expires_at.isoformat() if proposal.expires_at else None,
             createdAt=proposal.created_at.isoformat(),
             counterOfId=str(proposal.counter_of_id) if proposal.counter_of_id else None,
             awaitingCredits=self._awaiting_credits(proposal),
+            noLongerValid=read_status == TradeStatus.EXPIRED
+            and not (
+                proposal.expires_at is not None
+                and proposal.expires_at <= (proposal.decided_at or now)
+            ),
         )
 
     def _athlete_labels(self, raw_ids: list[str]) -> list[TradeAthleteResponse]:

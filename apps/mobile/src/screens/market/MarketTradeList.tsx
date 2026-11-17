@@ -251,7 +251,7 @@ export function MarketTradeList({
                     {teamNameFor(proposal.proposerTeamId)} → {teamNameFor(proposal.recipientTeamId)}
                   </Text>
                   <StatusBadge
-                    label={TRADE_STATUS_LABEL[proposal.status]}
+                    label={proposal.noLongerValid ? "Non più valida" : TRADE_STATUS_LABEL[proposal.status]}
                     color={statusColor.background}
                     textColor={statusColor.text}
                   />

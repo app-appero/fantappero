@@ -28,6 +28,7 @@ import {
 } from "react-native";
 import {
   excludeFantasyTurnFixture,
+  reincludeFantasyTurnFixture,
   excludeUnplayedFantasyTurnFixtures,
   fetchFantasyTurn,
   fetchFantasyTurns,
@@ -528,6 +529,34 @@ export function MatchdayScreen() {
                 </View>
               );
             })}
+            {isAdmin && (selected.excludedFixtures ?? []).length > 0 ? (
+              <View testID="matchday-excluded-fixtures">
+                <Text style={styles.hint}>Partite escluse dal turno</Text>
+                {(selected.excludedFixtures ?? []).map((fixture) => (
+                  <View key={fixture.id}>
+                    <Text style={styles.hint}>
+                      {fixture.homeClubName} – {fixture.awayClubName} · {formatDateTime(fixture.kickoffAt)}
+                    </Text>
+                    {selected.modificationAllowed ? (
+                      <Pressable
+                        style={styles.ghostButton}
+                        disabled={busy || excluding}
+                        onPress={() =>
+                          void excludeAndRecalculate(() =>
+                            reincludeFantasyTurnFixture(accessToken as string, activeLeagueId as string, selected.id, {
+                              fixtureId: fixture.fixtureId,
+                            }),
+                          )
+                        }
+                        testID={`matchday-reinclude-${fixture.fixtureId}`}
+                      >
+                        <Text style={styles.ghostLabel}>Rimetti nel turno</Text>
+                      </Pressable>
+                    ) : null}
+                  </View>
+                ))}
+              </View>
+            ) : null}
             {fixtureFilter === "unplayed" &&
             selected.fixtures.every((fixture) => !isUnplayedFixtureStatus(fixture.statusShort)) ? (
               <Text style={styles.hint} testID="matchday-unplayed-empty">

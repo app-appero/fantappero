@@ -36,6 +36,7 @@ import {
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   excludeFantasyTurnFixture,
+  reincludeFantasyTurnFixture,
   excludeUnplayedFantasyTurnFixtures,
   fetchFantasyTurn,
   fetchFantasyTurns,
@@ -652,6 +653,29 @@ export function MatchdayPage() {
     );
   }
 
+  function runReinclude(fixtureId: string) {
+    if (!selected) {
+      return;
+    }
+    const current = selected;
+    return applyExclusion(
+      () =>
+        reincludeFantasyTurnFixture(loadStoredSession()?.accessToken ?? "", activeLeagueId ?? "", current.id, {
+          fixtureId,
+        }),
+      () => {
+        const back = (current.excludedFixtures ?? []).find((row) => row.fixtureId === fixtureId);
+        setSelected({
+          ...current,
+          fixtureCount: current.fixtureCount + (back ? 1 : 0),
+          fixtures: back ? [...current.fixtures, back] : current.fixtures,
+          excludedFixtures: (current.excludedFixtures ?? []).filter((row) => row.fixtureId !== fixtureId),
+        });
+      },
+      "Partita rimessa nel turno (demo). Il ricalcolo parte solo su una lega reale.",
+    );
+  }
+
   function renderFixture(fixture: FantasyTurnFixture, showCompetition: boolean) {
     if (!selected) {
       return null;
@@ -969,6 +993,32 @@ export function MatchdayPage() {
                   </Tabs>
                 )}
               </div>
+            ) : null}
+
+            {isAdmin && selected && (selected.excludedFixtures ?? []).length > 0 ? (
+              <Card data-testid="matchday-excluded-fixtures">
+                <CardHeader title="Partite escluse dal turno" />
+                <CardBody>
+                  {(selected.excludedFixtures ?? []).map((fixture) => (
+                    <div key={fixture.id} className="fa-matchday-fixture">
+                      <p>
+                        {fixture.homeClubName} – {fixture.awayClubName} · {formatDateTime(fixture.kickoffAt)}
+                      </p>
+                      {selected.modificationAllowed ? (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          disabled={busy || excluding}
+                          onClick={() => void runReinclude(fixture.fixtureId)}
+                          data-testid={`matchday-reinclude-${fixture.fixtureId}`}
+                        >
+                          Rimetti nel turno
+                        </Button>
+                      ) : null}
+                    </div>
+                  ))}
+                </CardBody>
+              </Card>
             ) : null}
 
             {pendingFixtures.length > 0 ? (

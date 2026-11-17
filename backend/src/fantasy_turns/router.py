@@ -283,6 +283,23 @@ def open_fantasy_turn(
 
 
 @router.post(
+    "/{league_id}/turni/{round_id}/reincludi-fixture",
+    response_model=FantasyTurnExclusionResponse,
+)
+def reinclude_fantasy_turn_fixture(
+    round_id: UUID,
+    body: ExcludeFantasyTurnFixtureRequest,
+    league_access: LeagueAccess = Depends(require_league_permissions(Permission.LEAGUE_ADMIN)),
+    service: FantasyTurnService = Depends(get_fantasy_turn_service),
+) -> FantasyTurnExclusionResponse | JSONResponse:
+    """Rimette nel turno una partita esclusa (finché il turno è programmato) e ricalcola."""
+    try:
+        return service.reinclude_fixture(league_access, round_id, body)
+    except AuthError as exc:
+        return _error_response(exc)
+
+
+@router.post(
     "/{league_id}/turni/{round_id}/escludi-fixture",
     response_model=FantasyTurnExclusionResponse,
 )

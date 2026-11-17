@@ -115,6 +115,7 @@ class LeagueAuditAction(str, enum.Enum):
     FANTASY_TURN_GENERATED = "fantasy_turn_generated"
     FANTASY_TURN_OPENED = "fantasy_turn_opened"
     FANTASY_TURN_FIXTURE_EXCLUDED = "fantasy_turn_fixture_excluded"
+    FANTASY_TURN_FIXTURE_REINCLUDED = "fantasy_turn_fixture_reincluded"
     FANTASY_TURN_CUTOFF_RECALCULATED = "fantasy_turn_cutoff_recalculated"
     FANTASY_LINEUP_SAVED = "fantasy_lineup_saved"
     FANTASY_LINEUP_COPIED = "fantasy_lineup_copied"
