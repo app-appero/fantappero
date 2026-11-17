@@ -447,6 +447,13 @@ def test_history_private_trade_events_visible_only_to_parties_and_reviewers() ->
     assert visible(row, "team-c", True, set(), teams)  # proprietario/operatore
     executed = SimpleNamespace(action=LeagueAuditAction.MARKET_TRADE_ACCEPTED, details={})
     assert visible(executed, "team-c", False, set(), teams)  # scambi eseguiti: pubblici
+    pending = SimpleNamespace(
+        action=LeagueAuditAction.MARKET_TRADE_ACCEPTED,
+        details={"proposalId": "p1", "pendingApproval": True},
+    )
+    assert not visible(pending, "team-c", False, set(), teams)  # in attesa dell'admin
+    assert visible(pending, "team-a", False, set(), teams)
+    assert visible(pending, "team-c", True, set(), teams)
 
 
 def test_league_audit_hides_sealed_bids_while_open_and_rejects_out_of_range_dates(
