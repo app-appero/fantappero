@@ -6095,3 +6095,10 @@ button.fa-starter-row:disabled {
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+.fa-admin-testmode__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}

@@ -44,6 +44,8 @@ type PendingAction = {
 type UsersTab = "utenti" | "richieste" | "lista-nera";
 
 /** Elenco utenti + promuovi/revoca operatore — mobile port of `apps/web/src/pages/AdminUsersPage.tsx` (EP11-04b). */
+const TESTER_PAGE_SIZE = 10;
+
 export function AdminUsersScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { accessToken, startImpersonation, user: currentUser } = useAuthSession();
@@ -61,6 +63,9 @@ export function AdminUsersScreen() {
   const [testMode, setTestModeState] = useState<AdminTestMode | null>(null);
   const [testModeBusy, setTestModeBusy] = useState(false);
   const [newTesterEmail, setNewTesterEmail] = useState("");
+  const [testersOpen, setTestersOpen] = useState(false);
+  const [testerQuery, setTesterQuery] = useState("");
+  const [testerPage, setTesterPage] = useState(1);
   const [tab, setTab] = useState<UsersTab>("utenti");
   const [pendingRequests, setPendingRequests] = useState(0);
   const [blocklist, setBlocklist] = useState<AdminBlocklist | null>(null);
@@ -259,6 +264,21 @@ export function AdminUsersScreen() {
     }
   }
 
+  const filteredTesters = (testMode?.testers ?? []).filter((tester) => {
+    const needle = testerQuery.trim().toLowerCase();
+    return (
+      !needle ||
+      tester.email.toLowerCase().includes(needle) ||
+      (tester.displayName ?? "").toLowerCase().includes(needle)
+    );
+  });
+  const testerPages = Math.max(1, Math.ceil(filteredTesters.length / TESTER_PAGE_SIZE));
+  const safeTesterPage = Math.min(testerPage, testerPages);
+  const visibleTesters = filteredTesters.slice(
+    (safeTesterPage - 1) * TESTER_PAGE_SIZE,
+    safeTesterPage * TESTER_PAGE_SIZE,
+  );
+
   return (
     <PageContainer
       title="Utenti"
@@ -396,62 +416,18 @@ export function AdminUsersScreen() {
                 {testMode.enabled ? "Disattiva modalità test" : "Attiva modalità test"}
               </Text>
             </Pressable>
-            <TextInput
-              style={styles.input}
-              value={newTesterEmail}
-              onChangeText={setNewTesterEmail}
-              placeholder="Aggiungi un tester (email Google)"
-              autoCapitalize="none"
-              autoCorrect={false}
-              keyboardType="email-address"
-              testID="admin-tester-email"
-            />
             <Pressable
-              style={[styles.button, testModeBusy && styles.disabled]}
-              disabled={testModeBusy || !newTesterEmail.trim()}
+              style={styles.secondaryButton}
               onPress={() => {
-                const email = newTesterEmail.trim();
-                void runTestModeAction(
-                  (token) => addTester(token, email),
-                  `${email} è ora tester.`,
-                  true,
-                ).then(() => setNewTesterEmail(""));
+                setTesterPage(1);
+                setTesterQuery("");
+                setTestersOpen(true);
               }}
-              testID="admin-tester-add"
+              accessibilityLabel="Gestisci tester"
+              testID="admin-testers-open"
             >
-              <Text style={styles.buttonLabel}>Aggiungi</Text>
+              <Text style={styles.secondaryButtonLabel}>{`+ Tester (${testMode.testers.length})`}</Text>
             </Pressable>
-            {testMode.testers.length === 0 ? (
-              <Text style={styles.meta} testID="admin-testers-empty">
-                Nessun tester in lista (gli operatori sono sempre abilitati).
-              </Text>
-            ) : (
-              <View style={local.chips}>
-                {testMode.testers.map((tester) => (
-                  <View key={tester.id} style={local.chip} testID={`admin-tester-${tester.id}`}>
-                    <Text style={local.chipLabel} numberOfLines={1}>
-                      {tester.email}
-                    </Text>
-                    <Pressable
-                      accessibilityRole="button"
-                      accessibilityLabel={`Rimuovi ${tester.email} dai tester`}
-                      style={[local.chipX, testModeBusy && styles.disabled]}
-                      disabled={testModeBusy}
-                      onPress={() =>
-                        void runTestModeAction(
-                          (token) => removeTester(token, tester.id),
-                          `${tester.email} non è più tester.`,
-                          true,
-                        )
-                      }
-                      testID={`admin-tester-remove-${tester.id}`}
-                    >
-                      <Text style={local.chipXLabel}>✕</Text>
-                    </Pressable>
-                  </View>
-                ))}
-              </View>
-            )}
           </>
         ) : (
           <Text style={styles.meta}>Stato della modalità test non disponibile.</Text>
@@ -645,6 +621,117 @@ export function AdminUsersScreen() {
 
         </>
       )}
+
+      <Modal
+        visible={testersOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setTestersOpen(false)}
+      >
+        <View style={styles.confirmOverlay}>
+          <View style={styles.confirmBox} testID="admin-testers-modal">
+            <Text style={styles.sectionTitle}>Tester</Text>
+            <TextInput
+              style={styles.input}
+              value={newTesterEmail}
+              onChangeText={setNewTesterEmail}
+              placeholder="Aggiungi un tester (email Google)"
+              autoCapitalize="none"
+              autoCorrect={false}
+              keyboardType="email-address"
+              testID="admin-tester-email"
+            />
+            <Pressable
+              style={[styles.button, testModeBusy && styles.disabled]}
+              disabled={testModeBusy || !newTesterEmail.trim()}
+              onPress={() => {
+                const email = newTesterEmail.trim();
+                void runTestModeAction(
+                  (token) => addTester(token, email),
+                  `${email} è ora tester.`,
+                  true,
+                ).then(() => setNewTesterEmail(""));
+              }}
+              testID="admin-tester-add"
+            >
+              <Text style={styles.buttonLabel}>Aggiungi</Text>
+            </Pressable>
+            <TextInput
+              style={styles.input}
+              value={testerQuery}
+              onChangeText={(value) => {
+                setTesterQuery(value);
+                setTesterPage(1);
+              }}
+              placeholder="Cerca tester"
+              autoCapitalize="none"
+              autoCorrect={false}
+              testID="admin-tester-query"
+            />
+            {filteredTesters.length === 0 ? (
+              <Text style={styles.meta} testID="admin-testers-empty">
+                {testerQuery.trim()
+                  ? "Nessun tester trovato."
+                  : "Nessun tester in lista (gli operatori sono sempre abilitati)."}
+              </Text>
+            ) : (
+              <View style={local.chips}>
+                {visibleTesters.map((tester) => (
+                  <View key={tester.id} style={local.chip} testID={`admin-tester-${tester.id}`}>
+                    <Text style={local.chipLabel} numberOfLines={1}>
+                      {tester.displayName ? `${tester.displayName} · ${tester.email}` : tester.email}
+                    </Text>
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel={`Rimuovi ${tester.email} dai tester`}
+                      style={[local.chipX, testModeBusy && styles.disabled]}
+                      disabled={testModeBusy}
+                      onPress={() =>
+                        void runTestModeAction(
+                          (token) => removeTester(token, tester.id),
+                          `${tester.email} non è più tester.`,
+                          true,
+                        )
+                      }
+                      testID={`admin-tester-remove-${tester.id}`}
+                    >
+                      <Text style={local.chipXLabel}>✕</Text>
+                    </Pressable>
+                  </View>
+                ))}
+              </View>
+            )}
+            {testerPages > 1 ? (
+              <View style={styles.rowActions} testID="admin-testers-pager">
+                <Pressable
+                  style={[styles.secondaryButton, safeTesterPage <= 1 && styles.disabled]}
+                  disabled={safeTesterPage <= 1}
+                  onPress={() => setTesterPage(safeTesterPage - 1)}
+                >
+                  <Text style={styles.secondaryButtonLabel}>‹</Text>
+                </Pressable>
+                <Text style={styles.meta}>
+                  {`Pagina ${safeTesterPage} di ${testerPages} · ${filteredTesters.length} tester`}
+                </Text>
+                <Pressable
+                  style={[styles.secondaryButton, safeTesterPage >= testerPages && styles.disabled]}
+                  disabled={safeTesterPage >= testerPages}
+                  onPress={() => setTesterPage(safeTesterPage + 1)}
+                >
+                  <Text style={styles.secondaryButtonLabel}>›</Text>
+                </Pressable>
+              </View>
+            ) : null}
+            <Pressable
+              style={styles.secondaryButton}
+              onPress={() => setTestersOpen(false)}
+              testID="admin-testers-close"
+            >
+              <Text style={styles.secondaryButtonLabel}>Chiudi</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
 
       <Modal
         visible={pending !== null}

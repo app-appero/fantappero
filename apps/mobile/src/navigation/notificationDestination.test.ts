@@ -72,6 +72,13 @@ test("la notifica di una nuova segnalazione apre la schermata operatore", () => 
   );
 });
 
+test("la notifica di una nuova richiesta tester apre la schermata utenti operatore", () => {
+  assert.deepEqual(
+    resolveNotificationRoute({ title: "Nuova richiesta di accesso al pilota", deepLink: "/admin/utenti" }),
+    { kind: "admin", screen: "AdminUsers" },
+  );
+});
+
 test("impersonificazione: nome di schermata o percorso web aprono la tab giusta", () => {
   assert.equal(impersonationTab("Formation"), "Formation");
   assert.equal(impersonationTab(" Standings "), "Standings");
