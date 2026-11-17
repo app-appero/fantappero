@@ -39,6 +39,8 @@ import { getApiErrorMessage, useAuth } from "../auth/AuthContext";
 import { loadStoredSession } from "../auth/sessionStorage";
 import { useNavigate } from "../router/simpleRouter";
 
+const TESTER_PAGE_SIZE = 10;
+
 type PendingAction = {
   user: AdminUser;
   kind: "promote" | "revoke" | "impersonate" | "delete";
@@ -59,6 +61,9 @@ export function AdminUsersPage() {
   const [testMode, setTestModeState] = useState<AdminTestMode | null>(null);
   const [testModeBusy, setTestModeBusy] = useState(false);
   const [newTesterEmail, setNewTesterEmail] = useState("");
+  const [testersOpen, setTestersOpen] = useState(false);
+  const [testerQuery, setTesterQuery] = useState("");
+  const [testerPage, setTesterPage] = useState(1);
   const [pendingRequests, setPendingRequests] = useState(0);
   const [blocklist, setBlocklist] = useState<AdminBlocklist | null>(null);
   const [blockEmail, setBlockEmail] = useState("");
@@ -244,6 +249,21 @@ export function AdminUsersPage() {
     }
   }
 
+  const filteredTesters = (testMode?.testers ?? []).filter((tester) => {
+    const needle = testerQuery.trim().toLowerCase();
+    return (
+      !needle ||
+      tester.email.toLowerCase().includes(needle) ||
+      (tester.displayName ?? "").toLowerCase().includes(needle)
+    );
+  });
+  const testerPages = Math.max(1, Math.ceil(filteredTesters.length / TESTER_PAGE_SIZE));
+  const safeTesterPage = Math.min(testerPage, testerPages);
+  const visibleTesters = filteredTesters.slice(
+    (safeTesterPage - 1) * TESTER_PAGE_SIZE,
+    safeTesterPage * TESTER_PAGE_SIZE,
+  );
+
   return (
     <PageContainer
       title="Utenti"
@@ -270,78 +290,35 @@ export function AdminUsersPage() {
                 ? "Attiva: possono accedere solo i tester e gli operatori. Gli altri vedono «Non autorizzato»."
                 : "Spenta: chiunque abbia il link può accedere con Google."}
             </p>
-            <Button
-              type="button"
-              variant={testMode.enabled ? "secondary" : "primary"}
-              loading={testModeBusy}
-              onClick={() =>
-                void runTestModeAction(
-                  (token) => setTestMode(token, !testMode.enabled),
-                  testMode.enabled ? "Modalità test disattivata." : "Modalità test attivata.",
-                )
-              }
-              data-testid="admin-testmode-toggle"
-            >
-              {testMode.enabled ? "Disattiva modalità test" : "Attiva modalità test"}
-            </Button>
-            <form
-              className="fa-admin-testmode__add"
-              onSubmit={(event) => {
-                event.preventDefault();
-                const email = newTesterEmail.trim();
-                if (!email) {
-                  return;
+            <div className="fa-admin-testmode__actions">
+              <Button
+                type="button"
+                variant={testMode.enabled ? "secondary" : "primary"}
+                loading={testModeBusy}
+                onClick={() =>
+                  void runTestModeAction(
+                    (token) => setTestMode(token, !testMode.enabled),
+                    testMode.enabled ? "Modalità test disattivata." : "Modalità test attivata.",
+                  )
                 }
-                void runTestModeAction(
-                  (token) => addTester(token, email),
-                  `${email} è ora tester.`,
-                  true,
-                ).then(() => setNewTesterEmail(""));
-              }}
-            >
-              <Input
-                label="Aggiungi un tester (email Google)"
-                name="admin-tester-email"
-                type="email"
-                value={newTesterEmail}
-                onChange={(event) => setNewTesterEmail(event.target.value)}
-              />
-              <Button type="submit" variant="primary" loading={testModeBusy} data-testid="admin-tester-add">
-                Aggiungi
+                data-testid="admin-testmode-toggle"
+              >
+                {testMode.enabled ? "Disattiva modalità test" : "Attiva modalità test"}
               </Button>
-            </form>
-            {testMode.testers.length === 0 ? (
-              <p data-testid="admin-testers-empty">Nessun tester in lista (gli operatori sono sempre abilitati).</p>
-            ) : (
-              <ul className="fa-admin-users__list" data-testid="admin-testers-list">
-                {testMode.testers.map((tester) => (
-                  <li key={tester.id} className="fa-admin-users__item">
-                    <span className="fa-admin-users__identity">
-                      <strong>{tester.displayName ?? "Non ha ancora acceduto"}</strong>
-                      <small>{tester.email}</small>
-                    </span>
-                    <span className="fa-admin-users__actions">
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="ghost"
-                        loading={testModeBusy}
-                        onClick={() =>
-                          void runTestModeAction(
-                            (token) => removeTester(token, tester.id),
-                            `${tester.email} non è più tester.`,
-                            true,
-                          )
-                        }
-                        data-testid={`admin-tester-remove-${tester.id}`}
-                      >
-                        Rimuovi
-                      </Button>
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            )}
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={() => {
+                  setTesterPage(1);
+                  setTesterQuery("");
+                  setTestersOpen(true);
+                }}
+                aria-label="Gestisci tester"
+                data-testid="admin-testers-open"
+              >
+                {`+ Tester (${testMode.testers.length})`}
+              </Button>
+            </div>
           </>
         ) : (
           <p>Stato della modalità test non disponibile.</p>
@@ -517,6 +494,24 @@ export function AdminUsersPage() {
           ))}
         </ul>
       ) : null}
+      {!loading && !error && result && result.totalPages > 1 ? (
+        <div className="fa-feedback-admin__pager" data-testid="admin-users-pager">
+          <Button type="button" variant="secondary" disabled={page <= 1} onClick={() => setPage((value) => value - 1)}>
+            Precedente
+          </Button>
+          <span>
+            Pagina {result.page} di {result.totalPages} · {result.total} utenti
+          </span>
+          <Button
+            type="button"
+            variant="secondary"
+            disabled={page >= result.totalPages}
+            onClick={() => setPage((value) => value + 1)}
+          >
+            Successiva
+          </Button>
+        </div>
+      ) : null}
 
         </TabPanel>
         <TabPanel value="lista-nera">
@@ -607,6 +602,120 @@ export function AdminUsersPage() {
           </section>
         </TabPanel>
       </Tabs>
+
+      <Modal
+        open={testersOpen}
+        onClose={() => setTestersOpen(false)}
+        title="Tester"
+        footer={
+          <Button type="button" variant="ghost" onClick={() => setTestersOpen(false)}>
+            Chiudi
+          </Button>
+        }
+      >
+        <div data-testid="admin-testers-modal">
+          <form
+            className="fa-admin-testmode__add"
+            onSubmit={(event) => {
+              event.preventDefault();
+              const email = newTesterEmail.trim();
+              if (!email) {
+                return;
+              }
+              void runTestModeAction(
+                (token) => addTester(token, email),
+                `${email} è ora tester.`,
+                true,
+              ).then(() => setNewTesterEmail(""));
+            }}
+          >
+            <Input
+              label="Aggiungi un tester (email Google)"
+              name="admin-tester-email"
+              type="email"
+              value={newTesterEmail}
+              onChange={(event) => setNewTesterEmail(event.target.value)}
+            />
+            <Button type="submit" variant="primary" loading={testModeBusy} data-testid="admin-tester-add">
+              Aggiungi
+            </Button>
+          </form>
+          {success ? <p role="status">{success}</p> : null}
+          {error ? (
+            <p role="alert" className="fa-field__error">
+              {error}
+            </p>
+          ) : null}
+          <Input
+            label="Cerca tester"
+            name="admin-tester-query"
+            value={testerQuery}
+            onChange={(event) => {
+              setTesterQuery(event.target.value);
+              setTesterPage(1);
+            }}
+          />
+          {filteredTesters.length === 0 ? (
+            <p data-testid="admin-testers-empty">
+              {testerQuery.trim()
+                ? "Nessun tester trovato."
+                : "Nessun tester in lista (gli operatori sono sempre abilitati)."}
+            </p>
+          ) : (
+            <ul className="fa-admin-users__list" data-testid="admin-testers-list">
+              {visibleTesters.map((tester) => (
+                <li key={tester.id} className="fa-admin-users__item">
+                  <span className="fa-admin-users__identity">
+                    <strong>{tester.displayName ?? "Non ha ancora acceduto"}</strong>
+                    <small>{tester.email}</small>
+                  </span>
+                  <span className="fa-admin-users__actions">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      loading={testModeBusy}
+                      onClick={() =>
+                        void runTestModeAction(
+                          (token) => removeTester(token, tester.id),
+                          `${tester.email} non è più tester.`,
+                          true,
+                        )
+                      }
+                      data-testid={`admin-tester-remove-${tester.id}`}
+                    >
+                      Rimuovi
+                    </Button>
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+          {testerPages > 1 ? (
+            <div className="fa-feedback-admin__pager" data-testid="admin-testers-pager">
+              <Button
+                type="button"
+                variant="secondary"
+                disabled={safeTesterPage <= 1}
+                onClick={() => setTesterPage(safeTesterPage - 1)}
+              >
+                Precedente
+              </Button>
+              <span>
+                Pagina {safeTesterPage} di {testerPages} · {filteredTesters.length} tester
+              </span>
+              <Button
+                type="button"
+                variant="secondary"
+                disabled={safeTesterPage >= testerPages}
+                onClick={() => setTesterPage(safeTesterPage + 1)}
+              >
+                Successiva
+              </Button>
+            </div>
+          ) : null}
+        </div>
+      </Modal>
 
       <Modal
         open={pending !== null}

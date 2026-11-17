@@ -44,6 +44,11 @@ function extractQueryParam(deepLink: string | null | undefined, key: string): st
 const PATH_ROUTES: Array<[RegExp, NotificationRoute]> = [
   // Nuova segnalazione utente: la notifica arriva solo agli operatori.
   [/^\/admin\/feedback/, { kind: "admin", screen: "AdminFeedback" }],
+  // Nuova richiesta di accesso al pilota (solo operatori): pannello utenti e richieste tester.
+  [/^\/admin\/utenti/, { kind: "admin", screen: "AdminUsers" }],
+  [/^\/admin\/leghe/, { kind: "admin", screen: "AdminLeagues" }],
+  [/^\/admin\/notifiche/, { kind: "admin", screen: "AdminNotifications" }],
+  [/^\/admin\/?$/, { kind: "admin", screen: "AdminHome" }],
   // Aggiornamento di stato di una propria segnalazione.
   [/^\/feedback/, { kind: "stack", name: "Feedback" }],
   [/^\/$/, { kind: "stack", name: "LeagueHome" }],
