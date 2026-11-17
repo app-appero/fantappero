@@ -375,7 +375,7 @@ class AdminTesterRequestResponse(ApiModel):
     email: str
     first_name: str = Field(alias="firstName")
     last_name: str = Field(alias="lastName")
-    phone: str
+    phone: str | None = None
     motivation: str | None = None
     status: str
     created_at: datetime = Field(alias="createdAt")

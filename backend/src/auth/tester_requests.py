@@ -99,7 +99,7 @@ class TesterRequestService:
         email: str,
         first_name: str,
         last_name: str,
-        phone: str,
+        phone: str | None,
         motivation: str | None,
         consent: bool,
     ) -> TesterAccessRequest:
@@ -121,8 +121,10 @@ class TesterRequestService:
             )
         first = _clean(first_name, field="nome", max_len=80)
         last = _clean(last_name, field="cognome", max_len=80)
-        phone_clean = _clean(phone, field="numero di telefono", max_len=30)
-        if not _PHONE_RE.match(phone_clean):
+        phone_clean: str | None = (
+            _clean(phone or "", field="numero di telefono", max_len=30, required=False) or None
+        )
+        if phone_clean is not None and not _PHONE_RE.match(phone_clean):
             raise ValidationAuthError(
                 "Il numero di telefono non sembra valido: usa cifre, spazi o il prefisso +39.",
                 code="invalid_request_field",

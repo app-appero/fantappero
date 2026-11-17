@@ -269,6 +269,9 @@ class AuthService:
                 # Per mostrare a quale account Google si riferisce la richiesta e precompilare il nome.
                 "requestEmail": identity.email,
                 "requestName": identity.name,
+                # Google separa già nome e cognome: il modulo li precompila così.
+                "requestFirstName": identity.given_name,
+                "requestLastName": identity.family_name,
             }
             if existing is None:
                 extra["requestToken"] = make_request_token(
@@ -287,7 +290,7 @@ class AuthService:
         request_token: str,
         first_name: str,
         last_name: str,
-        phone: str,
+        phone: str | None,
         motivation: str | None,
         consent: bool,
         client_ip: str,

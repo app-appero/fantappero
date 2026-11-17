@@ -156,14 +156,18 @@ export function AdminTesterRequestsSection({
                 </Text>
               </Pressable>
               <Text style={styles.meta}>{row.email}</Text>
-              <Pressable
-                onPress={() => void Linking.openURL(whatsappUrl(row.phone))}
-                accessibilityRole="link"
-                accessibilityLabel={`Apri WhatsApp con ${row.phone}`}
-                testID={`admin-request-phone-${row.id}`}
-              >
-                <Text style={local.phone}>{`Tel. ${row.phone} · apri su WhatsApp`}</Text>
-              </Pressable>
+              {row.phone ? (
+                <Pressable
+                  onPress={() => void Linking.openURL(whatsappUrl(row.phone as string))}
+                  accessibilityRole="link"
+                  accessibilityLabel={`Apri WhatsApp con ${row.phone}`}
+                  testID={`admin-request-phone-${row.id}`}
+                >
+                  <Text style={local.phone}>{`Tel. ${row.phone} · apri su WhatsApp`}</Text>
+                </Pressable>
+              ) : (
+                <Text style={styles.meta}>Nessun telefono</Text>
+              )}
               {row.motivation ? <Text style={styles.meta}>{`«${row.motivation}»`}</Text> : null}
               <Text style={styles.meta}>
                 {`${formatDate(row.createdAt)} · ${

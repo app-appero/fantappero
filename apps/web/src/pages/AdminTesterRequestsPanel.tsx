@@ -148,7 +148,7 @@ export function AdminTesterRequestsPanel({
                   {row.firstName} {row.lastName}
                 </strong>
                 <small>{row.email}</small>
-                <small>Tel. {row.phone}</small>
+                <small>{row.phone ? `Tel. ${row.phone}` : "Nessun telefono"}</small>
                 {row.motivation ? <small>«{row.motivation}»</small> : null}
                 <small>
                   {formatDate(row.createdAt)} ·{" "}

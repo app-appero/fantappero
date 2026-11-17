@@ -12,6 +12,9 @@ export type TesterGateInfo = {
   /** Account Google a cui si riferisce la richiesta e nome da precompilare. */
   email?: string;
   name?: string;
+  /** Nome e cognome separati, come li fornisce Google (se disponibili). */
+  firstName?: string;
+  lastName?: string;
 };
 
 /** Se l'errore è il rifiuto `tester_only` dell'accesso con Google, dice a che punto è la richiesta. */
@@ -30,6 +33,10 @@ export function testerGateFromError(error: unknown): TesterGateInfo | null {
         : undefined,
     email: typeof error.payload.requestEmail === "string" ? error.payload.requestEmail : undefined,
     name: typeof error.payload.requestName === "string" ? error.payload.requestName : undefined,
+    firstName:
+      typeof error.payload.requestFirstName === "string" ? error.payload.requestFirstName : undefined,
+    lastName:
+      typeof error.payload.requestLastName === "string" ? error.payload.requestLastName : undefined,
   };
 }
 
@@ -50,7 +57,7 @@ function splitName(name?: string): { first: string; last: string } {
 }
 
 const STEPS = [
-  { title: "Invii la richiesta", detail: "Nome, cognome e telefono" },
+  { title: "Invii la richiesta", detail: "Nome e cognome, telefono facoltativo" },
   { title: "La valutiamo", detail: "Ti avvisiamo noi" },
   { title: "Entri nel gruppo", detail: "Poi accedi con lo stesso Google" },
 ] as const;
@@ -125,7 +132,7 @@ function GoogleAccountRow({ email, onBack }: { email?: string; onBack: () => voi
 
 /**
  * Pilota in modalità test: chi non è tra i tester non crea nessun account, ma può chiedere di
- * partecipare. Il numero di telefono serve solo per aggiungere la persona al gruppo WhatsApp.
+ * partecipare. Il telefono è facoltativo: serve solo per aggiungere la persona alla chat WhatsApp.
  */
 export function TesterRequestPanel({
   info,
@@ -134,7 +141,11 @@ export function TesterRequestPanel({
   info: TesterGateInfo;
   onBack: () => void;
 }) {
-  const prefill = splitName(info.name);
+  const split = splitName(info.name);
+  const prefill = {
+    first: info.firstName?.trim() || split.first,
+    last: info.lastName?.trim() || split.last,
+  };
   const [firstName, setFirstName] = useState(prefill.first);
   const [lastName, setLastName] = useState(prefill.last);
   const [phone, setPhone] = useState("");
@@ -204,7 +215,7 @@ export function TesterRequestPanel({
         requestToken: info.requestToken,
         firstName,
         lastName,
-        phone,
+        phone: phone.trim() ? phone : null,
         motivation: motivation.trim() ? motivation : null,
         consent,
       });
@@ -252,14 +263,13 @@ export function TesterRequestPanel({
           />
         </div>
         <Input
-          label="Numero di telefono"
+          label="Numero di telefono (facoltativo)"
           type="tel"
           value={phone}
           onChange={(event) => setPhone(event.target.value)}
-          required
           maxLength={30}
           autoComplete="tel"
-          hint="Lo useremo solo per aggiungerti al gruppo WhatsApp dei tester, per nessun altro scopo."
+          hint="Per avere info più direttamente: chi lascia il numero viene inserito nella chat WhatsApp dei tester. Lo useremo solo per questo."
           data-testid="tester-request-phone"
         />
         <Textarea
@@ -278,9 +288,9 @@ export function TesterRequestPanel({
             data-testid="tester-request-consent"
           />
           <span>
-            Acconsento al trattamento di questi dati per valutare la richiesta e, se accolta, per
-            aggiungermi al gruppo WhatsApp dei tester. Se la richiesta non viene accolta i dati si
-            cancellano entro 30 giorni.
+            Acconsento al trattamento di questi dati per valutare la richiesta e, se ho lasciato il
+            numero, per aggiungermi alla chat WhatsApp dei tester. Se la richiesta non viene accolta
+            i dati si cancellano entro 30 giorni.
           </span>
         </label>
         {error ? (

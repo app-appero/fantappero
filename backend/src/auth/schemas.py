@@ -32,7 +32,7 @@ class TesterRequestSubmit(ApiModel):
     request_token: str = Field(min_length=1, alias="requestToken")
     first_name: str = Field(min_length=1, max_length=80, alias="firstName")
     last_name: str = Field(min_length=1, max_length=80, alias="lastName")
-    phone: str = Field(min_length=6, max_length=30)
+    phone: str | None = Field(default=None, max_length=30)
     motivation: str | None = Field(default=None, max_length=1000)
     consent: bool = False
 
