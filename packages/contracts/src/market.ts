@@ -140,6 +140,8 @@ export interface TradeProposal {
   counterOfId: string | null;
   /** I saldi non coprono i crediti della proposta: non si può accettare finché non bastano. */
   awaitingCredits?: boolean;
+  /** Decaduta perché un calciatore non è più nella rosa (non per data di scadenza). */
+  noLongerValid?: boolean;
 }
 
 export interface TradeProposalList {

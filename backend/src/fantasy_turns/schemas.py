@@ -164,6 +164,10 @@ class FantasyTurnSummaryResponse(ApiModel):
 class FantasyTurnDetailResponse(FantasyTurnSummaryResponse):
     homologation_status: Literal["provisional", "homologated"] = Field(alias="homologationStatus")
     fixtures: list[FantasyTurnFixtureResponse] = Field(default_factory=list)
+    # Partite escluse dall'admin: restano visibili per poterle rimettere nel turno.
+    excluded_fixtures: list[FantasyTurnFixtureResponse] = Field(
+        default_factory=list, alias="excludedFixtures"
+    )
 
 
 class FantasyTurnPreviewResponse(ApiModel):

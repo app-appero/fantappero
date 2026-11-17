@@ -110,8 +110,9 @@ def _exclusion_message(
     result_final: bool,
     homologated: bool,
     error: str | None,
+    subject: str | None = None,
 ) -> str:
-    subject = "Partita esclusa" if single else f"Escluse {excluded_count} partite"
+    subject = subject or ("Partita esclusa" if single else f"Escluse {excluded_count} partite")
     if error:
         return f"{subject}. Il ricalcolo non è riuscito: {error}"
     if homologated:
@@ -977,6 +978,25 @@ class FantasyTurnService:
                 message="La partita è già esclusa dal turno.",
             )
 
+        # Il turno non può scendere sotto la soglia minima di partite della lega.
+        rules = self._load_rules(league_access.league.id)
+        min_required = rules.min_fixtures_per_round if rules is not None else 25
+        active_after = (
+            self._session.scalar(
+                select(func.count(FantasyRoundFixture.id)).where(
+                    FantasyRoundFixture.round_id == fantasy_round.id,
+                    FantasyRoundFixture.excluded_at.is_(None),
+                )
+            )
+            or 0
+        ) - 1
+        if active_after < min_required:
+            raise ValidationAuthError(
+                f"Non puoi escludere questa partita: il turno resterebbe con {active_after} "
+                f"partite, sotto il minimo di {min_required} della lega.",
+                code="turn_below_min_fixtures",
+            )
+
         link.excluded_at = now
         link.excluded_by_user_id = league_access.user.id
         self._session.flush()
@@ -1004,6 +1024,69 @@ class FantasyTurnService:
             round_id,
             excluded_count=1,
             single=True,
+        )
+
+    def reinclude_fixture(
+        self,
+        league_access: LeagueAccess,
+        round_id: UUID,
+        payload: ExcludeFantasyTurnFixtureRequest,
+    ) -> FantasyTurnExclusionResponse:
+        """Rimette nel turno una partita esclusa in precedenza e ricalcola."""
+        fantasy_round = self._load_round(league_access.league.id, round_id, for_update=True)
+        now = datetime.now(UTC)
+        assert_modification_allowed(
+            stored=fantasy_round.status,
+            now=now,
+            cutoff_at=fantasy_round.cutoff_at,
+        )
+        link = self._session.scalars(
+            select(FantasyRoundFixture)
+            .where(
+                FantasyRoundFixture.round_id == fantasy_round.id,
+                FantasyRoundFixture.fixture_id == payload.fixture_id,
+            )
+            .with_for_update()
+        ).first()
+        if link is None:
+            raise ValidationAuthError(
+                "Partita non presente nel turno.",
+                code="fixture_not_in_turn",
+            )
+        if link.excluded_at is None:
+            return FantasyTurnExclusionResponse(
+                turn=self._to_detail(fantasy_round, now=now),
+                excludedCount=0,
+                recalculated=False,
+                resultFinal=False,
+                homologated=False,
+                message="La partita è già nel turno.",
+            )
+        link.excluded_at = None
+        link.excluded_by_user_id = None
+        self._session.flush()
+        self._reconcile_cutoff(
+            fantasy_round,
+            now=now,
+            actor_id=league_access.user.id,
+            commit=False,
+        )
+        self._add_audit(
+            league_id=league_access.league.id,
+            actor_id=league_access.user.id,
+            action=LeagueAuditAction.FANTASY_TURN_FIXTURE_REINCLUDED,
+            details={
+                "roundId": str(fantasy_round.id),
+                "fixtureId": str(payload.fixture_id),
+            },
+        )
+        get_metrics().incr("fantasy_turn_fixture_reincluded_total", labels={"result": "success"})
+        return self._commit_exclusion_and_recalculate(
+            league_access,
+            round_id,
+            excluded_count=0,
+            single=True,
+            subject="Partita rimessa nel turno",
         )
 
     def exclude_unplayed_fixtures(
@@ -1089,6 +1172,7 @@ class FantasyTurnService:
         *,
         excluded_count: int,
         single: bool,
+        subject: str | None = None,
     ) -> FantasyTurnExclusionResponse:
         """Persiste l'esclusione, poi ricalcola. Un ricalcolo fallito non la annulla."""
         self._session.commit()
@@ -1135,6 +1219,7 @@ class FantasyTurnService:
                 result_final=result_final,
                 homologated=homologated,
                 error=error,
+                subject=subject,
             ),
         )
 
@@ -2404,6 +2489,9 @@ class FantasyTurnService:
         summary = self._to_summary(fantasy_round, now=now)
         links = self._load_round_fixtures(fantasy_round.id)
         fixtures = [self._to_fixture_response(link) for link in links if link.excluded_at is None]
+        excluded = [
+            self._to_fixture_response(link) for link in links if link.excluded_at is not None
+        ]
         return FantasyTurnDetailResponse(
             id=summary.id,
             leagueId=summary.league_id,
@@ -2423,6 +2511,7 @@ class FantasyTurnService:
             matchStatus=summary.match_status,
             homologationStatus=fantasy_round.homologation_status.value,
             fixtures=fixtures,
+            excludedFixtures=excluded,
         )
 
     @staticmethod

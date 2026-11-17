@@ -964,7 +964,9 @@ export function MarketPage() {
                       <p className="fa-trade-card__head">
                         {teamNameFor(proposal.proposerTeamId)} → {teamNameFor(proposal.recipientTeamId)}{" "}
                         <Badge variant={TRADE_STATUS_VARIANT[proposal.status] ?? "neutral"}>
-                          {TRADE_STATUS_LABEL[proposal.status] ?? proposal.status}
+                          {proposal.noLongerValid
+                            ? "Non più valida"
+                            : (TRADE_STATUS_LABEL[proposal.status] ?? proposal.status)}
                         </Badge>
                       </p>
                       <p className="fa-trade-card__side">

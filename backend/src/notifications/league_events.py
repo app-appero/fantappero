@@ -16,7 +16,8 @@ from notifications.service import NotificationService
 
 # Un turno si notifica solo se il blocco è vicino: la sincronizzazione può aprire mesi di turni
 # in un colpo solo e non deve riempire di avvisi.
-TURN_NOTIFY_WINDOW = timedelta(days=10)
+# "Turno aperto" arriva un giorno prima del blocco reale (calcio d'inizio meno il margine).
+TURN_NOTIFY_WINDOW = timedelta(days=1)
 
 
 def _member_user_ids(session: Session, league_id: UUID) -> list[UUID]:
@@ -92,17 +93,21 @@ def notify_turn_opened(
     cutoff_at: datetime | None,
     now: datetime | None = None,
 ) -> None:
-    """Un turno si è aperto: ci si può schierare la formazione (solo se il blocco è vicino)."""
+    """Turno aperto: avvisa quando manca al più un giorno al blocco reale.
+
+    Chiamata all'apertura e dal batch orario (``notify_turns_locking_soon``): il dedup
+    garantisce un solo avviso per turno e partecipante.
+    """
     moment = now or datetime.now(UTC)
-    if cutoff_at is not None and cutoff_at > moment + TURN_NOTIFY_WINDOW:
-        return
-    league = session.get(League, league_id)
-    if league is None:
-        return
     margin = session.scalar(
         select(LeagueRules.lineup_lock_margin_minutes).where(LeagueRules.league_id == league_id)
     )
     lock_at = cutoff_at - timedelta(minutes=margin or 0) if cutoff_at is not None else None
+    if lock_at is None or lock_at > moment + TURN_NOTIFY_WINDOW or lock_at <= moment:
+        return
+    league = session.get(League, league_id)
+    if league is None:
+        return
     service = NotificationService(session)
     for user_id in _member_user_ids(session, league_id):
         service.create_notification(
@@ -119,3 +124,30 @@ def notify_turn_opened(
             },
             dedup_key=f"turn_opened:{round_id}:{user_id}",
         )
+
+
+def notify_turns_locking_soon(session: Session, *, now: datetime | None = None) -> int:
+    """Batch: avvisa "Turno aperto" per i turni aperti il cui blocco è entro un giorno."""
+    from database.enums import FantasyTurnStatus
+    from fantasy_turns.models import FantasyRound
+
+    moment = now or datetime.now(UTC)
+    # Il margine di lega anticipa il blocco: si guarda un po' oltre e si filtra in notify.
+    rounds = session.scalars(
+        select(FantasyRound).where(
+            FantasyRound.status == FantasyTurnStatus.OPEN,
+            FantasyRound.cutoff_at.is_not(None),
+            FantasyRound.cutoff_at > moment,
+            FantasyRound.cutoff_at <= moment + TURN_NOTIFY_WINDOW + timedelta(days=1),
+        )
+    ).all()
+    for fantasy_round in rounds:
+        notify_turn_opened(
+            session,
+            league_id=fantasy_round.league_id,
+            round_id=fantasy_round.id,
+            number=fantasy_round.number,
+            cutoff_at=fantasy_round.cutoff_at,
+            now=moment,
+        )
+    return len(rounds)

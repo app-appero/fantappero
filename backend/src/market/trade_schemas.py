@@ -55,6 +55,8 @@ class TradeProposalResponse(ApiModel):
     # True se uno dei due saldi non copre i crediti della proposta: non si può accettare finché i
     # crediti non bastano (si riattiva da sola) e non conta nel limite delle proposte attive.
     awaiting_credits: bool = Field(default=False, alias="awaitingCredits")
+    # Decaduta perché un calciatore non è più nella rosa attesa (non per data di scadenza).
+    no_longer_valid: bool = Field(default=False, alias="noLongerValid")
 
 
 class TradeProposalListResponse(ApiModel):

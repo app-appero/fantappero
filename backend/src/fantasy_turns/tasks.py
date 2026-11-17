@@ -56,6 +56,9 @@ def ensure_upcoming_fantasy_turns_task() -> dict[str, int]:
                 horizon_days=horizon,
                 auto_open=True,
             )
+            from notifications.league_events import notify_turns_locking_soon
+
+            totals["turns_locking_soon"] = notify_turns_locking_soon(session)
     finally:
         engine.dispose()
     logger.info("fantasy_turns_ensure_task_done", extra=totals)

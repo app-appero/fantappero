@@ -730,7 +730,13 @@ def test_job_closes_and_notifies_proposals_whose_players_left_the_roster(
             select(Notification).where(Notification.user_id == b_id)
         ).all()
     ]
-    assert any("è scaduta" in title for title in titles_b)
+    assert any("non è più valida" in title for title in titles_b)
+    assert not any("è scaduta" in title for title in titles_b)
+    listed = client.get(f"/leagues/{league_id}/mercato/scambi/proposte", headers=_hdr(b_token))
+    assert listed.status_code == 200, listed.text
+    rows = listed.json()["proposals"]
+    row = next(item for item in rows if item["id"] == str(proposal_id))
+    assert row["status"] == "expired" and row["noLongerValid"] is True
     # Una seconda passata non ri-notifica.
     TradeService(db_session).expire_overdue_proposals()
     db_session.expire_all()
@@ -1381,9 +1387,9 @@ def test_league_event_notifications_reach_the_right_people(
         member_user_id=member_id,
     )
     notify_league_activated(db_session, league=league)
-    # Turno lontano (oltre 10 giorni): niente avviso; turno vicino: avviso a tutti.
-    far = datetime.now(UTC) + timedelta(days=60)
-    soon = datetime.now(UTC) + timedelta(days=3)
+    # "Turno aperto" arriva un giorno prima del blocco: a 3 giorni niente, a 20 ore sì.
+    far = datetime.now(UTC) + timedelta(days=3)
+    soon = datetime.now(UTC) + timedelta(hours=20)
     notify_turn_opened(db_session, league_id=league.id, round_id=uuid4(), number=9, cutoff_at=far)
     notify_turn_opened(db_session, league_id=league.id, round_id=uuid4(), number=10, cutoff_at=soon)
     db_session.commit()

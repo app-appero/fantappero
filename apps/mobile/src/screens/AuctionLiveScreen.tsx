@@ -497,6 +497,14 @@ export function AuctionLiveScreen() {
                   />
                 </View>
               ) : null}
+              {isOperator &&
+              currentSession.nominationMode === "turn_based" &&
+              currentTurnTeamId !== null &&
+              currentTurnTeamId !== (myTeam?.id ?? null) ? (
+                <Text style={[styles.fieldLabel, { flexBasis: "100%" }]} testID="auction-live-operator-turn-hint">
+                  Chiami al posto di {currentTurnTeamName ?? "chi è di turno"}: la chiamata usa il suo turno e poi tocca al successivo.
+                </Text>
+              ) : null}
               <Pressable
                 style={[styles.button, (actionBusy || !marketOpen || (needsExplicitAthlete && !manualAthleteId)) && styles.disabled]}
                 disabled={actionBusy || !marketOpen || (needsExplicitAthlete && !manualAthleteId)}

@@ -445,6 +445,9 @@ _TRADE_V2_TITLES: dict[str, str] = {
     "admin_review": "Scambio tra {team} e {second_team} da approvare",
     "cancelled": "{team} ha annullato la proposta di scambio",
     "expired": "La proposta di scambio con {team} è scaduta",
+    "no_longer_valid": (
+        "La proposta di scambio con {team} non è più valida: un calciatore non è più in rosa"
+    ),
     "executed": "Scambio con {team} approvato",
     "rejected_by_admin": "Scambio con {team} rifiutato dall'amministratore",
 }
@@ -455,7 +458,10 @@ def _render_mercato_scambio_v2(params: NotificationParams) -> NotificationConten
     status = str(params.get("status"))
     team = str(params.get("other_team", "Un altro fantallenatore"))
     second_team = str(params.get("second_team", "un altro fantallenatore"))
-    title = _TRADE_V2_TITLES.get(status, "Aggiornamento scambio").format(
+    title_key = (
+        "no_longer_valid" if status == "expired" and params.get("no_longer_valid") else status
+    )
+    title = _TRADE_V2_TITLES.get(title_key, "Aggiornamento scambio").format(
         team=team, second_team=second_team
     )
     gives = _join(_names(params.get("offered")), _credits(params.get("offered_credits")), sep=" + ")
