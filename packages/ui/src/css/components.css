@@ -1749,6 +1749,26 @@ select option,
   color: #ff8fa8;
 }
 
+/* Tema chiaro: lo sfondo blu notte e il rosa sono pensati per il tema scuro; con il testo scuro
+   del tema chiaro il contrasto crollava (nome 2,7:1, posizione ed etichette circa 1:1). */
+[data-color-scheme="light"] .fa-standings-card {
+  border-color: var(--fa-color-border);
+  background: var(--fa-color-background-elevated);
+}
+
+[data-color-scheme="light"] .fa-standings-card--current {
+  border-color: rgba(122, 77, 255, 0.45);
+  background: linear-gradient(90deg, rgba(53, 96, 240, 0.1), rgba(122, 77, 255, 0.08));
+}
+
+[data-color-scheme="light"] .fa-standings-card__stats {
+  border-top-color: var(--fa-color-border);
+}
+
+[data-color-scheme="light"] .fa-standings-card__stat--danger dd {
+  color: var(--fa-danger-600);
+}
+
 @media (max-width: 720px) {
   .fa-standings-cards {
     display: grid;

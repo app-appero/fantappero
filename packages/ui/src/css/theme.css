@@ -166,6 +166,12 @@ body[data-surface="auth"] {
   color: var(--fa-color-warning);
 }
 
+/* Tema chiaro: il giallo warning su bianco si leggeva a 2,1:1; qui l'ocra scuro già usato
+   per l'oro del podio. */
+[data-color-scheme="light"] .fa-state-panel--forbidden .fa-state-panel__title {
+  color: #8a6508;
+}
+
 .fa-state-panel--success .fa-state-panel__title {
   color: var(--fa-color-success);
 }

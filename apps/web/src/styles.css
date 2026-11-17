@@ -1586,7 +1586,7 @@ a.fa-member-list__identity:focus-visible {
   border-radius: var(--fa-radius-pill);
   border: 2px solid var(--fa-color-accent);
   background: var(--fa-color-accent);
-  color: var(--fa-color-on-brand);
+  color: var(--fa-color-accent-contrast);
   font-weight: 800;
   cursor: pointer;
 }
@@ -4481,7 +4481,7 @@ h2 {
 .fa-athlete-chooser__pill--active {
   background: var(--fa-color-accent);
   border-color: var(--fa-color-accent);
-  color: var(--fa-color-on-brand);
+  color: var(--fa-color-accent-contrast);
 }
 
 .fa-athlete-chooser__count {
@@ -4532,7 +4532,7 @@ h2 {
 .fa-athlete-chooser__row--active .fa-athlete-chooser__mark {
   background: var(--fa-color-accent);
   border-color: var(--fa-color-accent);
-  color: var(--fa-color-on-brand);
+  color: var(--fa-color-accent-contrast);
 }
 
 .fa-athlete-chooser__dot {

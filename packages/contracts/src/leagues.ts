@@ -874,7 +874,12 @@ export type CreditLedgerReason =
   | "initial_allocation"
   | "admin_adjustment"
   | "roster_purchase"
-  | "roster_release_refund";
+  | "roster_release_refund"
+  | "market_auction_win"
+  | "market_waiver_acquisition"
+  | "market_release_refund"
+  | "market_trade_credits_sent"
+  | "market_trade_credits_received";
 
 export interface CreditAccount {
   fantasyTeamId: string;
