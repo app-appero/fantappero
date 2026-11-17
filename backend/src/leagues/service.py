@@ -92,6 +92,18 @@ from observability.metrics import get_metrics
 
 logger = get_logger(__name__)
 
+_ADMIN_PANEL_SETUP_MESSAGE = "Configura il regolamento della lega prima dell'avvio."
+_ADMIN_PANEL_MESSAGES: dict[LeagueState, str] = {
+    LeagueState.ACTIVE: "La stagione è in corso.",
+    LeagueState.CONCLUDED: "La stagione è conclusa.",
+    LeagueState.ARCHIVED: "La lega è archiviata.",
+}
+
+
+def admin_panel_message(state: LeagueState) -> str:
+    """Messaggio del pannello amministrazione coerente con lo stato lega."""
+    return _ADMIN_PANEL_MESSAGES.get(state, _ADMIN_PANEL_SETUP_MESSAGE)
+
 
 class LeagueService:
     def __init__(self, session: Session, authz: AuthorizationService) -> None:
@@ -299,7 +311,7 @@ class LeagueService:
         rules = self._resolve_rules_for_league(league)
         return LeagueAdminPanelResponse(
             league_id=str(league_access.league.id),
-            message="Configura il regolamento della lega prima dell'avvio.",
+            message=admin_panel_message(league.state),
             rules=self._to_rules_response(rules),
             lifecycle=self._to_lifecycle_response(league),
             configuration_saved=self._configuration_saved(league.id),

@@ -325,12 +325,20 @@ class TradeService:
                 LeagueAuditAction.MARKET_TRADE_ACCEPTED,
                 details={"proposalId": str(proposal.id), "pendingApproval": True},
             )
+            # Un avviso per evento e mai a chi ha appena accettato: l'amministratore che è
+            # parte dello scambio riceve solo "da approvare" (e nulla se ha accettato lui).
+            admin_ids = self._notify_admins_trade_pending(
+                proposal,
+                proposer_team,
+                recipient_team,
+                exclude_user_ids={league_access.user.id},
+            )
             self._notify_trade_status(
                 proposal_id=proposal.id,
                 status=TradeStatus.PENDING_APPROVAL,
                 team_ids=[proposer_team.id],
+                exclude_user_ids=admin_ids | {league_access.user.id},
             )
-            self._notify_admins_trade_pending(proposal, proposer_team, recipient_team)
             self._session.commit()
             get_metrics().incr("trade_proposal_accepted_total", labels={"result": "pending"})
             return self._to_response(proposal)
@@ -401,6 +409,7 @@ class TradeService:
             proposal_id=proposal.id,
             status=TradeStatus.EXECUTED,
             team_ids=[proposer_team.id, recipient_team.id],
+            exclude_user_ids={league_access.user.id},
         )
         self._session.commit()
         get_metrics().incr("trade_proposal_approved_total")
@@ -424,6 +433,7 @@ class TradeService:
             proposal_id=proposal.id,
             status=TradeStatus.REJECTED_BY_ADMIN,
             team_ids=[proposal.proposer_team_id, proposal.recipient_team_id],
+            exclude_user_ids={league_access.user.id},
         )
         self._session.commit()
         get_metrics().incr("trade_proposal_rejected_by_admin_total")
@@ -660,12 +670,22 @@ class TradeService:
         )
         self._session.flush()
 
-    def _is_stale(self, proposal: TradeProposal) -> bool:
+    def _is_stale(
+        self, proposal: TradeProposal, *, rosters: dict[UUID, set[UUID]] | None = None
+    ) -> bool:
         """True se i calciatori della proposta non sono più nelle rose attese."""
+
+        def roster(team_id: UUID) -> set[UUID]:
+            if rosters is None:
+                return self._roster_athlete_ids(team_id)
+            if team_id not in rosters:
+                rosters[team_id] = self._roster_athlete_ids(team_id)
+            return rosters[team_id]
+
         offered = {UUID(value) for value in proposal.offered_athlete_ids}
         requested = {UUID(value) for value in proposal.requested_athlete_ids}
-        return not offered <= set(self._roster_athlete_ids(proposal.proposer_team_id)) or (
-            not requested <= set(self._roster_athlete_ids(proposal.recipient_team_id))
+        return not offered <= roster(proposal.proposer_team_id) or (
+            not requested <= roster(proposal.recipient_team_id)
         )
 
     def expire_overdue_proposals(self, *, now: datetime | None = None, limit: int = 500) -> int:
@@ -695,8 +715,47 @@ class TradeService:
                 status=TradeStatus.EXPIRED,
                 team_ids=[proposal.proposer_team_id, proposal.recipient_team_id],
             )
+        # Decadute senza scadenza: un calciatore ha lasciato la rosa (svincolo, altro scambio).
+        # Si leggono già "scadute"; qui si chiudono, così l'avviso parte anche se nessuno prova
+        # ad accettarle. Le proposte "in attesa di crediti" restano aperte: non sono decadute.
+        closed = len(rows)
+        open_ids = self._session.scalars(
+            select(TradeProposal.id)
+            .where(
+                TradeProposal.status == TradeStatus.PROPOSED,
+                or_(TradeProposal.expires_at.is_(None), TradeProposal.expires_at > moment),
+            )
+            .order_by(TradeProposal.created_at.asc())
+        ).all()
+        rosters: dict[UUID, set[UUID]] = {}
+        for proposal_id in open_ids:
+            if closed >= limit:
+                break
+            candidate = self._session.get(TradeProposal, proposal_id)
+            if candidate is None or not self._is_stale(candidate, rosters=rosters):
+                continue
+            # Blocco e ricontrollo: un accetta/annulla concorrente vince e qui si salta.
+            proposal = self._session.scalars(
+                select(TradeProposal)
+                .where(
+                    TradeProposal.id == proposal_id, TradeProposal.status == TradeStatus.PROPOSED
+                )
+                .with_for_update(skip_locked=True)
+                .execution_options(populate_existing=True)
+            ).first()
+            if proposal is None or not self._is_stale(proposal):
+                continue
+            proposal.status = TradeStatus.EXPIRED
+            proposal.decided_at = moment
+            self._session.flush()
+            self._notify_trade_status(
+                proposal_id=proposal.id,
+                status=TradeStatus.EXPIRED,
+                team_ids=[proposal.proposer_team_id, proposal.recipient_team_id],
+            )
+            closed += 1
         self._session.commit()
-        return len(rows)
+        return closed
 
     def _execute_or_expire(
         self,
@@ -735,8 +794,13 @@ class TradeService:
         proposal: TradeProposal,
         proposer_team: FantasyTeam,
         recipient_team: FantasyTeam,
-    ) -> None:
-        """N3: avvisa l'amministratore che c'è uno scambio da approvare."""
+        *,
+        exclude_user_ids: set[UUID],
+    ) -> set[UUID]:
+        """N3: avvisa l'amministratore che c'è uno scambio da approvare.
+
+        Non avvisa chi ha compiuto l'azione; restituisce chi è stato avvisato.
+        """
         owner_ids = self._session.scalars(
             select(LeagueMembership.user_id).where(
                 LeagueMembership.league_id == proposal.league_id,
@@ -745,7 +809,8 @@ class TradeService:
         ).all()
         notifications = NotificationService(self._session)
         shared = self._trade_notification_params(proposal)
-        for user_id in owner_ids:
+        notified = {user_id for user_id in owner_ids if user_id not in exclude_user_ids}
+        for user_id in notified:
             notifications.create_notification(
                 user_id=user_id,
                 category=NotificationCategory.MERCATO,
@@ -759,6 +824,7 @@ class TradeService:
                 },
                 dedup_key=f"trade_status:{proposal.id}:admin_review:{user_id}",
             )
+        return notified
 
     def _notify_trade_status(
         self,
@@ -766,12 +832,15 @@ class TradeService:
         proposal_id: UUID,
         status: TradeStatus,
         team_ids: list[UUID],
+        exclude_user_ids: set[UUID] | None = None,
     ) -> None:
         recipients = user_ids_for_teams(self._session, team_ids)
         notifications = NotificationService(self._session)
         proposal = self._session.get(TradeProposal, proposal_id)
         shared = self._trade_notification_params(proposal)
         for team_id, user_id in recipients.items():
+            if exclude_user_ids and user_id in exclude_user_ids:
+                continue
             params: dict[str, object] = {"status": status.value, **shared}
             if proposal is not None:
                 other_id = (

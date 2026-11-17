@@ -568,10 +568,19 @@ class LeagueCalendarService:
                 "rigenera per riallineare le giornate alle finestre."
             )
         else:
-            summary = (
-                f"{plan.cycle_count} cicli completi da {plan.cycle_length} giornate "
-                f"su {plan.eligible_window_count} finestre eleggibili."
+            # ``cycle_count`` include l'eventuale ultimo ciclo parziale: nel
+            # testo si dichiarano "completi" solo i cicli interi.
+            full_cycles, extra_rounds = divmod(plan.round_count, plan.cycle_length)
+            cycles_text = (
+                f"1 ciclo completo da {plan.cycle_length} giornate"
+                if full_cycles == 1
+                else f"{full_cycles} cicli completi da {plan.cycle_length} giornate"
             )
+            if extra_rounds == 1:
+                cycles_text += " più 1 giornata di un ciclo parziale"
+            elif extra_rounds > 1:
+                cycles_text += f" più {extra_rounds} giornate di un ciclo parziale"
+            summary = f"{cycles_text} su {plan.eligible_window_count} finestre eleggibili."
         return LeagueCalendarPlanResponse(
             algorithmVersion=plan.algorithm_version,
             participantCount=plan.participant_count,

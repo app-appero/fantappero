@@ -56,6 +56,12 @@ def try_advance_league_lifecycle(
     ).first()
     if league is None:
         return None
+    # La lega è quasi sempre già nella identity map (caricata dal controllo
+    # permessi prima del blocco): ``with_for_update`` attende la riga ma non
+    # ne aggiorna gli attributi, quindi senza rilettura lo stato sarebbe quello
+    # precedente al blocco e due richieste concorrenti registrerebbero entrambe
+    # la stessa transizione.
+    session.refresh(league, attribute_names=["state"])
 
     audit_actor_id = actor_id
     if audit_actor_id is None:

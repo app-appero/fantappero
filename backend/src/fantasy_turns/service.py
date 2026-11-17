@@ -20,6 +20,7 @@ from database.enums import (
     FantasyTurnKind,
     FantasyTurnStatus,
     LeagueAuditAction,
+    LeagueCalendarStatus,
     LeagueMemberRole,
     LeagueState,
 )
@@ -77,6 +78,7 @@ from fantasy_turns.validators import validate_anchor_date, validate_turn_kind
 from leagues.models.competition import Competition
 from leagues.models.league import League
 from leagues.models.league_audit_event import LeagueAuditEvent
+from leagues.models.league_calendar import LeagueCalendar, LeagueCalendarRoundWindow
 from leagues.models.league_competition import LeagueCompetition
 from leagues.models.league_membership import LeagueMembership
 from leagues.models.league_rules import LeagueRules
@@ -148,6 +150,15 @@ class FullSeasonMaterializeResult:
     upgraded: int
     opened: int
     removed: int
+
+
+@dataclass(frozen=True)
+class ThresholdReevaluationResult:
+    """Esito della rivalutazione dei turni futuri con la soglia partite attuale."""
+
+    skipped: int = 0
+    upgraded: int = 0
+    opened: int = 0
 
 
 def load_league_candidate_fixtures(session: Session, league: League) -> list[EligibleFixtureRef]:
@@ -414,6 +425,16 @@ class FantasyTurnService:
                 code="league_owner_missing",
             )
 
+        # La soglia partite può essere cambiata dopo la nascita dei turni:
+        # prima di creare/aggiornare, i turni futuri non ancora aperti
+        # vengono rivalutati con la soglia attuale.
+        reevaluated = self._reevaluate_future_rounds_threshold(
+            locked,
+            now=datetime.now(UTC),
+            actor_id=system_actor,
+            auto_open=auto_open,
+        )
+
         if self._season_calendar_needs_full_materialize(locked):
             full = self.materialize_full_season(
                 locked,
@@ -440,14 +461,16 @@ class FantasyTurnService:
             return EnsureFantasyTurnsResponse(
                 leagueId=str(locked.id),
                 created=full.created,
-                opened=full.opened,
-                upgraded=full.upgraded,
+                opened=full.opened + reevaluated.opened,
+                upgraded=full.upgraded + reevaluated.upgraded,
                 duplicates=0,
                 waiting=0,
                 horizonDays=horizon_days,
             )
 
-        created = opened = upgraded = duplicates = waiting = 0
+        created = duplicates = waiting = 0
+        opened = reevaluated.opened
+        upgraded = reevaluated.upgraded
         for kind, anchor in upcoming_turn_specs(ref, horizon_days=horizon_days):
             result = self._materialize_window(
                 locked,
@@ -1204,6 +1227,11 @@ class FantasyTurnService:
         candidates = self._load_candidate_fixtures(league)
         already_linked = self._existing_fixture_ids(existing.id) if existing is not None else set()
         assigned = self._active_assigned_fixture_ids(league.id) - already_linked
+        if existing is not None:
+            # Una partita esclusa dall'admin resta agganciata al turno con
+            # `excluded_at`: non è rieleggibile per lo stesso turno (vincolo
+            # unico `(round_id, fixture_id)`).
+            assigned |= self._excluded_fixture_ids(existing.id)
         selected = select_eligible_from_candidates(
             candidates,
             window,
@@ -1373,6 +1401,142 @@ class FantasyTurnService:
             round_id=fantasy_round.id,
             opened=did_open,
         )
+
+    def _reevaluate_future_rounds_threshold(
+        self,
+        league: League,
+        *,
+        now: datetime,
+        actor_id: UUID | None,
+        auto_open: bool,
+    ) -> ThresholdReevaluationResult:
+        """Rivaluta i turni futuri quando cambia ``min_fixtures_per_round``.
+
+        Regola "Soglia" (docs/api/fantasy_turns.md): se le partite sono meno
+        del minimo il turno è ``skipped`` con motivo visibile. Senza questo
+        passaggio la soglia valeva solo alla nascita del turno: alzarla
+        lasciava giocabili turni ormai sotto soglia, e riabbassarla non
+        recuperava quelli saltati fuori dall'orizzonte breve.
+
+        Perimetro volutamente stretto:
+        - sotto soglia → ``skipped`` solo se il turno è ``scheduled``, la sua
+          finestra non è ancora iniziata, non ha formazioni né omologazione e
+          non è una giornata di un calendario fantallenatori **confermato**.
+          Turni aperti, in corso, conclusi o già a calendario non si toccano;
+        - di nuovo in soglia → un turno ``skipped`` futuro che ha già
+          abbastanza partite agganciate torna ``scheduled`` con lo stesso
+          percorso di ``_materialize_window`` (cutoff, audit, auto-apertura).
+
+        Il turno non viene cancellato né rinumerato: resta visibile come
+        "Non disputato" e la numerazione non si sposta.
+        """
+        rules = self._load_rules(league.id)
+        min_required = rules.min_fixtures_per_round if rules is not None else 25
+        rounds = list(
+            self._session.scalars(
+                select(FantasyRound)
+                .where(
+                    FantasyRound.league_id == league.id,
+                    FantasyRound.status.in_(
+                        (FantasyTurnStatus.SCHEDULED, FantasyTurnStatus.SKIPPED)
+                    ),
+                    FantasyRound.window_start_at > now,
+                    FantasyRound.homologation_status == FantasyRoundHomologationStatus.PROVISIONAL,
+                    ~exists().where(LineupSubmission.round_id == FantasyRound.id),
+                    ~exists().where(EffectiveLineup.round_id == FantasyRound.id),
+                )
+                .order_by(FantasyRound.window_start_at.asc())
+                .with_for_update()
+            ).all()
+        )
+        if not rounds:
+            return ThresholdReevaluationResult()
+        active_counts: dict[UUID, int] = {
+            round_id: int(count)
+            for round_id, count in self._session.execute(
+                select(FantasyRoundFixture.round_id, func.count(FantasyRoundFixture.id))
+                .where(
+                    FantasyRoundFixture.round_id.in_([row.id for row in rounds]),
+                    FantasyRoundFixture.excluded_at.is_(None),
+                )
+                .group_by(FantasyRoundFixture.round_id)
+            ).all()
+        }
+        confirmed_windows = self._confirmed_calendar_windows(league.id)
+
+        skipped = upgraded = opened = 0
+        for fantasy_round in rounds:
+            count = active_counts.get(fantasy_round.id, 0)
+            threshold = evaluate_threshold(count, min_required)
+            if fantasy_round.status == FantasyTurnStatus.SCHEDULED:
+                if threshold.ok:
+                    continue
+                if (
+                    fantasy_round.window_start_at,
+                    fantasy_round.window_end_at,
+                ) in confirmed_windows:
+                    continue
+                fantasy_round.status = FantasyTurnStatus.SKIPPED
+                fantasy_round.skip_reason = threshold.skip_reason
+                fantasy_round.cutoff_at = None
+                self._add_audit(
+                    league_id=league.id,
+                    actor_id=actor_id,
+                    action=LeagueAuditAction.FANTASY_TURN_GENERATED,
+                    details={
+                        "roundId": str(fantasy_round.id),
+                        "number": fantasy_round.number,
+                        "status": FantasyTurnStatus.SKIPPED.value,
+                        "eligibleCount": threshold.eligible_count,
+                        "minRequired": threshold.min_required,
+                        "downgradedFromScheduled": True,
+                    },
+                )
+                get_metrics().incr("fantasy_turn_generated_total", labels={"result": "skipped"})
+                logger.info(
+                    "fantasy_turn_skipped",
+                    extra={
+                        "league_id": str(league.id),
+                        "round_number": fantasy_round.number,
+                        "eligible_count": threshold.eligible_count,
+                        "min_required": threshold.min_required,
+                    },
+                )
+                skipped += 1
+                continue
+            if not threshold.ok:
+                continue
+            result = self._materialize_window(
+                league,
+                kind=fantasy_round.kind,
+                anchor=fantasy_round.window_start_at.astimezone(DEFAULT_LEAGUE_TZ).date(),
+                actor_id=actor_id,
+                persist_skipped=False,
+                auto_open=auto_open,
+                raise_on_duplicate=False,
+            )
+            if result.outcome == "upgraded":
+                upgraded += 1
+            if result.opened:
+                opened += 1
+        if skipped:
+            self._session.flush()
+        return ThresholdReevaluationResult(skipped=skipped, upgraded=upgraded, opened=opened)
+
+    def _confirmed_calendar_windows(self, league_id: UUID) -> set[tuple[datetime, datetime]]:
+        """Finestre già usate come giornate da un calendario H2H confermato."""
+        rows = self._session.execute(
+            select(
+                LeagueCalendarRoundWindow.window_start_at,
+                LeagueCalendarRoundWindow.window_end_at,
+            )
+            .join(LeagueCalendar, LeagueCalendar.id == LeagueCalendarRoundWindow.calendar_id)
+            .where(
+                LeagueCalendar.league_id == league_id,
+                LeagueCalendar.status == LeagueCalendarStatus.CONFIRMED,
+            )
+        ).all()
+        return {(start, end) for start, end in rows}
 
     def _try_auto_open(
         self,
@@ -1921,6 +2085,16 @@ class FantasyTurnService:
                 select(FantasyRoundFixture.fixture_id).where(
                     FantasyRoundFixture.round_id == round_id,
                     FantasyRoundFixture.excluded_at.is_(None),
+                )
+            ).all()
+        )
+
+    def _excluded_fixture_ids(self, round_id: UUID) -> set[UUID]:
+        return set(
+            self._session.scalars(
+                select(FantasyRoundFixture.fixture_id).where(
+                    FantasyRoundFixture.round_id == round_id,
+                    FantasyRoundFixture.excluded_at.is_not(None),
                 )
             ).all()
         )

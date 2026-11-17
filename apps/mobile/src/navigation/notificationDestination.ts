@@ -21,8 +21,10 @@ const TRADE_TITLES = new Set([
 const AUCTION_TITLES = new Set([
   "Busta aggiudicata",
   "Busta non aggiudicata",
+  "Spareggio aperto",
   "Lotto aggiudicato",
   "Sei stato sorpassato",
+  "Scelta richiesta: rosa al completo",
   "Asta a rilanci iniziata",
 ]);
 
