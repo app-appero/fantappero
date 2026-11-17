@@ -52,7 +52,10 @@ export function AppThemeProvider({ children }: { children: ReactNode }) {
   );
 
   useEffect(() => {
-    Appearance.setColorScheme(preference === "system" ? "unspecified" : preference);
+    // Sul web (react-native-web) setColorScheme non esiste: il tema resta quello del sistema.
+    if (typeof Appearance.setColorScheme === "function") {
+      Appearance.setColorScheme(preference === "system" ? "unspecified" : preference);
+    }
   }, [preference]);
 
   const setPreference = useCallback((next: ThemePreference) => {

@@ -33,10 +33,10 @@ Le corse partono solo di notte (ora di Roma) per lasciare i token del mattino a 
 
 **Data del piano.** Dal 13/11/2026 le corse notturne anticipano il piano del giorno dopo: la data del piano è la data della notte **più un giorno** (il piano del 13/11 è stato eseguito nel pomeriggio di quel giorno). Per esempio la notte iniziata il 13/11 esegue il piano del 14/11, quella del 14/11 il piano del 15/11 (domenica: controllo a campione).
 
-Rotazione dei gruppi (A = aree 1 e 2; B = aree 3 e 6; C = aree 7 e 8; D = aree 9, 10 e 11), in base al giorno dell'anno della data del piano (`tm_yday % 2`):
+Rotazione dei gruppi (A = aree 1 e 2; B = aree 3 e 6; C = aree 7 e 8; D = aree 9, 10 (app mobile) e 11), in base al giorno dell'anno della data del piano (`tm_yday % 2`):
 - pari → 00:23 gruppo A, 02:23 gruppo B
 - dispari → 00:23 gruppo C, 02:23 gruppo D
-- piano di domenica → controllo a campione: 00:23 aree 1-6, 02:23 aree 7-11, e verifica che le correzioni già pubblicate non si siano rotte.
+- piano di domenica → controllo a campione: 00:23 aree 1-6, 02:23 aree 7-11 (con un giro rapido dell'app mobile nel browser), e verifica che le correzioni già pubblicate non si siano rotte.
 Così ogni area è rivista ogni 2 notti.
 
 Regole di consumo: se una corsa trova un limite d'uso o un errore di quota, si ferma e lo scrive nel rapporto; la corsa delle 04:23 si salta se una precedente ha incontrato limiti. Nessuna corsa parte fuori dalla fascia 22-5. Il rapporto indica corsa e gruppo eseguiti. I bug già in `known_issues.md` si rivalutano solo se l'area della corsa li riguarda.
@@ -79,8 +79,16 @@ Centro notifiche (elenco, segna letta, badge), generate da: invito, scambio (tut
 ### 9. Web (browser headless, Playwright è già installato)
 Viewport desktop 1280 e mobile 390: ogni pagina principale carica senza errori in console né richieste fallite, nessun scorrimento orizzontale, tab Mercato (Rosa/Asta/Scambi), controproposta e rifiuto che chiude il pannello, selettore calciatori dell'asta, contrasto leggibile in tema chiaro e scuro.
 
-### 10. Coerenza web/mobile (letture)
-Confronta stessi dati letti dall'API con quello che mostrano le etichette del web: stati scambi, conteggi, colori ruolo (P verde, D giallo, C blu, A rosa/rosso). L'app mobile non si apre: segnala solo discrepanze di contratto/etichette trovate nel codice (`apps/mobile`).
+### 10. App mobile (nel browser, a misura di telefono) e coerenza web/mobile
+L'app mobile si prova nella sua versione web (react-native-web), con Playwright e un telefono emulato. Preparazione, dalla cartella del repository:
+```
+cd apps/mobile && npm ci   # solo se node_modules manca
+EXPO_PUBLIC_API_BASE_URL=https://fantappero-api-dev.up.railway.app npx expo export --platform web --output-dir /tmp/mobweb
+python3 -m http.server 8765 --directory /tmp/mobweb   # in background; per i percorsi diretti apri sempre "/"
+```
+Poi Playwright con `devices['Pixel 7']` (o iPhone 13) su `http://127.0.0.1:8765/`, accesso **con email e password** degli account QA (il login Google nativo non si prova qui).
+Checklist: ogni schermata principale (Turni, Classifica, Rosa, Formazione, Asta, Svincolati, Mercato, Profilo, Notifiche, Inviti, Fantallenatori) si apre senza errori in console e senza scorrimento orizzontale; **tocco su ogni tipo di notifica → schermata giusta** (scambi, aste, turni, inviti, fantallenatori, e per l'operatore richieste tester → Utenti, segnalazioni → Feedback); pannello operatore (Utenti con modale "+ Tester" e liste impaginate, Leghe con "Elimina", Turni, Notifiche); stessi dati e stesse etichette del web (stati scambi, conteggi, colori ruolo P verde, D giallo, C blu, A rosa/rosso, causali crediti).
+Non verificabile qui (scriverlo): notifiche push vere, login Google nativo, fotocamera/galleria, aspetto con font o componenti solo nativi. Le differenze dovute solo al browser (es. scorrimento) non sono difetti dell'app se il codice nativo è corretto: segnalale come "da verificare su telefono".
 
 ### 11. Salute e prestazioni
 `/live`, `/ready`, tempi di risposta delle letture principali (segnala oltre 2 secondi), errori 5xx in qualunque richiesta (sempre difetto), risposte che espongono dati altrui.
