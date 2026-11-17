@@ -199,6 +199,23 @@ def test_require_trade_approval_defers_execution_until_admin_acts(
     assert accepted.status_code == 200
     assert accepted.json()["status"] == "pending_approval"
 
+    from notifications.models import Notification
+
+    def trade_notes(user_id) -> list[str]:
+        db_session.expire_all()
+        return [
+            row.dedup_key
+            for row in db_session.scalars(
+                select(Notification).where(Notification.user_id == user_id)
+            ).all()
+            if row.dedup_key and proposal["id"] in row.dedup_key
+        ]
+
+    # L'admin parte dello scambio riceve solo "da approvare", non anche "in attesa".
+    admin_after_accept = trade_notes(admin_id)
+    assert len(admin_after_accept) == 1
+    assert "admin_review" in admin_after_accept[0]
+
     # Nothing moved yet: the player is still with the recipient.
     slot = db_session.scalar(
         select(FantasyRosterSlot).where(
@@ -220,6 +237,9 @@ def test_require_trade_approval_defers_execution_until_admin_acts(
     )
     assert approved.status_code == 200
     assert approved.json()["status"] == "executed"
+    # Chi approva non riceve l'avviso della propria azione; l'altra parte sì.
+    assert trade_notes(admin_id) == admin_after_accept
+    assert any("executed" in key for key in trade_notes(member_id))
 
     db_session.expire_all()
     slot_after = db_session.scalar(

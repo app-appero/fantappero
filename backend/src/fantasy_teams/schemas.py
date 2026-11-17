@@ -240,7 +240,7 @@ class RosterAsOfResponse(ApiModel):
 
 
 class CreateRosterTurnSnapshotRequest(ApiModel):
-    round_number: int = Field(alias="roundNumber", ge=1)
+    round_number: int = Field(alias="roundNumber", ge=1, le=2_147_483_647)
 
 
 class RosterTurnSnapshotSummaryResponse(ApiModel):

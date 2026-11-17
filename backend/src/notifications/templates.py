@@ -155,6 +155,11 @@ def _render_formazione_blocco_imminente(params: NotificationParams) -> Notificat
     )
 
 
+# Percorsi web delle due sotto-schede di Asta: «/mercato» apre invece la scheda Scambi.
+_AUCTION_PATH = "/asta"
+_LIVE_AUCTION_PATH = "/asta-live"
+
+
 @register_template("mercato.esito_busta", 1)
 def _render_mercato_esito_busta(params: NotificationParams) -> NotificationContent:
     athlete_name = params.get("athlete_name", "un giocatore")
@@ -165,14 +170,14 @@ def _render_mercato_esito_busta(params: NotificationParams) -> NotificationConte
                 f"Parità su {athlete_name}: sei ammesso allo spareggio, hai 24 ore per rilanciare.",
                 params,
             ),
-            deep_link=_league_link("/mercato", params),
+            deep_link=_league_link(_AUCTION_PATH, params),
         )
     if params.get("outcome") == "assigned":
         amount = params.get("amount_credits")
         return NotificationContent(
             title="Busta aggiudicata",
             body=_league_body(f"Hai aggiudicato {athlete_name} per {amount} crediti.", params),
-            deep_link=_league_link("/mercato", params),
+            deep_link=_league_link(_AUCTION_PATH, params),
         )
     reason = (
         "non è stato possibile assegnarlo (crediti insufficienti o rosa non valida)"
@@ -182,7 +187,7 @@ def _render_mercato_esito_busta(params: NotificationParams) -> NotificationConte
     return NotificationContent(
         title="Busta non aggiudicata",
         body=_league_body(f"Non hai aggiudicato {athlete_name}: {reason}.", params),
-        deep_link=_league_link("/mercato", params),
+        deep_link=_league_link(_AUCTION_PATH, params),
     )
 
 
@@ -193,7 +198,7 @@ def _render_mercato_asta_live_aggiudicato(params: NotificationParams) -> Notific
     return NotificationContent(
         title="Lotto aggiudicato",
         body=_league_body(f"Hai aggiudicato {athlete_name} per {amount} crediti.", params),
-        deep_link=_league_link("/mercato", params),
+        deep_link=_league_link(_LIVE_AUCTION_PATH, params),
     )
 
 
@@ -206,7 +211,7 @@ def _render_mercato_asta_live_sorpassato(params: NotificationParams) -> Notifica
     return NotificationContent(
         title="Sei stato sorpassato",
         body=_league_body(f"Un altro fantallenatore ha rilanciato su {athlete_name}.", params),
-        deep_link=_league_link("/mercato", params),
+        deep_link=_league_link(_LIVE_AUCTION_PATH, params),
     )
 
 
@@ -220,7 +225,7 @@ def _render_mercato_asta_live_scambio_richiesto(params: NotificationParams) -> N
             "scegli chi scambiare.",
             params,
         ),
-        deep_link=_league_link("/mercato", params),
+        deep_link=_league_link(_LIVE_AUCTION_PATH, params),
     )
 
 
@@ -231,7 +236,7 @@ def _render_mercato_asta_live_iniziata(params: NotificationParams) -> Notificati
         body=_league_body(
             "La sessione d'asta a rilanci è aperta: raggiungi la lega per partecipare.", params
         ),
-        deep_link=_league_link("/mercato", params),
+        deep_link=_league_link(_LIVE_AUCTION_PATH, params),
     )
 
 

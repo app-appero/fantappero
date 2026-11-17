@@ -280,6 +280,18 @@ def test_turn_snapshot_idempotent_and_survives_release(
         json={"roundNumber": 0},
     )
     assert invalid.status_code == 422
+    # Numero di turno oltre la colonna a 32 bit: 422, non 500.
+    huge = client.post(
+        f"/leagues/{league_id}/amministrazione/rosa/snapshot-turni",
+        headers={"Authorization": f"Bearer {owner_token}"},
+        json={"roundNumber": 2_147_483_648},
+    )
+    assert huge.status_code == 422
+    huge_get = client.get(
+        f"/leagues/{league_id}/rosa/snapshot-turni/2147483648",
+        headers={"Authorization": f"Bearer {member_token}"},
+    )
+    assert huge_get.status_code == 422
 
     db_count = db_session.scalar(
         select(func.count(RosterTurnSnapshot.id)).where(

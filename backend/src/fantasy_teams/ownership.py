@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from uuid import UUID
 
-from sqlalchemy import and_, or_, select
+from sqlalchemy import and_, func, or_, select
 from sqlalchemy.orm import Session, selectinload
 
 from auth.exceptions import ValidationAuthError
@@ -18,7 +18,7 @@ from fantasy_teams.models import (
     RosterTurnSnapshot,
     RosterTurnSnapshotEntry,
 )
-from leagues.models.league_calendar import LeagueCalendar
+from leagues.models.league_calendar import LeagueCalendar, LeagueCalendarSlot
 from sports_data.listone.generate import get_role_assignment
 from sports_data.listone.overrides import effective_role_for_athlete, get_active_override
 
@@ -46,9 +46,21 @@ def validate_round_against_calendar(
     round_number: int,
 ) -> None:
     calendar = session.scalar(select(LeagueCalendar).where(LeagueCalendar.league_id == league_id))
-    if calendar is not None and round_number > calendar.round_count:
+    if calendar is None:
+        return
+    # I numeri di turno del calendario sono assoluti (la giornata N è il Turno
+    # Europeo N) e possono non partire da 1: il limite è l'ultimo turno in
+    # calendario, non il numero di giornate.
+    last_round = session.scalar(
+        select(func.max(LeagueCalendarSlot.round_number)).where(
+            LeagueCalendarSlot.calendar_id == calendar.id
+        )
+    )
+    if last_round is None:
+        last_round = calendar.round_count
+    if round_number > last_round:
         raise ValidationAuthError(
-            f"Il turno {round_number} supera i {calendar.round_count} turni del calendario.",
+            f"Il turno {round_number} supera l'ultimo turno del calendario ({last_round}).",
             code="round_number_out_of_range",
         )
 

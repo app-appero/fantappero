@@ -586,7 +586,7 @@ def test_market_notifications_carry_league_name_and_link() -> None:
         },
     )
     assert content.body.startswith("«Lega Amici» ·")
-    assert content.deep_link == "/mercato?lega=abc-123"
+    assert content.deep_link == "/asta?lega=abc-123"
     scambio = render_notification(
         "mercato.scambio",
         2,
@@ -685,6 +685,62 @@ def test_cancel_and_expiry_notify_the_other_coach(
     assert any("è scaduta" in title for title in titles_b)
     assert any("è scaduta" in title for title in titles_a)
     assert db_session.get(TradeProposal, UUID(expiring_id)).status.value == "expired"
+
+
+def test_job_closes_and_notifies_proposals_whose_players_left_the_roster(
+    client: TestClient, db_session: Session, competition_ids: list[str]
+) -> None:
+    """Proposta senza scadenza: il calciatore offerto viene svincolato, il job la chiude."""
+    import random
+
+    from market.trade_service import TradeService
+
+    admin_token, _ = _register_and_login(client, "stale17.admin@example.com")
+    a_token, a_id = _register_and_login(client, "stale17.a@example.com")
+    b_token, b_id = _register_and_login(client, "stale17.b@example.com")
+    league_id = _create_league(client, admin_token, competition_ids, "Lega Decadute")
+    _add_member(db_session, league_id, a_id)
+    _add_member(db_session, league_id, b_id)
+    offered = _seed_athlete(db_session, random.randint(100_000_000, 2_000_000_000), "Decade")
+    team_a = client.get(f"/leagues/{league_id}/rosa", headers=_hdr(a_token)).json()["id"]
+    team_b = client.get(f"/leagues/{league_id}/rosa", headers=_hdr(b_token)).json()["id"]
+    _assign_priced(client, league_id, admin_token, team_a, 0, offered, 1)
+    created = client.post(
+        f"/leagues/{league_id}/mercato/scambi/proposte",
+        headers=_hdr(a_token),
+        json={
+            "recipientTeamId": team_b,
+            "offeredAthleteIds": [str(offered.id)],
+            "requestedCredits": 1,
+        },
+    )
+    assert created.status_code == 201, created.json()
+    proposal_id = UUID(created.json()["id"])
+    released = client.delete(
+        f"/leagues/{league_id}/amministrazione/squadre/{team_a}/slot/0", headers=_hdr(admin_token)
+    )
+    assert released.status_code in (200, 204), released.text
+
+    assert TradeService(db_session).expire_overdue_proposals() >= 1
+    db_session.expire_all()
+    assert db_session.get(TradeProposal, proposal_id).status.value == "expired"
+    titles_b = [
+        row.title
+        for row in db_session.scalars(
+            select(Notification).where(Notification.user_id == b_id)
+        ).all()
+    ]
+    assert any("è scaduta" in title for title in titles_b)
+    # Una seconda passata non ri-notifica.
+    TradeService(db_session).expire_overdue_proposals()
+    db_session.expire_all()
+    again = [
+        row.title
+        for row in db_session.scalars(
+            select(Notification).where(Notification.user_id == b_id)
+        ).all()
+    ]
+    assert len(again) == len(titles_b)
 
 
 def test_small_validation_fixes() -> None:
