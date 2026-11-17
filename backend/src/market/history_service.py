@@ -197,7 +197,13 @@ class MarketHistoryService:
             if isinstance(session_id, str) and session_id not in open_sessions:
                 return True  # sessione chiusa: le buste diventano pubbliche
             return viewer_team_id is not None and details.get("fantasyTeamId") == viewer_team_id
-        if row.action in _PRIVATE_TRADE_ACTIONS:
+        # Accettazione in attesa dell'admin: lo scambio non è (ancora) avvenuto, quindi la
+        # vedono solo le due squadre e chi approva, come la proposta.
+        pending_acceptance = (
+            row.action == LeagueAuditAction.MARKET_TRADE_ACCEPTED
+            and details.get("pendingApproval") is True
+        )
+        if row.action in _PRIVATE_TRADE_ACTIONS or pending_acceptance:
             if reviewer:
                 return True
             if viewer_team_id is None:

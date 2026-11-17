@@ -257,6 +257,12 @@ def test_tied_bids_open_a_tiebreak_session(
     assert forbidden.status_code == 400
     assert forbidden.json()["code"] == "market_team_not_eligible"
 
+    # Nello spareggio non si scende sotto l'importo del pareggio (pareggiarlo resta ammesso).
+    lower = _bid(client, league_id, tiebreak_id, admin_token, athlete.id, 50)
+    assert lower.status_code == 400
+    assert lower.json()["code"] == "tiebreak_bid_below_tied_amount"
+    assert _bid(client, league_id, tiebreak_id, member_token, athlete.id, 100).status_code == 200
+
     # A tied team can now rebid inside the tiebreak session.
     rebid = _bid(client, league_id, tiebreak_id, admin_token, athlete.id, 120)
     assert rebid.status_code == 200

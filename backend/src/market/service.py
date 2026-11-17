@@ -22,6 +22,7 @@ from database.enums import (
     NotificationCategory,
 )
 from fantasy_teams.composition_service import (
+    assert_assignment_respects_role_quota,
     reconcile_roster_overflow,
     resolve_effective_athlete_role,
     sync_team_composition_status,
@@ -571,6 +572,19 @@ class MarketService:
         validate_bid_targets_session_athlete(
             target_athlete_id=market_session.target_athlete_id, athlete_id=athlete_id
         )
+        if market_session.parent_session_id is not None:
+            # Spareggio: si può pareggiare o rilanciare l'importo del pareggio, non scendere.
+            tied_amount = self._session.scalar(
+                select(func.max(MarketBid.amount_credits)).where(
+                    MarketBid.session_id == market_session.parent_session_id,
+                    MarketBid.athlete_id == athlete_id,
+                )
+            )
+            if tied_amount is not None and amount < tied_amount:
+                raise ValidationAuthError(
+                    f"Nello spareggio l'offerta deve essere almeno {tied_amount} crediti.",
+                    code="tiebreak_bid_below_tied_amount",
+                )
 
         team = self._my_team(league_access)
         validate_team_eligible_for_session(
@@ -633,6 +647,25 @@ class MarketService:
                 owner_team_id=release_slot.fantasy_team_id if release_slot is not None else None,
                 team_id=team.id,
             )
+            # La risoluzione waiver rispetta la quota di ruolo: se il cambio la supera,
+            # l'offerta non potrebbe mai essere assegnata, quindi si rifiuta subito.
+            if release_slot is not None:
+                try:
+                    assert_assignment_respects_role_quota(
+                        self._session,
+                        league=league_access.league,
+                        team=team,
+                        athlete_id=athlete_id,
+                        slot_index=release_slot.slot_index,
+                    )
+                except ValidationAuthError as exc:
+                    if exc.code != "role_quota_exceeded":
+                        raise
+                    raise ValidationAuthError(
+                        f"{exc.message} Svincola un calciatore dello stesso ruolo "
+                        "per fare questa offerta.",
+                        code="waiver_role_quota_exceeded",
+                    ) from exc
         else:
             validate_release_athlete_not_allowed(payload.release_athlete_id)
             release_athlete_id = None

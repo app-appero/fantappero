@@ -374,3 +374,47 @@ def test_concurrent_waiver_resolve_calls_swap_exactly_once(
         )
     ).all()
     assert len(ledger_entries) == 1
+
+
+def test_waiver_bid_rejected_when_swap_would_exceed_role_quota(
+    client: TestClient,
+    db_session: Session,
+    competition_ids: list[str],
+) -> None:
+    """Portieri al completo: svincolare un difensore per un portiere non può mai riuscire."""
+    import random
+
+    admin_token, _ = _register_and_login(client, "waiver.quota.admin@example.com")
+    league_id = _create_league(client, admin_token, competition_ids, "Lega Svincoli Quota")
+    team_id = client.get(
+        f"/leagues/{league_id}/rosa", headers={"Authorization": f"Bearer {admin_token}"}
+    ).json()["id"]
+    base = random.randint(100_000_000, 2_000_000_000)
+    owned = [
+        _seed_athlete(db_session, base + index, f"Portiere {index}", role=FantasyRole.P)
+        for index in range(3)
+    ]
+    defender = _seed_athlete(db_session, base + 10, "Difensore Da Svincolare", role=FantasyRole.D)
+    for index, athlete in enumerate([*owned, defender]):
+        placed = client.put(
+            f"/leagues/{league_id}/amministrazione/squadre/{team_id}/slot/{index}",
+            headers=_owner_headers(league_id, admin_token),
+            json={"athleteId": str(athlete.id), "purchaseCredits": 0},
+        )
+        assert placed.status_code == 200, placed.text
+    fourth_keeper = _seed_athlete(db_session, base + 20, "Quarto Portiere", role=FantasyRole.P)
+
+    session_id = _create_open_waiver_session(client, admin_token, league_id)
+    url = f"/leagues/{league_id}/mercato/svincoli/sessioni/{session_id}/offerte/{fourth_keeper.id}"
+    headers = {"Authorization": f"Bearer {admin_token}"}
+
+    over = client.put(
+        url, headers=headers, json={"amountCredits": 10, "releaseAthleteId": str(defender.id)}
+    )
+    assert over.status_code == 400
+    assert over.json()["code"] == "waiver_role_quota_exceeded"
+
+    same_role = client.put(
+        url, headers=headers, json={"amountCredits": 10, "releaseAthleteId": str(owned[0].id)}
+    )
+    assert same_role.status_code == 200, same_role.text
