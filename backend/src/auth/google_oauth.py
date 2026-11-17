@@ -29,6 +29,8 @@ class GoogleIdentity:
     email: str
     email_verified: bool
     name: str | None
+    given_name: str | None = None
+    family_name: str | None = None
 
 
 def verify_id_token(id_token: str, *, allowed_audiences: list[str]) -> GoogleIdentity:
@@ -62,4 +64,6 @@ def verify_id_token(id_token: str, *, allowed_audiences: list[str]) -> GoogleIde
         email=str(email).strip().lower(),
         email_verified=bool(payload.get("email_verified", False)),
         name=payload.get("name"),
+        given_name=payload.get("given_name"),
+        family_name=payload.get("family_name"),
     )

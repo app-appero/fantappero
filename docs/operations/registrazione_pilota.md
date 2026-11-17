@@ -52,9 +52,11 @@ dev con indirizzi inventati. Il valore predefinito resta `true`: senza la variab
 
 ## Richiesta di accesso per chi non è ancora tester (solo web)
 Con la **modalità test** accesa, chi entra con Google e non è tester non crea nessun account: il web
-gli mostra un modulo (nome, cognome, **telefono**, motivo facoltativo, consenso).
-- Il **telefono** serve solo per aggiungere la persona al **gruppo WhatsApp dei tester**: lo dice il
-  modulo ed è l'unico uso previsto.
+gli mostra un modulo (nome, cognome, **telefono facoltativo**, motivo facoltativo, consenso).
+Nome e cognome sono già compilati con quelli dell'account Google (modificabili).
+- Il **telefono** è facoltativo e serve solo per aggiungere la persona alla **chat WhatsApp dei
+  tester**, per avere info più direttamente: lo dice il modulo ed è l'unico uso previsto. Senza
+  numero la richiesta si invia lo stesso.
 - Le richieste stanno nella tabella `tester_access_requests` (non sono utenti). Una richiesta per
   indirizzo email, verificato da Google. Il modulo si invia con un gettone firmato valido 30 minuti.
 - **Pannello operatore → Utenti → scheda «Richieste tester»**: elenco con quello che hanno scritto;

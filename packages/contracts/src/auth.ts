@@ -56,7 +56,7 @@ export interface TesterRequestBody {
   requestToken: string;
   firstName: string;
   lastName: string;
-  phone: string;
+  phone?: string | null;
   motivation?: string | null;
   consent: boolean;
 }

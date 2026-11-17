@@ -67,9 +67,12 @@ def _operator(client: TestClient, db_session: Session, email: str) -> dict[str, 
         "/auth/register",
         json={"email": email, "password": PASSWORD, "displayName": "Operatore"},
     )
-    match = re.search(r"token=([A-Za-z0-9_-]+)", get_captured_emails()[-1].message.text_body)
-    assert match
-    client.post("/auth/verify-email", json={"token": match.group(1)})
+    # Se la verifica email è spenta (dipende dai test eseguiti prima) non arriva nessuna mail.
+    emails = get_captured_emails()
+    if emails:
+        match = re.search(r"token=([A-Za-z0-9_-]+)", emails[-1].message.text_body)
+        assert match
+        client.post("/auth/verify-email", json={"token": match.group(1)})
     login = client.post("/auth/login", json={"email": email, "password": PASSWORD})
     assert login.status_code == 200
     user = db_session.get(User, UUID(login.json()["user"]["id"]))
@@ -422,3 +425,34 @@ def test_removing_tester_from_list_lets_them_ask_again(
     blocked = _google(client, monkeypatch, email, "sub-del3-tester")
     assert blocked.status_code == 403
     assert blocked.json()["requestStatus"] == "none"
+
+
+def test_request_without_phone_is_accepted_and_google_names_are_split(
+    client: TestClient, db_session: Session, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    operator = _operator(client, db_session, "req3.operator@example.com")
+    client.put("/admin/test-mode", headers=operator, json={"enabled": True})
+    identity = GoogleIdentity(
+        sub="sub-req3",
+        email="req3.nuovo@example.com",
+        email_verified=True,
+        name="Maria Rosa De Luca",
+        given_name="Maria Rosa",
+        family_name="De Luca",
+    )
+    monkeypatch.setattr(google_oauth, "verify_id_token", lambda *_a, **_k: identity)
+    blocked = client.post("/auth/google", json={"idToken": "fake"}).json()
+    assert blocked["requestFirstName"] == "Maria Rosa"
+    assert blocked["requestLastName"] == "De Luca"
+
+    form = {k: v for k, v in FORM.items() if k != "phone"}
+    sent = client.post(
+        "/auth/tester-requests", json={**form, "requestToken": blocked["requestToken"]}
+    )
+    assert sent.status_code == 201, sent.text
+    row = db_session.scalar(
+        select(TesterAccessRequest).where(TesterAccessRequest.email == "req3.nuovo@example.com")
+    )
+    assert row is not None and row.phone is None
+    listed = client.get("/admin/tester-requests", headers=operator)
+    assert listed.status_code == 200

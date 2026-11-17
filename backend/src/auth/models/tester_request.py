@@ -20,7 +20,8 @@ class TesterAccessRequest(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     first_name: Mapped[str] = mapped_column(String(80), nullable=False)
     last_name: Mapped[str] = mapped_column(String(80), nullable=False)
     # Solo per aggiungere la persona al gruppo WhatsApp dei tester: mai altri usi.
-    phone: Mapped[str] = mapped_column(String(30), nullable=False)
+    # Facoltativo: chi lo lascia viene aggiunto alla chat WhatsApp dei tester.
+    phone: Mapped[str | None] = mapped_column(String(30), nullable=True)
     motivation: Mapped[str | None] = mapped_column(Text, nullable=True)
     status: Mapped[str] = mapped_column(String(16), nullable=False, default="pending")
     consent_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)

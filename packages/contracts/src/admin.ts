@@ -309,7 +309,7 @@ export interface AdminTesterRequest {
   email: string;
   firstName: string;
   lastName: string;
-  phone: string;
+  phone: string | null;
   motivation?: string | null;
   status: AdminTesterRequestStatus;
   createdAt: string;

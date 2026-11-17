@@ -40,9 +40,25 @@ describe("TesterRequestPanel — richiesta di accesso al pilota", () => {
   it("mostra il modulo con la nota sul telefono e blocca l'invio senza consenso", async () => {
     await render({ status: "none", requestToken: "tok" });
     const text = container.textContent ?? "";
-    expect(text).toContain("gruppo WhatsApp dei tester");
+    expect(text).toContain("chat WhatsApp dei tester");
+    const phone = container.querySelector<HTMLInputElement>('[data-testid="tester-request-phone"] input, input[data-testid="tester-request-phone"]');
+    expect(phone?.required ?? false).toBe(false);
     const submit = container.querySelector<HTMLButtonElement>('[data-testid="tester-request-submit"]');
     expect(submit?.disabled).toBe(true);
+  });
+
+  it("precompila nome e cognome con quelli separati di Google", async () => {
+    await render({
+      status: "none",
+      requestToken: "tok",
+      name: "Maria Rosa De Luca",
+      firstName: "Maria Rosa",
+      lastName: "De Luca",
+    });
+    const first = container.querySelector<HTMLInputElement>('input[data-testid="tester-request-first-name"], [data-testid="tester-request-first-name"] input');
+    const last = container.querySelector<HTMLInputElement>('input[data-testid="tester-request-last-name"], [data-testid="tester-request-last-name"] input');
+    expect(first?.value).toBe("Maria Rosa");
+    expect(last?.value).toBe("De Luca");
   });
 
   it("in valutazione e rifiutata mostra solo il messaggio, senza modulo", async () => {
