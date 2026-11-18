@@ -24,7 +24,7 @@ Aggiornato il 18/11/2026 con i circa 30 rapporti delle corse dal 12/11 al 18/11,
    - rose complete a 35 (riempimento casuale o import CSV), lega **attivata**, così ci sono calendario e turni veri.
    - Serve a tutte le voci [PREP]. Le corse possono usarla, ma non devono eliminarla né modificarne le regole.
 2. **Lega preparata `QA-PREP-DISPARI`** con 5 partecipanti (`qa-01`…`qa-05`), attivata: serve al calendario dispari dal vivo.
-3. **Account operatore QA:** Rosario promuove un account dedicato (per esempio `qa-09@test.fantappero.it`). Finché non c'è, le voci [OPER] restano NV.
+3. **Account operatore QA:** `qa-09@test.fantappero.it` (stessa password degli altri), registrato il 18/11 e da promuovere a operatore da Rosario. Finché non è operatore, le voci [OPER] restano NV.
 4. **Turno vivo:** il primo calcio d'inizio reale su dev è il **20/11 alle 20:45** (ora di Roma). Ci sono 3 controlli brevi programmati (−2 h, −10 min, +5 min) sulla lega `QA-PREP-PARI`.
 
 ## Area 1 – Accesso, profilo, privacy
@@ -195,12 +195,35 @@ Ogni corsa prova, nelle sue aree, prima le voci DA FARE senza prerequisiti manca
 | 03:03 Gruppo D | 9, 10, 11 | 9.2, 9.3, 4.4, 4.5, 4.6, 5.8 (W e MobB), 10.1 MobB, 1.9 MobB, 11.3; con [PREP]: 9.5, 10.2, 10.4, 11.2 |
 | 04:13 Verifica | tutte | regressioni: le voci "CORRETTI" degli ultimi 3 giorni di `known_issues.md` |
 
-### Giorno, sul PC di Rosario (emulatore Android)
-Le prove si fanno a emulatore acceso e senza altre build in corso. Le build si fanno solo a emulatore spento: insieme non stanno nei 16 GB di RAM.
-1. Aggiornare Maestro dalla 2.10.0 alla 2.12.x, per l'accesso con `inputText`.
-2. Creare `QA-PREP-PARI` e `QA-PREP-DISPARI` (prerequisiti 1 e 2).
-3. Sulla lega preparata: 3.12, 6.5, 4.9, 5.10, 8.6, 10.2 EMU, 7.6 EMU.
-4. Deep link e galleria: 1.13, 2.4, 10.6.
+### Mobile di giorno: emulatore Android sul PC di Rosario (dalle 8 alle 22)
+Le corse mobile vere si fanno di giorno, quando Rosario è disponibile. Le esegue la sessione aperta sul suo PC ("rosario-graceful-feigenbaum") con l'app installata sull'emulatore, Maestro e `adb`, contro l'API di dev. Quella sessione le avvia da sola con un timer locale (`CronCreate`) e scrive il rapporto nella sua chat.
+- **Regole per tutti i blocchi:**
+  - account `qa-02` (e `qa-03` per gli scambi), lega `QA-PREP-PARI`;
+  - prima di ogni blocco `git pull` su `main`;
+  - si provano solo le voci del blocco ancora DA FARE o DA RIVERIFICARE nella colonna EMU.
+- **Build:** se `main` ha modifiche in `apps/mobile` o `packages`, si ricompila l'APK prima del blocco, solo a emulatore spento (insieme non stanno nei 16 GB di RAM) e senza altre build in corso sul PC.
+- **Se il PC è spento** o la sessione non è aperta, il blocco salta e lo recupera quello successivo.
+
+| Ora (Roma) | Blocco | Voci del registro |
+|---|---|---|
+| 08:30 | M1 Accesso e account | 1.12 (accesso con Maestro 2.12), 1.13 (link di verifica e reset), 1.9 (informativa), 10.5 (schermata di accesso), 10.6 (avatar dalla galleria), 2.3 (inviti a schermo), 2.4 (link di invito) |
+| 11:30 | M2 Rosa e mercato | 3.2 (ricerca senza accenti), 3.12 (rosa piena), 4.5 e 4.6 (filtri, statistiche, "Non più valida"), 4.9 (scambio e notifica), 5.8 (selettore asta), 5.10 (offerta in busta) |
+| 14:30 | M3 Formazione e turni | 6.5 (salvare la formazione), 7.6 (turni, calendario, classifica), 10.2 (schermate con i contenuti di lega) |
+| 17:30 | M4 Notifiche | 8.6 (tocco su ogni tipo di notifica), 8.7 (lega eliminata, noto), notifiche nate dalle prove di M2 e M3 |
+| 20:30 | M5 Ripasso | tutti i flussi Maestro di `apps/mobile/e2e/maestro/flows/dev/` sull'ultimo APK: è la regressione mobile del giorno |
+
+Il **20/11** il blocco delle 20:30 si sposta alle **20:40**: guarda sull'app il blocco progressivo della partita delle 20:45 (6.7, EMU).
+
+Restano alle corse notturne (cloud):
+- l'app mobile **nel browser** (MobB, corsa delle 03:03);
+- la **coerenza con il web** a 390 px (10.4), perché lì web e app si aprono nello stesso browser.
+
+Restano NV sul mobile: push vere e accesso con Google (10.7), perché l'emulatore non ha Play Store, e il pannello operatore (10.3) finché non c'è `qa-09` operatore.
+
+**Prerequisiti, una volta sola:**
+1. Maestro dalla 2.10.0 alla 2.12.x;
+2. creare `QA-PREP-PARI` e `QA-PREP-DISPARI`;
+3. registrare `qa-09`, che Rosario poi promuove a operatore.
 
 ### Turno vivo, 20/11 (lega `QA-PREP-PARI`)
 Tre controlli brevi, alle 18:45, alle 20:35 e alle 20:50 ora di Roma: 4.8, 6.7, 7.5.
