@@ -40,4 +40,27 @@ def validate_display_name(display_name: str) -> str:
             "Il nome visualizzato è troppo lungo.",
             code="invalid_display_name",
         )
-    return cleaned
+    return ensure_visible_display_name(cleaned)
+
+
+# Caratteri invisibili o di controllo che renderebbero il nome vuoto o ingannevole a schermo.
+_INVISIBLE_FILLERS = frozenset({"\u115f", "\u1160", "\u3164", "\uffa0", "\u2800"})
+_ALLOWED_FORMAT = frozenset({"\u200c", "\u200d"})  # ZWNJ/ZWJ servono alle emoji composte
+
+
+def ensure_visible_display_name(name: str) -> str:
+    """Rifiuta nomi con caratteri di controllo/invisibili o senza nulla di visibile."""
+    import unicodedata
+
+    for char in name:
+        category = unicodedata.category(char)
+        if char in _ALLOWED_FORMAT:
+            continue
+        if category in ("Cc", "Cf", "Cs", "Zl", "Zp") or char in _INVISIBLE_FILLERS:
+            raise ValidationAuthError(
+                "Il nome contiene caratteri invisibili o non consentiti.",
+                code="invalid_display_name",
+            )
+    if not any(not char.isspace() and char not in _ALLOWED_FORMAT for char in name):
+        raise ValidationAuthError("Inserisci un nome visualizzato.", code="invalid_display_name")
+    return name

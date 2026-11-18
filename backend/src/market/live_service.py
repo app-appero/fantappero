@@ -859,7 +859,9 @@ class LiveMarketService:
         seconds_remaining: int | None = None
         if current_lot is not None:
             now = datetime.now(UTC)
-            seconds_remaining = max(0, int((current_lot.closes_at - now).total_seconds()))
+            # In pausa (mercato chiuso) il tempo restante resta fermo a quello della chiusura.
+            reference = current_lot.paused_at or now
+            seconds_remaining = max(0, int((current_lot.closes_at - reference).total_seconds()))
             raises = self._session.scalars(
                 select(MarketLiveRaise)
                 .options(selectinload(MarketLiveRaise.fantasy_team))
@@ -1364,20 +1366,37 @@ class LiveMarketService:
         raise ForbiddenError()
 
     def _assert_no_conflicting_initial_auction(self, league_id: UUID) -> None:
-        """A league cannot run both auction mechanisms for the initial auction."""
-        existing_sealed = self._session.scalar(
+        """Niente live con un'asta iniziale a buste attiva o con uno spareggio aperto.
+
+        Si guardano tutte le righe "aperte": una sessione scaduta ma non chiusa non deve
+        nascondere quella davvero attiva. Lo spareggio blocca qualunque sia la sessione madre
+        (asta iniziale o svincolati), così il calciatore conteso non finisce altrove.
+        """
+        now = datetime.now(UTC)
+        active_states = (MarketSessionStatus.SCHEDULED, MarketSessionStatus.OPEN)
+        sealed = self._session.scalars(
             select(MarketSession).where(
                 MarketSession.league_id == league_id,
                 MarketSession.kind == MarketSessionKind.INITIAL_AUCTION,
                 MarketSession.parent_session_id.is_(None),
-                MarketSession.status.in_((MarketSessionStatus.SCHEDULED, MarketSessionStatus.OPEN)),
+                MarketSession.status.in_(active_states),
             )
-        )
-        if existing_sealed is not None and effective_status(
-            existing_sealed, now=datetime.now(UTC)
-        ) in (MarketSessionStatus.SCHEDULED, MarketSessionStatus.OPEN):
+        ).all()
+        if any(effective_status(row, now=now) in active_states for row in sealed):
             raise ValidationAuthError(
                 "Esiste già un'asta iniziale a buste chiuse attiva per questa lega.",
+                code="market_session_already_active",
+            )
+        tiebreaks = self._session.scalars(
+            select(MarketSession).where(
+                MarketSession.league_id == league_id,
+                MarketSession.parent_session_id.is_not(None),
+                MarketSession.status.in_(active_states),
+            )
+        ).all()
+        if any(effective_status(row, now=now) in active_states for row in tiebreaks):
+            raise ValidationAuthError(
+                "C'è uno spareggio in corso: concludilo prima di creare una nuova sessione.",
                 code="market_session_already_active",
             )
 

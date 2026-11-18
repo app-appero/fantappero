@@ -22,6 +22,7 @@ const AUCTION_TITLES = new Set([
   "Busta aggiudicata",
   "Busta non aggiudicata",
   "Spareggio aperto",
+  "Spareggio annullato",
   "Lotto aggiudicato",
   "Sei stato sorpassato",
   "Scelta richiesta: rosa al completo",

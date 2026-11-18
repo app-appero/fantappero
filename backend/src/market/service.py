@@ -119,6 +119,7 @@ class MarketService:
         payload: SetMarketGateRequest,
     ) -> MarketGateResponse:
         write_market_open(self._session, league_access.league.id, payload.open)
+        self._pause_or_resume_live_lots(league_access.league.id, resume=payload.open)
         self._session.add(
             LeagueAuditEvent(
                 league_id=league_access.league.id,
@@ -139,6 +140,28 @@ class MarketService:
             labels={"open": "true" if payload.open else "false"},
         )
         return MarketGateResponse(marketOpen=payload.open)
+
+    def _pause_or_resume_live_lots(self, league_id: UUID, *, resume: bool) -> None:
+        """Chiusura del mercato: il timer del lotto live si ferma; riapertura: riparte."""
+        from database.enums import MarketLiveLotStatus
+        from market.live_models import MarketLiveLot
+
+        now = datetime.now(UTC)
+        lots = self._session.scalars(
+            select(MarketLiveLot)
+            .join(MarketSession, MarketSession.id == MarketLiveLot.session_id)
+            .where(
+                MarketSession.league_id == league_id,
+                MarketLiveLot.status == MarketLiveLotStatus.OPEN,
+            )
+            .with_for_update(of=MarketLiveLot)
+        ).all()
+        for lot in lots:
+            if resume and lot.paused_at is not None:
+                lot.closes_at = lot.closes_at + (now - lot.paused_at)
+                lot.paused_at = None
+            elif not resume and lot.paused_at is None:
+                lot.paused_at = now
 
     # -- sessions ---------------------------------------------------------
 
@@ -435,6 +458,22 @@ class MarketService:
 
         bidder_user_ids = user_ids_for_teams(self._session, (bid.fantasy_team_id for bid in bids))
         notifications = NotificationService(self._session)
+        # Spareggio "orfano": il calciatore conteso è finito nel frattempo a un'altra squadra.
+        cancelled_tiebreak_athletes: set[UUID] = set()
+        if market_session.parent_session_id is not None:
+            owned = {
+                row.athlete_id: row.fantasy_team_id
+                for row in self._session.execute(
+                    select(FantasyRosterSlot.athlete_id, FantasyRosterSlot.fantasy_team_id).where(
+                        FantasyRosterSlot.league_id == market_session.league_id,
+                        FantasyRosterSlot.athlete_id.in_({bid.athlete_id for bid in bids}),
+                    )
+                ).all()
+            }
+            bidder_teams = {bid.fantasy_team_id for bid in bids}
+            cancelled_tiebreak_athletes = {
+                athlete_id for athlete_id, team_id in owned.items() if team_id not in bidder_teams
+            }
         for bid in bids:
             # Le offerte in parità (EXPIRED) vanno allo spareggio: anche loro vanno avvisate.
             if bid.status not in (
@@ -462,6 +501,7 @@ class MarketService:
                     "athlete_name": bid.athlete.canonical_name,
                     "amount_credits": bid.amount_credits,
                     "not_assignable": bid.id in unassignable_bid_ids,
+                    "tiebreak_cancelled": bid.athlete_id in cancelled_tiebreak_athletes,
                     **league_params(self._session, market_session.league_id),
                 },
                 dedup_key=f"market_bid_outcome:{bid.id}",
@@ -745,6 +785,9 @@ class MarketService:
         session_id: UUID,
         athlete_id: UUID,
     ) -> None:
+        # Come l'invio: a mercato chiuso (o turno in corso) non si ritira nulla.
+        league = self._lock_league(league_access.league.id)
+        assert_market_open(league)
         market_session = self._find_session(league_access.league.id, session_id)
         now = datetime.now(UTC)
         if not is_open_for_bids(market_session, now=now):

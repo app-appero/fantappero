@@ -180,6 +180,7 @@ class PrivacyService:
                 for membership in user.league_memberships
             ],
             "pushDevices": self._export_push_devices(user.id),
+            "notificationPreferences": self._export_notification_preferences(user.id),
             "teams": self._export_teams(user.id),
             # Segnalazioni scritte dall'utente (testo e metadati; gli allegati sono solo contati).
             "feedback": [
@@ -197,6 +198,33 @@ class PrivacyService:
                     .where(FeedbackReport.user_id == user.id)
                     .order_by(FeedbackReport.created_at)
                 ).all()
+            ],
+        }
+
+    def _export_notification_preferences(self, user_id: UUID) -> dict[str, object]:
+        """Preferenze di notifica per categoria e per singolo evento (solo quelle modificate)."""
+        from notifications.models import NotificationEventPreference, NotificationPreference
+
+        categories = self._session.scalars(
+            select(NotificationPreference).where(NotificationPreference.user_id == user_id)
+        ).all()
+        events = self._session.scalars(
+            select(NotificationEventPreference).where(
+                NotificationEventPreference.user_id == user_id
+            )
+        ).all()
+        return {
+            "categories": [
+                {"category": row.category.value, "inAppEnabled": row.in_app_enabled}
+                for row in categories
+            ],
+            "events": [
+                {
+                    "eventKey": row.event_key,
+                    "inAppEnabled": row.in_app_enabled,
+                    "pushEnabled": row.push_enabled,
+                }
+                for row in events
             ],
         }
 

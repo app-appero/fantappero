@@ -179,6 +179,15 @@ def _render_mercato_esito_busta(params: NotificationParams) -> NotificationConte
             body=_league_body(f"Hai aggiudicato {athlete_name} per {amount} crediti.", params),
             deep_link=_league_link(_AUCTION_PATH, params),
         )
+    if params.get("tiebreak_cancelled"):
+        return NotificationContent(
+            title="Spareggio annullato",
+            body=_league_body(
+                f"Lo spareggio su {athlete_name} è annullato: il calciatore non è più disponibile.",
+                params,
+            ),
+            deep_link=_league_link(_AUCTION_PATH, params),
+        )
     reason = (
         "non è stato possibile assegnarlo (crediti insufficienti o rosa non valida)"
         if params.get("not_assignable")

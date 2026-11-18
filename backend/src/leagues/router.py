@@ -287,7 +287,7 @@ def list_league_members_public(
 )
 def get_fantasy_coach_profile(
     user_id: UUID,
-    page: int = Query(default=1, ge=1),
+    page: int = Query(default=1, ge=1, le=100_000),
     page_size: int = Query(default=20, ge=1, le=50, alias="pageSize"),
     league_access: LeagueAccess = Depends(require_league_permissions(Permission.LEAGUE_VIEW)),
     service: NamedLeagueInviteService = Depends(get_named_league_invite_service),
@@ -311,7 +311,7 @@ def get_fantasy_coach_profile(
     response_model=FantasyCoachDirectoryResponse,
 )
 def list_fantasy_coaches(
-    page: int = Query(default=1, ge=1),
+    page: int = Query(default=1, ge=1, le=100_000),
     page_size: int = Query(default=20, ge=1, le=50, alias="pageSize"),
     search: str | None = Query(default=None, max_length=80),
     user_type: UserType | None = Query(default=None, alias="userType"),
@@ -800,7 +800,7 @@ def get_league_audit_log(
     action: LeagueAuditAction | None = Query(default=None),
     date_from: str | None = Query(default=None, alias="dateFrom"),
     date_to: str | None = Query(default=None, alias="dateTo"),
-    page: int = Query(default=1, ge=1),
+    page: int = Query(default=1, ge=1, le=100_000),
     page_size: int = Query(default=DEFAULT_PAGE_SIZE, ge=1, le=MAX_PAGE_SIZE, alias="pageSize"),
     league_access: LeagueAccess = Depends(require_league_permissions(Permission.LEAGUE_ADMIN)),
     session: Session = Depends(get_db_session),

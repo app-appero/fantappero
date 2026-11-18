@@ -20,6 +20,7 @@ from auth.profile_validators import (
     validate_profile_display_name,
     validate_profile_nickname,
     validate_quiet_hour,
+    validate_quiet_hours_pair,
     validate_timezone,
 )
 from auth.security import utc_now
@@ -78,6 +79,11 @@ class ProfileService:
                 else None
             )
             changed = True
+        if (
+            "quiet_hours_start_hour" in payload.model_fields_set
+            or "quiet_hours_end_hour" in payload.model_fields_set
+        ):
+            validate_quiet_hours_pair(profile.quiet_hours_start_hour, profile.quiet_hours_end_hour)
         if payload.available_for_invites is not None:
             self._set_invite_availability(user, profile, payload.available_for_invites)
             changed = True

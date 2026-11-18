@@ -214,6 +214,10 @@ def would_exceed_role_quota(
     replacing_role: FantasyRole | None = None,
 ) -> bool:
     """True if adding ``new_role`` (optionally replacing another) exceeds the limit."""
+    if replacing_role is not None and replacing_role == new_role:
+        # Cambio nello stesso ruolo: il conteggio non aumenta, anche se il ruolo è già oltre
+        # quota (esubero in attesa). Non è mai un superamento.
+        return False
     counts = count_roles(current_roles)
     if replacing_role is not None:
         counts[replacing_role] = max(0, counts[replacing_role] - 1)

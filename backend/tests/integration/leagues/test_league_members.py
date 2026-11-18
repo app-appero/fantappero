@@ -471,3 +471,93 @@ def test_admin_can_be_shared_or_passed_at_any_time_and_co_admin_can_be_revoked(
     last = client.post(f"{base}/{third_id}/revoca-admin", headers=third)
     assert last.status_code == 400
     assert last.json()["code"] == "last_league_admin"
+
+
+def _put_rules(client: TestClient, token: str, league_id: str, *, participants: int, credits: int):
+    return client.put(
+        f"/leagues/{league_id}/amministrazione/regolamento",
+        headers={"Authorization": f"Bearer {token}"},
+        json={
+            "presetName": "standard",
+            "participantCount": participants,
+            "roster": {
+                "rosterSize": 35,
+                "goalkeepers": 3,
+                "defenders": 11,
+                "midfielders": 11,
+                "forwards": 10,
+            },
+            "totalCredits": credits,
+            "options": {"allowTrades": True, "allowManualInvites": True},
+        },
+    )
+
+
+def test_rules_keep_participants_above_members_and_realign_unspent_credits(
+    client: TestClient,
+    db_session: Session,
+    competition_ids: list[str],
+) -> None:
+    """QA 18/11: partecipanti mai sotto gli iscritti; crediti iniziali riallineati finché
+    nessuno ha speso, poi bloccati."""
+    owner_token, _ = _register_and_login(client, "rules18.owner@example.com")
+    member_token, member_id = _register_and_login(client, "rules18.member@example.com")
+    league_id = _create_league(client, owner_token, competition_ids, "Lega Regole 18")
+    assert (
+        _put_rules(client, owner_token, league_id, participants=8, credits=1000).status_code == 200
+    )
+    _add_member(db_session, league_id, member_id)
+
+    def balance(token: str) -> int:
+        return client.get(
+            f"/leagues/{league_id}/crediti", headers={"Authorization": f"Bearer {token}"}
+        ).json()["balance"]
+
+    # Il conto del membro nasce con il totale attuale.
+    assert balance(member_token) == 1000
+    from datetime import UTC, datetime
+
+    from auth.models.user import User
+    from auth.models.user_profile import UserProfile
+    from database.enums import PlatformRole, UserType
+
+    for index in range(3):  # 5 iscritti in tutto
+        extra = User(
+            email=f"rules18.extra{index}@example.com",
+            password_hash="x",
+            platform_role=PlatformRole.USER,
+            user_type=UserType.HUMAN,
+            email_verified_at=datetime.now(UTC),
+        )
+        db_session.add(extra)
+        db_session.flush()
+        db_session.add(UserProfile(user_id=extra.id, display_name=f"Extra {index}"))
+        db_session.commit()
+        _add_member(db_session, league_id, extra.id)
+    too_few = _put_rules(client, owner_token, league_id, participants=4, credits=1000)
+    assert too_few.status_code == 400
+    assert too_few.json()["code"] == "participant_count_below_members"
+
+    realigned = _put_rules(client, owner_token, league_id, participants=8, credits=500)
+    assert realigned.status_code == 200, realigned.text
+    assert balance(owner_token) == 500
+    assert balance(member_token) == 500
+
+    # Dopo una spesa il totale non si cambia più.
+    team_id = client.get(
+        f"/leagues/{league_id}/rosa", headers={"Authorization": f"Bearer {member_token}"}
+    ).json()["id"]
+    adjust = client.post(
+        f"/leagues/{league_id}/amministrazione/crediti/movimenti",
+        headers={"Authorization": f"Bearer {owner_token}"},
+        json={
+            "fantasyTeamId": team_id,
+            "amount": -10,
+            "note": "prova",
+            "transactionId": "qa18-spesa",
+        },
+    )
+    assert adjust.status_code in (200, 201), adjust.text
+    locked = _put_rules(client, owner_token, league_id, participants=8, credits=700)
+    assert locked.status_code == 400
+    assert locked.json()["code"] == "total_credits_locked"
