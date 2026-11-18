@@ -119,7 +119,13 @@ def materialize_initial_fantasy_turns_task(
         api = get_api_settings()
         enabled = api.fantasy_turns_auto_generate_enabled
 
-    if not enabled:
+    from system_jobs.service import is_job_enabled
+
+    # Stesso interruttore del job "Turni in arrivo": se l'operatore lo accende dal
+    # pannello (riga in `system_jobs`) vale anche per i turni iniziali. Prima qui
+    # contava solo la variabile d'ambiente e su dev le leghe nuove restavano senza
+    # turni (calendario `european_turns_missing`, QA 18/11).
+    if not is_job_enabled("fantasy-turns-ensure-upcoming", enabled):
         logger.info(
             "fantasy_turns_materialize_initial_skipped_disabled", extra={"league_id": league_id}
         )

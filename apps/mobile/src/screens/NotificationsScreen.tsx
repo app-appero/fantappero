@@ -3,6 +3,7 @@ import type { NotificationItem } from "@fantappero/contracts";
 import { theme } from "@fantappero/ui/theme";
 import { useNavigation, type NavigationProp } from "@react-navigation/core";
 import { useCallback, useMemo, useState } from "react";
+import { appendNotificationPage, NOTIFICATIONS_PAGE_SIZE } from "../navigation/notificationPages";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import {
   fetchNotifications,
@@ -66,6 +67,11 @@ export function NotificationsScreen() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  // Paginazione: prima si caricavano solo le ultime 30 e le più vecchie non si
+  // raggiungevano più (QA emulatore 18/11). "Carica altre" aggiunge la pagina dopo.
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [loadingMore, setLoadingMore] = useState(false);
 
   const load = useCallback(async () => {
     if (!accessToken) {
@@ -77,9 +83,11 @@ export function NotificationsScreen() {
     setLoading(true);
     setLoadError(null);
     try {
-      const result = await fetchNotifications(accessToken, { pageSize: 30 });
+      const result = await fetchNotifications(accessToken, { page: 1, pageSize: NOTIFICATIONS_PAGE_SIZE });
       setItems(result.items);
       setUnreadCount(result.unreadCount);
+      setPage(1);
+      setTotalPages(result.totalPages);
     } catch (error) {
       setItems([]);
       setLoadError(getApiErrorMessage(error, "Impossibile caricare le notifiche."));
@@ -131,6 +139,26 @@ export function NotificationsScreen() {
     } else if (route?.kind === "admin") {
       openAdminScreen(route.screen);
       navigation.navigate("AdminPanel");
+    }
+  }
+
+  async function onLoadMore() {
+    if (!accessToken || loadingMore || page >= totalPages) {
+      return;
+    }
+    setLoadingMore(true);
+    setActionError(null);
+    try {
+      const next = page + 1;
+      const result = await fetchNotifications(accessToken, { page: next, pageSize: NOTIFICATIONS_PAGE_SIZE });
+      setItems((current) => appendNotificationPage(current, result.items));
+      setUnreadCount(result.unreadCount);
+      setPage(next);
+      setTotalPages(result.totalPages);
+    } catch (error) {
+      setActionError(getApiErrorMessage(error, "Impossibile caricare altre notifiche."));
+    } finally {
+      setLoadingMore(false);
     }
   }
 
@@ -291,6 +319,19 @@ export function NotificationsScreen() {
               </View>
             ))
           )}
+
+          {page < totalPages ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Carica altre notifiche"
+              disabled={loadingMore}
+              onPress={() => void onLoadMore()}
+              style={styles.secondaryButton}
+              testID="notifications-load-more"
+            >
+              <Text style={styles.secondaryLabel}>{loadingMore ? "Caricamento…" : "Carica altre"}</Text>
+            </Pressable>
+          ) : null}
         </View>
       ) : null}
     </PageContainer>

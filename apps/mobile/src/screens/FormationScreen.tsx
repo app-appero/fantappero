@@ -1198,7 +1198,12 @@ export function FormationScreen() {
           onLayout={(event) => setStatusBottom(event.nativeEvent.layout.y + event.nativeEvent.layout.height + 80)}
         >
           <Text style={styles.turnTitle} testID="formation-cutoff">
-            Turno {context.roundNumber} · cutoff {formatDateTime(context.cutoffAt)}
+            {/* Prima diceva "cutoff" accanto al conto alla rovescia del blocco: due orari
+                diversi (calcio d'inizio e blocco) senza spiegazione (QA emulatore 18/11). */}
+            Turno {context.roundNumber} · primo calcio d'inizio {formatDateTime(context.cutoffAt)}
+            {(context.lineupLockMarginMinutes ?? 0) > 0
+              ? ` · ogni giocatore si blocca ${context.lineupLockMarginMinutes} min prima della sua partita`
+              : ""}
           </Text>
           <View style={styles.movesRow}>
             <View style={styles.movesChip}>
