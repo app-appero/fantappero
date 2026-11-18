@@ -19,13 +19,13 @@ Aggiornato il 18/11/2026 con i circa 30 rapporti delle corse dal 12/11 al 18/11,
 
 ## Prerequisiti da preparare una volta sola
 
-1. **Lega preparata `QA-PREP-PARI`**, da tenere e non cancellare:
+1. **Lega preparata `QA-PREP-PARI`** (PRONTA dal 18/11: id `d96590b8-37e2-4eff-9f7b-e24dccf8370d`, attiva, 8 × 35, 31 turni europei, 21 giornate; rose fatte con l'import CSV, perché il riempimento casuale vale solo per i fantallenatori IA), da tenere e non cancellare:
    - 8 partecipanti (`qa-01` admin, poi `qa-02`…`qa-08`) e competizioni Serie A, Premier e LaLiga;
    - rose complete a 35 (riempimento casuale o import CSV), lega **attivata**, così ci sono calendario e turni veri.
    - Serve a tutte le voci [PREP]. Le corse possono usarla, ma non devono eliminarla né modificarne le regole.
-2. **Lega preparata `QA-PREP-DISPARI`** con 5 partecipanti (`qa-01`…`qa-05`), attivata: serve al calendario dispari dal vivo.
-3. **Account operatore QA:** `qa-09@test.fantappero.it` (stessa password degli altri), registrazione chiesta il 18/11 alla sessione del PC; poi Rosario lo promuove a operatore. Finché non è operatore, le voci [OPER] restano NV.
-4. **Turno vivo:** il primo calcio d'inizio reale su dev è il **20/11 alle 20:45** (ora di Roma). Ci sono 3 controlli brevi programmati (−2 h, −10 min, +5 min) sulla lega `QA-PREP-PARI`.
+2. **Lega preparata `QA-PREP-DISPARI`** (PRONTA dal 18/11: id `7a1b25b2-acfc-4ff3-a433-8056a7766330`, attiva, 5 × 35) con 5 partecipanti (`qa-01`…`qa-05`): serve al calendario dispari dal vivo.
+3. **Account operatore QA:** `qa-09@test.fantappero.it` (stessa password degli altri), PRONTO dal 18/11: registrato e promosso a operatore da Rosario. Le voci [OPER] ora si possono provare con `qa-09`.
+4. **Turno vivo:** su dev il primo calcio d'inizio del turno #11 è **Athletic Club–Espanyol, 20/11 alle 21:00** (ora di Roma), con il blocco della formazione alle **20:45**. Ci sono 3 controlli brevi programmati (−2 h, −10 min, +5 min rispetto al blocco) sulla lega `QA-PREP-PARI`.
 
 ## Area 1 – Accesso, profilo, privacy
 
@@ -42,8 +42,8 @@ Aggiornato il 18/11/2026 con i circa 30 rapporti delle corse dal 12/11 al 18/11,
 | 1.9 | Informativa privacy a schermo | DA FARE | W1280, W390, MobB |
 | 1.10 | Rate limit registrazione e login | OK | API |
 | 1.11 | Login, logout e sessione dopo il riavvio dell'app | OK | EMU 18/11 (flusso 04) |
-| 1.12 | Accesso con email nell'app | OK con riserva | EMU: l'app è OK, ma Maestro 2.10 si blocca a scrivere il testo, quindi l'accesso si fa con adb |
-| 1.13 | Link di verifica email e di reset password aperti dall'app | DA FARE | EMU: `adb shell am start -d "fantappero://…"` (deep link) |
+| 1.12 | Accesso con email nell'app | OK | EMU 18/11 con Maestro 2.12.1 (flusso 01) |
+| 1.13 | Link di verifica email e di reset password aperti dall'app | APERTO | EMU 18/11: l'app non gestisce i link (manca `linking`, e il backend genera link web). Vedi `known_issues.md` |
 | 1.14 | PATCH del nickname in parallelo, token push non cancellati all'eliminazione | APERTO | solo lettura del codice |
 | 1.15 | Email reali, accesso con Google, richiesta di accesso dei non tester | NV | su dev |
 
@@ -54,7 +54,7 @@ Aggiornato il 18/11/2026 con i circa 30 rapporti delle corse dal 12/11 al 18/11,
 | 2.1 | Creazione lega, preset, crediti iniziali, codice invito e adesione | OK | API |
 | 2.2 | Invito nominale: accetta, rifiuta, revoca, duplicati | OK | API |
 | 2.3 | Gli stessi flussi a schermo | DA FARE | W1280, W390, MobB, EMU |
-| 2.4 | Ingresso con link di invito aperto dall'app | DA FARE | EMU: deep link |
+| 2.4 | Ingresso con link di invito aperto dall'app | APERTO | come 1.13 |
 | 2.5 | Elenco partecipanti, ruoli, permessi admin e non membro | OK | API |
 | 2.6 | Sostituzione partecipante | DA RIVERIFICARE | API (incerto dal 15-16/11) |
 | 2.7 | Eliminazione lega da admin (bozza) | OK | API |
@@ -69,7 +69,7 @@ Aggiornato il 18/11/2026 con i circa 30 rapporti delle corse dal 12/11 al 18/11,
 |---|---|---|---|
 | 3.1 | Listone: conteggi e filtro ruolo | OK | API (`?role=` non valido → 200: APERTO, stile) |
 | 3.2 | Ricerca senza accenti ("dembele" → "Dembélé") | DA RIVERIFICARE | W1280, W390, MobB, EMU, listoni admin: corretto 18/11 |
-| 3.3 | Listone solo con i club dei campionati della lega (decisione 14) | DA RIVERIFICARE | API: corretto 18/11 nel codice; su dev serve un "Aggiorna listone" dell'admin di lega, poi in una lega Liga/Premier/Serie A non devono comparire club tedeschi o francesi né squadre di serie B |
+| 3.3 | Listone solo con i club dei campionati della lega (decisione 14) | OK | API 18/11 su `QA-PREP-PARI`: dopo "Aggiorna listone" da 82 a 60 club, 20 per campionato, nessun club tedesco o francese |
 | 3.4 | Override di ruolo: NUL nel motivo → 422 | DA RIVERIFICARE | API |
 | 3.5 | Override di ruolo dal turno successivo | DA FARE [PREP] | API |
 | 3.6 | Assegnazione slot, limiti 3/11/11/10, crediti | OK | API |
@@ -78,7 +78,7 @@ Aggiornato il 18/11/2026 con i circa 30 rapporti delle corse dal 12/11 al 18/11,
 | 3.9 | Riempimento casuale | OK | API (lento, circa 6 s) |
 | 3.10 | Riempimento IA | NV | manca l'API per creare un fantallenatore IA |
 | 3.11 | Movimenti crediti = saldo, storico rosa, esubero in attesa | OK | API |
-| 3.12 | Rosa e crediti a schermo con una rosa piena | DA FARE [PREP] | W390, MobB, EMU |
+| 3.12 | Rosa e crediti a schermo con una rosa piena | OK su EMU 18/11; DA FARE [PREP] su W390 e MobB | W390, MobB |
 
 ## Area 4 – Mercato: scambi
 
@@ -92,7 +92,7 @@ Aggiornato il 18/11/2026 con i circa 30 rapporti delle corse dal 12/11 al 18/11,
 | 4.6 | "Non più valida" e "+ N in attesa di crediti", a schermo | DA FARE | W1280, MobB |
 | 4.7 | Scambio sbilanciato a rosa piena 35/35 ed esubero di ruolo | DA FARE [PREP] | API |
 | 4.8 | Scambi chiusi a turno in corso (`round_freeze`) | DA FARE [PREP][VIVO] | API, il 20/11 sera |
-| 4.9 | Proporre uno scambio dall'app e riceverne la notifica | DA FARE [PREP] | EMU |
+| 4.9 | Proporre uno scambio dall'app e riceverne la notifica | OK | EMU 18/11 (flusso 07; notifica di `qa-03` verificata via API) |
 | 4.10 | Limite proposte aggirabile con l'approvazione admin | APERTO | noto |
 | 4.11 | Scambio con un non membro | NV | manca un account esterno |
 
@@ -109,7 +109,7 @@ Aggiornato il 18/11/2026 con i circa 30 rapporti delle corse dal 12/11 al 18/11,
 | 5.7 | Live: scambio immediato a rosa 35/35 | DA FARE [PREP] | API |
 | 5.8 | Selettore calciatori dell'asta (buste e live), a schermo | DA FARE | W1280, W390, MobB |
 | 5.9 | Avvisi "Spareggio annullato", busta "non assegnabile", "Scelta richiesta: rosa al completo" visti davvero | DA FARE | API e MobB |
-| 5.10 | Fare un'offerta in busta dall'app | DA FARE [PREP] | EMU |
+| 5.10 | Fare un'offerta in busta dall'app | DA FARE [PREP] | EMU: serve una sessione a buste aperta in `QA-PREP-PARI` (la apre l'admin `qa-01`); il 18/11 non ce n'erano |
 | 5.11 | Rimborso del calciatore svincolato con il waiver | APERTO | da decidere |
 | 5.12 | Risoluzione concorrente vera | NV | regola: una richiesta alla volta per account |
 
@@ -121,7 +121,7 @@ Aggiornato il 18/11/2026 con i circa 30 rapporti delle corse dal 12/11 al 18/11,
 | 6.2 | Bozza: al massimo 11 titolari, 1 portiere e i ruoli del modulo; DELETE solo a turno aperto | DA RIVERIFICARE | API: corretto 18/11 |
 | 6.3 | Bloccati, indisponibili, fuori rosa | DA RIVERIFICARE | API (incerto per gli indisponibili reali) |
 | 6.4 | Copia formazione precedente | DA RIVERIFICARE | API (incerto) |
-| 6.5 | Salvare la formazione a schermo | DA FARE [PREP] | W390, MobB, EMU |
+| 6.5 | Salvare la formazione a schermo | OK su EMU 18/11 (flusso 06); DA FARE [PREP] su W390 e MobB | W390, MobB |
 | 6.6 | Esubero di ruolo in formazione | DA FARE [PREP] | API |
 | 6.7 | Blocco progressivo, mosse tattiche, formazione automatica al primo blocco | DA FARE [PREP][VIVO] | API, il 20/11 dalle 18:45 alle 20:50 |
 | 6.8 | Formazione dell'operatore | DA FARE [OPER] | API |
@@ -135,7 +135,7 @@ Aggiornato il 18/11/2026 con i circa 30 rapporti delle corse dal 12/11 al 18/11,
 | 7.3 | Attivazione lega: blocco per crediti | DA FARE | API: un partecipante a saldo negativo prima dell'attivazione |
 | 7.4 | Cutoff, ricalcolo, apertura manuale del turno, omologazione, correzioni | DA FARE [OPER] | API |
 | 7.5 | Notifiche "formazione in scadenza" e "blocco imminente" | DA FARE [PREP][VIVO] | API, MobB |
-| 7.6 | Turni, calendario e classifica a schermo con una lega attiva | DA FARE [PREP] | W1280, W390, MobB, EMU |
+| 7.6 | Turni, calendario e classifica a schermo con una lega attiva | OK su EMU 18/11 (flusso 05); DA FARE [PREP] su W1280, W390, MobB | W1280, W390, MobB |
 | 7.7 | Risultati, voti, fantapunti, classifica, scontro diretto | NV | nessuna partita giocata su dev, forse dal 21/11 |
 
 ## Area 8 – Notifiche
@@ -147,7 +147,7 @@ Aggiornato il 18/11/2026 con i circa 30 rapporti delle corse dal 12/11 al 18/11,
 | 8.3 | Generate da invito, scambio e asta | OK | API |
 | 8.4 | Link profondo sul web | OK | API |
 | 8.5 | Tocco su una notifica di scambio nell'app → Mercato › Scambi | OK | EMU 18/11 |
-| 8.6 | Tocco su ogni altro tipo di notifica (asta, turno, invito, fantallenatori, operatore) | DA FARE | MobB, EMU [PREP] |
+| 8.6 | Tocco su ogni altro tipo di notifica (asta, turno, invito, fantallenatori, operatore) | APERTO in parte | EMU 18/11: "La lega è partita" OK; gli altri tipi non si raggiungono perché l'app carica solo le ultime 30 notifiche. MobB DA FARE |
 | 8.7 | Notifica di una lega eliminata: apre Scambi senza lega | APERTO | noto: sul mobile il tocco non cambia la lega attiva |
 | 8.8 | Push ed email reali | NV | l'emulatore ha Google APIs senza Play Store, push da verificare su un telefono |
 
@@ -166,11 +166,11 @@ Aggiornato il 18/11/2026 con i circa 30 rapporti delle corse dal 12/11 al 18/11,
 | Cod | Voce | Stato | Dove / note |
 |---|---|---|---|
 | 10.1 | Schermate principali senza errori | OK su EMU 18/11 (flusso 02, account senza lega); DA FARE su MobB | MobB |
-| 10.2 | Schermate principali con contenuti di lega | DA FARE [PREP] | MobB, EMU |
+| 10.2 | Schermate principali con contenuti di lega | OK su EMU 18/11 (flusso 05); DA FARE [PREP] su MobB | MobB |
 | 10.3 | Pannello operatore mobile | DA FARE [OPER] | MobB, EMU |
 | 10.4 | Coerenza con il web: etichette, stati scambi, colori ruolo, causali crediti | DA FARE | MobB contro W390, sulla stessa lega [PREP] |
-| 10.5 | Schermata di accesso: tema chiaro, bandiera Premier, tastiera | OK | EMU 18/11 (contrasto di "GIOCA" corretto il 18/11: DA RIVERIFICARE) |
-| 10.6 | Galleria e fotocamera per l'avatar | DA FARE | EMU |
+| 10.5 | Schermata di accesso: tema chiaro, bandiera Premier, tastiera, titolo | OK | EMU 18/11 (anche "GIOCA" leggibile) |
+| 10.6 | Galleria e fotocamera per l'avatar | OK galleria; fotocamera DA FARE | EMU 18/11 ("Avatar aggiornato.") |
 | 10.7 | Push vere, Google nativo | NV | serve un telefono vero |
 
 ## Area 12 – App Android: azioni sull'app (solo EMU)

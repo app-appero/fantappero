@@ -1,0 +1,51 @@
+# 05-lega-preparata.yaml
+# Schermate con contenuti di lega su QA-PREP-PARI (voci 7.6, 10.2, 3.12).
+# Richiede sessione attiva (01) di un partecipante della lega preparata.
+appId: com.fantappero.mobile
+---
+- launchApp
+- extendedWaitUntil: { visible: { id: "app-menu-button" }, timeout: 30000 }
+- assertVisible: "QA-PREP-PARI"
+# Turni: calendario fantallenatori e turni europei (7.6)
+- tapOn: { id: "app-menu-button" }
+- tapOn: { id: "app-drawer-item-matchday" }
+- extendedWaitUntil: { visible: { id: "screen-matchday" }, timeout: 15000 }
+- assertVisible: "Calendario fantallenatori"
+- assertVisible: "Giornata .*"
+- takeScreenshot: dev-05-calendario
+- tapOn: "Turni europei"
+- waitForAnimationToEnd
+- takeScreenshot: dev-05-turni-europei
+# Classifica (7.6)
+- tapOn: { id: "app-menu-button" }
+- tapOn: { id: "app-drawer-item-standings" }
+- extendedWaitUntil: { visible: { id: "standings-success" }, timeout: 20000 }
+- takeScreenshot: dev-05-classifica
+# Rosa piena e crediti (3.12)
+- tapOn: { id: "app-menu-button" }
+- tapOn: { id: "app-drawer-item-market-hub" }
+- tapOn: { id: "market-hub-tabs-Roster" }
+- extendedWaitUntil: { visible: { id: "roster-success" }, timeout: 20000 }
+- takeScreenshot: dev-05-rosa
+- assertVisible: { id: "roster-value-tiles" }
+# Formazione (10.2)
+- tapOn: { id: "app-menu-button" }
+- tapOn: { id: "app-drawer-item-formation" }
+- waitForAnimationToEnd
+- assertNotVisible: "Nessuna lega attiva"
+- takeScreenshot: dev-05-formazione
+# Asta e Scambi (10.2)
+- tapOn: { id: "app-menu-button" }
+- tapOn: { id: "app-drawer-item-market-hub" }
+- tapOn: { id: "market-hub-tabs-Auction" }
+- extendedWaitUntil: { visible: { id: "screen-auction" }, timeout: 15000 }
+- takeScreenshot: dev-05-asta
+- tapOn: { id: "market-hub-tabs-Market" }
+- extendedWaitUntil: { visible: { id: "screen-market" }, timeout: 15000 }
+- assertNotVisible: "Nessuna lega selezionata"
+- takeScreenshot: dev-05-scambi
+# Lega (10.2)
+- tapOn: { id: "app-menu-button" }
+- tapOn: { id: "app-drawer-item-league-hub" }
+- waitForAnimationToEnd
+- takeScreenshot: dev-05-lega

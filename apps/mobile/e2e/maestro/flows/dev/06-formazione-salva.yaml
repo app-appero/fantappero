@@ -1,0 +1,46 @@
+# 06-formazione-salva.yaml
+# Voce 6.5: compila la formazione con "Formazione migliore" e la salva.
+# Richiede sessione attiva (01) di un partecipante di QA-PREP-PARI con rosa piena.
+appId: com.fantappero.mobile
+---
+- launchApp
+- extendedWaitUntil: { visible: { id: "app-menu-button" }, timeout: 30000 }
+- tapOn: { id: "app-menu-button" }
+- tapOn: { id: "app-drawer-item-formation" }
+- extendedWaitUntil: { visible: { id: "formation-pitch" }, timeout: 20000 }
+- runFlow:
+    when:
+      visible: { id: "formation-apply-best" }
+    commands:
+      - tapOn: { id: "formation-apply-best" }
+- runFlow:
+    when:
+      visible: { id: "formation-best-confirm" }
+    commands:
+      - tapOn: { id: "formation-best-confirm" }
+- runFlow:
+    when:
+      visible: { id: "formation-sheet-best-confirm" }
+    commands:
+      - tapOn: { id: "formation-sheet-best-confirm" }
+- waitForAnimationToEnd
+- assertVisible: "Formazione completa"
+- takeScreenshot: dev-06-compilata
+# Il pulsante è in fondo, dopo campo, panchina e tribuna: pagina lunga.
+- scrollUntilVisible:
+    element: { id: "formation-save" }
+    direction: DOWN
+    timeout: 60000
+    speed: 80
+- tapOn: { id: "formation-save" }
+- extendedWaitUntil: { visible: { id: "formation-success" }, timeout: 20000 }
+- takeScreenshot: dev-06-salvata
+# Riapertura: la formazione salvata resta
+- stopApp
+- launchApp
+- extendedWaitUntil: { visible: { id: "app-menu-button" }, timeout: 30000 }
+- tapOn: { id: "app-menu-button" }
+- tapOn: { id: "app-drawer-item-formation" }
+- extendedWaitUntil: { visible: { id: "formation-pitch" }, timeout: 20000 }
+- assertVisible: "Formazione completa"
+- takeScreenshot: dev-06-riaperta

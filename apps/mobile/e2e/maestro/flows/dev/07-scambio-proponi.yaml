@@ -1,0 +1,47 @@
+# 07-scambio-proponi.yaml
+# Voce 4.9: proposta di scambio dall'app a "QA Agente 3" (qa-03) in QA-PREP-PARI.
+# Richiede sessione attiva (01) di qa-02. La notifica a qa-03 si verifica via API.
+appId: com.fantappero.mobile
+---
+- launchApp
+- extendedWaitUntil: { visible: { id: "app-menu-button" }, timeout: 30000 }
+- tapOn: { id: "app-menu-button" }
+- tapOn: { id: "app-drawer-item-market-hub" }
+- tapOn: { id: "market-hub-tabs-Market" }
+- extendedWaitUntil: { visible: { id: "market-trade-new-toggle" }, timeout: 20000 }
+- tapOn: { id: "market-trade-new-toggle" }
+- extendedWaitUntil: { visible: { id: "market-trade-recipient" }, timeout: 20000 }
+- tapOn: "QA Agente 3"
+# Un calciatore offerto (il primo della lista) e uno richiesto.
+- scrollUntilVisible:
+    element: { id: "market-trade-offered-athletes-.+" }
+    direction: DOWN
+# Il tocco sulla riga apre la scheda del calciatore: si tocca la casella a sinistra.
+- tapOn:
+    id: "market-trade-offered-athletes-.+"
+    index: 0
+    point: "8%,50%"
+- scrollUntilVisible:
+    element: { id: "market-trade-requested-[0-9a-f]{8}-.+" }
+    direction: DOWN
+    timeout: 60000
+    speed: 80
+- tapOn:
+    id: "market-trade-requested-[0-9a-f]{8}-.+"
+    index: 0
+    point: "8%,50%"
+- takeScreenshot: dev-07-compilata
+- scrollUntilVisible:
+    element: { id: "market-trade-create-submit" }
+    direction: DOWN
+    timeout: 60000
+    speed: 80
+- tapOn: { id: "market-trade-create-submit" }
+- waitForAnimationToEnd
+- assertNotVisible: { id: "market-trade-create-error" }
+- scrollUntilVisible:
+    element: { id: "market-trade-proposal-.+" }
+    direction: UP
+    timeout: 60000
+    speed: 80
+- takeScreenshot: dev-07-inviata
