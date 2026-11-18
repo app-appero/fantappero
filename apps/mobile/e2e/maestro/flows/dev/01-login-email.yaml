@@ -1,0 +1,31 @@
+# 01-login-email.yaml
+# Accesso con email e password su dev (API Railway).
+# Esecuzione: maestro test -e QA_EMAIL=qa-02@test.fantappero.it -e QA_PASSWORD=... 01-login-email.yaml
+appId: com.fantappero.mobile
+---
+- launchApp:
+    clearState: true
+- extendedWaitUntil:
+    visible:
+      id: "screen-auth"
+    timeout: 20000
+- scrollUntilVisible:
+    element:
+      id: "auth-email"
+    direction: DOWN
+- tapOn:
+    id: "auth-email"
+- inputText: ${QA_EMAIL}
+- tapOn:
+    id: "auth-password"
+- inputText: ${QA_PASSWORD}
+- hideKeyboard
+- tapOn:
+    id: "auth-login-submit"
+- extendedWaitUntil:
+    visible:
+      id: "app-menu-button"
+    timeout: 30000
+- assertNotVisible:
+    id: "auth-error"
+- takeScreenshot: dev-01-home

@@ -21,31 +21,35 @@ Questo file è il manuale che ogni esecuzione programmata legge all'inizio. Vale
   - Mai due `pytest` sullo stesso database nello stesso momento.
   - Il diff consegnato deve essere un file `.patch` applicabile con `git apply` sul ramo `main`.
 
-## Corse notturne (fino a 4 per notte, dalle 22 alle 5)
-Le corse partono solo di notte (ora di Roma) per lasciare i token del mattino a Rosario. Un'unica attività le lancia alle **22:23, 00:23, 02:23 e 04:23**; ogni corsa capisce da sola quale è dall'ora di Roma in cui parte. La "notte" porta la data della sera in cui è iniziata (la corsa delle 00:23 appartiene alla notte iniziata il giorno prima).
+## Corse notturne (6 per notte, dalle 22 alle 5, in prova dal 18/11)
+Le corse partono solo di notte (ora di Roma) per lasciare i token del giorno a Rosario. Dal 18/11 ci sono **6 attività programmate separate**, una per corsa: ogni corsa sa già dal suo messaggio di avvio quale è. La "notte" porta la data della sera in cui è iniziata (la corsa delle 00:43 appartiene alla notte iniziata il giorno prima). Così ogni area è rivista **ogni notte** (prima ogni 2 notti).
 
 | Corsa | Cosa copre |
 |---|---|
 | 22:23 | Mercato: aree 4 e 5 (scambi, aste sigillate e live, svincolati, esubero in attesa, crediti) |
-| 00:23 | Primo gruppo a rotazione |
-| 02:23 | Secondo gruppo a rotazione |
-| 04:23 | Facoltativa: ripete i difetti trovati nella notte per escludere falsi positivi e controlla che i fixer abbiano consegnato `.patch` validi |
+| 23:33 | Gruppo A: aree 1 e 2 |
+| 00:43 | Gruppo B: aree 3 e 6 |
+| 01:53 | Gruppo C: aree 7 e 8 |
+| 03:03 | Gruppo D: aree 9, 10 (app mobile nel browser) e 11 |
+| 04:13 | Verifica: riprova su dev le voci "CORRETTI" degli ultimi 3 giorni di `known_issues.md` (regressioni) e controlla che le patch proposte di recente siano davvero pubblicate |
 
-**Data del piano.** Dal 13/11/2026 le corse notturne anticipano il piano del giorno dopo: la data del piano è la data della notte **più un giorno** (il piano del 13/11 è stato eseguito nel pomeriggio di quel giorno). Per esempio la notte iniziata il 13/11 esegue il piano del 14/11, quella del 14/11 il piano del 15/11 (domenica: controllo a campione).
+Le corse sono distanziate di 70 minuti per non sovrapporsi (usano gli stessi account QA): ogni corsa usa solo le leghe con il proprio codice `QA-<data>-<corsa>-<lettera>` (es. `QA-2026-11-19-2333-A`).
 
-Rotazione dei gruppi (A = aree 1 e 2; B = aree 3 e 6; C = aree 7 e 8; D = aree 9, 10 (app mobile) e 11), in base al giorno dell'anno della data del piano (`tm_yday % 2`):
-- pari → 00:23 gruppo A, 02:23 gruppo B
-- dispari → 00:23 gruppo C, 02:23 gruppo D
-- piano di domenica → controllo a campione: 00:23 aree 1-6, 02:23 aree 7-11 (con un giro rapido dell'app mobile nel browser), e verifica che le correzioni già pubblicate non si siano rotte.
-Così ogni area è rivista ogni 2 notti.
+**Data del piano.** È la data della notte **più un giorno** (la notte iniziata il 18/11 esegue il piano del 19/11). Serve per il nome delle leghe e per la domenica.
 
-Regole di consumo: se una corsa trova un limite d'uso o un errore di quota, si ferma e lo scrive nel rapporto; la corsa delle 04:23 si salta se una precedente ha incontrato limiti. Nessuna corsa parte fuori dalla fascia 22-5. Il rapporto indica corsa e gruppo eseguiti. I bug già in `known_issues.md` si rivalutano solo se l'area della corsa li riguarda.
+**Domenica.** Se la data del piano è una domenica, le corse dei gruppi A-D fanno un controllo a campione delle proprie aree (circa metà delle voci di checklist, scelte a rotazione) e verificano che le correzioni già pubblicate non si siano rotte. Mercato e verifica restano normali.
+
+**Consegna.** Ogni corsa manda prima una notifica push breve e poi scrive il rapporto finale come ultimo messaggio. Alle 06:17 la chat "Riepilogo QA mattutino" legge i 6 rapporti, li riassume con il costo di ogni corsa e manda una notifica. Le corse non si leggono tra loro.
+
+**Emulatore Android.** Le corse cloud non usano il PC di Rosario (ogni collegamento va approvato di persona). Le prove sull'emulatore Android vero le fa la sessione aperta sul PC, con i flussi Maestro in `apps/mobile/e2e/maestro/flows/dev/`.
+
+Regole di consumo: se una corsa trova un limite d'uso o un errore di quota, si ferma e lo scrive nel rapporto; la corsa delle 04:13 si salta se nel rapporto di una corsa precedente della stessa notte risulta un limite d'uso (se non lo sa, parte comunque e si ferma al primo limite). Nessuna corsa parte fuori dalla fascia 22-5. Il rapporto indica corsa e gruppo eseguiti. I bug già in `known_issues.md` si rivalutano solo se l'area della corsa li riguarda.
 
 ## Scenario "turno vivo" (solo quando serve)
 Se su dev c'è un turno con cutoff nelle prossime 24 ore, il coordinatore, oltre alla corsa normale, programma con `send_later` 2 o 3 controlli mirati (anche fuori dalla fascia notturna, sono brevi e mirati) (indicativamente a −2h, −10 minuti e +5 minuti dal cutoff). Ogni controllo riprende le leghe/formazioni create nella corsa del giorno e verifica: mosse tattiche e relativo conteggio a ridosso del blocco, blocco progressivo per partita, formazione automatica al primo blocco, cutoff e ricalcolo, notifiche di turno. Dove manca il dato sportivo scrive "non verificabile". Nei giorni senza turno vicino non si programma nulla. Ogni controllo finisce nel rapporto del giorno.
 
 ## Preparazione di ogni esecuzione
-1. Accedi con gli otto account `qa-01..08@test.fantappero.it`, password fissa `QaAgenti!2026x`. Se il login fallisce con credenziali errate, registra l'account (`POST /auth/register`) e riprova. Se risponde `tester_only`, fermati e segnala: la modalità test è stata riaccesa.
+1. Accedi con gli otto account `qa-01..08@test.fantappero.it`, password fissa `QaAgenti!2026x`. Se il login fallisce con credenziali errate, registra l'account (`POST /auth/register`) e riprova. Se risponde `tester_only`, fermati e segnala: la modalità test è stata riaccesa. Dal 18/11 **qa-08 è un utente normale** (non più operatore, decisione di Rosario): va bene nei test di permesso come utente qualunque; le prove da operatore sono "non verificabili" finché Rosario non promuove un account dedicato.
 2. Crea le leghe necessarie alle aree del giorno (se la rotazione non tocca turni/calendario, la lega B non serve) (le intestazioni dei percorsi sono nei router `backend/src/*/router.py` e nei client `apps/web/src/api/`):
    - **QA-…-A (mercato)**: 6 partecipanti (qa-01 proprietario, qa-02..06 con invito o codice), regole standard.
    - **QA-…-B (ciclo di vita)**: 4 partecipanti (minimo consentito), usata per attivazione, calendario e turni.

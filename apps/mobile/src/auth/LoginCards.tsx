@@ -1,3 +1,4 @@
+import { lazyStyles } from "../theme/lazyStyles";
 import { LOGIN_CARDS, LOGIN_SHOWCASE_LEAGUES } from "@fantappero/contracts";
 import { theme } from "@fantappero/ui/theme";
 import { StyleSheet, Text, View } from "react-native";
@@ -62,7 +63,9 @@ const CARD_POS = [
   { right: 0, top: 38, transform: [{ rotate: "9deg" }], zIndex: 2 },
 ];
 
-const styles = StyleSheet.create({
+// Colori letti a ogni cambio di tema: con StyleSheet.create statico lo sfondo
+// restava quello dell'avvio e i testi del tema chiaro sparivano (QA 18/11).
+const styles = lazyStyles(() => StyleSheet.create({
   wrap: { gap: spacing.sm, marginTop: spacing.sm },
   stage: { height: 228, marginBottom: spacing.sm },
   card: {
@@ -90,4 +93,4 @@ const styles = StyleSheet.create({
   codes: { flexDirection: "row", gap: 8, marginTop: 2 },
   codeChip: { backgroundColor: "rgba(255,255,255,0.1)", borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3 },
   codeChipLabel: { color: colors.foreground, fontSize: 11, fontWeight: "800", letterSpacing: 0.8 },
-});
+}));

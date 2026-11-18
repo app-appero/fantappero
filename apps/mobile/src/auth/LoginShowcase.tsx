@@ -1,3 +1,4 @@
+import { lazyStyles } from "../theme/lazyStyles";
 import { LOGIN_SHOWCASE_LEAGUES, LOGIN_SHOWCASE_PITCH, type ShowcaseRole } from "@fantappero/contracts";
 import { theme } from "@fantappero/ui/theme";
 import { StyleSheet, Text, View } from "react-native";
@@ -67,7 +68,9 @@ export function LoginShowcase() {
   );
 }
 
-const styles = StyleSheet.create({
+// Colori letti a ogni cambio di tema: con StyleSheet.create statico lo sfondo
+// restava quello dell'avvio e i testi del tema chiaro sparivano (QA 18/11).
+const styles = lazyStyles(() => StyleSheet.create({
   wrap: { gap: spacing.sm, marginTop: spacing.sm },
   tagline: { color: colors.foregroundMuted, fontSize: 14 },
   pitch: {
@@ -102,4 +105,4 @@ const styles = StyleSheet.create({
   pillRole: { width: 17, height: 17, borderRadius: 9, alignItems: "center", justifyContent: "center" },
   pillRoleLabel: { color: "#11162B", fontSize: 9, fontWeight: "800" },
   pillName: { flexShrink: 1, color: colors.foreground, fontSize: 11, fontWeight: "700" },
-});
+}));

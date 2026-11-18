@@ -1,0 +1,18 @@
+# 04-logout-riavvio.yaml
+# La sessione sopravvive alla chiusura dell'app; poi logout e ritorno all'accesso.
+appId: com.fantappero.mobile
+---
+- launchApp
+- extendedWaitUntil: { visible: { id: "app-menu-button" }, timeout: 30000 }
+- stopApp
+- launchApp
+- extendedWaitUntil: { visible: { id: "app-menu-button" }, timeout: 30000 }
+- assertNotVisible: { id: "screen-auth" }
+- takeScreenshot: dev-04-dopo-riavvio
+- tapOn: { id: "app-menu-button" }
+- scrollUntilVisible:
+    element: { id: "app-drawer-logout" }
+    direction: DOWN
+- tapOn: { id: "app-drawer-logout" }
+- extendedWaitUntil: { visible: { id: "screen-auth" }, timeout: 20000 }
+- takeScreenshot: dev-04-dopo-logout

@@ -1,0 +1,61 @@
+# 02-schermate-principali.yaml
+# Apre le schermate principali dal menu laterale. Richiede sessione attiva (eseguire dopo 01).
+appId: com.fantappero.mobile
+---
+- launchApp
+- extendedWaitUntil:
+    visible:
+      id: "app-menu-button"
+    timeout: 30000
+# Turni
+- tapOn: { id: "app-menu-button" }
+- tapOn: { id: "app-drawer-item-matchday" }
+- extendedWaitUntil: { visible: { id: "screen-matchday" }, timeout: 15000 }
+- takeScreenshot: dev-02-turni
+# Classifica
+- tapOn: { id: "app-menu-button" }
+- tapOn: { id: "app-drawer-item-standings" }
+- extendedWaitUntil: { visible: { id: "screen-standings" }, timeout: 15000 }
+- takeScreenshot: dev-02-classifica
+# Mercato: Rosa, Asta, Svincolati, Scambi
+- tapOn: { id: "app-menu-button" }
+- tapOn: { id: "app-drawer-item-market-hub" }
+- extendedWaitUntil: { visible: { id: "market-hub-tabs" }, timeout: 15000 }
+- tapOn: "Rosa"
+- extendedWaitUntil: { visible: { id: "screen-roster" }, timeout: 15000 }
+- takeScreenshot: dev-02-rosa
+- tapOn: "Asta"
+- extendedWaitUntil: { visible: { id: "screen-auction" }, timeout: 15000 }
+- takeScreenshot: dev-02-asta
+- tapOn: "Svincolati"
+- extendedWaitUntil: { visible: { id: "screen-waiver" }, timeout: 15000 }
+- takeScreenshot: dev-02-svincolati
+- tapOn: "Scambi"
+- extendedWaitUntil: { visible: { id: "screen-market" }, timeout: 15000 }
+- takeScreenshot: dev-02-mercato
+# Formazione
+- tapOn: { id: "app-menu-button" }
+- tapOn: { id: "app-drawer-item-formation" }
+- assertVisible: "Formazione"
+- takeScreenshot: dev-02-formazione
+# Profilo
+- tapOn: { id: "app-menu-button" }
+- tapOn: { id: "app-drawer-item-profile" }
+- extendedWaitUntil: { visible: { id: "screen-profile" }, timeout: 15000 }
+- takeScreenshot: dev-02-profilo
+# Notifiche
+- tapOn: { id: "header-notifications-button" }
+- extendedWaitUntil: { visible: { id: "screen-notifications" }, timeout: 15000 }
+- takeScreenshot: dev-02-notifiche
+- back
+# Inviti
+- tapOn: { id: "app-menu-button" }
+- tapOn: { id: "app-drawer-item-received-invites" }
+- extendedWaitUntil: { visible: { id: "screen-received-invites" }, timeout: 15000 }
+- takeScreenshot: dev-02-inviti
+- back
+# Fantallenatori
+- tapOn: { id: "app-menu-button" }
+- tapOn: { id: "app-drawer-item-manager-directory" }
+- extendedWaitUntil: { visible: { id: "screen-manager-directory" }, timeout: 15000 }
+- takeScreenshot: dev-02-fantallenatori
