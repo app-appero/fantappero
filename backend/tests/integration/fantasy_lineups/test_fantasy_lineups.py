@@ -327,7 +327,8 @@ def test_full_roster_and_lineup_query_counts_are_bounded(
     # "sostituito" (`_substitution_minutes_for_fixtures`, stessa funzione):
     # stesso numero costante di query indipendentemente dalla dimensione
     # della rosa, non per-giocatore.
-    assert lineup_queries <= 50
+    # +1: controllo della sessione sul token (logout immediato, 18/11).
+    assert lineup_queries <= 51
 
 
 def test_roster_exposes_athlete_photo_url_when_available(
