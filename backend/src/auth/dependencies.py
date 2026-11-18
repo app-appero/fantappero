@@ -125,6 +125,21 @@ def get_client_ip(request: Request) -> str:
     return "unknown"
 
 
+def _family_closed(session: Session, access_session: object) -> bool:
+    """Vero se nella catena di rinnovi non resta nessuna sessione attiva."""
+    from sqlalchemy import select
+
+    from auth.models.auth_session import AuthSession
+
+    family = getattr(access_session, "family_id", None) or getattr(access_session, "id", None)
+    active = session.scalar(
+        select(AuthSession.id)
+        .where(AuthSession.family_id == family, AuthSession.revoked_at.is_(None))
+        .limit(1)
+    )
+    return active is None
+
+
 def get_current_user(
     credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
     session: Session = Depends(get_db_session),
@@ -148,6 +163,20 @@ def get_current_user(
         if not jti or (impersonation_store is not None and not impersonation_store.is_active(jti)):
             raise SessionRequiredError()
     user_id = UUID(str(payload["sub"]))
+    sid = payload.get("sid")
+    if sid:
+        from auth.models.auth_session import AuthSession
+
+        try:
+            access_session = session.get(AuthSession, UUID(str(sid)))
+        except ValueError as exc:
+            raise SessionRequiredError() from exc
+        # Sessione chiusa (logout o revoca): il token d'accesso non vale più. La sessione
+        # resta valida se è stata solo ruotata dal rinnovo (la nuova ha lo stesso family_id).
+        if access_session is None or (
+            access_session.revoked_at is not None and _family_closed(session, access_session)
+        ):
+            raise SessionRequiredError()
     user = session.get(User, user_id)
     if user is None or user.deleted_at is not None:
         raise SessionRequiredError()

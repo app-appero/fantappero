@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from decimal import Decimal
 from uuid import UUID
 
@@ -458,6 +459,11 @@ class LeagueService:
             get_metrics().incr("league_rules_updated_total", labels={"result": "noop"})
             return self._to_rules_response(rules)
 
+        if participant_count != rules.participant_count:
+            self._assert_participant_count_fits_members(league.id, participant_count)
+        if total_credits != rules.total_credits:
+            self._realign_initial_credits(league.id, total_credits, actor_id=league_access.user.id)
+
         rules.preset_name = preset_name
         rules.participant_count = participant_count
         rules.roster_size = payload.roster.roster_size
@@ -495,6 +501,94 @@ class LeagueService:
         self._session.commit()
         get_metrics().incr("league_rules_updated_total", labels={"result": "success"})
         return self._to_rules_response(rules)
+
+    def _assert_participant_count_fits_members(
+        self, league_id: UUID, participant_count: int
+    ) -> None:
+        """Partecipanti previsti mai sotto iscritti + inviti nominativi pendenti."""
+        from database.enums import NamedInviteStatus
+        from leagues.models.league_membership import LeagueMembership
+        from leagues.models.named_league_invite import NamedLeagueInvite
+
+        members = (
+            self._session.scalar(
+                select(func.count(LeagueMembership.id)).where(
+                    LeagueMembership.league_id == league_id
+                )
+            )
+            or 0
+        )
+        pending = (
+            self._session.scalar(
+                select(func.count(NamedLeagueInvite.id)).where(
+                    NamedLeagueInvite.league_id == league_id,
+                    NamedLeagueInvite.status == NamedInviteStatus.PENDING,
+                    NamedLeagueInvite.expires_at > datetime.now(UTC),
+                )
+            )
+            or 0
+        )
+        if participant_count < members + pending:
+            raise ValidationAuthError(
+                f"I partecipanti non possono essere meno di {members + pending}: "
+                f"ci sono già {members} iscritti e {pending} inviti in attesa.",
+                code="participant_count_below_members",
+            )
+
+    def _realign_initial_credits(
+        self, league_id: UUID, total_credits: int, *, actor_id: UUID
+    ) -> None:
+        """Cambio dei crediti iniziali: si riallineano tutti i saldi finché nessuno ha speso.
+
+        Dopo il primo movimento diverso dall'allocazione iniziale (o da un riallineamento
+        precedente) il totale non si può più cambiare.
+        """
+        from database.enums import CreditLedgerReason
+        from fantasy_teams.ledger import apply_ledger_movement
+        from fantasy_teams.models import CreditAccount, CreditLedgerEntry, FantasyTeam
+
+        accounts = list(
+            self._session.scalars(
+                select(CreditAccount)
+                .join(FantasyTeam, FantasyTeam.id == CreditAccount.fantasy_team_id)
+                .where(FantasyTeam.league_id == league_id)
+                .with_for_update(of=CreditAccount)
+            ).all()
+        )
+        if not accounts:
+            return
+        account_ids = [account.id for account in accounts]
+        spent = self._session.scalar(
+            select(func.count(CreditLedgerEntry.id)).where(
+                CreditLedgerEntry.account_id.in_(account_ids),
+                ~(
+                    (CreditLedgerEntry.reason == CreditLedgerReason.INITIAL_ALLOCATION)
+                    | (
+                        (CreditLedgerEntry.reason == CreditLedgerReason.ADMIN_ADJUSTMENT)
+                        & CreditLedgerEntry.transaction_id.like("rules-total-credits:%")
+                    )
+                ),
+            )
+        )
+        if spent:
+            raise ValidationAuthError(
+                "I crediti iniziali non si possono più cambiare: in lega ci sono già "
+                "movimenti di crediti (acquisti o rettifiche).",
+                code="total_credits_locked",
+            )
+        for account in accounts:
+            delta = total_credits - account.balance
+            if delta == 0:
+                continue
+            apply_ledger_movement(
+                self._session,
+                account,
+                amount=delta,
+                reason=CreditLedgerReason.ADMIN_ADJUSTMENT,
+                transaction_id=f"rules-total-credits:{account.id}:{account.version}",
+                actor_id=actor_id,
+                note=f"Crediti iniziali portati a {total_credits}",
+            )
 
     def delete_league(self, league_access: LeagueAccess) -> None:
         """Hard-delete a draft/configuring league; audit row survives via ON DELETE SET NULL."""

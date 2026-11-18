@@ -93,7 +93,7 @@ def get_overview(
 @router.get("/users", response_model=PaginatedAdminUsersResponse)
 def list_users(
     query: str | None = Query(default=None, max_length=200),
-    page: int = Query(default=1, ge=1),
+    page: int = Query(default=1, ge=1, le=100_000),
     _operator: User = Depends(require_permissions(Permission.GLOBAL_OPERATE)),
     service: AdminService = Depends(get_admin_service),
 ) -> PaginatedAdminUsersResponse:
@@ -277,7 +277,7 @@ def revoke_impersonation(
 @router.get("/leagues", response_model=PaginatedAdminLeaguesResponse)
 def list_leagues(
     query: str | None = Query(default=None, max_length=200),
-    page: int = Query(default=1, ge=1),
+    page: int = Query(default=1, ge=1, le=100_000),
     _operator: User = Depends(require_permissions(Permission.GLOBAL_OPERATE)),
     service: AdminService = Depends(get_admin_service),
 ) -> PaginatedAdminLeaguesResponse:
@@ -300,7 +300,7 @@ def delete_league(
 
 @router.get("/transfers/pending-review", response_model=PaginatedAdminPendingTransfersResponse)
 def list_pending_transfers(
-    page: int = Query(default=1, ge=1),
+    page: int = Query(default=1, ge=1, le=100_000),
     page_size: int = Query(default=50, ge=1, le=200, alias="pageSize"),
     _operator: User = Depends(require_permissions(Permission.GLOBAL_OPERATE)),
     service: AdminTransfersService = Depends(get_admin_transfers_service),

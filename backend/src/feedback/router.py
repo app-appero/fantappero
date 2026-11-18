@@ -215,7 +215,7 @@ def get_feedback_media(
 @admin_router.get("", response_model=FeedbackAdminListResponse)
 def list_feedback_for_operators(
     status: str | None = Query(default=None),
-    page: int = Query(default=1, ge=1),
+    page: int = Query(default=1, ge=1, le=100_000),
     _operator: User = Depends(require_permissions(Permission.GLOBAL_OPERATE)),
     service: FeedbackService = Depends(get_feedback_service),
 ) -> FeedbackAdminListResponse | JSONResponse:

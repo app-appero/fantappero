@@ -170,6 +170,9 @@ def _json_safe(value: object) -> object:
     """NaN e Infinity non sono JSON valido: nel dettaglio dell'errore diventano testo."""
     if isinstance(value, float) and not math.isfinite(value):
         return str(value)
+    if isinstance(value, str):
+        # Surrogati UTF-16 isolati non sono codificabili in JSON/UTF-8: niente 500.
+        return value.encode("utf-8", "replace").decode("utf-8")
     if isinstance(value, dict):
         return {key: _json_safe(item) for key, item in value.items()}
     if isinstance(value, list | tuple):
@@ -180,7 +183,10 @@ def _json_safe(value: object) -> object:
 @app.exception_handler(RequestValidationError)
 def request_validation_error_handler(_request: object, exc: RequestValidationError) -> JSONResponse:
     """422 nel formato `{message, code}` degli altri errori, con `detail` per i client esistenti."""
-    errors = _json_safe(jsonable_encoder(exc.errors()))
+    # Mai rimandare indietro i valori inviati (`input`): possono contenere la password.
+    errors = _json_safe(
+        jsonable_encoder([{k: v for k, v in e.items() if k != "input"} for e in exc.errors()])
+    )
     assert isinstance(errors, list)
     first = errors[0] if errors else {}
     # Solo i nomi dei campi: le posizioni numeriche (es. "1") non dicono nulla.

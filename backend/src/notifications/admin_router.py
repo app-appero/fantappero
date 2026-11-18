@@ -168,7 +168,7 @@ def list_recipients(
     push_only: bool = Query(default=False, alias="pushOnly"),
     no_push: bool = Query(default=False, alias="noPush"),
     operators_only: bool = Query(default=False, alias="operatorsOnly"),
-    page: int = Query(default=1, ge=1),
+    page: int = Query(default=1, ge=1, le=100_000),
     page_size: int = Query(default=10, ge=1, le=100, alias="pageSize"),
     _operator: User = Depends(require_permissions(Permission.GLOBAL_OPERATE)),
     session: Session = Depends(get_db_session),
@@ -238,7 +238,7 @@ def create_broadcast(
 
 @router.get("/broadcasts", response_model=BroadcastHistory)
 def list_broadcasts(
-    page: int = Query(default=1, ge=1),
+    page: int = Query(default=1, ge=1, le=100_000),
     page_size: int = Query(default=10, ge=1, le=100, alias="pageSize"),
     _operator: User = Depends(require_permissions(Permission.GLOBAL_OPERATE)),
     session: Session = Depends(get_db_session),
@@ -311,7 +311,7 @@ def send_operator_email(
 
 @router.get("/emails", response_model=OperatorEmailHistory)
 def list_operator_emails(
-    page: int = Query(default=1, ge=1),
+    page: int = Query(default=1, ge=1, le=100_000),
     page_size: int = Query(default=10, ge=1, le=100, alias="pageSize"),
     _operator: User = Depends(require_permissions(Permission.GLOBAL_OPERATE)),
     session: Session = Depends(get_db_session),

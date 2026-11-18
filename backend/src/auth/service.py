@@ -266,7 +266,7 @@ class AuthService:
                 existing = None
             extra: dict[str, object] = {
                 "requestStatus": existing.status if existing else "none",
-                # Per mostrare a quale account Google si riferisce la richiesta e precompilare il nome.
+                # Account Google della richiesta e nome da precompilare.
                 "requestEmail": identity.email,
                 "requestName": identity.name,
                 # Google separa già nome e cognome: il modulo li precompila così.
@@ -369,10 +369,24 @@ class AuthService:
         session_row = self._session.scalar(
             select(AuthSession).where(AuthSession.token_hash == token_hash)
         )
-        if session_row is None or session_row.revoked_at is not None:
-            raise InvalidCredentialsError()
+        expired = InvalidCredentialsError("La sessione è scaduta: accedi di nuovo.")
+        if session_row is None:
+            raise expired
+        if session_row.revoked_at is not None:
+            # Rinnovo già usato e ripresentato: possibile furto, si chiude tutta la catena.
+            family = session_row.family_id or session_row.id
+            now = utc_now()
+            for row in self._session.scalars(
+                select(AuthSession).where(
+                    AuthSession.family_id == family, AuthSession.revoked_at.is_(None)
+                )
+            ):
+                row.revoked_at = now
+            self._session.commit()
+            get_metrics().incr("auth_refresh_reuse_total")
+            raise expired
         if session_row.expires_at <= utc_now():
-            raise InvalidCredentialsError()
+            raise expired
 
         user = self._session.get(User, session_row.user_id)
         if user is None or user.deleted_at is not None or user.user_type == UserType.AI:
@@ -381,7 +395,7 @@ class AuthService:
         self._assert_tester_allowed(user.email, user.platform_role)
 
         session_row.revoked_at = utc_now()
-        tokens = self._create_session(user)
+        tokens = self._create_session(user, family_id=session_row.family_id or session_row.id)
         self._session.commit()
         return tokens
 
@@ -481,7 +495,7 @@ class AuthService:
             return None
         return user
 
-    def _create_session(self, user: User) -> AuthTokensResponse:
+    def _create_session(self, user: User, *, family_id: UUID | None = None) -> AuthTokensResponse:
         refresh_raw = generate_opaque_token()
         refresh_hash = hash_opaque_token(refresh_raw)
         expires_at = utc_now() + timedelta(days=self._settings.jwt_refresh_token_expire_days)
@@ -491,11 +505,14 @@ class AuthService:
             expires_at=expires_at,
         )
         self._session.add(refresh_row)
+        self._session.flush()
+        refresh_row.family_id = family_id or refresh_row.id
 
         access_token, expires_in = create_access_token(
             user_id=user.id,
             secret=self._settings.resolved_jwt_secret(),
             expire_minutes=self._settings.jwt_access_token_expire_minutes,
+            session_id=refresh_row.id,
         )
         return AuthTokensResponse(
             accessToken=access_token,

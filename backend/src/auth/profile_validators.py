@@ -26,6 +26,15 @@ def validate_quiet_hour(hour: int) -> int:
     return hour
 
 
+def validate_quiet_hours_pair(start: int | None, end: int | None) -> None:
+    """Le ore di silenzio hanno senso solo con inizio e fine insieme."""
+    if (start is None) != (end is None):
+        raise ValidationAuthError(
+            "Imposta sia l'ora di inizio sia quella di fine del silenzio, oppure nessuna.",
+            code="incomplete_quiet_hours",
+        )
+
+
 def validate_profile_display_name(display_name: str) -> str:
     cleaned = display_name.strip()
     if not cleaned:
@@ -35,7 +44,9 @@ def validate_profile_display_name(display_name: str) -> str:
             "Il nome visualizzato è troppo lungo.",
             code="invalid_display_name",
         )
-    return cleaned
+    from auth.validators import ensure_visible_display_name
+
+    return ensure_visible_display_name(cleaned)
 
 
 _NICKNAME_PATTERN = re.compile(r"^[\w .\-]{2,30}$", re.UNICODE)
@@ -43,10 +54,13 @@ _NICKNAME_PATTERN = re.compile(r"^[\w .\-]{2,30}$", re.UNICODE)
 
 def validate_profile_nickname(nickname: str) -> str | None:
     """Stringa vuota = nessun nickname (si torna al nome visualizzato)."""
-    cleaned = " ".join(nickname.split())
+    import unicodedata
+
+    # NFKC: le lettere "a larghezza piena" (ＡＤＭＩＮ) diventano quelle normali, niente sosia.
+    cleaned = " ".join(unicodedata.normalize("NFKC", nickname).split())
     if not cleaned:
         return None
-    if not _NICKNAME_PATTERN.match(cleaned):
+    if not _NICKNAME_PATTERN.match(cleaned) or not any(char.isalnum() for char in cleaned):
         raise ValidationAuthError(
             "Il nickname deve avere 2-30 caratteri: lettere, numeri, spazi, punto, "
             "trattino o underscore.",

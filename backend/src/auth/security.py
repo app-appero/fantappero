@@ -46,6 +46,7 @@ def create_access_token(
     secret: str,
     expire_minutes: int,
     impersonation_jti: str | None = None,
+    session_id: UUID | None = None,
 ) -> tuple[str, int]:
     expires_in = expire_minutes * 60
     payload: dict[str, Any] = {
@@ -54,6 +55,9 @@ def create_access_token(
         "exp": datetime.now(UTC) + timedelta(seconds=expires_in),
         "iat": datetime.now(UTC),
     }
+    if session_id is not None:
+        # Sessione di accesso: al logout il token smette subito di valere.
+        payload["sid"] = str(session_id)
     if impersonation_jti is not None:
         # Marks this as an impersonation token so get_current_user can check it
         # against ImpersonationStore (auth/impersonation.py) — revocable on demand,
