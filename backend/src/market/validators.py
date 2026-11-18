@@ -29,6 +29,11 @@ def validate_session_window(
                 "La scadenza della sessione è troppo lontana (massimo 2 anni).",
                 code="invalid_session_window",
             )
+        if opens_at < now - MAX_SESSION_AHEAD:
+            raise ValidationAuthError(
+                "L'apertura della sessione è troppo nel passato (massimo 2 anni).",
+                code="invalid_session_window",
+            )
 
 
 def validate_bid_amount(amount_credits: int) -> int:

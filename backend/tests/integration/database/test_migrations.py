@@ -108,10 +108,10 @@ def test_upgrade_from_empty_database(clean_db: str) -> None:
                 .scalars()
                 .all()
             )
-            # Head aggiornata a d7f9b1c3e458 (famiglia dei rinnovi di sessione);
-            # prima c6e8a0b2d347 (telefono facoltativo nelle richieste tester).
+            # Head aggiornata a e8a0c2d4f569 (pausa del lotto live a mercato chiuso);
+            # prima d7f9b1c3e458 (famiglia dei rinnovi di sessione).
             # Aggiornare questa costante ad ogni nuova migrazione in coda.
-            assert version == "d7f9b1c3e458"
+            assert version == "e8a0c2d4f569"
         assert named_statuses == ["pending", "accepted", "declined", "revoked", "expired"]
         assert calendar_statuses == ["draft", "confirmed"]
         assert fantasy_roles == ["P", "D", "C", "A"]

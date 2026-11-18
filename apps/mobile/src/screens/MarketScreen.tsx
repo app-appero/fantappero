@@ -140,7 +140,10 @@ export function MarketScreen() {
   // MarketTradeList.tsx.
   const openStatuses = ["proposed", "pending_approval"];
   const pendingForMe = trade.proposals.filter(
-    (row) => row.recipientTeamId === team?.id && row.status === "proposed",
+    (row) => row.recipientTeamId === team?.id && row.status === "proposed" && !row.awaitingCredits,
+  ).length;
+  const awaitingCreditsForMe = trade.proposals.filter(
+    (row) => row.recipientTeamId === team?.id && row.status === "proposed" && row.awaitingCredits === true,
   ).length;
   // Stesse 4 statistiche del web (Crediti residui / Da gestire / Inviate in
   // corso / Scambi conclusi), per non mostrare numeri diversi tra le piattaforme.
@@ -423,6 +426,9 @@ export function MarketScreen() {
               <View style={styles.statTile}>
                 <Text style={styles.heroLabel}>Da gestire</Text>
                 <Text style={styles.heroValue}>{pendingForMe}</Text>
+                {awaitingCreditsForMe > 0 ? (
+                  <Text style={styles.heroLabel}>{`+ ${awaitingCreditsForMe} in attesa di crediti`}</Text>
+                ) : null}
               </View>
             </View>
             {canManageMarket ? (

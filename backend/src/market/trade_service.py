@@ -101,6 +101,8 @@ class TradeService:
         league_id = league_access.league.id
         assert_no_round_in_progress(self._session, league_id)
         proposer = self._my_team(league_access)
+        # Il blocco del conto serializza le proposte della stessa squadra (limite proposte attive).
+        find_account_for_team(self._session, proposer.id, for_update=True)
         try:
             recipient_team_id = UUID(payload.recipient_team_id)
         except ValueError as exc:
@@ -403,7 +405,16 @@ class TradeService:
             league_access.league.id,
             league_access.user.id,
             LeagueAuditAction.MARKET_TRADE_APPROVED,
-            details={"proposalId": str(proposal.id)},
+            details={
+                "proposalId": str(proposal.id),
+                # L'admin può approvare uno scambio in cui è parte: resta scritto nel registro.
+                "approverIsParty": league_access.user.id
+                in set(
+                    user_ids_for_teams(
+                        self._session, [proposer_team.id, recipient_team.id]
+                    ).values()
+                ),
+            },
         )
         self._notify_trade_status(
             proposal_id=proposal.id,
@@ -448,6 +459,8 @@ class TradeService:
         assert_no_round_in_progress(self._session, league_access.league.id)
         team = self._my_team(league_access)
         original = self._lock_actionable_proposal_as_recipient(proposal_id, league_access, team)
+        # Conto bloccato dopo la proposta, nello stesso ordine di accetta e annulla.
+        find_account_for_team(self._session, team.id, for_update=True)
         original_proposer = self._session.get(FantasyTeam, original.proposer_team_id)
         assert original_proposer is not None
 
@@ -610,7 +623,12 @@ class TradeService:
                 "Devi essere partecipante della lega per operare sul mercato.",
                 code="membership_required",
             )
-        team, _ = ensure_team_for_membership(
+        # Lettura senza blocchi: bloccare qui il conto crediti di chi agisce, prima della
+        # proposta, provocava deadlock fra accettazioni incrociate e "accetta + annulla".
+        existing = find_team_for_membership(self._session, membership.id)
+        if existing is not None and find_account_for_team(self._session, existing.id) is not None:
+            return existing
+        ensure_team_for_membership(
             self._session,
             membership,
             name=league_access.user.display_name or "Squadra",
@@ -910,7 +928,8 @@ class TradeService:
             expiresAt=proposal.expires_at.isoformat() if proposal.expires_at else None,
             createdAt=proposal.created_at.isoformat(),
             counterOfId=str(proposal.counter_of_id) if proposal.counter_of_id else None,
-            awaitingCredits=self._awaiting_credits(proposal),
+            awaitingCredits=read_status == TradeStatus.PROPOSED
+            and self._awaiting_credits(proposal),
             noLongerValid=read_status == TradeStatus.EXPIRED
             and not (
                 proposal.expires_at is not None

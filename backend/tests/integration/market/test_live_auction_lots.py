@@ -927,3 +927,36 @@ def test_expired_live_window_rejects_nomination_and_raise(
     )
     assert nominated.status_code == 400
     assert nominated.json()["code"] == "market_live_session_not_open"
+
+
+def test_closing_the_market_pauses_the_live_lot_timer(
+    client: TestClient, db_session: Session, competition_ids: list[str]
+) -> None:
+    """QA 18/11: a mercato chiuso il timer del lotto si ferma e riparte alla riapertura."""
+    from market.live_models import MarketLiveLot
+
+    admin_token, _ = _register_and_login(client, "live.pause.admin@example.com")
+    league_id = _create_league(client, admin_token, competition_ids, "Lega Pausa Lotto")
+    athlete = _seed_athlete(db_session, _unique_id(), "Calciatore In Pausa")
+    session_id = _start_manual_session(client, admin_token, league_id, lot_duration=30)
+    lot = _nominate(client, admin_token, league_id, session_id, athlete.id)
+    headers = {"Authorization": f"Bearer {admin_token}"}
+
+    client.post(f"/leagues/{league_id}/mercato/stato", headers=headers, json={"open": False})
+    db_session.expire_all()
+    row = db_session.get(MarketLiveLot, UUID(lot["id"]))
+    assert row is not None and row.paused_at is not None
+    original_close = row.closes_at
+
+    # Simula 5 minuti di mercato chiuso: alla riapertura la scadenza slitta di altrettanto.
+    row.paused_at = row.paused_at - timedelta(minutes=5)
+    db_session.commit()
+    client.post(f"/leagues/{league_id}/mercato/stato", headers=headers, json={"open": True})
+    db_session.expire_all()
+    resumed = db_session.get(MarketLiveLot, UUID(lot["id"]))
+    assert resumed.paused_at is None
+    assert resumed.closes_at >= original_close + timedelta(minutes=5)
+    state = client.get(
+        f"/leagues/{league_id}/mercato/asta-live/sessioni/{session_id}/stato", headers=headers
+    ).json()
+    assert state["currentLot"]["status"] == "open"

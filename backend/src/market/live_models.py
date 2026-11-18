@@ -96,6 +96,8 @@ class MarketLiveLot(Base, UUIDPrimaryKeyMixin, TimestampMixin):
         Integer, nullable=False, server_default=text("0")
     )
     closed_at: Mapped[datetime | None] = mapped_column(UTCDateTime(), nullable=True)
+    # Mercato chiuso con il lotto aperto: il timer si ferma qui e riparte alla riapertura.
+    paused_at: Mapped[datetime | None] = mapped_column(UTCDateTime(), nullable=True)
 
     session: Mapped[MarketSession] = relationship()
     athlete: Mapped[Athlete] = relationship()

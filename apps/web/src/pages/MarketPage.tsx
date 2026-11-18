@@ -562,7 +562,13 @@ export function MarketPage() {
         : tradeTab === "sent"
           ? sentTrades
           : openTrades;
-  const pendingForMe = receivedTrades.filter((row) => row.status === "proposed").length;
+  // "Da gestire" = proposte che posso accettare ora; quelle in attesa di crediti si contano a parte.
+  const pendingForMe = receivedTrades.filter(
+    (row) => row.status === "proposed" && !row.awaitingCredits,
+  ).length;
+  const awaitingCreditsForMe = receivedTrades.filter(
+    (row) => row.status === "proposed" && row.awaitingCredits === true,
+  ).length;
 
   return (
     <PageContainer
@@ -711,6 +717,11 @@ export function MarketPage() {
             <div className="fa-trade-stat">
               <span>Da gestire</span>
               <strong>{pendingForMe}</strong>
+              {awaitingCreditsForMe > 0 ? (
+                <small data-testid="market-trade-stat-awaiting">
+                  + {awaitingCreditsForMe} in attesa di crediti
+                </small>
+              ) : null}
             </div>
             <div className="fa-trade-stat">
               <span>Inviate in corso</span>
