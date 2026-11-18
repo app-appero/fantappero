@@ -173,6 +173,37 @@ Aggiornato il 18/11/2026 con i circa 30 rapporti delle corse dal 12/11 al 18/11,
 | 10.6 | Galleria e fotocamera per l'avatar | DA FARE | EMU |
 | 10.7 | Push vere, Google nativo | NV | serve un telefono vero |
 
+## Area 12 – App Android: azioni sull'app (solo EMU)
+Le aree 1-8 sono state provate quasi sempre via API. Qui ci sono le stesse funzioni fatte **dall'app**, più le cose che esistono solo su un telefono. Quando serve l'altra parte (per esempio chi riceve uno scambio), quella si fa via API con un altro account QA.
+
+| Cod | Voce | Stato | Blocco |
+|---|---|---|---|
+| 12.1 | Registrazione dall'app con un account usa e getta, messaggio di verifica | DA FARE | M1 |
+| 12.2 | "Password dimenticata" dall'app | DA FARE | M1 |
+| 12.3 | Profilo: nome, nickname, preferenze notifiche, ore di silenzio, tema chiaro e scuro | DA FARE | M1 |
+| 12.4 | Esportazione dati ed eliminazione account dall'app (account usa e getta) | DA FARE | M1 |
+| 12.5 | Sessione: app in background per più di 30 minuti e ritorno (rinnovo del token), poi riavvio | DA FARE | M1 |
+| 12.6 | Creare una lega dall'app (nome, competizioni, regole) | DA FARE | M1 |
+| 12.7 | Ingresso con codice; invito nominale ricevuto, accettato e rifiutato | DA FARE | M1 |
+| 12.8 | Partecipanti, directory fantallenatori, cambio della lega attiva | DA FARE [PREP] | M1 |
+| 12.9 | Listone: filtro ruolo, ricerca, "Solo disponibili" | DA FARE [PREP] | M2 |
+| 12.10 | Admin dall'app: assegnazione manuale di uno slot, svincolo con rimborso | DA FARE [PREP] | M2 |
+| 12.11 | Scambi dall'app: proponi, accetta, rifiuta, annulla, controproposta | DA FARE [PREP] | M2 |
+| 12.12 | Approvazione admin di uno scambio dall'app | DA FARE [PREP] | M2 |
+| 12.13 | Asta a buste dall'app: offerta, ritiro, esito | DA FARE [PREP] | M2 |
+| 12.14 | Asta live dall'app: rilancio, timer, aggiudicazione (gli altri rilanciano via API) | DA FARE [PREP] | M2 |
+| 12.15 | Movimenti crediti e causali | DA FARE [PREP] | M2 |
+| 12.16 | Formazione: modulo, titolari, panchina e ordine, bozza, copia della precedente | DA FARE [PREP] | M3 |
+| 12.17 | Calciatori bloccati o indisponibili visibili ma non selezionabili | DA FARE [PREP] | M3 |
+| 12.18 | Turni europei, calendario, scontro diretto, classifica | DA FARE [PREP] | M3 |
+| 12.19 | Centro notifiche: badge, segna letta, segna tutte lette | DA FARE | M4 |
+| 12.20 | Preferenze notifiche e ore di silenzio rispettate | DA FARE | M4 |
+| 12.21 | Tasto "indietro" di Android su ogni schermata: non esce dall'app per sbaglio e non perde i dati inseriti | DA FARE | M5 |
+| 12.22 | Accessibilità: testo grande (scala 1,3) e TalkBack sui pulsanti principali | DA FARE | M5 |
+| 12.23 | Rete assente o lenta (modalità aereo): messaggi d'errore e ripresa | DA FARE | M5 |
+| 12.24 | Tema chiaro e scuro su tutte le schermate principali | DA FARE | M5 |
+| 12.25 | Schermo più piccolo: l'AVD `maestro_e2e` (Pixel 5) | DA FARE | M5 |
+
 ## Area 11 – Salute e prestazioni
 
 | Cod | Voce | Stato | Dove / note |
@@ -206,11 +237,13 @@ Le corse mobile vere si fanno di giorno, quando Rosario è disponibile. Le esegu
 
 | Ora (Roma) | Blocco | Voci del registro |
 |---|---|---|
-| 08:30 | M1 Accesso e account | 1.12 (accesso con Maestro 2.12), 1.13 (link di verifica e reset), 1.9 (informativa), 10.5 (schermata di accesso), 10.6 (avatar dalla galleria), 2.3 (inviti a schermo), 2.4 (link di invito) |
-| 11:30 | M2 Rosa e mercato | 3.2 (ricerca senza accenti), 3.12 (rosa piena), 4.5 e 4.6 (filtri, statistiche, "Non più valida"), 4.9 (scambio e notifica), 5.8 (selettore asta), 5.10 (offerta in busta) |
-| 14:30 | M3 Formazione e turni | 6.5 (salvare la formazione), 7.6 (turni, calendario, classifica), 10.2 (schermate con i contenuti di lega) |
-| 17:30 | M4 Notifiche | 8.6 (tocco su ogni tipo di notifica), 8.7 (lega eliminata, noto), notifiche nate dalle prove di M2 e M3 |
-| 20:30 | M5 Ripasso | tutti i flussi Maestro di `apps/mobile/e2e/maestro/flows/dev/` sull'ultimo APK: è la regressione mobile del giorno |
+| 08:30 | M1 Accesso, account e leghe | 1.12, 1.13, 1.9, 10.5, 10.6, 2.3, 2.4, 12.1-12.8 |
+| 11:30 | M2 Rosa e mercato | 3.2, 3.12, 4.5, 4.6, 4.9, 5.8, 5.10, 12.9-12.15 |
+| 14:30 | M3 Formazione e turni | 6.5, 7.6, 10.2, 12.16-12.18 |
+| 17:30 | M4 Notifiche | 8.6, 12.19, 12.20, e le notifiche nate dalle prove di M2 e M3 |
+| 20:30 | M5 Sistema e ripasso | 12.21-12.25, poi tutti i flussi Maestro di `apps/mobile/e2e/maestro/flows/dev/` sull'ultimo APK (regressione mobile del giorno) |
+
+Ogni blocco dura al massimo un'ora circa: le voci che non riesce a fare passano al giorno dopo, finché nel registro non restano voci DA FARE per quel blocco. Quando un blocco non ha più voci DA FARE, fa solo il ripasso dei flussi Maestro.
 
 Il **20/11** il blocco delle 20:30 si sposta alle **20:40**: guarda sull'app il blocco progressivo della partita delle 20:45 (6.7, EMU).
 
