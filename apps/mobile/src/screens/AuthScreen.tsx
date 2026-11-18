@@ -269,6 +269,11 @@ export function AuthScreen() {
   );
 }
 
+/** Corpo delle schermate secondarie di accesso dentro AuthShell (verifica email, password). */
+export const authPageStyles = lazyStyles(() => StyleSheet.create({
+  form: { gap: spacing.md },
+}));
+
 export const authFormStyles = lazyStyles(() => StyleSheet.create({
   googleNote: { textAlign: "center" },
   root: {

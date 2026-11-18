@@ -2,18 +2,19 @@ import { useNavigation } from "@react-navigation/core";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useState } from "react";
 import { Pressable, Text, View } from "react-native";
+import { AuthShell } from "../auth/AuthShell";
 import { AppTextInput as TextInput } from "../components/AppTextInput";
 import { forgotPassword } from "../api/auth";
-import { BrandLogo } from "../components/BrandLogo";
 import { UiStatePanel } from "../components/UiStatePanel";
-import { PageContainer } from "../layout/PageContainer";
 import type { RootStackParamList } from "../navigation/types";
 import { getApiErrorMessage } from "../session/DemoSessionContext";
-import { authFormStyles as styles } from "./AuthScreen";
+import { authFormStyles as styles, authPageStyles } from "./AuthScreen";
 
 /** Recupero password — allineato a web /accedi/recupera. */
 export function AuthForgotPasswordScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  // Freccia indietro: torna alla schermata precedente (di solito Accedi), anche da un link.
+  const goBack = () => (navigation.canGoBack() ? navigation.goBack() : navigation.navigate("Auth"));
   const [email, setEmail] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -37,11 +38,11 @@ export function AuthForgotPasswordScreen() {
   }
 
   return (
-    <View style={styles.root} testID="screen-auth-forgot">
-      <PageContainer title="Recupera accesso" testID="screen-auth-forgot-form">
-        <View style={styles.brand}>
-          <BrandLogo variant="full" size="lg" />
-        </View>
+    <AuthShell testID="screen-auth-forgot" onBack={goBack}>
+      <View style={authPageStyles.form} testID="screen-auth-forgot-form">
+        <Text style={styles.heroTitleLeft} accessibilityRole="header">
+          Recupera accesso
+        </Text>
         {successMessage ? (
           <>
             <UiStatePanel
@@ -71,7 +72,6 @@ export function AuthForgotPasswordScreen() {
           </>
         ) : (
           <>
-            <Text style={styles.heroTitleLeft}>Recupera accesso</Text>
             <Text style={styles.lead}>
               Inserisci l&apos;email dell&apos;account: ti invieremo un link per reimpostare la
               password.
@@ -118,7 +118,7 @@ export function AuthForgotPasswordScreen() {
             </Pressable>
           </>
         )}
-      </PageContainer>
-    </View>
+      </View>
+    </AuthShell>
   );
 }
