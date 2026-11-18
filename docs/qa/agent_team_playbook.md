@@ -39,7 +39,7 @@ Le corse sono distanziate di 70 minuti per non sovrapporsi (usano gli stessi acc
 
 **Domenica.** Se la data del piano è una domenica, le corse dei gruppi A-D fanno un controllo a campione delle proprie aree (circa metà delle voci di checklist, scelte a rotazione) e verificano che le correzioni già pubblicate non si siano rotte. Mercato e verifica restano normali.
 
-**Consegna.** Il rapporto finale è l'ultimo messaggio della corsa e lo legge il riepilogo del mattino (06:17, una sessione nuova ogni mattina con notifica push). Ogni corsa manda anche una notifica push breve. Le corse non si leggono tra loro.
+**Consegna.** Ogni corsa manda prima una notifica push breve e poi scrive il rapporto finale come ultimo messaggio. Alle 06:17 la chat "Riepilogo QA mattutino" legge i 6 rapporti, li riassume con il costo di ogni corsa e manda una notifica. Le corse non si leggono tra loro.
 
 **Emulatore Android.** Le corse cloud non usano il PC di Rosario (ogni collegamento va approvato di persona). Le prove sull'emulatore Android vero le fa la sessione aperta sul PC, con i flussi Maestro in `apps/mobile/e2e/maestro/flows/dev/`.
 
