@@ -1936,8 +1936,10 @@ export function FormationPage() {
                 </p>
               ) : null}
               <p data-testid="formation-cutoff">
-                Cutoff (primo kickoff): {formatDateTime(context.cutoffAt)} — lock progressivo per
-                calciatore
+                Primo calcio d'inizio: {formatDateTime(context.cutoffAt)}
+                {(context.lineupLockMarginMinutes ?? 0) > 0
+                  ? ` — ogni giocatore si blocca ${context.lineupLockMarginMinutes} min prima della sua partita`
+                  : " — blocco progressivo per giocatore"}
               </p>
               {countdown && countdown.roundId === context.roundId ? (
                 <LockCountdown

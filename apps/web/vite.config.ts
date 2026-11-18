@@ -1,5 +1,8 @@
+import type { IncomingMessage, ServerResponse } from "node:http";
 import { defineConfig } from "vitest/config";
+import type { Plugin } from "vite";
 import react from "@vitejs/plugin-react";
+import { ASSET_LINKS_PATH, buildAssetLinks } from "./src/config/assetLinks";
 
 // Niente "/admin": è anche il prefisso delle pagine SPA del pannello operatore
 // (/admin, /admin/utenti, /admin/leghe, ...). Il client chiama comunque l'API
@@ -40,8 +43,32 @@ const ALLOWED_HOSTS = [
 // ma su una porta che da fuori nessuno raggiunge (502).
 const PORT = 5174;
 
+// App Link Android: /.well-known/assetlinks.json esiste solo dove il servizio web ha
+// ANDROID_APP_LINK_SHA256 (vedi src/config/assetLinks.ts). Vale per dev server e preview.
+function androidAssetLinks(): Plugin {
+  const serve = (req: IncomingMessage, res: ServerResponse, next: () => void) => {
+    if (req.url?.split("?")[0] !== ASSET_LINKS_PATH) {
+      next();
+      return;
+    }
+    const body = buildAssetLinks(process.env.ANDROID_APP_LINK_SHA256);
+    res.statusCode = body ? 200 : 404;
+    res.setHeader("content-type", "application/json");
+    res.end(body ?? "[]");
+  };
+  return {
+    name: "fantappero-android-asset-links",
+    configureServer(server) {
+      server.middlewares.use(serve);
+    },
+    configurePreviewServer(server) {
+      server.middlewares.use(serve);
+    },
+  };
+}
+
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), androidAssetLinks()],
   server: {
     port: PORT,
     strictPort: true,

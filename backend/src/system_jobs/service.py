@@ -120,6 +120,27 @@ def beat_schedule_dict(session: Session) -> dict[str, dict[str, object]]:
     return schedule
 
 
+def is_job_enabled(key: str, env_default: bool) -> bool:
+    """Come `allow_periodic`, ma solo in lettura: non segna il job come avviato.
+
+    Serve ai task che dipendono dall'interruttore di un job periodico senza
+    esserne un giro (es. i turni iniziali di una lega appena creata).
+    """
+    try:
+        settings = get_api_settings()
+        engine = create_engine_from_url(settings.database_url)
+        factory = create_session_factory(engine)
+        try:
+            with session_scope(factory) as session:
+                row = session.get(SystemJob, key)
+                return row.enabled if row is not None else env_default
+        finally:
+            engine.dispose()
+    except Exception:
+        logger.exception("system_job_gate_failed", extra={"job_key": key})
+        return env_default
+
+
 def allow_periodic(key: str, env_default: bool) -> bool:
     """True se il job deve girare. Una riga in tabella vince sull'ambiente.
 

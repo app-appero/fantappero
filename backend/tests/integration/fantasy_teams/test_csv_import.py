@@ -508,3 +508,44 @@ def test_csv_ambiguous_name_can_be_resolved_on_confirm(
         )
     )
     assert owned is not None
+
+
+def test_csv_matches_names_with_double_spaces_accents_and_turkish_i(
+    client: TestClient,
+    db_session: Session,
+    competition_ids: list[str],
+) -> None:
+    """QA emulatore 18/11: "J.  McGinn" (doppio spazio nel listone) ed
+    "E. İlkhan" (İ turca) risultavano `athlete_not_found`."""
+    token, _ = _register_and_login(client, "csv.names.unicode@example.com")
+    league_id = _create_league(client, token, competition_ids, "Lega CSV Nomi")
+    headers = {"Authorization": f"Bearer {token}"}
+    team_name = client.get(f"/leagues/{league_id}/rosa", headers=headers).json()["name"]
+    tag = random.randint(100_000, 999_999)
+    spaced = _seed_athlete(
+        db_session, random.randint(100_000_000, 2_000_000_000), f"J.  McGinnQa{tag}"
+    )
+    turkish = _seed_athlete(
+        db_session, random.randint(100_000_000, 2_000_000_000), f"E. İlkhanQa{tag}"
+    )
+    accented = _seed_athlete(
+        db_session, random.randint(100_000_000, 2_000_000_000), f"A. DembéléQa{tag}"
+    )
+    csv_body = (
+        "squadra,provider_id,nome,crediti\n"
+        f"{team_name},,J. McGinnQa{tag},1\n"
+        f"{team_name},,E. İlkhanQa{tag},1\n"
+        f"{team_name},,A. DembeleQa{tag},1\n"
+    ).encode()
+    preview = client.post(
+        f"/leagues/{league_id}/amministrazione/import-csv/anteprima",
+        headers=headers,
+        files={"file": ("rose.csv", csv_body, "text/csv")},
+    )
+    assert preview.status_code == 200, preview.text
+    rows = preview.json()["rows"]
+    assert [row["athleteId"] for row in rows] == [
+        str(spaced.id),
+        str(turkish.id),
+        str(accented.id),
+    ], [row["issues"] for row in rows]

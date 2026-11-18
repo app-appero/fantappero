@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from collections import defaultdict
 from uuid import UUID
 
@@ -23,6 +24,7 @@ from fantasy_teams.factory import resolve_roster_size
 from fantasy_teams.ledger import find_account_for_team
 from fantasy_teams.models import FantasyRosterSlot, FantasyTeam
 from sports_data.listone.generate import get_role_assignment
+from sports_data.listone.models import RoleAssignment
 from sports_data.roster.models import Athlete
 
 
@@ -83,25 +85,61 @@ def build_preview_rows(
     names = {normalize_athlete_name(row.nome) for row in parsed_rows if row.nome}
     athletes_by_name: dict[str, list[Athlete]] = defaultdict(list)
     athletes_by_surname: dict[str, list[Athlete]] = defaultdict(list)
+
+    def index_athletes(rows: list[Athlete]) -> None:
+        for athlete in rows:
+            athletes_by_name[normalize_athlete_name(athlete.canonical_name)].append(athlete)
+            for surname_key in surname_lookup_keys(athlete.canonical_name, athlete.last_name):
+                athletes_by_surname[surname_key].append(athlete)
+
     if names:
-        lowered = list(names)
+        # Ricerca veloce in SQL con il nome come scritto (minuscolo, spazi singoli).
+        lowered = sorted(
+            {re.sub(r"\s+", " ", row.nome.strip().lower()) for row in parsed_rows if row.nome}
+            | names
+        )
         surname_patterns = [
             func.lower(Athlete.canonical_name).like(f"%. {like_literal(name)}", escape="\\")
             for name in lowered
         ]
-        matched_athletes = session.scalars(
-            select(Athlete).where(
-                or_(
-                    func.lower(Athlete.canonical_name).in_(lowered),
-                    func.lower(Athlete.last_name).in_(lowered),
-                    *surname_patterns,
-                )
+        index_athletes(
+            list(
+                session.scalars(
+                    select(Athlete).where(
+                        or_(
+                            func.lower(Athlete.canonical_name).in_(lowered),
+                            func.regexp_replace(
+                                func.lower(Athlete.canonical_name), r"\s+", " ", "g"
+                            ).in_(lowered),
+                            func.lower(Athlete.last_name).in_(lowered),
+                            *surname_patterns,
+                        )
+                    )
+                ).all()
             )
-        ).all()
-        for athlete in matched_athletes:
-            athletes_by_name[normalize_athlete_name(athlete.canonical_name)].append(athlete)
-            for surname_key in surname_lookup_keys(athlete.canonical_name, athlete.last_name):
-                athletes_by_surname[surname_key].append(athlete)
+        )
+        # Nomi non trovati (accenti, lettere come la İ turca, spazi doppi nel
+        # listone): confronto in Python con la chiave normalizzata su tutti i
+        # calciatori del listone della stagione (QA 18/11).
+        unmatched = {
+            name
+            for name in names
+            if not athletes_by_name.get(name) and not athletes_by_surname.get(name)
+        }
+        if unmatched:
+            season_athletes = session.scalars(
+                select(Athlete)
+                .join(RoleAssignment, RoleAssignment.athlete_id == Athlete.id)
+                .where(RoleAssignment.season_year == season_year)
+            ).all()
+            index_athletes(
+                [
+                    athlete
+                    for athlete in season_athletes
+                    if normalize_athlete_name(athlete.canonical_name) in unmatched
+                    or surname_lookup_keys(athlete.canonical_name, athlete.last_name) & unmatched
+                ]
+            )
 
     seen_athletes: dict[UUID, int] = {}
     claimed_slots: dict[UUID, list[int]] = {

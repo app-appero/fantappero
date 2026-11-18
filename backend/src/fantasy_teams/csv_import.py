@@ -6,6 +6,7 @@ import csv
 import hashlib
 import io
 import re
+import unicodedata
 from dataclasses import dataclass, field
 from uuid import UUID
 
@@ -222,7 +223,15 @@ def normalize_team_key(name: str) -> str:
 
 
 def normalize_athlete_name(name: str) -> str:
-    return re.sub(r"\s+", " ", name.strip().casefold())
+    """Chiave di confronto dei nomi: minuscole, senza accenti, spazi singoli.
+
+    Senza accenti anche le lettere che `casefold` scompone (la İ turca diventa
+    "i" + punto combinante): "E. İlkhan" e "e. ilkhan" sono lo stesso nome,
+    come "Dembélé" e "Dembele" (QA 18/11).
+    """
+    decomposed = unicodedata.normalize("NFKD", name.casefold())
+    plain = "".join(char for char in decomposed if not unicodedata.combining(char))
+    return re.sub(r"\s+", " ", plain).strip()
 
 
 _INITIAL_CANONICAL = re.compile(r"^[^\W\d_]\.\s+(.+)$", re.UNICODE)

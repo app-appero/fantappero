@@ -63,6 +63,26 @@ emulatore/device Android con USB debugging.
 
 Documentazione shell: [`docs/design/shell-mobile.md`](../../docs/design/shell-mobile.md).
 
+## Link che aprono l'app
+
+I link delle email (verifica email, nuova password, invito in lega) aprono la
+schermata giusta dell'app (`src/navigation/deepLinks.ts`, `AppLinkHandler.tsx`):
+
+- `fantappero://accedi/verifica?token=…`, `fantappero://accedi/reimposta-password?token=…`
+  e `fantappero://leghe/invito?token=…` funzionano sempre (utili per le prove con
+  `adb shell am start -W -a android.intent.action.VIEW -d "<link>" com.fantappero.mobile`);
+- gli stessi percorsi su `https://<sito dell'ambiente>` aprono l'app se l'APK è stato
+  costruito con `EXPO_PUBLIC_APP_LINK_HOSTS` (in `env/<profilo>.env`: dev, pilota e
+  produzione `fantappero.it`/`www.fantappero.it`) **e** il sito pubblica
+  `/.well-known/assetlinks.json`. Il sito lo pubblica solo se il servizio web ha
+  `ANDROID_APP_LINK_SHA256` (impronta SHA-256 del certificato dell'APK, separate da virgola;
+  `apksigner verify --print-certs <apk>`). Controllo sul telefono:
+  `adb shell pm get-app-links com.fantappero.mobile`.
+
+Oggi l'APK è firmato con la chiave di debug pubblica del modello React Native: va bene
+per dev. Per pilota e produzione serve prima una chiave di firma privata, poi la sua
+impronta in `ANDROID_APP_LINK_SHA256` di quell'ambiente.
+
 ## Status
 
 - EPUI-06 — shell mobile con navigazione, placeholder wireframe, sessione demo.

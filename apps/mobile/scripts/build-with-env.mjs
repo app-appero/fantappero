@@ -32,8 +32,11 @@ const androidDir = join(appRoot, "android");
 // La cartella android/ è generata (non versionata): senza rigenerarla restano
 // nome e icona di una build precedente. `prebuild` (senza --clean) la aggiorna
 // da app.json (nome, icona, icona adattiva) prima di compilare.
+// Il profilo serve anche qui: i domini degli App Link (EXPO_PUBLIC_APP_LINK_HOSTS) finiscono
+// nel manifest Android durante il prebuild (plugins/withAppLinks.js).
 const prebuild = spawnSync("npx", ["expo", "prebuild", "--platform", "android", "--no-install"], {
   cwd: appRoot,
+  env: { ...process.env, ...resolved.env },
   stdio: "inherit",
   shell: process.platform === "win32",
 });

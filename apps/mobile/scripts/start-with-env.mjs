@@ -9,6 +9,8 @@ const PROFILE_KEYS = [
   "EXPO_PUBLIC_GOOGLE_CLIENT_ID_WEB",
   "EXPO_PUBLIC_GOOGLE_CLIENT_ID_ANDROID",
   "EXPO_PUBLIC_WEB_BASE_URL",
+  // Domini dei link che aprono l'app (plugins/withAppLinks.js), separati da virgola.
+  "EXPO_PUBLIC_APP_LINK_HOSTS",
 ];
 
 export function parseEnvFile(path) {

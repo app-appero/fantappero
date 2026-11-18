@@ -176,3 +176,11 @@ def test_parse_roster_csv_accepts_semicolon_and_tab_separators() -> None:
     # Con BOM e intestazione in maiuscolo (come esporta Excel).
     bom = "﻿Squadra;Provider_ID;Nome;Crediti\nFC Test;;Rossi;1\n".encode()
     assert parse_roster_csv(bom)[0].crediti == 1
+
+
+def test_normalize_athlete_name_ignores_accents_case_and_spaces() -> None:
+    from fantasy_teams.csv_import import normalize_athlete_name
+
+    assert normalize_athlete_name("  J.  McGinn ") == "j. mcginn"
+    assert normalize_athlete_name("E. İlkhan") == normalize_athlete_name("e. ilkhan")
+    assert normalize_athlete_name("A. Dembélé") == "a. dembele"
