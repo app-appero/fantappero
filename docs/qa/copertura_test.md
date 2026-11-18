@@ -43,7 +43,7 @@ Aggiornato il 18/11/2026 con i circa 30 rapporti delle corse dal 12/11 al 18/11,
 | 1.10 | Rate limit registrazione e login | OK | API |
 | 1.11 | Login, logout e sessione dopo il riavvio dell'app | OK | EMU 18/11 (flusso 04) |
 | 1.12 | Accesso con email nell'app | OK | EMU 18/11 con Maestro 2.12.1 (flusso 01) |
-| 1.13 | Link di verifica email e di reset password aperti dall'app | DA RIFARE | EMU 18/11: l'app non gestiva i link. Corretto il 18/11 (`AppLinkHandler`, App Link Android sui domini dell'ambiente): rifare su emulatore con l'APK nuovo, sia `fantappero://accedi/verifica?token=…` sia il link web `https://dev.fantappero.it/…` |
+| 1.13 | Link di verifica email e di reset password aperti dall'app | OK | EMU 18/11 (APK `2633ca4`): da scollegato `fantappero://accedi/verifica?token=…` apre "Verifica email" e `…/accedi/reimposta-password?token=…` apre "Reimposta password", con il token già scritto. App Link dev verificati (`pm get-app-links`: dev.fantappero.it e fantappero-web-dev.up.railway.app `verified`); il link web apre l'app a freddo senza chiedere |
 | 1.14 | PATCH del nickname in parallelo, token push non cancellati all'eliminazione | APERTO | solo lettura del codice |
 | 1.15 | Email reali, accesso con Google, richiesta di accesso dei non tester | NV | su dev |
 
@@ -54,7 +54,7 @@ Aggiornato il 18/11/2026 con i circa 30 rapporti delle corse dal 12/11 al 18/11,
 | 2.1 | Creazione lega, preset, crediti iniziali, codice invito e adesione | OK | API |
 | 2.2 | Invito nominale: accetta, rifiuta, revoca, duplicati | OK | API |
 | 2.3 | Gli stessi flussi a schermo | DA FARE | W1280, W390, MobB, EMU |
-| 2.4 | Ingresso con link di invito aperto dall'app | DA RIFARE | come 1.13; provare anche il link aperto prima dell'accesso: dopo il login deve aprirsi "Entra in una lega" con il token |
+| 2.4 | Ingresso con link di invito aperto dall'app | OK | EMU 18/11: da collegato `fantappero://leghe/invito?token=…` apre "Entra in una lega" con "Link invito pronto"; da scollegato resta su Accedi e dopo l'accesso apre "Entra in una lega"; `https://dev.fantappero.it/leghe/invito?token=…` apre direttamente l'app |
 | 2.5 | Elenco partecipanti, ruoli, permessi admin e non membro | OK | API |
 | 2.6 | Sostituzione partecipante | DA RIVERIFICARE | API (incerto dal 15-16/11) |
 | 2.7 | Eliminazione lega da admin (bozza) | OK | API |
@@ -147,7 +147,7 @@ Aggiornato il 18/11/2026 con i circa 30 rapporti delle corse dal 12/11 al 18/11,
 | 8.3 | Generate da invito, scambio e asta | OK | API |
 | 8.4 | Link profondo sul web | OK | API |
 | 8.5 | Tocco su una notifica di scambio nell'app → Mercato › Scambi | OK | EMU 18/11 |
-| 8.6 | Tocco su ogni altro tipo di notifica (asta, turno, invito, fantallenatori, operatore) | DA RIFARE | EMU 18/11: "La lega è partita" OK; gli altri tipi non si raggiungevano (solo 30 notifiche). Aggiunto "Carica altre" il 18/11: rifare con l'APK nuovo. MobB DA FARE |
+| 8.6 | Tocco su ogni altro tipo di notifica (asta, turno, invito, fantallenatori, operatore) | OK in parte | EMU 18/11: "Carica altre" OK (90 notifiche dopo due tocchi, nessun doppione); "La lega è partita" → Home lega, "Turno aperto" → Formazione, "Nuovo invito" → Inviti ricevuti: OK. Asta e lega eliminata NV: Maestro non le trova in un elenco di 526 (probabile limite della prova, non difetto accertato): provarle con un account con poche notifiche. Operatore: nessuna notifica disponibile. MobB DA FARE |
 | 8.7 | Notifica di una lega eliminata: apre Scambi senza lega | APERTO | noto: sul mobile il tocco non cambia la lega attiva |
 | 8.8 | Push ed email reali | NV | l'emulatore ha Google APIs senza Play Store, push da verificare su un telefono |
 
