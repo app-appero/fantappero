@@ -6,8 +6,9 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any
+from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 import database.models  # noqa: F401 — register ORM mappers
@@ -49,6 +50,7 @@ class CatalogSyncCounters:
     clubs_skipped_national: int = 0
     memberships_created: int = 0
     memberships_unchanged: int = 0
+    memberships_removed: int = 0
     snapshots_stored: int = 0
     snapshots_deduped: int = 0
 
@@ -347,16 +349,44 @@ def sync_clubs_for_season(
         )
 
     result.competition_ids_by_provider[competition_provider_id] = competition.id
+    seen_club_ids: set[UUID] = set()
     for mapped in map_clubs(envelope):
         club = upsert_club(session, mapped, result.counters)
         if club is None:
             continue
+        seen_club_ids.add(club.id)
         ensure_season_club_membership(
             session,
             sport_season=sport_season,
             club=club,
             counters=result.counters,
         )
+    if seen_club_ids:
+        # Decisione 14 (18/11): il listone mostra solo i club dei campionati della
+        # lega. Le iscrizioni a una stagione venivano solo aggiunte, mai tolte: club
+        # retrocessi o associati per errore restavano nella stagione per sempre.
+        # Con una risposta non vuota la stagione diventa esattamente quella elencata
+        # dal fornitore (una risposta vuota non cancella nulla).
+        stale = session.execute(
+            delete(CompetitionSeasonClub)
+            .where(
+                CompetitionSeasonClub.sport_season_id == sport_season.id,
+                CompetitionSeasonClub.club_id.not_in(seen_club_ids),
+            )
+            .execution_options(synchronize_session=False)
+        )
+        removed = int(stale.rowcount or 0)
+        result.counters.memberships_removed += removed
+        if removed:
+            logger.info(
+                "catalog_stale_memberships_removed",
+                extra={
+                    "provider": PROVIDER_NAME,
+                    "competition_provider_id": competition_provider_id,
+                    "season_year": season_year,
+                    "removed": removed,
+                },
+            )
 
     logger.info(
         "catalog_clubs_synced",

@@ -1,5 +1,5 @@
 import { lazyStyles } from "../theme/lazyStyles";
-import { theme } from "@fantappero/ui/theme";
+import { getActiveColorScheme, theme } from "@fantappero/ui/theme";
 import { DISPLAY_FONT } from "../theme/fonts";
 import { useNavigation } from "@react-navigation/core";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
@@ -394,8 +394,10 @@ export const authFormStyles = lazyStyles(() => StyleSheet.create({
     textTransform: "uppercase",
     marginBottom: spacing.md,
   },
-  displayAccent: { color: "#8CA8FF" },
-  displayAccent2: { color: "#C58CFF" },
+  // Tema scuro: i colori chiari dei mockup. Tema chiaro: le varianti scure dello
+  // stesso accento, perché l'azzurro chiaro sull'alone azzurro non si leggeva (QA 18/11).
+  displayAccent: { color: getActiveColorScheme() === "light" ? colors.accent : "#8CA8FF" },
+  displayAccent2: { color: getActiveColorScheme() === "light" ? colors.accentSecondary : "#C58CFF" },
   googleMain: {
     minHeight: 58,
     flexDirection: "row",
