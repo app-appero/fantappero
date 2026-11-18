@@ -7,11 +7,17 @@ appId: com.fantappero.mobile
 - tapOn: { id: "header-notifications-button" }
 - extendedWaitUntil: { visible: { id: "screen-notifications" }, timeout: 15000 }
 - takeScreenshot: dev-03-elenco
-# Le righe non hanno testID: si tocca la prima riga sotto i filtri.
-# DA VERIFICARE con `maestro hierarchy` dopo il login.
+# Ogni riga ha testID notification-<uuid>; il pallino non-letta è
+# notification-unread-<uuid>, escluso dalla regex.
 - tapOn:
-    below: { id: "notifications-filters" }
+    id: "notification-[0-9a-f]{8}-[0-9a-f-]+"
     index: 0
 - waitForAnimationToEnd
 - assertNotVisible: { id: "screen-notifications" }
+# Le notifiche di scambio portano a Mercato > Scambi (deepLink /mercato).
+- runFlow:
+    when:
+      visible: { id: "market-hub-tabs" }
+    commands:
+      - assertVisible: { id: "screen-market" }
 - takeScreenshot: dev-03-destinazione

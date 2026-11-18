@@ -28,7 +28,7 @@ export function AuthShell({
     <View style={styles.root} testID={testID}>
       <View pointerEvents="none" style={[styles.glow, styles.glowBlue]} />
       <View pointerEvents="none" style={[styles.glow, styles.glowViolet]} />
-      <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === "ios" ? "padding" : undefined}>
+      <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === "ios" ? "padding" : "height"}>
         <ScrollView
           contentContainerStyle={[styles.content, { paddingTop: insets.top + spacing.md, paddingBottom: insets.bottom + spacing.lg }]}
           keyboardShouldPersistTaps="handled"
