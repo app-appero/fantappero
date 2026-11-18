@@ -1,0 +1,20 @@
+# 08-notifica-tocco.yaml
+# Voce 8.6: tocca una notifica precisa e fotografa la schermata di destinazione.
+# Esecuzione: maestro test -e NOTIF_ID=<uuid> -e NOME=<etichetta> 08-notifica-tocco.yaml
+# Gli id per tipo si leggono da GET /notifications dell'account (qa-02).
+# Oggi funziona solo con le ultime 30 notifiche: l'elenco dell'app non carica le precedenti.
+appId: com.fantappero.mobile
+---
+- launchApp
+- extendedWaitUntil: { visible: { id: "app-menu-button" }, timeout: 30000 }
+- tapOn: { id: "header-notifications-button" }
+- extendedWaitUntil: { visible: { id: "screen-notifications" }, timeout: 15000 }
+- scrollUntilVisible:
+    element: { id: "notification-${NOTIF_ID}" }
+    direction: DOWN
+    timeout: 120000
+    speed: 90
+- tapOn: { id: "notification-${NOTIF_ID}" }
+- waitForAnimationToEnd
+- assertNotVisible: { id: "screen-notifications" }
+- takeScreenshot: dev-08-${NOME}
