@@ -1,4 +1,5 @@
 import { playerAvatarUrl } from "@fantappero/contracts";
+import { foldSearchText } from "../utils/searchText";
 import type { FantasyRole, LeagueListoneEntry } from "@fantappero/contracts";
 import { PlayerPhotoBadge } from "@fantappero/ui";
 import { useEffect, useMemo, useState } from "react";
@@ -42,11 +43,11 @@ export function AthleteChooser({
     [entries, ownedAthleteIds],
   );
   const filtered = useMemo(() => {
-    const needle = query.trim().toLocaleLowerCase("it-IT");
+    const needle = foldSearchText(query);
     return available.filter(
       (entry) =>
         (role === "all" || entry.effectiveRole === role) &&
-        (!needle || `${entry.canonicalName} ${entry.clubName ?? ""}`.toLocaleLowerCase("it-IT").includes(needle)),
+        (!needle || foldSearchText(`${entry.canonicalName} ${entry.clubName ?? ""}`).includes(needle)),
     );
   }, [available, query, role]);
 

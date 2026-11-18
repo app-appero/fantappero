@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pydantic import Field
 
-from app.text_validation import NoNulStr
+from app.text_validation import NoNulStr, NoSurrogateStr
 from auth.schemas import ApiModel
 
 
@@ -84,7 +84,7 @@ class EnsureFantasyTeamsResponse(ApiModel):
 
 
 class AssignRosterSlotRequest(ApiModel):
-    athlete_id: str = Field(alias="athleteId", min_length=1)
+    athlete_id: NoNulStr = Field(alias="athleteId", min_length=1)
     purchase_credits: int = Field(alias="purchaseCredits", ge=0, le=2_147_483_647)
 
 
@@ -185,7 +185,7 @@ class RosterImportPreviewResponse(ApiModel):
 
 class RosterImportResolutionItem(ApiModel):
     row_number: int = Field(alias="rowNumber", ge=2)
-    athlete_id: str = Field(alias="athleteId", min_length=1)
+    athlete_id: NoNulStr = Field(alias="athleteId", min_length=1)
 
 
 class RosterImportConfirmRequest(ApiModel):
@@ -193,7 +193,9 @@ class RosterImportConfirmRequest(ApiModel):
 
 
 class RosterImportTextPreviewRequest(ApiModel):
-    csv_text: str = Field(alias="csvText", min_length=1, max_length=512_000)
+    # Il NUL nelle righe è già un errore di riga dell'anteprima; il surrogato
+    # isolato invece faceva fallire l'encode con un 500 (QA 18/11).
+    csv_text: NoSurrogateStr = Field(alias="csvText", min_length=1, max_length=512_000)
 
 
 class RosterImportConfirmResponse(ApiModel):

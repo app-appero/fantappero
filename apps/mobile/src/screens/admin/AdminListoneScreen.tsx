@@ -13,6 +13,7 @@ import { StatusBadge } from "../../components/StatusBadge";
 import { UiStatePanel } from "../../components/UiStatePanel";
 import { AthleteName } from "../../athletes/AthleteCard";
 import { PageContainer } from "../../layout/PageContainer";
+import { foldSearchText } from "../roster/listoneFilter";
 import { getApiErrorMessage, useAuthSession } from "../../session/DemoSessionContext";
 
 const { colors } = theme;
@@ -52,7 +53,7 @@ function filterEntries(
   tab: RoleTab,
   query: string,
 ): AdminListoneEntry[] {
-  const normalized = query.trim().toLocaleLowerCase("it-IT");
+  const normalized = foldSearchText(query);
   return entries.filter((entry) => {
     if (tab !== "all" && entry.officialRole !== tab) {
       return false;
@@ -60,7 +61,7 @@ function filterEntries(
     if (!normalized) {
       return true;
     }
-    const haystack = `${entry.canonicalName} ${entry.clubName ?? ""}`.toLocaleLowerCase("it-IT");
+    const haystack = foldSearchText(`${entry.canonicalName} ${entry.clubName ?? ""}`);
     return haystack.includes(normalized);
   });
 }

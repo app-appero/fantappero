@@ -166,6 +166,24 @@ def test_profile_avatar_upload_and_remove(client: TestClient, tmp_path, monkeypa
     assert removed.status_code == 200
     assert removed.json()["avatarUrl"] is None
 
+    # Decisione 13 (18/11): un file che inizia come JPEG ma non è un'immagine
+    # viene rifiutato, e gli avatar si servono con `nosniff`.
+    fake = client.post(
+        "/profile/me/avatar",
+        headers=headers,
+        files={
+            "file": (
+                "avatar.jpg",
+                BytesIO(b"\xff\xd8\xff\xe0<html><script>alert(1)</script></html>"),
+                "image/jpeg",
+            )
+        },
+    )
+    assert fake.status_code == 400
+    assert fake.json()["code"] == "invalid_avatar_format"
+    served = client.get(f"/media/avatars/{session['user_id']}.png")
+    assert served.headers.get("x-content-type-options") == "nosniff"
+
 
 def test_profile_policy_consent(client: TestClient, monkeypatch) -> None:
     monkeypatch.setenv("PROFILE_POLICY_VERSION", "2026-01")

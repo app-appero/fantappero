@@ -1226,6 +1226,36 @@ def test_lineup_draft_allows_incomplete_and_rejects_out_of_time(
     assert too_early.status_code == 400
     assert too_early.json()["code"] == "turn_not_open"
 
+    # QA 18/11: nemmeno la cancellazione della bozza a turno non aperto.
+    discard_too_early = client.delete(
+        f"/leagues/{league_id}/turni/{scheduled.id}/formazione/bozza",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert discard_too_early.status_code == 400
+    assert discard_too_early.json()["code"] == "turn_not_open"
+
+    # QA 18/11: la bozza può essere incompleta ma non oltre i massimi.
+    by_role: dict[str, list[str]] = {"P": [], "D": [], "C": [], "A": []}
+    for athlete in athletes:
+        by_role[athlete.canonical_name[0]].append(str(athlete.id))
+    over_limits = [
+        (
+            [*payload["starterAthleteIds"], payload["benchAthleteIds"][0]],
+            "starter_count_invalid",
+        ),
+        ([by_role["P"][0], by_role["P"][1], *by_role["D"][:2]], "goalkeeper_count_invalid"),
+        ([by_role["P"][0], *by_role["D"][:5]], "module_role_mismatch"),
+    ]
+    for starters, code in over_limits:
+        bench = [item for item in payload["benchAthleteIds"] if item not in starters][:3]
+        rejected = client.put(
+            f"/leagues/{league_id}/turni/{fantasy_round.id}/formazione/bozza",
+            headers={"Authorization": f"Bearer {token}"},
+            json={"module": "4-3-3", "starterAthleteIds": starters, "benchAthleteIds": bench},
+        )
+        assert rejected.status_code == 400, (code, rejected.text)
+        assert rejected.json()["code"] == code
+
     draft_audit = db_session.scalars(
         select(LeagueAuditEvent).where(
             LeagueAuditEvent.league_id == UUID(league_id),
@@ -1578,12 +1608,18 @@ def test_saving_the_lineup_discards_the_older_draft(
     client.get(f"/leagues/{league_id}/rosa", headers={"Authorization": f"Bearer {token}"})
     grouped = _seed_roster_athletes(db_session, id_offset=9_700_000)
     athletes = _fill_validated_roster(db_session, league_id, grouped)
+    # Quando gira insieme agli altri, la lega può avere già il turno 1 (creato in
+    # automatico): si usa il primo numero libero invece di un turno 1 duplicato.
+    last_number = db_session.scalar(
+        select(func.max(FantasyRound.number)).where(FantasyRound.league_id == UUID(league_id))
+    )
     fantasy_round, _clubs = _create_open_round(
         db_session,
         league_id,
         cutoff=datetime.now(UTC) + timedelta(hours=5),
         id_offset=9_710_000,
         competition_ids=competition_ids,
+        number=(last_number or 0) + 1,
     )
     payload = _lineup_payload(athletes, "4-3-3")
     headers = {"Authorization": f"Bearer {token}"}

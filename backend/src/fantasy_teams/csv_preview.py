@@ -361,7 +361,9 @@ def _resolve_athlete(
             PreviewRowIssue(
                 code="ambiguous_athlete_name",
                 message="Nome ambiguo: seleziona il calciatore corretto.",
-                severity="error",
+                # Avviso, non errore: la riga resta "ambiguous" e si sblocca
+                # scegliendo un candidato in conferma (QA 18/11).
+                severity="warning",
             )
         )
         return None

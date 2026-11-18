@@ -408,3 +408,103 @@ def test_csv_preview_flags_rows_over_the_role_quota(
         if any(i["code"] == "role_quota_exceeded" for i in row["issues"])
     ]
     assert len(flagged) == 1
+
+
+def test_csv_rows_over_quota_do_not_take_slots_from_valid_rows(
+    client: TestClient,
+    db_session: Session,
+    competition_ids: list[str],
+) -> None:
+    """QA 18/11: le righe oltre la quota di ruolo occupavano slot e le righe
+    valide successive ricevevano `roster_full`."""
+    token, _ = _register_and_login(client, "csv.quota.slots@example.com")
+    league_id = _create_league(client, token, competition_ids, "Lega CSV Quota Slot")
+    headers = {"Authorization": f"Bearer {token}"}
+    rosa = client.get(f"/leagues/{league_id}/rosa", headers=headers).json()
+    team_name = rosa["name"]
+    roster_size = len(rosa["slots"])
+    lines = ["squadra,provider_id,nome,crediti"]
+    # Tutti portieri tranne l'ultimo slot: oltre il terzo sono fuori quota.
+    for index in range(roster_size - 1):
+        keeper = _seed_athlete(
+            db_session,
+            random.randint(100_000_000, 2_000_000_000),
+            f"Portiere Slot {index}",
+            role=FantasyRole.P,
+        )
+        lines.append(f"{team_name},{keeper.provider_id},{keeper.canonical_name},1")
+    forwards = [
+        _seed_athlete(
+            db_session,
+            random.randint(100_000_000, 2_000_000_000),
+            f"Attaccante Slot {index}",
+            role=FantasyRole.A,
+        )
+        for index in range(3)
+    ]
+    for forward in forwards:
+        lines.append(f"{team_name},{forward.provider_id},{forward.canonical_name},1")
+    preview = client.post(
+        f"/leagues/{league_id}/amministrazione/import-csv/anteprima",
+        headers=headers,
+        files={"file": ("rose.csv", "\n".join(lines).encode(), "text/csv")},
+    )
+    assert preview.status_code == 200, preview.text
+    rows = preview.json()["rows"]
+    forward_ids = {str(forward.id) for forward in forwards}
+    forward_rows = [row for row in rows if row["athleteId"] in forward_ids]
+    assert len(forward_rows) == 3
+    for row in forward_rows:
+        assert row["status"] == "ok", row
+        assert not any(issue["code"] == "roster_full" for issue in row["issues"])
+    keeper_rows = [row for row in rows if row["athleteId"] not in forward_ids]
+    assert sum(1 for row in keeper_rows if row["status"] == "ok") == 3
+    assert all(
+        any(issue["code"] == "role_quota_exceeded" for issue in row["issues"])
+        for row in keeper_rows
+        if row["status"] != "ok"
+    )
+
+
+def test_csv_ambiguous_name_can_be_resolved_on_confirm(
+    client: TestClient,
+    db_session: Session,
+    competition_ids: list[str],
+) -> None:
+    """QA 18/11: il nome ambiguo era un errore bloccante e la conferma con la
+    scelta del candidato rispondeva `import_has_errors`."""
+    token, _ = _register_and_login(client, "csv.ambiguous@example.com")
+    league_id = _create_league(client, token, competition_ids, "Lega CSV Ambiguo")
+    headers = {"Authorization": f"Bearer {token}"}
+    team_name = client.get(f"/leagues/{league_id}/rosa", headers=headers).json()["name"]
+    surname = f"Omonimo{random.randint(100_000, 999_999)}"
+    first = _seed_athlete(db_session, random.randint(100_000_000, 2_000_000_000), f"P. {surname}")
+    _seed_athlete(db_session, random.randint(100_000_000, 2_000_000_000), f"S. {surname}")
+    csv_body = f"squadra,provider_id,nome,crediti\n{team_name},,{surname},12\n".encode()
+    preview = client.post(
+        f"/leagues/{league_id}/amministrazione/import-csv/anteprima",
+        headers=headers,
+        files={"file": ("rose.csv", csv_body, "text/csv")},
+    )
+    assert preview.status_code == 200, preview.text
+    row = preview.json()["rows"][0]
+    assert row["status"] == "ambiguous", row["issues"]
+    assert len(row["candidates"]) == 2
+    ambiguity = next(i for i in row["issues"] if i["code"] == "ambiguous_athlete_name")
+    assert ambiguity["severity"] == "warning"
+    assert preview.json()["canConfirm"] is False
+
+    confirm = client.post(
+        f"/leagues/{league_id}/amministrazione/import-csv/{preview.json()['importId']}/conferma",
+        headers=headers,
+        json={"resolutions": [{"rowNumber": row["rowNumber"], "athleteId": str(first.id)}]},
+    )
+    assert confirm.status_code == 200, confirm.text
+    assert confirm.json()["assignedCount"] == 1
+    owned = db_session.scalar(
+        select(FantasyRosterSlot).where(
+            FantasyRosterSlot.league_id == UUID(league_id),
+            FantasyRosterSlot.athlete_id == first.id,
+        )
+    )
+    assert owned is not None

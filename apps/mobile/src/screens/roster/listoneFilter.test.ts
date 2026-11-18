@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import type { LeagueListoneEntry } from "@fantappero/contracts";
-import { filterListone } from "./listoneFilter.ts";
+import { filterListone, foldSearchText } from "./listoneFilter.ts";
 
 function entry(
   athleteId: string,
@@ -60,5 +60,26 @@ describe("filterListone", () => {
       filterListone(listone, "A", "adams", true, owned).map((row) => row.athleteId),
       ["2"],
     );
+  });
+
+  it("ignores accents and case in the search (QA 18/11)", () => {
+    const accented = [...listone, entry("4", "A. Dembélé", "A", "Paris"), entry("5", "M. Ødegaard", "C", "Arsenal")];
+    assert.deepEqual(
+      filterListone(accented, "all", "dembele").map((row) => row.athleteId),
+      ["4"],
+    );
+    assert.deepEqual(
+      filterListone(accented, "all", "ODEGAARD").map((row) => row.athleteId),
+      ["5"],
+    );
+    assert.deepEqual(
+      filterListone(accented, "all", "Dembélé").map((row) => row.athleteId),
+      ["4"],
+    );
+  });
+
+  it("folds accents, case and spaces", () => {
+    assert.equal(foldSearchText("  Çalhanoğlu "), "calhanoglu");
+    assert.equal(foldSearchText("Müller"), "muller");
   });
 });

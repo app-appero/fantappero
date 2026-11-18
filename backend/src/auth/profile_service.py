@@ -14,6 +14,7 @@ from auth.models.user import User
 from auth.models.user_profile import UserProfile
 from auth.profile_schemas import PolicyConsentRequest, ProfileResponse, UpdateProfileRequest
 from auth.profile_validators import (
+    reencode_avatar,
     validate_avatar_upload,
     validate_language,
     validate_policy_version,
@@ -125,10 +126,11 @@ class ProfileService:
 
     def upload_avatar(self, user: User, *, data: bytes) -> ProfileResponse:
         profile = self._ensure_profile(user)
-        _content_type, extension = validate_avatar_upload(
+        content_type, extension = validate_avatar_upload(
             data=data,
             max_bytes=self._settings.avatar_max_bytes,
         )
+        data = reencode_avatar(data, content_type)
 
         storage_dir = Path(self._settings.avatar_storage_path)
         storage_dir.mkdir(parents=True, exist_ok=True)

@@ -43,3 +43,37 @@ def test_forgot_reset_login_flow(client: TestClient) -> None:
 
     new_login = client.post("/auth/login", json={"email": email, "password": new_password})
     assert new_login.status_code == 200
+
+
+def test_register_and_reset_reject_common_or_email_passwords(client: TestClient) -> None:
+    """Decisione 12 (18/11): password comuni o uguali all'email rifiutate."""
+    email = "weak.password@example.com"
+    common = client.post(
+        "/auth/register",
+        json={"email": email, "password": "password1", "displayName": "Debole"},
+    )
+    assert common.status_code == 400
+    assert common.json()["code"] == "password_too_common"
+    same = client.post(
+        "/auth/register",
+        json={"email": email, "password": email.upper(), "displayName": "Debole"},
+    )
+    assert same.status_code == 400
+    assert same.json()["code"] == "password_same_as_email"
+
+    _register_and_verify(client, email, "Password123!")
+    client.post("/auth/forgot-password", json={"email": email})
+    reset_match = re.search(r"token=([A-Za-z0-9_-]+)", get_captured_emails()[-1].message.text_body)
+    assert reset_match
+    for weak, code in (("qwertyuiop", "password_too_common"), (email, "password_same_as_email")):
+        response = client.post(
+            "/auth/reset-password",
+            json={"token": reset_match.group(1), "newPassword": weak},
+        )
+        assert response.status_code == 400, response.text
+        assert response.json()["code"] == code
+    ok = client.post(
+        "/auth/reset-password",
+        json={"token": reset_match.group(1), "newPassword": "NuovaPassword456!"},
+    )
+    assert ok.status_code == 200

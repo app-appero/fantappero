@@ -80,7 +80,7 @@ class AuthService:
                 code="email_registration_disabled",
             )
         normalized_email = validate_email(email)
-        validated_password = validate_password(password)
+        validated_password = validate_password(password, email=normalized_email)
         validated_name = validate_display_name(display_name)
         self._assert_not_blocked(normalized_email)
 
@@ -474,8 +474,9 @@ class AuthService:
         return MessageResponse(message=GENERIC_FORGOT_MESSAGE)
 
     def reset_password(self, *, token: str, new_password: str) -> MessageResponse:
-        validated_password = validate_password(new_password)
+        validate_password(new_password)
         auth_token, user = self._resolve_auth_token(token, AuthTokenType.PASSWORD_RESET)
+        validated_password = validate_password(new_password, email=user.email)
         user.password_hash = hash_password(validated_password)
         auth_token.used_at = utc_now()
         self._revoke_all_sessions(user.id)

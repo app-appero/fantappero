@@ -18,6 +18,7 @@ dependencies = [
     "python-multipart==0.0.32",
     "httpx==0.28.1",
     "openpyxl==3.1.5",
+    "pillow==12.3.0",
 ]
 
 [project.optional-dependencies]
@@ -34,6 +35,10 @@ build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.package-data]
+# Lista delle password comuni (decisione 12): deve finire nel pacchetto installato.
+auth = ["data/*.txt.gz"]
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]

@@ -1,3 +1,4 @@
+import { foldSearchText } from "../../utils/searchText";
 import type {
   CreditAccount,
   CreditLedgerList,
@@ -129,7 +130,7 @@ export function filterListone(
   onlyFree = false,
   ownedAthleteIds?: ReadonlySet<string>,
 ): LeagueListoneEntry[] {
-  const normalized = query.trim().toLocaleLowerCase("it-IT");
+  const normalized = foldSearchText(query);
   const hideOwned = onlyFree && normalized.length === 0;
   return filterByTab(entries, tab).filter((entry) => {
     if (hideOwned && ownedAthleteIds?.has(entry.athleteId)) {
@@ -138,7 +139,7 @@ export function filterListone(
     if (!normalized) {
       return true;
     }
-    const haystack = `${entry.canonicalName} ${entry.clubName ?? ""}`.toLocaleLowerCase("it-IT");
+    const haystack = foldSearchText(`${entry.canonicalName} ${entry.clubName ?? ""}`);
     return haystack.includes(normalized);
   });
 }

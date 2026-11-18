@@ -2,13 +2,23 @@
 
 from __future__ import annotations
 
+import gzip
+import logging
 import re
+from functools import lru_cache
+from pathlib import Path
 
 from auth.exceptions import ValidationAuthError
+
+logger = logging.getLogger(__name__)
 
 _PASSWORD_MIN_LENGTH = 8
 _DISPLAY_NAME_MAX_LENGTH = 80
 _EMAIL_PATTERN = re.compile(r"^[^\s@]+@[^\s@]+\.[^\s@]+$")
+# Le 10.000 password più comuni (minuscole), dalla lista che Django distribuisce in
+# `django/contrib/auth/common-passwords.txt.gz` (licenza BSD; fonte originale:
+# Royce Williams, https://gist.github.com/roycewilliams/226886fd01572964e1431ac8afc999ce).
+_COMMON_PASSWORDS_PATH = Path(__file__).resolve().parent / "data" / "common_passwords.txt.gz"
 
 
 def validate_email(email: str) -> str:
@@ -20,7 +30,19 @@ def validate_email(email: str) -> str:
     return normalized
 
 
-def validate_password(password: str) -> str:
+@lru_cache(maxsize=1)
+def common_passwords() -> frozenset[str]:
+    try:
+        with gzip.open(_COMMON_PASSWORDS_PATH, "rt", encoding="utf-8") as handle:
+            return frozenset(line.strip() for line in handle if line.strip())
+    except OSError:
+        # Il file manca solo se il pacchetto è installato male: meglio un avviso
+        # nei log che una registrazione che risponde 500.
+        logger.error("common_passwords_list_missing", extra={"path": str(_COMMON_PASSWORDS_PATH)})
+        return frozenset()
+
+
+def validate_password(password: str, *, email: str | None = None) -> str:
     if len(password) < _PASSWORD_MIN_LENGTH:
         raise ValidationAuthError(
             f"La password deve contenere almeno {_PASSWORD_MIN_LENGTH} caratteri.",
@@ -28,6 +50,18 @@ def validate_password(password: str) -> str:
         )
     if len(password) > 128:
         raise ValidationAuthError("La password è troppo lunga.", code="invalid_password")
+    folded = password.strip().lower()
+    # Decisione 12 (18/11): niente password tra le più comuni né uguali all'email.
+    if folded in common_passwords():
+        raise ValidationAuthError(
+            "Questa password è tra le più usate e facili da indovinare: scegline un'altra.",
+            code="password_too_common",
+        )
+    if email is not None and folded == email.strip().lower():
+        raise ValidationAuthError(
+            "La password non può essere uguale all'indirizzo email.",
+            code="password_same_as_email",
+        )
     return password
 
 

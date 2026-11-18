@@ -152,3 +152,27 @@ def test_apply_resolutions_selects_candidate() -> None:
     assert updated[0].athlete_id == athlete_b
     assert updated[0].provider_id == 2
     assert not any(issue.code == "ambiguous_athlete_name" for issue in updated[0].issues)
+
+
+def test_parse_roster_csv_accepts_semicolon_and_tab_separators() -> None:
+    """Decisione 15 (18/11): CSV di Excel italiano con il punto e virgola."""
+    from fantasy_teams.csv_import import detect_csv_delimiter, parse_roster_csv
+
+    semicolon = b"squadra;provider_id;nome;crediti\nFC Test;123;Mario Rossi;15\n"
+    rows = parse_roster_csv(semicolon)
+    assert len(rows) == 1
+    assert rows[0].squadra == "FC Test"
+    assert rows[0].provider_id == 123
+    assert rows[0].nome == "Mario Rossi"
+    assert rows[0].crediti == 15
+
+    tab = b"squadra\tprovider_id\tnome\tcrediti\nFC Test\t\tRossi, Mario\t7\n"
+    assert parse_roster_csv(tab)[0].nome == "Rossi, Mario"
+
+    # Virgola come sempre; un nome con il punto e virgola non confonde il riconoscimento.
+    comma = 'squadra,provider_id,nome,crediti\nFC Test,,"Rossi; Mario",3\n'
+    assert detect_csv_delimiter(comma) == ","
+    assert parse_roster_csv(comma.encode())[0].nome == "Rossi; Mario"
+    # Con BOM e intestazione in maiuscolo (come esporta Excel).
+    bom = "﻿Squadra;Provider_ID;Nome;Crediti\nFC Test;;Rossi;1\n".encode()
+    assert parse_roster_csv(bom)[0].crediti == 1

@@ -95,3 +95,43 @@ def test_avatar_size_limit_label_uses_configured_mebibytes() -> None:
 
 def test_detect_avatar_content_type_rejects_unknown() -> None:
     assert detect_avatar_content_type(b"not-an-image") is None
+
+
+def _real_image(fmt: str, size: tuple[int, int] = (4, 4)) -> bytes:
+    import io
+
+    from PIL import Image
+
+    output = io.BytesIO()
+    Image.new("RGB", size, (200, 30, 30)).save(output, fmt)
+    return output.getvalue()
+
+
+def test_reencode_avatar_accepts_real_images_and_strips_trailing_data() -> None:
+    """Decisione 13 (18/11): l'avatar deve essere un'immagine vera."""
+    from auth.profile_validators import reencode_avatar
+
+    for content_type, fmt in (
+        ("image/jpeg", "JPEG"),
+        ("image/png", "PNG"),
+        ("image/webp", "WEBP"),
+    ):
+        payload = _real_image(fmt) + b"<script>alert(1)</script>"
+        cleaned = reencode_avatar(payload, content_type)
+        assert b"<script>" not in cleaned
+        assert detect_avatar_content_type(cleaned) == content_type
+    assert reencode_avatar(_MINIMAL_PNG, "image/png")
+
+
+def test_reencode_avatar_rejects_fake_images() -> None:
+    from auth.profile_validators import reencode_avatar
+
+    fake_jpeg = b"\xff\xd8\xff\xe0" + b"<html><script>alert(1)</script></html>"
+    fake_png = b"\x89PNG\r\n\x1a\n" + b"<html>not a picture</html>"
+    for data, content_type in ((fake_jpeg, "image/jpeg"), (fake_png, "image/png")):
+        with pytest.raises(ValidationAuthError) as exc:
+            reencode_avatar(data, content_type)
+        assert exc.value.code == "invalid_avatar_format"
+    # Firma PNG ma contenuto JPEG: rifiutato.
+    with pytest.raises(ValidationAuthError):
+        reencode_avatar(_real_image("JPEG"), "image/png")

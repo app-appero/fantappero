@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import io
 import re
 from zoneinfo import ZoneInfo, available_timezones
 
@@ -145,3 +146,51 @@ def validate_avatar_upload(*, data: bytes, max_bytes: int) -> tuple[str, str]:
         "image/webp": "webp",
     }[content_type]
     return content_type, extension
+
+
+# Oltre questa dimensione l'avatar non serve e la decodifica costa troppo.
+_AVATAR_MAX_PIXELS = 25_000_000
+_AVATAR_PIL_FORMAT = {"image/jpeg": "JPEG", "image/png": "PNG", "image/webp": "WEBP"}
+
+
+def reencode_avatar(data: bytes, content_type: str) -> bytes:
+    """Decodifica l'immagine per intero e la risalva (decisione 13, 18/11).
+
+    I primi byte da soli non bastano: un file che inizia come JPEG ma contiene
+    altro (per esempio HTML) passava. Risalvarla toglie anche dati in coda,
+    metadati e fotogrammi successivi al primo.
+    """
+    from PIL import Image, ImageOps, UnidentifiedImageError
+
+    invalid = ValidationAuthError(
+        "Il file non è un'immagine valida. Usa JPEG, PNG o WebP.",
+        code="invalid_avatar_format",
+    )
+    expected = _AVATAR_PIL_FORMAT[content_type]
+    try:
+        with Image.open(io.BytesIO(data)) as image:
+            if image.format != expected:
+                raise invalid
+            if image.width * image.height > _AVATAR_MAX_PIXELS:
+                raise ValidationAuthError(
+                    "L'immagine ha troppi pixel: usane una più piccola.",
+                    code="avatar_too_large",
+                )
+            image.load()
+            picture = ImageOps.exif_transpose(image)
+            output = io.BytesIO()
+            if expected == "JPEG":
+                if picture.mode not in ("RGB", "L"):
+                    picture = picture.convert("RGB")
+                picture.save(output, "JPEG", quality=90)
+            elif expected == "PNG":
+                picture.save(output, "PNG")
+            else:
+                if picture.mode not in ("RGB", "RGBA"):
+                    picture = picture.convert("RGBA")
+                picture.save(output, "WEBP", quality=90)
+    except ValidationAuthError:
+        raise
+    except (UnidentifiedImageError, Image.DecompressionBombError, OSError, SyntaxError, ValueError):
+        raise invalid from None
+    return output.getvalue()

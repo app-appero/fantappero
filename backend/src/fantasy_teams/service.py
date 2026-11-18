@@ -836,11 +836,10 @@ class FantasyTeamService:
                 actor_id=league_access.user.id,
                 note=f"Acquisto {athlete.canonical_name}",
             )
-        elif (
-            purchase_credits > 0
-            and previous_athlete_id == athlete_id
-            and (previous_purchase or 0) != purchase_credits
-        ):
+        elif previous_athlete_id == athlete_id and (previous_purchase or 0) != purchase_credits:
+            # Rettifica del prezzo dello stesso calciatore, anche verso 0: la
+            # differenza torna sul conto (prima il ramo richiedeva un prezzo
+            # nuovo > 0 e i crediti pagati sparivano, QA 18/11).
             delta = purchase_credits - (previous_purchase or 0)
             if delta != 0:
                 apply_ledger_movement(
@@ -1343,6 +1342,9 @@ class FantasyTeamService:
         if excel:
             skip_unmatched_excel_rows(rows)
         self._flag_role_quota_overflow(league, rows)
+        # Le righe oltre quota non devono tenersi uno slot: si riassegnano gli
+        # slot liberi solo alle righe valide (QA 18/11, `roster_full` su righe ok).
+        rows = recompute_slot_assignments(self._session, league_id=league.id, rows=rows)
         error_count, warning_count = count_preview_issues(rows)
         payload = {
             "rows": [preview_row_to_dict(row) for row in rows],
@@ -1485,6 +1487,8 @@ class FantasyTeamService:
                 ) from exc
 
         rows = apply_resolutions(rows, resolutions)
+        # Un nome ambiguo appena risolto può superare la quota del ruolo.
+        self._flag_role_quota_overflow(league, rows)
         rows = recompute_slot_assignments(self._session, league_id=league.id, rows=rows)
         error_count, warning_count = count_preview_issues(rows)
         session.preview_payload = {

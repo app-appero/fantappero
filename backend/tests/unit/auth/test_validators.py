@@ -27,3 +27,22 @@ def test_validate_display_name_required() -> None:
     with pytest.raises(ValidationAuthError):
         validate_display_name("   ")
     assert validate_display_name("  Marco  ") == "Marco"
+
+
+def test_validate_password_rejects_common_passwords() -> None:
+    """Decisione 12 (18/11): le password più comuni non sono ammesse."""
+    from auth.validators import common_passwords
+
+    assert len(common_passwords()) == 10_000
+    for weak in ("password", "12345678", "Password1", "QWERTYUIOP"):
+        with pytest.raises(ValidationAuthError) as exc:
+            validate_password(weak)
+        assert exc.value.code == "password_too_common"
+    assert validate_password("Password123!") == "Password123!"
+
+
+def test_validate_password_rejects_the_email_itself() -> None:
+    with pytest.raises(ValidationAuthError) as exc:
+        validate_password("Mario.Rossi@Example.com", email="mario.rossi@example.com")
+    assert exc.value.code == "password_same_as_email"
+    assert validate_password("Password123!", email="mario.rossi@example.com")
