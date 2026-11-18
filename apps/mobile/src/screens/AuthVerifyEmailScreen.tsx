@@ -2,23 +2,23 @@ import { useNavigation, useRoute, type RouteProp } from "@react-navigation/core"
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useState } from "react";
 import { Pressable, Text, View } from "react-native";
+import { AuthShell } from "../auth/AuthShell";
 import { AppTextInput as TextInput } from "../components/AppTextInput";
 import { verifyEmail } from "../api/auth";
-import { BrandLogo } from "../components/BrandLogo";
 import { UiStatePanel } from "../components/UiStatePanel";
-import { PageContainer } from "../layout/PageContainer";
 import type { RootStackParamList } from "../navigation/types";
 import { getApiErrorMessage } from "../session/DemoSessionContext";
-import { authFormStyles as styles } from "./AuthScreen";
+import { authFormStyles as styles, authPageStyles } from "./AuthScreen";
 
 /**
- * Verifica email — allineata a web /accedi/verifica, ma con inserimento
- * manuale del token: sul mobile non esiste ancora un deep link funzionante
- * che apra questa schermata da un link ricevuto via email (vedi matrice di
- * parità C1 — problema #3), stesso fallback già usato da AuthResetPasswordScreen.
+ * Verifica email — allineata a web /accedi/verifica. Il link dell'email apre questa
+ * schermata con il codice già scritto (`navigation/deepLinks.ts`); resta possibile
+ * incollarlo a mano, come in AuthResetPasswordScreen.
  */
 export function AuthVerifyEmailScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  // Freccia indietro: torna alla schermata precedente (di solito Accedi), anche da un link.
+  const goBack = () => (navigation.canGoBack() ? navigation.goBack() : navigation.navigate("Auth"));
   const route = useRoute<RouteProp<RootStackParamList, "AuthVerifyEmail">>();
   const [token, setToken] = useState(route.params?.token ?? "");
   const [error, setError] = useState<string | null>(null);
@@ -43,11 +43,11 @@ export function AuthVerifyEmailScreen() {
   }
 
   return (
-    <View style={styles.root} testID="screen-auth-verify-email">
-      <PageContainer title="Verifica email" testID="screen-auth-verify-email-form">
-        <View style={styles.brand}>
-          <BrandLogo variant="full" size="lg" />
-        </View>
+    <AuthShell testID="screen-auth-verify-email" onBack={goBack}>
+      <View style={authPageStyles.form} testID="screen-auth-verify-email-form">
+        <Text style={styles.heroTitleLeft} accessibilityRole="header">
+          Verifica email
+        </Text>
         {successMessage ? (
           <>
             <UiStatePanel
@@ -67,7 +67,6 @@ export function AuthVerifyEmailScreen() {
           </>
         ) : (
           <>
-            <Text style={styles.heroTitleLeft}>Verifica email</Text>
             <Text style={styles.lead}>
               Incolla il codice di verifica ricevuto via email per completare la registrazione.
             </Text>
@@ -112,7 +111,7 @@ export function AuthVerifyEmailScreen() {
             </Pressable>
           </>
         )}
-      </PageContainer>
-    </View>
+      </View>
+    </AuthShell>
   );
 }

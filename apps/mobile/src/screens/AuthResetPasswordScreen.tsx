@@ -2,18 +2,19 @@ import { useNavigation, useRoute, type RouteProp } from "@react-navigation/core"
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useState } from "react";
 import { Pressable, Text, View } from "react-native";
+import { AuthShell } from "../auth/AuthShell";
 import { AppTextInput as TextInput } from "../components/AppTextInput";
 import { resetPassword } from "../api/auth";
-import { BrandLogo } from "../components/BrandLogo";
 import { UiStatePanel } from "../components/UiStatePanel";
-import { PageContainer } from "../layout/PageContainer";
 import type { RootStackParamList } from "../navigation/types";
 import { getApiErrorMessage } from "../session/DemoSessionContext";
-import { authFormStyles as styles } from "./AuthScreen";
+import { authFormStyles as styles, authPageStyles } from "./AuthScreen";
 
 /** Reimposta password — allineata a web /accedi/reimposta-password. */
 export function AuthResetPasswordScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  // Freccia indietro: torna alla schermata precedente (di solito Accedi), anche da un link.
+  const goBack = () => (navigation.canGoBack() ? navigation.goBack() : navigation.navigate("Auth"));
   const route = useRoute<RouteProp<RootStackParamList, "AuthResetPassword">>();
   const [token, setToken] = useState(route.params?.token ?? "");
   const [password, setPassword] = useState("");
@@ -51,11 +52,11 @@ export function AuthResetPasswordScreen() {
   }
 
   return (
-    <View style={styles.root} testID="screen-auth-reset">
-      <PageContainer title="Reimposta password" testID="screen-auth-reset-form">
-        <View style={styles.brand}>
-          <BrandLogo variant="full" size="lg" />
-        </View>
+    <AuthShell testID="screen-auth-reset" onBack={goBack}>
+      <View style={authPageStyles.form} testID="screen-auth-reset-form">
+        <Text style={styles.heroTitleLeft} accessibilityRole="header">
+          Reimposta password
+        </Text>
         {successMessage ? (
           <>
             <UiStatePanel
@@ -75,7 +76,6 @@ export function AuthResetPasswordScreen() {
           </>
         ) : (
           <>
-            <Text style={styles.heroTitleLeft}>Nuova password</Text>
             <Text style={styles.lead}>Scegli una nuova password per il tuo account.</Text>
             {error ? (
               <UiStatePanel
@@ -140,7 +140,7 @@ export function AuthResetPasswordScreen() {
             </Pressable>
           </>
         )}
-      </PageContainer>
-    </View>
+      </View>
+    </AuthShell>
   );
 }
