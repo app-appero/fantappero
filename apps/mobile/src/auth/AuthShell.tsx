@@ -1,3 +1,4 @@
+import { lazyStyles } from "../theme/lazyStyles";
 import { theme } from "@fantappero/ui/theme";
 import type { ReactNode } from "react";
 import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, View } from "react-native";
@@ -45,7 +46,9 @@ export function AuthShell({
   );
 }
 
-const styles = StyleSheet.create({
+// Colori letti a ogni cambio di tema: con StyleSheet.create statico lo sfondo
+// restava quello dell'avvio e i testi del tema chiaro sparivano (QA 18/11).
+const styles = lazyStyles(() => StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.background, overflow: "hidden" },
   flex: { flex: 1 },
   glow: { position: "absolute", borderRadius: 999 },
@@ -55,4 +58,4 @@ const styles = StyleSheet.create({
   header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: spacing.lg },
   body: { gap: spacing.xs },
   footer: { marginTop: "auto", paddingTop: spacing.xl, gap: spacing.sm },
-});
+}));

@@ -1,0 +1,17 @@
+# 03-notifiche.yaml
+# Apre Notifiche, tocca la prima e verifica che si apra una schermata di destinazione.
+appId: com.fantappero.mobile
+---
+- launchApp
+- extendedWaitUntil: { visible: { id: "app-menu-button" }, timeout: 30000 }
+- tapOn: { id: "header-notifications-button" }
+- extendedWaitUntil: { visible: { id: "screen-notifications" }, timeout: 15000 }
+- takeScreenshot: dev-03-elenco
+# Le righe non hanno testID: si tocca la prima riga sotto i filtri.
+# DA VERIFICARE con `maestro hierarchy` dopo il login.
+- tapOn:
+    below: { id: "notifications-filters" }
+    index: 0
+- waitForAnimationToEnd
+- assertNotVisible: { id: "screen-notifications" }
+- takeScreenshot: dev-03-destinazione
