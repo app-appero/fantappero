@@ -148,3 +148,63 @@ def test_catalog_sync_skips_national_clubs(session: Session) -> None:
     assert (
         session.execute(select(Club).where(Club.provider_id == 900002)).scalar_one_or_none() is None
     )
+
+
+def test_catalog_sync_removes_clubs_no_longer_listed_for_the_season(session: Session) -> None:
+    """Decisione 14 (18/11): un club che il fornitore non elenca più per una
+    stagione (retrocesso o associato per errore) esce dalla stagione, così non
+    compare più nel listone delle leghe di quel campionato."""
+    leagues = parse_envelope(_load("reference/leagues.json"), endpoint="/leagues", http_status=200)
+    raw_teams = _load("reference/teams.json")
+    teams = parse_envelope(raw_teams, endpoint="/teams", http_status=200)
+    sync_catalog(
+        session,
+        leagues_envelope=leagues,
+        teams_batches=[TeamsBatch(envelope=teams, competition_provider_id=39, season_year=2026)],
+    )
+    session.commit()
+    premier_2026 = session.scalars(
+        select(SportSeason)
+        .join(Competition, Competition.id == SportSeason.competition_id)
+        .where(Competition.provider_id == 39, SportSeason.year == 2026)
+    ).one()
+
+    def season_members() -> int:
+        return session.execute(
+            select(func.count())
+            .select_from(CompetitionSeasonClub)
+            .where(CompetitionSeasonClub.sport_season_id == premier_2026.id)
+        ).scalar_one()
+
+    before = season_members()
+    assert before >= 3
+    reduced = {**raw_teams, "response": raw_teams["response"][:-2]}
+    result = sync_catalog(
+        session,
+        teams_batches=[
+            TeamsBatch(
+                envelope=parse_envelope(reduced, endpoint="/teams", http_status=200),
+                competition_provider_id=39,
+                season_year=2026,
+            )
+        ],
+    )
+    session.commit()
+    assert season_members() == before - 2
+    assert result.counters.memberships_removed == 2
+    # I club restano nel catalogo: esce solo l'iscrizione alla stagione.
+    assert session.execute(select(func.count()).select_from(Club)).scalar_one() >= before
+
+    empty = {**raw_teams, "response": []}
+    sync_catalog(
+        session,
+        teams_batches=[
+            TeamsBatch(
+                envelope=parse_envelope(empty, endpoint="/teams", http_status=200),
+                competition_provider_id=39,
+                season_year=2026,
+            )
+        ],
+    )
+    session.commit()
+    assert season_members() == before - 2  # una risposta vuota non cancella nulla

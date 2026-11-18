@@ -35,6 +35,8 @@ Le corse partono solo di notte (ora di Roma) per lasciare i token del giorno a R
 
 Le corse sono distanziate di 70 minuti per non sovrapporsi (usano gli stessi account QA): ogni corsa usa solo le leghe con il proprio codice `QA-<data>-<corsa>-<lettera>` (es. `QA-2026-11-19-2333-A`).
 
+**Copertura (dal 19/11).** Prima di lanciare i tester, la corsa legge `docs/qa/copertura_test.md` e prova SOLO le voci delle sue aree marcate **DA FARE** o **DA RIVERIFICARE**, partendo da quelle elencate per lei nella "Scaletta". Non ripete le voci OK, non segnala di nuovo le APERTO e salta le voci con un prerequisito che manca ([PREP], [OPER], [VIVO]): le scrive come "non verificabile: manca il prerequisito". Nel rapporto ogni voce si indica con il suo codice (es. `3.8`), la piattaforma e l'esito. Le leghe preparate `QA-PREP-PARI` e `QA-PREP-DISPARI` si usano ma non si eliminano e non se ne cambiano le regole.
+
 **Data del piano.** È la data della notte **più un giorno** (la notte iniziata il 18/11 esegue il piano del 19/11). Serve per il nome delle leghe e per la domenica.
 
 **Domenica.** Se la data del piano è una domenica, le corse dei gruppi A-D fanno un controllo a campione delle proprie aree (circa metà delle voci di checklist, scelte a rotazione) e verificano che le correzioni già pubblicate non si siano rotte. Mercato e verifica restano normali.
