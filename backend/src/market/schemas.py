@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from pydantic import Field, StrictInt
 
+from app.text_validation import NoNulStr
 from auth.schemas import ApiModel
 
 
@@ -36,7 +37,7 @@ class SubmitMarketBidRequest(ApiModel):
     amount_credits: StrictInt = Field(alias="amountCredits", ge=1, le=2**31 - 1)
     # Required for waiver bids (FR-MKT-01): the roster player to release if won.
     # Must be omitted for initial-auction bids.
-    release_athlete_id: str | None = Field(default=None, alias="releaseAthleteId")
+    release_athlete_id: NoNulStr | None = Field(default=None, alias="releaseAthleteId")
 
 
 class MarketBidResponse(ApiModel):
@@ -49,7 +50,7 @@ class MarketBidResponse(ApiModel):
     amount_credits: int = Field(alias="amountCredits")
     status: str
     submitted_at: str = Field(alias="submittedAt")
-    release_athlete_id: str | None = Field(default=None, alias="releaseAthleteId")
+    release_athlete_id: NoNulStr | None = Field(default=None, alias="releaseAthleteId")
     release_athlete_name: str | None = Field(default=None, alias="releaseAthleteName")
 
 
@@ -75,10 +76,10 @@ class MarketResolutionResponse(ApiModel):
 
 
 class MarketReleaseRequest(ApiModel):
-    reason: str = Field(min_length=1)  # "voluntary" | "league_exit"
+    reason: NoNulStr = Field(min_length=1)  # "voluntary" | "league_exit"
     # Facoltativo: il calciatore che si vuole svincolare. Se lo slot ne contiene un altro (la rosa
     # si è riordinata) la richiesta è rifiutata e non svincola nessuno.
-    athlete_id: str | None = Field(default=None, alias="athleteId")
+    athlete_id: NoNulStr | None = Field(default=None, alias="athleteId")
 
 
 class MarketReleasePreviewResponse(ApiModel):

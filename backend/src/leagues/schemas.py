@@ -602,7 +602,7 @@ class LeagueListoneEntryResponse(ApiModel):
 class SetLeagueRoleOverrideRequest(ApiModel):
     role: Literal["P", "D", "C", "A"]
     current_round: int | None = Field(default=None, ge=0, alias="currentRound")
-    reason: str | None = Field(default=None, max_length=240)
+    reason: NoNulStr | None = Field(default=None, max_length=240)
 
 
 class LeagueListoneRefreshCounters(ApiModel):

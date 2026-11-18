@@ -514,6 +514,9 @@ def test_purchase_price_edit_applies_credits_even_when_revisiting_a_prior_price(
     assert assign(30) == balance_start - 30
     # Revisits price 25, previously used above — must still apply the delta.
     assert assign(25) == balance_start - 25
+    # QA 18/11: portare il prezzo a 0 rimborsa tutto quello che era stato pagato.
+    assert assign(0) == balance_start
+    assert assign(10) == balance_start - 10
 
 
 def test_release_refund_applies_credits_even_when_repeating_a_prior_release(

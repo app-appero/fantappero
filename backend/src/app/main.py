@@ -154,9 +154,12 @@ class AvatarCacheControlMiddleware:
                 headers = [
                     (key, value)
                     for key, value in message.get("headers") or []
-                    if key.lower() != b"cache-control"
+                    if key.lower() not in (b"cache-control", b"x-content-type-options")
                 ]
                 headers.append((b"cache-control", b"no-cache"))
+                # Il browser non deve mai "indovinare" un tipo diverso da quello
+                # dichiarato (decisione 13, 18/11).
+                headers.append((b"x-content-type-options", b"nosniff"))
                 message = {**message, "headers": headers}
             await send(message)
 

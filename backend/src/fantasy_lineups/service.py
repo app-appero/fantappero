@@ -1178,6 +1178,10 @@ class FantasyLineupService:
     ) -> LineupContextResponse:
         """Elimina la bozza: l'editor torna alla formazione confermata del turno (se c'è)."""
         fantasy_round = self._load_round(league_access.league.id, round_id, for_update=True)
+        # Stesso controllo del salvataggio: a turno non aperto la bozza non si
+        # tocca (QA 18/11: il DELETE rispondeva 200 su un turno `scheduled`).
+        if not self._bypasses_locks_for(league_access, target_team_id):
+            assert_lineup_modification_allowed(stored=fantasy_round.status)
         team = self._resolve_lineup_team(league_access, target_team_id, for_update=True)
         self._session.execute(
             delete(LineupDraft).where(

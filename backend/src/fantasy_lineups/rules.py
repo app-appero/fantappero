@@ -411,6 +411,50 @@ def evaluate_lineup(
                 )
             )
 
+    if not strict:
+        # Bozza: può essere incompleta, ma non oltre i massimi (QA 18/11: si
+        # salvavano 20 titolari o 2 portieri).
+        if len(filled_starters) > STARTER_COUNT:
+            issues.append(
+                LineupIssue(
+                    code="starter_count_invalid",
+                    message=(
+                        f"La formazione può avere al massimo {STARTER_COUNT} titolari "
+                        f"(attuali: {len(filled_starters)})."
+                    ),
+                )
+            )
+        if starter_role_counts[FantasyRole.P] > GOALKEEPER_STARTERS:
+            issues.append(
+                LineupIssue(
+                    code="goalkeeper_count_invalid",
+                    message=(
+                        f"Puoi schierare al massimo {GOALKEEPER_STARTERS} portiere titolare "
+                        f"(attuali: {starter_role_counts[FantasyRole.P]})."
+                    ),
+                )
+            )
+        if parsed is not None:
+            expected = module_counts(parsed)
+            if (
+                starter_role_counts[FantasyRole.D] > expected.defenders
+                or starter_role_counts[FantasyRole.C] > expected.midfielders
+                or starter_role_counts[FantasyRole.A] > expected.forwards
+            ):
+                issues.append(
+                    LineupIssue(
+                        code="module_role_mismatch",
+                        message=(
+                            f"Il modulo {parsed.value} ammette al massimo "
+                            f"{expected.defenders}D–{expected.midfielders}C–"
+                            f"{expected.forwards}A titolari "
+                            f"(attuali: {starter_role_counts[FantasyRole.D]}D–"
+                            f"{starter_role_counts[FantasyRole.C]}C–"
+                            f"{starter_role_counts[FantasyRole.A]}A)."
+                        ),
+                    )
+                )
+
     if strict and filled_bench:
         required = bench_active_role_requirements(filled_bench)
         active_slots = filled_bench[:BENCH_ACTIVE_SIZE]

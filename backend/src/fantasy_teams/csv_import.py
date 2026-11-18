@@ -88,6 +88,25 @@ def normalize_header(value: str) -> str:
     return _HEADER_ALIASES.get(cleaned, cleaned)
 
 
+_CSV_DELIMITERS = (",", ";", "\t")
+
+
+def detect_csv_delimiter(text: str) -> str:
+    """Virgola, punto e virgola o tabulazione, riconosciuti dall'intestazione.
+
+    Decisione 15 (18/11): Excel in italiano salva i CSV con il punto e virgola.
+    Vince il separatore che, applicato alla prima riga, dà tutte le colonne del
+    modello; se nessuno ci riesce resta la virgola (e l'errore d'intestazione).
+    """
+    first_line = next((line for line in text.splitlines() if line.strip()), "")
+    required = set(CSV_TEMPLATE_HEADERS)
+    for delimiter in _CSV_DELIMITERS:
+        cells = next(csv.reader([first_line], delimiter=delimiter, skipinitialspace=True), [])
+        if required.issubset({normalize_header(cell) for cell in cells}):
+            return delimiter
+    return ","
+
+
 def parse_roster_csv(data: bytes) -> list[ParsedCsvRow]:
     if not data:
         raise ValidationAuthError("Il file CSV è vuoto.", code="csv_empty")
@@ -98,7 +117,9 @@ def parse_roster_csv(data: bytes) -> list[ParsedCsvRow]:
         )
 
     text = _decode_csv(data)
-    reader = csv.DictReader(io.StringIO(text), skipinitialspace=True)
+    reader = csv.DictReader(
+        io.StringIO(text), skipinitialspace=True, delimiter=detect_csv_delimiter(text)
+    )
     if reader.fieldnames is None:
         raise ValidationAuthError(
             "Intestazione CSV mancante. Scarica il modello ufficiale.",

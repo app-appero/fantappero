@@ -27,6 +27,7 @@ import { fetchAdminListone } from "../api/admin";
 import { ApiError } from "../api/client";
 import { getApiErrorMessage } from "../auth/AuthContext";
 import { loadStoredSession } from "../auth/sessionStorage";
+import { foldSearchText } from "../utils/searchText";
 
 type RoleTab = "all" | FantasyRole;
 
@@ -65,7 +66,7 @@ function filterEntries(
   tab: RoleTab,
   query: string,
 ): AdminListoneEntry[] {
-  const normalized = query.trim().toLocaleLowerCase("it-IT");
+  const normalized = foldSearchText(query);
   return entries.filter((entry) => {
     if (tab !== "all" && entry.officialRole !== tab) {
       return false;
@@ -73,7 +74,7 @@ function filterEntries(
     if (!normalized) {
       return true;
     }
-    const haystack = `${entry.canonicalName} ${entry.clubName ?? ""}`.toLocaleLowerCase("it-IT");
+    const haystack = foldSearchText(`${entry.canonicalName} ${entry.clubName ?? ""}`);
     return haystack.includes(normalized);
   });
 }
