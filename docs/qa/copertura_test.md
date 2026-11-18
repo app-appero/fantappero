@@ -24,7 +24,7 @@ Aggiornato il 18/11/2026 con i circa 30 rapporti delle corse dal 12/11 al 18/11,
    - rose complete a 35 (riempimento casuale o import CSV), lega **attivata**, così ci sono calendario e turni veri.
    - Serve a tutte le voci [PREP]. Le corse possono usarla, ma non devono eliminarla né modificarne le regole.
 2. **Lega preparata `QA-PREP-DISPARI`** con 5 partecipanti (`qa-01`…`qa-05`), attivata: serve al calendario dispari dal vivo.
-3. **Account operatore QA:** `qa-09@test.fantappero.it` (stessa password degli altri), registrato il 18/11 e da promuovere a operatore da Rosario. Finché non è operatore, le voci [OPER] restano NV.
+3. **Account operatore QA:** `qa-09@test.fantappero.it` (stessa password degli altri), registrazione chiesta il 18/11 alla sessione del PC; poi Rosario lo promuove a operatore. Finché non è operatore, le voci [OPER] restano NV.
 4. **Turno vivo:** il primo calcio d'inizio reale su dev è il **20/11 alle 20:45** (ora di Roma). Ci sono 3 controlli brevi programmati (−2 h, −10 min, +5 min) sulla lega `QA-PREP-PARI`.
 
 ## Area 1 – Accesso, profilo, privacy
