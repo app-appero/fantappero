@@ -319,13 +319,17 @@ class LiveMarketService:
     def end_session(
         self, league_access: LeagueAccess, session_id: UUID
     ) -> LiveAuctionSessionResponse:
+        # Prima la lega, poi la sessione (lo stesso ordine delle altre operazioni sui lotti):
+        # chiudere uno scambio in sospeso può assegnare il calciatore e addebitare crediti.
+        league = self._lock_league(league_access.league.id)
         market_session = self._get_session_for_update(league_access.league.id, session_id)
         self._assert_is_live(market_session)
         if market_session.status == MarketSessionStatus.RESOLVED:
             return self._to_session_response(market_session)
         # Un lotto con il tempo finito va chiuso prima di terminare, anche se nessuno ha
-        # aperto la schermata di stato (il tick fa commit: si ri-prende il blocco).
+        # aperto la schermata di stato (il tick fa commit: si riprendono i blocchi).
         if self._tick_current_lot(market_session):
+            league = self._lock_league(league_access.league.id)
             market_session = self._get_session_for_update(league_access.league.id, session_id)
         open_lot = self._session.scalar(
             select(MarketLiveLot).where(
@@ -338,7 +342,7 @@ class LiveMarketService:
                 "Chiudi il lotto in corso prima di terminare la sessione.",
                 code="market_live_lot_still_open",
             )
-        self._auto_decline_pending_swaps(league_access, market_session)
+        self._auto_decline_pending_swaps(league_access, market_session, league=league)
         market_session.status = MarketSessionStatus.RESOLVED
         market_session.resolved_at = datetime.now(UTC)
         self._session.flush()
@@ -353,29 +357,72 @@ class LiveMarketService:
         return self._to_session_response(market_session)
 
     def _auto_decline_pending_swaps(
-        self, league_access: LeagueAccess, market_session: MarketSession
+        self, league_access: LeagueAccess, market_session: MarketSession, *, league: League
     ) -> None:
-        """Ending the session must never leave a swap decision dangling (EP08-09)."""
+        """Ending the session must never leave a swap decision dangling (EP08-09).
+
+        Decisione di Rosario del 19/11: lo scambio non scelto conta come rinuncia, e il lotto
+        va all'offerta successiva valida come quando il capofila non ha i crediti; passa solo
+        se nessuno si qualifica. Assegnare e addebitare a mercato chiuso non si può: con uno
+        scambio in sospeso la sessione si termina solo a mercato aperto.
+        """
         pending_lots = self._session.scalars(
             select(MarketLiveLot)
             .where(
                 MarketLiveLot.session_id == market_session.id,
                 MarketLiveLot.status == MarketLiveLotStatus.PENDING_SWAP,
             )
+            .order_by(MarketLiveLot.sequence_number.asc())
             .with_for_update()
         ).all()
+        if not pending_lots:
+            return
+        assert_market_open(league)
         now = datetime.now(UTC)
         for lot in pending_lots:
-            lot.status = MarketLiveLotStatus.PASSED
-            lot.closed_at = now
             self._add_audit(
                 market_session.league_id,
                 league_access.user.id,
                 LeagueAuditAction.MARKET_LIVE_LOT_SWAP_DECLINED,
                 details={"lotId": str(lot.id), "reason": "session_ended"},
             )
-        if pending_lots:
-            self._session.flush()
+            self._close_declined_swap(
+                market_session,
+                lot,
+                league=league,
+                now=now,
+                reason="session_ended",
+                actor_id=league_access.user.id,
+            )
+
+    def _close_declined_swap(
+        self,
+        market_session: MarketSession,
+        lot: MarketLiveLot,
+        *,
+        league: League,
+        now: datetime,
+        reason: str,
+        actor_id: UUID | None,
+    ) -> None:
+        """Scambio rifiutato o non scelto: il lotto va all'offerta successiva, o passa."""
+        former_leader = (
+            self._session.get(FantasyTeam, lot.current_leader_team_id)
+            if lot.current_leader_team_id is not None
+            else None
+        )
+        if former_leader is None:
+            self._pass_lot_internal(market_session, lot, now=now, actor_id=actor_id, reason=reason)
+            return
+        self._sell_to_runner_up_or_pass(
+            market_session,
+            lot,
+            league=league,
+            former_leader=former_leader,
+            now=now,
+            reason=reason,
+            actor_id=actor_id,
+        )
 
     # -- lots -----------------------------------------------------------------
 
@@ -793,19 +840,33 @@ class LiveMarketService:
     def decline_swap(
         self, league_access: LeagueAccess, session_id: UUID, lot_id: UUID
     ) -> LiveLotResponse:
+        """Il capofila a rosa piena rinuncia allo scambio proposto.
+
+        Decisione di Rosario del 19/11: come quando il capofila non ha i crediti, il lotto va
+        all'offerta successiva valida (stessi controlli, a parità la prima, ognuno paga la
+        propria offerta una volta sola) e passa solo se nessuno si qualifica. Poiché può
+        assegnare e addebitare, come lo scambio stesso si fa solo a mercato aperto.
+        """
+        league = self._lock_league(league_access.league.id)
+        assert_market_open(league)
         market_session = self._get_session_for_update(league_access.league.id, session_id)
         self._assert_is_live(market_session)
         lot = self._get_pending_swap_lot_for_update(market_session.id, lot_id)
         team = self._assert_swap_owner(league_access, lot)
         now = datetime.now(UTC)
-        lot.status = MarketLiveLotStatus.PASSED
-        lot.closed_at = now
-        self._session.flush()
         self._add_audit(
             market_session.league_id,
             league_access.user.id,
             LeagueAuditAction.MARKET_LIVE_LOT_SWAP_DECLINED,
             details={"lotId": str(lot.id), "fantasyTeamId": str(team.id)},
+        )
+        self._close_declined_swap(
+            market_session,
+            lot,
+            league=league,
+            now=now,
+            reason="swap_declined",
+            actor_id=league_access.user.id,
         )
         self._session.commit()
         get_metrics().incr("market_live_swap_declined_total")

@@ -1408,3 +1408,297 @@ def test_manual_pass_and_sell_keep_the_admin_as_actor(
     assert [
         (entry.amount, entry.actor_id) for entry in _win_ledger_entries(db_session, sold_lot_id)
     ] == [(-20, admin_id)]
+
+
+# -- Capofila a rosa piena che non sceglie lo scambio: il lotto va all'offerta successiva ------
+
+
+def _pending_swap_lot(
+    client: TestClient,
+    db_session: Session,
+    admin_token: str,
+    league_id: str,
+    leader_token: str,
+    raises: list[tuple[str, int]],
+    *,
+    name: str,
+) -> tuple[str, str]:
+    """Capofila con i portieri al completo che vince un portiere: lotto in attesa di scambio.
+
+    ``raises`` sono i rilanci in ordine (token, importo); l'ultimo deve essere del capofila.
+    """
+    _fill_goalkeeper_quota(
+        client, db_session, admin_token, leader_token, league_id, seed_offset=_unique_id()
+    )
+    keeper = _seed_athlete(db_session, _unique_id(), name, role=FantasyRole.P)
+    session_id = _start_manual_session(client, admin_token, league_id)
+    lot_id = _nominate(client, admin_token, league_id, session_id, keeper.id)["id"]
+    for token, amount in raises:
+        _place_raise(client, token, league_id, session_id, lot_id, amount)
+    sold = client.post(
+        f"{_live_base(league_id, session_id)}/lotti/{lot_id}/aggiudica",
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+    assert sold.status_code == 200
+    assert sold.json()["status"] == "pending_swap"
+    return session_id, lot_id
+
+
+def _lot_athlete_owner(db_session: Session, lot_id: str) -> FantasyRosterSlot | None:
+    db_session.expire_all()
+    lot = db_session.get(MarketLiveLot, UUID(lot_id))
+    assert lot is not None
+    return db_session.scalar(
+        select(FantasyRosterSlot).where(FantasyRosterSlot.athlete_id == lot.athlete_id)
+    )
+
+
+def test_declined_swap_gives_the_lot_to_the_next_bid(
+    client: TestClient, db_session: Session, competition_ids: list[str]
+) -> None:
+    """Il capofila a rosa piena rinuncia allo scambio: il portiere va alla seconda offerta,
+    che paga la propria offerta una sola volta; il capofila riceve «rosa al completo»."""
+    admin_token, _ = _register_and_login(client, "live.swapfb.decline.admin@example.com")
+    runner_token, runner_id = _register_and_login(client, "live.swapfb.decline.runner@example.com")
+    leader_token, leader_id = _register_and_login(client, "live.swapfb.decline.leader@example.com")
+    league_id = _create_league(client, admin_token, competition_ids, "Lega Rinuncia Scambio P4")
+    _add_member(db_session, league_id, runner_id)
+    _add_member(db_session, league_id, leader_id)
+    session_id, lot_id = _pending_swap_lot(
+        client,
+        db_session,
+        admin_token,
+        league_id,
+        leader_token,
+        [(runner_token, 10), (leader_token, 20)],
+        name="Portiere Rinunciato",
+    )
+    runner_team = _my_team(client, runner_token, league_id)
+    leader_team = _my_team(client, leader_token, league_id)
+    leader_before = _balance(client, leader_token, league_id)
+
+    declined = client.post(
+        f"{_live_base(league_id, session_id)}/lotti/{lot_id}/rinuncia-scambio",
+        headers={"Authorization": f"Bearer {leader_token}"},
+    )
+    assert declined.status_code == 200, declined.json()
+    body = declined.json()
+    assert body["status"] == "sold"
+    assert body["currentLeaderTeamId"] == runner_team["id"]
+    assert body["currentLeaderTeamName"] == runner_team["name"]
+    assert body["currentAmountCredits"] == 10
+
+    slot = _lot_athlete_owner(db_session, lot_id)
+    assert slot is not None
+    assert str(slot.fantasy_team_id) == runner_team["id"]
+    assert slot.purchase_credits == 10
+    assert _balance(client, runner_token, league_id) == 990
+    assert _balance(client, leader_token, league_id) == leader_before
+    assert [entry.amount for entry in _win_ledger_entries(db_session, lot_id)] == [-10]
+
+    assert len(_notifications(db_session, runner_id, "mercato.asta_live_aggiudicato")) == 1
+    assert _notifications(db_session, leader_id, "mercato.asta_live_aggiudicato") == []
+    lost = _notifications(db_session, leader_id, "mercato.asta_live_perso")
+    assert len(lost) == 1
+    assert lost[0].title == "Lotto perso: rosa al completo"
+    assert "Portiere Rinunciato" in lost[0].body
+    assert "offerta successiva" in lost[0].body
+
+    declined_events = _lot_audit(
+        db_session, lot_id, LeagueAuditAction.MARKET_LIVE_LOT_SWAP_DECLINED
+    )
+    assert [event.actor_id for event in declined_events] == [leader_id]
+    sold_events = _lot_audit(db_session, lot_id, LeagueAuditAction.MARKET_LIVE_LOT_SOLD)
+    assert len(sold_events) == 1
+    assert sold_events[0].actor_id == leader_id
+    assert sold_events[0].details["fantasyTeamId"] == runner_team["id"]
+    assert sold_events[0].details["amountCredits"] == 10
+    assert sold_events[0].details["formerLeaderTeamId"] == leader_team["id"]
+    assert sold_events[0].details["formerAmountCredits"] == 20
+    assert sold_events[0].details["reason"] == "swap_declined"
+    assert _lot_audit(db_session, lot_id, LeagueAuditAction.MARKET_LIVE_LOT_PASSED) == []
+
+
+def test_swap_still_pending_at_session_end_goes_to_the_earliest_next_bid(
+    client: TestClient, db_session: Session, competition_ids: list[str]
+) -> None:
+    """Scambio ancora da scegliere quando l'amministratore termina la sessione: il lotto va
+    all'offerta successiva; a parità vince chi ha offerto prima."""
+    admin_token, admin_id = _register_and_login(client, "live.swapfb.end.admin@example.com")
+    later_token, later_id = _register_and_login(client, "live.swapfb.end.later@example.com")
+    earlier_token, earlier_id = _register_and_login(client, "live.swapfb.end.earlier@example.com")
+    leader_token, leader_id = _register_and_login(client, "live.swapfb.end.leader@example.com")
+    league_id = _create_league(client, admin_token, competition_ids, "Lega Fine Sessione P4")
+    for user_id in (later_id, earlier_id, leader_id):
+        _add_member(db_session, league_id, user_id)
+    _fill_goalkeeper_quota(
+        client, db_session, admin_token, leader_token, league_id, seed_offset=_unique_id()
+    )
+    keeper = _seed_athlete(db_session, _unique_id(), "Portiere In Sospeso", role=FantasyRole.P)
+    session_id = _start_manual_session(client, admin_token, league_id)
+    lot_id = _nominate(client, admin_token, league_id, session_id, keeper.id)["id"]
+    later_team = _my_team(client, later_token, league_id)
+    earlier_team = _my_team(client, earlier_token, league_id)
+    leader_team = _my_team(client, leader_token, league_id)
+    _place_raise(client, later_token, league_id, session_id, lot_id, 10)
+    _place_raise(client, leader_token, league_id, session_id, lot_id, 20)
+    # Seconda offerta allo stesso importo, registrata dopo ma datata prima (come nel caso P4).
+    later_raise = db_session.scalar(
+        select(MarketLiveRaise).where(
+            MarketLiveRaise.lot_id == UUID(lot_id),
+            MarketLiveRaise.fantasy_team_id == UUID(later_team["id"]),
+        )
+    )
+    assert later_raise is not None
+    db_session.add(
+        MarketLiveRaise(
+            lot_id=UUID(lot_id),
+            fantasy_team_id=UUID(earlier_team["id"]),
+            amount_credits=10,
+            placed_at=later_raise.placed_at - timedelta(seconds=5),
+        )
+    )
+    db_session.commit()
+
+    # Il lotto scade da sé: lo scambio viene proposto senza autore nel registro.
+    lot = _expire_and_poll(client, db_session, admin_token, league_id, session_id, lot_id)
+    assert lot["status"] == "pending_swap"
+    pending_events = _lot_audit(db_session, lot_id, LeagueAuditAction.MARKET_LIVE_LOT_SWAP_PENDING)
+    assert [event.actor_id for event in pending_events] == [None]
+
+    ended = client.post(
+        f"{_live_base(league_id, session_id)}/termina",
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+    assert ended.status_code == 200, ended.json()
+    assert ended.json()["status"] == "resolved"
+    lots = client.get(
+        f"{_live_base(league_id, session_id)}/lotti",
+        headers={"Authorization": f"Bearer {admin_token}"},
+    ).json()["lots"]
+    lot = next(row for row in lots if row["id"] == lot_id)
+    assert lot["status"] == "sold"
+    assert lot["currentLeaderTeamId"] == earlier_team["id"]
+    assert lot["currentAmountCredits"] == 10
+
+    slot = _lot_athlete_owner(db_session, lot_id)
+    assert slot is not None
+    assert str(slot.fantasy_team_id) == earlier_team["id"]
+    assert _balance(client, earlier_token, league_id) == 990
+    assert _balance(client, later_token, league_id) == 1000
+    assert [entry.amount for entry in _win_ledger_entries(db_session, lot_id)] == [-10]
+    assert len(_notifications(db_session, earlier_id, "mercato.asta_live_aggiudicato")) == 1
+    assert _notifications(db_session, later_id, "mercato.asta_live_aggiudicato") == []
+    lost = _notifications(db_session, leader_id, "mercato.asta_live_perso")
+    assert len(lost) == 1
+    assert lost[0].title == "Lotto perso: rosa al completo"
+    assert "offerta successiva" in lost[0].body
+
+    declined_events = _lot_audit(
+        db_session, lot_id, LeagueAuditAction.MARKET_LIVE_LOT_SWAP_DECLINED
+    )
+    assert len(declined_events) == 1
+    assert declined_events[0].actor_id == admin_id
+    assert declined_events[0].details["reason"] == "session_ended"
+    sold_events = _lot_audit(db_session, lot_id, LeagueAuditAction.MARKET_LIVE_LOT_SOLD)
+    assert len(sold_events) == 1
+    assert sold_events[0].actor_id == admin_id
+    assert sold_events[0].details["fantasyTeamId"] == earlier_team["id"]
+    assert sold_events[0].details["formerLeaderTeamId"] == leader_team["id"]
+    assert sold_events[0].details["reason"] == "session_ended"
+
+
+def test_declined_swap_passes_the_lot_when_no_next_bid_qualifies(
+    client: TestClient, db_session: Session, competition_ids: list[str]
+) -> None:
+    """L'unica altra offerta non ha più i crediti: il lotto passa e nessuno paga nulla."""
+    admin_token, _ = _register_and_login(client, "live.swapfb.none.admin@example.com")
+    poor_token, poor_id = _register_and_login(client, "live.swapfb.none.poor@example.com")
+    leader_token, leader_id = _register_and_login(client, "live.swapfb.none.leader@example.com")
+    league_id = _create_league(client, admin_token, competition_ids, "Lega Rinuncia Nessuno")
+    _add_member(db_session, league_id, poor_id)
+    _add_member(db_session, league_id, leader_id)
+    session_id, lot_id = _pending_swap_lot(
+        client,
+        db_session,
+        admin_token,
+        league_id,
+        leader_token,
+        [(poor_token, 10), (leader_token, 20)],
+        name="Portiere Senza Acquirenti",
+    )
+    poor_team = _my_team(client, poor_token, league_id)
+    _admin_adjust_credits(client, admin_token, league_id, poor_team["id"], -995, "swapfb-poor")
+    balances_before = {
+        token: _balance(client, token, league_id) for token in (poor_token, leader_token)
+    }
+
+    declined = client.post(
+        f"{_live_base(league_id, session_id)}/lotti/{lot_id}/rinuncia-scambio",
+        headers={"Authorization": f"Bearer {leader_token}"},
+    )
+    assert declined.status_code == 200, declined.json()
+    assert declined.json()["status"] == "passed"
+
+    assert _lot_athlete_owner(db_session, lot_id) is None
+    assert {
+        token: _balance(client, token, league_id) for token in balances_before
+    } == balances_before
+    assert _win_ledger_entries(db_session, lot_id) == []
+    assert _notifications(db_session, poor_id, "mercato.asta_live_aggiudicato") == []
+    lost = _notifications(db_session, leader_id, "mercato.asta_live_perso")
+    assert len(lost) == 1
+    assert lost[0].title == "Lotto perso: rosa al completo"
+    assert "svincolato" in lost[0].body
+    passed_events = _lot_audit(db_session, lot_id, LeagueAuditAction.MARKET_LIVE_LOT_PASSED)
+    assert len(passed_events) == 1
+    assert passed_events[0].actor_id == leader_id
+    assert passed_events[0].details["reason"] == "swap_declined"
+    assert _lot_audit(db_session, lot_id, LeagueAuditAction.MARKET_LIVE_LOT_SOLD) == []
+
+    # Il calciatore è di nuovo libero: si può richiamare.
+    db_session.expire_all()
+    keeper_id = db_session.get(MarketLiveLot, UUID(lot_id)).athlete_id
+    assert _nominate(client, admin_token, league_id, session_id, keeper_id)["status"] == "open"
+
+
+def test_declining_or_ending_with_a_pending_swap_is_blocked_while_the_market_is_closed(
+    client: TestClient, db_session: Session, competition_ids: list[str]
+) -> None:
+    """Rinunciare allo scambio (o terminare la sessione) ora può assegnare e addebitare:
+    a mercato chiuso non si fa, come per lo scambio stesso."""
+    admin_token, _ = _register_and_login(client, "live.swapfb.closed.admin@example.com")
+    runner_token, runner_id = _register_and_login(client, "live.swapfb.closed.runner@example.com")
+    leader_token, leader_id = _register_and_login(client, "live.swapfb.closed.leader@example.com")
+    league_id = _create_league(client, admin_token, competition_ids, "Lega Rinuncia Chiusa")
+    _add_member(db_session, league_id, runner_id)
+    _add_member(db_session, league_id, leader_id)
+    session_id, lot_id = _pending_swap_lot(
+        client,
+        db_session,
+        admin_token,
+        league_id,
+        leader_token,
+        [(runner_token, 10), (leader_token, 20)],
+        name="Portiere Mercato Chiuso",
+    )
+    admin = {"Authorization": f"Bearer {admin_token}"}
+    client.post(f"/leagues/{league_id}/mercato/stato", headers=admin, json={"open": False})
+
+    declined = client.post(
+        f"{_live_base(league_id, session_id)}/lotti/{lot_id}/rinuncia-scambio",
+        headers={"Authorization": f"Bearer {leader_token}"},
+    )
+    assert declined.status_code == 400
+    assert declined.json()["code"] == "market_closed"
+    ended = client.post(f"{_live_base(league_id, session_id)}/termina", headers=admin)
+    assert ended.status_code == 400
+    assert ended.json()["code"] == "market_closed"
+    db_session.expire_all()
+    assert db_session.get(MarketLiveLot, UUID(lot_id)).status.value == "pending_swap"
+    assert _win_ledger_entries(db_session, lot_id) == []
+
+    client.post(f"/leagues/{league_id}/mercato/stato", headers=admin, json={"open": True})
+    ended = client.post(f"{_live_base(league_id, session_id)}/termina", headers=admin)
+    assert ended.status_code == 200, ended.json()
+    assert _balance(client, runner_token, league_id) == 990

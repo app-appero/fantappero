@@ -87,6 +87,27 @@ def test_render_mercato_asta_live_perso_variants() -> None:
     assert "500" not in roster.body
 
 
+def test_render_mercato_asta_live_perso_after_declined_or_unchosen_swap() -> None:
+    """Rosa al completo e scambio rifiutato, o non scelto prima della fine della sessione."""
+    base = {"athlete_name": "Bomber", "amount_credits": 500}
+    declined = render_notification(
+        "mercato.asta_live_perso", 1, {**base, "reason": "swap_declined", "reassigned": True}
+    )
+    assert declined.title == "Lotto perso: rosa al completo"
+    assert declined.body == (
+        "Hai rinunciato allo scambio per Bomber con la rosa al completo: "
+        "il calciatore va all'offerta successiva."
+    )
+    ended = render_notification(
+        "mercato.asta_live_perso", 1, {**base, "reason": "session_ended", "reassigned": False}
+    )
+    assert ended.title == "Lotto perso: rosa al completo"
+    assert ended.body == (
+        "L'asta è terminata prima che scegliessi chi scambiare con Bomber: "
+        "nessun'altra offerta valida, il calciatore resta svincolato."
+    )
+
+
 def test_render_mercato_scambio_known_and_unknown_status() -> None:
     known = render_notification("mercato.scambio", 1, {"status": "rejected"})
     assert known.title == "Scambio rifiutato"

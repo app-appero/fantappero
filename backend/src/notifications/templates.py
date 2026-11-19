@@ -243,11 +243,21 @@ def _render_mercato_asta_live_scambio_richiesto(params: NotificationParams) -> N
 @register_template("mercato.asta_live_perso", 1)
 def _render_mercato_asta_live_perso(params: NotificationParams) -> NotificationContent:
     """Il capofila non ha potuto prendere il calciatore alla chiusura del lotto: il calciatore
-    è andato all'offerta successiva valida (``reassigned``) oppure il lotto è passato."""
+    è andato all'offerta successiva valida (``reassigned``) oppure il lotto è passato.
+
+    Con la rosa al completo il motivo può essere anche lo scambio rifiutato
+    (``swap_declined``) o non scelto prima della fine della sessione (``session_ended``)."""
     athlete_name = params.get("athlete_name", "un giocatore")
-    if params.get("reason") == "assignment_failed":
+    reason = params.get("reason")
+    if reason == "assignment_failed":
         title = "Lotto perso: rosa al completo"
         cause = f"Alla chiusura non c'era posto nella tua rosa per {athlete_name}"
+    elif reason == "swap_declined":
+        title = "Lotto perso: rosa al completo"
+        cause = f"Hai rinunciato allo scambio per {athlete_name} con la rosa al completo"
+    elif reason == "session_ended":
+        title = "Lotto perso: rosa al completo"
+        cause = f"L'asta è terminata prima che scegliessi chi scambiare con {athlete_name}"
     else:
         title = "Lotto perso: crediti insufficienti"
         amount = params.get("amount_credits")
