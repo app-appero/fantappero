@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from datetime import timedelta
+
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import select
@@ -21,7 +23,11 @@ from database.enums import FantasyRoundHomologationStatus, LineupAutoResolutionS
 from database.session import create_session_factory
 from fantasy_lineups.models import LineupSubmission
 from fantasy_ratings.service import compute_fixture_ratings
-from fantasy_turns.live_pipeline import process_live_fantasy_rounds
+from fantasy_turns.live_pipeline import (
+    LIVE_PIPELINE_HORIZON,
+    process_live_fantasy_rounds,
+    select_live_rounds,
+)
 from fantasy_turns.models import FantasyRound
 from fantasy_turns.round_calculation_service import calculate_league_round
 from leagues.models.league_calendar import LeagueCalendar, LeagueCalendarSlot
@@ -199,3 +205,25 @@ def test_calculate_round_endpoint_matches_the_service_result_for_an_operator(
     refreshed = db_session.get(FantasyRound, fantasy_round.id)
     assert refreshed is not None
     assert refreshed.homologation_status == FantasyRoundHomologationStatus.HOMOLOGATED
+
+
+def test_the_automatic_job_skips_rounds_whose_matches_are_too_old_to_change(
+    db_session: Session,
+) -> None:
+    """QA notte 18-19/11: il job ricalcolava ogni 5 minuti tutti i turni mai omologati,
+    anche vecchi di settimane, e teneva occupato il worker. Con l'orizzonte del job
+    automatico il turno vecchio resta fuori; i comandi manuali (senza orizzonte) no."""
+    fixture = _existing_fixture(db_session)
+    fantasy_round, _teams = _build_two_team_round(db_session, fixture)
+    pair = (fantasy_round.id, fantasy_round.league_id)
+    kickoff = fixture.kickoff_at
+
+    assert pair in select_live_rounds(
+        db_session, horizon=LIVE_PIPELINE_HORIZON, now=kickoff + timedelta(hours=3)
+    )
+    assert pair not in select_live_rounds(
+        db_session,
+        horizon=LIVE_PIPELINE_HORIZON,
+        now=kickoff + LIVE_PIPELINE_HORIZON + timedelta(minutes=1),
+    )
+    assert pair in select_live_rounds(db_session)

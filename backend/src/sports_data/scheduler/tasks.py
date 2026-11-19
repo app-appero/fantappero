@@ -6,7 +6,7 @@ import database.models  # noqa: F401 — register ORM mappers
 from app.worker import celery_app
 from config.settings import get_api_settings
 from database.session import create_engine_from_url, create_session_factory, session_scope
-from fantasy_turns.live_pipeline import process_live_fantasy_rounds
+from fantasy_turns.live_pipeline import LIVE_PIPELINE_HORIZON, process_live_fantasy_rounds
 from sports_data.provider.client import build_client_from_settings
 from sports_data.provider.errors import ProviderConfigError
 from sports_data.scheduler.locks import RedisJobLock
@@ -75,8 +75,9 @@ def _run_window(window: PollWindow) -> dict[str, object]:
                     client=client,
                     enabled=True,
                 )
+                # Solo i turni con partite recenti: i dati più vecchi non cambiano più.
                 pipeline = (
-                    process_live_fantasy_rounds(session)
+                    process_live_fantasy_rounds(session, horizon=LIVE_PIPELINE_HORIZON)
                     if window
                     in {PollWindow.LIVE, PollWindow.POST_MATCH, PollWindow.LATE_CORRECTIONS}
                     else None
