@@ -1,4 +1,5 @@
 import { lazyStyles } from "../../theme/lazyStyles";
+import { liveStringMap } from "../../theme/liveColors";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import type { MatchBadge, MatchBadgeKind } from "@fantappero/contracts";
 import { theme } from "@fantappero/ui/theme";
@@ -6,20 +7,33 @@ import { StyleSheet, Text, View } from "react-native";
 
 const { colors } = theme;
 
-type IconSpec = { name: keyof typeof MaterialCommunityIcons.glyphMap; color: string };
-
-const ICON_BY_KIND: Record<MatchBadgeKind, IconSpec> = {
-  goal: { name: "soccer", color: colors.foreground },
-  ownGoal: { name: "soccer", color: colors.danger },
-  penaltyScored: { name: "soccer", color: colors.foreground },
-  penaltyMissed: { name: "close-circle", color: colors.danger },
-  penaltySaved: { name: "hand-back-right", color: colors.foreground },
-  assist: { name: "shoe-print", color: colors.accent },
-  yellowCard: { name: "card", color: colors.warning },
-  redCard: { name: "card", color: colors.danger },
-  substitutionIn: { name: "arrow-up-bold-box", color: colors.success },
-  substitutionOut: { name: "arrow-down-bold-box", color: colors.danger },
+const ICON_NAME_BY_KIND: Record<MatchBadgeKind, keyof typeof MaterialCommunityIcons.glyphMap> = {
+  goal: "soccer",
+  ownGoal: "soccer",
+  penaltyScored: "soccer",
+  penaltyMissed: "close-circle",
+  penaltySaved: "hand-back-right",
+  assist: "shoe-print",
+  yellowCard: "card",
+  redCard: "card",
+  substitutionIn: "arrow-up-bold-box",
+  substitutionOut: "arrow-down-bold-box",
 };
+
+// Letti a ogni render: una tabella fissata al caricamento del modulo resterebbe
+// con i colori del tema d'avvio anche dopo il cambio tema.
+const ICON_COLOR_BY_KIND = liveStringMap<MatchBadgeKind>(() => ({
+  goal: colors.foreground,
+  ownGoal: colors.danger,
+  penaltyScored: colors.foreground,
+  penaltyMissed: colors.danger,
+  penaltySaved: colors.foreground,
+  assist: colors.accent,
+  yellowCard: colors.warning,
+  redCard: colors.danger,
+  substitutionIn: colors.success,
+  substitutionOut: colors.danger,
+}));
 
 export type EventBadgesProps = {
   badges: readonly MatchBadge[];
@@ -35,10 +49,13 @@ export function EventBadges({ badges, size = 14, testID }: EventBadgesProps) {
   return (
     <View style={styles.row} testID={testID}>
       {badges.map((badge) => {
-        const icon = ICON_BY_KIND[badge.kind];
         return (
           <View key={badge.kind} style={styles.item} testID={`event-badge-${badge.kind}`}>
-            <MaterialCommunityIcons name={icon.name} size={size} color={icon.color} />
+            <MaterialCommunityIcons
+              name={ICON_NAME_BY_KIND[badge.kind]}
+              size={size}
+              color={ICON_COLOR_BY_KIND[badge.kind]}
+            />
             {badge.count > 1 ? <Text style={styles.count}>×{badge.count}</Text> : null}
           </View>
         );

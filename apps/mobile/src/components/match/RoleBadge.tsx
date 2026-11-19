@@ -1,16 +1,19 @@
 import { lazyStyles } from "../../theme/lazyStyles";
+import { liveStringMap } from "../../theme/liveColors";
 import { pitchRoleFullLabel, resolvePitchRole, type PitchRole } from "@fantappero/contracts";
 import { theme } from "@fantappero/ui/theme";
 import { StyleSheet, Text, View } from "react-native";
 
 const { colors } = theme;
 
-const COLOR_BY_ROLE: Record<PitchRole, string> = {
+// Letti a ogni render: una tabella fissata al caricamento del modulo resterebbe
+// con i colori del tema d'avvio anche dopo il cambio tema.
+const COLOR_BY_ROLE = liveStringMap<PitchRole>(() => ({
   GK: colors.success,
   DEF: colors.warning,
   MID: colors.accent,
   FWD: colors.danger,
-};
+}));
 
 export type RoleBadgeProps = {
   code: string | null | undefined;
