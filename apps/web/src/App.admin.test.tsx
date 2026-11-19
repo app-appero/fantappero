@@ -232,6 +232,9 @@ describe("Admin panel identity gate (EP11-04a)", () => {
     const { html, unmount } = await renderAppAt("/admin/leghe", OPERATOR);
     expect(html).toContain('data-testid="admin-leagues-list"');
     expect(html).toContain("Lega Globale");
+    // Lo stato si legge in italiano, non come codice dell'API.
+    expect(html).toContain('<span class="fa-admin-leagues__state">Attiva</span>');
+    expect(html).not.toContain(">active<");
     unmount();
   });
 

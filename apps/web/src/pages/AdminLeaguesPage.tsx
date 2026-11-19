@@ -1,10 +1,11 @@
-import type { PaginatedAdminLeagues } from "@fantappero/contracts";
+import type { LeagueState, PaginatedAdminLeagues } from "@fantappero/contracts";
 import { Breadcrumb, Button, Input, PageContainer, UiStatePanel } from "@fantappero/ui";
 import { useCallback, useEffect, useState } from "react";
 import { deleteAdminLeague, fetchAdminLeagues } from "../api/admin";
 import { ApiError } from "../api/client";
 import { getApiErrorMessage } from "../auth/AuthContext";
 import { loadStoredSession } from "../auth/sessionStorage";
+import { leagueStateLabel } from "../leagues/leagueLabels";
 
 export function AdminLeaguesPage() {
   const [query, setQuery] = useState("");
@@ -144,7 +145,7 @@ export function AdminLeaguesPage() {
           {result.items.map((league) => (
             <li key={league.id} className="fa-admin-leagues__item">
               <strong className="fa-admin-leagues__name">{league.name}</strong>
-              <span className="fa-admin-leagues__state">{league.state}</span>
+              <span className="fa-admin-leagues__state">{leagueStateLabel(league.state as LeagueState)}</span>
               <span className="fa-admin-leagues__owner">Admin: {league.ownerDisplayName ?? "—"}</span>
               <Button
                 variant="danger"
