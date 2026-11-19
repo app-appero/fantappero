@@ -21,6 +21,7 @@ from database.enums import (
     LeagueAuditAction,
     LineupSlotKind,
     Permission,
+    RosterCompositionStatus,
     TacticalMoveStatus,
     UserType,
 )
@@ -78,6 +79,7 @@ from fantasy_lineups.validators import (
 )
 from fantasy_ratings.round_scores import RoundAthleteScore, compute_round_athlete_scores
 from fantasy_teams.composition_service import (
+    flag_role_quota_overflow,
     reconcile_roster_overflow,
     resolve_effective_athlete_roles,
     roster_allows_lineup,
@@ -1868,9 +1870,20 @@ class FantasyLineupService:
         """Rosa convalidata, o non convalidata solo per gli esuberi di uno scambio.
 
         I calciatori in esubero (``exceeds_role_quota``) restano comunque fuori dalla
-        formazione: vedi `roster_allows_lineup`.
+        formazione: vedi `roster_allows_lineup`. Se la rosa è bloccata perché un ruolo è
+        oltre quota senza nessuno segnato (KO-A), si segnano gli esuberi e si riprova.
+        Una rosa convalidata non si tocca: la formazione già passa e un calciatore
+        riclassificato dopo lo schieramento deve restare schierabile. La squadra è già
+        bloccata ``for_update`` e il flag appena scritto vale anche per `_roster_rows`
+        (stessi oggetti della sessione); il commit resta quello del salvataggio, o del
+        router se il salvataggio fallisce.
         """
-        if roster_allows_lineup(self._session, team, league=league_access.league):
+        league = league_access.league
+        if roster_allows_lineup(self._session, team, league=league):
+            return
+        if flag_role_quota_overflow(self._session, team, league=league) and roster_allows_lineup(
+            self._session, team, league=league
+        ):
             return
         raise ValidationAuthError(
             "La rosa deve essere convalidata prima di schierare la formazione.",
@@ -2085,9 +2098,20 @@ class FantasyLineupService:
             else find_team_for_membership(self._session, membership.id, with_slots=True)
         )
         assert team is not None
-        if not for_update and any(slot.exceeds_role_quota for slot in team.slots):
-            # Auto-riparazione di un esubero (EP08-10) ormai risolto.
-            if reconcile_roster_overflow(self._session, league=league_access.league, team=team):
+        if not for_update:
+            league = league_access.league
+            # Auto-riparazione degli esuberi (EP08-10): si toglie il flag a chi è
+            # rientrato in quota e, se la rosa non è convalidata, lo si mette a chi è
+            # oltre quota senza flag (KO-A), così la pagina formazione mostra subito chi
+            # non è schierabile. Stesso criterio di `_require_validated_roster`.
+            changed = False
+            if any(slot.exceeds_role_quota for slot in team.slots):
+                changed = reconcile_roster_overflow(self._session, league=league, team=team)
+            if team.composition_status != RosterCompositionStatus.VALIDATED and (
+                flag_role_quota_overflow(self._session, team, league=league)
+            ):
+                changed = True
+            if changed:
                 self._session.commit()
                 healed = find_team_for_membership(self._session, membership.id, with_slots=True)
                 assert healed is not None

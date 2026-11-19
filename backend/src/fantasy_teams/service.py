@@ -26,10 +26,11 @@ from database.enums import (
     RosterOwnershipSource,
     UserType,
 )
-from fantasy_teams.composition import ROLE_LABEL_IT, RosterCompositionReport
+from fantasy_teams.composition import ROLE_LABEL_IT, RosterCompositionReport, role_quota_overflow
 from fantasy_teams.composition_service import (
     assert_assignment_respects_role_quota,
     evaluate_team_composition,
+    flag_role_quota_overflow,
     reconcile_roster_overflow,
     resolve_effective_athlete_role,
     resolve_effective_athlete_roles,
@@ -182,10 +183,18 @@ class FantasyTeamService:
         team = find_team_for_membership(self._session, membership.id, with_slots=True)
         assert team is not None
         # Auto-riparazione: un esubero (EP08-10) già risolto non deve restare
-        # segnato "in attesa" solo perché la rosa è cambiata per altre vie.
-        if any(slot.exceeds_role_quota for slot in team.slots) and reconcile_roster_overflow(
-            self._session, league=league_access.league, team=team
+        # segnato "in attesa" solo perché la rosa è cambiata per altre vie; in una rosa
+        # non convalidata, un ruolo oltre quota senza nessuno segnato (KO-A) mostra
+        # invece chi è in più (stesso criterio della formazione).
+        league = league_access.league
+        changed = False
+        if any(slot.exceeds_role_quota for slot in team.slots):
+            changed = reconcile_roster_overflow(self._session, league=league, team=team)
+        if team.composition_status != RosterCompositionStatus.VALIDATED and (
+            flag_role_quota_overflow(self._session, team, league=league)
         ):
+            changed = True
+        if changed:
             self._session.commit()
             team = find_team_for_membership(self._session, membership.id, with_slots=True)
             assert team is not None
@@ -1413,20 +1422,25 @@ class FantasyTeamService:
                 continue
             per_team = counts.setdefault(str(team_id), {})
             per_team[effective.role] = per_team.get(effective.role, 0) + 1
+        rows_by_team: dict[str, list[tuple[PreviewRow, FantasyRole]]] = {}
         for row in candidates:
             effective = roles.get(UUID(row.athlete_id)) if row.athlete_id else None
             if effective is None or row.fantasy_team_id is None:
                 continue
-            per_team = counts.setdefault(row.fantasy_team_id, {})
-            per_team[effective.role] = per_team.get(effective.role, 0) + 1
-            if per_team[effective.role] > limits.for_role(effective.role):
+            rows_by_team.setdefault(row.fantasy_team_id, []).append((row, effective.role))
+        # Stessa regola dell'auto-riparazione degli slot (`flag_role_quota_overflow`):
+        # partendo dalla rosa attuale, in ordine di file vanno oltre quota le ultime righe.
+        for team_key, team_rows in rows_by_team.items():
+            for row, role in role_quota_overflow(
+                limits=limits, items=team_rows, base_counts=counts.get(team_key)
+            ):
                 row.status = "error"
                 row.issues.append(
                     PreviewRowIssue(
                         code="role_quota_exceeded",
                         message=(
-                            f"Limite {ROLE_LABEL_IT[effective.role]} superato "
-                            f"({limits.for_role(effective.role)}) per questa squadra."
+                            f"Limite {ROLE_LABEL_IT[role]} superato "
+                            f"({limits.for_role(role)}) per questa squadra."
                         ),
                         severity="error",
                     )
