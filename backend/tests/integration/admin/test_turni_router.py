@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import json
+from datetime import UTC, datetime, timedelta
+
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import select
@@ -17,11 +20,19 @@ from tests.integration.leagues.test_scoring_service import (
     _sync_match,
 )
 
-from database.enums import FantasyRoundHomologationStatus, LineupAutoResolutionSource
+from database.enums import (
+    FantasyRoundHomologationStatus,
+    FantasyTurnKind,
+    FantasyTurnStatus,
+    LeagueState,
+    LineupAutoResolutionSource,
+)
 from database.session import create_session_factory
 from fantasy_lineups.models import LineupSubmission
 from fantasy_ratings.service import compute_fixture_ratings
 from fantasy_turns.models import FantasyRound
+from leagues.models.league import League
+from leagues.models.league_rules import LeagueRules
 from sports_data.fixtures.models import Fixture
 
 
@@ -162,3 +173,59 @@ def test_historical_repair_endpoint_repairs_a_round_stuck_provisional_forever(
         )
     ).one()
     assert chelsea_submission.auto_resolution_source == LineupAutoResolutionSource.ZERO_FALLBACK
+
+
+def _homologated_round(db_session: Session, operator_id) -> FantasyRound:
+    now = datetime.now(UTC)
+    league = League(name="Lega Motivo NUL", season_year=2026, state=LeagueState.ACTIVE)
+    db_session.add(league)
+    db_session.flush()
+    db_session.add(LeagueRules(league_id=league.id))
+    fantasy_round = FantasyRound(
+        league_id=league.id,
+        number=1,
+        kind=FantasyTurnKind.WEEKEND,
+        window_start_at=now - timedelta(days=3),
+        window_end_at=now - timedelta(days=1),
+        status=FantasyTurnStatus.LOCKED,
+        generated_at=now - timedelta(days=4),
+        homologation_status=FantasyRoundHomologationStatus.HOMOLOGATED,
+        homologated_at=now - timedelta(hours=1),
+        homologated_by_user_id=operator_id,
+        homologation_formula_version="test",
+    )
+    db_session.add(fantasy_round)
+    db_session.commit()
+    return fantasy_round
+
+
+def test_reason_with_nul_byte_or_lone_surrogate_is_422_not_500(
+    client: TestClient,
+    db_session: Session,
+) -> None:
+    """QA 19/11: un motivo con il byte NUL arrivava al JSONB dell'audit e Postgres
+    rispondeva con un 500 (correzione turno e ricalcolo storico)."""
+    token, user_id = _register_and_login(client, "admin-motivo-nul.operator@example.com")
+    _promote_to_operator(db_session, user_id)
+    fantasy_round = _homologated_round(db_session, user_id)
+    headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
+    correction_url = f"/fantasy-scoring/rounds/{fantasy_round.id}/correzione"
+
+    for reason in (f"qa{chr(0)}nul", f"motivo {chr(0xD83D)}"):
+        # json.dumps (ensure_ascii) scrive NUL e surrogato come escape \uXXXX, come un
+        # client reale; httpx con `json=` non riuscirebbe a codificare il surrogato.
+        body = json.dumps({"reason": reason}).encode("ascii")
+        for url in (correction_url, "/admin/turni/ricalcola-storico"):
+            response = client.post(url, headers=headers, content=body)
+            assert response.status_code == 422, (url, reason, response.text)
+            assert response.json()["code"] == "validation_error"
+
+    db_session.expire_all()
+    untouched = db_session.get(FantasyRound, fantasy_round.id)
+    assert untouched is not None
+    assert untouched.homologation_status == FantasyRoundHomologationStatus.HOMOLOGATED
+
+    # Con un motivo valido la stessa correzione passa.
+    corrected = client.post(correction_url, headers=headers, json={"reason": "qa motivo valido"})
+    assert corrected.status_code == 200, corrected.text
+    assert corrected.json()["homologationStatus"] == "provisional"

@@ -8,6 +8,7 @@ from uuid import UUID
 
 from pydantic import Field
 
+from app.text_validation import NoNulStr
 from auth.schemas import ApiModel
 
 
@@ -246,7 +247,8 @@ class PendingFixtureResponse(ApiModel):
 
 
 class ApplyRoundCorrectionRequest(ApiModel):
-    reason: str = Field(min_length=1)
+    # Il motivo finisce nel JSONB dell'audit: con il byte NUL Postgres dava 500 (QA 19/11).
+    reason: NoNulStr = Field(min_length=1)
 
 
 class RoundHomologationResponse(ApiModel):

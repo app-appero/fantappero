@@ -7,6 +7,7 @@ from typing import Literal
 
 from pydantic import Field
 
+from app.text_validation import NoNulStr
 from auth.schemas import ApiModel, SessionUserResponse
 from database.enums import LeagueState, PlatformRole
 
@@ -219,7 +220,8 @@ class AdminRoundCalculationResultResponse(ApiModel):
 
 
 class AdminHistoricalRepairRequest(ApiModel):
-    reason: str = Field(min_length=1)
+    # Come per la correzione di un turno: niente NUL né surrogati nel motivo (QA 19/11).
+    reason: NoNulStr = Field(min_length=1)
 
 
 class AdminHistoricalRepairJobResponse(ApiModel):
