@@ -1,7 +1,9 @@
 import { lazyStyles } from "../theme/lazyStyles";
 import { theme } from "@fantappero/ui/theme";
+import { useState } from "react";
 import { Image, StyleSheet, Text, View } from "react-native";
 import { resolveAvatarUrl } from "../utils/avatar";
+import { visibleAvatarSrc } from "../utils/avatarFallback";
 
 const { colors } = theme;
 
@@ -15,7 +17,10 @@ export function initialsOf(name: string): string {
     .toUpperCase();
 }
 
-/** Avatar tondo con iniziali (brand + anello viola), usato per squadre e partecipanti. */
+/**
+ * Avatar tondo con iniziali (brand + anello viola), usato per squadre e partecipanti.
+ * Se l'immagine non si carica (es. 404) si torna alle iniziali.
+ */
 export function TeamAvatar({
   name,
   size = 44,
@@ -25,7 +30,9 @@ export function TeamAvatar({
   size?: number;
   avatarUrl?: string | null;
 }) {
-  const src = resolveAvatarUrl(avatarUrl ?? null);
+  const resolvedSrc = resolveAvatarUrl(avatarUrl ?? null);
+  const [failedSrc, setFailedSrc] = useState<string | null>(null);
+  const src = visibleAvatarSrc(resolvedSrc, failedSrc);
   return (
     <View
       style={[styles.ring, { width: size, height: size, borderRadius: size / 2 }]}
@@ -33,7 +40,7 @@ export function TeamAvatar({
       importantForAccessibility="no-hide-descendants"
     >
       {src ? (
-        <Image source={{ uri: src }} style={styles.image} />
+        <Image source={{ uri: src }} style={styles.image} onError={() => setFailedSrc(src)} />
       ) : (
         <Text style={[styles.text, { fontSize: Math.round(size * 0.38) }]} allowFontScaling={false}>
           {initialsOf(name)}
