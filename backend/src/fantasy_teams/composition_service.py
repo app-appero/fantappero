@@ -7,8 +7,8 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from uuid import UUID
 
-from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy import select, update
+from sqlalchemy.orm import Session, undefer
 
 from database.enums import FantasyRole, LeagueState, RosterCompositionStatus
 from fantasy_teams.composition import (
@@ -17,20 +17,25 @@ from fantasy_teams.composition import (
     RosterCompositionReport,
     evaluate_roster_composition,
     limits_from_rules,
+    role_quota_overflow,
     would_exceed_role_quota,
 )
-from fantasy_teams.models import FantasyRosterSlot, FantasyTeam
+from fantasy_teams.models import FantasyRosterSlot, FantasyTeam, RosterOwnershipInterval
 from leagues.models.league import League
 from leagues.models.league_competition import LeagueCompetition
 from leagues.models.league_membership import LeagueMembership
 from leagues.models.league_rules import LeagueRules
 from leagues.validators import LifecycleBlocker
+from observability.logging import get_logger
+from observability.metrics import get_metrics
 from sports_data.catalog.models import CompetitionSeasonClub, SportSeason
 from sports_data.listone.generate import get_role_assignment, list_role_assignments
 from sports_data.listone.mapping import map_provider_position_to_role
 from sports_data.listone.models import LeagueRoleOverride, RoleAssignment
 from sports_data.listone.overrides import effective_role_for_athlete, get_active_override
 from sports_data.roster.models import SquadMembership
+
+logger = get_logger(__name__)
 
 
 @dataclass(frozen=True)
@@ -274,6 +279,118 @@ def evaluate_team_composition(
     )
 
 
+#: Possesso non registrato: conta come l'acquisto più vecchio.
+_UNKNOWN_ACQUISITION = datetime.min.replace(tzinfo=UTC)
+
+
+def flag_role_quota_overflow(
+    session: Session,
+    team: FantasyTeam,
+    *,
+    league: League,
+) -> list[FantasyRosterSlot]:
+    """Auto-riparazione: segna ``exceeds_role_quota`` sugli esuberi di ruolo rimasti senza flag.
+
+    Un ruolo può trovarsi oltre quota senza nessun calciatore segnato (KO-A, QA 19/11:
+    11 attaccanti su 10, nessuno slot in esubero) se un'operazione l'ha portato lì senza
+    passare dal controllo di quota, per esempio un cambio di ruolo nel listone o un
+    override di lega. In quello stato `roster_allows_lineup` non trova esuberi da
+    togliere e blocca la formazione per sempre.
+
+    Per ogni ruolo restano in quota al massimo ``limite`` calciatori non segnati; quelli
+    in più si segnano, in quest'ordine: prima l'acquisto più recente (``acquired_at``
+    del possesso attivo dello slot), poi lo slot più alto. Uno slot senza possesso
+    registrato (dati precedenti allo storico dei possessi) conta come il più vecchio.
+    I ruoli sono quelli della valutazione della rosa (`evaluate_team_composition`), così
+    dopo la riparazione la rosa senza esuberi non è più oltre quota.
+
+    Non toglie mai un flag (lo fa `reconcile_roster_overflow` quando l'esubero rientra)
+    ed è idempotente: con gli esuberi già segnati non cambia nulla. Fa flush e lascia
+    il commit al chiamante. Ritorna gli slot appena segnati.
+    """
+    slots = list(
+        session.scalars(
+            select(FantasyRosterSlot)
+            .where(
+                FantasyRosterSlot.fantasy_team_id == team.id,
+                FantasyRosterSlot.athlete_id.is_not(None),
+            )
+            .options(undefer(FantasyRosterSlot.exceeds_role_quota))
+        ).all()
+    )
+    unflagged = [slot for slot in slots if not slot.exceeds_role_quota]
+    limits = resolve_league_rules_limits(session, league.id)
+    if len(unflagged) <= min(limits.for_role(role) for role in FantasyRole):
+        # Nessun ruolo può superare la quota con così pochi calciatori.
+        return []
+    roles = resolve_effective_athlete_roles(
+        session,
+        league_id=league.id,
+        athlete_ids=[slot.athlete_id for slot in unflagged if slot.athlete_id is not None],
+        season_year=league.season_year,
+    )
+    acquired_at = {
+        (slot_index, athlete_id): acquired
+        for slot_index, athlete_id, acquired in session.execute(
+            select(
+                RosterOwnershipInterval.slot_index,
+                RosterOwnershipInterval.athlete_id,
+                RosterOwnershipInterval.acquired_at,
+            ).where(
+                RosterOwnershipInterval.fantasy_team_id == team.id,
+                RosterOwnershipInterval.released_at.is_(None),
+            )
+        ).all()
+    }
+
+    def arrival_order(slot: FantasyRosterSlot) -> tuple[bool, datetime, int]:
+        # Dal più vecchio al più recente: gli ultimi oltre quota sono gli esuberi.
+        acquired = acquired_at.get((slot.slot_index, slot.athlete_id))
+        return (acquired is not None, acquired or _UNKNOWN_ACQUISITION, slot.slot_index)
+
+    overflow = role_quota_overflow(
+        limits=limits,
+        items=[
+            (slot, roles[slot.athlete_id].role)
+            for slot in sorted(unflagged, key=arrival_order)
+            if slot.athlete_id in roles
+        ],
+    )
+    flagged: list[FantasyRosterSlot] = []
+    for slot, role in overflow:
+        # UPDATE condizionato: se nel frattempo lo slot ha cambiato calciatore (svincolo o
+        # scambio concorrente) non si segna, per non lasciare un flag su chi non c'entra.
+        result = session.execute(
+            update(FantasyRosterSlot)
+            .where(
+                FantasyRosterSlot.id == slot.id,
+                FantasyRosterSlot.athlete_id == slot.athlete_id,
+                FantasyRosterSlot.exceeds_role_quota.is_(False),
+            )
+            .values(exceeds_role_quota=True)
+            .execution_options(synchronize_session="fetch")
+        )
+        if result.rowcount:
+            flagged.append(slot)
+            logger.warning(
+                "fantasy_roster_role_overflow_flagged",
+                extra={
+                    "fantasy_team_id": str(team.id),
+                    "slot_index": slot.slot_index,
+                    "athlete_id": str(slot.athlete_id),
+                    "role": role.value,
+                },
+            )
+    if flagged:
+        session.flush()
+        get_metrics().incr(
+            "fantasy_roster_role_overflow_flagged_total",
+            labels={"result": "self_healed"},
+            amount=len(flagged),
+        )
+    return flagged
+
+
 def sync_team_composition_status(
     session: Session,
     team: FantasyTeam,
@@ -281,6 +398,10 @@ def sync_team_composition_status(
     league: League,
     require_complete: bool | None = None,
 ) -> RosterCompositionReport:
+    # Chi scrive lo stato della rosa ripara anche gli esuberi senza flag: la valutazione
+    # resta la stessa (gli esuberi contano), ma la rosa mostra chi è in più e la
+    # formazione si può schierare senza di lui (vedi `roster_allows_lineup`).
+    flag_role_quota_overflow(session, team, league=league)
     report = evaluate_team_composition(
         session,
         team,
@@ -315,6 +436,9 @@ def roster_allows_lineup(session: Session, team: FantasyTeam, *, league: League)
     - tolti gli esuberi, nessun ruolo supera la quota e ogni ruolo è risolvibile;
     - tolti gli esuberi, la rosa rappresenta ancora almeno 3 campionati (stessa
       regola della convalida, ``MIN_ROSTER_COMPETITIONS``).
+
+    Conta solo gli esuberi già segnati: chi la usa per sbloccare la formazione chiama
+    prima `flag_role_quota_overflow`, che segna quelli rimasti senza flag (KO-A).
     """
     if team.composition_status == RosterCompositionStatus.VALIDATED:
         return True

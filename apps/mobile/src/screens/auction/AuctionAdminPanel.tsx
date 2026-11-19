@@ -1,5 +1,6 @@
 import { Pressable, Text, View } from "react-native";
-import { DateTimeField, formatDateTimeValue } from "../../components/DateTimeField";
+import { DateTimeField } from "../../components/DateTimeField";
+import { formatRomeDateTime } from "../../utils/romeTime";
 import { StatusBadge } from "../../components/StatusBadge";
 import { UiStatePanel } from "../../components/UiStatePanel";
 import type { MarketSessionFlow } from "../../market/useMarketSessionFlow";
@@ -73,7 +74,7 @@ export function AuctionAdminPanel({
             <Text style={styles.meta}>Offerte: {flow.currentSession.bidCount ?? "—"}</Text>
           </View>
           <Text style={styles.meta} testID={`${testIdPrefix}-admin-window`}>
-            {`Apre ${formatDateTimeValue(new Date(flow.currentSession.opensAt))} · chiude ${formatDateTimeValue(new Date(flow.currentSession.closesAt))}`}
+            {`Apre ${formatRomeDateTime(flow.currentSession.opensAt)} · chiude ${formatRomeDateTime(flow.currentSession.closesAt)}`}
           </Text>
           <View style={styles.rowActions}>
             <Pressable

@@ -7,12 +7,14 @@ import type {
   MarketReleaseReason,
   RosterOccupancyEntry,
   TeamRosterPlayer,
+  TradeProposal,
 } from "@fantappero/contracts";
 import {
   Badge,
   Breadcrumb,
   Button,
   Input,
+  Modal,
   PageContainer,
   Select,
   UiStatePanel,
@@ -33,6 +35,12 @@ import { RoleGroupedAthletes } from "./RoleGroupedAthletes";
 import { getApiErrorMessage, useAuth } from "../auth/AuthContext";
 import { loadStoredSession } from "../auth/sessionStorage";
 import { useMarketHistory } from "../market/useMarketHistory";
+import {
+  TRADE_ACCEPT_CANCEL_LABEL,
+  TRADE_ACCEPT_CONFIRM_LABEL,
+  TRADE_ACCEPT_CONFIRM_TITLE,
+  tradeAcceptConfirmMessage,
+} from "../market/tradeAcceptConfirm";
 import { useTradeFlow } from "../market/useTradeFlow";
 import { useLocation } from "../router/simpleRouter";
 import { parseWireframeStateFromSearch } from "../wireframes/useWireframeState";
@@ -455,6 +463,10 @@ export function MarketPage() {
   const [counterCreditsAmount, setCounterCreditsAmount] = useState("0");
   const [counterHasExpiry, setCounterHasExpiry] = useState(false);
   const [counterExpiresAt, setCounterExpiresAt] = useState("");
+  // «Accetta» esegue subito lo scambio (calciatori e crediti si spostano e non si torna
+  // indietro): la proposta da accettare passa prima da una conferma (QA 19/11).
+  // Rifiuta e Controproponi restano senza conferma.
+  const [acceptTarget, setAcceptTarget] = useState<TradeProposal | null>(null);
 
   // N15: il link di una notifica deve mostrare lo scambio anche se è già concluso, ma la
   // scheda predefinita è "In corso": passa a "Tutte" una volta sola, se serve.
@@ -507,6 +519,16 @@ export function MarketPage() {
         expiresAt: counterHasExpiry && counterExpiresAt ? new Date(counterExpiresAt).toISOString() : null,
       })
       .then(() => setCounteringProposalId(null));
+  }
+
+  async function onConfirmAccept() {
+    const target = acceptTarget;
+    if (!target || trade.actionPendingId === target.id) {
+      return;
+    }
+    // L'esito (anche l'errore) si legge nella pagina: la conferma si chiude in entrambi i casi.
+    await trade.acceptProposal(target.id);
+    setAcceptTarget((current) => (current?.id === target.id ? null : current));
   }
 
   function teamNameFor(teamId: string): string {
@@ -1027,7 +1049,8 @@ export function MarketPage() {
                             variant="primary"
                             size="sm"
                             disabled={pending || proposal.awaitingCredits === true}
-                            onClick={() => void trade.acceptProposal(proposal.id)}
+                            onClick={() => setAcceptTarget(proposal)}
+                            data-testid={`market-trade-accept-${proposal.id}`}
                           >
                             {proposal.awaitingCredits ? "In attesa di crediti" : "Accetta"}
                           </Button>
@@ -1248,6 +1271,37 @@ export function MarketPage() {
             ) : null}
           </WireframeSection>
         ) : null}
+
+        <Modal
+          open={acceptTarget !== null}
+          onClose={() => setAcceptTarget(null)}
+          title={TRADE_ACCEPT_CONFIRM_TITLE}
+          footer={
+            <>
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => setAcceptTarget(null)}
+                data-testid="market-trade-accept-cancel"
+              >
+                {TRADE_ACCEPT_CANCEL_LABEL}
+              </Button>
+              <Button
+                type="button"
+                variant="primary"
+                loading={acceptTarget !== null && trade.actionPendingId === acceptTarget.id}
+                onClick={() => void onConfirmAccept()}
+                data-testid="market-trade-accept-confirm"
+              >
+                {TRADE_ACCEPT_CONFIRM_LABEL}
+              </Button>
+            </>
+          }
+        >
+          <p data-testid="market-trade-accept-dialog">
+            {acceptTarget ? tradeAcceptConfirmMessage(acceptTarget, team?.id) : null}
+          </p>
+        </Modal>
       </div>
     </PageContainer>
   );

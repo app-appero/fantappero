@@ -263,6 +263,7 @@ export {
   isAthleteKickoffLocked,
   isLineupModificationAllowed,
   isTacticalWindowActive,
+  keepStartersForModule,
   lineupSignature,
   moduleCounts,
   moveBenchItem,

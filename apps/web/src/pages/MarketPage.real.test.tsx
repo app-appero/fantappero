@@ -468,6 +468,100 @@ describe("Mercato — scambi collegati alle API reali (EP08-05/06)", () => {
     unmount();
   });
 
+  it("Accetta chiede conferma: Indietro chiude senza accettare, Accetta scambio chiama l'API", async () => {
+    const received = {
+      id: "proposal-received",
+      leagueId: "league-1",
+      proposerTeamId: "team-2",
+      recipientTeamId: "team-1",
+      offeredAthletes: [{ id: "athlete-2", name: "Giocatore Avversario" }],
+      requestedAthletes: [{ id: "athlete-1", name: "Giocatore Svincolabile" }],
+      offeredCredits: 10,
+      requestedCredits: 0,
+      status: "proposed",
+      expiresAt: null,
+      createdAt: "2026-08-19T00:00:00Z",
+      counterOfId: null,
+    };
+    fetchTradeProposalsMock.mockReset().mockResolvedValue({ proposals: [received] });
+    acceptTradeProposalMock.mockReset().mockResolvedValue({ ...received, status: "accepted" });
+    const { container, unmount } = await renderAppAt("/mercato");
+    const query = (testId: string) =>
+      container.querySelector(`[data-testid="${testId}"]`) as HTMLButtonElement | null;
+
+    const accept = query("market-trade-accept-proposal-received");
+    expect(accept?.textContent).toContain("Accetta");
+    expect(query("market-trade-accept-dialog")).toBeNull();
+
+    // Il primo tocco apre solo la conferma, con il riepilogo dello scambio.
+    await act(async () => {
+      accept!.click();
+    });
+    expect(acceptTradeProposalMock).not.toHaveBeenCalled();
+    expect(container.querySelector('[role="dialog"]')?.textContent).toContain("Accettare lo scambio?");
+    expect(query("market-trade-accept-dialog")?.textContent).toBe(
+      "Riceverai Giocatore Avversario + 10 crediti e cederai Giocatore Svincolabile. " +
+        "Una volta accettato non potrai annullarlo.",
+    );
+    expect(query("market-trade-accept-cancel")?.textContent).toBe("Indietro");
+    expect(query("market-trade-accept-confirm")?.textContent).toBe("Accetta scambio");
+
+    // Indietro chiude la conferma senza accettare.
+    await act(async () => {
+      query("market-trade-accept-cancel")!.click();
+    });
+    expect(query("market-trade-accept-dialog")).toBeNull();
+    expect(acceptTradeProposalMock).not.toHaveBeenCalled();
+
+    // Solo «Accetta scambio» accetta davvero.
+    await act(async () => {
+      query("market-trade-accept-proposal-received")!.click();
+    });
+    await act(async () => {
+      query("market-trade-accept-confirm")!.click();
+    });
+    await flushAsync();
+    expect(acceptTradeProposalMock).toHaveBeenCalledTimes(1);
+    expect(acceptTradeProposalMock).toHaveBeenCalledWith("access-token", "league-1", "proposal-received");
+    expect(query("market-trade-accept-dialog")).toBeNull();
+    unmount();
+  });
+
+  it("Rifiuta resta senza conferma", async () => {
+    fetchTradeProposalsMock.mockReset().mockResolvedValue({
+      proposals: [
+        {
+          id: "proposal-received",
+          leagueId: "league-1",
+          proposerTeamId: "team-2",
+          recipientTeamId: "team-1",
+          offeredAthletes: [{ id: "athlete-2", name: "Giocatore Avversario" }],
+          requestedAthletes: [],
+          offeredCredits: 0,
+          requestedCredits: 0,
+          status: "proposed",
+          expiresAt: null,
+          createdAt: "2026-08-19T00:00:00Z",
+          counterOfId: null,
+        },
+      ],
+    });
+    rejectTradeProposalMock.mockReset().mockResolvedValue({});
+    const { container, unmount } = await renderAppAt("/mercato");
+    const card = container.querySelector('[data-testid="market-trade-proposal-proposal-received"]');
+    const reject = [...(card?.querySelectorAll("button") ?? [])].find(
+      (button) => (button.textContent ?? "") === "Rifiuta",
+    );
+    await act(async () => {
+      reject!.click();
+    });
+    await flushAsync();
+    expect(rejectTradeProposalMock).toHaveBeenCalledWith("access-token", "league-1", "proposal-received");
+    expect(container.querySelector('[role="dialog"]')).toBeNull();
+    expect(acceptTradeProposalMock).not.toHaveBeenCalled();
+    unmount();
+  });
+
   it("admin: proposta in attesa di approvazione mostra Approva/Rifiuta (admin)", async () => {
     fetchTradeProposalsMock.mockReset().mockResolvedValue({
       proposals: [
@@ -531,6 +625,12 @@ describe("Mercato — scambi collegati alle API reali (EP08-05/06)", () => {
       (b.textContent ?? "").includes("In attesa di crediti"),
     );
     expect(acceptButton?.hasAttribute("disabled")).toBe(true);
+    // Sospeso: nessuna conferma da aprire, nessuna chiamata.
+    await act(async () => {
+      acceptButton!.click();
+    });
+    expect(container.querySelector('[data-testid="market-trade-accept-dialog"]')).toBeNull();
+    expect(acceptTradeProposalMock).not.toHaveBeenCalled();
     const stats = container.querySelector('[data-testid="market-trade-stats"]');
     const statText = (label: string) =>
       [...(stats?.querySelectorAll(".fa-trade-stat") ?? [])]

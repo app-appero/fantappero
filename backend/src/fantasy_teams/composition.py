@@ -206,6 +206,32 @@ def evaluate_roster_composition(
     )
 
 
+def role_quota_overflow[K](
+    *,
+    limits: RosterCompositionLimits,
+    items: Iterable[tuple[K, FantasyRole]],
+    base_counts: Mapping[FantasyRole, int] | None = None,
+) -> list[tuple[K, FantasyRole]]:
+    """Elementi che portano il proprio ruolo oltre la quota, nell'ordine dato.
+
+    I ruoli si contano partendo da ``base_counts`` (calciatori già in rosa, che non si
+    toccano) e scorrendo ``items`` nell'ordine ricevuto: ogni elemento che supera il
+    limite del suo ruolo è in esubero. In ordine di arrivo restano quindi in quota i
+    primi e vanno in esubero gli ultimi.
+
+    Regola unica per l'anteprima dell'import CSV (righe oltre quota) e per
+    l'auto-riparazione dei flag ``exceeds_role_quota`` sugli slot
+    (`fantasy_teams.composition_service.flag_role_quota_overflow`).
+    """
+    counts: Counter[FantasyRole] = Counter(base_counts or {})
+    overflow: list[tuple[K, FantasyRole]] = []
+    for key, role in items:
+        counts[role] += 1
+        if counts[role] > limits.for_role(role):
+            overflow.append((key, role))
+    return overflow
+
+
 def would_exceed_role_quota(
     *,
     limits: RosterCompositionLimits,

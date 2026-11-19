@@ -26,6 +26,7 @@ import {
   computeCountdown,
   formatCountdown,
   isAthleteKickoffLocked,
+  keepStartersForModule,
   layoutFromModule,
   lineupSignature,
   moveBenchToIndex,
@@ -339,6 +340,31 @@ function playerLocked(
 
 const KICKOFF_LOCK_MESSAGE =
   "Uno o più calciatori non sono più modificabili: la loro partita è già iniziata.";
+
+const MODULE_CHANGE_FALLBACK_MESSAGE =
+  "Non è stato possibile scegliere i migliori per il nuovo modulo: ho tenuto i giocatori compatibili.";
+
+/**
+ * Rifiuti previsti della formazione migliore: rosa insufficiente (o non ancora validata) e turno
+ * non modificabile. Non sono guasti: al cambio modulo si tengono i compatibili senza errore.
+ * Stesso elenco dell'app (`apps/mobile/src/screens/formation/moduleChange.ts`).
+ */
+const BEST_LINEUP_EXPECTED_REFUSALS: ReadonlySet<string> = new Set([
+  "ai_lineup_incomplete",
+  "roster_not_validated",
+  "turn_not_open",
+  "turn_skipped",
+  "turn_modification_closed",
+]);
+
+/** Messaggio quando al cambio modulo la formazione migliore non arriva: solo per un errore vero. */
+function moduleChangeFallbackNotice(error: unknown): string | null {
+  const code =
+    error && typeof error === "object" && "code" in error && typeof error.code === "string"
+      ? error.code
+      : null;
+  return code && BEST_LINEUP_EXPECTED_REFUSALS.has(code) ? null : MODULE_CHANGE_FALLBACK_MESSAGE;
+}
 
 const AUTO_RESOLUTION_MESSAGE: Record<"draft" | "previous_round" | "zero_fallback", string> = {
   draft: "Non avevi confermato una formazione: è stata usata automaticamente la bozza salvata.",
@@ -944,6 +970,22 @@ export function FormationPage() {
     applyContext(detail);
   }
 
+  /** Esito della formazione migliore (tasto o cambio modulo): contesto, bozza e panchina ordinata. */
+  function commitBestLineup(requestId: number, detail: LineupContext) {
+    if (!isCurrentLineupRequest(requestId)) {
+      return;
+    }
+    commitLineup(requestId, detail);
+    // Panchina dal portiere all'attaccante (1P·3D·3C·3A nei primi 10).
+    setBenchIds(
+      orderBenchForActiveRoles(
+        (detail.draft?.benchAthleteIds ?? detail.lineup?.bench.map((player) => player.athleteId) ?? []).map(
+          (athleteId) => ({ athleteId, role: playerRole(roster, athleteId) }),
+        ),
+      ).map((player) => player.athleteId),
+    );
+  }
+
   /** Stato "come salvato sul server": bozza se c'è, altrimenti formazione confermata. */
   function savedEditorState(detail: LineupContext | null): {
     module: FantasyModule;
@@ -1078,26 +1120,73 @@ export function FormationPage() {
     const now = context?.serverNow ? new Date(context.serverNow) : new Date();
     // Solo la bozza corrente come fonte, mai concatenata con
     // `context.lineup.starters` — stesso motivo del calcolo di `reservedIds`.
-    const lockedIds = starterIds.filter((id) => id && playerLocked(roster, id, now, lockMarginMinutes));
-    const preserved = preserveLockedStarters({
-      template: starterTemplate(next),
-      currentStarters: [...lockedIds, ...starterIds],
+    const lockedIds = displayStarters.filter((id) => id && playerLocked(roster, id, now, lockMarginMinutes));
+    // Prima i bloccati, poi i titolari dello stesso ruolo; chi non entra torna in panchina.
+    const kept = keepStartersForModule({
+      module: next,
+      currentStarters: displayStarters,
+      benchIds,
       roster,
       now,
+      lockMarginMinutes,
     });
-    if (lockedIds.some((id) => id && !preserved.includes(id))) {
+    if (lockedIds.some((id) => !kept.starterIds.includes(id))) {
       pushToast({ title: KICKOFF_LOCK_MESSAGE, variant: "danger" });
       return;
     }
+    // I compatibili subito: nessuno slot con il ruolo sbagliato mentre si aspetta il server, e
+    // sono già il ripiego se la formazione migliore non arriva.
     setModuleCode(next);
-    setStarterIds(preserved);
-    setBenchIds(
-      orderedBenchFromRoster(
-        roster.map((row) => row.athleteId),
-        preserved,
-        benchIds,
-      ),
-    );
+    setStarterIds(kept.starterIds);
+    setBenchIds(kept.benchIds);
+    // Demo, turno non modificabile o sessione assente: la richiesta non può partire.
+    if (isDemoMode || !canModify) {
+      return;
+    }
+    void applyBestForModule(next);
+  }
+
+  /**
+   * Cambio modulo senza bloccati in campo (decisione del 19/11): i migliori per ruolo sul nuovo
+   * modulo, con lo stesso criterio di «Applica formazione migliore». Il server salva solo la
+   * bozza: niente mosse tattiche consumate, niente conferma. Se la richiesta fallisce restano i
+   * compatibili già mostrati; il messaggio compare solo per un errore vero, non per rosa
+   * insufficiente o turno chiuso.
+   */
+  async function applyBestForModule(next: FantasyModule) {
+    const session = loadStoredSession();
+    if (!session?.accessToken || !activeLeagueId || !selectedRoundId) {
+      return;
+    }
+    const requestId = startLineupRequest();
+    setBusy(true);
+    try {
+      const detail = await applyBestLineup(
+        session.accessToken,
+        activeLeagueId,
+        selectedRoundId,
+        targetTeamIdRef.current || undefined,
+        "keep_module",
+        next,
+      );
+      if (!isCurrentLineupRequest(requestId)) {
+        return;
+      }
+      commitBestLineup(requestId, detail);
+      pushToast({ title: `Modulo ${next}: formazione migliore applicata in bozza.`, variant: "success" });
+    } catch (error) {
+      if (!isCurrentLineupRequest(requestId)) {
+        return;
+      }
+      const notice = moduleChangeFallbackNotice(error);
+      if (notice) {
+        pushToast({ title: notice, variant: "danger" });
+      }
+    } finally {
+      if (isCurrentLineupRequest(requestId)) {
+        setBusy(false);
+      }
+    }
   }
 
   /** Riporta la panchina alla regola 1P·3D·3C·3A nei primi 10 posti, senza toccare i titolari. */
@@ -1521,15 +1610,7 @@ export function FormationPage() {
       if (!isCurrentLineupRequest(requestId)) {
         return;
       }
-      commitLineup(requestId, detail);
-      // Panchina dal portiere all'attaccante (1P·3D·3C·3A nei primi 10).
-      setBenchIds(
-        orderBenchForActiveRoles(
-          (detail.draft?.benchAthleteIds ?? detail.lineup?.bench.map((player) => player.athleteId) ?? []).map(
-            (athleteId) => ({ athleteId, role: playerRole(roster, athleteId) }),
-          ),
-        ).map((player) => player.athleteId),
-      );
+      commitBestLineup(requestId, detail);
       pushToast({ title: "Formazione migliore applicata in bozza.", variant: "success" });
     } catch (error) {
       if (!isCurrentLineupRequest(requestId)) {
@@ -2174,7 +2255,8 @@ export function FormationPage() {
                 return { value: code, label: blocked ? `🔒 ${label}` : label, disabled: blocked };
               })}
               data-testid="formation-module"
-              disabled={!canModify}
+              // Mentre arriva la formazione migliore (o un altro salvataggio) il modulo non cambia.
+              disabled={busy || !canModify}
             />
             <Badge
               variant={movesRemaining === 0 ? "danger" : movesRemaining === 1 ? "warning" : "neutral"}

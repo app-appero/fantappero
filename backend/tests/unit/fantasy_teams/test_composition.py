@@ -8,6 +8,7 @@ from database.enums import FantasyRole, RosterCompositionStatus
 from fantasy_teams.composition import (
     evaluate_roster_composition,
     limits_from_rules,
+    role_quota_overflow,
     would_exceed_role_quota,
 )
 
@@ -95,6 +96,25 @@ def test_would_exceed_role_quota_accounts_for_replacement() -> None:
         new_role=FantasyRole.P,
         replacing_role=FantasyRole.P,
     )
+
+
+def test_role_quota_overflow_marks_the_last_arrivals_beyond_the_limit() -> None:
+    """KO-A: 11 attaccanti su 10, in ordine di arrivo va in esubero l'ultimo."""
+    forwards = [(f"A{index}", FantasyRole.A) for index in range(11)]
+    assert role_quota_overflow(limits=STANDARD, items=forwards) == [("A10", FantasyRole.A)]
+    # Con la rosa attuale come base (anteprima CSV) vanno oltre quota le righe in più.
+    assert role_quota_overflow(
+        limits=STANDARD,
+        items=[("r1", FantasyRole.P), ("r2", FantasyRole.D), ("r3", FantasyRole.P)],
+        base_counts={FantasyRole.P: 2},
+    ) == [("r3", FantasyRole.P)]
+    # Quote esatte: nessun esubero.
+    exact = [
+        (f"{role.value}{index}", role)
+        for role in FantasyRole
+        for index in range(STANDARD.for_role(role))
+    ]
+    assert role_quota_overflow(limits=STANDARD, items=exact) == []
 
 
 def test_limits_are_taken_from_configuration_not_hardcoded_call_site() -> None:

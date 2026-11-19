@@ -7,7 +7,7 @@ import type {
 import { HScroll } from "../../components/HScroll";
 import { DateTimeField, formatDateTimeValue } from "../../components/DateTimeField";
 import { useEffect, useState } from "react";
-import { Pressable, Text, View } from "react-native";
+import { Alert, Pressable, Text, View } from "react-native";
 import { AthleteName } from "../../athletes/AthleteCard";
 import { AppTextInput as TextInput } from "../../components/AppTextInput";
 import { StatusBadge } from "../../components/StatusBadge";
@@ -16,6 +16,12 @@ import { TRADE_STATUS_COLOR, TRADE_STATUS_LABEL } from "../../market/marketLabel
 import { marketUiStyles as styles } from "../../market/marketUiStyles";
 import type { useTradeFlow } from "../../market/useTradeFlow";
 import { CreditsDirectionField, PickPanel, type CreditsDirection, type TradeAthleteMeta } from "./MarketTradeCreateForm";
+import {
+  TRADE_ACCEPT_CANCEL_LABEL,
+  TRADE_ACCEPT_CONFIRM_LABEL,
+  TRADE_ACCEPT_CONFIRM_TITLE,
+  tradeAcceptConfirmMessage,
+} from "./tradeAcceptConfirm";
 import { TRADE_OFFERED_LABEL, TRADE_REQUESTED_LABEL, tradeExpiryLabel } from "./tradeCardLabels";
 
 type TradeTab = "received" | "sent" | "open" | "all";
@@ -105,6 +111,22 @@ export function MarketTradeList({
     setCounterCreditsDirection("offer");
     setCounterCreditsAmount("0");
     setCounterExpiresAt("");
+  }
+
+  // «Accetta» esegue subito lo scambio (calciatori e crediti si spostano e non
+  // si torna indietro): prima si chiede conferma con il riepilogo (QA 19/11).
+  // Rifiuta e Controproponi restano senza conferma.
+  function confirmAccept(proposal: TradeProposal) {
+    if (trade.actionPendingId === proposal.id || proposal.awaitingCredits === true) {
+      return;
+    }
+    Alert.alert(TRADE_ACCEPT_CONFIRM_TITLE, tradeAcceptConfirmMessage(proposal, selfTeamId), [
+      { text: TRADE_ACCEPT_CANCEL_LABEL, style: "cancel" },
+      {
+        text: TRADE_ACCEPT_CONFIRM_LABEL,
+        onPress: () => void trade.acceptProposal(proposal.id),
+      },
+    ]);
   }
 
   function handleCounterSubmit(proposalId: string) {
@@ -294,7 +316,7 @@ export function MarketTradeList({
                         (pending || proposal.awaitingCredits) && styles.disabled,
                       ]}
                       disabled={pending || proposal.awaitingCredits === true}
-                      onPress={() => void trade.acceptProposal(proposal.id)}
+                      onPress={() => confirmAccept(proposal)}
                       testID={`market-trade-accept-${proposal.id}`}
                     >
                       <Text style={styles.buttonLabel} numberOfLines={1} adjustsFontSizeToFit>
