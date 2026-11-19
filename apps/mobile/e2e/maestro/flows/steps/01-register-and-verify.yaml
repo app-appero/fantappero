@@ -6,12 +6,29 @@ appId: com.fantappero.mobile
 
 - launchApp:
     clearState: true
-- assertVisible:
-    id: "screen-auth"
+- extendedWaitUntil:
+    visible:
+      id: "screen-auth"
+    timeout: 20000
+# Dal 19/11 la registrazione è la scheda «Registrati» della schermata di accesso
+# (non più la schermata a parte). Con Google configurato la scheda è chiusa
+# dietro «Continua con email»; in locale Google manca ed è già aperta.
+- scrollUntilVisible:
+    element:
+      id: "auth-email-toggle|auth-tab-register"
+    direction: DOWN
+    timeout: 20000
+- runFlow:
+    when:
+      visible:
+        id: "auth-email-toggle"
+    commands:
+      - tapOn:
+          id: "auth-email-toggle"
 - tapOn:
-    id: "auth-register-link"
+    id: "auth-tab-register"
 - assertVisible:
-    id: "screen-auth-register"
+    id: "auth-email-register"
 
 - tapOn:
     id: "auth-register-display-name"
@@ -19,21 +36,21 @@ appId: com.fantappero.mobile
 - tapOn:
     id: "auth-register-email"
 - inputText: ${TEST_EMAIL}
-- tapOn:
-    id: "auth-register-password"
-- inputText: ${TEST_PASSWORD}
-# CORRETTO nel dry run (26/09/2026): dopo aver scritto la password la
-# tastiera copre il campo "Conferma password" sottostante, Maestro non lo
-# trova più nella gerarchia visibile finché la tastiera non si chiude.
+# CORRETTO nel dry run (26/09/2026): la tastiera copre i campi sottostanti,
+# Maestro non li trova più finché non si chiude.
 - hideKeyboard
 - tapOn:
-    id: "auth-register-confirm-password"
+    id: "auth-register-password"
 - inputText: ${TEST_PASSWORD}
 - hideKeyboard
 - tapOn:
     id: "auth-register-submit"
-- assertVisible:
-    id: "auth-register-success"
+# In locale la conferma email è accesa: dopo la registrazione l'accesso
+# automatico risponde «verifica l'email» e la scheda mostra il messaggio.
+- extendedWaitUntil:
+    visible:
+      id: "auth-register-success"
+    timeout: 15000
 
 - tapOn:
     id: "auth-register-verify-link"

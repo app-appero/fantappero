@@ -13,6 +13,22 @@ appId: com.fantappero.mobile
     timeout: 10000
 
 # --- Passo 10: login di nuovo ---
+# Scheda email chiusa dietro «Continua con email» quando Google è configurato.
+- runFlow:
+    when:
+      visible:
+        id: "auth-email-toggle"
+    commands:
+      - tapOn:
+          id: "auth-email-toggle"
+# L'app ricorda l'ultimo account: al posto del campo email c'è «Cambia».
+- runFlow:
+    when:
+      visible:
+        id: "auth-switch-account"
+    commands:
+      - tapOn:
+          id: "auth-switch-account"
 - tapOn:
     id: "auth-email"
 - inputText: ${TEST_EMAIL}
