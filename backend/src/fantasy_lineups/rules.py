@@ -73,6 +73,10 @@ COPIED_NOT_IN_ROSTER_MESSAGE = (
 COPIED_UNAVAILABLE_MESSAGE = (
     "Uno o più calciatori non sono disponibili: la loro partita è già iniziata."
 )
+ATHLETE_NOT_IN_ROSTER_MESSAGE = "Uno o più calciatori schierati non appartengono alla rosa."
+#: Avviso del contesto formazione (QA 19/11): chi non è più in rosa è stato tolto dalla
+#: formazione salvata o dalla bozza di un turno ancora modificabile.
+LINEUP_ATHLETE_LEFT_ROSTER_CODE = "lineup_athlete_left_roster"
 
 
 @dataclass(frozen=True)
@@ -142,6 +146,18 @@ class TacticalMoveEvaluation:
     would_consume: bool
     remaining_after: int
     issues: tuple[LineupIssue, ...]
+
+
+@dataclass(frozen=True)
+class DepartedLineupCleanup:
+    """Formazione senza chi non è più in rosa (vedi `drop_departed_athletes`)."""
+
+    #: Stessi posti di prima: ``""`` dove c'era chi è uscito, così gli altri non scalano.
+    starter_ids: tuple[object, ...]
+    #: Panchina senza chi è uscito, gli altri nello stesso ordine.
+    bench_ids: tuple[object, ...]
+    #: Chi è stato tolto, nell'ordine in cui compariva (titolari, poi panchina).
+    removed_ids: tuple[object, ...]
 
 
 @dataclass(frozen=True)
@@ -289,6 +305,131 @@ def _bench_role_shortfall_message(missing: Mapping[FantasyRole, int]) -> str:
     return f"{BENCH_ACTIVE_ROLE_QUOTA_MESSAGE} (mancano: {shortfall})."
 
 
+def join_names(names: Sequence[str]) -> str:
+    """«A», «A e B», «A, B e C»."""
+    items = [name for name in names if name]
+    if len(items) <= 1:
+        return "".join(items)
+    return f"{', '.join(items[:-1])} e {items[-1]}"
+
+
+def athlete_not_in_roster_message(names: Sequence[str]) -> str:
+    """Formazione rifiutata perché schiera chi non è più in rosa: il messaggio dice chi.
+
+    Senza nomi (calciatore sconosciuto, o in rosa ma in esubero di ruolo) resta il
+    messaggio generico.
+    """
+    unique = list(dict.fromkeys(name for name in names if name))
+    if not unique:
+        return ATHLETE_NOT_IN_ROSTER_MESSAGE
+    verb = "non è più" if len(unique) == 1 else "non sono più"
+    return f"{join_names(unique)} {verb} nella tua rosa."
+
+
+def lineup_athlete_left_roster_message(names: Sequence[str]) -> str:
+    """Avviso per chi è stato tolto dalla formazione perché non è più in rosa."""
+    unique = list(dict.fromkeys(name for name in names if name))
+    if not unique:
+        return (
+            "Uno o più calciatori non sono più nella tua rosa: sono stati tolti dalla "
+            "formazione, scegli chi mettere al loro posto."
+        )
+    if len(unique) == 1:
+        return (
+            f"{unique[0]} non è più nella tua rosa: è stato tolto dalla formazione, "
+            "scegli chi mettere al suo posto."
+        )
+    return (
+        f"{join_names(unique)} non sono più nella tua rosa: sono stati tolti dalla "
+        "formazione, scegli chi mettere al loro posto."
+    )
+
+
+def drop_departed_athletes(
+    *,
+    starter_ids: Sequence[object],
+    bench_ids: Sequence[object],
+    roster_athlete_ids: Iterable[object],
+    locked_athlete_ids: Iterable[object] = (),
+) -> DepartedLineupCleanup:
+    """Toglie da titolari e panchina chi non è più in rosa (scambio, svincolo, asta, admin).
+
+    Il posto di un titolare resta vuoto (``""``) invece di far scalare gli altri: i titolari
+    sono posizionali sul modulo. In panchina chi resta mantiene l'ordine. Chi ha la partita
+    già iniziata (``locked_athlete_ids``) resta dov'è: quella formazione conta già per il
+    punteggio e non si cambia a posteriori. Funzione pura: decidere se e quando applicarla
+    (solo turni ancora modificabili) spetta al chiamante.
+    """
+    roster = {item for item in roster_athlete_ids if item not in {None, ""}}
+    locked = {item for item in locked_athlete_ids if item not in {None, ""}}
+
+    def departed(athlete_id: object) -> bool:
+        return (
+            athlete_id not in {None, ""} and athlete_id not in roster and athlete_id not in locked
+        )
+
+    removed: list[object] = []
+    starters: list[object] = []
+    for athlete_id in starter_ids:
+        if departed(athlete_id):
+            removed.append(athlete_id)
+            starters.append("")
+        else:
+            starters.append(athlete_id)
+    bench: list[object] = []
+    for athlete_id in bench_ids:
+        if departed(athlete_id):
+            removed.append(athlete_id)
+        else:
+            bench.append(athlete_id)
+    return DepartedLineupCleanup(
+        starter_ids=tuple(starters),
+        bench_ids=tuple(bench),
+        removed_ids=tuple(dict.fromkeys(removed)),
+    )
+
+
+def fill_starter_holes(
+    *,
+    module: str,
+    starters: Sequence[tuple[int, LineupPlayerRef]],
+) -> list[LineupPlayerRef]:
+    """Titolari nell'ordine dei loro posti, con un riferimento vuoto dove il posto è libero.
+
+    Chi esce dalla rosa viene tolto dalla formazione salvata dei turni non ancora iniziati e il
+    suo posto resta vuoto: gli altri titolari tengono il loro ``sort_order`` (vedi
+    ``fantasy_lineups.departures``). Il posto vuoto prende il ruolo che manca al modulo, così
+    la validazione segnala lo slot da riempire (``missing_athlete``) e non un modulo sbagliato.
+    Senza posti liberi restituisce i titolari così come sono, in ordine di posto.
+    """
+    ordered = sorted(starters, key=lambda item: item[0])
+    by_position = dict(ordered)
+    if len(by_position) != len(ordered) or not ordered:
+        return [ref for _, ref in ordered]
+    size = max(STARTER_COUNT, ordered[-1][0] + 1)
+    if len(ordered) >= size:
+        return [ref for _, ref in ordered]
+    missing: list[FantasyRole] = []
+    parsed = parse_module(module)
+    if parsed is not None:
+        expected = module_counts(parsed)
+        present = count_roles([ref for _, ref in ordered])
+        for role, wanted in (
+            (FantasyRole.P, expected.goalkeepers),
+            (FantasyRole.D, expected.defenders),
+            (FantasyRole.C, expected.midfielders),
+            (FantasyRole.A, expected.forwards),
+        ):
+            missing.extend([role] * max(0, wanted - present[role]))
+    filled: list[LineupPlayerRef] = []
+    for position in range(size):
+        ref = by_position.get(position)
+        if ref is None:
+            ref = LineupPlayerRef(athlete_id="", role=missing.pop(0) if missing else None)
+        filled.append(ref)
+    return filled
+
+
 def evaluate_lineup(
     *,
     module: str,
@@ -296,10 +437,13 @@ def evaluate_lineup(
     bench: Sequence[LineupPlayerRef],
     roster_athlete_ids: Sequence[object],
     strict: bool = True,
+    athlete_names: Mapping[object, str] | None = None,
 ) -> LineupEvaluation:
     """Validate 7 modules, 1 GK, 11 starters, P–D–C–A counts and roster membership.
 
     Drafts may pass ``strict=False`` to allow incomplete XI/panchina (EP06-06).
+    ``athlete_names`` (stesse chiavi degli id passati) serve solo al messaggio di
+    ``athlete_not_in_roster``: chi non è più in rosa viene nominato.
     """
     issues: list[LineupIssue] = []
     parsed = parse_module(module)
@@ -342,11 +486,19 @@ def evaluate_lineup(
         )
 
     roster_set = {item for item in roster_athlete_ids if item not in {None, ""}}
-    if any(athlete_id not in {None, ""} and athlete_id not in roster_set for athlete_id in all_ids):
+    outside_roster = [
+        athlete_id
+        for athlete_id in all_ids
+        if athlete_id not in {None, ""} and athlete_id not in roster_set
+    ]
+    if outside_roster:
+        names = athlete_names or {}
         issues.append(
             LineupIssue(
                 code="athlete_not_in_roster",
-                message="Uno o più calciatori schierati non appartengono alla rosa.",
+                message=athlete_not_in_roster_message(
+                    [names[athlete_id] for athlete_id in outside_roster if athlete_id in names]
+                ),
             )
         )
 

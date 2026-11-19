@@ -108,21 +108,24 @@ def execute_trade(
     }
 
     with session.begin_nested():
-        # Release every outgoing player first, freeing slots for both sides.
-        for slot in proposer_out_slots:
-            slot.athlete_id = None
-            slot.purchase_credits = None
-            slot.exceeds_role_quota = False
-            sync_ownership_on_release(
-                session, fantasy_team_id=proposer_team.id, slot_index=slot.slot_index
-            )
-        for slot in recipient_out_slots:
-            slot.athlete_id = None
-            slot.purchase_credits = None
-            slot.exceeds_role_quota = False
-            sync_ownership_on_release(
-                session, fantasy_team_id=recipient_team.id, slot_index=slot.slot_index
-            )
+        # Release every outgoing player first, freeing slots for both sides. Chi esce lascia
+        # anche le formazioni dei turni non ancora iniziati (sync_ownership_on_release).
+        for team_id, out_slots in (
+            (proposer_team.id, proposer_out_slots),
+            (recipient_team.id, recipient_out_slots),
+        ):
+            for slot in out_slots:
+                released_athlete_id = slot.athlete_id
+                slot.athlete_id = None
+                slot.purchase_credits = None
+                slot.exceeds_role_quota = False
+                sync_ownership_on_release(
+                    session,
+                    fantasy_team_id=team_id,
+                    slot_index=slot.slot_index,
+                    athlete_id=released_athlete_id,
+                    actor_id=actor_id,
+                )
         session.flush()
 
         # Assign incoming players one at a time; each role-quota check sees the

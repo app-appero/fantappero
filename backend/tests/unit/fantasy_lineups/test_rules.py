@@ -23,16 +23,20 @@ from fantasy_lineups.rules import (
     assert_lineup_modification_allowed,
     assert_progressive_lock,
     assert_tactical_move,
+    athlete_not_in_roster_message,
     bench_active_role_requirements,
     coerce_max_automatic_substitutions,
     copy_previous_lineup,
+    drop_departed_athletes,
     evaluate_bench_order_lock,
     evaluate_lineup,
     evaluate_progressive_lock,
     evaluate_tactical_move,
+    fill_starter_holes,
     is_athlete_kickoff_locked,
     is_lineup_modification_allowed,
     is_tactical_window_active,
+    lineup_athlete_left_roster_message,
     module_counts,
     next_unlocked_kickoff,
     ordered_bench_from_roster,
@@ -1108,3 +1112,79 @@ def test_copy_previous_lineup_unavailable_on_simultaneous_timezone_kickoffs() ->
     with pytest.raises(ValidationAuthError, match="già iniziata") as error:
         assert_copy_previous_lineup(blocked)
     assert error.value.code == "athlete_kickoff_locked"
+
+
+def test_athlete_not_in_roster_names_who_left_the_roster() -> None:
+    """QA 19/11: il salvataggio rifiutato dice chi non è più in rosa (prima non lo diceva)."""
+    roster, starters, bench = _valid_433()
+    result = evaluate_lineup(
+        module="4-3-3",
+        starters=starters,
+        bench=[LineupPlayerRef(athlete_id="ceduto", role=FantasyRole.D), *bench[1:]],
+        roster_athlete_ids=roster,
+        athlete_names={"ceduto": "N. Zortea"},
+    )
+    messages = [issue.message for issue in result.issues if issue.code == "athlete_not_in_roster"]
+    assert messages == ["N. Zortea non è più nella tua rosa."]
+    # Senza nome resta il messaggio generico.
+    assert athlete_not_in_roster_message([]) == (
+        "Uno o più calciatori schierati non appartengono alla rosa."
+    )
+    assert athlete_not_in_roster_message(["A. Uno", "B. Due", "A. Uno"]) == (
+        "A. Uno e B. Due non sono più nella tua rosa."
+    )
+
+
+def test_lineup_athlete_left_roster_message_singular_and_plural() -> None:
+    assert lineup_athlete_left_roster_message(["N. Zortea"]) == (
+        "N. Zortea non è più nella tua rosa: è stato tolto dalla formazione, "
+        "scegli chi mettere al suo posto."
+    )
+    assert lineup_athlete_left_roster_message(["A. Uno", "B. Due", "C. Tre"]) == (
+        "A. Uno, B. Due e C. Tre non sono più nella tua rosa: sono stati tolti dalla "
+        "formazione, scegli chi mettere al loro posto."
+    )
+
+
+def test_drop_departed_athletes_leaves_starter_slot_empty_and_keeps_locked() -> None:
+    cleanup = drop_departed_athletes(
+        starter_ids=["p1", "d1", "via", "d3"],
+        bench_ids=["p2", "via-panchina", "giocato", "d4"],
+        roster_athlete_ids=["p1", "d1", "d3", "p2", "d4"],
+        locked_athlete_ids=["giocato"],
+    )
+    assert cleanup.starter_ids == ("p1", "d1", "", "d3")
+    assert cleanup.bench_ids == ("p2", "giocato", "d4")
+    assert cleanup.removed_ids == ("via", "via-panchina")
+
+
+def _ref(athlete_id: str, role: FantasyRole | None) -> LineupPlayerRef:
+    return LineupPlayerRef(athlete_id=athlete_id, role=role)
+
+
+def _433_starters() -> list[tuple[int, LineupPlayerRef]]:
+    roles = [FantasyRole.P, *[FantasyRole.D] * 4, *[FantasyRole.C] * 3, *[FantasyRole.A] * 3]
+    return [(index, _ref(f"t{index}", role)) for index, role in enumerate(roles)]
+
+
+def test_fill_starter_holes_puts_an_empty_slot_with_the_missing_role() -> None:
+    """Chi è uscito dalla rosa lascia il suo posto vuoto: la validazione chiede di riempirlo."""
+    starters = [item for item in _433_starters() if item[0] not in {2, 9}]
+    filled = fill_starter_holes(module="4-3-3", starters=starters)
+    expected = [f"t{index}" for index in range(11)]
+    expected[2] = expected[9] = ""
+    assert [ref.athlete_id for ref in filled] == expected
+    assert [filled[2].role, filled[9].role] == [FantasyRole.D, FantasyRole.A]
+    evaluation = evaluate_lineup(
+        module="4-3-3", starters=filled, bench=[], roster_athlete_ids=[f"t{i}" for i in range(11)]
+    )
+    codes = {issue.code for issue in evaluation.issues}
+    assert "missing_athlete" in codes
+    assert not codes & {"starter_count_invalid", "module_role_mismatch"}
+
+
+def test_fill_starter_holes_without_holes_returns_starters_in_slot_order() -> None:
+    starters = list(reversed(_433_starters()))
+    filled = fill_starter_holes(module="4-3-3", starters=starters)
+    assert [ref.athlete_id for ref in filled] == [f"t{index}" for index in range(11)]
+    assert fill_starter_holes(module="4-3-3", starters=[]) == []

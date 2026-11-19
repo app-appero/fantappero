@@ -131,6 +131,33 @@ def close_ownership_interval(
     return interval
 
 
+def _remove_from_future_lineups(
+    session: Session,
+    *,
+    league_id: UUID,
+    fantasy_team_id: UUID,
+    athlete_id: UUID,
+    now: datetime,
+    actor_id: UUID | None,
+) -> None:
+    """Chi lascia la squadra esce anche da formazione e bozza dei turni non ancora iniziati.
+
+    Altrimenti, senza un nuovo salvataggio prima del blocco, conterebbe ancora per la vecchia
+    squadra nel calcolo del turno (``fantasy_lineups.departures``). Import locale:
+    fantasy_lineups dipende già da fantasy_teams.
+    """
+    from fantasy_lineups.departures import purge_departed_athlete_from_future_lineups
+
+    purge_departed_athlete_from_future_lineups(
+        session,
+        league_id=league_id,
+        team_id=fantasy_team_id,
+        athlete_id=athlete_id,
+        now=now,
+        actor_id=actor_id,
+    )
+
+
 def open_ownership_interval(
     session: Session,
     *,
@@ -167,8 +194,15 @@ def sync_ownership_on_assign(
     purchase_credits: int,
     source: RosterOwnershipSource,
     previous_athlete_id: UUID | None,
+    actor_id: UUID | None = None,
 ) -> OwnershipAssignResult:
-    """Close previous interval when needed and open/update the active one."""
+    """Close previous interval when needed and open/update the active one.
+
+    Va chiamata dopo aver scritto il nuovo calciatore nello slot. Chi c'era prima
+    (``previous_athlete_id``, o il calciatore dell'intervallo chiuso) ha lasciato la squadra:
+    esce anche dalle formazioni dei turni non ancora iniziati (``actor_id`` è chi ha fatto il
+    cambio, per l'audit della formazione).
+    """
     now = datetime.now(UTC)
     active = find_active_interval_for_slot(
         session,
@@ -186,6 +220,16 @@ def sync_ownership_on_assign(
     closed: RosterOwnershipInterval | None = None
     if active is not None:
         closed = close_ownership_interval(session, active, released_at=now)
+    departed = {previous_athlete_id, closed.athlete_id if closed is not None else None}
+    for departed_id in sorted(item for item in departed if item not in {None, athlete_id}):
+        _remove_from_future_lineups(
+            session,
+            league_id=league_id,
+            fantasy_team_id=fantasy_team_id,
+            athlete_id=departed_id,
+            now=now,
+            actor_id=actor_id,
+        )
 
     opened = open_ownership_interval(
         session,
@@ -205,16 +249,49 @@ def sync_ownership_on_release(
     *,
     fantasy_team_id: UUID,
     slot_index: int,
+    athlete_id: UUID | None = None,
+    actor_id: UUID | None = None,
 ) -> RosterOwnershipInterval | None:
+    """Chiude il possesso dello slot appena liberato.
+
+    ``athlete_id`` è chi c'era nello slot: serve quando manca l'intervallo di possesso (rose
+    precedenti agli intervalli o caricate a mano). Chi esce lascia anche le formazioni dei
+    turni non ancora iniziati; ``actor_id`` è chi ha fatto il cambio, per l'audit.
+    """
+    now = datetime.now(UTC)
     active = find_active_interval_for_slot(
         session,
         fantasy_team_id=fantasy_team_id,
         slot_index=slot_index,
         for_update=True,
     )
-    if active is None:
-        return None
-    return close_ownership_interval(session, active)
+    closed = (
+        close_ownership_interval(session, active, released_at=now) if active is not None else None
+    )
+    departed = sorted(
+        item
+        for item in {athlete_id, closed.athlete_id if closed is not None else None}
+        if item is not None
+    )
+    if not departed:
+        return closed
+    league_id = (
+        closed.league_id
+        if closed is not None
+        else session.scalar(select(FantasyTeam.league_id).where(FantasyTeam.id == fantasy_team_id))
+    )
+    if league_id is None:
+        return closed
+    for departed_id in departed:
+        _remove_from_future_lineups(
+            session,
+            league_id=league_id,
+            fantasy_team_id=fantasy_team_id,
+            athlete_id=departed_id,
+            now=now,
+            actor_id=actor_id,
+        )
+    return closed
 
 
 def list_ownership_intervals(

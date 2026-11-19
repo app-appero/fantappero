@@ -125,6 +125,7 @@ def _finalize_slot_assignment(
         purchase_credits=amount_credits,
         source=RosterOwnershipSource.MARKET,
         previous_athlete_id=previous_athlete_id,
+        actor_id=actor_id,
     )
     sync_team_composition_status(session, team, league=league)
     return slot

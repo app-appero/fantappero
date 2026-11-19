@@ -54,6 +54,7 @@ import {
 } from "../api/leagues";
 import { BottomSheet, FormationLegend, FormationPitch, PlayerPickerSheet, TONE_COLOR, probableTone, roleRingColor, type Candidate, type PitchSlot } from "./formation/FormationParts";
 import { moduleChangeFallbackNotice, moduleChangeRoute } from "./formation/moduleChange";
+import { rosterDepartureNotices, savedStarterSlotIds } from "./formation/savedLineup";
 import { LockCountdown } from "../components/LockCountdown";
 import { EventBadges } from "../components/match/EventBadges";
 import { setMovesDock } from "../layout/movesDock";
@@ -334,7 +335,10 @@ export function FormationScreen() {
     }
     if (detail.lineup) {
       setModuleCode(detail.lineup.module);
-      setStarterIds(detail.lineup.starters.map((player) => player.athleteId));
+      // Per `sortOrder`: il posto di chi non è più in rosa (tolto dal server) resta vuoto.
+      setStarterIds(
+        savedStarterSlotIds(detail.lineup.starters, starterTemplate(detail.lineup.module).length),
+      );
       setBenchIds(detail.lineup.bench.map((player) => player.athleteId));
       return;
     }
@@ -428,7 +432,10 @@ export function FormationScreen() {
     if (context?.lineup) {
       return {
         module: context.lineup.module,
-        starters: context.lineup.starters.map((player) => player.athleteId),
+        starters: savedStarterSlotIds(
+          context.lineup.starters,
+          starterTemplate(context.lineup.module).length,
+        ),
         bench: context.lineup.bench.map((player) => player.athleteId),
       };
     }
@@ -534,6 +541,8 @@ export function FormationScreen() {
     })),
     rosterAthleteIds: roster.map((row) => row.athleteId),
   });
+  // Chi non è più in rosa è stato tolto dalla formazione dal server: si dice chi (QA 19/11).
+  const rosterNotices = rosterDepartureNotices(context?.issues);
   const maxMoves = context?.maxTacticalMoves ?? MAX_TACTICAL_MOVES;
   const movesUsed = context?.tacticalMovesUsed ?? 0;
   const tacticalEvaluation = evaluateTacticalMove({
@@ -1583,6 +1592,15 @@ export function FormationScreen() {
             {actionError}
           </Text>
         ) : null}
+        {rosterNotices.length > 0 ? (
+          <View style={styles.bannerNotice} testID="formation-roster-notices">
+            {rosterNotices.map((message) => (
+              <Text key={message} style={styles.notice}>
+                • {message}
+              </Text>
+            ))}
+          </View>
+        ) : null}
         {evaluation.issues.length > 0 ? (
           <View style={styles.banner}>
             {evaluation.issues.map((issue) => (
@@ -2227,6 +2245,15 @@ const styles = lazyStyles(() => StyleSheet.create({
     gap: 4,
     overflow: "hidden",
   },
+  bannerNotice: {
+    borderWidth: 1,
+    borderColor: colors.warning,
+    borderRadius: radius.md,
+    padding: spacing.sm,
+    gap: 4,
+    overflow: "hidden",
+  },
+  notice: { color: colors.foreground },
   bannerOk: {
     borderWidth: 1,
     borderColor: colors.success,

@@ -36,6 +36,8 @@ import {
   preserveLockedStarters,
   labelFantasyTurnStatus,
   resolveDefaultEuropeanTurn,
+  rosterDepartureNotices,
+  savedStarterSlotIds,
   slotsFromLineupIds,
   starterTemplate, playerAvatarUrl
 } from "@fantappero/contracts";
@@ -765,6 +767,8 @@ export function FormationPage() {
     })),
     rosterAthleteIds: roster.map((row) => row.athleteId),
   });
+  // Chi non è più in rosa è stato tolto dalla formazione dal server: si dice chi (QA 19/11).
+  const rosterNotices = rosterDepartureNotices(context?.issues);
   const maxMoves = context?.maxTacticalMoves ?? MAX_TACTICAL_MOVES;
   const movesUsed = context?.tacticalMovesUsed ?? 0;
   // Mosse finite: ogni altro cambio verrebbe rifiutato, quindi la formazione non si tocca più.
@@ -1008,7 +1012,11 @@ export function FormationPage() {
     if (detail?.lineup) {
       return {
         module: detail.lineup.module,
-        starterIds: detail.lineup.starters.map((player) => player.athleteId),
+        // Per `sortOrder`: il posto di chi non è più in rosa (tolto dal server) resta vuoto.
+        starterIds: savedStarterSlotIds(
+          detail.lineup.starters,
+          starterTemplate(detail.lineup.module).length,
+        ),
         benchIds: detail.lineup.bench.map((player) => player.athleteId),
       };
     }
@@ -2066,6 +2074,16 @@ export function FormationPage() {
               ) : null}
             </CardBody>
           </Card>
+
+          {rosterNotices.length > 0 ? (
+            <div data-testid="formation-roster-notices" className="fa-formation-layout__notice" role="status">
+              <ul>
+                {rosterNotices.map((message) => (
+                  <li key={message}>{message}</li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
 
           {clientEvaluation.issues.length > 0 ? (
             <div data-testid="formation-issues" className="fa-formation-layout__issues" role="alert">

@@ -334,7 +334,9 @@ def test_full_roster_and_lineup_query_counts_are_bounded(
     # stesso numero costante di query indipendentemente dalla dimensione
     # della rosa, non per-giocatore.
     # +1: controllo della sessione sul token (logout immediato, 18/11).
-    assert lineup_queries <= 51
+    # +1: avviso di chi è uscito dalla rosa (audit della pulizia all'uscita,
+    # fantasy_lineups.departures): una query costante, solo a turno programmato o aperto.
+    assert lineup_queries <= 52
 
 
 def test_roster_exposes_athlete_photo_url_when_available(

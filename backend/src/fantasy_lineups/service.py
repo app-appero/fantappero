@@ -32,6 +32,7 @@ from fantasy_lineups.best_lineup_service import (
     compute_best_lineup_respecting_locks,
     select_best_module,
 )
+from fantasy_lineups.departures import departure_notices, is_purgeable_turn_status
 from fantasy_lineups.kickoffs import KickoffRef, athlete_kickoffs
 from fantasy_lineups.models import LineupDraft, LineupPlayer, LineupSubmission, TacticalMove
 from fantasy_lineups.rules import (
@@ -39,6 +40,7 @@ from fantasy_lineups.rules import (
     BENCH_ACTIVE_ROLE_QUOTA,
     BENCH_ACTIVE_SIZE,
     DEFAULT_LINEUP_LOCK_MARGIN_MINUTES,
+    LINEUP_ATHLETE_LEFT_ROSTER_CODE,
     MAX_AUTOMATIC_SUBSTITUTIONS,
     MAX_TACTICAL_MOVES,
     LineupPlayerRef,
@@ -49,9 +51,12 @@ from fantasy_lineups.rules import (
     assert_progressive_lock,
     assert_tactical_move,
     copy_previous_lineup,
+    drop_departed_athletes,
     evaluate_lineup,
+    fill_starter_holes,
     is_athlete_kickoff_locked,
     is_lineup_modification_allowed,
+    lineup_athlete_left_roster_message,
     lineup_signature,
     next_unlocked_kickoff,
     parse_module,
@@ -97,6 +102,7 @@ from observability.logging import get_logger
 from observability.metrics import get_metrics
 from sports_data.catalog.models import Club
 from sports_data.predicted.read import AthleteProbable, hints_for_fixtures
+from sports_data.roster.models import Athlete
 
 logger = get_logger(__name__)
 
@@ -395,6 +401,8 @@ class FantasyLineupService:
             starters=starters,
             bench=bench,
             roster_athlete_ids=roster_ids,
+            # Chi non è più in rosa (es. formazione aperta prima di uno scambio) va nominato.
+            athlete_names=self._departed_athlete_names(roster, [*starter_ids, *bench_ids]),
         )
         if not evaluation.valid:
             first = evaluation.issues[0]
@@ -1093,6 +1101,7 @@ class FantasyLineupService:
             bench=bench,
             roster_athlete_ids=roster_ids,
             strict=False,
+            athlete_names=self._departed_athlete_names(roster, [*starter_ids, *bench_ids]),
         )
         if not evaluation.valid:
             first = evaluation.issues[0]
@@ -1364,22 +1373,86 @@ class FantasyLineupService:
         )
         issues: list[LineupIssueResponse] = []
         saved: SavedLineupResponse | None = None
+        draft = self._load_draft(fantasy_round.id, fantasy_team_id)
+        draft_response = self._to_draft(draft) if draft is not None else None
+        owned_ids = {str(row.athlete_id) for row in roster}
+        # Turno ancora aperto (non bloccato né concluso): chi non è più in rosa (scambio,
+        # svincolo, asta, rimozione dell'admin) esce dalla formazione e dalla bozza
+        # restituite e il suo posto torna vuoto (QA 19/11). Solo in lettura: nel DB resta
+        # fino al prossimo salvataggio, che lo rifiuta finché c'è. Chi ha già la partita
+        # iniziata resta dov'è, e i turni bloccati o conclusi non si toccano.
+        departed_cleanup = effective == FantasyTurnStatus.OPEN
+        fielded_ids = [
+            *(str(player.athlete_id) for player in (submission.players if submission else ())),
+            *(draft_response.starter_athlete_ids if draft_response else ()),
+            *(draft_response.bench_athlete_ids if draft_response else ()),
+        ]
+        locked_departed = (
+            self._locked_departed_ids(
+                round_id=fantasy_round.id,
+                season_year=season_year,
+                owned_ids=owned_ids,
+                athlete_ids=fielded_ids,
+                now=now,
+                lock_margin=lock_margin,
+            )
+            if departed_cleanup
+            else set()
+        )
+        removed_names: list[str] = []
         if submission is not None:
             saved = self._to_saved(submission)
-            starters = [
-                LineupPlayerRef(
-                    athlete_id=player.athlete_id,
-                    role=self._parse_role(player.role),
+            names_by_id = {
+                player.athlete_id: player.athlete_name
+                for player in (*saved.starters, *saved.bench)
+                if player.athlete_id not in owned_ids
+            }
+            removed: set[object] = set()
+            if departed_cleanup:
+                cleanup = drop_departed_athletes(
+                    starter_ids=[player.athlete_id for player in saved.starters],
+                    bench_ids=[player.athlete_id for player in saved.bench],
+                    roster_athlete_ids=owned_ids,
+                    locked_athlete_ids=locked_departed,
                 )
-                for player in saved.starters
-            ]
+                removed = set(cleanup.removed_ids)
+                removed_names.extend(names_by_id.get(str(item), "") for item in cleanup.removed_ids)
+            # Posto vuoto ma con il ruolo di chi c'era: la validazione segnala lo slot da
+            # riempire (`missing_athlete`), non un modulo sbagliato. Lo stesso per il posto
+            # lasciato nel DB da chi è uscito dalla rosa (fantasy_lineups.departures): lì il
+            # ruolo è quello che manca al modulo.
+            starters = fill_starter_holes(
+                module=saved.module,
+                starters=[
+                    (
+                        player.sort_order,
+                        LineupPlayerRef(
+                            athlete_id="" if player.athlete_id in removed else player.athlete_id,
+                            role=self._parse_role(player.role),
+                        ),
+                    )
+                    for player in saved.starters
+                ],
+            )
             bench = [
                 LineupPlayerRef(
                     athlete_id=player.athlete_id,
                     role=self._parse_role(player.role),
                 )
                 for player in saved.bench
+                if player.athlete_id not in removed
             ]
+            if removed:
+                saved = saved.model_copy(
+                    update={
+                        "starters": [
+                            player for player in saved.starters if player.athlete_id not in removed
+                        ],
+                        "bench": [
+                            player for player in saved.bench if player.athlete_id not in removed
+                        ],
+                    }
+                )
             evaluation = evaluate_lineup(
                 module=saved.module,
                 starters=starters,
@@ -1387,22 +1460,71 @@ class FantasyLineupService:
                 roster_athlete_ids=[
                     str(row.athlete_id) for row in roster if not row.exceeds_role_quota
                 ],
+                athlete_names=names_by_id,
             )
             issues = [
                 LineupIssueResponse(code=item.code, message=item.message)
                 for item in evaluation.issues
             ]
+        if draft_response is not None and departed_cleanup:
+            cleanup = drop_departed_athletes(
+                starter_ids=draft_response.starter_athlete_ids,
+                bench_ids=draft_response.bench_athlete_ids,
+                roster_athlete_ids=owned_ids,
+                locked_athlete_ids=locked_departed,
+            )
+            if cleanup.removed_ids:
+                draft_response = draft_response.model_copy(
+                    update={
+                        "starter_athlete_ids": [str(item) for item in cleanup.starter_ids],
+                        "bench_athlete_ids": [str(item) for item in cleanup.bench_ids],
+                    }
+                )
+                if any(draft_response.starter_athlete_ids):
+                    draft_names = self._athlete_names([str(item) for item in cleanup.removed_ids])
+                    removed_names.extend(
+                        draft_names.get(str(item), "") for item in cleanup.removed_ids
+                    )
+        if draft_response is not None and not any(draft_response.starter_athlete_ids):
+            # Bozza senza nessun titolare (es. copia di una formazione non più in rosa): non è una
+            # formazione, la si ignora invece di mostrarla come «bozza salvata».
+            draft_response = None
+        if is_purgeable_turn_status(effective) and (submission is not None or draft is not None):
+            # Chi è uscito dalla rosa è già stato tolto dal DB al momento dell'uscita
+            # (fantasy_lineups.departures): l'avviso col nome resta finché il fantallenatore non
+            # salva di nuovo formazione o bozza, e sparisce se nel frattempo è tornato in rosa.
+            last_saved = max(
+                moment
+                for moment in (
+                    submission.submitted_at if submission is not None else None,
+                    draft.saved_at if draft is not None else None,
+                )
+                if moment is not None
+            )
+            removed_names[:0] = [
+                notice.athlete_name
+                for notice in departure_notices(
+                    self._session,
+                    league_id=league_id,
+                    round_id=fantasy_round.id,
+                    team_id=fantasy_team_id,
+                )
+                if notice.removed_at > last_saved and notice.athlete_id not in owned_ids
+            ]
+        if removed_names:
+            issues.insert(
+                0,
+                LineupIssueResponse(
+                    code=LINEUP_ATHLETE_LEFT_ROSTER_CODE,
+                    message=lineup_athlete_left_roster_message(removed_names),
+                ),
+            )
         max_automatic_substitutions = self._max_automatic_substitutions_for_league(league_id)
         moves = list(submission.tactical_moves) if submission is not None else []
         moves.sort(key=lambda row: row.sequence)
         used = len(moves)
         locked_ids = [str(row.athlete_id) for row in roster if locked_flags[row.athlete_id]]
         previous = self._load_previous_submission(fantasy_team_id, fantasy_round)
-        draft = self._load_draft(fantasy_round.id, fantasy_team_id)
-        if draft is not None and not any(item for item in draft.starter_athlete_ids):
-            # Bozza senza nessun titolare (es. copia di una formazione non più in rosa): non è una
-            # formazione, la si ignora invece di mostrarla come «bozza salvata».
-            draft = None
         copy_preview = None
         if previous is not None:
             copy_preview = copy_previous_lineup(
@@ -1487,7 +1609,7 @@ class FantasyLineupService:
             ],
             lineup=saved,
             previousLineup=self._to_previous(previous) if previous is not None else None,
-            draft=self._to_draft(draft) if draft is not None else None,
+            draft=draft_response,
             copyAvailable=copy_available,
             copyIssues=copy_issues,
             issues=issues,
@@ -1524,6 +1646,69 @@ class FantasyLineupService:
             athlete_ids=athlete_ids,
             for_update=for_update,
         )
+
+    def _locked_departed_ids(
+        self,
+        *,
+        round_id: UUID,
+        season_year: int,
+        owned_ids: set[str],
+        athlete_ids: list[str],
+        now: datetime,
+        lock_margin: int,
+    ) -> set[str]:
+        """Tra chi è schierato ma non è più in rosa, chi ha la partita già iniziata (o in blocco).
+
+        Il blocco è quello vero della partita, senza l'esenzione dell'operatore: la formazione
+        di chi ha già giocato è storia del punteggio e non si tocca.
+        """
+        departed: list[UUID] = []
+        for raw in dict.fromkeys(athlete_ids):
+            if not raw or raw in owned_ids:
+                continue
+            try:
+                departed.append(UUID(raw))
+            except ValueError:
+                continue
+        if not departed:
+            return set()
+        kickoffs = self._athlete_kickoffs(
+            round_id=round_id, season_year=season_year, athlete_ids=departed
+        )
+        return {
+            str(athlete_id)
+            for athlete_id in departed
+            if self._is_row_locked(athlete_id, kickoffs, now, lock_margin)
+        }
+
+    def _athlete_names(self, athlete_ids: list[str]) -> dict[str, str]:
+        """Nome (``canonical_name``) per id calciatore, chiavi come stringhe."""
+        parsed: list[UUID] = []
+        for raw in dict.fromkeys(athlete_ids):
+            try:
+                parsed.append(UUID(str(raw)))
+            except ValueError:
+                continue
+        if not parsed:
+            return {}
+        return {
+            str(athlete_id): name
+            for athlete_id, name in self._session.execute(
+                select(Athlete.id, Athlete.canonical_name).where(Athlete.id.in_(parsed))
+            ).all()
+        }
+
+    def _departed_athlete_names(
+        self, roster: list[_RosterRow], athlete_ids: list[UUID] | list[str]
+    ) -> dict[str, str]:
+        """Nomi di chi è nella formazione proposta ma non è più nella rosa della squadra.
+
+        Nessuna query quando sono tutti in rosa (il caso normale). Chi è in rosa ma in esubero
+        di ruolo non è tra questi: per lui resta il messaggio generico.
+        """
+        owned = {str(row.athlete_id) for row in roster}
+        departed = [str(item) for item in athlete_ids if item and str(item) not in owned]
+        return self._athlete_names(departed) if departed else {}
 
     @staticmethod
     def _is_row_locked(

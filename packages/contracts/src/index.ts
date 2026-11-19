@@ -245,6 +245,7 @@ export {
   APPROVED_MODULES,
   BENCH_ACTIVE_ROLE_QUOTA,
   BENCH_ACTIVE_SIZE,
+  LINEUP_ATHLETE_LEFT_ROSTER_CODE,
   MAX_AUTOMATIC_SUBSTITUTIONS,
   benchActiveShortfall,
   orderBenchForActiveRoles,
@@ -273,6 +274,8 @@ export {
   remainingRosterForBench,
   remainingTacticalMoves,
   resolveAutomaticSubstitutions,
+  rosterDepartureNotices,
+  savedStarterSlotIds,
   slotsFromLineupIds,
   starterTemplate,
 } from "./fantasyLineups.js";
