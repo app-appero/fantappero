@@ -72,6 +72,7 @@ describe("AuthRegisterPage — registrazione solo con Google nel pilota", () => 
     // I passi non parlano più di email da confermare.
     expect(text()).not.toContain("Conferma l'email");
     expect(container.querySelector('a[href="/accedi"]')).toBeNull();
+    expect(container.querySelector('[data-testid="register-privacy-link"]')).toBeNull();
   });
 
   it("non mostra il modulo con email nemmeno mentre il server non ha ancora risposto", async () => {
@@ -88,6 +89,10 @@ describe("AuthRegisterPage — registrazione solo con Google nel pilota", () => 
     expect(container.querySelector('input[type="password"]')).not.toBeNull();
     expect(text()).toContain("Crea account con email");
     expect(container.querySelector('[data-testid="register-google-only"]')).toBeNull();
+    // Chi si registra con email vede il rimando all'informativa privacy.
+    const note = container.querySelector('[data-testid="register-privacy-link"]');
+    expect(note?.textContent).toBe("Registrandoti accetti l'informativa privacy.");
+    expect(note?.querySelector('a[href="/privacy"]')?.textContent).toBe("informativa privacy");
   });
 
   it("se non riesce a leggere le opzioni (server irraggiungibile) resta il solo Google", async () => {
