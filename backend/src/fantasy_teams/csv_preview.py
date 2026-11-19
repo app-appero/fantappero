@@ -23,7 +23,7 @@ from fantasy_teams.csv_import import (
 from fantasy_teams.factory import resolve_roster_size
 from fantasy_teams.ledger import find_account_for_team
 from fantasy_teams.models import FantasyRosterSlot, FantasyTeam
-from sports_data.listone.generate import get_role_assignment
+from sports_data.listone.generate import _competition_filter_clause, get_role_assignment
 from sports_data.listone.models import RoleAssignment
 from sports_data.roster.models import Athlete
 
@@ -93,6 +93,17 @@ def build_preview_rows(
                 athletes_by_surname[surname_key].append(athlete)
 
     if names:
+        # Per nome si cerca solo nel listone della lega (stagione e campionati scelti):
+        # i candidati presi da tutto il catalogo rendevano ambiguo un nome unico nel
+        # listone, e scegliere un omonimo fuori listone faceva fallire la conferma con
+        # `role_unresolved` (QA 19/11). Il provider_id resta cercato su tutto il catalogo.
+        listone_athlete_ids = select(RoleAssignment.athlete_id).where(
+            RoleAssignment.season_year == season_year
+        )
+        if competition_ids:
+            listone_athlete_ids = listone_athlete_ids.where(
+                _competition_filter_clause(season_year=season_year, competition_ids=competition_ids)
+            )
         # Ricerca veloce in SQL con il nome come scritto (minuscolo, spazi singoli).
         lowered = sorted(
             {re.sub(r"\s+", " ", row.nome.strip().lower()) for row in parsed_rows if row.nome}
@@ -106,6 +117,7 @@ def build_preview_rows(
             list(
                 session.scalars(
                     select(Athlete).where(
+                        Athlete.id.in_(listone_athlete_ids),
                         or_(
                             func.lower(Athlete.canonical_name).in_(lowered),
                             func.regexp_replace(
@@ -113,29 +125,27 @@ def build_preview_rows(
                             ).in_(lowered),
                             func.lower(Athlete.last_name).in_(lowered),
                             *surname_patterns,
-                        )
+                        ),
                     )
                 ).all()
             )
         )
         # Nomi non trovati (accenti, lettere come la İ turca, spazi doppi nel
         # listone): confronto in Python con la chiave normalizzata su tutti i
-        # calciatori del listone della stagione (QA 18/11).
+        # calciatori del listone della lega (QA 18/11; campionati dal 19/11).
         unmatched = {
             name
             for name in names
             if not athletes_by_name.get(name) and not athletes_by_surname.get(name)
         }
         if unmatched:
-            season_athletes = session.scalars(
-                select(Athlete)
-                .join(RoleAssignment, RoleAssignment.athlete_id == Athlete.id)
-                .where(RoleAssignment.season_year == season_year)
+            listone_athletes = session.scalars(
+                select(Athlete).where(Athlete.id.in_(listone_athlete_ids))
             ).all()
             index_athletes(
                 [
                     athlete
-                    for athlete in season_athletes
+                    for athlete in listone_athletes
                     if normalize_athlete_name(athlete.canonical_name) in unmatched
                     or surname_lookup_keys(athlete.canonical_name, athlete.last_name) & unmatched
                 ]
