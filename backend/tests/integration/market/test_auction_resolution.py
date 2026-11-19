@@ -818,3 +818,120 @@ def test_waiver_tiebreak_tied_again_goes_to_the_first_bid(
     assert len(_notification(db_session, admin_id, "Busta non aggiudicata")) == 1
     assert _resolved_audit(db_session, tiebreak_id).details["tiebreakRule"] == "first_bid"
     assert isinstance(create_waiver_session(60), str)
+
+
+# -- "Spareggio annullato" a tutte le squadre in parità -----------------------------------------
+
+
+def _admin_assign(
+    client: TestClient, admin_token: str, league_id: str, team_id: str, athlete_id: UUID
+) -> None:
+    """L'amministratore mette a mano il calciatore conteso nel primo slot (vuoto) di una squadra."""
+    placed = client.put(
+        f"/leagues/{league_id}/amministrazione/squadre/{team_id}/slot/0",
+        headers={"Authorization": f"Bearer {admin_token}"},
+        json={"athleteId": str(athlete_id), "purchaseCredits": 0},
+    )
+    assert placed.status_code == 200, placed.json()
+
+
+def _cancelled(db_session: Session, user_id: UUID) -> list[Notification]:
+    return _notification(db_session, user_id, "Spareggio annullato")
+
+
+def test_cancelled_tiebreak_notifies_every_tied_team_except_the_new_owner(
+    client: TestClient,
+    db_session: Session,
+    competition_ids: list[str],
+) -> None:
+    """Parità tra A e B, nello spareggio offre solo A, l'admin dà il calciatore a C:
+    l'avviso "Spareggio annullato" arriva ad A e anche a B, non a C."""
+    a_token, a_id = _register_and_login(client, "res.tiecancel.a@example.com")
+    b_token, b_id = _register_and_login(client, "res.tiecancel.b@example.com")
+    c_token, c_id = _register_and_login(client, "res.tiecancel.c@example.com")
+    league_id = _create_league(client, a_token, competition_ids, "Lega Spareggio Annullato")
+    _add_member(db_session, league_id, b_id)
+    _add_member(db_session, league_id, c_id)
+    athlete = _seed_athlete(db_session, _random_provider_id(), "Conteso Altrove")
+    a_team = _team_id(client, league_id, a_token)
+    b_team = _team_id(client, league_id, b_token)
+    c_team = _team_id(client, league_id, c_token)
+
+    tiebreak_id = _open_tiebreak(client, league_id, a_token, [a_token, b_token], athlete.id)
+    assert _bid(client, league_id, tiebreak_id, a_token, athlete.id, 100).status_code == 200
+    _admin_assign(client, a_token, league_id, c_team, athlete.id)
+
+    resolution = _close_and_resolve(client, league_id, tiebreak_id, a_token)
+    assert resolution.status_code == 200
+    assert resolution.json()["outcomes"][0]["outcome"] == "unassigned"
+
+    db_session.expire_all()
+    for user_id, team_id in ((a_id, a_team), (b_id, b_team)):
+        cancelled = _cancelled(db_session, user_id)
+        assert len(cancelled) == 1, user_id
+        assert cancelled[0].dedup_key == f"market_tiebreak_cancelled:{tiebreak_id}:{team_id}"
+        assert "Conteso Altrove" in cancelled[0].body
+    # A non riceve anche il "Busta non aggiudicata" della sua offerta: basta l'annullamento.
+    assert _notification(db_session, a_id, "Busta non aggiudicata") == []
+    assert _cancelled(db_session, c_id) == []
+
+
+def test_cancelled_tiebreak_without_bids_still_notifies_the_tied_teams(
+    client: TestClient,
+    db_session: Session,
+    competition_ids: list[str],
+) -> None:
+    """Nessuno offre nello spareggio e l'admin dà il calciatore a B (una delle squadre in
+    parità): l'annullamento arriva ad A, non a B che ora ha il calciatore."""
+    a_token, a_id = _register_and_login(client, "res.tiecancel.nobid.a@example.com")
+    b_token, b_id = _register_and_login(client, "res.tiecancel.nobid.b@example.com")
+    league_id = _create_league(client, a_token, competition_ids, "Lega Spareggio Senza Offerte")
+    _add_member(db_session, league_id, b_id)
+    athlete = _seed_athlete(db_session, _random_provider_id(), "Conteso Senza Offerte")
+    a_team = _team_id(client, league_id, a_token)
+    b_team = _team_id(client, league_id, b_token)
+
+    tiebreak_id = _open_tiebreak(client, league_id, a_token, [a_token, b_token], athlete.id)
+    _admin_assign(client, a_token, league_id, b_team, athlete.id)
+
+    resolution = _close_and_resolve(client, league_id, tiebreak_id, a_token)
+    assert resolution.status_code == 200
+    assert resolution.json()["outcomes"] == []
+
+    db_session.expire_all()
+    cancelled = _cancelled(db_session, a_id)
+    assert len(cancelled) == 1
+    assert cancelled[0].dedup_key == f"market_tiebreak_cancelled:{tiebreak_id}:{a_team}"
+    assert _cancelled(db_session, b_id) == []
+    # Lo spareggio è risolto: il mercato non è più bloccato.
+    assert _new_auction_session_status(client, a_token, league_id) == 201
+
+
+def test_tiebreak_without_bids_and_player_still_free_notifies_nobody(
+    client: TestClient,
+    db_session: Session,
+    competition_ids: list[str],
+) -> None:
+    """Comportamento invariato: spareggio senza offerte, calciatore ancora libero."""
+    a_token, a_id = _register_and_login(client, "res.tienobid.a@example.com")
+    b_token, b_id = _register_and_login(client, "res.tienobid.b@example.com")
+    league_id = _create_league(client, a_token, competition_ids, "Lega Spareggio Deserto")
+    _add_member(db_session, league_id, b_id)
+    athlete = _seed_athlete(db_session, _random_provider_id(), "Conteso Libero")
+
+    tiebreak_id = _open_tiebreak(client, league_id, a_token, [a_token, b_token], athlete.id)
+    resolution = _close_and_resolve(client, league_id, tiebreak_id, a_token)
+    assert resolution.status_code == 200
+    assert resolution.json()["outcomes"] == []
+
+    db_session.expire_all()
+    assert (
+        db_session.scalar(
+            select(FantasyRosterSlot).where(FantasyRosterSlot.athlete_id == athlete.id)
+        )
+        is None
+    )
+    for user_id in (a_id, b_id):
+        assert _cancelled(db_session, user_id) == []
+        assert _notification(db_session, user_id, "Busta non aggiudicata") == []
+    assert _new_auction_session_status(client, a_token, league_id) == 201
