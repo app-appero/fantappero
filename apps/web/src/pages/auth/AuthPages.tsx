@@ -1,9 +1,8 @@
 import { LOGIN_CARDS, LOGIN_SHOWCASE_FEATURES, LOGIN_SHOWCASE_LEAGUES, LOGIN_SHOWCASE_PITCH } from "@fantappero/contracts";
-import { AuthFormLayout, BrandLogo, PageContainer, UiStatePanel } from "@fantappero/ui";
+import { AuthFormLayout, BrandLogo, Button, PageContainer, UiStatePanel } from "@fantappero/ui";
 import { type FormEvent, type ReactNode, useCallback, useEffect, useRef, useState } from "react";
 import {
   forgotPassword,
-  register as registerApi,
   resetPassword,
   startGoogleHandoff,
   verifyEmail,
@@ -11,10 +10,11 @@ import {
 import { getApiErrorMessage, useAuth } from "../../auth/AuthContext";
 import { googleAppHandoffUrl, googleAppReturnUrl } from "../../auth/googleAppReturn";
 import { renderGoogleButton } from "../../auth/googleIdentity";
+import { EmailAuthPanel, type EmailAuthTab } from "./EmailAuthPanel";
 import { TesterRequestPanel, testerGateFromError, type TesterGateInfo } from "./TesterRequestPanel";
 import { clearLastUser, initialsOf, readLastUser, writeLastUser, type LastUser } from "../../auth/lastUser";
 import { loadStoredSession } from "../../auth/sessionStorage";
-import { useAuthOptions } from "../../auth/useAuthOptions";
+import { type AuthOptionsState, useAuthOptions } from "../../auth/useAuthOptions";
 import { getWebEnv } from "../../config/env";
 import { Link, useLocation, useNavigate } from "../../router/simpleRouter";
 
@@ -160,39 +160,17 @@ function AuthSplit({
 
 export function AuthRegisterPage() {
   const authOptions = useAuthOptions();
-  // Finché il server non ha risposto non si mostra il modulo con email: nel pilota è spento.
-  const googleOnly = !authOptions.loaded || !authOptions.emailRegistrationEnabled;
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
-  const [displayName, setDisplayName] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [successMessage, setSuccessMessage] = useState<string | null>(null);
-
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setError(null);
-
-    if (!email.trim() || !password || !displayName.trim()) {
-      setError("Compila tutti i campi obbligatori.");
-      return;
-    }
-    if (password !== confirmPassword) {
-      setError("Le password non coincidono.");
-      return;
-    }
-
-    setLoading(true);
-    try {
-      const response = await registerApi({ email, password, displayName });
-      setSuccessMessage(response.message);
-    } catch (submitError) {
-      setError(getApiErrorMessage(submitError, "Registrazione non riuscita."));
-    } finally {
-      setLoading(false);
-    }
+  // Con la registrazione con email accesa «Registrati» è una scheda della pagina di accesso:
+  // si apre già sul modulo di registrazione.
+  if (authOptions.loaded && authOptions.emailRegistrationEnabled) {
+    return <LoginPage authOptions={authOptions} initialEmailTab="registrati" />;
   }
+  // Finché il server non ha risposto (o se l'email è spenta, come nel pilota) solo Google.
+  return <GoogleOnlyRegisterPage />;
+}
+
+function GoogleOnlyRegisterPage() {
+  const [error, setError] = useState<string | null>(null);
 
   return (
     <div className="fa-auth-page fa-login" data-testid="register-page">
@@ -204,7 +182,7 @@ export function AuthRegisterPage() {
           </h1>
         </div>
         <ol className="fa-login__steps" aria-label="Come funziona">
-          {(googleOnly ? REGISTER_STEPS_GOOGLE : REGISTER_STEPS).map((step, index) => (
+          {REGISTER_STEPS_GOOGLE.map((step, index) => (
             <li key={step.title} className="fa-login__step">
               <span className="fa-login__step-n" aria-hidden="true">
                 {index + 1}
@@ -218,71 +196,15 @@ export function AuthRegisterPage() {
         </ol>
       </section>
       <section className="fa-login__panel">
-        {successMessage ? (
-          <>
-            <UiStatePanel
-              state="success"
-              title="Controlla la tua email"
-              message={successMessage}
-              testId="auth-register-success"
-            />
-            <p className="fa-auth-layout__register">
-              <Link to="/accedi">Torna al login</Link>
-            </p>
-          </>
-        ) : googleOnly ? (
-          <>
-            <SocialLogins onError={setError} appleLabel="Registrati con Apple" dividerLabel={null} />
-            {/* Solo Google: con Google si accede e ci si registra nello stesso gesto, nessun testo aggiuntivo. */}
-            <div data-testid="register-google-only">
-              {error ? <UiStatePanel state="error" title="Registrazione non riuscita" message={error} testId="auth-register-error" /> : null}
-            </div>
-          </>
-        ) : (
-          <>
-            <SocialLogins onError={setError} appleLabel="Registrati con Apple" dividerLabel="oppure con email" />
-            <AuthFormLayout
-              brand={null}
-              hideBrand
-              title="Registrati"
-              submitLabel="Crea account con email"
-              showDisplayName
-              showConfirmPassword
-              email={email}
-              password={password}
-              confirmPassword={confirmPassword}
-              displayName={displayName}
-              onEmailChange={setEmail}
-              onPasswordChange={setPassword}
-              onConfirmPasswordChange={setConfirmPassword}
-              onDisplayNameChange={setDisplayName}
-              onSubmit={handleSubmit}
-              loading={loading}
-              error={error ?? undefined}
-              registerPrompt={
-                <>
-                  <p className="fa-auth-layout__register">
-                    Hai già un account? <Link to="/accedi">Accedi</Link>
-                  </p>
-                  {/* Solo nella registrazione con email: quella solo Google resta senza testo aggiuntivo. */}
-                  <p className="fa-auth-layout__register" data-testid="register-privacy-link">
-                    Registrandoti accetti l&apos;<Link to="/privacy">informativa privacy</Link>.
-                  </p>
-                </>
-              }
-            />
-          </>
-        )}
+        <SocialLogins onError={setError} appleLabel="Registrati con Apple" dividerLabel={null} />
+        {/* Solo Google: con Google si accede e ci si registra nello stesso gesto, nessun testo aggiuntivo. */}
+        <div data-testid="register-google-only">
+          {error ? <UiStatePanel state="error" title="Registrazione non riuscita" message={error} testId="auth-register-error" /> : null}
+        </div>
       </section>
     </div>
   );
 }
-
-const REGISTER_STEPS = [
-  { title: "Crea l'account", detail: "Nome, email e password" },
-  { title: "Conferma l'email", detail: "Ti scriviamo un codice" },
-  { title: "Entra in lega", detail: "Crea la tua o usa un invito" },
-] as const;
 
 const REGISTER_STEPS_GOOGLE = [
   { title: "Continua con Google", detail: "Un solo tocco, nessuna password" },
@@ -361,8 +283,34 @@ function LoginFeatures() {
   );
 }
 
-/** Accesso solo Google: carte giocatore + titolo + un solo bottone. */
-function LoginCardsPage({ firstName, error, onError, onTesterGate }: { firstName: string; error: string | null; onError: (message: string) => void; onTesterGate: (info: TesterGateInfo) => void }) {
+/** Alternativa con email sotto il tasto di Google (registrazione con email accesa). */
+type LoginEmailOption = {
+  open: boolean;
+  onOpen: () => void;
+  /** Il pannello con le schede «Accedi» e «Registrati», quando è aperto. */
+  panel: ReactNode;
+  /** Senza Google (es. in locale) niente «oppure»: il pannello è l'unica via. */
+  googleConfigured: boolean;
+};
+
+/**
+ * Accesso del pilota: carte giocatore + titolo + «Continua con Google». Con la registrazione con
+ * email accesa, sotto Google c'è «oppure» e «Continua con email», che apre il pannello qui.
+ */
+function LoginCardsPage({
+  firstName,
+  error,
+  onError,
+  onTesterGate,
+  emailOption = null,
+}: {
+  firstName: string;
+  error: string | null;
+  onError: (message: string) => void;
+  onTesterGate: (info: TesterGateInfo) => void;
+  emailOption?: LoginEmailOption | null;
+}) {
+  const emailOpen = emailOption?.open ?? false;
   return (
     <div className="fa-auth-page fa-login fa-login-cards" data-testid="login-page">
       <div className="fa-login-cards__pitch" aria-hidden="true" />
@@ -400,13 +348,39 @@ function LoginCardsPage({ firstName, error, onError, onTesterGate }: { firstName
             <li key={league.code}>{league.code}</li>
           ))}
         </ul>
-        <div className="fa-login-cards__cta" data-testid="login-google-only">
+        <div className="fa-login-cards__cta" data-testid={emailOption ? "login-email-option" : "login-google-only"}>
           <SocialLogins onError={onError} appleLabel="Continua con Apple" dividerLabel={null} onTesterGate={onTesterGate} />
           {error ? <UiStatePanel state="error" title="Accesso non riuscito" message={error} testId="auth-login-error" /> : null}
-          <p className="fa-login-cards__note">Niente password: un tocco e sei dentro</p>
-          <p className="fa-login-cards__note" data-testid="login-privacy-link">
-            Accedendo accetti l&apos;<Link to="/privacy">informativa privacy</Link>.
-          </p>
+          {/* La nota parla di Google: con il pannello con email aperto si toglie. */}
+          {emailOpen ? null : <p className="fa-login-cards__note">Niente password: un tocco e sei dentro</p>}
+          {emailOption ? (
+            <>
+              {emailOption.googleConfigured ? (
+                <p className="fa-auth-layout__divider" data-testid="auth-email-divider">
+                  oppure
+                </p>
+              ) : null}
+              {emailOption.open ? (
+                emailOption.panel
+              ) : (
+                <Button
+                  variant="secondary"
+                  className="fa-login-cards__email-toggle"
+                  onClick={emailOption.onOpen}
+                  aria-expanded={false}
+                  data-testid="auth-email-toggle"
+                >
+                  Continua con email
+                </Button>
+              )}
+            </>
+          ) : null}
+          {/* Il pannello aperto ha la sua riga sull'informativa (cambia tra Accedi e Registrati). */}
+          {emailOpen ? null : (
+            <p className="fa-login-cards__note" data-testid="login-privacy-link">
+              Accedendo accetti l&apos;<Link to="/privacy">informativa privacy</Link>.
+            </p>
+          )}
         </div>
       </section>
     </div>
@@ -414,22 +388,86 @@ function LoginCardsPage({ firstName, error, onError, onTesterGate }: { firstName
 }
 
 export function AuthLoginPage() {
+  const authOptions = useAuthOptions();
+  return <LoginPage authOptions={authOptions} initialEmailTab="accedi" />;
+}
+
+/**
+ * Pagina di accesso (anche `/accedi/registrati`, aperta sulla scheda «Registrati»).
+ *
+ * Sempre Google per primo. Con la registrazione con email accesa sotto c'è l'alternativa con
+ * email, chiusa finché non la si apre; è già aperta se Google non è configurato (in locale), da
+ * `/accedi/registrati` e da `/accedi?accesso=email`. Con la registrazione con email spenta la
+ * pagina è solo Google; chi ha un account con password (es. un operatore) apre
+ * `/accedi?accesso=email` e trova il modulo di sempre. Finché il server non risponde l'email non
+ * si mostra; se la richiesta fallisce resta solo Google (salvo `?accesso=email`).
+ */
+function LoginPage({ authOptions, initialEmailTab }: { authOptions: AuthOptionsState; initialEmailTab: EmailAuthTab }) {
+  const { search } = useLocation();
+  const { viteGoogleClientId } = getWebEnv();
+  const googleConfigured = Boolean(viteGoogleClientId);
+  const emailEnabled = authOptions.loaded && authOptions.emailRegistrationEnabled;
+  const passwordEntry = new URLSearchParams(search).get("accesso") === "email";
+  const [remembered] = useState<LastUser | null>(() => readLastUser());
+  const [emailOpen, setEmailOpen] = useState(
+    () => !googleConfigured || initialEmailTab === "registrati" || passwordEntry,
+  );
+  const [emailTab, setEmailTab] = useState<EmailAuthTab>(initialEmailTab);
+  const [error, setError] = useState<string | null>(null);
+  const [testerGate, setTesterGate] = useState<TesterGateInfo | null>(null);
+
+  const firstName = remembered?.displayName.trim().split(/\s+/)[0] ?? "";
+
+  if (testerGate) {
+    return <TesterRequestPanel info={testerGate} onBack={() => setTesterGate(null)} />;
+  }
+
+  if (passwordEntry && !emailEnabled) {
+    return <PasswordLoginPage onTesterGate={setTesterGate} />;
+  }
+
+  const emailOption: LoginEmailOption | null = emailEnabled
+    ? {
+        open: emailOpen,
+        onOpen: () => setEmailOpen(true),
+        googleConfigured,
+        panel: (
+          <EmailAuthPanel
+            tab={emailTab}
+            onTabChange={setEmailTab}
+            onClose={() => setEmailOpen(false)}
+            onTesterGate={setTesterGate}
+            verificationRequired={authOptions.emailVerificationRequired}
+            initialEmail={remembered?.email ?? ""}
+          />
+        ),
+      }
+    : null;
+
+  return (
+    <LoginCardsPage
+      firstName={firstName}
+      error={error}
+      onError={setError}
+      onTesterGate={setTesterGate}
+      emailOption={emailOption}
+    />
+  );
+}
+
+/**
+ * Registrazione con email spenta: `/accedi?accesso=email` per chi ha un account con password
+ * (es. un operatore). Con la registrazione accesa non compare: c'è il pannello sotto Google.
+ */
+function PasswordLoginPage({ onTesterGate }: { onTesterGate: (info: TesterGateInfo) => void }) {
   const { login } = useAuth();
   const navigate = useNavigate();
   const { search } = useLocation();
-  // Pilota: con la registrazione con email spenta anche l'accesso è solo con Google. Chi ha un
-  // account con password (es. un operatore) apre `/accedi?accesso=email`. Finché il server non
-  // risponde il modulo non si mostra; se la richiesta fallisce sì.
-  const authOptions = useAuthOptions();
-  const showEmailLogin =
-    (authOptions.loaded && authOptions.emailRegistrationEnabled) ||
-    new URLSearchParams(search).get("accesso") === "email";
   const [remembered, setRemembered] = useState<LastUser | null>(() => readLastUser());
   const [email, setEmail] = useState(() => readLastUser()?.email ?? "");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [testerGate, setTesterGate] = useState<TesterGateInfo | null>(null);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -445,6 +483,12 @@ export function AuthLoginPage() {
       const returnTo = params.get("returnTo");
       navigate(returnTo ? decodeURIComponent(returnTo) : "/leghe");
     } catch (submitError) {
+      // Pilota in modalità test: anche con la password un non tester può chiedere di entrare.
+      const gate = testerGateFromError(submitError);
+      if (gate) {
+        onTesterGate({ ...gate, provider: "email" });
+        return;
+      }
       setError(getApiErrorMessage(submitError, "Accesso non riuscito."));
     } finally {
       setLoading(false);
@@ -460,14 +504,6 @@ export function AuthLoginPage() {
   }
 
   const firstName = remembered?.displayName.trim().split(/\s+/)[0] ?? "";
-
-  if (testerGate) {
-    return <TesterRequestPanel info={testerGate} onBack={() => setTesterGate(null)} />;
-  }
-
-  if (!showEmailLogin) {
-    return <LoginCardsPage firstName={firstName} error={error} onError={setError} onTesterGate={setTesterGate} />;
-  }
 
   return (
     <div className="fa-auth-page fa-login fa-login--home" data-testid="login-page">
@@ -497,16 +533,7 @@ export function AuthLoginPage() {
         <LoginShowcase />
       </section>
       <section className="fa-login__panel">
-        <SocialLogins onError={setError} appleLabel="Continua con Apple" dividerLabel={showEmailLogin ? (remembered ? "oppure con la password" : "oppure con email") : null} onTesterGate={setTesterGate} />
-        {!showEmailLogin ? (
-          // Solo Google: l'accesso crea l'account da solo, quindi nessun testo né link «Registrati».
-          <div data-testid="login-google-only">
-            {error ? <UiStatePanel state="error" title="Accesso non riuscito" message={error} testId="auth-login-error" /> : null}
-            <p className="fa-auth-layout__register" data-testid="login-privacy-link">
-              Accedendo accetti l'<Link to="/privacy">informativa privacy</Link>.
-            </p>
-          </div>
-        ) : (
+        <SocialLogins onError={setError} appleLabel="Continua con Apple" dividerLabel={remembered ? "oppure con la password" : "oppure con email"} onTesterGate={onTesterGate} />
         <AuthFormLayout
           brand={null}
           hideBrand
@@ -557,7 +584,6 @@ export function AuthLoginPage() {
             </>
           }
         />
-        )}
         <LoginFeatures />
       </section>
     </div>

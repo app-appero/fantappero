@@ -5,6 +5,8 @@ export type AuthOptionsState = {
   /** `false` finché il server non ha risposto: nel dubbio non si mostra il modulo con email. */
   loaded: boolean;
   emailRegistrationEnabled: boolean;
+  /** Con `false` (dev e pilota) dopo la registrazione si entra subito, senza email da aprire. */
+  emailVerificationRequired: boolean;
 };
 
 /**
@@ -14,19 +16,28 @@ export type AuthOptionsState = {
  * server nessun accesso può riuscire.
  */
 export function useAuthOptions(): AuthOptionsState {
-  const [state, setState] = useState<AuthOptionsState>({ loaded: false, emailRegistrationEnabled: false });
+  const [state, setState] = useState<AuthOptionsState>({
+    loaded: false,
+    emailRegistrationEnabled: false,
+    emailVerificationRequired: true,
+  });
 
   useEffect(() => {
     let cancelled = false;
     fetchAuthOptions()
       .then((options) => {
         if (!cancelled) {
-          setState({ loaded: true, emailRegistrationEnabled: options.emailRegistrationEnabled });
+          setState({
+            loaded: true,
+            emailRegistrationEnabled: options.emailRegistrationEnabled,
+            // Server meno recenti non lo dicono: si resta sul comportamento di prima (verifica).
+            emailVerificationRequired: options.emailVerificationRequired !== false,
+          });
         }
       })
       .catch(() => {
         if (!cancelled) {
-          setState({ loaded: true, emailRegistrationEnabled: false });
+          setState({ loaded: true, emailRegistrationEnabled: false, emailVerificationRequired: true });
         }
       });
     return () => {

@@ -32,12 +32,14 @@ test("un utente si registra, verifica l'email, accede, crea una lega, schiera la
   const leagueName = `Lega E2E ${Date.now()}`;
 
   await test.step("registrazione", async () => {
+    // /accedi/registrati apre il pannello con email già sulla scheda «Registrati».
     await page.goto("/accedi/registrati");
+    await expect(page.getByTestId("auth-email-tab-register")).toHaveAttribute("aria-selected", "true");
     await page.getByLabel("Nome visualizzato").fill("Tester E2E");
     await page.getByLabel("Email").fill(email);
     await page.getByLabel("Password", { exact: true }).fill(password);
-    await page.getByLabel("Conferma password").fill(password);
-    await page.getByRole("button", { name: "Registrati" }).click();
+    await page.getByRole("button", { name: "Crea account" }).click();
+    // Lo stack e2e richiede la verifica email (default): si entra dopo il link di Mailpit.
     await expect(page.getByTestId("auth-register-success")).toBeVisible();
   });
 
@@ -49,9 +51,15 @@ test("un utente si registra, verifica l'email, accede, crea una lega, schiera la
 
   await test.step("login", async () => {
     await page.goto("/accedi");
+    // Pannello con email: chiuso se Google è configurato, già aperto altrimenti (stack e2e).
+    const toggle = page.getByTestId("auth-email-toggle");
+    await expect(toggle.or(page.getByTestId("auth-email-panel"))).toBeVisible();
+    if (await toggle.isVisible()) {
+      await toggle.click();
+    }
     await page.getByLabel("Email").fill(email);
     await page.getByLabel("Password", { exact: true }).fill(password);
-    await page.getByRole("button", { name: "Accedi" }).click();
+    await page.getByRole("button", { name: "Accedi", exact: true }).click();
     await expect(page).toHaveURL(/\/leghe/);
   });
 

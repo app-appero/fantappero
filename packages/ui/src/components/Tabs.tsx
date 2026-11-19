@@ -137,9 +137,10 @@ export type TabProps = {
   children: ReactNode;
   disabled?: boolean;
   className?: string;
+  testId?: string;
 };
 
-export function Tab({ value, children, disabled = false, className }: TabProps) {
+export function Tab({ value, children, disabled = false, className, testId }: TabProps) {
   const { activeValue, setActiveValue, registerTab } = useTabsContext("Tab");
   const selected = activeValue === value;
 
@@ -157,6 +158,7 @@ export function Tab({ value, children, disabled = false, className }: TabProps) 
       tabIndex={selected ? 0 : -1}
       disabled={disabled}
       className={classNames("fa-tab", className)}
+      data-testid={testId}
       onClick={() => setActiveValue(value)}
     >
       {children}

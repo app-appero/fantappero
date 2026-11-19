@@ -87,7 +87,8 @@ export function AuthFormLayout({
     <form className="fa-auth-layout" data-testid={testId} onSubmit={onSubmit} noValidate>
       {hideBrand ? null : <div className="fa-auth-layout__brand">{brand}</div>}
       <Card>
-        <CardHeader>{title}</CardHeader>
+        {/* Senza titolo nessuna intestazione (es. quando il titolo lo dà già una scheda). */}
+        {title ? <CardHeader>{title}</CardHeader> : null}
         <CardBody>
           {error ? (
             <p className="fa-field__error" role="alert" data-testid="auth-form-error">

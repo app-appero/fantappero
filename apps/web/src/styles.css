@@ -6164,3 +6164,87 @@ button.fa-starter-row:disabled {
   color: var(--fa-color-foreground-muted);
   font-size: var(--fa-text-sm);
 }
+
+/* ── Accesso: alternativa con email sotto «Continua con Google» ──────────── */
+.fa-login-cards__email-toggle {
+  width: 100%;
+  min-height: 3rem;
+  justify-content: center;
+}
+
+.fa-login-email {
+  width: 100%;
+  box-sizing: border-box;
+  display: grid;
+  gap: var(--fa-space-md);
+  padding: var(--fa-space-md);
+  border: 1px solid var(--fa-color-border);
+  border-radius: 1.5rem;
+  background-color: color-mix(in srgb, var(--fa-color-foreground) 5%, transparent);
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
+}
+
+[data-color-scheme="light"] .fa-login-email {
+  background-color: var(--fa-color-background-elevated);
+}
+
+.fa-login-email__head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--fa-space-sm);
+}
+
+.fa-login-email__head .fa-tablist {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.fa-login-email__close {
+  flex: 0 0 auto;
+}
+
+/* Il modulo sta già dentro la scheda: niente seconda cornice né intestazione. */
+.fa-login-email .fa-auth-layout {
+  max-width: none;
+}
+
+.fa-login-email .fa-card {
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+.fa-login-email .fa-card__body,
+.fa-login-email .fa-card__footer {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fa-space-md);
+  padding: 0;
+  border: 0;
+}
+
+.fa-login-email .fa-card__footer {
+  margin-top: var(--fa-space-md);
+}
+
+.fa-login-email .fa-card__footer .fa-btn {
+  width: 100%;
+  min-height: 3rem;
+  justify-content: center;
+}
+
+.fa-login-email__done {
+  display: grid;
+  gap: var(--fa-space-md);
+}
+
+/* Stesso link all'informativa della pagina (fuori dal pannello). */
+.fa-login-email .fa-auth-layout__register a {
+  color: inherit;
+  font-weight: 700;
+  text-decoration: underline;
+}
