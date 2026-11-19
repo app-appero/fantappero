@@ -2,9 +2,11 @@
 
 Flusso: l'accesso con Google di un non tester, a modalità test accesa, non crea nessun account.
 Google ha già verificato l'indirizzo; il backend rilascia un gettone firmato a scadenza breve con
-cui la persona può inviare il modulo (nome, cognome, telefono, motivo facoltativo). Le richieste
-vivono in una tabella a parte. L'operatore approva dal pannello: l'indirizzo entra nella lista dei
-tester e al prossimo accesso con Google la persona entra normalmente.
+cui la persona può inviare il modulo (nome, cognome, telefono, motivo facoltativo). Lo stesso
+gettone lo riceve chi accede con email e password, dopo il controllo della password: in quel caso
+l'account esiste già, ma non entra finché non è tester. Le richieste vivono in una tabella a parte.
+L'operatore approva dal pannello: l'indirizzo entra nella lista dei tester e al prossimo accesso
+(Google o email) la persona entra normalmente.
 
 Il numero di telefono serve solo per aggiungere la persona al gruppo WhatsApp dei tester.
 """
@@ -53,12 +55,12 @@ def read_request_token(*, secret: str, token: str) -> dict[str, str]:
         payload = jwt.decode(token, secret, algorithms=["HS256"])
     except jwt.PyJWTError as exc:
         raise ValidationAuthError(
-            "La sessione di accesso è scaduta: accedi di nuovo con Google e riprova.",
+            "La sessione di accesso è scaduta: accedi di nuovo e riprova.",
             code="tester_request_token_invalid",
         ) from exc
     if payload.get("type") != _TOKEN_TYPE or not payload.get("email"):
         raise ValidationAuthError(
-            "La sessione di accesso non è valida: accedi di nuovo con Google.",
+            "La sessione di accesso non è valida: accedi di nuovo.",
             code="tester_request_token_invalid",
         )
     return {"email": str(payload["email"]), "name": str(payload.get("name") or "")}
@@ -117,7 +119,7 @@ class TesterRequestService:
         normalized = normalize_tester_email(email)
         if access.is_listed(normalized):
             raise ValidationAuthError(
-                "Sei già tra i tester: accedi con Google.", code="already_tester"
+                "Sei già tra i tester: accedi di nuovo.", code="already_tester"
             )
         first = _clean(first_name, field="nome", max_len=80)
         last = _clean(last_name, field="cognome", max_len=80)

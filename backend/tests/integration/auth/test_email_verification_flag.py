@@ -36,7 +36,12 @@ def test_account_is_usable_right_away_when_verification_is_off(
     reset_settings_cache()
     emails_before = len(get_captured_emails())
 
-    assert _register(client, "verif.spenta@example.com").status_code == 201
+    registered = _register(client, "verif.spenta@example.com")
+    assert registered.status_code == 201
+    # Nessuna email da aspettare: il messaggio dice di accedere subito, anche a chi c'era già.
+    assert registered.json()["message"] == "Registrazione completata: ora puoi accedere."
+    again = _register(client, "verif.spenta@example.com")
+    assert again.json() == registered.json()
 
     assert len(get_captured_emails()) == emails_before
     response = _login(client, "verif.spenta@example.com")
