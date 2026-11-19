@@ -6,8 +6,10 @@ toglie già dalla formazione salvata e dalla bozza (fantasy_lineups.departures, 
 test_lineup_departure_purge.py); se resta lì per altre vie (dati precedenti, correzioni fatte
 a mano nel DB) GET formazione lo toglie comunque dai titolari e dalla panchina restituiti. In
 entrambi i casi il suo posto resta vuoto e l'avviso dice chi è stato tolto. Il salvataggio con
-lui ancora dentro resta rifiutato, ma il messaggio dice chi è. Nei turni bloccati o conclusi,
-e per chi ha la partita già iniziata, la formazione non si tocca: è storia del punteggio.
+lui ancora dentro resta rifiutato, ma il messaggio dice chi è. Al primo blocco del turno lo
+toglie la regola di inizio turno (fantasy_lineups.turn_start, test_lineup_turn_start_autofill.py),
+anche se la sua partita è già in blocco. Nei turni già calcolati o conclusi la formazione non si
+tocca: è storia del punteggio.
 """
 
 from __future__ import annotations
@@ -31,6 +33,7 @@ from tests.integration.fantasy_lineups.test_trade_overflow_lineup import (  # no
 
 from database.enums import FantasyRole, FantasyTurnStatus
 from fantasy_lineups.models import LineupDraft, LineupPlayer, LineupSubmission
+from fantasy_lineups.substitution_service import compute_round_effective_lineups
 from fantasy_teams.models import FantasyRosterSlot
 from fantasy_turns.models import FantasyRound, FantasyRoundFixture
 from sports_data.fixtures.models import Fixture
@@ -261,11 +264,8 @@ def _depart_then_close_turn(
     setup = _trade_league(client, db_session, competition_ids, prefix=prefix, id_offset=id_offset)
     payload = _save_lineup(client, db_session, setup)
     departed = UUID(payload["benchAthleteIds"][3])
-    # Uscito senza passare dal mercato (correzione diretta nel DB, o dati di prima della pulizia
-    # all'uscita): resta nella formazione salvata. Uno scambio lo avrebbe già tolto.
-    _replace_in_roster(db_session, setup, departed, provider_id=id_offset + 9_999)
 
-    # Il turno parte (o finisce) dopo l'uscita: tutte le partite sono iniziate.
+    # Il turno è in corso (o finito): tutte le partite sono iniziate.
     started = datetime.now(UTC) - timedelta(hours=3)
     fantasy_round = db_session.get(FantasyRound, UUID(setup["round_id"]))
     assert fantasy_round is not None
@@ -282,6 +282,14 @@ def _depart_then_close_turn(
         fixture.kickoff_at = started
         fixture.status_short = "FT" if homologated else "2H"
     db_session.commit()
+    if not homologated:
+        # Turno bloccato e già calcolato: dopo il primo calcolo la regola di inizio turno
+        # (fantasy_lineups.turn_start) non lo tocca più.
+        compute_round_effective_lineups(db_session, round_id=fantasy_round.id)
+        db_session.commit()
+    # Uscito senza passare dal mercato (correzione diretta nel DB): resta nella formazione
+    # salvata. Uno scambio lo avrebbe già tolto, e a turno in corso il mercato è chiuso.
+    _replace_in_roster(db_session, setup, departed, provider_id=id_offset + 9_999)
     return setup, payload, departed
 
 
@@ -313,7 +321,7 @@ def _assert_lineup_untouched(
     assert _stored_athlete_ids(db_session, setup) == stored_before
 
 
-def test_locked_turn_lineup_with_a_departed_player_is_left_alone(
+def test_locked_and_scored_turn_lineup_with_a_departed_player_is_left_alone(
     client: TestClient,
     db_session: Session,
     competition_ids: list[str],
@@ -345,12 +353,17 @@ def test_finished_turn_lineup_with_a_departed_player_is_left_alone(
     _assert_lineup_untouched(client, db_session, setup, payload, departed)
 
 
-def test_departed_player_whose_match_already_started_stays_in_the_lineup(
+def test_departed_player_whose_match_is_locked_leaves_the_lineup_at_turn_start(
     client: TestClient,
     db_session: Session,
     competition_ids: list[str],
 ) -> None:
-    """Turno ancora aperto, ma la partita del calciatore uscito è già in blocco."""
+    """Turno ancora aperto, ma la partita del calciatore uscito è già in blocco.
+
+    È il primo blocco del turno: la regola di inizio turno (fantasy_lineups.turn_start,
+    decisione del 19/11) toglie dalla formazione chi non è più in rosa, anche se la sua
+    partita è già in blocco. Prima del primo calcolo non conta ancora per nessun punteggio.
+    """
     setup = _trade_league(
         client, db_session, competition_ids, prefix="lar.partita", id_offset=9_400_000
     )
@@ -364,5 +377,16 @@ def test_departed_player_whose_match_already_started_stays_in_the_lineup(
 
     body = client.get(_lineup_url(setup), headers=_headers(setup["token_a"])).json()
     assert body["effectiveStatus"] == "open"
-    assert str(departed) in [player["athleteId"] for player in body["lineup"]["bench"]]
-    assert LEFT_ROSTER_CODE not in [issue["code"] for issue in body["issues"]]
+    assert str(departed) not in [player["athleteId"] for player in body["lineup"]["bench"]]
+    assert [issue for issue in body["issues"] if issue["code"] == LEFT_ROSTER_CODE] == [
+        {
+            "code": LEFT_ROSTER_CODE,
+            "message": (
+                f"All'inizio del turno 1 {_name(db_session, departed)} è stato tolto dalla "
+                "formazione: non è più nella tua rosa."
+            ),
+        }
+    ]
+    assert departed not in {
+        athlete_id for _, _, athlete_id in _stored_athlete_ids(db_session, setup)
+    }

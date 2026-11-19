@@ -278,6 +278,7 @@ export {
   savedStarterSlotIds,
   slotsFromLineupIds,
   starterTemplate,
+  withoutRoleQuotaExcess,
 } from "./fantasyLineups.js";
 
 export {

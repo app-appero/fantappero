@@ -33,6 +33,7 @@ import {
   resolveAutomaticSubstitutions,
   slotsFromLineupIds,
   starterTemplate,
+  withoutRoleQuotaExcess,
 } from "./fantasyLineups.ts";
 
 function ids(prefix: string, count: number): string[] {
@@ -892,6 +893,17 @@ describe("fantasyLineups rules", () => {
       assert.deepEqual(plan.starterIds, ["P1", "D2", "D1", "D3", "D4", "C1", "C2", "C3", "", "A1", "A2"]);
     });
 
+    it("chi è in esubero di ruolo non entra nella panchina della formazione (QA 19/11)", () => {
+      // A6 in esubero: web e app lo mettevano in coda alla panchina e il server rifiutava tutto.
+      const plan = keepStartersForModule({
+        module: "4-4-2",
+        currentStarters: starters433,
+        benchIds: bench,
+        roster: roster({ A6: { exceedsRoleQuota: true } }),
+      });
+      assert.deepEqual(plan.benchIds, [...bench.filter((athleteId) => athleteId !== "A6"), "A3"]);
+    });
+
     it("un bloccato senza posto nel nuovo modulo non prende lo slot di un altro ruolo", () => {
       // 4-5-1 ha un solo attaccante: A2 bloccato resta fuori, chi chiama deve rifiutare il modulo.
       const plan = keepStartersForModule({
@@ -948,5 +960,28 @@ describe("formazione con chi non è più in rosa (QA 19/11)", () => {
       ),
       ["P1", "D1", "D2", ""],
     );
+  });
+});
+
+describe("withoutRoleQuotaExcess (QA 19/11, qa-02)", () => {
+  const roster = [
+    { athleteId: "A1" },
+    { athleteId: "A2", exceedsRoleQuota: true },
+    { athleteId: "A3", exceedsRoleQuota: false },
+  ];
+
+  it("toglie chi è in esubero di ruolo e lascia gli altri nel loro ordine", () => {
+    assert.deepEqual(withoutRoleQuotaExcess(["A3", "A2", "A1"], roster), ["A3", "A1"]);
+    // Gli id della rosa per la panchina: con la rosa intera lui finiva in coda alla panchina.
+    assert.deepEqual(
+      orderedBenchFromRoster(withoutRoleQuotaExcess(["A1", "A2", "A3"], roster), ["A1"], ["A3"]),
+      ["A3"],
+    );
+  });
+
+  it("senza nessuno in esubero, o con chi non è in rosa, non cambia niente", () => {
+    assert.deepEqual(withoutRoleQuotaExcess(["A1", "A3", "X9"], roster), ["A1", "A3", "X9"]);
+    assert.deepEqual(withoutRoleQuotaExcess(["A1", "A2"], []), ["A1", "A2"]);
+    assert.deepEqual(withoutRoleQuotaExcess([], roster), []);
   });
 });

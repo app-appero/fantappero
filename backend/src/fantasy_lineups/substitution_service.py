@@ -2,7 +2,10 @@
 
 Resolves, for every fantasy team in a turn, which starters lack a valid
 statistical vote (EP07-02) and applies the automatic substitutions described
-in ``fantasy_lineups.rules.resolve_automatic_substitutions``. The result is
+in ``fantasy_lineups.rules.resolve_automatic_substitutions``. Before the first
+computation of a turn the saved lineups go through the turn-start rule
+(``fantasy_lineups.turn_start``: departed players out, empty starter places
+filled from the bench and the tribuna). The result is
 persisted idempotently: a recompute (e.g. after a rating correction, EP07-07)
 overwrites the existing row for ``(round_id, fantasy_team_id)`` instead of
 duplicating it, so it stays deterministic.
@@ -26,6 +29,7 @@ from fantasy_lineups.rules import (
     SubstitutionResolution,
     resolve_automatic_substitutions,
 )
+from fantasy_lineups.turn_start import settle_lineups_at_turn_start
 from fantasy_lineups.validators import validate_max_automatic_substitutions_override
 from fantasy_ratings.config import default_formula_config
 from fantasy_ratings.models import PlayerMatchRating
@@ -68,6 +72,11 @@ def compute_round_effective_lineups(
     if fantasy_round is None:
         raise ValidationAuthError("Turno non trovato.", code="turn_not_found")
     assert_round_not_homologated(fantasy_round)
+    # Prima del primo calcolo del turno le formazioni passano dalla regola di inizio turno (chi
+    # non è più in rosa esce, i posti vuoti si coprono dalla panchina e dalla tribuna): nessun
+    # calcolo, automatico o dell'operatore, parte da una formazione non sistemata. Dal primo
+    # calcolo in poi non fa più niente (fantasy_lineups.turn_start).
+    settle_lineups_at_turn_start(session, fantasy_round=fantasy_round, now=datetime.now(UTC))
 
     rules = session.execute(
         select(LeagueRules).where(LeagueRules.league_id == fantasy_round.league_id)

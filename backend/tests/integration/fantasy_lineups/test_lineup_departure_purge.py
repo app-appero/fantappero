@@ -440,11 +440,16 @@ def test_trade_removes_departed_players_from_future_lineup_draft_and_scoring(
     ).one()
     assert str(starter) not in effective_a.effective_starter_ids
     assert str(bench_player) not in effective_a.effective_starter_ids
-    assert len(effective_a.effective_starter_ids) == 10
+    # All'inizio del turno il posto vuoto lo prende il primo difensore della panchina
+    # (fantasy_lineups.turn_start, decisione del 19/11): A non gioca più in 10.
+    first_bench_defender = UUID(payload_a["benchAthleteIds"][1])
+    assert setup["role_of"][first_bench_defender] == FantasyRole.D
+    assert effective_a.effective_starter_ids[2] == str(first_bench_defender)
+    assert len(effective_a.effective_starter_ids) == 11
     compute_round_results(db_session, round_id=UUID(round_id))
     db_session.commit()
     db_session.refresh(slot)
-    assert slot.home_score == pytest.approx(60.0)  # 10 titolari rimasti a 6
+    assert slot.home_score == pytest.approx(66.0)  # 11 titolari a 6, senza chi è uscito
     assert slot.away_score == pytest.approx(66.0)  # B: i suoi 11, senza chi ha ricevuto
 
 

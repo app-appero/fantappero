@@ -766,8 +766,12 @@ export function keepStartersForModule(input: {
   }
   return {
     starterIds: starters,
+    // Chi è in esubero di ruolo non entra nella panchina della formazione.
     benchIds: orderedBenchFromRoster(
-      input.roster.map((row) => row.athleteId),
+      withoutRoleQuotaExcess(
+        input.roster.map((row) => row.athleteId),
+        input.roster,
+      ),
       starters,
       input.benchIds ?? [],
     ),
@@ -846,6 +850,23 @@ export function savedStarterSlotIds(
     slots[free] = athleteId;
   }
   return slots;
+}
+
+/**
+ * Gli stessi id senza chi è in esubero di ruolo (`exceedsRoleQuota`, QA 19/11).
+ *
+ * Chi è in esubero resta in rosa ma non si schiera finché la rosa non torna in regola: non va
+ * nella formazione mandata al server (titolari, panchina e tribuna) né nel confronto con quella
+ * salvata. Il server lo toglie comunque in silenzio dalla tribuna (app già installate) e rifiuta
+ * la formazione se è titolare o nei primi 10 della panchina. Serve sia per gli id della rosa da
+ * dare a `orderedBenchFromRoster` sia per una panchina già fatta.
+ */
+export function withoutRoleQuotaExcess(
+  athleteIds: readonly string[],
+  roster: readonly Pick<LineupRosterPlayer, "athleteId" | "exceedsRoleQuota">[],
+): string[] {
+  const excess = new Set(roster.filter((row) => row.exceedsRoleQuota === true).map((row) => row.athleteId));
+  return athleteIds.filter((athleteId) => !excess.has(athleteId));
 }
 
 /**

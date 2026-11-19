@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections import Counter, defaultdict
-from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 
@@ -77,6 +77,10 @@ ATHLETE_NOT_IN_ROSTER_MESSAGE = "Uno o più calciatori schierati non appartengon
 #: Avviso del contesto formazione (QA 19/11): chi non è più in rosa è stato tolto dalla
 #: formazione salvata o dalla bozza di un turno ancora modificabile.
 LINEUP_ATHLETE_LEFT_ROSTER_CODE = "lineup_athlete_left_roster"
+#: Titolare o nei primi ``BENCH_ACTIVE_SIZE`` della panchina un calciatore in esubero di ruolo
+#: (``exceeds_role_quota``): è in rosa ma non si schiera finché la rosa non torna in regola.
+ATHLETE_EXCEEDS_ROLE_QUOTA_CODE = "athlete_exceeds_role_quota"
+COPIED_EXCEEDS_ROLE_QUOTA_CODE = "copied_athlete_exceeds_role_quota"
 
 
 @dataclass(frozen=True)
@@ -345,6 +349,74 @@ def lineup_athlete_left_roster_message(names: Sequence[str]) -> str:
     )
 
 
+def athlete_exceeds_role_quota_message(names: Sequence[str]) -> str:
+    """Formazione rifiutata perché schiera chi è in esubero di ruolo: il messaggio dice chi."""
+    unique = list(dict.fromkeys(name for name in names if name))
+    if not unique:
+        return (
+            "Uno o più calciatori sono in esubero di ruolo: non possono essere schierati "
+            "finché la rosa non torna in regola."
+        )
+    if len(unique) == 1:
+        return (
+            f"{unique[0]} è in esubero di ruolo: non può essere schierato finché la rosa "
+            "non torna in regola."
+        )
+    return (
+        f"{join_names(unique)} sono in esubero di ruolo: non possono essere schierati "
+        "finché la rosa non torna in regola."
+    )
+
+
+def copied_athlete_exceeds_role_quota_message(names: Sequence[str]) -> str:
+    """Avviso della copia: chi era schierato nel turno precedente ed è in esubero di ruolo."""
+    unique = list(dict.fromkeys(name for name in names if name))
+    if not unique:
+        return (
+            "Uno o più calciatori della formazione precedente sono in esubero di ruolo e sono "
+            "stati esclusi."
+        )
+    if len(unique) == 1:
+        return f"{unique[0]} è in esubero di ruolo ed è stato escluso dalla formazione copiata."
+    return (
+        f"{join_names(unique)} sono in esubero di ruolo e sono stati esclusi dalla formazione "
+        "copiata."
+    )
+
+
+def drop_role_quota_excess_from_tribuna[T](
+    bench: Sequence[T],
+    excess_athlete_ids: Iterable[object],
+    *,
+    key: Callable[[T], object] | None = None,
+) -> list[T]:
+    """Panchina senza chi è in esubero di ruolo dall'11° posto in poi (la tribuna).
+
+    Web e app, anche le versioni già installate, mettono in coda alla panchina tutta la rosa,
+    compreso chi è in esubero (``exceeds_role_quota``). In tribuna non entra mai nei cambi
+    automatici: lo si toglie senza errore e non si salva (QA 19/11). Nei primi
+    ``BENCH_ACTIVE_SIZE`` posti resta, e la validazione lo rifiuta con il nome
+    (``athlete_exceeds_role_quota``). I posti si contano su quelli occupati, come la regola
+    della panchina attiva; quelli vuoti di una bozza (``""``) restano dove sono. ``key`` dà
+    l'id da confrontare con ``excess_athlete_ids`` (es. ``str`` per gli UUID).
+    """
+    excess = {item for item in excess_athlete_ids if item not in {None, ""}}
+    if not excess:
+        return list(bench)
+    kept: list[T] = []
+    filled = 0
+    for item in bench:
+        athlete_id = key(item) if key is not None else item
+        if athlete_id in {None, ""}:
+            kept.append(item)
+            continue
+        if filled >= BENCH_ACTIVE_SIZE and athlete_id in excess:
+            continue
+        filled += 1
+        kept.append(item)
+    return kept
+
+
 def drop_departed_athletes(
     *,
     starter_ids: Sequence[object],
@@ -430,6 +502,192 @@ def fill_starter_holes(
     return filled
 
 
+#: Da dove arriva chi copre un posto vuoto all'inizio del turno.
+TURN_START_FROM_BENCH = "bench"
+TURN_START_FROM_TRIBUNA = "tribuna"
+
+
+@dataclass(frozen=True)
+class TurnStartHoleFill:
+    """Un posto da titolare vuoto all'inizio del turno e come è stato coperto."""
+
+    #: ``sort_order`` del posto tra i titolari.
+    starter_position: int
+    #: Il ruolo che manca al modulo in quel posto (``None``: modulo non leggibile).
+    role: FantasyRole | None
+    #: Chi è entrato tra i titolari; ``None`` se il posto resta vuoto.
+    starter_athlete_id: object | None = None
+    #: ``TURN_START_FROM_BENCH`` o ``TURN_START_FROM_TRIBUNA``; ``None`` se il posto resta vuoto.
+    source: str | None = None
+    #: Posizione in panchina (0-based, prima del cambio) di chi è entrato.
+    from_bench_position: int | None = None
+    #: Chi dalla tribuna ha preso in panchina il posto di chi è entrato.
+    bench_athlete_id: object | None = None
+    #: Il posto in panchina preso da ``bench_athlete_id`` (quello lasciato da chi è entrato).
+    bench_position: int | None = None
+    #: Posizione in panchina (0-based, prima del cambio) di ``bench_athlete_id``; ``None`` se
+    #: non era nella formazione (in rosa ma non schierato).
+    bench_from_position: int | None = None
+
+
+@dataclass(frozen=True)
+class TurnStartLineup:
+    """Formazione dopo la regola di inizio turno (``fill_lineup_holes_at_turn_start``)."""
+
+    #: Titolari come ``(sort_order, calciatore)``: gli altri tengono il loro posto.
+    starters: tuple[tuple[int, LineupPlayerRef], ...]
+    #: Panchina completa (panchina attiva e tribuna) nel nuovo ordine.
+    bench: tuple[LineupPlayerRef, ...]
+    #: Un elemento per ogni posto vuoto, in ordine di posto.
+    fills: tuple[TurnStartHoleFill, ...]
+
+    @property
+    def changed(self) -> bool:
+        return any(item.starter_athlete_id is not None for item in self.fills)
+
+
+def fill_lineup_holes_at_turn_start(
+    *,
+    module: str,
+    starters: Sequence[tuple[int, LineupPlayerRef]],
+    bench: Sequence[LineupPlayerRef],
+    outside: Sequence[LineupPlayerRef] = (),
+    unavailable_ids: Iterable[object] = (),
+) -> TurnStartLineup:
+    """Copre i posti vuoti tra i titolari all'inizio del turno (decisione di Rosario del 19/11).
+
+    Ogni posto vuoto ha il ruolo che manca al modulo (``fill_starter_holes``). In due passi:
+
+    1. per ogni posto vuoto, in ordine di posto, entra il primo della panchina attiva (i primi
+       ``BENCH_ACTIVE_SIZE``, in ordine di panchina) con quel ruolo; senza nessuno in panchina
+       entra direttamente il primo della tribuna con quel ruolo; senza nessuno di quel ruolo il
+       posto resta vuoto;
+    2. poi, per ogni panchinaro entrato, il primo della tribuna con lo stesso ruolo prende il
+       suo posto in panchina. Stesso ruolo nello stesso posto: la quota per ruolo della
+       panchina attiva non cambia e gli altri non si spostano, quindi non serve mai metterlo in
+       coda. Senza nessuno in tribuna la panchina si ricompatta.
+
+    Con due posti vuoti dello stesso ruolo entrano i primi due panchinari di quel ruolo, e i
+    primi due della tribuna salgono ai loro posti: l'ordine scelto dal fantallenatore conta.
+
+    La tribuna è nell'ordine mostrato da web e app («Altri N in tribuna»): prima la panchina
+    salvata dall'11° posto in poi, poi chi è in rosa ma non è nella formazione (``outside``,
+    nell'ordine degli slot della rosa). Non entra chi è in ``unavailable_ids`` (esubero di
+    ruolo, ruolo non risolto, nessun voto possibile in questo turno), né chi non ha un ruolo.
+
+    Funzione pura e deterministica: niente blocchi per partita, così l'esito non dipende da
+    quando gira; decidere se e quando applicarla spetta al chiamante
+    (``fantasy_lineups.turn_start``).
+    """
+    unavailable = {item for item in unavailable_ids if item not in {None, ""}}
+    present = [(position, ref) for position, ref in starters if ref.athlete_id not in {None, ""}]
+    slots = fill_starter_holes(module=module, starters=present)
+    holes = [(position, ref.role) for position, ref in enumerate(slots) if ref.athlete_id == ""]
+    final_starters: dict[int, LineupPlayerRef] = dict(present)
+    if not holes:
+        return TurnStartLineup(
+            starters=tuple(sorted(final_starters.items(), key=lambda item: item[0])),
+            bench=tuple(bench),
+            fills=(),
+        )
+    original_position = {ref.athlete_id: index for index, ref in enumerate(bench)}
+    # Le prime ``BENCH_ACTIVE_SIZE`` posizioni non cambiano durante i due passi (chi entra resta
+    # al suo posto fino alla fine); la tribuna è tutto il resto, nel suo ordine.
+    active = list(bench[:BENCH_ACTIVE_SIZE])
+    tribuna = list(bench[BENCH_ACTIVE_SIZE:])
+    spare = [ref for ref in outside if ref.athlete_id not in {None, ""}]
+    used: set[object] = set()
+
+    def usable(ref: LineupPlayerRef, role: FantasyRole) -> bool:
+        return (
+            ref.athlete_id not in {None, ""}
+            and ref.athlete_id not in unavailable
+            and ref.athlete_id not in used
+            and ref.role is not None
+            and ref.role == role
+        )
+
+    def take_from_tribuna(role: FantasyRole) -> LineupPlayerRef | None:
+        for pool in (tribuna, spare):
+            index = next((i for i, ref in enumerate(pool) if usable(ref, role)), None)
+            if index is not None:
+                ref = pool.pop(index)
+                used.add(ref.athlete_id)
+                return ref
+        return None
+
+    # 1. I posti vuoti: prima la panchina attiva, poi la tribuna.
+    entered: dict[int, tuple[LineupPlayerRef, str | None, int | None]] = {}
+    for position, role in holes:
+        if role is None:
+            continue
+        bench_index = next((i for i, ref in enumerate(active) if usable(ref, role)), None)
+        if bench_index is not None:
+            promoted = active[bench_index]
+            used.add(promoted.athlete_id)
+            final_starters[position] = promoted
+            entered[position] = (promoted, TURN_START_FROM_BENCH, bench_index)
+            continue
+        direct = take_from_tribuna(role)
+        if direct is not None:
+            final_starters[position] = direct
+            entered[position] = (direct, TURN_START_FROM_TRIBUNA, None)
+
+    # 2. In panchina, al posto di ogni panchinaro entrato, il primo della tribuna dello stesso
+    # ruolo; dove non c'è nessuno il posto si libera e la panchina si ricompatta.
+    refills: dict[int, LineupPlayerRef] = {}
+    for position, _ in holes:
+        item = entered.get(position)
+        if item is None or item[1] != TURN_START_FROM_BENCH:
+            continue
+        promoted, _, bench_index = item
+        assert bench_index is not None and promoted.role is not None
+        refill = take_from_tribuna(promoted.role)
+        if refill is not None:
+            refills[position] = refill
+            active[bench_index] = refill
+    promoted_ids = {
+        item[0].athlete_id for item in entered.values() if item[1] == TURN_START_FROM_BENCH
+    }
+    final_bench = [ref for ref in active if ref.athlete_id not in promoted_ids] + tribuna
+    final_position = {ref.athlete_id: index for index, ref in enumerate(final_bench)}
+
+    fills: list[TurnStartHoleFill] = []
+    for position, role in holes:
+        item = entered.get(position)
+        if item is None:
+            fills.append(TurnStartHoleFill(starter_position=position, role=role))
+            continue
+        ref, source, _ = item
+        refill = refills.get(position)
+        fills.append(
+            TurnStartHoleFill(
+                starter_position=position,
+                role=role,
+                starter_athlete_id=ref.athlete_id,
+                source=source,
+                from_bench_position=original_position.get(ref.athlete_id),
+                bench_athlete_id=refill.athlete_id if refill is not None else None,
+                bench_position=final_position[refill.athlete_id] if refill is not None else None,
+                bench_from_position=(
+                    original_position.get(refill.athlete_id) if refill is not None else None
+                ),
+            )
+        )
+    return TurnStartLineup(
+        starters=tuple(sorted(final_starters.items(), key=lambda item: item[0])),
+        bench=tuple(final_bench),
+        fills=tuple(fills),
+    )
+
+
+def turn_start_role_label(role: FantasyRole | None) -> str:
+    """«difensore», «portiere»…: il ruolo al singolare per gli avvisi."""
+    if role is None:
+        return "titolare"
+    return _BENCH_ROLE_LABELS[role][0]
+
+
 def evaluate_lineup(
     *,
     module: str,
@@ -438,15 +696,23 @@ def evaluate_lineup(
     roster_athlete_ids: Sequence[object],
     strict: bool = True,
     athlete_names: Mapping[object, str] | None = None,
+    excess_athlete_ids: Iterable[object] = (),
 ) -> LineupEvaluation:
     """Validate 7 modules, 1 GK, 11 starters, P–D–C–A counts and roster membership.
 
     Drafts may pass ``strict=False`` to allow incomplete XI/panchina (EP06-06).
-    ``athlete_names`` (stesse chiavi degli id passati) serve solo al messaggio di
-    ``athlete_not_in_roster``: chi non è più in rosa viene nominato.
+    ``athlete_names`` (stesse chiavi degli id passati) serve solo ai messaggi di
+    ``athlete_not_in_roster`` e ``athlete_exceeds_role_quota``: chi non è più in rosa, o è in
+    esubero di ruolo, viene nominato.
+
+    ``excess_athlete_ids``: chi è in rosa ma in esubero di ruolo (fuori da
+    ``roster_athlete_ids``). In tribuna non conta (vedi `drop_role_quota_excess_from_tribuna`),
+    titolare o nei primi ``BENCH_ACTIVE_SIZE`` della panchina dà ``athlete_exceeds_role_quota``.
     """
     issues: list[LineupIssue] = []
     parsed = parse_module(module)
+    excess = {item for item in excess_athlete_ids if item not in {None, ""}}
+    bench = drop_role_quota_excess_from_tribuna(bench, excess, key=lambda ref: ref.athlete_id)
     starter_role_counts = count_roles(starters)
 
     if parsed is None:
@@ -485,14 +751,28 @@ def evaluate_lineup(
             )
         )
 
+    names = athlete_names or {}
+    # Tolto chi è in tribuna, chi resta in esubero è titolare o nei primi 10 della panchina.
+    fielded_excess = [athlete_id for athlete_id in all_ids if athlete_id in excess]
+    if fielded_excess:
+        issues.append(
+            LineupIssue(
+                code=ATHLETE_EXCEEDS_ROLE_QUOTA_CODE,
+                message=athlete_exceeds_role_quota_message(
+                    [names[athlete_id] for athlete_id in fielded_excess if athlete_id in names]
+                ),
+            )
+        )
+
     roster_set = {item for item in roster_athlete_ids if item not in {None, ""}}
     outside_roster = [
         athlete_id
         for athlete_id in all_ids
-        if athlete_id not in {None, ""} and athlete_id not in roster_set
+        if athlete_id not in {None, ""}
+        and athlete_id not in roster_set
+        and athlete_id not in excess
     ]
     if outside_roster:
-        names = athlete_names or {}
         issues.append(
             LineupIssue(
                 code="athlete_not_in_roster",
@@ -1243,11 +1523,20 @@ def copy_previous_lineup(
     current_confirmed_slots: Mapping[object, str] | None = None,
     current_confirmed_bench: Sequence[object] | None = None,
     role_by_athlete_id: Mapping[object, FantasyRole | None] | None = None,
+    excess_athlete_ids: Iterable[object] = (),
+    athlete_names: Mapping[object, str] | None = None,
 ) -> CopyLineupResult:
-    """Revalidate a previous lineup against current roster and kickoff availability."""
+    """Revalidate a previous lineup against current roster and kickoff availability.
+
+    Chi oggi è in esubero di ruolo (``excess_athlete_ids``, fuori da ``roster_athlete_ids``)
+    resta fuori dalla copia come chi non è più in rosa: se era in tribuna senza avviso, se era
+    titolare o nei primi 10 della panchina con un avviso che lo nomina (``athlete_names``).
+    """
     roster_set = {item for item in roster_athlete_ids if item not in {None, ""}}
     locked = {item for item in (locked_athlete_ids or ()) if item not in {None, ""}}
     confirmed = dict(current_confirmed_slots or {})
+    excess = {item for item in excess_athlete_ids if item not in {None, ""}}
+    previous_bench_ids = drop_role_quota_excess_from_tribuna(previous_bench_ids, excess)
     dropped: list[object] = []
     unavailable: list[object] = []
     starters: list[object] = []
@@ -1331,9 +1620,20 @@ def copy_previous_lineup(
     ]
 
     issues: list[LineupIssue] = []
-    if dropped:
+    if any(item not in excess for item in dropped):
         issues.append(
             LineupIssue(code="copied_athlete_not_in_roster", message=COPIED_NOT_IN_ROSTER_MESSAGE)
+        )
+    dropped_excess = [item for item in dropped if item in excess]
+    if dropped_excess:
+        names = athlete_names or {}
+        issues.append(
+            LineupIssue(
+                code=COPIED_EXCEEDS_ROLE_QUOTA_CODE,
+                message=copied_athlete_exceeds_role_quota_message(
+                    [names[item] for item in dropped_excess if item in names]
+                ),
+            )
         )
     if unavailable:
         issues.append(

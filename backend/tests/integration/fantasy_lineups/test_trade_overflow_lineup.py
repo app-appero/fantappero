@@ -370,14 +370,14 @@ def _assert_team_can_field_without_excess(
     fielded = {item["athleteId"] for item in (*lineup["starters"], *lineup["bench"])}
     assert not set(map(str, flagged)) & fielded
 
-    # Il calciatore in esubero, invece, non è schierabile.
+    # Il calciatore in esubero, invece, non è schierabile: il rifiuto dice chi è.
     with_excess = client.put(
         _lineup_url(setup),
         headers=_headers(token),
         json=_lineup_payload(slots, setup["role_of"], include=flagged[0]),
     )
     assert with_excess.status_code == 400
-    assert with_excess.json()["code"] == "athlete_not_in_roster"
+    assert with_excess.json()["code"] == "athlete_exceeds_role_quota"
 
 
 def test_two_for_one_trade_receiving_team_can_field_without_the_excess(

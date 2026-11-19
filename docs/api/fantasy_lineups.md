@@ -196,7 +196,9 @@ panchinaro o cambiare la formazione senza costo.
 - **Formazione automatica al primo blocco**: appena un calciatore della rosa è bloccato, chi non
   ha una formazione confermata riceve subito quella automatica (bozza valida → turno
   precedente → vuota), alla prima lettura o modifica. Da lì la bozza non conta più e ogni cambio
-  confermato costa una mossa.
+  confermato costa una mossa. Dal primo blocco del turno vale anche la regola di inizio turno
+  (chi non è più in rosa esce, i posti vuoti si coprono dalla panchina e dalla tribuna: vedi
+  sotto).
 - **Bloccati non presenti nella formazione precedente** (formazione automatica vuota, acquisto a
   turno iniziato): solo in tribuna, mai nei primi 10 della panchina (`bench_order_locked`).
 - **Mosse della squadra, chiunque schieri**: a 3/3 la squadra è bloccata anche per l'operatore
@@ -347,13 +349,25 @@ Body salvataggio:
 
 Errori con motivazione: `invalid_module`, `module_role_mismatch`,
 `goalkeeper_count_invalid`, `starter_count_invalid`, `duplicate_athlete`,
-`athlete_not_in_roster`, `bench_incomplete`, `unresolved_role`,
-`roster_not_validated`, `turn_not_open`, `turn_skipped`,
+`athlete_not_in_roster`, `athlete_exceeds_role_quota`, `bench_incomplete`,
+`unresolved_role`, `roster_not_validated`, `turn_not_open`, `turn_skipped`,
 `turn_modification_closed`, `athlete_kickoff_locked`, `bench_order_locked`,
 `tactical_moves_exhausted`, `previous_lineup_not_found`,
-`copied_athlete_not_in_roster`, `copied_athlete_unavailable`,
-`ai_lineup_incomplete` (rosa insufficiente per completare il modulo con la
-formula automatica).
+`copied_athlete_not_in_roster`, `copied_athlete_exceeds_role_quota`,
+`copied_athlete_unavailable`, `ai_lineup_incomplete` (rosa insufficiente per completare il
+modulo con la formula automatica).
+
+**Chi è in esubero di ruolo** (`exceedsRoleQuota` in `roster`, QA 19/11) resta in rosa ma non
+si schiera finché la rosa non torna in regola, e non è tra i calciatori che `benchAthleteIds`
+deve contenere. Se salvataggio o bozza lo mettono in tribuna (dall'11° posto in poi della
+panchina, contando i posti occupati: è quello che fanno web e app anche nelle versioni già
+installate) lo si toglie senza errore e non si salva; nemmeno il confronto con la formazione
+salvata lo conta (nessuna nuova `revision`, nessuna mossa tattica). Titolare o nei primi 10
+della panchina la richiesta è rifiutata con `athlete_exceeds_role_quota` e il nome, ad esempio
+«A. Adams è in esubero di ruolo: non può essere schierato finché la rosa non torna in regola.».
+La copia della formazione precedente lo esclude: senza avviso se era in tribuna, altrimenti con
+`copied_athlete_exceeds_role_quota` («A. Adams è in esubero di ruolo ed è stato escluso dalla
+formazione copiata.»). «Migliore» non lo schiera mai.
 
 **Chi non è più in rosa** (scambio, svincolo, asta, rimozione o sostituzione dell'admin;
 QA 19/11) esce dalla formazione salvata e dalla bozza della squadra **nel momento in cui
@@ -379,6 +393,45 @@ salvataggio (o una bozza) che lo contiene ancora è rifiutato con `athlete_not_i
 il nome («N. Zortea non è più nella tua rosa.»). Non cambia niente nei turni bloccati o
 conclusi, né per chi ha già la partita iniziata o in blocco: il ricalcolo di un turno passato
 usa la formazione così com'era.
+
+**All'inizio del turno la formazione si sistema da sola** (decisione di Rosario del 19/11,
+`fantasy_lineups/turn_start.py`). Al primo blocco del turno (la stessa soglia del mercato
+chiuso) ogni formazione salvata:
+
+1. perde chi non è più in rosa, come la pulizia all'uscita (posto da titolare vuoto, panchina
+   ricompattata): vale anche per le formazioni rimaste sporche da prima di quella pulizia;
+2. copre ogni posto vuoto tra i titolari (il ruolo è quello che manca al modulo): entra il
+   primo panchinaro di quel ruolo (primi 10, in ordine di panchina) e al suo posto in panchina
+   sale il primo della tribuna dello stesso ruolo. Stesso ruolo nello stesso posto: la quota
+   per ruolo dei primi 10 non cambia e gli altri non si spostano. Senza nessuno di quel ruolo
+   in panchina entra direttamente il primo della tribuna; senza nessuno di quel ruolo il posto
+   resta vuoto (si gioca in 10 come prima). Con due posti dello stesso ruolo entrano i primi
+   due panchinari e salgono i primi due della tribuna.
+
+La tribuna è nell'ordine che mostrano web e app («Altri N in tribuna»): la panchina salvata
+dall'11° posto in poi, poi chi è in rosa ma non è nella formazione, in ordine di slot della
+rosa. Non entra chi è in esubero di ruolo (`exceedsRoleQuota`), chi non ha un ruolo, e chi di
+sicuro non prende il voto (`selectionBlocked`: nessuna partita nel turno, partita rinviata,
+indisponibilità confermata), né dalla panchina né dalla tribuna. Le formazioni automatiche «a
+zero» restano vuote; una squadra senza rosa non si tocca.
+
+È una regola di sistema: `revision` e `submittedAt` non cambiano, non consuma mosse tattiche
+(i cambi successivi si confrontano con la formazione sistemata); resta un evento di audit
+`fantasy_lineup_saved` con `source = "turn_start_autofill"`, chi è uscito (`removed`) e per ogni
+posto chi è entrato, da dove, e chi è salito in panchina (`fills`). Gira dal job del calcolo
+(`process_live_fantasy_rounds`, ogni minuto con lo scheduler dei dati sportivi), dentro il
+calcolo delle formazioni effettive prima di leggerle (`compute_round_effective_lineups`, anche
+dai comandi dell'operatore) e da GET, salvataggio e bozza dopo il primo blocco: sempre la stessa
+regola, solo dal primo blocco e fino al primo calcolo del turno (nessuna formazione effettiva);
+rieseguirla non cambia niente. I turni saltati, omologati o già calcolati non si toccano.
+
+Finché la squadra non salva di nuovo, `issues` comincia con un avviso
+`lineup_athlete_left_roster` per ogni cambio, ad esempio «All'inizio del turno 12 L. Rossi è
+entrato al posto di N. Zortea (non più in rosa); dalla tribuna è salito in panchina M.
+Bianchi.», «… è entrato dalla tribuna al posto di …: in panchina non c'era nessun difensore da
+far entrare.», «… il posto di N. Zortea (non più in rosa) è rimasto vuoto: in rosa non c'è
+nessun altro difensore da schierare.». Per chi è citato lì l'avviso «scegli chi mettere al suo
+posto» non compare più.
 
 La **copia** prende l'ultima formazione confermata di un turno precedente della
 stessa squadra, la rivalida e la scrive in **bozza**. Non conferma e non consuma

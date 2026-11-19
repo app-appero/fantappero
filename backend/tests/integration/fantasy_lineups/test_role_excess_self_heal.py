@@ -176,7 +176,7 @@ def test_unflagged_forward_excess_is_flagged_on_lineup_save_newest_first(
     # Segnato l'acquisto più recente del ruolo (slot 24), non lo slot più alto (34).
     assert _flagged(db_session, setup["team_a"]) == [(LAST_MIDFIELDER_SLOT, excess_id)]
 
-    # Il calciatore in esubero non è schierabile.
+    # Il calciatore in esubero non è schierabile: il rifiuto dice chi è.
     with_excess = client.put(
         _lineup_url(setup),
         headers=_headers(token),
@@ -185,7 +185,8 @@ def test_unflagged_forward_excess_is_flagged_on_lineup_save_newest_first(
         ),
     )
     assert with_excess.status_code == 400
-    assert with_excess.json()["code"] == "athlete_not_in_roster"
+    assert with_excess.json()["code"] == "athlete_exceeds_role_quota"
+    assert with_excess.json()["message"].startswith("SqA A11 legacy è in esubero di ruolo")
 
     # GET /rosa mostra l'esubero proprio su quello slot.
     assert _rosa_flags(client, setup, token) == [LAST_MIDFIELDER_SLOT]
