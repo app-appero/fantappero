@@ -21,7 +21,6 @@ from database.enums import (
     LeagueAuditAction,
     LineupSlotKind,
     Permission,
-    RosterCompositionStatus,
     TacticalMoveStatus,
     UserType,
 )
@@ -81,6 +80,7 @@ from fantasy_ratings.round_scores import RoundAthleteScore, compute_round_athlet
 from fantasy_teams.composition_service import (
     reconcile_roster_overflow,
     resolve_effective_athlete_roles,
+    roster_allows_lineup,
 )
 from fantasy_teams.factory import ensure_team_for_membership, find_team_for_membership
 from fantasy_teams.models import FantasyRosterSlot, FantasyTeam
@@ -330,15 +330,14 @@ class FantasyLineupService:
 
         team = self._resolve_lineup_team(league_access, target_team_id, for_update=True)
 
-        if team.composition_status != RosterCompositionStatus.VALIDATED:
+        try:
+            self._require_validated_roster(team, league_access)
+        except ValidationAuthError as exc:
             get_metrics().incr(
                 "fantasy_lineup_saved_total",
-                labels={"result": "roster_not_validated"},
+                labels={"result": exc.code},
             )
-            raise ValidationAuthError(
-                "La rosa deve essere convalidata prima di schierare la formazione.",
-                code="roster_not_validated",
-            )
+            raise
 
         roster = self._roster_rows(
             league_access.league.season_year, team, round_number=fantasy_round.number
@@ -616,7 +615,7 @@ class FantasyLineupService:
 
         team = self._resolve_lineup_team(league_access, target_team_id, for_update=True)
         try:
-            self._require_validated_roster(team)
+            self._require_validated_roster(team, league_access)
         except ValidationAuthError as exc:
             get_metrics().incr("fantasy_lineup_copied_total", labels={"result": exc.code})
             raise
@@ -785,7 +784,7 @@ class FantasyLineupService:
 
         team = self._resolve_lineup_team(league_access, target_team_id, for_update=True)
         try:
-            self._require_validated_roster(team)
+            self._require_validated_roster(team, league_access)
         except ValidationAuthError as exc:
             get_metrics().incr(
                 "fantasy_lineup_best_applied_total",
@@ -1029,7 +1028,7 @@ class FantasyLineupService:
 
         team = self._resolve_lineup_team(league_access, target_team_id, for_update=True)
         try:
-            self._require_validated_roster(team)
+            self._require_validated_roster(team, league_access)
         except ValidationAuthError as exc:
             get_metrics().incr("fantasy_lineup_draft_saved_total", labels={"result": exc.code})
             raise
@@ -1865,8 +1864,13 @@ class FantasyLineupService:
                 result.append(str(item))
         return result
 
-    def _require_validated_roster(self, team: FantasyTeam) -> None:
-        if team.composition_status == RosterCompositionStatus.VALIDATED:
+    def _require_validated_roster(self, team: FantasyTeam, league_access: LeagueAccess) -> None:
+        """Rosa convalidata, o non convalidata solo per gli esuberi di uno scambio.
+
+        I calciatori in esubero (``exceeds_role_quota``) restano comunque fuori dalla
+        formazione: vedi `roster_allows_lineup`.
+        """
+        if roster_allows_lineup(self._session, team, league=league_access.league):
             return
         raise ValidationAuthError(
             "La rosa deve essere convalidata prima di schierare la formazione.",
