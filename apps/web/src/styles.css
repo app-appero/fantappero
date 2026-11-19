@@ -1763,6 +1763,15 @@ a.fa-member-list__identity:focus-visible {
   padding-left: var(--fa-space-md);
 }
 
+.fa-formation-layout__notice {
+  border-left: 3px solid var(--fa-color-warning);
+  padding-left: var(--fa-space-md);
+}
+
+.fa-formation-layout__notice ul {
+  margin: 0;
+}
+
 .fa-formation-layout__issues-title {
   margin: 0 0 var(--fa-space-xs);
   font-weight: 600;

@@ -355,6 +355,18 @@ Errori con motivazione: `invalid_module`, `module_role_mismatch`,
 `ai_lineup_incomplete` (rosa insufficiente per completare il modulo con la
 formula automatica).
 
+**Chi non è più in rosa** (scambio, svincolo, asta, rimozione dell'admin; QA 19/11): nel
+contesto di un turno ancora aperto (`effectiveStatus = open`) esce da `lineup` e da
+`draft`. Tra i titolari il suo posto resta vuoto: gli altri tengono il loro `sortOrder`
+(nella bozza c'è `""`), i client li dispongono per `sortOrder`. In panchina gli altri
+restano nell'ordine. Il primo elemento di `issues` è l'avviso
+`lineup_athlete_left_roster` con i nomi, ad esempio «N. Zortea non è più nella tua rosa:
+è stato tolto dalla formazione, scegli chi mettere al suo posto.». È solo in lettura:
+nel DB la formazione resta com'era fino al salvataggio successivo, e un salvataggio (o
+una bozza) che lo contiene ancora è rifiutato con `athlete_not_in_roster` e il nome
+(«N. Zortea non è più nella tua rosa.»). Non cambia niente nei turni bloccati o conclusi,
+né per chi ha già la partita iniziata o in blocco.
+
 La **copia** prende l'ultima formazione confermata di un turno precedente della
 stessa squadra, la rivalida e la scrive in **bozza**. Non conferma e non consuma
 mosse. La **bozza** accetta uno schieramento incompleto; duplicati, calciatori

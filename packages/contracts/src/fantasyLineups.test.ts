@@ -28,6 +28,8 @@ import {
   preserveLockedStarters,
   remainingRosterForBench,
   remainingTacticalMoves,
+  rosterDepartureNotices,
+  savedStarterSlotIds,
   resolveAutomaticSubstitutions,
   slotsFromLineupIds,
   starterTemplate,
@@ -902,5 +904,49 @@ describe("fantasyLineups rules", () => {
       assert.ok(!plan.starterIds.includes("A2"));
       assert.ok(!plan.starterIds.includes("A3"));
     });
+  });
+});
+
+describe("formazione con chi non è più in rosa (QA 19/11)", () => {
+  it("rosterDepartureNotices prende solo gli avvisi «non è più nella tua rosa»", () => {
+    const notice = "N. Zortea non è più nella tua rosa: è stato tolto dalla formazione, scegli chi mettere al suo posto.";
+    assert.deepEqual(
+      rosterDepartureNotices([
+        { code: "lineup_athlete_left_roster", message: notice },
+        { code: "bench_incomplete", message: "Tutti i calciatori in rosa devono essere schierati: mancano 1 in panchina." },
+      ]),
+      [notice],
+    );
+    assert.deepEqual(rosterDepartureNotices(undefined), []);
+  });
+
+  it("savedStarterSlotIds lascia vuoto il posto di chi è stato tolto, gli altri non scalano", () => {
+    const starters = ["P1", "D1", "D3", "D4", "C1", "C2", "C3", "A1", "A2", "A3"].map((athleteId, index) => ({
+      athleteId,
+      sortOrder: index < 2 ? index : index + 1,
+    }));
+    assert.deepEqual(savedStarterSlotIds(starters, 11), [
+      "P1", "D1", "", "D3", "D4", "C1", "C2", "C3", "A1", "A2", "A3",
+    ]);
+  });
+
+  it("savedStarterSlotIds con una formazione completa resta nell'ordine salvato", () => {
+    const ids = ["P1", "D1", "D2", "D3", "D4", "C1", "C2", "C3", "A1", "A2", "A3"];
+    assert.deepEqual(savedStarterSlotIds(ids.map((athleteId, sortOrder) => ({ athleteId, sortOrder })), 11), ids);
+    assert.deepEqual(savedStarterSlotIds([], 11), Array.from({ length: 11 }, () => ""));
+  });
+
+  it("savedStarterSlotIds mette nel primo posto libero un sortOrder fuori modulo o doppio", () => {
+    assert.deepEqual(
+      savedStarterSlotIds(
+        [
+          { athleteId: "P1", sortOrder: 0 },
+          { athleteId: "D1", sortOrder: 0 },
+          { athleteId: "D2", sortOrder: 20 },
+        ],
+        4,
+      ),
+      ["P1", "D1", "D2", ""],
+    );
   });
 });

@@ -803,6 +803,52 @@ const BENCH_ORDER_LOCKED_MESSAGE =
   "Non puoi cambiare l'ordine di panchina di un calciatore la cui partita è già iniziata.";
 
 /**
+ * Avviso del server nel contesto formazione (QA 19/11): chi non è più in rosa (scambio,
+ * svincolo, asta, rimozione dell'admin) è stato tolto dalla formazione o dalla bozza di un
+ * turno ancora aperto e il suo posto è vuoto.
+ */
+export const LINEUP_ATHLETE_LEFT_ROSTER_CODE = "lineup_athlete_left_roster";
+
+/** Messaggi degli avvisi «non è più nella tua rosa» tra le `issues` del contesto. */
+export function rosterDepartureNotices(issues: readonly LineupIssue[] | null | undefined): string[] {
+  return (issues ?? [])
+    .filter((item) => item.code === LINEUP_ATHLETE_LEFT_ROSTER_CODE)
+    .map((item) => item.message);
+}
+
+/**
+ * Titolari della formazione salvata nei posti del modulo, secondo `sortOrder`.
+ *
+ * Il server toglie dalla formazione restituita chi non è più in rosa e il suo posto resta vuoto:
+ * gli altri tengono il loro `sortOrder`. In fila per indice scalerebbero di un posto (es. un
+ * centrocampista nello slot di un difensore). Un `sortOrder` fuori dal modulo o già occupato va
+ * nel primo posto libero.
+ */
+export function savedStarterSlotIds(
+  starters: readonly Pick<LineupPlayer, "athleteId" | "sortOrder">[],
+  slotCount: number,
+): string[] {
+  const slots = Array.from({ length: slotCount }, () => "");
+  const unplaced: string[] = [];
+  for (const player of starters) {
+    const index = player.sortOrder;
+    if (Number.isInteger(index) && index >= 0 && index < slotCount && !slots[index]) {
+      slots[index] = player.athleteId;
+    } else {
+      unplaced.push(player.athleteId);
+    }
+  }
+  for (const athleteId of unplaced) {
+    const free = slots.indexOf("");
+    if (free < 0) {
+      break;
+    }
+    slots[free] = athleteId;
+  }
+  return slots;
+}
+
+/**
  * Keep the saved bench order for players still on the bench; append newcomers at the end.
  */
 export function orderedBenchFromRoster(
