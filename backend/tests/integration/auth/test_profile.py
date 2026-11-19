@@ -253,3 +253,40 @@ def test_profile_quiet_hours_set_reject_invalid_and_clear(client: TestClient) ->
     assert cleared.status_code == 200
     assert cleared.json()["quietHoursStartHour"] is None
     assert cleared.json()["quietHoursEndHour"] is None
+
+
+def test_profile_rejected_update_saves_nothing(client: TestClient) -> None:
+    """A18i: una PATCH rifiutata con 400 non deve salvare nessuno dei campi inviati."""
+    session = _register_and_login(client, "rejected.update@example.com", "Rifiuto Totale")
+    headers = {"Authorization": f"Bearer {session['access']}"}
+
+    cleared = client.patch(
+        "/profile/me",
+        headers=headers,
+        json={"quietHoursStartHour": None, "quietHoursEndHour": None},
+    )
+    assert cleared.status_code == 200
+    named = client.patch("/profile/me", headers=headers, json={"nickname": "Rifiuto"})
+    assert named.status_code == 200
+
+    # Solo l'inizio del silenzio: la coppia si controlla dopo aver già scritto il campo.
+    half_hours = client.patch("/profile/me", headers=headers, json={"quietHoursStartHour": 21})
+    assert half_hours.status_code == 400
+    assert half_hours.json()["code"] == "incomplete_quiet_hours"
+
+    # Il nome è valido e viene scritto prima che il nickname sia rifiutato.
+    bad_nickname = client.patch(
+        "/profile/me",
+        headers=headers,
+        json={"displayName": "x", "nickname": "<x>"},
+    )
+    assert bad_nickname.status_code == 400
+    assert bad_nickname.json()["code"] == "invalid_nickname"
+
+    profile = client.get("/profile/me", headers=headers)
+    assert profile.status_code == 200
+    body = profile.json()
+    assert body["quietHoursStartHour"] is None
+    assert body["quietHoursEndHour"] is None
+    assert body["displayName"] == "Rifiuto Totale"
+    assert body["nickname"] == "Rifiuto"
