@@ -22,6 +22,7 @@ import {
   formatCountdown,
   formatFantasyPoints,
   isAthleteKickoffLocked,
+  keepStartersForModule,
   moveBenchToIndex,
   orderBenchForActiveRoles,
   orderedBenchFromRoster,
@@ -52,6 +53,7 @@ import {
   saveMyLineup,
 } from "../api/leagues";
 import { BottomSheet, FormationLegend, FormationPitch, PlayerPickerSheet, TONE_COLOR, probableTone, roleRingColor, type Candidate, type PitchSlot } from "./formation/FormationParts";
+import { moduleChangeFallbackNotice, moduleChangeRoute } from "./formation/moduleChange";
 import { LockCountdown } from "../components/LockCountdown";
 import { EventBadges } from "../components/match/EventBadges";
 import { setMovesDock } from "../layout/movesDock";
@@ -683,24 +685,71 @@ export function FormationScreen() {
         mode,
         moduleCode,
       );
-      setContext(detail);
-      applyEditor(detail);
-      // Panchina dal portiere all'attaccante (1P·3D·3C·3A nei primi 10).
-      setBenchIds(
-        orderBenchForActiveRoles(
-          (detail.draft?.benchAthleteIds ?? detail.lineup?.bench.map((player) => player.athleteId) ?? []).map(
-            (athleteId) => ({
-              athleteId,
-              role: roster.find((row) => row.athleteId === athleteId)?.role ?? null,
-            }),
-          ),
-        ).map((player) => player.athleteId),
-      );
+      commitBestLineup(detail);
       setActionMessage("Formazione migliore applicata in bozza.");
     } catch (error) {
       setActionError(getApiErrorMessage(error, "Applicazione della formazione migliore non riuscita."));
     } finally {
       setBusy(false);
+    }
+  }
+
+  /** Esito della formazione migliore (tasto o cambio modulo): contesto, bozza e panchina ordinata. */
+  function commitBestLineup(detail: LineupContext) {
+    setContext(detail);
+    applyEditor(detail);
+    // Panchina dal portiere all'attaccante (1P·3D·3C·3A nei primi 10).
+    setBenchIds(
+      orderBenchForActiveRoles(
+        (detail.draft?.benchAthleteIds ?? detail.lineup?.bench.map((player) => player.athleteId) ?? []).map(
+          (athleteId) => ({
+            athleteId,
+            role: roster.find((row) => row.athleteId === athleteId)?.role ?? null,
+          }),
+        ),
+      ).map((player) => player.athleteId),
+    );
+  }
+
+  /**
+   * Cambio modulo senza bloccati in campo (decisione del 19/11): i migliori per ruolo sul nuovo
+   * modulo, con lo stesso criterio di «Formazione migliore». Il server salva solo la bozza: niente
+   * mosse tattiche consumate, niente conferma. Se la richiesta fallisce restano i compatibili già
+   * mostrati; il messaggio compare solo per un errore vero, non per rosa insufficiente o turno chiuso.
+   */
+  async function applyBestForModule(code: FantasyModule) {
+    if (!accessToken || !activeLeagueId || !selectedRoundId) {
+      return;
+    }
+    // Un cambio modulo successivo, o un cambio di turno/squadra, rende vecchia questa risposta.
+    const requestId = (lineupRequest.current += 1);
+    setBusy(true);
+    try {
+      const detail = await applyBestLineup(
+        accessToken,
+        activeLeagueId,
+        selectedRoundId,
+        targetTeamId || undefined,
+        "keep_module",
+        code,
+      );
+      if (lineupRequest.current !== requestId) {
+        return;
+      }
+      commitBestLineup(detail);
+      setActionMessage(`Modulo ${code}: formazione migliore applicata in bozza.`);
+    } catch (error) {
+      if (lineupRequest.current !== requestId) {
+        return;
+      }
+      const notice = moduleChangeFallbackNotice(error);
+      if (notice) {
+        setActionError(notice);
+      }
+    } finally {
+      if (lineupRequest.current === requestId) {
+        setBusy(false);
+      }
     }
   }
 
@@ -971,8 +1020,14 @@ export function FormationScreen() {
     if (code === moduleCode) {
       return;
     }
+    const route = moduleChangeRoute({
+      lockedCount: lockedAthleteIds.length,
+      lineupComplete: displayStarters.every(Boolean),
+      editable,
+      hasSession: Boolean(accessToken && activeLeagueId && selectedRoundId),
+    });
     // Formazione completa e bloccati presenti: i bloccati restano esattamente dove sono.
-    if (lockedAthleteIds.length > 0 && displayStarters.every(Boolean)) {
+    if (route === "planned") {
       const plan = planForModule(code);
       if (!plan) {
         setActionError("Con i calciatori già bloccati questo modulo non è più possibile.");
@@ -988,27 +1043,30 @@ export function FormationScreen() {
     // Solo la bozza corrente come fonte, mai concatenata con
     // `context.lineup.starters` — stesso motivo del calcolo di
     // `reservedIds` più sopra.
-    const lockedIds = starterIds.filter((id) => id && playerLocked(id));
-    const preserved = preserveLockedStarters({
-      template: starterTemplate(code),
-      currentStarters: [...lockedIds, ...starterIds],
+    const lockedIds = displayStarters.filter((id) => id && playerLocked(id));
+    // Prima i bloccati, poi i titolari dello stesso ruolo; chi non entra torna in panchina.
+    const kept = keepStartersForModule({
+      module: code,
+      currentStarters: displayStarters,
+      benchIds,
       roster,
       now: clock,
+      lockMarginMinutes,
     });
-    if (lockedIds.some((id) => id && !preserved.includes(id))) {
+    if (lockedIds.some((id) => !kept.starterIds.includes(id))) {
       setActionError(KICKOFF_LOCK_MESSAGE);
       return;
     }
+    // I compatibili subito: nessuno slot con il ruolo sbagliato mentre si aspetta il server, e
+    // sono già il ripiego se la formazione migliore non arriva.
     setModuleCode(code);
-    setStarterIds(preserved);
-    setBenchIds(
-      orderedBenchFromRoster(
-        roster.map((row) => row.athleteId),
-        preserved,
-        benchIds,
-      ),
-    );
+    setStarterIds(kept.starterIds);
+    setBenchIds(kept.benchIds);
+    setActionError(null);
     setActionMessage(null);
+    if (route === "best") {
+      void applyBestForModule(code);
+    }
   }
 
   function pickPlayer(index: number, athleteId: string) {
@@ -1272,7 +1330,8 @@ export function FormationScreen() {
               key={code}
               accessibilityRole="button"
               accessibilityLabel={blockedModules.has(code) ? `${code}, bloccato` : code}
-              disabled={!editable || blockedModules.has(code)}
+              // Mentre arriva la formazione migliore (o un altro salvataggio) il modulo non cambia.
+              disabled={busy || !editable || blockedModules.has(code)}
               onPress={() => changeModule(code)}
               style={[
                 styles.pill,
