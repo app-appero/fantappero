@@ -35,7 +35,7 @@ from leagues.models.league_audit_event import LeagueAuditEvent
 from mail.capture import get_captured_emails
 from sports_data.catalog.models import Club, SportSeason
 from sports_data.fixtures.models import Fixture
-from sports_data.listone.models import RoleAssignment
+from sports_data.listone.models import LeagueRoleOverride, RoleAssignment
 from sports_data.roster.models import Athlete
 
 
@@ -219,10 +219,16 @@ def _create_open_round(
     return fantasy_round, clubs
 
 
-def _lineup_payload(athletes: list[Athlete], module: str = "4-3-3") -> dict:
+def _lineup_payload(
+    athletes: list[Athlete],
+    module: str = "4-3-3",
+    *,
+    roles: dict[UUID, str] | None = None,
+) -> dict:
+    # `roles` sostituisce il ruolo letto dal nome (es. un override di ruolo della lega).
     by_role: dict[str, list[str]] = {"P": [], "D": [], "C": [], "A": []}
     for athlete in athletes:
-        prefix = athlete.canonical_name[0]
+        prefix = (roles or {}).get(athlete.id, athlete.canonical_name[0])
         by_role[prefix].append(str(athlete.id))
     if module == "4-3-3":
         starters = [
@@ -2202,3 +2208,62 @@ def test_identical_lineup_discards_draft_and_oversized_lists_are_rejected(
         response = client.put(url, headers=headers, json=body)
         assert response.status_code == 422, response.text
         assert response.json()["code"] == "validation_error"
+
+
+def test_role_override_applies_to_the_lineup_from_its_effective_round(
+    client: TestClient,
+    db_session: Session,
+    competition_ids: list[str],
+) -> None:
+    """N1: un override D→C deciso a lega avviata vale in formazione dal suo turno in poi."""
+    token, user_id = _register_and_login(client, "lineup.override@example.com")
+    league_id = _create_league(client, token, competition_ids, "Lega Override Ruolo")
+    headers = {"Authorization": f"Bearer {token}"}
+    client.get(f"/leagues/{league_id}/rosa", headers=headers)
+    grouped = _seed_roster_athletes(db_session, id_offset=3_600_000)
+    athletes = _fill_validated_roster(db_session, league_id, grouped)
+    # Turno N >= 12, oltre a quelli che la lega può aver già generato in automatico.
+    existing = db_session.scalar(
+        select(func.max(FantasyRound.number)).where(FantasyRound.league_id == UUID(league_id))
+    )
+    round_number = max(12, (existing or 0) + 1)
+    fantasy_round, _clubs = _create_open_round(
+        db_session,
+        league_id,
+        cutoff=datetime.now(UTC) + timedelta(hours=5),
+        id_offset=3_610_000,
+        competition_ids=competition_ids,
+        number=round_number,
+    )
+
+    promoted = grouped["D"][-1]  # override effettivo da questo turno: centrocampista
+    pending = grouped["D"][-2]  # override effettivo dal turno dopo: resta difensore
+    for athlete, effective_from in ((promoted, round_number), (pending, round_number + 1)):
+        db_session.add(
+            LeagueRoleOverride(
+                league_id=UUID(league_id),
+                athlete_id=athlete.id,
+                role=FantasyRole.C,
+                effective_from_round=effective_from,
+                actor_id=user_id,
+            )
+        )
+    db_session.commit()
+
+    base = f"/leagues/{league_id}/turni/{fantasy_round.id}/formazione"
+    context = client.get(base, headers=headers)
+    assert context.status_code == 200, context.text
+    roster_roles = {row["athleteId"]: row["role"] for row in context.json()["roster"]}
+    assert roster_roles[str(promoted.id)] == "C"
+    assert roster_roles[str(pending.id)] == "D"
+
+    # 4-3-3 con il difensore promosso tra i tre centrocampisti titolari.
+    ordered = [promoted, *(athlete for athlete in athletes if athlete.id != promoted.id)]
+    payload = _lineup_payload(ordered, "4-3-3", roles={promoted.id: "C"})
+    assert str(promoted.id) in payload["starterAthleteIds"]
+    saved = client.put(base, headers=headers, json=payload)
+    assert saved.status_code == 200, saved.text
+    starter_roles = {row["athleteId"]: row["role"] for row in saved.json()["lineup"]["starters"]}
+    assert starter_roles[str(promoted.id)] == "C"
+    assert list(starter_roles.values()).count("C") == 3
+    assert list(starter_roles.values()).count("D") == 4

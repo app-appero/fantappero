@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Collection
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from uuid import UUID
@@ -11,6 +12,7 @@ from sqlalchemy.orm import Session
 
 from database.enums import FantasyRole, LeagueState, RosterCompositionStatus
 from fantasy_teams.composition import (
+    MIN_ROSTER_COMPETITIONS,
     RosterCompositionLimits,
     RosterCompositionReport,
     evaluate_roster_composition,
@@ -204,7 +206,14 @@ def evaluate_team_composition(
     league: League,
     require_complete: bool | None = None,
     effective_roles: dict[UUID, EffectiveAthleteRole] | None = None,
+    exclude_athlete_ids: Collection[UUID] = (),
 ) -> RosterCompositionReport:
+    """Valuta la rosa della squadra.
+
+    ``exclude_athlete_ids`` toglie dal conteggio i calciatori indicati (ruoli, slot
+    occupati e campionati): serve a valutare la rosa senza gli esuberi di uno scambio
+    (vedi `roster_allows_lineup`).
+    """
     limits = resolve_league_rules_limits(session, league.id)
     must_complete = (
         league_requires_complete_rosters(league) if require_complete is None else require_complete
@@ -224,7 +233,12 @@ def evaluate_team_composition(
         ).all()
     )
 
-    athlete_ids = [slot.athlete_id for slot in slots if slot.athlete_id is not None]
+    excluded = set(exclude_athlete_ids)
+    athlete_ids = [
+        slot.athlete_id
+        for slot in slots
+        if slot.athlete_id is not None and slot.athlete_id not in excluded
+    ]
     resolved = effective_roles
     if resolved is None:
         resolved = resolve_effective_athlete_roles(
@@ -281,6 +295,51 @@ def sync_team_composition_status(
     else:
         team.validated_at = None
     return report
+
+
+#: Problemi che bloccano la formazione anche dopo aver tolto gli esuberi dalla rosa.
+_LINEUP_BLOCKING_ISSUES = frozenset({"role_quota_exceeded", "role_unresolved"})
+
+
+def roster_allows_lineup(session: Session, team: FantasyTeam, *, league: League) -> bool:
+    """True se la squadra può schierare la formazione.
+
+    Vale sempre per una rosa convalidata. Uno scambio sbilanciato (2 per 1, un D per
+    un C) lascia invece la rosa ``invalid`` per il ruolo in esubero, anche se il
+    calciatore in più è già segnato ``exceeds_role_quota`` e quindi escluso dalla
+    formazione (EP08-10): la squadra deve poter giocare con gli altri. Con calciatori
+    in esubero la formazione è ammessa se:
+
+    - gli slot occupati (esuberi compresi) sono almeno quanti la misura della rosa:
+      una rosa con uno slot vuoto resta bloccata, come dopo uno svincolo;
+    - tolti gli esuberi, nessun ruolo supera la quota e ogni ruolo è risolvibile;
+    - tolti gli esuberi, la rosa rappresenta ancora almeno 3 campionati (stessa
+      regola della convalida, ``MIN_ROSTER_COMPETITIONS``).
+    """
+    if team.composition_status == RosterCompositionStatus.VALIDATED:
+        return True
+    rows = session.execute(
+        select(FantasyRosterSlot.athlete_id, FantasyRosterSlot.exceeds_role_quota).where(
+            FantasyRosterSlot.fantasy_team_id == team.id,
+            FantasyRosterSlot.athlete_id.is_not(None),
+        )
+    ).all()
+    flagged = {athlete_id for athlete_id, exceeds in rows if exceeds}
+    if not flagged:
+        return False
+    limits = resolve_league_rules_limits(session, league.id)
+    if len(rows) < limits.roster_size:
+        return False
+    report = evaluate_team_composition(
+        session,
+        team,
+        league=league,
+        require_complete=False,
+        exclude_athlete_ids=flagged,
+    )
+    if any(issue.code in _LINEUP_BLOCKING_ISSUES for issue in report.issues):
+        return False
+    return report.competition_count >= MIN_ROSTER_COMPETITIONS
 
 
 def assert_assignment_respects_role_quota(

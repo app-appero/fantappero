@@ -46,6 +46,32 @@ def test_render_mercato_esito_busta_lost() -> None:
     assert "non aggiudicata" in content.title.lower()
 
 
+def test_render_mercato_asta_live_perso_variants() -> None:
+    """P4: capofila senza crediti (o senza posto) alla chiusura del lotto live."""
+    base = {"athlete_name": "Bomber", "amount_credits": 500, "league_id": "abc"}
+    credits = render_notification(
+        "mercato.asta_live_perso", 1, {**base, "reason": "insufficient_credits", "reassigned": True}
+    )
+    assert credits.title == "Lotto perso: crediti insufficienti"
+    assert "Bomber" in credits.body and "500 crediti" in credits.body
+    assert "offerta successiva" in credits.body
+    assert credits.deep_link == "/asta-live?lega=abc"
+
+    passed = render_notification(
+        "mercato.asta_live_perso",
+        1,
+        {**base, "reason": "insufficient_credits", "reassigned": False},
+    )
+    assert passed.title == "Lotto perso: crediti insufficienti"
+    assert "svincolato" in passed.body
+
+    roster = render_notification(
+        "mercato.asta_live_perso", 1, {**base, "reason": "assignment_failed", "reassigned": True}
+    )
+    assert roster.title == "Lotto perso: rosa al completo"
+    assert "500" not in roster.body
+
+
 def test_render_mercato_scambio_known_and_unknown_status() -> None:
     known = render_notification("mercato.scambio", 1, {"status": "rejected"})
     assert known.title == "Scambio rifiutato"

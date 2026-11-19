@@ -222,5 +222,8 @@ def execute_trade(
         session.flush()
         reconcile_roster_overflow(session, league=league, team=proposer_team)
         reconcile_roster_overflow(session, league=league, team=recipient_team)
-        sync_team_composition_status(session, proposer_team, league=league)
-        sync_team_composition_status(session, recipient_team, league=league)
+        # Stesso criterio della pagina rosa e delle operazioni di rosa in fantasy_teams
+        # (``require_complete=False``): una squadra rimasta a 34/35 è "incompleta", non
+        # "non valida", e lo stato salvato coincide con quello mostrato in GET /rosa.
+        sync_team_composition_status(session, proposer_team, league=league, require_complete=False)
+        sync_team_composition_status(session, recipient_team, league=league, require_complete=False)

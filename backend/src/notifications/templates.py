@@ -238,6 +238,30 @@ def _render_mercato_asta_live_scambio_richiesto(params: NotificationParams) -> N
     )
 
 
+@register_template("mercato.asta_live_perso", 1)
+def _render_mercato_asta_live_perso(params: NotificationParams) -> NotificationContent:
+    """Il capofila non ha potuto prendere il calciatore alla chiusura del lotto: il calciatore
+    è andato all'offerta successiva valida (``reassigned``) oppure il lotto è passato."""
+    athlete_name = params.get("athlete_name", "un giocatore")
+    if params.get("reason") == "assignment_failed":
+        title = "Lotto perso: rosa al completo"
+        cause = f"Alla chiusura non c'era posto nella tua rosa per {athlete_name}"
+    else:
+        title = "Lotto perso: crediti insufficienti"
+        amount = params.get("amount_credits")
+        cause = f"Alla chiusura non avevi più i crediti per {athlete_name} ({amount} crediti)"
+    outcome = (
+        "il calciatore va all'offerta successiva."
+        if params.get("reassigned")
+        else "nessun'altra offerta valida, il calciatore resta svincolato."
+    )
+    return NotificationContent(
+        title=title,
+        body=_league_body(f"{cause}: {outcome}", params),
+        deep_link=_league_link(_LIVE_AUCTION_PATH, params),
+    )
+
+
 @register_template("mercato.asta_live_iniziata", 1)
 def _render_mercato_asta_live_iniziata(params: NotificationParams) -> NotificationContent:
     return NotificationContent(

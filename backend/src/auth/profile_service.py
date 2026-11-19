@@ -9,7 +9,7 @@ from uuid import UUID
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
 
-from auth.exceptions import ValidationAuthError
+from auth.exceptions import AuthError, ValidationAuthError
 from auth.models.user import User
 from auth.models.user_profile import UserProfile
 from auth.profile_schemas import PolicyConsentRequest, ProfileResponse, UpdateProfileRequest
@@ -42,6 +42,27 @@ class ProfileService:
         return self._to_response(user, profile)
 
     def update_profile(self, user: User, payload: UpdateProfileRequest) -> ProfileResponse:
+        try:
+            profile = self._apply_profile_update(user, payload)
+        except AuthError:
+            # I campi vengono scritti sul profilo man mano che passano la convalida, mentre la
+            # coppia delle ore di silenzio, la disponibilità agli inviti e il controllo
+            # "nessuna modifica" possono fallire dopo. Il router trasforma l'errore in un 400
+            # senza rilanciarlo, quindi `get_db_session` non vede eccezioni e farebbe commit
+            # delle scritture parziali: si annulla tutto qui.
+            # Si intercetta `AuthError`, la stessa classe che cattura il router (oggi qui si
+            # solleva solo `ValidationAuthError`); gli altri errori risalgono e il rollback lo
+            # fa già `get_db_session`. Il 400 si costruisce solo da messaggio e codice
+            # dell'errore; `user` resta legato alla sessione della richiesta e, se letto di
+            # nuovo, si ricarica dal database con i valori salvati.
+            self._session.rollback()
+            raise
+        self._session.commit()
+        get_metrics().incr("profile_update_total", labels={"result": "success"})
+        return self._to_response(user, profile)
+
+    def _apply_profile_update(self, user: User, payload: UpdateProfileRequest) -> UserProfile:
+        """Convalida e scrive i campi richiesti sul profilo, senza commit."""
         profile = self._ensure_profile(user)
         changed = False
 
@@ -94,10 +115,7 @@ class ProfileService:
                 "Nessuna preferenza da aggiornare.",
                 code="empty_update",
             )
-
-        self._session.commit()
-        get_metrics().incr("profile_update_total", labels={"result": "success"})
-        return self._to_response(user, profile)
+        return profile
 
     def update_invite_availability(
         self,

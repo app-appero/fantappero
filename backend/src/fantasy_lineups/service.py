@@ -21,7 +21,6 @@ from database.enums import (
     LeagueAuditAction,
     LineupSlotKind,
     Permission,
-    RosterCompositionStatus,
     TacticalMoveStatus,
     UserType,
 )
@@ -81,6 +80,7 @@ from fantasy_ratings.round_scores import RoundAthleteScore, compute_round_athlet
 from fantasy_teams.composition_service import (
     reconcile_roster_overflow,
     resolve_effective_athlete_roles,
+    roster_allows_lineup,
 )
 from fantasy_teams.factory import ensure_team_for_membership, find_team_for_membership
 from fantasy_teams.models import FantasyRosterSlot, FantasyTeam
@@ -205,7 +205,9 @@ class FantasyLineupService:
             commit=True,
         )
         team = self._resolve_lineup_team(league_access, target_team_id, ensure_created=True)
-        roster = self._roster_rows(league_access.league.season_year, team)
+        roster = self._roster_rows(
+            league_access.league.season_year, team, round_number=fantasy_round.number
+        )
         submission = self._load_submission(fantasy_round.id, team.id)
         if submission is None and (
             fantasy_round.cutoff_at is None
@@ -274,7 +276,8 @@ class FantasyLineupService:
             self._session.commit()
         team = find_team_for_membership(self._session, membership.id, with_slots=True)
         assert team is not None
-        roster = self._roster_rows(league.season_year, team)
+        # Ruoli del turno di riferimento: è quello per cui si calcola il prossimo blocco.
+        roster = self._roster_rows(league.season_year, team, round_number=reference.number)
         if not roster:
             return LineupLockCountdownResponse(**base, state="no_roster")
         kickoffs = self._athlete_kickoffs(
@@ -327,17 +330,18 @@ class FantasyLineupService:
 
         team = self._resolve_lineup_team(league_access, target_team_id, for_update=True)
 
-        if team.composition_status != RosterCompositionStatus.VALIDATED:
+        try:
+            self._require_validated_roster(team, league_access)
+        except ValidationAuthError as exc:
             get_metrics().incr(
                 "fantasy_lineup_saved_total",
-                labels={"result": "roster_not_validated"},
+                labels={"result": exc.code},
             )
-            raise ValidationAuthError(
-                "La rosa deve essere convalidata prima di schierare la formazione.",
-                code="roster_not_validated",
-            )
+            raise
 
-        roster = self._roster_rows(league_access.league.season_year, team)
+        roster = self._roster_rows(
+            league_access.league.season_year, team, round_number=fantasy_round.number
+        )
         roster_ids = [str(row.athlete_id) for row in roster if not row.exceeds_role_quota]
 
         # Chi è bloccato e con quale ruolo è stato schierato va saputo *prima*
@@ -611,12 +615,14 @@ class FantasyLineupService:
 
         team = self._resolve_lineup_team(league_access, target_team_id, for_update=True)
         try:
-            self._require_validated_roster(team)
+            self._require_validated_roster(team, league_access)
         except ValidationAuthError as exc:
             get_metrics().incr("fantasy_lineup_copied_total", labels={"result": exc.code})
             raise
 
-        roster = self._roster_rows(league_access.league.season_year, team)
+        roster = self._roster_rows(
+            league_access.league.season_year, team, round_number=fantasy_round.number
+        )
         previous = self._load_previous_submission(team.id, fantasy_round)
         if previous is None:
             get_metrics().incr(
@@ -778,7 +784,7 @@ class FantasyLineupService:
 
         team = self._resolve_lineup_team(league_access, target_team_id, for_update=True)
         try:
-            self._require_validated_roster(team)
+            self._require_validated_roster(team, league_access)
         except ValidationAuthError as exc:
             get_metrics().incr(
                 "fantasy_lineup_best_applied_total",
@@ -789,7 +795,9 @@ class FantasyLineupService:
         self._materialize_if_started(
             fantasy_round=fantasy_round,
             team=team,
-            roster=self._roster_rows(league_access.league.season_year, team),
+            roster=self._roster_rows(
+                league_access.league.season_year, team, round_number=fantasy_round.number
+            ),
             season_year=league_access.league.season_year,
             now=now,
         )
@@ -810,7 +818,9 @@ class FantasyLineupService:
                     "Modulo non valido.", code="invalid_lineup_module"
                 ) from exc
 
-        roster = self._roster_rows(league_access.league.season_year, team)
+        roster = self._roster_rows(
+            league_access.league.season_year, team, round_number=fantasy_round.number
+        )
         kickoffs = self._athlete_kickoffs(
             round_id=fantasy_round.id,
             season_year=league_access.league.season_year,
@@ -1018,12 +1028,14 @@ class FantasyLineupService:
 
         team = self._resolve_lineup_team(league_access, target_team_id, for_update=True)
         try:
-            self._require_validated_roster(team)
+            self._require_validated_roster(team, league_access)
         except ValidationAuthError as exc:
             get_metrics().incr("fantasy_lineup_draft_saved_total", labels={"result": exc.code})
             raise
 
-        roster = self._roster_rows(league_access.league.season_year, team)
+        roster = self._roster_rows(
+            league_access.league.season_year, team, round_number=fantasy_round.number
+        )
         roster_ids = [str(row.athlete_id) for row in roster if not row.exceeds_role_quota]
 
         # Come in `save_my_lineup`: serve sapere chi è bloccato prima di
@@ -1254,17 +1266,27 @@ class FantasyLineupService:
                 roles[player.athlete_id] = player.role
         return roles
 
-    def _roster_rows(self, season_year: int, team: FantasyTeam) -> list[_RosterRow]:
+    def _roster_rows(
+        self,
+        season_year: int,
+        team: FantasyTeam,
+        *,
+        round_number: int,
+    ) -> list[_RosterRow]:
         athlete_ids = [
             slot.athlete_id
             for slot in team.slots
             if slot.athlete_id is not None and slot.athlete is not None
         ]
+        # Il numero del turno serve agli override di ruolo decisi a lega avviata: valgono solo
+        # da `effective_from_round` in poi. Senza, il risolutore usa il turno 0 e l'override
+        # non si applica mai alla formazione.
         effective_roles = resolve_effective_athlete_roles(
             self._session,
             league_id=team.league_id,
             athlete_ids=athlete_ids,
             season_year=season_year,
+            current_round=round_number,
         )
         club_ids = {item.club_id for item in effective_roles.values() if item.club_id is not None}
         club_names: dict[UUID, str] = (
@@ -1842,8 +1864,13 @@ class FantasyLineupService:
                 result.append(str(item))
         return result
 
-    def _require_validated_roster(self, team: FantasyTeam) -> None:
-        if team.composition_status == RosterCompositionStatus.VALIDATED:
+    def _require_validated_roster(self, team: FantasyTeam, league_access: LeagueAccess) -> None:
+        """Rosa convalidata, o non convalidata solo per gli esuberi di uno scambio.
+
+        I calciatori in esubero (``exceeds_role_quota``) restano comunque fuori dalla
+        formazione: vedi `roster_allows_lineup`.
+        """
+        if roster_allows_lineup(self._session, team, league=league_access.league):
             return
         raise ValidationAuthError(
             "La rosa deve essere convalidata prima di schierare la formazione.",
