@@ -172,6 +172,18 @@ export function AuthRegisterScreen() {
             </Pressable>
               </>
             )}
+            {/* Sempre visibile, anche con la sola registrazione Google: come nel login. */}
+            <Pressable
+              accessibilityRole="link"
+              accessibilityLabel="Leggi l'informativa privacy"
+              onPress={() => navigation.navigate("Privacy")}
+              style={styles.centerLink}
+              testID="register-privacy-link"
+            >
+              <Text style={styles.muted}>
+                Registrandoti accetti l'<Text style={styles.linkStrong}>informativa privacy</Text>
+              </Text>
+            </Pressable>
             {googleOnly ? null : (
               <Pressable
                 accessibilityRole="button"
