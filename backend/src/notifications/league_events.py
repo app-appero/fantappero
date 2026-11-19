@@ -70,16 +70,28 @@ def notify_league_activated(session: Session, *, league: League) -> None:
         )
 
 
-def notify_league_deleted(session: Session, *, league: League) -> None:
-    """Un operatore ha eliminato la lega: avvisa tutti i partecipanti."""
+def notify_league_deleted(
+    session: Session, *, league: League, deleted_by_user_id: UUID | None = None
+) -> None:
+    """La lega è stata eliminata: avvisa tutti i partecipanti.
+
+    Senza ``deleted_by_user_id`` l'ha eliminata un operatore e l'avviso va a tutti.
+    Con ``deleted_by_user_id`` l'ha eliminata l'amministratore della lega: lui non
+    riceve l'avviso della propria azione e il testo dice chi l'ha eliminata (QA 19/11).
+    """
+    params: dict[str, object] = {"league_name": league.name}
+    if deleted_by_user_id is not None:
+        params["by_league_admin"] = True
     service = NotificationService(session)
     for user_id in _member_user_ids(session, league.id):
+        if user_id == deleted_by_user_id:
+            continue
         service.create_notification(
             user_id=user_id,
             category=NotificationCategory.SISTEMA,
             template_key="lega.eliminata",
             template_version=1,
-            params={"league_name": league.name},
+            params=params,
             dedup_key=f"league_deleted:{league.id}:{user_id}",
         )
 

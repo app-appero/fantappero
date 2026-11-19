@@ -548,13 +548,20 @@ def _render_lega_attivata(params: NotificationParams) -> NotificationContent:
 
 @register_template("lega.eliminata", 1)
 def _render_lega_eliminata(params: NotificationParams) -> NotificationContent:
-    """La lega è stata eliminata da un operatore."""
+    """La lega è stata eliminata da un operatore o dal suo amministratore."""
     name = params.get("league_name")
+    # «by_league_admin» c'è solo quando l'ha eliminata l'amministratore della lega (QA 19/11);
+    # senza il parametro (eliminazione da operatore) il testo resta «dall'amministrazione».
+    by = (
+        "dall'amministratore della lega"
+        if params.get("by_league_admin")
+        else "dall'amministrazione"
+    )
     return NotificationContent(
         title="Lega eliminata",
-        body=f"La lega {name} è stata eliminata dall'amministrazione."
+        body=f"La lega {name} è stata eliminata {by}."
         if name
-        else "Una tua lega è stata eliminata dall'amministrazione.",
+        else f"Una tua lega è stata eliminata {by}.",
         deep_link="/",
     )
 

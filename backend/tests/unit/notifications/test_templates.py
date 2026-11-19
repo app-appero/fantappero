@@ -88,6 +88,26 @@ def test_render_risultati_templates_include_round_number() -> None:
     assert "7" in correction.body
 
 
+def test_render_lega_eliminata_names_who_deleted_the_league() -> None:
+    """QA 19/11: l'eliminazione da parte dell'amministratore di lega ha un testo suo."""
+    by_operator = render_notification("lega.eliminata", 1, {"league_name": "Lega Amici"})
+    assert by_operator.title == "Lega eliminata"
+    assert by_operator.body == "La lega Lega Amici è stata eliminata dall'amministrazione."
+    assert by_operator.deep_link == "/"
+
+    by_admin = render_notification(
+        "lega.eliminata", 1, {"league_name": "Lega Amici", "by_league_admin": True}
+    )
+    assert by_admin.title == "Lega eliminata"
+    assert by_admin.body == "La lega Lega Amici è stata eliminata dall'amministratore della lega."
+    assert by_admin.deep_link == "/"
+
+    nameless = render_notification("lega.eliminata", 1, {"by_league_admin": True})
+    assert nameless.body == "Una tua lega è stata eliminata dall'amministratore della lega."
+    operator_nameless = render_notification("lega.eliminata", 1, {})
+    assert operator_nameless.body == "Una tua lega è stata eliminata dall'amministrazione."
+
+
 def test_goal_v2_names_player_in_title_and_match_in_body() -> None:
     content = render_notification(
         "risultati.gol",

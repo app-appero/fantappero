@@ -104,6 +104,60 @@ def test_admin_can_delete_draft_league(
     }
 
 
+def test_admin_delete_notifies_other_participants(
+    client: TestClient,
+    db_session: Session,
+    competition_ids: list[str],
+) -> None:
+    """QA 19/11: se la lega la elimina il suo amministratore, i partecipanti non
+    ricevevano «Lega eliminata» (arrivava solo con l'eliminazione da operatore)."""
+    from notifications.models import Notification
+
+    owner_token, owner_id = _register_and_login(client, "delete.notify.owner@example.com")
+    member_token, member_id = _register_and_login(client, "delete.notify.member@example.com")
+    league_id = _create_league(client, owner_token, competition_ids, "Lega Avvisata")
+
+    invite = client.post(
+        f"/leagues/{league_id}/amministrazione/inviti",
+        headers={"Authorization": f"Bearer {owner_token}"},
+        json={"expiresInDays": 7},
+    )
+    assert invite.status_code == 201
+    accepted = client.post(
+        "/leagues/inviti/accetta",
+        headers={"Authorization": f"Bearer {member_token}"},
+        json={"token": invite.json()["token"]},
+    )
+    assert accepted.status_code == 200
+
+    response = client.delete(
+        f"/leagues/{league_id}",
+        headers={"Authorization": f"Bearer {owner_token}"},
+    )
+    assert response.status_code == 204
+
+    db_session.expire_all()
+    member_notes = db_session.scalars(
+        select(Notification).where(
+            Notification.user_id == member_id,
+            Notification.template_key == "lega.eliminata",
+        )
+    ).all()
+    assert len(member_notes) == 1
+    note = member_notes[0]
+    assert note.title == "Lega eliminata"
+    assert note.body == "La lega Lega Avvisata è stata eliminata dall'amministratore della lega."
+    assert note.deep_link == "/"
+    # Chi elimina la lega non riceve l'avviso della propria azione.
+    owner_notes = db_session.scalars(
+        select(Notification).where(
+            Notification.user_id == owner_id,
+            Notification.template_key == "lega.eliminata",
+        )
+    ).all()
+    assert owner_notes == []
+
+
 def test_member_cannot_delete_league(
     client: TestClient,
     competition_ids: list[str],
