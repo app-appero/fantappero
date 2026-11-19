@@ -99,5 +99,8 @@ export default defineConfig({
   test: {
     environment: "jsdom",
     setupFiles: ["./src/test/setupActEnvironment.ts"],
+    // Di norma vitest svuota i CSS importati; solo gli import `?raw` restano leggibili, così un
+    // test può controllare che una regola esista (es. i margini di /privacy).
+    css: { include: [/\.css\?raw$/] },
   },
 });

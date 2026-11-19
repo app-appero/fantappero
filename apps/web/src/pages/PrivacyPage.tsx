@@ -5,15 +5,32 @@ import {
   PRIVACY_NOTICE_VERSION,
 } from "@fantappero/contracts";
 
+import type { MouseEvent } from "react";
+
 import { Link } from "../router/simpleRouter";
+
+/**
+ * «← Indietro»: se c'è una pagina precedente (es. accesso, profilo, segnalazioni) ci torna;
+ * se l'informativa è stata aperta da fuori (scheda nuova) il link porta all'accesso.
+ */
+function goBackIfPossible(event: MouseEvent<HTMLAnchorElement>) {
+  // Ctrl/Cmd+clic e clic centrale aprono /accedi come un link normale.
+  if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) {
+    return;
+  }
+  if (window.history.length > 1) {
+    event.preventDefault();
+    window.history.back();
+  }
+}
 
 /** Informativa privacy del pilota: pubblica (si legge anche prima di accedere). */
 export function PrivacyPage() {
   return (
     <main className="fa-privacy" data-testid="privacy-page">
       <article className="fa-privacy__article">
-        <p>
-          <Link to="/accedi" data-testid="privacy-back">
+        <p className="fa-privacy__back">
+          <Link to="/accedi" data-testid="privacy-back" onClick={goBackIfPossible}>
             ← Indietro
           </Link>
         </p>
