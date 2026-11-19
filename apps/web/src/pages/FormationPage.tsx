@@ -1954,7 +1954,8 @@ export function FormationPage() {
                   ? "I calciatori la cui partita è già iniziata restano bloccati anche se l'orario viene rinviato; gli altri restano modificabili."
                   : "Nessun calciatore è più modificabile."}
               </p>
-              {context.previousLineup ? (
+              {/* Solo se la copia è davvero possibile: stessa condizione del tasto «Copia formazione precedente». */}
+              {context.copyAvailable && context.previousLineup ? (
                 <p data-testid="formation-previous-hint">
                   Formazione precedente disponibile: turno {context.previousLineup.roundNumber} (
                   {context.previousLineup.module}). La copia viene rivalidata su rosa e disponibilità
