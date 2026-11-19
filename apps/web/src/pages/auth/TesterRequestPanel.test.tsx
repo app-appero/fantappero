@@ -61,6 +61,15 @@ describe("TesterRequestPanel — richiesta di accesso al pilota", () => {
     expect(last?.value).toBe("De Luca");
   });
 
+  it("per chi accede con email i testi non parlano di Google", async () => {
+    await render({ status: "none", requestToken: "tok", email: "lucia@example.com", provider: "email" });
+    expect(container.querySelector('[data-testid="tester-request-account"]')?.textContent).not.toContain("Google");
+    expect(container.textContent).toContain("entri con la stessa email e password");
+    await render({ status: "pending", email: "lucia@example.com", provider: "email" });
+    expect(container.textContent).toContain("potrai accedere con la stessa email e password");
+    expect(container.textContent).not.toContain("Google");
+  });
+
   it("in valutazione e rifiutata mostra solo il messaggio, senza modulo", async () => {
     await render({ status: "pending", submittedAt: "2026-11-13T10:00:00Z" });
     expect(container.querySelector('[data-testid="tester-request-pending"]')).not.toBeNull();

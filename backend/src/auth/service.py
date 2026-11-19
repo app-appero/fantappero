@@ -51,6 +51,9 @@ GENERIC_FORGOT_MESSAGE = (
     "Se l'indirizzo email è registrato, riceverai un messaggio con le istruzioni."
 )
 GENERIC_RESEND_MESSAGE = GENERIC_REGISTER_MESSAGE
+# Senza verifica email (dev e pilota) nessun messaggio arriva: si può accedere subito. Stesso testo
+# per account nuovi ed esistenti, così la risposta non rivela se l'indirizzo era già registrato.
+REGISTER_MESSAGE_NO_VERIFICATION = "Registrazione completata: ora puoi accedere."
 
 
 class AuthService:
@@ -92,13 +95,18 @@ class AuthService:
                 window_seconds=3600,
             )
 
+        done_message = (
+            GENERIC_REGISTER_MESSAGE
+            if self._settings.auth_email_verification_required
+            else REGISTER_MESSAGE_NO_VERIFICATION
+        )
         existing = self._session.scalar(select(User).where(User.email == normalized_email))
         if existing is not None:
             if not existing.email_verified:
                 self._issue_email_verification(existing)
                 self._session.commit()
             get_metrics().incr("auth_register_total", labels={"result": "existing"})
-            return MessageResponse(message=GENERIC_REGISTER_MESSAGE)
+            return MessageResponse(message=done_message)
 
         user = User(
             email=normalized_email,
@@ -115,7 +123,7 @@ class AuthService:
             user.email_verified_at = utc_now()
         self._session.commit()
         get_metrics().incr("auth_register_total", labels={"result": "success"})
-        return MessageResponse(message=GENERIC_REGISTER_MESSAGE)
+        return MessageResponse(message=done_message)
 
     def login(
         self,
@@ -161,7 +169,13 @@ class AuthService:
             user.email_verified_at = utc_now()
             self._session.flush()
 
-        self._assert_tester_allowed(user.email, user.platform_role)
+        # Solo ora, a password verificata, si può dire a un non tester a che punto è la sua
+        # richiesta (come per Google): prima lo stato tester non deve trapelare.
+        self._assert_tester_allowed_with_request(
+            user.email,
+            user.profile.display_name if user.profile is not None else None,
+            user.platform_role,
+        )
         tokens = self._create_session(user)
         self._session.commit()
         if self._rate_limiter is not None:
@@ -250,34 +264,55 @@ class AuthService:
     def _assert_tester_allowed_google(
         self, identity: google_oauth.GoogleIdentity, platform_role: PlatformRole | None
     ) -> None:
-        """Come `_assert_tester_allowed`, ma per chi accede con Google a un non tester.
+        """Accesso con Google: Google separa già nome e cognome, il modulo li precompila così."""
+        self._assert_tester_allowed_with_request(
+            identity.email,
+            identity.name,
+            platform_role,
+            first_name=identity.given_name,
+            last_name=identity.family_name,
+        )
 
-        Invece del solo rifiuto, dice a che punto è la richiesta di accesso: `none` con il
-        gettone per inviarla, `pending` (in valutazione) o `rejected` (già valutata).
+    def _assert_tester_allowed_with_request(
+        self,
+        email: str,
+        display_name: str | None,
+        platform_role: PlatformRole | None,
+        *,
+        first_name: str | None = None,
+        last_name: str | None = None,
+    ) -> None:
+        """Come `_assert_tester_allowed`, ma a un non tester dice a che punto è la richiesta.
+
+        Invece del solo rifiuto: `none` con il gettone per inviarla, `pending` (in valutazione)
+        o `rejected` (già valutata). Google ed email e password danno lo stesso contenuto
+        dell'errore, così i client lo gestiscono allo stesso modo. Va chiamato solo a identità
+        accertata (token Google verificato o password corretta): prima lo stato tester non deve
+        trapelare.
         """
         try:
-            self._assert_tester_allowed(identity.email, platform_role)
+            self._assert_tester_allowed(email, platform_role)
         except TesterOnlyError as exc:
             requests = TesterRequestService(self._session)
-            existing = requests.status_for(identity.email)
+            existing = requests.status_for(email)
             # Richiesta già accolta ma l'indirizzo non è più tra i tester (tolto a mano): si può
             # chiedere di nuovo, come per chi non ha mai chiesto.
             if existing is not None and existing.status == "approved":
                 existing = None
             extra: dict[str, object] = {
                 "requestStatus": existing.status if existing else "none",
-                # Account Google della richiesta e nome da precompilare.
-                "requestEmail": identity.email,
-                "requestName": identity.name,
-                # Google separa già nome e cognome: il modulo li precompila così.
-                "requestFirstName": identity.given_name,
-                "requestLastName": identity.family_name,
+                # Account della richiesta e nome da precompilare.
+                "requestEmail": email,
+                "requestName": display_name,
+                # Nome e cognome separati, se noti (Google li fornisce, l'email no).
+                "requestFirstName": first_name,
+                "requestLastName": last_name,
             }
             if existing is None:
                 extra["requestToken"] = make_request_token(
                     secret=self._settings.resolved_jwt_secret(),
-                    email=identity.email,
-                    name=identity.name,
+                    email=email,
+                    name=display_name,
                 )
             else:
                 extra["requestSubmittedAt"] = existing.created_at.isoformat()

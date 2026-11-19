@@ -36,7 +36,10 @@ def _register(client: TestClient, email: str):
 def test_options_default_to_email_registration_enabled(client: TestClient) -> None:
     response = client.get("/auth/options")
     assert response.status_code == 200
-    assert response.json() == {"emailRegistrationEnabled": True}
+    assert response.json() == {
+        "emailRegistrationEnabled": True,
+        "emailVerificationRequired": True,
+    }
     assert _register(client, "flag.default@example.com").status_code == 201
 
 
@@ -44,9 +47,15 @@ def test_options_are_public_and_report_the_flag(
     client: TestClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     _set_flag(monkeypatch, "false")
+    monkeypatch.setenv("AUTH_EMAIL_VERIFICATION_REQUIRED", "false")
+    reset_settings_cache()
     response = client.get("/auth/options")  # senza token: serve alla schermata di accesso
     assert response.status_code == 200
-    assert response.json() == {"emailRegistrationEnabled": False}
+    # La verifica email spenta (dev e pilota) dice al web di entrare subito dopo la registrazione.
+    assert response.json() == {
+        "emailRegistrationEnabled": False,
+        "emailVerificationRequired": False,
+    }
 
 
 def test_email_registration_is_refused_and_creates_nothing_when_disabled(

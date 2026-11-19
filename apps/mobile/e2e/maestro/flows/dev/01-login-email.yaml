@@ -13,6 +13,21 @@ appId: com.fantappero.mobile
     visible:
       id: "screen-auth"
     timeout: 20000
+# Dal 19/11 con Google configurato l'email è chiusa dietro «Continua con email»;
+# senza Google (dev) la scheda è già aperta. Si aspetta che compaia l'una o
+# l'altra (arrivano dopo GET /auth/options; gli id di Maestro sono regex).
+- scrollUntilVisible:
+    element:
+      id: "auth-email-toggle|auth-login-submit"
+    direction: DOWN
+    timeout: 20000
+- runFlow:
+    when:
+      visible:
+        id: "auth-email-toggle"
+    commands:
+      - tapOn:
+          id: "auth-email-toggle"
 # Il modulo è in fondo alla pagina: portare il pulsante Accedi al centro.
 - scrollUntilVisible:
     element:

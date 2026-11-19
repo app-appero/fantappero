@@ -4,20 +4,32 @@ import { submitTesterRequest } from "../../api/auth";
 import { ApiError } from "../../api/client";
 import { getApiErrorMessage } from "../../auth/AuthContext";
 
-/** Cosa ha risposto l'accesso con Google a chi non è ancora tester. */
+/** Cosa ha risposto l'accesso (con Google o con email) a chi non è ancora tester. */
 export type TesterGateInfo = {
   status: "none" | "pending" | "rejected";
   requestToken?: string;
   submittedAt?: string;
-  /** Account Google a cui si riferisce la richiesta e nome da precompilare. */
+  /** Account a cui si riferisce la richiesta e nome da precompilare. */
   email?: string;
   name?: string;
   /** Nome e cognome separati, come li fornisce Google (se disponibili). */
   firstName?: string;
   lastName?: string;
+  /**
+   * Da dove arriva il rifiuto: lo imposta chi chiama (il server risponde allo stesso modo).
+   * Cambia solo i testi («accedi con Google» o «con email e password»). Assente vale Google.
+   */
+  provider?: TesterGateProvider;
 };
 
-/** Se l'errore è il rifiuto `tester_only` dell'accesso con Google, dice a che punto è la richiesta. */
+export type TesterGateProvider = "google" | "email";
+
+/** Come si rientra dopo l'approvazione, nei testi della pagina. */
+function signInLabel(provider?: TesterGateProvider): string {
+  return provider === "email" ? "con la stessa email e password" : "con lo stesso account Google";
+}
+
+/** Se l'errore è il rifiuto `tester_only` dell'accesso, dice a che punto è la richiesta. */
 export function testerGateFromError(error: unknown): TesterGateInfo | null {
   if (!(error instanceof ApiError) || error.code !== "tester_only") {
     return null;
@@ -56,16 +68,21 @@ function splitName(name?: string): { first: string; last: string } {
   return { first: parts[0] ?? "", last: parts.slice(1).join(" ") };
 }
 
-const STEPS = [
-  { title: "Invii la richiesta", detail: "Nome e cognome, telefono facoltativo" },
-  { title: "La valutiamo", detail: "Ti avvisiamo noi" },
-  { title: "Entri nel gruppo", detail: "Poi accedi con lo stesso Google" },
-] as const;
+function testerSteps(provider?: TesterGateProvider) {
+  return [
+    { title: "Invii la richiesta", detail: "Nome e cognome, telefono facoltativo" },
+    { title: "La valutiamo", detail: "Ti avvisiamo noi" },
+    {
+      title: "Entri nel gruppo",
+      detail: provider === "email" ? "Poi accedi con la stessa email" : "Poi accedi con lo stesso Google",
+    },
+  ] as const;
+}
 
-function TesterSteps({ current }: { current: number }) {
+function TesterSteps({ current, provider }: { current: number; provider?: TesterGateProvider }) {
   return (
     <ol className="fa-tester-steps" aria-label="Come funziona">
-      {STEPS.map((step, index) => {
+      {testerSteps(provider).map((step, index) => {
         const state = index < current ? "done" : index === current ? "now" : "todo";
         return (
           <li key={step.title} className={`fa-tester-steps__item fa-tester-steps__item--${state}`}>
@@ -88,10 +105,12 @@ function TesterShell({
   current,
   children,
   testId,
+  provider,
 }: {
   current: number;
   children: ReactNode;
   testId: string;
+  provider?: TesterGateProvider;
 }) {
   return (
     <div className="fa-auth-page fa-tester-page" data-testid={testId}>
@@ -103,24 +122,33 @@ function TesterShell({
         <p className="fa-tester-page__lead">
           Stiamo provando il gioco con un gruppo ristretto. Chiedi di entrare: ti rispondiamo noi.
         </p>
-        <TesterSteps current={current} />
+        <TesterSteps current={current} provider={provider} />
       </section>
       <section className="fa-tester-card">{children}</section>
     </div>
   );
 }
 
-function GoogleAccountRow({ email, onBack }: { email?: string; onBack: () => void }) {
+function AccountRow({
+  email,
+  provider,
+  onBack,
+}: {
+  email?: string;
+  provider?: TesterGateProvider;
+  onBack: () => void;
+}) {
   if (!email) {
     return null;
   }
+  const viaEmail = provider === "email";
   return (
     <div className="fa-tester-account" data-testid="tester-request-account">
       <span className="fa-tester-account__g" aria-hidden="true">
-        G
+        {viaEmail ? "@" : "G"}
       </span>
       <span className="fa-tester-account__text">
-        <small>Account Google</small>
+        <small>{viaEmail ? "Account" : "Account Google"}</small>
         <strong>{email}</strong>
       </span>
       <button type="button" className="fa-tester-account__change" onClick={onBack}>
@@ -158,7 +186,7 @@ export function TesterRequestPanel({
   if (sent || info.status === "pending") {
     const date = formatDate(info.submittedAt) || (sent ? new Date().toLocaleDateString("it-IT") : "");
     return (
-      <TesterShell current={1} testId="tester-request-pending">
+      <TesterShell current={1} testId="tester-request-pending" provider={info.provider}>
         <div className="fa-tester-card__done" aria-hidden="true">
           ✓
         </div>
@@ -169,10 +197,10 @@ export function TesterRequestPanel({
           {sent
             ? "Abbiamo ricevuto la tua richiesta."
             : `La tua richiesta${date ? ` del ${date}` : ""} è in valutazione.`}{" "}
-          Quando verrà accolta potrai accedere con Google e ti aggiungeremo al gruppo WhatsApp dei
-          tester. <strong>Non serve inviarla di nuovo.</strong>
+          Quando verrà accolta potrai accedere {signInLabel(info.provider)} e ti aggiungeremo al
+          gruppo WhatsApp dei tester. <strong>Non serve inviarla di nuovo.</strong>
         </p>
-        <TesterSteps current={1} />
+        <TesterSteps current={1} provider={info.provider} />
         {info.email || date ? (
           <p className="fa-tester-card__note">
             {date ? `Richiesta del ${date}` : null}
@@ -189,7 +217,7 @@ export function TesterRequestPanel({
 
   if (info.status === "rejected") {
     return (
-      <TesterShell current={1} testId="tester-request-rejected">
+      <TesterShell current={1} testId="tester-request-rejected" provider={info.provider}>
         <h2 className="fa-tester-card__title">Accesso non disponibile</h2>
         <p className="fa-tester-card__text">
           La tua richiesta è già stata valutata e per ora non è stata accolta. Potrai riprovare più
@@ -205,7 +233,7 @@ export function TesterRequestPanel({
   async function onSubmit(event: FormEvent) {
     event.preventDefault();
     if (!info.requestToken) {
-      setError("Non riesco a inviare la richiesta da questa schermata: torna indietro e accedi di nuovo con Google.");
+      setError("Non riesco a inviare la richiesta da questa schermata: torna indietro e accedi di nuovo.");
       return;
     }
     setSending(true);
@@ -228,7 +256,7 @@ export function TesterRequestPanel({
   }
 
   return (
-    <TesterShell current={0} testId="tester-request-page">
+    <TesterShell current={0} testId="tester-request-page" provider={info.provider}>
       <form className="fa-tester-request" onSubmit={onSubmit} data-testid="tester-request-form">
         <p className="fa-tester-card__kick">
           <i aria-hidden="true" />
@@ -239,9 +267,9 @@ export function TesterRequestPanel({
         </h2>
         <p className="fa-tester-card__text">
           L&apos;accesso al pilota è riservato ai tester. Lasciaci i tuoi dati: valuteremo la
-          richiesta e, se accolta, entri con lo stesso account Google.
+          richiesta e, se accolta, entri {signInLabel(info.provider)}.
         </p>
-        <GoogleAccountRow email={info.email} onBack={onBack} />
+        <AccountRow email={info.email} provider={info.provider} onBack={onBack} />
         <div className="fa-tester-request__names">
           <Input
             label="Nome"

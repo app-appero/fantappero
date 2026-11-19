@@ -6,6 +6,7 @@ import { Pressable, Text, View } from "react-native";
 import { AppTextInput as TextInput } from "../components/AppTextInput";
 import { register as registerApi } from "../api/auth";
 import { AuthShell } from "../auth/AuthShell";
+import { registrationRequestBody, validateEmailRegistration } from "../auth/emailRegistration";
 import { useAuthOptions } from "../auth/useAuthOptions";
 import { useGoogleAuth } from "../auth/useGoogleAuth";
 import { UiStatePanel } from "../components/UiStatePanel";
@@ -19,7 +20,11 @@ import { authFormStyles as styles } from "./AuthScreen";
  */
 const SHOW_APPLE_SIGN_IN = false;
 
-/** Registrazione — allineata a web /accedi/registrati. */
+/**
+ * Registrazione — allineata a web /accedi/registrati. Dal 19/11 la schermata di accesso registra
+ * nella scheda «Registrati» e non porta più qui: la rotta `AuthRegister` resta registrata ma
+ * nessun tasto o link ci arriva (da togliere se non serve più).
+ */
 export function AuthRegisterScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const [email, setEmail] = useState("");
@@ -48,21 +53,16 @@ export function AuthRegisterScreen() {
 
   async function onSubmit() {
     setError(null);
-    if (!email.trim() || !password || !displayName.trim()) {
-      setError("Compila tutti i campi obbligatori.");
-      return;
-    }
-    if (password !== confirmPassword) {
-      setError("Le password non coincidono.");
+    // Stessi controlli della scheda «Registrati» della schermata di accesso.
+    const fields = { displayName, email, password, confirmPassword };
+    const invalid = validateEmailRegistration(fields);
+    if (invalid) {
+      setError(invalid);
       return;
     }
     setSubmitting(true);
     try {
-      const response = await registerApi({
-        email: email.trim(),
-        password,
-        displayName: displayName.trim(),
-      });
+      const response = await registerApi(registrationRequestBody(fields));
       setSuccessMessage(response.message);
     } catch (submitError) {
       setError(getApiErrorMessage(submitError, "Registrazione non riuscita."));

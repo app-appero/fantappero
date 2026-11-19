@@ -5,8 +5,26 @@ appId: com.fantappero.mobile
 
 - assertVisible:
     id: "screen-auth"
+# Scheda email chiusa dietro «Continua con email» quando Google è configurato
+# (in locale non lo è e la scheda è già aperta, su Accedi).
+- runFlow:
+    when:
+      visible:
+        id: "auth-email-toggle"
+    commands:
+      - tapOn:
+          id: "auth-email-toggle"
+- runFlow:
+    when:
+      visible:
+        id: "auth-tab-login"
+    commands:
+      - tapOn:
+          id: "auth-tab-login"
 - tapOn:
     id: "auth-email"
+# Dopo la registrazione l'email è già scritta: svuotare il campo prima di riscriverla.
+- eraseText
 - inputText: ${TEST_EMAIL}
 - tapOn:
     id: "auth-password"

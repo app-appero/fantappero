@@ -14,16 +14,32 @@ function uniqueEmail(prefix: string): string {
   return `${prefix}.${Date.now()}.${Math.random().toString(36).slice(2, 8)}@example.com`;
 }
 
+/**
+ * L'accesso con email sta in un pannello sotto «Continua con Google»: chiuso se Google è
+ * configurato, già aperto altrimenti (come nello stack e2e). Lo apre se serve.
+ */
+async function openEmailPanel(page: import("@playwright/test").Page) {
+  const toggle = page.getByTestId("auth-email-toggle");
+  const panel = page.getByTestId("auth-email-panel");
+  await expect(toggle.or(panel)).toBeVisible();
+  if (await toggle.isVisible()) {
+    await toggle.click();
+  }
+  await expect(panel).toBeVisible();
+}
+
 async function registerVerifyLogin(
   page: import("@playwright/test").Page,
   { displayName, email, password }: { displayName: string; email: string; password: string },
 ) {
+  // /accedi/registrati apre già il pannello sulla scheda «Registrati».
   await page.goto("/accedi/registrati");
+  await expect(page.getByTestId("auth-email-tab-register")).toHaveAttribute("aria-selected", "true");
   await page.getByLabel("Nome visualizzato").fill(displayName);
   await page.getByLabel("Email").fill(email);
   await page.getByLabel("Password", { exact: true }).fill(password);
-  await page.getByLabel("Conferma password").fill(password);
-  await page.getByRole("button", { name: "Registrati" }).click();
+  await page.getByRole("button", { name: "Crea account" }).click();
+  // Lo stack e2e richiede la verifica email (default): si entra dopo il link di Mailpit.
   await expect(page.getByTestId("auth-register-success")).toBeVisible();
 
   const verificationLink = await waitForVerificationLink(email);
@@ -38,9 +54,10 @@ async function login(
   { email, password }: { email: string; password: string },
 ) {
   await page.goto("/accedi");
+  await openEmailPanel(page);
   await page.getByLabel("Email").fill(email);
   await page.getByLabel("Password", { exact: true }).fill(password);
-  await page.getByRole("button", { name: "Accedi" }).click();
+  await page.getByRole("button", { name: "Accedi", exact: true }).click();
   await expect(page).toHaveURL(/\/leghe/);
 }
 

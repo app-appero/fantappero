@@ -11,7 +11,7 @@ si entra solo con «Continua con Google». Il codice di registrazione e login co
 
 Per riaccenderla basta rimettere `true` (o togliere la variabile) e rifare il deploy dell'API:
 non serve ricompilare l'app, perché web e app leggono lo stato dal server (`GET /auth/options`,
-pubblico, risponde `{"emailRegistrationEnabled": false}`).
+pubblico, risponde `{"emailRegistrationEnabled": false, "emailVerificationRequired": …}`).
 
 ## Cosa cambia
 - `POST /auth/register` risponde **403** con codice `email_registration_disabled` e **non crea
@@ -25,6 +25,22 @@ pubblico, risponde `{"emailRegistrationEnabled": false}`).
   **`/accedi?accesso=email`**, che mostra il modulo. L'app non ha questo ingresso: lì si usa Google.
   Chi entra con Google con lo stesso indirizzo email dell'account esistente accede allo stesso account.
 - Con Google l'account nasce **già verificato**: nessuna email di verifica e nessun reset password.
+
+## Alternativa con email (registrazione con email accesa, web)
+Decisa il 19/11 per dev e pilota, per i tester senza un account Google. Con
+`AUTH_EMAIL_REGISTRATION_ENABLED=true` la pagina di accesso resta quella del pilota, con Google per
+primo; sotto ci sono «oppure» e il tasto secondario «Continua con email». Il tasto apre, nella stessa
+scheda, un pannello con due schede:
+- **Accedi**: email, password, «Accedi» e «Password dimenticata?»;
+- **Registrati**: nome, email, password e «Crea account»;
+- la riga sull'informativa privacy («Accedendo…» / «Registrandoti…») e «Chiudi» per richiuderlo.
+
+`/accedi/registrati` apre la pagina con il pannello già aperto su «Registrati»; senza Google
+configurato (in locale) il pannello è aperto da subito. Con la registrazione con email spenta la
+pagina resta quella solo Google descritta sopra (e `/accedi?accesso=email` il modulo di sempre).
+
+Con la verifica email spenta (vedi sotto) dopo «Crea account» si entra subito, con le stesse
+credenziali; con la verifica accesa compare «Controlla la tua email» come prima.
 
 ## Cosa non cambia
 - Il **server** accetta ancora il login con email e password (`POST /auth/login`): l'interruttore
@@ -41,14 +57,17 @@ profilo (`notifications_push`, acceso di default; `NOTIFICATIONS_PUSH_ENABLED=tr
 - **iPhone**: oggi solo web (nessuna build iOS nel pilota), quindi solo in app.
 Un tester che non apre mai l'app o che ha negato il permesso alle notifiche non riceve la push.
 
-## Verifica email facoltativa (solo dev)
+## Verifica email facoltativa (dev e pilota)
 | Variabile | Dove | Default | Dev | Pilota |
 | --- | --- | --- | --- | --- |
-| `AUTH_EMAIL_VERIFICATION_REQUIRED` | servizio **api** | `true` | `false` | **`true`** (non toccare) |
+| `AUTH_EMAIL_VERIFICATION_REQUIRED` | servizio **api** | `true` | `false` | **`false`** (decisione del 19/11) |
 
 Con `false` i nuovi account con email e password nascono già verificati (nessuna email inviata)
-e un account non ancora verificato viene verificato al primo accesso. Serve ai test automatici su
-dev con indirizzi inventati. Il valore predefinito resta `true`: senza la variabile nulla cambia.
+e un account non ancora verificato viene verificato al primo accesso. `POST /auth/register`
+risponde «Registrazione completata: ora puoi accedere.» (stesso testo se l'indirizzo era già
+registrato) e il web entra subito dopo la registrazione (`emailVerificationRequired: false` in
+`GET /auth/options`). Il valore predefinito resta `true`: senza la variabile nulla cambia.
+Attenzione: senza verifica nessuno controlla che l'indirizzo sia davvero di chi si registra.
 
 ## Richiesta di accesso per chi non è ancora tester (solo web)
 Con la **modalità test** accesa, chi entra con Google e non è tester non crea nessun account: il web
@@ -66,7 +85,11 @@ Nome e cognome sono già compilati con quelli dell'account Google (modificabili)
 - Gli operatori ricevono una notifica in app e push a ogni nuova richiesta.
 - Le richieste **rifiutate si cancellano dopo 30 giorni** (poi la persona può chiedere di nuovo).
 - Con la modalità test **spenta** il modulo non compare e l'invio è rifiutato.
-- L'accesso con email e password resta bloccato per tutti nel pilota.
+- **Accesso con email e password**: chi non è tester riceve la stessa risposta e lo stesso modulo
+  (stesso gettone, stesso invio), ma solo **dopo** il controllo della password: con una password
+  sbagliata resta l'errore generico «Email o password non validi.». Il nome è precompilato con
+  quello del profilo. A differenza di Google, l'account esiste già; entra quando la richiesta è
+  approvata.
 - **App (APK)**: «Continua con Google» apre già la pagina web di accesso nel browser del telefono;
   se chi accede non è tester, lo stesso modulo compare lì (stesso testo, stesso invio). Dopo
   l'invio torna all'app e al successivo accesso vale la stessa risposta della richiesta.

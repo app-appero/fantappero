@@ -97,6 +97,11 @@ export interface ResendVerificationRequest {
 /** Opzioni di accesso attive sul server (pubbliche): per il pilota la registrazione è solo con Google. */
 export interface AuthOptions {
   emailRegistrationEnabled: boolean;
+  /**
+   * `false` su dev e pilota: dopo la registrazione con email si entra subito. Assente sui server
+   * meno recenti, da trattare come `true` (si aspetta il messaggio di verifica).
+   */
+  emailVerificationRequired?: boolean;
 }
 
 export interface AuthMessageResponse {

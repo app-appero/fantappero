@@ -57,9 +57,3 @@ export async function clearLastUser(): Promise<void> {
     // vedi sopra
   }
 }
-
-export function initialsOf(displayName: string): string {
-  const parts = displayName.trim().split(/\s+/).filter(Boolean);
-  const letters = parts.length > 1 ? [parts[0], parts[parts.length - 1]] : [parts[0] ?? "?"];
-  return letters.map((p) => p?.charAt(0) ?? "").join("").toUpperCase().slice(0, 2);
-}

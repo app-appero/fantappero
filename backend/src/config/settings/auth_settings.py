@@ -47,10 +47,10 @@ class AuthSettingsMixin:
         default=True,
         validation_alias="AUTH_EMAIL_VERIFICATION_REQUIRED",
         description=(
-            "Richiede di verificare l'email prima di accedere. Con `false` (solo ambiente dev, "
-            "per i test automatici con indirizzi inventati) i nuovi account nascono già "
-            "verificati e chi non lo è ancora viene verificato al primo accesso. "
-            "Non va mai spento sul pilota: il valore predefinito resta `true`."
+            "Richiede di verificare l'email prima di accedere. Con `false` (dev e pilota, "
+            "decisione del 19/11) i nuovi account nascono già verificati e chi non lo è ancora "
+            "viene verificato al primo accesso; il web lo legge da `GET /auth/options` ed entra "
+            "subito dopo la registrazione. Il valore predefinito resta `true`."
         ),
     )
     protected_operator_emails: str = Field(

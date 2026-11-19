@@ -89,3 +89,6 @@ class AuthOptionsResponse(ApiModel):
     """Opzioni di accesso attive (pubbliche): leggono le schermate di login e registrazione."""
 
     email_registration_enabled: bool = Field(alias="emailRegistrationEnabled")
+    # Con `false` (dev e pilota) dopo la registrazione con email si entra subito, senza
+    # aspettare il messaggio di verifica.
+    email_verification_required: bool = Field(alias="emailVerificationRequired")

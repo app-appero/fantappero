@@ -60,8 +60,10 @@ def _error_response(exc: AuthError) -> JSONResponse:
 @router.get("/options", response_model=AuthOptionsResponse)
 def auth_options() -> AuthOptionsResponse:
     """Cosa è attivo per accedere/registrarsi: pubblico, serve alle schermate di accesso."""
+    settings = get_api_settings()
     return AuthOptionsResponse(
-        emailRegistrationEnabled=get_api_settings().auth_email_registration_enabled,
+        emailRegistrationEnabled=settings.auth_email_registration_enabled,
+        emailVerificationRequired=settings.auth_email_verification_required,
     )
 
 
