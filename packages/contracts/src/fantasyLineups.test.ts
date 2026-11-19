@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
+import type { LineupRole, LineupRosterPlayer } from "./fantasyLineups.ts";
 import {
   APPROVED_MODULES,
   copyPreviousLineup,
@@ -17,6 +18,7 @@ import {
   isAthleteKickoffLocked,
   isLineupModificationAllowed,
   isTacticalWindowActive,
+  keepStartersForModule,
   MAX_AUTOMATIC_SUBSTITUTIONS,
   MAX_TACTICAL_MOVES,
   moduleCounts,
@@ -805,6 +807,100 @@ describe("fantasyLineups rules", () => {
         lockedAthleteIds: ["C4", "C5", "C6", "C7", "C8"],
       });
       assert.equal(plan, null);
+    });
+  });
+
+  describe("keepStartersForModule", () => {
+    const ids = (prefix: string, count: number) => Array.from({ length: count }, (_, i) => `${prefix}${i + 1}`);
+    const P = ids("P", 3);
+    const D = ids("D", 8);
+    const C = ids("C", 8);
+    const A = ids("A", 6);
+    const rosterIds = [...P, ...D, ...C, ...A];
+    const roster = (overrides: Record<string, Partial<LineupRosterPlayer>> = {}): LineupRosterPlayer[] =>
+      rosterIds.map((athleteId, slotIndex) => ({
+        athleteId,
+        athleteName: athleteId,
+        role: athleteId[0] as LineupRole,
+        slotIndex,
+        locked: false,
+        ...overrides[athleteId],
+      }));
+    // 4-3-3 completo, poi panchina attiva 1P·3D·3C·3A e tribuna.
+    const starters433 = [P[0], ...D.slice(0, 4), ...C.slice(0, 3), ...A.slice(0, 3)] as string[];
+    const bench = [P[1], D[4], D[5], D[6], C[3], C[4], C[5], A[3], A[4], A[5], P[2], D[7], C[6], C[7]] as string[];
+
+    it("4-3-3 → 4-4-2: tiene 4 D e 3 C, lascia vuoto il quarto C e tiene 2 dei 3 A", () => {
+      const plan = keepStartersForModule({
+        module: "4-4-2",
+        currentStarters: starters433,
+        benchIds: bench,
+        roster: roster(),
+      });
+      // Template 4-4-2: [P, D, D, D, D, C, C, C, C, A, A].
+      assert.deepEqual(plan.starterIds, ["P1", "D1", "D2", "D3", "D4", "C1", "C2", "C3", "", "A1", "A2"]);
+      assert.equal(starterTemplate("4-4-2")[8], "C");
+      // Il terzo attaccante torna in panchina, in coda: l'ordine di chi c'era già resta.
+      assert.deepEqual(plan.benchIds, [...bench, "A3"]);
+    });
+
+    it("riserva prima i bloccati (anche con l'anticipo del blocco), poi i titolari nel loro ordine", () => {
+      const now = "2026-11-22T13:50:00.000Z";
+      const rows = roster({
+        D3: { locked: true },
+        // Partita alle 14:00: bloccato solo con un anticipo di almeno 10 minuti.
+        D4: { kickoffAt: "2026-11-22T14:00:00.000Z" },
+      });
+      const withMargin = keepStartersForModule({
+        module: "3-4-3",
+        currentStarters: starters433,
+        benchIds: bench,
+        roster: rows,
+        now,
+        lockMarginMinutes: 15,
+      });
+      // Template 3-4-3: [P, D, D, D, C, C, C, C, A, A, A]. D3 e D4 bloccati passano davanti a D1 e D2.
+      assert.deepEqual(withMargin.starterIds, ["P1", "D3", "D4", "D1", "C1", "C2", "C3", "", "A1", "A2", "A3"]);
+      assert.deepEqual(withMargin.benchIds, [...bench, "D2"]);
+
+      const withoutMargin = keepStartersForModule({
+        module: "3-4-3",
+        currentStarters: starters433,
+        benchIds: bench,
+        roster: rows,
+        now,
+      });
+      assert.deepEqual(withoutMargin.starterIds.slice(1, 4), ["D3", "D1", "D2"]);
+      assert.deepEqual(withoutMargin.benchIds, [...bench, "D4"]);
+    });
+
+    it("non duplica nessuno, nemmeno se la lista dei titolari ripete un calciatore", () => {
+      const plan = keepStartersForModule({
+        module: "4-4-2",
+        currentStarters: ["D2", "P1", "D1", "D1", "D2", "D3", "D4", "C1", "C2", "C3", "A1", "A1", "A2"],
+        benchIds: bench,
+        roster: roster({ D2: { locked: true } }),
+      });
+      const placed = plan.starterIds.filter(Boolean);
+      assert.equal(new Set(placed).size, placed.length);
+      assert.equal(new Set(plan.benchIds).size, plan.benchIds.length);
+      assert.ok(placed.every((athleteId) => !plan.benchIds.includes(athleteId)));
+      // Ognuno è in campo o in panchina, una volta sola.
+      assert.deepEqual([...placed, ...plan.benchIds].sort(), [...rosterIds].sort());
+      assert.deepEqual(plan.starterIds, ["P1", "D2", "D1", "D3", "D4", "C1", "C2", "C3", "", "A1", "A2"]);
+    });
+
+    it("un bloccato senza posto nel nuovo modulo non prende lo slot di un altro ruolo", () => {
+      // 4-5-1 ha un solo attaccante: A2 bloccato resta fuori, chi chiama deve rifiutare il modulo.
+      const plan = keepStartersForModule({
+        module: "4-5-1",
+        currentStarters: starters433,
+        benchIds: bench,
+        roster: roster({ A1: { locked: true }, A2: { locked: true } }),
+      });
+      assert.equal(plan.starterIds[10], "A1");
+      assert.ok(!plan.starterIds.includes("A2"));
+      assert.ok(!plan.starterIds.includes("A3"));
     });
   });
 });

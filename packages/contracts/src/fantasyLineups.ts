@@ -673,6 +673,8 @@ export function preserveLockedStarters(input: {
   currentStarters: readonly string[];
   roster: readonly LineupRosterPlayer[];
   now?: string | Date;
+  /** Anticipo del blocco in minuti (come `isAthleteKickoffLocked`); 0 se assente. */
+  lockMarginMinutes?: number;
 }): string[] {
   const next = input.template.map(() => "");
   const rosterById = new Map(input.roster.map((row) => [row.athleteId, row]));
@@ -689,11 +691,7 @@ export function preserveLockedStarters(input: {
     if (!player?.role) {
       continue;
     }
-    const locked =
-      player.locked === true ||
-      (input.now != null &&
-        isAthleteKickoffLocked(input.now, player.kickoffAt, player.fixtureStatus, player.lockLatched));
-    if (!locked) {
+    if (!isRosterPlayerLocked(player, input.now, input.lockMarginMinutes)) {
       continue;
     }
     const slot = next.findIndex((value, index) => !value && input.template[index] === player.role);
@@ -703,6 +701,77 @@ export function preserveLockedStarters(input: {
     }
   }
   return next;
+}
+
+function isRosterPlayerLocked(
+  player: LineupRosterPlayer,
+  now: string | Date | undefined,
+  marginMinutes = 0,
+): boolean {
+  return (
+    player.locked === true ||
+    (now != null &&
+      isAthleteKickoffLocked(now, player.kickoffAt, player.fixtureStatus, player.lockLatched, marginMinutes))
+  );
+}
+
+/**
+ * Cambio modulo quando la «formazione migliore» non si può chiedere al server (demo, turno non
+ * modificabile, errore di rete, rosa insufficiente): tiene i titolari compatibili con il nuovo
+ * modulo invece di svuotare la formazione.
+ *
+ * 1. I titolari bloccati prima di tutti, come `preserveLockedStarters` (primo slot libero del
+ *    loro ruolo).
+ * 2. Poi i titolari non bloccati, nel loro ordine attuale, nei posti rimasti del loro ruolo.
+ * 3. Chi non entra più torna in panchina con la regola di `orderedBenchFromRoster` (l'ordine
+ *    salvato resta, chi scende va in coda); gli slot senza un pari ruolo restano vuoti.
+ *
+ * Un titolare bloccato che non trova posto nel nuovo modulo resta fuori dagli slot: chi chiama
+ * deve controllarlo prima (il modulo non è raggiungibile) e non applicare il risultato.
+ */
+export function keepStartersForModule(input: {
+  module: FantasyModule;
+  currentStarters: readonly string[];
+  /** Ordine di panchina attuale, da conservare per chi resta in panchina. */
+  benchIds?: readonly string[];
+  roster: readonly LineupRosterPlayer[];
+  now?: string | Date;
+  lockMarginMinutes?: number;
+}): ModuleChangePlan {
+  const template = starterTemplate(input.module);
+  const starters = preserveLockedStarters({
+    template,
+    currentStarters: input.currentStarters,
+    roster: input.roster,
+    now: input.now,
+    lockMarginMinutes: input.lockMarginMinutes,
+  });
+  const rosterById = new Map(input.roster.map((row) => [row.athleteId, row]));
+  // Stesso atleta ripetuto in `currentStarters`: entra una volta sola.
+  const placed = new Set(starters.filter(Boolean));
+  for (const athleteId of input.currentStarters) {
+    if (!athleteId || placed.has(athleteId)) {
+      continue;
+    }
+    const player = rosterById.get(athleteId);
+    // I bloccati li ha già sistemati il primo passaggio: se non sono lì, non c'è posto per loro.
+    if (!player?.role || isRosterPlayerLocked(player, input.now, input.lockMarginMinutes)) {
+      continue;
+    }
+    const slot = starters.findIndex((value, index) => !value && template[index] === player.role);
+    if (slot >= 0) {
+      starters[slot] = athleteId;
+      placed.add(athleteId);
+    }
+  }
+  return {
+    starterIds: starters,
+    benchIds: orderedBenchFromRoster(
+      input.roster.map((row) => row.athleteId),
+      starters,
+      input.benchIds ?? [],
+    ),
+  };
 }
 
 /**
