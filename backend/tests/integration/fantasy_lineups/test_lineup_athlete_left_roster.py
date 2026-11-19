@@ -1,9 +1,11 @@
 # ruff: noqa: F811
 """Formazione salvata con un calciatore non più in rosa (QA 19/11, qa-02 e N. Zortea).
 
-La squadra cede un calciatore dopo aver salvato la formazione del turno aperto: lui resta
-nella formazione salvata (o nella bozza). GET formazione deve toglierlo dai titolari e dalla
-panchina restituiti, lasciare il suo posto vuoto e dire chi è stato tolto. Il salvataggio con
+La squadra cede un calciatore dopo aver salvato la formazione del turno aperto. Lo scambio lo
+toglie già dalla formazione salvata e dalla bozza (fantasy_lineups.departures, vedi anche
+test_lineup_departure_purge.py); se resta lì per altre vie (dati precedenti, correzioni fatte
+a mano nel DB) GET formazione lo toglie comunque dai titolari e dalla panchina restituiti. In
+entrambi i casi il suo posto resta vuoto e l'avviso dice chi è stato tolto. Il salvataggio con
 lui ancora dentro resta rifiutato, ma il messaggio dice chi è. Nei turni bloccati o conclusi,
 e per chi ha la partita già iniziata, la formazione non si tocca: è storia del punteggio.
 """
@@ -134,8 +136,9 @@ def test_bench_player_traded_away_leaves_the_open_turn_lineup(
     name = _name(db_session, departed)
     incoming = setup["roles_b"][FantasyRole.D][-1]
     _trade(client, setup, offered=[departed], requested=[incoming])
+    # Lo scambio lo ha già tolto dalla formazione salvata, non solo da quella restituita.
     stored_before = _stored_athlete_ids(db_session, setup)
-    assert departed in {athlete_id for _, _, athlete_id in stored_before}
+    assert departed not in {athlete_id for _, _, athlete_id in stored_before}
 
     context = client.get(_lineup_url(setup), headers=_headers(token))
     assert context.status_code == 200, context.json()
@@ -154,7 +157,7 @@ def test_bench_player_traded_away_leaves_the_open_turn_lineup(
     codes = {issue["code"] for issue in body["issues"]}
     assert "athlete_not_in_roster" not in codes
     assert "bench_incomplete" in codes
-    # Sola lettura: nel DB la formazione resta quella salvata fino al prossimo salvataggio.
+    # GET non cambia niente: la pulizia l'ha già fatta lo scambio.
     assert _stored_athlete_ids(db_session, setup) == stored_before
 
     # Salvare con lui ancora dentro (app aperta prima dello scambio) resta rifiutato, con il nome.
@@ -246,7 +249,7 @@ def test_starter_removed_from_roster_leaves_an_empty_slot_in_lineup_and_draft(
     assert saved.json()["issues"] == []
 
 
-def _trade_then_close_turn(
+def _depart_then_close_turn(
     client: TestClient,
     db_session: Session,
     competition_ids: list[str],
@@ -258,9 +261,11 @@ def _trade_then_close_turn(
     setup = _trade_league(client, db_session, competition_ids, prefix=prefix, id_offset=id_offset)
     payload = _save_lineup(client, db_session, setup)
     departed = UUID(payload["benchAthleteIds"][3])
-    _trade(client, setup, offered=[departed], requested=[setup["roles_b"][FantasyRole.D][-1]])
+    # Uscito senza passare dal mercato (correzione diretta nel DB, o dati di prima della pulizia
+    # all'uscita): resta nella formazione salvata. Uno scambio lo avrebbe già tolto.
+    _replace_in_roster(db_session, setup, departed, provider_id=id_offset + 9_999)
 
-    # Il turno parte (o finisce) dopo lo scambio: tutte le partite sono iniziate.
+    # Il turno parte (o finisce) dopo l'uscita: tutte le partite sono iniziate.
     started = datetime.now(UTC) - timedelta(hours=3)
     fantasy_round = db_session.get(FantasyRound, UUID(setup["round_id"]))
     assert fantasy_round is not None
@@ -313,7 +318,7 @@ def test_locked_turn_lineup_with_a_departed_player_is_left_alone(
     db_session: Session,
     competition_ids: list[str],
 ) -> None:
-    setup, payload, departed = _trade_then_close_turn(
+    setup, payload, departed = _depart_then_close_turn(
         client,
         db_session,
         competition_ids,
@@ -329,7 +334,7 @@ def test_finished_turn_lineup_with_a_departed_player_is_left_alone(
     db_session: Session,
     competition_ids: list[str],
 ) -> None:
-    setup, payload, departed = _trade_then_close_turn(
+    setup, payload, departed = _depart_then_close_turn(
         client,
         db_session,
         competition_ids,

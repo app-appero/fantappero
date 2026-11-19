@@ -1048,6 +1048,8 @@ class MarketService:
             self._session,
             fantasy_team_id=team.id,
             slot_index=slot_index,
+            athlete_id=athlete_id,
+            actor_id=league_access.user.id,
         )
         if refund > 0:
             apply_ledger_movement(

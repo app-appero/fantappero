@@ -355,17 +355,30 @@ Errori con motivazione: `invalid_module`, `module_role_mismatch`,
 `ai_lineup_incomplete` (rosa insufficiente per completare il modulo con la
 formula automatica).
 
-**Chi non è più in rosa** (scambio, svincolo, asta, rimozione dell'admin; QA 19/11): nel
-contesto di un turno ancora aperto (`effectiveStatus = open`) esce da `lineup` e da
-`draft`. Tra i titolari il suo posto resta vuoto: gli altri tengono il loro `sortOrder`
-(nella bozza c'è `""`), i client li dispongono per `sortOrder`. In panchina gli altri
-restano nell'ordine. Il primo elemento di `issues` è l'avviso
-`lineup_athlete_left_roster` con i nomi, ad esempio «N. Zortea non è più nella tua rosa:
-è stato tolto dalla formazione, scegli chi mettere al suo posto.». È solo in lettura:
-nel DB la formazione resta com'era fino al salvataggio successivo, e un salvataggio (o
-una bozza) che lo contiene ancora è rifiutato con `athlete_not_in_roster` e il nome
-(«N. Zortea non è più nella tua rosa.»). Non cambia niente nei turni bloccati o conclusi,
-né per chi ha già la partita iniziata o in blocco.
+**Chi non è più in rosa** (scambio, svincolo, asta, rimozione o sostituzione dell'admin;
+QA 19/11) esce dalla formazione salvata e dalla bozza della squadra **nel momento in cui
+lascia la rosa**, in tutti i turni programmati o aperti non ancora iniziati (nessuna partita
+in blocco: la stessa soglia per cui il mercato chiude). Così il calcolo del turno, che legge
+la formazione salvata, non lo conta più per la vecchia squadra anche se il fantallenatore non
+salva di nuovo. Tra i titolari il suo posto resta vuoto: gli altri tengono il loro
+`sortOrder` (nella bozza c'è `""`), i client li dispongono per `sortOrder`, e la validazione
+del contesto segnala lo slot da riempire (`missing_athlete`). In panchina gli altri restano
+nell'ordine, con le posizioni ricompattate. È una pulizia di sistema: `revision` e
+`submittedAt` non cambiano e non consuma mosse tattiche; resta un evento di audit
+`fantasy_lineup_saved` con `source = "roster_departure"` e il nome. Finché la squadra non
+salva di nuovo formazione o bozza, il primo elemento di `issues` (turno programmato o
+aperto) è l'avviso `lineup_athlete_left_roster` con i nomi, ad esempio «N. Zortea non è più
+nella tua rosa: è stato tolto dalla formazione, scegli chi mettere al suo posto.». Anche il
+promemoria di scadenza (`formazione.scadenza_turno`) considera non schierata una formazione
+a cui manca un titolare.
+
+Se un calciatore non più in rosa è ancora nella formazione per altre vie (dati precedenti,
+correzioni nel DB), nel contesto di un turno aperto (`effectiveStatus = open`) GET lo toglie
+comunque da `lineup` e `draft` restituiti, con lo stesso avviso, senza toccare il DB; un
+salvataggio (o una bozza) che lo contiene ancora è rifiutato con `athlete_not_in_roster` e
+il nome («N. Zortea non è più nella tua rosa.»). Non cambia niente nei turni bloccati o
+conclusi, né per chi ha già la partita iniziata o in blocco: il ricalcolo di un turno passato
+usa la formazione così com'era.
 
 La **copia** prende l'ultima formazione confermata di un turno precedente della
 stessa squadra, la rivalida e la scrive in **bozza**. Non conferma e non consuma

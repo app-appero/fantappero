@@ -389,6 +389,47 @@ def drop_departed_athletes(
     )
 
 
+def fill_starter_holes(
+    *,
+    module: str,
+    starters: Sequence[tuple[int, LineupPlayerRef]],
+) -> list[LineupPlayerRef]:
+    """Titolari nell'ordine dei loro posti, con un riferimento vuoto dove il posto è libero.
+
+    Chi esce dalla rosa viene tolto dalla formazione salvata dei turni non ancora iniziati e il
+    suo posto resta vuoto: gli altri titolari tengono il loro ``sort_order`` (vedi
+    ``fantasy_lineups.departures``). Il posto vuoto prende il ruolo che manca al modulo, così
+    la validazione segnala lo slot da riempire (``missing_athlete``) e non un modulo sbagliato.
+    Senza posti liberi restituisce i titolari così come sono, in ordine di posto.
+    """
+    ordered = sorted(starters, key=lambda item: item[0])
+    by_position = dict(ordered)
+    if len(by_position) != len(ordered) or not ordered:
+        return [ref for _, ref in ordered]
+    size = max(STARTER_COUNT, ordered[-1][0] + 1)
+    if len(ordered) >= size:
+        return [ref for _, ref in ordered]
+    missing: list[FantasyRole] = []
+    parsed = parse_module(module)
+    if parsed is not None:
+        expected = module_counts(parsed)
+        present = count_roles([ref for _, ref in ordered])
+        for role, wanted in (
+            (FantasyRole.P, expected.goalkeepers),
+            (FantasyRole.D, expected.defenders),
+            (FantasyRole.C, expected.midfielders),
+            (FantasyRole.A, expected.forwards),
+        ):
+            missing.extend([role] * max(0, wanted - present[role]))
+    filled: list[LineupPlayerRef] = []
+    for position in range(size):
+        ref = by_position.get(position)
+        if ref is None:
+            ref = LineupPlayerRef(athlete_id="", role=missing.pop(0) if missing else None)
+        filled.append(ref)
+    return filled
+
+
 def evaluate_lineup(
     *,
     module: str,

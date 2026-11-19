@@ -32,6 +32,7 @@ from fantasy_lineups.best_lineup_service import (
     compute_best_lineup_respecting_locks,
     select_best_module,
 )
+from fantasy_lineups.departures import departure_notices, is_purgeable_turn_status
 from fantasy_lineups.kickoffs import KickoffRef, athlete_kickoffs
 from fantasy_lineups.models import LineupDraft, LineupPlayer, LineupSubmission, TacticalMove
 from fantasy_lineups.rules import (
@@ -52,6 +53,7 @@ from fantasy_lineups.rules import (
     copy_previous_lineup,
     drop_departed_athletes,
     evaluate_lineup,
+    fill_starter_holes,
     is_athlete_kickoff_locked,
     is_lineup_modification_allowed,
     lineup_athlete_left_roster_message,
@@ -1416,14 +1418,22 @@ class FantasyLineupService:
                 removed = set(cleanup.removed_ids)
                 removed_names.extend(names_by_id.get(str(item), "") for item in cleanup.removed_ids)
             # Posto vuoto ma con il ruolo di chi c'era: la validazione segnala lo slot da
-            # riempire (`missing_athlete`), non un modulo sbagliato.
-            starters = [
-                LineupPlayerRef(
-                    athlete_id="" if player.athlete_id in removed else player.athlete_id,
-                    role=self._parse_role(player.role),
-                )
-                for player in saved.starters
-            ]
+            # riempire (`missing_athlete`), non un modulo sbagliato. Lo stesso per il posto
+            # lasciato nel DB da chi è uscito dalla rosa (fantasy_lineups.departures): lì il
+            # ruolo è quello che manca al modulo.
+            starters = fill_starter_holes(
+                module=saved.module,
+                starters=[
+                    (
+                        player.sort_order,
+                        LineupPlayerRef(
+                            athlete_id="" if player.athlete_id in removed else player.athlete_id,
+                            role=self._parse_role(player.role),
+                        ),
+                    )
+                    for player in saved.starters
+                ],
+            )
             bench = [
                 LineupPlayerRef(
                     athlete_id=player.athlete_id,
@@ -1479,6 +1489,28 @@ class FantasyLineupService:
             # Bozza senza nessun titolare (es. copia di una formazione non più in rosa): non è una
             # formazione, la si ignora invece di mostrarla come «bozza salvata».
             draft_response = None
+        if is_purgeable_turn_status(effective) and (submission is not None or draft is not None):
+            # Chi è uscito dalla rosa è già stato tolto dal DB al momento dell'uscita
+            # (fantasy_lineups.departures): l'avviso col nome resta finché il fantallenatore non
+            # salva di nuovo formazione o bozza, e sparisce se nel frattempo è tornato in rosa.
+            last_saved = max(
+                moment
+                for moment in (
+                    submission.submitted_at if submission is not None else None,
+                    draft.saved_at if draft is not None else None,
+                )
+                if moment is not None
+            )
+            removed_names[:0] = [
+                notice.athlete_name
+                for notice in departure_notices(
+                    self._session,
+                    league_id=league_id,
+                    round_id=fantasy_round.id,
+                    team_id=fantasy_team_id,
+                )
+                if notice.removed_at > last_saved and notice.athlete_id not in owned_ids
+            ]
         if removed_names:
             issues.insert(
                 0,

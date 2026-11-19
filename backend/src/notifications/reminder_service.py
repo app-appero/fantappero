@@ -1,7 +1,9 @@
 """Lineup deadline reminders: at-risk-of-missing-cutoff teams (EP09-02).
 
 Reminds every fantasy team that has not yet submitted a lineup for a round
-whose cutoff is approaching. Never fires once the round has locked (the
+whose cutoff is approaching, or whose lineup has lost a starter since (a player
+who left the roster is removed and leaves an empty slot, see
+``fantasy_lineups.departures``). Never fires once the round has locked (the
 query only ever looks at ``cutoff_at > now``), and is deduplicated per
 ``(round, team)`` so re-running the periodic task cannot double-send.
 """
@@ -11,12 +13,13 @@ from __future__ import annotations
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from auth.models.user_profile import UserProfile
-from database.enums import FantasyTurnStatus, NotificationCategory
-from fantasy_lineups.models import LineupSubmission
+from database.enums import FantasyTurnStatus, LineupSlotKind, NotificationCategory
+from fantasy_lineups.models import LineupPlayer, LineupSubmission
+from fantasy_lineups.rules import STARTER_COUNT
 from fantasy_teams.models import FantasyTeam
 from fantasy_turns.models import FantasyRound
 from leagues.models.league_membership import LeagueMembership
@@ -65,14 +68,30 @@ class LineupReminderService:
                 continue
 
             team_ids = [team_id for team_id, _, _ in teams]
-            submitted_team_ids = set(
-                self._session.scalars(
-                    select(LineupSubmission.fantasy_team_id).where(
+            # Una formazione a cui manca un titolare (chi è uscito dalla rosa viene tolto e il
+            # suo posto resta vuoto, fantasy_lineups.departures) non è schierata: va ricordata
+            # come una formazione mancante. Una formazione senza nessun giocatore conta come
+            # prima (es. quella vuota creata a fine turno).
+            starters = func.count(LineupPlayer.id).filter(
+                LineupPlayer.slot_kind == LineupSlotKind.STARTER
+            )
+            submitted_team_ids = {
+                team_id
+                for team_id, starter_count, player_count in self._session.execute(
+                    select(
+                        LineupSubmission.fantasy_team_id,
+                        starters,
+                        func.count(LineupPlayer.id),
+                    )
+                    .outerjoin(LineupPlayer, LineupPlayer.submission_id == LineupSubmission.id)
+                    .where(
                         LineupSubmission.round_id == round_.id,
                         LineupSubmission.fantasy_team_id.in_(team_ids),
                     )
+                    .group_by(LineupSubmission.fantasy_team_id)
                 ).all()
-            )
+                if player_count == 0 or starter_count >= STARTER_COUNT
+            }
 
             pending = [row for row in teams if row[0] not in submitted_team_ids]
             if pending:

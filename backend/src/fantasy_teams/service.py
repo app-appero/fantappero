@@ -873,6 +873,7 @@ class FantasyTeamService:
             purchase_credits=purchase_credits,
             source=self._ownership_source(league_access, csv_import=False),
             previous_athlete_id=previous_athlete_id,
+            actor_id=league_access.user.id,
         )
         if ownership.closed is not None:
             self._add_audit(
@@ -985,6 +986,8 @@ class FantasyTeamService:
             self._session,
             fantasy_team_id=team.id,
             slot_index=slot_index,
+            athlete_id=previous_athlete_id,
+            actor_id=league_access.user.id,
         )
         # Svincolare chiunque di quel ruolo (anche un acquisto appena fatto da uno
         # scambio) può liberare la quota per un calciatore dello stesso ruolo
