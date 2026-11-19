@@ -12,6 +12,7 @@ import {
   roleBadgeColors,
 } from "./rosterHelpers";
 import { AthleteName } from "../../athletes/AthleteCard";
+import { filterRosterSlots } from "./listoneFilter";
 import { SwipeHint, SwipeRow } from "./SwipeRow";
 import { rosterStyles as styles } from "./rosterStyles";
 
@@ -259,13 +260,6 @@ export function RosterFilledSummary({
 
   const [query, setQuery] = useState("");
   const [roleFilter, setRoleFilter] = useState<"all" | FantasyRole>("all");
-  const needle = query.trim().toLocaleLowerCase("it-IT");
-  const filterSlots = (slots: RosterSlot[]) =>
-    needle
-      ? slots.filter((slot) =>
-          `${slot.athleteName ?? ""} ${slot.clubName ?? ""}`.toLocaleLowerCase("it-IT").includes(needle),
-        )
-      : slots;
   const counts = viewedTeam.composition?.counts;
   const filledSlotsList = viewedTeam.slots.filter((slot) => slot.athleteId);
   const totalValue = filledSlotsList.reduce((sum, slot) => sum + (slot.purchaseCredits ?? 0), 0);
@@ -352,7 +346,8 @@ export function RosterFilledSummary({
       </ScrollView>
       <View testID="roster-filled-table" style={styles.roleTables}>
         {ROLE_SECTION_ORDER.filter((role) => roleFilter === "all" || roleFilter === role).map((role) => {
-          const slots = filterSlots(filledByRole[role]);
+          // Ricerca senza accenti né maiuscole, come il listone (QA 19/11).
+          const slots = filterRosterSlots(filledByRole[role], query);
           const limit = roleLimit(role);
           return (
             <RosterRoleSection
