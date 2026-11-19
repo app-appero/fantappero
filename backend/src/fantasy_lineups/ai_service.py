@@ -299,6 +299,10 @@ def collect_candidates_for_team(
     starters = _official_starters(session, round_id=round_id)
     form = _recent_form(session, league_id=league_id, athlete_ids=athlete_ids)
     lock_margin = _lineup_lock_margin_for_league(session, league_id=league_id)
+    # Gli override di ruolo decisi a lega avviata valgono dal loro turno: serve il numero di
+    # questo turno (di solito già in sessione, quindi senza query in più).
+    fantasy_round = session.get(FantasyRound, round_id)
+    round_number = fantasy_round.number if fantasy_round is not None else 0
     # Stesso risolutore usato dal percorso umano: tiene conto degli override
     # di ruolo della lega e porta con sé il club di appartenenza.
     effective_roles = resolve_effective_athlete_roles(
@@ -306,6 +310,7 @@ def collect_candidates_for_team(
         league_id=league_id,
         athlete_ids=athlete_ids,
         season_year=season_year,
+        current_round=round_number,
     )
 
     candidates: list[CandidateInput] = []

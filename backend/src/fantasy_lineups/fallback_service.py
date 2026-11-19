@@ -131,11 +131,13 @@ def ensure_lineup_submissions_for_round(
             continue
 
         roster_athlete_ids = [slot.athlete_id for slot in team.slots if slot.athlete_id is not None]
+        # Ruoli di questo turno: gli override decisi a lega avviata valgono dal loro turno.
         effective_roles = resolve_effective_athlete_roles(
             session,
             league_id=league_id,
             athlete_ids=roster_athlete_ids,
             season_year=league.season_year,
+            current_round=fantasy_round.number,
         )
         roles_by_id: dict[str, FantasyRole | None] = {
             str(athlete_id): (
