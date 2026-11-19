@@ -18,6 +18,7 @@ from notifications.templates import render_notification
         ("mercato.asta_live_aggiudicato", {"amount_credits": 5}, "/asta-live"),
         ("mercato.asta_live_sorpassato", {}, "/asta-live"),
         ("mercato.asta_live_scambio_richiesto", {}, "/asta-live"),
+        ("mercato.asta_live_perso", {"reason": "insufficient_credits"}, "/asta-live"),
         ("mercato.asta_live_iniziata", {}, "/asta-live"),
     ],
 )

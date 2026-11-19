@@ -978,7 +978,7 @@ class LiveMarketService:
         if lot is None or not lot_is_expired(lot, now=now):
             return False
         if lot.current_leader_team_id is not None:
-            self._sell_lot(league_access, market_session, lot, now=now)
+            self._sell_lot(league_access, market_session, lot, now=now, automatic=True)
         else:
             self._pass_lot_internal(league_access, market_session, lot, now=now)
         self._session.commit()
@@ -991,7 +991,9 @@ class LiveMarketService:
         lot: MarketLiveLot,
         *,
         now: datetime,
+        automatic: bool = False,
     ) -> None:
+        """Assegna il lotto al capofila; ``automatic`` se lo chiude la scadenza del tempo."""
         league = self._session.get(League, market_session.league_id)
         assert league is not None
         team = self._session.get(FantasyTeam, lot.current_leader_team_id)
@@ -999,19 +1001,25 @@ class LiveMarketService:
 
         account = find_account_for_team(self._session, team.id)
         if account is None or account.balance < lot.current_amount_credits:
-            self._pass_lot_internal(
-                league_access, market_session, lot, now=now, reason="insufficient_credits"
+            self._sell_to_runner_up_or_pass(
+                league_access,
+                market_session,
+                lot,
+                league=league,
+                former_leader=team,
+                now=now,
+                reason="insufficient_credits",
+                automatic=automatic,
             )
             return
 
-        transaction_id = f"market-live:{lot.id}:{team.id}:{lot.athlete_id}"
         slot = assign_winning_bid(
             self._session,
             league=league,
             team=team,
             athlete_id=lot.athlete_id,
             amount_credits=lot.current_amount_credits,
-            transaction_id=transaction_id,
+            transaction_id=self._win_transaction_id(lot, team.id),
             actor_id=league_access.user.id,
         )
         if slot is None:
@@ -1035,10 +1043,17 @@ class LiveMarketService:
                 assert athlete is not None
                 self._notify_pending_swap(lot, team=team, athlete=athlete)
                 return
-            # No same-role player to release either (rare) — a legitimate pass,
-            # not a fatal error (mirrors sealed resolution's own "lost bid" outcome).
-            self._pass_lot_internal(
-                league_access, market_session, lot, now=now, reason="assignment_failed"
+            # Nessun calciatore dello stesso ruolo da liberare (raro): come per i crediti,
+            # il lotto va alla seconda offerta valida e passa solo se non ce n'è nessuna.
+            self._sell_to_runner_up_or_pass(
+                league_access,
+                market_session,
+                lot,
+                league=league,
+                former_leader=team,
+                now=now,
+                reason="assignment_failed",
+                automatic=automatic,
             )
             return
         lot.status = MarketLiveLotStatus.SOLD
@@ -1058,6 +1073,111 @@ class LiveMarketService:
             },
         )
         self._notify_lot_sold(lot, team=team, athlete=athlete)
+
+    @staticmethod
+    def _win_transaction_id(lot: MarketLiveLot, team_id: UUID) -> str:
+        """Una sola chiave per lotto e squadra: l'addebito dell'aggiudicazione non si ripete."""
+        return f"market-live:{lot.id}:{team_id}:{lot.athlete_id}"
+
+    def _sell_to_runner_up_or_pass(
+        self,
+        league_access: LeagueAccess,
+        market_session: MarketSession,
+        lot: MarketLiveLot,
+        *,
+        league: League,
+        former_leader: FantasyTeam,
+        now: datetime,
+        reason: str,
+        automatic: bool,
+    ) -> None:
+        """Il capofila non si può aggiudicare il lotto (crediti, rosa o ruolo).
+
+        Come nell'asta a buste: il calciatore va alla seconda offerta più alta di una squadra
+        che ha crediti e posto, al prezzo di quell'offerta; a parità vince chi ha offerto
+        prima. Il lotto passa solo se nessuno lo può prendere. Il capofila viene avvisato in
+        entrambi i casi. Sulla chiusura automatica il registro non ha un autore (``None``):
+        chi ha solo aperto la schermata non ha deciso nulla.
+        """
+        actor_id = None if automatic else league_access.user.id
+        former_amount = lot.current_amount_credits
+        athlete = self._session.get(Athlete, lot.athlete_id)
+        assert athlete is not None
+        for bid in self._runner_up_bids(lot, exclude_team_id=former_leader.id):
+            team = self._session.get(FantasyTeam, bid.fantasy_team_id)
+            if team is None:
+                continue
+            # Stessi controlli del capofila: crediti per la propria offerta, posto libero e
+            # quota del ruolo. Da seconda offerta non si propone lo scambio, serve un posto.
+            slot = assign_winning_bid(
+                self._session,
+                league=league,
+                team=team,
+                athlete_id=lot.athlete_id,
+                amount_credits=bid.amount_credits,
+                transaction_id=self._win_transaction_id(lot, team.id),
+                actor_id=actor_id,
+            )
+            if slot is None:
+                continue
+            # Capofila e prezzo mostrati devono essere quelli di chi ha preso il calciatore.
+            lot.current_leader_team = team
+            lot.current_amount_credits = bid.amount_credits
+            lot.status = MarketLiveLotStatus.SOLD
+            lot.closed_at = now
+            self._session.flush()
+            self._add_audit(
+                market_session.league_id,
+                actor_id,
+                LeagueAuditAction.MARKET_LIVE_LOT_SOLD,
+                details={
+                    "lotId": str(lot.id),
+                    "athleteId": str(lot.athlete_id),
+                    "fantasyTeamId": str(team.id),
+                    "amountCredits": bid.amount_credits,
+                    "formerLeaderTeamId": str(former_leader.id),
+                    "formerAmountCredits": former_amount,
+                    "reason": reason,
+                },
+            )
+            self._notify_lot_sold(lot, team=team, athlete=athlete)
+            self._notify_lot_lost(
+                lot,
+                team_id=former_leader.id,
+                athlete=athlete,
+                amount_credits=former_amount,
+                reason=reason,
+                reassigned=True,
+            )
+            return
+        self._pass_lot_internal(
+            league_access, market_session, lot, now=now, reason=reason, automatic=automatic
+        )
+        self._notify_lot_lost(
+            lot,
+            team_id=former_leader.id,
+            athlete=athlete,
+            amount_credits=former_amount,
+            reason=reason,
+            reassigned=False,
+        )
+
+    def _runner_up_bids(
+        self, lot: MarketLiveLot, *, exclude_team_id: UUID
+    ) -> list[MarketLiveRaise]:
+        """Ultima offerta di ogni altra squadra sul lotto, dalla più alta (a parità, la prima)."""
+        rows = self._session.scalars(
+            select(MarketLiveRaise)
+            .where(
+                MarketLiveRaise.lot_id == lot.id,
+                MarketLiveRaise.fantasy_team_id != exclude_team_id,
+            )
+            .order_by(MarketLiveRaise.placed_at.asc(), MarketLiveRaise.id.asc())
+        ).all()
+        last_by_team: dict[UUID, MarketLiveRaise] = {}
+        for row in rows:
+            last_by_team[row.fantasy_team_id] = row
+        return sorted(last_by_team.values(), key=lambda row: (-row.amount_credits, row.placed_at))
 
     def _pending_swap_candidates(
         self, league: League, team: FantasyTeam, athlete_id: UUID
@@ -1107,13 +1227,14 @@ class LiveMarketService:
         *,
         now: datetime,
         reason: str | None = None,
+        automatic: bool = False,
     ) -> None:
         lot.status = MarketLiveLotStatus.PASSED
         lot.closed_at = now
         self._session.flush()
         self._add_audit(
             market_session.league_id,
-            league_access.user.id,
+            None if automatic else league_access.user.id,
             LeagueAuditAction.MARKET_LIVE_LOT_PASSED,
             details={"lotId": str(lot.id), "reason": reason},
         )
@@ -1496,7 +1617,7 @@ class LiveMarketService:
     def _add_audit(
         self,
         league_id: UUID,
-        actor_id: UUID,
+        actor_id: UUID | None,
         action: LeagueAuditAction,
         *,
         details: dict[str, object] | None = None,
@@ -1555,6 +1676,35 @@ class LiveMarketService:
                 **self._lot_league_params(lot),
             },
             dedup_key=f"market_live_lot_sold:{lot.id}",
+        )
+
+    def _notify_lot_lost(
+        self,
+        lot: MarketLiveLot,
+        *,
+        team_id: UUID,
+        athlete: Athlete,
+        amount_credits: int,
+        reason: str,
+        reassigned: bool,
+    ) -> None:
+        """Avvisa il capofila che alla chiusura non ha potuto prendere il calciatore."""
+        recipient_id = user_ids_for_teams(self._session, [team_id]).get(team_id)
+        if recipient_id is None:
+            return
+        NotificationService(self._session).create_notification(
+            user_id=recipient_id,
+            category=NotificationCategory.MERCATO,
+            template_key="mercato.asta_live_perso",
+            template_version=1,
+            params={
+                "athlete_name": athlete.canonical_name,
+                "amount_credits": amount_credits,
+                "reason": reason,
+                "reassigned": reassigned,
+                **self._lot_league_params(lot),
+            },
+            dedup_key=f"market_live_lot_lost:{lot.id}:{team_id}",
         )
 
     def _notify_pending_swap(

@@ -13,13 +13,15 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 from tests.integration.database.helpers import create_engine_for_url
 
-from database.enums import FantasyRole, LeagueMemberRole
+from database.enums import FantasyRole, LeagueAuditAction, LeagueMemberRole
 from database.session import create_session_factory
-from fantasy_teams.models import FantasyRosterSlot
+from fantasy_teams.models import CreditLedgerEntry, FantasyRosterSlot
 from leagues.models.competition import Competition
+from leagues.models.league_audit_event import LeagueAuditEvent
 from leagues.models.league_membership import LeagueMembership
 from mail.capture import get_captured_emails
-from market.live_models import MarketLiveLot
+from market.live_models import MarketLiveLot, MarketLiveRaise
+from notifications.models import Notification
 from sports_data.listone.models import RoleAssignment
 from sports_data.roster.models import Athlete
 
@@ -960,3 +962,372 @@ def test_closing_the_market_pauses_the_live_lot_timer(
         f"/leagues/{league_id}/mercato/asta-live/sessioni/{session_id}/stato", headers=headers
     ).json()
     assert state["currentLot"]["status"] == "open"
+
+
+# -- P4 (QA 19/11): capofila che alla chiusura non può pagare -> offerta successiva ---------
+
+
+def _live_base(league_id: str, session_id: str) -> str:
+    return f"/leagues/{league_id}/mercato/asta-live/sessioni/{session_id}"
+
+
+def _place_raise(
+    client: TestClient, token: str, league_id: str, session_id: str, lot_id: str, amount: int
+) -> None:
+    response = client.put(
+        f"{_live_base(league_id, session_id)}/lotti/{lot_id}/rilanci",
+        headers={"Authorization": f"Bearer {token}"},
+        json={"amountCredits": amount},
+    )
+    assert response.status_code == 200, response.json()
+
+
+def _my_team(client: TestClient, token: str, league_id: str) -> dict:
+    rosa = client.get(f"/leagues/{league_id}/rosa", headers={"Authorization": f"Bearer {token}"})
+    assert rosa.status_code == 200
+    return rosa.json()
+
+
+def _admin_adjust_credits(
+    client: TestClient,
+    admin_token: str,
+    league_id: str,
+    team_id: str,
+    amount: int,
+    transaction_id: str,
+) -> None:
+    response = client.post(
+        f"/leagues/{league_id}/amministrazione/crediti/movimenti",
+        headers={"Authorization": f"Bearer {admin_token}"},
+        json={
+            "fantasyTeamId": team_id,
+            "amount": amount,
+            "transactionId": transaction_id,
+            "note": "Correzione di prova",
+        },
+    )
+    assert response.status_code == 200, response.json()
+
+
+def _balance(client: TestClient, token: str, league_id: str) -> int:
+    response = client.get(
+        f"/leagues/{league_id}/crediti", headers={"Authorization": f"Bearer {token}"}
+    )
+    assert response.status_code == 200
+    return response.json()["balance"]
+
+
+def _expire_and_poll(
+    client: TestClient,
+    db_session: Session,
+    token: str,
+    league_id: str,
+    session_id: str,
+    lot_id: str,
+) -> dict:
+    """Fa scadere il lotto e lascia che lo chiuda la prima lettura (chiusura automatica)."""
+    row = db_session.get(MarketLiveLot, UUID(lot_id))
+    assert row is not None
+    row.closes_at = datetime.now(UTC) - timedelta(seconds=1)
+    db_session.commit()
+    headers = {"Authorization": f"Bearer {token}"}
+    state = client.get(f"{_live_base(league_id, session_id)}/stato", headers=headers)
+    assert state.status_code == 200
+    assert state.json()["currentLot"] is None
+    lots = client.get(f"{_live_base(league_id, session_id)}/lotti", headers=headers)
+    assert lots.status_code == 200
+    db_session.expire_all()
+    return next(row for row in lots.json()["lots"] if row["id"] == lot_id)
+
+
+def _notifications(db_session: Session, user_id: UUID, template_key: str) -> list[Notification]:
+    return list(
+        db_session.scalars(
+            select(Notification).where(
+                Notification.user_id == user_id,
+                Notification.template_key == template_key,
+            )
+        ).all()
+    )
+
+
+def _win_ledger_entries(db_session: Session, lot_id: str) -> list[CreditLedgerEntry]:
+    """Addebiti dell'aggiudicazione di questo lotto, su qualunque squadra."""
+    return list(
+        db_session.scalars(
+            select(CreditLedgerEntry).where(
+                CreditLedgerEntry.transaction_id.like(f"market-live:{lot_id}:%")
+            )
+        ).all()
+    )
+
+
+def _lot_audit(
+    db_session: Session, lot_id: str, action: LeagueAuditAction
+) -> list[LeagueAuditEvent]:
+    rows = db_session.scalars(
+        select(LeagueAuditEvent).where(LeagueAuditEvent.action == action)
+    ).all()
+    return [row for row in rows if (row.details or {}).get("lotId") == lot_id]
+
+
+def test_expired_lot_goes_to_runner_up_when_leader_lacks_credits(
+    client: TestClient, db_session: Session, competition_ids: list[str]
+) -> None:
+    """P4: 100 di qa-02, 500 di qa-04, l'amministratore toglie crediti a qa-04, il lotto
+    scade. Il calciatore va a qa-02 a 100, con un solo addebito, ed entrambi vengono avvisati."""
+    admin_token, _ = _register_and_login(client, "live.p4.admin@example.com")
+    second_token, second_id = _register_and_login(client, "live.p4.second@example.com")
+    leader_token, leader_id = _register_and_login(client, "live.p4.leader@example.com")
+    league_id = _create_league(client, admin_token, competition_ids, "Lega P4 Seconda Offerta")
+    _add_member(db_session, league_id, second_id)
+    _add_member(db_session, league_id, leader_id)
+    athlete = _seed_athlete(db_session, _unique_id(), "Calciatore P4")
+    session_id = _start_manual_session(client, admin_token, league_id)
+    lot_id = _nominate(client, admin_token, league_id, session_id, athlete.id)["id"]
+
+    _place_raise(client, second_token, league_id, session_id, lot_id, 100)
+    _place_raise(client, leader_token, league_id, session_id, lot_id, 500)
+    second_team = _my_team(client, second_token, league_id)
+    leader_team = _my_team(client, leader_token, league_id)
+    _admin_adjust_credits(client, admin_token, league_id, leader_team["id"], -600, "p4-addebito")
+    assert _balance(client, leader_token, league_id) == 400
+
+    lot = _expire_and_poll(client, db_session, admin_token, league_id, session_id, lot_id)
+    assert lot["status"] == "sold"
+    assert lot["currentLeaderTeamId"] == second_team["id"]
+    assert lot["currentLeaderTeamName"] == second_team["name"]
+    assert lot["currentAmountCredits"] == 100
+
+    slot = db_session.scalar(
+        select(FantasyRosterSlot).where(FantasyRosterSlot.athlete_id == athlete.id)
+    )
+    assert slot is not None
+    assert str(slot.fantasy_team_id) == second_team["id"]
+    assert slot.purchase_credits == 100
+
+    # Un solo addebito, al vincitore effettivo e al prezzo della sua offerta.
+    assert _balance(client, second_token, league_id) == 900
+    assert _balance(client, leader_token, league_id) == 400
+    assert [entry.amount for entry in _win_ledger_entries(db_session, lot_id)] == [-100]
+
+    won = _notifications(db_session, second_id, "mercato.asta_live_aggiudicato")
+    assert len(won) == 1
+    assert won[0].title == "Lotto aggiudicato"
+    assert "100 crediti" in won[0].body
+    lost = _notifications(db_session, leader_id, "mercato.asta_live_perso")
+    assert len(lost) == 1
+    assert lost[0].title == "Lotto perso: crediti insufficienti"
+    assert "Calciatore P4" in lost[0].body
+    assert lost[0].deep_link == f"/asta-live?lega={league_id}"
+    assert _notifications(db_session, leader_id, "mercato.asta_live_aggiudicato") == []
+
+    sold_events = _lot_audit(db_session, lot_id, LeagueAuditAction.MARKET_LIVE_LOT_SOLD)
+    assert len(sold_events) == 1
+    assert sold_events[0].actor_id is None  # chiusura automatica, non un'azione di chi legge
+    details = sold_events[0].details
+    assert details["fantasyTeamId"] == second_team["id"]
+    assert details["amountCredits"] == 100
+    assert details["formerLeaderTeamId"] == leader_team["id"]
+    assert details["formerAmountCredits"] == 500
+    assert details["reason"] == "insufficient_credits"
+    assert _lot_audit(db_session, lot_id, LeagueAuditAction.MARKET_LIVE_LOT_PASSED) == []
+
+
+def test_runner_up_tie_goes_to_the_earliest_bid(
+    client: TestClient, db_session: Session, competition_ids: list[str]
+) -> None:
+    """Due offerte successive allo stesso importo: vince chi ha offerto prima."""
+    admin_token, _ = _register_and_login(client, "live.p4.tie.admin@example.com")
+    later_token, later_id = _register_and_login(client, "live.p4.tie.later@example.com")
+    earlier_token, earlier_id = _register_and_login(client, "live.p4.tie.earlier@example.com")
+    leader_token, leader_id = _register_and_login(client, "live.p4.tie.leader@example.com")
+    league_id = _create_league(client, admin_token, competition_ids, "Lega P4 Parità")
+    for user_id in (later_id, earlier_id, leader_id):
+        _add_member(db_session, league_id, user_id)
+    athlete = _seed_athlete(db_session, _unique_id(), "Calciatore Parità")
+    session_id = _start_manual_session(client, admin_token, league_id)
+    lot_id = _nominate(client, admin_token, league_id, session_id, athlete.id)["id"]
+
+    later_team = _my_team(client, later_token, league_id)
+    earlier_team = _my_team(client, earlier_token, league_id)
+    leader_team = _my_team(client, leader_token, league_id)
+    _place_raise(client, later_token, league_id, session_id, lot_id, 10)
+    _place_raise(client, leader_token, league_id, session_id, lot_id, 20)
+    # A rilanci non si arriva a due offerte uguali: la seconda si inserisce a mano,
+    # registrata dopo ma datata prima, così l'ordine di inserimento non decide nulla.
+    later_raise = db_session.scalar(
+        select(MarketLiveRaise).where(
+            MarketLiveRaise.lot_id == UUID(lot_id),
+            MarketLiveRaise.fantasy_team_id == UUID(later_team["id"]),
+        )
+    )
+    assert later_raise is not None
+    db_session.add(
+        MarketLiveRaise(
+            lot_id=UUID(lot_id),
+            fantasy_team_id=UUID(earlier_team["id"]),
+            amount_credits=10,
+            placed_at=later_raise.placed_at - timedelta(seconds=5),
+        )
+    )
+    db_session.commit()
+    _admin_adjust_credits(client, admin_token, league_id, leader_team["id"], -995, "p4-pari")
+
+    lot = _expire_and_poll(client, db_session, admin_token, league_id, session_id, lot_id)
+    assert lot["status"] == "sold"
+    assert lot["currentLeaderTeamId"] == earlier_team["id"]
+    assert lot["currentAmountCredits"] == 10
+
+    slot = db_session.scalar(
+        select(FantasyRosterSlot).where(FantasyRosterSlot.athlete_id == athlete.id)
+    )
+    assert slot is not None
+    assert str(slot.fantasy_team_id) == earlier_team["id"]
+    assert _balance(client, earlier_token, league_id) == 990
+    assert _balance(client, later_token, league_id) == 1000
+    assert _balance(client, leader_token, league_id) == 5
+    assert [entry.amount for entry in _win_ledger_entries(db_session, lot_id)] == [-10]
+    assert len(_notifications(db_session, earlier_id, "mercato.asta_live_aggiudicato")) == 1
+    assert _notifications(db_session, later_id, "mercato.asta_live_aggiudicato") == []
+    assert len(_notifications(db_session, leader_id, "mercato.asta_live_perso")) == 1
+
+
+def test_lot_passes_when_no_runner_up_can_be_assigned(
+    client: TestClient, db_session: Session, competition_ids: list[str]
+) -> None:
+    """Nessuna offerta successiva valida (una senza crediti, una senza posto): il lotto passa."""
+    admin_token, _ = _register_and_login(client, "live.p4.none.admin@example.com")
+    poor_token, poor_id = _register_and_login(client, "live.p4.none.poor@example.com")
+    full_token, full_id = _register_and_login(client, "live.p4.none.full@example.com")
+    leader_token, leader_id = _register_and_login(client, "live.p4.none.leader@example.com")
+    league_id = _create_league(client, admin_token, competition_ids, "Lega P4 Nessuno")
+    for user_id in (poor_id, full_id, leader_id):
+        _add_member(db_session, league_id, user_id)
+    # Chi ha i crediti ha già tre portieri: il quarto non entra (e da seconda offerta
+    # non si propone lo scambio, serve un posto libero).
+    _fill_goalkeeper_quota(
+        client, db_session, admin_token, full_token, league_id, seed_offset=_unique_id()
+    )
+    keeper = _seed_athlete(db_session, _unique_id(), "Portiere Conteso", role=FantasyRole.P)
+    session_id = _start_manual_session(client, admin_token, league_id)
+    lot_id = _nominate(client, admin_token, league_id, session_id, keeper.id)["id"]
+
+    poor_team = _my_team(client, poor_token, league_id)
+    leader_team = _my_team(client, leader_token, league_id)
+    _place_raise(client, poor_token, league_id, session_id, lot_id, 10)
+    _place_raise(client, full_token, league_id, session_id, lot_id, 20)
+    _place_raise(client, leader_token, league_id, session_id, lot_id, 30)
+    _admin_adjust_credits(client, admin_token, league_id, poor_team["id"], -995, "p4-poor")
+    _admin_adjust_credits(client, admin_token, league_id, leader_team["id"], -990, "p4-leader")
+    balances_before = {
+        token: _balance(client, token, league_id)
+        for token in (poor_token, full_token, leader_token)
+    }
+
+    lot = _expire_and_poll(client, db_session, admin_token, league_id, session_id, lot_id)
+    assert lot["status"] == "passed"
+    assert (
+        db_session.scalar(
+            select(FantasyRosterSlot).where(FantasyRosterSlot.athlete_id == keeper.id)
+        )
+        is None
+    )
+    assert {
+        token: _balance(client, token, league_id) for token in balances_before
+    } == balances_before
+    assert _win_ledger_entries(db_session, lot_id) == []
+    for user_id in (poor_id, full_id, leader_id):
+        assert _notifications(db_session, user_id, "mercato.asta_live_aggiudicato") == []
+        assert _notifications(db_session, user_id, "mercato.asta_live_scambio_richiesto") == []
+    lost = _notifications(db_session, leader_id, "mercato.asta_live_perso")
+    assert len(lost) == 1
+    assert lost[0].title == "Lotto perso: crediti insufficienti"
+    assert "svincolato" in lost[0].body
+
+    passed_events = _lot_audit(db_session, lot_id, LeagueAuditAction.MARKET_LIVE_LOT_PASSED)
+    assert len(passed_events) == 1
+    assert passed_events[0].actor_id is None  # chiusura automatica
+    assert passed_events[0].details["reason"] == "insufficient_credits"
+    assert _lot_audit(db_session, lot_id, LeagueAuditAction.MARKET_LIVE_LOT_SOLD) == []
+
+
+def test_expired_lot_with_solvent_leader_is_sold_as_before(
+    client: TestClient, db_session: Session, competition_ids: list[str]
+) -> None:
+    """Caso normale invariato: vince il capofila al suo prezzo, nessuno riceve «lotto perso»."""
+    admin_token, admin_id = _register_and_login(client, "live.p4.ok.admin@example.com")
+    second_token, second_id = _register_and_login(client, "live.p4.ok.second@example.com")
+    leader_token, leader_id = _register_and_login(client, "live.p4.ok.leader@example.com")
+    league_id = _create_league(client, admin_token, competition_ids, "Lega P4 Normale")
+    _add_member(db_session, league_id, second_id)
+    _add_member(db_session, league_id, leader_id)
+    athlete = _seed_athlete(db_session, _unique_id(), "Calciatore Normale")
+    session_id = _start_manual_session(client, admin_token, league_id)
+    lot_id = _nominate(client, admin_token, league_id, session_id, athlete.id)["id"]
+
+    _place_raise(client, second_token, league_id, session_id, lot_id, 10)
+    _place_raise(client, leader_token, league_id, session_id, lot_id, 20)
+    leader_team = _my_team(client, leader_token, league_id)
+
+    lot = _expire_and_poll(client, db_session, admin_token, league_id, session_id, lot_id)
+    assert lot["status"] == "sold"
+    assert lot["currentLeaderTeamId"] == leader_team["id"]
+    assert lot["currentAmountCredits"] == 20
+    assert _balance(client, leader_token, league_id) == 980
+    assert _balance(client, second_token, league_id) == 1000
+    assert [entry.amount for entry in _win_ledger_entries(db_session, lot_id)] == [-20]
+    assert len(_notifications(db_session, leader_id, "mercato.asta_live_aggiudicato")) == 1
+    for user_id in (second_id, leader_id):
+        assert _notifications(db_session, user_id, "mercato.asta_live_perso") == []
+
+    sold_events = _lot_audit(db_session, lot_id, LeagueAuditAction.MARKET_LIVE_LOT_SOLD)
+    assert len(sold_events) == 1
+    assert sold_events[0].actor_id == admin_id
+    assert sold_events[0].details == {
+        "lotId": lot_id,
+        "athleteId": str(athlete.id),
+        "fantasyTeamId": leader_team["id"],
+        "amountCredits": 20,
+    }
+
+
+def test_force_sell_falls_back_to_runner_up_with_admin_as_actor(
+    client: TestClient, db_session: Session, competition_ids: list[str]
+) -> None:
+    """«Aggiudica» dell'amministratore: stessa regola, e nel registro l'autore è lui."""
+    admin_token, admin_id = _register_and_login(client, "live.p4.force.admin@example.com")
+    second_token, second_id = _register_and_login(client, "live.p4.force.second@example.com")
+    leader_token, leader_id = _register_and_login(client, "live.p4.force.leader@example.com")
+    league_id = _create_league(client, admin_token, competition_ids, "Lega P4 Aggiudica")
+    _add_member(db_session, league_id, second_id)
+    _add_member(db_session, league_id, leader_id)
+    athlete = _seed_athlete(db_session, _unique_id(), "Calciatore Aggiudicato")
+    session_id = _start_manual_session(client, admin_token, league_id)
+    lot_id = _nominate(client, admin_token, league_id, session_id, athlete.id)["id"]
+
+    _place_raise(client, second_token, league_id, session_id, lot_id, 10)
+    _place_raise(client, leader_token, league_id, session_id, lot_id, 20)
+    second_team = _my_team(client, second_token, league_id)
+    leader_team = _my_team(client, leader_token, league_id)
+    _admin_adjust_credits(client, admin_token, league_id, leader_team["id"], -995, "p4-force")
+
+    sold = client.post(
+        f"{_live_base(league_id, session_id)}/lotti/{lot_id}/aggiudica",
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+    assert sold.status_code == 200
+    body = sold.json()
+    assert body["status"] == "sold"
+    assert body["currentLeaderTeamId"] == second_team["id"]
+    assert body["currentLeaderTeamName"] == second_team["name"]
+    assert body["currentAmountCredits"] == 10
+    assert _balance(client, second_token, league_id) == 990
+    assert _balance(client, leader_token, league_id) == 5
+
+    db_session.expire_all()
+    sold_events = _lot_audit(db_session, lot_id, LeagueAuditAction.MARKET_LIVE_LOT_SOLD)
+    assert len(sold_events) == 1
+    assert sold_events[0].actor_id == admin_id
+    assert sold_events[0].details["formerLeaderTeamId"] == leader_team["id"]
+    assert len(_notifications(db_session, leader_id, "mercato.asta_live_perso")) == 1
