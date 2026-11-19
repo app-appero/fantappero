@@ -1,23 +1,22 @@
-import { lazyStyles } from "../theme/lazyStyles";
-import { getActiveColorScheme, theme } from "@fantappero/ui/theme";
-import { DISPLAY_FONT } from "../theme/fonts";
 import { useNavigation } from "@react-navigation/core";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import { theme } from "@fantappero/ui/theme";
 import { useEffect, useState } from "react";
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { Pressable, StyleSheet, Text, View } from "react-native";
-import { AppTextInput as TextInput } from "../components/AppTextInput";
+import { Pressable, Text, View } from "react-native";
 import { useAuthOptions } from "../auth/useAuthOptions";
 import { useGoogleAuth } from "../auth/useGoogleAuth";
-import { loadMobileEnv } from "../config/env";
 import { AuthShell } from "../auth/AuthShell";
+import { authFormStyles } from "../auth/authFormStyles";
+import { resolveAuthScreenView } from "../auth/authScreenState";
+import { EmailAccessCard } from "../auth/EmailAccessCard";
 import { LoginCards } from "../auth/LoginCards";
-import { LoginShowcase } from "../auth/LoginShowcase";
+import { TesterRequestPanel } from "../auth/TesterRequestPanel";
+import type { TesterGateInfo } from "../auth/testerGate";
 import { UiStatePanel } from "../components/UiStatePanel";
 import type { RootStackParamList } from "../navigation/types";
 import { getApiErrorMessage, useAuthSession } from "../session/DemoSessionContext";
-import { clearLastUser, initialsOf, readLastUser, writeLastUser, type LastUser } from "../session/lastUser";
-import { getMemorySession } from "../session/sessionStorage";
+import { clearLastUser, readLastUser, type LastUser } from "../session/lastUser";
 
 /**
  * Accesso con Apple: per ora nascosto (arriverà con la versione iPhone, Fase 2).
@@ -25,31 +24,27 @@ import { getMemorySession } from "../session/sessionStorage";
  */
 const SHOW_APPLE_SIGN_IN = false;
 
-const { colors, spacing, typography, radius } = theme;
+const { colors } = theme;
 
-function devApiHost(): string {
-  try {
-    return loadMobileEnv().expoPublicApiBaseUrl;
-  } catch {
-    return "EXPO_PUBLIC_API_BASE_URL mancante";
-  }
-}
-
-/** Login — allineato a web /accedi. */
+/**
+ * Login — allineato a web /accedi. Google è l'accesso principale; se il server ha la
+ * registrazione con email attiva, sotto c'è «Continua con email» che apre la scheda
+ * Accedi / Registrati (decisioni in `auth/authScreenState.ts`).
+ */
 export function AuthScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
-  const { login, claimGoogleHandoff } = useAuthSession();
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const { claimGoogleHandoff } = useAuthSession();
   const [error, setError] = useState<string | null>(null);
-  const [submitting, setSubmitting] = useState(false);
   const [googleSubmitting, setGoogleSubmitting] = useState(false);
   const [remembered, setRemembered] = useState<LastUser | null>(null);
+  /** Scelta dell'utente sulla scheda con email: `null` finché non la apre o chiude. */
+  const [expandedChoice, setExpandedChoice] = useState<boolean | null>(null);
+  /** Rifiuto `tester_only` dell'accesso con email: al posto della schermata, la richiesta. */
+  const [testerGate, setTesterGate] = useState<TesterGateInfo | null>(null);
   useEffect(() => {
     void readLastUser().then((last) => {
       if (last) {
         setRemembered(last);
-        setEmail(last.email);
       }
     });
   }, []);
@@ -57,8 +52,6 @@ export function AuthScreen() {
 
   function switchAccount() {
     setRemembered(null);
-    setEmail("");
-    setPassword("");
     setError(null);
     void clearLastUser();
   }
@@ -74,33 +67,25 @@ export function AuthScreen() {
       });
   });
 
-  async function onLogin() {
-    setError(null);
-    if (!email.trim() || !password) {
-      setError("Inserisci email e password.");
-      return;
-    }
-    setSubmitting(true);
-    try {
-      await login(email.trim(), password);
-      const user = getMemorySession()?.user;
-      if (user?.displayName) {
-        void writeLastUser({ displayName: user.displayName, email: email.trim() });
-      }
-    } catch (loginError) {
-      const message = getApiErrorMessage(loginError, "Accesso non riuscito.");
-      // Solo in sviluppo: dice a quale server sta parlando l'app, per capire un «Connessione non disponibile».
-      setError(__DEV__ ? `${message} [API: ${devApiHost()}]` : message);
-    } finally {
-      setSubmitting(false);
-    }
+  // Pilota: con la registrazione con email spenta anche l'accesso è solo con Google.
+  // Finché il server non risponde non si mostra l'email; se la richiesta fallisce nemmeno.
+  const authOptions = useAuthOptions();
+  const view = resolveAuthScreenView({
+    optionsLoaded: authOptions.loaded,
+    emailRegistrationEnabled: authOptions.emailRegistrationEnabled,
+    googleAvailable: googleAuth.available,
+    expandedChoice,
+  });
+  const googleLabel = remembered ? `Continua come ${firstName} con Google` : "Continua con Google";
+
+  if (testerGate) {
+    return (
+      <AuthShell testID="screen-auth" onBack={() => setTesterGate(null)}>
+        <TesterRequestPanel info={testerGate} onBack={() => setTesterGate(null)} />
+      </AuthShell>
+    );
   }
 
-  // Pilota: con la registrazione con email spenta anche l'accesso è solo con Google.
-  // Finché il server non risponde non si mostra il modulo; se la richiesta fallisce sì.
-  const authOptions = useAuthOptions();
-  const showEmailLogin = authOptions.loaded && authOptions.emailRegistrationEnabled;
-  const googleLabel = remembered ? `Continua come ${firstName} con Google` : "Continua con Google";
   return (
     <AuthShell
       testID="screen-auth"
@@ -125,7 +110,7 @@ export function AuthScreen() {
               <Text style={styles.googleMainLabel}>{googleSubmitting ? "Accesso…" : googleLabel}</Text>
             </Pressable>
           ) : null}
-          {googleAuth.available && !showEmailLogin ? (
+          {view.showGoogleNote ? (
             <Text style={[styles.muted, styles.googleNote]}>Entri in un tocco: niente password da ricordare</Text>
           ) : null}
           {__DEV__ && !googleAuth.available ? (
@@ -140,80 +125,37 @@ export function AuthScreen() {
               <Text style={styles.appleLabel}>Continua con Apple</Text>
             </View>
           ) : null}
-          {showEmailLogin ? (
-            <>
-          <View style={styles.orRow}>
-            <View style={styles.orLine} />
-            <Text style={styles.muted}>{remembered ? "oppure con la password" : "oppure con email"}</Text>
-            <View style={styles.orLine} />
-          </View>
-          {remembered ? (
-            <View style={styles.accountRow} testID="auth-account">
-              <View style={styles.accountText}>
-                <Text style={styles.accountCaption}>Account</Text>
-                <Text style={styles.accountEmail} numberOfLines={1}>{remembered.email}</Text>
-              </View>
-              <Pressable accessibilityRole="button" accessibilityLabel="Cambia account" onPress={switchAccount} testID="auth-switch-account">
-                <Text style={styles.link}>Cambia</Text>
-              </Pressable>
+          {view.dividerLabel ? (
+            <View style={styles.orRow} testID="auth-email-divider">
+              <View style={styles.orLine} />
+              <Text style={styles.muted}>{view.dividerLabel}</Text>
+              <View style={styles.orLine} />
             </View>
-          ) : (
-            <View>
-              <Text style={styles.label}>Email</Text>
-              <TextInput
-                value={email}
-                onChangeText={setEmail}
-                autoCapitalize="none"
-                autoCorrect={false}
-                keyboardType="email-address"
-                placeholder="nome@esempio.it"
-                placeholderTextColor={colors.foregroundMuted}
-                style={styles.input}
-                accessibilityLabel="Email"
-                testID="auth-email"
-              />
-            </View>
-          )}
-          <View>
-            <Text style={styles.label}>Password</Text>
-            <TextInput
-              value={password}
-              onChangeText={setPassword}
-              secureTextEntry
-              placeholder="La tua password"
-              placeholderTextColor={colors.foregroundMuted}
-              style={styles.input}
-              accessibilityLabel="Password"
-              testID="auth-password"
-            />
-          </View>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Password dimenticata"
-            onPress={() => navigation.navigate("AuthForgotPassword")}
-            style={styles.rightLink}
-            testID="auth-forgot-link"
-          >
-            <Text style={styles.linkUnderline}>Password dimenticata?</Text>
-          </Pressable>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Accedi"
-            disabled={submitting}
-            onPress={() => void onLogin()}
-            style={[styles.emailButton, submitting && styles.disabled]}
-            testID="auth-login-submit"
-          >
-            <Text style={styles.emailButtonLabel}>
-              {submitting ? "Accesso…" : remembered ? `Accedi come ${firstName}` : "Accedi con email"}
-            </Text>
-          </Pressable>
-          {remembered ? (
-            <Pressable accessibilityRole="button" accessibilityLabel={`Non sei ${firstName}? Cambia account`} onPress={switchAccount} style={styles.centerLink} testID="auth-not-you">
-              <Text style={styles.linkUnderline}>Non sei {firstName}? Cambia account</Text>
+          ) : null}
+          {view.showEmailToggle ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Continua con email"
+              accessibilityState={{ expanded: false }}
+              onPress={() => {
+                setError(null);
+                setExpandedChoice(true);
+              }}
+              style={styles.emailToggle}
+              testID="auth-email-toggle"
+            >
+              <Ionicons name="mail-outline" size={22} color={colors.foreground} />
+              <Text style={styles.emailToggleLabel}>Continua con email</Text>
             </Pressable>
           ) : null}
-            </>
+          {view.showEmailCard ? (
+            <EmailAccessCard
+              remembered={remembered}
+              firstName={firstName}
+              onSwitchAccount={switchAccount}
+              onClose={() => setExpandedChoice(false)}
+              onTesterGate={setTesterGate}
+            />
           ) : null}
           <Pressable
             accessibilityRole="link"
@@ -226,41 +168,11 @@ export function AuthScreen() {
               Accedendo accetti l'<Text style={styles.linkStrong}>informativa privacy</Text>
             </Text>
           </Pressable>
-          {showEmailLogin ? (
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Crea un account"
-              onPress={() => navigation.navigate("AuthRegister")}
-              style={styles.centerLink}
-              testID="auth-register-link"
-            >
-              <Text style={styles.muted}>
-                Nuovo qui? <Text style={styles.linkStrong}>Crea un account</Text>
-              </Text>
-            </Pressable>
-          ) : null}
         </>
       }
     >
       <View testID="screen-auth-form">
-        {!showEmailLogin ? (
-          <LoginCards firstName={remembered ? firstName : undefined} />
-        ) : remembered ? (
-          <View style={styles.hero} testID="auth-welcome">
-            <View style={styles.avatarRing}>
-              <View style={styles.avatarInner}>
-                <Text style={styles.avatarText}>{initialsOf(remembered.displayName)}</Text>
-              </View>
-            </View>
-            <Text style={styles.displayTitle}>Bentornato, {firstName}</Text>
-          </View>
-        ) : (
-          <Text style={styles.displayTitleLeft}>
-            Il fantacalcio{"\n"}che si <Text style={styles.displayAccent}>gioca{"\n"}</Text>
-            <Text style={styles.displayAccent2}>davvero</Text>
-          </Text>
-        )}
-        {showEmailLogin ? <LoginShowcase /> : null}
+        <LoginCards firstName={remembered ? firstName : undefined} compact={!view.showCardsStage} />
         {error ? (
           <UiStatePanel state="error" title="Accesso non riuscito" message={error} testID="auth-error" />
         ) : null}
@@ -269,246 +181,7 @@ export function AuthScreen() {
   );
 }
 
-/** Corpo delle schermate secondarie di accesso dentro AuthShell (verifica email, password). */
-export const authPageStyles = lazyStyles(() => StyleSheet.create({
-  form: { gap: spacing.md },
-}));
-
-export const authFormStyles = lazyStyles(() => StyleSheet.create({
-  googleNote: { textAlign: "center" },
-  root: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
-  brand: {
-    marginBottom: spacing.md,
-  },
-  lead: {
-    color: colors.foregroundMuted,
-    fontSize: typography.fontSize.sm,
-    marginBottom: spacing.md,
-  },
-  label: {
-    marginTop: spacing.sm,
-    color: colors.foregroundMuted,
-    fontSize: typography.fontSize.sm,
-    fontWeight: typography.fontWeight.semibold,
-  },
-  input: {
-    marginTop: spacing.xs,
-    minHeight: 54,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 18,
-    paddingHorizontal: spacing.md + 2,
-    color: colors.foreground,
-    backgroundColor: colors.background,
-  },
-  primaryButton: {
-    marginTop: spacing.md,
-    minHeight: 58,
-    paddingVertical: spacing.md,
-    borderRadius: 20,
-    backgroundColor: colors.brand,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  primaryLabel: {
-    color: colors.onBrand,
-    fontWeight: typography.fontWeight.semibold,
-    fontSize: typography.fontSize.md,
-  },
-  secondaryButton: {
-    marginTop: spacing.sm,
-    minHeight: 44,
-    paddingVertical: spacing.md,
-    borderRadius: radius.pill,
-    borderWidth: 1,
-    borderColor: colors.border,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  secondaryLabel: {
-    color: colors.foreground,
-    fontWeight: typography.fontWeight.semibold,
-    fontSize: typography.fontSize.md,
-  },
-  linkRow: {
-    marginTop: spacing.md,
-    minHeight: 44,
-    justifyContent: "center",
-  },
-  link: {
-    color: colors.accent,
-    fontWeight: typography.fontWeight.semibold,
-    fontSize: typography.fontSize.sm,
-  },
-  muted: {
-    color: colors.foregroundMuted,
-    fontSize: typography.fontSize.sm,
-  },
-  disabled: {
-    opacity: 0.6,
-  },
-  hero: {
-    alignItems: "center",
-    gap: spacing.sm,
-    marginBottom: spacing.md,
-  },
-  avatarRing: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    padding: 4,
-    backgroundColor: colors.accentSecondary,
-  },
-  avatarInner: {
-    flex: 1,
-    borderRadius: 42,
-    backgroundColor: colors.brand,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  avatarText: {
-    color: colors.onBrand,
-    fontSize: 30,
-    fontStyle: "italic",
-    fontWeight: "800",
-  },
-  heroTitle: {
-    color: colors.foreground,
-    fontSize: typography.fontSize.xl,
-    fontStyle: "italic",
-    fontWeight: "800",
-    textTransform: "uppercase",
-    textAlign: "center",
-  },
-  displayTitle: {
-    color: colors.foreground,
-    fontSize: 40,
-    lineHeight: 42,
-    fontFamily: DISPLAY_FONT,
-    textTransform: "uppercase",
-    textAlign: "center",
-  },
-  displayTitleLeft: {
-    color: colors.foreground,
-    fontSize: 46,
-    lineHeight: 48,
-    fontFamily: DISPLAY_FONT,
-    textTransform: "uppercase",
-    marginBottom: spacing.md,
-  },
-  // Tema scuro: i colori chiari dei mockup. Tema chiaro: le varianti scure dello
-  // stesso accento, perché l'azzurro chiaro sull'alone azzurro non si leggeva (QA 18/11).
-  displayAccent: { color: getActiveColorScheme() === "light" ? colors.accent : "#8CA8FF" },
-  displayAccent2: { color: getActiveColorScheme() === "light" ? colors.accentSecondary : "#C58CFF" },
-  googleMain: {
-    minHeight: 58,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: spacing.sm,
-    borderRadius: 20,
-    backgroundColor: "#FFFFFF",
-  },
-  googleMarkMain: {
-    width: 26,
-    height: 26,
-    borderRadius: 13,
-    borderWidth: 1.5,
-    borderColor: "#D9DEEC",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  googleMainLabel: { color: "#11162B", fontWeight: "700", fontSize: typography.fontSize.md },
-  appleDisabled: {
-    minHeight: 58,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: spacing.sm,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.backgroundElevated,
-    opacity: 0.5,
-  },
-  appleGlyph: { color: colors.foreground, fontSize: 20 },
-  appleLabel: { color: colors.foreground, fontWeight: "700", fontSize: typography.fontSize.md },
-  emailButton: {
-    minHeight: 54,
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: 20,
-    borderWidth: 1.5,
-    borderColor: "#7A4DFF",
-    backgroundColor: "rgba(122,77,255,0.12)",
-  },
-  emailButtonLabel: { color: colors.accentSecondary, fontWeight: "700", fontSize: typography.fontSize.md },
-  googleButton: {
-    minHeight: 54,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: spacing.sm,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.backgroundElevated,
-  },
-  googleMark: { width: 24, height: 24, borderRadius: 12, backgroundColor: "#fff", alignItems: "center", justifyContent: "center" },
-  googleMarkLabel: { color: "#4285F4", fontWeight: "800", fontSize: 14 },
-  centerLink: { minHeight: 40, alignItems: "center", justifyContent: "center" },
-  rightLink: { alignSelf: "flex-end", minHeight: 40, justifyContent: "center" },
-  linkUnderline: { color: colors.accent, fontSize: typography.fontSize.sm, textDecorationLine: "underline" },
-  linkStrong: { color: colors.accent, fontWeight: typography.fontWeight.semibold, textDecorationLine: "underline" },
-  stepBadge: {
-    paddingHorizontal: spacing.md,
-    paddingVertical: 6,
-    borderRadius: radius.pill,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.backgroundElevated,
-  },
-  stepBadgeLabel: { color: colors.foregroundMuted, fontSize: 12, fontWeight: "600" },
-  orRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
-  orLine: { flex: 1, height: 1, backgroundColor: colors.border },
-  heroTitleLeft: {
-    color: colors.foreground,
-    fontSize: typography.fontSize.xl,
-    fontStyle: "italic",
-    fontWeight: "800",
-    textTransform: "uppercase",
-    marginBottom: spacing.xs,
-  },
-  accountRow: {
-    marginTop: spacing.sm,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: spacing.md,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.backgroundElevated,
-  },
-  accountText: {
-    flex: 1,
-    minWidth: 0,
-  },
-  accountCaption: {
-    color: colors.foregroundMuted,
-    fontSize: 11,
-    letterSpacing: 1.4,
-    textTransform: "uppercase",
-  },
-  accountEmail: {
-    color: colors.foreground,
-    fontWeight: typography.fontWeight.semibold,
-  },
-}));
+/** Stili condivisi: ora in `auth/authFormStyles.ts`, riesportati per le altre schermate di accesso. */
+export { authFormStyles, authPageStyles } from "../auth/authFormStyles";
 
 const styles = authFormStyles;

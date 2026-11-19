@@ -10,6 +10,7 @@ import type {
   RegisterRequest,
   ResetPasswordRequest,
   SessionUser,
+  TesterRequestBody,
   VerifyEmailRequest,
 } from "@fantappero/contracts";
 import { apiRequest } from "./client";
@@ -25,6 +26,11 @@ export function register(body: RegisterRequest): Promise<AuthMessageResponse> {
 
 export function login(body: LoginRequest): Promise<AuthTokensResponse> {
   return apiRequest<AuthTokensResponse>("/auth/login", { body });
+}
+
+/** Richiesta di accesso al pilota di chi non è tester, con il gettone del rifiuto `tester_only`. */
+export function submitTesterRequest(body: TesterRequestBody): Promise<AuthMessageResponse> {
+  return apiRequest<AuthMessageResponse>("/auth/tester-requests", { body });
 }
 
 export function loginWithGoogle(body: GoogleLoginRequest): Promise<AuthTokensResponse> {

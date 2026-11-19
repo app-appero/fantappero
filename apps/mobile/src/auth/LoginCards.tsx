@@ -7,33 +7,39 @@ const { colors, spacing } = theme;
 
 const TONE: Record<(typeof LOGIN_CARDS)[number]["tone"], string> = { blue: "#1F4FC0", violet: "#5B34B8", pink: "#B82C60" };
 
-/** Accesso solo Google: tre carte giocatore a ventaglio, titolo e sigle dei 5 campionati. */
-export function LoginCards({ firstName }: { firstName?: string }) {
+/**
+ * Accesso: tre carte giocatore a ventaglio, titolo e sigle dei 5 campionati.
+ * `compact` (scheda con email aperta) toglie carte e sigle e lascia il titolo, così il modulo
+ * sta nello schermo di un telefono.
+ */
+export function LoginCards({ firstName, compact = false }: { firstName?: string; compact?: boolean }) {
   return (
     <View style={styles.wrap} testID="login-showcase">
-      <View style={styles.stage} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
-        {LOGIN_CARDS.map((card, index) => (
-          <View key={card.name} style={[styles.card, { backgroundColor: TONE[card.tone] }, CARD_POS[index]]}>
-            <View style={styles.top}>
-              <Text style={styles.vote}>{card.vote}</Text>
-              <View style={styles.code}>
-                <Text style={styles.codeLabel}>{card.code}</Text>
+      {compact ? null : (
+        <View style={styles.stage} accessibilityElementsHidden importantForAccessibility="no-hide-descendants" testID="login-showcase-cards">
+          {LOGIN_CARDS.map((card, index) => (
+            <View key={card.name} style={[styles.card, { backgroundColor: TONE[card.tone] }, CARD_POS[index]]}>
+              <View style={styles.top}>
+                <Text style={styles.vote}>{card.vote}</Text>
+                <View style={styles.code}>
+                  <Text style={styles.codeLabel}>{card.code}</Text>
+                </View>
+              </View>
+              <View style={styles.initialWrap}>
+                <Text style={styles.initial}>{card.name.charAt(0)}</Text>
+              </View>
+              <View style={styles.foot}>
+                <View style={styles.role}>
+                  <Text style={styles.roleLabel}>{card.role}</Text>
+                </View>
+                <Text style={styles.name} numberOfLines={1}>
+                  {card.name}
+                </Text>
               </View>
             </View>
-            <View style={styles.initialWrap}>
-              <Text style={styles.initial}>{card.name.charAt(0)}</Text>
-            </View>
-            <View style={styles.foot}>
-              <View style={styles.role}>
-                <Text style={styles.roleLabel}>{card.role}</Text>
-              </View>
-              <Text style={styles.name} numberOfLines={1}>
-                {card.name}
-              </Text>
-            </View>
-          </View>
-        ))}
-      </View>
+          ))}
+        </View>
+      )}
       <Text style={styles.title}>
         {firstName ? (
           <>
@@ -46,13 +52,15 @@ export function LoginCards({ firstName }: { firstName?: string }) {
         )}
       </Text>
       <Text style={styles.sub}>Serie A, Premier, LaLiga, Bundesliga e Ligue 1 in una sola lega.</Text>
-      <View style={styles.codes}>
-        {LOGIN_SHOWCASE_LEAGUES.map((league) => (
-          <View key={league.code} style={styles.codeChip}>
-            <Text style={styles.codeChipLabel}>{league.code}</Text>
-          </View>
-        ))}
-      </View>
+      {compact ? null : (
+        <View style={styles.codes}>
+          {LOGIN_SHOWCASE_LEAGUES.map((league) => (
+            <View key={league.code} style={styles.codeChip}>
+              <Text style={styles.codeChipLabel}>{league.code}</Text>
+            </View>
+          ))}
+        </View>
+      )}
     </View>
   );
 }
