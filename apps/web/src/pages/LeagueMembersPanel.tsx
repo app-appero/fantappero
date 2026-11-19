@@ -49,6 +49,12 @@ type LeagueMembersPanelProps = {
   search: string;
   /** Capienza regolamento (`participantCount`). */
   participantCount?: number | null;
+  /**
+   * Minimo ammesso per «Partecipanti» (`participantMin`): sotto questa soglia
+   * il server rifiuta il salvataggio, quindi non si suggerisce di scendere lì.
+   * `null` = nessun limite noto, come prima.
+   */
+  participantMin?: number | null;
   /** Incrementato dal parent per ricaricare gli iscritti dopo un invito. */
   reloadToken?: number;
   /** Conteggio iscritti dopo ogni load, per la directory. */
@@ -64,6 +70,7 @@ export function LeagueMembersPanel({
   isDemoMode,
   search,
   participantCount = null,
+  participantMin = null,
   reloadToken = 0,
   onMembersLoaded,
   onMembersChanged,
@@ -298,6 +305,10 @@ export function LeagueMembersPanel({
     }
   }
 
+  // Il server rifiuta «Partecipanti» sotto il minimo (invalid_participant_count):
+  // abbassarlo agli iscritti si suggerisce solo se arrivano almeno al minimo.
+  const canLowerToMembers = participantMin == null || members.length >= participantMin;
+
   async function onAssignRandomRoster(target: LeagueMember) {
     setError(null);
     setSuccess(null);
@@ -387,7 +398,9 @@ export function LeagueMembersPanel({
           title="Numero partecipanti non allineato"
           message={
             members.length < participantCount
-              ? `Servono ancora ${participantCount - members.length} iscritti, oppure abbassa «Partecipanti» nel regolamento a ${members.length} e salva.`
+              ? canLowerToMembers
+                ? `Servono ancora ${participantCount - members.length} iscritti, oppure abbassa «Partecipanti» nel regolamento a ${members.length} e salva.`
+                : `Servono ancora ${participantCount - members.length} iscritti.`
               : `Ci sono più iscritti del previsto: alza «Partecipanti» a ${members.length} e salva, oppure rimuovi i membri in eccesso.`
           }
           testId="league-members-mismatch"

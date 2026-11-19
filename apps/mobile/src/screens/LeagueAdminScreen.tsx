@@ -830,7 +830,11 @@ export function LeagueAdminScreen() {
               title="Numero partecipanti non allineato"
               message={
                 members.length < rules.participantCount
-                  ? `Servono ancora ${rules.participantCount - members.length} iscritti, oppure abbassa «Partecipanti» a ${members.length} e salva.`
+                  ? // Sotto il minimo il server rifiuta «Partecipanti»
+                    // (invalid_participant_count): niente suggerimento di abbassarlo.
+                    rules.participantMin == null || members.length >= rules.participantMin
+                    ? `Servono ancora ${rules.participantCount - members.length} iscritti, oppure abbassa «Partecipanti» a ${members.length} e salva.`
+                    : `Servono ancora ${rules.participantCount - members.length} iscritti.`
                   : `Ci sono più iscritti del previsto: alza «Partecipanti» a ${members.length} e salva.`
               }
               testID="league-members-mismatch"
