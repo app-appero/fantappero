@@ -325,7 +325,7 @@ class LiveMarketService:
             return self._to_session_response(market_session)
         # Un lotto con il tempo finito va chiuso prima di terminare, anche se nessuno ha
         # aperto la schermata di stato (il tick fa commit: si ri-prende il blocco).
-        if self._tick_current_lot(league_access, market_session):
+        if self._tick_current_lot(market_session):
             market_session = self._get_session_for_update(league_access.league.id, session_id)
         open_lot = self._session.scalar(
             select(MarketLiveLot).where(
@@ -399,7 +399,7 @@ class LiveMarketService:
         assert_market_open(league)
         market_session = self._get_session_for_update(league_access.league.id, session_id)
         self._assert_is_live(market_session)
-        self._tick_current_lot(league_access, market_session)
+        self._tick_current_lot(market_session)
         self._assert_window_open(market_session)
         if market_session.status != MarketSessionStatus.OPEN:
             raise ValidationAuthError(
@@ -551,7 +551,7 @@ class LiveMarketService:
         assert_market_open(league)
         market_session = self._find_session(league_access.league.id, session_id)
         self._assert_is_live(market_session)
-        self._tick_current_lot(league_access, market_session)
+        self._tick_current_lot(market_session)
 
         team = self._my_team(league_access)
         # Tolleranza: il lotto già aperto alla fine della sessione si chiude da sé (i rilanci
@@ -631,7 +631,8 @@ class LiveMarketService:
                 code="market_live_lot_no_bids",
             )
         now = datetime.now(UTC)
-        self._sell_lot(league_access, market_session, lot, now=now)
+        # «Aggiudica» è una decisione dell'amministratore: nel registro l'autore è lui.
+        self._sell_lot(market_session, lot, now=now, actor_id=league_access.user.id)
         self._session.commit()
         athlete = self._session.get(Athlete, lot.athlete_id)
         assert athlete is not None
@@ -646,7 +647,7 @@ class LiveMarketService:
         self._assert_is_live(market_session)
         lot = self._get_open_lot_for_update(market_session.id, lot_id)
         now = datetime.now(UTC)
-        self._pass_lot_internal(league_access, market_session, lot, now=now)
+        self._pass_lot_internal(market_session, lot, now=now, actor_id=league_access.user.id)
         self._session.commit()
         athlete = self._session.get(Athlete, lot.athlete_id)
         assert athlete is not None
@@ -840,7 +841,7 @@ class LiveMarketService:
         market_session = self._find_session(league_access.league.id, session_id)
         self._assert_is_live(market_session)
         if market_session.status == MarketSessionStatus.OPEN:
-            if self._tick_current_lot(league_access, market_session):
+            if self._tick_current_lot(market_session):
                 self._session.refresh(market_session)
 
         current_lot = self._session.scalars(
@@ -941,7 +942,7 @@ class LiveMarketService:
     def list_lots(self, league_access: LeagueAccess, session_id: UUID) -> LiveLotListResponse:
         market_session = self._find_session(league_access.league.id, session_id)
         self._assert_is_live(market_session)
-        self._tick_current_lot(league_access, market_session)
+        self._tick_current_lot(market_session)
         rows = self._session.scalars(
             select(MarketLiveLot)
             .options(
@@ -958,11 +959,14 @@ class LiveMarketService:
 
     # -- internal: lazy finalization -------------------------------------------
 
-    def _tick_current_lot(self, league_access: LeagueAccess, market_session: MarketSession) -> bool:
+    def _tick_current_lot(self, market_session: MarketSession) -> bool:
         """Finalize the current lot if its window has passed. Returns True if it did.
 
         A mercato chiuso non si assegna né si addebita nulla: il lotto resta com'è e viene
         chiuso al primo controllo dopo la riapertura (e una lettura non scrive niente).
+
+        La chiusura per scadenza del tempo è automatica: nel registro (e sull'addebito) non ha
+        un autore (``actor_id`` nullo). Chi ha solo aperto la schermata non ha deciso nulla.
         """
         if not read_market_open(self._session, market_session.league_id):
             return False
@@ -978,22 +982,25 @@ class LiveMarketService:
         if lot is None or not lot_is_expired(lot, now=now):
             return False
         if lot.current_leader_team_id is not None:
-            self._sell_lot(league_access, market_session, lot, now=now, automatic=True)
+            self._sell_lot(market_session, lot, now=now, actor_id=None)
         else:
-            self._pass_lot_internal(league_access, market_session, lot, now=now)
+            self._pass_lot_internal(market_session, lot, now=now, actor_id=None)
         self._session.commit()
         return True
 
     def _sell_lot(
         self,
-        league_access: LeagueAccess,
         market_session: MarketSession,
         lot: MarketLiveLot,
         *,
         now: datetime,
-        automatic: bool = False,
+        actor_id: UUID | None,
     ) -> None:
-        """Assegna il lotto al capofila; ``automatic`` se lo chiude la scadenza del tempo."""
+        """Assegna il lotto al capofila.
+
+        ``actor_id`` è chi ha deciso la chiusura («Aggiudica» dell'amministratore), oppure
+        ``None`` quando il lotto lo chiude la scadenza del tempo.
+        """
         league = self._session.get(League, market_session.league_id)
         assert league is not None
         team = self._session.get(FantasyTeam, lot.current_leader_team_id)
@@ -1002,14 +1009,13 @@ class LiveMarketService:
         account = find_account_for_team(self._session, team.id)
         if account is None or account.balance < lot.current_amount_credits:
             self._sell_to_runner_up_or_pass(
-                league_access,
                 market_session,
                 lot,
                 league=league,
                 former_leader=team,
                 now=now,
                 reason="insufficient_credits",
-                automatic=automatic,
+                actor_id=actor_id,
             )
             return
 
@@ -1020,7 +1026,7 @@ class LiveMarketService:
             athlete_id=lot.athlete_id,
             amount_credits=lot.current_amount_credits,
             transaction_id=self._win_transaction_id(lot, team.id),
-            actor_id=league_access.user.id,
+            actor_id=actor_id,
         )
         if slot is None:
             # Budget was fine, so the failure is roster-full or role-quota: offer
@@ -1031,7 +1037,7 @@ class LiveMarketService:
                 self._session.flush()
                 self._add_audit(
                     market_session.league_id,
-                    league_access.user.id,
+                    actor_id,
                     LeagueAuditAction.MARKET_LIVE_LOT_SWAP_PENDING,
                     details={
                         "lotId": str(lot.id),
@@ -1046,14 +1052,13 @@ class LiveMarketService:
             # Nessun calciatore dello stesso ruolo da liberare (raro): come per i crediti,
             # il lotto va alla seconda offerta valida e passa solo se non ce n'è nessuna.
             self._sell_to_runner_up_or_pass(
-                league_access,
                 market_session,
                 lot,
                 league=league,
                 former_leader=team,
                 now=now,
                 reason="assignment_failed",
-                automatic=automatic,
+                actor_id=actor_id,
             )
             return
         lot.status = MarketLiveLotStatus.SOLD
@@ -1063,7 +1068,7 @@ class LiveMarketService:
         assert athlete is not None
         self._add_audit(
             market_session.league_id,
-            league_access.user.id,
+            actor_id,
             LeagueAuditAction.MARKET_LIVE_LOT_SOLD,
             details={
                 "lotId": str(lot.id),
@@ -1081,7 +1086,6 @@ class LiveMarketService:
 
     def _sell_to_runner_up_or_pass(
         self,
-        league_access: LeagueAccess,
         market_session: MarketSession,
         lot: MarketLiveLot,
         *,
@@ -1089,17 +1093,16 @@ class LiveMarketService:
         former_leader: FantasyTeam,
         now: datetime,
         reason: str,
-        automatic: bool,
+        actor_id: UUID | None,
     ) -> None:
         """Il capofila non si può aggiudicare il lotto (crediti, rosa o ruolo).
 
         Come nell'asta a buste: il calciatore va alla seconda offerta più alta di una squadra
         che ha crediti e posto, al prezzo di quell'offerta; a parità vince chi ha offerto
         prima. Il lotto passa solo se nessuno lo può prendere. Il capofila viene avvisato in
-        entrambi i casi. Sulla chiusura automatica il registro non ha un autore (``None``):
-        chi ha solo aperto la schermata non ha deciso nulla.
+        entrambi i casi. Sulla chiusura automatica il registro non ha un autore
+        (``actor_id`` nullo): chi ha solo aperto la schermata non ha deciso nulla.
         """
-        actor_id = None if automatic else league_access.user.id
         former_amount = lot.current_amount_credits
         athlete = self._session.get(Athlete, lot.athlete_id)
         assert athlete is not None
@@ -1150,9 +1153,7 @@ class LiveMarketService:
                 reassigned=True,
             )
             return
-        self._pass_lot_internal(
-            league_access, market_session, lot, now=now, reason=reason, automatic=automatic
-        )
+        self._pass_lot_internal(market_session, lot, now=now, actor_id=actor_id, reason=reason)
         self._notify_lot_lost(
             lot,
             team_id=former_leader.id,
@@ -1221,20 +1222,20 @@ class LiveMarketService:
 
     def _pass_lot_internal(
         self,
-        league_access: LeagueAccess,
         market_session: MarketSession,
         lot: MarketLiveLot,
         *,
         now: datetime,
+        actor_id: UUID | None,
         reason: str | None = None,
-        automatic: bool = False,
     ) -> None:
+        """Il lotto passa invenduto; ``actor_id`` è ``None`` sulla chiusura automatica."""
         lot.status = MarketLiveLotStatus.PASSED
         lot.closed_at = now
         self._session.flush()
         self._add_audit(
             market_session.league_id,
-            None if automatic else league_access.user.id,
+            actor_id,
             LeagueAuditAction.MARKET_LIVE_LOT_PASSED,
             details={"lotId": str(lot.id), "reason": reason},
         )

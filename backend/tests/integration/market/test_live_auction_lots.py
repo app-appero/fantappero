@@ -1283,7 +1283,7 @@ def test_expired_lot_with_solvent_leader_is_sold_as_before(
 
     sold_events = _lot_audit(db_session, lot_id, LeagueAuditAction.MARKET_LIVE_LOT_SOLD)
     assert len(sold_events) == 1
-    assert sold_events[0].actor_id == admin_id
+    assert sold_events[0].actor_id is None  # chiusura automatica, non un'azione di chi legge
     assert sold_events[0].details == {
         "lotId": lot_id,
         "athleteId": str(athlete.id),
@@ -1331,3 +1331,80 @@ def test_force_sell_falls_back_to_runner_up_with_admin_as_actor(
     assert sold_events[0].actor_id == admin_id
     assert sold_events[0].details["formerLeaderTeamId"] == leader_team["id"]
     assert len(_notifications(db_session, leader_id, "mercato.asta_live_perso")) == 1
+
+
+# -- Autore nel registro: chiusura automatica (nessuno) e manuale (l'amministratore) -----------
+
+
+def test_automatic_lot_close_has_no_actor_in_the_audit(
+    client: TestClient, db_session: Session, competition_ids: list[str]
+) -> None:
+    """Il lotto scade e lo chiude la lettura dello stato di un partecipante qualunque:
+    né il «passato» né il «venduto» (né l'addebito) vanno attribuiti a chi ha letto."""
+    admin_token, admin_id = _register_and_login(client, "live.actor.auto.admin@example.com")
+    bidder_token, bidder_id = _register_and_login(client, "live.actor.auto.bidder@example.com")
+    viewer_token, viewer_id = _register_and_login(client, "live.actor.auto.viewer@example.com")
+    league_id = _create_league(client, admin_token, competition_ids, "Lega Autore Automatico")
+    _add_member(db_session, league_id, bidder_id)
+    _add_member(db_session, league_id, viewer_id)
+    unsold = _seed_athlete(db_session, _unique_id(), "Calciatore Senza Offerte")
+    sold = _seed_athlete(db_session, _unique_id(), "Calciatore Venduto Da Solo")
+    session_id = _start_manual_session(client, admin_token, league_id)
+
+    passed_lot_id = _nominate(client, admin_token, league_id, session_id, unsold.id)["id"]
+    lot = _expire_and_poll(client, db_session, viewer_token, league_id, session_id, passed_lot_id)
+    assert lot["status"] == "passed"
+    passed_events = _lot_audit(db_session, passed_lot_id, LeagueAuditAction.MARKET_LIVE_LOT_PASSED)
+    assert len(passed_events) == 1
+    assert passed_events[0].actor_id is None
+
+    sold_lot_id = _nominate(client, admin_token, league_id, session_id, sold.id)["id"]
+    _place_raise(client, bidder_token, league_id, session_id, sold_lot_id, 30)
+    lot = _expire_and_poll(client, db_session, viewer_token, league_id, session_id, sold_lot_id)
+    assert lot["status"] == "sold"
+    sold_events = _lot_audit(db_session, sold_lot_id, LeagueAuditAction.MARKET_LIVE_LOT_SOLD)
+    assert len(sold_events) == 1
+    assert sold_events[0].actor_id is None
+    assert [
+        (entry.amount, entry.actor_id) for entry in _win_ledger_entries(db_session, sold_lot_id)
+    ] == [(-30, None)]
+    assert _balance(client, bidder_token, league_id) == 970
+
+
+def test_manual_pass_and_sell_keep_the_admin_as_actor(
+    client: TestClient, db_session: Session, competition_ids: list[str]
+) -> None:
+    """«Salta» e «Aggiudica» sono decisioni dell'amministratore: nel registro l'autore è lui."""
+    admin_token, admin_id = _register_and_login(client, "live.actor.manual.admin@example.com")
+    bidder_token, bidder_id = _register_and_login(client, "live.actor.manual.bidder@example.com")
+    league_id = _create_league(client, admin_token, competition_ids, "Lega Autore Manuale")
+    _add_member(db_session, league_id, bidder_id)
+    skipped = _seed_athlete(db_session, _unique_id(), "Calciatore Saltato")
+    sold = _seed_athlete(db_session, _unique_id(), "Calciatore Aggiudicato A Mano")
+    session_id = _start_manual_session(client, admin_token, league_id)
+    admin = {"Authorization": f"Bearer {admin_token}"}
+
+    skipped_lot_id = _nominate(client, admin_token, league_id, session_id, skipped.id)["id"]
+    _place_raise(client, bidder_token, league_id, session_id, skipped_lot_id, 10)
+    response = client.post(
+        f"{_live_base(league_id, session_id)}/lotti/{skipped_lot_id}/salta", headers=admin
+    )
+    assert response.status_code == 200
+    assert response.json()["status"] == "passed"
+
+    sold_lot_id = _nominate(client, admin_token, league_id, session_id, sold.id)["id"]
+    _place_raise(client, bidder_token, league_id, session_id, sold_lot_id, 20)
+    response = client.post(
+        f"{_live_base(league_id, session_id)}/lotti/{sold_lot_id}/aggiudica", headers=admin
+    )
+    assert response.status_code == 200
+    assert response.json()["status"] == "sold"
+
+    db_session.expire_all()
+    passed_events = _lot_audit(db_session, skipped_lot_id, LeagueAuditAction.MARKET_LIVE_LOT_PASSED)
+    assert [event.actor_id for event in passed_events] == [admin_id]
+    sold_events = _lot_audit(db_session, sold_lot_id, LeagueAuditAction.MARKET_LIVE_LOT_SOLD)
+    assert [event.actor_id for event in sold_events] == [admin_id]
+    assert [
+        (entry.amount, entry.actor_id) for entry in _win_ledger_entries(db_session, sold_lot_id)
+    ] == [(-20, admin_id)]
