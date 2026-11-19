@@ -77,6 +77,21 @@ export function createNamedLeagueInvite(
   );
 }
 
+/** Revoca un invito nominativo ancora pendente (admin di lega): 200 con stato `revoked`. */
+export function revokeNamedLeagueInvite(
+  accessToken: string,
+  leagueId: string,
+  inviteId: string,
+): Promise<NamedLeagueInvite> {
+  return apiRequest<NamedLeagueInvite>(
+    `/leagues/${leagueId}/amministrazione/inviti-nominativi/${inviteId}`,
+    {
+      method: "DELETE",
+      accessToken,
+    },
+  );
+}
+
 export function fetchReceivedNamedInvites(
   accessToken: string,
 ): Promise<NamedLeagueInvite[]> {

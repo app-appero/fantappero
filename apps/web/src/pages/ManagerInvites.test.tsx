@@ -3,7 +3,8 @@ import { act, createElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
-import { fetchManagerDirectory } from "../api/managerInvites";
+import { ApiError } from "../api/client";
+import { fetchManagerDirectory, revokeNamedLeagueInvite } from "../api/managerInvites";
 import { AuthProvider } from "../auth/AuthContext";
 import { clearStoredSession, saveStoredSession } from "../auth/sessionStorage";
 import { ManagerDirectory } from "../components/ManagerDirectory";
@@ -31,6 +32,7 @@ vi.mock("../api/managerInvites", async (importOriginal) => {
   return {
     ...original,
     fetchManagerDirectory: vi.fn(),
+    revokeNamedLeagueInvite: vi.fn(),
     fetchReceivedNamedInvites: vi.fn(),
     acceptReceivedNamedInvite: vi.fn(),
     declineReceivedNamedInvite: vi.fn(),
@@ -229,6 +231,170 @@ describe("directory fantallenatori", () => {
     });
     host.remove();
     clearStoredSession();
+  });
+});
+
+describe("annulla invito nominativo", () => {
+  const pending: FantasyCoachDirectoryItem = {
+    userId: "user-pending",
+    displayName: "Pina Pendente",
+    avatarUrl: null,
+    userType: "human",
+    availableForInvites: true,
+    namedInviteStatus: "pending",
+    namedInviteId: "invite-1",
+    memberSince: "10/2026",
+    concludedLeagues: 0,
+    bestPosition: null,
+    historySummary: "Nessuna lega conclusa",
+  };
+
+  function page(items: FantasyCoachDirectoryItem[]) {
+    return { items, page: 1, pageSize: 10, total: items.length, totalPages: 1 };
+  }
+
+  async function mountDirectory() {
+    saveStoredSession({
+      accessToken: "token-admin",
+      refreshToken: "refresh-admin",
+      user: { id: "admin-1", displayName: "Admin", globalRole: "member" },
+    });
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+    const root: Root = createRoot(host);
+    await act(async () => {
+      root.render(
+        createElement(MemoryRouter, {
+          initialEntries: ["/lega/amministrazione"],
+          children: createElement(ManagerDirectory, {
+            leagueId: "league-1",
+            isDemoMode: false,
+          }),
+        }),
+      );
+    });
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    return {
+      host,
+      cleanup() {
+        act(() => {
+          root.unmount();
+        });
+        host.remove();
+        clearStoredSession();
+      },
+    };
+  }
+
+  async function click(element: Element | null) {
+    expect(element).not.toBeNull();
+    await act(async () => {
+      (element as HTMLElement).click();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+  }
+
+  it("chiede conferma, revoca l'invito e riporta la riga su «Invita»", async () => {
+    vi.mocked(fetchManagerDirectory).mockReset();
+    vi.mocked(revokeNamedLeagueInvite).mockReset();
+    vi.mocked(fetchManagerDirectory)
+      .mockResolvedValueOnce(page([pending]))
+      .mockResolvedValue(
+        page([{ ...pending, namedInviteStatus: "revoked", namedInviteId: "invite-1" }]),
+      );
+    vi.mocked(revokeNamedLeagueInvite).mockResolvedValue({
+      id: "invite-1",
+      leagueId: "league-1",
+      leagueName: "Lega Test",
+      recipientUserId: "user-pending",
+      recipientDisplayName: "Pina Pendente",
+      recipientUserType: "human",
+      status: "revoked",
+      expiresAt: "2026-12-01T00:00:00Z",
+      respondedAt: null,
+      createdAt: "2026-11-19T00:00:00Z",
+      autoAccepted: false,
+    });
+    const { host, cleanup } = await mountDirectory();
+
+    const invite = host.querySelector('[data-testid="manager-invite-user-pending"]');
+    expect(invite?.textContent).toBe("Già invitato");
+    expect(invite?.hasAttribute("disabled")).toBe(true);
+    const revoke = host.querySelector('[data-testid="manager-revoke-user-pending"]');
+    expect(revoke?.textContent).toBe("Annulla invito");
+
+    // Primo click: solo la finestra di conferma, nessuna chiamata.
+    await click(revoke);
+    expect(host.querySelector('[data-testid="manager-revoke-dialog"]')?.textContent).toContain(
+      "Pina Pendente",
+    );
+    expect(revokeNamedLeagueInvite).not.toHaveBeenCalled();
+
+    await click(host.querySelector('[data-testid="manager-revoke-confirm"]'));
+    expect(revokeNamedLeagueInvite).toHaveBeenCalledTimes(1);
+    expect(revokeNamedLeagueInvite).toHaveBeenCalledWith("token-admin", "league-1", "invite-1");
+    expect(vi.mocked(fetchManagerDirectory).mock.calls.length).toBe(2);
+    expect(host.querySelector('[data-testid="manager-revoke-dialog"]')).toBeNull();
+
+    const after = host.querySelector('[data-testid="manager-invite-user-pending"]');
+    expect(after?.textContent).toBe("Invita");
+    expect(after?.hasAttribute("disabled")).toBe(false);
+    expect(host.querySelector('[data-testid="manager-revoke-user-pending"]')).toBeNull();
+    expect(host.querySelector('[data-testid="manager-directory-success"]')?.textContent).toContain(
+      "Invito annullato",
+    );
+    cleanup();
+  });
+
+  it("chiudendo la conferma non revoca nulla", async () => {
+    vi.mocked(fetchManagerDirectory).mockReset();
+    vi.mocked(revokeNamedLeagueInvite).mockReset();
+    vi.mocked(fetchManagerDirectory).mockResolvedValue(page([pending]));
+    const { host, cleanup } = await mountDirectory();
+
+    await click(host.querySelector('[data-testid="manager-revoke-user-pending"]'));
+    await click(host.querySelector('[data-testid="manager-revoke-cancel"]'));
+    expect(host.querySelector('[data-testid="manager-revoke-dialog"]')).toBeNull();
+    expect(revokeNamedLeagueInvite).not.toHaveBeenCalled();
+    expect(host.querySelector('[data-testid="manager-invite-user-pending"]')?.textContent).toBe(
+      "Già invitato",
+    );
+    cleanup();
+  });
+
+  it("mostra l'errore se l'invito non è più annullabile", async () => {
+    vi.mocked(fetchManagerDirectory).mockReset();
+    vi.mocked(revokeNamedLeagueInvite).mockReset();
+    vi.mocked(fetchManagerDirectory).mockResolvedValue(page([pending]));
+    vi.mocked(revokeNamedLeagueInvite).mockRejectedValue(
+      new ApiError("L'invito non è più revocabile.", 400, "named_invite_not_pending"),
+    );
+    const { host, cleanup } = await mountDirectory();
+
+    await click(host.querySelector('[data-testid="manager-revoke-user-pending"]'));
+    await click(host.querySelector('[data-testid="manager-revoke-confirm"]'));
+    expect(revokeNamedLeagueInvite).toHaveBeenCalledTimes(1);
+    expect(
+      host.querySelector('[data-testid="manager-directory-revoke-error"]')?.textContent,
+    ).toContain("non è più annullabile");
+    expect(host.querySelector('[data-testid="manager-directory-success"]')).toBeNull();
+    cleanup();
+  });
+
+  it("senza id invito (backend precedente) resta solo «Già invitato»", async () => {
+    vi.mocked(fetchManagerDirectory).mockReset();
+    vi.mocked(fetchManagerDirectory).mockResolvedValue(
+      page([{ ...pending, namedInviteId: undefined }]),
+    );
+    const { host, cleanup } = await mountDirectory();
+
+    expect(host.querySelector('[data-testid="manager-invite-user-pending"]')?.textContent).toBe(
+      "Già invitato",
+    );
+    expect(host.querySelector('[data-testid="manager-revoke-user-pending"]')).toBeNull();
+    cleanup();
   });
 });
 

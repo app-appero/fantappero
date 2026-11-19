@@ -4,10 +4,19 @@ import { theme } from "@fantappero/ui/theme";
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useCallback, useEffect, useState } from "react";
-import { Image, Pressable, StyleSheet, Text, View } from "react-native";
+import { Alert, Image, Pressable, StyleSheet, Text, View } from "react-native";
 import { AppTextInput as TextInput } from "./AppTextInput";
 import { ApiError } from "../api/client";
-import { createNamedLeagueInvite, fetchManagerDirectory } from "../api/managerInvites";
+import {
+  createNamedLeagueInvite,
+  fetchManagerDirectory,
+  revokeNamedLeagueInvite,
+} from "../api/managerInvites";
+import {
+  revocableInviteId,
+  revokeInviteConfirmMessage,
+  revokeInviteErrorMessage,
+} from "../leagues/namedInviteHelpers";
 import type { RootStackParamList } from "../navigation/types";
 import { getApiErrorMessage, useAuthSession } from "../session/DemoSessionContext";
 import { resolveAvatarUrl } from "../utils/avatar";
@@ -58,7 +67,8 @@ export function CoachDirectoryPanel({
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [inviteError, setInviteError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
+  const [revokeError, setRevokeError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<{ title: string; message: string } | null>(null);
   const [workingId, setWorkingId] = useState<string | null>(null);
   const [capacityReached, setCapacityReached] = useState(false);
   const [onlyAvailable, setOnlyAvailable] = useState(false);
@@ -86,6 +96,7 @@ export function CoachDirectoryPanel({
       if (!options?.silent) {
         setSuccess(null);
         setInviteError(null);
+        setRevokeError(null);
       }
       if (!can(["league:admin"])) {
         setLoadError("Solo l’amministratore della lega può consultare la directory.");
@@ -162,6 +173,7 @@ export function CoachDirectoryPanel({
 
   async function onInvite(manager: FantasyCoachDirectoryItem) {
     setInviteError(null);
+    setRevokeError(null);
     setSuccess(null);
     if (manager.isSelf || manager.inLeague || manager.emailVerified === false) {
       return;
@@ -184,11 +196,12 @@ export function CoachDirectoryPanel({
     setWorkingId(manager.userId);
     try {
       const created = await createNamedLeagueInvite(accessToken, leagueId, manager.userId);
-      setSuccess(
-        created.autoAccepted
+      setSuccess({
+        title: "Invito nominativo inviato",
+        message: created.autoAccepted
           ? `${manager.displayName} è entrato automaticamente nella lega.`
           : `Invito inviato a ${manager.displayName}.`,
-      );
+      });
       await load({ silent: true });
       if (created.autoAccepted) {
         onMembershipChanged?.();
@@ -200,6 +213,56 @@ export function CoachDirectoryPanel({
         return;
       }
       setInviteError(getApiErrorMessage(error, "Impossibile inviare l'invito."));
+    } finally {
+      setWorkingId(null);
+    }
+  }
+
+  function onRevoke(coach: FantasyCoachDirectoryItem) {
+    const inviteId = revocableInviteId(coach);
+    if (!inviteId) {
+      return;
+    }
+    Alert.alert("Annullare l'invito?", revokeInviteConfirmMessage(coach.displayName), [
+      { text: "Indietro", style: "cancel" },
+      {
+        text: "Annulla invito",
+        style: "destructive",
+        onPress: () => void revoke(coach, inviteId),
+      },
+    ]);
+  }
+
+  async function revoke(coach: FantasyCoachDirectoryItem, inviteId: string) {
+    setInviteError(null);
+    setRevokeError(null);
+    setSuccess(null);
+    if (!accessToken) {
+      setRevokeError("Sessione non disponibile. Accedi di nuovo.");
+      return;
+    }
+    setWorkingId(`revoke-${coach.userId}`);
+    try {
+      await revokeNamedLeagueInvite(accessToken, leagueId, inviteId);
+      // Ricarica dal server: la riga torna su «Invita» e il posto prenotato si libera.
+      await load({ silent: true });
+      setSuccess({
+        title: "Invito annullato",
+        message: `L'invito a ${coach.displayName} è stato annullato: puoi invitarlo di nuovo.`,
+      });
+    } catch (error) {
+      const apiError = error instanceof ApiError ? error : null;
+      if (
+        apiError?.code === "named_invite_not_pending" ||
+        apiError?.code === "named_invite_not_found"
+      ) {
+        // Il fantallenatore ha già risposto (o l'invito è scaduto): riallinea la riga.
+        await load({ silent: true });
+      }
+      setRevokeError(
+        revokeInviteErrorMessage(apiError) ??
+          getApiErrorMessage(error, "Impossibile annullare l'invito."),
+      );
     } finally {
       setWorkingId(null);
     }
@@ -266,8 +329,8 @@ export function CoachDirectoryPanel({
       {success ? (
         <UiStatePanel
           state="success"
-          title="Invito nominativo inviato"
-          message={success}
+          title={success.title}
+          message={success.message}
           testID={`${testIDPrefix}-invite-success`}
         />
       ) : null}
@@ -285,6 +348,14 @@ export function CoachDirectoryPanel({
           title="Invito non riuscito"
           message={inviteError}
           testID={`${testIDPrefix}-invite-error`}
+        />
+      ) : null}
+      {revokeError ? (
+        <UiStatePanel
+          state="error"
+          title="Annullamento non riuscito"
+          message={revokeError}
+          testID={`${testIDPrefix}-revoke-error`}
         />
       ) : null}
       {visibleItems.length === 0 ? (
@@ -324,6 +395,8 @@ export function CoachDirectoryPanel({
                   : pending
                     ? "Già invitato"
                     : "Invita";
+          const revocable = revocableInviteId(coach) !== null;
+          const revoking = workingId === `revoke-${coach.userId}`;
           return (
             <View key={coach.userId} style={styles.card}>
               <Pressable
@@ -372,6 +445,20 @@ export function CoachDirectoryPanel({
               >
                 <Text style={styles.buttonLabel}>{inviteLabel}</Text>
               </Pressable>
+              {revocable ? (
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={`Annulla l'invito a ${coach.displayName}`}
+                  disabled={workingId !== null}
+                  onPress={() => onRevoke(coach)}
+                  style={[styles.secondaryButton, workingId !== null && styles.buttonDisabled]}
+                  testID={`${testIDPrefix}-revoke-${coach.userId}`}
+                >
+                  <Text style={styles.secondaryButtonLabel}>
+                    {revoking ? "Annullamento…" : "Annulla invito"}
+                  </Text>
+                </Pressable>
+              ) : null}
             </View>
           );
         })}
@@ -534,6 +621,19 @@ const styles = lazyStyles(() => StyleSheet.create({
   },
   buttonLabel: {
     color: colors.onBrand,
+    fontWeight: typography.fontWeight.semibold,
+  },
+  secondaryButton: {
+    minHeight: 44,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: spacing.md,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  secondaryButtonLabel: {
+    color: colors.foreground,
     fontWeight: typography.fontWeight.semibold,
   },
   retry: {

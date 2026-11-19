@@ -46,6 +46,11 @@ from observability.context import get_correlation_id
 from observability.metrics import get_metrics
 
 
+def invite_notification_dedup_key(invite_id: UUID) -> str:
+    """Chiave della notifica «Nuovo invito»: una sola per invito, ritrovabile alla revoca."""
+    return f"named_invite:{invite_id}"
+
+
 def directory_invite_status(status: NamedInviteStatus | None) -> str | None:
     """Stato mostrato in directory.
 
@@ -79,17 +84,24 @@ class NamedLeagueInviteService:
         self._check_rate_limit("coach_directory", league_access)
         now = datetime.now(UTC)
         self._expire_pending_for_league(league_access.league.id, now)
-        latest_status = (
-            select(NamedLeagueInvite.status)
-            .where(
-                NamedLeagueInvite.league_id == league_access.league.id,
-                NamedLeagueInvite.recipient_id == User.id,
+
+        def latest_invite(column):
+            # Stesso ordinamento (con spareggio sull'id) per stato e id: i due
+            # campi devono descrivere sempre lo stesso invito.
+            return (
+                select(column)
+                .where(
+                    NamedLeagueInvite.league_id == league_access.league.id,
+                    NamedLeagueInvite.recipient_id == User.id,
+                )
+                .order_by(NamedLeagueInvite.created_at.desc(), NamedLeagueInvite.id.desc())
+                .limit(1)
+                .correlate(User)
+                .scalar_subquery()
             )
-            .order_by(NamedLeagueInvite.created_at.desc())
-            .limit(1)
-            .correlate(User)
-            .scalar_subquery()
-        )
+
+        latest_status = latest_invite(NamedLeagueInvite.status)
+        latest_id = latest_invite(NamedLeagueInvite.id)
         in_league = (
             select(LeagueMembership.user_id)
             .where(
@@ -124,6 +136,7 @@ class NamedLeagueInviteService:
                 User,
                 UserProfile,
                 latest_status.label("invite_status"),
+                latest_id.label("invite_id"),
                 in_league.label("in_league"),
             )
             .outerjoin(UserProfile, UserProfile.user_id == User.id)
@@ -140,7 +153,7 @@ class NamedLeagueInviteService:
         ).all()
         # Storico della sola pagina corrente, in una query: la card vieta
         # esplicitamente l'N+1 sulla preview.
-        histories = load_histories(self._session, user_ids=[user.id for user, _, _, _ in rows])
+        histories = load_histories(self._session, user_ids=[user.id for user, *_ in rows])
         items = [
             FantasyCoachDirectoryItem(
                 userId=str(user.id),
@@ -160,12 +173,17 @@ class NamedLeagueInviteService:
                 emailVerified=user.email_verified_at is not None,
                 isSelf=user.id == league_access.user.id,
                 namedInviteStatus=directory_invite_status(invite_status),
+                # Serve alla UI per «Annulla invito»: segue lo stato mostrato,
+                # quindi è nullo quando lo stato in directory è nullo.
+                namedInviteId=(
+                    str(invite_id) if directory_invite_status(invite_status) is not None else None
+                ),
                 memberSince=seniority_label(user.created_at, now=now),
                 concludedLeagues=histories[user.id].concluded_leagues,
                 bestPosition=histories[user.id].best_position,
                 historySummary=summary_line(histories[user.id]),
             )
-            for user, profile, invite_status, is_member in rows
+            for user, profile, invite_status, invite_id, is_member in rows
         ]
         get_metrics().incr("coach_directory_viewed_total", labels={"result": "success"})
         return FantasyCoachDirectoryResponse(
@@ -399,7 +417,7 @@ class NamedLeagueInviteService:
                     "league_name": league.name,
                     "inviter_name": league_access.user.display_name,
                 },
-                dedup_key=f"named_invite:{invite.id}",
+                dedup_key=invite_notification_dedup_key(invite.id),
             )
         self._session.commit()
         get_metrics().incr(
@@ -495,6 +513,10 @@ class NamedLeagueInviteService:
         if invite is None or invite.league_id != league.id:
             self._fail("Invito non trovato.", "named_invite_not_found", "not_found")
         if invite.status == NamedInviteStatus.REVOKED:
+            # Idempotente: ripulisce anche la notifica di revoche fatte prima
+            # che la revoca la togliesse.
+            if self._withdraw_invite_notification(invite):
+                self._session.commit()
             return self._response(invite, league, invite.recipient)
         if invite.status != NamedInviteStatus.PENDING:
             self._fail("L'invito non è più revocabile.", "named_invite_not_pending", "not_pending")
@@ -507,9 +529,25 @@ class NamedLeagueInviteService:
             LeagueAuditAction.NAMED_INVITE_REVOKED,
             invite,
         )
+        self._withdraw_invite_notification(invite)
         self._session.commit()
         get_metrics().incr("named_invite_revoked_total", labels={"result": "success"})
         return self._response(invite, league, invite.recipient)
+
+    def _withdraw_invite_notification(self, invite: NamedLeagueInvite) -> bool:
+        """Toglie al destinatario la notifica «Nuovo invito» di un invito revocato.
+
+        Il suo link porta a «Inviti ricevuti», dove un invito revocato non
+        compare più: lasciarla in campanella (letta o no) manderebbe a una
+        pagina vuota. Resta nella transazione della revoca.
+        """
+        return (
+            NotificationService(self._session).delete_notification_by_dedup_key(
+                user_id=invite.recipient_id,
+                dedup_key=invite_notification_dedup_key(invite.id),
+            )
+            > 0
+        )
 
     def _respond(
         self,

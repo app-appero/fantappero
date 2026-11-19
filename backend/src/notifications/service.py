@@ -6,7 +6,7 @@ import math
 from datetime import UTC, datetime
 from uuid import UUID
 
-from sqlalchemy import func, select, update
+from sqlalchemy import delete, func, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -262,6 +262,26 @@ class NotificationService:
                 "notifications_read_total", labels={"category": notification.category.value}
             )
         return _to_item(notification)
+
+    def delete_notification_by_dedup_key(self, *, user_id: UUID, dedup_key: str) -> int:
+        """Elimina la notifica di ``user_id`` con questa ``dedup_key``, letta o no.
+
+        Per quando l'oggetto a cui la notifica rimanda non esiste più (es. un
+        invito nominativo revocato) e il suo link porterebbe a una pagina
+        vuota. Nessuna FK punta a ``notifications``: la riga si può togliere
+        senza effetti collaterali. Niente commit: resta nella transazione del
+        chiamante. Restituisce quante righe sono state eliminate (0 o 1).
+        """
+        result = self._session.execute(
+            delete(Notification).where(
+                Notification.user_id == user_id,
+                Notification.dedup_key == dedup_key,
+            )
+        )
+        deleted = result.rowcount or 0
+        if deleted:
+            get_metrics().incr("notifications_withdrawn_total", amount=deleted)
+        return deleted
 
     def mark_all_read(self, *, user_id: UUID) -> MarkAllReadResponse:
         result = self._session.execute(

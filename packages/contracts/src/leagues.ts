@@ -365,6 +365,12 @@ export interface FantasyCoachDirectoryItem {
   emailVerified?: boolean;
   isSelf?: boolean;
   namedInviteStatus: NamedLeagueInviteStatus | null;
+  /**
+   * Id dell'invito a cui si riferisce `namedInviteStatus`, `null` quando lo
+   * stato è `null`. Con stato `pending` serve a «Annulla invito». Facoltativo:
+   * assente sulle fixture demo e sui backend precedenti.
+   */
+  namedInviteId?: string | null;
   /** Anzianità in forma `MM/AAAA`; `null` se sconosciuta (EP13-P06). */
   memberSince: string | null;
   concludedLeagues: number;

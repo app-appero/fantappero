@@ -1,10 +1,11 @@
-import { Badge, Button, Input, Select, UiStatePanel } from "@fantappero/ui";
+import { Badge, Button, Input, Modal, Select, UiStatePanel } from "@fantappero/ui";
 import { useCallback, useEffect, useState } from "react";
 import type { CoachPlacement, FantasyCoachProfile } from "@fantappero/contracts";
 import { formatFantasyPoints } from "@fantappero/contracts";
 import {
   createNamedLeagueInvite,
   fetchManagerDirectory,
+  revokeNamedLeagueInvite,
   type FantasyCoachDirectoryItem,
   type PaginatedFantasyCoachDirectory,
   type UserType,
@@ -227,6 +228,27 @@ function inviteErrorMessage(error: unknown): string {
   return getApiErrorMessage(error, "Impossibile inviare l'invito nominativo.");
 }
 
+function revokeErrorMessage(error: unknown): string {
+  if (error instanceof ApiError) {
+    if (error.status === 403) return "Non hai i permessi per annullare gli inviti di questa lega.";
+    if (error.code === "named_invite_not_pending") {
+      return "L'invito non è più annullabile: il fantallenatore ha già risposto o è scaduto.";
+    }
+    if (error.code === "named_invite_not_found") return "Invito non trovato.";
+  }
+  return getApiErrorMessage(error, "Impossibile annullare l'invito.");
+}
+
+/** «Annulla invito» solo su un invito ancora pendente di cui si conosce l'id (in demo basta lo stato). */
+function canRevokeInvite(manager: FantasyCoachDirectoryItem, isDemoMode: boolean): boolean {
+  return (
+    manager.namedInviteStatus === "pending" &&
+    manager.isSelf !== true &&
+    manager.inLeague !== true &&
+    (isDemoMode || Boolean(manager.namedInviteId))
+  );
+}
+
 function userTypeLabel(userType: UserType): string {
   return userType === "ai" ? "IA" : "Manuale";
 }
@@ -374,8 +396,11 @@ export function ManagerDirectory({
     return null;
   });
   const [inviteError, setInviteError] = useState<string | null>(null);
+  const [revokeError, setRevokeError] = useState<string | null>(null);
   const [workingId, setWorkingId] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
+  const [success, setSuccess] = useState<{ title: string; message: string } | null>(null);
+  // Invito di cui si chiede conferma dell'annullamento (finestra aperta se valorizzato).
+  const [revokeTarget, setRevokeTarget] = useState<FantasyCoachDirectoryItem | null>(null);
   const [capacityReached, setCapacityReached] = useState(isDemoMode && demoState === "capacity");
   const membersFull =
     memberCount != null && participantCount != null && memberCount >= participantCount;
@@ -392,6 +417,7 @@ export function ManagerDirectory({
   const load = useCallback(async () => {
     setSuccess(null);
     setInviteError(null);
+    setRevokeError(null);
     if (isDemoMode) {
       setLoading(demoState === "loading");
       setCapacityReached(demoState === "capacity");
@@ -475,6 +501,7 @@ export function ManagerDirectory({
 
   async function onInvite(manager: FantasyCoachDirectoryItem) {
     setInviteError(null);
+    setRevokeError(null);
     setSuccess(null);
     if (manager.isSelf || manager.inLeague || manager.emailVerified === false) {
       return;
@@ -495,7 +522,10 @@ export function ManagerDirectory({
       return;
     }
     if (isDemoMode) {
-      setSuccess(`Invito inviato a ${manager.displayName} (demo).`);
+      setSuccess({
+        title: "Invito inviato",
+        message: `Invito inviato a ${manager.displayName} (demo).`,
+      });
       setResult((current) =>
         current
           ? {
@@ -516,18 +546,19 @@ export function ManagerDirectory({
     setWorkingId(manager.userId);
     try {
       const created = await createNamedLeagueInvite(session.accessToken, leagueId, manager.userId);
-      setSuccess(
-        created.autoAccepted
+      setSuccess({
+        title: "Invito inviato",
+        message: created.autoAccepted
           ? `${manager.displayName} è entrato automaticamente nella lega.`
           : `Invito inviato a ${manager.displayName}.`,
-      );
+      });
       setResult((current) =>
         current
           ? {
               ...current,
               items: current.items.map((row) =>
                 row.userId === manager.userId
-                  ? { ...row, namedInviteStatus: created.status }
+                  ? { ...row, namedInviteStatus: created.status, namedInviteId: created.id }
                   : row,
               ),
             }
@@ -543,6 +574,64 @@ export function ManagerDirectory({
         return;
       }
       setInviteError(inviteErrorMessage(error));
+    } finally {
+      setWorkingId(null);
+    }
+  }
+
+  async function onConfirmRevoke() {
+    const manager = revokeTarget;
+    if (!manager) {
+      return;
+    }
+    setInviteError(null);
+    setRevokeError(null);
+    setSuccess(null);
+    const revokedMessage = `L'invito a ${manager.displayName} è stato annullato: puoi invitarlo di nuovo.`;
+    if (isDemoMode) {
+      setRevokeTarget(null);
+      setResult((current) =>
+        current
+          ? {
+              ...current,
+              items: current.items.map((row) =>
+                row.userId === manager.userId
+                  ? { ...row, namedInviteStatus: "revoked", namedInviteId: null }
+                  : row,
+              ),
+            }
+          : current,
+      );
+      setSuccess({ title: "Invito annullato", message: `${revokedMessage} (demo)` });
+      return;
+    }
+    const session = loadStoredSession();
+    if (!session?.accessToken) {
+      setRevokeTarget(null);
+      setRevokeError("Sessione non disponibile. Accedi di nuovo.");
+      return;
+    }
+    if (!leagueId || !manager.namedInviteId) {
+      setRevokeTarget(null);
+      return;
+    }
+    setWorkingId(`revoke-${manager.userId}`);
+    try {
+      await revokeNamedLeagueInvite(session.accessToken, leagueId, manager.namedInviteId);
+      setRevokeTarget(null);
+      // Ricarica dal server: la riga torna su «Invita» e il posto prenotato si libera.
+      await load();
+      setSuccess({ title: "Invito annullato", message: revokedMessage });
+    } catch (error) {
+      setRevokeTarget(null);
+      if (
+        error instanceof ApiError &&
+        (error.code === "named_invite_not_pending" || error.code === "named_invite_not_found")
+      ) {
+        // Il fantallenatore ha già risposto (o l'invito è scaduto): riallinea la riga.
+        await load();
+      }
+      setRevokeError(revokeErrorMessage(error));
     } finally {
       setWorkingId(null);
     }
@@ -617,8 +706,8 @@ export function ManagerDirectory({
       {success ? (
         <UiStatePanel
           state="success"
-          title="Invito inviato"
-          message={success}
+          title={success.title}
+          message={success.message}
           testId="manager-directory-success"
         />
       ) : null}
@@ -636,6 +725,14 @@ export function ManagerDirectory({
           title="Invito non riuscito"
           message={inviteError}
           testId="manager-directory-invite-error"
+        />
+      ) : null}
+      {revokeError ? (
+        <UiStatePanel
+          state="error"
+          title="Annullamento non riuscito"
+          message={revokeError}
+          testId="manager-directory-revoke-error"
         />
       ) : null}
       {loading ? (
@@ -681,6 +778,30 @@ export function ManagerDirectory({
               const unverified = manager.emailVerified === false;
               const inviteBlocked =
                 isSelf || inLeague || unverified || unavailable || alreadyInvited || leagueFull;
+              const revocable = Boolean(leagueId) && canRevokeInvite(manager, isDemoMode);
+              const inviteButton = (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={inviteBlocked ? "secondary" : "primary"}
+                  disabled={inviteBlocked}
+                  loading={workingId === manager.userId}
+                  onClick={() => void onInvite(manager)}
+                  data-testid={`manager-invite-${manager.userId}`}
+                >
+                  {isSelf
+                    ? "Sei tu"
+                    : inLeague
+                      ? "Già in lega"
+                      : unverified
+                        ? "Non verificato"
+                        : unavailable
+                          ? "Indisponibile"
+                          : alreadyInvited
+                            ? "Già invitato"
+                            : "Invita"}
+                </Button>
+              );
               return (
                 <li key={manager.userId} className="fa-manager-directory__item">
                   <CoachAvatar
@@ -718,28 +839,26 @@ export function ManagerDirectory({
                       {manager.historySummary}
                     </span>
                   </Link>
-                  {leagueId ? (
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant={inviteBlocked ? "secondary" : "primary"}
-                      disabled={inviteBlocked}
-                      loading={workingId === manager.userId}
-                      onClick={() => void onInvite(manager)}
-                      data-testid={`manager-invite-${manager.userId}`}
-                    >
-                      {isSelf
-                        ? "Sei tu"
-                        : inLeague
-                          ? "Già in lega"
-                          : unverified
-                            ? "Non verificato"
-                            : unavailable
-                              ? "Indisponibile"
-                              : alreadyInvited
-                                ? "Già invitato"
-                                : "Invita"}
-                    </Button>
+                  {revocable ? (
+                    <div className="fa-manager-directory__actions">
+                      {inviteButton}
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        disabled={workingId !== null}
+                        loading={workingId === `revoke-${manager.userId}`}
+                        onClick={() => {
+                          setRevokeError(null);
+                          setRevokeTarget(manager);
+                        }}
+                        data-testid={`manager-revoke-${manager.userId}`}
+                      >
+                        Annulla invito
+                      </Button>
+                    </div>
+                  ) : leagueId ? (
+                    inviteButton
                   ) : (
                     <span className="fa-manager-directory__status">
                       {unavailable ? "Non disponibile" : "Disponibile"}
@@ -774,6 +893,38 @@ export function ManagerDirectory({
           ) : null}
         </>
       ) : null}
+      <Modal
+        open={revokeTarget !== null}
+        onClose={() => setRevokeTarget(null)}
+        title="Annullare l'invito?"
+        footer={
+          <>
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => setRevokeTarget(null)}
+              data-testid="manager-revoke-cancel"
+            >
+              Indietro
+            </Button>
+            <Button
+              type="button"
+              variant="danger"
+              loading={revokeTarget !== null && workingId === `revoke-${revokeTarget.userId}`}
+              onClick={() => void onConfirmRevoke()}
+              data-testid="manager-revoke-confirm"
+            >
+              Annulla invito
+            </Button>
+          </>
+        }
+      >
+        <p data-testid="manager-revoke-dialog">
+          {revokeTarget
+            ? `${revokeTarget.displayName} non vedrà più l'invito tra quelli ricevuti. Potrai invitarlo di nuovo quando vuoi.`
+            : null}
+        </p>
+      </Modal>
     </section>
   );
 }

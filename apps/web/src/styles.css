@@ -589,6 +589,14 @@ a.fa-member-list__identity:focus-visible {
   margin-top: 2px;
 }
 
+/* «Già invitato» + «Annulla invito» affiancati. */
+.fa-manager-directory__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--fa-space-sm);
+}
+
 .fa-manager-directory__pagination {
   display: flex;
   align-items: center;
@@ -1280,6 +1288,7 @@ a.fa-member-list__identity:focus-visible {
   }
 
   .fa-manager-directory__item > .fa-btn,
+  .fa-manager-directory__actions,
   .fa-manager-directory__status {
     grid-column: 1 / -1;
     width: 100%;
@@ -3179,6 +3188,7 @@ h2 {
 }
 
 .fa-manager-directory__list .fa-manager-directory__item > .fa-btn,
+.fa-manager-directory__list .fa-manager-directory__actions,
 .fa-manager-directory__list .fa-manager-directory__status {
   align-self: flex-start;
   margin-top: auto;
