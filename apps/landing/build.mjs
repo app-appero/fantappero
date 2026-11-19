@@ -62,7 +62,12 @@ const lockIcon = (s = 16) =>
 const logo = (s) =>
   `<svg class="logo" width="${s}" height="${s}" viewBox="0 0 64 64" role="img" aria-label="FantApperò"><defs><linearGradient id="lg" x1="0" y1="0" x2="64" y2="64" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#2748d8"/><stop offset="1" stop-color="#6a3fe0"/></linearGradient><clipPath id="lc"><rect width="64" height="64" rx="18"/></clipPath></defs><rect width="64" height="64" rx="18" fill="url(#lg)"/><g opacity=".18" clip-path="url(#lc)"><rect x="0" width="8" height="64" fill="#fff"/><rect x="16" width="8" height="64" fill="#fff"/><rect x="32" width="8" height="64" fill="#fff"/><rect x="48" width="8" height="64" fill="#fff"/></g><path d="M14 52L20.6 12H49L47.5 20.5H29.2L27.8 28.5H41.8L40.6 35.5H26.6L24.2 52Z" fill="#fff"/><circle cx="47" cy="46" r="8.5" fill="#ffd23f"/><path d="M47 42.2L50.7 44.8L49.3 49.1H44.7L43.3 44.8Z" fill="#2748d8"/><path d="M45.5 33L53 27" stroke="#ffd23f" stroke-width="3.6" stroke-linecap="round"/></svg>`;
 
-const FAVICON = `data:image/svg+xml;utf8,${encodeURIComponent(logo(64).replace('class="logo" ', '').replace(/ role="img" aria-label="FantApperò"/, ""))}`;
+// Icona della scheda: file SVG vero con xmlns (senza, i browser non la disegnano), più PNG e ICO
+// per i browser che non usano l'SVG e per chi chiede /favicon.ico.
+const FAVICON_SVG = logo(64)
+  .replace('<svg class="logo" ', '<svg xmlns="http://www.w3.org/2000/svg" ')
+  .replace(/ role="img" aria-label="FantApperò"/, "");
+writeFileSync(new URL("./favicon.svg", OUT), FAVICON_SVG);
 
 const players = PITCH.map(([x, y, name, club, role, tone, cd, locked]) => {
   const label = name;
@@ -132,7 +137,9 @@ const html = `<!doctype html>
 <meta property="og:title" content="FantApperò Calcio · Lavori in corso">
 <meta property="og:description" content="5 campionati, una sola lega. Diventa tester della fase pilota su pilota.fantappero.it.">
 <meta property="og:type" content="website">
-<link rel="icon" href="${FAVICON}">
+<link rel="icon" href="favicon.ico" sizes="any">
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Condensed:ital,wght@1,700;1,800&display=swap">
