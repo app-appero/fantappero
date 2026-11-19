@@ -188,11 +188,13 @@ def _render_mercato_esito_busta(params: NotificationParams) -> NotificationConte
             ),
             deep_link=_league_link(_AUCTION_PATH, params),
         )
-    reason = (
-        "non è stato possibile assegnarlo (crediti insufficienti o rosa non valida)"
-        if params.get("not_assignable")
-        else "offerta inferiore"
-    )
+    if params.get("lost_on_tie"):
+        # Spareggio finito di nuovo in parità: vince l'offerta inviata per prima.
+        reason = "a parità d'importo nello spareggio vince l'offerta inviata per prima"
+    elif params.get("not_assignable"):
+        reason = "non è stato possibile assegnarlo (crediti insufficienti o rosa non valida)"
+    else:
+        reason = "offerta inferiore"
     return NotificationContent(
         title="Busta non aggiudicata",
         body=_league_body(f"Non hai aggiudicato {athlete_name}: {reason}.", params),
@@ -241,11 +243,21 @@ def _render_mercato_asta_live_scambio_richiesto(params: NotificationParams) -> N
 @register_template("mercato.asta_live_perso", 1)
 def _render_mercato_asta_live_perso(params: NotificationParams) -> NotificationContent:
     """Il capofila non ha potuto prendere il calciatore alla chiusura del lotto: il calciatore
-    è andato all'offerta successiva valida (``reassigned``) oppure il lotto è passato."""
+    è andato all'offerta successiva valida (``reassigned``) oppure il lotto è passato.
+
+    Con la rosa al completo il motivo può essere anche lo scambio rifiutato
+    (``swap_declined``) o non scelto prima della fine della sessione (``session_ended``)."""
     athlete_name = params.get("athlete_name", "un giocatore")
-    if params.get("reason") == "assignment_failed":
+    reason = params.get("reason")
+    if reason == "assignment_failed":
         title = "Lotto perso: rosa al completo"
         cause = f"Alla chiusura non c'era posto nella tua rosa per {athlete_name}"
+    elif reason == "swap_declined":
+        title = "Lotto perso: rosa al completo"
+        cause = f"Hai rinunciato allo scambio per {athlete_name} con la rosa al completo"
+    elif reason == "session_ended":
+        title = "Lotto perso: rosa al completo"
+        cause = f"L'asta è terminata prima che scegliessi chi scambiare con {athlete_name}"
     else:
         title = "Lotto perso: crediti insufficienti"
         amount = params.get("amount_credits")
@@ -548,13 +560,20 @@ def _render_lega_attivata(params: NotificationParams) -> NotificationContent:
 
 @register_template("lega.eliminata", 1)
 def _render_lega_eliminata(params: NotificationParams) -> NotificationContent:
-    """La lega è stata eliminata da un operatore."""
+    """La lega è stata eliminata da un operatore o dal suo amministratore."""
     name = params.get("league_name")
+    # «by_league_admin» c'è solo quando l'ha eliminata l'amministratore della lega (QA 19/11);
+    # senza il parametro (eliminazione da operatore) il testo resta «dall'amministrazione».
+    by = (
+        "dall'amministratore della lega"
+        if params.get("by_league_admin")
+        else "dall'amministrazione"
+    )
     return NotificationContent(
         title="Lega eliminata",
-        body=f"La lega {name} è stata eliminata dall'amministrazione."
+        body=f"La lega {name} è stata eliminata {by}."
         if name
-        else "Una tua lega è stata eliminata dall'amministrazione.",
+        else f"Una tua lega è stata eliminata {by}.",
         deep_link="/",
     )
 

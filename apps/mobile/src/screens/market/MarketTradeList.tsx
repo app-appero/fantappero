@@ -16,6 +16,7 @@ import { TRADE_STATUS_COLOR, TRADE_STATUS_LABEL } from "../../market/marketLabel
 import { marketUiStyles as styles } from "../../market/marketUiStyles";
 import type { useTradeFlow } from "../../market/useTradeFlow";
 import { CreditsDirectionField, PickPanel, type CreditsDirection, type TradeAthleteMeta } from "./MarketTradeCreateForm";
+import { TRADE_OFFERED_LABEL, TRADE_REQUESTED_LABEL, tradeExpiryLabel } from "./tradeCardLabels";
 
 type TradeTab = "received" | "sent" | "open" | "all";
 // "accepted" è già uno stato finale (execute_trade sposta subito giocatori e
@@ -256,16 +257,22 @@ export function MarketTradeList({
                     textColor={statusColor.text}
                   />
                 </View>
-                {proposal.expiresAt ? (
-                  <Text style={styles.meta}>
-                    {`Scade il ${new Date(proposal.expiresAt).toLocaleString("it-IT", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}`}
-                  </Text>
-                ) : null}
-                <TradeSide title="Offre" athletes={proposal.offeredAthletes} credits={proposal.offeredCredits} />
+                <Text style={styles.meta} testID={`market-trade-expiry-${proposal.id}`}>
+                  {tradeExpiryLabel(proposal.expiresAt)}
+                </Text>
+                <TradeSide
+                  title={TRADE_OFFERED_LABEL}
+                  athletes={proposal.offeredAthletes}
+                  credits={proposal.offeredCredits}
+                />
                 <View style={styles.swapBadge}>
                   <Text style={styles.swapBadgeLabel}>⇅</Text>
                 </View>
-                <TradeSide title="Chiede" athletes={proposal.requestedAthletes} credits={proposal.requestedCredits} />
+                <TradeSide
+                  title={TRADE_REQUESTED_LABEL}
+                  athletes={proposal.requestedAthletes}
+                  credits={proposal.requestedCredits}
+                />
 
                 {proposal.status === "proposed" && isProposer ? (
                   <Pressable

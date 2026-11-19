@@ -111,6 +111,36 @@ def test_profile_nickname_is_unique_and_used_as_public_name(client: TestClient) 
     assert client.get("/auth/me", headers=first_headers).json()["displayName"] == "Luca Bianchi"
 
 
+def test_profile_nickname_rejects_cyrillic_lookalike_of_another_nickname(
+    client: TestClient,
+) -> None:
+    """QA 19/11: «qa07nick1119» con la «a» cirillica (U+0430) passava per un nickname diverso."""
+    owner = _register_and_login(client, "qa07.nick@example.com", "Qa Sette")
+    impostor = _register_and_login(client, "qa06.nick@example.com", "Qa Sei")
+    owner_headers = {"Authorization": f"Bearer {owner['access']}"}
+    impostor_headers = {"Authorization": f"Bearer {impostor['access']}"}
+
+    saved = client.patch("/profile/me", headers=owner_headers, json={"nickname": "qa07nick1119"})
+    assert saved.status_code == 200, saved.text
+
+    cyrillic = client.patch(
+        "/profile/me", headers=impostor_headers, json={"nickname": "q\u043007nick1119"}
+    )
+    assert cyrillic.status_code == 400, cyrillic.text
+    assert cyrillic.json()["code"] == "invalid_nickname"
+    greek = client.patch(
+        "/profile/me", headers=impostor_headers, json={"nickname": "qa07nick111\u03b9"}
+    )
+    assert greek.status_code == 400, greek.text
+    assert greek.json()["code"] == "invalid_nickname"
+    assert client.get("/profile/me", headers=impostor_headers).json()["nickname"] is None
+
+    # Le lettere latine accentate restano valide.
+    accented = client.patch("/profile/me", headers=impostor_headers, json={"nickname": "Niccolò"})
+    assert accented.status_code == 200, accented.text
+    assert accented.json()["nickname"] == "Niccolò"
+
+
 def test_profile_requires_authentication(client: TestClient) -> None:
     response = client.get("/profile/me")
     assert response.status_code == 401

@@ -231,6 +231,10 @@ class FantasyCoachDirectoryItem(ApiModel):
     named_invite_status: Literal["pending", "accepted", "declined", "revoked", "expired"] | None = (
         Field(default=None, alias="namedInviteStatus")
     )
+    # Id dell'invito a cui si riferisce `namedInviteStatus` (nullo quando lo
+    # stato è nullo): con stato `pending` permette all'admin di revocarlo.
+    # Facoltativo, per non rompere i client che non lo conoscono.
+    named_invite_id: str | None = Field(default=None, alias="namedInviteId")
     # Preview storico (EP13-P06): solo fatti osservabili. `None` quando il
     # dato non esiste — non va reso come zero.
     member_since: str | None = Field(default=None, alias="memberSince")

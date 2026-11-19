@@ -75,10 +75,15 @@ from sports_data.roster.models import Athlete
 
 logger = get_logger(__name__)
 
-# Parity rule for the initial auction is an open decision in the functional spec
-# (Doc §20 "Parità nell'asta iniziale e nello spareggio mercato"). Default: reopen a
-# 24h tiebreak session scoped to the tied teams and the contested athlete.
+# Regola di parità (Doc §20 "Parità nell'asta iniziale e nello spareggio mercato"), decisa da
+# Rosario il 19/11, uguale per buste e svincolati: la parità sull'offerta più alta apre UN SOLO
+# spareggio di 24 ore, riservato alle squadre in parità e al calciatore conteso. Se anche lo
+# spareggio finisce in parità non se ne apre un altro: il calciatore va all'offerta in parità
+# inviata per prima (conta l'ultimo invio; a pari orario decide l'id dell'offerta). Se quella
+# non si può assegnare (crediti, rosa o ruolo) si passa alla successiva in parità, poi alle
+# offerte più basse come in ogni risoluzione. Senza offerte nello spareggio non si assegna nulla.
 TIEBREAK_WINDOW = timedelta(hours=24)
+TIEBREAK_RULE_FIRST_BID = "first_bid"
 
 
 MAX_SLOT_INDEX = 1000  # oltre non esiste nessuna rosa: evita int fuori range nel database
@@ -317,6 +322,9 @@ class MarketService:
     ) -> MarketResolutionResponse:
         """Resolve a closed session: highest bid wins, ties reopen a tiebreak session.
 
+        Lo spareggio è uno solo: una nuova parità dentro lo spareggio va all'offerta in
+        parità inviata per prima (vedi ``TIEBREAK_WINDOW``), senza aprire altre sessioni.
+
         Atomic and idempotent: replaying against an already-resolved session just
         returns the persisted outcome without recomputing or re-charging anyone.
         """
@@ -353,10 +361,15 @@ class MarketService:
         for bid in bids:
             by_athlete.setdefault(bid.athlete_id, []).append(bid)
 
+        is_tiebreak = market_session.parent_session_id is not None
         candidates: list[MarketBid] = []
         tie_groups: dict[UUID, list[MarketBid]] = {}
+        # Parità dentro uno spareggio: non si riapre nulla, decide l'ordine d'invio.
+        repeated_ties: dict[UUID, list[MarketBid]] = {}
         for athlete_id, group in by_athlete.items():
-            group.sort(key=lambda row: (-row.amount_credits, row.submitted_at))
+            # A parità d'importo vale l'orario d'invio (aggiornato a ogni nuovo invio), poi l'id:
+            # l'ordine è sempre lo stesso, anche con due offerte arrivate nello stesso istante.
+            group.sort(key=lambda row: (-row.amount_credits, row.submitted_at, row.id))
             top_amount = group[0].amount_credits
             top_bids = [row for row in group if row.amount_credits == top_amount]
             for loser in group:
@@ -364,6 +377,8 @@ class MarketService:
                     loser.status = MarketBidStatus.LOST
             if len(top_bids) == 1:
                 candidates.append(top_bids[0])
+            elif is_tiebreak:
+                repeated_ties[athlete_id] = top_bids
             else:
                 tie_groups[athlete_id] = top_bids
 
@@ -424,6 +439,39 @@ class MarketService:
                 if try_assign(runner_up):
                     break
 
+        # Spareggio finito di nuovo in parità (regola "first_bid"): si prova l'offerta in parità
+        # inviata per prima, poi le altre in parità nello stesso ordine, poi le offerte più basse.
+        # Chi resta fuori perché un'offerta uguale è arrivata prima lo dice la notifica.
+        lost_on_tie_bid_ids: set[UUID] = set()
+        tiebreak_results: list[dict[str, object]] = []
+        for athlete_id, tied_bids in repeated_ties.items():
+            winner: MarketBid | None = None
+            for bid in tied_bids:
+                if try_assign(bid):
+                    winner = bid
+                    break
+                unassignable_bid_ids.add(bid.id)
+            for bid in tied_bids:
+                if bid.status == MarketBidStatus.SUBMITTED:
+                    bid.status = MarketBidStatus.LOST
+                    lost_on_tie_bid_ids.add(bid.id)
+            if winner is None:
+                tied_ids = {bid.id for bid in tied_bids}
+                for runner_up in by_athlete[athlete_id]:
+                    if runner_up.id in tied_ids or runner_up.status != MarketBidStatus.LOST:
+                        continue
+                    if try_assign(runner_up):
+                        winner = runner_up
+                        break
+            tiebreak_results.append(
+                {
+                    "athleteId": str(athlete_id),
+                    "tiedAmountCredits": tied_bids[0].amount_credits,
+                    "teamIds": [str(bid.fantasy_team_id) for bid in tied_bids],
+                    "winnerTeamId": str(winner.fantasy_team_id) if winner is not None else None,
+                }
+            )
+
         tiebreak_count = 0
         for athlete_id, tied_bids in tie_groups.items():
             for bid in tied_bids:
@@ -458,23 +506,26 @@ class MarketService:
 
         bidder_user_ids = user_ids_for_teams(self._session, (bid.fantasy_team_id for bid in bids))
         notifications = NotificationService(self._session)
-        # Spareggio "orfano": il calciatore conteso è finito nel frattempo a un'altra squadra.
-        cancelled_tiebreak_athletes: set[UUID] = set()
-        if market_session.parent_session_id is not None:
-            owned = {
-                row.athlete_id: row.fantasy_team_id
-                for row in self._session.execute(
-                    select(FantasyRosterSlot.athlete_id, FantasyRosterSlot.fantasy_team_id).where(
-                        FantasyRosterSlot.league_id == market_session.league_id,
-                        FantasyRosterSlot.athlete_id.in_({bid.athlete_id for bid in bids}),
-                    )
-                ).all()
-            }
-            bidder_teams = {bid.fantasy_team_id for bid in bids}
-            cancelled_tiebreak_athletes = {
-                athlete_id for athlete_id, team_id in owned.items() if team_id not in bidder_teams
-            }
+        # Spareggio "orfano": il calciatore conteso è finito nel frattempo in una rosa (per
+        # esempio assegnato a mano dall'amministratore) e nessuna offerta dello spareggio l'ha
+        # vinto. Si guarda sempre il calciatore dello spareggio, anche se nessuno ha offerto.
+        target_athlete_id = market_session.target_athlete_id
+        tiebreak_owner_team_id: UUID | None = None
+        tiebreak_cancelled = False
+        if is_tiebreak and target_athlete_id is not None:
+            tiebreak_owner_team_id = self._session.scalar(
+                select(FantasyRosterSlot.fantasy_team_id).where(
+                    FantasyRosterSlot.league_id == market_session.league_id,
+                    FantasyRosterSlot.athlete_id == target_athlete_id,
+                )
+            )
+            tiebreak_cancelled = tiebreak_owner_team_id is not None and not any(
+                bid.athlete_id == target_athlete_id and bid.status == MarketBidStatus.WON
+                for bid in bids
+            )
         for bid in bids:
+            if tiebreak_cancelled and bid.athlete_id == target_athlete_id:
+                continue  # l'annullamento si comunica sotto, una volta per squadra in parità
             # Le offerte in parità (EXPIRED) vanno allo spareggio: anche loro vanno avvisate.
             if bid.status not in (
                 MarketBidStatus.WON,
@@ -501,38 +552,99 @@ class MarketService:
                     "athlete_name": bid.athlete.canonical_name,
                     "amount_credits": bid.amount_credits,
                     "not_assignable": bid.id in unassignable_bid_ids,
-                    "tiebreak_cancelled": bid.athlete_id in cancelled_tiebreak_athletes,
+                    "lost_on_tie": bid.id in lost_on_tie_bid_ids,
                     **league_params(self._session, market_session.league_id),
                 },
                 dedup_key=f"market_bid_outcome:{bid.id}",
+            )
+        if tiebreak_cancelled:
+            self._notify_tiebreak_cancelled(
+                notifications, market_session, owner_team_id=tiebreak_owner_team_id
             )
 
         market_session.status = MarketSessionStatus.RESOLVED
         market_session.resolved_at = now
         self._session.flush()
+        # Tutte le assegnazioni, anche quelle andate a un'offerta successiva o decise dalla
+        # regola dello spareggio: lo storico mostra l'evento alle squadre vincitrici.
+        won_bids = sorted(
+            (bid for bid in bids if bid.status == MarketBidStatus.WON),
+            key=lambda row: (-row.amount_credits, row.submitted_at, row.id),
+        )
         winners = [
             {
                 "fantasyTeamId": str(bid.fantasy_team_id),
                 "athleteId": str(bid.athlete_id),
                 "amountCredits": bid.amount_credits,
             }
-            for bid in candidates
-            if bid.status == MarketBidStatus.WON
+            for bid in won_bids
         ]
+        resolution_details: dict[str, object] = {
+            "sessionId": str(market_session.id),
+            "assigned": len(winners),
+            "tiebreaksOpened": tiebreak_count,
+            "winners": winners,
+        }
+        if tiebreak_results:
+            resolution_details["tiebreakRule"] = TIEBREAK_RULE_FIRST_BID
+            resolution_details["tiebreakResults"] = tiebreak_results
+        if tiebreak_cancelled:
+            resolution_details["tiebreakCancelled"] = True
         self._add_audit(
             league.id,
             league_access.user.id,
             LeagueAuditAction.MARKET_SESSION_RESOLVED,
-            details={
-                "sessionId": str(market_session.id),
-                "assigned": len(winners),
-                "tiebreaksOpened": tiebreak_count,
-                "winners": winners,
-            },
+            details=resolution_details,
         )
         self._session.commit()
         get_metrics().incr("market_session_resolved_total")
         return self._resolution_summary(market_session)
+
+    def _notify_tiebreak_cancelled(
+        self,
+        notifications: NotificationService,
+        market_session: MarketSession,
+        *,
+        owner_team_id: UUID | None,
+    ) -> None:
+        """Avviso «Spareggio annullato» a ogni squadra ammessa allo spareggio, abbia offerto o no.
+
+        Non lo riceve la squadra che ora ha il calciatore (se era fra quelle in parità).
+        """
+        team_ids: list[UUID] = []
+        for raw_team_id in market_session.eligible_team_ids or []:
+            try:
+                team_id = UUID(str(raw_team_id))
+            except ValueError:
+                continue
+            if team_id != owner_team_id and team_id not in team_ids:
+                team_ids.append(team_id)
+        if not team_ids:
+            return
+        athlete = (
+            self._session.get(Athlete, market_session.target_athlete_id)
+            if market_session.target_athlete_id is not None
+            else None
+        )
+        recipients = user_ids_for_teams(self._session, team_ids)
+        params = {
+            "outcome": "lost",
+            "athlete_name": athlete.canonical_name if athlete is not None else "un giocatore",
+            "tiebreak_cancelled": True,
+            **league_params(self._session, market_session.league_id),
+        }
+        for team_id in team_ids:
+            recipient_id = recipients.get(team_id)
+            if recipient_id is None:
+                continue
+            notifications.create_notification(
+                user_id=recipient_id,
+                category=NotificationCategory.MERCATO,
+                template_key="mercato.esito_busta",
+                template_version=1,
+                params=params,
+                dedup_key=f"market_tiebreak_cancelled:{market_session.id}:{team_id}",
+            )
 
     def _resolution_summary(self, market_session: MarketSession) -> MarketResolutionResponse:
         bids = self._session.scalars(

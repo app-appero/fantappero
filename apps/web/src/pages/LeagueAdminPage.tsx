@@ -708,6 +708,7 @@ export function LeagueAdminPage() {
                       isDemoMode={isDemoMode}
                       search={search}
                       participantCount={rules.participantCount}
+                      participantMin={rules.participantMin}
                       reloadToken={membersReloadToken}
                       onMembersLoaded={setMemberCount}
                       onMembersChanged={refreshAfterMembershipChange}

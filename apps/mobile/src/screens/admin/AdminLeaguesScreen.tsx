@@ -1,13 +1,14 @@
-import type { PaginatedAdminLeagues } from "@fantappero/contracts";
+import type { AdminLeague, PaginatedAdminLeagues } from "@fantappero/contracts";
 import { theme } from "@fantappero/ui/theme";
 import { useCallback, useEffect, useState } from "react";
-import { Pressable, Text, View } from "react-native";
+import { Alert, Pressable, Text, View } from "react-native";
 import { AppTextInput as TextInput } from "../../components/AppTextInput";
-import { fetchAdminLeagues } from "../../api/admin";
+import { deleteAdminLeague, fetchAdminLeagues } from "../../api/admin";
 import { ApiError } from "../../api/client";
 import { adminUiStyles as styles } from "../../admin/adminUiStyles";
 import { UiStatePanel } from "../../components/UiStatePanel";
 import { PageContainer } from "../../layout/PageContainer";
+import { leagueStateLabel } from "../../leagues/leagueLabels";
 import { getApiErrorMessage, useAuthSession } from "../../session/DemoSessionContext";
 
 /** Elenco leghe globale — mobile port of `apps/web/src/pages/AdminLeaguesPage.tsx` (EP11-04a). */
@@ -75,6 +76,53 @@ export function AdminLeaguesScreen() {
     }
   }, [load]);
 
+  // Eliminazione di una lega (come AdminLeaguesPage del web): conferma, DELETE, ricarica.
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [actionSuccess, setActionSuccess] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+
+  const deleteLeague = useCallback(
+    async (league: AdminLeague) => {
+      if (!accessToken) {
+        setActionError("Sessione non disponibile. Accedi di nuovo.");
+        return;
+      }
+      setDeletingId(league.id);
+      setActionSuccess(null);
+      setActionError(null);
+      try {
+        await deleteAdminLeague(accessToken, league.id);
+        setActionSuccess(`Lega "${league.name}" eliminata. Gli allenatori sono stati avvisati.`);
+        await load({ silent: true });
+      } catch (deleteError) {
+        if (deleteError instanceof ApiError && deleteError.status === 403) {
+          setActionError("Non hai i permessi per eliminare le leghe.");
+        } else {
+          setActionError(getApiErrorMessage(deleteError, "Impossibile eliminare la lega."));
+        }
+      } finally {
+        setDeletingId(null);
+      }
+    },
+    [accessToken, load],
+  );
+
+  const confirmDelete = useCallback(
+    (league: AdminLeague) => {
+      setActionSuccess(null);
+      setActionError(null);
+      Alert.alert(
+        "Eliminare la lega?",
+        `Eliminare definitivamente la lega "${league.name}"? Gli allenatori riceveranno una notifica. L'azione non è reversibile.`,
+        [
+          { text: "Annulla", style: "cancel" },
+          { text: "Elimina", style: "destructive", onPress: () => void deleteLeague(league) },
+        ],
+      );
+    },
+    [deleteLeague],
+  );
+
   return (
     <PageContainer
       title="Leghe"
@@ -92,6 +140,22 @@ export function AdminLeaguesScreen() {
         testID="admin-leagues-query"
       />
 
+      {actionSuccess ? (
+        <UiStatePanel
+          state="success"
+          title="Lega eliminata"
+          message={actionSuccess}
+          testID="admin-leagues-action-success"
+        />
+      ) : null}
+      {actionError ? (
+        <UiStatePanel
+          state={actionError.includes("permessi") ? "forbidden" : "error"}
+          title="Eliminazione non riuscita"
+          message={actionError}
+          testID="admin-leagues-action-error"
+        />
+      ) : null}
       {loading ? (
         <UiStatePanel
           state="loading"
@@ -121,8 +185,24 @@ export function AdminLeaguesScreen() {
           {result.items.map((league) => (
             <View key={league.id} style={styles.listRow} testID={`admin-league-${league.id}`}>
               <Text style={styles.name}>{league.name}</Text>
-              <Text style={styles.meta}>{league.state}</Text>
+              <Text style={styles.meta} testID={`admin-league-state-${league.id}`}>
+                {leagueStateLabel(league.state)}
+              </Text>
               <Text style={styles.meta}>{league.ownerDisplayName ?? "—"}</Text>
+              <View style={styles.rowActions}>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={`Elimina la lega ${league.name}`}
+                  style={[styles.secondaryButton, deletingId !== null && styles.disabled]}
+                  disabled={deletingId !== null}
+                  onPress={() => confirmDelete(league)}
+                  testID={`admin-league-delete-${league.id}`}
+                >
+                  <Text style={styles.secondaryButtonLabel}>
+                    {deletingId === league.id ? "Eliminazione…" : "Elimina"}
+                  </Text>
+                </Pressable>
+              </View>
             </View>
           ))}
           {result.totalPages > 1 ? (

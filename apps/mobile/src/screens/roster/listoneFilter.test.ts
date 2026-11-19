@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import type { LeagueListoneEntry } from "@fantappero/contracts";
-import { filterListone, foldSearchText } from "./listoneFilter.ts";
+import { filterListone, filterRosterSlots, foldSearchText } from "./listoneFilter.ts";
 
 function entry(
   athleteId: string,
@@ -81,5 +81,31 @@ describe("filterListone", () => {
   it("folds accents, case and spaces", () => {
     assert.equal(foldSearchText("  Çalhanoğlu "), "calhanoglu");
     assert.equal(foldSearchText("Müller"), "muller");
+  });
+});
+
+describe("filterRosterSlots", () => {
+  const slots = [
+    { athleteId: "1", athleteName: "K. Lomónaco", clubName: "Independiente" },
+    { athleteId: "2", athleteName: "A. Simón", clubName: "Bilbao" },
+    { athleteId: "3", athleteName: "H. Bellerín", clubName: "Betis" },
+    { athleteId: "4", athleteName: "G. Donnarumma", clubName: "Paris" },
+    { athleteId: "5", athleteName: null, clubName: null },
+  ];
+
+  it("ignores accents and case in the roster search (QA 19/11)", () => {
+    assert.deepEqual(filterRosterSlots(slots, "lomonaco").map((slot) => slot.athleteId), ["1"]);
+    assert.deepEqual(filterRosterSlots(slots, "simon").map((slot) => slot.athleteId), ["2"]);
+    assert.deepEqual(filterRosterSlots(slots, "BELLERIN").map((slot) => slot.athleteId), ["3"]);
+    assert.deepEqual(filterRosterSlots(slots, "Bellerín").map((slot) => slot.athleteId), ["3"]);
+  });
+
+  it("matches the club too", () => {
+    assert.deepEqual(filterRosterSlots(slots, "betis").map((slot) => slot.athleteId), ["3"]);
+  });
+
+  it("keeps every slot when the search is empty or blank", () => {
+    assert.equal(filterRosterSlots(slots, "").length, slots.length);
+    assert.equal(filterRosterSlots(slots, "   ").length, slots.length);
   });
 });

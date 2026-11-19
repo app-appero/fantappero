@@ -50,21 +50,25 @@ def validate_profile_display_name(display_name: str) -> str:
     return ensure_visible_display_name(cleaned)
 
 
-_NICKNAME_PATTERN = re.compile(r"^[\w .\-]{2,30}$", re.UNICODE)
+# Solo alfabeto latino, accentate comprese (Latin-1 senza × e ÷): con `\w` e re.UNICODE
+# passavano anche cirillico e greco, e «qa07nick» scritto con la «a» cirillica (U+0430)
+# si spacciava per il «qa07nick» di un altro (QA 19/11). NFKC non trasforma il cirillico.
+_NICKNAME_PATTERN = re.compile(r"^[0-9A-Za-zÀ-ÖØ-öø-ÿ_ .\-]{2,30}$")
 
 
 def validate_profile_nickname(nickname: str) -> str | None:
     """Stringa vuota = nessun nickname (si torna al nome visualizzato)."""
     import unicodedata
 
-    # NFKC: le lettere "a larghezza piena" (ＡＤＭＩＮ) diventano quelle normali, niente sosia.
+    # NFKC: le lettere "a larghezza piena" (ＡＤＭＩＮ) diventano quelle normali, niente sosia;
+    # gli accenti scritti come carattere combinante si ricompongono (o + U+0300 diventa ò).
     cleaned = " ".join(unicodedata.normalize("NFKC", nickname).split())
     if not cleaned:
         return None
     if not _NICKNAME_PATTERN.match(cleaned) or not any(char.isalnum() for char in cleaned):
         raise ValidationAuthError(
-            "Il nickname deve avere 2-30 caratteri: lettere, numeri, spazi, punto, "
-            "trattino o underscore.",
+            "Il nickname deve avere 2-30 caratteri: lettere latine (anche accentate), "
+            "numeri, spazi, punto, trattino o underscore.",
             code="invalid_nickname",
         )
     return cleaned

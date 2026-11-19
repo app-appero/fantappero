@@ -3,7 +3,6 @@ import { foldSearchText } from "../utils/searchText";
 import type { FantasyRole, LeagueListoneEntry } from "@fantappero/contracts";
 import { PlayerPhotoBadge } from "@fantappero/ui";
 import { useEffect, useMemo, useState } from "react";
-import { AthleteName } from "../athletes/AthleteCard";
 
 const PAGE_SIZE = 10;
 const ROLE_PILLS: Array<{ value: "all" | FantasyRole; label: string }> = [
@@ -117,7 +116,9 @@ export function AthleteChooser({
                   </span>
                 )}
                 <span className="fa-athlete-chooser__name">
-                  <AthleteName athleteId={entry.athleteId}>{entry.canonicalName}</AthleteName>
+                  {/* Testo semplice: un nome cliccabile qui sarebbe un pulsante dentro il pulsante della
+                      riga e, toccato, aprirebbe la scheda invece di scegliere il calciatore. */}
+                  <span>{entry.canonicalName}</span>
                   {entry.clubName ? <small>{entry.clubName}</small> : null}
                 </span>
               </button>

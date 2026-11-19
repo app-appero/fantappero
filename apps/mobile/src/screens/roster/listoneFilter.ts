@@ -35,6 +35,24 @@ export function matchesSearch(haystack: string, query: string): boolean {
   return needle.length === 0 || foldSearchText(haystack).includes(needle);
 }
 
+/** Campi di uno slot di rosa usati dalla ricerca (nome calciatore e club). */
+type SearchableRosterSlot = {
+  athleteName?: string | null;
+  clubName?: string | null;
+};
+
+/**
+ * Slot della rosa che corrispondono alla ricerca per nome o club, ignorando
+ * accenti e maiuscole come il listone: "lomonaco" trova "K. Lomónaco",
+ * "bellerin" trova "H. Bellerín" (QA 19/11). Ricerca vuota = tutti gli slot.
+ */
+export function filterRosterSlots<T extends SearchableRosterSlot>(slots: readonly T[], query: string): T[] {
+  if (!foldSearchText(query)) {
+    return [...slots];
+  }
+  return slots.filter((slot) => matchesSearch(`${slot.athleteName ?? ""} ${slot.clubName ?? ""}`, query));
+}
+
 export const ROLE_TABS: Array<{ value: RoleTab; label: string }> = [
   { value: "all", label: "Tutti" },
   { value: "P", label: "Portieri" },

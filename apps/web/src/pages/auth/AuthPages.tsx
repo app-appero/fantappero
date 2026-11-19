@@ -260,9 +260,15 @@ export function AuthRegisterPage() {
               loading={loading}
               error={error ?? undefined}
               registerPrompt={
-                <p className="fa-auth-layout__register">
-                  Hai già un account? <Link to="/accedi">Accedi</Link>
-                </p>
+                <>
+                  <p className="fa-auth-layout__register">
+                    Hai già un account? <Link to="/accedi">Accedi</Link>
+                  </p>
+                  {/* Solo nella registrazione con email: quella solo Google resta senza testo aggiuntivo. */}
+                  <p className="fa-auth-layout__register" data-testid="register-privacy-link">
+                    Registrandoti accetti l&apos;<Link to="/privacy">informativa privacy</Link>.
+                  </p>
+                </>
               }
             />
           </>
@@ -532,17 +538,23 @@ export function AuthLoginPage() {
             </p>
           }
           registerPrompt={
-            <p className="fa-auth-layout__register">
-              {remembered ? (
-                <>
-                  <button type="button" className="fa-login__account-switch" onClick={switchAccount}>
-                    Non sei {firstName}? Cambia account
-                  </button>
-                  <br />
-                </>
-              ) : null}
-              Non hai un account? <Link to="/accedi/registrati">Registrati</Link>
-            </p>
+            <>
+              <p className="fa-auth-layout__register">
+                {remembered ? (
+                  <>
+                    <button type="button" className="fa-login__account-switch" onClick={switchAccount}>
+                      Non sei {firstName}? Cambia account
+                    </button>
+                    <br />
+                  </>
+                ) : null}
+                Non hai un account? <Link to="/accedi/registrati">Registrati</Link>
+              </p>
+              {/* Il rimando all'informativa vale anche per chi accede con email, non solo con Google. */}
+              <p className="fa-auth-layout__register" data-testid="login-privacy-link">
+                Accedendo accetti l&apos;<Link to="/privacy">informativa privacy</Link>.
+              </p>
+            </>
           }
         />
         )}

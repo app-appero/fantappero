@@ -27,6 +27,8 @@ const AUCTION_TITLES = new Set([
   "Sei stato sorpassato",
   "Scelta richiesta: rosa al completo",
   "Asta a rilanci iniziata",
+  "Lotto perso: crediti insufficienti",
+  "Lotto perso: rosa al completo",
 ]);
 
 /** Valore di un parametro di query nel deep link (es. "?scambio=<id>"), o `null`. */
@@ -60,7 +62,10 @@ const PATH_ROUTES: Array<[RegExp, NotificationRoute]> = [
   [/^\/classifica/, { kind: "tab", screen: "Standings" }],
   [/^\/turni/, { kind: "tab", screen: "Matchday" }],
   [/^\/rosa/, { kind: "tab", screen: "Roster" }],
-  [/^\/asta/, { kind: "tab", screen: "Auction" }],
+  // «/asta-live» deve precedere «/asta», che altrimenti lo intercetterebbe: le notifiche
+  // dell'asta a rilanci aprono la scheda «Live», quelle delle buste chiuse «Buste chiuse».
+  [/^\/asta-live/, { kind: "tab", screen: "Auction", params: { modalita: "live" } }],
+  [/^\/asta/, { kind: "tab", screen: "Auction", params: { modalita: "buste" } }],
   [/^\/svincolati/, { kind: "tab", screen: "Waiver" }],
   [/^\/scambi/, { kind: "tab", screen: "Market" }],
   [/^\/profilo/, { kind: "tab", screen: "Profile" }],
@@ -81,12 +86,15 @@ export function resolveNotificationRoute(
       ? { kind: "tab", screen: "Market", params: { scambio: proposalId } }
       : { kind: "tab", screen: "Market" };
   }
-  if (AUCTION_TITLES.has(item.title)) {
+  const link = (item.deepLink ?? "").trim();
+  const isInternalLink = link.startsWith("/") && !link.startsWith("//") && !link.includes("://");
+  const path = isInternalLink ? (link.split(/[?#]/)[0] ?? link) : "";
+  // Il titolo d'asta è solo un fallback (es. notifiche vecchie con «/mercato»): se il deep
+  // link punta già a «/asta» o «/asta-live» decide PATH_ROUTES, che sceglie anche la scheda.
+  if (AUCTION_TITLES.has(item.title) && !/^\/asta/.test(path)) {
     return { kind: "tab", screen: "Auction" };
   }
-  const link = (item.deepLink ?? "").trim();
-  if (link.startsWith("/") && !link.startsWith("//") && !link.includes("://")) {
-    const path = link.split(/[?#]/)[0] ?? link;
+  if (isInternalLink) {
     const matchup = /^\/turni\/scontro\/([^/]+)\/?$/.exec(path);
     if (matchup?.[1]) {
       return { kind: "matchup", slotId: decodeURIComponent(matchup[1]) };

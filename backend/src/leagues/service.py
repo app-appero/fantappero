@@ -592,6 +592,8 @@ class LeagueService:
 
     def delete_league(self, league_access: LeagueAccess) -> None:
         """Hard-delete a draft/configuring league; audit row survives via ON DELETE SET NULL."""
+        from notifications.league_events import notify_league_deleted
+
         league = self._lock_league_for_lifecycle(league_access.league.id)
         try:
             validate_league_deletable(league.state)
@@ -613,6 +615,12 @@ class LeagueService:
                 correlation_id=get_correlation_id(),
                 details=details,
             ),
+        )
+        # Avviso «Lega eliminata» agli altri partecipanti, come per l'eliminazione da
+        # operatore (QA 19/11): va scritto prima di eliminare la lega, finché le iscrizioni
+        # si possono ancora leggere, e nella stessa transazione dell'eliminazione.
+        notify_league_deleted(
+            self._session, league=league, deleted_by_user_id=league_access.user.id
         )
         self._session.flush()
         self._session.delete(league)

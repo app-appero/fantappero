@@ -45,6 +45,34 @@ def test_validate_profile_nickname_rejects_invalid_values() -> None:
         validate_profile_nickname("nome!")
 
 
+@pytest.mark.parametrize(
+    "lookalike",
+    [
+        "q\u043007nick1119",  # «a» cirillica (U+0430) al posto della «a» latina
+        "\u0410DMIN",  # «A» cirillica maiuscola (U+0410)
+        "\u03bd\u03b9\u03ba\u03bf\u03c2",  # «nikos» in greco
+        "nick\u03bf",  # «o» greca (U+03BF) in coda
+        "a×b",  # «×»: tra le lettere accentate ma non è una lettera
+    ],
+)
+def test_validate_profile_nickname_rejects_non_latin_lookalikes(lookalike: str) -> None:
+    """QA 19/11: un nickname con lettere cirilliche o greche si spacciava per un altro."""
+    with pytest.raises(ValidationAuthError) as exc:
+        validate_profile_nickname(lookalike)
+    assert exc.value.code == "invalid_nickname"
+    assert "latine" in exc.value.message
+
+
+def test_validate_profile_nickname_keeps_accented_latin_letters() -> None:
+    assert validate_profile_nickname("Niccolò") == "Niccolò"
+    assert validate_profile_nickname("José") == "José"
+    assert validate_profile_nickname("Ærø_Øst-ÿ.ß") == "Ærø_Øst-ÿ.ß"
+    # Accento scritto come carattere combinante: NFKC lo ricompone in «ò».
+    assert validate_profile_nickname("Niccolo\u0300") == "Niccolò"
+    # Le lettere a larghezza piena restano ammesse perché NFKC le riporta all'ASCII.
+    assert validate_profile_nickname("ＡＤＭＩＮ") == "ADMIN"
+
+
 def test_validate_language_accepts_italian() -> None:
     assert validate_language("it") == "it"
 

@@ -1,5 +1,5 @@
-import { useNavigation, type NavigationProp } from "@react-navigation/core";
-import { useState } from "react";
+import { useNavigation, useRoute, type NavigationProp, type RouteProp } from "@react-navigation/core";
+import { useEffect, useState } from "react";
 import { ScreenTabs } from "../components/ScreenTabs";
 import { PageContainer } from "../layout/PageContainer";
 import { MARKET_HUB_TABS } from "../navigation/marketHubTabs";
@@ -7,8 +7,7 @@ import type { AppTabParamList } from "../navigation/types";
 import { MarketGateBar } from "../market/MarketGateBar";
 import { AuctionLiveScreen } from "./AuctionLiveScreen";
 import { AuctionScreen } from "./AuctionScreen";
-
-type AuctionMode = "buste" | "live";
+import { auctionModeFromParams, type AuctionMode } from "./auctionMode";
 
 const AUCTION_MODE_TABS = [
   { id: "buste", label: "Buste chiuse" },
@@ -20,10 +19,25 @@ const AUCTION_MODE_TABS = [
  * al suo interno, il toggle "Buste chiuse"/"Live" tra `AuctionScreen` (sealed)
  * e `AuctionLiveScreen` (rilanci). Il pull-to-refresh remonta la schermata
  * attiva incrementando `refreshKey`.
+ *
+ * Il parametro `modalita` (es. da una notifica dell'asta a rilanci, vedi
+ * notificationDestination.ts) sceglie la scheda all'apertura e la cambia
+ * quando arriva una nuova navigazione con parametri diversi.
  */
 export function AuctionHubScreen() {
   const navigation = useNavigation<NavigationProp<AppTabParamList>>();
-  const [mode, setMode] = useState<AuctionMode>("buste");
+  const route = useRoute<RouteProp<AppTabParamList, "Auction">>();
+  const requested = auctionModeFromParams(route.params);
+  const [mode, setMode] = useState<AuctionMode>(requested ?? "buste");
+
+  // Dipende dall'oggetto `route.params`, non solo dal valore: una seconda notifica
+  // «live» dopo che l'utente è passato a mano alle buste riporta comunque su «Live».
+  useEffect(() => {
+    const next = auctionModeFromParams(route.params);
+    if (next) {
+      setMode(next);
+    }
+  }, [route.params]);
   const [refreshKey, setRefreshKey] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
 

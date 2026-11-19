@@ -34,6 +34,48 @@ test("le notifiche d'asta aprono Asta", () => {
   assert.deepEqual(resolveNotificationRoute({ title: "Sei stato sorpassato", deepLink: "/mercato" }), { kind: "tab", screen: "Auction" });
 });
 
+test("le notifiche dell'asta a rilanci aprono la scheda «Live» dell'Asta", () => {
+  const titles = [
+    "Asta a rilanci iniziata",
+    "Lotto aggiudicato",
+    "Sei stato sorpassato",
+    "Scelta richiesta: rosa al completo",
+    "Lotto perso: crediti insufficienti",
+    "Lotto perso: rosa al completo",
+  ];
+  for (const title of titles) {
+    assert.deepEqual(
+      resolveNotificationRoute({ title, deepLink: "/asta-live?lega=league-1" }),
+      { kind: "tab", screen: "Auction", params: { modalita: "live" } },
+      title,
+    );
+  }
+});
+
+test("le notifiche delle buste chiuse aprono la scheda «Buste chiuse» dell'Asta", () => {
+  for (const title of ["Busta aggiudicata", "Busta non aggiudicata", "Spareggio aperto", "Spareggio annullato"]) {
+    assert.deepEqual(
+      resolveNotificationRoute({ title, deepLink: "/asta?lega=league-1" }),
+      { kind: "tab", screen: "Auction", params: { modalita: "buste" } },
+      title,
+    );
+  }
+});
+
+test("i percorsi web dell'asta scelgono la modalità anche senza titolo noto", () => {
+  assert.deepEqual(resolveNotificationRoute({ title: "x", deepLink: "/asta-live" }), {
+    kind: "tab",
+    screen: "Auction",
+    params: { modalita: "live" },
+  });
+  assert.deepEqual(resolveNotificationRoute({ title: "x", deepLink: "/asta" }), {
+    kind: "tab",
+    screen: "Auction",
+    params: { modalita: "buste" },
+  });
+  assert.equal(impersonationTab("/asta-live"), "Auction");
+});
+
 test("deep link interni mappati sulle schermate dell'app", () => {
   assert.deepEqual(resolveNotificationRoute({ title: "x", deepLink: "/formazione?turno=3" }), { kind: "tab", screen: "Formation" });
   assert.deepEqual(resolveNotificationRoute({ title: "x", deepLink: "/inviti" }), { kind: "stack", name: "ReceivedInvites" });

@@ -46,6 +46,21 @@ def test_render_mercato_esito_busta_lost() -> None:
     assert "non aggiudicata" in content.title.lower()
 
 
+def test_render_mercato_esito_busta_lost_on_repeated_tiebreak_tie() -> None:
+    """Spareggio di nuovo in parità: chi perde non ha offerto meno, è arrivato dopo."""
+    content = render_notification(
+        "mercato.esito_busta",
+        1,
+        {"outcome": "lost", "athlete_name": "Bomber", "lost_on_tie": True},
+    )
+    assert content.title == "Busta non aggiudicata"
+    assert content.body == (
+        "Non hai aggiudicato Bomber: a parità d'importo nello spareggio vince "
+        "l'offerta inviata per prima."
+    )
+    assert "inferiore" not in content.body
+
+
 def test_render_mercato_asta_live_perso_variants() -> None:
     """P4: capofila senza crediti (o senza posto) alla chiusura del lotto live."""
     base = {"athlete_name": "Bomber", "amount_credits": 500, "league_id": "abc"}
@@ -72,6 +87,27 @@ def test_render_mercato_asta_live_perso_variants() -> None:
     assert "500" not in roster.body
 
 
+def test_render_mercato_asta_live_perso_after_declined_or_unchosen_swap() -> None:
+    """Rosa al completo e scambio rifiutato, o non scelto prima della fine della sessione."""
+    base = {"athlete_name": "Bomber", "amount_credits": 500}
+    declined = render_notification(
+        "mercato.asta_live_perso", 1, {**base, "reason": "swap_declined", "reassigned": True}
+    )
+    assert declined.title == "Lotto perso: rosa al completo"
+    assert declined.body == (
+        "Hai rinunciato allo scambio per Bomber con la rosa al completo: "
+        "il calciatore va all'offerta successiva."
+    )
+    ended = render_notification(
+        "mercato.asta_live_perso", 1, {**base, "reason": "session_ended", "reassigned": False}
+    )
+    assert ended.title == "Lotto perso: rosa al completo"
+    assert ended.body == (
+        "L'asta è terminata prima che scegliessi chi scambiare con Bomber: "
+        "nessun'altra offerta valida, il calciatore resta svincolato."
+    )
+
+
 def test_render_mercato_scambio_known_and_unknown_status() -> None:
     known = render_notification("mercato.scambio", 1, {"status": "rejected"})
     assert known.title == "Scambio rifiutato"
@@ -86,6 +122,26 @@ def test_render_risultati_templates_include_round_number() -> None:
     assert "7" in homologation.body
     correction = render_notification("risultati.correzione", 1, {"round_number": 7})
     assert "7" in correction.body
+
+
+def test_render_lega_eliminata_names_who_deleted_the_league() -> None:
+    """QA 19/11: l'eliminazione da parte dell'amministratore di lega ha un testo suo."""
+    by_operator = render_notification("lega.eliminata", 1, {"league_name": "Lega Amici"})
+    assert by_operator.title == "Lega eliminata"
+    assert by_operator.body == "La lega Lega Amici è stata eliminata dall'amministrazione."
+    assert by_operator.deep_link == "/"
+
+    by_admin = render_notification(
+        "lega.eliminata", 1, {"league_name": "Lega Amici", "by_league_admin": True}
+    )
+    assert by_admin.title == "Lega eliminata"
+    assert by_admin.body == "La lega Lega Amici è stata eliminata dall'amministratore della lega."
+    assert by_admin.deep_link == "/"
+
+    nameless = render_notification("lega.eliminata", 1, {"by_league_admin": True})
+    assert nameless.body == "Una tua lega è stata eliminata dall'amministratore della lega."
+    operator_nameless = render_notification("lega.eliminata", 1, {})
+    assert operator_nameless.body == "Una tua lega è stata eliminata dall'amministrazione."
 
 
 def test_goal_v2_names_player_in_title_and_match_in_body() -> None:

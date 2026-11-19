@@ -109,6 +109,11 @@ export function fetchAdminLeagues(
   return apiRequest<PaginatedAdminLeagues>(`/admin/leagues${qs ? `?${qs}` : ""}`, { accessToken });
 }
 
+/** Elimina una lega in qualsiasi stato; il backend avvisa i partecipanti (risposta 204). */
+export function deleteAdminLeague(accessToken: string, leagueId: string): Promise<void> {
+  return apiRequest<void>(`/admin/leagues/${leagueId}`, { accessToken, method: "DELETE" });
+}
+
 export function fetchAdminListone(
   accessToken: string,
   seasonYear: number,

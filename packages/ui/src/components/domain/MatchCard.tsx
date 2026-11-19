@@ -2,6 +2,7 @@ import { type HTMLAttributes } from "react";
 import { Badge } from "../Badge.js";
 import { Card, CardBody } from "../Card.js";
 import { classNames } from "../../utils/classNames.js";
+import { AvatarWithFallback } from "./AvatarWithFallback.js";
 
 export type MatchStatus = "scheduled" | "live" | "finished" | "postponed" | "needs_update";
 
@@ -46,9 +47,6 @@ function TeamMark({
   if (logoUrl) {
     return <img className="fa-match-card__team-logo" src={logoUrl} alt="" aria-hidden="true" />;
   }
-  if (avatarUrl) {
-    return <img className="fa-match-card__person-avatar" src={avatarUrl} alt="" aria-hidden="true" />;
-  }
   const initials = name
     .split(/\s+/)
     .filter(Boolean)
@@ -56,10 +54,17 @@ function TeamMark({
     .slice(0, 2)
     .join("")
     .toUpperCase();
+  // Avatar del fantallenatore: se manca o non si carica restano le iniziali.
   return (
-    <span className="fa-match-card__avatar" aria-hidden="true">
-      {initials}
-    </span>
+    <AvatarWithFallback
+      className="fa-match-card__person-avatar"
+      src={avatarUrl}
+      fallback={
+        <span className="fa-match-card__avatar" aria-hidden="true">
+          {initials}
+        </span>
+      }
+    />
   );
 }
 

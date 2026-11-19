@@ -228,3 +228,138 @@ def test_count_is_scoped_to_the_requesting_user(
 
     assert _pending_count(client, guest_token) == 1
     assert _pending_count(client, other_token) == 0
+
+
+def _revoke(client: TestClient, token: str, league_id: str, invite_id: str):
+    return client.delete(
+        f"/leagues/{league_id}/amministrazione/inviti-nominativi/{invite_id}",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
+
+def _invite_notifications(db_session: Session, user_id: UUID) -> list[Notification]:
+    db_session.expire_all()
+    return list(
+        db_session.scalars(
+            select(Notification).where(
+                Notification.user_id == user_id,
+                Notification.template_key == "sistema.invito_lega",
+            )
+        ).all()
+    )
+
+
+def _directory_row(client: TestClient, token: str, league_id: str, user_id: UUID) -> dict:
+    response = client.get(
+        f"/leagues/{league_id}/amministrazione/fantallenatori",
+        headers={"Authorization": f"Bearer {token}"},
+        params={"pageSize": 50},
+    )
+    assert response.status_code == 200
+    rows = [row for row in response.json()["items"] if row["userId"] == str(user_id)]
+    assert len(rows) == 1
+    return rows[0]
+
+
+def test_revoking_a_named_invite_withdraws_its_notification(
+    client: TestClient, db_session: Session, competition_ids: list[str]
+) -> None:
+    """La revoca toglie «Nuovo invito» e l'invito da «Inviti ricevuti»; l'altro resta."""
+    admin_token, _ = _register_and_login(client, "rev-admin@example.com")
+    other_admin_token, _ = _register_and_login(client, "rev-other-admin@example.com")
+    guest_token, guest_id = _register_and_login(client, "rev-guest@example.com")
+    league_id = _create_league(client, admin_token, competition_ids, "Lega Revoca")
+    other_league_id = _create_league(client, other_admin_token, competition_ids, "Lega Resta")
+    _make_available(db_session, guest_id)
+
+    created = _invite(client, admin_token, league_id, guest_id)
+    assert created.status_code == 201
+    invite_id = created.json()["id"]
+    kept = _invite(client, other_admin_token, other_league_id, guest_id)
+    assert kept.status_code == 201
+    assert len(_invite_notifications(db_session, guest_id)) == 2
+
+    # La directory espone l'id dell'invito pendente, necessario per revocarlo.
+    row = _directory_row(client, admin_token, league_id, guest_id)
+    assert row["namedInviteStatus"] == "pending"
+    assert row["namedInviteId"] == invite_id
+
+    revoked = _revoke(client, admin_token, league_id, invite_id)
+    assert revoked.status_code == 200
+    assert revoked.json()["status"] == "revoked"
+
+    remaining = _invite_notifications(db_session, guest_id)
+    assert len(remaining) == 1
+    assert remaining[0].dedup_key == f"named_invite:{kept.json()['id']}"
+    assert "Lega Resta" in remaining[0].body
+
+    inbox = client.get(
+        "/leagues/inviti-ricevuti",
+        headers={"Authorization": f"Bearer {guest_token}"},
+    )
+    assert inbox.status_code == 200
+    assert [item["id"] for item in inbox.json()] == [kept.json()["id"]]
+    assert _pending_count(client, guest_token) == 1
+
+    bell = client.get("/notifications", headers={"Authorization": f"Bearer {guest_token}"})
+    assert bell.status_code == 200
+    assert "Lega Revoca" not in str(bell.json()["items"])
+
+    # Torna invitabile: stato revocato, niente più «Già invitato».
+    row = _directory_row(client, admin_token, league_id, guest_id)
+    assert row["namedInviteStatus"] == "revoked"
+    assert row["namedInviteId"] == invite_id
+
+    # Una seconda revoca è idempotente e non tocca le altre notifiche.
+    again = _revoke(client, admin_token, league_id, invite_id)
+    assert again.status_code == 200
+    assert again.json()["status"] == "revoked"
+    assert len(_invite_notifications(db_session, guest_id)) == 1
+
+    # Un nuovo invito crea una nuova notifica.
+    reinvite = _invite(client, admin_token, league_id, guest_id)
+    assert reinvite.status_code == 201
+    assert len(_invite_notifications(db_session, guest_id)) == 2
+
+
+def test_revoking_withdraws_the_notification_even_if_already_read(
+    client: TestClient, db_session: Session, competition_ids: list[str]
+) -> None:
+    """Anche letta, la notifica porterebbe a «Inviti ricevuti» vuoto."""
+    admin_token, _ = _register_and_login(client, "revread-admin@example.com")
+    guest_token, guest_id = _register_and_login(client, "revread-guest@example.com")
+    league_id = _create_league(client, admin_token, competition_ids, "Lega Revoca Letta")
+    _make_available(db_session, guest_id)
+    invite_id = _invite(client, admin_token, league_id, guest_id).json()["id"]
+
+    (notification,) = _invite_notifications(db_session, guest_id)
+    marked = client.post(
+        f"/notifications/{notification.id}/read",
+        headers={"Authorization": f"Bearer {guest_token}"},
+    )
+    assert marked.status_code == 200
+
+    assert _revoke(client, admin_token, league_id, invite_id).status_code == 200
+    assert _invite_notifications(db_session, guest_id) == []
+    assert _pending_count(client, guest_token) == 0
+
+
+def test_answered_invite_cannot_be_revoked_and_keeps_its_notification(
+    client: TestClient, db_session: Session, competition_ids: list[str]
+) -> None:
+    admin_token, _ = _register_and_login(client, "revans-admin@example.com")
+    guest_token, guest_id = _register_and_login(client, "revans-guest@example.com")
+    league_id = _create_league(client, admin_token, competition_ids, "Lega Risposta")
+    _make_available(db_session, guest_id)
+    invite_id = _invite(client, admin_token, league_id, guest_id).json()["id"]
+
+    declined = client.post(
+        f"/leagues/inviti-ricevuti/{invite_id}/rifiuta",
+        headers={"Authorization": f"Bearer {guest_token}"},
+    )
+    assert declined.status_code == 200
+
+    refused = _revoke(client, admin_token, league_id, invite_id)
+    assert refused.status_code == 400
+    assert refused.json()["code"] == "named_invite_not_pending"
+    assert len(_invite_notifications(db_session, guest_id)) == 1

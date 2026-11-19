@@ -383,7 +383,9 @@ export function MatchdayPage() {
   const [actionMessage, setActionMessage] = useState<string | null>(null);
   const [fixtureFilter, setFixtureFilter] = useState<"all" | "unplayed">("all");
   const [competitionTab, setCompetitionTab] = useState("");
-  const [excluding, setExcluding] = useState(false);
+  /** Testo dell'operazione in corso (esclusione o reinclusione); null quando non ce n'è. */
+  const [exclusionProgress, setExclusionProgress] = useState<string | null>(null);
+  const excluding = exclusionProgress !== null;
   const toast = useOptionalToast();
 
   const isAdmin = can(["league:admin"]);
@@ -592,6 +594,7 @@ export function MatchdayPage() {
     request: () => Promise<FantasyTurnExclusionResult>,
     demoApply: () => void,
     demoMessage: string,
+    progressMessage = "Esclusione in corso. Poi ricalcolo la giornata.",
   ) {
     if (!selected) {
       return;
@@ -603,7 +606,7 @@ export function MatchdayPage() {
       }
     }
     toast?.push({
-      title: "Esclusione in corso. Poi ricalcolo la giornata.",
+      title: progressMessage,
       variant: "info",
     });
     if (isDemoMode) {
@@ -612,7 +615,7 @@ export function MatchdayPage() {
       toast?.push({ title: demoMessage, variant: "info" });
       return;
     }
-    setExcluding(true);
+    setExclusionProgress(progressMessage);
     setActionError(null);
     try {
       const result = await request();
@@ -622,13 +625,18 @@ export function MatchdayPage() {
         title: result.message,
         variant: result.homologated || result.resultFinal ? "success" : result.recalculated ? "info" : "warning",
       });
-      await loadTurns();
+      // Solo l'elenco (conteggi e stati): loadTurns() riselezionerebbe il turno di default,
+      // facendo saltare l'admin via dal turno su cui sta lavorando.
+      const session = loadStoredSession();
+      if (session?.accessToken && activeLeagueId) {
+        await fetchFantasyTurns(session.accessToken, activeLeagueId).then(setTurns).catch(() => undefined);
+      }
     } catch (error) {
       const message = getApiErrorMessage(error, "Esclusione non consentita.");
       setActionError(message);
       toast?.push({ title: message, variant: "danger" });
     } finally {
-      setExcluding(false);
+      setExclusionProgress(null);
     }
   }
 
@@ -673,6 +681,7 @@ export function MatchdayPage() {
         });
       },
       "Partita rimessa nel turno (demo). Il ricalcolo parte solo su una lega reale.",
+      "Reinclusione in corso. Poi ricalcolo la giornata.",
     );
   }
 
@@ -944,9 +953,9 @@ export function MatchdayPage() {
                     </Button>
                   ) : null}
                 </div>
-                {excluding ? (
+                {exclusionProgress ? (
                   <p className="fa-matchday-hint" data-testid="matchday-exclude-progress">
-                    Esclusione e ricalcolo in corso…
+                    {exclusionProgress}
                   </p>
                 ) : null}
 

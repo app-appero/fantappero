@@ -19,6 +19,7 @@ from leagues.models.competition import Competition
 from leagues.models.league_audit_event import LeagueAuditEvent
 from leagues.models.league_membership import LeagueMembership
 from mail.capture import get_captured_emails
+from sports_data.catalog.models import Club, CompetitionSeasonClub, SportSeason
 from sports_data.listone.models import RoleAssignment
 from sports_data.roster.models import Athlete
 
@@ -549,3 +550,118 @@ def test_csv_matches_names_with_double_spaces_accents_and_turkish_i(
         str(turkish.id),
         str(accented.id),
     ], [row["issues"] for row in rows]
+
+
+def _random_provider_id() -> int:
+    return random.randint(100_000_000, 2_000_000_000)
+
+
+def _seed_catalog_only_athlete(db_session: Session, name: str) -> Athlete:
+    """Calciatore del catalogo senza ruolo in nessun listone."""
+    athlete = Athlete(provider_id=_random_provider_id(), canonical_name=name)
+    db_session.add(athlete)
+    db_session.commit()
+    db_session.refresh(athlete)
+    return athlete
+
+
+def _seed_athlete_outside_league_competitions(db_session: Session, name: str) -> Athlete:
+    """Calciatore nel listone 2026 ma di un club che gioca in un campionato fuori dalla lega."""
+    provider_id = _random_provider_id()
+    competition = Competition(
+        provider_id=provider_id, name=f"Campionato Escluso {provider_id}", country="XX"
+    )
+    club = Club(provider_id=provider_id, name=f"Club Escluso {provider_id}")
+    db_session.add_all([competition, club])
+    db_session.flush()
+    season = SportSeason(competition_id=competition.id, year=2026)
+    db_session.add(season)
+    db_session.flush()
+    db_session.add(CompetitionSeasonClub(sport_season_id=season.id, club_id=club.id))
+    athlete = Athlete(provider_id=provider_id, canonical_name=name)
+    db_session.add(athlete)
+    db_session.flush()
+    db_session.add(
+        RoleAssignment(
+            athlete_id=athlete.id,
+            season_year=2026,
+            role=FantasyRole.A,
+            mapping_version="v1.0.0",
+            provider_position_raw="A",
+            club_id=club.id,
+        )
+    )
+    db_session.commit()
+    db_session.refresh(athlete)
+    return athlete
+
+
+def test_csv_name_search_is_limited_to_the_league_listone(
+    client: TestClient,
+    db_session: Session,
+    competition_ids: list[str],
+) -> None:
+    """QA 19/11: "A. Bamba", "A. Buksa" e "A. Cissè", unici nel listone della lega,
+    risultavano `ambiguous` con candidati presi da tutto il catalogo; sceglierne uno
+    fuori listone faceva fallire la conferma con `role_unresolved`."""
+    token, _ = _register_and_login(client, "csv.names.listone@example.com")
+    league_id = _create_league(client, token, competition_ids, "Lega CSV Listone")
+    headers = {"Authorization": f"Bearer {token}"}
+    team_name = client.get(f"/leagues/{league_id}/rosa", headers=headers).json()["name"]
+    tag = random.randint(100_000, 999_999)
+    bamba = _seed_athlete(db_session, _random_provider_id(), f"A. Bamba{tag}")
+    buksa = _seed_athlete(db_session, _random_provider_id(), f"A. Buksa{tag}")
+    cisse = _seed_athlete(db_session, _random_provider_id(), f"A. Cissè{tag}")
+    kone = _seed_athlete(db_session, _random_provider_id(), f"K. Koné{tag}")
+    # Omonimi fuori dal listone della lega: senza ruolo, di un'altra stagione o di un
+    # club che gioca in un campionato che la lega non ha scelto.
+    _seed_catalog_only_athlete(db_session, f"A. Bamba{tag}")
+    _seed_athlete(db_session, _random_provider_id(), f"A. Bamba{tag}", season_year=2025)
+    _seed_athlete_outside_league_competitions(db_session, f"A. Bamba{tag}")
+    _seed_catalog_only_athlete(db_session, f"A. Buksa{tag}")
+    _seed_athlete_outside_league_competitions(db_session, f"A. Cissè{tag}")
+    # "K. Kone" senza accento passa dal confronto in Python (stessa stagione, altro campionato).
+    _seed_athlete_outside_league_competitions(db_session, f"K. Koné{tag}")
+    _seed_catalog_only_athlete(db_session, f"Z. Fuori{tag}")
+
+    url = f"/leagues/{league_id}/amministrazione/import-csv/anteprima-testo"
+    csv_text = (
+        "squadra,provider_id,nome,crediti\n"
+        f"{team_name},,A. Bamba{tag},1\n"
+        f"{team_name},,A. Buksa{tag},1\n"
+        f"{team_name},,A. Cissè{tag},1\n"
+        f"{team_name},,K. Kone{tag},1\n"
+    )
+    preview = client.post(url, headers=headers, json={"csvText": csv_text})
+    assert preview.status_code == 200, preview.text
+    rows = preview.json()["rows"]
+    assert [row["status"] for row in rows] == ["ok"] * 4, [
+        (row["issues"], row["candidates"]) for row in rows
+    ]
+    assert [row["athleteId"] for row in rows] == [
+        str(bamba.id),
+        str(buksa.id),
+        str(cisse.id),
+        str(kone.id),
+    ]
+    assert preview.json()["canConfirm"] is True
+
+    confirm = client.post(
+        f"/leagues/{league_id}/amministrazione/import-csv/{preview.json()['importId']}/conferma",
+        headers=headers,
+        json={"resolutions": []},
+    )
+    assert confirm.status_code == 200, confirm.text
+    assert confirm.json()["assignedCount"] == 4
+
+    # Un nome che esiste solo fuori dal listone non si trova più (prima era
+    # `athlete_not_on_listone` su un calciatore che la conferma rifiutava).
+    outside = client.post(
+        url,
+        headers=headers,
+        json={"csvText": f"squadra,provider_id,nome,crediti\n{team_name},,Z. Fuori{tag},1\n"},
+    )
+    assert outside.status_code == 200, outside.text
+    outside_row = outside.json()["rows"][0]
+    assert outside_row["athleteId"] is None
+    assert [issue["code"] for issue in outside_row["issues"]] == ["athlete_not_found"]

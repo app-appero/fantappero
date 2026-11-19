@@ -35,6 +35,12 @@ describe("AuthLoginPage — accesso solo con Google nel pilota", () => {
   }
   const passwordField = () => container.querySelector('input[type="password"]');
   const googleOnly = () => container.querySelector('[data-testid="login-google-only"]');
+  function expectPrivacyLink() {
+    const notes = container.querySelectorAll('[data-testid="login-privacy-link"]');
+    expect(notes).toHaveLength(1);
+    expect(notes[0]?.textContent).toBe("Accedendo accetti l'informativa privacy.");
+    expect(notes[0]?.querySelector('a[href="/privacy"]')?.textContent).toBe("informativa privacy");
+  }
 
   beforeEach(() => {
     container = document.createElement("div");
@@ -78,6 +84,7 @@ describe("AuthLoginPage — accesso solo con Google nel pilota", () => {
     expect(passwordField()).not.toBeNull();
     expect(container.textContent).toContain("Accedi con email");
     expect(googleOnly()).toBeNull();
+    expectPrivacyLink();
   });
 
   it("con la registrazione con email attiva mostra il modulo come prima", async () => {
@@ -86,6 +93,14 @@ describe("AuthLoginPage — accesso solo con Google nel pilota", () => {
     expect(passwordField()).not.toBeNull();
     expect(container.textContent).toContain("Password dimenticata");
     expect(googleOnly()).toBeNull();
+    // Anche nell'accesso con email si vede il rimando all'informativa privacy.
+    expectPrivacyLink();
+  });
+
+  it("con l'accesso solo Google il rimando all'informativa privacy resta", async () => {
+    fetchAuthOptionsMock.mockResolvedValue({ emailRegistrationEnabled: false });
+    await render();
+    expectPrivacyLink();
   });
 
   it("se non riesce a leggere le opzioni (server irraggiungibile) resta il solo accesso con Google", async () => {

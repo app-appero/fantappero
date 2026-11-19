@@ -589,6 +589,14 @@ a.fa-member-list__identity:focus-visible {
   margin-top: 2px;
 }
 
+/* «Già invitato» + «Annulla invito» affiancati. */
+.fa-manager-directory__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--fa-space-sm);
+}
+
 .fa-manager-directory__pagination {
   display: flex;
   align-items: center;
@@ -1280,6 +1288,7 @@ a.fa-member-list__identity:focus-visible {
   }
 
   .fa-manager-directory__item > .fa-btn,
+  .fa-manager-directory__actions,
   .fa-manager-directory__status {
     grid-column: 1 / -1;
     width: 100%;
@@ -3179,6 +3188,7 @@ h2 {
 }
 
 .fa-manager-directory__list .fa-manager-directory__item > .fa-btn,
+.fa-manager-directory__list .fa-manager-directory__actions,
 .fa-manager-directory__list .fa-manager-directory__status {
   align-self: flex-start;
   margin-top: auto;
@@ -6101,4 +6111,56 @@ button.fa-starter-row:disabled {
   flex-wrap: wrap;
   gap: 8px;
   align-items: center;
+}
+
+/* Informativa privacy (/privacy): pagina pubblica fuori dalla shell, testo leggibile e centrato. */
+.fa-privacy {
+  box-sizing: border-box;
+  min-height: 100vh;
+  padding-block: var(--fa-space-lg) var(--fa-space-xl);
+  padding-inline: var(--fa-space-md);
+  background: var(--fa-color-background);
+  color: var(--fa-color-foreground);
+}
+
+.fa-privacy__article {
+  max-width: 46rem;
+  margin-inline: auto;
+  line-height: var(--fa-leading-normal);
+  overflow-wrap: anywhere;
+}
+
+.fa-privacy__article h1 {
+  margin: 0 0 var(--fa-space-xs);
+  font-family: var(--fa-font-display);
+  font-size: var(--fa-text-xl);
+  line-height: var(--fa-leading-tight);
+}
+
+.fa-privacy__article h2 {
+  margin: var(--fa-space-lg) 0 var(--fa-space-sm);
+  font-size: var(--fa-text-lg);
+  line-height: var(--fa-leading-snug);
+}
+
+.fa-privacy__article p,
+.fa-privacy__article ul {
+  margin: 0 0 var(--fa-space-sm);
+}
+
+.fa-privacy__article ul {
+  padding-inline-start: var(--fa-space-lg);
+}
+
+.fa-privacy__article a {
+  color: var(--fa-color-accent);
+}
+
+.fa-privacy__back {
+  margin-bottom: var(--fa-space-md);
+}
+
+.fa-privacy__version {
+  color: var(--fa-color-foreground-muted);
+  font-size: var(--fa-text-sm);
 }

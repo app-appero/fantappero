@@ -1,4 +1,5 @@
 import { Badge } from "../Badge.js";
+import { AvatarWithFallback } from "./AvatarWithFallback.js";
 import {
   Table,
   TableBody,
@@ -103,18 +104,15 @@ export function StandingsTable({
             <TableCell>
               <span className="fa-standings-row__identity">
                 {row.managerDisplayName ? (
-                  row.managerAvatarUrl ? (
-                    <img
-                      className="fa-standings-row__avatar"
-                      src={row.managerAvatarUrl}
-                      alt=""
-                      aria-hidden="true"
-                    />
-                  ) : (
-                    <span className="fa-standings-row__avatar fa-standings-row__avatar--initials" aria-hidden="true">
-                      {row.managerDisplayName.charAt(0).toUpperCase()}
-                    </span>
-                  )
+                  <AvatarWithFallback
+                    className="fa-standings-row__avatar"
+                    src={row.managerAvatarUrl}
+                    fallback={
+                      <span className="fa-standings-row__avatar fa-standings-row__avatar--initials" aria-hidden="true">
+                        {row.managerDisplayName.charAt(0).toUpperCase()}
+                      </span>
+                    }
+                  />
                 ) : null}
                 <span className="fa-standings-row__labels">
                   {onManagerClick && row.managerUserId ? (
@@ -190,13 +188,15 @@ function StandingsCards({
           >
             <div className="fa-standings-card__top">
               <span className="fa-standings-card__pos">{row.position}</span>
-              {row.managerAvatarUrl ? (
-                <img className="fa-standings-row__avatar" src={row.managerAvatarUrl} alt="" aria-hidden="true" />
-              ) : (
-                <span className="fa-standings-row__avatar fa-standings-row__avatar--initials" aria-hidden="true">
-                  {initial}
-                </span>
-              )}
+              <AvatarWithFallback
+                className="fa-standings-row__avatar"
+                src={row.managerAvatarUrl}
+                fallback={
+                  <span className="fa-standings-row__avatar fa-standings-row__avatar--initials" aria-hidden="true">
+                    {initial}
+                  </span>
+                }
+              />
               {onManagerClick && row.managerUserId ? (
                 <button
                   type="button"
