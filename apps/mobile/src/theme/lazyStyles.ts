@@ -4,6 +4,10 @@ import { getActiveColorScheme } from "@fantappero/ui/theme";
 /**
  * Builds a stylesheet the first time a key is read, then again when the
  * color scheme changes. Callers keep using `styles.foo` as before.
+ *
+ * Gli stili nuovi arrivano solo a chi si ridisegna: per questo App.tsx rimonta
+ * tutta la navigazione al cambio tema (`key={scheme}`), invece di contare sul
+ * fatto che ogni schermata si ridisegni da sola.
  */
 export function lazyStyles<T extends Record<string, unknown>>(factory: () => T): T {
   let cachedId = "";

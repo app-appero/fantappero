@@ -1,6 +1,7 @@
 import { theme } from "@fantappero/ui/theme";
 import { useEffect, useMemo, useRef, type ReactNode } from "react";
 import { Animated, PanResponder, StyleSheet, Text, View } from "react-native";
+import { lazyStyles } from "../../theme/lazyStyles";
 
 const THRESHOLD = 96;
 const MAX_PULL = 150;
@@ -118,7 +119,8 @@ export function SwipeHint({ left, right }: { left?: string; right?: string }) {
   );
 }
 
-const styles = StyleSheet.create({
+// Con lazyStyles il colore del suggerimento segue il tema attivo, non quello d'avvio.
+const styles = lazyStyles(() => StyleSheet.create({
   wrap: { marginBottom: theme.spacing.xs, borderRadius: theme.radius.lg, overflow: "hidden" },
   reveal: {
     ...StyleSheet.absoluteFill,
@@ -130,4 +132,4 @@ const styles = StyleSheet.create({
   revealLabel: { color: "#fff", fontWeight: "700" },
   hint: { flexDirection: "row", justifyContent: "space-between", gap: theme.spacing.sm, marginBottom: 6 },
   hintText: { color: theme.colors.foregroundMuted, fontSize: 12 },
-});
+}));

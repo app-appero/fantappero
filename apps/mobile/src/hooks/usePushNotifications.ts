@@ -3,7 +3,7 @@ import { useNavigation, type NavigationProp } from "@react-navigation/core";
 import Constants, { ExecutionEnvironment } from "expo-constants";
 import * as Device from "expo-device";
 import type * as NotificationsModule from "expo-notifications";
-import { useEffect, useRef } from "react";
+import { useEffect } from "react";
 import { Platform } from "react-native";
 import { registerPushDevice } from "../api/notifications";
 import { openAdminScreen } from "../navigation/adminEntry";
@@ -44,6 +44,16 @@ function loadNotifications(): Notifications | null {
   return cached;
 }
 
+/**
+ * Ricordati per tutta la vita del processo, non del componente: al cambio tema
+ * la navigazione si rimonta (App.tsx) e con dei `useRef` l'hook ripartirebbe da
+ * zero, riaprendo la notifica che ha aperto l'app, richiedendo di nuovo il
+ * permesso a chi l'ha appena negato e registrando di nuovo il token.
+ */
+let registeredForToken: string | null = null;
+let lastHandledResponseId: string | null = null;
+let permissionAsked = false;
+
 function platformName(): PushDevicePlatform | null {
   if (Platform.OS === "ios") return "ios";
   if (Platform.OS === "android") return "android";
@@ -60,8 +70,6 @@ function platformName(): PushDevicePlatform | null {
  */
 export function usePushNotifications(accessToken: string | null | undefined): void {
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
-  const registeredForToken = useRef<string | null>(null);
-  const lastHandledResponseId = useRef<string | null>(null);
 
   useEffect(() => {
     const Notifications = loadNotifications();
@@ -69,14 +77,16 @@ export function usePushNotifications(accessToken: string | null | undefined): vo
     if (!accessToken || !Notifications || platform === null || !Device.isDevice) {
       return;
     }
-    if (registeredForToken.current === accessToken) {
+    if (registeredForToken === accessToken) {
       return;
     }
     let cancelled = false;
     (async () => {
       const current = await Notifications.getPermissionsAsync();
       let granted = current.granted;
-      if (!granted && current.canAskAgain) {
+      // Al massimo una richiesta per avvio dell'app: col cambio tema non si ripropone.
+      if (!granted && current.canAskAgain && !permissionAsked) {
+        permissionAsked = true;
         granted = (await Notifications.requestPermissionsAsync()).granted;
       }
       const projectId = Constants.expoConfig?.extra?.eas?.projectId as string | undefined;
@@ -89,7 +99,7 @@ export function usePushNotifications(accessToken: string | null | undefined): vo
           return;
         }
         await registerPushDevice(accessToken, { token, platform });
-        registeredForToken.current = accessToken;
+        registeredForToken = accessToken;
       } catch {
         // Offline o errore del provider push: si ritenta al prossimo avvio.
       }
@@ -109,10 +119,10 @@ export function usePushNotifications(accessToken: string | null | undefined): vo
         return;
       }
       const id = response.notification.request.identifier;
-      if (lastHandledResponseId.current === id) {
+      if (lastHandledResponseId === id) {
         return;
       }
-      lastHandledResponseId.current = id;
+      lastHandledResponseId = id;
       const content = response.notification.request.content;
       const deepLink = (content.data?.deepLink as string | null | undefined) ?? null;
       const route = resolveNotificationRoute({ title: content.title ?? "", deepLink });
