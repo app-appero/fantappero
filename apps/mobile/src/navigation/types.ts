@@ -38,6 +38,11 @@ export type MarketParams = WireframeParams & {
   scambio?: string;
 };
 
+/** Apertura da una notifica d'asta: sceglie la scheda «Buste chiuse» o «Live». */
+export type AuctionParams = WireframeParams & {
+  modalita?: "buste" | "live";
+};
+
 /** Dettaglio partita del turno europeo (EP13-P04). */
 export type FixtureDetailParams = {
   turnId: string;
@@ -49,7 +54,7 @@ export type AppTabParamList = {
   Standings: WireframeParams | undefined;
   Roster: WireframeParams | undefined;
   Formation: WireframeParams | undefined;
-  Auction: WireframeParams | undefined;
+  Auction: AuctionParams | undefined;
   Waiver: WireframeParams | undefined;
   Market: MarketParams | undefined;
   Profile: undefined;
