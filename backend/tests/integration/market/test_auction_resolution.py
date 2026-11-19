@@ -14,10 +14,11 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 from tests.integration.database.helpers import create_engine_for_url
 
-from database.enums import CreditLedgerReason, FantasyRole, LeagueMemberRole
+from database.enums import CreditLedgerReason, FantasyRole, LeagueAuditAction, LeagueMemberRole
 from database.session import create_session_factory
 from fantasy_teams.models import CreditAccount, CreditLedgerEntry, FantasyRosterSlot
 from leagues.models.competition import Competition
+from leagues.models.league_audit_event import LeagueAuditEvent
 from leagues.models.league_membership import LeagueMembership
 from mail.capture import get_captured_emails
 from market.models import MarketBid, MarketSession
@@ -461,7 +462,7 @@ def test_unassignable_top_bid_falls_to_the_runner_up_with_enough_credits(
     db_session: Session,
     competition_ids: list[str],
 ) -> None:
-    """Il coach non ha più crediti per la seconda offerta vinta: l'atleta va al secondo offerente."""
+    """Il coach non ha più crediti per la seconda offerta vinta: va al secondo offerente."""
     admin_token, _ = _register_and_login(client, "res.runner.admin@example.com")
     member_token, member_id = _register_and_login(client, "res.runner.member@example.com")
     league_id = _create_league(client, admin_token, competition_ids, "Lega Seconda Offerta")
@@ -488,3 +489,332 @@ def test_unassignable_top_bid_falls_to_the_runner_up_with_enough_credits(
 
     db_session.expire_all()
     assert owner_of(second.id) == str(member_id)
+
+
+# -- Spareggio unico (decisione di Rosario del 19/11) ------------------------------------------
+
+
+def _team_id(client: TestClient, league_id: str, token: str) -> str:
+    rosa = client.get(f"/leagues/{league_id}/rosa", headers={"Authorization": f"Bearer {token}"})
+    assert rosa.status_code == 200
+    return rosa.json()["id"]
+
+
+def _balance(client: TestClient, league_id: str, token: str) -> int:
+    response = client.get(
+        f"/leagues/{league_id}/crediti", headers={"Authorization": f"Bearer {token}"}
+    )
+    assert response.status_code == 200
+    return response.json()["balance"]
+
+
+def _admin_adjust_credits(
+    client: TestClient, admin_token: str, league_id: str, team_id: str, amount: int, tx: str
+) -> None:
+    response = client.post(
+        f"/leagues/{league_id}/amministrazione/crediti/movimenti",
+        headers={"Authorization": f"Bearer {admin_token}"},
+        json={
+            "fantasyTeamId": team_id,
+            "amount": amount,
+            "transactionId": tx,
+            "note": "Correzione di prova",
+        },
+    )
+    assert response.status_code == 200, response.json()
+
+
+def _titles(db_session: Session, user_id: UUID) -> list[str]:
+    return [
+        row.title
+        for row in db_session.scalars(
+            select(Notification).where(Notification.user_id == user_id)
+        ).all()
+    ]
+
+
+def _notification(db_session: Session, user_id: UUID, title: str) -> list[Notification]:
+    return list(
+        db_session.scalars(
+            select(Notification).where(Notification.user_id == user_id, Notification.title == title)
+        ).all()
+    )
+
+
+def _resolved_audit(db_session: Session, session_id: str) -> LeagueAuditEvent:
+    rows = [
+        row
+        for row in db_session.scalars(
+            select(LeagueAuditEvent).where(
+                LeagueAuditEvent.action == LeagueAuditAction.MARKET_SESSION_RESOLVED
+            )
+        ).all()
+        if (row.details or {}).get("sessionId") == session_id
+    ]
+    assert len(rows) == 1
+    return rows[0]
+
+
+def _open_tiebreak(
+    client: TestClient,
+    league_id: str,
+    admin_token: str,
+    tokens: list[str],
+    athlete_id: UUID,
+    *,
+    amount: int = 100,
+) -> str:
+    """Sessione a buste con le squadre di ``tokens`` in parità: ritorna l'id dello spareggio."""
+    session_id = _create_open_session(client, admin_token, league_id)
+    for token in tokens:
+        assert _bid(client, league_id, session_id, token, athlete_id, amount).status_code == 200
+    resolution = _close_and_resolve(client, league_id, session_id, admin_token)
+    assert resolution.status_code == 200
+    outcome = resolution.json()["outcomes"][0]
+    assert outcome["outcome"] == "tiebreak"
+    return outcome["tiebreakSessionId"]
+
+
+def _new_auction_session_status(client: TestClient, admin_token: str, league_id: str) -> int:
+    now = datetime.now(UTC)
+    response = client.post(
+        f"/leagues/{league_id}/mercato/asta/sessioni",
+        headers={"Authorization": f"Bearer {admin_token}"},
+        json={
+            "opensAt": (now - timedelta(minutes=1)).isoformat(),
+            "closesAt": (now + timedelta(hours=1)).isoformat(),
+        },
+    )
+    return response.status_code
+
+
+def _random_provider_id() -> int:
+    return random.randint(100_000_000, 2_000_000_000)
+
+
+def test_tiebreak_tied_again_goes_to_the_first_bid_and_unblocks_the_market(
+    client: TestClient,
+    db_session: Session,
+    competition_ids: list[str],
+) -> None:
+    """Spareggio di nuovo in parità: niente secondo spareggio, vince chi ha inviato per primo.
+
+    Conta l'ultimo invio: chi riinvia la stessa offerta passa dopo l'altro.
+    """
+    admin_token, admin_id = _register_and_login(client, "res.tie2.admin@example.com")
+    member_token, member_id = _register_and_login(client, "res.tie2.member@example.com")
+    league_id = _create_league(client, admin_token, competition_ids, "Lega Spareggio Unico")
+    _add_member(db_session, league_id, member_id)
+    athlete = _seed_athlete(db_session, _random_provider_id(), "Conteso Due Volte")
+    admin_team = _team_id(client, league_id, admin_token)
+    member_team = _team_id(client, league_id, member_token)
+
+    tiebreak_id = _open_tiebreak(
+        client, league_id, admin_token, [admin_token, member_token], athlete.id
+    )
+    assert _bid(client, league_id, tiebreak_id, member_token, athlete.id, 120).status_code == 200
+    assert _bid(client, league_id, tiebreak_id, admin_token, athlete.id, 120).status_code == 200
+    # Il membro riinvia la stessa offerta: ora la sua è l'ultima arrivata.
+    assert _bid(client, league_id, tiebreak_id, member_token, athlete.id, 120).status_code == 200
+
+    resolution = _close_and_resolve(client, league_id, tiebreak_id, admin_token)
+    assert resolution.status_code == 200
+    outcome = resolution.json()["outcomes"][0]
+    assert outcome["outcome"] == "assigned"
+    assert outcome["winningTeamId"] == admin_team
+    assert outcome["amountCredits"] == 120
+    assert outcome["tiebreakSessionId"] is None
+
+    db_session.expire_all()
+    # Nessun nuovo spareggio.
+    assert (
+        db_session.scalars(
+            select(MarketSession).where(MarketSession.parent_session_id == UUID(tiebreak_id))
+        ).all()
+        == []
+    )
+    bids = {
+        str(row.fantasy_team_id): row.status.value
+        for row in db_session.scalars(
+            select(MarketBid).where(MarketBid.session_id == UUID(tiebreak_id))
+        ).all()
+    }
+    assert bids == {admin_team: "won", member_team: "lost"}
+    slot = db_session.scalar(
+        select(FantasyRosterSlot).where(FantasyRosterSlot.athlete_id == athlete.id)
+    )
+    assert slot is not None
+    assert str(slot.fantasy_team_id) == admin_team
+    assert slot.purchase_credits == 120
+    assert _balance(client, league_id, admin_token) == 880
+    assert _balance(client, league_id, member_token) == 1000
+
+    # Le solite notifiche di esito.
+    assert len(_notification(db_session, admin_id, "Busta aggiudicata")) == 1
+    lost = _notification(db_session, member_id, "Busta non aggiudicata")
+    assert len(lost) == 1
+    assert "inviata per prima" in lost[0].body
+    assert _titles(db_session, member_id).count("Spareggio aperto") == 1  # solo il primo
+
+    details = _resolved_audit(db_session, tiebreak_id).details
+    assert details["tiebreakRule"] == "first_bid"
+    assert details["tiebreaksOpened"] == 0
+    assert details["winners"] == [
+        {"fantasyTeamId": admin_team, "athleteId": str(athlete.id), "amountCredits": 120}
+    ]
+    assert details["tiebreakResults"] == [
+        {
+            "athleteId": str(athlete.id),
+            "tiedAmountCredits": 120,
+            "teamIds": [admin_team, member_team],
+            "winnerTeamId": admin_team,
+        }
+    ]
+
+    # Il mercato non resta bloccato: si può creare una nuova sessione.
+    assert _new_auction_session_status(client, admin_token, league_id) == 201
+
+
+def test_tiebreak_tied_again_skips_a_first_bid_that_cannot_be_paid(
+    client: TestClient,
+    db_session: Session,
+    competition_ids: list[str],
+) -> None:
+    """La prima offerta in parità non è più coperta dai crediti: vince la successiva in parità."""
+    admin_token, admin_id = _register_and_login(client, "res.tie2.poor.admin@example.com")
+    member_token, member_id = _register_and_login(client, "res.tie2.poor.member@example.com")
+    league_id = _create_league(client, admin_token, competition_ids, "Lega Spareggio Senza Crediti")
+    _add_member(db_session, league_id, member_id)
+    athlete = _seed_athlete(db_session, _random_provider_id(), "Conteso Senza Crediti")
+    admin_team = _team_id(client, league_id, admin_token)
+    member_team = _team_id(client, league_id, member_token)
+
+    tiebreak_id = _open_tiebreak(
+        client, league_id, admin_token, [admin_token, member_token], athlete.id
+    )
+    assert _bid(client, league_id, tiebreak_id, admin_token, athlete.id, 150).status_code == 200
+    assert _bid(client, league_id, tiebreak_id, member_token, athlete.id, 150).status_code == 200
+    _admin_adjust_credits(client, admin_token, league_id, admin_team, -900, "tie2-poor")
+
+    resolution = _close_and_resolve(client, league_id, tiebreak_id, admin_token)
+    assert resolution.status_code == 200
+    outcome = resolution.json()["outcomes"][0]
+    assert outcome["outcome"] == "assigned"
+    assert outcome["winningTeamId"] == member_team
+    assert outcome["amountCredits"] == 150
+
+    db_session.expire_all()
+    assert (
+        db_session.scalars(
+            select(MarketSession).where(MarketSession.parent_session_id == UUID(tiebreak_id))
+        ).all()
+        == []
+    )
+    assert _balance(client, league_id, member_token) == 850
+    assert _balance(client, league_id, admin_token) == 100
+    lost = _notification(db_session, admin_id, "Busta non aggiudicata")
+    assert len(lost) == 1
+    assert "non è stato possibile assegnarlo" in lost[0].body
+    assert len(_notification(db_session, member_id, "Busta aggiudicata")) == 1
+    details = _resolved_audit(db_session, tiebreak_id).details
+    assert details["tiebreakRule"] == "first_bid"
+    assert details["tiebreakResults"][0]["teamIds"] == [admin_team, member_team]
+    assert details["tiebreakResults"][0]["winnerTeamId"] == member_team
+    assert _new_auction_session_status(client, admin_token, league_id) == 201
+
+
+def test_waiver_tiebreak_tied_again_goes_to_the_first_bid(
+    client: TestClient,
+    db_session: Session,
+    competition_ids: list[str],
+) -> None:
+    """Stessa regola per lo spareggio degli svincolati (stesso percorso di risoluzione)."""
+    admin_token, admin_id = _register_and_login(client, "res.tie2.waiver.admin@example.com")
+    member_token, member_id = _register_and_login(client, "res.tie2.waiver.member@example.com")
+    league_id = _create_league(client, admin_token, competition_ids, "Lega Spareggio Svincolati")
+    _add_member(db_session, league_id, member_id)
+    admin_team = _team_id(client, league_id, admin_token)
+    member_team = _team_id(client, league_id, member_token)
+    admin_headers = {"Authorization": f"Bearer {admin_token}"}
+    release: dict[str, str] = {}
+    for token, team_id in ((admin_token, admin_team), (member_token, member_team)):
+        owned = _seed_athlete(db_session, _random_provider_id(), f"Da Svincolare {team_id[:8]}")
+        placed = client.put(
+            f"/leagues/{league_id}/amministrazione/squadre/{team_id}/slot/0",
+            headers=admin_headers,
+            json={"athleteId": str(owned.id), "purchaseCredits": 0},
+        )
+        assert placed.status_code == 200, placed.json()
+        release[token] = str(owned.id)
+    free_agent = _seed_athlete(db_session, _random_provider_id(), "Svincolato Conteso")
+    base = f"/leagues/{league_id}/mercato/svincoli/sessioni"
+
+    def waiver_bid(session_id: str, token: str, amount: int) -> None:
+        response = client.put(
+            f"{base}/{session_id}/offerte/{free_agent.id}",
+            headers={"Authorization": f"Bearer {token}"},
+            json={"amountCredits": amount, "releaseAthleteId": release[token]},
+        )
+        assert response.status_code == 200, response.json()
+
+    def close_and_resolve(session_id: str) -> dict:
+        assert client.post(f"{base}/{session_id}/chiudi", headers=admin_headers).status_code == 200
+        resolved = client.post(f"{base}/{session_id}/risolvi", headers=admin_headers)
+        assert resolved.status_code == 200, resolved.json()
+        return resolved.json()
+
+    def create_waiver_session(minutes: int) -> int | str:
+        now = datetime.now(UTC)
+        response = client.post(
+            base,
+            headers=admin_headers,
+            json={
+                "opensAt": (now - timedelta(minutes=1)).isoformat(),
+                "closesAt": (now + timedelta(minutes=minutes)).isoformat(),
+            },
+        )
+        return response.json()["id"] if response.status_code == 201 else response.status_code
+
+    waiver_id = create_waiver_session(1)
+    assert isinstance(waiver_id, str)
+    waiver_bid(waiver_id, admin_token, 50)
+    waiver_bid(waiver_id, member_token, 50)
+    first = close_and_resolve(waiver_id)["outcomes"][0]
+    assert first["outcome"] == "tiebreak"
+    tiebreak_id = first["tiebreakSessionId"]
+    assert create_waiver_session(60) == 400  # lo spareggio aperto blocca il mercato
+
+    waiver_bid(tiebreak_id, member_token, 60)
+    waiver_bid(tiebreak_id, admin_token, 60)
+    outcome = close_and_resolve(tiebreak_id)["outcomes"][0]
+    assert outcome["outcome"] == "assigned"
+    assert outcome["winningTeamId"] == member_team
+    assert outcome["amountCredits"] == 60
+
+    db_session.expire_all()
+    assert (
+        db_session.scalars(
+            select(MarketSession).where(MarketSession.parent_session_id == UUID(tiebreak_id))
+        ).all()
+        == []
+    )
+    slot = db_session.scalar(
+        select(FantasyRosterSlot).where(FantasyRosterSlot.athlete_id == free_agent.id)
+    )
+    assert slot is not None
+    assert str(slot.fantasy_team_id) == member_team
+
+    def owner(athlete_id: str) -> FantasyRosterSlot | None:
+        return db_session.scalar(
+            select(FantasyRosterSlot).where(FantasyRosterSlot.athlete_id == UUID(athlete_id))
+        )
+
+    # Esce dalla rosa solo il calciatore indicato dal vincitore.
+    assert owner(release[member_token]) is None
+    assert owner(release[admin_token]) is not None
+    assert _balance(client, league_id, member_token) == 940
+    assert _balance(client, league_id, admin_token) == 1000
+    assert len(_notification(db_session, member_id, "Busta aggiudicata")) == 1
+    assert len(_notification(db_session, admin_id, "Busta non aggiudicata")) == 1
+    assert _resolved_audit(db_session, tiebreak_id).details["tiebreakRule"] == "first_bid"
+    assert isinstance(create_waiver_session(60), str)

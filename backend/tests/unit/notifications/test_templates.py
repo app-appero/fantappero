@@ -46,6 +46,21 @@ def test_render_mercato_esito_busta_lost() -> None:
     assert "non aggiudicata" in content.title.lower()
 
 
+def test_render_mercato_esito_busta_lost_on_repeated_tiebreak_tie() -> None:
+    """Spareggio di nuovo in parità: chi perde non ha offerto meno, è arrivato dopo."""
+    content = render_notification(
+        "mercato.esito_busta",
+        1,
+        {"outcome": "lost", "athlete_name": "Bomber", "lost_on_tie": True},
+    )
+    assert content.title == "Busta non aggiudicata"
+    assert content.body == (
+        "Non hai aggiudicato Bomber: a parità d'importo nello spareggio vince "
+        "l'offerta inviata per prima."
+    )
+    assert "inferiore" not in content.body
+
+
 def test_render_mercato_asta_live_perso_variants() -> None:
     """P4: capofila senza crediti (o senza posto) alla chiusura del lotto live."""
     base = {"athlete_name": "Bomber", "amount_credits": 500, "league_id": "abc"}

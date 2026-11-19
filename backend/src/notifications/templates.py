@@ -188,11 +188,13 @@ def _render_mercato_esito_busta(params: NotificationParams) -> NotificationConte
             ),
             deep_link=_league_link(_AUCTION_PATH, params),
         )
-    reason = (
-        "non è stato possibile assegnarlo (crediti insufficienti o rosa non valida)"
-        if params.get("not_assignable")
-        else "offerta inferiore"
-    )
+    if params.get("lost_on_tie"):
+        # Spareggio finito di nuovo in parità: vince l'offerta inviata per prima.
+        reason = "a parità d'importo nello spareggio vince l'offerta inviata per prima"
+    elif params.get("not_assignable"):
+        reason = "non è stato possibile assegnarlo (crediti insufficienti o rosa non valida)"
+    else:
+        reason = "offerta inferiore"
     return NotificationContent(
         title="Busta non aggiudicata",
         body=_league_body(f"Non hai aggiudicato {athlete_name}: {reason}.", params),
