@@ -430,6 +430,192 @@ def fill_starter_holes(
     return filled
 
 
+#: Da dove arriva chi copre un posto vuoto all'inizio del turno.
+TURN_START_FROM_BENCH = "bench"
+TURN_START_FROM_TRIBUNA = "tribuna"
+
+
+@dataclass(frozen=True)
+class TurnStartHoleFill:
+    """Un posto da titolare vuoto all'inizio del turno e come è stato coperto."""
+
+    #: ``sort_order`` del posto tra i titolari.
+    starter_position: int
+    #: Il ruolo che manca al modulo in quel posto (``None``: modulo non leggibile).
+    role: FantasyRole | None
+    #: Chi è entrato tra i titolari; ``None`` se il posto resta vuoto.
+    starter_athlete_id: object | None = None
+    #: ``TURN_START_FROM_BENCH`` o ``TURN_START_FROM_TRIBUNA``; ``None`` se il posto resta vuoto.
+    source: str | None = None
+    #: Posizione in panchina (0-based, prima del cambio) di chi è entrato.
+    from_bench_position: int | None = None
+    #: Chi dalla tribuna ha preso in panchina il posto di chi è entrato.
+    bench_athlete_id: object | None = None
+    #: Il posto in panchina preso da ``bench_athlete_id`` (quello lasciato da chi è entrato).
+    bench_position: int | None = None
+    #: Posizione in panchina (0-based, prima del cambio) di ``bench_athlete_id``; ``None`` se
+    #: non era nella formazione (in rosa ma non schierato).
+    bench_from_position: int | None = None
+
+
+@dataclass(frozen=True)
+class TurnStartLineup:
+    """Formazione dopo la regola di inizio turno (``fill_lineup_holes_at_turn_start``)."""
+
+    #: Titolari come ``(sort_order, calciatore)``: gli altri tengono il loro posto.
+    starters: tuple[tuple[int, LineupPlayerRef], ...]
+    #: Panchina completa (panchina attiva e tribuna) nel nuovo ordine.
+    bench: tuple[LineupPlayerRef, ...]
+    #: Un elemento per ogni posto vuoto, in ordine di posto.
+    fills: tuple[TurnStartHoleFill, ...]
+
+    @property
+    def changed(self) -> bool:
+        return any(item.starter_athlete_id is not None for item in self.fills)
+
+
+def fill_lineup_holes_at_turn_start(
+    *,
+    module: str,
+    starters: Sequence[tuple[int, LineupPlayerRef]],
+    bench: Sequence[LineupPlayerRef],
+    outside: Sequence[LineupPlayerRef] = (),
+    unavailable_ids: Iterable[object] = (),
+) -> TurnStartLineup:
+    """Copre i posti vuoti tra i titolari all'inizio del turno (decisione di Rosario del 19/11).
+
+    Ogni posto vuoto ha il ruolo che manca al modulo (``fill_starter_holes``). In due passi:
+
+    1. per ogni posto vuoto, in ordine di posto, entra il primo della panchina attiva (i primi
+       ``BENCH_ACTIVE_SIZE``, in ordine di panchina) con quel ruolo; senza nessuno in panchina
+       entra direttamente il primo della tribuna con quel ruolo; senza nessuno di quel ruolo il
+       posto resta vuoto;
+    2. poi, per ogni panchinaro entrato, il primo della tribuna con lo stesso ruolo prende il
+       suo posto in panchina. Stesso ruolo nello stesso posto: la quota per ruolo della
+       panchina attiva non cambia e gli altri non si spostano, quindi non serve mai metterlo in
+       coda. Senza nessuno in tribuna la panchina si ricompatta.
+
+    Con due posti vuoti dello stesso ruolo entrano i primi due panchinari di quel ruolo, e i
+    primi due della tribuna salgono ai loro posti: l'ordine scelto dal fantallenatore conta.
+
+    La tribuna è nell'ordine mostrato da web e app («Altri N in tribuna»): prima la panchina
+    salvata dall'11° posto in poi, poi chi è in rosa ma non è nella formazione (``outside``,
+    nell'ordine degli slot della rosa). Non entra chi è in ``unavailable_ids`` (esubero di
+    ruolo, ruolo non risolto, nessun voto possibile in questo turno), né chi non ha un ruolo.
+
+    Funzione pura e deterministica: niente blocchi per partita, così l'esito non dipende da
+    quando gira; decidere se e quando applicarla spetta al chiamante
+    (``fantasy_lineups.turn_start``).
+    """
+    unavailable = {item for item in unavailable_ids if item not in {None, ""}}
+    present = [(position, ref) for position, ref in starters if ref.athlete_id not in {None, ""}]
+    slots = fill_starter_holes(module=module, starters=present)
+    holes = [(position, ref.role) for position, ref in enumerate(slots) if ref.athlete_id == ""]
+    final_starters: dict[int, LineupPlayerRef] = dict(present)
+    if not holes:
+        return TurnStartLineup(
+            starters=tuple(sorted(final_starters.items(), key=lambda item: item[0])),
+            bench=tuple(bench),
+            fills=(),
+        )
+    original_position = {ref.athlete_id: index for index, ref in enumerate(bench)}
+    # Le prime ``BENCH_ACTIVE_SIZE`` posizioni non cambiano durante i due passi (chi entra resta
+    # al suo posto fino alla fine); la tribuna è tutto il resto, nel suo ordine.
+    active = list(bench[:BENCH_ACTIVE_SIZE])
+    tribuna = list(bench[BENCH_ACTIVE_SIZE:])
+    spare = [ref for ref in outside if ref.athlete_id not in {None, ""}]
+    used: set[object] = set()
+
+    def usable(ref: LineupPlayerRef, role: FantasyRole) -> bool:
+        return (
+            ref.athlete_id not in {None, ""}
+            and ref.athlete_id not in unavailable
+            and ref.athlete_id not in used
+            and ref.role is not None
+            and ref.role == role
+        )
+
+    def take_from_tribuna(role: FantasyRole) -> LineupPlayerRef | None:
+        for pool in (tribuna, spare):
+            index = next((i for i, ref in enumerate(pool) if usable(ref, role)), None)
+            if index is not None:
+                ref = pool.pop(index)
+                used.add(ref.athlete_id)
+                return ref
+        return None
+
+    # 1. I posti vuoti: prima la panchina attiva, poi la tribuna.
+    entered: dict[int, tuple[LineupPlayerRef, str | None, int | None]] = {}
+    for position, role in holes:
+        if role is None:
+            continue
+        bench_index = next((i for i, ref in enumerate(active) if usable(ref, role)), None)
+        if bench_index is not None:
+            promoted = active[bench_index]
+            used.add(promoted.athlete_id)
+            final_starters[position] = promoted
+            entered[position] = (promoted, TURN_START_FROM_BENCH, bench_index)
+            continue
+        direct = take_from_tribuna(role)
+        if direct is not None:
+            final_starters[position] = direct
+            entered[position] = (direct, TURN_START_FROM_TRIBUNA, None)
+
+    # 2. In panchina, al posto di ogni panchinaro entrato, il primo della tribuna dello stesso
+    # ruolo; dove non c'è nessuno il posto si libera e la panchina si ricompatta.
+    refills: dict[int, LineupPlayerRef] = {}
+    for position, _ in holes:
+        item = entered.get(position)
+        if item is None or item[1] != TURN_START_FROM_BENCH:
+            continue
+        promoted, _, bench_index = item
+        assert bench_index is not None and promoted.role is not None
+        refill = take_from_tribuna(promoted.role)
+        if refill is not None:
+            refills[position] = refill
+            active[bench_index] = refill
+    promoted_ids = {
+        item[0].athlete_id for item in entered.values() if item[1] == TURN_START_FROM_BENCH
+    }
+    final_bench = [ref for ref in active if ref.athlete_id not in promoted_ids] + tribuna
+    final_position = {ref.athlete_id: index for index, ref in enumerate(final_bench)}
+
+    fills: list[TurnStartHoleFill] = []
+    for position, role in holes:
+        item = entered.get(position)
+        if item is None:
+            fills.append(TurnStartHoleFill(starter_position=position, role=role))
+            continue
+        ref, source, _ = item
+        refill = refills.get(position)
+        fills.append(
+            TurnStartHoleFill(
+                starter_position=position,
+                role=role,
+                starter_athlete_id=ref.athlete_id,
+                source=source,
+                from_bench_position=original_position.get(ref.athlete_id),
+                bench_athlete_id=refill.athlete_id if refill is not None else None,
+                bench_position=final_position[refill.athlete_id] if refill is not None else None,
+                bench_from_position=(
+                    original_position.get(refill.athlete_id) if refill is not None else None
+                ),
+            )
+        )
+    return TurnStartLineup(
+        starters=tuple(sorted(final_starters.items(), key=lambda item: item[0])),
+        bench=tuple(final_bench),
+        fills=tuple(fills),
+    )
+
+
+def turn_start_role_label(role: FantasyRole | None) -> str:
+    """«difensore», «portiere»…: il ruolo al singolare per gli avvisi."""
+    if role is None:
+        return "titolare"
+    return _BENCH_ROLE_LABELS[role][0]
+
+
 def evaluate_lineup(
     *,
     module: str,

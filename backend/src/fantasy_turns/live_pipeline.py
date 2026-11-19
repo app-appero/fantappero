@@ -17,6 +17,7 @@ from sqlalchemy.orm import Session
 
 from auth.exceptions import ValidationAuthError
 from database.enums import FantasyRoundHomologationStatus, FantasyTurnStatus
+from fantasy_lineups.turn_start import settle_started_turns
 from fantasy_turns.models import FantasyRound, FantasyRoundFixture
 from fantasy_turns.round_calculation_service import calculate_league_round
 from observability.logging import get_logger
@@ -46,6 +47,8 @@ class LivePipelineResult:
     rounds_processed: int = 0
     rounds_finalized: int = 0
     fixtures_scored: int = 0
+    #: Formazioni sistemate dalla regola di inizio turno in questo giro.
+    turn_start_teams_changed: int = 0
     errors: list[dict[str, str]] = field(default_factory=list)
 
     def as_dict(self) -> dict[str, object]:
@@ -54,6 +57,7 @@ class LivePipelineResult:
             "roundsProcessed": self.rounds_processed,
             "roundsFinalized": self.rounds_finalized,
             "fixturesScored": self.fixtures_scored,
+            "turnStartTeamsChanged": self.turn_start_teams_changed,
             "errors": list(self.errors),
         }
 
@@ -96,8 +100,15 @@ def process_live_fantasy_rounds(
     A savepoint isolates one league from another: malformed data in a single
     round is reported and does not prevent other live leagues from updating.
     """
+    # Prima di tutto la regola di inizio turno sulle formazioni dei turni appena arrivati al
+    # primo blocco (e non ancora calcolati): così vale dal primo blocco anche se nessuno apre la
+    # formazione, e prima di qualunque calcolo (fantasy_lineups.turn_start).
+    turn_start = settle_started_turns(session, now=now)
     round_rows = select_live_rounds(session, horizon=horizon, now=now)
-    result = LivePipelineResult(rounds_considered=len(round_rows))
+    result = LivePipelineResult(
+        rounds_considered=len(round_rows),
+        turn_start_teams_changed=sum(item.teams_changed for item in turn_start),
+    )
 
     for round_id, league_id in round_rows:
         # Chiude la transazione della lega precedente: senza questo i blocchi sui turni

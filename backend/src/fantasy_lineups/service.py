@@ -27,6 +27,7 @@ from database.enums import (
 )
 from fantasy_lineups.ai_selection import LineupPlan
 from fantasy_lineups.ai_service import DEFAULT_MODULE
+from fantasy_lineups.availability import no_vote_reasons, probable_hints
 from fantasy_lineups.best_lineup_service import (
     compute_best_lineup_for_team,
     compute_best_lineup_respecting_locks,
@@ -76,6 +77,7 @@ from fantasy_lineups.schemas import (
     SaveLineupRequest,
     TacticalMoveResponse,
 )
+from fantasy_lineups.turn_start import settle_lineups_at_turn_start, turn_start_notices
 from fantasy_lineups.validators import (
     MAX_LINEUP_LOCK_MARGIN_MINUTES,
     parse_optional_athlete_ids,
@@ -91,8 +93,8 @@ from fantasy_teams.composition_service import (
 )
 from fantasy_teams.factory import ensure_team_for_membership, find_team_for_membership
 from fantasy_teams.models import FantasyRosterSlot, FantasyTeam
-from fantasy_turns.models import FantasyRound, FantasyRoundFixture
-from fantasy_turns.rules import INACTIVE_FIXTURE_STATUSES, derive_effective_status
+from fantasy_turns.models import FantasyRound
+from fantasy_turns.rules import derive_effective_status
 from fantasy_turns.service import FantasyTurnService
 from leagues.models.league_audit_event import LeagueAuditEvent
 from leagues.models.league_membership import LeagueMembership
@@ -101,7 +103,7 @@ from observability.context import get_correlation_id
 from observability.logging import get_logger
 from observability.metrics import get_metrics
 from sports_data.catalog.models import Club
-from sports_data.predicted.read import AthleteProbable, hints_for_fixtures
+from sports_data.predicted.read import AthleteProbable
 from sports_data.roster.models import Athlete
 
 logger = get_logger(__name__)
@@ -165,38 +167,46 @@ class FantasyLineupService:
         now: datetime,
         kickoffs: dict[UUID, _KickoffRef] | None = None,
     ) -> None:
-        """Primo blocco del turno senza formazione confermata: arriva subito quella automatica.
+        """Primo blocco del turno: formazione automatica e regola di inizio turno.
 
-        Bozza valida, poi formazione del turno precedente, poi vuota (come a fine turno). Da lì
-        ogni cambio costa una mossa: la bozza non resta un modo per cambiare senza limiti.
+        Senza formazione confermata arriva subito quella automatica: bozza valida, poi
+        formazione del turno precedente, poi vuota (come a fine turno). Da lì ogni cambio costa
+        una mossa: la bozza non resta un modo per cambiare senza limiti.
+
+        Poi, per la formazione della squadra (anche quella appena creata), la regola di inizio
+        turno: chi non è più in rosa esce e i posti vuoti tra i titolari si coprono dalla
+        panchina e dalla tribuna (``fantasy_lineups.turn_start``). È la stessa che applica il
+        job del calcolo; vale solo dal primo blocco e fino al primo calcolo del turno, e
+        rieseguirla non cambia niente. Nessuna nuova revisione né mossa tattica.
         """
         # Nessuna query finché il primo blocco possibile del turno è ancora lontano.
         if fantasy_round.cutoff_at is not None and now < fantasy_round.cutoff_at - timedelta(
             minutes=MAX_LINEUP_LOCK_MARGIN_MINUTES
         ):
             return
-        if self._load_submission(fantasy_round.id, team.id) is not None:
-            return
-        if kickoffs is None:
-            kickoffs = self._athlete_kickoffs(
-                round_id=fantasy_round.id,
-                season_year=season_year,
-                athlete_ids=[row.athlete_id for row in roster],
-            )
-        margin = self._lineup_lock_margin_for_league(fantasy_round.league_id)
-        if not any(self._is_row_locked(row.athlete_id, kickoffs, now, margin) for row in roster):
-            return
-        from fantasy_lineups.fallback_service import ensure_lineup_submissions_for_round
+        if self._load_submission(fantasy_round.id, team.id) is None:
+            if kickoffs is None:
+                kickoffs = self._athlete_kickoffs(
+                    round_id=fantasy_round.id,
+                    season_year=season_year,
+                    athlete_ids=[row.athlete_id for row in roster],
+                )
+            margin = self._lineup_lock_margin_for_league(fantasy_round.league_id)
+            if any(self._is_row_locked(row.athlete_id, kickoffs, now, margin) for row in roster):
+                from fantasy_lineups.fallback_service import ensure_lineup_submissions_for_round
 
-        ensure_lineup_submissions_for_round(
-            self._session,
-            round_id=fantasy_round.id,
-            league_id=fantasy_round.league_id,
-            actor_id=None,
-            team_ids={team.id},
+                ensure_lineup_submissions_for_round(
+                    self._session,
+                    round_id=fantasy_round.id,
+                    league_id=fantasy_round.league_id,
+                    actor_id=None,
+                    team_ids={team.id},
+                )
+                self._session.flush()
+                logger.info("fantasy_lineup_materialized_at_first_lock")
+        settle_lineups_at_turn_start(
+            self._session, fantasy_round=fantasy_round, now=now, team_ids={team.id}
         )
-        self._session.flush()
-        logger.info("fantasy_lineup_materialized_at_first_lock")
 
     def get_my_lineup(
         self,
@@ -217,10 +227,11 @@ class FantasyLineupService:
             league_access.league.season_year, team, round_number=fantasy_round.number
         )
         submission = self._load_submission(fantasy_round.id, team.id)
-        if submission is None and (
-            fantasy_round.cutoff_at is None
-            or now >= fantasy_round.cutoff_at - timedelta(minutes=MAX_LINEUP_LOCK_MARGIN_MINUTES)
+        if fantasy_round.cutoff_at is None or now >= fantasy_round.cutoff_at - timedelta(
+            minutes=MAX_LINEUP_LOCK_MARGIN_MINUTES
         ):
+            # Dal primo blocco: formazione automatica se manca, poi la regola di inizio turno
+            # (la stessa del job del calcolo, nel caso questa richiesta arrivi prima del job).
             self._materialize_if_started(
                 fantasy_round=fantasy_round,
                 team=team,
@@ -1489,6 +1500,30 @@ class FantasyLineupService:
             # Bozza senza nessun titolare (es. copia di una formazione non più in rosa): non è una
             # formazione, la si ignora invece di mostrarla come «bozza salvata».
             draft_response = None
+        # All'inizio del turno la formazione è stata sistemata dalla regola di sistema
+        # (fantasy_lineups.turn_start): l'avviso dice chi è entrato al posto di chi, finché il
+        # fantallenatore non salva di nuovo. Per chi è citato lì non serve più l'avviso
+        # «scegli chi mettere al suo posto». Nessuna query finché il primo blocco è lontano.
+        turn_start = (
+            [
+                notice
+                for notice in turn_start_notices(
+                    self._session,
+                    league_id=league_id,
+                    round_id=fantasy_round.id,
+                    team_id=fantasy_team_id,
+                )
+                if notice.applied_at > submission.submitted_at
+            ]
+            if submission is not None
+            and (
+                fantasy_round.cutoff_at is None
+                or now
+                >= fantasy_round.cutoff_at - timedelta(minutes=MAX_LINEUP_LOCK_MARGIN_MINUTES)
+            )
+            else []
+        )
+        settled_ids = {item for notice in turn_start for item in notice.departed_athlete_ids}
         if is_purgeable_turn_status(effective) and (submission is not None or draft is not None):
             # Chi è uscito dalla rosa è già stato tolto dal DB al momento dell'uscita
             # (fantasy_lineups.departures): l'avviso col nome resta finché il fantallenatore non
@@ -1509,7 +1544,9 @@ class FantasyLineupService:
                     round_id=fantasy_round.id,
                     team_id=fantasy_team_id,
                 )
-                if notice.removed_at > last_saved and notice.athlete_id not in owned_ids
+                if notice.removed_at > last_saved
+                and notice.athlete_id not in owned_ids
+                and notice.athlete_id not in settled_ids
             ]
         if removed_names:
             issues.insert(
@@ -1519,6 +1556,13 @@ class FantasyLineupService:
                     message=lineup_athlete_left_roster_message(removed_names),
                 ),
             )
+        # Stesso codice dell'avviso «non è più nella tua rosa»: web e app lo mostrano già nello
+        # stesso riquadro, in testa.
+        issues[:0] = [
+            LineupIssueResponse(code=LINEUP_ATHLETE_LEFT_ROSTER_CODE, message=message)
+            for notice in turn_start
+            for message in notice.messages
+        ]
         max_automatic_substitutions = self._max_automatic_substitutions_for_league(league_id)
         moves = list(submission.tactical_moves) if submission is not None else []
         moves.sort(key=lambda row: row.sequence)
@@ -1845,20 +1889,7 @@ class FantasyLineupService:
         athlete_ids: list[UUID],
     ) -> dict[UUID, AthleteProbable]:
         """Indizi opzionali. Un errore qui non deve impedire di aprire la formazione."""
-        try:
-            with self._session.begin_nested():
-                fixture_ids = list(
-                    self._session.scalars(
-                        select(FantasyRoundFixture.fixture_id).where(
-                            FantasyRoundFixture.round_id == round_id,
-                            FantasyRoundFixture.excluded_at.is_(None),
-                        )
-                    ).all()
-                )
-                return hints_for_fixtures(self._session, fixture_ids, athlete_ids)
-        except Exception:
-            logger.warning("probable_lineup_hints_unavailable", exc_info=True)
-            return {}
+        return probable_hints(self._session, round_id, athlete_ids)
 
     @staticmethod
     def _no_vote_reasons(
@@ -1868,28 +1899,8 @@ class FantasyLineupService:
         *,
         include_schedule: bool = True,
     ) -> dict[UUID, str]:
-        """Chi di sicuro non prende il voto in questo turno, con il motivo da mostrare.
-
-        Nessuna partita nel turno, partita rinviata o annullata, indisponibilità confermata.
-        Non può entrare tra i titolari: altrimenti lo si schiera apposta per far entrare un
-        panchinaro di cui si conosce già il voto.
-        """
-        reasons: dict[UUID, str] = {}
-        for athlete_id in athlete_ids:
-            ref = kickoffs.get(athlete_id)
-            if include_schedule and ref is None:
-                reasons[athlete_id] = "Nessuna partita in questo turno"
-            elif (
-                include_schedule
-                and ref is not None
-                and (ref.status_short or "").strip().upper() in INACTIVE_FIXTURE_STATUSES
-            ):
-                reasons[athlete_id] = "Partita rinviata o annullata"
-            else:
-                hint = probable.get(athlete_id)
-                if hint is not None and hint.blocked:
-                    reasons[athlete_id] = hint.note
-        return reasons
+        """Chi di sicuro non prende il voto in questo turno (``fantasy_lineups.availability``)."""
+        return no_vote_reasons(athlete_ids, kickoffs, probable, include_schedule=include_schedule)
 
     def _reject_newly_blocked_starters(
         self,

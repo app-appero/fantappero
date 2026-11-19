@@ -17,7 +17,10 @@ from fantasy_lineups.rules import (
     MAX_AUTOMATIC_SUBSTITUTIONS,
     MAX_TACTICAL_MOVES,
     MIN_AUTOMATIC_SUBSTITUTIONS,
+    TURN_START_FROM_BENCH,
+    TURN_START_FROM_TRIBUNA,
     LineupPlayerRef,
+    TurnStartHoleFill,
     assert_bench_order_lock,
     assert_copy_previous_lineup,
     assert_lineup_modification_allowed,
@@ -32,6 +35,7 @@ from fantasy_lineups.rules import (
     evaluate_lineup,
     evaluate_progressive_lock,
     evaluate_tactical_move,
+    fill_lineup_holes_at_turn_start,
     fill_starter_holes,
     is_athlete_kickoff_locked,
     is_lineup_modification_allowed,
@@ -46,6 +50,7 @@ from fantasy_lineups.rules import (
     reorder_bench_for_active_roles,
     resolve_automatic_substitutions,
     starter_template,
+    turn_start_role_label,
 )
 
 
@@ -1188,3 +1193,163 @@ def test_fill_starter_holes_without_holes_returns_starters_in_slot_order() -> No
     filled = fill_starter_holes(module="4-3-3", starters=starters)
     assert [ref.athlete_id for ref in filled] == [f"t{index}" for index in range(11)]
     assert fill_starter_holes(module="4-3-3", starters=[]) == []
+
+
+# -- regola di inizio turno (decisione del 19/11) -----------------------------------------
+
+
+def _turn_start_bench() -> list[LineupPlayerRef]:
+    """Panchina attiva P C A D C A D C A D (b0-b9), poi la tribuna: un P, due D, un C."""
+    by_letter = {"P": FantasyRole.P, "D": FantasyRole.D, "C": FantasyRole.C, "A": FantasyRole.A}
+    active = [_ref(f"b{index}", by_letter[letter]) for index, letter in enumerate("PCADCADCAD")]
+    tribuna = [
+        _ref("t-p", FantasyRole.P),
+        _ref("t-d1", FantasyRole.D),
+        _ref("t-d2", FantasyRole.D),
+        _ref("t-c", FantasyRole.C),
+    ]
+    return [*active, *tribuna]
+
+
+def _ids_of(refs: object) -> list[object]:
+    return [ref.athlete_id for ref in refs]  # type: ignore[attr-defined]
+
+
+def test_turn_start_fill_promotes_first_bench_player_and_refills_from_the_tribuna() -> None:
+    starters = [item for item in _433_starters() if item[0] != 2]
+    result = fill_lineup_holes_at_turn_start(
+        module="4-3-3", starters=starters, bench=_turn_start_bench()
+    )
+    assert dict(result.starters)[2].athlete_id == "b3"  # primo D della panchina, 4°
+    assert _ids_of(result.bench) == [
+        *("b0", "b1", "b2", "t-d1", "b4", "b5", "b6", "b7", "b8", "b9"),
+        *("t-p", "t-d2", "t-c"),
+    ]
+    assert result.fills == (
+        TurnStartHoleFill(
+            starter_position=2,
+            role=FantasyRole.D,
+            starter_athlete_id="b3",
+            source=TURN_START_FROM_BENCH,
+            from_bench_position=3,
+            bench_athlete_id="t-d1",
+            bench_position=3,
+            bench_from_position=11,
+        ),
+    )
+    assert result.changed
+    # Stesso ruolo nello stesso posto: la formazione resta in regola, panchina compresa.
+    fielded = [*(ref.athlete_id for _, ref in result.starters), *_ids_of(result.bench)]
+    evaluation = evaluate_lineup(
+        module="4-3-3",
+        starters=[ref for _, ref in result.starters],
+        bench=list(result.bench),
+        roster_athlete_ids=fielded,
+    )
+    assert evaluation.valid, evaluation.issues
+
+
+def test_turn_start_fill_skips_unavailable_players_and_uses_the_rest_of_the_roster() -> None:
+    starters = [item for item in _433_starters() if item[0] != 2]
+    bench = _turn_start_bench()
+    # b3 non prende il voto, t-d1 è in esubero di ruolo: entra b6, al suo posto sale t-d2.
+    result = fill_lineup_holes_at_turn_start(
+        module="4-3-3", starters=starters, bench=bench, unavailable_ids={"b3", "t-d1"}
+    )
+    assert dict(result.starters)[2].athlete_id == "b6"
+    assert result.fills[0].bench_athlete_id == "t-d2"
+    assert _ids_of(result.bench)[6] == "t-d2"
+    # Nessun difensore utilizzabile in tribuna: sale il primo in rosa ma fuori formazione.
+    result = fill_lineup_holes_at_turn_start(
+        module="4-3-3",
+        starters=starters,
+        bench=bench,
+        outside=[_ref("x-c", FantasyRole.C), _ref("x-d", FantasyRole.D)],
+        unavailable_ids={"t-d1", "t-d2"},
+    )
+    assert result.fills[0].bench_athlete_id == "x-d"
+    assert result.fills[0].bench_from_position is None
+    assert _ids_of(result.bench)[3] == "x-d"
+
+
+def test_turn_start_fill_without_tribuna_compacts_the_bench() -> None:
+    starters = [item for item in _433_starters() if item[0] != 2]
+    result = fill_lineup_holes_at_turn_start(
+        module="4-3-3", starters=starters, bench=_turn_start_bench()[:10]
+    )
+    assert dict(result.starters)[2].athlete_id == "b3"
+    assert result.fills[0].bench_athlete_id is None
+    assert _ids_of(result.bench) == ["b0", "b1", "b2", "b4", "b5", "b6", "b7", "b8", "b9"]
+
+
+def test_turn_start_fill_from_the_tribuna_or_left_empty() -> None:
+    starters = [item for item in _433_starters() if item[0] not in {2, 9}]
+    bench = [
+        _ref("b-p", FantasyRole.P),
+        _ref("b-c", FantasyRole.C),
+        _ref("b-a", FantasyRole.A),
+        *(_ref(f"b-x{index}", FantasyRole.C) for index in range(7)),
+        _ref("t-d", FantasyRole.D),
+        _ref("t-c", FantasyRole.C),
+    ]
+    result = fill_lineup_holes_at_turn_start(module="4-3-3", starters=starters, bench=bench)
+    # Posto 2 (D): nessun difensore in panchina, entra il primo della tribuna.
+    # Posto 9 (A): entra b-a dalla panchina; in tribuna nessun attaccante da far salire.
+    assert [
+        (item.starter_position, item.source, item.starter_athlete_id) for item in result.fills
+    ] == [
+        (2, TURN_START_FROM_TRIBUNA, "t-d"),
+        (9, TURN_START_FROM_BENCH, "b-a"),
+    ]
+    assert _ids_of(result.bench) == ["b-p", "b-c", *(f"b-x{index}" for index in range(7)), "t-c"]
+    # Nessuno del ruolo: il posto resta vuoto, senza errori.
+    alone = fill_lineup_holes_at_turn_start(module="4-3-3", starters=starters, bench=bench[:2])
+    assert [(item.starter_position, item.starter_athlete_id) for item in alone.fills] == [
+        (2, None),
+        (9, None),
+    ]
+    assert not alone.changed
+    assert _ids_of(alone.bench) == ["b-p", "b-c"]
+
+
+def test_turn_start_fill_two_holes_of_the_same_role_follow_the_bench_order() -> None:
+    starters = [item for item in _433_starters() if item[0] not in {1, 3}]
+    result = fill_lineup_holes_at_turn_start(
+        module="4-3-3", starters=starters, bench=_turn_start_bench()
+    )
+    # Entrano i primi due difensori della panchina (b3, b6); ai loro posti salgono i primi due
+    # della tribuna (t-d1, t-d2), non un difensore appena salito.
+    assert [
+        (item.starter_position, item.starter_athlete_id, item.bench_athlete_id, item.bench_position)
+        for item in result.fills
+    ] == [(1, "b3", "t-d1", 3), (3, "b6", "t-d2", 6)]
+    assert _ids_of(result.bench) == [
+        *("b0", "b1", "b2", "t-d1", "b4", "b5", "t-d2", "b7", "b8", "b9"),
+        *("t-p", "t-c"),
+    ]
+    # Un solo difensore in panchina: il secondo posto lo prende il primo della tribuna, e al posto
+    # di b3 in panchina sale il secondo.
+    fillers = [_ref(f"f{index}", FantasyRole.C) for index in range(4)]
+    one = fill_lineup_holes_at_turn_start(
+        module="4-3-3",
+        starters=starters,
+        bench=[*_turn_start_bench()[:6], *fillers, *_turn_start_bench()[10:]],
+    )
+    assert [
+        (item.starter_position, item.source, item.starter_athlete_id, item.bench_athlete_id)
+        for item in one.fills
+    ] == [(1, TURN_START_FROM_BENCH, "b3", "t-d2"), (3, TURN_START_FROM_TRIBUNA, "t-d1", None)]
+
+
+def test_turn_start_fill_leaves_complete_or_empty_lineups_alone() -> None:
+    bench = _turn_start_bench()
+    full = fill_lineup_holes_at_turn_start(module="4-3-3", starters=_433_starters(), bench=bench)
+    assert full.fills == ()
+    assert not full.changed
+    assert _ids_of(full.bench) == _ids_of(bench)
+    # Formazione senza titolari (automatica «a zero»): non è un posto vuoto da coprire.
+    empty = fill_lineup_holes_at_turn_start(module="4-3-3", starters=[], bench=bench)
+    assert empty.fills == ()
+    assert empty.starters == ()
+    assert turn_start_role_label(FantasyRole.D) == "difensore"
+    assert turn_start_role_label(None) == "titolare"

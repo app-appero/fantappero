@@ -7,7 +7,9 @@ oggi riscriverebbe la storia quando si ricalcola un turno passato. Perciò chi l
 tolto **nel momento in cui la lascia**, e solo dalla formazione e dalla bozza dei turni non
 ancora iniziati: turno programmato o aperto, non omologato, e prima del primo blocco (nessuna
 partita già in blocco, la stessa soglia per cui il mercato chiude, ``market.round_freeze``).
-I turni bloccati o conclusi, e quindi chi ha la partita già iniziata, non si toccano.
+I turni bloccati o conclusi, e quindi chi ha la partita già iniziata, non si toccano: al primo
+blocco subentra la regola di inizio turno (``fantasy_lineups.turn_start``), che toglie chi è
+rimasto per altre vie e copre i posti lasciati vuoti, una volta, prima del calcolo.
 
 - Titolari: la riga esce e il posto resta vuoto; gli altri tengono il loro ``sort_order`` (i
   titolari sono posizionali sul modulo), come la pulizia in lettura di GET formazione.
@@ -140,11 +142,11 @@ def purge_departed_athlete_from_future_lineups(
     )
     if not candidates:
         return []
-    margin = _lock_margin_minutes(session, league_id)
+    margin = lock_margin_minutes(session, league_id)
     rounds = [
         fantasy_round
         for fantasy_round in candidates
-        if not _round_started(session, fantasy_round, now=moment, margin_minutes=margin)
+        if not turn_has_started(session, fantasy_round, now=moment, margin_minutes=margin)
     ]
     if not rounds:
         return []
@@ -205,7 +207,7 @@ def purge_departed_athlete_from_future_lineups(
             athlete = session.get(Athlete, athlete_id)
             athlete_name = athlete.canonical_name if athlete is not None else ""
         if audit_actor_id is None:
-            audit_actor_id = _team_owner_id(session, team_id)
+            audit_actor_id = team_owner_id(session, team_id)
         session.add(
             LeagueAuditEvent(
                 league_id=league_id,
@@ -320,7 +322,7 @@ def _remove_from_draft(draft: LineupDraft, athlete_id: UUID) -> bool:
     return True
 
 
-def _round_started(
+def turn_has_started(
     session: Session,
     fantasy_round: FantasyRound,
     *,
@@ -331,7 +333,9 @@ def _round_started(
 
     Il turno conta come iniziato se il suo cutoff (primo calcio d'inizio) o una sua partita è
     entro il margine di blocco della lega, se una partita è già iniziata, o se il blocco di una
-    partita è rimasto agganciato dopo un rinvio.
+    partita è rimasto agganciato dopo un rinvio. Da qui in poi vale la regola di inizio turno
+    (``fantasy_lineups.turn_start``): la formazione non si pulisce più all'uscita dalla rosa (il
+    mercato è chiuso), si sistema una volta all'inizio del turno.
     """
     effective = derive_effective_status(
         fantasy_round.status, now=now, cutoff_at=fantasy_round.cutoff_at
@@ -358,7 +362,7 @@ def _round_started(
     return locked_fixture is not None
 
 
-def _team_owner_id(session: Session, team_id: UUID) -> UUID | None:
+def team_owner_id(session: Session, team_id: UUID) -> UUID | None:
     return session.scalar(
         select(LeagueMembership.user_id)
         .join(FantasyTeam, FantasyTeam.membership_id == LeagueMembership.id)
@@ -366,7 +370,7 @@ def _team_owner_id(session: Session, team_id: UUID) -> UUID | None:
     )
 
 
-def _lock_margin_minutes(session: Session, league_id: UUID) -> int:
+def lock_margin_minutes(session: Session, league_id: UUID) -> int:
     margin = session.scalar(
         select(LeagueRules.lineup_lock_margin_minutes).where(LeagueRules.league_id == league_id)
     )
@@ -379,5 +383,8 @@ __all__ = [
     "DepartureNotice",
     "departure_notices",
     "is_purgeable_turn_status",
+    "lock_margin_minutes",
     "purge_departed_athlete_from_future_lineups",
+    "team_owner_id",
+    "turn_has_started",
 ]
