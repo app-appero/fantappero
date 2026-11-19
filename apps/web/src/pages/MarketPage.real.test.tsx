@@ -501,7 +501,7 @@ describe("Mercato — scambi collegati alle API reali (EP08-05/06)", () => {
     expect(container.querySelector('[role="dialog"]')?.textContent).toContain("Accettare lo scambio?");
     expect(query("market-trade-accept-dialog")?.textContent).toBe(
       "Riceverai Giocatore Avversario + 10 crediti e cederai Giocatore Svincolabile. " +
-        "Lo scambio è immediato e non si può annullare.",
+        "Una volta accettato non potrai annullarlo.",
     );
     expect(query("market-trade-accept-cancel")?.textContent).toBe("Indietro");
     expect(query("market-trade-accept-confirm")?.textContent).toBe("Accetta scambio");

@@ -14,7 +14,7 @@ export const TRADE_ACCEPT_CONFIRM_LABEL = "Accetta scambio";
 /** Pulsante che chiude la conferma senza fare nulla. */
 export const TRADE_ACCEPT_CANCEL_LABEL = "Indietro";
 
-const TRADE_ACCEPT_WARNING = "Lo scambio è immediato e non si può annullare.";
+const TRADE_ACCEPT_WARNING = "Una volta accettato non potrai annullarlo.";
 
 type TradeAcceptProposal = Pick<
   TradeProposal,
@@ -44,8 +44,9 @@ function tradeSideSummary(athletes: TradeAthlete[], credits: number): string {
 }
 
 /**
- * Testo della conferma: «Riceverai X e cederai Y. Lo scambio è immediato e non
- * si può annullare.». Chi accetta è il destinatario, che riceve ciò che il
+ * Testo della conferma: «Riceverai X e cederai Y. Una volta accettato non
+ * potrai annullarlo.». Con l'approvazione dell'admin attiva lo scambio
+ * avviene solo dopo la sua decisione. Chi accetta è il destinatario, che riceve ciò che il
  * proponente offre e cede ciò che chiede; se `myTeamId` è il proponente i due
  * lati si invertono.
  */

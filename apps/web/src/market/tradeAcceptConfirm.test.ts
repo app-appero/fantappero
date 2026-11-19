@@ -15,7 +15,7 @@ const BASE = {
   requestedCredits: 0,
 };
 
-const WARNING = "Lo scambio è immediato e non si può annullare.";
+const WARNING = "Una volta accettato non potrai annullarlo.";
 
 describe("tradeAcceptConfirmMessage", () => {
   it("titolo e pulsanti della conferma", () => {
