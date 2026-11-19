@@ -89,25 +89,16 @@ export function RosterCreditsPanel({
             </View>
           ) : null}
         </View>
-        {spent != null && credits ? (
-          <>
-            <View style={styles.heroBar}>
-              <View
-                style={[
-                  styles.heroBarFill,
-                  { width: `${Math.min(100, Math.round((spent / Math.max(1, spent + credits.balance)) * 100))}%` as `${number}%` },
-                ]}
-              />
-            </View>
-            <View style={styles.heroFoot}>
-              <Text style={styles.heroFootLabel}>
-                Spesi {spent} su {spent + credits.balance}
-              </Text>
-              <Text style={styles.heroFootLabel}>
-                {Math.round((spent / Math.max(1, spent + credits.balance)) * 100)}%
-              </Text>
-            </View>
-          </>
+        {/* Solo spesi e residui, come il web: il vecchio totale "su Y" era spesi + residui,
+            che non è il budget della lega (es. dopo un aggiustamento crediti) e mostrava
+            "Spesi X su 999". Via anche barra e percentuale, calcolate sullo stesso totale. */}
+        {spent != null ? (
+          <View style={styles.heroFoot}>
+            <Text style={styles.heroFootLabel} testID="roster-credits-spent">
+              Spesi {spent}
+            </Text>
+            <Text style={styles.heroFootLabel}>Residui {credits?.balance ?? "—"}</Text>
+          </View>
         ) : null}
         {canSwitch || isAdmin ? (
           <HScroll>

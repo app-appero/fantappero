@@ -604,8 +604,6 @@ export const rosterStyles = lazyStyles(() => StyleSheet.create({
   heroAvatarLabel: { color: colors.onBrand, fontSize: 19, fontFamily: DISPLAY_FONT },
   heroSub: { color: colors.foregroundMuted, fontSize: 13 },
   heroActions: { flexDirection: "row", flexWrap: "wrap", gap: spacing.xs },
-  heroBar: { height: 6, borderRadius: 999, backgroundColor: colors.border, overflow: "hidden" },
-  heroBarFill: { height: 6, backgroundColor: colors.brand },
   heroFoot: { flexDirection: "row", justifyContent: "space-between" },
   heroFootLabel: { color: colors.foregroundMuted, fontSize: 12 },
   heroSlotsNeed: { color: colors.accent },
