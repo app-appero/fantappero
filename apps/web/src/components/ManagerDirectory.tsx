@@ -652,7 +652,7 @@ export function ManagerDirectory({
       <div className="fa-manager-directory__panel">
       <div className="fa-manager-directory__filters">
         <Input
-          label="Cerca per nome, nickname o email"
+          label="Cerca per nome o nickname"
           name="manager-query"
           value={query}
           onChange={(event) => setQuery(event.target.value)}

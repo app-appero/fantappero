@@ -74,6 +74,16 @@ describe("directory fantallenatori", () => {
     expect(html).toContain("Già invitato");
   });
 
+  it("la ricerca non promette più la ricerca per email", () => {
+    const html = renderDirectory({
+      leagueId: "demo-league",
+      isDemoMode: true,
+      search: "",
+    });
+    expect(html).toContain("Cerca per nome o nickname");
+    expect(html).not.toMatch(/Cerca per[^<]*email/);
+  });
+
   it("mostra lo stato errore e permessi insufficienti", () => {
     const error = renderDirectory({ isDemoMode: true, search: "?directory=error" });
     const forbidden = renderDirectory({

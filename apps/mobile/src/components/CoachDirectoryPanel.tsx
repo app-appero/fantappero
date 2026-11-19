@@ -274,7 +274,7 @@ export function CoachDirectoryPanel({
         <TextInput
           value={query}
           onChangeText={setQuery}
-          placeholder="Cerca per nome, nickname o email"
+          placeholder="Cerca per nome o nickname"
           placeholderTextColor={colors.foregroundMuted}
           autoCapitalize="none"
           autoCorrect={false}
