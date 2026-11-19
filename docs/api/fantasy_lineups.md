@@ -349,13 +349,25 @@ Body salvataggio:
 
 Errori con motivazione: `invalid_module`, `module_role_mismatch`,
 `goalkeeper_count_invalid`, `starter_count_invalid`, `duplicate_athlete`,
-`athlete_not_in_roster`, `bench_incomplete`, `unresolved_role`,
-`roster_not_validated`, `turn_not_open`, `turn_skipped`,
+`athlete_not_in_roster`, `athlete_exceeds_role_quota`, `bench_incomplete`,
+`unresolved_role`, `roster_not_validated`, `turn_not_open`, `turn_skipped`,
 `turn_modification_closed`, `athlete_kickoff_locked`, `bench_order_locked`,
 `tactical_moves_exhausted`, `previous_lineup_not_found`,
-`copied_athlete_not_in_roster`, `copied_athlete_unavailable`,
-`ai_lineup_incomplete` (rosa insufficiente per completare il modulo con la
-formula automatica).
+`copied_athlete_not_in_roster`, `copied_athlete_exceeds_role_quota`,
+`copied_athlete_unavailable`, `ai_lineup_incomplete` (rosa insufficiente per completare il
+modulo con la formula automatica).
+
+**Chi è in esubero di ruolo** (`exceedsRoleQuota` in `roster`, QA 19/11) resta in rosa ma non
+si schiera finché la rosa non torna in regola, e non è tra i calciatori che `benchAthleteIds`
+deve contenere. Se salvataggio o bozza lo mettono in tribuna (dall'11° posto in poi della
+panchina, contando i posti occupati: è quello che fanno web e app anche nelle versioni già
+installate) lo si toglie senza errore e non si salva; nemmeno il confronto con la formazione
+salvata lo conta (nessuna nuova `revision`, nessuna mossa tattica). Titolare o nei primi 10
+della panchina la richiesta è rifiutata con `athlete_exceeds_role_quota` e il nome, ad esempio
+«A. Adams è in esubero di ruolo: non può essere schierato finché la rosa non torna in regola.».
+La copia della formazione precedente lo esclude: senza avviso se era in tribuna, altrimenti con
+`copied_athlete_exceeds_role_quota` («A. Adams è in esubero di ruolo ed è stato escluso dalla
+formazione copiata.»). «Migliore» non lo schiera mai.
 
 **Chi non è più in rosa** (scambio, svincolo, asta, rimozione o sostituzione dell'admin;
 QA 19/11) esce dalla formazione salvata e dalla bozza della squadra **nel momento in cui

@@ -39,7 +39,8 @@ import {
   rosterDepartureNotices,
   savedStarterSlotIds,
   slotsFromLineupIds,
-  starterTemplate, playerAvatarUrl
+  starterTemplate, playerAvatarUrl,
+  withoutRoleQuotaExcess,
 } from "@fantappero/contracts";
 import {
   Breadcrumb,
@@ -718,12 +719,15 @@ export function FormationPage() {
   // mostrata è semplicemente la bozza, senza ri-collocazioni.
   const displayStarters = template.map((_, index) => starterIds[index] ?? "");
   const savedBench = context?.lineup?.bench.map((player) => player.athleteId) ?? [];
+  // Chi è in esubero di ruolo resta fuori dalla formazione (QA 19/11): con lui in coda alla
+  // panchina ogni salvataggio era rifiutato e la formazione appena aperta risultava modificata.
   const orderedBench = orderedBenchFromRoster(
-    roster.map((row) => row.athleteId),
+    withoutRoleQuotaExcess(roster.map((row) => row.athleteId), roster),
     displayStarters,
     benchIds,
   );
-  const displayBench = [
+  /** Panchina e tribuna della formazione: quella che si salva e si confronta con il server. */
+  const lineupBench = [
     ...orderedBench.filter(
       (athleteId) => !(playerBlocked(roster, athleteId) && !savedBench.includes(athleteId)),
     ),
@@ -731,6 +735,11 @@ export function FormationPage() {
       (athleteId) => playerBlocked(roster, athleteId) && !savedBench.includes(athleteId),
     ),
   ];
+  const roleQuotaExcessIds = roster
+    .filter((row) => row.exceedsRoleQuota === true && !displayStarters.includes(row.athleteId))
+    .map((row) => row.athleteId);
+  // Chi è in esubero si vede ancora in fondo alla tribuna, ma non si sposta e non si salva.
+  const displayBench = [...lineupBench, ...roleQuotaExcessIds];
   const roleByAthleteId: Record<string, string | null | undefined> = Object.fromEntries(
     roster.map((row) => [row.athleteId, row.role]),
   );
@@ -755,6 +764,8 @@ export function FormationPage() {
     (lockedSet.has(athleteId) ? fieldedRoleById.get(athleteId) : undefined) ??
     playerRole(roster, athleteId);
 
+  // Sulla panchina mostrata e su tutta la rosa: chi è in esubero in fondo alla tribuna non dà
+  // errori; se fosse titolare (formazione salvata prima), il motivo con il nome lo dà il server.
   const clientEvaluation = evaluateLineup({
     module: moduleCode,
     starters: displayStarters.filter(Boolean).map((athleteId) => ({
@@ -780,10 +791,10 @@ export function FormationPage() {
     movesUsed,
     proposedModule: moduleCode,
     proposedStarterIds: displayStarters,
-    proposedBenchIds: displayBench,
+    proposedBenchIds: lineupBench,
     previousModule: context?.lineup?.module,
     previousStarterIds: context?.lineup?.starters.map((player) => player.athleteId) ?? [],
-    previousBenchIds: context?.lineup?.bench.map((player) => player.athleteId) ?? [],
+    previousBenchIds: withoutRoleQuotaExcess(savedBench, roster),
     maximum: maxMoves,
   });
   // Mosse *già usate*, non un'anteprima di quante ne resterebbero dopo un
@@ -829,7 +840,7 @@ export function FormationPage() {
     lineupSignature({
       module: moduleCode,
       starterIds: displayStarters,
-      benchIds: displayBench,
+      benchIds: lineupBench,
     }) !==
     lineupSignature({
       module: savedState.module,
@@ -1006,7 +1017,8 @@ export function FormationPage() {
       return {
         module: draft.module,
         starterIds: starters.slice(0, templateSlots.length),
-        benchIds: draft.benchAthleteIds,
+        // Chi è in esubero di ruolo non fa parte della formazione, nemmeno di quella salvata.
+        benchIds: withoutRoleQuotaExcess(draft.benchAthleteIds, detail?.roster ?? []),
       };
     }
     if (detail?.lineup) {
@@ -1017,7 +1029,10 @@ export function FormationPage() {
           detail.lineup.starters,
           starterTemplate(detail.lineup.module).length,
         ),
-        benchIds: detail.lineup.bench.map((player) => player.athleteId),
+        benchIds: withoutRoleQuotaExcess(
+          detail.lineup.bench.map((player) => player.athleteId),
+          detail.roster,
+        ),
       };
     }
     return {
@@ -1235,7 +1250,7 @@ export function FormationPage() {
     }
     setBenchIds(
       orderedBenchFromRoster(
-        roster.map((row) => row.athleteId),
+        withoutRoleQuotaExcess(roster.map((row) => row.athleteId), roster),
         nextStarters,
         benchIds,
       ),
@@ -1343,12 +1358,12 @@ export function FormationPage() {
       lockIssues: [
         ...evaluateProgressiveLock({
           previousSlots,
-          proposedSlots: slotsFromLineupIds(displayStarters, displayBench),
+          proposedSlots: slotsFromLineupIds(displayStarters, lineupBench),
           lockedAthleteIds,
         }),
         ...evaluateBenchOrderLock({
           previousBench: context?.lineup?.bench.map((player) => player.athleteId) ?? [],
-          proposedBench: displayBench,
+          proposedBench: lineupBench,
           lockedAthleteIds,
           roleByAthleteId,
         }),
@@ -1392,7 +1407,7 @@ export function FormationPage() {
         {
           module: moduleCode,
           starterAthleteIds: displayStarters,
-          benchAthleteIds: displayBench,
+          benchAthleteIds: lineupBench,
         },
         targetTeamIdRef.current || undefined,
       );
@@ -1643,12 +1658,12 @@ export function FormationPage() {
     const lockIssues = [
       ...evaluateProgressiveLock({
         previousSlots,
-        proposedSlots: slotsFromLineupIds(displayStarters, displayBench),
+        proposedSlots: slotsFromLineupIds(displayStarters, lineupBench),
         lockedAthleteIds,
       }),
       ...evaluateBenchOrderLock({
         previousBench: context?.lineup?.bench.map((player) => player.athleteId) ?? [],
-        proposedBench: displayBench,
+        proposedBench: lineupBench,
         lockedAthleteIds,
         roleByAthleteId,
       }),
@@ -1703,7 +1718,7 @@ export function FormationPage() {
         {
           module: moduleCode,
           starterAthleteIds: displayStarters,
-          benchAthleteIds: displayBench,
+          benchAthleteIds: lineupBench,
         },
         targetTeamIdRef.current || undefined,
       );
@@ -2389,7 +2404,7 @@ export function FormationPage() {
                             name={playerName(roster, athleteId)}
                             role={playerRole(roster, athleteId)}
                             locked={playerLocked(roster, athleteId, clock, lockMarginMinutes)}
-                            disabled={!canModify}
+                            disabled={!canModify || roleQuotaExcessIds.includes(athleteId)}
                             options={displayBench.map((_, target) => ({
                               value: String(target),
                               label: `${target + 1}°`,
@@ -2428,7 +2443,7 @@ export function FormationPage() {
                             name={playerName(roster, athleteId)}
                             role={playerRole(roster, athleteId)}
                             locked={playerLocked(roster, athleteId, clock, lockMarginMinutes)}
-                            disabled={!canModify}
+                            disabled={!canModify || roleQuotaExcessIds.includes(athleteId)}
                             options={displayBench.map((_, target) => ({
                               value: String(target),
                               label: `${target + 1}°`,

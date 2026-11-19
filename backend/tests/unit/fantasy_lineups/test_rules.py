@@ -26,11 +26,13 @@ from fantasy_lineups.rules import (
     assert_lineup_modification_allowed,
     assert_progressive_lock,
     assert_tactical_move,
+    athlete_exceeds_role_quota_message,
     athlete_not_in_roster_message,
     bench_active_role_requirements,
     coerce_max_automatic_substitutions,
     copy_previous_lineup,
     drop_departed_athletes,
+    drop_role_quota_excess_from_tribuna,
     evaluate_bench_order_lock,
     evaluate_lineup,
     evaluate_progressive_lock,
@@ -1353,3 +1355,131 @@ def test_turn_start_fill_leaves_complete_or_empty_lineups_alone() -> None:
     assert empty.starters == ()
     assert turn_start_role_label(FantasyRole.D) == "difensore"
     assert turn_start_role_label(None) == "titolare"
+
+
+def _433_with_excess_forward() -> tuple[list[str], list[LineupPlayerRef], list[LineupPlayerRef]]:
+    """4-3-3 valido e un 11° attaccante in esubero di ruolo (fuori dalla rosa schierabile)."""
+    roster, starters, bench = _valid_433()
+    return roster, starters, [*bench, LineupPlayerRef(athlete_id="esubero", role=FantasyRole.A)]
+
+
+def test_role_quota_excess_in_the_tribuna_is_ignored() -> None:
+    """QA 19/11 (qa-02): web e app mettono in coda alla panchina anche chi è in esubero di ruolo.
+
+    In tribuna non gioca: la formazione è valida e lui non conta, né come «non in rosa» né per
+    la quota per ruolo della panchina.
+    """
+    roster, starters, bench = _433_with_excess_forward()
+    result = evaluate_lineup(
+        module="4-3-3",
+        starters=starters,
+        bench=bench,
+        roster_athlete_ids=roster,
+        athlete_names={"esubero": "A. Adams"},
+        excess_athlete_ids=["esubero"],
+    )
+    assert result.valid, result.issues
+    # Senza saperlo in esubero resta il rifiuto generico di prima.
+    unaware = evaluate_lineup(
+        module="4-3-3", starters=starters, bench=bench, roster_athlete_ids=roster
+    )
+    assert [issue.code for issue in unaware.issues] == ["athlete_not_in_roster"]
+
+
+@pytest.mark.parametrize("strict", [True, False])
+def test_role_quota_excess_starter_or_active_bench_is_rejected_with_his_name(strict: bool) -> None:
+    roster, starters, bench = _valid_433()
+    excess = LineupPlayerRef(athlete_id="esubero", role=FantasyRole.A)
+    message = (
+        "A. Adams è in esubero di ruolo: non può essere schierato finché la rosa non torna "
+        "in regola."
+    )
+    as_starter = evaluate_lineup(
+        module="4-3-3",
+        starters=[*starters[:-1], excess],
+        bench=[*bench, starters[-1]],
+        roster_athlete_ids=roster,
+        strict=strict,
+        athlete_names={"esubero": "A. Adams"},
+        excess_athlete_ids=["esubero"],
+    )
+    in_active_bench = evaluate_lineup(
+        module="4-3-3",
+        starters=starters,
+        bench=[*bench[:7], excess, *bench[7:]],
+        roster_athlete_ids=roster,
+        strict=strict,
+        athlete_names={"esubero": "A. Adams"},
+        excess_athlete_ids=["esubero"],
+    )
+    for result in (as_starter, in_active_bench):
+        assert not result.valid
+        assert (result.issues[0].code, result.issues[0].message) == (
+            "athlete_exceeds_role_quota",
+            message,
+        )
+        assert all(issue.code != "athlete_not_in_roster" for issue in result.issues)
+
+
+def test_drop_role_quota_excess_from_tribuna_counts_filled_positions() -> None:
+    bench = [f"b{index}" for index in range(10)]
+    assert drop_role_quota_excess_from_tribuna([*bench, "x", "t1", "y"], ["x", "y"]) == [
+        *bench,
+        "t1",
+    ]
+    # Nei primi 10 resta: lo rifiuta la validazione.
+    assert drop_role_quota_excess_from_tribuna(["x", *bench], ["x"]) == ["x", *bench]
+    # I posti vuoti di una bozza non contano e restano dove sono.
+    assert drop_role_quota_excess_from_tribuna(["", *bench[:9], "x"], ["x"]) == [
+        "",
+        *bench[:9],
+        "x",
+    ]
+    assert drop_role_quota_excess_from_tribuna([*bench, "x"], []) == [*bench, "x"]
+    assert athlete_exceeds_role_quota_message([]) == (
+        "Uno o più calciatori sono in esubero di ruolo: non possono essere schierati finché la "
+        "rosa non torna in regola."
+    )
+    assert athlete_exceeds_role_quota_message(["A. Adams", "B. Bianchi"]) == (
+        "A. Adams e B. Bianchi sono in esubero di ruolo: non possono essere schierati finché la "
+        "rosa non torna in regola."
+    )
+
+
+def test_copy_previous_lineup_leaves_out_role_quota_excess() -> None:
+    roster, starters, bench = _433_with_excess_forward()
+    role_by_id = {player.athlete_id: player.role for player in [*starters, *bench]}
+    starter_ids = [player.athlete_id for player in starters]
+    bench_ids = [player.athlete_id for player in bench]
+
+    # In tribuna nel turno precedente: escluso senza avviso.
+    from_tribuna = copy_previous_lineup(
+        previous_module="4-3-3",
+        previous_starter_ids=starter_ids,
+        previous_bench_ids=bench_ids,
+        roster_athlete_ids=roster,
+        role_by_athlete_id=role_by_id,
+        excess_athlete_ids=["esubero"],
+        athlete_names={"esubero": "A. Adams"},
+    )
+    assert from_tribuna.issues == ()
+    assert from_tribuna.can_confirm is True
+    assert "esubero" not in from_tribuna.bench_ids
+
+    # Titolare nel turno precedente: posto vuoto e avviso con il nome, non «non è più in rosa».
+    from_starters = copy_previous_lineup(
+        previous_module="4-3-3",
+        previous_starter_ids=[*starter_ids[:-1], "esubero"],
+        previous_bench_ids=[*bench_ids[:-1], starter_ids[-1]],
+        roster_athlete_ids=roster,
+        role_by_athlete_id=role_by_id,
+        excess_athlete_ids=["esubero"],
+        athlete_names={"esubero": "A. Adams"},
+    )
+    assert from_starters.starter_ids[-1] == ""
+    assert [(issue.code, issue.message) for issue in from_starters.issues] == [
+        (
+            "copied_athlete_exceeds_role_quota",
+            "A. Adams è in esubero di ruolo ed è stato escluso dalla formazione copiata.",
+        )
+    ]

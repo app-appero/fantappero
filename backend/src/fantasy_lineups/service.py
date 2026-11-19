@@ -53,6 +53,7 @@ from fantasy_lineups.rules import (
     assert_tactical_move,
     copy_previous_lineup,
     drop_departed_athletes,
+    drop_role_quota_excess_from_tribuna,
     evaluate_lineup,
     fill_starter_holes,
     is_athlete_kickoff_locked,
@@ -362,6 +363,11 @@ class FantasyLineupService:
             league_access.league.season_year, team, round_number=fantasy_round.number
         )
         roster_ids = [str(row.athlete_id) for row in roster if not row.exceeds_role_quota]
+        # Chi è in esubero di ruolo arriva in coda alla panchina (web e app, anche le versioni
+        # già installate, mandano tutta la rosa): in tribuna non gioca, si toglie senza errore e
+        # non si salva. Titolare o nei primi 10 della panchina lo rifiuta `evaluate_lineup`.
+        excess = self._role_quota_excess(roster)
+        bench_ids = drop_role_quota_excess_from_tribuna(bench_ids, excess, key=str)
 
         # Chi è bloccato e con quale ruolo è stato schierato va saputo *prima*
         # di validare il modulo (vedi `_validation_roles`). `for_update=True`
@@ -412,8 +418,13 @@ class FantasyLineupService:
             starters=starters,
             bench=bench,
             roster_athlete_ids=roster_ids,
-            # Chi non è più in rosa (es. formazione aperta prima di uno scambio) va nominato.
-            athlete_names=self._departed_athlete_names(roster, [*starter_ids, *bench_ids]),
+            # Chi non è più in rosa (es. formazione aperta prima di uno scambio) o è in esubero
+            # di ruolo va nominato.
+            athlete_names={
+                **self._departed_athlete_names(roster, [*starter_ids, *bench_ids]),
+                **excess,
+            },
+            excess_athlete_ids=excess,
         )
         if not evaluation.valid:
             first = evaluation.issues[0]
@@ -423,6 +434,11 @@ class FantasyLineupService:
             )
             raise ValidationAuthError(first.message, code=first.code)
 
+        # Anche nel confronto con la formazione salvata chi è in esubero in tribuna non conta:
+        # toglierlo non è un cambio di formazione né una mossa tattica.
+        compared_bench = drop_role_quota_excess_from_tribuna(
+            self._bench_order_from_submission(submission), excess
+        )
         try:
             assert_progressive_lock(
                 previous_slots=self._slots_from_submission(submission),
@@ -458,7 +474,7 @@ class FantasyLineupService:
                 proposed_bench_ids=[str(athlete_id) for athlete_id in bench_ids],
                 previous_module=submission.module.value if submission is not None else None,
                 previous_starter_ids=self._starter_order_from_submission(submission),
-                previous_bench_ids=self._bench_order_from_submission(submission),
+                previous_bench_ids=compared_bench,
             )
             record_move = move_evaluation.would_consume and moves_used < MAX_TACTICAL_MOVES
         except ValidationAuthError as exc:
@@ -476,7 +492,7 @@ class FantasyLineupService:
         ) == lineup_signature(
             module=submission.module.value,
             starter_ids=self._starter_order_from_submission(submission),
-            bench_ids=self._bench_order_from_submission(submission),
+            bench_ids=compared_bench,
         ):
             # Formazione identica alla confermata: nessuna nuova revisione, ma la bozza
             # eventualmente aperta non ha più senso e va scartata.
@@ -679,6 +695,7 @@ class FantasyLineupService:
             kickoffs=kickoffs,
         )
         submission = self._load_submission(fantasy_round.id, team.id, for_update=True)
+        excess = self._role_quota_excess(roster)
         copied = copy_previous_lineup(
             previous_module=previous.module.value,
             previous_starter_ids=self._starter_order_from_submission(previous),
@@ -690,6 +707,8 @@ class FantasyLineupService:
             current_confirmed_slots=self._slots_from_submission(submission),
             current_confirmed_bench=self._bench_order_from_submission(submission),
             role_by_athlete_id={str(row.athlete_id): row.role for row in roster},
+            excess_athlete_ids=excess,
+            athlete_names=excess,
         )
         try:
             assert_copy_previous_lineup(copied)
@@ -1058,6 +1077,9 @@ class FantasyLineupService:
             league_access.league.season_year, team, round_number=fantasy_round.number
         )
         roster_ids = [str(row.athlete_id) for row in roster if not row.exceeds_role_quota]
+        # Come in `save_my_lineup`: chi è in esubero di ruolo in tribuna si toglie senza errore.
+        excess = self._role_quota_excess(roster)
+        bench_ids = drop_role_quota_excess_from_tribuna(bench_ids, excess)
 
         # Come in `save_my_lineup`: serve sapere chi è bloccato prima di
         # validare, per usare il ruolo di schieramento (vedi `_validation_roles`).
@@ -1112,7 +1134,11 @@ class FantasyLineupService:
             bench=bench,
             roster_athlete_ids=roster_ids,
             strict=False,
-            athlete_names=self._departed_athlete_names(roster, [*starter_ids, *bench_ids]),
+            athlete_names={
+                **self._departed_athlete_names(roster, [*starter_ids, *bench_ids]),
+                **excess,
+            },
+            excess_athlete_ids=excess,
         )
         if not evaluation.valid:
             first = evaluation.issues[0]
@@ -1387,6 +1413,7 @@ class FantasyLineupService:
         draft = self._load_draft(fantasy_round.id, fantasy_team_id)
         draft_response = self._to_draft(draft) if draft is not None else None
         owned_ids = {str(row.athlete_id) for row in roster}
+        excess = self._role_quota_excess(roster)
         # Turno ancora aperto (non bloccato né concluso): chi non è più in rosa (scambio,
         # svincolo, asta, rimozione dell'admin) esce dalla formazione e dalla bozza
         # restituite e il suo posto torna vuoto (QA 19/11). Solo in lettura: nel DB resta
@@ -1471,7 +1498,8 @@ class FantasyLineupService:
                 roster_athlete_ids=[
                     str(row.athlete_id) for row in roster if not row.exceeds_role_quota
                 ],
-                athlete_names=names_by_id,
+                athlete_names={**names_by_id, **excess},
+                excess_athlete_ids=excess,
             )
             issues = [
                 LineupIssueResponse(code=item.code, message=item.message)
@@ -1582,6 +1610,8 @@ class FantasyLineupService:
                 current_confirmed_slots=self._slots_from_submission(submission),
                 current_confirmed_bench=self._bench_order_from_submission(submission),
                 role_by_athlete_id={str(row.athlete_id): row.role for row in roster},
+                excess_athlete_ids=excess,
+                athlete_names=excess,
             )
         copy_issues = (
             [
@@ -1748,11 +1778,19 @@ class FantasyLineupService:
         """Nomi di chi è nella formazione proposta ma non è più nella rosa della squadra.
 
         Nessuna query quando sono tutti in rosa (il caso normale). Chi è in rosa ma in esubero
-        di ruolo non è tra questi: per lui resta il messaggio generico.
+        di ruolo non è tra questi: lo nomina `_role_quota_excess`.
         """
         owned = {str(row.athlete_id) for row in roster}
         departed = [str(item) for item in athlete_ids if item and str(item) not in owned]
         return self._athlete_names(departed) if departed else {}
+
+    @staticmethod
+    def _role_quota_excess(roster: list[_RosterRow]) -> dict[str, str]:
+        """Chi è in rosa ma in esubero di ruolo (``exceeds_role_quota``): id -> nome.
+
+        Non si schiera finché la rosa non torna in regola; il nome serve ai messaggi.
+        """
+        return {str(row.athlete_id): row.athlete_name for row in roster if row.exceeds_role_quota}
 
     @staticmethod
     def _is_row_locked(

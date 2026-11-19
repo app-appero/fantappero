@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections import Counter, defaultdict
-from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 
@@ -77,6 +77,10 @@ ATHLETE_NOT_IN_ROSTER_MESSAGE = "Uno o più calciatori schierati non appartengon
 #: Avviso del contesto formazione (QA 19/11): chi non è più in rosa è stato tolto dalla
 #: formazione salvata o dalla bozza di un turno ancora modificabile.
 LINEUP_ATHLETE_LEFT_ROSTER_CODE = "lineup_athlete_left_roster"
+#: Titolare o nei primi ``BENCH_ACTIVE_SIZE`` della panchina un calciatore in esubero di ruolo
+#: (``exceeds_role_quota``): è in rosa ma non si schiera finché la rosa non torna in regola.
+ATHLETE_EXCEEDS_ROLE_QUOTA_CODE = "athlete_exceeds_role_quota"
+COPIED_EXCEEDS_ROLE_QUOTA_CODE = "copied_athlete_exceeds_role_quota"
 
 
 @dataclass(frozen=True)
@@ -343,6 +347,74 @@ def lineup_athlete_left_roster_message(names: Sequence[str]) -> str:
         f"{join_names(unique)} non sono più nella tua rosa: sono stati tolti dalla "
         "formazione, scegli chi mettere al loro posto."
     )
+
+
+def athlete_exceeds_role_quota_message(names: Sequence[str]) -> str:
+    """Formazione rifiutata perché schiera chi è in esubero di ruolo: il messaggio dice chi."""
+    unique = list(dict.fromkeys(name for name in names if name))
+    if not unique:
+        return (
+            "Uno o più calciatori sono in esubero di ruolo: non possono essere schierati "
+            "finché la rosa non torna in regola."
+        )
+    if len(unique) == 1:
+        return (
+            f"{unique[0]} è in esubero di ruolo: non può essere schierato finché la rosa "
+            "non torna in regola."
+        )
+    return (
+        f"{join_names(unique)} sono in esubero di ruolo: non possono essere schierati "
+        "finché la rosa non torna in regola."
+    )
+
+
+def copied_athlete_exceeds_role_quota_message(names: Sequence[str]) -> str:
+    """Avviso della copia: chi era schierato nel turno precedente ed è in esubero di ruolo."""
+    unique = list(dict.fromkeys(name for name in names if name))
+    if not unique:
+        return (
+            "Uno o più calciatori della formazione precedente sono in esubero di ruolo e sono "
+            "stati esclusi."
+        )
+    if len(unique) == 1:
+        return f"{unique[0]} è in esubero di ruolo ed è stato escluso dalla formazione copiata."
+    return (
+        f"{join_names(unique)} sono in esubero di ruolo e sono stati esclusi dalla formazione "
+        "copiata."
+    )
+
+
+def drop_role_quota_excess_from_tribuna[T](
+    bench: Sequence[T],
+    excess_athlete_ids: Iterable[object],
+    *,
+    key: Callable[[T], object] | None = None,
+) -> list[T]:
+    """Panchina senza chi è in esubero di ruolo dall'11° posto in poi (la tribuna).
+
+    Web e app, anche le versioni già installate, mettono in coda alla panchina tutta la rosa,
+    compreso chi è in esubero (``exceeds_role_quota``). In tribuna non entra mai nei cambi
+    automatici: lo si toglie senza errore e non si salva (QA 19/11). Nei primi
+    ``BENCH_ACTIVE_SIZE`` posti resta, e la validazione lo rifiuta con il nome
+    (``athlete_exceeds_role_quota``). I posti si contano su quelli occupati, come la regola
+    della panchina attiva; quelli vuoti di una bozza (``""``) restano dove sono. ``key`` dà
+    l'id da confrontare con ``excess_athlete_ids`` (es. ``str`` per gli UUID).
+    """
+    excess = {item for item in excess_athlete_ids if item not in {None, ""}}
+    if not excess:
+        return list(bench)
+    kept: list[T] = []
+    filled = 0
+    for item in bench:
+        athlete_id = key(item) if key is not None else item
+        if athlete_id in {None, ""}:
+            kept.append(item)
+            continue
+        if filled >= BENCH_ACTIVE_SIZE and athlete_id in excess:
+            continue
+        filled += 1
+        kept.append(item)
+    return kept
 
 
 def drop_departed_athletes(
@@ -624,15 +696,23 @@ def evaluate_lineup(
     roster_athlete_ids: Sequence[object],
     strict: bool = True,
     athlete_names: Mapping[object, str] | None = None,
+    excess_athlete_ids: Iterable[object] = (),
 ) -> LineupEvaluation:
     """Validate 7 modules, 1 GK, 11 starters, P–D–C–A counts and roster membership.
 
     Drafts may pass ``strict=False`` to allow incomplete XI/panchina (EP06-06).
-    ``athlete_names`` (stesse chiavi degli id passati) serve solo al messaggio di
-    ``athlete_not_in_roster``: chi non è più in rosa viene nominato.
+    ``athlete_names`` (stesse chiavi degli id passati) serve solo ai messaggi di
+    ``athlete_not_in_roster`` e ``athlete_exceeds_role_quota``: chi non è più in rosa, o è in
+    esubero di ruolo, viene nominato.
+
+    ``excess_athlete_ids``: chi è in rosa ma in esubero di ruolo (fuori da
+    ``roster_athlete_ids``). In tribuna non conta (vedi `drop_role_quota_excess_from_tribuna`),
+    titolare o nei primi ``BENCH_ACTIVE_SIZE`` della panchina dà ``athlete_exceeds_role_quota``.
     """
     issues: list[LineupIssue] = []
     parsed = parse_module(module)
+    excess = {item for item in excess_athlete_ids if item not in {None, ""}}
+    bench = drop_role_quota_excess_from_tribuna(bench, excess, key=lambda ref: ref.athlete_id)
     starter_role_counts = count_roles(starters)
 
     if parsed is None:
@@ -671,14 +751,28 @@ def evaluate_lineup(
             )
         )
 
+    names = athlete_names or {}
+    # Tolto chi è in tribuna, chi resta in esubero è titolare o nei primi 10 della panchina.
+    fielded_excess = [athlete_id for athlete_id in all_ids if athlete_id in excess]
+    if fielded_excess:
+        issues.append(
+            LineupIssue(
+                code=ATHLETE_EXCEEDS_ROLE_QUOTA_CODE,
+                message=athlete_exceeds_role_quota_message(
+                    [names[athlete_id] for athlete_id in fielded_excess if athlete_id in names]
+                ),
+            )
+        )
+
     roster_set = {item for item in roster_athlete_ids if item not in {None, ""}}
     outside_roster = [
         athlete_id
         for athlete_id in all_ids
-        if athlete_id not in {None, ""} and athlete_id not in roster_set
+        if athlete_id not in {None, ""}
+        and athlete_id not in roster_set
+        and athlete_id not in excess
     ]
     if outside_roster:
-        names = athlete_names or {}
         issues.append(
             LineupIssue(
                 code="athlete_not_in_roster",
@@ -1429,11 +1523,20 @@ def copy_previous_lineup(
     current_confirmed_slots: Mapping[object, str] | None = None,
     current_confirmed_bench: Sequence[object] | None = None,
     role_by_athlete_id: Mapping[object, FantasyRole | None] | None = None,
+    excess_athlete_ids: Iterable[object] = (),
+    athlete_names: Mapping[object, str] | None = None,
 ) -> CopyLineupResult:
-    """Revalidate a previous lineup against current roster and kickoff availability."""
+    """Revalidate a previous lineup against current roster and kickoff availability.
+
+    Chi oggi è in esubero di ruolo (``excess_athlete_ids``, fuori da ``roster_athlete_ids``)
+    resta fuori dalla copia come chi non è più in rosa: se era in tribuna senza avviso, se era
+    titolare o nei primi 10 della panchina con un avviso che lo nomina (``athlete_names``).
+    """
     roster_set = {item for item in roster_athlete_ids if item not in {None, ""}}
     locked = {item for item in (locked_athlete_ids or ()) if item not in {None, ""}}
     confirmed = dict(current_confirmed_slots or {})
+    excess = {item for item in excess_athlete_ids if item not in {None, ""}}
+    previous_bench_ids = drop_role_quota_excess_from_tribuna(previous_bench_ids, excess)
     dropped: list[object] = []
     unavailable: list[object] = []
     starters: list[object] = []
@@ -1517,9 +1620,20 @@ def copy_previous_lineup(
     ]
 
     issues: list[LineupIssue] = []
-    if dropped:
+    if any(item not in excess for item in dropped):
         issues.append(
             LineupIssue(code="copied_athlete_not_in_roster", message=COPIED_NOT_IN_ROSTER_MESSAGE)
+        )
+    dropped_excess = [item for item in dropped if item in excess]
+    if dropped_excess:
+        names = athlete_names or {}
+        issues.append(
+            LineupIssue(
+                code=COPIED_EXCEEDS_ROLE_QUOTA_CODE,
+                message=copied_athlete_exceeds_role_quota_message(
+                    [names[item] for item in dropped_excess if item in names]
+                ),
+            )
         )
     if unavailable:
         issues.append(
