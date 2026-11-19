@@ -108,6 +108,8 @@ export { RoleBadge } from "./components/domain/RoleBadge.js";
 export type { RoleBadgeProps } from "./components/domain/RoleBadge.js";
 export { PlayerPhotoBadge } from "./components/domain/PlayerPhotoBadge.js";
 export type { PlayerPhotoBadgeProps } from "./components/domain/PlayerPhotoBadge.js";
+export { AvatarWithFallback } from "./components/domain/AvatarWithFallback.js";
+export type { AvatarWithFallbackProps } from "./components/domain/AvatarWithFallback.js";
 
 export { EventBadges } from "./components/domain/EventBadges.js";
 export type { EventBadgesProps } from "./components/domain/EventBadges.js";
