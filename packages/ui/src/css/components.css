@@ -1307,6 +1307,11 @@ button.fa-pitch-player {
   box-shadow: var(--fa-glow-accent);
 }
 
+/* «.fa-tab:hover:not(:disabled)» è più specifica e, nel tema chiaro, metteva il testo scuro sul gradiente. */
+.fa-tab[aria-selected="true"]:hover:not(:disabled) {
+  color: var(--fa-color-on-brand);
+}
+
 /* Tabelle */
 .fa-table-wrap {
   border-radius: var(--fa-radius-xl);

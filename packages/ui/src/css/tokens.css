@@ -190,6 +190,8 @@
   --fa-color-field-alt: #1b7d5a;
   --fa-color-border: #d3dde4;
   --fa-color-border-strong: #a9b8c4;
+  /* Il menta del tema scuro su fondo chiaro si leggeva a 1,6:1: verde scuro, almeno 4,5:1. */
+  --fa-color-success: #08765a;
   --fa-color-input-bg: #ffffff;
   --fa-color-input-placeholder: #4f5c78;
   --fa-color-disabled-bg: #dce5eb;
