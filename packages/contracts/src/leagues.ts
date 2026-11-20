@@ -410,9 +410,10 @@ export interface FantasyCoachDirectoryItem {
   displayName: string;
   nickname?: string | null;
   /**
-   * Solo per l'admin della lega e per l'operatore, `null` per gli altri:
-   * distingue account diversi con lo stesso nome (decisione del 18/11).
-   * Assente sulle fixture demo e sui backend precedenti.
+   * Per l'operatore sempre; per l'admin della lega solo se il fantallenatore
+   * è iscritto o ha un invito nominativo della lega in corso o con risposta;
+   * `null` negli altri casi (decisione del 20/11). Assente sulle fixture demo
+   * e sui backend precedenti.
    */
   email?: string | null;
   avatarUrl: string | null;
@@ -453,7 +454,7 @@ export interface FantasyCoachProfile {
   userId: string;
   displayName: string;
   nickname?: string | null;
-  /** Solo per l'admin della lega e per l'operatore (EP13-P06bis); `null` per gli altri. */
+  /** Stessa regola di `FantasyCoachDirectoryItem.email` (EP13-P06bis); `null` per gli altri. */
   email?: string | null;
   avatarUrl: string | null;
   userType: import("./profile.js").UserType;

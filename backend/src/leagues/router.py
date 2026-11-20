@@ -294,10 +294,10 @@ def get_fantasy_coach_profile(
 ) -> FantasyCoachProfileResponse | JSONResponse:
     """Profilo storico limitato di un fantallenatore (EP13-P06).
 
-    Accessibile a qualunque membro della lega (non solo admin): l'email
-    resta nascosta (``null``) a chi non è admin della lega né operatore
-    (EP13-P06bis — distinguere account diversi con lo stesso nome mostrato è
-    un bisogno amministrativo, non di un membro qualsiasi).
+    Accessibile a qualunque membro della lega (non solo admin): l'email la
+    vedono solo l'operatore e l'admin della lega per chi ne fa parte o ne ha
+    un invito nominativo (``can_see_coach_email``, EP13-P06bis); per gli altri
+    è ``null``.
     """
     try:
         return service.coach_profile(league_access, user_id, page=page, page_size=page_size)
@@ -318,7 +318,7 @@ def list_fantasy_coaches(
     league_access: LeagueAccess = Depends(require_league_permissions(Permission.LEAGUE_ADMIN)),
     service: NamedLeagueInviteService = Depends(get_named_league_invite_service),
 ) -> FantasyCoachDirectoryResponse:
-    """Directory per gli inviti: con l'email di ogni fantallenatore per l'admin e l'operatore."""
+    """Directory per gli inviti; l'email solo dove `can_see_coach_email` lo consente."""
     return service.directory(
         league_access,
         page=page,

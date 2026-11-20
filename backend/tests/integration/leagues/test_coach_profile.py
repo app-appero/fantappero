@@ -15,13 +15,21 @@ from tests.integration.database.helpers import create_engine_for_url
 from auth.models.user import User
 from auth.models.user_profile import UserProfile
 from authorization.service import AuthorizationService
-from database.enums import LeagueMemberRole, LeagueRole, LeagueState, PlatformRole, UserType
+from database.enums import (
+    LeagueMemberRole,
+    LeagueRole,
+    LeagueState,
+    NamedInviteStatus,
+    PlatformRole,
+    UserType,
+)
 from database.session import create_session_factory
 from fantasy_teams.models import FantasyTeam
 from leagues.models.competition import Competition
 from leagues.models.league import League
 from leagues.models.league_membership import LeagueMembership
 from leagues.models.league_standing import LeagueStanding
+from leagues.models.named_league_invite import NamedLeagueInvite
 from leagues.named_invite_service import NamedLeagueInviteService
 from mail.capture import get_captured_emails
 
@@ -238,11 +246,12 @@ def test_profile_returns_placements_without_revealing_league_names(
     # visibili nel dettaglio profilo, non solo lo storico posizioni.
     assert placement["fantasyPoints"] == 612.5
 
-    # Nessun nome di lega nel payload; l'email c'è, visibile solo a chi
-    # amministra la lega (EP13-P06bis).
+    # Nessun nome di lega nel payload. Nemmeno l'email: il fantallenatore non
+    # è iscritto né invitato alla lega dell'admin (decisione del 20/11).
     serialized = response.text
     assert league.name not in serialized
-    assert body["email"] == coach.email
+    assert body["email"] is None
+    assert coach.email not in serialized
     assert "leagueId" not in serialized
 
 
@@ -525,17 +534,23 @@ def test_profile_works_for_a_coach_without_a_profile_row(
     assert body["availableForInvites"] is False
 
 
-# --- Email dei fantallenatori per admin e operatore (decisione del 18/11, richiesta del 20/11) ---
+# --- Email dei fantallenatori (decisione del 20/11) -------------------------------------------
+# Operatore: sempre. Admin della lega: solo per chi è iscritto o ha un invito nominativo della
+# lega in corso o con risposta. Tutti gli altri: `null`.
 
 
 def _directory_url(league_id: str) -> str:
     return f"/leagues/{league_id}/amministrazione/fantallenatori"
 
 
-def _namesakes(db_session: Session, seed: int) -> tuple[str, list[User]]:
-    """Due account diversi con lo stesso nome mostrato, come i due «Giuseppe Trotta»."""
+def _seed() -> int:
+    return int(datetime.now(UTC).timestamp() * 1000) % 400_000
+
+
+def _namesakes(db_session: Session, seed: int, count: int = 2) -> tuple[str, list[User]]:
+    """Account diversi con lo stesso nome mostrato, come i due «Giuseppe Trotta»."""
     name = f"Giuseppe Trotta {seed}"
-    coaches = [_make_coach(db_session, f"trotta{index}", seed) for index in (1, 2)]
+    coaches = [_make_coach(db_session, f"trotta{index}", seed) for index in range(1, count + 1)]
     for coach in coaches:
         profile = db_session.get(UserProfile, coach.id)
         assert profile is not None
@@ -555,55 +570,160 @@ def _join_as_member(db_session: Session, league_id: str, user_id: UUID) -> None:
     db_session.commit()
 
 
-def test_directory_shows_namesakes_emails_to_the_league_admin(
-    client: TestClient, db_session: Session, competition_ids: list[str]
-) -> None:
-    """Richiesta di Rosario (20/11): due «Giuseppe Trotta» in directory sono
-    indistinguibili senza email. L'admin della lega la vede su ogni riga."""
-    token, _ = _register_and_login(client, "email-dir-admin@example.com")
-    league_id = _create_league(client, token, competition_ids, "Lega Omonimi")
-    seed = int(datetime.now(UTC).timestamp() * 1000) % 400_000
-    name, coaches = _namesakes(db_session, seed)
+def _invite(client: TestClient, admin_token: str, league_id: str, coach: User) -> None:
+    """Invito nominativo vero, dall'endpoint dell'admin: resta in corso."""
+    response = client.post(
+        f"/leagues/{league_id}/amministrazione/inviti-nominativi",
+        headers={"Authorization": f"Bearer {admin_token}"},
+        json={"recipientUserId": str(coach.id)},
+    )
+    assert response.status_code == 201, response.text
+    assert response.json()["status"] == "pending"
 
+
+def _invite_with_status(
+    db_session: Session,
+    *,
+    league_id: str,
+    admin_id: UUID,
+    coach: User,
+    status: NamedInviteStatus,
+    past_expiry: bool = False,
+) -> None:
+    """Invito nominativo già in uno stato preciso (con i timestamp che i vincoli chiedono)."""
+    now = datetime.now(UTC)
+    db_session.add(
+        NamedLeagueInvite(
+            league_id=UUID(league_id),
+            recipient_id=coach.id,
+            created_by_id=admin_id,
+            status=status,
+            created_at=now - timedelta(days=10),
+            expires_at=now - timedelta(days=3) if past_expiry else now + timedelta(days=5),
+            responded_at=(
+                now if status in (NamedInviteStatus.ACCEPTED, NamedInviteStatus.DECLINED) else None
+            ),
+            revoked_at=now if status == NamedInviteStatus.REVOKED else None,
+        )
+    )
+    db_session.commit()
+
+
+def _directory_emails(client: TestClient, token: str, league_id: str, name: str) -> dict:
     response = client.get(
         _directory_url(league_id),
         headers={"Authorization": f"Bearer {token}"},
         params={"search": name},
     )
-    assert response.status_code == 200
-    rows = response.json()["items"]
-    assert [row["displayName"] for row in rows] == [name, name]
-    assert {row["userId"]: row["email"] for row in rows} == {
-        str(coach.id): coach.email for coach in coaches
-    }
+    assert response.status_code == 200, response.text
+    return {row["userId"]: row["email"] for row in response.json()["items"]}
 
 
-def test_directory_shows_emails_to_an_operator_also_as_plain_member(
+def _profile_email(client: TestClient, token: str, league_id: str, coach: User) -> str | None:
+    response = client.get(
+        f"{_directory_url(league_id)}/{coach.id}",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert response.status_code == 200, response.text
+    return response.json()["email"]
+
+
+def test_admin_sees_email_only_of_members_and_invited_coaches(
     client: TestClient, db_session: Session, competition_ids: list[str]
 ) -> None:
-    """L'operatore vede l'email sia in una lega di cui non fa parte sia in una
-    in cui è un partecipante qualunque (Rosario è admin della sua lega e
-    operatore)."""
-    owner_token, _ = _register_and_login(client, "email-dir-op-owner@example.com")
-    league_id = _create_league(client, owner_token, competition_ids, "Lega Operatore Dir")
+    """Tre «Giuseppe Trotta»: l'admin vede l'email di chi è iscritto alla lega
+    e di chi ha appena invitato (per controllare di aver scelto la persona
+    giusta), non quella di chi non ha legami con la lega. Stessa regola in
+    directory e nel profilo."""
+    token, _ = _register_and_login(client, "email-admin-rule@example.com")
+    league_id = _create_league(client, token, competition_ids, "Lega Omonimi")
+    name, (member, invited, unrelated) = _namesakes(db_session, _seed(), count=3)
+    _join_as_member(db_session, league_id, member.id)
+    _invite(client, token, league_id, invited)
+
+    assert _directory_emails(client, token, league_id, name) == {
+        str(member.id): member.email,
+        str(invited.id): invited.email,
+        str(unrelated.id): None,
+    }
+    assert _profile_email(client, token, league_id, member) == member.email
+    assert _profile_email(client, token, league_id, invited) == invited.email
+    assert _profile_email(client, token, league_id, unrelated) is None
+
+
+def test_admin_email_visibility_by_invite_status(
+    client: TestClient, db_session: Session, competition_ids: list[str]
+) -> None:
+    """Invito in corso o con risposta (accettato, anche se poi è uscito dalla
+    lega, o rifiutato): email visibile. Revocato, scaduto o in corso ma oltre
+    la scadenza: solo il nome."""
+    token, admin_id = _register_and_login(client, "email-admin-status@example.com")
+    league_id = _create_league(client, token, competition_ids, "Lega Stati Invito")
+    cases = [
+        (NamedInviteStatus.PENDING, False, True),
+        (NamedInviteStatus.ACCEPTED, False, True),
+        (NamedInviteStatus.DECLINED, False, True),
+        (NamedInviteStatus.REVOKED, False, False),
+        (NamedInviteStatus.EXPIRED, False, False),
+        (NamedInviteStatus.PENDING, True, False),
+    ]
+    name, coaches = _namesakes(db_session, _seed(), count=len(cases))
+    for coach, (status, past_expiry, _) in zip(coaches, cases, strict=True):
+        _invite_with_status(
+            db_session,
+            league_id=league_id,
+            admin_id=admin_id,
+            coach=coach,
+            status=status,
+            past_expiry=past_expiry,
+        )
+    expected = {
+        str(coach.id): coach.email if visible else None
+        for coach, (_, _, visible) in zip(coaches, cases, strict=True)
+    }
+
+    # Prima il profilo: la directory segna come scaduti gli inviti oltre la scadenza.
+    assert {
+        str(coach.id): _profile_email(client, token, league_id, coach) for coach in coaches
+    } == expected
+    assert _directory_emails(client, token, league_id, name) == expected
+
+
+def test_operator_sees_every_email_in_the_directory(
+    client: TestClient, db_session: Session, competition_ids: list[str]
+) -> None:
+    """L'operatore vede l'email anche di chi non ha legami con la lega: da
+    admin della propria lega (il caso di Rosario), da esterno e da
+    partecipante qualunque."""
     operator_token, operator_id = _register_and_login(client, "email-dir-operator@example.com")
     _promote_to_operator(db_session, operator_id)
-    seed = int(datetime.now(UTC).timestamp() * 1000) % 400_000
-    name, coaches = _namesakes(db_session, seed)
+    own_league_id = _create_league(client, operator_token, competition_ids, "Lega Operatore")
+    owner_token, _ = _register_and_login(client, "email-dir-op-owner@example.com")
+    other_league_id = _create_league(client, owner_token, competition_ids, "Lega Altrui Dir")
+    name, coaches = _namesakes(db_session, _seed())
     expected = {str(coach.id): coach.email for coach in coaches}
 
-    def emails() -> dict[str, str | None]:
-        response = client.get(
-            _directory_url(league_id),
-            headers={"Authorization": f"Bearer {operator_token}"},
-            params={"search": name},
-        )
-        assert response.status_code == 200, response.text
-        return {row["userId"]: row["email"] for row in response.json()["items"]}
+    assert _directory_emails(client, operator_token, own_league_id, name) == expected
+    assert _directory_emails(client, operator_token, other_league_id, name) == expected
+    _join_as_member(db_session, other_league_id, operator_id)
+    assert _directory_emails(client, operator_token, other_league_id, name) == expected
 
-    assert emails() == expected
+
+def test_operator_sees_the_email_in_the_profile(
+    client: TestClient, db_session: Session, competition_ids: list[str]
+) -> None:
+    """Profilo di un fantallenatore senza legami con la lega, aperto
+    dall'operatore da esterno e poi da partecipante qualunque."""
+    owner_token, _ = _register_and_login(client, "email-prof-op-owner@example.com")
+    league_id = _create_league(client, owner_token, competition_ids, "Lega Operatore Profilo")
+    operator_token, operator_id = _register_and_login(client, "email-prof-operator@example.com")
+    _promote_to_operator(db_session, operator_id)
+    coach = _make_coach(db_session, "visto-da-operatore", _seed())
+    db_session.commit()
+
+    assert _profile_email(client, operator_token, league_id, coach) == coach.email
     _join_as_member(db_session, league_id, operator_id)
-    assert emails() == expected
+    assert _profile_email(client, operator_token, league_id, coach) == coach.email
 
 
 def test_directory_stays_closed_to_a_plain_participant(
@@ -615,8 +735,8 @@ def test_directory_stays_closed_to_a_plain_participant(
     league_id = _create_league(client, owner_token, competition_ids, "Lega Directory Chiusa")
     member_token, member_id = _register_and_login(client, "email-dir-closed-member@example.com")
     _join_as_member(db_session, league_id, member_id)
-    seed = int(datetime.now(UTC).timestamp() * 1000) % 400_000
-    name, coaches = _namesakes(db_session, seed)
+    name, coaches = _namesakes(db_session, _seed())
+    _join_as_member(db_session, league_id, coaches[0].id)
 
     response = client.get(
         _directory_url(league_id),
@@ -631,13 +751,15 @@ def test_directory_service_hides_emails_from_a_plain_participant(
     client: TestClient, db_session: Session, competition_ids: list[str]
 ) -> None:
     """Il backend non si affida solo alla rotta (`league:admin`): chiamato con
-    l'accesso di un partecipante normale, il servizio lascia l'email nulla."""
+    l'accesso di un partecipante normale, il servizio lascia l'email nulla,
+    anche per un compagno di lega e per un invitato."""
     owner_token, _ = _register_and_login(client, "email-dir-svc-owner@example.com")
     league_id = _create_league(client, owner_token, competition_ids, "Lega Servizio Directory")
     _, member_id = _register_and_login(client, "email-dir-svc-member@example.com")
     _join_as_member(db_session, league_id, member_id)
-    seed = int(datetime.now(UTC).timestamp() * 1000) % 400_000
-    name, coaches = _namesakes(db_session, seed)
+    name, coaches = _namesakes(db_session, _seed())
+    _join_as_member(db_session, league_id, coaches[0].id)
+    _invite(client, owner_token, league_id, coaches[1])
 
     member = db_session.get(User, member_id)
     assert member is not None
@@ -654,37 +776,12 @@ def test_directory_service_hides_emails_from_a_plain_participant(
     assert all(coach.email not in serialized for coach in coaches)
 
 
-def test_profile_shows_email_to_an_operator_also_as_plain_member(
-    client: TestClient, db_session: Session, competition_ids: list[str]
-) -> None:
-    """Profilo aperto dall'operatore: email visibile anche quando nella lega è
-    un partecipante qualunque, non solo quando non ne fa parte."""
-    owner_token, _ = _register_and_login(client, "email-prof-op-owner@example.com")
-    league_id = _create_league(client, owner_token, competition_ids, "Lega Operatore Profilo")
-    operator_token, operator_id = _register_and_login(client, "email-prof-operator@example.com")
-    _promote_to_operator(db_session, operator_id)
-    seed = int(datetime.now(UTC).timestamp() * 1000) % 400_000
-    coach = _make_coach(db_session, "visto-da-operatore", seed)
-    db_session.commit()
-
-    def email() -> str | None:
-        response = client.get(
-            f"{_directory_url(league_id)}/{coach.id}",
-            headers={"Authorization": f"Bearer {operator_token}"},
-        )
-        assert response.status_code == 200, response.text
-        return response.json()["email"]
-
-    assert email() == coach.email
-    _join_as_member(db_session, league_id, operator_id)
-    assert email() == coach.email
-
-
 def test_profile_email_follows_the_league_it_is_opened_from(
     client: TestClient, db_session: Session, competition_ids: list[str]
 ) -> None:
     """Privacy: chi amministra la propria lega ma è un partecipante qualunque
-    in un'altra non vede l'email aprendo il profilo da quest'ultima."""
+    in un'altra non vede l'email aprendo il profilo da quest'ultima, anche
+    di un fantallenatore iscritto a tutte e due."""
     other_owner_token, _ = _register_and_login(client, "email-prof-other-owner@example.com")
     other_league_id = _create_league(
         client, other_owner_token, competition_ids, "Lega Altrui Profilo"
@@ -692,17 +789,9 @@ def test_profile_email_follows_the_league_it_is_opened_from(
     token, user_id = _register_and_login(client, "email-prof-own-admin@example.com")
     own_league_id = _create_league(client, token, competition_ids, "Lega Propria Profilo")
     _join_as_member(db_session, other_league_id, user_id)
-    seed = int(datetime.now(UTC).timestamp() * 1000) % 400_000
-    coach = _make_coach(db_session, "due-leghe", seed)
+    coach = _make_coach(db_session, "due-leghe", _seed())
     _join_as_member(db_session, other_league_id, coach.id)
+    _join_as_member(db_session, own_league_id, coach.id)
 
-    def email(league_id: str) -> str | None:
-        response = client.get(
-            f"{_directory_url(league_id)}/{coach.id}",
-            headers={"Authorization": f"Bearer {token}"},
-        )
-        assert response.status_code == 200, response.text
-        return response.json()["email"]
-
-    assert email(own_league_id) == coach.email
-    assert email(other_league_id) is None
+    assert _profile_email(client, token, own_league_id, coach) == coach.email
+    assert _profile_email(client, token, other_league_id, coach) is None

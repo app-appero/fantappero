@@ -129,8 +129,6 @@ def test_directory_pagination_filters_and_excludes_members(
     assert payload["total"] >= 1
     assert all(row["userType"] == "human" for row in payload["items"])
     assert all(row["availableForInvites"] is True for row in payload["items"])
-    # Decisione del 18/11: l'admin della lega vede l'email (N2 resta per la ricerca, sotto).
-    assert all(row["email"] for row in payload["items"])
 
     search = client.get(
         f"/leagues/{league_id}/amministrazione/fantallenatori",
@@ -138,7 +136,10 @@ def test_directory_pagination_filters_and_excludes_members(
         params={"search": "IA 99", "userType": "ai"},
     )
     assert search.status_code == 200
-    assert any(row["userId"] == str(ai.id) for row in search.json()["items"])
+    ai_rows = [row for row in search.json()["items"] if row["userId"] == str(ai.id)]
+    assert len(ai_rows) == 1
+    # Decisione del 20/11: senza legami con la lega l'admin vede solo il nome.
+    assert ai_rows[0]["email"] is None
 
     member = LeagueMembership(
         league_id=UUID(league_id),
@@ -157,6 +158,8 @@ def test_directory_pagination_filters_and_excludes_members(
     joined = [row for row in after_join.json()["items"] if row["userId"] == str(human_id)]
     assert len(joined) == 1
     assert joined[0]["inLeague"] is True
+    # Iscritto alla lega: l'admin ne vede l'email.
+    assert joined[0]["email"] == "dir.human@example.com"
 
     _set_available(client, human_token, False)
     unavailable = client.get(

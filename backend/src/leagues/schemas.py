@@ -217,9 +217,9 @@ class PendingInviteCountResponse(ApiModel):
 class FantasyCoachDirectoryItem(ApiModel):
     user_id: str = Field(alias="userId")
     display_name: str = Field(alias="displayName")
-    # Solo per l'admin della lega e per l'operatore (`can_see_coach_email`), `null` per
-    # tutti gli altri: distingue account diversi con lo stesso nome mostrato (decisione del
-    # 18/11). La ricerca per email resta esclusa (N2).
+    # Per l'operatore sempre; per l'admin della lega solo se il fantallenatore è iscritto o
+    # ha un invito nominativo della lega in corso o con risposta; `null` in tutti gli altri
+    # casi (`can_see_coach_email`, decisione del 20/11). La ricerca per email resta esclusa (N2).
     email: str | None = None
     avatar_url: str | None = Field(default=None, alias="avatarUrl")
     nickname: str | None = None
@@ -259,8 +259,8 @@ class CoachPlacementResponse(ApiModel):
 class FantasyCoachProfileResponse(ApiModel):
     """Profilo storico limitato, accessibile a qualunque membro della lega.
 
-    ``email`` è ``null`` per chi non è admin della lega né operatore (vedi
-    ``can_see_coach_email``).
+    ``email`` segue la stessa regola della directory (vedi ``can_see_coach_email``):
+    ``null`` per il partecipante normale e, per l'admin, per chi non ha legami con la lega.
     """
 
     user_id: str = Field(alias="userId")
