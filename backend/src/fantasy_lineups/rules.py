@@ -303,6 +303,169 @@ def reorder_bench_for_active_roles(
     return active + tail
 
 
+@dataclass(frozen=True)
+class BenchRoleRepair:
+    """Panchina dopo ``restore_bench_active_roles``."""
+
+    #: Panchina completa (panchina attiva e tribuna) nel nuovo ordine.
+    bench: tuple[LineupPlayerRef, ...]
+    #: ``(chi è salito, chi è sceso)`` per ogni scambio, nell'ordine in cui sono stati fatti.
+    moves: tuple[tuple[object, object], ...]
+    #: Ruoli che mancano ancora nei primi ``BENCH_ACTIVE_SIZE`` (vuoto: panchina in regola).
+    missing: dict[FantasyRole, int]
+
+    @property
+    def changed(self) -> bool:
+        return bool(self.moves)
+
+
+def bench_active_role_shortfall(
+    bench: Sequence[LineupPlayerRef],
+    *,
+    unavailable_athlete_ids: Iterable[object] = (),
+    unfieldable_athlete_ids: Iterable[object] = (),
+) -> dict[FantasyRole, int]:
+    """Quanti ne mancano per ruolo nei primi ``BENCH_ACTIVE_SIZE``, come ``evaluate_lineup``.
+
+    Chi è in ``unavailable_athlete_ids`` (esubero di ruolo, ruolo non risolto) dall'11° posto in
+    poi non conta, come nella validazione (``drop_role_quota_excess_from_tribuna``); chi è in
+    ``unfieldable_athlete_ids`` (nessun voto possibile nel turno) non alza la quota, come
+    ``evaluate_lineup(unfieldable_athlete_ids=...)``. Senza, la quota si conta come web e app
+    già installati: su tutta la panchina.
+    """
+    filled = [ref for ref in bench if ref.athlete_id not in {None, ""}]
+    counted = drop_role_quota_excess_from_tribuna(
+        filled, unavailable_athlete_ids, key=lambda ref: ref.athlete_id
+    )
+    if not counted:
+        return {}
+    unfieldable = {item for item in unfieldable_athlete_ids if item not in {None, ""}}
+    required = bench_active_role_requirements(
+        [ref for ref in counted if ref.athlete_id not in unfieldable]
+    )
+    active = count_roles(counted[:BENCH_ACTIVE_SIZE])
+    return {
+        role: needed - active.get(role, 0)
+        for role, needed in required.items()
+        if active.get(role, 0) < needed
+    }
+
+
+def restore_bench_active_roles(
+    bench: Sequence[LineupPlayerRef],
+    *,
+    locked_athlete_ids: Iterable[object] = (),
+    unavailable_athlete_ids: Iterable[object] = (),
+    unfieldable_athlete_ids: Iterable[object] = (),
+    overtake_locked_in_tribuna: bool = False,
+) -> BenchRoleRepair:
+    """Rimette in regola la quota per ruolo dei primi ``BENCH_ACTIVE_SIZE`` con il minimo di
+    spostamenti (Rosario, 20/11: un portiere in panchina al posto dell'attaccante).
+
+    Quando il sistema riscrive una panchina senza il fantallenatore (chi esce dalla rosa, la
+    regola di inizio turno) gli altri scalano di un posto e il primo della tribuna entra al 10°
+    posto qualunque ruolo abbia: con la tribuna in ordine P→D→C→A, uscito un attaccante, saliva
+    un portiere e la formazione non era più salvabile (``bench_roles_invalid``).
+
+    Per ogni ruolo che manca, finché la rosa lo permette:
+
+    - scende l'ultimo dei primi ``BENCH_ACTIVE_SIZE`` che è in più per il suo ruolo (di solito
+      proprio chi era appena salito dalla tribuna) e diventa il primo della tribuna;
+    - chi era dopo di lui sale di un posto e il primo della tribuna con il ruolo che manca
+      diventa il ``BENCH_ACTIVE_SIZE``-esimo.
+
+    Nessun altro si sposta e l'ordine dentro ogni ruolo resta quello scelto dal fantallenatore
+    (conta per i cambi automatici, che vanno solo a parità di ruolo). Chi ha la partita già
+    iniziata (``locked_athlete_ids``) non si sposta e non si scavalca; chi è in
+    ``unavailable_athlete_ids`` (esubero di ruolo, ruolo non risolto) non sale; chi è in
+    ``unfieldable_athlete_ids`` (nessun voto nel turno) non alza la quota e non sale, come nella
+    validazione. Senza, la quota si conta come web e app già installati. Se il ruolo che
+    manca non si può far salire la panchina resta com'è (``missing``): la validazione lo dirà.
+    Con ``overtake_locked_in_tribuna`` (regola di inizio turno, del sistema) chi ha la partita
+    iniziata ed è in tribuna si può scavalcare: scala di un posto in tribuna, che non entra mai
+    nei cambi automatici; nei primi ``BENCH_ACTIVE_SIZE`` resta un limite. Il fantallenatore
+    invece non può (``evaluate_bench_order_lock``), quindi web e app non lo fanno.
+    Funzione pura; la stessa regola è ``restoreBenchActiveRoles`` in
+    ``packages/contracts`` (tasto «Sistema la panchina» di web e app).
+    """
+    locked = {item for item in locked_athlete_ids if item not in {None, ""}}
+    unavailable = {item for item in unavailable_athlete_ids if item not in {None, ""}}
+    unfieldable = {item for item in unfieldable_athlete_ids if item not in {None, ""}}
+    empty = [ref for ref in bench if ref.athlete_id in {None, ""}]
+    items = [ref for ref in bench if ref.athlete_id not in {None, ""}]
+    moves: list[tuple[object, object]] = []
+    while True:
+        missing = bench_active_role_shortfall(
+            items, unavailable_athlete_ids=unavailable, unfieldable_athlete_ids=unfieldable
+        )
+        if not missing:
+            break
+        counted = drop_role_quota_excess_from_tribuna(
+            items, unavailable, key=lambda ref: ref.athlete_id
+        )
+        required = bench_active_role_requirements(
+            [ref for ref in counted if ref.athlete_id not in unfieldable]
+        )
+        active = count_roles(items[:BENCH_ACTIVE_SIZE])
+
+        def surplus(ref: LineupPlayerRef, active=active, required=required) -> bool:
+            return ref.role is None or active.get(ref.role, 0) > required.get(ref.role, 0)
+
+        demotable = [
+            index
+            for index in range(min(BENCH_ACTIVE_SIZE, len(items)) - 1, -1, -1)
+            if items[index].athlete_id not in locked and surplus(items[index])
+        ]
+        pair: tuple[int, int] | None = None
+        for role in FantasyRole:
+            if role not in missing:
+                continue
+            promotable = [
+                index
+                for index in range(BENCH_ACTIVE_SIZE, len(items))
+                if items[index].role == role
+                and items[index].athlete_id not in locked
+                and items[index].athlete_id not in unavailable
+                and items[index].athlete_id not in unfieldable
+            ]
+            for down in demotable:
+                up = next(
+                    (
+                        candidate
+                        for candidate in promotable
+                        if not any(
+                            items[index].athlete_id in locked
+                            and (index < BENCH_ACTIVE_SIZE or not overtake_locked_in_tribuna)
+                            for index in range(down + 1, candidate)
+                        )
+                    ),
+                    None,
+                )
+                if up is not None:
+                    pair = (down, up)
+                    break
+            if pair is not None:
+                break
+        if pair is None:
+            break
+        down, up = pair
+        promoted, demoted = items[up], items[down]
+        items = [
+            *(ref for index, ref in enumerate(items[:BENCH_ACTIVE_SIZE]) if index != down),
+            promoted,
+            demoted,
+            *(ref for index, ref in enumerate(items) if index >= BENCH_ACTIVE_SIZE and index != up),
+        ]
+        moves.append((promoted.athlete_id, demoted.athlete_id))
+    return BenchRoleRepair(
+        bench=(*items, *empty),
+        moves=tuple(moves),
+        missing=bench_active_role_shortfall(
+            items, unavailable_athlete_ids=unavailable, unfieldable_athlete_ids=unfieldable
+        ),
+    )
+
+
 def _bench_role_shortfall_message(missing: Mapping[FantasyRole, int]) -> str:
     parts = []
     for role in FantasyRole:
@@ -751,10 +914,19 @@ def evaluate_lineup(
     excess_athlete_ids: Iterable[object] = (),
     left_roster_athlete_ids: Iterable[object] = (),
     role_unresolved_athlete_ids: Iterable[object] = (),
+    unfieldable_athlete_ids: Iterable[object] = (),
 ) -> LineupEvaluation:
     """Validate 7 modules, 1 GK, 11 starters, P–D–C–A counts and roster membership.
 
     Drafts may pass ``strict=False`` to allow incomplete XI/panchina (EP06-06).
+
+    ``unfieldable_athlete_ids``: chi di sicuro non prende il voto in questo turno (nessuna
+    partita, partita rinviata, indisponibilità confermata: ``selectionBlocked`` di web e app).
+    Non alza la quota per ruolo dei primi ``BENCH_ACTIVE_SIZE`` della panchina: la quota chiede
+    ``min(quota, panchinari schierabili di quel ruolo)`` (Rosario, 20/11: con l'unico terzo
+    attaccante senza partita la quota chiedeva 3 attaccanti nei primi 10, e web e app, che lo
+    tengono in coda, non riuscivano mai a soddisfarla). Nei primi 10 conta comunque: la regola
+    può solo diventare meno severa.
     ``athlete_names`` (stesse chiavi degli id passati) serve solo ai messaggi di
     ``athlete_not_in_roster``, ``athlete_exceeds_role_quota`` e ``athlete_role_unresolved``:
     chi non è in rosa, è in esubero di ruolo o non ha un ruolo viene nominato.
@@ -965,7 +1137,10 @@ def evaluate_lineup(
                 )
 
     if strict and filled_bench:
-        required = bench_active_role_requirements(filled_bench)
+        unfieldable = {item for item in unfieldable_athlete_ids if item not in {None, ""}}
+        required = bench_active_role_requirements(
+            [player for player in filled_bench if player.athlete_id not in unfieldable]
+        )
         active_slots = filled_bench[:BENCH_ACTIVE_SIZE]
         active_role_counts = count_roles(active_slots)
         missing = {

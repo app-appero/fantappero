@@ -65,13 +65,17 @@ from fantasy_lineups.departures import (
 from fantasy_lineups.kickoffs import athlete_kickoffs
 from fantasy_lineups.models import EffectiveLineup, LineupPlayer, LineupSubmission
 from fantasy_lineups.rules import (
+    BENCH_ACTIVE_ROLE_QUOTA_MESSAGE,
     TURN_START_FROM_BENCH,
     TURN_START_FROM_TRIBUNA,
     LineupPlayerRef,
     TurnStartHoleFill,
+    bench_active_role_shortfall,
     fill_lineup_holes_at_turn_start,
     fill_starter_holes,
+    is_athlete_kickoff_locked,
     join_names,
+    restore_bench_active_roles,
     turn_start_role_label,
 )
 from fantasy_lineups.validators import MAX_LINEUP_LOCK_MARGIN_MINUTES
@@ -382,6 +386,16 @@ def turn_start_messages(details: dict) -> list[str]:
         if isinstance(item, dict) and str(item.get("athleteId")) not in cited
     ]
     others = [name for name in others if name]
+    for move in details.get("benchRepair") or ():
+        if not isinstance(move, dict):
+            continue
+        promoted = move.get("promotedName") or "un calciatore della tribuna"
+        demoted = move.get("demotedName") or "chi era in più"
+        messages.append(
+            f"{opening} {promoted} è salito in panchina al posto di {demoted}, che va in "
+            f"tribuna: {BENCH_ACTIVE_ROLE_QUOTA_MESSAGE[0].lower()}"
+            f"{BENCH_ACTIVE_ROLE_QUOTA_MESSAGE[1:]}."
+        )
     if others:
         if len(others) == 1:
             messages.append(
@@ -444,15 +458,23 @@ def _settle_submission(
             ref.athlete_id == ""
             for ref in fill_starter_holes(module=submission.module.value, starters=starters)
         )
-        if not departed and not has_hole:
-            return None
-    bench = [
-        LineupPlayerRef(athlete_id=row.athlete_id, role=row.role)
-        for row in sorted(
-            (row for row in kept if row.slot_kind == LineupSlotKind.BENCH),
-            key=lambda row: row.sort_order,
+        bench = [
+            LineupPlayerRef(athlete_id=row.athlete_id, role=row.role)
+            for row in sorted(
+                (row for row in kept if row.slot_kind == LineupSlotKind.BENCH),
+                key=lambda row: row.sort_order,
+            )
+        ]
+        # Nei primi 10 manca un ruolo (es. un portiere salito al posto di un attaccante uscito
+        # dalla rosa, Rosario 20/11): anche questo si sistema all'inizio del turno.
+        bench_short = bool(
+            bench_active_role_shortfall(
+                bench,
+                unavailable_athlete_ids={athlete_id for athlete_id, excess in roster if excess},
+            )
         )
-    ]
+        if not departed and not has_hole and not bench_short:
+            return None
 
     roster_ids = [athlete_id for athlete_id, _ in roster]
     effective_roles = resolve_effective_athlete_roles(
@@ -495,8 +517,36 @@ def _settle_submission(
         outside=outside,
         unavailable_ids=unavailable,
     )
-    if not departed and not outcome.changed:
-        # Un posto vuoto che nessuno può coprire: niente da scrivere.
+    # La quota per ruolo dei primi 10: chi è uscito ha fatto scalare la panchina, o un
+    # panchinaro entrato tra i titolari non aveva nessuno dello stesso ruolo in tribuna. Sale il
+    # primo della tribuna con il ruolo che manca; chi ha la partita già iniziata non si sposta
+    # (in tribuna lo si può scavalcare: lì non entra comunque).
+    margin = lock_margin_minutes(session, league.id)
+    locked = {
+        athlete_id
+        for athlete_id, ref in kickoffs.items()
+        if is_athlete_kickoff_locked(
+            now=now,
+            kickoff_at=ref.kickoff_at,
+            status_short=ref.status_short,
+            lock_latched=ref.lock_latched,
+            margin_minutes=margin,
+        )
+    }
+    repair = restore_bench_active_roles(
+        outcome.bench,
+        locked_athlete_ids=locked,
+        unavailable_athlete_ids={
+            *(athlete_id for athlete_id, excess in roster if excess),
+            *(athlete_id for athlete_id, role in roles.items() if role is None),
+        },
+        # Come la validazione: chi non prende il voto non alza la quota (una formazione
+        # salvata valida non si tocca) e non sale nei primi 10.
+        unfieldable_athlete_ids=set(reasons),
+        overtake_locked_in_tribuna=True,
+    )
+    if not departed and not outcome.changed and not repair.changed:
+        # Un posto vuoto (o un ruolo nei primi 10) che nessuno può coprire: niente da scrivere.
         return None
 
     # Prima di scrivere: le righe di chi esce vengono cancellate.
@@ -517,12 +567,13 @@ def _settle_submission(
         )
     ]
     module, revision = submission.module.value, submission.revision
-    _write_rows(session, submission, starters=outcome.starters, bench=outcome.bench)
+    _write_rows(session, submission, starters=outcome.starters, bench=repair.bench)
 
     involved = {
         *departed_ids,
         *(item.starter_athlete_id for item in outcome.fills if item.starter_athlete_id),
         *(item.bench_athlete_id for item in outcome.fills if item.bench_athlete_id),
+        *(athlete_id for move in repair.moves for athlete_id in move),
     }
     left_by = _left_by(
         session,
@@ -579,6 +630,16 @@ def _settle_submission(
                 "tacticalMoveConsumed": False,
                 "removed": removed,
                 "fills": fills,
+                # Chi è salito dalla tribuna nei primi 10 per la quota per ruolo, e chi è sceso.
+                "benchRepair": [
+                    {
+                        "promotedId": str(promoted),
+                        "promotedName": names.get(promoted, ""),  # type: ignore[call-overload]
+                        "demotedId": str(demoted),
+                        "demotedName": names.get(demoted, ""),  # type: ignore[call-overload]
+                    }
+                    for promoted, demoted in repair.moves
+                ],
             },
         )
     )

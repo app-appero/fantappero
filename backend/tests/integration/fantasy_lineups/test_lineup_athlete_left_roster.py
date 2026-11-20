@@ -156,17 +156,23 @@ def test_bench_player_traded_away_leaves_the_open_turn_lineup(
     starters = [player["athleteId"] for player in body["lineup"]["starters"]]
     bench = [player["athleteId"] for player in body["lineup"]["bench"]]
     assert starters == payload["starterAthleteIds"]
-    # Tolto dalla panchina, gli altri nello stesso ordine: il suo posto resta da riempire.
-    assert bench == [item for item in payload["benchAthleteIds"] if item != str(departed)]
+    # Tolto dalla panchina, gli altri nello stesso ordine; al 10° posto, invece del primo della
+    # tribuna (P3, un portiere), sale il primo difensore della tribuna (Rosario, 20/11), e il
+    # difensore arrivato con lo scambio è in coda, come lo mettono web e app.
+    kept = [item for item in payload["benchAthleteIds"] if item != str(departed)]
+    first_tribuna, first_tribuna_defender = UUID(kept[9]), UUID(kept[10])
+    assert setup["role_of"][first_tribuna] == FantasyRole.P
+    assert setup["role_of"][first_tribuna_defender] == FantasyRole.D
+    assert bench == [*kept[:9], kept[10], kept[9], *kept[11:], str(incoming)]
     roster_ids = {row["athleteId"] for row in body["roster"]}
     assert str(departed) not in roster_ids
-    assert str(incoming) in roster_ids and str(incoming) not in bench
+    assert str(incoming) in roster_ids
     notices = [issue for issue in body["issues"] if issue["code"] == LEFT_ROSTER_CODE]
     assert notices == [{"code": LEFT_ROSTER_CODE, "message": _left_roster_notice(name)}]
     assert body["issues"][0]["code"] == LEFT_ROSTER_CODE
     codes = {issue["code"] for issue in body["issues"]}
     assert "athlete_not_in_roster" not in codes
-    assert "bench_incomplete" in codes
+    assert "bench_roles_invalid" not in codes
     # GET non cambia niente: la pulizia l'ha già fatta lo scambio.
     assert _stored_athlete_ids(db_session, setup) == stored_before
 

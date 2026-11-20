@@ -14,8 +14,13 @@ rimasto per altre vie e copre i posti lasciati vuoti, una volta, prima del calco
 - Titolari: la riga esce e il posto resta vuoto; gli altri tengono il loro ``sort_order`` (i
   titolari sono posizionali sul modulo), come la pulizia in lettura di GET formazione.
 - Panchina: gli altri restano nell'ordine, con le posizioni ricompattate (0..n-1), così i primi
-  ``BENCH_ACTIVE_SIZE`` sono gli stessi per il calcolo e per la pagina rosa.
-- Bozza: ``""`` al posto del titolare, la panchina senza di lui.
+  ``BENCH_ACTIVE_SIZE`` sono gli stessi per il calcolo e per la pagina rosa. Se così nei primi
+  ``BENCH_ACTIVE_SIZE`` manca un ruolo (es. uscito un attaccante sale un portiere, il primo della
+  tribuna), sale il primo della tribuna con quel ruolo e chi era salito torna primo della tribuna
+  (``rules.restore_bench_active_roles``, Rosario 20/11): prima la formazione restava con 2 P e
+  2 A nei primi 10 e ogni salvataggio era rifiutato (``bench_roles_invalid``).
+- Bozza: ``""`` al posto del titolare, la panchina senza di lui (con la stessa regola per la
+  quota dei primi 10).
 
 È una pulizia di sistema, non una scelta del fantallenatore: nessuna nuova revisione,
 ``submitted_at`` e ``saved_at`` invariati, nessuna mossa tattica. Per ogni turno toccato resta
@@ -33,9 +38,14 @@ from uuid import UUID
 from sqlalchemy import or_, select
 from sqlalchemy.orm import Session, selectinload
 
-from database.enums import FantasyTurnStatus, LeagueAuditAction, LineupSlotKind
+from database.enums import FantasyRole, FantasyTurnStatus, LeagueAuditAction, LineupSlotKind
 from fantasy_lineups.models import LineupDraft, LineupPlayer, LineupSubmission
-from fantasy_lineups.rules import DEFAULT_LINEUP_LOCK_MARGIN_MINUTES
+from fantasy_lineups.rules import (
+    DEFAULT_LINEUP_LOCK_MARGIN_MINUTES,
+    LineupPlayerRef,
+    bench_active_role_shortfall,
+    restore_bench_active_roles,
+)
 from fantasy_teams.models import FantasyRosterSlot, FantasyTeam
 from fantasy_turns.models import FantasyRound, FantasyRoundFixture
 from fantasy_turns.rules import STARTED_FIXTURE_STATUSES, derive_effective_status, ensure_utc
@@ -66,6 +76,8 @@ class DepartedLineupRemoval:
     #: Posto lasciato nella formazione salvata, ``("starter" | "bench", sort_order)``.
     lineup_slot: tuple[str, int] | None
     removed_from_draft: bool
+    #: ``(chi è salito dalla tribuna, chi è sceso)`` per tenere la quota dei primi 10.
+    bench_repair: tuple[tuple[object, object], ...] = ()
 
 
 @dataclass(frozen=True)
@@ -185,15 +197,20 @@ def purge_departed_athlete_from_future_lineups(
     removals: list[DepartedLineupRemoval] = []
     athlete_name: str | None = None
     audit_actor_id = actor_id
+    roster_context = _RosterContext(session, team_id, (athlete_id,))
     for fantasy_round in rounds:
         submission = submissions.get(fantasy_round.id)
         draft = drafts.get(fantasy_round.id)
-        lineup_slot = (
-            _remove_from_submission(session, submission, athlete_id)
+        removed = (
+            _remove_from_submission(session, submission, athlete_id, roster_context)
             if submission is not None
             else None
         )
-        in_draft = _remove_from_draft(draft, athlete_id) if draft is not None else False
+        lineup_slot = removed[0] if removed is not None else None
+        bench_repair = removed[1] if removed is not None else ()
+        in_draft = (
+            _remove_from_draft(draft, athlete_id, roster_context) if draft is not None else False
+        )
         if lineup_slot is None and not in_draft:
             continue
         removals.append(
@@ -201,6 +218,7 @@ def purge_departed_athlete_from_future_lineups(
                 round_id=fantasy_round.id,
                 lineup_slot=lineup_slot,
                 removed_from_draft=in_draft,
+                bench_repair=bench_repair,
             )
         )
         if athlete_name is None:
@@ -228,6 +246,11 @@ def purge_departed_athlete_from_future_lineups(
                     "draft": in_draft,
                     "revision": submission.revision if submission is not None else None,
                     "tacticalMoveConsumed": False,
+                    # Chi è salito dalla tribuna per tenere la quota dei primi 10, e chi è sceso.
+                    "benchRepair": [
+                        {"promotedId": str(promoted), "demotedId": str(demoted)}
+                        for promoted, demoted in bench_repair
+                    ],
                 },
             )
         )
@@ -282,9 +305,87 @@ def departure_notices(
     return notices
 
 
+class _RosterContext:
+    """Chi in rosa non può salire nei primi 10 (esubero di ruolo, ruolo non risolto) e i ruoli
+    di oggi, letti solo se servono: quasi sempre la panchina resta in regola da sé."""
+
+    def __init__(
+        self, session: Session, team_id: UUID, extra_athlete_ids: tuple[UUID, ...] = ()
+    ) -> None:
+        self._session = session
+        self._team_id = team_id
+        self._extra_athlete_ids = extra_athlete_ids
+        self._loaded: tuple[set[str], dict[str, FantasyRole | None]] | None = None
+
+    def load(self) -> tuple[set[str], dict[str, FantasyRole | None]]:
+        if self._loaded is None:
+            # Import locale: fantasy_teams importa questo modulo (pulizia all'uscita dalla rosa).
+            from fantasy_teams.composition_service import resolve_effective_athlete_roles
+            from leagues.models.league import League
+
+            rows = self._session.execute(
+                select(
+                    FantasyRosterSlot.athlete_id,
+                    FantasyRosterSlot.exceeds_role_quota,
+                    FantasyTeam.league_id,
+                )
+                .join(FantasyTeam, FantasyTeam.id == FantasyRosterSlot.fantasy_team_id)
+                .where(
+                    FantasyRosterSlot.fantasy_team_id == self._team_id,
+                    FantasyRosterSlot.athlete_id.is_not(None),
+                )
+            ).all()
+            excess = {str(athlete_id) for athlete_id, flagged, _ in rows if flagged}
+            roles: dict[str, FantasyRole | None] = {}
+            league = self._session.get(League, rows[0][2]) if rows else None
+            if league is not None:
+                owned = [athlete_id for athlete_id, _, _ in rows]
+                resolved = resolve_effective_athlete_roles(
+                    self._session,
+                    league_id=league.id,
+                    # Anche chi esce: serve a sapere com'era la bozza prima della sua uscita.
+                    athlete_ids=[*owned, *self._extra_athlete_ids],
+                    season_year=league.season_year,
+                )
+                roles = {
+                    str(athlete_id): resolved[athlete_id].role if athlete_id in resolved else None
+                    for athlete_id in [*owned, *self._extra_athlete_ids]
+                }
+                unresolved = {
+                    str(athlete_id) for athlete_id in owned if roles.get(str(athlete_id)) is None
+                }
+            else:
+                unresolved = set()
+            self._loaded = (excess | unresolved, roles)
+        return self._loaded
+
+
+def _restored_bench(
+    refs: list[LineupPlayerRef], roster_context: _RosterContext
+) -> tuple[list[LineupPlayerRef], tuple[tuple[object, object], ...]]:
+    """La panchina ricompattata, con la quota dei primi 10 rimessa a posto se serve.
+
+    Il turno non è ancora iniziato (è la condizione della pulizia), quindi nessuno ha la partita
+    in corso. Chi è in esubero di ruolo o senza ruolo non sale nei primi 10.
+    """
+    if not bench_active_role_shortfall(refs):
+        return refs, ()
+    unavailable, _ = roster_context.load()
+    outcome = restore_bench_active_roles(
+        refs,
+        unavailable_athlete_ids={
+            ref.athlete_id for ref in refs if str(ref.athlete_id) in unavailable
+        },
+    )
+    return list(outcome.bench), outcome.moves
+
+
 def _remove_from_submission(
-    session: Session, submission: LineupSubmission, athlete_id: UUID
-) -> tuple[str, int] | None:
+    session: Session,
+    submission: LineupSubmission,
+    athlete_id: UUID,
+    roster_context: _RosterContext,
+) -> tuple[tuple[str, int], tuple[tuple[object, object], ...]] | None:
     leaving = next((row for row in submission.players if row.athlete_id == athlete_id), None)
     if leaving is None:
         return None
@@ -292,11 +393,20 @@ def _remove_from_submission(
     # delete-orphan: la riga esce davvero, prima di ricompattare (vincolo di unicità).
     submission.players.remove(leaving)
     session.flush()
+    repair: tuple[tuple[object, object], ...] = ()
     if leaving.slot_kind == LineupSlotKind.BENCH:
         bench = sorted(
             (row for row in submission.players if row.slot_kind == LineupSlotKind.BENCH),
             key=lambda row: row.sort_order,
         )
+        # Ricompattata la panchina, nei primi 10 può mancare un ruolo (Rosario, 20/11): sale il
+        # primo della tribuna con quel ruolo, non semplicemente il primo della tribuna.
+        refs, repair = _restored_bench(
+            [LineupPlayerRef(athlete_id=row.athlete_id, role=row.role) for row in bench],
+            roster_context,
+        )
+        by_id = {row.athlete_id: row for row in bench}
+        bench = [by_id[ref.athlete_id] for ref in refs]  # type: ignore[index]
         moved = [(row, index) for index, row in enumerate(bench) if row.sort_order != index]
         if moved:
             for row, index in moved:
@@ -305,10 +415,12 @@ def _remove_from_submission(
             for row, index in moved:
                 row.sort_order = index
             session.flush()
-    return slot
+    return slot, repair
 
 
-def _remove_from_draft(draft: LineupDraft, athlete_id: UUID) -> bool:
+def _remove_from_draft(
+    draft: LineupDraft, athlete_id: UUID, roster_context: _RosterContext
+) -> bool:
     key = str(athlete_id)
     starters = list(draft.starter_athlete_ids or [])
     bench = list(draft.bench_athlete_ids or [])
@@ -316,6 +428,20 @@ def _remove_from_draft(draft: LineupDraft, athlete_id: UUID) -> bool:
     new_bench = [item for item in bench if str(item) != key]
     if new_starters == starters and new_bench == bench:
         return False
+    if len(new_bench) != len(bench) and all(new_bench):
+        # Stessa regola della formazione per la quota dei primi 10, con i ruoli di oggi; ma solo
+        # se a romperla è stata questa uscita: una bozza non si valida per intero, e una quota già
+        # fuori posto l'ha scelta il fantallenatore.
+        _, roles = roster_context.load()
+
+        def refs_of(items: list) -> list[LineupPlayerRef]:
+            return [
+                LineupPlayerRef(athlete_id=str(item), role=roles.get(str(item))) for item in items
+            ]
+
+        if not bench_active_role_shortfall(refs_of([item for item in bench if item])):
+            refs, _ = _restored_bench(refs_of(new_bench), roster_context)
+            new_bench = [str(ref.athlete_id) for ref in refs]
     # Liste nuove (non modificate sul posto): così SQLAlchemy vede il cambio del JSONB.
     draft.starter_athlete_ids = new_starters
     draft.bench_athlete_ids = new_bench
