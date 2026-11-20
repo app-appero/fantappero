@@ -13,7 +13,7 @@ from database.enums import CreditLedgerReason, RosterOwnershipSource
 from fantasy_teams.composition_service import (
     assert_assignment_respects_role_quota,
     assign_allowing_role_quota_overflow,
-    resolve_effective_athlete_role,
+    resolve_effective_athlete_roles,
     sync_team_composition_status,
 )
 from fantasy_teams.ledger import apply_ledger_movement, find_account_for_team
@@ -263,22 +263,21 @@ def resolve_live_swap(
 
     # Scambio dello stesso ruolo: non peggiora la composizione, quindi non può essere
     # respinto per quota anche se il ruolo è già in sovrannumero (il flag resta acceso).
-    competition_ids = {competition.id for competition in league.competitions}
-    released_role = resolve_effective_athlete_role(
+    # Ruoli della valutazione della rosa, come il controllo di quota: chi esce conta con il
+    # ruolo con cui la rosa lo conta, anche se non è più nel listone di quest'anno.
+    roles = resolve_effective_athlete_roles(
         session,
         league_id=league.id,
-        athlete_id=release_athlete_id,
+        athlete_ids=[release_athlete_id, acquire_athlete_id],
         season_year=league.season_year,
-        competition_ids=competition_ids,
     )
-    acquired_role = resolve_effective_athlete_role(
-        session,
-        league_id=league.id,
-        athlete_id=acquire_athlete_id,
-        season_year=league.season_year,
-        competition_ids=competition_ids,
+    released_role = roles.get(release_athlete_id)
+    acquired_role = roles.get(acquire_athlete_id)
+    same_role = (
+        released_role is not None
+        and acquired_role is not None
+        and released_role.role == acquired_role.role
     )
-    same_role = released_role is not None and released_role == acquired_role
 
     try:
         with session.begin_nested():

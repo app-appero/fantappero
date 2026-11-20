@@ -13,6 +13,7 @@ from auth.exceptions import ValidationAuthError
 from authorization.context import LeagueAccess
 from config.settings.loader import get_api_settings
 from database.enums import FantasyRole, LeagueAuditAction
+from fantasy_teams.composition_service import resync_team_compositions
 from leagues.listone_refresh_progress import (
     ListoneRefreshProgress,
     load_progress,
@@ -201,6 +202,14 @@ class LeagueListoneService:
                     season_year=league.season_year,
                     on_progress=listone_progress,
                 )
+                # Il listone vale per tutte le leghe della stagione: le rose con calciatori a
+                # cui è cambiato il ruolo si ricalcolano (stato ed esuberi), in ogni lega.
+                if listone_result.affected_athlete_ids:
+                    resync_team_compositions(
+                        self._session,
+                        athlete_ids=listone_result.affected_athlete_ids,
+                        season_year=league.season_year,
+                    )
                 refreshed_at = datetime.now(UTC)
                 counters = LeagueListoneRefreshCounters(
                     athletesCreated=roster_result.counters.athletes_created,
@@ -391,6 +400,8 @@ class LeagueListoneService:
             actor_id=league_access.user.id,
             reason=(reason.strip() if reason else None) or None,
         )
+        # Il nuovo ruolo può portare oltre quota (o riportare in quota) la rosa che lo ha.
+        resync_team_compositions(self._session, athlete_ids=[athlete_id], league_id=league.id)
         self._session.add(
             LeagueAuditEvent(
                 league_id=league.id,
@@ -473,6 +484,8 @@ class LeagueListoneService:
                 "Non esiste un override attivo per questo calciatore.",
                 code="role_override_not_found",
             )
+        # Torna il ruolo ufficiale: stesso ricalcolo della rosa che lo ha.
+        resync_team_compositions(self._session, athlete_ids=[athlete_id], league_id=league.id)
 
         athlete = self._session.get(Athlete, athlete_id)
         club = self._session.get(Club, assignment.club_id) if assignment.club_id else None

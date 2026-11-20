@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from collections.abc import Collection
+from collections import Counter
+from collections.abc import Collection, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from uuid import UUID
@@ -33,9 +34,13 @@ from sports_data.listone.generate import get_role_assignment, list_role_assignme
 from sports_data.listone.mapping import map_provider_position_to_role
 from sports_data.listone.models import LeagueRoleOverride, RoleAssignment
 from sports_data.listone.overrides import effective_role_for_athlete, get_active_override
-from sports_data.roster.models import SquadMembership
+from sports_data.roster.models import Athlete, SquadMembership
 
 logger = get_logger(__name__)
+
+#: Regola unica dello stato salvato (``composition_status``) e delle letture della rosa:
+#: una rosa incompleta è "incompleta", non "non valida", in qualunque stato della lega.
+STORED_STATUS_REQUIRES_COMPLETE = False
 
 
 @dataclass(frozen=True)
@@ -223,12 +228,7 @@ def evaluate_team_composition(
     must_complete = (
         league_requires_complete_rosters(league) if require_complete is None else require_complete
     )
-    league_competition_ids = {
-        row.competition_id
-        for row in session.scalars(
-            select(LeagueCompetition).where(LeagueCompetition.league_id == league.id)
-        ).all()
-    }
+    league_competition_ids = _league_competition_ids(session, league.id)
 
     slots = list(
         session.scalars(
@@ -252,31 +252,105 @@ def evaluate_team_composition(
             athlete_ids=athlete_ids,
             season_year=league.season_year,
         )
-    roles = [resolved[athlete_id].role for athlete_id in athlete_ids if athlete_id in resolved]
-    unresolved = len(athlete_ids) - len(roles)
+    athletes = set(athlete_ids)
     club_ids = {
         item.club_id
         for athlete_id, item in resolved.items()
-        if athlete_id in athlete_ids and item.club_id is not None
+        if athlete_id in athletes and item.club_id is not None
     }
-
     club_competitions = resolve_club_competition_ids(
         session,
         club_ids=club_ids,
         season_year=league.season_year,
         league_competition_ids=league_competition_ids,
     )
-    competition_ids: set[UUID] = set()
-    for comps in club_competitions.values():
-        competition_ids.update(comps)
+    return _composition_report(
+        limits=limits,
+        require_complete=must_complete,
+        athlete_ids=athlete_ids,
+        resolved=resolved,
+        club_competitions=club_competitions,
+    )
 
+
+def _league_competition_ids(session: Session, league_id: UUID) -> set[UUID]:
+    return {
+        row.competition_id
+        for row in session.scalars(
+            select(LeagueCompetition).where(LeagueCompetition.league_id == league_id)
+        ).all()
+    }
+
+
+def _composition_report(
+    *,
+    limits: RosterCompositionLimits,
+    require_complete: bool,
+    athlete_ids: Sequence[UUID],
+    resolved: Mapping[UUID, EffectiveAthleteRole],
+    club_competitions: Mapping[UUID, set[UUID]],
+) -> RosterCompositionReport:
+    """Valutazione di una rosa a ruoli e campionati dei club già risolti (nessuna query)."""
+    roles = [resolved[athlete_id].role for athlete_id in athlete_ids if athlete_id in resolved]
+    competition_ids: set[UUID] = set()
+    for athlete_id in athlete_ids:
+        item = resolved.get(athlete_id)
+        if item is not None and item.club_id is not None:
+            competition_ids.update(club_competitions.get(item.club_id, ()))
     return evaluate_roster_composition(
         limits=limits,
         roles=roles,
         competition_ids=competition_ids,
-        require_complete=must_complete,
-        unresolved_role_count=unresolved,
+        require_complete=require_complete,
+        unresolved_role_count=len(athlete_ids) - len(roles),
     )
+
+
+def evaluate_league_team_compositions(
+    session: Session,
+    league: League,
+    teams: Sequence[FantasyTeam],
+) -> tuple[dict[UUID, RosterCompositionReport], dict[UUID, EffectiveAthleteRole]]:
+    """Valuta le rose di più squadre della lega in un numero fisso di query (``/squadre``).
+
+    Stesso risultato di `evaluate_team_composition` con la regola dello stato salvato
+    (``require_complete=False``), squadra per squadra, ma con i ruoli e i campionati dei club
+    risolti una volta sola per tutta la lega. Usa ``team.slots`` già caricati. Ritorna i report
+    per squadra e i ruoli risolti (per `composition_needs_refresh`).
+    """
+    limits = resolve_league_rules_limits(session, league.id)
+    athlete_ids_by_team = {
+        team.id: [slot.athlete_id for slot in team.slots if slot.athlete_id is not None]
+        for team in teams
+    }
+    resolved = resolve_effective_athlete_roles(
+        session,
+        league_id=league.id,
+        athlete_ids=[athlete_id for ids in athlete_ids_by_team.values() for athlete_id in ids],
+        season_year=league.season_year,
+    )
+    club_ids = {item.club_id for item in resolved.values() if item.club_id is not None}
+    club_competitions = (
+        resolve_club_competition_ids(
+            session,
+            club_ids=club_ids,
+            season_year=league.season_year,
+            league_competition_ids=_league_competition_ids(session, league.id),
+        )
+        if club_ids
+        else {}
+    )
+    reports = {
+        team_id: _composition_report(
+            limits=limits,
+            require_complete=STORED_STATUS_REQUIRES_COMPLETE,
+            athlete_ids=athlete_ids,
+            resolved=resolved,
+            club_competitions=club_competitions,
+        )
+        for team_id, athlete_ids in athlete_ids_by_team.items()
+    }
+    return reports, resolved
 
 
 #: Possesso non registrato: conta come l'acquisto più vecchio.
@@ -396,17 +470,25 @@ def sync_team_composition_status(
     team: FantasyTeam,
     *,
     league: League,
-    require_complete: bool | None = None,
 ) -> RosterCompositionReport:
+    """Unico punto che scrive ``composition_status``: la fonte unica dello stato della rosa.
+
+    ``/squadre``, ``/rosa`` e la vista admin della squadra mostrano lo stato salvato, quindi
+    lo si valuta sempre con la stessa regola delle loro letture
+    (``STORED_STATUS_REQUIRES_COMPLETE``): una rosa a 34/35 è "incompleta", non "non valida",
+    in qualunque stato della lega. I controlli per l'avvio della stagione (rosa completa e
+    tre campionati) non leggono lo stato salvato e valutano a parte.
+    """
     # Chi scrive lo stato della rosa ripara anche gli esuberi senza flag: la valutazione
     # resta la stessa (gli esuberi contano), ma la rosa mostra chi è in più e la
-    # formazione si può schierare senza di lui (vedi `roster_allows_lineup`).
+    # formazione si può schierare senza di lui (vedi `roster_allows_lineup`). Vale anche
+    # per una rosa salvata come convalidata ma ormai oltre quota (stato scaduto).
     flag_role_quota_overflow(session, team, league=league)
     report = evaluate_team_composition(
         session,
         team,
         league=league,
-        require_complete=require_complete,
+        require_complete=STORED_STATUS_REQUIRES_COMPLETE,
     )
     previous = team.composition_status
     team.composition_status = report.status
@@ -415,7 +497,187 @@ def sync_team_composition_status(
             team.validated_at = datetime.now(UTC)
     else:
         team.validated_at = None
+    if previous == RosterCompositionStatus.VALIDATED and report.status != previous:
+        logger.info(
+            "fantasy_roster_composition_invalidated",
+            extra={"fantasy_team_id": str(team.id), "status": report.status.value},
+        )
     return report
+
+
+def composition_needs_refresh(
+    team: FantasyTeam,
+    report: RosterCompositionReport,
+    *,
+    effective_roles: Mapping[UUID, EffectiveAthleteRole],
+) -> bool:
+    """True se stato salvato o flag di esubero non corrispondono alla valutazione ``report``.
+
+    Controllo in memoria, senza query, sugli slot già caricati (``team.slots`` con
+    ``exceeds_role_quota``) e sui ruoli già risolti: le letture della rosa lo usano per
+    riallineare (`refresh_team_composition`) solo le squadre rimaste indietro, per esempio
+    una rosa salvata come convalidata prima che un cambio di ruolo la portasse oltre quota
+    (QA 20/11, qa-04 e qa-08). Scaduto vuol dire:
+
+    - lo stato salvato (o ``validated_at``) diverso da quello valutato;
+    - un ruolo oltre quota con meno segnati dell'eccedenza (lo segnerebbe
+      `flag_role_quota_overflow`);
+    - un flag non più giustificato o uno slot extra da ricompattare (li toglierebbe
+      `reconcile_roster_overflow`, stesso conteggio).
+    """
+    if team.composition_status != report.status:
+        return True
+    if (report.status == RosterCompositionStatus.VALIDATED) != (team.validated_at is not None):
+        return True
+    limits = report.limits
+    occupied = [slot for slot in team.slots if slot.athlete_id is not None]
+    counts: Counter[FantasyRole] = Counter()
+    unflagged: Counter[FantasyRole] = Counter()
+    flagged: Counter[FantasyRole] = Counter()
+    for slot in occupied:
+        resolved = effective_roles.get(slot.athlete_id) if slot.athlete_id else None
+        if resolved is None:
+            continue
+        counts[resolved.role] += 1
+        (flagged if slot.exceeds_role_quota else unflagged)[resolved.role] += 1
+    if any(unflagged[role] > limits.for_role(role) for role in FantasyRole):
+        return True
+    # Stessi due passi di `reconcile_roster_overflow`: prima la quota di ruolo, poi la misura.
+    kept_for_role = {
+        role: min(flagged[role], max(0, counts[role] - limits.for_role(role)))
+        for role in FantasyRole
+    }
+    capacity_candidates = sum(flagged[role] - kept_for_role[role] for role in FantasyRole)
+    capacity_over = max(0, len(occupied) - limits.roster_size)
+    if capacity_candidates > capacity_over:
+        return True
+    if not occupied:
+        return False
+    has_free_slot = any(
+        slot.athlete_id is None and slot.slot_index < limits.roster_size for slot in team.slots
+    )
+    return any(
+        slot.slot_index >= limits.roster_size
+        and (slot.athlete_id is None or (not slot.exceeds_role_quota and has_free_slot))
+        for slot in team.slots
+    )
+
+
+def refresh_team_composition(
+    session: Session,
+    team: FantasyTeam,
+    *,
+    league: League,
+) -> RosterCompositionReport:
+    """Riallinea flag di esubero e stato salvato alla rosa e ai ruoli di oggi.
+
+    Toglie i flag non più giustificati (`reconcile_roster_overflow`), segna gli esuberi
+    rimasti senza flag e riscrive lo stato (`sync_team_composition_status`). Gira dopo un
+    cambio di ruolo (override di lega, aggiornamento del listone:
+    `resync_team_compositions`) e nelle letture della rosa (``/squadre``, ``/rosa``, vista
+    admin) che trovano uno stato scaduto (`composition_needs_refresh`). Non gira in lettura
+    né in salvataggio della formazione, che si fidano dello stato salvato
+    (`roster_allows_lineup`); chi è già in campo e bloccato resta comunque schierabile per
+    il turno anche se segnato qui (`FantasyLineupService._keep_fielded_locked_excess`).
+
+    La squadra si blocca (``FOR UPDATE``) come nelle scritture di rosa, così una lettura
+    non riscrive lo stato con una rosa vecchia mentre un'assegnazione è in corso. Fa flush
+    e lascia il commit al chiamante.
+    """
+    session.execute(select(FantasyTeam.id).where(FantasyTeam.id == team.id).with_for_update())
+    has_flags = session.scalar(
+        select(FantasyRosterSlot.id)
+        .where(
+            FantasyRosterSlot.fantasy_team_id == team.id,
+            FantasyRosterSlot.exceeds_role_quota.is_(True),
+        )
+        .limit(1)
+    )
+    if has_flags is not None:
+        reconcile_roster_overflow(session, league=league, team=team)
+    report = sync_team_composition_status(session, team, league=league)
+    session.flush()
+    return report
+
+
+#: Leghe ferme: niente override (vedi `LOCKED_OVERRIDE_STATES`) e rose non più da ricalcolare.
+_FROZEN_LEAGUE_STATES = frozenset({LeagueState.CONCLUDED, LeagueState.ARCHIVED})
+
+#: Quanti calciatori per query nella ricerca delle squadre da ricalcolare.
+_RESYNC_ATHLETE_CHUNK = 1000
+
+
+def resync_team_compositions(
+    session: Session,
+    *,
+    athlete_ids: Collection[UUID],
+    league_id: UUID | None = None,
+    season_year: int | None = None,
+) -> int:
+    """Ricalcola le rose che contengono i calciatori il cui ruolo è appena cambiato.
+
+    Con ``league_id`` (override di lega impostato o tolto) solo le squadre di quella lega;
+    con ``season_year`` (listone ufficiale rigenerato o aggiornato, che vale per tutte le
+    leghe della stagione) le squadre di ogni lega di quell'anno non conclusa né archiviata.
+    Ogni squadra è bloccata (``FOR UPDATE``, in ordine di id) come nelle scritture di rosa,
+    poi `refresh_team_composition`: una rosa che il nuovo ruolo porta oltre quota diventa
+    ``invalid`` con l'esubero segnato (prima l'arrivo più recente), una che ci rientra perde
+    il flag. Fa flush e lascia il commit al chiamante. Ritorna quante squadre ha ricalcolato.
+    """
+    ids = list(dict.fromkeys(athlete_ids))
+    if not ids or (league_id is None and season_year is None):
+        return 0
+    team_ids: set[UUID] = set()
+    for start in range(0, len(ids), _RESYNC_ATHLETE_CHUNK):
+        chunk = ids[start : start + _RESYNC_ATHLETE_CHUNK]
+        stmt = select(FantasyRosterSlot.fantasy_team_id).where(
+            FantasyRosterSlot.athlete_id.in_(chunk)
+        )
+        if league_id is not None:
+            stmt = stmt.where(FantasyRosterSlot.league_id == league_id)
+        else:
+            stmt = stmt.join(League, League.id == FantasyRosterSlot.league_id).where(
+                League.season_year == season_year
+            )
+        team_ids.update(session.scalars(stmt.distinct()).all())
+    if not team_ids:
+        return 0
+    teams = list(
+        session.scalars(
+            select(FantasyTeam)
+            .where(FantasyTeam.id.in_(team_ids))
+            .order_by(FantasyTeam.id.asc())
+            .with_for_update()
+        ).all()
+    )
+    leagues = {
+        row.id: row
+        for row in session.scalars(
+            select(League).where(League.id.in_({team.league_id for team in teams}))
+        ).all()
+    }
+    refreshed = 0
+    for team in teams:
+        league = leagues.get(team.league_id)
+        if league is None or league.state in _FROZEN_LEAGUE_STATES:
+            continue
+        refresh_team_composition(session, team, league=league)
+        refreshed += 1
+    logger.info(
+        "fantasy_roster_composition_resynced",
+        extra={
+            "league_id": str(league_id) if league_id else None,
+            "season_year": season_year,
+            "athletes": len(ids),
+            "teams": refreshed,
+        },
+    )
+    get_metrics().incr(
+        "fantasy_roster_composition_resynced_total",
+        labels={"scope": "league" if league_id is not None else "season"},
+        amount=refreshed,
+    )
+    return refreshed
 
 
 #: Problemi che bloccano la formazione anche dopo aver tolto gli esuberi dalla rosa.
@@ -466,6 +728,119 @@ def roster_allows_lineup(session: Session, team: FantasyTeam, *, league: League)
     return report.competition_count >= MIN_ROSTER_COMPETITIONS
 
 
+_ROLE_UNRESOLVED_MESSAGE = "Il calciatore non ha un ruolo listone valido (P–D–C–A)."
+
+
+def _role_quota_check(
+    session: Session,
+    *,
+    league: League,
+    team: FantasyTeam,
+    athlete_id: UUID,
+    slot_index: int,
+    require_listone: bool,
+) -> tuple[FantasyRole, str | None]:
+    """Ruolo di chi entra nello slot e, se supera la quota, il messaggio del rifiuto.
+
+    I ruoli sono quelli della valutazione della rosa (`evaluate_team_composition`), per chi
+    entra e per chi c'è già: stesso risolutore, quindi anche le stagioni precedenti e la
+    posizione nel club per chi non è più nel listone di quest'anno. Prima il controllo usava
+    solo il listone corrente: un attaccante uscito dal listone non contava e ne entrava un
+    altro oltre quota, che la valutazione poi vedeva (QA 20/11, qa-04 e qa-08).
+
+    Chi in rosa non ha un ruolo nemmeno così (``role_unresolved`` nella valutazione, che
+    rende la rosa ``invalid``) non è mai un posto libero: conta come se avesse il ruolo di
+    chi entra. L'ingresso passa solo se la quota regge qualunque ruolo riceva poi.
+
+    ``require_listone``: chi entra in lega da fuori (assegnazione dell'admin, import, aste)
+    deve essere nel listone della stagione e dei campionati della lega (``role_unresolved``
+    altrimenti, come prima). Chi si scambia è già nella lega: vale il ruolo con cui lo conta
+    la rosa che lo cede.
+    """
+    from auth.exceptions import ValidationAuthError
+    from fantasy_teams.composition import ROLE_LABEL_IT
+
+    if require_listone and (
+        get_role_assignment(
+            session,
+            athlete_id=athlete_id,
+            season_year=league.season_year,
+            competition_ids={competition.id for competition in league.competitions},
+        )
+        is None
+    ):
+        raise ValidationAuthError(_ROLE_UNRESOLVED_MESSAGE, code="role_unresolved")
+
+    slots = list(
+        session.scalars(
+            select(FantasyRosterSlot).where(
+                FantasyRosterSlot.fantasy_team_id == team.id,
+                FantasyRosterSlot.athlete_id.is_not(None),
+            )
+        ).all()
+    )
+    roles = resolve_effective_athlete_roles(
+        session,
+        league_id=league.id,
+        athlete_ids=[athlete_id, *(slot.athlete_id for slot in slots if slot.athlete_id)],
+        season_year=league.season_year,
+    )
+    incoming = roles.get(athlete_id)
+    if incoming is None:
+        raise ValidationAuthError(_ROLE_UNRESOLVED_MESSAGE, code="role_unresolved")
+    new_role = incoming.role
+
+    current_roles: list[FantasyRole | None] = []
+    without_role: list[UUID] = []
+    replacing: FantasyRole | None = None
+    for slot in slots:
+        resolved = roles.get(slot.athlete_id) if slot.athlete_id else None
+        role = resolved.role if resolved is not None else None
+        if slot.slot_index == slot_index:
+            replacing = role
+            continue
+        if role is None and slot.athlete_id is not None:
+            without_role.append(slot.athlete_id)
+            continue
+        current_roles.append(role)
+
+    limits = resolve_league_rules_limits(session, league.id)
+    if not would_exceed_role_quota(
+        limits=limits,
+        current_roles=[*current_roles, *([new_role] * len(without_role))],
+        new_role=new_role,
+        replacing_role=replacing,
+    ):
+        return new_role, None
+    message = f"Limite {ROLE_LABEL_IT[new_role]} raggiunto ({limits.for_role(new_role)})."
+    if without_role and not would_exceed_role_quota(
+        limits=limits,
+        current_roles=current_roles,
+        new_role=new_role,
+        replacing_role=replacing,
+    ):
+        # Il limite lo superano solo contando chi non ha un ruolo: lo si dice per nome.
+        names = list(
+            session.scalars(
+                select(Athlete.canonical_name)
+                .where(Athlete.id.in_(without_role))
+                .order_by(Athlete.canonical_name.asc())
+            ).all()
+        )
+        if len(names) == 1:
+            detail = f"{names[0]} non ha un ruolo nel listone e finché non lo riceve conta"
+        else:
+            detail = (
+                f"{', '.join(names)} non hanno un ruolo nel listone e finché non lo ricevono "
+                "contano"
+            )
+        message = (
+            f"Limite {ROLE_LABEL_IT[new_role]} raggiunto ({limits.for_role(new_role)}): "
+            f"{detail} tra i {ROLE_LABEL_IT[new_role]}."
+        )
+    return new_role, message
+
+
 def assert_assignment_respects_role_quota(
     session: Session,
     *,
@@ -473,58 +848,26 @@ def assert_assignment_respects_role_quota(
     team: FantasyTeam,
     athlete_id: UUID,
     slot_index: int,
+    require_listone: bool = True,
 ) -> FantasyRole:
-    """Reject assignments that would exceed configurable role limits."""
+    """Reject assignments that would exceed configurable role limits.
+
+    Stessi ruoli della valutazione della rosa e chi non ha ruolo conta come chi entra:
+    vedi `_role_quota_check`.
+    """
     from auth.exceptions import ValidationAuthError
-    from fantasy_teams.composition import ROLE_LABEL_IT
 
-    limits = resolve_league_rules_limits(session, league.id)
-    new_role = resolve_effective_athlete_role(
+    role, refusal = _role_quota_check(
         session,
-        league_id=league.id,
+        league=league,
+        team=team,
         athlete_id=athlete_id,
-        season_year=league.season_year,
-        competition_ids={competition.id for competition in league.competitions},
+        slot_index=slot_index,
+        require_listone=require_listone,
     )
-    if new_role is None:
-        raise ValidationAuthError(
-            "Il calciatore non ha un ruolo listone valido (P–D–C–A).",
-            code="role_unresolved",
-        )
-
-    slots = list(
-        session.scalars(
-            select(FantasyRosterSlot).where(FantasyRosterSlot.fantasy_team_id == team.id)
-        ).all()
-    )
-    current_roles: list[FantasyRole | None] = []
-    replacing: FantasyRole | None = None
-    for slot in slots:
-        if slot.athlete_id is None:
-            continue
-        role = resolve_effective_athlete_role(
-            session,
-            league_id=league.id,
-            athlete_id=slot.athlete_id,
-            season_year=league.season_year,
-        )
-        if slot.slot_index == slot_index:
-            replacing = role
-            continue
-        current_roles.append(role)
-
-    if would_exceed_role_quota(
-        limits=limits,
-        current_roles=current_roles,
-        new_role=new_role,
-        replacing_role=replacing,
-    ):
-        limit = limits.for_role(new_role)
-        raise ValidationAuthError(
-            f"Limite {ROLE_LABEL_IT[new_role]} raggiunto ({limit}).",
-            code="role_quota_exceeded",
-        )
-    return new_role
+    if refusal is not None:
+        raise ValidationAuthError(refusal, code="role_quota_exceeded")
+    return role
 
 
 def assign_allowing_role_quota_overflow(
@@ -534,6 +877,7 @@ def assign_allowing_role_quota_overflow(
     team: FantasyTeam,
     athlete_id: UUID,
     slot_index: int,
+    require_listone: bool = True,
 ) -> tuple[FantasyRole, bool]:
     """Like `assert_assignment_respects_role_quota`, but a quota overflow is allowed
     through instead of rejected — for trade acceptance only (EP08-10): the system
@@ -542,30 +886,15 @@ def assign_allowing_role_quota_overflow(
     `(role, exceeds_quota)`; the caller marks the slot so the player counts as
     owned but stays unavailable to field until released.
     """
-    from auth.exceptions import ValidationAuthError
-
-    try:
-        role = assert_assignment_respects_role_quota(
-            session,
-            league=league,
-            team=team,
-            athlete_id=athlete_id,
-            slot_index=slot_index,
-        )
-        return role, False
-    except ValidationAuthError as exc:
-        if exc.code != "role_quota_exceeded":
-            raise
-        role = resolve_effective_athlete_role(
-            session,
-            league_id=league.id,
-            athlete_id=athlete_id,
-            season_year=league.season_year,
-            competition_ids={competition.id for competition in league.competitions},
-        )
-        if role is None:
-            raise
-        return role, True
+    role, refusal = _role_quota_check(
+        session,
+        league=league,
+        team=team,
+        athlete_id=athlete_id,
+        slot_index=slot_index,
+        require_listone=require_listone,
+    )
+    return role, refusal is not None
 
 
 def reconcile_roster_overflow(session: Session, *, league: League, team: FantasyTeam) -> bool:

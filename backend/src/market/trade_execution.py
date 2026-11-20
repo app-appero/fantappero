@@ -134,12 +134,15 @@ def execute_trade(
             slot, overflow_capacity = next_free_slot_or_overflow(
                 session, team_id=proposer_team.id, league_id=league.id
             )
+            # Chi si scambia è già nella lega: vale il ruolo con cui lo conta la rosa che lo
+            # cede, anche se non è più nel listone di quest'anno (``require_listone=False``).
             _, exceeds_quota = assign_allowing_role_quota_overflow(
                 session,
                 league=league,
                 team=proposer_team,
                 athlete_id=athlete_id,
                 slot_index=slot.slot_index,
+                require_listone=False,
             )
             slot.athlete_id = athlete_id
             slot.purchase_credits = price_by_athlete.get(athlete_id, 0)
@@ -165,6 +168,7 @@ def execute_trade(
                 team=recipient_team,
                 athlete_id=athlete_id,
                 slot_index=slot.slot_index,
+                require_listone=False,
             )
             slot.athlete_id = athlete_id
             slot.purchase_credits = price_by_athlete.get(athlete_id, 0)
@@ -225,8 +229,7 @@ def execute_trade(
         session.flush()
         reconcile_roster_overflow(session, league=league, team=proposer_team)
         reconcile_roster_overflow(session, league=league, team=recipient_team)
-        # Stesso criterio della pagina rosa e delle operazioni di rosa in fantasy_teams
-        # (``require_complete=False``): una squadra rimasta a 34/35 è "incompleta", non
-        # "non valida", e lo stato salvato coincide con quello mostrato in GET /rosa.
-        sync_team_composition_status(session, proposer_team, league=league, require_complete=False)
-        sync_team_composition_status(session, recipient_team, league=league, require_complete=False)
+        # Lo stato salvato segue sempre la regola delle letture della rosa: una squadra
+        # rimasta a 34/35 è "incompleta", non "non valida" (`sync_team_composition_status`).
+        sync_team_composition_status(session, proposer_team, league=league)
+        sync_team_composition_status(session, recipient_team, league=league)

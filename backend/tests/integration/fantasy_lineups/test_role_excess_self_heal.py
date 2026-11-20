@@ -202,7 +202,7 @@ def test_unflagged_forward_excess_is_flagged_on_lineup_save_newest_first(
     team = db_session.get(FantasyTeam, UUID(setup["team_a"]))
     league = db_session.get(League, UUID(setup["league_id"]))
     assert team is not None and league is not None
-    sync_team_composition_status(db_session, team, league=league, require_complete=False)
+    sync_team_composition_status(db_session, team, league=league)
     db_session.commit()
     assert _flagged(db_session, setup["team_a"]) == [(LAST_MIDFIELDER_SLOT, excess_id)]
 
@@ -258,9 +258,7 @@ def test_composition_sync_flags_the_excess_once(
     assert team is not None and league is not None
 
     for _ in range(2):
-        report = sync_team_composition_status(
-            db_session, team, league=league, require_complete=False
-        )
+        report = sync_team_composition_status(db_session, team, league=league)
         db_session.commit()
         # Il ruolo resta oltre quota (lo stato non cambia), ma l'esubero è segnato una volta.
         assert report.status == RosterCompositionStatus.INVALID
@@ -286,7 +284,7 @@ def test_roster_with_exact_quotas_gets_no_flags(
     team = db_session.get(FantasyTeam, UUID(setup["team_a"]))
     league = db_session.get(League, UUID(setup["league_id"]))
     assert team is not None and league is not None
-    report = sync_team_composition_status(db_session, team, league=league, require_complete=False)
+    report = sync_team_composition_status(db_session, team, league=league)
     db_session.commit()
     assert report.status == RosterCompositionStatus.VALIDATED
     assert _flagged(db_session, setup["team_a"]) == []

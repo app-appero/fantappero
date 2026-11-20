@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import UTC, datetime, timedelta
 from typing import Literal
 from uuid import UUID
@@ -363,12 +363,6 @@ class FantasyLineupService:
         roster = self._roster_rows(
             league_access.league.season_year, team, round_number=fantasy_round.number
         )
-        roster_ids = [str(row.athlete_id) for row in roster if not row.exceeds_role_quota]
-        # Chi è in esubero di ruolo arriva in coda alla panchina (web e app, anche le versioni
-        # già installate, mandano tutta la rosa): in tribuna non gioca, si toglie senza errore e
-        # non si salva. Titolare o nei primi 10 della panchina lo rifiuta `evaluate_lineup`.
-        excess = self._role_quota_excess(roster)
-        bench_ids = drop_role_quota_excess_from_tribuna(bench_ids, excess, key=str)
 
         # Chi è bloccato e con quale ruolo è stato schierato va saputo *prima*
         # di validare il modulo (vedi `_validation_roles`). `for_update=True`
@@ -400,6 +394,13 @@ class FantasyLineupService:
             kickoffs=kickoffs,
         )
         submission = self._load_submission(fantasy_round.id, team.id, for_update=True)
+        roster = self._keep_fielded_locked_excess(roster, submission, locked_ids)
+        roster_ids = [str(row.athlete_id) for row in roster if not row.exceeds_role_quota]
+        # Chi è in esubero di ruolo arriva in coda alla panchina (web e app, anche le versioni
+        # già installate, mandano tutta la rosa): in tribuna non gioca, si toglie senza errore e
+        # non si salva. Titolare o nei primi 10 della panchina lo rifiuta `evaluate_lineup`.
+        excess = self._role_quota_excess(roster)
+        bench_ids = drop_role_quota_excess_from_tribuna(bench_ids, excess, key=str)
 
         roles_by_id = self._validation_roles(
             roster=roster,
@@ -695,6 +696,7 @@ class FantasyLineupService:
             kickoffs=kickoffs,
         )
         submission = self._load_submission(fantasy_round.id, team.id, for_update=True)
+        roster = self._keep_fielded_locked_excess(roster, submission, locked_ids)
         excess = self._role_quota_excess(roster)
         copied = copy_previous_lineup(
             previous_module=previous.module.value,
@@ -1076,10 +1078,6 @@ class FantasyLineupService:
         roster = self._roster_rows(
             league_access.league.season_year, team, round_number=fantasy_round.number
         )
-        roster_ids = [str(row.athlete_id) for row in roster if not row.exceeds_role_quota]
-        # Come in `save_my_lineup`: chi è in esubero di ruolo in tribuna si toglie senza errore.
-        excess = self._role_quota_excess(roster)
-        bench_ids = drop_role_quota_excess_from_tribuna(bench_ids, excess)
 
         # Come in `save_my_lineup`: serve sapere chi è bloccato prima di
         # validare, per usare il ruolo di schieramento (vedi `_validation_roles`).
@@ -1107,6 +1105,11 @@ class FantasyLineupService:
             kickoffs=kickoffs,
         )
         submission = self._load_submission(fantasy_round.id, team.id, for_update=True)
+        roster = self._keep_fielded_locked_excess(roster, submission, locked_ids)
+        roster_ids = [str(row.athlete_id) for row in roster if not row.exceeds_role_quota]
+        # Come in `save_my_lineup`: chi è in esubero di ruolo in tribuna si toglie senza errore.
+        excess = self._role_quota_excess(roster)
+        bench_ids = drop_role_quota_excess_from_tribuna(bench_ids, excess)
 
         roles_by_uuid = self._validation_roles(
             roster=roster,
@@ -1403,6 +1406,11 @@ class FantasyLineupService:
             )
             for row in roster
         }
+        roster = self._keep_fielded_locked_excess(
+            roster,
+            submission,
+            [row.athlete_id for row in roster if locked_flags[row.athlete_id]],
+        )
         any_unlocked = any(not locked for locked in locked_flags.values()) if roster else True
         turn_editable = operator_bypass or is_lineup_modification_allowed(
             stored=fantasy_round.status
@@ -1812,6 +1820,39 @@ class FantasyLineupService:
         }
 
     @staticmethod
+    def _keep_fielded_locked_excess(
+        roster: list[_RosterRow],
+        submission: LineupSubmission | None,
+        locked_athlete_ids: Iterable[object],
+    ) -> list[_RosterRow]:
+        """Chi è già in campo resta schierabile per il turno anche se segnato in esubero dopo.
+
+        Un cambio di ruolo arrivato dopo lo schieramento (listone aggiornato a turno in corso,
+        QA 20/11) ricalcola la rosa e può segnare in esubero proprio un calciatore della
+        formazione confermata già bloccato (partita iniziata o imminente). Lui non si può più
+        togliere: se contasse come esubero la formazione resterebbe non salvabile fino alla
+        fine del turno, e i client lo toglierebbero dalla formazione inviata. Come per il ruolo
+        (`_validation_roles`), per il turno in corso vale la situazione con cui è stato
+        schierato: qui il flag non conta. Dal turno dopo, o appena non è più bloccato, sì.
+        """
+        if submission is None:
+            return roster
+        locked = {str(item) for item in locked_athlete_ids}
+        fielded_locked = {
+            str(player.athlete_id)
+            for player in submission.players
+            if str(player.athlete_id) in locked
+        }
+        if not fielded_locked:
+            return roster
+        return [
+            replace(row, exceeds_role_quota=False)
+            if row.exceeds_role_quota and str(row.athlete_id) in fielded_locked
+            else row
+            for row in roster
+        ]
+
+    @staticmethod
     def _role_quota_excess(roster: list[_RosterRow]) -> dict[str, str]:
         """Chi è in rosa ma in esubero di ruolo (``exceeds_role_quota``): id -> nome.
 
@@ -2134,7 +2175,10 @@ class FantasyLineupService:
         formazione: vedi `roster_allows_lineup`. Se la rosa è bloccata perché un ruolo è
         oltre quota senza nessuno segnato (KO-A), si segnano gli esuberi e si riprova.
         Una rosa convalidata non si tocca: la formazione già passa e un calciatore
-        riclassificato dopo lo schieramento deve restare schierabile. La squadra è già
+        riclassificato dopo lo schieramento deve restare schierabile. Uno stato salvato
+        "validated" ormai oltre quota lo correggono i cambi di ruolo, le scritture e le
+        letture della rosa (`refresh_team_composition`), non la formazione; chi era già in
+        campo resta schierabile per il turno (`_keep_fielded_locked_excess`). La squadra è già
         bloccata ``for_update`` e il flag appena scritto vale anche per `_roster_rows`
         (stessi oggetti della sessione); il commit resta quello del salvataggio, o del
         router se il salvataggio fallisce.

@@ -28,11 +28,13 @@ from database.enums import (
 )
 from fantasy_teams.composition import ROLE_LABEL_IT, RosterCompositionReport, role_quota_overflow
 from fantasy_teams.composition_service import (
+    STORED_STATUS_REQUIRES_COMPLETE,
     assert_assignment_respects_role_quota,
+    composition_needs_refresh,
+    evaluate_league_team_compositions,
     evaluate_team_composition,
-    flag_role_quota_overflow,
     reconcile_roster_overflow,
-    resolve_effective_athlete_role,
+    refresh_team_composition,
     resolve_effective_athlete_roles,
     resolve_league_rules_limits,
     sync_team_composition_status,
@@ -185,35 +187,59 @@ class FantasyTeamService:
         team = find_team_for_membership(self._session, membership.id, with_slots=True)
         assert team is not None
         # Auto-riparazione: un esubero (EP08-10) già risolto non deve restare
-        # segnato "in attesa" solo perché la rosa è cambiata per altre vie; in una rosa
-        # non convalidata, un ruolo oltre quota senza nessuno segnato (KO-A) mostra
-        # invece chi è in più (stesso criterio della formazione).
-        league = league_access.league
-        changed = False
-        if any(slot.exceeds_role_quota for slot in team.slots):
-            changed = reconcile_roster_overflow(self._session, league=league, team=team)
-        if team.composition_status != RosterCompositionStatus.VALIDATED and (
-            flag_role_quota_overflow(self._session, team, league=league)
+        # segnato "in attesa" solo perché la rosa è cambiata per altre vie. Gli esuberi
+        # senza flag (KO-A) e uno stato salvato scaduto li riallinea `_to_team_response`.
+        if any(slot.exceeds_role_quota for slot in team.slots) and reconcile_roster_overflow(
+            self._session, league=league_access.league, team=team
         ):
-            changed = True
-        if changed:
             self._session.commit()
             team = find_team_for_membership(self._session, membership.id, with_slots=True)
             assert team is not None
         return self._to_team_response(team)
 
     def list_teams(self, league_access: LeagueAccess) -> list[FantasyTeamSummaryResponse]:
-        teams = self._session.scalars(
-            select(FantasyTeam)
-            .where(FantasyTeam.league_id == league_access.league.id)
-            .options(
-                selectinload(FantasyTeam.slots),
-                selectinload(FantasyTeam.membership).selectinload(LeagueMembership.user),
-            )
-            .order_by(FantasyTeam.created_at.asc())
-        ).all()
-        roster_size = resolve_roster_size(self._session, league_access.league.id)
+        league = league_access.league
+        teams = self._load_league_teams(league.id)
+        if self._refresh_stale_compositions(league, teams):
+            self._session.commit()
+            teams = self._load_league_teams(league.id)
+        roster_size = resolve_roster_size(self._session, league.id)
         return [self._to_summary(team, roster_size=roster_size) for team in teams]
+
+    def _load_league_teams(self, league_id: UUID) -> list[FantasyTeam]:
+        return list(
+            self._session.scalars(
+                select(FantasyTeam)
+                .where(FantasyTeam.league_id == league_id)
+                .options(
+                    selectinload(FantasyTeam.slots).undefer(FantasyRosterSlot.exceeds_role_quota),
+                    selectinload(FantasyTeam.membership).selectinload(LeagueMembership.user),
+                )
+                .order_by(FantasyTeam.created_at.asc())
+                .execution_options(populate_existing=True)
+            ).all()
+        )
+
+    def _refresh_stale_compositions(self, league: League, teams: Sequence[FantasyTeam]) -> bool:
+        """Riallinea lo stato salvato delle squadre rimaste indietro (``/squadre``).
+
+        Lo stato della rosa ha una fonte unica, ``composition_status``, che ``/squadre``,
+        ``/rosa`` e la vista admin mostrano tutte. Qui si valutano tutte le rose della lega in
+        un numero fisso di query e si ricalcola (`refresh_team_composition`) solo chi ha lo
+        stato o i flag scaduti, per esempio una rosa salvata come convalidata prima che un
+        cambio di ruolo la portasse oltre quota (QA 20/11). Ritorna True se ha ricalcolato.
+        """
+        if not teams:
+            return False
+        reports, roles = evaluate_league_team_compositions(self._session, league, teams)
+        stale = [
+            team
+            for team in teams
+            if composition_needs_refresh(team, reports[team.id], effective_roles=roles)
+        ]
+        for team in sorted(stale, key=lambda item: str(item.id)):
+            refresh_team_composition(self._session, team, league=league)
+        return bool(stale)
 
     def get_team_for_admin(
         self,
@@ -273,7 +299,7 @@ class FantasyTeamService:
         roster_size = resolve_roster_size(self._session, league.id)
         created = 0
         existing = 0
-        summaries: list[FantasyTeamSummaryResponse] = []
+        teams: list[FantasyTeam] = []
         for membership in memberships:
             name = self._default_team_name(membership.user, membership)
             team, was_created = ensure_team_for_membership(
@@ -306,7 +332,13 @@ class FantasyTeamService:
                 existing += 1
             team = find_team_for_membership(self._session, membership.id, with_slots=True)
             assert team is not None
-            summaries.append(self._to_summary(team, roster_size=roster_size))
+            teams.append(team)
+        # Stesso stato di `/squadre` (fonte unica, riallineata se scaduta).
+        if self._refresh_stale_compositions(league, teams):
+            self._session.flush()
+            reloaded = {row.id: row for row in self._load_league_teams(league.id)}
+            teams = [reloaded.get(team.id, team) for team in teams]
+        summaries = [self._to_summary(team, roster_size=roster_size) for team in teams]
 
         if created:
             # La classifica deve elencare **tutti** i fantallenatori della
@@ -394,17 +426,17 @@ class FantasyTeamService:
             FantasyRole.C: 0,
             FantasyRole.A: 0,
         }
+        # Stessi ruoli della valutazione della rosa e del controllo di quota.
+        filled_roles = resolve_effective_athlete_roles(
+            self._session,
+            league_id=league.id,
+            athlete_ids=[slot.athlete_id for slot in slots if slot.athlete_id is not None],
+            season_year=league.season_year,
+        )
         for slot in slots:
-            if slot.athlete_id is None:
-                continue
-            role = resolve_effective_athlete_role(
-                self._session,
-                league_id=league.id,
-                athlete_id=slot.athlete_id,
-                season_year=league.season_year,
-            )
-            if role is not None:
-                filled_by_role[role] += 1
+            filled = filled_roles.get(slot.athlete_id) if slot.athlete_id else None
+            if filled is not None:
+                filled_by_role[filled.role] += 1
 
         needed_by_role: dict[FantasyRole, int] = {}
         for role in FantasyRole:
@@ -1423,10 +1455,11 @@ class FantasyTeamService:
         counts: dict[str, dict[FantasyRole, int]] = {}
         for team_id, athlete_id in owned:
             effective = roles.get(athlete_id) if athlete_id is not None else None
-            if effective is None:
-                continue
             per_team = counts.setdefault(str(team_id), {})
-            per_team[effective.role] = per_team.get(effective.role, 0) + 1
+            # Chi in rosa non ha un ruolo conta in ogni ruolo, come nel controllo di quota
+            # della conferma (`assert_assignment_respects_role_quota`).
+            for role in (effective.role,) if effective is not None else tuple(FantasyRole):
+                per_team[role] = per_team.get(role, 0) + 1
         rows_by_team: dict[str, list[tuple[PreviewRow, FantasyRole]]] = {}
         for row in candidates:
             effective = roles.get(UUID(row.athlete_id)) if row.athlete_id else None
@@ -2052,12 +2085,7 @@ class FantasyTeamService:
         actor_id: UUID | None = None,
     ) -> RosterCompositionReport:
         previous = team.composition_status
-        report = sync_team_composition_status(
-            self._session,
-            team,
-            league=league,
-            require_complete=False,
-        )
+        report = sync_team_composition_status(self._session, team, league=league)
         if (
             report.status == RosterCompositionStatus.VALIDATED
             and previous != RosterCompositionStatus.VALIDATED
@@ -2146,6 +2174,29 @@ class FantasyTeamService:
             athlete_ids=athlete_ids,
             season_year=season_year,
         )
+        report = composition
+        if report is None and league is not None:
+            report = evaluate_team_composition(
+                self._session,
+                team,
+                league=league,
+                require_complete=STORED_STATUS_REQUIRES_COMPLETE,
+                effective_roles=effective_roles,
+            )
+            if composition_needs_refresh(team, report, effective_roles=effective_roles):
+                # Stato salvato o flag scaduti, per esempio "validated" ma oltre quota dopo un
+                # cambio di ruolo (QA 20/11): si riallineano qui, così stato e dettaglio
+                # coincidono con `/squadre` (fonte unica: `composition_status`).
+                report = refresh_team_composition(self._session, team, league=league)
+                self._session.commit()
+                # Slot ricompattati o flag cambiati: la rosa si rilegge (expire_on_commit=False).
+                team_id, league_id = team.id, team.league_id
+                self._session.expire(team)
+                reloaded = find_team_by_id(
+                    self._session, league_id=league_id, team_id=team_id, with_slots=True
+                )
+                assert reloaded is not None
+                team = reloaded
         club_ids = {item.club_id for item in effective_roles.values() if item.club_id is not None}
         club_names = (
             dict(
@@ -2171,19 +2222,9 @@ class FantasyTeamService:
             for slot in sorted(team.slots, key=lambda row: row.slot_index)
         ]
         filled = sum(1 for slot in slots if slot.athlete_id is not None)
-        report = composition
-        if report is None and league is not None:
-            report = evaluate_team_composition(
-                self._session,
-                team,
-                league=league,
-                require_complete=False,
-                effective_roles=effective_roles,
-            )
         composition_payload = (
             self._composition_response(team, report) if report is not None else None
         )
-        status_value = report.status.value if report is not None else team.composition_status.value
         user = team.membership.user
         return FantasyTeamResponse(
             id=str(team.id),
@@ -2194,7 +2235,8 @@ class FantasyTeamService:
             name=team.name,
             rosterSize=roster_size,
             filledSlots=filled,
-            compositionStatus=status_value,
+            # Fonte unica: lo stato salvato, lo stesso di `/squadre` (`_to_summary`).
+            compositionStatus=team.composition_status.value,
             composition=composition_payload,
             slots=slots,
         )
