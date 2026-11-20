@@ -184,9 +184,9 @@ export function MarketPage() {
   const canManageMarket = can(["market:manage"]);
   // Decisione del 20/11: scambi (proposta, accettazione, approvazione) e svincoli del
   // partecipante solo a lega al completo. Il banner con il motivo è nella barra del mercato.
-  const { leagueFull } = useMarketGate();
+  const { leagueFull, marketActive } = useMarketGate();
   const tradesLocked = !leagueFull;
-  const releaseLocked = !canManageMarket && !leagueFull;
+  const releaseLocked = !canManageMarket && !marketActive;
   const { search } = useLocation();
   const demoState = isDemoMode ? parseWireframeStateFromSearch(search) : null;
   // Notifica di scambio (?scambio=<id>): apre direttamente la proposta giusta

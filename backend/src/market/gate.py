@@ -55,22 +55,26 @@ def assert_market_open(league: LeagueMarketGate, *, actor_is_admin: bool = False
 
     Prima la lega al completo, poi l'interruttore, poi il turno in corso: a lega incompleta
     l'errore è ``league_not_full`` anche a interruttore spento, perché è la condizione che
-    l'amministratore deve risolvere per primo. ``actor_is_admin`` esenta dal solo controllo
-    «al completo» le operazioni dell'amministratore sulle rose (assegnazioni, import, rettifiche,
-    svincoli): interruttore e turno in corso valgono anche per lui. Aste e svincolati non lo
-    passano mai: sono attività di mercato per tutti.
+    l'amministratore deve risolvere per primo.
+
+    ``actor_is_admin`` è per le operazioni dell'amministratore sulle rose (assegnazioni e
+    sostituzioni, rettifiche di prezzo, svincoli, import CSV/Excel, rosa random IA): decisione
+    del 20/11, l'amministratore prepara le rose in anticipo, quindi per lui non contano né la
+    lega al completo né l'interruttore, solo il turno in corso. Aste e svincolati non lo
+    passano mai: sono attività di mercato per tutti, amministratore compreso.
     """
     league_id = getattr(league, "id", None)
     try:
         session = object_session(league)
     except UnmappedInstanceError:
         session = None
-    if not actor_is_admin and session is not None and league_id is not None:
-        from leagues.capacity import assert_league_full_for_market
+    if not actor_is_admin:
+        if session is not None and league_id is not None:
+            from leagues.capacity import assert_league_full_for_market
 
-        assert_league_full_for_market(session, league_id)
-    if not _league_is_open(league):
-        raise ValidationAuthError(MARKET_CLOSED_MESSAGE, code=MARKET_CLOSED_CODE)
+            assert_league_full_for_market(session, league_id)
+        if not _league_is_open(league):
+            raise ValidationAuthError(MARKET_CLOSED_MESSAGE, code=MARKET_CLOSED_CODE)
     if session is not None and league_id is not None:
         from market.round_freeze import assert_no_round_in_progress
 

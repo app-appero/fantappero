@@ -5,9 +5,11 @@ import type { MarketGate } from "./market.js";
  *
  * Il mercato si apre solo quando la lega è al completo (iscritti = partecipanti previsti):
  * fino ad allora l'interruttore «Mercato aperto» non si accende e rosa, aste e scambi del
- * partecipante restano fermi. Le operazioni dell'amministratore sulle rose seguono solo
- * l'interruttore. Una risposta senza `leagueFull` (backend più vecchio, demo) conta come lega
- * al completo: non blocca nulla che prima funzionava.
+ * partecipante restano fermi. Le operazioni dell'amministratore sulle rose (assegnazioni,
+ * rettifiche, svincoli, import) non dipendono né dalla lega al completo né
+ * dall'interruttore: si fermano solo a turno in corso. Una risposta senza `leagueFull`
+ * (backend più vecchio, demo) conta come lega al completo: non blocca nulla che prima
+ * funzionava.
  *
  * Sull'app mobile la stessa logica è copiata in `apps/mobile/src/market/marketGateNotice.ts`
  * (i test `node:test` non importano il bundle di `@fantappero/contracts`).

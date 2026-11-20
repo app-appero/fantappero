@@ -75,10 +75,11 @@ export function RosterScreen() {
   const isAdmin = can(["league:admin"]);
   const canView = can(["roster:view"]);
   const canEdit = can(["roster:edit"]);
-  const { marketOpen, marketActive } = useMarketGate();
-  // Decisione del 20/11: il partecipante si inserisce calciatori solo a lega al completo;
-  // l'amministratore assegna, rettifica e svincola seguendo solo l'interruttore.
-  const rosterLocked = isAdmin ? !marketOpen : !marketActive;
+  const { marketActive } = useMarketGate();
+  // Decisione del 20/11: il partecipante si inserisce calciatori solo a lega al completo e a
+  // interruttore acceso; l'amministratore prepara le rose in anticipo (assegna, rettifica,
+  // svincola, importa) e si ferma solo a turno in corso, che decide il server.
+  const rosterLocked = !isAdmin && !marketActive;
 
   const [team, setTeam] = useState<FantasyTeam | null>(null);
   const [credits, setCredits] = useState<CreditAccount | null>(null);
@@ -1027,7 +1028,6 @@ export function RosterScreen() {
           <RosterAdminToolsPanel
             ensuring={ensuring}
             randomAiBusy={randomAiBusy}
-            marketOpen={marketOpen}
             onEnsureTeams={onEnsureTeams}
             leagueTeams={leagueTeams}
             adminOrViewedTeam={adminTeam ?? viewedTeam}

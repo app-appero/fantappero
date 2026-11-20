@@ -70,7 +70,8 @@ export function useMarketGate({ reloadToken = 0 }: { reloadToken?: number } = {}
     marketOpen: gate.marketOpen,
     /**
      * Interruttore acceso e lega al completo (decisione del 20/11): rosa, aste e scambi del
-     * partecipante. Le operazioni dell'amministratore sulle rose seguono solo `marketOpen`.
+     * partecipante. Le operazioni dell'amministratore sulle rose non dipendono né da questo
+     * né dall'interruttore: si fermano solo a turno in corso.
      */
     marketActive: isMarketActive(gate),
     leagueFull: gate.leagueFull !== false,

@@ -240,8 +240,10 @@ lega al completo, interruttore `market_open` acceso e nessun turno in corso
   accettazione, approvazione dell'amministratore). Rifiutare o annullare uno scambio resta
   possibile.
 - Restano consentite le operazioni dell'amministratore sulle rose (assegnazione e sostituzione
-  su ogni squadra, rettifica del prezzo, svincolo, import CSV/Excel, rosa random IA): per lui
-  valgono solo interruttore e turno in corso.
+  su ogni squadra, rettifica del prezzo, svincolo, import CSV/Excel, rosa random IA). Per lui
+  conta solo il turno in corso, così prepara le rose in anticipo anche a lega incompleta e a
+  interruttore spento, già in una lega appena creata. Aste, svincolati e scambi restano fermi
+  anche per l'amministratore.
 - Quando un ingresso (invito con link o codice, invito nominativo, fantallenatore IA,
   sostituzione) porta la lega al completo con l'interruttore spento, ogni amministratore riceve
   una sola volta (`dedup_key = league_full:{league_id}:{admin_id}`) la notifica

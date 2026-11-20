@@ -2,7 +2,8 @@
 
 Iscritti = partecipanti del regolamento. Finché la lega non è al completo restano fermi
 l'inserimento in rosa del partecipante, le aste (buste, rilanci, svincolati) e gli scambi;
-le operazioni dell'amministratore sulle rose no. L'interruttore non si accende a lega
+le operazioni dell'amministratore sulle rose no, nemmeno a interruttore spento: prepara le
+rose in anticipo e si ferma solo a turno in corso. L'interruttore non si accende a lega
 incompleta, una lega nuova nasce col mercato chiuso e, quando entra l'ultimo partecipante,
 l'amministratore riceve un solo avviso «La lega è al completo: puoi aprire il mercato».
 
@@ -295,6 +296,90 @@ def test_switch_cannot_open_until_full_but_can_always_close(
     assert closed.json()["memberCount"] == 3
     assert closed.json()["participantCount"] == 4
     assert closed.json()["marketBlockedReason"] == NOT_FULL_CODE
+
+
+def test_new_league_admin_prepares_rosters_while_not_full_and_switch_off(
+    client: TestClient, db_session: Session, competition_ids: list[str]
+) -> None:
+    """Lega nuova, 2/4 e interruttore spento: l'amministratore assegna e importa, il
+    partecipante no (decisione del 20/11: l'amministratore prepara le rose in anticipo)."""
+    admin_token, _ = _register_and_login(client, "full.prep.admin@example.com")
+    member_token, _ = _register_and_login(client, "full.prep.member@example.com")
+    league_id = _create_league(client, db_session, admin_token, competition_ids, "Lega Prep")
+    admin_team_id = _team_id(client, league_id, admin_token)
+    member_team_id = _join_with_code(client, admin_token, league_id, member_token)
+    gate = _gate(client, league_id, admin_token)
+    assert gate["marketOpen"] is False
+    assert gate["memberCount"] == 2
+    assert gate["marketBlockedReason"] == NOT_FULL_CODE
+
+    member_pick = _seed_athlete(db_session, 97601, "Prep Scelta Membro")
+    admin_pick = _seed_athlete(db_session, 97602, "Prep Scelta Admin")
+    imported = _seed_athlete(db_session, 97603, "Prep Import", role=FantasyRole.A)
+
+    # Il partecipante non si inserisce calciatori.
+    _assert_not_full(_assign(client, league_id, member_token, member_team_id, 0, member_pick), 2, 4)
+
+    # L'amministratore assegna su ogni squadra, rettifica il prezzo e svincola.
+    assigned = _assign(client, league_id, admin_token, member_team_id, 0, member_pick, credits=4)
+    assert assigned.status_code == 200, assigned.text
+    corrected = _assign(client, league_id, admin_token, member_team_id, 0, member_pick, credits=2)
+    assert corrected.status_code == 200, corrected.text
+    own = _assign(client, league_id, admin_token, admin_team_id, 0, admin_pick)
+    assert own.status_code == 200, own.text
+    # Il partecipante non svincola il calciatore che l'amministratore gli ha dato.
+    _assert_not_full(
+        client.delete(
+            f"/leagues/{league_id}/amministrazione/squadre/{member_team_id}/slot/0",
+            headers=_auth(member_token),
+        ),
+        2,
+        4,
+    )
+    released = client.delete(
+        f"/leagues/{league_id}/amministrazione/squadre/{admin_team_id}/slot/0",
+        headers=_auth(admin_token),
+    )
+    assert released.status_code == 200, released.text
+
+    # Import delle rose dell'amministratore, sempre a interruttore spento.
+    member_team_name = client.get(f"/leagues/{league_id}/rosa", headers=_auth(member_token)).json()[
+        "name"
+    ]
+    preview = client.post(
+        f"/leagues/{league_id}/amministrazione/import-csv/anteprima",
+        headers=_auth(admin_token),
+        files={
+            "file": (
+                "rose.csv",
+                (
+                    "squadra,provider_id,nome,crediti\n"
+                    f"{member_team_name},{imported.provider_id},{imported.canonical_name},6\n"
+                ).encode(),
+                "text/csv",
+            )
+        },
+    )
+    assert preview.status_code == 200, preview.text
+    confirm = client.post(
+        f"/leagues/{league_id}/amministrazione/import-csv/{preview.json()['importId']}/conferma",
+        headers=_auth(admin_token),
+        json={"resolutions": []},
+    )
+    assert confirm.status_code == 200, confirm.text
+    assert confirm.json()["assignedCount"] == 1
+
+    # L'interruttore non si è mosso e un'asta resta ferma anche per l'amministratore.
+    assert _gate(client, league_id, admin_token)["marketOpen"] is False
+    _assert_not_full(
+        client.post(
+            f"/leagues/{league_id}/mercato/asta/sessioni",
+            headers=_auth(admin_token),
+            json=_window(),
+        ),
+        2,
+        4,
+    )
 
 
 def test_not_full_blocks_participant_market_but_not_admin_roster_operations(

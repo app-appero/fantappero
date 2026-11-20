@@ -3,9 +3,10 @@
  *
  * Il mercato si apre solo quando la lega è al completo (iscritti = partecipanti previsti):
  * fino ad allora l'interruttore «Mercato aperto» non si accende e rosa, aste e scambi del
- * partecipante restano fermi. Le operazioni dell'amministratore sulle rose seguono solo
- * l'interruttore. Una risposta senza `leagueFull` (backend più vecchio) conta come lega al
- * completo: non blocca nulla che prima funzionava.
+ * partecipante restano fermi. Le operazioni dell'amministratore sulle rose (assegnazioni,
+ * rettifiche, svincoli, import) non dipendono né dalla lega al completo né
+ * dall'interruttore: si fermano solo a turno in corso. Una risposta senza `leagueFull`
+ * (backend più vecchio) conta come lega al completo: non blocca nulla che prima funzionava.
  *
  * Solo logica pura e import di tipo: gira nei test `node:test` senza il bundle di
  * `@fantappero/contracts`. Sul web la stessa logica è in `@fantappero/contracts`

@@ -1028,7 +1028,8 @@ class MarketService:
         if not 0 <= slot_index <= MAX_SLOT_INDEX:
             raise ValidationAuthError("Slot non trovato.", code="slot_not_found")
         league = self._lock_league(league_access.league.id)
-        # Lo svincolo dell'amministratore vale anche a lega non al completo (20/11).
+        # Lo svincolo dell'amministratore vale anche a lega incompleta e a interruttore
+        # spento; si ferma solo a turno in corso (20/11).
         assert_market_open(league, actor_is_admin=self._is_league_admin(league_access))
         team = self._my_team(league_access)
         reason, percent = self._resolve_release_reason(league_access, reason_raw)

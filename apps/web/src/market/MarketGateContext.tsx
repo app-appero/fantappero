@@ -25,7 +25,8 @@ export type MarketGateContextValue = {
   marketOpen: boolean;
   /**
    * Interruttore acceso e lega al completo (decisione del 20/11): rosa, aste e scambi del
-   * partecipante. Le operazioni dell'amministratore sulle rose seguono solo `marketOpen`.
+   * partecipante. Le operazioni dell'amministratore sulle rose non dipendono né da questo
+   * né dall'interruttore: si fermano solo a turno in corso.
    */
   marketActive: boolean;
   /** `false` finché non sono occupati tutti i posti della lega. */
