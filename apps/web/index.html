@@ -4,6 +4,29 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>FantApperò Web</title>
+    <!-- iPhone: «Aggiungi alla schermata Home» apre il sito come un'app (senza le barre di Safari),
+         con nome e icona di FantApperò. Barra di stato «default»: iOS la colora con theme-color e
+         sceglie da solo il testo chiaro o scuro, quindi si legge sia con il tema scuro sia con il chiaro. -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="FantApperò" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <!-- Colore di sfondo dell'header (--fa-color-background); lo script qui sotto e
+         src/theme/colorScheme.ts lo allineano al tema scelto nell'app. -->
+    <meta name="theme-color" content="#0a0f22" media="(prefers-color-scheme: dark)" />
+    <meta name="theme-color" content="#f2f6f8" media="(prefers-color-scheme: light)" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+    <style>
+      /* Sfondo del tema già al primo disegno, prima che arrivi il CSS dell'app:
+         all'avvio dalla schermata Home niente lampo bianco. */
+      html {
+        background-color: #0a0f22;
+      }
+      html[data-color-scheme="light"] {
+        background-color: #f2f6f8;
+      }
+    </style>
     <script>
       (function () {
         var pref = "system";
@@ -21,6 +44,13 @@
         }
         document.documentElement.dataset.colorScheme = scheme;
         document.documentElement.style.colorScheme = scheme;
+        // Barra di stato dell'iPhone (e barra del browser) del colore del tema scelto nell'app,
+        // anche quando è diverso da quello del telefono.
+        var themeColor = scheme === "light" ? "#f2f6f8" : "#0a0f22";
+        var metas = document.querySelectorAll('meta[name="theme-color"]');
+        for (var i = 0; i < metas.length; i++) {
+          metas[i].setAttribute("content", themeColor);
+        }
       })();
     </script>
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />

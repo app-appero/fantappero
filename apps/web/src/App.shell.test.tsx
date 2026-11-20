@@ -54,6 +54,8 @@ describe("App responsive shell (EPUI-05)", () => {
     const html = renderShellAt("/percorso-sconosciuto");
     expect(html).toContain('data-testid="not-found"');
     expect(html).not.toContain('data-testid="app-shell"');
+    // Senza menu né tasto Indietro di Safari (app dalla schermata Home): un link per uscire.
+    expect(html).toMatch(/<a href="\/leghe" data-testid="not-found-home">/);
   });
 
   it("includes responsive shell structure for desktop sidebar and mobile menu", () => {

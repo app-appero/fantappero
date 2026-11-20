@@ -23,10 +23,27 @@ export function systemColorScheme(): "light" | "dark" | null {
   return window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
 }
 
+/**
+ * Colore della barra di stato dell'iPhone (app dalla schermata Home) e della barra del browser:
+ * lo sfondo dell'header (`--fa-color-background`). Stessi valori di index.html e del manifest.
+ */
+export const THEME_COLOR_BY_SCHEME = { dark: "#0a0f22", light: "#f2f6f8" } as const;
+
+/**
+ * I meta theme-color di index.html seguono il tema del telefono (media query); qui li si allinea
+ * al tema scelto nell'app, altrimenti con «Scuro» su un telefono chiaro la barra resterebbe chiara.
+ */
+function applyThemeColorMeta(scheme: "light" | "dark"): void {
+  document.querySelectorAll('meta[name="theme-color"]').forEach((meta) => {
+    meta.setAttribute("content", THEME_COLOR_BY_SCHEME[scheme]);
+  });
+}
+
 export function applyDocumentColorScheme(preference = readThemePreference()): "light" | "dark" {
   const scheme = resolveColorScheme(preference, systemColorScheme());
   document.documentElement.dataset.colorScheme = scheme;
   document.documentElement.style.colorScheme = scheme;
+  applyThemeColorMeta(scheme);
   return scheme;
 }
 
