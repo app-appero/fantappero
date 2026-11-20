@@ -53,6 +53,7 @@ import { RosterAdminManualCard } from "./roster/RosterAdminManualCard";
 import { RosterAdminToolsPanel } from "./roster/RosterAdminToolsPanel";
 import { RosterCreditsPanel } from "./roster/RosterCreditsPanel";
 import { RosterCsvImportCard } from "./roster/RosterCsvImportCard";
+import { csvResolutionPayload, toggleCsvResolution } from "./roster/csvImportResolutions";
 import { RosterEmptyState } from "./roster/RosterEmptyState";
 import { RosterFilledSummary } from "./roster/RosterFilledSummary";
 import {
@@ -105,6 +106,8 @@ export function RosterScreen() {
   const [adminError, setAdminError] = useState<string | null>(null);
   const [ledgerPage, setLedgerPage] = useState(0);
   const [csvPreview, setCsvPreview] = useState<RosterImportPreview | null>(null);
+  // Calciatore scelto per ogni nome ambiguo dell'anteprima (QA 19-20/11).
+  const [csvResolutions, setCsvResolutions] = useState<Record<number, string>>({});
   const [csvBusy, setCsvBusy] = useState(false);
   const [csvMessage, setCsvMessage] = useState<string | null>(null);
   const [csvError, setCsvError] = useState<string | null>(null);
@@ -550,6 +553,7 @@ export function RosterScreen() {
     setCsvError(null);
     setCsvMessage(null);
     setCsvPreview(null);
+    setCsvResolutions({});
     if (!activeLeagueId || !accessToken) {
       setCsvError("Sessione o lega non disponibile.");
       return;
@@ -599,6 +603,7 @@ export function RosterScreen() {
     setCsvError(null);
     setCsvMessage(null);
     setCsvPreview(null);
+    setCsvResolutions({});
     if (!activeLeagueId || !accessToken) {
       setCsvError("Sessione o lega non disponibile.");
       return;
@@ -648,12 +653,14 @@ export function RosterScreen() {
         accessToken,
         activeLeagueId,
         csvPreview.importId,
-        { resolutions: [] },
+        // Il calciatore scelto per ogni nome ambiguo (prima l'app mandava sempre []).
+        { resolutions: csvResolutionPayload(csvResolutions) },
       );
       setCsvMessage(
         `Import completato: ${result.assignedCount} assegnazioni su ${result.teamsTouched} squadre.`,
       );
       setCsvPreview(null);
+      setCsvResolutions({});
       await loadRoster({ silent: true });
       await loadEditContext(adminTeamId || undefined);
     } catch (error) {
@@ -1005,6 +1012,10 @@ export function RosterScreen() {
             onPickExcel={onPickExcel}
             onPickBulkExcel={onPickBulkExcel}
             csvPreview={csvPreview}
+            csvResolutions={csvResolutions}
+            onCsvResolutionPress={(rowNumber, athleteId) =>
+              setCsvResolutions((current) => toggleCsvResolution(current, rowNumber, athleteId))
+            }
             onConfirmCsvImport={onConfirmCsvImport}
             csvMessage={csvMessage}
             csvError={csvError}

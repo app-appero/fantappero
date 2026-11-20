@@ -160,9 +160,13 @@ export {
   LEAGUE_STATE_DOT_EMOJI,
   SNAPSHOT_SECTIONS,
   groupSnapshotByTeam,
+  canConfirmRosterImport,
   describeLeagueLifecycleStep,
+  describeRosterImportCandidate,
   leagueLifecyclePhaseIndex,
   orderLeagueSetupBlockers,
+  rosterImportAmbiguousCount,
+  rosterImportAmbiguousRows,
 } from "./leagues.js";
 
 export {

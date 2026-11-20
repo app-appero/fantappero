@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import io
 import random
 import re
 from uuid import UUID
@@ -665,3 +666,284 @@ def test_csv_name_search_is_limited_to_the_league_listone(
     outside_row = outside.json()["rows"][0]
     assert outside_row["athleteId"] is None
     assert [issue["code"] for issue in outside_row["issues"]] == ["athlete_not_found"]
+
+
+def _seed_athlete_at_club(
+    db_session: Session,
+    name: str,
+    *,
+    competition_id: str,
+    club_name: str,
+    role: FantasyRole,
+) -> Athlete:
+    """Calciatore del listone 2026 di un club che gioca in un campionato della lega."""
+    provider_id = _random_provider_id()
+    season = db_session.scalar(
+        select(SportSeason).where(
+            SportSeason.competition_id == UUID(competition_id), SportSeason.year == 2026
+        )
+    )
+    if season is None:
+        season = SportSeason(competition_id=UUID(competition_id), year=2026)
+        db_session.add(season)
+        db_session.flush()
+    club = Club(provider_id=provider_id, name=club_name)
+    db_session.add(club)
+    db_session.flush()
+    db_session.add(CompetitionSeasonClub(sport_season_id=season.id, club_id=club.id))
+    athlete = Athlete(provider_id=provider_id, canonical_name=name)
+    db_session.add(athlete)
+    db_session.flush()
+    db_session.add(
+        RoleAssignment(
+            athlete_id=athlete.id,
+            season_year=2026,
+            role=role,
+            mapping_version="v1.0.0",
+            provider_position_raw=role.value,
+            club_id=club.id,
+        )
+    )
+    db_session.commit()
+    db_session.refresh(athlete)
+    return athlete
+
+
+def _competition_name(db_session: Session, competition_id: str) -> str:
+    competition = db_session.get(Competition, UUID(competition_id))
+    assert competition is not None
+    return competition.name
+
+
+def test_csv_homonym_written_without_accent_is_ambiguous_with_role_and_club(
+    client: TestClient,
+    db_session: Session,
+    competition_ids: list[str],
+) -> None:
+    """QA 19-20/11: "toni fernandez" finiva in silenzio su Toni Fernández del
+    Barcelona, mentre nel listone c'è anche il Toni Fernández del Venezia. La
+    ricerca SQL "come scritto" trovava solo l'omonimo senza accento e il confronto
+    senza accenti non partiva. Decisione: riga ambigua con ruolo, squadra e
+    campionato di ogni candidato."""
+    token, _ = _register_and_login(client, "csv.homonyms@example.com")
+    league_id = _create_league(client, token, competition_ids, "Lega CSV Omonimi")
+    headers = {"Authorization": f"Bearer {token}"}
+    team_name = client.get(f"/leagues/{league_id}/rosa", headers=headers).json()["name"]
+    tag = random.randint(100_000, 999_999)
+    barcelona = _seed_athlete_at_club(
+        db_session,
+        f"Toni Fernandez{tag}",
+        competition_id=competition_ids[0],
+        club_name=f"Barcelona {tag}",
+        role=FantasyRole.C,
+    )
+    venezia = _seed_athlete_at_club(
+        db_session,
+        f"Toni Fernández{tag}",
+        competition_id=competition_ids[1],
+        club_name=f"Venezia {tag}",
+        role=FantasyRole.A,
+    )
+
+    preview = client.post(
+        f"/leagues/{league_id}/amministrazione/import-csv/anteprima-testo",
+        headers=headers,
+        json={"csvText": f"squadra,provider_id,nome,crediti\n{team_name},,toni fernandez{tag},3\n"},
+    )
+    assert preview.status_code == 200, preview.text
+    row = preview.json()["rows"][0]
+    assert row["status"] == "ambiguous", (row["athleteName"], row["issues"])
+    assert row["athleteId"] is None
+    candidates = {candidate["athleteId"]: candidate for candidate in row["candidates"]}
+    assert set(candidates) == {str(barcelona.id), str(venezia.id)}
+    assert candidates[str(barcelona.id)]["role"] == "C"
+    assert candidates[str(barcelona.id)]["clubName"] == f"Barcelona {tag}"
+    assert candidates[str(barcelona.id)]["competitionName"] == _competition_name(
+        db_session, competition_ids[0]
+    )
+    assert candidates[str(venezia.id)]["role"] == "A"
+    assert candidates[str(venezia.id)]["clubName"] == f"Venezia {tag}"
+    assert candidates[str(venezia.id)]["competitionName"] == _competition_name(
+        db_session, competition_ids[1]
+    )
+
+    # Si conferma scegliendo il candidato giusto; ruolo e squadra restano nella
+    # sessione salvata (la conferma la rilegge).
+    confirm = client.post(
+        f"/leagues/{league_id}/amministrazione/import-csv/{preview.json()['importId']}/conferma",
+        headers=headers,
+        json={"resolutions": [{"rowNumber": row["rowNumber"], "athleteId": str(venezia.id)}]},
+    )
+    assert confirm.status_code == 200, confirm.text
+    assert confirm.json()["assignedCount"] == 1
+    owned = db_session.scalar(
+        select(FantasyRosterSlot.athlete_id).where(
+            FantasyRosterSlot.league_id == UUID(league_id),
+            FantasyRosterSlot.athlete_id.in_([barcelona.id, venezia.id]),
+        )
+    )
+    assert owned == venezia.id
+
+
+def test_csv_ambiguous_rows_are_not_counted_as_errors(
+    client: TestClient,
+    db_session: Session,
+    competition_ids: list[str],
+) -> None:
+    """QA 19-20/11: le righe ambigue finivano in `errorCount`. Sono avvisi da
+    risolvere: `ambiguousCount` le conta, e la conferma senza scelta le rifiuta."""
+    token, _ = _register_and_login(client, "csv.ambiguous.count@example.com")
+    league_id = _create_league(client, token, competition_ids, "Lega CSV Conteggi")
+    headers = {"Authorization": f"Bearer {token}"}
+    team_name = client.get(f"/leagues/{league_id}/rosa", headers=headers).json()["name"]
+    surname = f"Gemello{random.randint(100_000, 999_999)}"
+    _seed_athlete(db_session, _random_provider_id(), f"P. {surname}")
+    _seed_athlete(db_session, _random_provider_id(), f"S. {surname}")
+    unique = _seed_athlete(db_session, _random_provider_id(), f"U. Unico{surname}")
+    url = f"/leagues/{league_id}/amministrazione/import-csv/anteprima-testo"
+
+    preview = client.post(
+        url,
+        headers=headers,
+        json={
+            "csvText": (
+                "squadra,provider_id,nome,crediti\n"
+                f"{team_name},,{unique.canonical_name},2\n"
+                f"{team_name},,{surname},3\n"
+            )
+        },
+    )
+    assert preview.status_code == 200, preview.text
+    body = preview.json()
+    assert [row["status"] for row in body["rows"]] == ["ok", "ambiguous"]
+    assert body["errorCount"] == 0
+    assert body["ambiguousCount"] == 1
+    assert body["warningCount"] >= 1
+    assert body["canConfirm"] is False
+
+    blocked = client.post(
+        f"/leagues/{league_id}/amministrazione/import-csv/{body['importId']}/conferma",
+        headers=headers,
+        json={"resolutions": []},
+    )
+    assert blocked.status_code == 400, blocked.text
+    assert blocked.json()["code"] == "import_has_ambiguities"
+    assert (
+        db_session.scalar(
+            select(FantasyRosterSlot).where(
+                FantasyRosterSlot.league_id == UUID(league_id),
+                FantasyRosterSlot.athlete_id == unique.id,
+            )
+        )
+        is None
+    )
+
+    # Con un errore vero l'errore si conta, l'ambiguità resta a parte.
+    with_error = client.post(
+        url,
+        headers=headers,
+        json={
+            "csvText": (
+                "squadra,provider_id,nome,crediti\n"
+                f"{team_name},,{surname},3\n"
+                f"{team_name},,Inesistente{surname},1\n"
+            )
+        },
+    )
+    assert with_error.status_code == 200, with_error.text
+    assert with_error.json()["errorCount"] == 1
+    assert with_error.json()["ambiguousCount"] == 1
+
+
+def test_csv_matches_dotless_turkish_i(
+    client: TestClient,
+    db_session: Session,
+    competition_ids: list[str],
+) -> None:
+    """QA 19-20/11: "A. Bayindir" non trovava "A. Bayındır" (ı turca senza punto)."""
+    token, _ = _register_and_login(client, "csv.names.dotless@example.com")
+    league_id = _create_league(client, token, competition_ids, "Lega CSV Bayindir")
+    headers = {"Authorization": f"Bearer {token}"}
+    team_name = client.get(f"/leagues/{league_id}/rosa", headers=headers).json()["name"]
+    tag = random.randint(100_000, 999_999)
+    keeper = _seed_athlete(db_session, _random_provider_id(), f"A. Bayındır{tag}")
+    preview = client.post(
+        f"/leagues/{league_id}/amministrazione/import-csv/anteprima-testo",
+        headers=headers,
+        json={"csvText": f"squadra,provider_id,nome,crediti\n{team_name},,A. Bayindir{tag},1\n"},
+    )
+    assert preview.status_code == 200, preview.text
+    row = preview.json()["rows"][0]
+    assert row["status"] == "ok", row["issues"]
+    assert row["athleteId"] == str(keeper.id)
+
+
+def test_excel_ambiguous_name_is_kept_to_choose_instead_of_ignored(
+    client: TestClient,
+    db_session: Session,
+    competition_ids: list[str],
+) -> None:
+    """Decisione 19-20/11: anche nell'Excel (web e app) il nome di più calciatori
+    non si ignora più: la riga resta da scegliere, con ruolo e squadra dei
+    candidati. Il nome che non esiste resta ignorato."""
+    from openpyxl import Workbook
+
+    token, _ = _register_and_login(client, "xlsx.homonyms@example.com")
+    league_id = _create_league(client, token, competition_ids, "Lega Excel Omonimi")
+    headers = {"Authorization": f"Bearer {token}"}
+    team_id = client.get(f"/leagues/{league_id}/rosa", headers=headers).json()["id"]
+    tag = random.randint(100_000, 999_999)
+    first = _seed_athlete_at_club(
+        db_session,
+        f"Toni Fernández{tag}",
+        competition_id=competition_ids[0],
+        club_name=f"Barcelona {tag}",
+        role=FantasyRole.C,
+    )
+    _seed_athlete_at_club(
+        db_session,
+        f"Toni Fernández{tag}",
+        competition_id=competition_ids[1],
+        club_name=f"Venezia {tag}",
+        role=FantasyRole.A,
+    )
+    workbook = Workbook()
+    sheet = workbook.active
+    sheet.append(["Calciatore", "Crediti"])
+    sheet.append([f"toni fernandez{tag}", 3])
+    sheet.append([f"Nessuno{tag}", 1])
+    buffer = io.BytesIO()
+    workbook.save(buffer)
+
+    preview = client.post(
+        f"/leagues/{league_id}/amministrazione/import-csv/anteprima",
+        headers=headers,
+        params={"teamId": team_id},
+        files={
+            "file": (
+                "rosa.xlsx",
+                buffer.getvalue(),
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            )
+        },
+    )
+    assert preview.status_code == 200, preview.text
+    body = preview.json()
+    ambiguous, missing = body["rows"]
+    assert ambiguous["status"] == "ambiguous", ambiguous["issues"]
+    assert sorted(candidate["clubName"] for candidate in ambiguous["candidates"]) == [
+        f"Barcelona {tag}",
+        f"Venezia {tag}",
+    ]
+    assert all(candidate["role"] for candidate in ambiguous["candidates"])
+    assert missing["status"] == "skipped"
+    assert body["errorCount"] == 0
+    assert body["ambiguousCount"] == 1
+
+    confirm = client.post(
+        f"/leagues/{league_id}/amministrazione/import-csv/{body['importId']}/conferma",
+        headers=headers,
+        json={"resolutions": [{"rowNumber": ambiguous["rowNumber"], "athleteId": str(first.id)}]},
+    )
+    assert confirm.status_code == 200, confirm.text
+    assert confirm.json()["assignedCount"] == 1

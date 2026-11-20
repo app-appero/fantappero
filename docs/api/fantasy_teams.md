@@ -108,9 +108,14 @@ placeholder: verificano rose e conti reali.
 Colonne: `squadra,provider_id,nome,crediti`.
 
 Matching: `provider_id` prioritario; altrimenti il nome del listone, oppure solo il cognome se è
-univoco. Il confronto è in minuscolo (`casefold`): maiuscole e minuscole sono equivalenti.
-Ambiguità → status `ambiguous` + candidati
-(risolvibili in conferma via `resolutions: [{rowNumber, athleteId}]`).
+univoco. Il confronto ignora maiuscole, accenti e spazi doppi (`normalize_athlete_name`, anche la
+İ e la ı turche: "A. Bayindir" trova "A. Bayındır") e gira sempre su tutto il listone della lega,
+così ogni omonimo diventa un candidato ("toni fernandez" con due Toni Fernández → ambiguo).
+Ambiguità → status `ambiguous` + candidati con `role` (ruolo nella lega), `clubName` e
+`competitionName`, risolvibili in conferma via `resolutions: [{rowNumber, athleteId}]`.
+Una riga ambigua è un avviso, non un errore: non entra in `errorCount` ma in `ambiguousCount`;
+`canConfirm` resta `false` finché ce n'è una, e la conferma senza scelta risponde
+`import_has_ambiguities`.
 
 Vincoli server (stessi dell’inserimento manuale): esclusività lega, crediti ≥ 0, saldo non negativo,
 slot liberi, tetti ruolo P–D–C–A. Diversità campionati e completezza valgono all’avvio stagione.
@@ -132,7 +137,8 @@ squadre correnti della lega:
 
 - foglio riconosciuto → le sue righe entrano nell'anteprima con `squadra` impostata al vero
   `team.name` (stessa pipeline di risoluzione/validazione del CSV multi-squadra con colonna
-  `squadra`, incluso lo "skip silenzioso" delle righe Excel ambigue o senza match);
+  `squadra`, incluso lo "skip silenzioso" delle righe Excel senza match; le righe ambigue
+  restano invece `ambiguous`, da risolvere scegliendo il candidato);
 - foglio **non** riconosciuto → ignorato silenziosamente, nessuna riga, nessun errore; il suo
   nome finisce in `skippedSheets` nella risposta di anteprima (utile solo per un eventuale avviso
   informativo in UI, non blocca la conferma);
@@ -151,9 +157,12 @@ atomica, sia per l'import singolo che per quello massivo.
   oppure export/import massivo di tutte le rose (un foglio per allenatore, vedi sopra).
   Colonne del file: `Calciatore`, `Crediti`. Niente nome squadra e niente `provider_id`.
   Il nome può essere quello del listone (`L. Martinez`) oppure solo il cognome (`Martinez`).
-  Maiuscole e minuscole non contano. Se non si trova, o il cognome corrisponde a più calciatori,
-  la riga resta in anteprima come ignorata e non scrive nulla. Il CSV resta accettato
-  dall’anteprima con le colonne `squadra,provider_id,nome,crediti`.
+  Maiuscole, minuscole e accenti non contano. Se non si trova, la riga resta in anteprima come
+  ignorata e non scrive nulla. Se il nome corrisponde a più calciatori (decisione 19-20/11),
+  l'anteprima mostra i candidati con ruolo, squadra e campionato: si sceglie quello giusto (menu
+  a tendina sul web, elenco da toccare nell'app) e «Conferma» si abilita solo quando ogni nome
+  ambiguo ha la sua scelta. Il riepilogo conta a parte errori, nomi ambigui e avvisi.
+  Il CSV resta accettato dall’anteprima con le colonne `squadra,provider_id,nome,crediti`.
 
 ## Metriche e audit
 

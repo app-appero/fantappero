@@ -922,7 +922,7 @@ export interface AdminCreditMovementRequest {
 /** CSV roster import with preview (EP05-04 / FR-ROS-03). */
 export type RosterImportStatus = "draft" | "confirmed";
 
-export type RosterImportRowStatus = "ok" | "error" | "ambiguous";
+export type RosterImportRowStatus = "ok" | "error" | "ambiguous" | "skipped";
 
 export interface RosterImportIssue {
   code: string;
@@ -934,6 +934,10 @@ export interface RosterImportAthleteCandidate {
   athleteId: string;
   providerId: number;
   canonicalName: string;
+  /** Ruolo nella lega (P/D/C/A): con squadra e campionato distingue gli omonimi. */
+  role?: FantasyRole | string | null;
+  clubName?: string | null;
+  competitionName?: string | null;
 }
 
 export interface RosterImportRow {
@@ -959,15 +963,80 @@ export interface RosterImportPreview {
   originalFilename: string | null;
   canConfirm: boolean;
   rowCount: number;
+  /** Righe con errori bloccanti. I nomi ambigui non sono errori: stanno in `ambiguousCount`. */
   errorCount: number;
+  /**
+   * Righe con un nome di più calciatori, da risolvere scegliendo il candidato in conferma.
+   * Assente nelle risposte dei server precedenti: si ricava dalle righe.
+   */
+  ambiguousCount?: number;
   warningCount: number;
   rows: RosterImportRow[];
   confirmedAt: string | null;
+  /** Solo import massivo: fogli senza allenatore corrispondente, ignorati. */
+  skippedSheets?: string[];
 }
 
 export interface RosterImportResolution {
   rowNumber: number;
   athleteId: string;
+}
+
+const ROSTER_IMPORT_ROLE_LABEL: Record<FantasyRole, string> = {
+  P: "Portiere",
+  D: "Difensore",
+  C: "Centrocampista",
+  A: "Attaccante",
+};
+
+/** Righe ancora da risolvere (nome di più calciatori). */
+export function rosterImportAmbiguousRows(preview: RosterImportPreview): RosterImportRow[] {
+  return preview.rows.filter((row) => row.status === "ambiguous");
+}
+
+/** Numero di nomi ambigui: dal server, oppure contati sulle righe. */
+export function rosterImportAmbiguousCount(preview: RosterImportPreview): number {
+  return typeof preview.ambiguousCount === "number"
+    ? preview.ambiguousCount
+    : rosterImportAmbiguousRows(preview).length;
+}
+
+/**
+ * Ruolo, squadra e campionato di un candidato, per scegliere fra omonimi
+ * (QA 19-20/11: "toni fernandez" finiva in silenzio su uno dei due Toni Fernández).
+ * Es. "Centrocampista · Barcelona · La Liga".
+ */
+export function describeRosterImportCandidate(candidate: RosterImportAthleteCandidate): string {
+  const role = candidate.role
+    ? (ROSTER_IMPORT_ROLE_LABEL[candidate.role as FantasyRole] ?? candidate.role)
+    : null;
+  const parts = [role, candidate.clubName, candidate.competitionName]
+    .map((part) => (part ?? "").trim())
+    .filter((part) => part.length > 0);
+  return parts.length > 0 ? parts.join(" · ") : `#${candidate.providerId}`;
+}
+
+/**
+ * Si può confermare se c'è almeno una riga da importare e nessun errore, e ogni
+ * nome ambiguo ha il suo calciatore scelto. Le righe ignorate non bloccano.
+ */
+export function canConfirmRosterImport(
+  preview: RosterImportPreview | null,
+  resolutions: Readonly<Record<number, string>>,
+): boolean {
+  if (!preview || preview.status !== "draft") {
+    return false;
+  }
+  const resolved = (row: RosterImportRow) =>
+    row.status === "ambiguous" &&
+    row.candidates.some((candidate) => candidate.athleteId === resolutions[row.rowNumber]);
+  const importable = preview.rows.some((row) => row.status === "ok" || resolved(row));
+  if (!importable || preview.errorCount > 0) {
+    return false;
+  }
+  return preview.rows.every(
+    (row) => row.status === "ok" || row.status === "skipped" || resolved(row),
+  );
 }
 
 export interface RosterImportConfirmRequest {

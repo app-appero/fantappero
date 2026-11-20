@@ -590,6 +590,8 @@ export const rosterStyles = lazyStyles(() => StyleSheet.create({
   moveSign: { width: 38, height: 38, borderRadius: 19, alignItems: "center", justifyContent: "center" },
   moveSignLabel: { fontSize: 22, fontFamily: DISPLAY_FONT },
   moveTitle: { color: colors.foreground, fontWeight: "600" },
+  // Candidato scelto per un nome ambiguo dell'import Excel.
+  candidateRowSelected: { borderColor: colors.brand, borderWidth: 2 },
   moveDate: { color: colors.foregroundMuted, fontSize: 12 },
   moveValue: { fontSize: 22, fontFamily: DISPLAY_FONT },
   blockTitle: { color: colors.foreground, fontSize: 24, lineHeight: 26, fontFamily: DISPLAY_FONT, textTransform: "uppercase", marginTop: spacing.sm, marginBottom: spacing.xs },

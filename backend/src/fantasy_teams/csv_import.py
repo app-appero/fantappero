@@ -6,10 +6,10 @@ import csv
 import hashlib
 import io
 import re
-import unicodedata
 from dataclasses import dataclass, field
 from uuid import UUID
 
+from app.text_folding import strip_accents
 from auth.exceptions import ValidationAuthError
 
 CSV_TEMPLATE_HEADERS = ("squadra", "provider_id", "nome", "crediti")
@@ -49,6 +49,10 @@ class AthleteCandidate:
     athlete_id: str
     provider_id: int
     canonical_name: str
+    # Ruolo, squadra e campionato servono a scegliere fra omonimi (QA 19-20/11).
+    role: str | None = None
+    club_name: str | None = None
+    competition_name: str | None = None
 
 
 @dataclass
@@ -227,11 +231,11 @@ def normalize_athlete_name(name: str) -> str:
 
     Senza accenti anche le lettere che `casefold` scompone (la İ turca diventa
     "i" + punto combinante): "E. İlkhan" e "e. ilkhan" sono lo stesso nome,
-    come "Dembélé" e "Dembele" (QA 18/11).
+    come "Dembélé" e "Dembele" (QA 18/11). Anche le lettere che non si
+    scompongono, come la ı turca senza punto: "A. Bayindir" trova "A. Bayındır"
+    (QA 19-20/11).
     """
-    decomposed = unicodedata.normalize("NFKD", name.casefold())
-    plain = "".join(char for char in decomposed if not unicodedata.combining(char))
-    return re.sub(r"\s+", " ", plain).strip()
+    return re.sub(r"\s+", " ", strip_accents(name.casefold())).strip()
 
 
 _INITIAL_CANONICAL = re.compile(r"^[^\W\d_]\.\s+(.+)$", re.UNICODE)
@@ -252,10 +256,6 @@ def surname_lookup_keys(canonical_name: str, last_name: str | None = None) -> se
             keys.add(normalize_athlete_name(parts[-1]))
     keys.discard("")
     return keys
-
-
-def like_literal(value: str) -> str:
-    return value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
 
 
 def select_name_matches[T](
@@ -309,6 +309,9 @@ def preview_row_to_dict(row: PreviewRow) -> dict[str, object]:
                 "athleteId": candidate.athlete_id,
                 "providerId": candidate.provider_id,
                 "canonicalName": candidate.canonical_name,
+                "role": candidate.role,
+                "clubName": candidate.club_name,
+                "competitionName": candidate.competition_name,
             }
             for candidate in row.candidates
         ],
@@ -348,11 +351,18 @@ def preview_row_from_dict(payload: dict[str, object]) -> PreviewRow:
                 athlete_id=str(item["athleteId"]),
                 provider_id=int(item["providerId"]),
                 canonical_name=str(item["canonicalName"]),
+                role=_optional_str(item.get("role")),
+                club_name=_optional_str(item.get("clubName")),
+                competition_name=_optional_str(item.get("competitionName")),
             )
             for item in candidates_raw
             if isinstance(item, dict)
         ],
     )
+
+
+def _optional_str(value: object) -> str | None:
+    return str(value) if value else None
 
 
 def apply_resolutions(

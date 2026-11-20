@@ -50,6 +50,7 @@ from fantasy_teams.csv_import import (
 from fantasy_teams.csv_preview import (
     build_preview_rows,
     count_preview_issues,
+    has_unresolved_ambiguities,
     recompute_slot_assignments,
     skip_unmatched_excel_rows,
 )
@@ -1526,6 +1527,18 @@ class FantasyTeamService:
                 "L'anteprima contiene errori bloccanti: correggi il file o risolvi le ambiguità.",
                 code="import_has_errors",
             )
+        # I nomi ambigui non sono errori (QA 19-20/11), ma senza una scelta la riga
+        # resterebbe fuori in silenzio: la conferma aspetta il calciatore giusto.
+        if has_unresolved_ambiguities(rows):
+            self._session.commit()
+            get_metrics().incr(
+                "fantasy_roster_csv_confirm_total",
+                labels={"result": "blocked"},
+            )
+            raise ValidationAuthError(
+                "Scegli il calciatore giusto per ogni nome ambiguo prima di confermare.",
+                code="import_has_ambiguities",
+            )
 
         ok_rows = [row for row in rows if row.status == "ok"]
         if not ok_rows:
@@ -1727,12 +1740,15 @@ class FantasyTeamService:
         rows_payload = session.preview_payload.get("rows") or []
         rows: list[RosterImportRowResponse] = []
         ok_rows = 0
+        ambiguous_rows = 0
         if isinstance(rows_payload, list):
             for item in rows_payload:
                 if not isinstance(item, dict):
                     continue
                 if str(item.get("status") or "") == "ok":
                     ok_rows += 1
+                elif str(item.get("status") or "") == "ambiguous":
+                    ambiguous_rows += 1
                 rows.append(
                     RosterImportRowResponse(
                         rowNumber=int(item.get("rowNumber") or 0),
@@ -1760,6 +1776,9 @@ class FantasyTeamService:
                                 athleteId=str(candidate["athleteId"]),
                                 providerId=int(candidate["providerId"]),
                                 canonicalName=str(candidate["canonicalName"]),
+                                role=candidate.get("role"),  # type: ignore[arg-type]
+                                clubName=candidate.get("clubName"),  # type: ignore[arg-type]
+                                competitionName=candidate.get("competitionName"),  # type: ignore[arg-type]
                             )
                             for candidate in (item.get("candidates") or [])
                             if isinstance(candidate, dict)
@@ -1771,13 +1790,16 @@ class FantasyTeamService:
             status=session.status.value,
             fileSha256=session.file_sha256,
             originalFilename=session.original_filename,
+            # Confermabile così com'è: con nomi ambigui serve prima la scelta del candidato.
             canConfirm=(
                 session.status == RosterImportStatus.DRAFT
                 and session.error_count == 0
+                and ambiguous_rows == 0
                 and ok_rows > 0
             ),
             rowCount=session.row_count,
             errorCount=session.error_count,
+            ambiguousCount=ambiguous_rows,
             warningCount=session.warning_count,
             rows=rows,
             confirmedAt=session.confirmed_at.isoformat() if session.confirmed_at else None,

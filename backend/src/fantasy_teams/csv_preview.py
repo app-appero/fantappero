@@ -2,19 +2,18 @@
 
 from __future__ import annotations
 
-import re
 from collections import defaultdict
 from uuid import UUID
 
-from sqlalchemy import func, or_, select
+from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
+from fantasy_teams.composition_service import resolve_effective_athlete_roles
 from fantasy_teams.csv_import import (
     AthleteCandidate,
     ParsedCsvRow,
     PreviewRow,
     PreviewRowIssue,
-    like_literal,
     normalize_athlete_name,
     normalize_team_key,
     select_name_matches,
@@ -23,6 +22,8 @@ from fantasy_teams.csv_import import (
 from fantasy_teams.factory import resolve_roster_size
 from fantasy_teams.ledger import find_account_for_team
 from fantasy_teams.models import FantasyRosterSlot, FantasyTeam
+from leagues.models.competition import Competition
+from sports_data.catalog.models import Club, CompetitionSeasonClub, SportSeason
 from sports_data.listone.generate import _competition_filter_clause, get_role_assignment
 from sports_data.listone.models import RoleAssignment
 from sports_data.roster.models import Athlete
@@ -104,51 +105,32 @@ def build_preview_rows(
             listone_athlete_ids = listone_athlete_ids.where(
                 _competition_filter_clause(season_year=season_year, competition_ids=competition_ids)
             )
-        # Ricerca veloce in SQL con il nome come scritto (minuscolo, spazi singoli).
-        lowered = sorted(
-            {re.sub(r"\s+", " ", row.nome.strip().lower()) for row in parsed_rows if row.nome}
-            | names
-        )
-        surname_patterns = [
-            func.lower(Athlete.canonical_name).like(f"%. {like_literal(name)}", escape="\\")
-            for name in lowered
-        ]
-        index_athletes(
-            list(
-                session.scalars(
-                    select(Athlete).where(
-                        Athlete.id.in_(listone_athlete_ids),
-                        or_(
-                            func.lower(Athlete.canonical_name).in_(lowered),
-                            func.regexp_replace(
-                                func.lower(Athlete.canonical_name), r"\s+", " ", "g"
-                            ).in_(lowered),
-                            func.lower(Athlete.last_name).in_(lowered),
-                            *surname_patterns,
-                        ),
-                    )
-                ).all()
-            )
-        )
-        # Nomi non trovati (accenti, lettere come la İ turca, spazi doppi nel
-        # listone): confronto in Python con la chiave normalizzata su tutti i
-        # calciatori del listone della lega (QA 18/11; campionati dal 19/11).
-        unmatched = {
-            name
-            for name in names
-            if not athletes_by_name.get(name) and not athletes_by_surname.get(name)
-        }
-        if unmatched:
-            listone_athletes = session.scalars(
-                select(Athlete).where(Athlete.id.in_(listone_athlete_ids))
+        # Il confronto con la chiave normalizzata (senza accenti e maiuscole, spazi
+        # singoli, İ e ı turche) gira sempre su tutto il listone della lega (QA 18/11;
+        # campionati dal 19/11). Prima partiva solo per i nomi che la ricerca SQL "come
+        # scritto" non trovava: se quella trovava un solo omonimo, l'altro con l'accento
+        # restava fuori e "toni fernandez" finiva in silenzio su uno dei due Toni
+        # Fernández invece di diventare ambiguo (QA 19-20/11). Si leggono solo id e
+        # nomi; le schede complete solo dei calciatori che combaciano.
+        matching_ids = [
+            athlete_id
+            for athlete_id, canonical_name, last_name in session.execute(
+                select(Athlete.id, Athlete.canonical_name, Athlete.last_name).where(
+                    Athlete.id.in_(listone_athlete_ids)
+                )
             ).all()
+            if normalize_athlete_name(canonical_name) in names
+            or surname_lookup_keys(canonical_name, last_name) & names
+        ]
+        if matching_ids:
             index_athletes(
-                [
-                    athlete
-                    for athlete in listone_athletes
-                    if normalize_athlete_name(athlete.canonical_name) in unmatched
-                    or surname_lookup_keys(athlete.canonical_name, athlete.last_name) & unmatched
-                ]
+                list(
+                    session.scalars(
+                        select(Athlete)
+                        .where(Athlete.id.in_(matching_ids))
+                        .order_by(Athlete.canonical_name.asc(), Athlete.provider_id.asc())
+                    ).all()
+                )
             )
 
     seen_athletes: dict[UUID, int] = {}
@@ -253,7 +235,77 @@ def build_preview_rows(
             row.status = "ok"
         preview_rows.append(row)
 
+    _describe_candidates(
+        session,
+        preview_rows,
+        league_id=league_id,
+        season_year=season_year,
+        competition_ids=competition_ids,
+    )
     return preview_rows
+
+
+def _describe_candidates(
+    session: Session,
+    rows: list[PreviewRow],
+    *,
+    league_id: UUID,
+    season_year: int,
+    competition_ids: set[UUID] | None,
+) -> None:
+    """Ruolo nella lega, squadra e campionato dei candidati di un nome ambiguo.
+
+    Decisione 19-20/11: con due omonimi (es. Toni Fernández del Barcelona e del
+    Venezia) chi importa deve poter scegliere quello giusto, su web e mobile.
+    """
+    athlete_ids = list(
+        dict.fromkeys(UUID(candidate.athlete_id) for row in rows for candidate in row.candidates)
+    )
+    if not athlete_ids:
+        return
+    roles = resolve_effective_athlete_roles(
+        session,
+        league_id=league_id,
+        athlete_ids=athlete_ids,
+        season_year=season_year,
+        competition_ids=competition_ids,
+    )
+    club_ids = {item.club_id for item in roles.values() if item.club_id is not None}
+    club_names: dict[UUID, str] = {}
+    competitions: dict[UUID, list[str]] = defaultdict(list)
+    if club_ids:
+        club_names = {
+            club_id: name
+            for club_id, name in session.execute(
+                select(Club.id, Club.name).where(Club.id.in_(club_ids))
+            ).all()
+        }
+        competition_stmt = (
+            select(CompetitionSeasonClub.club_id, Competition.name)
+            .join(SportSeason, SportSeason.id == CompetitionSeasonClub.sport_season_id)
+            .join(Competition, Competition.id == SportSeason.competition_id)
+            .where(
+                CompetitionSeasonClub.club_id.in_(club_ids),
+                SportSeason.year == season_year,
+            )
+            .order_by(Competition.name.asc())
+        )
+        if competition_ids:
+            competition_stmt = competition_stmt.where(
+                SportSeason.competition_id.in_(competition_ids)
+            )
+        for club_id, competition_name in session.execute(competition_stmt).all():
+            if competition_name not in competitions[club_id]:
+                competitions[club_id].append(competition_name)
+    for row in rows:
+        for candidate in row.candidates:
+            effective = roles.get(UUID(candidate.athlete_id))
+            if effective is None:
+                continue
+            candidate.role = effective.role.value
+            if effective.club_id is not None:
+                candidate.club_name = club_names.get(effective.club_id)
+                candidate.competition_name = ", ".join(competitions[effective.club_id]) or None
 
 
 def _validate_basic_fields(row: PreviewRow, parsed: ParsedCsvRow) -> None:
@@ -459,44 +511,61 @@ def _warn_if_not_on_listone(
         )
 
 
-_UNMATCHED_ATHLETE_CODES = frozenset(
-    {"athlete_not_found", "ambiguous_athlete_name", "missing_athlete_key"}
-)
+_UNMATCHED_ATHLETE_CODES = frozenset({"athlete_not_found", "missing_athlete_key"})
 
 
 def skip_unmatched_excel_rows(rows: list[PreviewRow]) -> None:
-    """Leave the roster unchanged when Excel cannot name exactly one athlete."""
+    """Leave the roster unchanged when Excel names no athlete of the listone.
+
+    Un nome di più calciatori invece non si ignora: la riga resta `ambiguous`, con
+    ruolo, squadra e campionato dei candidati, e chi importa sceglie quello giusto
+    prima di confermare, su web e mobile (decisione 19-20/11).
+    """
     for row in rows:
         if row.athlete_id is not None or row.fantasy_team_id is None:
             continue
-        unmatched = [issue for issue in row.issues if issue.code in _UNMATCHED_ATHLETE_CODES]
-        if row.status != "ambiguous" and not unmatched:
+        if row.status == "ambiguous" or row.candidates:
             continue
-        if row.status == "ambiguous" or any(
-            issue.code == "ambiguous_athlete_name" for issue in unmatched
-        ):
-            code = "ambiguous_athlete_name"
-            message = "Nome non univoco: riga ignorata. Aggiungi il calciatore a mano."
-        else:
-            code = "athlete_not_found"
-            message = "Calciatore non trovato: riga ignorata. Aggiungilo a mano se serve."
+        if not any(issue.code in _UNMATCHED_ATHLETE_CODES for issue in row.issues):
+            continue
         row.status = "skipped"
         row.slot_index = None
         row.athlete_id = None
         row.athlete_name = None
         row.candidates = []
-        row.issues = [PreviewRowIssue(code=code, message=message, severity="warning")]
+        row.issues = [
+            PreviewRowIssue(
+                code="athlete_not_found",
+                message="Calciatore non trovato: riga ignorata. Aggiungilo a mano se serve.",
+                severity="warning",
+            )
+        ]
 
 
 def count_preview_issues(rows: list[PreviewRow]) -> tuple[int, int]:
+    """Righe con errori bloccanti e numero di avvisi.
+
+    Un nome ambiguo non è un errore: è un avviso (QA 18/11) che si risolve scegliendo
+    il candidato in conferma, quindi non entra in `errorCount` (QA 19-20/11). Le righe
+    ancora da scegliere le conta `count_unresolved_ambiguities`.
+    """
     errors = sum(
         1
         for row in rows
-        if row.status in {"error", "ambiguous"}
-        or any(issue.severity == "error" for issue in row.issues)
+        if row.status == "error" or any(issue.severity == "error" for issue in row.issues)
     )
     warnings = sum(1 for row in rows for issue in row.issues if issue.severity == "warning")
     return errors, warnings
+
+
+def count_unresolved_ambiguities(rows: list[PreviewRow]) -> int:
+    """Righe con un nome di più calciatori ancora senza scelta."""
+    return sum(1 for row in rows if row.status == "ambiguous")
+
+
+def has_unresolved_ambiguities(rows: list[PreviewRow]) -> bool:
+    """La conferma resta bloccata finché ogni nome ambiguo non ha il suo calciatore."""
+    return count_unresolved_ambiguities(rows) > 0
 
 
 def recompute_slot_assignments(
