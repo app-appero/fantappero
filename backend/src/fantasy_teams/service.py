@@ -64,6 +64,7 @@ from fantasy_teams.ledger import (
     apply_ledger_movement,
     ensure_credit_account_for_team,
     find_account_for_team,
+    ledger_note_for_display,
     order_ledger_entries,
     reconstruct_balance,
 )
@@ -2224,7 +2225,7 @@ class FantasyTeamService:
             reason=entry.reason.value,
             transactionId=entry.transaction_id,
             balanceAfter=entry.balance_after,
-            note=entry.note,
+            note=ledger_note_for_display(entry),
             actorId=str(entry.actor_id) if entry.actor_id else None,
             createdAt=entry.created_at.isoformat(),
         )

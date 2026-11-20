@@ -1702,3 +1702,90 @@ def test_declining_or_ending_with_a_pending_swap_is_blocked_while_the_market_is_
     ended = client.post(f"{_live_base(league_id, session_id)}/termina", headers=admin)
     assert ended.status_code == 200, ended.json()
     assert _balance(client, runner_token, league_id) == 990
+
+
+def _movement_notes(client: TestClient, token: str, league_id: str) -> dict[str, str | None]:
+    response = client.get(
+        f"/leagues/{league_id}/crediti/movimenti", headers={"Authorization": f"Bearer {token}"}
+    )
+    assert response.status_code == 200
+    return {row["transactionId"]: row["note"] for row in response.json()["entries"]}
+
+
+def test_live_auction_win_movement_says_live_auction(
+    client: TestClient, db_session: Session, competition_ids: list[str]
+) -> None:
+    """QA 19-20/11: i crediti di un lotto vinto all'asta a rilanci avevano la nota
+    «Assegnazione da asta a buste». Vale per l'aggiudicazione al capofila e per quella
+    all'offerta successiva."""
+    admin_token, _ = _register_and_login(client, "live.note.admin@example.com")
+    leader_token, leader_id = _register_and_login(client, "live.note.leader@example.com")
+    runner_token, runner_id = _register_and_login(client, "live.note.runner@example.com")
+    league_id = _create_league(client, admin_token, competition_ids, "Lega Nota Rilanci")
+    _add_member(db_session, league_id, leader_id)
+    _add_member(db_session, league_id, runner_id)
+    session_id = _start_manual_session(client, admin_token, league_id)
+
+    # Aggiudicazione al capofila (l'amministratore chiude il lotto).
+    first = _seed_athlete(db_session, _unique_id(), "Calciatore Nota Uno")
+    first_lot = _nominate(client, admin_token, league_id, session_id, first.id)["id"]
+    _place_raise(client, leader_token, league_id, session_id, first_lot, 10)
+    sold = client.post(
+        f"{_live_base(league_id, session_id)}/lotti/{first_lot}/aggiudica",
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+    assert sold.status_code == 200, sold.json()
+
+    # Aggiudicazione all'offerta successiva: al capofila mancano i crediti alla chiusura.
+    second = _seed_athlete(db_session, _unique_id(), "Calciatore Nota Due")
+    second_lot = _nominate(client, admin_token, league_id, session_id, second.id)["id"]
+    _place_raise(client, runner_token, league_id, session_id, second_lot, 20)
+    _place_raise(client, leader_token, league_id, session_id, second_lot, 500)
+    leader_team = _my_team(client, leader_token, league_id)
+    _admin_adjust_credits(client, admin_token, league_id, leader_team["id"], -600, "nota-live")
+    lot = _expire_and_poll(client, db_session, admin_token, league_id, session_id, second_lot)
+    assert lot["status"] == "sold"
+    assert lot["currentLeaderTeamId"] == _my_team(client, runner_token, league_id)["id"]
+
+    entries = _win_ledger_entries(db_session, first_lot) + _win_ledger_entries(
+        db_session, second_lot
+    )
+    assert [entry.amount for entry in entries] == [-10, -20]
+    assert [entry.note for entry in entries] == ["Assegnazione da asta a rilanci"] * 2
+
+    # Web e app mostrano la nota così come arriva dal server.
+    for token, entry in ((leader_token, entries[0]), (runner_token, entries[1])):
+        notes = _movement_notes(client, token, league_id)
+        assert notes[entry.transaction_id] == "Assegnazione da asta a rilanci"
+
+
+def test_old_live_auction_movements_show_the_live_note(
+    client: TestClient, db_session: Session, competition_ids: list[str]
+) -> None:
+    """I movimenti dell'asta a rilanci salvati prima della correzione hanno ancora la nota
+    dell'asta a buste: il registro non si riscrive, ma web e app ricevono quella giusta.
+    Quelli dell'asta a buste restano come sono."""
+    from database.enums import CreditLedgerReason
+    from fantasy_teams.ledger import apply_ledger_movement, find_account_for_team
+
+    token, _ = _register_and_login(client, "live.note.legacy@example.com")
+    league_id = _create_league(client, token, competition_ids, "Lega Nota Vecchia")
+    team_id = UUID(_my_team(client, token, league_id)["id"])
+    account = find_account_for_team(db_session, team_id, for_update=True)
+    assert account is not None
+    live_txn = f"market-live:{UUID(int=1)}:{team_id}:{UUID(int=2)}"
+    sealed_txn = f"market:{UUID(int=3)}:{team_id}:{UUID(int=4)}"
+    for transaction_id in (live_txn, sealed_txn):
+        apply_ledger_movement(
+            db_session,
+            account,
+            amount=-5,
+            reason=CreditLedgerReason.MARKET_AUCTION_WIN,
+            transaction_id=transaction_id,
+            note="Assegnazione da asta a buste",
+        )
+    db_session.commit()
+
+    notes = _movement_notes(client, token, league_id)
+    assert notes[live_txn] == "Assegnazione da asta a rilanci"
+    assert notes[sealed_txn] == "Assegnazione da asta a buste"

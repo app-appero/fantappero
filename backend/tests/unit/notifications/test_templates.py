@@ -61,6 +61,81 @@ def test_render_mercato_esito_busta_lost_on_repeated_tiebreak_tie() -> None:
     assert "inferiore" not in content.body
 
 
+def test_render_mercato_esito_busta_waiver_has_own_titles_and_link() -> None:
+    """QA 19-20/11: gli esiti degli svincolati arrivavano con i titoli e il link dell'asta."""
+    base = {
+        "athlete_name": "Bomber",
+        "league_id": "abc",
+        "league_name": "Lega Test",
+        "session_kind": "waiver",
+    }
+    assigned = render_notification(
+        "mercato.esito_busta", 1, {**base, "outcome": "assigned", "amount_credits": 42}
+    )
+    assert assigned.title == "Svincolato aggiudicato"
+    assert assigned.body == "«Lega Test» · Hai aggiudicato Bomber dagli svincolati per 42 crediti."
+    assert assigned.deep_link == "/svincolati?lega=abc"
+
+    lost = render_notification("mercato.esito_busta", 1, {**base, "outcome": "lost"})
+    assert lost.title == "Svincolato perso"
+    assert lost.body == (
+        "«Lega Test» · Non hai aggiudicato Bomber dagli svincolati: offerta inferiore."
+    )
+    assert lost.deep_link == "/svincolati?lega=abc"
+
+    not_assignable = render_notification(
+        "mercato.esito_busta", 1, {**base, "outcome": "lost", "not_assignable": True}
+    )
+    assert not_assignable.title == "Svincolato perso"
+    assert "giocatore da svincolare non più in rosa" in not_assignable.body
+
+    lost_on_tie = render_notification(
+        "mercato.esito_busta", 1, {**base, "outcome": "lost", "lost_on_tie": True}
+    )
+    assert lost_on_tie.title == "Svincolato perso"
+    assert "vince l'offerta inviata per prima" in lost_on_tie.body
+
+    tiebreak = render_notification("mercato.esito_busta", 1, {**base, "outcome": "tiebreak"})
+    assert tiebreak.title == "Spareggio svincolati aperto"
+    assert tiebreak.body == (
+        "«Lega Test» · Parità su Bomber negli svincolati: sei ammesso allo spareggio, "
+        "hai 24 ore per rilanciare."
+    )
+    assert tiebreak.deep_link == "/svincolati?lega=abc"
+
+    cancelled = render_notification(
+        "mercato.esito_busta", 1, {**base, "outcome": "lost", "tiebreak_cancelled": True}
+    )
+    assert cancelled.title == "Spareggio svincolati annullato"
+    assert cancelled.body == (
+        "«Lega Test» · Lo spareggio degli svincolati su Bomber è annullato: "
+        "il calciatore non è più disponibile."
+    )
+    assert cancelled.deep_link == "/svincolati?lega=abc"
+
+    for content in (assigned, lost, not_assignable, lost_on_tie, tiebreak, cancelled):
+        assert "Busta" not in content.title
+        assert "/asta" not in (content.deep_link or "")
+
+
+def test_render_mercato_esito_busta_sealed_bid_unchanged() -> None:
+    """L'asta a buste (con o senza ``session_kind``) mantiene titoli e link di prima."""
+    for extra in ({}, {"session_kind": "initial_auction"}):
+        content = render_notification(
+            "mercato.esito_busta",
+            1,
+            {
+                "outcome": "assigned",
+                "athlete_name": "Bomber",
+                "amount_credits": 42,
+                "league_id": "abc",
+                **extra,
+            },
+        )
+        assert content.title == "Busta aggiudicata"
+        assert content.deep_link == "/asta?lega=abc"
+
+
 def test_render_mercato_asta_live_perso_variants() -> None:
     """P4: capofila senza crediti (o senza posto) alla chiusura del lotto live."""
     base = {"athlete_name": "Bomber", "amount_credits": 500, "league_id": "abc"}

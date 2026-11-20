@@ -66,7 +66,9 @@ const PATH_ROUTES: Array<[RegExp, NotificationRoute]> = [
   // dell'asta a rilanci aprono la scheda «Live», quelle delle buste chiuse «Buste chiuse».
   [/^\/asta-live/, { kind: "tab", screen: "Auction", params: { modalita: "live" } }],
   [/^\/asta/, { kind: "tab", screen: "Auction", params: { modalita: "buste" } }],
+  // Esiti degli svincolati (link «/svincolati»); «/svincoli» è la pagina web equivalente.
   [/^\/svincolati/, { kind: "tab", screen: "Waiver" }],
+  [/^\/svincoli/, { kind: "tab", screen: "Waiver" }],
   [/^\/scambi/, { kind: "tab", screen: "Market" }],
   [/^\/profilo/, { kind: "tab", screen: "Profile" }],
 ];

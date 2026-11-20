@@ -46,7 +46,7 @@ from leagues.market_open import read_market_open
 from leagues.models.league import League
 from leagues.models.league_audit_event import LeagueAuditEvent
 from leagues.models.league_membership import LeagueMembership
-from market.assignment import assign_winning_bid, resolve_live_swap
+from market.assignment import LIVE_AUCTION_WIN_NOTE, assign_winning_bid, resolve_live_swap
 from market.gate import assert_market_open
 from market.live_models import (
     MarketLiveLot,
@@ -1088,6 +1088,7 @@ class LiveMarketService:
             amount_credits=lot.current_amount_credits,
             transaction_id=self._win_transaction_id(lot, team.id),
             actor_id=actor_id,
+            note=LIVE_AUCTION_WIN_NOTE,
         )
         if slot is None:
             # Budget was fine, so the failure is roster-full or role-quota: offer
@@ -1181,6 +1182,7 @@ class LiveMarketService:
                 amount_credits=bid.amount_credits,
                 transaction_id=self._win_transaction_id(lot, team.id),
                 actor_id=actor_id,
+                note=LIVE_AUCTION_WIN_NOTE,
             )
             if slot is None:
                 continue

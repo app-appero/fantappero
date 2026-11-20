@@ -11,7 +11,8 @@ import { WaiverPage } from "./WaiverPage";
 
 // Mercato svincolati (sessione a buste chiuse) nascosta dalla tab bar: ADR-0006.
 // Route, TabPanel e backend restano intatti e raggiungibili via URL diretto
-// (/svincoli) — riattivare riportando questo flag a true.
+// (/svincoli) — riattivare riportando questo flag a true. «/svincolati» è il link
+// delle notifiche con gli esiti degli svincolati, lo stesso percorso che apre l'app.
 const SHOW_WAIVER_TAB = false;
 
 const TABS = [
@@ -23,7 +24,13 @@ const TABS = [
     matchPaths: ["/asta", "/asta-live"],
     permission: "market:view" as const,
   },
-  { value: "svincoli", label: "Svincolati", path: "/svincoli", matchPaths: ["/svincoli"], permission: "market:view" as const },
+  {
+    value: "svincoli",
+    label: "Svincolati",
+    path: "/svincoli",
+    matchPaths: ["/svincoli", "/svincolati"],
+    permission: "market:view" as const,
+  },
   { value: "mercato", label: "Scambi", path: "/mercato", matchPaths: ["/mercato"], permission: "market:view" as const },
 ];
 

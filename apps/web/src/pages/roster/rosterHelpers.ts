@@ -116,15 +116,16 @@ export function formatLedgerDate(iso: string): string {
   });
 }
 
+/**
+ * Movimenti dal più recente. Il server li manda dal più vecchio, già nell'ordine in cui il
+ * saldo si è mosso: a parità di orario (stesso millisecondo) si tiene quell'ordine, rovesciato.
+ * Prima a parità si ordinava per id, che è casuale.
+ */
 export function sortLedgerNewestFirst(entries: CreditLedgerList["entries"]) {
-  return [...entries].sort((left, right) => {
-    const leftTime = Date.parse(left.createdAt);
-    const rightTime = Date.parse(right.createdAt);
-    if (leftTime !== rightTime) {
-      return rightTime - leftTime;
-    }
-    return right.id.localeCompare(left.id);
-  });
+  return entries
+    .map((entry, index) => ({ entry, index, time: Date.parse(entry.createdAt) }))
+    .sort((left, right) => right.time - left.time || right.index - left.index)
+    .map(({ entry }) => entry);
 }
 
 export function formatLedgerEntry(entry: CreditLedgerList["entries"][number]): string {

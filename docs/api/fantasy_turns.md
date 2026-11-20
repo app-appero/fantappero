@@ -118,7 +118,10 @@ restano finestre con fixture senza turno esegue il backfill full-season
 in attesa di più partite sul percorso breve (riprova al giro successivo);
 rispetta `auto_open` del chiamante. Dopo la materializzazione ricalcola cutoff e
 lock dei turni già esistenti (rinvii / variazioni orario, EP06-07) senza
-sbloccare azioni già consumate. Task iniziale post-creazione:
+sbloccare azioni già consumate. Con `auto_open` apre poi ogni turno `scheduled`
+il cui blocco cade entro `FANTASY_TURNS_HORIZON_DAYS`, anche se esisteva già
+(per esempio creato dal task iniziale della lega): lo stesso vale per
+`POST /leagues/{id}/turni/sincronizza`. Task iniziale post-creazione:
 `fantasy_turns.materialize_initial_for_league` (`auto_open=false`).
 
 ## Metriche

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -40,7 +40,10 @@ def find_account_for_team(
 
 def order_ledger_entries(entries: list[CreditLedgerEntry]) -> list[CreditLedgerEntry]:
     """Ordina i movimenti per data e, a parità di data (stessa transazione), nell'ordine
-    in cui il saldo si è davvero mosso, così ``balanceAfter`` scorre in modo coerente."""
+    in cui il saldo si è davvero mosso, così ``balanceAfter`` scorre in modo coerente.
+
+    Dal 20/11 ogni movimento ha l'orario del proprio inserimento (vedi
+    ``apply_ledger_movement``): la parità resta solo per i movimenti salvati prima."""
     ordered: list[CreditLedgerEntry] = []
     i = 0
     items = sorted(entries, key=lambda e: (e.created_at, str(e.id)))
@@ -68,6 +71,25 @@ def order_ledger_entries(entries: list[CreditLedgerEntry]) -> list[CreditLedgerE
         ordered.extend(group)
         i = j
     return ordered
+
+
+# Fino al 20/11 l'aggiudicazione dell'asta a rilanci registrava la nota dell'asta a buste.
+# Il registro non si riscrive: i movimenti già salvati si riconoscono dalla chiave della
+# transazione (``market-live:…``) e mostrano la nota giusta.
+_LEGACY_LIVE_WIN_NOTE = "Assegnazione da asta a buste"
+_LIVE_WIN_NOTE = "Assegnazione da asta a rilanci"
+_LIVE_WIN_TRANSACTION_PREFIX = "market-live:"
+
+
+def ledger_note_for_display(entry: CreditLedgerEntry) -> str | None:
+    """Nota del movimento da mostrare a web e app."""
+    if (
+        entry.reason == CreditLedgerReason.MARKET_AUCTION_WIN
+        and entry.note == _LEGACY_LIVE_WIN_NOTE
+        and entry.transaction_id.startswith(_LIVE_WIN_TRANSACTION_PREFIX)
+    ):
+        return _LIVE_WIN_NOTE
+    return entry.note
 
 
 def reconstruct_balance(session: Session, account_id: UUID) -> int:
@@ -115,6 +137,11 @@ def apply_ledger_movement(
         balance_after=new_balance,
         note=note[:255] if note else None,
         actor_id=actor_id,
+        # Orario dell'inserimento, non dell'inizio della transazione (``now()``): più
+        # movimenti nella stessa transazione (rimborso e addebito di uno scambio, più
+        # aggiudicazioni nella stessa risoluzione) avevano lo stesso orario e uscivano
+        # nell'ordine casuale dell'id. Stessa forma del valore predefinito della colonna.
+        created_at=func.timezone("utc", func.clock_timestamp()),
     )
     account.balance = new_balance
     account.version += 1

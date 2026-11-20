@@ -23,6 +23,11 @@ from leagues.models.league import League
 from leagues.models.league_rules import LeagueRules
 from market.validators import compute_release_refund
 
+# Note dei movimenti di crediti per un calciatore vinto all'asta: le due modalità hanno la
+# stessa causale (``market_auction_win``), la nota dice da quale asta arriva l'addebito.
+SEALED_AUCTION_WIN_NOTE = "Assegnazione da asta a buste"
+LIVE_AUCTION_WIN_NOTE = "Assegnazione da asta a rilanci"
+
 
 def next_free_slot_or_overflow(
     session: Session, *, team_id: UUID, league_id: UUID
@@ -141,6 +146,7 @@ def assign_winning_bid(
     transaction_id: str,
     actor_id: UUID | None,
     allow_overflow: bool = False,
+    note: str = SEALED_AUCTION_WIN_NOTE,
 ) -> FantasyRosterSlot | None:
     """Assign an auction-won athlete to the team's first free slot.
 
@@ -152,6 +158,9 @@ def assign_winning_bid(
     With ``allow_overflow`` (sealed-bid auction, EP08-10 bis) a full roster or
     an exceeded role quota no longer loses the bid: the player is assigned,
     flagged as in excess, and waits for the coach to release someone.
+
+    ``note`` è la nota del movimento di crediti: l'asta a rilanci passa
+    ``LIVE_AUCTION_WIN_NOTE``, altrimenti resta quella dell'asta a buste.
     """
     if allow_overflow:
         try:
@@ -170,7 +179,7 @@ def assign_winning_bid(
                     reason=CreditLedgerReason.MARKET_AUCTION_WIN,
                     transaction_id=transaction_id,
                     actor_id=actor_id,
-                    note="Assegnazione da asta a buste",
+                    note=note,
                     allow_overflow=True,
                     force_overflow_flag=created_new,
                 )
@@ -201,7 +210,7 @@ def assign_winning_bid(
         reason=CreditLedgerReason.MARKET_AUCTION_WIN,
         transaction_id=transaction_id,
         actor_id=actor_id,
-        note="Assegnazione da asta a buste",
+        note=note,
     )
 
 

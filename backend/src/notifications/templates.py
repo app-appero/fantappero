@@ -158,10 +158,19 @@ def _render_formazione_blocco_imminente(params: NotificationParams) -> Notificat
 # Percorsi web delle due sotto-schede di Asta: «/mercato» apre invece la scheda Scambi.
 _AUCTION_PATH = "/asta"
 _LIVE_AUCTION_PATH = "/asta-live"
+# Mercato svincolati: la pagina web e la schermata dell'app che lo mostrano.
+_WAIVER_PATH = "/svincolati"
 
 
 @register_template("mercato.esito_busta", 1)
 def _render_mercato_esito_busta(params: NotificationParams) -> NotificationContent:
+    """Esito di un'offerta a buste chiuse: asta iniziale oppure mercato svincolati.
+
+    ``session_kind`` dice da quale sessione arriva l'offerta. Le notifiche salvate prima
+    di questo parametro non lo hanno e restano quelle dell'asta a buste.
+    """
+    if params.get("session_kind") == "waiver":
+        return _render_esito_svincolati(params)
     athlete_name = params.get("athlete_name", "un giocatore")
     if params.get("outcome") == "tiebreak":
         return NotificationContent(
@@ -199,6 +208,57 @@ def _render_mercato_esito_busta(params: NotificationParams) -> NotificationConte
         title="Busta non aggiudicata",
         body=_league_body(f"Non hai aggiudicato {athlete_name}: {reason}.", params),
         deep_link=_league_link(_AUCTION_PATH, params),
+    )
+
+
+def _render_esito_svincolati(params: NotificationParams) -> NotificationContent:
+    """Esito di un'offerta del mercato svincolati: stessi casi dell'asta a buste, con titoli
+    e testi propri e il link alla pagina degli svincolati (non all'asta)."""
+    athlete_name = params.get("athlete_name", "un giocatore")
+    if params.get("outcome") == "tiebreak":
+        return NotificationContent(
+            title="Spareggio svincolati aperto",
+            body=_league_body(
+                f"Parità su {athlete_name} negli svincolati: sei ammesso allo spareggio, "
+                "hai 24 ore per rilanciare.",
+                params,
+            ),
+            deep_link=_league_link(_WAIVER_PATH, params),
+        )
+    if params.get("outcome") == "assigned":
+        amount = params.get("amount_credits")
+        return NotificationContent(
+            title="Svincolato aggiudicato",
+            body=_league_body(
+                f"Hai aggiudicato {athlete_name} dagli svincolati per {amount} crediti.", params
+            ),
+            deep_link=_league_link(_WAIVER_PATH, params),
+        )
+    if params.get("tiebreak_cancelled"):
+        return NotificationContent(
+            title="Spareggio svincolati annullato",
+            body=_league_body(
+                f"Lo spareggio degli svincolati su {athlete_name} è annullato: "
+                "il calciatore non è più disponibile.",
+                params,
+            ),
+            deep_link=_league_link(_WAIVER_PATH, params),
+        )
+    if params.get("lost_on_tie"):
+        reason = "a parità d'importo nello spareggio vince l'offerta inviata per prima"
+    elif params.get("not_assignable"):
+        reason = (
+            "non è stato possibile assegnarlo (crediti insufficienti, giocatore da svincolare "
+            "non più in rosa o rosa non valida)"
+        )
+    else:
+        reason = "offerta inferiore"
+    return NotificationContent(
+        title="Svincolato perso",
+        body=_league_body(
+            f"Non hai aggiudicato {athlete_name} dagli svincolati: {reason}.", params
+        ),
+        deep_link=_league_link(_WAIVER_PATH, params),
     )
 
 

@@ -193,6 +193,7 @@ export function AppRoutes() {
     pathname === "/asta" ||
     pathname === "/asta-live" ||
     pathname === "/svincoli" ||
+    pathname === "/svincolati" ||
     pathname === "/mercato"
   ) {
     return (

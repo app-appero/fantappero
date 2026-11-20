@@ -14,6 +14,17 @@ test("scambi, asta e formazione", () => {
   assert.equal(notificationKind({ title: "Scadenza formazione in arrivo", category: "formazione" }).group, "formazione");
 });
 
+test("gli esiti degli svincolati stanno con l'asta, non con gli scambi", () => {
+  for (const title of [
+    "Svincolato aggiudicato",
+    "Svincolato perso",
+    "Spareggio svincolati aperto",
+    "Spareggio svincolati annullato",
+  ]) {
+    assert.deepEqual(notificationKind({ title, category: "mercato" }), { group: "asta", glyph: "🔨" }, title);
+  }
+});
+
 test("giorni", () => {
   const now = new Date(2026, 9, 20, 12, 0);
   assert.equal(notificationDayLabel(new Date(2026, 9, 20, 9, 0).toISOString(), now), "Oggi");

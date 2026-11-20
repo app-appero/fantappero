@@ -62,6 +62,24 @@ test("le notifiche delle buste chiuse aprono la scheda «Buste chiuse» dell'Ast
   }
 });
 
+test("gli esiti degli svincolati aprono la schermata Svincolati, non l'Asta (QA 19-20/11)", () => {
+  for (const title of [
+    "Svincolato aggiudicato",
+    "Svincolato perso",
+    "Spareggio svincolati aperto",
+    "Spareggio svincolati annullato",
+  ]) {
+    assert.deepEqual(
+      resolveNotificationRoute({ title, deepLink: "/svincolati?lega=league-1" }),
+      { kind: "tab", screen: "Waiver" },
+      title,
+    );
+  }
+  // Anche il percorso della pagina web («/svincoli», es. contesto di una segnalazione).
+  assert.deepEqual(resolveNotificationRoute({ title: "x", deepLink: "/svincoli" }), { kind: "tab", screen: "Waiver" });
+  assert.equal(impersonationTab("/svincoli"), "Waiver");
+});
+
 test("i percorsi web dell'asta scelgono la modalità anche senza titolo noto", () => {
   assert.deepEqual(resolveNotificationRoute({ title: "x", deepLink: "/asta-live" }), {
     kind: "tab",
