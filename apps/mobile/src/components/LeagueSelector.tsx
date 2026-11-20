@@ -5,7 +5,7 @@ import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from "react-nati
 import { AppTextInput as TextInput } from "./AppTextInput";
 import Feather from "@expo/vector-icons/Feather";
 import { theme } from "@fantappero/ui/theme";
-import { LEAGUE_STATE_DOT_COLOR, type LeagueState } from "@fantappero/contracts";
+import { avatarLetters, LEAGUE_STATE_DOT_COLOR, type LeagueState } from "@fantappero/contracts";
 
 const { colors, spacing, typography, radius } = theme;
 
@@ -144,7 +144,7 @@ export function LeagueSelector({
                     testID={`${testID}-${league.value}`}
                   >
                     <View style={styles.avatar}>
-                      <Text style={styles.avatarLabel}>{league.label.slice(0, 2).toUpperCase()}</Text>
+                      <Text style={styles.avatarLabel}>{avatarLetters(league.label)}</Text>
                       <StateDot state={league.state} style={styles.avatarDot} />
                     </View>
                     <Text style={styles.rowLabel} numberOfLines={1}>

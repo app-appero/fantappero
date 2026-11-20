@@ -1,5 +1,6 @@
 import { lazyStyles } from "../theme/lazyStyles";
 import type { FantasyCoachDirectoryItem } from "@fantappero/contracts";
+import { avatarInitial } from "@fantappero/contracts";
 import { theme } from "@fantappero/ui/theme";
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
@@ -31,7 +32,7 @@ function CoachAvatar({ name, avatarUrl }: { name: string; avatarUrl: string | nu
   }
   return (
     <View style={styles.avatarPlaceholder}>
-      <Text style={styles.avatarInitial}>{name.charAt(0).toUpperCase()}</Text>
+      <Text style={styles.avatarInitial}>{avatarInitial(name)}</Text>
     </View>
   );
 }

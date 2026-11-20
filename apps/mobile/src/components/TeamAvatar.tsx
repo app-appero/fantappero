@@ -1,3 +1,4 @@
+import { avatarInitials } from "@fantappero/contracts";
 import { lazyStyles } from "../theme/lazyStyles";
 import { theme } from "@fantappero/ui/theme";
 import { useState } from "react";
@@ -6,16 +7,6 @@ import { resolveAvatarUrl } from "../utils/avatar";
 import { visibleAvatarSrc } from "../utils/avatarFallback";
 
 const { colors } = theme;
-
-export function initialsOf(name: string): string {
-  return name
-    .split(/\s+/)
-    .filter(Boolean)
-    .map((part) => part.charAt(0))
-    .slice(0, 2)
-    .join("")
-    .toUpperCase();
-}
 
 /**
  * Avatar tondo con iniziali (brand + anello viola), usato per squadre e partecipanti.
@@ -43,7 +34,7 @@ export function TeamAvatar({
         <Image source={{ uri: src }} style={styles.image} onError={() => setFailedSrc(src)} />
       ) : (
         <Text style={[styles.text, { fontSize: Math.round(size * 0.38) }]} allowFontScaling={false}>
-          {initialsOf(name)}
+          {avatarInitials(name)}
         </Text>
       )}
     </View>

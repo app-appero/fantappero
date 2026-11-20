@@ -1,3 +1,4 @@
+import { avatarInitial } from "@fantappero/contracts";
 import { Badge } from "../Badge.js";
 import { AvatarWithFallback } from "./AvatarWithFallback.js";
 import {
@@ -109,7 +110,7 @@ export function StandingsTable({
                     src={row.managerAvatarUrl}
                     fallback={
                       <span className="fa-standings-row__avatar fa-standings-row__avatar--initials" aria-hidden="true">
-                        {row.managerDisplayName.charAt(0).toUpperCase()}
+                        {avatarInitial(row.managerDisplayName)}
                       </span>
                     }
                   />
@@ -178,7 +179,7 @@ function StandingsCards({
     <ul className="fa-standings-cards" data-testid={testId}>
       {rows.map((row) => {
         const name = primaryLabel(row);
-        const initial = name.charAt(0).toUpperCase();
+        const initial = avatarInitial(name);
         return (
           <li
             key={row.id}

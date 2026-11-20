@@ -93,6 +93,37 @@ describe("Avatar con iniziali di riserva (immagine che non si carica)", () => {
     expect(initials).toEqual(["GR", "MB"]);
   });
 
+  it("un nome che inizia con un'emoji dà iniziali intere, non «�Ü» (QA 19-20/11)", async () => {
+    await render(
+      createElement("div", null, [
+        createElement(StandingsTable, {
+          key: "standings",
+          caption: "Classifica",
+          positionLabel: "Pos",
+          teamLabel: "Squadra",
+          playedLabel: "G",
+          pointsLabel: "Pt",
+          goalsLabel: "Gol",
+          rows: [{ ...ROW, managerDisplayName: "😀 Ümit Kaya", managerAvatarUrl: null }],
+        }),
+        createElement(MatchCard, {
+          key: "match",
+          homeTeam: "😀 Ümit Kaya",
+          awayTeam: "👩‍💻Ada Lovelace",
+          kickoffLabel: "Giornata 3",
+          status: "scheduled",
+          statusLabel: "In programma",
+        }),
+      ]),
+    );
+    const standings = [...container.querySelectorAll(".fa-standings-row__avatar--initials")].map(
+      (node) => node.textContent,
+    );
+    expect(standings).toEqual(["😀", "😀"]);
+    const match = [...container.querySelectorAll(".fa-match-card__avatar")].map((node) => node.textContent);
+    expect(match).toEqual(["😀Ü", "👩‍💻L"]);
+  });
+
   it("riprova con un indirizzo nuovo dopo un errore", async () => {
     const fallback = createElement("span", { className: "initials" }, "GR");
     await render(createElement(AvatarWithFallback, { src: BROKEN, className: "avatar", fallback }));

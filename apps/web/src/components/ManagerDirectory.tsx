@@ -1,7 +1,7 @@
 import { Badge, Button, Input, Modal, Select, UiStatePanel } from "@fantappero/ui";
 import { useCallback, useEffect, useState } from "react";
 import type { CoachPlacement, FantasyCoachProfile } from "@fantappero/contracts";
-import { formatFantasyPoints } from "@fantappero/contracts";
+import { avatarInitial, formatFantasyPoints } from "@fantappero/contracts";
 import {
   createNamedLeagueInvite,
   fetchManagerDirectory,
@@ -196,7 +196,7 @@ function CoachAvatar({
   }
   return (
     <span className={className} aria-hidden>
-      {name.charAt(0)}
+      {avatarInitial(name)}
     </span>
   );
 }

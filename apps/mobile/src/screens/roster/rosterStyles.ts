@@ -2,6 +2,7 @@ import { DISPLAY_FONT } from "../../theme/fonts";
 import { lazyStyles } from "../../theme/lazyStyles";
 import { theme } from "@fantappero/ui/theme";
 import { StyleSheet } from "react-native";
+import { PENDING_BADGE_COLORS } from "./pendingBadge";
 
 const { colors, spacing, typography, radius } = theme;
 
@@ -376,10 +377,18 @@ export const rosterStyles = lazyStyles(() => StyleSheet.create({
     fontSize: typography.fontSize.xs,
     color: colors.foregroundMuted,
   },
+  // Badge come sul web: il solo testo ambra si leggeva a 3,3:1 nel tema chiaro (QA 19-20/11).
   playerPendingBadge: {
+    alignSelf: "flex-start",
+    marginTop: 2,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 1,
+    borderRadius: radius.pill,
+    overflow: "hidden",
+    backgroundColor: PENDING_BADGE_COLORS.background,
+    color: PENDING_BADGE_COLORS.text,
     fontSize: typography.fontSize.xs,
     fontWeight: typography.fontWeight.semibold,
-    color: colors.warning,
   },
   rowActionBadge: {
     width: 28,

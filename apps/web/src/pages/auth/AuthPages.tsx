@@ -1,4 +1,10 @@
-import { LOGIN_CARDS, LOGIN_SHOWCASE_FEATURES, LOGIN_SHOWCASE_LEAGUES, LOGIN_SHOWCASE_PITCH } from "@fantappero/contracts";
+import {
+  firstGrapheme,
+  LOGIN_CARDS,
+  LOGIN_SHOWCASE_FEATURES,
+  LOGIN_SHOWCASE_LEAGUES,
+  LOGIN_SHOWCASE_PITCH,
+} from "@fantappero/contracts";
 import { AuthFormLayout, BrandLogo, Button, PageContainer, UiStatePanel } from "@fantappero/ui";
 import { type FormEvent, type ReactNode, useCallback, useEffect, useRef, useState } from "react";
 import {
@@ -220,7 +226,7 @@ function LoginPitch({ variant }: { variant: "hero" | "panel" }) {
           className={`fa-login__mini-player fa-login__mini-player--${player.role.toLowerCase()}${player.state ? ` fa-login__mini-player--${player.state}` : ""}`}
           style={{ left: `${player.x}%`, top: `${player.y}%` }}
         >
-          <i>{player.name.charAt(0)}</i>
+          <i>{firstGrapheme(player.name)}</i>
           <small>
             {player.name}
             <em>{player.code}</em>
@@ -321,7 +327,7 @@ function LoginCardsPage({
               <b>{card.vote}</b>
               <span>{card.code}</span>
             </div>
-            <div className="fa-login-card__initial">{card.name.charAt(0)}</div>
+            <div className="fa-login-card__initial">{firstGrapheme(card.name)}</div>
             <div className="fa-login-card__foot">
               <i>{card.role}</i>
               <strong>{card.name}</strong>

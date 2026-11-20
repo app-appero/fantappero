@@ -984,7 +984,9 @@ export interface RosterImportConfirmResult {
 }
 
 /** Roster ownership history and turn snapshots (EP05-06). */
-export type RosterOwnershipSource = "manual" | "csv_import" | "admin";
+
+/** Origine del possesso, come `RosterOwnershipSource` del backend: `market` copre aste, buste e scambi. */
+export type RosterOwnershipSource = "manual" | "csv_import" | "admin" | "market";
 
 export interface RosterOwnershipInterval {
   id: string;

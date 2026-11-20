@@ -1,4 +1,5 @@
 import type { FantasyCoachDirectoryItem, LeagueMember } from "@fantappero/contracts";
+import { avatarInitial } from "@fantappero/contracts";
 import { Button, Input, Modal, Select, UiStatePanel } from "@fantappero/ui";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
@@ -454,7 +455,7 @@ export function LeagueMembersPanel({
                   {avatarSrc ? (
                     <img src={avatarSrc} alt="" />
                   ) : (
-                    member.displayName.charAt(0).toUpperCase()
+                    avatarInitial(member.displayName)
                   )}
                 </span>
                 <span className="fa-member-list__text">

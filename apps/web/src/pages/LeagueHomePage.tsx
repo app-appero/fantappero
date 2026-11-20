@@ -3,6 +3,7 @@ import type {
   LeagueDetail,
   LeagueMember,
 } from "@fantappero/contracts";
+import { avatarInitials } from "@fantappero/contracts";
 import {
   Breadcrumb,
   Button,
@@ -321,13 +322,7 @@ export function LeagueHomePage() {
                   {members.map((member) => (
                     <li key={member.userId}>
                       <span className="fa-lhome__avatar" aria-hidden="true">
-                        {member.displayName
-                          .split(/\s+/)
-                          .filter(Boolean)
-                          .map((part) => part.charAt(0))
-                          .slice(0, 2)
-                          .join("")
-                          .toUpperCase()}
+                        {avatarInitials(member.displayName)}
                       </span>
                       <span>
                         <strong>{member.displayName}</strong>

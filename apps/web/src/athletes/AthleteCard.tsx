@@ -1,5 +1,5 @@
 import type { AthleteCard } from "@fantappero/contracts";
-import { formatFantasyPoints, playerAvatarUrl } from "@fantappero/contracts";
+import { avatarInitials, formatFantasyPoints, playerAvatarUrl } from "@fantappero/contracts";
 import { Modal, UiStatePanel } from "@fantappero/ui";
 import {
   createContext,
@@ -80,14 +80,7 @@ function roleLabel(code: string | null): string | null {
 }
 
 function initials(name: string): string {
-  const parts = name.trim().split(/\s+/).filter(Boolean);
-  if (parts.length === 0) {
-    return "?";
-  }
-  if (parts.length === 1) {
-    return parts[0]!.slice(0, 2).toUpperCase();
-  }
-  return `${parts[0]!.charAt(0)}${parts[parts.length - 1]!.charAt(0)}`.toUpperCase();
+  return avatarInitials(name, { words: "first-last", singleWordLength: 2 });
 }
 
 export function AthleteCardView({ card }: { card: AthleteCard }) {

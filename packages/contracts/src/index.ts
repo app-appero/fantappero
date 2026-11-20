@@ -588,3 +588,6 @@ export {
   leagueBadgeSvg,
   leagueBadgeUrl,
 } from "./playerAvatar.js";
+
+export { avatarInitial, avatarInitials, avatarLetters, firstGrapheme, leadingGraphemes } from "./initials.js";
+export type { AvatarInitialsOptions } from "./initials.js";

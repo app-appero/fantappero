@@ -17,6 +17,7 @@ export {
   type RoleTab,
 } from "./listoneFilter";
 export { reasonLabel };
+export { ownershipSourceLabel } from "./ownershipSource";
 
 const { colors } = theme;
 

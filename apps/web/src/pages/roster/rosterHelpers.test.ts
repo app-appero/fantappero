@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { LeagueListoneEntry } from "@fantappero/contracts";
 import { foldSearchText, matchesSearch } from "../../utils/searchText";
-import { filterListone, reasonLabel } from "./rosterHelpers";
+import { filterListone, ownershipSourceLabel, reasonLabel } from "./rosterHelpers";
 
 describe("reasonLabel", () => {
   it("traduce le causali della rosa", () => {
@@ -19,6 +19,21 @@ describe("reasonLabel", () => {
 
   it("lascia invariata una causale sconosciuta", () => {
     expect(reasonLabel("causale_futura")).toBe("causale_futura");
+  });
+});
+
+describe("ownershipSourceLabel (storico della rosa, QA 19-20/11)", () => {
+  it("traduce ogni origine del possesso inviata dal backend", () => {
+    expect(ownershipSourceLabel("manual")).toBe("Inserimento manuale");
+    expect(ownershipSourceLabel("csv_import")).toBe("Importazione da file");
+    expect(ownershipSourceLabel("admin")).toBe("Assegnazione admin");
+    expect(ownershipSourceLabel("market")).toBe("Mercato");
+  });
+
+  it("un'origine sconosciuta ha un'etichetta generica, mai il codice", () => {
+    expect(ownershipSourceLabel("origine_futura")).toBe("Altro");
+    expect(ownershipSourceLabel("")).toBe("Altro");
+    expect(ownershipSourceLabel("toString")).toBe("Altro");
   });
 });
 

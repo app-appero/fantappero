@@ -7,6 +7,7 @@ import type {
   FantasyTeamSummary,
   LeagueListoneEntry,
   RosterOccupancyEntry,
+  RosterOwnershipSource,
 } from "@fantappero/contracts";
 import { parseWireframeStateFromSearch } from "../../wireframes/useWireframeState";
 import {
@@ -82,6 +83,23 @@ export function reasonLabel(reason: string): string {
     return "Crediti ricevuti da scambio";
   }
   return reason;
+}
+
+const OWNERSHIP_SOURCE_LABEL: Record<RosterOwnershipSource, string> = {
+  manual: "Inserimento manuale",
+  csv_import: "Importazione da file",
+  admin: "Assegnazione admin",
+  market: "Mercato",
+};
+
+/**
+ * Etichetta italiana dell'origine di un possesso nello storico della rosa (QA 19-20/11: si
+ * vedeva il codice, «market» o «csv_import»). Un codice nuovo non ancora tradotto mostra «Altro».
+ */
+export function ownershipSourceLabel(source: string): string {
+  return Object.prototype.hasOwnProperty.call(OWNERSHIP_SOURCE_LABEL, source)
+    ? OWNERSHIP_SOURCE_LABEL[source as RosterOwnershipSource]
+    : "Altro";
 }
 
 export function formatLedgerDate(iso: string): string {

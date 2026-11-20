@@ -14,7 +14,7 @@ import { ScreenTabs } from "../../components/ScreenTabs";
 import { AppTextInput as TextInput } from "../../components/AppTextInput";
 import { UiStatePanel } from "../../components/UiStatePanel";
 import { AthleteName } from "../../athletes/AthleteCard";
-import { formatLedgerDate, LEDGER_PAGE_SIZE, reasonLabel } from "./rosterHelpers";
+import { formatLedgerDate, LEDGER_PAGE_SIZE, ownershipSourceLabel, reasonLabel } from "./rosterHelpers";
 import { rosterStyles as styles } from "./rosterStyles";
 
 const { spacing } = theme;
@@ -160,7 +160,7 @@ export function RosterHistorySection({
                   {row.athleteName ?? row.athleteId}
                 </AthleteName>
                 <Text style={styles.moveDate}>
-                  slot {row.slotIndex + 1} · {row.source}
+                  slot {row.slotIndex + 1} · {ownershipSourceLabel(row.source)}
                 </Text>
               </View>
               <Text style={styles.moveDate}>{`${row.purchaseCredits} cr · ${row.releasedAt ? "chiuso" : "in rosa"}`}</Text>

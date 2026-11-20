@@ -1,4 +1,5 @@
 import {
+  avatarInitial,
   BROADCAST_CATEGORY_OPTIONS,
   BROADCAST_DESTINATIONS,
   BROADCAST_KIND_OPTIONS,
@@ -204,7 +205,7 @@ export function RecipientPicker({
               >
                 <Check on={on} />
                 <View style={styles.avatar}>
-                  <Text style={styles.avatarLabel}>{user.displayName.slice(0, 1).toUpperCase()}</Text>
+                  <Text style={styles.avatarLabel}>{avatarInitial(user.displayName)}</Text>
                 </View>
                 <View style={styles.flex}>
                   <Text style={styles.strong} numberOfLines={1}>{user.displayName}</Text>

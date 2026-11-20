@@ -2425,10 +2425,9 @@ a.fa-member-list__identity:focus-visible {
   gap: var(--fa-space-sm);
 }
 
-.fa-lifecycle-checklist__item--locked {
-  opacity: 0.65;
-}
-
+/* Niente opacità sulla riga bloccata: sopra il testo secondario portava «In attesa» e
+   «Completa prima il passaggio precedente.» a circa 2,6:1 (QA 19-20/11). Il passaggio in attesa
+   si distingue già dal badge neutro e dal testo secondario, che restano oltre 4,5:1. */
 .fa-lifecycle-checklist__item--locked .fa-lifecycle-checklist__message {
   color: var(--fa-color-foreground-muted, #9aa3b2);
 }

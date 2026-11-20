@@ -1,5 +1,5 @@
 import { lazyStyles } from "../../theme/lazyStyles";
-import { resolvePitchRole, type MatchBadge, type PitchPosition } from "@fantappero/contracts";
+import { firstGrapheme, resolvePitchRole, type MatchBadge, type PitchPosition } from "@fantappero/contracts";
 import { theme } from "@fantappero/ui/theme";
 import { useEffect, useRef } from "react";
 import { Animated, Easing, Image, Pressable, StyleSheet, Text, View } from "react-native";
@@ -54,7 +54,7 @@ function abbreviateName(name: string): string {
     return name;
   }
   const last = parts[parts.length - 1] ?? name;
-  const initials = parts.slice(0, -1).map((part) => `${part.charAt(0)}.`);
+  const initials = parts.slice(0, -1).map((part) => `${firstGrapheme(part)}.`);
   return `${initials.join(" ")} ${last}`;
 }
 

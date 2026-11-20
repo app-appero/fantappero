@@ -1,5 +1,5 @@
 import { lazyStyles } from "../theme/lazyStyles";
-import { formatFantasyPoints } from "@fantappero/contracts";
+import { avatarInitial, formatFantasyPoints } from "@fantappero/contracts";
 import type { FantasyCoachProfile } from "@fantappero/contracts";
 import { theme } from "@fantappero/ui/theme";
 import { useNavigation, useRoute, type RouteProp } from "@react-navigation/core";
@@ -87,7 +87,7 @@ export function CoachProfileScreen() {
               <Image source={{ uri: avatarSrc }} style={styles.avatarImage} />
             ) : (
               <View style={styles.avatarPlaceholder}>
-                <Text style={styles.avatarInitial}>{profile.displayName.charAt(0)}</Text>
+                <Text style={styles.avatarInitial}>{avatarInitial(profile.displayName)}</Text>
               </View>
             )}
             <View style={styles.headerText}>
