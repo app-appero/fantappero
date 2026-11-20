@@ -10,7 +10,8 @@
  *
  * Solo logica pura e import di tipo: gira nei test `node:test` senza il bundle di
  * `@fantappero/contracts`. Sul web lo stesso criterio è in `@fantappero/contracts`
- * (`restoreBenchActiveRoles`, `benchQuotaSwapIds`, `formationLineupBench`); sul server in
+ * (`restoreBenchActiveRoles`, `benchQuotaSwapIds`, `formationLineupBench`, e per «Svuota
+ * formazione» `clearLineupKeepingLocked` e `benchAfterStarterPick`); sul server in
  * `restore_bench_active_roles` (backend/src/fantasy_lineups/rules.py).
  */
 import type { LineupPlayerInput, LineupRole } from "@fantappero/contracts";
@@ -243,4 +244,132 @@ export function formationLineupBench(input: {
     ...input.orderedBench.filter((athleteId) => !deferred(athleteId)),
     ...input.orderedBench.filter((athleteId) => deferred(athleteId)),
   ];
+}
+
+/** Esito di «Svuota formazione» (`clearLineupKeepingLocked`). */
+export type ClearedLineup = {
+  /** Gli slot del modulo: restano solo i titolari bloccati, nel loro slot; gli altri sono vuoti. */
+  starterIds: string[];
+  /** Panchina e tribuna ricomposte (tutta la rosa che non è titolare, come sempre). */
+  benchIds: string[];
+  /** Chi non è bloccato ma resta al suo posto in panchina perché davanti a un bloccato. */
+  heldBenchIds: string[];
+};
+
+/**
+ * «Svuota formazione» (Rosario, 20/11): toglie i titolari e la scelta della panchina per
+ * ricominciare da capo. Solo l'editor: niente salvataggi, niente mosse. Stessa regola di
+ * `clearLineupKeepingLocked` dei contratti (web).
+ *
+ * - Titolari: restano solo i bloccati (partita già iniziata), nello stesso slot.
+ * - Panchina: non può restare vuota (tutta la rosa che non gioca è in panchina o in tribuna, e il
+ *   server la vuole completa), quindi torna all'ordine della rosa, con in coda chi oggi non si può
+ *   schierare e i primi 10 riportati alla quota 1P·3D·3C·3A da `restoreBenchActiveRoles`.
+ * - Bloccati in panchina: restano al loro posto, e con loro chi li precede (davanti a un bloccato
+ *   non si entra e non si esce, altrimenti il salvataggio viene rifiutato). Si riordina solo quello
+ *   che viene dopo l'ultimo bloccato.
+ *
+ * Con tutti bloccati non cambia niente.
+ */
+export function clearLineupKeepingLocked(input: {
+  starterIds: readonly string[];
+  /** Panchina e tribuna attuali, in ordine (senza chi è in esubero di ruolo). */
+  benchIds: readonly string[];
+  /** La rosa schierabile nell'ordine della rosa (senza chi è in esubero di ruolo). */
+  rosterAthleteIds: readonly string[];
+  lockedAthleteIds: readonly string[];
+  roleByAthleteId: Readonly<Record<string, string | null | undefined>>;
+  /** Chi oggi non si può schierare (indisponibile, squalificato): in coda, dopo gli altri. */
+  unavailableAthleteIds?: readonly string[];
+  /** Di sicuro senza voto (`selectionBlocked`): non alza la quota dei primi 10. */
+  unfieldableAthleteIds?: readonly string[];
+}): ClearedLineup {
+  const locked = new Set(input.lockedAthleteIds.filter(Boolean));
+  const roster = [...new Set(input.rosterAthleteIds.filter(Boolean))];
+  const inRoster = new Set(roster);
+  const starterIds = input.starterIds.map((athleteId) => (athleteId && locked.has(athleteId) ? athleteId : ""));
+  const keptStarters = new Set(starterIds.filter(Boolean));
+  const bench = [...new Set(input.benchIds)].filter(
+    (athleteId) => athleteId && inRoster.has(athleteId) && !keptStarters.has(athleteId),
+  );
+  // Fino all'ultimo bloccato la panchina resta com'è.
+  let lastLocked = -1;
+  bench.forEach((athleteId, index) => {
+    if (locked.has(athleteId)) {
+      lastLocked = index;
+    }
+  });
+  const held = bench.slice(0, lastLocked + 1);
+  const heldSet = new Set(held);
+  const unavailable = new Set((input.unavailableAthleteIds ?? []).filter(Boolean));
+  const rest = roster.filter((athleteId) => !keptStarters.has(athleteId) && !heldSet.has(athleteId));
+  const ordered = [
+    ...held,
+    ...rest.filter((athleteId) => !unavailable.has(athleteId)),
+    ...rest.filter((athleteId) => unavailable.has(athleteId)),
+  ];
+  const roleOf = (athleteId: string): LineupRole | null => {
+    const role = input.roleByAthleteId[athleteId];
+    return isRole(role) ? role : null;
+  };
+  // Chi resta al suo posto conta come bloccato: la quota si sistema solo dopo l'ultimo bloccato.
+  const repaired = restoreBenchActiveRoles(
+    ordered.map((athleteId) => ({ athleteId, role: roleOf(athleteId) })),
+    held,
+    input.unfieldableAthleteIds ?? [],
+  );
+  return {
+    starterIds,
+    benchIds: repaired.bench.map((player) => player.athleteId),
+    heldBenchIds: held.filter((athleteId) => !locked.has(athleteId)),
+  };
+}
+
+/**
+ * Chi sale titolare in uno slot vuoto (dopo «Svuota formazione», o dopo che il server ha tolto chi
+ * non è più in rosa) lascia un buco in panchina e chi viene dopo scorre. Se dopo il buco c'è chi ha
+ * la partita già iniziata, cambierebbe posto e il salvataggio verrebbe rifiutato: allora il buco lo
+ * prende, come in uno scambio, il primo pari ruolo non bloccato dopo l'ultimo bloccato che non era
+ * nella panchina salvata (di solito un titolare tolto con «Svuota formazione»). Stessa regola di
+ * `benchAfterStarterPick` dei contratti.
+ *
+ * `null` quando non serve (nessun bloccato dopo il buco, nessuna formazione salvata) o non c'è chi
+ * riempia il buco: la panchina scorre come prima.
+ */
+export function benchAfterStarterPick(input: {
+  bench: readonly string[];
+  athleteId: string;
+  savedBench: readonly string[];
+  lockedAthleteIds: readonly string[];
+  roleByAthleteId: Readonly<Record<string, string | null | undefined>>;
+}): string[] | null {
+  const bench = input.bench.filter(Boolean);
+  const index = bench.indexOf(input.athleteId);
+  const locked = new Set(input.lockedAthleteIds.filter(Boolean));
+  let lastLocked = -1;
+  bench.forEach((athleteId, position) => {
+    if (locked.has(athleteId)) {
+      lastLocked = position;
+    }
+  });
+  if (index < 0 || lastLocked < index || input.savedBench.filter(Boolean).length === 0) {
+    return null;
+  }
+  const saved = new Set(input.savedBench);
+  const role = input.roleByAthleteId[input.athleteId];
+  const fill = bench.findIndex(
+    (athleteId, position) =>
+      position > lastLocked &&
+      !locked.has(athleteId) &&
+      !saved.has(athleteId) &&
+      role != null &&
+      input.roleByAthleteId[athleteId] === role,
+  );
+  if (fill < 0) {
+    return null;
+  }
+  const next = [...bench];
+  next[index] = bench[fill] as string;
+  next.splice(fill, 1);
+  return next;
 }

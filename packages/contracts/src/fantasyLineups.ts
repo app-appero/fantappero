@@ -578,6 +578,172 @@ export function formationLineupBench(input: {
   ];
 }
 
+/** Esito di «Svuota formazione» (`clearLineupKeepingLocked`). */
+export interface ClearedLineup {
+  /** Gli slot del modulo: restano solo i titolari bloccati, nel loro slot; gli altri sono vuoti. */
+  starterIds: string[];
+  /** Panchina e tribuna ricomposte (tutta la rosa che non è titolare, come sempre). */
+  benchIds: string[];
+  /**
+   * Chi non è bloccato ma resta al suo posto in panchina perché davanti a un bloccato: spostarlo
+   * cambierebbe il posto del bloccato e il salvataggio verrebbe rifiutato.
+   */
+  heldBenchIds: string[];
+}
+
+/**
+ * «Svuota formazione» (Rosario, 20/11): toglie i titolari e la scelta della panchina per
+ * ricominciare da capo. Solo l'editor: niente salvataggi, niente mosse.
+ *
+ * - Titolari: restano solo i bloccati (partita già iniziata), nello stesso slot.
+ * - Panchina: non può restare vuota (tutta la rosa che non gioca è in panchina o in tribuna, e il
+ *   server la vuole completa), quindi torna all'ordine della rosa (`rosterAthleteIds`), con in coda
+ *   chi oggi non si può schierare (`unavailableAthleteIds`) e i primi 10 riportati alla quota
+ *   1P·3D·3C·3A da `restoreBenchActiveRoles`. I titolari tolti finiscono lì dentro.
+ * - Bloccati in panchina: restano al loro posto, e con loro chi li precede. Davanti a un bloccato
+ *   non si può né entrare né uscire (`evaluateBenchOrderLock`): ricomporre quel tratto farebbe
+ *   rifiutare il salvataggio. Si riordina solo quello che viene dopo l'ultimo bloccato.
+ *
+ * Con tutti bloccati non cambia niente.
+ */
+export function clearLineupKeepingLocked(input: {
+  /** Gli slot del modulo ("" = vuoto). */
+  starterIds: readonly string[];
+  /** Panchina e tribuna attuali, in ordine (senza chi è in esubero di ruolo). */
+  benchIds: readonly string[];
+  /** La rosa schierabile nell'ordine della rosa (senza chi è in esubero di ruolo). */
+  rosterAthleteIds: readonly string[];
+  lockedAthleteIds: readonly string[];
+  /** Ruolo per la quota dei primi 10. */
+  roleByAthleteId: Readonly<Record<string, string | null | undefined>>;
+  /** Chi oggi non si può schierare (indisponibile, squalificato): in coda, dopo gli altri. */
+  unavailableAthleteIds?: readonly string[];
+  /** Di sicuro senza voto (`selectionBlocked`): non alza la quota dei primi 10, come in `evaluateLineup`. */
+  unfieldableAthleteIds?: readonly string[];
+}): ClearedLineup {
+  const locked = new Set(input.lockedAthleteIds.filter(Boolean));
+  const roster = [...new Set(input.rosterAthleteIds.filter(Boolean))];
+  const inRoster = new Set(roster);
+  const starterIds = input.starterIds.map((athleteId) => (athleteId && locked.has(athleteId) ? athleteId : ""));
+  const keptStarters = new Set(starterIds.filter(Boolean));
+  const bench = [...new Set(input.benchIds)].filter(
+    (athleteId) => athleteId && inRoster.has(athleteId) && !keptStarters.has(athleteId),
+  );
+  // Fino all'ultimo bloccato la panchina resta com'è.
+  let lastLocked = -1;
+  bench.forEach((athleteId, index) => {
+    if (locked.has(athleteId)) {
+      lastLocked = index;
+    }
+  });
+  const held = bench.slice(0, lastLocked + 1);
+  const heldSet = new Set(held);
+  const unavailable = new Set((input.unavailableAthleteIds ?? []).filter(Boolean));
+  const rest = roster.filter((athleteId) => !keptStarters.has(athleteId) && !heldSet.has(athleteId));
+  const ordered = [
+    ...held,
+    ...rest.filter((athleteId) => !unavailable.has(athleteId)),
+    ...rest.filter((athleteId) => unavailable.has(athleteId)),
+  ];
+  const roleOf = (athleteId: string): LineupRole | null => {
+    const role = input.roleByAthleteId[athleteId];
+    return isLineupRole(role) ? role : null;
+  };
+  // Chi resta al suo posto conta come bloccato: la quota si sistema solo dopo l'ultimo bloccato.
+  const repaired = restoreBenchActiveRoles(
+    ordered.map((athleteId) => ({ athleteId, role: roleOf(athleteId) })),
+    { lockedAthleteIds: held, unfieldableAthleteIds: input.unfieldableAthleteIds ?? [] },
+  );
+  return {
+    starterIds,
+    benchIds: repaired.bench.map((player) => player.athleteId),
+    heldBenchIds: held.filter((athleteId) => !locked.has(athleteId)),
+  };
+}
+
+/**
+ * Chi sale titolare in uno slot vuoto (dopo «Svuota formazione», o dopo che il server ha tolto chi
+ * non è più in rosa) lascia un buco in panchina, e chi viene dopo scorre di un posto. Se dopo il
+ * buco c'è chi ha la partita già iniziata, scorrendo cambierebbe posto e il salvataggio verrebbe
+ * rifiutato (`evaluateBenchOrderLock`). Allora il buco lo prende, come in uno scambio, il primo
+ * pari ruolo non bloccato dopo l'ultimo bloccato che non era nella panchina salvata (di solito un
+ * titolare tolto con «Svuota formazione»).
+ *
+ * Restituisce la panchina senza `athleteId` con il buco riempito, oppure `null` quando non serve
+ * (nessun bloccato dopo il buco, nessuna formazione salvata) o non c'è chi lo riempia: allora la
+ * panchina scorre come prima.
+ */
+export function benchAfterStarterPick(input: {
+  /** Panchina e tribuna attuali, in ordine. */
+  bench: readonly string[];
+  /** Chi sale titolare. */
+  athleteId: string;
+  /** La panchina della formazione salvata (quella con cui il server confronta). */
+  savedBench: readonly string[];
+  lockedAthleteIds: readonly string[];
+  roleByAthleteId: Readonly<Record<string, string | null | undefined>>;
+}): string[] | null {
+  const bench = input.bench.filter(Boolean);
+  const index = bench.indexOf(input.athleteId);
+  const locked = new Set(input.lockedAthleteIds.filter(Boolean));
+  let lastLocked = -1;
+  bench.forEach((athleteId, position) => {
+    if (locked.has(athleteId)) {
+      lastLocked = position;
+    }
+  });
+  if (index < 0 || lastLocked < index || input.savedBench.filter(Boolean).length === 0) {
+    return null;
+  }
+  const saved = new Set(input.savedBench);
+  const role = input.roleByAthleteId[input.athleteId];
+  const fill = bench.findIndex(
+    (athleteId, position) =>
+      position > lastLocked &&
+      !locked.has(athleteId) &&
+      !saved.has(athleteId) &&
+      role != null &&
+      input.roleByAthleteId[athleteId] === role,
+  );
+  if (fill < 0) {
+    return null;
+  }
+  const next = [...bench];
+  next[index] = bench[fill] as string;
+  next.splice(fill, 1);
+  return next;
+}
+
+/**
+ * Testi di «Svuota formazione» (Rosario, 20/11). La panchina non può restare vuota: torna
+ * all'ordine della rosa, e i testi lo dicono. Copia per l'app in
+ * `apps/mobile/src/screens/formation/clearLineup.ts`.
+ */
+export const CLEAR_LINEUP_TITLE = "Svuota formazione";
+export const CLEAR_LINEUP_DESCRIPTION =
+  "Toglie i titolari e rimette la panchina nell'ordine della rosa, per ricominciare da capo.";
+export const CLEAR_LINEUP_CONFIRM_TITLE = "Svuotare la formazione?";
+export const CLEAR_LINEUP_CONFIRM_BODY =
+  "Tolgo tutti i titolari e rimetto la panchina nell'ordine della rosa, così la ricomponi da capo.";
+export const CLEAR_LINEUP_CONFIRM_POINTS: readonly string[] = [
+  "I giocatori già bloccati restano al loro posto.",
+  "Finché non salvi, vale ancora la formazione salvata: puoi tornare indietro con «Annulla modifiche».",
+  "A turno iniziato, salvare la nuova formazione conta come una mossa.",
+];
+export const CLEAR_LINEUP_CANCEL_LABEL = "Indietro";
+/** Sul web il tasto della conferma ripete l'azione; nell'app (Alert) basta «Svuota». */
+export const CLEAR_LINEUP_CONFIRM_LABEL = "Svuota formazione";
+const CLEAR_LINEUP_HELD_NOTE = "In panchina resta al suo posto anche chi è davanti a un giocatore già bloccato.";
+
+/**
+ * Messaggio dopo lo svuotamento sul web: i titolari si scelgono dall'elenco «Titolari» (i cerchi
+ * del campo aprono la scheda del calciatore) e il tasto è «Applica formazione migliore».
+ */
+export function clearLineupSuccessMessage(heldBenchCount: number): string {
+  const base = "Formazione svuotata. Scegli i titolari nell'elenco «Titolari», oppure usa «Applica formazione migliore».";
+  return heldBenchCount > 0 ? `${base} ${CLEAR_LINEUP_HELD_NOTE}` : base;
+}
+
 function issue(code: string, message: string): LineupIssue {
   return { code, message };
 }

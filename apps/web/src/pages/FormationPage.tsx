@@ -11,11 +11,21 @@ import {
   APPROVED_MODULES,
   playerVoteState,
   BENCH_ACTIVE_SIZE,
+  CLEAR_LINEUP_CANCEL_LABEL,
+  CLEAR_LINEUP_CONFIRM_BODY,
+  CLEAR_LINEUP_CONFIRM_LABEL,
+  CLEAR_LINEUP_CONFIRM_POINTS,
+  CLEAR_LINEUP_CONFIRM_TITLE,
+  CLEAR_LINEUP_DESCRIPTION,
+  CLEAR_LINEUP_TITLE,
   MAX_AUTOMATIC_SUBSTITUTIONS,
   MAX_TACTICAL_MOVES,
   approvedModuleCatalog,
+  benchAfterStarterPick,
   benchQuotaSwapIds,
   blockingLineupSaveIssue,
+  clearLineupKeepingLocked,
+  clearLineupSuccessMessage,
   copyPreviousLineup,
   evaluateBenchOrderLock,
   evaluateLineup,
@@ -695,6 +705,7 @@ export function FormationPage() {
   const [pendingAction, setPendingAction] = useState<"save" | "draft" | "reset" | null>(null);
   const [bestModalOpen, setBestModalOpen] = useState(false);
   const [bestMode, setBestMode] = useState<"keep_module" | "best_module">("keep_module");
+  const [clearModalOpen, setClearModalOpen] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(() =>
     isDemoMode && demoState === "error" ? "Impossibile caricare la formazione (demo)." : null,
   );
@@ -788,6 +799,20 @@ export function FormationPage() {
       .filter((athleteId) => !roleQuotaExcessIds.includes(athleteId)),
     unfieldableAthleteIds: unfieldableIds,
   });
+  // «Svuota formazione»: che cosa resterebbe (i bloccati) e la panchina nell'ordine della rosa.
+  // Se è uguale a quella mostrata non c'è niente da svuotare e il tasto è spento.
+  const clearedLineup = clearLineupKeepingLocked({
+    starterIds: displayStarters,
+    benchIds: lineupBench,
+    rosterAthleteIds: withoutRoleQuotaExcess(roster.map((row) => row.athleteId), roster),
+    lockedAthleteIds,
+    roleByAthleteId: Object.fromEntries(roster.map((row) => [row.athleteId, validationRole(row.athleteId)])),
+    unavailableAthleteIds: roster.filter((row) => playerBlocked(roster, row.athleteId)).map((row) => row.athleteId),
+    unfieldableAthleteIds: unfieldableIds,
+  });
+  const nothingToClear =
+    lineupSignature({ module: moduleCode, starterIds: clearedLineup.starterIds, benchIds: clearedLineup.benchIds }) ===
+    lineupSignature({ module: moduleCode, starterIds: displayStarters, benchIds: lineupBench });
   // Chi non è più in rosa è stato tolto dalla formazione dal server: si dice chi (QA 19/11).
   const rosterNotices = rosterDepartureNotices(context?.issues);
   const maxMoves = context?.maxTacticalMoves ?? MAX_TACTICAL_MOVES;
@@ -1284,12 +1309,19 @@ export function FormationPage() {
       setBenchIds(swappedBench);
       return;
     }
+    // Slot vuoto (es. dopo «Svuota formazione»): se dopo chi sale c'è un bloccato, il suo posto in
+    // panchina lo prende un pari ruolo tolto dai titolari, così il bloccato non scorre.
+    const filledBench =
+      !currentId && incomingBenchPos >= 0
+        ? benchAfterStarterPick({ bench: lineupBench, athleteId, savedBench, lockedAthleteIds, roleByAthleteId })
+        : null;
     setBenchIds(
-      orderedBenchFromRoster(
-        withoutRoleQuotaExcess(roster.map((row) => row.athleteId), roster),
-        nextStarters,
-        benchIds,
-      ),
+      filledBench ??
+        orderedBenchFromRoster(
+          withoutRoleQuotaExcess(roster.map((row) => row.athleteId), roster),
+          nextStarters,
+          benchIds,
+        ),
     );
   }
 
@@ -1569,6 +1601,20 @@ export function FormationPage() {
     }
     applyContext(context);
     pushToast({ title: "Modifiche annullate.", variant: "info" });
+  }
+
+  /**
+   * «Svuota formazione» (Rosario, 20/11): toglie i titolari tranne i bloccati e rimette la panchina
+   * nell'ordine della rosa (`clearLineupKeepingLocked`). Solo l'editor, come le altre modifiche:
+   * niente chiamate al server, nessuna mossa; «Annulla modifiche» rimette lo stato del server.
+   */
+  function clearLineup() {
+    if (!canModify) {
+      return;
+    }
+    setStarterIds(clearedLineup.starterIds);
+    setBenchIds(clearedLineup.benchIds);
+    pushToast({ title: clearLineupSuccessMessage(clearedLineup.heldBenchIds.length), variant: "success" });
   }
 
   /** «Ripristina formazione salvata»: butta la bozza e torna alla formazione confermata del turno. */
@@ -2288,6 +2334,52 @@ export function FormationPage() {
                 Ripristina formazione salvata
               </Button>
             ) : null}
+            <Button
+              type="button"
+              variant="secondary"
+              className="fa-formation-clear"
+              disabled={busy || !canModify || nothingToClear}
+              onClick={() => setClearModalOpen(true)}
+              title={CLEAR_LINEUP_DESCRIPTION}
+              data-testid="formation-clear"
+            >
+              {CLEAR_LINEUP_TITLE}
+            </Button>
+            <Modal
+              open={clearModalOpen}
+              onClose={() => setClearModalOpen(false)}
+              title={CLEAR_LINEUP_CONFIRM_TITLE}
+              footer={
+                <>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={() => setClearModalOpen(false)}
+                    data-testid="formation-clear-cancel"
+                  >
+                    {CLEAR_LINEUP_CANCEL_LABEL}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="danger"
+                    onClick={() => {
+                      setClearModalOpen(false);
+                      clearLineup();
+                    }}
+                    data-testid="formation-clear-confirm"
+                  >
+                    {CLEAR_LINEUP_CONFIRM_LABEL}
+                  </Button>
+                </>
+              }
+            >
+              <p className="fa-field__hint">{CLEAR_LINEUP_CONFIRM_BODY}</p>
+              <ul className="fa-formation-clear__points" data-testid="formation-clear-points">
+                {CLEAR_LINEUP_CONFIRM_POINTS.map((point) => (
+                  <li key={point}>{point}</li>
+                ))}
+              </ul>
+            </Modal>
             {/* Con la formazione tutta vuota non c'è nulla da salvare in bozza. */}
             {displayStarters.some(Boolean) ? (
               <Button
