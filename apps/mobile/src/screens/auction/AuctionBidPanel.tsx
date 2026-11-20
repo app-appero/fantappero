@@ -33,6 +33,7 @@ export function AuctionBidPanel({
   testIdPrefix = "auction",
   extraField,
   marketOpen = true,
+  closedMessage = null,
 }: {
   flow: MarketSessionFlow;
   balance: number | null;
@@ -51,6 +52,8 @@ export function AuctionBidPanel({
   testIdPrefix?: string;
   extraField?: ReactNode;
   marketOpen?: boolean;
+  /** Motivo del mercato fermo, se diverso dall'interruttore (es. lega non al completo, 20/11). */
+  closedMessage?: string | null;
 }) {
   const sessionOpen = marketOpen && flow.currentSession?.status === "open";
 
@@ -64,7 +67,8 @@ export function AuctionBidPanel({
           title={!marketOpen ? "Mercato chiuso" : "Asta non aperta"}
           message={
             !marketOpen
-              ? "L'amministratore ha chiuso il mercato. Restano disponibili solo gli scambi."
+              ? (closedMessage ??
+                "L'amministratore ha chiuso il mercato. Restano disponibili solo gli scambi.")
               : flow.currentSession?.status === "scheduled"
                 ? `La sessione è programmata: si apre ${formatRomeDateTime(flow.currentSession.opensAt)} e chiude ${formatRomeDateTime(flow.currentSession.closesAt)}.`
                 : notOpenMessage

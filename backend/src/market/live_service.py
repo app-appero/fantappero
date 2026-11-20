@@ -42,6 +42,7 @@ from fantasy_teams.composition_service import (
 from fantasy_teams.factory import ensure_team_for_membership, find_team_for_membership
 from fantasy_teams.ledger import find_account_for_team
 from fantasy_teams.models import FantasyRosterSlot, FantasyTeam
+from leagues.capacity import league_is_full
 from leagues.market_open import read_market_open
 from leagues.models.league import League
 from leagues.models.league_audit_event import LeagueAuditEvent
@@ -1030,6 +1031,10 @@ class LiveMarketService:
         un autore (``actor_id`` nullo). Chi ha solo aperto la schermata non ha deciso nulla.
         """
         if not read_market_open(self._session, market_session.league_id):
+            return False
+        # Lo stesso a lega non più al completo (un'uscita, 20/11): nessuna assegnazione finché
+        # tutti i posti non sono di nuovo occupati.
+        if not league_is_full(self._session, market_session.league_id):
             return False
         now = datetime.now(UTC)
         lot = self._session.scalars(

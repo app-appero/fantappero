@@ -219,6 +219,18 @@ def test_render_lega_eliminata_names_who_deleted_the_league() -> None:
     assert operator_nameless.body == "Una tua lega è stata eliminata dall'amministrazione."
 
 
+def test_render_lega_al_completo_points_the_admin_to_the_league_admin_page() -> None:
+    """Decisione del 20/11: a lega al completo l'amministratore apre il mercato."""
+    content = render_notification(
+        "lega.al_completo", 1, {"league_name": "Lega Amici", "league_id": "abc-123"}
+    )
+    assert content.title == "La lega è al completo: puoi aprire il mercato"
+    assert content.body == (
+        "«Lega Amici» · Tutti i posti sono occupati. Apri il mercato da Amministrazione lega."
+    )
+    assert content.deep_link == "/lega/amministrazione?lega=abc-123"
+
+
 def test_goal_v2_names_player_in_title_and_match_in_body() -> None:
     content = render_notification(
         "risultati.gol",

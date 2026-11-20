@@ -271,7 +271,7 @@ class LeagueInviteService:
                 LeagueAuditAction.NAMED_INVITE_ACCEPTED,
             )
         self._add_audit(league.id, user.id, LeagueAuditAction.LEAGUE_MEMBER_JOINED)
-        from notifications.league_events import notify_member_joined
+        from notifications.league_events import notify_league_full_if_needed, notify_member_joined
 
         notify_member_joined(
             self._session,
@@ -280,6 +280,8 @@ class LeagueInviteService:
             member_name=user.display_name,
             member_user_id=user.id,
         )
+        # Ultimo posto occupato: l'amministratore può aprire il mercato (20/11).
+        notify_league_full_if_needed(self._session, league=league)
         from leagues.season_activate import try_advance_league_lifecycle
 
         try_advance_league_lifecycle(self._session, league.id, actor_id=user.id)

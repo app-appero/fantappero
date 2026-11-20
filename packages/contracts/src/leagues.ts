@@ -295,6 +295,12 @@ export interface LeagueDetail {
   state: LeagueState;
   viewerRole: "member" | "league_admin" | null;
   marketOpen: boolean;
+  /** Iscritti alla lega (decisione del 20/11: il mercato si apre solo a lega al completo). */
+  memberCount?: number;
+  /** Partecipanti previsti dal regolamento. */
+  participantCount?: number | null;
+  leagueFull?: boolean;
+  marketBlockedReason?: import("./market.js").MarketBlockedReason | null;
   competitions: CompetitionSummary[];
   rules: LeagueRules | null;
 }

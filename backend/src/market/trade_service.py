@@ -28,8 +28,8 @@ from leagues.models.league import League
 from leagues.models.league_audit_event import LeagueAuditEvent
 from leagues.models.league_membership import LeagueMembership
 from leagues.models.league_rules import LeagueRules
+from market.gate import assert_trade_market_open
 from market.models import TradeProposal
-from market.round_freeze import assert_no_round_in_progress
 from market.trade_execution import execute_trade
 from market.trade_schemas import (
     CounterTradeProposalRequest,
@@ -99,7 +99,9 @@ class TradeService:
         payload: CreateTradeProposalRequest,
     ) -> TradeProposalResponse:
         league_id = league_access.league.id
-        assert_no_round_in_progress(self._session, league_id)
+        # Proposta, controproposta, accettazione e approvazione: solo a lega al completo (20/11)
+        # e fuori dal turno in corso. Rifiutare o annullare resta sempre possibile.
+        assert_trade_market_open(self._session, league_id)
         proposer = self._my_team(league_access)
         # Il blocco del conto serializza le proposte della stessa squadra (limite proposte attive).
         find_account_for_team(self._session, proposer.id, for_update=True)
@@ -302,7 +304,7 @@ class TradeService:
         league_access: LeagueAccess,
         proposal_id: UUID,
     ) -> TradeProposalResponse:
-        assert_no_round_in_progress(self._session, league_access.league.id)
+        assert_trade_market_open(self._session, league_access.league.id)
         team = self._my_team(league_access)
         proposal = self._lock_actionable_proposal_as_recipient(proposal_id, league_access, team)
         league = self._session.get(League, league_access.league.id)
@@ -384,7 +386,7 @@ class TradeService:
         proposal_id: UUID,
     ) -> TradeProposalResponse:
         """Admin approval (EP08-07): re-validates and executes a pending trade."""
-        assert_no_round_in_progress(self._session, league_access.league.id)
+        assert_trade_market_open(self._session, league_access.league.id)
         proposal = self._lock_pending_approval_proposal(proposal_id, league_access)
         league = self._session.get(League, league_access.league.id)
         assert league is not None
@@ -456,7 +458,7 @@ class TradeService:
         proposal_id: UUID,
         payload: CounterTradeProposalRequest,
     ) -> TradeProposalResponse:
-        assert_no_round_in_progress(self._session, league_access.league.id)
+        assert_trade_market_open(self._session, league_access.league.id)
         team = self._my_team(league_access)
         original = self._lock_actionable_proposal_as_recipient(proposal_id, league_access, team)
         # Conto bloccato dopo la proposta, nello stesso ordine di accetta e annulla.

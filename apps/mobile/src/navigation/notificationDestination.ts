@@ -2,7 +2,7 @@ import type { NotificationItem } from "@fantappero/contracts";
 import type { AdminStackParamList, AppTabParamList, RootStackParamList } from "./types";
 
 export type NotificationRoute =
-  | { kind: "stack"; name: keyof RootStackParamList }
+  | { kind: "stack"; name: keyof RootStackParamList; params?: Record<string, string> }
   | { kind: "matchup"; slotId: string }
   | { kind: "tab"; screen: keyof AppTabParamList; params?: Record<string, string> }
   | { kind: "admin"; screen: keyof AdminStackParamList };
@@ -103,6 +103,14 @@ export function resolveNotificationRoute(
     }
     if (/^\/mercato/.test(path)) {
       return { kind: "tab", screen: "Roster" };
+    }
+    // «La lega è al completo: puoi aprire il mercato» (20/11): l'amministrazione della lega
+    // della notifica, che la schermata rende attiva.
+    if (/^\/lega\/amministrazione/.test(path)) {
+      const leagueId = extractQueryParam(item.deepLink, "lega");
+      return leagueId
+        ? { kind: "stack", name: "LeagueAdmin", params: { leagueId } }
+        : { kind: "stack", name: "LeagueAdmin" };
     }
     for (const [pattern, route] of PATH_ROUTES) {
       if (pattern.test(path)) {

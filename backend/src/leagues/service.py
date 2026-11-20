@@ -35,7 +35,7 @@ from fantasy_turns.validators import (
     validate_turn_coverage_threshold,
 )
 from leagues.calendar_service import league_has_confirmed_calendar
-from leagues.market_open import read_market_open, read_market_open_map
+from leagues.market_open import read_market_open_map
 from leagues.models.competition import Competition
 from leagues.models.league import League
 from leagues.models.league_audit_event import LeagueAuditEvent
@@ -87,6 +87,7 @@ from leagues.validators import (
     validate_standard_roster,
     validate_total_credits,
 )
+from market.gate import market_status
 from observability.context import get_correlation_id
 from observability.logging import get_logger
 from observability.metrics import get_metrics
@@ -805,13 +806,18 @@ class LeagueService:
 
     def _to_league_detail(self, league: League, *, viewer_role: str | None) -> LeagueDetailResponse:
         competitions = sorted(league.competitions, key=lambda row: row.name)
+        status = market_status(self._session, league.id)
         return LeagueDetailResponse(
             id=str(league.id),
             name=league.name,
             seasonYear=league.season_year,
             state=league.state.value,
             viewerRole=viewer_role,
-            marketOpen=read_market_open(self._session, league.id),
+            marketOpen=status.market_open,
+            memberCount=status.member_count,
+            participantCount=status.participant_count,
+            leagueFull=status.league_full,
+            marketBlockedReason=status.blocked_reason,
             competitions=[self._to_competition_summary(row) for row in competitions],
             rules=self._to_rules_response(league.rules) if league.rules is not None else None,
         )

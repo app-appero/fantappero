@@ -6,10 +6,17 @@ from pydantic import Field, StrictInt
 
 from app.text_validation import NoNulStr
 from auth.schemas import ApiModel
+from market.gate import MarketBlockedReason
 
 
 class MarketGateResponse(ApiModel):
     market_open: bool = Field(alias="marketOpen")
+    # Decisione del 20/11: il mercato si apre solo a lega al completo. Le app mostrano
+    # «Il mercato si apre quando la lega è al completo (iscritti/partecipanti).»
+    member_count: int = Field(alias="memberCount")
+    participant_count: int | None = Field(alias="participantCount")
+    league_full: bool = Field(alias="leagueFull")
+    market_blocked_reason: MarketBlockedReason | None = Field(alias="marketBlockedReason")
 
 
 class SetMarketGateRequest(ApiModel):

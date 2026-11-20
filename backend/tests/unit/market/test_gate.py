@@ -30,3 +30,11 @@ class _MissingMarketOpenColumn:
 
 def test_assert_market_open_defaults_open_when_column_is_missing() -> None:
     assert_market_open(_MissingMarketOpenColumn())
+
+
+def test_admin_bypass_skips_only_the_capacity_rule_not_the_switch() -> None:
+    """Decisione del 20/11: l'amministratore salta la regola «al completo», non l'interruttore."""
+    with pytest.raises(ValidationAuthError) as exc:
+        assert_market_open(SimpleNamespace(market_open=False), actor_is_admin=True)
+    assert exc.value.code == MARKET_CLOSED_CODE
+    assert_market_open(SimpleNamespace(market_open=True), actor_is_admin=True)

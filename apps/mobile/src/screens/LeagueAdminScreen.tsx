@@ -44,6 +44,7 @@ import { useScreenData } from "../hooks/useScreenData";
 import { PageContainer } from "../layout/PageContainer";
 import { isLeagueDeletable } from "../leagues/leagueDeleteHelpers";
 import { leagueStateLabel } from "../leagues/leagueLabels";
+import { MarketGateBar } from "../market/MarketGateBar";
 import type { RootStackParamList } from "../navigation/types";
 import { getApiErrorMessage, useAuthSession } from "../session/DemoSessionContext";
 import { copyToClipboard } from "../utils/clipboard";
@@ -615,6 +616,11 @@ export function LeagueAdminScreen() {
                 La lega si concluderà automaticamente quando tutte le giornate saranno omologate.
               </Text>
             ) : null}
+          </View>
+
+          {/* Interruttore «Mercato aperto»: a lega incompleta non si accende (decisione del 20/11). */}
+          <View testID="league-admin-market">
+            <MarketGateBar reloadToken={members.length} />
           </View>
 
           <Text style={styles.heading}>Prossime fasi</Text>

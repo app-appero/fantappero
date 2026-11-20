@@ -323,6 +323,7 @@ export type {
   MarketBid,
   MarketBidList,
   MarketBidStatus,
+  MarketBlockedReason,
   MarketGate,
   MarketHistoryCategory,
   MarketHistoryEntry,
@@ -351,6 +352,13 @@ export type {
   TradeProposalList,
   TradeStatus,
 } from "./market.js";
+export {
+  isMarketActive,
+  leagueNotFullMessage,
+  marketNotFullNotice,
+  marketSwitchLocked,
+} from "./marketGate.js";
+export type { MarketGateState } from "./marketGate.js";
 
 export {
   LIVE_SEAT_CALL_COLOR,

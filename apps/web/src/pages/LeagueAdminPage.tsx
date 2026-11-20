@@ -22,6 +22,8 @@ import { getApiErrorMessage, useAuth } from "../auth/AuthContext";
 import { ManagerDirectory } from "../components/ManagerDirectory";
 import { loadStoredSession } from "../auth/sessionStorage";
 import { NoLeagueSelectedPanel } from "../components/NoLeagueSelectedPanel";
+import { MarketGateBar } from "../market/MarketGateBar";
+import { MarketGateProvider } from "../market/MarketGateContext";
 import { useLocation } from "../router/simpleRouter";
 import { parseWireframeStateFromSearch } from "../wireframes/useWireframeState";
 import { LeagueDeletePanel } from "./LeagueDeletePanel";
@@ -431,6 +433,17 @@ export function LeagueAdminPage() {
               onOpenSetupHint={openSetupHint}
             />
           ) : null}
+
+          {/* Interruttore «Mercato aperto»: a lega incompleta non si accende (decisione del 20/11). */}
+          <section
+            aria-label="Mercato"
+            style={{ marginTop: "1.5rem" }}
+            data-testid="league-admin-market"
+          >
+            <MarketGateProvider reloadToken={membersReloadToken}>
+              <MarketGateBar />
+            </MarketGateProvider>
+          </section>
 
           <section
             aria-labelledby="league-admin-next-title"

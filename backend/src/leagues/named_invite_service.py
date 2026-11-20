@@ -42,6 +42,7 @@ from leagues.schemas import (
     RespondNamedLeagueInviteResponse,
 )
 from leagues.validators import validate_configurable_league_state
+from notifications.league_events import notify_league_full_if_needed
 from notifications.service import NotificationService
 from observability.context import get_correlation_id
 from observability.metrics import get_metrics
@@ -486,6 +487,8 @@ class NamedLeagueInviteService:
                 LeagueAuditAction.NAMED_INVITE_ACCEPTED,
                 invite,
             )
+            # Il fantallenatore IA occupa subito il posto: può essere l'ultimo (20/11).
+            notify_league_full_if_needed(self._session, league=league)
         else:
             # Notifica solo agli umani: un fantallenatore IA è già entrato e
             # non ha nulla da decidere (EP13-P07). `dedup_key` sull'id invito
@@ -715,6 +718,8 @@ class NamedLeagueInviteService:
                             },
                         )
                     )
+                # Ultimo posto occupato: l'amministratore può aprire il mercato (20/11).
+                notify_league_full_if_needed(self._session, league=league)
             audit_action = LeagueAuditAction.NAMED_INVITE_ACCEPTED
         else:
             audit_action = LeagueAuditAction.NAMED_INVITE_DECLINED

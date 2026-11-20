@@ -338,6 +338,31 @@ describe("Mercato — scambi collegati alle API reali (EP08-05/06)", () => {
     unmount();
   });
 
+  it("a lega non al completo il banner spiega perché e gli scambi sono fermi (20/11)", async () => {
+    fetchMarketGateMock.mockReset().mockResolvedValue({
+      marketOpen: false,
+      memberCount: 5,
+      participantCount: 8,
+      leagueFull: false,
+      marketBlockedReason: "league_not_full",
+    });
+    const { container, unmount } = await renderAppAt("/mercato", [
+      { id: "league-1", name: "Lega Test", role: "league_admin" },
+    ]);
+    const banner = container.querySelector('[data-testid="market-gate-not-full"]');
+    expect(banner?.textContent).toBe("Il mercato si apre quando la lega è al completo (5/8).");
+    const gateSwitch = container.querySelector(
+      '[data-testid="market-gate-switch"]',
+    ) as HTMLButtonElement | null;
+    expect(gateSwitch?.disabled).toBe(true);
+    const submit = container.querySelector(
+      '[data-testid="market-trade-create-form"] button[type="submit"]',
+    ) as HTMLButtonElement | null;
+    expect(submit?.textContent).toContain("Proponi scambio");
+    expect(submit?.disabled).toBe(true);
+    unmount();
+  });
+
   it("con mercato chiuso il form scambi resta disponibile", async () => {
     fetchMarketGateMock.mockReset().mockResolvedValue({ marketOpen: false });
     const { html, unmount } = await renderAppAt("/mercato");

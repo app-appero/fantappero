@@ -31,13 +31,14 @@ from fantasy_teams.factory import ensure_team_for_membership, find_team_for_memb
 from fantasy_teams.ledger import apply_ledger_movement, find_account_for_team
 from fantasy_teams.models import FantasyRosterSlot, FantasyTeam
 from fantasy_teams.ownership import sync_ownership_on_release
-from leagues.market_open import read_market_open, write_market_open
+from leagues.capacity import assert_league_full_for_market
+from leagues.market_open import write_market_open
 from leagues.models.league import League
 from leagues.models.league_audit_event import LeagueAuditEvent
 from leagues.models.league_membership import LeagueMembership
 from leagues.models.league_rules import LeagueRules
 from market.assignment import assign_winning_bid, assign_winning_waiver_bid
-from market.gate import assert_market_open
+from market.gate import assert_market_open, market_status
 from market.models import MarketBid, MarketSession
 from market.schemas import (
     CreateMarketSessionRequest,
@@ -114,15 +115,18 @@ class MarketService:
         self._session = session
 
     def get_gate(self, league_access: LeagueAccess) -> MarketGateResponse:
-        return MarketGateResponse(
-            marketOpen=read_market_open(self._session, league_access.league.id),
-        )
+        return self._gate_response(league_access.league.id)
 
     def set_gate(
         self,
         league_access: LeagueAccess,
         payload: SetMarketGateRequest,
     ) -> MarketGateResponse:
+        if payload.open:
+            # Decisione del 20/11: l'interruttore si accende solo a lega al completo (il blocco
+            # della lega serializza con gli ingressi e le uscite). Spegnerlo resta sempre possibile.
+            self._lock_league(league_access.league.id)
+            assert_league_full_for_market(self._session, league_access.league.id)
         write_market_open(self._session, league_access.league.id, payload.open)
         self._pause_or_resume_live_lots(league_access.league.id, resume=payload.open)
         self._session.add(
@@ -144,7 +148,17 @@ class MarketService:
             "market_gate_toggled_total",
             labels={"open": "true" if payload.open else "false"},
         )
-        return MarketGateResponse(marketOpen=payload.open)
+        return self._gate_response(league_access.league.id)
+
+    def _gate_response(self, league_id: UUID) -> MarketGateResponse:
+        status = market_status(self._session, league_id)
+        return MarketGateResponse(
+            marketOpen=status.market_open,
+            memberCount=status.member_count,
+            participantCount=status.participant_count,
+            leagueFull=status.league_full,
+            marketBlockedReason=status.blocked_reason,
+        )
 
     def _pause_or_resume_live_lots(self, league_id: UUID, *, resume: bool) -> None:
         """Chiusura del mercato: il timer del lotto live si ferma; riapertura: riparte."""
@@ -1014,7 +1028,8 @@ class MarketService:
         if not 0 <= slot_index <= MAX_SLOT_INDEX:
             raise ValidationAuthError("Slot non trovato.", code="slot_not_found")
         league = self._lock_league(league_access.league.id)
-        assert_market_open(league)
+        # Lo svincolo dell'amministratore vale anche a lega non al completo (20/11).
+        assert_market_open(league, actor_is_admin=self._is_league_admin(league_access))
         team = self._my_team(league_access)
         reason, percent = self._resolve_release_reason(league_access, reason_raw)
 
@@ -1094,6 +1109,12 @@ class MarketService:
             refundPercent=percent,
             refundCredits=refund,
             balance=account.balance,
+        )
+
+    @staticmethod
+    def _is_league_admin(league_access: LeagueAccess) -> bool:
+        return (
+            league_access.operator_bypass or league_access.membership_role == LeagueMemberRole.OWNER
         )
 
     def _resolve_release_reason(

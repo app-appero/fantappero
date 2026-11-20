@@ -93,7 +93,10 @@ export function RosterPage() {
   const isAdmin = can(["league:admin"]);
   const canView = can(["roster:view"]);
   const canEdit = can(["roster:edit"]);
-  const { marketOpen } = useMarketGate();
+  const { marketOpen, marketActive } = useMarketGate();
+  // Decisione del 20/11: il partecipante si inserisce calciatori solo a lega al completo;
+  // l'amministratore assegna, rettifica e svincola seguendo solo l'interruttore.
+  const rosterLocked = isAdmin ? !marketOpen : !marketActive;
 
   const [team, setTeam] = useState<FantasyTeam | null>(() =>
     initialDemoTeam(isDemoMode, demoState),
@@ -1642,7 +1645,7 @@ export function RosterPage() {
                 viewedTeam={viewedTeam}
                 filledByRole={filledByRole}
                 canEdit={canEdit}
-                adminBusy={adminBusy || !marketOpen}
+                adminBusy={adminBusy || rosterLocked}
                 onReleaseAthlete={onReleaseAthlete}
                 onUpdatePurchaseCredits={onUpdatePurchaseCredits}
               />
@@ -1665,7 +1668,7 @@ export function RosterPage() {
                 onRoleTabChange={setRoleTab}
                 ownership={ownership}
                 canReleaseAthlete={canReleaseAthlete}
-                adminBusy={adminBusy || !marketOpen}
+                adminBusy={adminBusy || rosterLocked}
                 onReleaseAthlete={onReleaseAthlete}
                 onAssignAthlete={onAssignAthlete}
               />

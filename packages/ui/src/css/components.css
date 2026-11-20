@@ -1135,6 +1135,15 @@ button.fa-pitch-player {
   color: var(--fa-color-foreground-muted);
 }
 
+/* Lega non al completo (20/11): resta visibile anche su schermo stretto, al posto dell'hint. */
+.fa-market-gate__notice {
+  margin: 0;
+  font-size: var(--fa-text-sm);
+  font-weight: 600;
+  color: var(--fa-color-warning, var(--fa-color-foreground));
+  white-space: normal;
+}
+
 .fa-market-gate__info {
   display: none;
 }
@@ -1205,6 +1214,14 @@ button.fa-pitch-player {
 
   .fa-market-gate__hint {
     display: none;
+  }
+
+  .fa-market-gate__main:has(.fa-market-gate__notice) {
+    flex-wrap: wrap;
+  }
+
+  .fa-market-gate__notice {
+    flex: 1 0 100%;
   }
 
   .fa-market-gate__info {

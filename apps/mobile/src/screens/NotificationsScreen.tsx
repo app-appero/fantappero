@@ -133,7 +133,7 @@ export function NotificationsScreen() {
     if (route?.kind === "matchup") {
       navigation.navigate("MatchupDetail", { slotId: route.slotId });
     } else if (route?.kind === "stack") {
-      navigation.navigate(route.name as never);
+      (navigation as unknown as { navigate: (name: string, params?: object) => void }).navigate(route.name, route.params);
     } else if (route?.kind === "tab") {
       navigation.navigate("MainTabs", { screen: route.screen, params: route.params });
     } else if (route?.kind === "admin") {

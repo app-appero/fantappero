@@ -11,6 +11,7 @@ from pydantic import Field
 from app.text_validation import NoNulStr
 from auth.schemas import ApiModel
 from database.enums import LeagueState
+from market.gate import MarketBlockedReason
 
 
 class LeagueSummaryResponse(ApiModel):
@@ -89,6 +90,14 @@ class LeagueDetailResponse(ApiModel):
     state: str
     viewer_role: str | None = Field(default=None, alias="viewerRole")
     market_open: bool = Field(alias="marketOpen", default=True)
+    # Decisione del 20/11: il mercato si apre solo a lega al completo (iscritti = partecipanti
+    # del regolamento). ``marketBlockedReason`` è ``None`` quando il mercato è attivo.
+    member_count: int = Field(alias="memberCount", default=0)
+    participant_count: int | None = Field(alias="participantCount", default=None)
+    league_full: bool = Field(alias="leagueFull", default=False)
+    market_blocked_reason: MarketBlockedReason | None = Field(
+        alias="marketBlockedReason", default=None
+    )
     competitions: list[CompetitionSummaryResponse] = Field(default_factory=list)
     rules: LeagueRulesResponse | None = None
 

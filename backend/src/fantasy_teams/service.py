@@ -379,7 +379,8 @@ class FantasyTeamService:
             )
 
         league = self._lock_league(league_access.league.id)
-        assert_market_open(league)
+        # Operazione dell'amministratore: vale anche a lega non al completo (20/11).
+        assert_market_open(league, actor_is_admin=True)
         team = self._get_team_for_update(league.id, team_id)
         membership = self._session.scalar(
             select(LeagueMembership)
@@ -762,7 +763,9 @@ class FantasyTeamService:
         payload: AssignRosterSlotRequest,
     ) -> FantasyTeamResponse:
         league = self._lock_league(league_access.league.id)
-        assert_market_open(league)
+        # Il partecipante si inserisce calciatori in rosa solo a lega al completo (20/11);
+        # l'amministratore assegna, sostituisce e rettifica i prezzi anche prima.
+        assert_market_open(league, actor_is_admin=self._is_league_admin(league_access))
         team = self._get_team_for_update(league.id, team_id)
         self._assert_can_edit_team(league_access, team)
         roster_size = resolve_roster_size(self._session, league.id)
@@ -969,7 +972,8 @@ class FantasyTeamService:
         slot_index: int,
     ) -> FantasyTeamResponse:
         league = self._lock_league(league_access.league.id)
-        assert_market_open(league)
+        # Come l'assegnazione: lo svincolo dell'amministratore vale anche a lega non al completo.
+        assert_market_open(league, actor_is_admin=self._is_league_admin(league_access))
         team = self._get_team_for_update(league.id, team_id)
         self._assert_can_edit_team(league_access, team)
         if not 0 <= slot_index <= 1_000:
@@ -1492,7 +1496,8 @@ class FantasyTeamService:
         payload: RosterImportConfirmRequest,
     ) -> RosterImportConfirmResponse:
         league = self._lock_league(league_access.league.id)
-        assert_market_open(league)
+        # Import delle rose (CSV/Excel): operazione dell'amministratore, anche a lega incompleta.
+        assert_market_open(league, actor_is_admin=self._is_league_admin(league_access))
         session = self._session.scalars(
             select(RosterImportSession)
             .where(

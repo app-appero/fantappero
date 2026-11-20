@@ -327,6 +327,12 @@ export const marketUiStyles = lazyStyles(() => StyleSheet.create({
     fontSize: typography.fontSize.sm,
     color: colors.foregroundMuted,
   },
+  /** Lega non al completo (20/11): banner sempre visibile sotto la barra del mercato. */
+  gateNotice: {
+    fontSize: typography.fontSize.sm,
+    fontWeight: "600",
+    color: colors.warning,
+  },
   heroCard: {
     gap: spacing.sm,
     padding: spacing.md,

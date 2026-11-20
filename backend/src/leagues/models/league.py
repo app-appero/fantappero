@@ -40,11 +40,13 @@ class League(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     # Admin-controlled transfer window: rosa purchases and auctions. Trades ignore this.
     # Deferred so ``session.get(League)`` does not SELECT this column: a missing
     # migration must not 500 the membership list or every league-scoped request.
+    # Decisione del 20/11/2026: una lega nuova nasce col mercato chiuso; l'amministratore lo
+    # apre quando la lega è al completo (``leagues.capacity``).
     market_open: Mapped[bool] = mapped_column(
         Boolean,
         nullable=False,
-        server_default=text("true"),
-        default=True,
+        server_default=text("false"),
+        default=False,
         deferred=True,
     )
 

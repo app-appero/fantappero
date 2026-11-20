@@ -152,7 +152,8 @@ export function AuctionPage() {
   const { search } = useLocation();
   const demoState = isDemoMode ? parseWireframeStateFromSearch(search) : null;
   const canManageSession = can(["market:manage"]);
-  const { marketOpen } = useMarketGate();
+  // Aste solo a mercato attivo: interruttore acceso e lega al completo (decisione del 20/11).
+  const { marketActive: marketOpen, notFullNotice } = useMarketGate();
 
   const [entries, setEntries] = useState<LeagueListoneEntry[]>(() =>
     initialDemoEntries(isDemoMode, demoState),
@@ -448,7 +449,8 @@ export function AuctionPage() {
                   ? flow.currentSession?.status === "scheduled"
                     ? `La sessione è programmata: si apre ${formatSessionDate(flow.currentSession.opensAt)} e chiude ${formatSessionDate(flow.currentSession.closesAt)}.`
                     : "Le offerte si possono inviare solo mentre la sessione è aperta."
-                  : "L'amministratore ha chiuso il mercato. Restano disponibili solo gli scambi."
+                  : (notFullNotice ??
+                    "L'amministratore ha chiuso il mercato. Restano disponibili solo gli scambi.")
               }
               testId={marketOpen ? "auction-bid-not-open" : "auction-bid-market-closed"}
             />
