@@ -10,6 +10,7 @@ lineup — mirroring "Copia formazione precedente".
 from __future__ import annotations
 
 import re
+from collections import Counter
 from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
@@ -625,12 +626,26 @@ def test_apply_best_lineup_never_promotes_a_locked_bench_player(
     assert str(locked_bench.id) not in draft["starterAthleteIds"]
     assert str(locked_bench.id) in draft["benchAthleteIds"]
 
-    # L'ordine relativo di chi era già in panchina e vi resta non cambia:
-    # solo chi arriva nuovo in panchina (ex titolare retrocesso) si accoda.
+    # Il bloccato tiene il suo posto e chi lo precede non cambia (davanti a un bloccato non si
+    # entra e non si esce); i primi 10 restano in quota 1P·3D·3C·3A. Prima un panchinaro dei
+    # primi 10 promosso titolare faceva scalare la panchina e al 10° posto saliva il primo della
+    # tribuna, qualunque ruolo avesse (qui 2P·4D·2C·2A): bozza non salvabile (e2e 20/11).
     confirmed_bench_ids = [str(athlete.id) for athlete in bench]
-    carried = [aid for aid in draft["benchAthleteIds"] if aid in set(confirmed_bench_ids)]
-    expected_order = [aid for aid in confirmed_bench_ids if aid in set(draft["benchAthleteIds"])]
-    assert carried == expected_order
+    locked_index = confirmed_bench_ids.index(str(locked_bench.id))
+    assert draft["benchAthleteIds"][: locked_index + 1] == confirmed_bench_ids[: locked_index + 1]
+    role_of = {str(athlete.id): role for role, athletes in grouped.items() for athlete in athletes}
+    first_ten = Counter(role_of[athlete_id] for athlete_id in draft["benchAthleteIds"][:10])
+    assert first_ten == Counter({"P": 1, "D": 3, "C": 3, "A": 3})
+    saved = client.put(
+        f"/leagues/{league_id}/turni/{fantasy_round.id}/formazione",
+        headers=headers,
+        json={
+            "module": draft["module"],
+            "starterAthleteIds": draft["starterAthleteIds"],
+            "benchAthleteIds": draft["benchAthleteIds"],
+        },
+    )
+    assert saved.status_code == 200, saved.json()
 
 
 def test_saving_is_not_blocked_by_a_role_reclassified_after_kickoff(
