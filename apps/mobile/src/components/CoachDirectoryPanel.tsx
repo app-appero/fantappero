@@ -14,6 +14,7 @@ import {
   revokeNamedLeagueInvite,
 } from "../api/managerInvites";
 import { coachProfileAccessibilityLabel, visibleCoachEmail } from "../leagues/coachEmail";
+import { leagueOccupancyLabel } from "../market/marketGateNotice";
 import {
   inviteErrorRefreshesRow,
   revocableInviteId,
@@ -43,6 +44,8 @@ export type CoachDirectoryPanelProps = {
   leagueId: string;
   memberCount: number;
   capacity: number;
+  /** Inviti nominativi in attesa, accanto ai posti («Posti 3/4 · 1 invito in attesa», 20/11). */
+  pendingInviteCount?: number;
   testIDPrefix: string;
   /** Incrementato dal parent per forzare un reload (pull-to-refresh). */
   reloadToken?: number;
@@ -50,6 +53,8 @@ export type CoachDirectoryPanelProps = {
   onReloadSettled?: () => void;
   /** Ricarica iscritti e prerequisiti dopo un ingresso in lega o a capienza piena. */
   onMembershipChanged?: () => void;
+  /** Invito nominativo inviato o annullato: cambiano gli inviti in attesa accanto al conto. */
+  onInvitesChanged?: () => void;
 };
 
 /** Directory fantallenatori via API (come web ManagerDirectory). */
@@ -57,10 +62,12 @@ export function CoachDirectoryPanel({
   leagueId,
   memberCount,
   capacity,
+  pendingInviteCount = 0,
   testIDPrefix,
   reloadToken,
   onReloadSettled,
   onMembershipChanged,
+  onInvitesChanged,
 }: CoachDirectoryPanelProps) {
   const { accessToken, can } = useAuthSession();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
@@ -208,6 +215,8 @@ export function CoachDirectoryPanel({
       await load({ silent: true });
       if (created.autoAccepted) {
         onMembershipChanged?.();
+      } else {
+        onInvitesChanged?.();
       }
     } catch (error) {
       if (error instanceof ApiError && error.code === "league_full") {
@@ -254,6 +263,7 @@ export function CoachDirectoryPanel({
       await revokeNamedLeagueInvite(accessToken, leagueId, inviteId);
       // Ricarica dal server: la riga torna su «Invita» e il posto prenotato si libera.
       await load({ silent: true });
+      onInvitesChanged?.();
       setSuccess({
         title: "Invito annullato",
         message: `L'invito a ${coach.displayName} è stato annullato: puoi invitarlo di nuovo.`,
@@ -303,7 +313,9 @@ export function CoachDirectoryPanel({
         </Pressable>
         <Text style={styles.hint}>
           Tutti i fantallenatori della piattaforma, non solo quelli di questa lega.
-          {capacity > 0 ? ` Posti ${memberCount}/${capacity}.` : ""}
+          {capacity > 0
+            ? ` Posti ${leagueOccupancyLabel(memberCount, capacity, pendingInviteCount)}.`
+            : ""}
         </Text>
       </View>
       {loading ? (

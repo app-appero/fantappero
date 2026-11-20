@@ -24,13 +24,18 @@ rimasto per altre vie e copre i posti lasciati vuoti, una volta, prima del calco
 
 È una pulizia di sistema, non una scelta del fantallenatore: nessuna nuova revisione,
 ``submitted_at`` e ``saved_at`` invariati, nessuna mossa tattica. Per ogni turno toccato resta
-un evento di audit ``fantasy_lineup_saved`` con ``source = "roster_departure"`` e il nome del
-calciatore; GET formazione lo usa per l'avviso «… non è più nella tua rosa» finché il
-fantallenatore non salva di nuovo formazione o bozza (``departure_notices``).
+un evento di audit ``fantasy_lineup_saved`` con ``source = "roster_departure"``, il nome del
+calciatore, il posto che ha lasciato e chi è entrato nei primi ``BENCH_ACTIVE_SIZE`` della
+panchina al suo posto (``benchEntered``). GET formazione lo usa per l'avviso finché il
+fantallenatore non salva di nuovo formazione o bozza (``departure_notices``): «X non è più nella
+tua rosa: al suo posto in panchina è salito Y.» se il posto l'ha già coperto la pulizia
+(Rosario, 20/11), «… scegli chi mettere al suo posto» se resta da coprire (un titolare, o una
+panchina senza nessuno in tribuna da far salire).
 """
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from uuid import UUID
@@ -41,7 +46,9 @@ from sqlalchemy.orm import Session, selectinload
 from database.enums import FantasyRole, FantasyTurnStatus, LeagueAuditAction, LineupSlotKind
 from fantasy_lineups.models import LineupDraft, LineupPlayer, LineupSubmission
 from fantasy_lineups.rules import (
+    BENCH_ACTIVE_SIZE,
     DEFAULT_LINEUP_LOCK_MARGIN_MINUTES,
+    LeftRosterRemoval,
     LineupPlayerRef,
     bench_active_role_shortfall,
     restore_bench_active_roles,
@@ -78,6 +85,8 @@ class DepartedLineupRemoval:
     removed_from_draft: bool
     #: ``(chi è salito dalla tribuna, chi è sceso)`` per tenere la quota dei primi 10.
     bench_repair: tuple[tuple[object, object], ...] = ()
+    #: Chi è entrato nei primi ``BENCH_ACTIVE_SIZE`` della panchina al suo posto.
+    bench_entered: tuple[object, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -87,6 +96,24 @@ class DepartureNotice:
     athlete_id: str
     athlete_name: str
     removed_at: datetime
+    #: Posto lasciato, ``("starter" | "bench", posizione)``: nella formazione salvata, o nella
+    #: bozza se nella formazione non c'era. ``None`` se l'audit non lo dice.
+    place: tuple[str, int] | None = None
+    #: Chi è entrato nei primi ``BENCH_ACTIVE_SIZE`` della panchina al suo posto.
+    bench_entered_names: tuple[str, ...] = ()
+
+    def removal(self) -> LeftRosterRemoval:
+        """Per l'avviso di GET formazione: posto già coperto, in tribuna, o da coprire."""
+        in_tribuna = (
+            self.place is not None
+            and self.place[0] == LineupSlotKind.BENCH.value
+            and self.place[1] >= BENCH_ACTIVE_SIZE
+        )
+        return LeftRosterRemoval(
+            name=self.athlete_name,
+            bench_replacements=self.bench_entered_names,
+            from_tribuna=in_tribuna and not self.bench_entered_names,
+        )
 
 
 def is_purgeable_turn_status(status: FantasyTurnStatus) -> bool:
@@ -206,24 +233,34 @@ def purge_departed_athlete_from_future_lineups(
             if submission is not None
             else None
         )
-        lineup_slot = removed[0] if removed is not None else None
-        bench_repair = removed[1] if removed is not None else ()
-        in_draft = (
-            _remove_from_draft(draft, athlete_id, roster_context) if draft is not None else False
+        lineup_slot = removed.place if removed is not None else None
+        bench_repair = removed.bench_repair if removed is not None else ()
+        from_draft = (
+            _remove_from_draft(draft, athlete_id, roster_context) if draft is not None else None
         )
+        in_draft = from_draft is not None
         if lineup_slot is None and not in_draft:
             continue
+        # Chi ha preso il suo posto nei primi 10: nella formazione salvata, o nella bozza se nella
+        # formazione non c'era.
+        if removed is not None:
+            entered = removed.bench_entered
+        else:
+            entered = from_draft.bench_entered if from_draft is not None else ()
+        draft_place = from_draft.place if from_draft is not None else None
         removals.append(
             DepartedLineupRemoval(
                 round_id=fantasy_round.id,
                 lineup_slot=lineup_slot,
                 removed_from_draft=in_draft,
                 bench_repair=bench_repair,
+                bench_entered=entered,
             )
         )
         if athlete_name is None:
             athlete = session.get(Athlete, athlete_id)
             athlete_name = athlete.canonical_name if athlete is not None else ""
+        entered_names = _athlete_names(session, entered)
         if audit_actor_id is None:
             audit_actor_id = team_owner_id(session, team_id)
         session.add(
@@ -244,12 +281,20 @@ def purge_departed_athlete_from_future_lineups(
                     "lineupSlotKind": lineup_slot[0] if lineup_slot is not None else None,
                     "lineupSortOrder": lineup_slot[1] if lineup_slot is not None else None,
                     "draft": in_draft,
+                    "draftSlotKind": draft_place[0] if draft_place is not None else None,
+                    "draftSortOrder": draft_place[1] if draft_place is not None else None,
                     "revision": submission.revision if submission is not None else None,
                     "tacticalMoveConsumed": False,
                     # Chi è salito dalla tribuna per tenere la quota dei primi 10, e chi è sceso.
                     "benchRepair": [
                         {"promotedId": str(promoted), "demotedId": str(demoted)}
                         for promoted, demoted in bench_repair
+                    ],
+                    # Chi è entrato nei primi 10 della panchina al suo posto: l'avviso lo nomina
+                    # invece di chiedere chi mettere al suo posto (Rosario, 20/11).
+                    "benchEntered": [
+                        {"athleteId": str(item), "athleteName": entered_names.get(str(item), "")}
+                        for item in entered
                     ],
                 },
             )
@@ -286,23 +331,76 @@ def departure_notices(
         )
         .order_by(LeagueAuditEvent.created_at.asc())
     ).all()
+    events = [details for details in rows if isinstance(details, dict)]
+    # Eventi scritti prima di ``benchEntered``: chi è salito per la quota dei primi 10 è in
+    # ``benchRepair``, senza nome.
+    legacy_ids = {
+        str(move.get("promotedId"))
+        for details in events
+        if "benchEntered" not in details
+        for move in details.get("benchRepair") or ()
+        if isinstance(move, dict) and move.get("promotedId")
+    }
+    legacy_names = _athlete_names(session, legacy_ids) if legacy_ids else {}
     notices: list[DepartureNotice] = []
-    for details in rows:
-        if not isinstance(details, dict):
-            continue
+    for details in events:
         try:
             removed_at = ensure_utc(datetime.fromisoformat(str(details.get("removedAt"))))
         except ValueError:
             continue
+        if "benchEntered" in details:
+            entered = [
+                str(item.get("athleteName") or "")
+                for item in details.get("benchEntered") or ()
+                if isinstance(item, dict)
+            ]
+        else:
+            entered = [
+                legacy_names.get(str(move.get("promotedId")), "")
+                for move in details.get("benchRepair") or ()
+                if isinstance(move, dict)
+            ]
         notices.append(
             DepartureNotice(
                 athlete_id=str(details.get("athleteId") or ""),
                 athlete_name=str(details.get("athleteName") or ""),
                 removed_at=removed_at,
+                place=_notice_place(details),
+                bench_entered_names=tuple(name for name in entered if name),
             )
         )
     notices.sort(key=lambda item: item.removed_at)
     return notices
+
+
+def _notice_place(details: dict) -> tuple[str, int] | None:
+    """Il posto lasciato secondo l'audit: nella formazione salvata, altrimenti nella bozza."""
+    for kind_key, order_key in (
+        ("lineupSlotKind", "lineupSortOrder"),
+        ("draftSlotKind", "draftSortOrder"),
+    ):
+        kind, order = details.get(kind_key), details.get(order_key)
+        if isinstance(kind, str) and isinstance(order, int):
+            return kind, order
+    return None
+
+
+def _athlete_names(session: Session, athlete_ids: Iterable[object]) -> dict[str, str]:
+    """``canonical_name`` per id calciatore, con le chiavi come stringhe."""
+    parsed: list[UUID] = []
+    for raw in dict.fromkeys(str(item) for item in athlete_ids):
+        try:
+            parsed.append(UUID(raw))
+        except ValueError:
+            continue
+    if not parsed:
+        return {}
+    return {
+        str(athlete_id): name
+        for athlete_id, name in session.execute(
+            select(Athlete.id, Athlete.canonical_name).where(Athlete.id.in_(parsed))
+        ).all()
+    }
 
 
 class _RosterContext:
@@ -380,54 +478,99 @@ def _restored_bench(
     return list(outcome.bench), outcome.moves
 
 
+@dataclass(frozen=True)
+class _PlaceLeft:
+    """Il posto lasciato in formazione o bozza, e chi lo ha preso nei primi 10 della panchina."""
+
+    #: ``("starter" | "bench", posizione)`` prima dell'uscita.
+    place: tuple[str, int]
+    bench_repair: tuple[tuple[object, object], ...] = ()
+    bench_entered: tuple[object, ...] = ()
+
+
+def _entered_active_bench(
+    before: list[object], after: list[object], departed: object
+) -> tuple[object, ...]:
+    """Chi è nei primi ``BENCH_ACTIVE_SIZE`` della panchina ricompattata e prima non c'era.
+
+    Di solito è uno: il primo della tribuna, o quello con il ruolo che mancava
+    (``restore_bench_active_roles``). Nessuno se chi è uscito era in tribuna o se in tribuna non
+    c'era nessuno da far salire.
+    """
+    key = str(departed)
+    was_active = {str(item) for item in before[:BENCH_ACTIVE_SIZE] if item and str(item) != key}
+    return tuple(item for item in after[:BENCH_ACTIVE_SIZE] if item and str(item) not in was_active)
+
+
 def _remove_from_submission(
     session: Session,
     submission: LineupSubmission,
     athlete_id: UUID,
     roster_context: _RosterContext,
-) -> tuple[tuple[str, int], tuple[tuple[object, object], ...]] | None:
+) -> _PlaceLeft | None:
     leaving = next((row for row in submission.players if row.athlete_id == athlete_id), None)
     if leaving is None:
         return None
     slot = (leaving.slot_kind.value, leaving.sort_order)
-    # delete-orphan: la riga esce davvero, prima di ricompattare (vincolo di unicità).
-    submission.players.remove(leaving)
-    session.flush()
-    repair: tuple[tuple[object, object], ...] = ()
-    if leaving.slot_kind == LineupSlotKind.BENCH:
-        bench = sorted(
+    before = [
+        row.athlete_id
+        for row in sorted(
             (row for row in submission.players if row.slot_kind == LineupSlotKind.BENCH),
             key=lambda row: row.sort_order,
         )
-        # Ricompattata la panchina, nei primi 10 può mancare un ruolo (Rosario, 20/11): sale il
-        # primo della tribuna con quel ruolo, non semplicemente il primo della tribuna.
-        refs, repair = _restored_bench(
-            [LineupPlayerRef(athlete_id=row.athlete_id, role=row.role) for row in bench],
-            roster_context,
-        )
-        by_id = {row.athlete_id: row for row in bench}
-        bench = [by_id[ref.athlete_id] for ref in refs]  # type: ignore[index]
-        moved = [(row, index) for index, row in enumerate(bench) if row.sort_order != index]
-        if moved:
-            for row, index in moved:
-                row.sort_order = index + _SORT_ORDER_PARKING
-            session.flush()
-            for row, index in moved:
-                row.sort_order = index
-            session.flush()
-    return slot, repair
+    ]
+    # delete-orphan: la riga esce davvero, prima di ricompattare (vincolo di unicità).
+    submission.players.remove(leaving)
+    session.flush()
+    if leaving.slot_kind != LineupSlotKind.BENCH:
+        return _PlaceLeft(place=slot)
+    bench = sorted(
+        (row for row in submission.players if row.slot_kind == LineupSlotKind.BENCH),
+        key=lambda row: row.sort_order,
+    )
+    # Ricompattata la panchina, nei primi 10 può mancare un ruolo (Rosario, 20/11): sale il
+    # primo della tribuna con quel ruolo, non semplicemente il primo della tribuna.
+    refs, repair = _restored_bench(
+        [LineupPlayerRef(athlete_id=row.athlete_id, role=row.role) for row in bench],
+        roster_context,
+    )
+    by_id = {row.athlete_id: row for row in bench}
+    bench = [by_id[ref.athlete_id] for ref in refs]  # type: ignore[index]
+    moved = [(row, index) for index, row in enumerate(bench) if row.sort_order != index]
+    if moved:
+        for row, index in moved:
+            row.sort_order = index + _SORT_ORDER_PARKING
+        session.flush()
+        for row, index in moved:
+            row.sort_order = index
+        session.flush()
+    return _PlaceLeft(
+        place=slot,
+        bench_repair=repair,
+        bench_entered=_entered_active_bench(before, [row.athlete_id for row in bench], athlete_id),
+    )
 
 
 def _remove_from_draft(
     draft: LineupDraft, athlete_id: UUID, roster_context: _RosterContext
-) -> bool:
+) -> _PlaceLeft | None:
     key = str(athlete_id)
     starters = list(draft.starter_athlete_ids or [])
     bench = list(draft.bench_athlete_ids or [])
     new_starters = ["" if str(item) == key else item for item in starters]
     new_bench = [item for item in bench if str(item) != key]
     if new_starters == starters and new_bench == bench:
-        return False
+        return None
+    if new_starters != starters:
+        place = (
+            LineupSlotKind.STARTER.value,
+            next(index for index, item in enumerate(starters) if str(item) == key),
+        )
+    else:
+        place = (
+            LineupSlotKind.BENCH.value,
+            next(index for index, item in enumerate(bench) if str(item) == key),
+        )
     if len(new_bench) != len(bench) and all(new_bench):
         # Stessa regola della formazione per la quota dei primi 10, con i ruoli di oggi; ma solo
         # se a romperla è stata questa uscita: una bozza non si valida per intero, e una quota già
@@ -445,7 +588,9 @@ def _remove_from_draft(
     # Liste nuove (non modificate sul posto): così SQLAlchemy vede il cambio del JSONB.
     draft.starter_athlete_ids = new_starters
     draft.bench_athlete_ids = new_bench
-    return True
+    if place[0] != LineupSlotKind.BENCH.value:
+        return _PlaceLeft(place=place)
+    return _PlaceLeft(place=place, bench_entered=_entered_active_bench(bench, new_bench, key))
 
 
 def turn_has_started(

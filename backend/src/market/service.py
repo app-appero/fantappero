@@ -158,6 +158,7 @@ class MarketService:
             participantCount=status.participant_count,
             leagueFull=status.league_full,
             marketBlockedReason=status.blocked_reason,
+            pendingInviteCount=status.pending_invite_count,
         )
 
     def _pause_or_resume_live_lots(self, league_id: UUID, *, resume: bool) -> None:

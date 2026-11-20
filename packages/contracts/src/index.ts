@@ -366,8 +366,10 @@ export type {
 export {
   isMarketActive,
   leagueNotFullMessage,
+  leagueOccupancyLabel,
   marketNotFullNotice,
   marketSwitchLocked,
+  pendingInvitesLabel,
 } from "./marketGate.js";
 export type { MarketGateState } from "./marketGate.js";
 

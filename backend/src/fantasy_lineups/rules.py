@@ -524,6 +524,74 @@ def lineup_athlete_left_roster_message(names: Sequence[str]) -> str:
     )
 
 
+@dataclass(frozen=True)
+class LeftRosterRemoval:
+    """Chi è stato tolto dalla formazione perché non è più in rosa, per l'avviso di GET formazione.
+
+    ``bench_replacements``: chi è salito nei primi ``BENCH_ACTIVE_SIZE`` della panchina al suo
+    posto (la pulizia all'uscita, ``fantasy_lineups.departures``): il posto è già coperto. Vuoto
+    per un titolare, per una panchina senza nessuno in tribuna da far salire, o quando non si sa.
+    ``from_tribuna``: era oltre i primi ``BENCH_ACTIVE_SIZE``, non c'è un posto da coprire.
+    """
+
+    name: str
+    bench_replacements: tuple[str, ...] = ()
+    from_tribuna: bool = False
+
+
+def lineup_athlete_left_roster_messages(removals: Sequence[LeftRosterRemoval]) -> list[str]:
+    """Gli avvisi per chi è stato tolto dalla formazione perché non è più in rosa.
+
+    Rosario, 20/11: quando il posto in panchina l'ha già coperto il sistema, l'avviso dice chi è
+    salito, una frase per calciatore («X non è più nella tua rosa: al suo posto in panchina è
+    salito Y.»). Chi lascia un posto da coprire (titolare, o nessuno da far salire in panchina)
+    resta in una sola frase, «… scegli chi mettere al suo posto»
+    (``lineup_athlete_left_roster_message``), e viene per prima: è l'unica che chiede qualcosa.
+    Chi era in tribuna non lascia posti da coprire. Ogni calciatore compare una volta sola.
+    """
+    unique: list[LeftRosterRemoval] = []
+    seen: set[str] = set()
+    for removal in removals:
+        if removal.name and removal.name in seen:
+            continue
+        seen.add(removal.name)
+        # Senza nome (calciatore sconosciuto) l'avviso resta quello generico, da coprire.
+        replacements = tuple(name for name in removal.bench_replacements if name)
+        unique.append(
+            LeftRosterRemoval(
+                name=removal.name,
+                bench_replacements=replacements if removal.name else (),
+                from_tribuna=removal.from_tribuna and bool(removal.name),
+            )
+        )
+    open_places = [
+        removal.name
+        for removal in unique
+        if not removal.bench_replacements and not removal.from_tribuna
+    ]
+    messages = [lineup_athlete_left_roster_message(open_places)] if open_places else []
+    for removal in unique:
+        if not removal.bench_replacements:
+            continue
+        verb = "è salito" if len(removal.bench_replacements) == 1 else "sono saliti"
+        messages.append(
+            f"{removal.name} non è più nella tua rosa: al suo posto in panchina {verb} "
+            f"{join_names(removal.bench_replacements)}."
+        )
+    tribuna = [
+        removal.name
+        for removal in unique
+        if removal.from_tribuna and not removal.bench_replacements
+    ]
+    if len(tribuna) == 1:
+        messages.append(f"{tribuna[0]} non è più nella tua rosa: è stato tolto dalla tribuna.")
+    elif tribuna:
+        messages.append(
+            f"{join_names(tribuna)} non sono più nella tua rosa: sono stati tolti dalla tribuna."
+        )
+    return messages
+
+
 def athlete_exceeds_role_quota_message(names: Sequence[str]) -> str:
     """Formazione rifiutata perché schiera chi è in esubero di ruolo: il messaggio dice chi."""
     unique = list(dict.fromkeys(name for name in names if name))

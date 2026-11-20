@@ -23,6 +23,7 @@ import { useScreenData } from "../hooks/useScreenData";
 import { PageContainer } from "../layout/PageContainer";
 import { LEAGUE_STATE_LABELS } from "../leagues/leagueLabels";
 import { leagueNextStepRoute } from "../leagues/leagueNextStep";
+import { pendingInvitesLabel } from "../market/marketGateNotice";
 import type { RootStackParamList } from "../navigation/types";
 import { getApiErrorMessage, useAuthSession } from "../session/DemoSessionContext";
 
@@ -211,14 +212,20 @@ export function LeagueHomeScreen() {
           {league.rules ? (
             <View style={styles.stats}>
               {[
-                ["Partecipanti", `${members.length}/${league.rules.participantCount}`, `${league.rules.participantMin}–${league.rules.participantMax} consentiti`],
-                ["Crediti", `${league.rules.totalCredits}`, "per squadra"],
-                ["Rosa", `${league.rules.roster.rosterSize}`, `${league.rules.roster.goalkeepers}P·${league.rules.roster.defenders}D·${league.rules.roster.midfielders}C·${league.rules.roster.forwards}A`],
-                ["Campionati", `${league.competitions.length}`, league.competitions.map((row) => row.name).join(" · ") || "—"],
-              ].map(([label, value, hint]) => (
+                // Inviti nominativi in attesa: tengono un posto, sotto il conto (Rosario, 20/11).
+                ["Partecipanti", `${members.length}/${league.rules.participantCount}`, `${league.rules.participantMin}–${league.rules.participantMax} consentiti`, (league.pendingInviteCount ?? 0) > 0 ? pendingInvitesLabel(league.pendingInviteCount ?? 0) : null],
+                ["Crediti", `${league.rules.totalCredits}`, "per squadra", null],
+                ["Rosa", `${league.rules.roster.rosterSize}`, `${league.rules.roster.goalkeepers}P·${league.rules.roster.defenders}D·${league.rules.roster.midfielders}C·${league.rules.roster.forwards}A`, null],
+                ["Campionati", `${league.competitions.length}`, league.competitions.map((row) => row.name).join(" · ") || "—", null],
+              ].map(([label, value, hint, extra]) => (
                 <View key={label} style={styles.stat}>
                   <Text style={styles.statLabel}>{label}</Text>
                   <Text style={styles.statValue}>{value}</Text>
+                  {extra ? (
+                    <Text style={styles.statHint} numberOfLines={1} testID="league-home-pending-invites">
+                      {extra}
+                    </Text>
+                  ) : null}
                   <Text style={styles.statHint} numberOfLines={1}>{hint}</Text>
                 </View>
               ))}

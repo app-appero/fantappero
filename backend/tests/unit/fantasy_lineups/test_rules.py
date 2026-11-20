@@ -19,6 +19,7 @@ from fantasy_lineups.rules import (
     MIN_AUTOMATIC_SUBSTITUTIONS,
     TURN_START_FROM_BENCH,
     TURN_START_FROM_TRIBUNA,
+    LeftRosterRemoval,
     LineupPlayerRef,
     TurnStartHoleFill,
     assert_bench_order_lock,
@@ -45,6 +46,7 @@ from fantasy_lineups.rules import (
     is_lineup_modification_allowed,
     is_tactical_window_active,
     lineup_athlete_left_roster_message,
+    lineup_athlete_left_roster_messages,
     module_counts,
     next_unlocked_kickoff,
     ordered_bench_from_roster,
@@ -1186,6 +1188,49 @@ def test_lineup_athlete_left_roster_message_singular_and_plural() -> None:
         "A. Uno, B. Due e C. Tre non sono più nella tua rosa: sono stati tolti dalla "
         "formazione, scegli chi mettere al loro posto."
     )
+
+
+def test_left_roster_messages_name_who_went_up_to_the_bench() -> None:
+    """Rosario, 20/11: se al posto lasciato in panchina è già salito qualcuno, l'avviso lo dice
+    invece di chiedere chi mettere al suo posto; un posto da coprire resta «scegli…»."""
+    filled = LeftRosterRemoval(name="N. Zortea", bench_replacements=("L. Rossi",))
+    assert lineup_athlete_left_roster_messages([filled]) == [
+        "N. Zortea non è più nella tua rosa: al suo posto in panchina è salito L. Rossi."
+    ]
+    # Titolare (o panchina senza nessuno da far salire): resta da coprire.
+    assert lineup_athlete_left_roster_messages([LeftRosterRemoval(name="M. Titolare")]) == [
+        lineup_athlete_left_roster_message(["M. Titolare"])
+    ]
+    # Insieme: prima la frase che chiede qualcosa (una sola per tutti i posti da coprire), poi una
+    # frase per ogni posto già coperto, poi chi era in tribuna.
+    assert lineup_athlete_left_roster_messages(
+        [
+            filled,
+            LeftRosterRemoval(name="A. Uno"),
+            LeftRosterRemoval(name="B. Due", bench_replacements=("C. Tre", "D. Quattro")),
+            LeftRosterRemoval(name="E. Cinque"),
+            LeftRosterRemoval(name="F. Sei", from_tribuna=True),
+            LeftRosterRemoval(name="N. Zortea", bench_replacements=("L. Rossi",)),
+        ]
+    ) == [
+        "A. Uno e E. Cinque non sono più nella tua rosa: sono stati tolti dalla formazione, "
+        "scegli chi mettere al loro posto.",
+        "N. Zortea non è più nella tua rosa: al suo posto in panchina è salito L. Rossi.",
+        "B. Due non è più nella tua rosa: al suo posto in panchina sono saliti C. Tre e "
+        "D. Quattro.",
+        "F. Sei non è più nella tua rosa: è stato tolto dalla tribuna.",
+    ]
+    assert lineup_athlete_left_roster_messages(
+        [
+            LeftRosterRemoval(name="F. Sei", from_tribuna=True),
+            LeftRosterRemoval(name="G. Sette", from_tribuna=True),
+        ]
+    ) == ["F. Sei e G. Sette non sono più nella tua rosa: sono stati tolti dalla tribuna."]
+    # Senza nome resta l'avviso generico, da coprire.
+    assert lineup_athlete_left_roster_messages(
+        [LeftRosterRemoval(name="", bench_replacements=("L. Rossi",))]
+    ) == [lineup_athlete_left_roster_message([])]
+    assert lineup_athlete_left_roster_messages([]) == []
 
 
 def test_drop_departed_athletes_leaves_starter_slot_empty_and_keeps_locked() -> None:

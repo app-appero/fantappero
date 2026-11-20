@@ -182,6 +182,13 @@ vincolo univoco `(league_id, user_id)` rimane la garanzia DB contro i duplicati.
 Errori di dominio: `invalid_invite`, `invite_expired`, `invite_revoked`, `league_full`,
 `league_not_draft`, `manual_invites_disabled`, `invite_not_found`.
 
+Gli inviti nominativi in attesa (non scaduti e senza risposta) tengono un posto: chi entra con
+link o codice non lo prende, chi ha l'invito sì. Il conto è `pending_named_invite_count` in
+`leagues/capacity.py`, lo stesso dei nuovi inviti nominativi. `league_full` ha due messaggi
+(Rosario, 20/11): «La lega ha raggiunto il numero massimo di partecipanti.» quando i posti sono
+tutti degli iscritti, «La lega è al completo: i posti rimasti sono riservati a inviti in
+attesa.» quando un posto per gli iscritti ci sarebbe ma è di un invito in attesa.
+
 Interfacce:
 
 - web admin: `/lega/amministrazione`;
@@ -230,10 +237,15 @@ lega al completo, interruttore `market_open` acceso e nessun turno in corso
 - `POST /leagues/{league_id}/mercato/stato` con `{"open": true}` a lega incompleta risponde
   `400 league_not_full`; `{"open": false}` è sempre consentito.
 - `GET /mercato/stato`, la risposta di `POST /mercato/stato` e `LeagueDetail` riportano
-  `memberCount`, `participantCount`, `leagueFull` e `marketBlockedReason`
-  (`null` | `league_not_full` | `market_closed` | `round_in_progress`).
+  `memberCount`, `participantCount`, `leagueFull`, `marketBlockedReason`
+  (`null` | `league_not_full` | `market_closed` | `round_in_progress`) e `pendingInviteCount`
+  (inviti nominativi in attesa e non scaduti, la stessa regola che riserva i posti
+  all'ingresso). Web e app mostrano «Il mercato si apre quando la lega è al completo (3/4 · 1
+  invito in attesa).» (plurale «2 inviti in attesa»; senza inviti solo «(3/4)»), anche nel
+  conto dei partecipanti di home lega e Amministrazione lega. Gli inviti non rendono la lega
+  al completo.
 - A lega incompleta rispondono `400 league_not_full` («Il mercato si apre quando la lega è al
-  completo (X/Y partecipanti).»): inserimento e svincolo in rosa fatti dal partecipante,
+  completo (X/Y partecipanti).», con «· N inviti in attesa» se ce ne sono): inserimento e svincolo in rosa fatti dal partecipante,
   svincolo volontario del partecipante, asta a buste chiuse e svincolati (creazione e
   risoluzione delle sessioni, offerte e ritiro), asta a rilanci (creazione, avvio, chiamata,
   rilanci, aggiudica, salta, annulla, scambio del lotto) e scambi (proposta, controproposta,

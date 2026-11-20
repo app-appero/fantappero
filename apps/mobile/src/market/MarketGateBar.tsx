@@ -3,11 +3,19 @@ import { theme } from "@fantappero/ui/theme";
 import { useState } from "react";
 import { Pressable, Switch, Text, View } from "react-native";
 import { marketUiStyles as styles } from "./marketUiStyles";
-import { useMarketGate } from "./useMarketGate";
+import { type MarketGateHandle, useMarketGate } from "./useMarketGate";
 
 export function MarketGateBar({ reloadToken = 0 }: { reloadToken?: number } = {}) {
-  const { marketOpen, canManage, toggling, error, setOpen, notFullNotice, switchLocked } =
-    useMarketGate({ reloadToken });
+  const gate = useMarketGate({ reloadToken });
+  return <MarketGateBarView gate={gate} />;
+}
+
+/**
+ * La barra con uno stato del mercato già letto: Amministrazione lega lo condivide con il conto
+ * degli iscritti, inviti in attesa compresi (Rosario, 20/11).
+ */
+export function MarketGateBarView({ gate }: { gate: MarketGateHandle }) {
+  const { marketOpen, canManage, toggling, error, setOpen, notFullNotice, switchLocked } = gate;
   const [infoOpen, setInfoOpen] = useState(false);
   const running = marketOpen && !notFullNotice;
   const hint =

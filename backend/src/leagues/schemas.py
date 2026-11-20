@@ -98,6 +98,8 @@ class LeagueDetailResponse(ApiModel):
     market_blocked_reason: MarketBlockedReason | None = Field(
         alias="marketBlockedReason", default=None
     )
+    # Inviti nominativi che tengono un posto (in attesa, non scaduti): «3/4 · 1 invito in attesa».
+    pending_invite_count: int = Field(alias="pendingInviteCount", default=0)
     competitions: list[CompetitionSummaryResponse] = Field(default_factory=list)
     rules: LeagueRulesResponse | None = None
 

@@ -92,13 +92,18 @@ def assert_trade_market_open(session: Session, league_id: UUID) -> None:
 
 @dataclass(frozen=True, slots=True)
 class MarketStatus:
-    """Stato del mercato per le app: interruttore, posti occupati e motivo del blocco."""
+    """Stato del mercato per le app: interruttore, posti occupati e motivo del blocco.
+
+    ``pending_invite_count`` sono gli inviti nominativi che tengono un posto (in attesa, non
+    scaduti): le app li mostrano accanto al conto, ma la lega è al completo solo con gli iscritti.
+    """
 
     market_open: bool
     member_count: int
     participant_count: int | None
     league_full: bool
     blocked_reason: MarketBlockedReason | None
+    pending_invite_count: int = 0
 
 
 def market_status(session: Session, league_id: UUID) -> MarketStatus:
@@ -123,4 +128,5 @@ def market_status(session: Session, league_id: UUID) -> MarketStatus:
         participant_count=occupancy.participants,
         league_full=occupancy.is_full,
         blocked_reason=reason,
+        pending_invite_count=occupancy.pending_invites,
     )

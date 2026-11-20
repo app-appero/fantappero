@@ -8,6 +8,9 @@
  * dall'interruttore: si fermano solo a turno in corso. Una risposta senza `leagueFull`
  * (backend più vecchio) conta come lega al completo: non blocca nulla che prima funzionava.
  *
+ * Gli inviti nominativi in attesa (`pendingInviteCount`) tengono un posto ma non rendono la
+ * lega al completo: si mostrano accanto al conto, «3/4 · 1 invito in attesa» (Rosario, 20/11).
+ *
  * Solo logica pura e import di tipo: gira nei test `node:test` senza il bundle di
  * `@fantappero/contracts`. Sul web la stessa logica è in `@fantappero/contracts`
  * (`packages/contracts/src/marketGate.ts`).
@@ -15,15 +18,36 @@
 import type { MarketGate } from "@fantappero/contracts";
 
 export type MarketGateState = Pick<MarketGate, "marketOpen"> &
-  Partial<Pick<MarketGate, "memberCount" | "participantCount" | "leagueFull">>;
+  Partial<
+    Pick<MarketGate, "memberCount" | "participantCount" | "leagueFull" | "pendingInviteCount">
+  >;
 
-/** «Il mercato si apre quando la lega è al completo (5/8).» */
+/** «1 invito in attesa», «2 inviti in attesa». */
+export function pendingInvitesLabel(count: number): string {
+  return count === 1 ? "1 invito in attesa" : `${count} inviti in attesa`;
+}
+
+/** «3/4», o «3/4 · 1 invito in attesa» quando ci sono inviti nominativi in attesa. */
+export function leagueOccupancyLabel(
+  memberCount: number,
+  participantCount: number | null | undefined,
+  pendingInviteCount: number | null | undefined = 0,
+): string {
+  const total = participantCount ?? "?";
+  const pending = pendingInviteCount ?? 0;
+  return pending > 0
+    ? `${memberCount}/${total} · ${pendingInvitesLabel(pending)}`
+    : `${memberCount}/${total}`;
+}
+
+/** «Il mercato si apre quando la lega è al completo (3/4 · 1 invito in attesa).» */
 export function leagueNotFullMessage(
   memberCount: number,
   participantCount: number | null | undefined,
+  pendingInviteCount: number | null | undefined = 0,
 ): string {
-  const total = participantCount ?? "?";
-  return `Il mercato si apre quando la lega è al completo (${memberCount}/${total}).`;
+  const occupancy = leagueOccupancyLabel(memberCount, participantCount, pendingInviteCount);
+  return `Il mercato si apre quando la lega è al completo (${occupancy}).`;
 }
 
 /** Testo da mostrare (interruttore e banner) finché la lega non è al completo, altrimenti `null`. */
@@ -31,7 +55,7 @@ export function marketNotFullNotice(gate: MarketGateState | null | undefined): s
   if (!gate || gate.leagueFull !== false) {
     return null;
   }
-  return leagueNotFullMessage(gate.memberCount ?? 0, gate.participantCount);
+  return leagueNotFullMessage(gate.memberCount ?? 0, gate.participantCount, gate.pendingInviteCount);
 }
 
 /** L'interruttore non si accende a lega incompleta; spegnerlo resta sempre possibile. */

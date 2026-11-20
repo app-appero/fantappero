@@ -3,6 +3,7 @@ import { theme } from "@fantappero/ui/theme";
 import { useCallback, useEffect, useState } from "react";
 import { StyleSheet, View } from "react-native";
 import { fetchLeagueAdminPanel, fetchLeagueMembers } from "../api/leagues";
+import { fetchMarketGate } from "../api/market";
 import { CoachDirectoryPanel } from "../components/CoachDirectoryPanel";
 import { UiStatePanel } from "../components/UiStatePanel";
 import { PageContainer } from "../layout/PageContainer";
@@ -17,6 +18,9 @@ export function ManagerDirectoryScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [memberCount, setMemberCount] = useState(0);
   const [capacity, setCapacity] = useState(0);
+  // Inviti nominativi in attesa accanto ai posti (Rosario, 20/11), dallo stato del mercato.
+  const [pendingInviteCount, setPendingInviteCount] = useState(0);
+  const [invitesReload, setInvitesReload] = useState(0);
 
   useEffect(() => {
     if (!accessToken || !activeLeagueId) {
@@ -44,6 +48,25 @@ export function ManagerDirectoryScreen() {
       cancelled = true;
     };
   }, [accessToken, activeLeagueId, reloadToken]);
+
+  useEffect(() => {
+    if (!accessToken || !activeLeagueId) {
+      return;
+    }
+    let cancelled = false;
+    void fetchMarketGate(accessToken, activeLeagueId)
+      .then((gate) => {
+        if (!cancelled) {
+          setPendingInviteCount(gate.pendingInviteCount ?? 0);
+        }
+      })
+      .catch(() => {
+        // Senza lo stato del mercato i posti si mostrano senza gli inviti in attesa.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [accessToken, activeLeagueId, reloadToken, invitesReload]);
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
@@ -92,6 +115,8 @@ export function ManagerDirectoryScreen() {
           leagueId={activeLeagueId}
           memberCount={memberCount}
           capacity={capacity}
+          pendingInviteCount={pendingInviteCount}
+          onInvitesChanged={() => setInvitesReload((current) => current + 1)}
           testIDPrefix="manager-directory"
           reloadToken={reloadToken}
           onReloadSettled={onReloadSettled}

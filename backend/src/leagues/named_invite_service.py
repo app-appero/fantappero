@@ -25,6 +25,7 @@ from database.enums import (
     UserType,
 )
 from fantasy_teams.factory import ensure_team_for_membership
+from leagues.capacity import pending_named_invite_count
 from leagues.coach_history import placements_page, seniority_label, summary_line
 from leagues.coach_history_service import load_histories, load_history
 from leagues.models.league import League
@@ -769,18 +770,8 @@ class NamedLeagueInviteService:
             )
             or 0
         )
-        pending = 0
-        if include_pending:
-            pending = (
-                self._session.scalar(
-                    select(func.count(NamedLeagueInvite.id)).where(
-                        NamedLeagueInvite.league_id == league.id,
-                        NamedLeagueInvite.status == NamedInviteStatus.PENDING,
-                        NamedLeagueInvite.expires_at > datetime.now(UTC),
-                    )
-                )
-                or 0
-            )
+        # Stessa regola dei posti riservati dell'ingresso con link o codice (leagues.capacity).
+        pending = pending_named_invite_count(self._session, league.id) if include_pending else 0
         if members + pending >= league.rules.participant_count:
             self._fail("La lega non ha posti disponibili.", "league_full", "full")
 

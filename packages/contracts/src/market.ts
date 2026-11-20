@@ -182,6 +182,11 @@ export interface MarketGate {
   /** `false` finché non sono occupati tutti i posti; assente da risposte più vecchie. */
   leagueFull?: boolean;
   marketBlockedReason?: MarketBlockedReason | null;
+  /**
+   * Inviti nominativi in attesa e non scaduti: tengono un posto (chi entra col codice non lo
+   * prende) ma non rendono la lega al completo. Si mostrano accanto al conto (Rosario, 20/11).
+   */
+  pendingInviteCount?: number;
 }
 
 export interface SetMarketGateRequest {

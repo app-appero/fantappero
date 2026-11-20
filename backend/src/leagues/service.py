@@ -818,6 +818,7 @@ class LeagueService:
             participantCount=status.participant_count,
             leagueFull=status.league_full,
             marketBlockedReason=status.blocked_reason,
+            pendingInviteCount=status.pending_invite_count,
             competitions=[self._to_competition_summary(row) for row in competitions],
             rules=self._to_rules_response(league.rules) if league.rules is not None else None,
         )

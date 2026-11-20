@@ -8,6 +8,8 @@ import {
   marketSwitchLocked,
 } from "./marketGateNotice";
 
+export type MarketGateHandle = ReturnType<typeof useMarketGate>;
+
 export function useMarketGate({ reloadToken = 0 }: { reloadToken?: number } = {}) {
   const { accessToken, activeLeagueId, activeLeague, can, patchLeague } = useAuthSession();
   const canManage = can(["market:manage"]);
@@ -75,8 +77,13 @@ export function useMarketGate({ reloadToken = 0 }: { reloadToken?: number } = {}
      */
     marketActive: isMarketActive(gate),
     leagueFull: gate.leagueFull !== false,
-    /** «Il mercato si apre quando la lega è al completo (5/8).», o `null` a lega al completo. */
+    /**
+     * «Il mercato si apre quando la lega è al completo (5/8).», con «· 1 invito in attesa» se ci
+     * sono inviti nominativi in attesa; `null` a lega al completo.
+     */
     notFullNotice: marketNotFullNotice(gate),
+    /** Inviti nominativi in attesa: tengono un posto, ma la lega è al completo solo con gli iscritti. */
+    pendingInviteCount: gate.pendingInviteCount ?? 0,
     /** A lega incompleta l'interruttore spento non si accende (spegnerlo resta possibile). */
     switchLocked: marketSwitchLocked(gate),
     canManage,

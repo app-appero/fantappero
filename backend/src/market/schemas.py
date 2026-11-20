@@ -17,6 +17,9 @@ class MarketGateResponse(ApiModel):
     participant_count: int | None = Field(alias="participantCount")
     league_full: bool = Field(alias="leagueFull")
     market_blocked_reason: MarketBlockedReason | None = Field(alias="marketBlockedReason")
+    # Inviti nominativi che tengono un posto (in attesa, non scaduti): le app li mostrano accanto
+    # al conto, «(3/4 · 1 invito in attesa)». Non rendono la lega al completo.
+    pending_invite_count: int = Field(alias="pendingInviteCount", default=0)
 
 
 class SetMarketGateRequest(ApiModel):

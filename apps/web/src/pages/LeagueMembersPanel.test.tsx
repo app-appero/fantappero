@@ -14,7 +14,11 @@ vi.mock("../auth/AuthContext", async (importOriginal) => {
 });
 
 /** In demo il pannello mostra 3 iscritti (admin, una persona, un'IA). */
-function renderPanel(props: { participantCount: number; participantMin?: number | null }) {
+function renderPanel(props: {
+  participantCount: number;
+  participantMin?: number | null;
+  pendingInviteCount?: number;
+}) {
   return renderToStaticMarkup(
     createElement(MemoryRouter, {
       initialEntries: ["/lega/amministrazione"],
@@ -73,5 +77,26 @@ describe("LeagueMembersPanel — numero partecipanti non allineato", () => {
     const html = renderPanel({ participantCount: 3, participantMin: 4 });
     expect(html).not.toContain('data-testid="league-members-mismatch"');
     expect(html).toContain('data-testid="league-members-capacity"');
+  });
+});
+
+describe("LeagueMembersPanel — inviti nominativi in attesa (Rosario, 20/11)", () => {
+  function capacityText(html: string): string {
+    const host = document.createElement("div");
+    host.innerHTML = html;
+    return host.querySelector('[data-testid="league-members-capacity"]')?.textContent ?? "";
+  }
+
+  it("accanto al conto degli iscritti mostra gli inviti in attesa, solo se ci sono", () => {
+    expect(capacityText(renderPanel({ participantCount: 4, pendingInviteCount: 1 }))).toBe(
+      "Iscritti: 3 / Previsti: 4 · 1 invito in attesa",
+    );
+    expect(capacityText(renderPanel({ participantCount: 5, pendingInviteCount: 2 }))).toBe(
+      "Iscritti: 3 / Previsti: 5 · 2 inviti in attesa",
+    );
+    expect(capacityText(renderPanel({ participantCount: 4 }))).toBe("Iscritti: 3 / Previsti: 4");
+    expect(capacityText(renderPanel({ participantCount: 4, pendingInviteCount: 0 }))).toBe(
+      "Iscritti: 3 / Previsti: 4",
+    );
   });
 });

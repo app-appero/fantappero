@@ -27,6 +27,7 @@ from database.session import create_session_factory
 from leagues.models.competition import Competition
 from leagues.models.league import League
 from leagues.models.league_rules import LeagueRules
+from leagues.models.named_league_invite import NamedLeagueInvite
 from mail.capture import get_captured_emails
 from notifications.models import Notification
 from sports_data.listone.models import RoleAssignment
@@ -255,6 +256,7 @@ def test_new_league_starts_with_market_closed_and_reports_capacity(
         "participantCount": 8,
         "leagueFull": False,
         "marketBlockedReason": NOT_FULL_CODE,
+        "pendingInviteCount": 0,
     }
     stored = db_session.scalar(select(League.market_open).where(League.id == UUID(body["id"])))
     assert stored is False
@@ -763,3 +765,135 @@ def test_member_removed_blocks_the_market_again_and_keeps_the_switch(
 
     athlete = _seed_athlete(db_session, 97501, "Dopo Uscita")
     _assert_not_full(_assign(client, league_id, members[0][0], team_ids[0], 0, athlete), 3, 4)
+
+
+# -- inviti nominativi in attesa accanto al conto (Rosario, 20/11) ----------------------------
+
+
+def _named_invite(client: TestClient, league_id: str, admin_token: str, recipient_id: UUID) -> str:
+    response = client.post(
+        f"/leagues/{league_id}/amministrazione/inviti-nominativi",
+        headers=_auth(admin_token),
+        json={"recipientUserId": str(recipient_id)},
+    )
+    assert response.status_code == 201, response.text
+    return response.json()["id"]
+
+
+def _expire_named_invite(db_session: Session, invite_id: str) -> None:
+    past = datetime.now(UTC) - timedelta(days=1)
+    db_session.execute(
+        update(NamedLeagueInvite)
+        .where(NamedLeagueInvite.id == UUID(invite_id))
+        .values(created_at=past - timedelta(days=7), expires_at=past)
+    )
+    db_session.commit()
+
+
+def test_pending_named_invites_are_reported_next_to_the_member_count(
+    client: TestClient, db_session: Session, competition_ids: list[str]
+) -> None:
+    """«2/4 · 1 invito in attesa»: gli inviti nominativi in attesa e non scaduti, gli stessi che
+    tengono il posto all'ingresso con il codice. La lega resta non al completo: contano solo gli
+    iscritti."""
+    admin_token, _ = _register_and_login(client, "pending.count.admin@example.com")
+    member_token, _ = _register_and_login(client, "pending.count.member@example.com")
+    invited = [
+        _register_and_login(client, f"pending.count.invited{index}@example.com")
+        for index in range(3)
+    ]
+    league_id = _create_league(client, db_session, admin_token, competition_ids, "Lega Inviti")
+    gate = _gate(client, league_id, admin_token)
+    assert (gate["memberCount"], gate["pendingInviteCount"]) == (1, 0)
+
+    invite_ids = [_named_invite(client, league_id, admin_token, user_id) for _, user_id in invited]
+    gate = _gate(client, league_id, admin_token)
+    assert gate["memberCount"] == 1
+    assert gate["participantCount"] == 4
+    assert gate["pendingInviteCount"] == 3
+    assert gate["leagueFull"] is False
+    assert gate["marketBlockedReason"] == NOT_FULL_CODE
+
+    # Non contano l'invito scaduto e quello rifiutato.
+    _expire_named_invite(db_session, invite_ids[2])
+    declined = client.post(
+        f"/leagues/inviti-ricevuti/{invite_ids[1]}/rifiuta", headers=_auth(invited[1][0])
+    )
+    assert declined.status_code == 200, declined.text
+    _join_with_code(client, admin_token, league_id, member_token)
+    gate = _gate(client, league_id, admin_token)
+    assert (gate["memberCount"], gate["pendingInviteCount"]) == (2, 1)
+
+    # Lo stesso nel dettaglio della lega e nel messaggio del blocco.
+    detail = client.get(f"/leagues/{league_id}", headers=_auth(admin_token))
+    assert detail.status_code == 200, detail.text
+    assert detail.json()["memberCount"] == 2
+    assert detail.json()["pendingInviteCount"] == 1
+    assert detail.json()["leagueFull"] is False
+    blocked = client.post(
+        f"/leagues/{league_id}/mercato/stato", headers=_auth(admin_token), json={"open": True}
+    )
+    assert blocked.status_code == 400
+    assert blocked.json()["code"] == NOT_FULL_CODE
+    assert blocked.json()["message"] == (
+        "Il mercato si apre quando la lega è al completo (2/4 partecipanti · 1 invito in attesa)."
+    )
+
+    # Accettato, l'invito diventa un iscritto.
+    accepted = client.post(
+        f"/leagues/inviti-ricevuti/{invite_ids[0]}/accetta", headers=_auth(invited[0][0])
+    )
+    assert accepted.status_code == 200, accepted.text
+    gate = _gate(client, league_id, admin_token)
+    assert (gate["memberCount"], gate["pendingInviteCount"]) == (3, 0)
+    assert gate["leagueFull"] is False
+
+
+def test_code_join_refused_because_pending_invites_hold_the_last_seats(
+    client: TestClient, db_session: Session, competition_ids: list[str]
+) -> None:
+    """3/4 con un invito nominativo in attesa: il codice non entra e il messaggio dice perché. A
+    lega piena di iscritti il messaggio resta quello di sempre. Il codice è ``league_full``."""
+    admin_token, _ = _register_and_login(client, "reserved.seats.admin@example.com")
+    members = [
+        _register_and_login(client, f"reserved.seats.member{index}@example.com")
+        for index in range(2)
+    ]
+    invited_token, invited_id = _register_and_login(client, "reserved.seats.invited@example.com")
+    outsider_token, _ = _register_and_login(client, "reserved.seats.outsider@example.com")
+    league_id = _create_league(client, db_session, admin_token, competition_ids, "Lega Riservata")
+    for token, _ in members:
+        _join_with_code(client, admin_token, league_id, token)
+    invite_id = _named_invite(client, league_id, admin_token, invited_id)
+    link = client.post(
+        f"/leagues/{league_id}/amministrazione/inviti",
+        headers=_auth(admin_token),
+        json={"expiresInDays": 7},
+    )
+    assert link.status_code == 201, link.text
+    code = link.json()["code"]
+
+    reserved = client.post(
+        "/leagues/inviti/accetta", headers=_auth(outsider_token), json={"code": code}
+    )
+    assert reserved.status_code == 400, reserved.text
+    assert reserved.json()["code"] == "league_full"
+    assert reserved.json()["message"] == (
+        "La lega è al completo: i posti rimasti sono riservati a inviti in attesa."
+    )
+
+    # Chi ha l'invito entra anche con il codice; dopo la lega è piena di iscritti.
+    joined = client.post(
+        "/leagues/inviti/accetta", headers=_auth(invited_token), json={"code": code}
+    )
+    assert joined.status_code == 200, joined.text
+    stored = db_session.get(NamedLeagueInvite, UUID(invite_id))
+    assert stored is not None
+    db_session.refresh(stored)
+    assert stored.status.value == "accepted"
+    full = client.post(
+        "/leagues/inviti/accetta", headers=_auth(outsider_token), json={"code": code}
+    )
+    assert full.status_code == 400, full.text
+    assert full.json()["code"] == "league_full"
+    assert full.json()["message"] == "La lega ha raggiunto il numero massimo di partecipanti."

@@ -301,6 +301,8 @@ export interface LeagueDetail {
   participantCount?: number | null;
   leagueFull?: boolean;
   marketBlockedReason?: import("./market.js").MarketBlockedReason | null;
+  /** Inviti nominativi in attesa e non scaduti: tengono un posto, «3/4 · 1 invito in attesa». */
+  pendingInviteCount?: number;
   competitions: CompetitionSummary[];
   rules: LeagueRules | null;
 }
