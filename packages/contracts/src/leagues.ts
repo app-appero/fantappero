@@ -409,6 +409,12 @@ export interface FantasyCoachDirectoryItem {
   userId: string;
   displayName: string;
   nickname?: string | null;
+  /**
+   * Solo per l'admin della lega e per l'operatore, `null` per gli altri:
+   * distingue account diversi con lo stesso nome (decisione del 18/11).
+   * Assente sulle fixture demo e sui backend precedenti.
+   */
+  email?: string | null;
   avatarUrl: string | null;
   userType: import("./profile.js").UserType;
   availableForInvites: boolean;
@@ -447,7 +453,7 @@ export interface FantasyCoachProfile {
   userId: string;
   displayName: string;
   nickname?: string | null;
-  /** Visibile solo a chi amministra la lega (EP13-P06bis); `null` per gli altri. */
+  /** Solo per l'admin della lega e per l'operatore (EP13-P06bis); `null` per gli altri. */
   email?: string | null;
   avatarUrl: string | null;
   userType: import("./profile.js").UserType;

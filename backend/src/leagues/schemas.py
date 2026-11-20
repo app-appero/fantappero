@@ -217,8 +217,10 @@ class PendingInviteCountResponse(ApiModel):
 class FantasyCoachDirectoryItem(ApiModel):
     user_id: str = Field(alias="userId")
     display_name: str = Field(alias="displayName")
-    # L'email non è mai esposta nell'elenco: tutti gli utenti della piattaforma sono
-    # candidati e la directory è raggiungibile da chiunque crei una lega.
+    # Solo per l'admin della lega e per l'operatore (`can_see_coach_email`), `null` per
+    # tutti gli altri: distingue account diversi con lo stesso nome mostrato (decisione del
+    # 18/11). La ricerca per email resta esclusa (N2).
+    email: str | None = None
     avatar_url: str | None = Field(default=None, alias="avatarUrl")
     nickname: str | None = None
     user_type: Literal["human", "ai"] = Field(alias="userType")
@@ -257,8 +259,8 @@ class CoachPlacementResponse(ApiModel):
 class FantasyCoachProfileResponse(ApiModel):
     """Profilo storico limitato, accessibile a qualunque membro della lega.
 
-    ``email`` è ``null`` per chi non amministra la lega (vedi
-    ``NamedLeagueInviteService.coach_profile``).
+    ``email`` è ``null`` per chi non è admin della lega né operatore (vedi
+    ``can_see_coach_email``).
     """
 
     user_id: str = Field(alias="userId")

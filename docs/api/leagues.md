@@ -422,15 +422,18 @@ distinguere «non esiste» da «non visibile».
 | Esposto | Non esposto |
 | --- | --- |
 | Nome visualizzato, avatar, tipo (Manuale/IA) | Budget, rose, formazioni |
-| Email (solo a chi amministra la lega, `league:admin`) | — |
+| Email, in elenco e nel profilo (solo all'admin della lega da cui si arriva e all'operatore) | Ricerca per email |
 | Anzianità in forma `MM/AAAA` | Data esatta di iscrizione |
 | Numero di leghe **concluse**, miglior piazzamento | **Nomi delle leghe** |
 | Per piazzamento: stagione, posizione, partecipanti, partite, punti | Id delle leghe, avversari |
 
 L'email serve solo a distinguere account diversi che condividono lo stesso
-nome mostrato (capita nel pilota, tra conoscenti): resta dietro al perimetro
-amministrativo già descritto sopra, non compare mai nelle viste rivolte ai
-membri di lega.
+nome mostrato (capita nel pilota, tra conoscenti: decisione del 18/11). La
+ricevono l'admin della lega indicata nel percorso e l'operatore, anche quando
+in quella lega è un partecipante qualunque (`can_see_coach_email` in
+`leagues/named_invite_service.py`); per tutti gli altri il campo `email` è
+`null`, anche nel profilo aperto dalla Classifica. Chi amministra un'altra lega
+non la vede passando da una lega in cui è un semplice partecipante.
 
 Il nome della lega non compare mai: un amministratore non deve poter dedurre a
 quali leghe private altrui una persona partecipa. Il numero di partecipanti

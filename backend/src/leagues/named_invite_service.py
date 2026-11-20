@@ -21,6 +21,7 @@ from database.enums import (
     LeagueRole,
     NamedInviteStatus,
     NotificationCategory,
+    PlatformRole,
     UserType,
 )
 from fantasy_teams.factory import ensure_team_for_membership
@@ -60,6 +61,27 @@ def directory_invite_status(status: NamedInviteStatus | None) -> str | None:
     if status is None or status == NamedInviteStatus.ACCEPTED:
         return None
     return status.value
+
+
+def can_see_coach_email(league_access: LeagueAccess) -> bool:
+    """Chi vede l'email dei fantallenatori in directory e nel profilo.
+
+    L'admin della lega da cui arriva la richiesta e l'operatore di
+    piattaforma, anche quando in quella lega è un partecipante qualunque o
+    non ne fa parte: l'email serve a distinguere account diversi con lo
+    stesso nome mostrato (decisione del 18/11, richiesta di Rosario del
+    20/11). Nessun altro: un partecipante normale non vede l'email altrui,
+    e chi amministra un'altra lega non la vede passando da questa.
+
+    Il controllo è qui, non solo sui permessi della rotta: la directory oggi
+    richiede `league:admin`, ma se un giorno si aprisse ai membri l'email
+    resterebbe comunque nascosta.
+    """
+    return (
+        league_access.operator_bypass
+        or league_access.user.platform_role == PlatformRole.OPERATOR
+        or league_access.api_role == LeagueRole.LEAGUE_ADMIN
+    )
 
 
 class NamedLeagueInviteService:
@@ -154,6 +176,7 @@ class NamedLeagueInviteService:
         # Storico della sola pagina corrente, in una query: la card vieta
         # esplicitamente l'N+1 sulla preview.
         histories = load_histories(self._session, user_ids=[user.id for user, *_ in rows])
+        show_email = can_see_coach_email(league_access)
         items = [
             FantasyCoachDirectoryItem(
                 userId=str(user.id),
@@ -162,6 +185,7 @@ class NamedLeagueInviteService:
                     if profile is not None and profile.display_name
                     else (user.email.split("@", 1)[0] or user.email)
                 ),
+                email=user.email if show_email else None,
                 avatarUrl=profile.avatar_url if profile is not None else None,
                 nickname=profile.nickname if profile is not None else None,
                 userType=user.user_type.value,
@@ -212,9 +236,8 @@ class NamedLeagueInviteService:
         membro normale di aprire il profilo di un altro fantallenatore della
         sua stessa lega). Lo storico restituisce solo fatti derivati da
         leghe concluse — mai budget, rose o nomi di lega; l'email resta
-        `null` per chi non amministra la lega, per distinguere account
-        diversi con lo stesso nome mostrato solo a chi ha bisogno di
-        amministrare la lega (EP13-P06bis).
+        `null` per chi non è admin di questa lega né operatore (vedi
+        `can_see_coach_email`, EP13-P06bis).
 
         Il chiamante NON viene escluso: la directory (`directory()`) lo
         elenca già con `isSelf=True`, e la Classifica può linkare anche la
@@ -270,15 +293,12 @@ class NamedLeagueInviteService:
         )
         history = load_history(self._session, user_id=user.id)
         page_items, total = placements_page(history.placements, page=page, page_size=page_size)
-        is_admin = league_access.operator_bypass or (
-            league_access.api_role == LeagueRole.LEAGUE_ADMIN
-        )
 
         get_metrics().incr("coach_profile_viewed_total", labels={"result": "success"})
         return FantasyCoachProfileResponse(
             userId=str(user.id),
             displayName=display_name,
-            email=user.email if is_admin else None,
+            email=user.email if can_see_coach_email(league_access) else None,
             avatarUrl=profile.avatar_url if profile is not None else None,
             nickname=profile.nickname if profile is not None else None,
             userType=user.user_type.value,

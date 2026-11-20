@@ -564,6 +564,7 @@ a.fa-member-list__identity:focus-visible {
   display: block;
   font-size: var(--fa-text-sm);
   color: var(--fa-color-foreground-muted);
+  overflow-wrap: anywhere;
 }
 
 .fa-manager-directory__identity:hover .fa-manager-directory__name {
@@ -640,6 +641,7 @@ a.fa-member-list__identity:focus-visible {
   margin: 0 0 var(--fa-space-xs);
   font-size: var(--fa-text-sm);
   color: var(--fa-color-foreground-muted);
+  overflow-wrap: anywhere;
 }
 
 .fa-coach-profile__meta {

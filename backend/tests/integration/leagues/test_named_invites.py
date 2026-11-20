@@ -129,8 +129,8 @@ def test_directory_pagination_filters_and_excludes_members(
     assert payload["total"] >= 1
     assert all(row["userType"] == "human" for row in payload["items"])
     assert all(row["availableForInvites"] is True for row in payload["items"])
-    # N2: l'email non è mai esposta, nemmeno agli amministratori di lega.
-    assert all("email" not in row for row in payload["items"])
+    # Decisione del 18/11: l'admin della lega vede l'email (N2 resta per la ricerca, sotto).
+    assert all(row["email"] for row in payload["items"])
 
     search = client.get(
         f"/leagues/{league_id}/amministrazione/fantallenatori",

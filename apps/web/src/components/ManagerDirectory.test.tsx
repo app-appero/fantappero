@@ -110,4 +110,18 @@ describe("CoachProfilePanel — profilo storico limitato (EP13-P06)", () => {
   it("segnala chi non è disponibile agli inviti", () => {
     expect(render(profile({ availableForInvites: false }))).toContain("Non disponibile");
   });
+
+  it("mostra l'email quando arriva (admin della lega o operatore)", () => {
+    const html = render(profile());
+    expect(html).toContain('data-testid="coach-profile-email"');
+    expect(html).toContain("lucia.bianchi@example.com");
+  });
+
+  it("senza email (partecipante normale) non lascia un riquadro vuoto", () => {
+    for (const email of [null, undefined]) {
+      const html = render(profile({ email }));
+      expect(html).not.toContain('data-testid="coach-profile-email"');
+      expect(html).not.toContain("lucia.bianchi@example.com");
+    }
+  });
 });

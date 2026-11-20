@@ -318,7 +318,8 @@ def test_named_invite_directory_accept_and_idempotency(
     item = next(row for row in directory.json()["items"] if row["userId"] == str(recipient_id))
     assert item["userType"] == "human"
     assert item["availableForInvites"] is True
-    assert "email" not in item
+    # Decisione del 18/11: l'admin della lega vede l'email, il nome resta senza «@».
+    assert item["email"] == "named.recipient@example.com"
     assert "@" not in item["displayName"]
 
     created = client.post(
