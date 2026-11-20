@@ -28,8 +28,10 @@ from fantasy_lineups.rules import (
     assert_tactical_move,
     athlete_exceeds_role_quota_message,
     athlete_not_in_roster_message,
+    athlete_role_unresolved_message,
     bench_active_role_requirements,
     coerce_max_automatic_substitutions,
+    copied_athlete_role_unresolved_message,
     copy_previous_lineup,
     drop_departed_athletes,
     drop_role_quota_excess_from_tribuna,
@@ -1514,5 +1516,109 @@ def test_copy_previous_lineup_leaves_out_role_quota_excess() -> None:
         (
             "copied_athlete_exceeds_role_quota",
             "A. Adams è in esubero di ruolo ed è stato escluso dalla formazione copiata.",
+        )
+    ]
+
+
+@pytest.mark.parametrize("strict", [True, False])
+def test_role_unresolved_player_is_ignored_in_the_tribuna_and_named_elsewhere(
+    strict: bool,
+) -> None:
+    """Decisione del 20/11: chi non ha un ruolo nel listone vale come chi è in esubero."""
+    roster, starters, bench = _valid_433()
+    unresolved = LineupPlayerRef(athlete_id="senza-ruolo", role=None)
+    names = {"senza-ruolo": "M. Rossi"}
+    in_tribuna = evaluate_lineup(
+        module="4-3-3",
+        starters=starters,
+        bench=[*bench, unresolved],
+        roster_athlete_ids=roster,
+        strict=strict,
+        athlete_names=names,
+        role_unresolved_athlete_ids=["senza-ruolo"],
+    )
+    assert in_tribuna.valid, in_tribuna.issues
+    message = "M. Rossi non ha un ruolo nel listone: non può essere schierato finché non lo riceve."
+    for fielded in (
+        evaluate_lineup(
+            module="4-3-3",
+            starters=[*starters[:-1], unresolved],
+            bench=[*bench, starters[-1]],
+            roster_athlete_ids=roster,
+            strict=strict,
+            athlete_names=names,
+            role_unresolved_athlete_ids=["senza-ruolo"],
+        ),
+        evaluate_lineup(
+            module="4-3-3",
+            starters=starters,
+            bench=[*bench[:7], unresolved, *bench[7:]],
+            roster_athlete_ids=roster,
+            strict=strict,
+            athlete_names=names,
+            role_unresolved_athlete_ids=["senza-ruolo"],
+        ),
+    ):
+        assert not fielded.valid
+        assert (fielded.issues[0].code, fielded.issues[0].message) == (
+            "athlete_role_unresolved",
+            message,
+        )
+        codes = {issue.code for issue in fielded.issues}
+        assert "athlete_not_in_roster" not in codes
+        assert "unresolved_role" not in codes
+
+
+def test_role_unresolved_messages_name_one_or_more_players() -> None:
+    assert athlete_role_unresolved_message([]) == (
+        "Uno o più calciatori non hanno un ruolo nel listone: non possono essere schierati "
+        "finché non lo ricevono."
+    )
+    assert athlete_role_unresolved_message(["M. Rossi", "L. Bianchi"]) == (
+        "M. Rossi e L. Bianchi non hanno un ruolo nel listone: non possono essere schierati "
+        "finché non lo ricevono."
+    )
+    assert copied_athlete_role_unresolved_message(["M. Rossi", "L. Bianchi"]) == (
+        "M. Rossi e L. Bianchi non hanno un ruolo nel listone e sono stati esclusi dalla "
+        "formazione copiata."
+    )
+
+
+def test_copy_previous_lineup_leaves_out_role_unresolved_players() -> None:
+    roster, starters, bench = _valid_433()
+    role_by_id: dict[object, FantasyRole | None] = {
+        player.athlete_id: player.role for player in [*starters, *bench]
+    }
+    role_by_id["senza-ruolo"] = None
+    starter_ids = [player.athlete_id for player in starters]
+    bench_ids = [player.athlete_id for player in bench]
+
+    from_tribuna = copy_previous_lineup(
+        previous_module="4-3-3",
+        previous_starter_ids=starter_ids,
+        previous_bench_ids=[*bench_ids, "senza-ruolo"],
+        roster_athlete_ids=roster,
+        role_by_athlete_id=role_by_id,
+        athlete_names={"senza-ruolo": "M. Rossi"},
+        role_unresolved_athlete_ids=["senza-ruolo"],
+    )
+    assert from_tribuna.issues == ()
+    assert from_tribuna.can_confirm is True
+    assert "senza-ruolo" not in from_tribuna.bench_ids
+
+    from_starters = copy_previous_lineup(
+        previous_module="4-3-3",
+        previous_starter_ids=[*starter_ids[:-1], "senza-ruolo"],
+        previous_bench_ids=[*bench_ids, starter_ids[-1]],
+        roster_athlete_ids=roster,
+        role_by_athlete_id=role_by_id,
+        athlete_names={"senza-ruolo": "M. Rossi"},
+        role_unresolved_athlete_ids=["senza-ruolo"],
+    )
+    assert from_starters.starter_ids[-1] == ""
+    assert [(issue.code, issue.message) for issue in from_starters.issues] == [
+        (
+            "copied_athlete_role_unresolved",
+            "M. Rossi non ha un ruolo nel listone ed è stato escluso dalla formazione copiata.",
         )
     ]

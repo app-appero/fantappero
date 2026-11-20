@@ -349,13 +349,18 @@ Body salvataggio:
 
 Errori con motivazione: `invalid_module`, `module_role_mismatch`,
 `goalkeeper_count_invalid`, `starter_count_invalid`, `duplicate_athlete`,
-`athlete_not_in_roster`, `athlete_exceeds_role_quota`, `bench_incomplete`,
-`unresolved_role`, `roster_not_validated`, `turn_not_open`, `turn_skipped`,
+`athlete_not_in_roster`, `athlete_exceeds_role_quota`, `athlete_role_unresolved`,
+`bench_incomplete`, `unresolved_role`, `roster_not_validated`, `turn_not_open`, `turn_skipped`,
 `turn_modification_closed`, `athlete_kickoff_locked`, `bench_order_locked`,
 `tactical_moves_exhausted`, `previous_lineup_not_found`,
 `copied_athlete_not_in_roster`, `copied_athlete_exceeds_role_quota`,
-`copied_athlete_unavailable`, `ai_lineup_incomplete` (rosa insufficiente per completare il
-modulo con la formula automatica).
+`copied_athlete_role_unresolved`, `copied_athlete_unavailable`, `ai_lineup_incomplete` (rosa
+insufficiente per completare il modulo con la formula automatica).
+
+`roster_not_validated`: la formazione si schiera con una rosa convalidata, oppure con una rosa
+`invalid` solo per chi è in esubero di ruolo o non ha un ruolo nel listone, se tolti loro la rosa
+è in regola (slot tutti occupati, nessun ruolo oltre quota, almeno 3 campionati). Lo stato della
+rosa resta `invalid` e i suoi problemi restano visibili in `GET …/rosa`.
 
 **Chi è in esubero di ruolo** (`exceedsRoleQuota` in `roster`, QA 19/11) resta in rosa ma non
 si schiera finché la rosa non torna in regola, e non è tra i calciatori che `benchAthleteIds`
@@ -368,6 +373,24 @@ della panchina la richiesta è rifiutata con `athlete_exceeds_role_quota` e il n
 La copia della formazione precedente lo esclude: senza avviso se era in tribuna, altrimenti con
 `copied_athlete_exceeds_role_quota` («A. Adams è in esubero di ruolo ed è stato escluso dalla
 formazione copiata.»). «Migliore» non lo schiera mai.
+
+**Chi non ha un ruolo nel listone** (nemmeno con i ripieghi: listone di una stagione precedente,
+posizione nel club; la rosa ha il problema `role_unresolved` e `GET …/rosa` gli dà `role: null`,
+ad esempio chi è passato a un campionato che non copriamo) vale come chi è in esubero di ruolo
+(decisione del 20/11): resta in rosa, non si schiera e non blocca la formazione degli altri. In
+tribuna si toglie senza errore e non si salva; titolare o nei primi 10 della panchina la
+richiesta è rifiutata con `athlete_role_unresolved` e il nome («M. Rossi non ha un ruolo nel
+listone: non può essere schierato finché non lo riceve.», al plurale «… non hanno un ruolo nel
+listone: non possono essere schierati finché non lo ricevono.»). La copia lo esclude, con
+`copied_athlete_role_unresolved` se non era in tribuna («M. Rossi non ha un ruolo nel listone ed
+è stato escluso dalla formazione copiata.»). «Migliore», la formazione IA, quella automatica
+(bozza o turno precedente) e la regola di inizio turno non lo schierano mai. A differenza
+dell'esubero **non è nella `roster` del contesto**: web e app, anche nelle versioni già
+installate, mettono in panchina tutta quella `roster` e rifiutano da sé un panchinaro senza
+ruolo, quindi con lui la formazione non si salverebbe. Per lo stesso motivo GET lo toglie dalla
+tribuna di `lineup` e `draft` restituiti (salvati quando il ruolo l'aveva), senza toccare il DB.
+Chi è già in campo e bloccato nella formazione confermata resta schierabile per il turno con il
+ruolo con cui è stato schierato, ed è nella `roster` con quel ruolo.
 
 **Chi non è più in rosa** (scambio, svincolo, asta, rimozione o sostituzione dell'admin;
 QA 19/11) esce dalla formazione salvata e dalla bozza della squadra **nel momento in cui

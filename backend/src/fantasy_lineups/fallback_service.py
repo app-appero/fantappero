@@ -35,11 +35,12 @@ from fantasy_lineups.models import LineupDraft, LineupPlayer, LineupSubmission
 from fantasy_lineups.rules import (
     LineupPlayerRef,
     copy_previous_lineup,
+    drop_role_quota_excess_from_tribuna,
     evaluate_lineup,
     parse_module,
 )
 from fantasy_teams.composition_service import resolve_effective_athlete_roles
-from fantasy_teams.models import FantasyTeam
+from fantasy_teams.models import FantasyRosterSlot, FantasyTeam
 from fantasy_turns.models import FantasyRound
 from leagues.models.league import League
 from leagues.models.league_audit_event import LeagueAuditEvent
@@ -90,7 +91,7 @@ def ensure_lineup_submissions_for_round(
         session.scalars(
             select(FantasyTeam)
             .where(FantasyTeam.league_id == league_id)
-            .options(selectinload(FantasyTeam.slots))
+            .options(selectinload(FantasyTeam.slots).undefer(FantasyRosterSlot.exceeds_role_quota))
         ).all()
     )
     if not teams:
@@ -145,7 +146,24 @@ def ensure_lineup_submissions_for_round(
             )
             for athlete_id in roster_athlete_ids
         }
-        roster_str_ids = [str(athlete_id) for athlete_id in roster_athlete_ids]
+        # Chi è in esubero di ruolo o non ha un ruolo nel listone resta in rosa ma non si schiera
+        # e non blocca gli altri (decisione del 20/11): non è tra chi la formazione deve
+        # contenere, e in tribuna si toglie, come nel salvataggio del fantallenatore.
+        excess_ids = {
+            str(slot.athlete_id)
+            for slot in team.slots
+            if slot.athlete_id is not None and slot.exceeds_role_quota
+        }
+        unresolved_ids = {
+            athlete_id
+            for athlete_id, role in roles_by_id.items()
+            if role is None and athlete_id not in excess_ids
+        }
+        roster_str_ids = [
+            str(athlete_id)
+            for athlete_id in roster_athlete_ids
+            if str(athlete_id) not in excess_ids and str(athlete_id) not in unresolved_ids
+        ]
 
         resolution = _resolve_team_lineup(
             session,
@@ -153,6 +171,8 @@ def ensure_lineup_submissions_for_round(
             fantasy_round=fantasy_round,
             roster_str_ids=roster_str_ids,
             roles_by_id=roles_by_id,
+            excess_ids=excess_ids,
+            unresolved_ids=unresolved_ids,
         )
 
         if resolution is None:
@@ -222,7 +242,10 @@ def _resolve_team_lineup(
     fantasy_round: FantasyRound,
     roster_str_ids: list[str],
     roles_by_id: dict[str, FantasyRole | None],
+    excess_ids: set[str],
+    unresolved_ids: set[str],
 ) -> tuple[FantasyModule, list[str], list[str], LineupAutoResolutionSource] | None:
+    unfieldable = excess_ids | unresolved_ids
     draft = session.execute(
         select(LineupDraft).where(
             LineupDraft.round_id == fantasy_round.id,
@@ -231,7 +254,9 @@ def _resolve_team_lineup(
     ).scalar_one_or_none()
     if draft is not None:
         starter_ids = [str(item) for item in draft.starter_athlete_ids if item not in {None, ""}]
-        bench_ids = [str(item) for item in draft.bench_athlete_ids if item not in {None, ""}]
+        bench_ids = drop_role_quota_excess_from_tribuna(
+            [str(item) for item in draft.bench_athlete_ids if item not in {None, ""}], unfieldable
+        )
         evaluation = evaluate_lineup(
             module=draft.module.value,
             starters=[
@@ -243,6 +268,8 @@ def _resolve_team_lineup(
                 for athlete_id in bench_ids
             ],
             roster_athlete_ids=roster_str_ids,
+            excess_athlete_ids=excess_ids,
+            role_unresolved_athlete_ids=unresolved_ids,
         )
         if evaluation.valid:
             return draft.module, starter_ids, bench_ids, LineupAutoResolutionSource.DRAFT
@@ -259,6 +286,8 @@ def _resolve_team_lineup(
             previous_bench_ids=_bench_order(previous),
             roster_athlete_ids=roster_str_ids,
             role_by_athlete_id=roles_by_id,
+            excess_athlete_ids=excess_ids,
+            role_unresolved_athlete_ids=unresolved_ids,
         )
         if copied.can_confirm:
             module = parse_module(copied.module)

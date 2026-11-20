@@ -692,3 +692,57 @@ def test_locked_players_are_not_dropped_on_a_second_run(
         select(LineupSubmission).where(LineupSubmission.fantasy_team_id == ai_team.id)
     ).scalar_one()
     assert {p.athlete_id for p in submission.players} == fielded_before
+
+
+def test_a_player_without_a_role_does_not_block_the_ai_lineup(
+    db_session: Session, scenario: dict[str, object]
+) -> None:
+    """Decisione del 20/11: chi non ha un ruolo nel listone (nemmeno dalla posizione nel club)
+    resta in rosa ma non si schiera e non blocca gli altri. Prima la validazione voleva tutta la
+    rosa in formazione e la formula, che giustamente lo lascia fuori, dava ``incomplete``."""
+    league = scenario["league"]
+    fantasy_round = scenario["round"]
+    ai_team = scenario["ai_team"]
+    home_club = scenario["home_club"]
+    athletes = scenario["athletes"]
+    # Fuori dall'intervallo degli id della rosa di `scenario` (seed * 10 + slot).
+    unresolved = Athlete(
+        provider_id=2_000_000_000 + athletes[0].provider_id, canonical_name="Senza Ruolo"
+    )
+    db_session.add(unresolved)
+    db_session.flush()
+    db_session.add(
+        SquadMembership(
+            athlete_id=unresolved.id,
+            club_id=home_club.id,
+            sport_season_id=scenario["fixture"].sport_season_id,
+            is_active=True,
+            provider_position_raw=None,
+        )
+    )
+    db_session.add(
+        FantasyRosterSlot(
+            fantasy_team_id=ai_team.id,
+            league_id=league.id,
+            slot_index=len(athletes),
+            athlete_id=unresolved.id,
+        )
+    )
+    db_session.commit()
+
+    result = generate_ai_lineup(
+        db_session,
+        league_id=league.id,
+        round_id=fantasy_round.id,
+        fantasy_team_id=ai_team.id,
+        now=NOW,
+    )
+    db_session.commit()
+
+    assert result.outcome == "created", result.message
+    submission = db_session.execute(
+        select(LineupSubmission).where(LineupSubmission.fantasy_team_id == ai_team.id)
+    ).scalar_one()
+    fielded = {player.athlete_id for player in submission.players}
+    assert unresolved.id not in fielded
+    assert fielded == {athlete.id for athlete in athletes}

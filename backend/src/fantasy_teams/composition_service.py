@@ -680,7 +680,8 @@ def resync_team_compositions(
     return refreshed
 
 
-#: Problemi che bloccano la formazione anche dopo aver tolto gli esuberi dalla rosa.
+#: Problemi che bloccano la formazione anche dopo aver tolto dalla rosa gli esuberi e chi non ha
+#: un ruolo (``role_unresolved`` resta per prudenza: tolti loro non dovrebbe più comparire).
 _LINEUP_BLOCKING_ISSUES = frozenset({"role_quota_exceeded", "role_unresolved"})
 
 
@@ -690,17 +691,25 @@ def roster_allows_lineup(session: Session, team: FantasyTeam, *, league: League)
     Vale sempre per una rosa convalidata. Uno scambio sbilanciato (2 per 1, un D per
     un C) lascia invece la rosa ``invalid`` per il ruolo in esubero, anche se il
     calciatore in più è già segnato ``exceeds_role_quota`` e quindi escluso dalla
-    formazione (EP08-10): la squadra deve poter giocare con gli altri. Con calciatori
-    in esubero la formazione è ammessa se:
+    formazione (EP08-10): la squadra deve poter giocare con gli altri. Lo stesso per chi
+    non ha un ruolo nemmeno con i ripieghi di `resolve_effective_athlete_roles`
+    (``role_unresolved``, es. uscito dal listone perché passato a un campionato che non
+    copriamo): decisione di Rosario del 20/11, vale come un esubero, resta in rosa ma non
+    si schiera e non blocca gli altri. Con calciatori in esubero o senza ruolo la
+    formazione è ammessa se:
 
-    - gli slot occupati (esuberi compresi) sono almeno quanti la misura della rosa:
+    - gli slot occupati (loro compresi) sono almeno quanti la misura della rosa:
       una rosa con uno slot vuoto resta bloccata, come dopo uno svincolo;
-    - tolti gli esuberi, nessun ruolo supera la quota e ogni ruolo è risolvibile;
-    - tolti gli esuberi, la rosa rappresenta ancora almeno 3 campionati (stessa
+    - tolti loro, nessun ruolo supera la quota;
+    - tolti loro, la rosa rappresenta ancora almeno 3 campionati (stessa
       regola della convalida, ``MIN_ROSTER_COMPETITIONS``).
 
+    Lo stato salvato resta ``invalid`` e i problemi della rosa (``role_quota_exceeded``,
+    ``role_unresolved``) restano visibili: cambia solo il permesso di schierare.
+
     Conta solo gli esuberi già segnati: chi la usa per sbloccare la formazione chiama
-    prima `flag_role_quota_overflow`, che segna quelli rimasti senza flag (KO-A).
+    prima `flag_role_quota_overflow`, che segna quelli rimasti senza flag (KO-A). I ruoli
+    sono quelli della valutazione della rosa (turno 0, come lo stato salvato).
     """
     if team.composition_status == RosterCompositionStatus.VALIDATED:
         return True
@@ -710,18 +719,30 @@ def roster_allows_lineup(session: Session, team: FantasyTeam, *, league: League)
             FantasyRosterSlot.athlete_id.is_not(None),
         )
     ).all()
-    flagged = {athlete_id for athlete_id, exceeds in rows if exceeds}
-    if not flagged:
-        return False
     limits = resolve_league_rules_limits(session, league.id)
     if len(rows) < limits.roster_size:
+        return False
+    flagged = {athlete_id for athlete_id, exceeds in rows if exceeds}
+    roles = resolve_effective_athlete_roles(
+        session,
+        league_id=league.id,
+        athlete_ids=[athlete_id for athlete_id, _ in rows if athlete_id not in flagged],
+        season_year=league.season_year,
+    )
+    unresolved = {
+        athlete_id
+        for athlete_id, _ in rows
+        if athlete_id not in flagged and athlete_id not in roles
+    }
+    if not flagged and not unresolved:
         return False
     report = evaluate_team_composition(
         session,
         team,
         league=league,
         require_complete=False,
-        exclude_athlete_ids=flagged,
+        effective_roles=roles,
+        exclude_athlete_ids=flagged | unresolved,
     )
     if any(issue.code in _LINEUP_BLOCKING_ISSUES for issue in report.issues):
         return False
