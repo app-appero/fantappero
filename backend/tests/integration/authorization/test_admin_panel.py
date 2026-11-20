@@ -7,7 +7,7 @@ from uuid import UUID
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import update
+from sqlalchemy import func, select, update
 from sqlalchemy.orm import Session
 from tests.integration.database.helpers import create_engine_for_url
 
@@ -125,6 +125,43 @@ def test_admin_overview_for_operator(client: TestClient, db_session: Session) ->
     assert body["operatorsCount"] >= 1
 
 
+def test_admin_overview_does_not_count_deleted_accounts(
+    client: TestClient, db_session: Session
+) -> None:
+    """QA 19-20/11: la dashboard diceva 129 utenti, l'elenco Utenti 112 (contava gli eliminati)."""
+    token, operator_id = _register_and_login(client, "admin.overview.op@example.com")
+    _promote(db_session, operator_id)
+    headers = {"Authorization": f"Bearer {token}"}
+    _, deleted_id = _register_and_login(client, "admin.overview.deleted@example.com")
+    _, kept_id = _register_and_login(client, "admin.overview.kept@example.com")
+    _, former_operator_id = _register_and_login(client, "admin.overview.former.op@example.com")
+    _promote(db_session, former_operator_id)
+
+    before = client.get("/admin/overview", headers=headers).json()
+    deleted = client.post(f"/admin/users/{deleted_id}/delete", headers=headers)
+    assert deleted.status_code == 200, deleted.json()
+    # Un operatore con l'account eliminato (es. cancellazione dal profilo) non conta più.
+    db_session.execute(
+        update(User).where(User.id == former_operator_id).values(deleted_at=func.now())
+    )
+    db_session.commit()
+
+    after = client.get("/admin/overview", headers=headers).json()
+    assert after["usersCount"] == before["usersCount"] - 2
+    assert after["operatorsCount"] == before["operatorsCount"] - 1
+    # Stesso numero dell'elenco Utenti, che esclude gli account eliminati.
+    users = client.get("/admin/users", headers=headers).json()
+    assert after["usersCount"] == users["total"]
+    assert str(kept_id) in {row["id"] for row in users["items"]}
+    assert str(deleted_id) not in {row["id"] for row in users["items"]}
+    active_operators = db_session.scalar(
+        select(func.count(User.id)).where(
+            User.deleted_at.is_(None), User.platform_role == PlatformRole.OPERATOR
+        )
+    )
+    assert after["operatorsCount"] == active_operators
+
+
 def test_admin_users_list_and_promote_revoke(client: TestClient, db_session: Session) -> None:
     op_token, op_id = _register_and_login(client, "admin.operator.two@example.com")
     _promote(db_session, op_id)
@@ -210,7 +247,9 @@ def test_admin_can_delete_active_league_and_members_are_notified(
     _promote(db_session, op_id)
     _, owner_id = _register_and_login(client, "admin.league.owner.del@example.com")
     league_id = _seed_league(db_session, name="Lega Da Eliminare", owner_id=owner_id)
-    db_session.execute(update(League).where(League.id == league_id).values(state=LeagueState.ACTIVE))
+    db_session.execute(
+        update(League).where(League.id == league_id).values(state=LeagueState.ACTIVE)
+    )
     db_session.commit()
 
     response = client.delete(

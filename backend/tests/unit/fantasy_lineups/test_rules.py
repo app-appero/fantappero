@@ -1130,6 +1130,7 @@ def test_athlete_not_in_roster_names_who_left_the_roster() -> None:
         bench=[LineupPlayerRef(athlete_id="ceduto", role=FantasyRole.D), *bench[1:]],
         roster_athlete_ids=roster,
         athlete_names={"ceduto": "N. Zortea"},
+        left_roster_athlete_ids={"ceduto"},
     )
     messages = [issue.message for issue in result.issues if issue.code == "athlete_not_in_roster"]
     assert messages == ["N. Zortea non è più nella tua rosa."]
@@ -1137,8 +1138,40 @@ def test_athlete_not_in_roster_names_who_left_the_roster() -> None:
     assert athlete_not_in_roster_message([]) == (
         "Uno o più calciatori schierati non appartengono alla rosa."
     )
-    assert athlete_not_in_roster_message(["A. Uno", "B. Due", "A. Uno"]) == (
+    assert athlete_not_in_roster_message(["A. Uno", "B. Due", "A. Uno"], left_roster=True) == (
         "A. Uno e B. Due non sono più nella tua rosa."
+    )
+
+
+def test_athlete_never_in_the_roster_gets_the_neutral_message() -> None:
+    """QA 19-20/11: «non è più nella tua rosa» era sbagliato per chi in rosa non c'è mai stato."""
+    roster, starters, bench = _valid_433()
+
+    def message(left_roster: set[str]) -> list[str]:
+        result = evaluate_lineup(
+            module="4-3-3",
+            starters=starters,
+            bench=[
+                LineupPlayerRef(athlete_id="altra-squadra", role=FantasyRole.D),
+                LineupPlayerRef(athlete_id="ceduto", role=FantasyRole.C),
+                *bench[2:],
+            ],
+            roster_athlete_ids=roster,
+            athlete_names={"altra-squadra": "M. Altri", "ceduto": "N. Zortea"},
+            left_roster_athlete_ids=left_roster,
+        )
+        return [issue.message for issue in result.issues if issue.code == "athlete_not_in_roster"]
+
+    # Né l'uno né l'altro risultano passati dalla rosa: testo neutro.
+    assert message(set()) == ["M. Altri e N. Zortea non sono nella tua rosa."]
+    # Uno solo dei due c'è stato: il neutro resta vero per entrambi.
+    assert message({"ceduto"}) == ["M. Altri e N. Zortea non sono nella tua rosa."]
+    assert message({"ceduto", "altra-squadra"}) == [
+        "M. Altri e N. Zortea non sono più nella tua rosa."
+    ]
+    assert athlete_not_in_roster_message(["M. Altri"]) == "M. Altri non è nella tua rosa."
+    assert athlete_not_in_roster_message(["M. Altri"], left_roster=True) == (
+        "M. Altri non è più nella tua rosa."
     )
 
 

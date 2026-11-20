@@ -2,10 +2,27 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import {
+  passwordAutofill,
   registrationLoginFailure,
   registrationRequestBody,
   validateEmailRegistration,
 } from "./emailRegistration.ts";
+
+describe("passwordAutofill", () => {
+  it("in registrazione la password è nuova (Android e iOS)", () => {
+    assert.deepEqual(passwordAutofill("register"), {
+      autoComplete: "new-password",
+      textContentType: "newPassword",
+    });
+  });
+
+  it("all'accesso è quella attuale", () => {
+    assert.deepEqual(passwordAutofill("login"), {
+      autoComplete: "current-password",
+      textContentType: "password",
+    });
+  });
+});
 
 describe("validateEmailRegistration", () => {
   it("chiede tutti i campi", () => {

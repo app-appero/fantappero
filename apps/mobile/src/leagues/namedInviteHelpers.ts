@@ -21,6 +21,19 @@ export function revokeInviteConfirmMessage(displayName: string): string {
 }
 
 /**
+ * Errori dell'invito che dicono che la riga della directory non è aggiornata (es. «Invito già
+ * inviato» da un altro admin o da un altro dispositivo): va ricaricata, così non offre più
+ * «Invita». Come la directory del web.
+ */
+export function inviteErrorRefreshesRow(error: { code?: string } | null | undefined): boolean {
+  return (
+    error?.code === "named_invite_already_pending" ||
+    error?.code === "already_member" ||
+    error?.code === "recipient_unavailable"
+  );
+}
+
+/**
  * Messaggio per gli errori noti della revoca; `null` per gli altri, che il
  * chiamante rende con il messaggio generico dell'API.
  */

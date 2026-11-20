@@ -238,6 +238,51 @@ describe("Admin panel identity gate (EP11-04a)", () => {
     unmount();
   });
 
+  it("/admin/leghe sfoglia tutte le pagine dell'API, non solo le prime 20 leghe", async () => {
+    const leaguesPage = (page: number) => ({
+      items: Array.from({ length: page < 5 ? 20 : 5 }, (_, index) => ({
+        id: `league-${page}-${index}`,
+        name: `Lega ${(page - 1) * 20 + index + 1}`,
+        state: "configuring",
+        ownerDisplayName: "Proprietario",
+        createdAt: "2026-01-01T00:00:00Z",
+      })),
+      page,
+      pageSize: 20,
+      total: 85,
+      totalPages: 5,
+    });
+    fetchAdminLeaguesMock.mockImplementation((_token: string, options: { page?: number }) =>
+      Promise.resolve(leaguesPage(options.page ?? 1)),
+    );
+
+    const { html, unmount } = await renderAppAt("/admin/leghe", OPERATOR);
+    expect(html).toContain('data-testid="admin-leagues-pager"');
+    expect(html).toContain("Pagina 1 di 5 · 85 leghe");
+    expect(fetchAdminLeaguesMock).toHaveBeenLastCalledWith("access-token", {
+      query: undefined,
+      page: 1,
+    });
+
+    const prev = document.querySelector<HTMLButtonElement>('[data-testid="admin-leagues-prev-page"]');
+    expect(prev?.disabled).toBe(true);
+    await act(async () => {
+      document.querySelector<HTMLButtonElement>('[data-testid="admin-leagues-next-page"]')?.click();
+    });
+    await flushAsync();
+    expect(fetchAdminLeaguesMock).toHaveBeenLastCalledWith("access-token", {
+      query: undefined,
+      page: 2,
+    });
+    const list = document.querySelector('[data-testid="admin-leagues-list"]');
+    expect(list?.textContent).toContain("Lega 21");
+    expect(list?.textContent).not.toContain("Lega 20");
+    expect(document.querySelector('[data-testid="admin-leagues-pager"]')?.textContent).toContain(
+      "Pagina 2 di 5",
+    );
+    unmount();
+  });
+
   it("smoke: operator reaches /admin/listone with real listone data", async () => {
     fetchAdminListoneMock.mockResolvedValue([
       {

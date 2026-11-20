@@ -1,7 +1,9 @@
-import type {
-  LeagueCalendar,
-  LeagueDetail,
-  LeagueMember,
+import {
+  leagueHomeNextStep,
+  type LeagueCalendar,
+  type LeagueDetail,
+  type LeagueMember,
+  type LeagueNextStepTarget,
 } from "@fantappero/contracts";
 import { avatarInitials } from "@fantappero/contracts";
 import {
@@ -91,6 +93,19 @@ const DEMO_CALENDAR: LeagueCalendar = {
   rounds: [],
   summary: { message: "Calendario confermato (demo)." },
 };
+
+const NEXT_STEP_PATH: Record<LeagueNextStepTarget, string> = {
+  admin: "/lega/amministrazione",
+  roster: "/rosa",
+  auction: "/asta",
+  formation: "/formazione",
+  standings: "/classifica",
+};
+
+/** Link del «Prossimo passo»: porta con sé la lega (`?lega=`), anche per chi è in più leghe. */
+export function leagueNextStepHref(target: LeagueNextStepTarget, leagueId: string): string {
+  return `${NEXT_STEP_PATH[target]}?lega=${encodeURIComponent(leagueId)}`;
+}
 
 /** Home lega minima M1: contesto, regolamento, partecipanti, placeholder M2 (EP03-UX-02). */
 export function LeagueHomePage() {
@@ -199,6 +214,7 @@ export function LeagueHomePage() {
   }, [loadHome]);
 
   const isAdmin = league?.viewerRole === "league_admin" || can(["league:admin"]);
+  const nextStep = league ? leagueHomeNextStep(league.state, { isAdmin }) : null;
 
   return (
     <PageContainer
@@ -266,12 +282,18 @@ export function LeagueHomePage() {
                 </Link>
               ) : null}
             </div>
-            <div className="fa-lhome__next">
+            <div className="fa-lhome__next" data-testid="league-home-next-step">
               <span className="fa-lhome__label">Prossimo passo</span>
-              <strong className="fa-lhome__next-title">Imposta la formazione</strong>
-              <Link to="/formazione" className="fa-btn fa-btn--primary" data-testid="league-home-formation-link">
-                Vai alla formazione
-              </Link>
+              <strong className="fa-lhome__next-title">{nextStep?.title}</strong>
+              {nextStep ? (
+                <Link
+                  to={leagueNextStepHref(nextStep.target, league.id)}
+                  className="fa-btn fa-btn--primary"
+                  data-testid="league-home-next-step-link"
+                >
+                  {nextStep.actionLabel}
+                </Link>
+              ) : null}
             </div>
           </section>
 

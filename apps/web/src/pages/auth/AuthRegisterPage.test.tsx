@@ -128,6 +128,20 @@ describe("AuthRegisterPage — /accedi/registrati", () => {
     expect(byTestId("register-google-only")).toBeNull();
   });
 
+  it("nella scheda «Registrati» la password è nuova (autocomplete new-password), in «Accedi» quella attuale", async () => {
+    fetchAuthOptionsMock.mockResolvedValue({ emailRegistrationEnabled: true });
+    await render();
+    const password = () => container.querySelector<HTMLInputElement>('input[name="password"]');
+    expect(byTestId("auth-email-tab-register")?.getAttribute("aria-selected")).toBe("true");
+    expect(password()?.getAttribute("autocomplete")).toBe("new-password");
+
+    await act(async () => {
+      byTestId("auth-email-tab-login")?.click();
+    });
+    expect(byTestId("auth-email-tab-login")?.getAttribute("aria-selected")).toBe("true");
+    expect(password()?.getAttribute("autocomplete")).toBe("current-password");
+  });
+
   it("se non riesce a leggere le opzioni (server irraggiungibile) resta il solo Google", async () => {
     fetchAuthOptionsMock.mockRejectedValue(new Error("rete assente"));
     await render();

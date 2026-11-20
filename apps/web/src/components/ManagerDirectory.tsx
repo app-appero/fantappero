@@ -228,6 +228,16 @@ function inviteErrorMessage(error: unknown): string {
   return getApiErrorMessage(error, "Impossibile inviare l'invito nominativo.");
 }
 
+/** Errori dell'invito che dicono che la riga mostrata non è aggiornata: va ricaricata. */
+function inviteErrorMeansStaleRow(error: unknown): boolean {
+  return (
+    error instanceof ApiError &&
+    (error.code === "named_invite_already_pending" ||
+      error.code === "already_member" ||
+      error.code === "recipient_unavailable")
+  );
+}
+
 function revokeErrorMessage(error: unknown): string {
   if (error instanceof ApiError) {
     if (error.status === 403) return "Non hai i permessi per annullare gli inviti di questa lega.";
@@ -572,6 +582,12 @@ export function ManagerDirectory({
         setCapacityReached(true);
         onMembershipChanged?.();
         return;
+      }
+      if (inviteErrorMeansStaleRow(error)) {
+        // La riga era vecchia (es. invito già inviato da un'altra scheda o da un altro
+        // admin): si ricarica dal server, così non offre più «Invita». `load` azzera i
+        // messaggi, quindi l'errore si mostra dopo.
+        await load();
       }
       setInviteError(inviteErrorMessage(error));
     } finally {

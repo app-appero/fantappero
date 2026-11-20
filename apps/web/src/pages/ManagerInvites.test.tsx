@@ -4,7 +4,11 @@ import { createRoot, type Root } from "react-dom/client";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import { ApiError } from "../api/client";
-import { fetchManagerDirectory, revokeNamedLeagueInvite } from "../api/managerInvites";
+import {
+  createNamedLeagueInvite,
+  fetchManagerDirectory,
+  revokeNamedLeagueInvite,
+} from "../api/managerInvites";
 import { AuthProvider } from "../auth/AuthContext";
 import { clearStoredSession, saveStoredSession } from "../auth/sessionStorage";
 import { ManagerDirectory } from "../components/ManagerDirectory";
@@ -32,6 +36,7 @@ vi.mock("../api/managerInvites", async (importOriginal) => {
   return {
     ...original,
     fetchManagerDirectory: vi.fn(),
+    createNamedLeagueInvite: vi.fn(),
     revokeNamedLeagueInvite: vi.fn(),
     fetchReceivedNamedInvites: vi.fn(),
     acceptReceivedNamedInvite: vi.fn(),
@@ -390,6 +395,36 @@ describe("annulla invito nominativo", () => {
       host.querySelector('[data-testid="manager-directory-revoke-error"]')?.textContent,
     ).toContain("non è più annullabile");
     expect(host.querySelector('[data-testid="manager-directory-success"]')).toBeNull();
+    cleanup();
+  });
+
+  it("dopo «Invito già inviato» ricarica la directory: la riga non offre più «Invita»", async () => {
+    vi.mocked(fetchManagerDirectory).mockReset();
+    vi.mocked(createNamedLeagueInvite).mockReset();
+    // La directory caricata prima che un altro admin (o un'altra scheda) invitasse Pina.
+    vi.mocked(fetchManagerDirectory)
+      .mockResolvedValueOnce(page([{ ...pending, namedInviteStatus: null, namedInviteId: null }]))
+      .mockResolvedValue(page([pending]));
+    vi.mocked(createNamedLeagueInvite).mockRejectedValue(
+      new ApiError("Invito già inviato.", 400, "named_invite_already_pending"),
+    );
+    const { host, cleanup } = await mountDirectory();
+
+    const invite = host.querySelector('[data-testid="manager-invite-user-pending"]');
+    expect(invite?.textContent).toBe("Invita");
+    await click(invite);
+    expect(createNamedLeagueInvite).toHaveBeenCalledWith("token-admin", "league-1", "user-pending");
+    expect(vi.mocked(fetchManagerDirectory).mock.calls.length).toBe(2);
+
+    const after = host.querySelector('[data-testid="manager-invite-user-pending"]');
+    expect(after?.textContent).toBe("Già invitato");
+    expect(after?.hasAttribute("disabled")).toBe(true);
+    expect(host.querySelector('[data-testid="manager-revoke-user-pending"]')?.textContent).toBe(
+      "Annulla invito",
+    );
+    expect(
+      host.querySelector('[data-testid="manager-directory-invite-error"]')?.textContent,
+    ).toContain("Hai già invitato questo fantallenatore.");
     cleanup();
   });
 

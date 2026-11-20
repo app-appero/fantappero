@@ -25,6 +25,21 @@ export function validateEmailRegistration(fields: RegistrationFields): string | 
   return null;
 }
 
+/**
+ * Suggerimenti di compilazione automatica del campo password (`autoComplete` per Android,
+ * `textContentType` per iOS). In registrazione si sceglie una password nuova: il sistema
+ * propone di generarla e salvarla, invece di proporre quella di un altro account. Come
+ * `autocomplete="new-password"` nella scheda «Registrati» del web.
+ */
+export function passwordAutofill(purpose: "login" | "register"): {
+  autoComplete: "current-password" | "new-password";
+  textContentType: "password" | "newPassword";
+} {
+  return purpose === "register"
+    ? { autoComplete: "new-password", textContentType: "newPassword" }
+    : { autoComplete: "current-password", textContentType: "password" };
+}
+
 export function registrationRequestBody(fields: RegistrationFields): RegisterRequest {
   return {
     email: fields.email.trim(),

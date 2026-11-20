@@ -390,7 +390,11 @@ Se un calciatore non più in rosa è ancora nella formazione per altre vie (dati
 correzioni nel DB), nel contesto di un turno aperto (`effectiveStatus = open`) GET lo toglie
 comunque da `lineup` e `draft` restituiti, con lo stesso avviso, senza toccare il DB; un
 salvataggio (o una bozza) che lo contiene ancora è rifiutato con `athlete_not_in_roster` e
-il nome («N. Zortea non è più nella tua rosa.»). Non cambia niente nei turni bloccati o
+il nome («N. Zortea non è più nella tua rosa.»). «non è più» vale solo per chi nella rosa
+della squadra c'è stato davvero (storico dei possessi, `roster_ownership_intervals`): per un
+calciatore che non c'è mai stato, ad esempio di un'altra squadra, il messaggio è neutro
+(«M. Rossi non è nella tua rosa.»), e lo stesso se tra i nominati ce n'è almeno uno così
+(QA 19-20/11). Non cambia niente nei turni bloccati o
 conclusi, né per chi ha già la partita iniziata o in blocco: il ricalcolo di un turno passato
 usa la formazione così com'era.
 

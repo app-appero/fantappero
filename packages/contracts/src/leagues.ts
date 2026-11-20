@@ -135,6 +135,59 @@ export function describeLeagueLifecycleStep(lifecycle: LeagueLifecycle): LeagueL
   };
 }
 
+/**
+ * Dove porta il «Prossimo passo» della home lega. Web e app lo traducono nella loro pagina
+ * (link con `?lega=` sul web, schermata sull'app).
+ */
+export type LeagueNextStepTarget = "admin" | "roster" | "auction" | "formation" | "standings";
+
+export interface LeagueNextStep {
+  title: string;
+  actionLabel: string;
+  target: LeagueNextStepTarget;
+}
+
+/**
+ * «Prossimo passo» della home lega secondo la fase (QA 19-20/11): mentre la lega è in
+ * configurazione «Imposta la formazione» non ha senso, la formazione si imposta solo a
+ * stagione avviata.
+ */
+export function leagueHomeNextStep(
+  state: LeagueState,
+  options: { isAdmin: boolean },
+): LeagueNextStep {
+  switch (state) {
+    case "draft":
+    case "configuring":
+      return options.isAdmin
+        ? {
+            title: "Completa la configurazione",
+            actionLabel: "Vai all'amministrazione",
+            target: "admin",
+          }
+        : {
+            title: "Attendi l'avvio della stagione",
+            actionLabel: "Guarda la tua rosa",
+            target: "roster",
+          };
+    case "auction":
+      return { title: "Partecipa all'asta", actionLabel: "Vai all'asta", target: "auction" };
+    case "active":
+      return {
+        title: "Imposta la formazione",
+        actionLabel: "Vai alla formazione",
+        target: "formation",
+      };
+    case "concluded":
+    case "archived":
+      return {
+        title: "Guarda la classifica finale",
+        actionLabel: "Vai alla classifica",
+        target: "standings",
+      };
+  }
+}
+
 /** Etichetta del link "vai a sistemare" mostrato accanto a ogni blocker. */
 export const LEAGUE_LIFECYCLE_ACTION_HINT_LABEL: Record<LeagueLifecycleActionHint, string> = {
   rules: "Vai al regolamento",

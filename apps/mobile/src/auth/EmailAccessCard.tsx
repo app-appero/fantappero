@@ -14,7 +14,12 @@ import { writeLastUser, type LastUser } from "../session/lastUser";
 import { getMemorySession } from "../session/sessionStorage";
 import { authFormStyles as styles } from "./authFormStyles";
 import { AUTH_TABS, INITIAL_AUTH_TAB, type AuthTab } from "./authScreenState";
-import { registrationLoginFailure, registrationRequestBody, validateEmailRegistration } from "./emailRegistration";
+import {
+  passwordAutofill,
+  registrationLoginFailure,
+  registrationRequestBody,
+  validateEmailRegistration,
+} from "./emailRegistration";
 import { testerGateFromError, type TesterGateInfo } from "./testerGate";
 
 const { colors, spacing, typography, radius } = theme;
@@ -219,7 +224,7 @@ export function EmailAccessCard({
               value={password}
               onChangeText={setPassword}
               secureTextEntry
-              autoComplete="current-password"
+              {...passwordAutofill("login")}
               placeholder="La tua password"
               returnKeyType="go"
               onSubmitEditing={() => void onLogin()}
@@ -316,7 +321,7 @@ export function EmailAccessCard({
               value={registerPassword}
               onChangeText={setRegisterPassword}
               secureTextEntry
-              autoComplete="new-password"
+              {...passwordAutofill("register")}
               placeholder="Almeno 8 caratteri"
               style={styles.input}
               accessibilityLabel="Password"

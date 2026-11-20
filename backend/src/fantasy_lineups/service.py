@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import Literal
@@ -93,7 +94,7 @@ from fantasy_teams.composition_service import (
     roster_allows_lineup,
 )
 from fantasy_teams.factory import ensure_team_for_membership, find_team_for_membership
-from fantasy_teams.models import FantasyRosterSlot, FantasyTeam
+from fantasy_teams.models import FantasyRosterSlot, FantasyTeam, RosterOwnershipInterval
 from fantasy_turns.models import FantasyRound
 from fantasy_turns.rules import derive_effective_status
 from fantasy_turns.service import FantasyTurnService
@@ -413,18 +414,17 @@ class FantasyLineupService:
             LineupPlayerRef(athlete_id=str(athlete_id), role=roles_by_id.get(athlete_id))
             for athlete_id in bench_ids
         ]
+        outside_names = self._outside_roster_names(roster, [*starter_ids, *bench_ids])
         evaluation = evaluate_lineup(
             module=module_code,
             starters=starters,
             bench=bench,
             roster_athlete_ids=roster_ids,
-            # Chi non è più in rosa (es. formazione aperta prima di uno scambio) o è in esubero
-            # di ruolo va nominato.
-            athlete_names={
-                **self._departed_athlete_names(roster, [*starter_ids, *bench_ids]),
-                **excess,
-            },
+            # Chi non è in rosa (es. formazione aperta prima di uno scambio, o un calciatore di
+            # un'altra squadra) o è in esubero di ruolo va nominato.
+            athlete_names={**outside_names, **excess},
             excess_athlete_ids=excess,
+            left_roster_athlete_ids=self._left_roster_athlete_ids(team.id, outside_names),
         )
         if not evaluation.valid:
             first = evaluation.issues[0]
@@ -1128,17 +1128,16 @@ class FantasyLineupService:
             )
             for athlete_id in bench_ids
         ]
+        outside_names = self._outside_roster_names(roster, [*starter_ids, *bench_ids])
         evaluation = evaluate_lineup(
             module=module_code,
             starters=starters,
             bench=bench,
             roster_athlete_ids=roster_ids,
             strict=False,
-            athlete_names={
-                **self._departed_athlete_names(roster, [*starter_ids, *bench_ids]),
-                **excess,
-            },
+            athlete_names={**outside_names, **excess},
             excess_athlete_ids=excess,
+            left_roster_athlete_ids=self._left_roster_athlete_ids(team.id, outside_names),
         )
         if not evaluation.valid:
             first = evaluation.issues[0]
@@ -1500,6 +1499,9 @@ class FantasyLineupService:
                 ],
                 athlete_names={**names_by_id, **excess},
                 excess_athlete_ids=excess,
+                # Chi è nella formazione salvata era in rosa quando è stata salvata: se ora
+                # non c'è, l'ha lasciata davvero («non è più nella tua rosa»).
+                left_roster_athlete_ids=names_by_id.keys(),
             )
             issues = [
                 LineupIssueResponse(code=item.code, message=item.message)
@@ -1772,17 +1774,42 @@ class FantasyLineupService:
             ).all()
         }
 
-    def _departed_athlete_names(
+    def _outside_roster_names(
         self, roster: list[_RosterRow], athlete_ids: list[UUID] | list[str]
     ) -> dict[str, str]:
-        """Nomi di chi è nella formazione proposta ma non è più nella rosa della squadra.
+        """Nomi di chi è nella formazione proposta ma non nella rosa della squadra.
 
-        Nessuna query quando sono tutti in rosa (il caso normale). Chi è in rosa ma in esubero
-        di ruolo non è tra questi: lo nomina `_role_quota_excess`.
+        Sia chi l'ha lasciata (ceduto, svincolato, tolto dall'admin) sia chi non c'è mai stato:
+        li distingue `_left_roster_athlete_ids`. Nessuna query quando sono tutti in rosa (il
+        caso normale). Chi è in rosa ma in esubero di ruolo non è tra questi: lo nomina
+        `_role_quota_excess`.
         """
         owned = {str(row.athlete_id) for row in roster}
-        departed = [str(item) for item in athlete_ids if item and str(item) not in owned]
-        return self._athlete_names(departed) if departed else {}
+        outside = [str(item) for item in athlete_ids if item and str(item) not in owned]
+        return self._athlete_names(outside) if outside else {}
+
+    def _left_roster_athlete_ids(self, team_id: UUID, athlete_ids: Iterable[str]) -> set[str]:
+        """Chi, tra questi calciatori fuori rosa, nella rosa della squadra c'è stato davvero.
+
+        Lo dice lo storico dei possessi (``RosterOwnershipInterval``), che ogni ingresso in rosa
+        apre: per loro il messaggio è «… non è più nella tua rosa». Per gli altri (es. un
+        calciatore di un'altra squadra) resta il neutro «… non è nella tua rosa». Nessuna query
+        se la lista è vuota (il caso normale).
+        """
+        parsed = [UUID(item) for item in athlete_ids]
+        if not parsed:
+            return set()
+        return {
+            str(athlete_id)
+            for athlete_id in self._session.scalars(
+                select(RosterOwnershipInterval.athlete_id)
+                .where(
+                    RosterOwnershipInterval.fantasy_team_id == team_id,
+                    RosterOwnershipInterval.athlete_id.in_(parsed),
+                )
+                .distinct()
+            ).all()
+        }
 
     @staticmethod
     def _role_quota_excess(roster: list[_RosterRow]) -> dict[str, str]:

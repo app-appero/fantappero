@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import { AuthProvider } from "../auth/AuthContext";
 import { AppRoutes } from "../routes";
 import { MemoryRouter } from "../router/simpleRouter";
+import { leagueNextStepHref } from "./LeagueHomePage";
 
 vi.mock("../api/auth", () => ({
   login: vi.fn(),
@@ -95,8 +96,27 @@ describe("EP03-UX-02 league home", () => {
     expect(html).toContain("Regolamento");
     expect(html).toContain('data-testid="league-home-members-list"');
     expect(html).toContain('data-testid="league-home-roster-link"');
-    expect(html).toContain('data-testid="league-home-formation-link"');
+    expect(html).toContain('data-testid="league-home-next-step"');
     expect(html).toContain("Vai alla formazione");
+  });
+
+  it("con la lega in configurazione il prossimo passo non è la formazione e il link porta la lega", () => {
+    // La lega demo è in configurazione e la persona è un partecipante.
+    const html = renderRoute("/lega/home?persona=member");
+    const nextStep = html.slice(html.indexOf('data-testid="league-home-next-step"'));
+    const block = nextStep.slice(0, nextStep.indexOf("</div>"));
+    expect(block).toContain("Attendi l&#x27;avvio della stagione");
+    expect(block).not.toContain("Imposta la formazione");
+    expect(block).toContain('href="/rosa?lega=lega-demo"');
+    expect(block).toContain("Guarda la tua rosa");
+  });
+
+  it("il link del prossimo passo porta sempre la lega (?lega=)", () => {
+    expect(leagueNextStepHref("formation", "lega-1")).toBe("/formazione?lega=lega-1");
+    expect(leagueNextStepHref("admin", "lega-1")).toBe("/lega/amministrazione?lega=lega-1");
+    expect(leagueNextStepHref("auction", "lega 2")).toBe("/asta?lega=lega%202");
+    expect(leagueNextStepHref("standings", "lega-1")).toBe("/classifica?lega=lega-1");
+    expect(leagueNextStepHref("roster", "lega-1")).toBe("/rosa?lega=lega-1");
   });
 
   it("redirects admin persona from /lega/home to Amministrazione lega content", () => {

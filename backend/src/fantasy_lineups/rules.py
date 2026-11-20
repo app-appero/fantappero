@@ -317,16 +317,22 @@ def join_names(names: Sequence[str]) -> str:
     return f"{', '.join(items[:-1])} e {items[-1]}"
 
 
-def athlete_not_in_roster_message(names: Sequence[str]) -> str:
-    """Formazione rifiutata perché schiera chi non è più in rosa: il messaggio dice chi.
+def athlete_not_in_roster_message(names: Sequence[str], *, left_roster: bool = False) -> str:
+    """Formazione rifiutata perché schiera chi non è in rosa: il messaggio dice chi.
 
-    Senza nomi (calciatore sconosciuto, o in rosa ma in esubero di ruolo) resta il
-    messaggio generico.
+    «non è più nella tua rosa» solo con ``left_roster``, cioè se tutti i nominati in questa
+    rosa ci sono stati davvero (ceduti, svincolati, tolti dall'admin). Per chi non c'è mai
+    stato, es. un calciatore di un'altra squadra, il testo resta neutro: «non è nella tua
+    rosa» (QA 19-20/11). Senza nomi (calciatore sconosciuto, o in rosa ma in esubero di
+    ruolo) resta il messaggio generico.
     """
     unique = list(dict.fromkeys(name for name in names if name))
     if not unique:
         return ATHLETE_NOT_IN_ROSTER_MESSAGE
-    verb = "non è più" if len(unique) == 1 else "non sono più"
+    if left_roster:
+        verb = "non è più" if len(unique) == 1 else "non sono più"
+    else:
+        verb = "non è" if len(unique) == 1 else "non sono"
     return f"{join_names(unique)} {verb} nella tua rosa."
 
 
@@ -697,13 +703,15 @@ def evaluate_lineup(
     strict: bool = True,
     athlete_names: Mapping[object, str] | None = None,
     excess_athlete_ids: Iterable[object] = (),
+    left_roster_athlete_ids: Iterable[object] = (),
 ) -> LineupEvaluation:
     """Validate 7 modules, 1 GK, 11 starters, P–D–C–A counts and roster membership.
 
     Drafts may pass ``strict=False`` to allow incomplete XI/panchina (EP06-06).
     ``athlete_names`` (stesse chiavi degli id passati) serve solo ai messaggi di
-    ``athlete_not_in_roster`` e ``athlete_exceeds_role_quota``: chi non è più in rosa, o è in
-    esubero di ruolo, viene nominato.
+    ``athlete_not_in_roster`` e ``athlete_exceeds_role_quota``: chi non è in rosa, o è in
+    esubero di ruolo, viene nominato. ``left_roster_athlete_ids``: chi, tra quelli fuori rosa,
+    in questa rosa c'è stato davvero; solo se lo sono tutti il messaggio dice «non è più».
 
     ``excess_athlete_ids``: chi è in rosa ma in esubero di ruolo (fuori da
     ``roster_athlete_ids``). In tribuna non conta (vedi `drop_role_quota_excess_from_tribuna`),
@@ -773,11 +781,13 @@ def evaluate_lineup(
         and athlete_id not in excess
     ]
     if outside_roster:
+        left_roster = {item for item in left_roster_athlete_ids if item not in {None, ""}}
         issues.append(
             LineupIssue(
                 code="athlete_not_in_roster",
                 message=athlete_not_in_roster_message(
-                    [names[athlete_id] for athlete_id in outside_roster if athlete_id in names]
+                    [names[athlete_id] for athlete_id in outside_roster if athlete_id in names],
+                    left_roster=all(athlete_id in left_roster for athlete_id in outside_roster),
                 ),
             )
         )

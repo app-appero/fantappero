@@ -115,10 +115,14 @@ class AdminService:
         self._impersonation_store = impersonation_store
 
     def overview(self, operator: User) -> AdminOverviewResponse:
-        users_count = self._session.scalar(select(func.count(User.id))) or 0
+        # Come l'elenco utenti (`list_users`): gli account eliminati (anonimizzati) non contano.
+        active_users = User.deleted_at.is_(None)
+        users_count = self._session.scalar(select(func.count(User.id)).where(active_users)) or 0
         operators_count = (
             self._session.scalar(
-                select(func.count(User.id)).where(User.platform_role == PlatformRole.OPERATOR)
+                select(func.count(User.id)).where(
+                    active_users, User.platform_role == PlatformRole.OPERATOR
+                )
             )
             or 0
         )

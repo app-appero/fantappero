@@ -28,6 +28,7 @@ from leagues.models.league_calendar import LeagueCalendar
 from leagues.models.league_membership import LeagueMembership
 from leagues.models.league_rules import LeagueRules
 from leagues.models.named_league_invite import NamedLeagueInvite
+from leagues.named_invite_service import invite_notification_dedup_key
 from leagues.schemas import LeagueMemberResponse
 from leagues.validators import (
     MIN_PARTICIPANTS,
@@ -35,6 +36,7 @@ from leagues.validators import (
     validate_configurable_league_state,
     validate_member_removal,
 )
+from notifications.service import NotificationService
 from observability.context import get_correlation_id
 from observability.logging import get_logger
 from observability.metrics import get_metrics
@@ -195,6 +197,7 @@ class LeagueMembershipService:
         if team is not None:
             team.name = new_user.display_name
         self._release_accepted_named_invites(league.id, target_user_id)
+        self._accept_pending_named_invites(league.id, new_user.id, actor_id=league_access.user.id)
         self._session.add(
             LeagueAuditEvent(
                 league_id=league.id,
@@ -376,6 +379,53 @@ class LeagueMembershipService:
             invite.status = NamedInviteStatus.REVOKED
             invite.responded_at = None
             invite.revoked_at = now
+
+    def _accept_pending_named_invites(
+        self, league_id: UUID, user_id: UUID, *, actor_id: UUID
+    ) -> None:
+        """Chi subentra con una sostituzione è già in lega: il suo invito nominativo è chiuso.
+
+        Restava `pending`: contava nel badge «Inviti», restava tra quelli ricevuti e, accettato
+        dopo, mandava all'admin un esito fuorviante. Si chiude come un'accettazione
+        (`accepted` con `responded_at`, audit `named_invite_accepted`), ma senza notifica di
+        esito all'admin, che ha fatto lui la sostituzione. La notifica «Nuovo invito» del
+        destinatario si toglie: porterebbe a «Inviti ricevuti», dove l'invito non c'è più.
+        Gli inviti già scaduti ma non ancora riconciliati passano a `expired`, come altrove.
+        """
+        now = datetime.now(UTC)
+        invites = self._session.scalars(
+            select(NamedLeagueInvite)
+            .where(
+                NamedLeagueInvite.league_id == league_id,
+                NamedLeagueInvite.recipient_id == user_id,
+                NamedLeagueInvite.status == NamedInviteStatus.PENDING,
+            )
+            .with_for_update()
+        ).all()
+        notifications = NotificationService(self._session)
+        for invite in invites:
+            if invite.expires_at <= now:
+                invite.status = NamedInviteStatus.EXPIRED
+            else:
+                invite.status = NamedInviteStatus.ACCEPTED
+                invite.responded_at = now
+                self._session.add(
+                    LeagueAuditEvent(
+                        league_id=league_id,
+                        actor_id=actor_id,
+                        action=LeagueAuditAction.NAMED_INVITE_ACCEPTED,
+                        correlation_id=get_correlation_id(),
+                        details={
+                            "namedInviteId": str(invite.id),
+                            "recipientUserId": str(user_id),
+                            "source": "coach_replaced",
+                        },
+                    )
+                )
+            notifications.delete_notification_by_dedup_key(
+                user_id=user_id,
+                dedup_key=invite_notification_dedup_key(invite.id),
+            )
 
     def _invalidate_stale_draft_calendar(self, league_id: UUID) -> None:
         """Cancella l'anteprima H2H: i partecipanti sono cambiati, va rigenerata."""

@@ -14,6 +14,7 @@ import {
   revokeNamedLeagueInvite,
 } from "../api/managerInvites";
 import {
+  inviteErrorRefreshesRow,
   revocableInviteId,
   revokeInviteConfirmMessage,
   revokeInviteErrorMessage,
@@ -212,6 +213,11 @@ export function CoachDirectoryPanel({
         setCapacityReached(true);
         onMembershipChanged?.();
         return;
+      }
+      if (error instanceof ApiError && inviteErrorRefreshesRow(error)) {
+        // Riga vecchia (es. «Invito già inviato»): si ricarica dal server, così non offre
+        // più «Invita».
+        await load({ silent: true });
       }
       setInviteError(getApiErrorMessage(error, "Impossibile inviare l'invito."));
     } finally {

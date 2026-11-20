@@ -80,6 +80,20 @@ describe("EPUI-04 domain wireframe components", () => {
     expect(html).toContain("FantApperò");
   });
 
+  it("auth form layout: password attuale all'accesso, nuova in registrazione", () => {
+    const render = (props: Partial<Parameters<typeof AuthFormLayout>[0]>) =>
+      renderToStaticMarkup(
+        createElement(AuthFormLayout, { brand: null, title: "", submitLabel: "Invia", ...props }),
+      );
+    expect(render({})).toContain('autoComplete="current-password"');
+    // Il modulo di registrazione chiede il nome: la password è nuova (QA 19-20/11).
+    expect(render({ showDisplayName: true })).toContain('autoComplete="new-password"');
+    expect(render({ showDisplayName: true })).not.toContain('autoComplete="current-password"');
+    expect(render({ passwordAutoComplete: "new-password" })).toContain(
+      'autoComplete="new-password"',
+    );
+  });
+
   it("renders brand logo mark and full variants", () => {
     const markHtml = renderToStaticMarkup(createElement(BrandLogo, { variant: "mark" }));
     expect(markHtml).toContain('data-testid="brand-logo"');

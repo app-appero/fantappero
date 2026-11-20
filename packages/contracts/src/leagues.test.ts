@@ -5,6 +5,7 @@ import {
   canConfirmRosterImport,
   describeLeagueLifecycleStep,
   describeRosterImportCandidate,
+  leagueHomeNextStep,
   leagueLifecyclePhaseIndex,
   orderLeagueSetupBlockers,
   rosterImportAmbiguousCount,
@@ -244,5 +245,33 @@ describe("roster import ambiguities", () => {
     assert.equal(canConfirmRosterImport(okAndSkipped, {}), true);
     assert.equal(canConfirmRosterImport({ ...okAndSkipped, status: "confirmed" }, {}), false);
     assert.equal(canConfirmRosterImport(null, {}), false);
+  });
+});
+
+describe("leagueHomeNextStep", () => {
+  it("in configurazione non propone la formazione", () => {
+    for (const state of ["draft", "configuring"] as const) {
+      assert.deepEqual(leagueHomeNextStep(state, { isAdmin: true }), {
+        title: "Completa la configurazione",
+        actionLabel: "Vai all'amministrazione",
+        target: "admin",
+      });
+      const member = leagueHomeNextStep(state, { isAdmin: false });
+      assert.equal(member.title, "Attendi l'avvio della stagione");
+      assert.equal(member.target, "roster");
+    }
+  });
+
+  it("segue le fasi successive: asta, formazione, classifica", () => {
+    assert.equal(leagueHomeNextStep("auction", { isAdmin: false }).target, "auction");
+    assert.deepEqual(leagueHomeNextStep("active", { isAdmin: false }), {
+      title: "Imposta la formazione",
+      actionLabel: "Vai alla formazione",
+      target: "formation",
+    });
+    assert.equal(leagueHomeNextStep("active", { isAdmin: true }).target, "formation");
+    for (const state of ["concluded", "archived"] as const) {
+      assert.equal(leagueHomeNextStep(state, { isAdmin: true }).target, "standings");
+    }
   });
 });
