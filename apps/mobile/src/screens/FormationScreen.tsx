@@ -2337,7 +2337,9 @@ const styles = lazyStyles(() => StyleSheet.create({
     fontWeight: "800",
   },
   benchRole: { width: 30, height: 30, borderRadius: 15, alignItems: "center", justifyContent: "center" },
-  benchRoleText: { color: "#11162B", fontWeight: "800", fontStyle: "italic" },
+  // Come RoleBadge: il fondo è il colore del ruolo del tema, la lettera il suo contrasto
+  // (scura nel tema scuro, bianca nel chiaro, dove fondi blu, rosso e ambra sono scuri).
+  benchRoleText: { color: colors.accentContrast, fontWeight: "800", fontStyle: "italic" },
   benchBody: { flex: 1, minWidth: 0 },
   benchName: { color: colors.foreground, fontSize: typography.fontSize.md, fontWeight: "700" },
   benchChange: {

@@ -59,6 +59,8 @@ export const palette = {
   success500: "#3ddc97",
   success400: "#7be8b8",
 
+  /** Ambra scuro: «attenzione» del tema chiaro, leggibile come testo (almeno 4,5:1). */
+  warning700: "#8a5a00",
   warning600: "#b8860b",
   warning500: "#e6a700",
   warning400: "#f0c040",

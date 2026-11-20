@@ -2,10 +2,12 @@ import { lazyStyles } from "../../theme/lazyStyles";
 import { liveStringMap } from "../../theme/liveColors";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import type { MatchBadge, MatchBadgeKind } from "@fantappero/contracts";
-import { theme } from "@fantappero/ui/theme";
+import { darkColors, theme } from "@fantappero/ui/theme";
 import { StyleSheet, Text, View } from "react-native";
 
 const { colors } = theme;
+/** Il cartellino resta giallo in entrambi i temi, come `YellowCardIcon` sul web. */
+const YELLOW_CARD = darkColors.warning;
 
 const ICON_NAME_BY_KIND: Record<MatchBadgeKind, keyof typeof MaterialCommunityIcons.glyphMap> = {
   goal: "soccer",
@@ -29,7 +31,7 @@ const ICON_COLOR_BY_KIND = liveStringMap<MatchBadgeKind>(() => ({
   penaltyMissed: colors.danger,
   penaltySaved: colors.foreground,
   assist: colors.accent,
-  yellowCard: colors.warning,
+  yellowCard: YELLOW_CARD,
   redCard: colors.danger,
   substitutionIn: colors.success,
   substitutionOut: colors.danger,
