@@ -295,14 +295,27 @@ const BENCH_ROLE_LABEL: Record<LineupRole, [string, string]> = {
   C: ["centrocampista", "centrocampisti"],
   A: ["attaccante", "attaccanti"],
 };
+/** Plurale con l'articolo: «i portieri», «gli attaccanti». */
+const BENCH_ROLE_PLURAL_ARTICLE: Record<LineupRole, string> = {
+  P: "i portieri",
+  D: "i difensori",
+  C: "i centrocampisti",
+  A: "gli attaccanti",
+};
 
 /**
  * Ruoli che mancano nella panchina attiva. Il vincolo per ruolo è `min(quota, disponibili in
  * panchina)`: se la rosa non ha abbastanza giocatori di un ruolo non lo si può pretendere.
+ * Chi è in `unfieldableAthleteIds` (di sicuro senza voto nel turno, `selectionBlocked`) non conta
+ * tra i disponibili, come sul server (Rosario, 20/11); nei primi 10 conta comunque.
  */
-export function benchActiveShortfall(bench: readonly LineupPlayerInput[]): Partial<Record<LineupRole, number>> {
+export function benchActiveShortfall(
+  bench: readonly LineupPlayerInput[],
+  unfieldableAthleteIds: readonly string[] = [],
+): Partial<Record<LineupRole, number>> {
+  const unfieldable = new Set(unfieldableAthleteIds.filter(Boolean));
   const filled = bench.filter((player) => player.athleteId);
-  const available = countRoles(filled);
+  const available = countRoles(filled.filter((player) => !unfieldable.has(player.athleteId)));
   const active = countRoles(filled.slice(0, BENCH_ACTIVE_SIZE));
   const missing: Partial<Record<LineupRole, number>> = {};
   for (const role of ["P", "D", "C", "A"] as const) {
@@ -355,6 +368,216 @@ export function orderBenchForActiveRoles<T extends LineupPlayerInput>(bench: rea
   return [...activeOrdered, ...tribuna, ...empty];
 }
 
+/** «1 attaccante», «2 difensori e 1 attaccante»: i ruoli che mancano nei primi 10. */
+function benchShortfallText(missing: Partial<Record<LineupRole, number>>): string {
+  return (["P", "D", "C", "A"] as const)
+    .filter((role) => missing[role])
+    .map((role) => `${missing[role]} ${BENCH_ROLE_LABEL[role][(missing[role] ?? 0) === 1 ? 0 : 1]}`)
+    .join(", ");
+}
+
+function benchQuotaMessage(missing: Partial<Record<LineupRole, number>>): string {
+  return `Nei primi ${BENCH_ACTIVE_SIZE} della panchina servono 1 portiere, 3 difensori, 3 centrocampisti e 3 attaccanti (mancano: ${benchShortfallText(missing)}).`;
+}
+
+/** Perché un ruolo che manca nei primi 10 non si può far salire dalla tribuna. */
+export type BenchRepairBlock = "locked_in_tribuna" | "locked_in_bench" | "locked_between";
+
+export interface BenchActiveRoleRepair<T extends LineupPlayerInput> {
+  /** La panchina sistemata (o com'era, se non c'era niente da fare). */
+  bench: T[];
+  /** Ogni scambio fatto: chi è salito dalla tribuna e chi è sceso al suo posto. */
+  moves: Array<{ promoted: T; demoted: T }>;
+  /** Ruoli ancora scoperti nei primi 10: vuoto se la panchina ora è in regola. */
+  missing: Partial<Record<LineupRole, number>>;
+  /** Con `missing` non vuoto: quale ruolo manca e perché non si può sistemare. */
+  message: string | null;
+}
+
+const isLineupRole = (role: unknown): role is LineupRole =>
+  role === "P" || role === "D" || role === "C" || role === "A";
+
+/**
+ * Riporta i primi 10 della panchina alla quota per ruolo (1P·3D·3C·3A, o quanti ce ne sono) con il
+ * minimo di spostamenti: per ogni ruolo che manca l'ultimo dei primi 10 che è in più per il suo
+ * ruolo scende e diventa il primo della tribuna, chi era dopo di lui sale di un posto e il primo
+ * della tribuna con il ruolo che manca diventa il 10°. Nessun altro si sposta e l'ordine dentro
+ * ogni ruolo resta quello scelto (conta per i cambi automatici, che vanno solo a parità di ruolo).
+ * Stessa regola del server (`restore_bench_active_roles`), usata dopo la pulizia di chi esce
+ * dalla rosa: lì, di solito, scende proprio chi era appena salito dalla tribuna.
+ *
+ * Chi ha la partita già iniziata (`lockedAthleteIds`) non si sposta e non si scavalca: se l'unico
+ * scambio possibile lo richiede, la panchina resta com'è e `message` dice quale ruolo manca e perché.
+ */
+export function restoreBenchActiveRoles<T extends LineupPlayerInput>(
+  bench: readonly T[],
+  options: { lockedAthleteIds?: readonly string[]; unfieldableAthleteIds?: readonly string[] } = {},
+): BenchActiveRoleRepair<T> {
+  const locked = new Set((options.lockedAthleteIds ?? []).filter(Boolean));
+  const unfieldableIds = (options.unfieldableAthleteIds ?? []).filter(Boolean);
+  const unfieldable = new Set(unfieldableIds);
+  const empty = bench.filter((player) => !player.athleteId);
+  let list = bench.filter((player) => player.athleteId);
+  const moves: Array<{ promoted: T; demoted: T }> = [];
+  const blocked: Partial<Record<LineupRole, BenchRepairBlock>> = {};
+  for (;;) {
+    const missing = benchActiveShortfall(list, unfieldableIds);
+    const short = (["P", "D", "C", "A"] as const).filter((role) => missing[role]);
+    if (short.length === 0) {
+      break;
+    }
+    const available = countRoles(list.filter((player) => !unfieldable.has(player.athleteId)));
+    const active = countRoles(list.slice(0, BENCH_ACTIVE_SIZE));
+    const surplus = (player: T) =>
+      !isLineupRole(player.role) ||
+      active[player.role] > Math.min(BENCH_ACTIVE_ROLE_QUOTA[player.role], available[player.role]);
+    let applied = false;
+    for (const role of short) {
+      const promotable: number[] = [];
+      list.forEach((player, index) => {
+        if (
+          index >= BENCH_ACTIVE_SIZE &&
+          player.role === role &&
+          !locked.has(player.athleteId) &&
+          !unfieldable.has(player.athleteId)
+        ) {
+          promotable.push(index);
+        }
+      });
+      const demotable: number[] = [];
+      for (let index = Math.min(BENCH_ACTIVE_SIZE, list.length) - 1; index >= 0; index -= 1) {
+        const player = list[index] as T;
+        if (!locked.has(player.athleteId) && surplus(player)) {
+          demotable.push(index);
+        }
+      }
+      if (promotable.length === 0) {
+        blocked[role] = "locked_in_tribuna";
+        continue;
+      }
+      if (demotable.length === 0) {
+        blocked[role] = "locked_in_bench";
+        continue;
+      }
+      let pair: [number, number] | null = null;
+      for (const down of demotable) {
+        const up = promotable.find(
+          (candidate) => !list.slice(down + 1, candidate).some((player) => locked.has(player.athleteId)),
+        );
+        if (up !== undefined) {
+          pair = [down, up];
+          break;
+        }
+      }
+      if (pair === null) {
+        blocked[role] = "locked_between";
+        continue;
+      }
+      const [down, up] = pair;
+      const promoted = list[up] as T;
+      const demoted = list[down] as T;
+      const nextActive = list.filter((_, index) => index < BENCH_ACTIVE_SIZE && index !== down);
+      nextActive.push(promoted);
+      const nextTribuna = list.filter((_, index) => index >= BENCH_ACTIVE_SIZE && index !== up);
+      list = [...nextActive, demoted, ...nextTribuna];
+      moves.push({ promoted, demoted });
+      delete blocked[role];
+      applied = true;
+      break;
+    }
+    if (!applied) {
+      break;
+    }
+  }
+  const missing = benchActiveShortfall(list, unfieldableIds);
+  const short = (["P", "D", "C", "A"] as const).filter((role) => missing[role]);
+  let message: string | null = null;
+  if (short.length > 0) {
+    const reasons = short.map((role) => {
+      const plural = BENCH_ROLE_LABEL[role][1];
+      switch (blocked[role]) {
+        case "locked_in_bench":
+          return `nei primi ${BENCH_ACTIVE_SIZE} chi potrebbe lasciare il posto a un ${BENCH_ROLE_LABEL[role][0]} ha la partita già iniziata`;
+        case "locked_between":
+          return `tra la panchina e ${BENCH_ROLE_PLURAL_ARTICLE[role]} in tribuna c'è chi ha la partita già iniziata e non si può scavalcare`;
+        default:
+          return `in tribuna non ci sono ${plural} schierabili: hanno la partita già iniziata`;
+      }
+    });
+    message = `${benchQuotaMessage(missing)} Non si può sistemare da sola: ${reasons.join("; ")}.`;
+  }
+  return { bench: [...list, ...empty], moves, missing, message };
+}
+
+/**
+ * Con la panchina fuori quota, con chi si può scambiare il calciatore al posto `index` per
+ * rimetterla in regola: per uno dei primi 10 che è in più per il suo ruolo, chi in tribuna ha un
+ * ruolo che manca; per uno in tribuna con un ruolo che manca, chi nei primi 10 è in più. Il «Cambia»
+ * della panchina li propone insieme a quelli dello stesso ruolo.
+ */
+export function benchQuotaSwapIds(
+  bench: readonly LineupPlayerInput[],
+  index: number,
+  unfieldableAthleteIds: readonly string[] = [],
+): string[] {
+  const current = bench[index];
+  if (!current?.athleteId) {
+    return [];
+  }
+  const unfieldable = new Set(unfieldableAthleteIds.filter(Boolean));
+  const missing = benchActiveShortfall(bench, unfieldableAthleteIds);
+  if (Object.keys(missing).length === 0) {
+    return [];
+  }
+  const available = countRoles(bench.filter((player) => player.athleteId && !unfieldable.has(player.athleteId)));
+  const active = countRoles(bench.slice(0, BENCH_ACTIVE_SIZE).filter((player) => player.athleteId));
+  const surplus = (player: LineupPlayerInput) =>
+    !isLineupRole(player.role) ||
+    active[player.role] > Math.min(BENCH_ACTIVE_ROLE_QUOTA[player.role], available[player.role]);
+  if (index < BENCH_ACTIVE_SIZE) {
+    if (!surplus(current)) {
+      return [];
+    }
+    return bench
+      .slice(BENCH_ACTIVE_SIZE)
+      .filter(
+        (player) =>
+          player.athleteId && !unfieldable.has(player.athleteId) && isLineupRole(player.role) && missing[player.role],
+      )
+      .map((player) => player.athleteId);
+  }
+  if (!isLineupRole(current.role) || !missing[current.role] || unfieldable.has(current.athleteId)) {
+    return [];
+  }
+  return bench
+    .slice(0, BENCH_ACTIVE_SIZE)
+    .filter((player) => player.athleteId && surplus(player))
+    .map((player) => player.athleteId);
+}
+
+/**
+ * La panchina della formazione mostrata e salvata (panchina e tribuna).
+ *
+ * Chi è arrivato in rosa dopo l'ultimo salvataggio e oggi non può essere schierato (`isBlocked`:
+ * nessun voto, squalificato) va in coda alla tribuna. Ma se il fantallenatore, o
+ * «Sistema la panchina», l'ha già messo in un posto (`placedBench`, la panchina dell'editor), quel
+ * posto si rispetta: prima tornava sempre in coda, e con lui l'unico attaccante che poteva
+ * rimettere in regola i primi 10 (Rosario, 20/11: il tasto non cambiava niente).
+ */
+export function formationLineupBench(input: {
+  orderedBench: readonly string[];
+  savedBench: readonly string[];
+  placedBench: readonly string[];
+  isBlocked: (athleteId: string) => boolean;
+}): string[] {
+  const kept = new Set([...input.savedBench, ...input.placedBench]);
+  const deferred = (athleteId: string) => input.isBlocked(athleteId) && !kept.has(athleteId);
+  return [
+    ...input.orderedBench.filter((athleteId) => !deferred(athleteId)),
+    ...input.orderedBench.filter((athleteId) => deferred(athleteId)),
+  ];
+}
+
 function issue(code: string, message: string): LineupIssue {
   return { code, message };
 }
@@ -367,6 +590,8 @@ export function evaluateLineup(input: {
   rosterAthleteIds: readonly string[];
   /** Confirmed save is strict; drafts may be incomplete (EP06-06). */
   strict?: boolean;
+  /** Di sicuro senza voto nel turno (`selectionBlocked`): non alzano la quota dei primi 10. */
+  unfieldableAthleteIds?: readonly string[];
 }): LineupEvaluation {
   const strict = input.strict !== false;
   const issues: LineupIssue[] = [];
@@ -466,17 +691,9 @@ export function evaluateLineup(input: {
   }
 
   if (strict) {
-    const missing = benchActiveShortfall(input.bench);
-    const parts = (["P", "D", "C", "A"] as const)
-      .filter((role) => missing[role])
-      .map((role) => `${missing[role]} ${BENCH_ROLE_LABEL[role][(missing[role] ?? 0) === 1 ? 0 : 1]}`);
-    if (parts.length > 0) {
-      issues.push(
-        issue(
-          "bench_roles_invalid",
-          `Nei primi ${BENCH_ACTIVE_SIZE} della panchina servono 1 portiere, 3 difensori, 3 centrocampisti e 3 attaccanti (mancano: ${parts.join(", ")}).`,
-        ),
-      );
+    const missing = benchActiveShortfall(input.bench, input.unfieldableAthleteIds ?? []);
+    if (Object.keys(missing).length > 0) {
+      issues.push(issue("bench_roles_invalid", benchQuotaMessage(missing)));
     }
   }
 

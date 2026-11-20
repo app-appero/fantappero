@@ -10,6 +10,9 @@ import {
   evaluateLineup,
   orderBenchForActiveRoles,
   benchActiveShortfall,
+  benchQuotaSwapIds,
+  formationLineupBench,
+  restoreBenchActiveRoles,
   evaluateProgressiveLock,
   evaluateTacticalMove,
   isApprovedModule,
@@ -983,5 +986,65 @@ describe("withoutRoleQuotaExcess (QA 19/11, qa-02)", () => {
     assert.deepEqual(withoutRoleQuotaExcess(["A1", "A3", "X9"], roster), ["A1", "A3", "X9"]);
     assert.deepEqual(withoutRoleQuotaExcess(["A1", "A2"], []), ["A1", "A2"]);
     assert.deepEqual(withoutRoleQuotaExcess([], roster), []);
+  });
+});
+
+describe("panchina con un portiere al posto di un attaccante (Rosario, 20/11)", () => {
+  type Role = "P" | "D" | "C" | "A";
+  const players = (ids: readonly string[]) => ids.map((athleteId) => ({ athleteId, role: athleteId[0] as Role }));
+  const idsOf = (list: readonly { athleteId: string }[]) => list.map((player) => player.athleteId);
+  // 4-4-2: l'attaccante 8° in panchina è uscito dalla rosa, P3 (primo della tribuna) è salito al 10°.
+  const dirty = ["P2", "D5", "D6", "D7", "C5", "C6", "C7", "A3", "A4", "P3", "D8", "C8", "A5"];
+
+  it("restoreBenchActiveRoles fa salire il primo attaccante della tribuna al posto del portiere in più", () => {
+    assert.deepEqual(benchActiveShortfall(players(dirty)), { A: 1 });
+    const repair = restoreBenchActiveRoles(players(dirty));
+    assert.deepEqual(idsOf(repair.bench), ["P2", "D5", "D6", "D7", "C5", "C6", "C7", "A3", "A4", "A5", "P3", "D8", "C8"]);
+    assert.deepEqual(repair.missing, {});
+    assert.equal(repair.message, null);
+    // A differenza di orderBenchForActiveRoles (blocchi P→D→C→A) il resto non si muove.
+    const mixed = players(["D5", "P2", "D6", "D7", "C5", "C6", "C7", "A3", "D9", "P3", "A4", "A6"]);
+    assert.deepEqual(idsOf(restoreBenchActiveRoles(mixed).bench), [
+      "D5", "P2", "D6", "D7", "C5", "C6", "C7", "A3", "A4", "A6", "D9", "P3",
+    ]);
+  });
+
+  it("non sposta né scavalca chi ha la partita già iniziata, e dice quale ruolo manca", () => {
+    // P2 (1°) è bloccato: scende P3 dal 10° posto, l'attaccante prende il suo posto.
+    const repair = restoreBenchActiveRoles(players(dirty), { lockedAthleteIds: ["P2"] });
+    assert.deepEqual(idsOf(repair.bench), ["P2", "D5", "D6", "D7", "C5", "C6", "C7", "A3", "A4", "A5", "P3", "D8", "C8"]);
+    // P3 (10°) è bloccato: per far salire A5 bisognerebbe scavalcarlo.
+    const stuck = restoreBenchActiveRoles(players(dirty), { lockedAthleteIds: ["P3"] });
+    assert.deepEqual(idsOf(stuck.bench), dirty);
+    assert.deepEqual(stuck.moves, []);
+    assert.deepEqual(stuck.missing, { A: 1 });
+    assert.match(stuck.message ?? "", /mancano: 1 attaccante/);
+    assert.match(stuck.message ?? "", /gli attaccanti in tribuna c'è chi ha la partita già iniziata/);
+    const none = restoreBenchActiveRoles(players(dirty), { lockedAthleteIds: ["A5"] });
+    assert.match(none.message ?? "", /in tribuna non ci sono attaccanti schierabili/);
+  });
+
+  it("come sul server, chi di sicuro non prende il voto non alza la quota dei primi 10", () => {
+    assert.deepEqual(benchActiveShortfall(players(dirty), ["A5"]), {});
+    assert.equal(restoreBenchActiveRoles(players(dirty), { unfieldableAthleteIds: ["A5"] }).moves.length, 0);
+    assert.deepEqual(benchQuotaSwapIds(players(dirty), 9, ["A5"]), []);
+  });
+
+  it("benchQuotaSwapIds: «Cambia» sul portiere in più propone l'attaccante della tribuna", () => {
+    assert.deepEqual(benchQuotaSwapIds(players(dirty), 9), ["A5"]);
+    assert.deepEqual(benchQuotaSwapIds(players(dirty), 12), ["P2", "P3"]);
+    assert.deepEqual(benchQuotaSwapIds(players(dirty), 3), []);
+  });
+
+  it("formationLineupBench rispetta il posto scelto per chi è arrivato dopo e non prende il voto", () => {
+    const saved = dirty.slice(0, 12);
+    const placed = idsOf(restoreBenchActiveRoles(players(dirty)).bench);
+    const isBlocked = (athleteId: string) => athleteId === "A5";
+    assert.deepEqual(formationLineupBench({ orderedBench: placed, savedBench: saved, placedBench: placed, isBlocked }), placed);
+    // Senza un posto scelto va in coda, come prima.
+    assert.deepEqual(
+      formationLineupBench({ orderedBench: ["A5", ...saved], savedBench: saved, placedBench: saved, isBlocked }),
+      [...saved, "A5"],
+    );
   });
 });

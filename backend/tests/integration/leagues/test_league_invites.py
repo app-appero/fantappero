@@ -318,7 +318,8 @@ def test_named_invite_directory_accept_and_idempotency(
     item = next(row for row in directory.json()["items"] if row["userId"] == str(recipient_id))
     assert item["userType"] == "human"
     assert item["availableForInvites"] is True
-    assert "email" not in item
+    # Decisione del 20/11: prima dell'invito l'admin vede solo il nome, senza «@».
+    assert item["email"] is None
     assert "@" not in item["displayName"]
 
     created = client.post(
@@ -329,6 +330,15 @@ def test_named_invite_directory_accept_and_idempotency(
     assert created.status_code == 201
     invite_id = created.json()["id"]
     assert created.json()["status"] == "pending"
+    # Con l'invito in corso l'admin vede l'email e controlla di aver scelto la persona giusta.
+    invited = client.get(
+        f"/leagues/{league_id}/amministrazione/fantallenatori",
+        headers={"Authorization": f"Bearer {owner_token}"},
+        params={"search": "named.recipient", "pageSize": 10},
+    )
+    assert invited.status_code == 200
+    invited_row = next(row for row in invited.json()["items"] if row["userId"] == str(recipient_id))
+    assert invited_row["email"] == "named.recipient@example.com"
     assert (
         db_session.scalar(
             select(func.count(LeagueAuditEvent.id)).where(

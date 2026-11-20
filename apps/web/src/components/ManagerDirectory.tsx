@@ -289,11 +289,14 @@ export function CoachProfilePanel({
           <h3 id="coach-profile-title" className="fa-coach-profile__title">
             {profile.nickname?.trim() || profile.displayName}
           </h3>
-          <p className="fa-coach-profile__email" data-testid="coach-profile-email">
-            {profile.email}
-          </p>
           {profile.nickname ? (
             <p className="fa-manager-directory__nickname">{profile.displayName}</p>
+          ) : null}
+          {/* Arriva solo all'admin della lega e all'operatore: per gli altri è null. */}
+          {profile.email ? (
+            <p className="fa-coach-profile__email" data-testid="coach-profile-email">
+              {profile.email}
+            </p>
           ) : null}
           <div className="fa-coach-profile__meta">
             <Badge variant={profile.userType === "ai" ? "accent" : "neutral"}>
@@ -828,7 +831,11 @@ export function ManagerDirectory({
                   <Link
                     to={profileHref(manager)}
                     className="fa-manager-directory__identity"
-                    aria-label={`Apri il profilo di ${manager.displayName}`}
+                    aria-label={
+                      manager.email
+                        ? `Apri il profilo di ${manager.displayName} (${manager.email})`
+                        : `Apri il profilo di ${manager.displayName}`
+                    }
                     data-testid={`manager-open-${manager.userId}`}
                   >
                     <span className="fa-manager-directory__name">
@@ -836,6 +843,15 @@ export function ManagerDirectory({
                     </span>
                     {manager.nickname ? (
                       <span className="fa-manager-directory__nickname">{manager.displayName}</span>
+                    ) : null}
+                    {/* Solo per l'admin della lega e l'operatore: distingue gli omonimi. */}
+                    {manager.email ? (
+                      <span
+                        className="fa-manager-directory__email"
+                        data-testid={`manager-email-${manager.userId}`}
+                      >
+                        {manager.email}
+                      </span>
                     ) : null}
                     <span className="fa-manager-directory__badges">
                       <Badge variant={manager.userType === "ai" ? "accent" : "neutral"}>

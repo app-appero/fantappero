@@ -220,6 +220,8 @@ export type {
 } from "./fantasyTurns.js";
 
 export type {
+  BenchActiveRoleRepair,
+  BenchRepairBlock,
   CopyLineupResult,
   FantasyModule,
   AiLineupRun,
@@ -255,7 +257,10 @@ export {
   LINEUP_ATHLETE_LEFT_ROSTER_CODE,
   MAX_AUTOMATIC_SUBSTITUTIONS,
   benchActiveShortfall,
+  benchQuotaSwapIds,
+  formationLineupBench,
   orderBenchForActiveRoles,
+  restoreBenchActiveRoles,
   MAX_TACTICAL_MOVES,
   approvedModuleCatalog,
   blockingLineupSaveIssue,

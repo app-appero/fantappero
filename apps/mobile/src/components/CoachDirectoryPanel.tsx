@@ -13,6 +13,7 @@ import {
   fetchManagerDirectory,
   revokeNamedLeagueInvite,
 } from "../api/managerInvites";
+import { coachProfileAccessibilityLabel, visibleCoachEmail } from "../leagues/coachEmail";
 import {
   inviteErrorRefreshesRow,
   revocableInviteId,
@@ -404,11 +405,13 @@ export function CoachDirectoryPanel({
                     : "Invita";
           const revocable = revocableInviteId(coach) !== null;
           const revoking = workingId === `revoke-${coach.userId}`;
+          // Arriva solo all'admin della lega e all'operatore: distingue gli omonimi.
+          const email = visibleCoachEmail(coach);
           return (
             <View key={coach.userId} style={styles.card}>
               <Pressable
                 accessibilityRole="button"
-                accessibilityLabel={`Apri il profilo di ${coach.displayName}`}
+                accessibilityLabel={coachProfileAccessibilityLabel(coach)}
                 onPress={() => openProfile(coach)}
                 style={styles.cardTop}
                 testID={`${testIDPrefix}-open-${coach.userId}`}
@@ -417,6 +420,11 @@ export function CoachDirectoryPanel({
                 <View style={styles.identity}>
                   <Text style={styles.name}>{coach.nickname?.trim() || coach.displayName}</Text>
                   {coach.nickname ? <Text style={styles.nickname}>{coach.displayName}</Text> : null}
+                  {email ? (
+                    <Text style={styles.email} testID={`${testIDPrefix}-email-${coach.userId}`}>
+                      {email}
+                    </Text>
+                  ) : null}
                 </View>
               </Pressable>
               <View style={styles.chips}>

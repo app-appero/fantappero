@@ -158,9 +158,25 @@ def _expected_starters(payload: dict, *departed: UUID) -> list[tuple[int, UUID]]
     ]
 
 
-def _expected_bench(bench_ids: list[str], *departed: UUID) -> list[tuple[int, UUID]]:
-    """Panchina meno chi è uscito: gli altri nello stesso ordine, posizioni di nuovo 0..n-1."""
-    return list(enumerate(UUID(item) for item in bench_ids if UUID(item) not in departed))
+def _expected_bench(
+    bench_ids: list[str], *departed: UUID, role_of: dict[UUID, FantasyRole] | None = None
+) -> list[tuple[int, UUID]]:
+    """Panchina meno chi è uscito: gli altri nello stesso ordine, posizioni di nuovo 0..n-1.
+
+    Con ``role_of``, per chi è uscito dai primi 10 sale al 10° posto il primo della tribuna con
+    il suo ruolo, e chi era scalato al 10° posto (il primo della tribuna, qui un portiere in più)
+    torna primo della tribuna: la quota 1P·3D·3C·3A resta in regola (Rosario, 20/11).
+    """
+    kept = [UUID(item) for item in bench_ids if UUID(item) not in departed]
+    if role_of is not None:
+        for item in bench_ids[:10]:
+            if UUID(item) not in departed:
+                continue
+            role = role_of[UUID(item)]
+            promoted = next(other for other in kept[10:] if role_of[other] == role)
+            kept.remove(promoted)
+            kept.insert(9, promoted)
+    return list(enumerate(kept))
 
 
 def _round_clubs(db_session: Session, round_id: str) -> list[Fixture]:
@@ -367,7 +383,9 @@ def test_trade_removes_departed_players_from_future_lineup_draft_and_scoring(
     # panchina gli altri restano nell'ordine, con le posizioni ricompattate.
     stored_a = _stored(db_session, round_id, team_a)
     assert _starters(stored_a) == _expected_starters(payload_a, starter)
-    assert _bench(stored_a) == _expected_bench(payload_a["benchAthleteIds"], bench_player)
+    assert _bench(stored_a) == _expected_bench(
+        payload_a["benchAthleteIds"], bench_player, role_of=setup["role_of"]
+    )
     draft = _draft(db_session, round_id, team_a)
     expected_draft_starters = list(payload_a["starterAthleteIds"])
     expected_draft_starters[2] = ""
@@ -503,7 +521,9 @@ def test_release_removes_the_player_from_the_future_lineup(
     stored = _stored(db_session, round_id, team_a)
     assert departed not in {athlete_id for _, _, athlete_id in stored}
     assert _starters(stored) == _expected_starters(payload, departed)
-    assert _bench(stored) == _expected_bench(payload["benchAthleteIds"], departed)
+    assert _bench(stored) == _expected_bench(
+        payload["benchAthleteIds"], departed, role_of=setup["role_of"]
+    )
     draft = _draft(db_session, round_id, team_a)
     assert str(departed) not in {*draft.starter_athlete_ids, *draft.bench_athlete_ids}
     if exit_path == "rimozione_admin":
@@ -657,7 +677,7 @@ def test_open_turn_already_started_is_untouched(
     db_session.commit()
     assert [item.round_id for item in removed] == [UUID(round_id)]
     assert _bench(_stored(db_session, round_id, team_a)) == _expected_bench(
-        payload["benchAthleteIds"], departed
+        payload["benchAthleteIds"], departed, role_of=setup["role_of"]
     )
 
 

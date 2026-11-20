@@ -10,6 +10,7 @@ import { fetchCoachProfile } from "../api/managerInvites";
 import { UiStatePanel } from "../components/UiStatePanel";
 import { useScreenData } from "../hooks/useScreenData";
 import { PageContainer } from "../layout/PageContainer";
+import { visibleCoachEmail } from "../leagues/coachEmail";
 import type { RootStackParamList } from "../navigation/types";
 import { getApiErrorMessage, useAuthSession } from "../session/DemoSessionContext";
 import { resolveAvatarUrl } from "../utils/avatar";
@@ -54,6 +55,8 @@ export function CoachProfileScreen() {
   const { refreshing, onRefresh } = useScreenData(load);
 
   const avatarSrc = profile ? resolveAvatarUrl(profile.avatarUrl) : null;
+  // Arriva solo all'admin della lega e all'operatore: per gli altri è null.
+  const email = profile ? visibleCoachEmail(profile) : null;
 
   return (
     <PageContainer
@@ -94,6 +97,11 @@ export function CoachProfileScreen() {
               <Text style={styles.name}>{profile.nickname?.trim() || profile.displayName}</Text>
               {profile.nickname?.trim() ? (
                 <Text style={styles.realName}>{profile.displayName}</Text>
+              ) : null}
+              {email ? (
+                <Text style={styles.realName} testID="coach-profile-email">
+                  {email}
+                </Text>
               ) : null}
               <View style={styles.badgeRow}>
                 <View style={styles.badge}>

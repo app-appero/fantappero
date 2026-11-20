@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, replace
 from datetime import UTC, datetime, timedelta
 from typing import Literal
@@ -64,6 +64,7 @@ from fantasy_lineups.rules import (
     next_unlocked_kickoff,
     parse_module,
     remaining_tactical_moves,
+    restore_bench_active_roles,
 )
 from fantasy_lineups.schemas import (
     LineupContextResponse,
@@ -420,6 +421,12 @@ class FantasyLineupService:
             for athlete_id in bench_ids
         ]
         outside_names = self._outside_roster_names(roster, [*starter_ids, *bench_ids])
+        roster_athlete_ids = [row.athlete_id for row in roster]
+        no_vote = self._no_vote_reasons(
+            roster_athlete_ids,
+            kickoffs,
+            self._probable_hints(fantasy_round.id, roster_athlete_ids),
+        )
         evaluation = evaluate_lineup(
             module=module_code,
             starters=starters,
@@ -431,6 +438,8 @@ class FantasyLineupService:
             excess_athlete_ids=excess,
             left_roster_athlete_ids=self._left_roster_athlete_ids(team.id, outside_names),
             role_unresolved_athlete_ids=unresolved,
+            # Chi di sicuro non prende il voto non alza la quota dei primi 10 (Rosario, 20/11).
+            unfieldable_athlete_ids={str(item) for item in no_vote},
         )
         if not evaluation.valid:
             first = evaluation.issues[0]
@@ -1421,6 +1430,13 @@ class FantasyLineupService:
             submission,
             [row.athlete_id for row in roster if locked_flags[row.athlete_id]],
         )
+        probable = self._probable_hints(
+            fantasy_round.id,
+            [row.athlete_id for row in roster],
+        )
+        no_vote_reasons = self._no_vote_reasons(
+            [row.athlete_id for row in roster], kickoffs, probable
+        )
         any_unlocked = any(not locked for locked in locked_flags.values()) if roster else True
         turn_editable = operator_bypass or is_lineup_modification_allowed(
             stored=fantasy_round.status
@@ -1519,6 +1535,18 @@ class FantasyLineupService:
                 )
                 if len(kept_bench) != len(saved.bench):
                     saved = saved.model_copy(update={"bench": kept_bench})
+            # Prima del primo blocco della squadra (blocchi veri, anche per l'operatore).
+            if is_purgeable_turn_status(effective) and not any(
+                self._is_row_locked(row.athlete_id, kickoffs, now, lock_margin) for row in roster
+            ):
+                saved, bench = self._bench_for_editing(
+                    saved=saved,
+                    bench=bench,
+                    roster=roster,
+                    excess=excess,
+                    unresolved=unresolved,
+                    no_vote=no_vote_reasons,
+                )
             evaluation = evaluate_lineup(
                 module=saved.module,
                 starters=starters,
@@ -1530,6 +1558,7 @@ class FantasyLineupService:
                 # non c'è, l'ha lasciata davvero («non è più nella tua rosa»).
                 left_roster_athlete_ids=names_by_id.keys(),
                 role_unresolved_athlete_ids=unresolved,
+                unfieldable_athlete_ids={str(item) for item in no_vote_reasons},
             )
             issues = [
                 LineupIssueResponse(code=item.code, message=item.message)
@@ -1669,13 +1698,6 @@ class FantasyLineupService:
             )
         )
         loaded_team = self._session.get(FantasyTeam, fantasy_team_id)
-        probable = self._probable_hints(
-            fantasy_round.id,
-            [row.athlete_id for row in roster],
-        )
-        no_vote_reasons = self._no_vote_reasons(
-            [row.athlete_id for row in roster], kickoffs, probable
-        )
         return LineupContextResponse(
             leagueId=str(league_id),
             fantasyTeamId=str(fantasy_team_id),
@@ -1732,6 +1754,83 @@ class FantasyLineupService:
             issues=issues,
             leagueHasAiManager=self._league_has_ai_manager(league_id),
         )
+
+    @staticmethod
+    def _bench_for_editing(
+        *,
+        saved: SavedLineupResponse,
+        bench: list[LineupPlayerRef],
+        roster: list[_RosterRow],
+        excess: Mapping[str, str],
+        unresolved: Mapping[str, str],
+        no_vote: Mapping[UUID, str],
+    ) -> tuple[SavedLineupResponse, list[LineupPlayerRef]]:
+        """Panchina restituita da GET prima del primo blocco: completa e con la quota dei primi 10.
+
+        Rosario, 20/11 (lega demo): con un portiere salito al 10° posto e l'unico attaccante da
+        far salire arrivato in rosa dopo l'ultimo salvataggio e senza voto in questo turno, web e
+        app (anche le versioni già installate) lo tengono sempre in coda alla tribuna, perché non
+        è nella formazione salvata: «Sistema la panchina» e «Formazione migliore» non cambiavano
+        niente e il salvataggio restava bloccato da loro stessi. Qui chi è in rosa ma non nella
+        formazione salvata entra in coda alla panchina restituita, come la mettono web e app
+        (prima chi prende il voto, poi chi no; chi è in esubero o senza ruolo no), e se nei primi
+        10 manca un ruolo sale il primo della tribuna con quel ruolo
+        (``restore_bench_active_roles``, con la quota contata come web e app). Solo in lettura:
+        nel DB la formazione resta com'è fino al prossimo salvataggio, che la manda completa.
+        Nessuno ha la partita iniziata (il chiamante lo garantisce), quindi niente blocchi.
+        """
+        present = {player.athlete_id for player in (*saved.starters, *saved.bench)}
+        present |= {str(ref.athlete_id) for ref in bench}
+        newcomers = [
+            row
+            for row in roster
+            if str(row.athlete_id) not in present
+            and row.role is not None
+            and str(row.athlete_id) not in excess
+            and str(row.athlete_id) not in unresolved
+        ]
+        newcomers.sort(key=lambda row: row.athlete_id in no_vote)
+        refs = [
+            *bench,
+            *(LineupPlayerRef(athlete_id=str(row.athlete_id), role=row.role) for row in newcomers),
+        ]
+        outcome = restore_bench_active_roles(
+            refs,
+            unavailable_athlete_ids={
+                ref.athlete_id
+                for ref in refs
+                if str(ref.athlete_id) in excess or str(ref.athlete_id) in unresolved
+            },
+            # Con chi è arrivato dopo l'ultimo salvataggio la quota si conta come web e app già
+            # installati (anche chi non prende il voto), perché solo così da lì si salva. Senza
+            # nuovi arrivati come la validazione: una formazione salvata valida non cambia.
+            unfieldable_athlete_ids=(
+                ()
+                if newcomers
+                else {ref.athlete_id for ref in refs if UUID(str(ref.athlete_id)) in no_vote}
+            ),
+        )
+        if not newcomers and not outcome.changed:
+            return saved, bench
+        by_id: dict[str, LineupPlayerResponse] = {
+            player.athlete_id: player for player in saved.bench
+        }
+        for row in newcomers:
+            assert row.role is not None
+            by_id[str(row.athlete_id)] = LineupPlayerResponse(
+                athleteId=str(row.athlete_id),
+                athleteName=row.athlete_name,
+                role=row.role.value,
+                slotKind=LineupSlotKind.BENCH.value,
+                sortOrder=0,
+            )
+        shown = [
+            by_id[str(ref.athlete_id)].model_copy(update={"sort_order": index})
+            for index, ref in enumerate(
+                ref for ref in outcome.bench if str(ref.athlete_id) in by_id
+            )
+        ]
+        return saved.model_copy(update={"bench": shown}), list(outcome.bench)
 
     def _league_has_ai_manager(self, league_id: UUID) -> bool:
         found = self._session.scalar(

@@ -443,6 +443,93 @@ describe("annulla invito nominativo", () => {
   });
 });
 
+describe("email nella directory (admin della lega e operatore)", () => {
+  function namesake(userId: string, email: string | null): FantasyCoachDirectoryItem {
+    return {
+      userId,
+      displayName: "Giuseppe Trotta",
+      email,
+      avatarUrl: null,
+      userType: "human",
+      availableForInvites: true,
+      namedInviteStatus: null,
+      memberSince: "10/2026",
+      concludedLeagues: 0,
+      bestPosition: null,
+      historySummary: "Nessuna lega conclusa",
+    };
+  }
+
+  async function mountWith(items: FantasyCoachDirectoryItem[]) {
+    vi.mocked(fetchManagerDirectory).mockReset();
+    vi.mocked(fetchManagerDirectory).mockResolvedValue({
+      items,
+      page: 1,
+      pageSize: 10,
+      total: items.length,
+      totalPages: 1,
+    });
+    saveStoredSession({
+      accessToken: "token-admin",
+      refreshToken: "refresh-admin",
+      user: { id: "admin-1", displayName: "Admin", globalRole: "member" },
+    });
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+    const root: Root = createRoot(host);
+    await act(async () => {
+      root.render(
+        createElement(MemoryRouter, {
+          initialEntries: ["/fantallenatori"],
+          children: createElement(ManagerDirectory, { leagueId: "league-1", isDemoMode: false }),
+        }),
+      );
+    });
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    return {
+      host,
+      cleanup() {
+        act(() => {
+          root.unmount();
+        });
+        host.remove();
+        clearStoredSession();
+      },
+    };
+  }
+
+  it("distingue due fantallenatori con lo stesso nome dall'email", async () => {
+    const { host, cleanup } = await mountWith([
+      namesake("trotta-1", "giuseppe.trotta@example.com"),
+      namesake("trotta-2", "gtrotta82@example.com"),
+    ]);
+
+    expect(host.querySelector('[data-testid="manager-email-trotta-1"]')?.textContent).toBe(
+      "giuseppe.trotta@example.com",
+    );
+    expect(host.querySelector('[data-testid="manager-email-trotta-2"]')?.textContent).toBe(
+      "gtrotta82@example.com",
+    );
+    // Anche il lettore di schermo distingue i due link al profilo.
+    expect(
+      host.querySelector('[data-testid="manager-open-trotta-1"]')?.getAttribute("aria-label"),
+    ).toBe("Apri il profilo di Giuseppe Trotta (giuseppe.trotta@example.com)");
+    cleanup();
+  });
+
+  it("senza email nella risposta non mostra nulla al suo posto", async () => {
+    const { host, cleanup } = await mountWith([namesake("trotta-1", null)]);
+
+    expect(host.querySelector('[data-testid="manager-email-trotta-1"]')).toBeNull();
+    expect(
+      host.querySelector('[data-testid="manager-open-trotta-1"]')?.getAttribute("aria-label"),
+    ).toBe("Apri il profilo di Giuseppe Trotta");
+    cleanup();
+  });
+});
+
 describe("inviti nominativi ricevuti", () => {
   it("espone azioni Accetta e Rifiuta", () => {
     const html = renderRoute("/inviti?persona=member");

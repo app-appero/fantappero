@@ -7,7 +7,7 @@ from datetime import UTC, datetime, timedelta
 from typing import Literal, NoReturn
 from uuid import UUID
 
-from sqlalchemy import func, or_, select, update
+from sqlalchemy import and_, func, or_, select, update
 from sqlalchemy.orm import Session, selectinload
 
 from auth.exceptions import ValidationAuthError
@@ -21,6 +21,7 @@ from database.enums import (
     LeagueRole,
     NamedInviteStatus,
     NotificationCategory,
+    PlatformRole,
     UserType,
 )
 from fantasy_teams.factory import ensure_team_for_membership
@@ -60,6 +61,75 @@ def directory_invite_status(status: NamedInviteStatus | None) -> str | None:
     if status is None or status == NamedInviteStatus.ACCEPTED:
         return None
     return status.value
+
+
+# Inviti nominativi della lega che mostrano l'email del destinatario al suo admin: quello in
+# corso (l'admin controlla di aver invitato la persona giusta e, se no, lo annulla) e quelli a
+# cui il fantallenatore ha risposto, accettando o rifiutando. Revocati e scaduti no: senza
+# risposta non c'è un legame con la lega, e un invito annullato per errore non deve lasciare
+# in vista l'email di chi non c'entra.
+EMAIL_INVITE_ANSWERED_STATUSES = (NamedInviteStatus.ACCEPTED, NamedInviteStatus.DECLINED)
+
+
+def _coach_in_league(league_id: UUID):
+    """EXISTS correlato a `User`: il fantallenatore è iscritto alla lega."""
+    return (
+        select(LeagueMembership.user_id)
+        .where(
+            LeagueMembership.league_id == league_id,
+            LeagueMembership.user_id == User.id,
+        )
+        .correlate(User)
+        .exists()
+    )
+
+
+def _coach_invited(league_id: UUID, now: datetime):
+    """EXISTS correlato a `User`: invito nominativo della lega in corso o con risposta."""
+    return (
+        select(NamedLeagueInvite.id)
+        .where(
+            NamedLeagueInvite.league_id == league_id,
+            NamedLeagueInvite.recipient_id == User.id,
+            or_(
+                NamedLeagueInvite.status.in_(EMAIL_INVITE_ANSWERED_STATUSES),
+                and_(
+                    NamedLeagueInvite.status == NamedInviteStatus.PENDING,
+                    NamedLeagueInvite.expires_at > now,
+                ),
+            ),
+        )
+        .correlate(User)
+        .exists()
+    )
+
+
+def can_see_coach_email(
+    league_access: LeagueAccess,
+    *,
+    coach_in_league: bool,
+    coach_invited: bool,
+) -> bool:
+    """Chi vede l'email di un fantallenatore, in directory e nel profilo (decisione del 20/11).
+
+    - L'operatore di piattaforma: sempre, anche quando nella lega è un
+      partecipante qualunque o non ne fa parte.
+    - L'admin della lega indicata nel percorso: solo per chi è già iscritto a
+      quella lega (`coach_in_league`) o ha un suo invito nominativo in corso o
+      con risposta (`coach_invited`, vedi `EMAIL_INVITE_ANSWERED_STATUSES`).
+      Per tutti gli altri utenti della directory vede solo il nome.
+    - Nessun altro: un partecipante normale non vede l'email altrui, e chi
+      amministra un'altra lega non la vede passando da questa.
+
+    Il controllo è qui, non solo sui permessi della rotta: la directory oggi
+    richiede `league:admin`, ma se un giorno si aprisse ai membri l'email
+    resterebbe comunque nascosta.
+    """
+    if league_access.operator_bypass or league_access.user.platform_role == PlatformRole.OPERATOR:
+        return True
+    if league_access.api_role != LeagueRole.LEAGUE_ADMIN:
+        return False
+    return coach_in_league or coach_invited
 
 
 class NamedLeagueInviteService:
@@ -102,15 +172,7 @@ class NamedLeagueInviteService:
 
         latest_status = latest_invite(NamedLeagueInvite.status)
         latest_id = latest_invite(NamedLeagueInvite.id)
-        in_league = (
-            select(LeagueMembership.user_id)
-            .where(
-                LeagueMembership.league_id == league_access.league.id,
-                LeagueMembership.user_id == User.id,
-            )
-            .correlate(User)
-            .exists()
-        )
+        in_league = _coach_in_league(league_access.league.id)
         effective_available = or_(
             User.user_type == UserType.AI,
             UserProfile.available_for_invites.is_(True),
@@ -138,6 +200,7 @@ class NamedLeagueInviteService:
                 latest_status.label("invite_status"),
                 latest_id.label("invite_id"),
                 in_league.label("in_league"),
+                _coach_invited(league_access.league.id, now).label("invited"),
             )
             .outerjoin(UserProfile, UserProfile.user_id == User.id)
             .where(*conditions)
@@ -162,6 +225,15 @@ class NamedLeagueInviteService:
                     if profile is not None and profile.display_name
                     else (user.email.split("@", 1)[0] or user.email)
                 ),
+                email=(
+                    user.email
+                    if can_see_coach_email(
+                        league_access,
+                        coach_in_league=bool(is_member),
+                        coach_invited=bool(invited),
+                    )
+                    else None
+                ),
                 avatarUrl=profile.avatar_url if profile is not None else None,
                 nickname=profile.nickname if profile is not None else None,
                 userType=user.user_type.value,
@@ -183,7 +255,7 @@ class NamedLeagueInviteService:
                 bestPosition=histories[user.id].best_position,
                 historySummary=summary_line(histories[user.id]),
             )
-            for user, profile, invite_status, invite_id, is_member in rows
+            for user, profile, invite_status, invite_id, is_member, invited in rows
         ]
         get_metrics().incr("coach_directory_viewed_total", labels={"result": "success"})
         return FantasyCoachDirectoryResponse(
@@ -211,10 +283,9 @@ class NamedLeagueInviteService:
         membro, non solo admin — prima era `LEAGUE_ADMIN`, impedendo a un
         membro normale di aprire il profilo di un altro fantallenatore della
         sua stessa lega). Lo storico restituisce solo fatti derivati da
-        leghe concluse — mai budget, rose o nomi di lega; l'email resta
-        `null` per chi non amministra la lega, per distinguere account
-        diversi con lo stesso nome mostrato solo a chi ha bisogno di
-        amministrare la lega (EP13-P06bis).
+        leghe concluse — mai budget, rose o nomi di lega; l'email la vedono
+        solo l'operatore e l'admin di questa lega per chi ne fa parte o ne ha
+        un invito nominativo (vedi `can_see_coach_email`, EP13-P06bis).
 
         Il chiamante NON viene escluso: la directory (`directory()`) lo
         elenca già con `isSelf=True`, e la Classifica può linkare anche la
@@ -246,7 +317,13 @@ class NamedLeagueInviteService:
             .scalar_subquery()
         )
         row = self._session.execute(
-            select(User, UserProfile, latest_status.label("invite_status"))
+            select(
+                User,
+                UserProfile,
+                latest_status.label("invite_status"),
+                _coach_in_league(league_access.league.id).label("in_league"),
+                _coach_invited(league_access.league.id, now).label("invited"),
+            )
             .outerjoin(UserProfile, UserProfile.user_id == User.id)
             .where(
                 User.id == user_id,
@@ -256,7 +333,7 @@ class NamedLeagueInviteService:
         if row is None:
             self._fail("Fantallenatore non trovato.", "coach_not_found", "not_found")
 
-        user, profile, invite_status = row
+        user, profile, invite_status, in_league, invited = row
         # Niente filtro su email verificata / nome visualizzato impostato:
         # la directory (`directory()`) elenca già utenti non verificati o
         # senza profilo completo (es. un fantallenatore MANUALE appena
@@ -270,15 +347,20 @@ class NamedLeagueInviteService:
         )
         history = load_history(self._session, user_id=user.id)
         page_items, total = placements_page(history.placements, page=page, page_size=page_size)
-        is_admin = league_access.operator_bypass or (
-            league_access.api_role == LeagueRole.LEAGUE_ADMIN
-        )
 
         get_metrics().incr("coach_profile_viewed_total", labels={"result": "success"})
         return FantasyCoachProfileResponse(
             userId=str(user.id),
             displayName=display_name,
-            email=user.email if is_admin else None,
+            email=(
+                user.email
+                if can_see_coach_email(
+                    league_access,
+                    coach_in_league=bool(in_league),
+                    coach_invited=bool(invited),
+                )
+                else None
+            ),
             avatarUrl=profile.avatar_url if profile is not None else None,
             nickname=profile.nickname if profile is not None else None,
             userType=user.user_type.value,

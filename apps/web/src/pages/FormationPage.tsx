@@ -14,6 +14,7 @@ import {
   MAX_AUTOMATIC_SUBSTITUTIONS,
   MAX_TACTICAL_MOVES,
   approvedModuleCatalog,
+  benchQuotaSwapIds,
   blockingLineupSaveIssue,
   copyPreviousLineup,
   evaluateBenchOrderLock,
@@ -22,6 +23,7 @@ import {
   evaluateTacticalMove,
   fantasyBadgesFromBonusMalus,
   formatFantasyPoints,
+  formationLineupBench,
   athleteLockAt,
   computeCountdown,
   formatCountdown,
@@ -36,6 +38,7 @@ import {
   preserveLockedStarters,
   labelFantasyTurnStatus,
   resolveDefaultEuropeanTurn,
+  restoreBenchActiveRoles,
   rosterDepartureNotices,
   savedStarterSlotIds,
   slotsFromLineupIds,
@@ -727,14 +730,13 @@ export function FormationPage() {
     benchIds,
   );
   /** Panchina e tribuna della formazione: quella che si salva e si confronta con il server. */
-  const lineupBench = [
-    ...orderedBench.filter(
-      (athleteId) => !(playerBlocked(roster, athleteId) && !savedBench.includes(athleteId)),
-    ),
-    ...orderedBench.filter(
-      (athleteId) => playerBlocked(roster, athleteId) && !savedBench.includes(athleteId),
-    ),
-  ];
+  const lineupBench = formationLineupBench({
+    orderedBench,
+    savedBench,
+    // Chi è già stato messo in un posto (anche da «Sistema la panchina») resta lì.
+    placedBench: benchIds,
+    isBlocked: (athleteId) => playerBlocked(roster, athleteId),
+  });
   const roleQuotaExcessIds = roster
     .filter((row) => row.exceedsRoleQuota === true && !displayStarters.includes(row.athleteId))
     .map((row) => row.athleteId);
@@ -764,19 +766,27 @@ export function FormationPage() {
     (lockedSet.has(athleteId) ? fieldedRoleById.get(athleteId) : undefined) ??
     playerRole(roster, athleteId);
 
-  // Sulla panchina mostrata e su tutta la rosa: chi è in esubero in fondo alla tribuna non dà
-  // errori; se fosse titolare (formazione salvata prima), il motivo con il nome lo dà il server.
+  // Sulla panchina che si salva, senza chi è in esubero in fondo alla tribuna: non si può
+  // spostare e il server non lo conta nella quota dei primi 10 (prima la pagina chiedeva un
+  // attaccante in più che non si poteva schierare). Se fosse titolare (formazione salvata prima),
+  // il motivo con il nome lo dà il server.
+  const lineupBenchPlayers = lineupBench.map((athleteId) => ({
+    athleteId,
+    role: validationRole(athleteId),
+  }));
+  // Chi di sicuro non prende il voto non alza la quota dei primi 10, come sul server (20/11).
+  const unfieldableIds = roster.filter((row) => row.selectionBlocked === true).map((row) => row.athleteId);
   const clientEvaluation = evaluateLineup({
     module: moduleCode,
     starters: displayStarters.filter(Boolean).map((athleteId) => ({
       athleteId,
       role: validationRole(athleteId),
     })),
-    bench: displayBench.map((athleteId) => ({
-      athleteId,
-      role: validationRole(athleteId),
-    })),
-    rosterAthleteIds: roster.map((row) => row.athleteId),
+    bench: lineupBenchPlayers,
+    rosterAthleteIds: roster
+      .map((row) => row.athleteId)
+      .filter((athleteId) => !roleQuotaExcessIds.includes(athleteId)),
+    unfieldableAthleteIds: unfieldableIds,
   });
   // Chi non è più in rosa è stato tolto dalla formazione dal server: si dice chi (QA 19/11).
   const rosterNotices = rosterDepartureNotices(context?.issues);
@@ -1212,13 +1222,39 @@ export function FormationPage() {
     }
   }
 
-  /** Riporta la panchina alla regola 1P·3D·3C·3A nei primi 10 posti, senza toccare i titolari. */
+  /**
+   * Riporta la panchina alla regola 1P·3D·3C·3A nei primi 10 posti, senza toccare i titolari: per
+   * ogni ruolo che manca sale il primo della tribuna con quel ruolo al posto di chi è in più (stessa
+   * regola del server). Se non si può (partite già iniziate), lo dice e non cambia niente.
+   */
   function fixActiveBench() {
-    const ordered = orderBenchForActiveRoles(
-      displayBench.map((athleteId) => ({ athleteId, role: validationRole(athleteId) })),
-    );
-    setBenchIds(ordered.map((player) => player.athleteId));
-    pushToast({ title: "Panchina sistemata: 1 portiere, 3 difensori, 3 centrocampisti, 3 attaccanti.", variant: "success" });
+    const repair = restoreBenchActiveRoles(lineupBenchPlayers, {
+      lockedAthleteIds,
+      unfieldableAthleteIds: unfieldableIds,
+    });
+    const next = repair.bench.map((player) => player.athleteId);
+    const orderIssues =
+      repair.moves.length > 0
+        ? evaluateBenchOrderLock({ previousBench: previousBenchIds(), proposedBench: next, lockedAthleteIds })
+        : [];
+    if (orderIssues.length > 0) {
+      pushToast({ title: orderIssues[0]?.message ?? KICKOFF_LOCK_MESSAGE, variant: "danger" });
+      return;
+    }
+    if (repair.moves.length > 0) {
+      setBenchIds(next);
+    }
+    if (repair.message) {
+      pushToast({ title: repair.message, variant: "danger" });
+      return;
+    }
+    const moved = repair.moves
+      .map(({ promoted, demoted }) => `${playerName(roster, promoted.athleteId)} al posto di ${playerName(roster, demoted.athleteId)}`)
+      .join(", ");
+    pushToast({
+      title: `Panchina sistemata: 1 portiere, 3 difensori, 3 centrocampisti, 3 attaccanti${moved ? ` (in panchina ${moved})` : ""}.`,
+      variant: "success",
+    });
   }
 
   function assignStarter(index: number, athleteId: string) {
@@ -1805,13 +1841,18 @@ export function FormationPage() {
   // Panchina attiva: i primi 10 posti (1P·3D·3C·3A); oltre è tribuna. I cambi automatici restano `maxSubs`.
   const benchActive = context?.benchActiveSize ?? BENCH_ACTIVE_SIZE;
   const panchinaIds = displayBench.slice(0, benchActive);
-  // Per ogni posto di panchina/tribuna: solo i calciatori dello stesso ruolo, con dove stanno ora.
+  // Per ogni posto di panchina/tribuna: i calciatori dello stesso ruolo, con dove stanno ora. Se i
+  // primi 10 sono fuori quota anche chi rimette a posto il ruolo che manca (es. per il portiere
+  // salito al 10° posto, gli attaccanti in tribuna).
   const benchChoicesFor = (index: number) => {
     const role = playerRole(roster, displayBench[index] ?? "");
+    const quotaSwaps = new Set(
+      index < lineupBench.length ? benchQuotaSwapIds(lineupBenchPlayers, index, unfieldableIds) : [],
+    );
     return roster
       .filter(
         (row) =>
-          row.role === role &&
+          (row.role === role || quotaSwaps.has(row.athleteId)) &&
           row.athleteId !== displayBench[index] &&
           !playerLocked(roster, row.athleteId, clock, lockMarginMinutes),
       )
@@ -1822,11 +1863,16 @@ export function FormationPage() {
           : pos >= 0 && pos < benchActive
             ? `Panchina ${pos + 1}°`
             : "Tribuna";
+        const quotaNote = quotaSwaps.has(row.athleteId)
+          ? pos < benchActive
+            ? ` · ${row.role} in più nei primi ${benchActive}`
+            : ` · ${row.role}, manca nei primi ${benchActive}`
+          : "";
         return {
           athleteId: row.athleteId,
-          name: `${playerName(roster, row.athleteId)}${probableMark(roster, row.athleteId)} · ${where}`,
+          name: `${playerName(roster, row.athleteId)}${probableMark(roster, row.athleteId)} · ${where}${quotaNote}`,
           plainName: playerName(roster, row.athleteId),
-          note: where,
+          note: `${where}${quotaNote}`,
           tone: probableState(roster, row.athleteId),
           countdown: lockLabel(row.athleteId),
           role: playerRole(roster, row.athleteId),
@@ -2380,7 +2426,8 @@ export function FormationPage() {
             </p>
             <p className="fa-bench-touch-hint">
               Tocca un calciatore per scambiarlo con un altro dello stesso ruolo (i bloccati non
-              compaiono); il numero a sinistra è l&apos;ordine di ingresso.
+              compaiono; se nei primi {benchActive} manca un ruolo, anche con chi manca); il numero
+              a sinistra è l&apos;ordine di ingresso.
             </p>
             {displayBench.length === 0 ? (
               <p data-testid="formation-bench-empty">Nessun panchinaro: tutti i calciatori sono titolari.</p>

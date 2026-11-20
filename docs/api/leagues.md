@@ -422,15 +422,37 @@ distinguere «non esiste» da «non visibile».
 | Esposto | Non esposto |
 | --- | --- |
 | Nome visualizzato, avatar, tipo (Manuale/IA) | Budget, rose, formazioni |
-| Email (solo a chi amministra la lega, `league:admin`) | — |
+| Email, in elenco e nel profilo: all'operatore sempre, all'admin solo per chi è iscritto alla lega o ne ha un invito nominativo in corso o con risposta | Email degli utenti senza legami con la lega (per l'admin); ricerca per email |
 | Anzianità in forma `MM/AAAA` | Data esatta di iscrizione |
 | Numero di leghe **concluse**, miglior piazzamento | **Nomi delle leghe** |
 | Per piazzamento: stagione, posizione, partecipanti, partite, punti | Id delle leghe, avversari |
 
-L'email serve solo a distinguere account diversi che condividono lo stesso
-nome mostrato (capita nel pilota, tra conoscenti): resta dietro al perimetro
-amministrativo già descritto sopra, non compare mai nelle viste rivolte ai
-membri di lega.
+L'email serve a distinguere account diversi che condividono lo stesso nome
+mostrato (capita nel pilota, tra conoscenti). Chi la riceve, in elenco e nel
+profilo (regola unica: `can_see_coach_email` in
+`leagues/named_invite_service.py`, decisione del 20/11):
+
+- **Operatore**: sempre, per tutti i fantallenatori, anche quando nella lega
+  del percorso è un partecipante qualunque o non ne fa parte.
+- **Admin della lega del percorso**: solo per chi è già iscritto a quella lega
+  o ha un suo invito nominativo **in corso** (non oltre la scadenza) o **con
+  risposta** (accettato, anche se poi è uscito, o rifiutato). L'invito in
+  corso serve a controllare di aver invitato la persona giusta e, se no, ad
+  annullarlo; dopo una risposta il fantallenatore ha già avuto a che fare con
+  la lega. Inviti **revocati** o **scaduti** non contano: senza risposta non
+  c'è un legame, e un invito annullato per errore non lascia in vista l'email
+  di chi non c'entra. Per tutti gli altri utenti della directory l'admin vede
+  solo il nome (`email: null`): due omonimi senza legami con la lega si
+  distinguono da avatar, nickname, «dal MM/AAAA» e storico.
+- **Tutti gli altri** (partecipante normale, anche nel profilo aperto dalla
+  Classifica): `email: null`. Chi amministra un'altra lega non la vede
+  passando da una lega in cui è un semplice partecipante.
+
+Nota: mentre un invito è in corso l'admin vede l'email del destinatario anche
+se poi lo annulla. L'invito però resta nel registro della lega
+(`named_invite_created`), arriva al destinatario come notifica, ha un limite
+di frequenza e si può mandare solo a chi ha l'email verificata e accetta
+inviti.
 
 Il nome della lega non compare mai: un amministratore non deve poter dedurre a
 quali leghe private altrui una persona partecipa. Il numero di partecipanti
