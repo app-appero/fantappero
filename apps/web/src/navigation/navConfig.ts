@@ -173,6 +173,7 @@ export const MARKET_HUB_PATHS = [
   "/asta",
   "/asta-live",
   "/svincoli",
+  "/svincolati",
   "/mercato",
 ] as const;
 

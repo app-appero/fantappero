@@ -7,6 +7,7 @@ import type {
   FantasyTeamSummary,
   LeagueListoneEntry,
   RosterOccupancyEntry,
+  RosterOwnershipSource,
 } from "@fantappero/contracts";
 import { parseWireframeStateFromSearch } from "../../wireframes/useWireframeState";
 import {
@@ -84,6 +85,23 @@ export function reasonLabel(reason: string): string {
   return reason;
 }
 
+const OWNERSHIP_SOURCE_LABEL: Record<RosterOwnershipSource, string> = {
+  manual: "Inserimento manuale",
+  csv_import: "Importazione da file",
+  admin: "Assegnazione admin",
+  market: "Mercato",
+};
+
+/**
+ * Etichetta italiana dell'origine di un possesso nello storico della rosa (QA 19-20/11: si
+ * vedeva il codice, «market» o «csv_import»). Un codice nuovo non ancora tradotto mostra «Altro».
+ */
+export function ownershipSourceLabel(source: string): string {
+  return Object.prototype.hasOwnProperty.call(OWNERSHIP_SOURCE_LABEL, source)
+    ? OWNERSHIP_SOURCE_LABEL[source as RosterOwnershipSource]
+    : "Altro";
+}
+
 export function formatLedgerDate(iso: string): string {
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) {
@@ -98,15 +116,16 @@ export function formatLedgerDate(iso: string): string {
   });
 }
 
+/**
+ * Movimenti dal più recente. Il server li manda dal più vecchio, già nell'ordine in cui il
+ * saldo si è mosso: a parità di orario (stesso millisecondo) si tiene quell'ordine, rovesciato.
+ * Prima a parità si ordinava per id, che è casuale.
+ */
 export function sortLedgerNewestFirst(entries: CreditLedgerList["entries"]) {
-  return [...entries].sort((left, right) => {
-    const leftTime = Date.parse(left.createdAt);
-    const rightTime = Date.parse(right.createdAt);
-    if (leftTime !== rightTime) {
-      return rightTime - leftTime;
-    }
-    return right.id.localeCompare(left.id);
-  });
+  return entries
+    .map((entry, index) => ({ entry, index, time: Date.parse(entry.createdAt) }))
+    .sort((left, right) => right.time - left.time || right.index - left.index)
+    .map(({ entry }) => entry);
 }
 
 export function formatLedgerEntry(entry: CreditLedgerList["entries"][number]): string {

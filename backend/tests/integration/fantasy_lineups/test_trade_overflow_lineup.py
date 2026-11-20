@@ -25,10 +25,12 @@ from database.enums import (
     LeagueMemberRole,
     LeagueState,
     RosterCompositionStatus,
+    RosterOwnershipSource,
 )
 from database.session import create_session_factory
 from fantasy_teams.composition_service import sync_team_composition_status
 from fantasy_teams.models import FantasyRosterSlot, FantasyTeam
+from fantasy_teams.ownership import open_ownership_interval
 from fantasy_turns.models import FantasyRound, FantasyRoundFixture
 from leagues.models.competition import Competition
 from leagues.models.league import League
@@ -156,8 +158,15 @@ def _fill_full_roster(
     *,
     provider_offset: int,
     label: str,
+    record_ownership: bool = False,
 ) -> dict[FantasyRole, list[UUID]]:
-    """35 calciatori con ruoli esatti, distribuiti sui club dei tre campionati."""
+    """35 calciatori con ruoli esatti, distribuiti sui club dei tre campionati.
+
+    Con ``record_ownership`` ciascuno apre anche il suo intervallo di possesso
+    (``RosterOwnershipInterval``), come ogni ingresso in rosa vero (asta, mercato, admin): lo
+    storico dice se un calciatore fuori rosa ne è uscito o non c'è mai stato. Di default no:
+    alcuni test costruiscono da sé lo storico (o la sua assenza, come nei dati legacy).
+    """
     slots = db_session.scalars(
         select(FantasyRosterSlot)
         .where(FantasyRosterSlot.fantasy_team_id == UUID(team_id))
@@ -185,6 +194,16 @@ def _fill_full_roster(
             )
             slots[index].athlete_id = athlete.id
             slots[index].purchase_credits = 1
+            if record_ownership:
+                open_ownership_interval(
+                    db_session,
+                    league_id=slots[index].league_id,
+                    fantasy_team_id=UUID(team_id),
+                    athlete_id=athlete.id,
+                    slot_index=slots[index].slot_index,
+                    purchase_credits=1,
+                    source=RosterOwnershipSource.ADMIN,
+                )
             by_role[role].append(athlete.id)
             index += 1
     db_session.commit()
@@ -198,8 +217,12 @@ def _trade_league(
     *,
     prefix: str,
     id_offset: int,
+    record_ownership: bool = False,
 ) -> dict:
-    """Lega avviata con due squadre a rosa completa e convalidata e un turno aperto."""
+    """Lega avviata con due squadre a rosa completa e convalidata e un turno aperto.
+
+    ``record_ownership``: le rose aprono anche lo storico dei possessi (`_fill_full_roster`).
+    """
     token_a, _ = _register_and_login(client, f"{prefix}.a@example.com")
     token_b, user_b = _register_and_login(client, f"{prefix}.b@example.com")
     created = client.post(
@@ -221,10 +244,20 @@ def _trade_league(
         db_session, league_id, competition_ids, id_offset=id_offset
     )
     roles_a = _fill_full_roster(
-        db_session, team_a, clubs, provider_offset=id_offset + 1_000, label="SqA"
+        db_session,
+        team_a,
+        clubs,
+        provider_offset=id_offset + 1_000,
+        label="SqA",
+        record_ownership=record_ownership,
     )
     roles_b = _fill_full_roster(
-        db_session, team_b, clubs, provider_offset=id_offset + 2_000, label="SqB"
+        db_session,
+        team_b,
+        clubs,
+        provider_offset=id_offset + 2_000,
+        label="SqB",
+        record_ownership=record_ownership,
     )
 
     league = db_session.get(League, UUID(league_id))

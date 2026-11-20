@@ -164,3 +164,39 @@ def test_refresh_maps_rate_limit(monkeypatch: pytest.MonkeyPatch) -> None:
     with pytest.raises(ValidationAuthError) as exc:
         service.refresh_from_provider(_access(), client=client)  # type: ignore[arg-type]
     assert exc.value.code == "provider_rate_limited"
+
+
+def test_refresh_recomputes_the_rosters_of_the_athletes_whose_role_changed(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Il listone vale per tutte le leghe della stagione: dopo la rigenerazione si
+    ricalcolano le rose con i calciatori a cui è cambiato il ruolo (QA 20/11)."""
+    service = LeagueListoneService(_FakeSession())  # type: ignore[arg-type]
+    client = SimpleNamespace(close=lambda: None)
+    changed = {uuid4(), uuid4()}
+    resynced: list[dict] = []
+    monkeypatch.setattr(LeagueListoneService, "_count_clubs_for_season", lambda self, year: 12)
+    monkeypatch.setattr(
+        "leagues.listone_service.sync_mvp_catalog_with_client", lambda *_a, **_k: None
+    )
+    monkeypatch.setattr(
+        "leagues.listone_service.sync_mvp_roster_with_client",
+        lambda *_a, **_k: RosterSyncResult(counters=RosterSyncCounters()),
+    )
+    monkeypatch.setattr(
+        "leagues.listone_service.generate_official_listone",
+        lambda *_a, **_k: ListoneGenerateResult(
+            season_year=2026,
+            mapping_version="v1.0.0",
+            counters=ListoneGenerateCounters(updated=2),
+            affected_athlete_ids=changed,
+        ),
+    )
+    monkeypatch.setattr(
+        "leagues.listone_service.resync_team_compositions",
+        lambda _session, **kwargs: resynced.append(kwargs) or 3,
+    )
+
+    service.refresh_from_provider(_access(), client=client)  # type: ignore[arg-type]
+
+    assert resynced == [{"athlete_ids": changed, "season_year": 2026}]

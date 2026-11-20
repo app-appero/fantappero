@@ -1,5 +1,6 @@
 import type { FantasyTeamSummary, LiveLot, LiveTurnOrderEntry, MarketLiveNominationMode } from "@fantappero/contracts";
 import {
+  avatarInitial,
   LIVE_SEAT_LEGEND,
   LIVE_SEAT_ME_COLOR,
   liveSeatCueColor,
@@ -100,7 +101,7 @@ export function LiveAuctionTable({
                   },
                 ]}
               >
-                <Text style={styles.avatarLabel}>{team.name.charAt(0).toUpperCase()}</Text>
+                <Text style={styles.avatarLabel}>{avatarInitial(team.name)}</Text>
               </View>
               <Text style={[styles.seatName, { color: nameColor }]} numberOfLines={1}>
                 {team.name}

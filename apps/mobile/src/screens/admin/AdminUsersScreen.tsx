@@ -4,6 +4,7 @@ import type {
   AdminUser,
   PaginatedAdminUsers,
 } from "@fantappero/contracts";
+import { avatarInitials } from "@fantappero/contracts";
 import { useNavigation } from "@react-navigation/core";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useCallback, useEffect, useState } from "react";
@@ -482,7 +483,7 @@ export function AdminUsersScreen() {
             <View key={row.id} style={styles.listRow} testID={`admin-user-${row.id}`}>
               <View style={local.userHead}>
                 <View style={local.avatar}>
-                  <Text style={local.avatarLabel}>{initialsOf(row.displayName)}</Text>
+                  <Text style={local.avatarLabel}>{avatarInitials(row.displayName)}</Text>
                 </View>
                 <View style={{ flex: 1, minWidth: 0 }}>
                   <Text style={styles.name}>{row.displayName}</Text>
@@ -801,15 +802,6 @@ export function AdminUsersScreen() {
       </Modal>
     </PageContainer>
   );
-}
-
-function initialsOf(name: string): string {
-  return name
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part.charAt(0).toUpperCase())
-    .join("");
 }
 
 const local = lazyStyles(() => StyleSheet.create({

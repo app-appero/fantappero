@@ -8,6 +8,7 @@ import type {
 import { theme } from "@fantappero/ui/theme";
 import { reasonLabel } from "./ledgerReason";
 
+export { sortLedgerNewestFirst } from "./ledgerOrder";
 export {
   filterByTab,
   filterListone,
@@ -17,6 +18,7 @@ export {
   type RoleTab,
 } from "./listoneFilter";
 export { reasonLabel };
+export { ownershipSourceLabel } from "./ownershipSource";
 
 const { colors } = theme;
 
@@ -63,17 +65,6 @@ export function formatLedgerEntry(entry: CreditLedgerList["entries"][number]): s
   const note = entry.note?.trim();
   const detail = note ? ` — ${note}` : "";
   return `${formatLedgerDate(entry.createdAt)} · ${reasonLabel(entry.reason)}${detail}: ${sign}${entry.amount} → saldo ${entry.balanceAfter}`;
-}
-
-export function sortLedgerNewestFirst(entries: CreditLedgerList["entries"]) {
-  return [...entries].sort((left, right) => {
-    const leftTime = Date.parse(left.createdAt);
-    const rightTime = Date.parse(right.createdAt);
-    if (leftTime !== rightTime) {
-      return rightTime - leftTime;
-    }
-    return right.id.localeCompare(left.id);
-  });
 }
 
 export function buildOwnership(entries: RosterOccupancyEntry[]): Map<string, AthleteOwnership> {

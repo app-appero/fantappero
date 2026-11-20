@@ -26,7 +26,7 @@ import {
 } from "@fantappero/ui";
 import { useMemo, useState } from "react";
 import { AthleteName } from "../../athletes/AthleteCard";
-import { formatLedgerEntry, LEDGER_PAGE_SIZE, roleLabel } from "./rosterHelpers";
+import { formatLedgerEntry, LEDGER_PAGE_SIZE, ownershipSourceLabel, roleLabel } from "./rosterHelpers";
 
 export function RosterHistorySection({
   historyLoading,
@@ -181,7 +181,7 @@ export function RosterHistorySection({
                         ? new Date(row.releasedAt).toLocaleString("it-IT")
                         : "In rosa"}
                     </TableCell>
-                    <TableCell>{row.source}</TableCell>
+                    <TableCell>{ownershipSourceLabel(row.source)}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>

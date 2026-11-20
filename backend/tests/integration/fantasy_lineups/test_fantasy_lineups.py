@@ -33,7 +33,7 @@ from leagues.models.competition import Competition
 from leagues.models.league import League
 from leagues.models.league_audit_event import LeagueAuditEvent
 from mail.capture import get_captured_emails
-from sports_data.catalog.models import Club, SportSeason
+from sports_data.catalog.models import Club, CompetitionSeasonClub, SportSeason
 from sports_data.fixtures.models import Fixture
 from sports_data.listone.models import LeagueRoleOverride, RoleAssignment
 from sports_data.roster.models import Athlete
@@ -271,6 +271,30 @@ def _lineup_payload(
     }
 
 
+def _register_club_in_competitions(
+    db_session: Session, club: Club, competition_ids: list[str]
+) -> None:
+    """Il club gioca in tutti i campionati della lega (2026).
+
+    Così una rosa tutta su quel club è convalidata davvero (regola dei 3 campionati), come
+    lo stato salvato che i test scrivono a mano: le letture della rosa riallineano uno stato
+    salvato che la valutazione non conferma (fonte unica dello stato, QA 20/11).
+    """
+    for raw_competition_id in competition_ids:
+        competition_id = UUID(raw_competition_id)
+        season = db_session.scalars(
+            select(SportSeason).where(
+                SportSeason.competition_id == competition_id, SportSeason.year == 2026
+            )
+        ).first()
+        if season is None:
+            season = SportSeason(competition_id=competition_id, year=2026, is_current=True)
+            db_session.add(season)
+            db_session.flush()
+        db_session.add(CompetitionSeasonClub(sport_season_id=season.id, club_id=club.id))
+    db_session.commit()
+
+
 def _count_request_queries(call) -> tuple[object, int]:
     engine = auth_dependencies._engine
     assert engine is not None
@@ -298,13 +322,16 @@ def test_full_roster_and_lineup_query_counts_are_bounded(
     league_id = _create_league(client, token, competition_ids, "Lega Query Budget")
     grouped = _seed_roster_athletes(db_session, id_offset=2_390_000)
     athletes = _fill_validated_roster(db_session, league_id, grouped)
-    fantasy_round, _clubs = _create_open_round(
+    fantasy_round, clubs = _create_open_round(
         db_session,
         league_id,
         cutoff=datetime.now(UTC) + timedelta(hours=4),
         id_offset=2_395_000,
         competition_ids=competition_ids,
     )
+    # Rosa convalidata davvero: con una convalidata solo a mano (0 campionati) GET /rosa la
+    # riallineerebbe e il conteggio misurerebbe la riparazione, non la lettura normale.
+    _register_club_in_competitions(db_session, clubs[-1], competition_ids)
     headers = {"Authorization": f"Bearer {token}"}
     saved = client.put(
         f"/leagues/{league_id}/turni/{fantasy_round.id}/formazione",

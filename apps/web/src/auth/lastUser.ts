@@ -1,5 +1,7 @@
 /** Ultimo account che ha fatto accesso su questo dispositivo (nome ed email, nessun segreto). */
 
+import { avatarInitials } from "@fantappero/contracts";
+
 const LAST_USER_KEY = "fantappero.lastUser";
 
 export type LastUser = {
@@ -55,13 +57,7 @@ export function clearLastUser(): void {
   }
 }
 
-/** Iniziali per l'avatar (massimo due lettere). */
+/** Iniziali per l'avatar (prima e ultima parola; un'emoji resta intera). */
 export function initialsOf(displayName: string): string {
-  const parts = displayName.trim().split(/\s+/).filter(Boolean);
-  const letters = parts.length > 1 ? [parts[0], parts[parts.length - 1]] : [parts[0] ?? "?"];
-  return letters
-    .map((part) => part?.charAt(0) ?? "")
-    .join("")
-    .toUpperCase()
-    .slice(0, 2);
+  return avatarInitials(displayName, { words: "first-last" });
 }

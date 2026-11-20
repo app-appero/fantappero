@@ -4,6 +4,7 @@ import type {
   RosterOccupancyEntry,
   TradeProposal,
 } from "@fantappero/contracts";
+import { avatarLetters } from "@fantappero/contracts";
 import { HScroll } from "../../components/HScroll";
 import { DateTimeField, formatDateTimeValue } from "../../components/DateTimeField";
 import { useEffect, useState } from "react";
@@ -267,7 +268,7 @@ export function MarketTradeList({
                 <View style={styles.proposalHead}>
                   <View style={styles.proposalAvatar}>
                     <Text style={styles.proposalAvatarLabel}>
-                      {teamNameFor(proposal.proposerTeamId).slice(0, 2).toUpperCase()}
+                      {avatarLetters(teamNameFor(proposal.proposerTeamId))}
                     </Text>
                   </View>
                   <Text style={styles.proposalTitle}>

@@ -6,7 +6,9 @@ toglie già dalla formazione salvata e dalla bozza (fantasy_lineups.departures, 
 test_lineup_departure_purge.py); se resta lì per altre vie (dati precedenti, correzioni fatte
 a mano nel DB) GET formazione lo toglie comunque dai titolari e dalla panchina restituiti. In
 entrambi i casi il suo posto resta vuoto e l'avviso dice chi è stato tolto. Il salvataggio con
-lui ancora dentro resta rifiutato, ma il messaggio dice chi è. Al primo blocco del turno lo
+lui ancora dentro resta rifiutato, ma il messaggio dice chi è: «non è più nella tua rosa» se in
+rosa c'è stato davvero (lo storico dei possessi, perciò qui ``record_ownership``), «non è nella
+tua rosa» per chi non c'è mai stato (QA 19-20/11). Al primo blocco del turno lo
 toglie la regola di inizio turno (fantasy_lineups.turn_start, test_lineup_turn_start_autofill.py),
 anche se la sua partita è già in blocco. Nei turni già calcolati o conclusi la formazione non si
 tocca: è storia del punteggio.
@@ -129,7 +131,12 @@ def test_bench_player_traded_away_leaves_the_open_turn_lineup(
     competition_ids: list[str],
 ) -> None:
     setup = _trade_league(
-        client, db_session, competition_ids, prefix="lar.panchina", id_offset=9_500_000
+        client,
+        db_session,
+        competition_ids,
+        prefix="lar.panchina",
+        id_offset=9_500_000,
+        record_ownership=True,
     )
     token = setup["token_a"]
     payload = _save_lineup(client, db_session, setup)
@@ -186,13 +193,65 @@ def test_bench_player_traded_away_leaves_the_open_turn_lineup(
     assert [player["athleteId"] for player in again["lineup"]["bench"]] == corrected_bench
 
 
+def test_player_of_another_team_is_refused_with_the_neutral_message(
+    client: TestClient,
+    db_session: Session,
+    competition_ids: list[str],
+) -> None:
+    """QA 19-20/11: chi non è mai stato in rosa non «non è più» nella tua rosa: «non è»."""
+    setup = _trade_league(
+        client,
+        db_session,
+        competition_ids,
+        prefix="lar.altrui",
+        id_offset=9_300_000,
+        record_ownership=True,
+    )
+    token = setup["token_a"]
+    payload = _save_lineup(client, db_session, setup)
+    outsider = setup["roles_b"][FantasyRole.D][0]
+    name = _name(db_session, outsider)
+    bench = list(payload["benchAthleteIds"])
+    bench[3] = str(outsider)
+    foreign = {**payload, "benchAthleteIds": bench}
+
+    saved = client.put(_lineup_url(setup), headers=_headers(token), json=foreign)
+    assert saved.status_code == 400
+    assert saved.json()["code"] == "athlete_not_in_roster"
+    assert saved.json()["message"] == f"{name} non è nella tua rosa."
+
+    draft = client.put(f"{_lineup_url(setup)}/bozza", headers=_headers(token), json=foreign)
+    assert draft.status_code == 400
+    assert draft.json()["code"] == "athlete_not_in_roster"
+    assert draft.json()["message"] == f"{name} non è nella tua rosa."
+
+    # Con anche un difensore appena ceduto (più avanti in panchina) il neutro vale per entrambi;
+    # il solo ceduto resta «non è più» (test_bench_player_traded_away_leaves_the_open_turn_lineup).
+    position = next(
+        index
+        for index, athlete_id in enumerate(payload["benchAthleteIds"])
+        if index > 3 and setup["role_of"][UUID(athlete_id)] == FantasyRole.D
+    )
+    departed = UUID(payload["benchAthleteIds"][position])
+    departed_name = _name(db_session, departed)
+    _trade(client, setup, offered=[departed], requested=[setup["roles_b"][FantasyRole.D][-1]])
+    both = client.put(_lineup_url(setup), headers=_headers(token), json=foreign)
+    assert both.status_code == 400
+    assert both.json()["message"] == f"{name} e {departed_name} non sono nella tua rosa."
+
+
 def test_starter_removed_from_roster_leaves_an_empty_slot_in_lineup_and_draft(
     client: TestClient,
     db_session: Session,
     competition_ids: list[str],
 ) -> None:
     setup = _trade_league(
-        client, db_session, competition_ids, prefix="lar.titolare", id_offset=9_600_000
+        client,
+        db_session,
+        competition_ids,
+        prefix="lar.titolare",
+        id_offset=9_600_000,
+        record_ownership=True,
     )
     token = setup["token_a"]
     payload = _save_lineup(client, db_session, setup)

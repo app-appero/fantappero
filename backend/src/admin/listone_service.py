@@ -29,6 +29,7 @@ from auth.exceptions import ValidationAuthError
 from auth.models.user import User
 from config.settings.api import ApiSettings
 from config.settings.loader import get_api_settings
+from fantasy_teams.composition_service import resync_team_compositions
 from leagues.listone_refresh_progress import (
     ListoneRefreshProgress,
     load_active_job_id,
@@ -142,6 +143,14 @@ def refresh_platform_listone(
                 season_year=season_year,
                 on_progress=listone_progress,
             )
+            # Come l'aggiornamento dalla lega: le rose con calciatori a cui è cambiato il ruolo
+            # si ricalcolano (stato ed esuberi) in tutte le leghe della stagione.
+            if listone_result.affected_athlete_ids:
+                resync_team_compositions(
+                    session,
+                    athlete_ids=listone_result.affected_athlete_ids,
+                    season_year=season_year,
+                )
             refreshed_at = datetime.now(UTC)
             counters = AdminListoneRefreshCounters(
                 athletesCreated=roster_result.counters.athletes_created,

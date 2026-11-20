@@ -1,5 +1,5 @@
 import type { LeagueStanding } from "@fantappero/contracts";
-import { formatFantasyPoints } from "@fantappero/contracts";
+import { avatarInitials, formatFantasyPoints } from "@fantappero/contracts";
 import {
   Breadcrumb,
   Button,
@@ -101,16 +101,6 @@ function toTableRows(
   });
 }
 
-function initialsOf(name: string): string {
-  return name
-    .split(/\s+/)
-    .filter(Boolean)
-    .map((part) => part.charAt(0))
-    .slice(0, 2)
-    .join("")
-    .toUpperCase();
-}
-
 /** Primi tre in evidenza: 2° · 1° · 3° su desktop, in colonna su mobile. */
 function StandingsPodium({ rows }: { rows: StandingsRow[] }) {
   const top = rows.filter((row) => row.position <= 3).slice(0, 3);
@@ -126,7 +116,7 @@ function StandingsPodium({ rows }: { rows: StandingsRow[] }) {
         >
           <span className="fa-podium__rank">{row.position}°</span>
           <span className="fa-podium__avatar" aria-hidden="true">
-            {initialsOf(row.teamName)}
+            {avatarInitials(row.teamName)}
           </span>
           <span className="fa-podium__name">
             {row.teamName}

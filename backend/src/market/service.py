@@ -553,6 +553,8 @@ class MarketService:
                     "amount_credits": bid.amount_credits,
                     "not_assignable": bid.id in unassignable_bid_ids,
                     "lost_on_tie": bid.id in lost_on_tie_bid_ids,
+                    # Asta a buste o svincolati: titoli, testi e link dipendono dal tipo.
+                    "session_kind": market_session.kind.value,
                     **league_params(self._session, market_session.league_id),
                 },
                 dedup_key=f"market_bid_outcome:{bid.id}",
@@ -631,6 +633,7 @@ class MarketService:
             "outcome": "lost",
             "athlete_name": athlete.canonical_name if athlete is not None else "un giocatore",
             "tiebreak_cancelled": True,
+            "session_kind": market_session.kind.value,
             **league_params(self._session, market_session.league_id),
         }
         for team_id in team_ids:

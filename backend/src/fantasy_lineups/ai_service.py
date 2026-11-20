@@ -195,14 +195,10 @@ def generate_ai_lineup(
     plan = build_lineup_plan(candidates, role_targets, decided_at=decided_at)
 
     roles_by_id = {candidate.athlete_id: candidate.role for candidate in candidates}
-    roster_ids = list(
-        session.scalars(
-            select(FantasyRosterSlot.athlete_id).where(
-                FantasyRosterSlot.fantasy_team_id == fantasy_team_id,
-                FantasyRosterSlot.athlete_id.is_not(None),
-            )
-        ).all()
-    )
+    # La rosa da schierare tutta è quella dei candidati: chi è in esubero di ruolo o non ha un
+    # ruolo nel listone resta in rosa ma non si schiera e non blocca gli altri (20/11), come
+    # nel salvataggio del fantallenatore.
+    roster_ids = list(roles_by_id)
     validation = evaluate_lineup(
         module=module.value,
         starters=[

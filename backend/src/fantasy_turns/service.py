@@ -416,6 +416,9 @@ class FantasyTurnService:
         H2H confermato (EP13-P04). Con stagione già completa l'orizzonte breve
         resta il comportamento giusto: intercetta solo le nuove fixture
         pubblicate dal provider nella finestra prossima.
+
+        Con ``auto_open`` apre anche i turni già esistenti entro l'orizzonte
+        (``_auto_open_due_rounds``), non solo quelli appena creati.
         """
         locked = self._lock_league(league.id)
         ref = reference_date or datetime.now(UTC).date()
@@ -447,6 +450,11 @@ class FantasyTurnService:
                 now=datetime.now(UTC),
                 actor_id=system_actor,
             )
+            opened_existing = (
+                self._auto_open_due_rounds(locked.id, now=datetime.now(UTC), actor_id=system_actor)
+                if auto_open
+                else 0
+            )
             self._session.commit()
             get_metrics().incr("fantasy_turn_ensure_total", labels={"result": "full_season"})
             logger.info(
@@ -462,7 +470,7 @@ class FantasyTurnService:
             return EnsureFantasyTurnsResponse(
                 leagueId=str(locked.id),
                 created=full.created,
-                opened=full.opened + reevaluated.opened,
+                opened=full.opened + reevaluated.opened + opened_existing,
                 upgraded=full.upgraded + reevaluated.upgraded,
                 duplicates=0,
                 waiting=0,
@@ -497,6 +505,10 @@ class FantasyTurnService:
             now=datetime.now(UTC),
             actor_id=system_actor,
         )
+        if auto_open:
+            opened += self._auto_open_due_rounds(
+                locked.id, now=datetime.now(UTC), actor_id=system_actor
+            )
         self._session.commit()
         get_metrics().incr("fantasy_turn_ensure_total", labels={"result": "ok"})
         logger.info(
@@ -1668,6 +1680,46 @@ class FantasyTurnService:
         )
         get_metrics().incr("fantasy_turn_opened_total", labels={"result": "auto"})
         return True
+
+    def _auto_open_due_rounds(
+        self,
+        league_id: UUID,
+        *,
+        now: datetime,
+        actor_id: UUID | None,
+    ) -> int:
+        """Apre i turni già esistenti ``scheduled`` il cui blocco cade entro l'orizzonte.
+
+        Regola del 16/11: un turno si apre da solo quando mancano al massimo
+        ``fantasy_turns_horizon_days`` giorni (14) al calcio d'inizio, e «sincronizza»
+        (come il batch ``fantasy_turns.ensure_upcoming``) crea e aggiorna. Senza questo
+        passaggio si aprivano solo i turni appena creati: quelli nati prima, per esempio
+        dal task iniziale della lega (``auto_open=False``) o quando erano ancora lontani,
+        restavano chiusi fino all'omologazione del turno precedente (QA 19-20/11).
+        Va chiamato dopo ``_reconcile_existing_rounds``, con i blocchi già aggiornati.
+        """
+        from config.settings.loader import get_api_settings
+
+        horizon = timedelta(days=get_api_settings().fantasy_turns_horizon_days)
+        rounds = self._session.scalars(
+            select(FantasyRound)
+            .where(
+                FantasyRound.league_id == league_id,
+                FantasyRound.status == FantasyTurnStatus.SCHEDULED,
+                FantasyRound.cutoff_at.is_not(None),
+                FantasyRound.cutoff_at > now,
+                FantasyRound.cutoff_at <= now + horizon,
+            )
+            .order_by(FantasyRound.number.asc())
+            .with_for_update()
+        ).all()
+        opened = 0
+        for fantasy_round in rounds:
+            if self._try_auto_open(fantasy_round, now=now, actor_id=actor_id):
+                opened += 1
+        if opened:
+            self._session.flush()
+        return opened
 
     def try_open_next_round(
         self,

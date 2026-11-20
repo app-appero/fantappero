@@ -1,6 +1,7 @@
 import { DISPLAY_FONT } from "../../theme/fonts";
 import { HScroll } from "../../components/HScroll";
 import type { LineupRole } from "@fantappero/contracts";
+import { avatarInitial } from "@fantappero/contracts";
 import { theme } from "@fantappero/ui/theme";
 import { useMemo, useState, type ReactNode } from "react";
 import { Image, Modal, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
@@ -223,7 +224,7 @@ export function FormationPitch({
             {slot.photoUrl ? (
               <AvatarImage uri={slot.photoUrl} style={styles.photo} size={38} />
             ) : (
-              <Text style={styles.initial}>{(slot.name ?? "?").trim().charAt(0).toUpperCase()}</Text>
+              <Text style={styles.initial}>{avatarInitial(slot.name)}</Text>
             )}
             {slot.locked ? (
               <View style={styles.lockDot}>

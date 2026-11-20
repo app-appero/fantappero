@@ -20,6 +20,23 @@ describe("resolveNotificationDestination", () => {
     ).toBe("/inviti");
   });
 
+  it("manda gli esiti degli svincolati alla pagina svincolati (QA 19-20/11)", () => {
+    expect(
+      resolveNotificationDestination({
+        title: "Svincolato aggiudicato",
+        deepLink: "/svincolati?lega=abc",
+      }),
+    ).toBe("/svincolati?lega=abc");
+    for (const title of [
+      "Svincolato aggiudicato",
+      "Svincolato perso",
+      "Spareggio svincolati aperto",
+      "Spareggio svincolati annullato",
+    ]) {
+      expect(resolveNotificationDestination({ title, deepLink: null })).toBe("/svincolati");
+    }
+  });
+
   it("ignora un link esterno", () => {
     expect(
       resolveNotificationDestination({

@@ -1,4 +1,5 @@
 import type { CreditAccount, FantasyTeamSummary } from "@fantappero/contracts";
+import { avatarLetters } from "@fantappero/contracts";
 import { theme } from "@fantappero/ui/theme";
 import { useState } from "react";
 import { Modal, Pressable, ScrollView, Text, View } from "react-native";
@@ -59,7 +60,7 @@ export function RosterCreditsPanel({
       <View style={styles.heroCard}>
         <View style={styles.heroTop}>
           <View style={styles.heroAvatar}>
-            <Text style={styles.heroAvatarLabel}>{(teamName ?? "?").slice(0, 2).toUpperCase()}</Text>
+            <Text style={styles.heroAvatarLabel}>{avatarLetters(teamName)}</Text>
           </View>
           <View style={{ flex: 1, minWidth: 0 }}>
             <Text style={styles.heroName} numberOfLines={2}>

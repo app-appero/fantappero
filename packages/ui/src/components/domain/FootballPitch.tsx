@@ -1,4 +1,5 @@
 import type { MatchBadge, PitchPosition } from "@fantappero/contracts";
+import { firstGrapheme } from "@fantappero/contracts";
 import { type HTMLAttributes } from "react";
 import { classNames } from "../../utils/classNames.js";
 import { EventBadges } from "./EventBadges.js";
@@ -46,7 +47,7 @@ function abbreviateName(name: string): string {
     return name;
   }
   const last = parts[parts.length - 1] ?? name;
-  const initials = parts.slice(0, -1).map((part) => `${part.charAt(0)}.`);
+  const initials = parts.slice(0, -1).map((part) => `${firstGrapheme(part)}.`);
   return `${initials.join(" ")} ${last}`;
 }
 

@@ -814,8 +814,16 @@ def test_waiver_tiebreak_tied_again_goes_to_the_first_bid(
     assert owner(release[admin_token]) is not None
     assert _balance(client, league_id, member_token) == 940
     assert _balance(client, league_id, admin_token) == 1000
-    assert len(_notification(db_session, member_id, "Busta aggiudicata")) == 1
-    assert len(_notification(db_session, admin_id, "Busta non aggiudicata")) == 1
+    # Esiti degli svincolati con titoli propri, non quelli dell'asta a buste (QA 19-20/11).
+    assert len(_notification(db_session, member_id, "Svincolato aggiudicato")) == 1
+    lost = _notification(db_session, admin_id, "Svincolato perso")
+    assert len(lost) == 1
+    assert "vince l'offerta inviata per prima" in lost[0].body
+    assert lost[0].deep_link == f"/svincolati?lega={league_id}"
+    for user_id in (admin_id, member_id):
+        assert _titles(db_session, user_id).count("Spareggio svincolati aperto") == 1
+        assert _notification(db_session, user_id, "Busta aggiudicata") == []
+        assert _notification(db_session, user_id, "Busta non aggiudicata") == []
     assert _resolved_audit(db_session, tiebreak_id).details["tiebreakRule"] == "first_bid"
     assert isinstance(create_waiver_session(60), str)
 

@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
+  inviteErrorRefreshesRow,
   revocableInviteId,
   revokeInviteConfirmMessage,
   revokeInviteErrorMessage,
@@ -64,5 +65,20 @@ describe("revokeInviteErrorMessage", () => {
     assert.equal(revokeInviteErrorMessage({ status: 500, code: "internal_error" }), null);
     assert.equal(revokeInviteErrorMessage(new Error("rete")), null);
     assert.equal(revokeInviteErrorMessage(null), null);
+  });
+});
+
+describe("inviteErrorRefreshesRow", () => {
+  it("dopo «Invito già inviato» (o una riga comunque vecchia) la directory si ricarica", () => {
+    assert.equal(inviteErrorRefreshesRow({ code: "named_invite_already_pending" }), true);
+    assert.equal(inviteErrorRefreshesRow({ code: "already_member" }), true);
+    assert.equal(inviteErrorRefreshesRow({ code: "recipient_unavailable" }), true);
+  });
+
+  it("gli altri errori non toccano la riga", () => {
+    assert.equal(inviteErrorRefreshesRow({ code: "league_full" }), false);
+    assert.equal(inviteErrorRefreshesRow({ code: "internal_error" }), false);
+    assert.equal(inviteErrorRefreshesRow(new Error("rete")), false);
+    assert.equal(inviteErrorRefreshesRow(null), false);
   });
 });

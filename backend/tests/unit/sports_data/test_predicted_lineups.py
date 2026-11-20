@@ -162,6 +162,16 @@ def test_player_without_known_given_name_still_matches_unique_surname() -> None:
     assert match_squad_player("G. Simeone", squad_ambiguous) is None
 
 
+def test_player_match_maps_dotless_turkish_i() -> None:
+    """QA 19-20/11: la ı turca senza punto diventava uno spazio, quindi "A. Bayindir"
+    non trovava "Altay Bayındır" (stesso confronto senza accenti dell'import rose)."""
+    keeper = uuid4()
+    squad = [SquadPlayer(keeper, "Altay Bayındır", "Altay", "Bayındır")]
+    assert match_squad_player("A. Bayindir", squad) == keeper
+    assert match_squad_player("Altay Bayindir", squad) == keeper
+    assert match_squad_player("Bayindir", squad) == keeper
+
+
 def test_reliability_requires_eleven_unique_mapped_starters() -> None:
     home_players = tuple(
         parse_lineup_payload(

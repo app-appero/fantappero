@@ -176,6 +176,10 @@ describe("EP05-01/02/03 roster, credits and manual assignment", () => {
     expect(html).toContain('data-testid="roster-credits-ledger"');
     expect(html).toContain('data-testid="roster-history-success"');
     expect(html).toContain("Intervalli di possesso");
+    // La fonte del possesso è un'etichetta, non il codice del backend («manual», «admin»).
+    expect(html).toContain("Inserimento manuale");
+    expect(html).toContain("Assegnazione admin");
+    expect(html).not.toMatch(/>(manual|admin)</);
     // Gli snapshot sono solo per l'amministratore di lega.
     expect(html).not.toContain('data-testid="roster-snapshots"');
     expect(html).not.toContain('data-testid="roster-snapshot-create"');

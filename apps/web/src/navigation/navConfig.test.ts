@@ -46,6 +46,11 @@ describe("filterNavItems", () => {
     expect(onAuction.find((item) => item.id === "market-hub")?.active).toBe(true);
   });
 
+  it("marks the Mercato hub active on the waiver page opened from a notification", () => {
+    const onWaiver = filterNavItems(APP_NAV_ITEMS, canFactory(memberContext), "/svincolati");
+    expect(onWaiver.find((item) => item.id === "market-hub")?.active).toBe(true);
+  });
+
   it("keeps ai-controlled managers on the same member catalog", () => {
     // Un fantallenatore IA è un membro di lega: stesse voci, nessuna amministrazione.
     const aiContext: PermissionContext = {

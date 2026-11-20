@@ -37,6 +37,8 @@ export function notificationKind(item: Pick<NotificationItem, "title" | "categor
     return { group: "scambi", glyph: title.includes("proposta") || title.includes("propone") ? "⇄" : "✓" };
   }
   if (title.includes("sorpassato")) return { group: "asta", glyph: "🔨" };
+  // Esiti del mercato svincolati (offerte a buste chiuse come l'asta).
+  if (title.includes("svincolat")) return { group: "asta", glyph: "🔨" };
   if (title.includes("busta") || title.includes("lotto") || title.includes("asta") || title.includes("rosa al completo")) {
     return { group: "asta", glyph: "🔨" };
   }

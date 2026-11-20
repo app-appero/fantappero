@@ -1,7 +1,7 @@
 import { Badge, Button, Input, Modal, Select, UiStatePanel } from "@fantappero/ui";
 import { useCallback, useEffect, useState } from "react";
 import type { CoachPlacement, FantasyCoachProfile } from "@fantappero/contracts";
-import { formatFantasyPoints } from "@fantappero/contracts";
+import { avatarInitial, formatFantasyPoints } from "@fantappero/contracts";
 import {
   createNamedLeagueInvite,
   fetchManagerDirectory,
@@ -196,7 +196,7 @@ function CoachAvatar({
   }
   return (
     <span className={className} aria-hidden>
-      {name.charAt(0)}
+      {avatarInitial(name)}
     </span>
   );
 }
@@ -226,6 +226,16 @@ function inviteErrorMessage(error: unknown): string {
     if (error.code === "league_full") return "La lega ha raggiunto la capienza massima.";
   }
   return getApiErrorMessage(error, "Impossibile inviare l'invito nominativo.");
+}
+
+/** Errori dell'invito che dicono che la riga mostrata non è aggiornata: va ricaricata. */
+function inviteErrorMeansStaleRow(error: unknown): boolean {
+  return (
+    error instanceof ApiError &&
+    (error.code === "named_invite_already_pending" ||
+      error.code === "already_member" ||
+      error.code === "recipient_unavailable")
+  );
 }
 
 function revokeErrorMessage(error: unknown): string {
@@ -572,6 +582,12 @@ export function ManagerDirectory({
         setCapacityReached(true);
         onMembershipChanged?.();
         return;
+      }
+      if (inviteErrorMeansStaleRow(error)) {
+        // La riga era vecchia (es. invito già inviato da un'altra scheda o da un altro
+        // admin): si ricarica dal server, così non offre più «Invita». `load` azzera i
+        // messaggi, quindi l'errore si mostra dopo.
+        await load();
       }
       setInviteError(inviteErrorMessage(error));
     } finally {

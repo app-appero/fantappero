@@ -11,7 +11,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 from tests.integration.database.helpers import create_engine_for_url
 
-from database.enums import LeagueAuditAction, LeagueMemberRole, LeagueState
+from database.enums import LeagueAuditAction, LeagueMemberRole, LeagueState, NamedInviteStatus
 from database.session import create_session_factory
 from fantasy_teams.factory import create_team_with_empty_slots
 from fantasy_teams.models import FantasyTeam
@@ -19,7 +19,9 @@ from leagues.models.competition import Competition
 from leagues.models.league import League
 from leagues.models.league_audit_event import LeagueAuditEvent
 from leagues.models.league_membership import LeagueMembership
+from leagues.models.named_league_invite import NamedLeagueInvite
 from mail.capture import get_captured_emails
+from notifications.models import Notification
 
 
 def _register_and_login(client: TestClient, email: str) -> tuple[str, UUID]:
@@ -408,6 +410,87 @@ def test_replace_coach_keeps_the_team_and_checks_the_candidate(
         )
         == 0
     )
+
+
+def test_replace_coach_closes_the_newcomer_pending_named_invite(
+    client: TestClient,
+    db_session: Session,
+    competition_ids: list[str],
+) -> None:
+    """QA 19-20/11 (D4): chi subentra aveva ancora l'invito nominativo della lega pendente.
+
+    Contava nel badge «Inviti», restava tra quelli ricevuti e, accettato dopo, mandava
+    all'admin la notifica fuorviante «ha accettato l'invito».
+    """
+    owner_token, owner_id = _register_and_login(client, "replace.inv.owner@example.com")
+    _old_token, old_id = _register_and_login(client, "replace.inv.vecchio@example.com")
+    new_token, new_id = _register_and_login(client, "replace.inv.nuovo@example.com")
+    league_id = _create_league(client, owner_token, competition_ids, "Lega Sostituzione Invito")
+    _add_member(db_session, league_id, old_id)
+    headers = {"Authorization": f"Bearer {owner_token}"}
+    new_headers = {"Authorization": f"Bearer {new_token}"}
+
+    invited = client.post(
+        f"/leagues/{league_id}/amministrazione/inviti-nominativi",
+        headers=headers,
+        json={"recipientUserId": str(new_id)},
+    )
+    assert invited.status_code == 201, invited.text
+    invite_id = UUID(invited.json()["id"])
+    assert invited.json()["status"] == "pending"
+    badge = client.get("/leagues/inviti-ricevuti/conteggio", headers=new_headers)
+    assert badge.json()["pendingInviteCount"] == 1
+
+    replaced = client.post(
+        f"/leagues/{league_id}/amministrazione/partecipanti/{old_id}/sostituzione",
+        headers=headers,
+        json={"newUserId": str(new_id)},
+    )
+    assert replaced.status_code == 200, replaced.text
+
+    # Invito chiuso come un'accettazione, con il suo evento di audit.
+    db_session.expire_all()
+    invite = db_session.get(NamedLeagueInvite, invite_id)
+    assert invite is not None
+    assert invite.status == NamedInviteStatus.ACCEPTED
+    assert invite.responded_at is not None
+    assert invite.revoked_at is None
+    accepted_events = db_session.scalars(
+        select(LeagueAuditEvent).where(
+            LeagueAuditEvent.league_id == UUID(league_id),
+            LeagueAuditEvent.action == LeagueAuditAction.NAMED_INVITE_ACCEPTED,
+        )
+    ).all()
+    assert [(row.details or {}).get("namedInviteId") for row in accepted_events] == [str(invite_id)]
+    # Badge e «Inviti ricevuti» a zero, e la notifica «Nuovo invito» non c'è più.
+    badge = client.get("/leagues/inviti-ricevuti/conteggio", headers=new_headers)
+    assert badge.json()["pendingInviteCount"] == 0
+    assert client.get("/leagues/inviti-ricevuti", headers=new_headers).json() == []
+    assert (
+        db_session.scalar(
+            select(func.count(Notification.id)).where(
+                Notification.user_id == new_id,
+                Notification.dedup_key == f"named_invite:{invite_id}",
+            )
+        )
+        == 0
+    )
+
+    # Un'accettazione arrivata tardi non fa nulla e non manda esiti all'admin.
+    late = client.post(f"/leagues/inviti-ricevuti/{invite_id}/accetta", headers=new_headers)
+    assert late.status_code == 200, late.text
+    assert late.json()["alreadyProcessed"] is True
+    assert (
+        db_session.scalar(
+            select(func.count(Notification.id)).where(
+                Notification.user_id == owner_id,
+                Notification.template_key == "sistema.invito_lega_esito",
+            )
+        )
+        == 0
+    )
+    members = client.get(f"/leagues/{league_id}/amministrazione/partecipanti", headers=headers)
+    assert {row["userId"] for row in members.json()} == {str(owner_id), str(new_id)}
 
 
 def test_admin_can_be_shared_or_passed_at_any_time_and_co_admin_can_be_revoked(

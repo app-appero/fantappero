@@ -27,6 +27,11 @@ export type AuthFormLayoutProps = {
   showPassword?: boolean;
   showConfirmPassword?: boolean;
   showDisplayName?: boolean;
+  /**
+   * `autocomplete` del campo password. Di default `new-password` nei moduli che creano una
+   * password (registrazione, nuova password), `current-password` altrimenti (accesso).
+   */
+  passwordAutoComplete?: "current-password" | "new-password";
   loading?: boolean;
   error?: string;
   email?: string;
@@ -63,6 +68,7 @@ export function AuthFormLayout({
   showPassword = true,
   showConfirmPassword = false,
   showDisplayName = false,
+  passwordAutoComplete,
   loading = false,
   error,
   email = "",
@@ -128,7 +134,10 @@ export function AuthFormLayout({
               placeholder={passwordPlaceholder}
               name="password"
               type="password"
-              autoComplete={showConfirmPassword ? "new-password" : "current-password"}
+              autoComplete={
+                passwordAutoComplete ??
+                (showConfirmPassword || showDisplayName ? "new-password" : "current-password")
+              }
               value={password}
               onChange={(event) => onPasswordChange?.(event.target.value)}
               disabled={loading}

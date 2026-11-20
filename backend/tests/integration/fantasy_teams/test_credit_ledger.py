@@ -296,3 +296,59 @@ def test_concurrent_adjustments_preserve_valid_balance(
         select(FantasyTeam).where(FantasyTeam.league_id == UUID(league_id))
     ).all()
     assert len(teams) == 1
+
+
+def test_movements_of_the_same_transaction_keep_their_real_order(
+    client: TestClient,
+    db_session: Session,
+    competition_ids: list[str],
+) -> None:
+    """QA 19-20/11: più movimenti salvati nella stessa transazione avevano lo stesso orario
+    (``now()`` è l'inizio della transazione) e tornavano nell'ordine casuale dell'id.
+    Con rimborso e addebito uguali (scambio dell'asta a rilanci) nemmeno il saldo permette
+    di ricostruire l'ordine. Ora ogni movimento ha l'orario del proprio inserimento."""
+    from fantasy_teams.ledger import apply_ledger_movement, find_account_for_team
+
+    token, _ = _register_and_login(client, "cr.order@example.com")
+    league_id = _create_league(client, token, competition_ids, "Lega Ordine Movimenti")
+    credits = client.get(
+        f"/leagues/{league_id}/crediti", headers={"Authorization": f"Bearer {token}"}
+    )
+    assert credits.status_code == 200
+    account = find_account_for_team(
+        db_session, UUID(credits.json()["fantasyTeamId"]), for_update=True
+    )
+    assert account is not None
+    amounts = [10, -10, 10, -10, -5]
+    for index, amount in enumerate(amounts):
+        apply_ledger_movement(
+            db_session,
+            account,
+            amount=amount,
+            reason=CreditLedgerReason.ADMIN_ADJUSTMENT,
+            transaction_id=f"qa-ordine:{index}",
+            note=f"Movimento {index}",
+        )
+    db_session.commit()
+
+    db_session.expire_all()
+    rows = {
+        row.transaction_id: row
+        for row in db_session.scalars(
+            select(CreditLedgerEntry).where(CreditLedgerEntry.transaction_id.like("qa-ordine:%"))
+        ).all()
+    }
+    times = [rows[f"qa-ordine:{index}"].created_at for index in range(len(amounts))]
+    assert len(set(times)) == len(amounts)
+    assert times == sorted(times)
+
+    expected = [f"Movimento {index}" for index in range(len(amounts))]
+    for _ in range(3):
+        movements = client.get(
+            f"/leagues/{league_id}/crediti/movimenti",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert movements.status_code == 200
+        entries = movements.json()["entries"]
+        assert [row["note"] for row in entries[1:]] == expected
+        assert [row["balanceAfter"] for row in entries] == [1000, 1010, 1000, 1010, 1000, 995]

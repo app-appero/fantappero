@@ -184,3 +184,112 @@ def test_normalize_athlete_name_ignores_accents_case_and_spaces() -> None:
     assert normalize_athlete_name("  J.  McGinn ") == "j. mcginn"
     assert normalize_athlete_name("E. İlkhan") == normalize_athlete_name("e. ilkhan")
     assert normalize_athlete_name("A. Dembélé") == "a. dembele"
+
+
+def test_normalize_athlete_name_maps_dotless_turkish_i() -> None:
+    """QA 19-20/11: "A. Bayindir" non trovava "A. Bayındır" (ı turca senza punto)."""
+    assert normalize_athlete_name("A. Bayındır") == normalize_athlete_name("A. Bayindir")
+    assert normalize_athlete_name("A. BAYINDIR") == "a. bayindir"
+    # Le altre lettere che NFKD non scompone, come nella ricerca del listone.
+    assert normalize_athlete_name("M. Ødegaard") == "m. odegaard"
+    assert normalize_athlete_name("Ł. Skorupski") == "l. skorupski"
+
+
+def _ambiguous_row(row_number: int = 3) -> PreviewRow:
+    from fantasy_teams.csv_import import AthleteCandidate
+
+    return PreviewRow(
+        row_number=row_number,
+        squadra="Romy",
+        provider_id=None,
+        nome="toni fernandez",
+        crediti=4,
+        status="ambiguous",
+        fantasy_team_id=str(uuid4()),
+        fantasy_team_name="Romy",
+        issues=[
+            PreviewRowIssue(
+                code="ambiguous_athlete_name",
+                message="Nome ambiguo: seleziona il calciatore corretto.",
+                severity="warning",
+            )
+        ],
+        candidates=[
+            AthleteCandidate(
+                athlete_id=str(uuid4()), provider_id=1, canonical_name="Toni Fernández"
+            ),
+            AthleteCandidate(
+                athlete_id=str(uuid4()), provider_id=2, canonical_name="Toni Fernández"
+            ),
+        ],
+    )
+
+
+def test_ambiguous_rows_are_not_counted_as_errors() -> None:
+    """QA 19-20/11: le righe ambigue finivano in `errorCount`."""
+    from fantasy_teams.csv_preview import (
+        count_preview_issues,
+        count_unresolved_ambiguities,
+        has_unresolved_ambiguities,
+    )
+
+    ok = PreviewRow(
+        row_number=2,
+        squadra="Romy",
+        provider_id=None,
+        nome="Barella",
+        crediti=10,
+        status="ok",
+        athlete_id=str(uuid4()),
+    )
+    assert count_preview_issues([ok, _ambiguous_row()]) == (0, 1)
+    assert count_unresolved_ambiguities([ok, _ambiguous_row()]) == 1
+    assert has_unresolved_ambiguities([ok, _ambiguous_row()]) is True
+    assert has_unresolved_ambiguities([ok]) is False
+
+    broken = PreviewRow(
+        row_number=4,
+        squadra="Romy",
+        provider_id=None,
+        nome="Nessuno",
+        crediti=1,
+        status="error",
+        issues=[PreviewRowIssue(code="athlete_not_found", message="x", severity="error")],
+    )
+    assert count_preview_issues([ok, _ambiguous_row(), broken]) == (1, 1)
+
+
+def test_candidate_details_survive_the_stored_preview() -> None:
+    from fantasy_teams.csv_import import preview_row_from_dict, preview_row_to_dict
+
+    row = _ambiguous_row()
+    row.candidates[0].role = "C"
+    row.candidates[0].club_name = "Barcelona"
+    row.candidates[0].competition_name = "La Liga"
+    restored = preview_row_from_dict(preview_row_to_dict(row))
+    first, second = restored.candidates
+    assert (first.role, first.club_name, first.competition_name) == ("C", "Barcelona", "La Liga")
+    assert (second.role, second.club_name, second.competition_name) == (None, None, None)
+
+
+def test_excel_keeps_ambiguous_rows_to_choose_and_skips_unknown_names() -> None:
+    """Decisione 19-20/11: nell'Excel il nome di più calciatori non si ignora più,
+    si sceglie il candidato giusto; il nome che non esiste resta ignorato."""
+    from fantasy_teams.csv_preview import skip_unmatched_excel_rows
+
+    ambiguous = _ambiguous_row()
+    missing = PreviewRow(
+        row_number=4,
+        squadra="Romy",
+        provider_id=None,
+        nome="Nessuno",
+        crediti=1,
+        status="error",
+        fantasy_team_id=str(uuid4()),
+        issues=[PreviewRowIssue(code="athlete_not_found", message="x", severity="error")],
+    )
+    skip_unmatched_excel_rows([ambiguous, missing])
+    assert ambiguous.status == "ambiguous"
+    assert len(ambiguous.candidates) == 2
+    assert missing.status == "skipped"
+    assert [issue.code for issue in missing.issues] == ["athlete_not_found"]

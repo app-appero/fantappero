@@ -119,6 +119,41 @@ def test_listone_generate_idempotent_and_maps_roles(session: Session) -> None:
     assert unchanged_metric == 5
 
 
+def test_listone_generate_reports_the_athletes_whose_assignment_changed(
+    session: Session,
+) -> None:
+    """Chi ha un'assegnazione creata, cambiata o tolta: le rose che lo contengono vanno
+    ricalcolate dopo l'aggiornamento del listone (QA 20/11)."""
+    _seed_roster(session)
+    first = generate_official_listone(session, season_year=2026)
+    session.commit()
+    created = set(session.scalars(select(RoleAssignment.athlete_id)).all())
+    assert len(created) == 5
+    assert first.affected_athlete_ids == created
+
+    unchanged = generate_official_listone(session, season_year=2026)
+    session.commit()
+    assert unchanged.affected_athlete_ids == set()
+
+    jimenez = session.execute(select(Athlete).where(Athlete.provider_id == 2887)).scalar_one()
+    left = session.execute(select(Athlete).where(Athlete.provider_id == 2676)).scalar_one()
+    membership = session.execute(
+        select(SquadMembership).where(SquadMembership.athlete_id == jimenez.id)
+    ).scalar_one()
+    membership.provider_position_raw = "Midfielder"
+    for row in session.scalars(
+        select(SquadMembership).where(SquadMembership.athlete_id == left.id)
+    ).all():
+        row.is_active = False
+    session.commit()
+
+    changed = generate_official_listone(session, season_year=2026)
+    session.commit()
+    assert changed.affected_athlete_ids == {jimenez.id, left.id}
+    assert changed.counters.updated == 1
+    assert changed.counters.deactivated == 1
+
+
 def test_league_override_pre_auction_immediate_post_start_deferred(session: Session) -> None:
     _seed_roster(session)
     generate_official_listone(session, season_year=2026)

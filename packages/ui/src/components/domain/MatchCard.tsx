@@ -1,3 +1,4 @@
+import { avatarInitials } from "@fantappero/contracts";
 import { type HTMLAttributes } from "react";
 import { Badge } from "../Badge.js";
 import { Card, CardBody } from "../Card.js";
@@ -47,13 +48,7 @@ function TeamMark({
   if (logoUrl) {
     return <img className="fa-match-card__team-logo" src={logoUrl} alt="" aria-hidden="true" />;
   }
-  const initials = name
-    .split(/\s+/)
-    .filter(Boolean)
-    .map((part) => part.charAt(0))
-    .slice(0, 2)
-    .join("")
-    .toUpperCase();
+  const initials = avatarInitials(name);
   // Avatar del fantallenatore: se manca o non si carica restano le iniziali.
   return (
     <AvatarWithFallback

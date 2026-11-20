@@ -195,6 +195,8 @@ export function EmailAuthPanel({
               title=""
               submitLabel="Crea account"
               showDisplayName
+              // Si sceglie una password nuova: il browser propone di generarla e salvarla.
+              passwordAutoComplete="new-password"
               email={email}
               password={password}
               displayName={displayName}

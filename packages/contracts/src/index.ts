@@ -121,6 +121,8 @@ export type {
   LeagueLifecyclePhase,
   LeagueLifecyclePhaseKey,
   LeagueLifecycleStep,
+  LeagueNextStep,
+  LeagueNextStepTarget,
   AthleteCard,
   AthleteCardAssignment,
   AthleteCardLive,
@@ -160,9 +162,14 @@ export {
   LEAGUE_STATE_DOT_EMOJI,
   SNAPSHOT_SECTIONS,
   groupSnapshotByTeam,
+  canConfirmRosterImport,
   describeLeagueLifecycleStep,
+  describeRosterImportCandidate,
+  leagueHomeNextStep,
   leagueLifecyclePhaseIndex,
   orderLeagueSetupBlockers,
+  rosterImportAmbiguousCount,
+  rosterImportAmbiguousRows,
 } from "./leagues.js";
 
 export {
@@ -588,3 +595,6 @@ export {
   leagueBadgeSvg,
   leagueBadgeUrl,
 } from "./playerAvatar.js";
+
+export { avatarInitial, avatarInitials, avatarLetters, firstGrapheme, leadingGraphemes } from "./initials.js";
+export type { AvatarInitialsOptions } from "./initials.js";

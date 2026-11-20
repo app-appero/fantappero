@@ -21,6 +21,16 @@ def generate_official_listone_task(season_year: int) -> dict[str, int | str]:
                 session,
                 season_year=season_year,
             )
+            if result.affected_athlete_ids:
+                # Import locale: i dati sportivi non dipendono dalle rose, solo questo job.
+                from fantasy_teams.composition_service import resync_team_compositions
+
+                # Rose con calciatori a cui è cambiato il ruolo: stato ed esuberi ricalcolati.
+                resync_team_compositions(
+                    session,
+                    athlete_ids=result.affected_athlete_ids,
+                    season_year=season_year,
+                )
     finally:
         engine.dispose()
     c = result.counters

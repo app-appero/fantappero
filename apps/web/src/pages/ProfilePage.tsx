@@ -1,5 +1,6 @@
 import { NotificationEventSettings } from "../notifications/NotificationEventSettings";
 import {
+  avatarInitial,
   DELETE_ACCOUNT_CONFIRMATION_PHRASE,
   PROFILE_LANGUAGE_OPTIONS,
   PROFILE_TIMEZONE_OPTIONS,
@@ -451,7 +452,7 @@ export function ProfilePage() {
                 />
               ) : (
                 <div className="fa-profile-avatar__placeholder" data-testid="profile-avatar-placeholder">
-                  {profile.displayName.charAt(0).toUpperCase()}
+                  {avatarInitial(profile.displayName)}
                 </div>
               )}
               <div className="fa-profile-avatar__actions">

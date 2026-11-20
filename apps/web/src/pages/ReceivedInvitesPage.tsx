@@ -1,3 +1,4 @@
+import { avatarInitial } from "@fantappero/contracts";
 import { Breadcrumb, Button, PageContainer, UiStatePanel } from "@fantappero/ui";
 import { useCallback, useEffect, useState } from "react";
 import {
@@ -173,7 +174,7 @@ export function ReceivedInvitesPage() {
           {invites.map((invite) => (
             <li key={invite.id} className="fa-received-invites__item">
               <span className="fa-received-invites__avatar" aria-hidden="true">
-                {invite.leagueName.charAt(0).toUpperCase()}
+                {avatarInitial(invite.leagueName)}
               </span>
               <div className="fa-received-invites__text">
                 <strong>{invite.leagueName}</strong>

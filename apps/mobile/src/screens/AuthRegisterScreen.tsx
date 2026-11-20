@@ -6,7 +6,11 @@ import { Pressable, Text, View } from "react-native";
 import { AppTextInput as TextInput } from "../components/AppTextInput";
 import { register as registerApi } from "../api/auth";
 import { AuthShell } from "../auth/AuthShell";
-import { registrationRequestBody, validateEmailRegistration } from "../auth/emailRegistration";
+import {
+  passwordAutofill,
+  registrationRequestBody,
+  validateEmailRegistration,
+} from "../auth/emailRegistration";
 import { useAuthOptions } from "../auth/useAuthOptions";
 import { useGoogleAuth } from "../auth/useGoogleAuth";
 import { UiStatePanel } from "../components/UiStatePanel";
@@ -144,6 +148,7 @@ export function AuthRegisterScreen() {
               value={password}
               onChangeText={setPassword}
               secureTextEntry
+              {...passwordAutofill("register")}
               placeholder="Almeno 8 caratteri"
               placeholderTextColor={styles.muted.color}
               style={styles.input}
@@ -155,6 +160,7 @@ export function AuthRegisterScreen() {
               value={confirmPassword}
               onChangeText={setConfirmPassword}
               secureTextEntry
+              {...passwordAutofill("register")}
               placeholder="Ripeti la password"
               placeholderTextColor={styles.muted.color}
               style={styles.input}

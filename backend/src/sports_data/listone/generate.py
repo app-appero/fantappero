@@ -52,6 +52,10 @@ class ListoneGenerateResult:
     season_year: int
     mapping_version: str
     counters: ListoneGenerateCounters = field(default_factory=ListoneGenerateCounters)
+    #: Calciatori con assegnazione creata, cambiata (ruolo o club) o tolta: il loro ruolo
+    #: effettivo può essere cambiato e le rose che li contengono vanno ricalcolate
+    #: (`fantasy_teams.composition_service.resync_team_compositions`).
+    affected_athlete_ids: set[UUID] = field(default_factory=set)
 
 
 def _touch_updated_at(row: Any) -> None:
@@ -159,6 +163,7 @@ def generate_official_listone(
 ) -> ListoneGenerateResult:
     """Build/refresh official role assignments from active squad memberships."""
     counters = ListoneGenerateCounters()
+    affected: set[UUID] = set()
     metrics = get_metrics()
     status = "ok"
     with Timer(
@@ -174,6 +179,7 @@ def generate_official_listone(
             assignment_total = len(assignments)
 
             for index, (athlete_id, membership) in enumerate(assignments, start=1):
+                before = (counters.created, counters.updated)
                 _upsert_assignment(
                     session,
                     athlete_id=athlete_id,
@@ -181,6 +187,8 @@ def generate_official_listone(
                     membership=membership,
                     counters=counters,
                 )
+                if (counters.created, counters.updated) != before:
+                    affected.add(athlete_id)
                 if on_progress is not None and (index == assignment_total or index % 100 == 0):
                     on_progress(index, assignment_total)
 
@@ -189,6 +197,7 @@ def generate_official_listone(
                 stale_stmt = stale_stmt.where(RoleAssignment.athlete_id.not_in(kept_athlete_ids))
             stale = session.execute(stale_stmt).scalars().all()
             for row in stale:
+                affected.add(row.athlete_id)
                 session.delete(row)
                 counters.incr("deactivated")
 
@@ -222,6 +231,7 @@ def generate_official_listone(
         season_year=season_year,
         mapping_version=MAPPING_VERSION,
         counters=counters,
+        affected_athlete_ids=affected,
     )
 
 

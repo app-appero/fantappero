@@ -1,8 +1,10 @@
 import { lazyStyles } from "../theme/lazyStyles";
-import type {
-  LeagueCalendar,
-  LeagueDetail,
-  LeagueMember,
+import {
+  leagueHomeNextStep,
+  type LeagueCalendar,
+  type LeagueDetail,
+  type LeagueMember,
+  type LeagueNextStepTarget,
 } from "@fantappero/contracts";
 import { theme } from "@fantappero/ui/theme";
 import { useNavigation, useRoute, type RouteProp } from "@react-navigation/core";
@@ -20,6 +22,7 @@ import { UiStatePanel } from "../components/UiStatePanel";
 import { useScreenData } from "../hooks/useScreenData";
 import { PageContainer } from "../layout/PageContainer";
 import { LEAGUE_STATE_LABELS } from "../leagues/leagueLabels";
+import { leagueNextStepRoute } from "../leagues/leagueNextStep";
 import type { RootStackParamList } from "../navigation/types";
 import { getApiErrorMessage, useAuthSession } from "../session/DemoSessionContext";
 
@@ -90,6 +93,22 @@ export function LeagueHomeScreen() {
   const { refreshing, onRefresh } = useScreenData(loadHome);
 
   const isAdmin = league?.viewerRole === "league_admin" || can(["league:admin"]);
+  // Come la home lega del web: in configurazione non si propone la formazione.
+  const nextStep = league ? leagueHomeNextStep(league.state, { isAdmin }) : null;
+
+  const openNextStep = useCallback(
+    (targetLeagueId: string, target: LeagueNextStepTarget) => {
+      // Le schede lavorano sulla lega attiva: prima si rende attiva questa (sul web `?lega=`).
+      setActiveLeagueId(targetLeagueId);
+      const route = leagueNextStepRoute(target);
+      if (route.kind === "admin") {
+        navigation.navigate("LeagueAdmin", { leagueId: targetLeagueId });
+      } else {
+        navigation.navigate("MainTabs", { screen: route.screen });
+      }
+    },
+    [navigation, setActiveLeagueId],
+  );
   const leagueTabs = isAdmin
     ? [
         { id: "league-home", label: "Home lega" },
@@ -163,14 +182,20 @@ export function LeagueHomeScreen() {
               </Text>
             </View>
             <Text style={styles.heroName}>{league.name}</Text>
-            <Pressable
-              accessibilityRole="button"
-              style={styles.primaryButton}
-              testID="league-home-formation-link"
-              onPress={() => navigation.navigate("MainTabs", { screen: "Formation" })}
-            >
-              <Text style={styles.primaryLabel}>Imposta la formazione</Text>
-            </Pressable>
+            {nextStep ? (
+              <View style={styles.nextStep} testID="league-home-next-step">
+                <Text style={styles.nextLabel}>Prossimo passo</Text>
+                <Text style={styles.nextTitle}>{nextStep.title}</Text>
+                <Pressable
+                  accessibilityRole="button"
+                  style={styles.primaryButton}
+                  testID="league-home-next-step-link"
+                  onPress={() => openNextStep(league.id, nextStep.target)}
+                >
+                  <Text style={styles.primaryLabel}>{nextStep.actionLabel}</Text>
+                </Pressable>
+              </View>
+            ) : null}
             {isAdmin ? (
               <Pressable
                 accessibilityRole="button"
@@ -346,6 +371,20 @@ const styles = lazyStyles(() => StyleSheet.create({
     fontWeight: "800",
     textTransform: "uppercase",
     lineHeight: 42,
+  },
+  nextStep: {
+    gap: spacing.xs,
+  },
+  nextLabel: {
+    color: colors.foregroundMuted,
+    fontSize: typography.fontSize.xs,
+    letterSpacing: 1.4,
+    textTransform: "uppercase",
+  },
+  nextTitle: {
+    color: colors.foreground,
+    fontSize: typography.fontSize.md,
+    fontWeight: typography.fontWeight.semibold,
   },
   primaryButton: {
     minHeight: 48,

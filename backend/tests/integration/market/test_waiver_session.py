@@ -418,3 +418,171 @@ def test_waiver_bid_rejected_when_swap_would_exceed_role_quota(
         url, headers=headers, json={"amountCredits": 10, "releaseAthleteId": str(owned[0].id)}
     )
     assert same_role.status_code == 200, same_role.text
+
+
+def _add_league_member(db_session: Session, league_id: str, user_id: UUID) -> None:
+    from database.enums import LeagueMemberRole
+    from leagues.models.league_membership import LeagueMembership
+
+    db_session.add(
+        LeagueMembership(league_id=UUID(league_id), user_id=user_id, role=LeagueMemberRole.MEMBER)
+    )
+    db_session.commit()
+
+
+def _waiver_outcome_notifications(db_session: Session, user_id: UUID) -> list:
+    from notifications.models import Notification
+
+    db_session.expire_all()
+    return list(
+        db_session.scalars(
+            select(Notification).where(
+                Notification.user_id == user_id,
+                Notification.template_key == "mercato.esito_busta",
+            )
+        ).all()
+    )
+
+
+def _two_teams_bid_on_same_free_agent(
+    client: TestClient,
+    db_session: Session,
+    competition_ids: list[str],
+    *,
+    prefix: str,
+    admin_amount: int,
+    member_amount: int,
+) -> dict:
+    """Due squadre offrono per lo stesso svincolato; la sessione si chiude e si risolve."""
+    import random
+
+    admin_token, admin_id = _register_and_login(client, f"{prefix}.admin@example.com")
+    member_token, member_id = _register_and_login(client, f"{prefix}.member@example.com")
+    league_id = _create_league(client, admin_token, competition_ids, f"Lega {prefix}")
+    _add_league_member(db_session, league_id, member_id)
+
+    base = random.randint(100_000_000, 2_000_000_000)
+    free_agent = _seed_athlete(db_session, base, "Svincolato Conteso", role=FantasyRole.D)
+    admin_owned = _seed_athlete(db_session, base + 1, "Da Svincolare Uno", role=FantasyRole.D)
+    member_owned = _seed_athlete(db_session, base + 2, "Da Svincolare Due", role=FantasyRole.D)
+    admin_team = _own_first_athlete_on_roster(
+        client, db_session, league_id, admin_token, admin_owned
+    )
+    _own_first_athlete_on_roster(client, db_session, league_id, member_token, member_owned)
+
+    session_id = _create_open_waiver_session(client, admin_token, league_id)
+    url = f"/leagues/{league_id}/mercato/svincoli/sessioni/{session_id}/offerte/{free_agent.id}"
+    for token, amount, release in (
+        (admin_token, admin_amount, admin_owned),
+        (member_token, member_amount, member_owned),
+    ):
+        bid = client.put(
+            url,
+            headers={"Authorization": f"Bearer {token}"},
+            json={"amountCredits": amount, "releaseAthleteId": str(release.id)},
+        )
+        assert bid.status_code == 200, bid.text
+    client.post(
+        f"/leagues/{league_id}/mercato/svincoli/sessioni/{session_id}/chiudi",
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+    resolution = client.post(
+        f"/leagues/{league_id}/mercato/svincoli/sessioni/{session_id}/risolvi",
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+    assert resolution.status_code == 200, resolution.text
+    return {
+        "league_id": league_id,
+        "admin_token": admin_token,
+        "admin_id": admin_id,
+        "admin_team": admin_team,
+        "member_id": member_id,
+        "free_agent_id": free_agent.id,
+        "outcome": resolution.json()["outcomes"][0],
+    }
+
+
+def test_waiver_results_use_waiver_titles_and_open_the_waiver_page(
+    client: TestClient,
+    db_session: Session,
+    competition_ids: list[str],
+) -> None:
+    """QA 19-20/11: gli esiti degli svincolati arrivavano come «Busta aggiudicata» con il
+    link all'asta. Ora hanno titoli e testi propri e aprono la pagina degli svincolati."""
+    run = _two_teams_bid_on_same_free_agent(
+        client,
+        db_session,
+        competition_ids,
+        prefix="waiver.notify",
+        admin_amount=80,
+        member_amount=50,
+    )
+    league_id = run["league_id"]
+    assert run["outcome"]["outcome"] == "assigned"
+
+    won = _waiver_outcome_notifications(db_session, run["admin_id"])
+    assert len(won) == 1
+    assert won[0].title == "Svincolato aggiudicato"
+    assert won[0].body.endswith(
+        "Hai aggiudicato Svincolato Conteso dagli svincolati per 80 crediti."
+    )
+    assert won[0].deep_link == f"/svincolati?lega={league_id}"
+
+    lost = _waiver_outcome_notifications(db_session, run["member_id"])
+    assert len(lost) == 1
+    assert lost[0].title == "Svincolato perso"
+    assert lost[0].body.endswith(
+        "Non hai aggiudicato Svincolato Conteso dagli svincolati: offerta inferiore."
+    )
+    assert lost[0].deep_link == f"/svincolati?lega={league_id}"
+
+
+def test_waiver_tie_announces_a_waiver_tiebreak_and_its_cancellation(
+    client: TestClient,
+    db_session: Session,
+    competition_ids: list[str],
+) -> None:
+    """Parità negli svincolati: lo spareggio si annuncia come spareggio degli svincolati.
+    Se nel frattempo l'amministratore dà il calciatore a una delle due squadre, l'altra
+    riceve «Spareggio svincolati annullato», sempre con il link agli svincolati."""
+    run = _two_teams_bid_on_same_free_agent(
+        client,
+        db_session,
+        competition_ids,
+        prefix="waiver.tie",
+        admin_amount=60,
+        member_amount=60,
+    )
+    league_id = run["league_id"]
+    assert run["outcome"]["outcome"] == "tiebreak"
+    for user_id in (run["admin_id"], run["member_id"]):
+        rows = _waiver_outcome_notifications(db_session, user_id)
+        assert len(rows) == 1
+        assert rows[0].title == "Spareggio svincolati aperto"
+        assert "Parità su Svincolato Conteso negli svincolati" in rows[0].body
+        assert rows[0].deep_link == f"/svincolati?lega={league_id}"
+
+    admin_headers = {"Authorization": f"Bearer {run['admin_token']}"}
+    placed = client.put(
+        f"/leagues/{league_id}/amministrazione/squadre/{run['admin_team']}/slot/1",
+        headers=admin_headers,
+        json={"athleteId": str(run["free_agent_id"]), "purchaseCredits": 0},
+    )
+    assert placed.status_code == 200, placed.text
+    tiebreak_id = run["outcome"]["tiebreakSessionId"]
+    base = f"/leagues/{league_id}/mercato/svincoli/sessioni/{tiebreak_id}"
+    assert client.post(f"{base}/chiudi", headers=admin_headers).status_code == 200
+    assert client.post(f"{base}/risolvi", headers=admin_headers).status_code == 200
+
+    cancelled = [
+        row
+        for row in _waiver_outcome_notifications(db_session, run["member_id"])
+        if row.title == "Spareggio svincolati annullato"
+    ]
+    assert len(cancelled) == 1
+    assert "Lo spareggio degli svincolati su Svincolato Conteso è annullato" in cancelled[0].body
+    assert cancelled[0].deep_link == f"/svincolati?lega={league_id}"
+    # Chi ora ha il calciatore non riceve l'annullamento.
+    assert [row.title for row in _waiver_outcome_notifications(db_session, run["admin_id"])] == [
+        "Spareggio svincolati aperto"
+    ]

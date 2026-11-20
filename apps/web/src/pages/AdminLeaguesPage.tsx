@@ -161,6 +161,32 @@ export function AdminLeaguesPage() {
           ))}
         </ul>
       ) : null}
+      {/* L'API restituisce 20 leghe per pagina: senza pager si vedevano solo le prime. */}
+      {!loading && !error && result && result.totalPages > 1 ? (
+        <div className="fa-feedback-admin__pager" data-testid="admin-leagues-pager">
+          <Button
+            type="button"
+            variant="secondary"
+            disabled={page <= 1}
+            onClick={() => setPage((value) => Math.max(1, value - 1))}
+            data-testid="admin-leagues-prev-page"
+          >
+            Precedente
+          </Button>
+          <span>
+            Pagina {result.page} di {result.totalPages} · {result.total} leghe
+          </span>
+          <Button
+            type="button"
+            variant="secondary"
+            disabled={page >= result.totalPages}
+            onClick={() => setPage((value) => Math.min(result.totalPages, value + 1))}
+            data-testid="admin-leagues-next-page"
+          >
+            Successiva
+          </Button>
+        </div>
+      ) : null}
     </PageContainer>
   );
 }

@@ -149,6 +149,10 @@ class RosterImportAthleteCandidateResponse(ApiModel):
     athlete_id: str = Field(alias="athleteId")
     provider_id: int = Field(alias="providerId")
     canonical_name: str = Field(alias="canonicalName")
+    # Per scegliere fra omonimi: ruolo nella lega (P/D/C/A), squadra e campionato.
+    role: str | None = None
+    club_name: str | None = Field(default=None, alias="clubName")
+    competition_name: str | None = Field(default=None, alias="competitionName")
 
 
 class RosterImportRowResponse(ApiModel):
@@ -174,7 +178,11 @@ class RosterImportPreviewResponse(ApiModel):
     original_filename: str | None = Field(default=None, alias="originalFilename")
     can_confirm: bool = Field(alias="canConfirm")
     row_count: int = Field(alias="rowCount")
+    # Righe con errori bloccanti: i nomi ambigui non ci sono, sono avvisi da risolvere.
     error_count: int = Field(alias="errorCount")
+    # Righe con un nome di più calciatori ancora senza scelta: bloccano la conferma
+    # finché non si sceglie il candidato (`resolutions`), ma non sono errori.
+    ambiguous_count: int = Field(default=0, alias="ambiguousCount")
     warning_count: int = Field(alias="warningCount")
     rows: list[RosterImportRowResponse] = Field(default_factory=list)
     confirmed_at: str | None = Field(default=None, alias="confirmedAt")

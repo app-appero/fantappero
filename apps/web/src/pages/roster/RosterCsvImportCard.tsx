@@ -1,4 +1,5 @@
 import type { RosterImportPreview } from "@fantappero/contracts";
+import { describeRosterImportCandidate, rosterImportAmbiguousCount } from "@fantappero/contracts";
 import {
   Button,
   Card,
@@ -71,6 +72,8 @@ export function RosterCsvImportCard({
   const [exportModalOpen, setExportModalOpen] = useState(false);
   const [importModalOpen, setImportModalOpen] = useState(false);
   const currentLabel = adminTeamName ? `(${adminTeamName})` : "";
+  // Nomi di più calciatori: avvisi da risolvere, non errori (QA 19-20/11).
+  const ambiguousCount = csvPreview ? rosterImportAmbiguousCount(csvPreview) : 0;
 
   return (
     <Card className="fa-roster-excel" data-testid="roster-excel-import">
@@ -132,8 +135,9 @@ export function RosterCsvImportCard({
         </div>
         <p className="fa-roster-excel__hint">
           Il file ha solo Calciatore e Crediti, per la squadra selezionata. Vale il nome del
-          listone oppure solo il cognome; maiuscole e minuscole non contano. Se non si trova, o
-          il cognome è di più calciatori, quella riga non cambia la rosa.
+          listone oppure solo il cognome; maiuscole, minuscole e accenti non contano. Se non si
+          trova, quella riga non cambia la rosa; se è di più calciatori, scegli quello giusto
+          nell'anteprima prima di confermare.
         </p>
 
         <Modal
@@ -230,10 +234,18 @@ export function RosterCsvImportCard({
         ) : null}
         {csvPreview ? (
           <div className="fa-roster-excel__preview" data-testid="roster-excel-preview">
-            <p>
-              Anteprima: {csvPreview.rowCount} righe · errori {csvPreview.errorCount} · avvisi{" "}
+            <p data-testid="roster-excel-preview-counts">
+              Anteprima: {csvPreview.rowCount} righe · errori {csvPreview.errorCount}
+              {ambiguousCount > 0 ? ` · nomi ambigui ${ambiguousCount}` : ""} · avvisi{" "}
               {csvPreview.warningCount}
             </p>
+            {ambiguousCount > 0 ? (
+              <p className="fa-roster-excel__hint" data-testid="roster-excel-ambiguous-hint">
+                {ambiguousCount === 1
+                  ? "Un nome corrisponde a più calciatori: scegli quello giusto (ruolo e squadra) e poi conferma."
+                  : `${ambiguousCount} nomi corrispondono a più calciatori: scegli quelli giusti (ruolo e squadra) e poi conferma.`}
+              </p>
+            ) : null}
             <Table>
               <TableHead>
                 <TableRow>
@@ -268,8 +280,12 @@ export function RosterCsvImportCard({
                         >
                           <option value="">Seleziona calciatore…</option>
                           {row.candidates.map((candidate) => (
-                            <option key={candidate.athleteId} value={candidate.athleteId}>
-                              {candidate.canonicalName} (#{candidate.providerId})
+                            <option
+                              key={candidate.athleteId}
+                              value={candidate.athleteId}
+                              data-testid={`roster-excel-candidate-${row.rowNumber}-${candidate.athleteId}`}
+                            >
+                              {`${candidate.canonicalName} — ${describeRosterImportCandidate(candidate)}`}
                             </option>
                           ))}
                         </select>

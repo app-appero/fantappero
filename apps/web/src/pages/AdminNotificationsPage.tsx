@@ -1,4 +1,5 @@
 import {
+  avatarInitial,
   BROADCAST_CATEGORY_OPTIONS,
   BROADCAST_DESTINATIONS,
   BROADCAST_KIND_OPTIONS,
@@ -205,7 +206,7 @@ export function RecipientPicker(props: {
                 >
                   <Check on={on} />
                   <span className="fa-nop-user__avatar" aria-hidden="true">
-                    {user.displayName.slice(0, 1).toUpperCase()}
+                    {avatarInitial(user.displayName)}
                   </span>
                   <span className="fa-nop-user__who">
                     <strong>{user.displayName}</strong>

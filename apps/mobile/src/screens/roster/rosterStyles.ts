@@ -2,6 +2,7 @@ import { DISPLAY_FONT } from "../../theme/fonts";
 import { lazyStyles } from "../../theme/lazyStyles";
 import { theme } from "@fantappero/ui/theme";
 import { StyleSheet } from "react-native";
+import { PENDING_BADGE_COLORS } from "./pendingBadge";
 
 const { colors, spacing, typography, radius } = theme;
 
@@ -376,10 +377,18 @@ export const rosterStyles = lazyStyles(() => StyleSheet.create({
     fontSize: typography.fontSize.xs,
     color: colors.foregroundMuted,
   },
+  // Badge come sul web: il solo testo ambra si leggeva a 3,3:1 nel tema chiaro (QA 19-20/11).
   playerPendingBadge: {
+    alignSelf: "flex-start",
+    marginTop: 2,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 1,
+    borderRadius: radius.pill,
+    overflow: "hidden",
+    backgroundColor: PENDING_BADGE_COLORS.background,
+    color: PENDING_BADGE_COLORS.text,
     fontSize: typography.fontSize.xs,
     fontWeight: typography.fontWeight.semibold,
-    color: colors.warning,
   },
   rowActionBadge: {
     width: 28,
@@ -581,6 +590,8 @@ export const rosterStyles = lazyStyles(() => StyleSheet.create({
   moveSign: { width: 38, height: 38, borderRadius: 19, alignItems: "center", justifyContent: "center" },
   moveSignLabel: { fontSize: 22, fontFamily: DISPLAY_FONT },
   moveTitle: { color: colors.foreground, fontWeight: "600" },
+  // Candidato scelto per un nome ambiguo dell'import Excel.
+  candidateRowSelected: { borderColor: colors.brand, borderWidth: 2 },
   moveDate: { color: colors.foregroundMuted, fontSize: 12 },
   moveValue: { fontSize: 22, fontFamily: DISPLAY_FONT },
   blockTitle: { color: colors.foreground, fontSize: 24, lineHeight: 26, fontFamily: DISPLAY_FONT, textTransform: "uppercase", marginTop: spacing.sm, marginBottom: spacing.xs },

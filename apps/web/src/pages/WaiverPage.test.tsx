@@ -84,6 +84,12 @@ describe("WaiverPage — layout demo (EP08-03)", () => {
     expect(html).toContain('data-testid="wireframe-region-waiver-bid"');
   });
 
+  it("il link delle notifiche «/svincolati» apre la stessa pagina (QA 19-20/11)", () => {
+    const html = renderRoute("/svincolati?persona=member&stato=success");
+    expect(html).toContain('data-testid="wireframe-region-waiver-bid"');
+    expect(html).not.toContain('data-testid="wireframe-region-auction-bid"');
+  });
+
   it("permessi insufficienti mostra lo stato forbidden", () => {
     const html = renderRoute("/svincoli?persona=member&stato=forbidden");
     expect(html).toContain('data-testid="waiver-forbidden"');

@@ -13,7 +13,7 @@ from database.enums import CreditLedgerReason, RosterOwnershipSource
 from fantasy_teams.composition_service import (
     assert_assignment_respects_role_quota,
     assign_allowing_role_quota_overflow,
-    resolve_effective_athlete_role,
+    resolve_effective_athlete_roles,
     sync_team_composition_status,
 )
 from fantasy_teams.ledger import apply_ledger_movement, find_account_for_team
@@ -22,6 +22,11 @@ from fantasy_teams.ownership import sync_ownership_on_assign
 from leagues.models.league import League
 from leagues.models.league_rules import LeagueRules
 from market.validators import compute_release_refund
+
+# Note dei movimenti di crediti per un calciatore vinto all'asta: le due modalità hanno la
+# stessa causale (``market_auction_win``), la nota dice da quale asta arriva l'addebito.
+SEALED_AUCTION_WIN_NOTE = "Assegnazione da asta a buste"
+LIVE_AUCTION_WIN_NOTE = "Assegnazione da asta a rilanci"
 
 
 def next_free_slot_or_overflow(
@@ -141,6 +146,7 @@ def assign_winning_bid(
     transaction_id: str,
     actor_id: UUID | None,
     allow_overflow: bool = False,
+    note: str = SEALED_AUCTION_WIN_NOTE,
 ) -> FantasyRosterSlot | None:
     """Assign an auction-won athlete to the team's first free slot.
 
@@ -152,6 +158,9 @@ def assign_winning_bid(
     With ``allow_overflow`` (sealed-bid auction, EP08-10 bis) a full roster or
     an exceeded role quota no longer loses the bid: the player is assigned,
     flagged as in excess, and waits for the coach to release someone.
+
+    ``note`` è la nota del movimento di crediti: l'asta a rilanci passa
+    ``LIVE_AUCTION_WIN_NOTE``, altrimenti resta quella dell'asta a buste.
     """
     if allow_overflow:
         try:
@@ -170,7 +179,7 @@ def assign_winning_bid(
                     reason=CreditLedgerReason.MARKET_AUCTION_WIN,
                     transaction_id=transaction_id,
                     actor_id=actor_id,
-                    note="Assegnazione da asta a buste",
+                    note=note,
                     allow_overflow=True,
                     force_overflow_flag=created_new,
                 )
@@ -201,7 +210,7 @@ def assign_winning_bid(
         reason=CreditLedgerReason.MARKET_AUCTION_WIN,
         transaction_id=transaction_id,
         actor_id=actor_id,
-        note="Assegnazione da asta a buste",
+        note=note,
     )
 
 
@@ -254,22 +263,21 @@ def resolve_live_swap(
 
     # Scambio dello stesso ruolo: non peggiora la composizione, quindi non può essere
     # respinto per quota anche se il ruolo è già in sovrannumero (il flag resta acceso).
-    competition_ids = {competition.id for competition in league.competitions}
-    released_role = resolve_effective_athlete_role(
+    # Ruoli della valutazione della rosa, come il controllo di quota: chi esce conta con il
+    # ruolo con cui la rosa lo conta, anche se non è più nel listone di quest'anno.
+    roles = resolve_effective_athlete_roles(
         session,
         league_id=league.id,
-        athlete_id=release_athlete_id,
+        athlete_ids=[release_athlete_id, acquire_athlete_id],
         season_year=league.season_year,
-        competition_ids=competition_ids,
     )
-    acquired_role = resolve_effective_athlete_role(
-        session,
-        league_id=league.id,
-        athlete_id=acquire_athlete_id,
-        season_year=league.season_year,
-        competition_ids=competition_ids,
+    released_role = roles.get(release_athlete_id)
+    acquired_role = roles.get(acquire_athlete_id)
+    same_role = (
+        released_role is not None
+        and acquired_role is not None
+        and released_role.role == acquired_role.role
     )
-    same_role = released_role is not None and released_role == acquired_role
 
     try:
         with session.begin_nested():

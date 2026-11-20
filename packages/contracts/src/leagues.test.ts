@@ -2,10 +2,16 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
   LEAGUE_LIFECYCLE_PHASES,
+  canConfirmRosterImport,
   describeLeagueLifecycleStep,
+  describeRosterImportCandidate,
+  leagueHomeNextStep,
   leagueLifecyclePhaseIndex,
   orderLeagueSetupBlockers,
+  rosterImportAmbiguousCount,
   type LeagueLifecycle,
+  type RosterImportPreview,
+  type RosterImportRow,
 } from "./leagues.ts";
 
 function lifecycle(overrides: Partial<LeagueLifecycle>): LeagueLifecycle {
@@ -119,5 +125,153 @@ describe("orderLeagueSetupBlockers", () => {
         ["calendar_not_configured", false],
       ],
     );
+  });
+});
+
+function importRow(overrides: Partial<RosterImportRow>): RosterImportRow {
+  return {
+    rowNumber: 2,
+    squadra: "Squadra",
+    providerId: null,
+    nome: "toni fernandez",
+    crediti: 5,
+    status: "ok",
+    fantasyTeamId: "team-1",
+    fantasyTeamName: "Squadra",
+    athleteId: "a-1",
+    athleteName: "Toni Fernández",
+    slotIndex: 0,
+    issues: [],
+    candidates: [],
+    ...overrides,
+  };
+}
+
+function importPreview(rows: RosterImportRow[], overrides: Partial<RosterImportPreview> = {}) {
+  return {
+    importId: "import-1",
+    status: "draft",
+    fileSha256: "sha",
+    originalFilename: "rose.xlsx",
+    canConfirm: false,
+    rowCount: rows.length,
+    errorCount: 0,
+    ambiguousCount: rows.filter((row) => row.status === "ambiguous").length,
+    warningCount: 0,
+    rows,
+    confirmedAt: null,
+    ...overrides,
+  } satisfies RosterImportPreview;
+}
+
+const homonyms = importRow({
+  rowNumber: 3,
+  status: "ambiguous",
+  athleteId: null,
+  athleteName: null,
+  slotIndex: null,
+  candidates: [
+    {
+      athleteId: "barca",
+      providerId: 1,
+      canonicalName: "Toni Fernández",
+      role: "C",
+      clubName: "Barcelona",
+      competitionName: "La Liga",
+    },
+    {
+      athleteId: "venezia",
+      providerId: 2,
+      canonicalName: "Toni Fernández",
+      role: "A",
+      clubName: "Venezia",
+      competitionName: "Serie B",
+    },
+  ],
+});
+
+describe("describeRosterImportCandidate", () => {
+  it("shows role, club and competition to tell homonyms apart", () => {
+    assert.deepEqual(
+      homonyms.candidates.map(describeRosterImportCandidate),
+      ["Centrocampista · Barcelona · La Liga", "Attaccante · Venezia · Serie B"],
+    );
+  });
+
+  it("skips missing details and falls back to the provider id", () => {
+    assert.equal(
+      describeRosterImportCandidate({
+        athleteId: "x",
+        providerId: 7,
+        canonicalName: "X",
+        role: "D",
+        clubName: null,
+      }),
+      "Difensore",
+    );
+    assert.equal(
+      describeRosterImportCandidate({ athleteId: "y", providerId: 9, canonicalName: "Y" }),
+      "#9",
+    );
+  });
+});
+
+describe("roster import ambiguities", () => {
+  it("counts ambiguous rows apart from errors, also without ambiguousCount", () => {
+    const preview = importPreview([importRow({}), homonyms]);
+    assert.equal(rosterImportAmbiguousCount(preview), 1);
+    assert.equal(rosterImportAmbiguousCount({ ...preview, ambiguousCount: undefined }), 1);
+  });
+
+  it("confirms only once every ambiguous name has a valid choice", () => {
+    const preview = importPreview([importRow({}), homonyms]);
+    assert.equal(canConfirmRosterImport(preview, {}), false);
+    assert.equal(canConfirmRosterImport(preview, { 3: "someone-else" }), false);
+    assert.equal(canConfirmRosterImport(preview, { 3: "venezia" }), true);
+    assert.equal(canConfirmRosterImport(importPreview([homonyms]), { 3: "barca" }), true);
+  });
+
+  it("stays blocked with errors, nothing to import or an already confirmed import", () => {
+    const withError = importPreview([importRow({}), importRow({ rowNumber: 4, status: "error" })], {
+      errorCount: 1,
+    });
+    assert.equal(canConfirmRosterImport(withError, {}), false);
+    const onlySkipped = importPreview([importRow({ status: "skipped", athleteId: null })]);
+    assert.equal(canConfirmRosterImport(onlySkipped, {}), false);
+    const okAndSkipped = importPreview([
+      importRow({}),
+      importRow({ rowNumber: 5, status: "skipped" }),
+    ]);
+    assert.equal(canConfirmRosterImport(okAndSkipped, {}), true);
+    assert.equal(canConfirmRosterImport({ ...okAndSkipped, status: "confirmed" }, {}), false);
+    assert.equal(canConfirmRosterImport(null, {}), false);
+  });
+});
+
+describe("leagueHomeNextStep", () => {
+  it("in configurazione non propone la formazione", () => {
+    for (const state of ["draft", "configuring"] as const) {
+      assert.deepEqual(leagueHomeNextStep(state, { isAdmin: true }), {
+        title: "Completa la configurazione",
+        actionLabel: "Vai all'amministrazione",
+        target: "admin",
+      });
+      const member = leagueHomeNextStep(state, { isAdmin: false });
+      assert.equal(member.title, "Attendi l'avvio della stagione");
+      assert.equal(member.target, "roster");
+    }
+  });
+
+  it("segue le fasi successive: asta, formazione, classifica", () => {
+    assert.equal(leagueHomeNextStep("auction", { isAdmin: false }).target, "auction");
+    assert.deepEqual(leagueHomeNextStep("active", { isAdmin: false }), {
+      title: "Imposta la formazione",
+      actionLabel: "Vai alla formazione",
+      target: "formation",
+    });
+    assert.equal(leagueHomeNextStep("active", { isAdmin: true }).target, "formation");
+    for (const state of ["concluded", "archived"] as const) {
+      assert.equal(leagueHomeNextStep(state, { isAdmin: true }).target, "standings");
+    }
   });
 });

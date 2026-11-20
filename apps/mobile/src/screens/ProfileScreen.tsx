@@ -1,6 +1,7 @@
 import type { RootStackParamList } from "../navigation/types";
 import { lazyStyles } from "../theme/lazyStyles";
 import {
+  avatarInitial,
   DELETE_ACCOUNT_CONFIRMATION_PHRASE,
   PROFILE_LANGUAGE_OPTIONS,
   PROFILE_TIMEZONE_OPTIONS,
@@ -424,7 +425,7 @@ export function ProfileScreen() {
         ) : (
           <View style={styles.avatarPlaceholder} testID="profile-avatar-placeholder">
             <Text style={styles.avatarPlaceholderLabel}>
-              {profile.displayName.charAt(0).toUpperCase()}
+              {avatarInitial(profile.displayName)}
             </Text>
           </View>
         )}

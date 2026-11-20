@@ -11,6 +11,7 @@ import type {
   RosterTurnSnapshotDetail,
   RosterTurnSnapshotSummary,
 } from "@fantappero/contracts";
+import { canConfirmRosterImport } from "@fantappero/contracts";
 import { Breadcrumb, Button, PageContainer, UiStatePanel } from "@fantappero/ui";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -961,8 +962,9 @@ export function RosterPage() {
         adminTeamId,
       );
       setCsvPreview(preview);
+      // I nomi ambigui non sono errori: si sceglie il calciatore nell'anteprima.
       if (preview.errorCount > 0) {
-        setCsvError("Anteprima con errori: correggi il file o risolvi le ambiguità.");
+        setCsvError("Anteprima con errori: correggi il file.");
       }
     } catch (error) {
       setCsvError(getApiErrorMessage(error, "Impossibile elaborare il file Excel."));
@@ -1042,8 +1044,9 @@ export function RosterPage() {
     try {
       const preview = await previewBulkRosterImport(stored.accessToken, activeLeagueId, file);
       setCsvPreview(preview);
+      // I nomi ambigui non sono errori: si sceglie il calciatore nell'anteprima.
       if (preview.errorCount > 0) {
-        setCsvError("Anteprima con errori: correggi il file o risolvi le ambiguità.");
+        setCsvError("Anteprima con errori: correggi il file.");
       }
     } catch (error) {
       setCsvError(getApiErrorMessage(error, "Impossibile elaborare il file Excel."));
@@ -1077,10 +1080,12 @@ export function RosterPage() {
       setCsvError("Sessione non disponibile. Accedi di nuovo.");
       return;
     }
-    const resolutions = Object.entries(csvResolutions).map(([rowNumber, athleteId]) => ({
-      rowNumber: Number(rowNumber),
-      athleteId,
-    }));
+    const resolutions = Object.entries(csvResolutions)
+      .filter(([, athleteId]) => Boolean(athleteId))
+      .map(([rowNumber, athleteId]) => ({
+        rowNumber: Number(rowNumber),
+        athleteId,
+      }));
     setCsvBusy(true);
     try {
       const result = await confirmRosterCsvImport(
@@ -1103,20 +1108,8 @@ export function RosterPage() {
     }
   };
 
-  const csvCanConfirm =
-    !!csvPreview &&
-    csvPreview.rows.some(
-      (row) =>
-        row.status === "ok" ||
-        (row.status === "ambiguous" && Boolean(csvResolutions[row.rowNumber])),
-    ) &&
-    (csvPreview.canConfirm ||
-      csvPreview.rows.every(
-        (row) =>
-          row.status === "ok" ||
-          row.status === "skipped" ||
-          (row.status === "ambiguous" && Boolean(csvResolutions[row.rowNumber])),
-      ));
+  // Stessa regola dell'app: niente errori e un calciatore scelto per ogni nome ambiguo.
+  const csvCanConfirm = canConfirmRosterImport(csvPreview, csvResolutions);
 
   const onSelectAdminTeam = (teamId: string) => {
     setAdminTeamId(teamId);

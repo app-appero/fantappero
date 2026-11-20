@@ -1,5 +1,6 @@
 import { lazyStyles } from "../theme/lazyStyles";
 import type { FantasyCoachDirectoryItem } from "@fantappero/contracts";
+import { avatarInitial } from "@fantappero/contracts";
 import { theme } from "@fantappero/ui/theme";
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
@@ -13,6 +14,7 @@ import {
   revokeNamedLeagueInvite,
 } from "../api/managerInvites";
 import {
+  inviteErrorRefreshesRow,
   revocableInviteId,
   revokeInviteConfirmMessage,
   revokeInviteErrorMessage,
@@ -31,7 +33,7 @@ function CoachAvatar({ name, avatarUrl }: { name: string; avatarUrl: string | nu
   }
   return (
     <View style={styles.avatarPlaceholder}>
-      <Text style={styles.avatarInitial}>{name.charAt(0).toUpperCase()}</Text>
+      <Text style={styles.avatarInitial}>{avatarInitial(name)}</Text>
     </View>
   );
 }
@@ -211,6 +213,11 @@ export function CoachDirectoryPanel({
         setCapacityReached(true);
         onMembershipChanged?.();
         return;
+      }
+      if (error instanceof ApiError && inviteErrorRefreshesRow(error)) {
+        // Riga vecchia (es. «Invito già inviato»): si ricarica dal server, così non offre
+        // più «Invita».
+        await load({ silent: true });
       }
       setInviteError(getApiErrorMessage(error, "Impossibile inviare l'invito."));
     } finally {

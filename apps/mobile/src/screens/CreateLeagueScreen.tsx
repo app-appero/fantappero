@@ -232,7 +232,9 @@ export function CreateLeagueScreen() {
                 accessibilityRole="checkbox"
                 accessibilityState={{ checked: isSelected }}
                 onPress={() => toggleCompetition(competition.id)}
-                style={[styles.competitionRow, isSelected && styles.competitionRowSelected, blocked && { opacity: 0.5 }]}
+                // Niente opacità sulla riga: «girone di ritorno già iniziato» scendeva a 2,2:1
+                // (QA 19-20/11). Come sul web, il blocco si vede dall'interruttore disattivato.
+                style={[styles.competitionRow, isSelected && styles.competitionRowSelected]}
                 testID={`create-league-competition-${competition.id}`}
               >
                 <Switch

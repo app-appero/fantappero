@@ -585,6 +585,88 @@ def test_ensure_sincronizza_creates_and_is_idempotent(
     assert second.json()["duplicates"] >= 1
 
 
+def test_sincronizza_opens_an_existing_scheduled_turn_within_the_horizon(
+    client: TestClient,
+    db_session: Session,
+    competition_ids: list[str],
+) -> None:
+    """QA 19-20/11: in una lega appena attivata «sincronizza» non apriva il turno vicino
+    (entro 14 giorni), che si è aperto solo con l'omologazione del precedente. I turni nati
+    prima senza apertura (task iniziale della lega, ``auto_open=False``) restavano
+    ``scheduled``: sincronizza li trovava già esistenti e non provava ad aprirli.
+    Regola del 16/11: si aprono da soli entro 14 giorni; quelli lontani restano programmati."""
+    token, _ = _register_and_login(client, "turn.ensure.existing@example.com")
+    league_id = _create_league(client, token, competition_ids, "Lega Turno Esistente")
+    _set_min_fixtures(db_session, league_id, 10)
+    today = datetime.now(UTC).date()
+    days_until_saturday = (5 - today.weekday()) % 7
+    saturday = today + timedelta(days=days_until_saturday or 7)
+    near_kickoff = datetime(saturday.year, saturday.month, saturday.day, 15, 0, tzinfo=UTC)
+    far_kickoff = near_kickoff + timedelta(weeks=5)
+    _seed_weekend_fixtures(
+        db_session,
+        competition_ids,
+        count=10,
+        kickoff=near_kickoff,
+        id_offset=987_000,
+        league_id=league_id,
+    )
+    _seed_weekend_fixtures(
+        db_session,
+        competition_ids,
+        count=10,
+        kickoff=far_kickoff,
+        id_offset=988_000,
+        league_id=league_id,
+        clubs_offset=987_000,
+    )
+
+    # Turni creati senza aprirli, come fa il task iniziale della lega.
+    headers = {"Authorization": f"Bearer {token}"}
+    round_ids = {}
+    for label, kickoff in (("near", near_kickoff), ("far", far_kickoff)):
+        created = client.post(
+            f"/leagues/{league_id}/turni",
+            headers=headers,
+            json={"kind": "weekend", "anchorDate": kickoff.strftime("%Y-%m-%d")},
+        )
+        assert created.status_code == 201, created.json()
+        assert created.json()["status"] == "scheduled"
+        round_ids[label] = created.json()["id"]
+
+    synced = client.post(f"/leagues/{league_id}/turni/sincronizza", headers=headers)
+    assert synced.status_code == 200
+    assert synced.json()["opened"] >= 1
+
+    def status(round_id: str) -> str:
+        detail = client.get(f"/leagues/{league_id}/turni/{round_id}", headers=headers)
+        assert detail.status_code == 200
+        return detail.json()["status"]
+
+    assert status(round_ids["near"]) == "open"
+    assert status(round_ids["far"]) == "scheduled"
+
+    db_session.expire_all()
+    opened_audit = [
+        row
+        for row in db_session.scalars(
+            select(LeagueAuditEvent).where(
+                LeagueAuditEvent.league_id == UUID(league_id),
+                LeagueAuditEvent.action == LeagueAuditAction.FANTASY_TURN_OPENED,
+            )
+        ).all()
+        if (row.details or {}).get("roundId") == round_ids["near"]
+    ]
+    assert len(opened_audit) == 1
+    assert opened_audit[0].details["trigger"] == "schedule"
+
+    # Idempotente: una seconda sincronizzazione non riapre né apre quello lontano.
+    again = client.post(f"/leagues/{league_id}/turni/sincronizza", headers=headers)
+    assert again.status_code == 200
+    assert status(round_ids["near"]) == "open"
+    assert status(round_ids["far"]) == "scheduled"
+
+
 def _future_saturday() -> datetime:
     """Un sabato alle 16:00 UTC nei prossimi anni, scelto a caso.
 

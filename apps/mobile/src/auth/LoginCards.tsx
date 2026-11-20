@@ -1,5 +1,5 @@
 import { lazyStyles } from "../theme/lazyStyles";
-import { LOGIN_CARDS, LOGIN_SHOWCASE_LEAGUES } from "@fantappero/contracts";
+import { firstGrapheme, LOGIN_CARDS, LOGIN_SHOWCASE_LEAGUES } from "@fantappero/contracts";
 import { theme } from "@fantappero/ui/theme";
 import { StyleSheet, Text, View } from "react-native";
 
@@ -26,7 +26,7 @@ export function LoginCards({ firstName, compact = false }: { firstName?: string;
                 </View>
               </View>
               <View style={styles.initialWrap}>
-                <Text style={styles.initial}>{card.name.charAt(0)}</Text>
+                <Text style={styles.initial}>{firstGrapheme(card.name)}</Text>
               </View>
               <View style={styles.foot}>
                 <View style={styles.role}>
