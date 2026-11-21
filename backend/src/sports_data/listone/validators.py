@@ -39,11 +39,15 @@ def compute_override_effective_from_round(
     *,
     league_state: LeagueState,
     current_round: int | None,
+    latest_started_round: int = 0,
 ) -> int | None:
     """Return effective_from_round for a new override.
 
     Pre-asta (draft/configuring/auction): immediate (``None`` = from auction/start).
-    Post-avvio (active): next round (current_round + 1).
+    Post-avvio (active): il turno dopo quello corrente. Il turno corrente è
+    ``latest_started_round``, calcolato dal server (il più alto già aperto, bloccato o in
+    corso); ``current_round`` del client conta solo se è più avanti (QA 20-21/11): senza,
+    o con 0, l'override valeva dal turno 1 e cambiava anche i turni già bloccati.
     """
     if league_state in LOCKED_OVERRIDE_STATES:
         raise ListoneValidationError(
@@ -59,7 +63,7 @@ def compute_override_effective_from_round(
                 "Il turno corrente non può essere negativo.",
                 code="invalid_current_round",
             )
-        return round_number + 1
+        return max(round_number, latest_started_round) + 1
     raise ListoneValidationError(
         "Stato lega non valido per override di ruolo.",
         code="league_role_override_locked",

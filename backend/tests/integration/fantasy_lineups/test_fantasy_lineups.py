@@ -20,6 +20,7 @@ from database.enums import (
     FantasyTurnKind,
     FantasyTurnStatus,
     LeagueAuditAction,
+    LeagueState,
     RosterCompositionStatus,
 )
 from database.session import create_session_factory
@@ -2296,3 +2297,83 @@ def test_role_override_applies_to_the_lineup_from_its_effective_round(
     assert starter_roles[str(promoted.id)] == "C"
     assert list(starter_roles.values()).count("C") == 3
     assert list(starter_roles.values()).count("D") == 4
+
+
+def test_role_override_without_current_round_starts_after_the_latest_open_or_locked_turn(
+    client: TestClient,
+    db_session: Session,
+    competition_ids: list[str],
+) -> None:
+    """QA 20-21/11 (D1): senza `currentRound` (o con 0) l'override a lega avviata valeva dal
+    turno 1, e la formazione dei turni già bloccati o aperti mostrava subito il ruolo nuovo.
+
+    Il turno corrente lo calcola il server: l'override vale dal turno dopo il più alto già
+    aperto, bloccato o in corso. Con due turni aperti insieme vale dopo il secondo, così non
+    cambia una formazione che si può già schierare. Il `currentRound` del client conta solo se
+    è più avanti."""
+    token, _ = _register_and_login(client, "lineup.override.server.round@example.com")
+    league_id = _create_league(client, token, competition_ids, "Lega Override Turno Server")
+    headers = {"Authorization": f"Bearer {token}"}
+    client.get(f"/leagues/{league_id}/rosa", headers=headers)
+    grouped = _seed_roster_athletes(db_session, id_offset=3_620_000)
+    _fill_validated_roster(db_session, league_id, grouped)
+    league = db_session.get(League, UUID(league_id))
+    assert league is not None
+    league.state = LeagueState.ACTIVE
+    db_session.commit()
+
+    existing = db_session.scalar(
+        select(func.max(FantasyRound.number)).where(FantasyRound.league_id == UUID(league_id))
+    )
+    locked_number = max(11, (existing or 0) + 1)
+    now = datetime.now(UTC)
+    rounds: dict[int, FantasyRound] = {}
+    for offset, (status, cutoff) in enumerate(
+        (
+            (FantasyTurnStatus.LOCKED, now - timedelta(hours=3)),
+            (FantasyTurnStatus.OPEN, now + timedelta(days=2)),
+            (FantasyTurnStatus.OPEN, now + timedelta(days=5)),
+            (FantasyTurnStatus.SCHEDULED, now + timedelta(days=9)),
+        )
+    ):
+        rounds[locked_number + offset], clubs = _create_open_round(
+            db_session,
+            league_id,
+            cutoff=cutoff,
+            status=status,
+            id_offset=3_630_000 + offset * 100,
+            competition_ids=competition_ids,
+            number=locked_number + offset,
+        )
+        if offset == 0:
+            # La rosa gioca nel club del primo turno: deve stare nei campionati della lega,
+            # se no il calciatore non è nel listone della lega.
+            _register_club_in_competitions(db_session, clubs[-1], competition_ids)
+    last_open = locked_number + 2
+
+    moved = grouped["D"][-1]
+    url = f"/leagues/{league_id}/amministrazione/listone/{moved.id}/ruolo"
+    for body in (
+        {"role": "C", "reason": "Senza turno"},
+        {"role": "C", "reason": "Turno zero", "currentRound": 0},
+        {"role": "C", "reason": "Turno indietro", "currentRound": locked_number + 1},
+    ):
+        response = client.put(url, headers=headers, json=body)
+        assert response.status_code == 200, response.text
+        override = response.json()["override"]
+        assert override["effectiveFromRound"] == last_open + 1, body
+        assert override["pending"] is True
+
+    # Turno bloccato e turni aperti: il calciatore resta difensore.
+    for number in (locked_number, locked_number + 1, last_open):
+        context = client.get(
+            f"/leagues/{league_id}/turni/{rounds[number].id}/formazione", headers=headers
+        )
+        assert context.status_code == 200, context.text
+        roster_roles = {row["athleteId"]: row["role"] for row in context.json()["roster"]}
+        assert roster_roles[str(moved.id)] == "D", number
+
+    # Un turno del client più avanti del server rimanda ancora l'override.
+    later = client.put(url, headers=headers, json={"role": "C", "currentRound": last_open + 3})
+    assert later.status_code == 200, later.text
+    assert later.json()["override"]["effectiveFromRound"] == last_open + 4

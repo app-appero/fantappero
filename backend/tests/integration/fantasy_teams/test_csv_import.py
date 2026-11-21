@@ -855,6 +855,102 @@ def test_csv_ambiguous_rows_are_not_counted_as_errors(
     assert with_error.json()["ambiguousCount"] == 1
 
 
+def test_csv_rejected_confirm_does_not_keep_partial_resolutions(
+    client: TestClient,
+    db_session: Session,
+    competition_ids: list[str],
+) -> None:
+    """QA 20-21/11 (D3): una conferma rifiutata salvava comunque le scelte dei nomi ambigui.
+    Alla conferma dopo la riga non era più ambigua e la scelta nuova veniva ignorata: veniva
+    assegnato il calciatore della prima scelta, e una scelta non valida passava in silenzio.
+
+    Una conferma rifiutata non salva niente: la successiva usa le sue scelte."""
+    token, _ = _register_and_login(client, "csv.ambiguous.rejected@example.com")
+    league_id = _create_league(client, token, competition_ids, "Lega CSV Scelte Rifiutate")
+    headers = {"Authorization": f"Bearer {token}"}
+    team_name = client.get(f"/leagues/{league_id}/rosa", headers=headers).json()["name"]
+    tag = random.randint(100_000, 999_999)
+    first_x = _seed_athlete(db_session, _random_provider_id(), f"P. Fernandez{tag}")
+    second_x = _seed_athlete(db_session, _random_provider_id(), f"S. Fernandez{tag}")
+    first_y = _seed_athlete(db_session, _random_provider_id(), f"P. Garofalo{tag}")
+    _seed_athlete(db_session, _random_provider_id(), f"S. Garofalo{tag}")
+    preview = client.post(
+        f"/leagues/{league_id}/amministrazione/import-csv/anteprima-testo",
+        headers=headers,
+        json={
+            "csvText": (
+                "squadra,provider_id,nome,crediti\n"
+                f"{team_name},,Fernandez{tag},6\n"
+                f"{team_name},,Garofalo{tag},2\n"
+            )
+        },
+    )
+    assert preview.status_code == 200, preview.text
+    body = preview.json()
+    row_x, row_y = body["rows"]
+    assert [row_x["status"], row_y["status"]] == ["ambiguous", "ambiguous"]
+    confirm_url = f"/leagues/{league_id}/amministrazione/import-csv/{body['importId']}/conferma"
+
+    def stored_statuses() -> list[str]:
+        db_session.expire_all()
+        stored = db_session.get(RosterImportSession, UUID(body["importId"]))
+        assert stored is not None
+        return [row["status"] for row in stored.preview_payload["rows"]]
+
+    def owned(athlete: Athlete) -> bool:
+        return (
+            db_session.scalar(
+                select(FantasyRosterSlot).where(
+                    FantasyRosterSlot.league_id == UUID(league_id),
+                    FantasyRosterSlot.athlete_id == athlete.id,
+                )
+            )
+            is not None
+        )
+
+    # Solo la prima riga scelta: rifiutata, e la scelta non resta salvata.
+    partial = client.post(
+        confirm_url,
+        headers=headers,
+        json={"resolutions": [{"rowNumber": row_x["rowNumber"], "athleteId": str(first_x.id)}]},
+    )
+    assert partial.status_code == 400, partial.text
+    assert partial.json()["code"] == "import_has_ambiguities"
+    assert stored_statuses() == ["ambiguous", "ambiguous"]
+
+    # Una scelta fuori dai candidati dopo il rifiuto: errore, non la scelta di prima.
+    invalid = client.post(
+        confirm_url,
+        headers=headers,
+        json={
+            "resolutions": [
+                {"rowNumber": row_x["rowNumber"], "athleteId": str(first_y.id)},
+                {"rowNumber": row_y["rowNumber"], "athleteId": str(first_y.id)},
+            ]
+        },
+    )
+    assert invalid.status_code == 400, invalid.text
+    assert invalid.json()["code"] == "import_has_errors"
+    assert stored_statuses() == ["ambiguous", "ambiguous"]
+    assert not owned(first_x) and not owned(first_y)
+
+    # La conferma buona usa le scelte nuove.
+    confirmed = client.post(
+        confirm_url,
+        headers=headers,
+        json={
+            "resolutions": [
+                {"rowNumber": row_x["rowNumber"], "athleteId": str(second_x.id)},
+                {"rowNumber": row_y["rowNumber"], "athleteId": str(first_y.id)},
+            ]
+        },
+    )
+    assert confirmed.status_code == 200, confirmed.text
+    assert confirmed.json()["assignedCount"] == 2
+    assert owned(second_x) and owned(first_y)
+    assert not owned(first_x)
+
+
 def test_csv_matches_dotless_turkish_i(
     client: TestClient,
     db_session: Session,

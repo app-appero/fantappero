@@ -618,6 +618,8 @@ class LeagueListoneEntryResponse(ApiModel):
 
 class SetLeagueRoleOverrideRequest(ApiModel):
     role: Literal["P", "D", "C", "A"]
+    # Facoltativo: il turno corrente lo calcola il server; un valore più avanti rimanda
+    # l'override, uno indietro non lo anticipa (QA 20-21/11).
     current_round: int | None = Field(default=None, ge=0, alias="currentRound")
     reason: NoNulStr | None = Field(default=None, max_length=240)
 

@@ -13,6 +13,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 import database.models  # noqa: F401 — register ORM mappers
+from app.text_folding import repair_mojibake
 from leagues.models.competition import Competition
 from observability.logging import get_logger
 from observability.metrics import Timer, get_metrics
@@ -187,6 +188,10 @@ def _resolve_sport_season(
     return season
 
 
+def _repaired_name(value: str | None) -> str | None:
+    return repair_mojibake(value) if value else value
+
+
 def upsert_athlete(
     session: Session,
     mapped: MappedAthlete,
@@ -199,12 +204,17 @@ def upsert_athlete(
         row = session.execute(
             select(Athlete).where(Athlete.provider_id == mapped.provider_id),
         ).scalar_one_or_none()
+    # Il fornitore manda a volte nomi con la codifica rovinata ("JovanoviÄ\x87", QA 20-21/11):
+    # si salvano riparati, e la prossima sincronizzazione ripara anche le righe già salvate.
+    canonical_name = repair_mojibake(mapped.canonical_name)
+    first_name = _repaired_name(mapped.first_name)
+    last_name = _repaired_name(mapped.last_name)
     if row is None:
         row = Athlete(
             provider_id=mapped.provider_id,
-            canonical_name=mapped.canonical_name,
-            first_name=mapped.first_name,
-            last_name=mapped.last_name,
+            canonical_name=canonical_name,
+            first_name=first_name,
+            last_name=last_name,
             nationality=mapped.nationality,
             birth_date=mapped.birth_date,
             height=mapped.height,
@@ -223,9 +233,9 @@ def upsert_athlete(
         cache.athletes[mapped.provider_id] = row
 
     fields = {
-        "canonical_name": mapped.canonical_name,
-        "first_name": mapped.first_name,
-        "last_name": mapped.last_name,
+        "canonical_name": canonical_name,
+        "first_name": first_name,
+        "last_name": last_name,
         "nationality": mapped.nationality,
         "birth_date": mapped.birth_date,
         "height": mapped.height,

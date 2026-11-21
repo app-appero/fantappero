@@ -13,12 +13,16 @@ from observability.metrics import get_metrics, reset_metrics
 from sports_data.catalog.models import Club
 from sports_data.catalog.sync import TeamsBatch, sync_catalog
 from sports_data.provider.envelope import parse_envelope
+from sports_data.provider.types import MappedAthlete
 from sports_data.roster.models import Athlete, SquadMembership, Transfer
+from sports_data.roster.name_repair import repair_athlete_names
 from sports_data.roster.sync import (
     ROSTER_SYNC_ENTITIES_TOTAL,
     PlayersBatch,
+    RosterSyncCounters,
     SquadBatch,
     sync_roster,
+    upsert_athlete,
 )
 
 DATASET = Path(__file__).resolve().parents[2] / "fixtures" / "api_football"
@@ -224,3 +228,110 @@ def test_roster_sync_skips_unknown_clubs(session: Session) -> None:
         session.execute(select(Athlete).where(Athlete.provider_id == 888001)).scalar_one_or_none()
         is None
     )
+
+
+# --- Nomi con la codifica rovinata (QA 20-21/11) -----------------------------------------------
+
+#: Come arrivati dal fornitore (UTF-8 letto come Latin-1) e come devono essere.
+BROKEN_NAMES = {
+    880_101: ("L. JovanoviÄ\x87", "L. Jovanović"),
+    880_102: ("R. ObriÄ\x87", "R. Obrić"),
+    880_103: ("D. PejiÄ\x8diÄ\x87", "D. Pejičić"),
+    880_104: ("N. KovaÄ\x8d", "N. Kovač"),
+}
+#: Nomi giusti con accenti e lettere speciali: non devono cambiare.
+CORRECT_NAMES = {
+    880_201: "A. Dembélé",
+    880_202: "A. Bayındır",
+    880_203: "Š. Vrsaljko",
+    880_204: "M. Ødegaard",
+    880_205: "N’Dicka",
+}
+
+
+def test_roster_sync_saves_repaired_names_and_repairs_stored_ones(session: Session) -> None:
+    counters = RosterSyncCounters()
+    # Riga già salvata rovinata: la prossima sincronizzazione la ripara.
+    stored = Athlete(provider_id=880_101, canonical_name="L. JovanoviÄ\x87")
+    session.add(stored)
+    session.flush()
+
+    for provider_id, (broken, _) in BROKEN_NAMES.items():
+        upsert_athlete(
+            session,
+            MappedAthlete(
+                provider_id=provider_id,
+                canonical_name=broken,
+                first_name="DuÅ¡an" if provider_id == 880_102 else None,
+                last_name=broken.split(" ", 1)[1],
+            ),
+            counters,
+        )
+    for provider_id, name in CORRECT_NAMES.items():
+        upsert_athlete(
+            session, MappedAthlete(provider_id=provider_id, canonical_name=name), counters
+        )
+    session.commit()
+
+    rows = {
+        row.provider_id: row
+        for row in session.scalars(
+            select(Athlete).where(Athlete.provider_id.in_([*BROKEN_NAMES, *CORRECT_NAMES]))
+        ).all()
+    }
+    for provider_id, (_, expected) in BROKEN_NAMES.items():
+        assert rows[provider_id].canonical_name == expected
+        assert rows[provider_id].last_name == expected.split(" ", 1)[1]
+    assert rows[880_102].first_name == "Dušan"
+    assert rows[880_101].id == stored.id
+    for provider_id, name in CORRECT_NAMES.items():
+        assert rows[provider_id].canonical_name == name
+
+
+def test_repair_athlete_names_fixes_only_broken_names_and_is_idempotent(
+    session: Session,
+) -> None:
+    for provider_id, (broken, _) in BROKEN_NAMES.items():
+        session.add(
+            Athlete(
+                provider_id=provider_id,
+                canonical_name=broken,
+                last_name=broken.split(" ", 1)[1],
+            )
+        )
+    for provider_id, name in CORRECT_NAMES.items():
+        session.add(Athlete(provider_id=provider_id, canonical_name=name, first_name="Kévin"))
+    session.commit()
+
+    def names() -> dict[int, tuple[str, str | None, str | None]]:
+        session.expire_all()
+        return {
+            row.provider_id: (row.canonical_name, row.first_name, row.last_name)
+            for row in session.scalars(select(Athlete)).all()
+        }
+
+    before = names()
+    planned = repair_athlete_names(session, dry_run=True)
+    session.commit()
+    assert names() == before
+    assert {(item.provider_id, item.field) for item in planned} == {
+        (provider_id, field)
+        for provider_id in BROKEN_NAMES
+        for field in ("canonical_name", "last_name")
+    }
+
+    repaired = repair_athlete_names(session)
+    session.commit()
+    assert [(item.before, item.after) for item in repaired if item.field == "canonical_name"] == [
+        BROKEN_NAMES[provider_id] for provider_id in sorted(BROKEN_NAMES)
+    ]
+    after = names()
+    for provider_id, (_, expected) in BROKEN_NAMES.items():
+        assert after[provider_id] == (expected, None, expected.split(" ", 1)[1])
+    for provider_id, name in CORRECT_NAMES.items():
+        assert after[provider_id] == (name, "Kévin", None)
+
+    # Seconda volta: niente da riparare, niente cambia.
+    assert repair_athlete_names(session) == []
+    session.commit()
+    assert names() == after

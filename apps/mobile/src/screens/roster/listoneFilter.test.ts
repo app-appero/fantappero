@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import type { LeagueListoneEntry } from "@fantappero/contracts";
-import { filterListone, filterRosterSlots, foldSearchText } from "./listoneFilter.ts";
+import { filterListone, filterRosterSlots, foldSearchText, repairMojibake } from "./listoneFilter.ts";
 
 function entry(
   athleteId: string,
@@ -81,6 +81,52 @@ describe("filterListone", () => {
   it("folds accents, case and spaces", () => {
     assert.equal(foldSearchText("  Çalhanoğlu "), "calhanoglu");
     assert.equal(foldSearchText("Müller"), "muller");
+  });
+
+  it("finds names with broken encoding without accents (QA 20-21/11)", () => {
+    const broken = [
+      ...listone,
+      entry("6", "L. JovanoviÄ\u0087", "D", "Udinese"),
+      entry("7", "R. ObriÄ\u0087", "C", "Atalanta"),
+      entry("8", "D. PejiÄ\u008diÄ\u0087", "C", "Udinese"),
+      entry("9", "N. KovaÄ\u008d", "A", "Lecce"),
+      entry("10", "A. DembÃ©lÃ©", "A", "Paris"),
+    ];
+    assert.deepEqual(filterListone(broken, "all", "jovanovic").map((row) => row.athleteId), ["6"]);
+    assert.deepEqual(filterListone(broken, "all", "Obrić").map((row) => row.athleteId), ["7"]);
+    assert.deepEqual(filterListone(broken, "all", "pejicic").map((row) => row.athleteId), ["8"]);
+    assert.deepEqual(filterListone(broken, "all", "kovac").map((row) => row.athleteId), ["9"]);
+    assert.deepEqual(filterListone(broken, "all", "dembele").map((row) => row.athleteId), ["10"]);
+  });
+});
+
+describe("repairMojibake", () => {
+  it("repairs UTF-8 read as Latin-1 or Windows-1252, even twice", () => {
+    assert.equal(repairMojibake("L. JovanoviÄ\u0087"), "L. Jovanović");
+    assert.equal(repairMojibake("L. JovanoviÄ‡"), "L. Jovanović");
+    assert.equal(repairMojibake("A. DembÃƒÂ©lÃƒÂ©"), "A. Dembélé");
+    assert.equal(repairMojibake("Y. Nâ€™Dicka"), "Y. N’Dicka");
+  });
+
+  it("leaves correct names unchanged", () => {
+    for (const name of [
+      "A. Dembélé",
+      "A. Bayındır",
+      "E. İlkhan",
+      "Š. Vrsaljko",
+      "Ž. Ivanušec",
+      "M. Ødegaard",
+      "Ç. Söyüncü",
+      "João Mário",
+      "N’Dicka",
+      "Nicolò Barella",
+      "Ã Test",
+      "",
+    ]) {
+      assert.equal(repairMojibake(name), name);
+    }
+    // Decodifica a un controllo (U+0085): resta com'è.
+    assert.equal(repairMojibake("AÂ\u0085B"), "AÂ\u0085B");
   });
 });
 

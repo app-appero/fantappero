@@ -1018,6 +1018,28 @@ a.fa-member-list__identity:focus-visible {
   min-width: 0;
 }
 
+/* Nome e badge «In attesa» della Rosa: affiancati se c'è posto, altrimenti il badge va sotto
+   il nome. Prima erano affiancati e basta: in colonna stretta il nome scendeva a 0 px e il
+   badge restava tagliato («IN ATTES» a 390 px, QA 20-21/11). */
+.fa-auction-player__text {
+  display: flex;
+  flex: 1 1 auto;
+  flex-wrap: wrap;
+  align-items: center;
+  column-gap: 0.35rem;
+  row-gap: 0.15rem;
+  min-width: 0;
+}
+
+.fa-auction-player__text .fa-auction-player__name {
+  max-width: 100%;
+}
+
+.fa-auction-player__badge {
+  flex-shrink: 0;
+  max-width: 100%;
+}
+
 .fa-roster-action__icon {
   display: none;
 }
@@ -1254,6 +1276,173 @@ a.fa-member-list__identity:focus-visible {
   [data-color-scheme="light"] .fa-roster-action--assign,
   [data-color-scheme="light"] .fa-roster-action--release {
     color: #ffffff;
+  }
+}
+
+/* Rosa: le tabelle stanno in colonne strette anche su desktop (a 1280 px la colonna dei ruoli
+   è larga circa 370 px). Le regole compatte del telefono qui sopra guardano lo schermo, non la
+   colonna, e su desktop bisognava scorrere in orizzontale per vedere «Slot» e «Rimuovi»
+   (QA 20-21/11). Qui le stesse regole valgono quando è stretta la tabella, a ogni larghezza
+   dello schermo. Soglia 38rem: la tabella di un ruolo, completa, è larga circa 32rem e a
+   1920 px (colonna da 620 px) resta com'è; a 1280 e 1440 px diventa compatta. */
+.fa-roster-columns .fa-table-wrap:has(> .fa-roster-table) {
+  container: fa-roster-table / inline-size;
+}
+
+@container fa-roster-table (max-width: 38rem) {
+  .fa-roster-table {
+    table-layout: fixed;
+    font-size: 0.75rem;
+  }
+
+  .fa-roster-table th,
+  .fa-roster-table td {
+    padding: 0.2rem 0.2rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    vertical-align: middle;
+    letter-spacing: 0;
+  }
+
+  .fa-roster-table th {
+    text-transform: none;
+    font-size: 0.68rem;
+  }
+
+  .fa-roster-table .fa-athlete-name,
+  .fa-roster-table .fa-auction-player__name {
+    display: block;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    text-align: left;
+  }
+
+  .fa-roster-col--name {
+    width: auto;
+  }
+
+  /* Più spazio al nome che al club nella Rosa. */
+  .fa-roster-table--rosa .fa-roster-col--club {
+    width: 28%;
+  }
+
+  .fa-roster-col--role {
+    width: 1.7rem;
+  }
+
+  .fa-roster-col--credits,
+  .fa-roster-col--price {
+    width: 2.7rem;
+  }
+
+  .fa-roster-col--slot {
+    width: 1.5rem;
+    text-align: center;
+  }
+
+  .fa-roster-col--action {
+    width: 1.9rem;
+    overflow: visible;
+    text-align: center;
+  }
+
+  .fa-roster-col--status .fa-badge,
+  .fa-roster-table .fa-auction-player__badge {
+    display: inline-block;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    vertical-align: middle;
+    padding-inline: 0.3rem;
+  }
+
+  /* «In attesa» intero anche sotto un nome in colonna stretta. */
+  .fa-roster-table .fa-auction-player__badge {
+    font-size: 0.6rem;
+    letter-spacing: 0.02em;
+  }
+
+  .fa-roster-col--role .fa-badge {
+    padding: 0 0.15rem;
+    min-width: 1.15rem;
+    justify-content: center;
+  }
+
+  .fa-roster-col-label--full,
+  .fa-roster-role-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  .fa-roster-col-label--short {
+    display: inline;
+  }
+
+  .fa-roster-action {
+    width: 1.7rem;
+    height: 1.7rem;
+    min-height: 1.7rem;
+    padding: 0;
+    border-radius: 999px;
+    gap: 0;
+  }
+
+  .fa-roster-action__label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  .fa-roster-action__icon {
+    display: inline-flex;
+  }
+
+  .fa-roster-action--assign {
+    background-color: var(--fa-color-accent);
+    border-color: transparent;
+    color: var(--fa-color-accent-contrast);
+  }
+
+  .fa-roster-action--release {
+    background-color: var(--fa-color-danger);
+    border-color: transparent;
+    color: var(--fa-ivory-50);
+  }
+
+  [data-color-scheme="light"] .fa-roster-action--assign,
+  [data-color-scheme="light"] .fa-roster-action--release {
+    color: #ffffff;
+  }
+
+  .fa-roster-table .fa-roster-price-edit .fa-input,
+  .fa-roster-table .fa-roster-price-input {
+    width: 100%;
+    min-width: 0;
+    min-height: 1.65rem;
+    padding: 0 0.1rem;
+    text-align: center;
+    font-size: 0.75rem;
+  }
+
+  .fa-roster-price-edit .fa-btn {
+    min-height: 1.65rem;
+    padding: 0 0.3rem;
+    font-size: 0.68rem;
   }
 }
 
