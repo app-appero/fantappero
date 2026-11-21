@@ -1651,6 +1651,11 @@ def test_concurrent_identical_lineup_saves_produce_single_revision(
     client.get(f"/leagues/{league_id}/rosa", headers={"Authorization": f"Bearer {token}"})
     grouped = _seed_roster_athletes(db_session, id_offset=2_950_000)
     athletes = _fill_validated_roster(db_session, league_id, grouped)
+    # Le partite lasciate dai test precedenti nei campionati della lega possono far generare
+    # da sola, alla creazione, un turno 1: il turno del test prende il numero successivo.
+    last_number = db_session.scalar(
+        select(func.max(FantasyRound.number)).where(FantasyRound.league_id == UUID(league_id))
+    )
     cutoff = datetime.now(UTC) + timedelta(hours=4)
     fantasy_round, _clubs = _create_open_round(
         db_session,
@@ -1658,6 +1663,7 @@ def test_concurrent_identical_lineup_saves_produce_single_revision(
         cutoff=cutoff,
         id_offset=2_960_000,
         competition_ids=competition_ids,
+        number=(last_number or 0) + 1,
     )
     payload = _lineup_payload(athletes, "4-3-3")
 
