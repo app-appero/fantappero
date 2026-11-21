@@ -1,5 +1,6 @@
 import type {
   FantasyTurnDetail,
+  FantasyTurnExclusionKind,
   FantasyTurnExclusionResult,
   FantasyTurnFixture,
   FantasyTurnSummary,
@@ -8,6 +9,8 @@ import type {
 } from "@fantappero/contracts";
 import {
   TURN_DISPLAY_LABEL,
+  exclusionProgressMessage,
+  exclusionResultTone,
   isUnplayedFixtureStatus,
   mapFixtureMatchStatus,
   resolveDefaultEuropeanTurn,
@@ -359,8 +362,15 @@ export function MatchdayPage() {
   });
 
   // Stato mostrato all'utente: dipende da dove cade il turno rispetto ad
-  // adesso, non dallo stato interno del ciclo di vita formazioni.
-  const turnDisplayStates = useMemo(() => resolveTurnDisplayStates(turns), [turns]);
+  // adesso, non dallo stato interno del ciclo di vita formazioni. L'orologio va
+  // avanti da solo: al primo blocco il turno passa da «Prossimo» a «In corso»
+  // anche senza ricaricare la pagina (QA 20-21/11).
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const timer = setInterval(() => setNow(new Date()), 30_000);
+    return () => clearInterval(timer);
+  }, []);
+  const turnDisplayStates = useMemo(() => resolveTurnDisplayStates(turns, now), [turns, now]);
   const selectedDisplayState = useMemo(() => {
     const index = turns.findIndex((turn) => turn.id === selected?.id);
     return index >= 0 ? (turnDisplayStates[index] ?? "upcoming") : "upcoming";
@@ -594,7 +604,7 @@ export function MatchdayPage() {
     request: () => Promise<FantasyTurnExclusionResult>,
     demoApply: () => void,
     demoMessage: string,
-    progressMessage = "Esclusione in corso. Poi ricalcolo la giornata.",
+    kind: FantasyTurnExclusionKind = "exclude",
   ) {
     if (!selected) {
       return;
@@ -605,13 +615,22 @@ export function MatchdayPage() {
         return;
       }
     }
-    toast?.push({
+    // Senza calendario H2H non c'è nessuna giornata da ricalcolare: non la si annuncia.
+    const progressMessage = exclusionProgressMessage(kind, h2hCalendar !== null);
+    const progressToastId = toast?.push({
       title: progressMessage,
       variant: "info",
     });
+    // L'esito sostituisce l'avviso «in corso», che altrimenti resterebbe a contraddirlo.
+    const closeProgressToast = () => {
+      if (progressToastId) {
+        toast?.dismiss(progressToastId);
+      }
+    };
     if (isDemoMode) {
       demoApply();
       setActionMessage(demoMessage);
+      closeProgressToast();
       toast?.push({ title: demoMessage, variant: "info" });
       return;
     }
@@ -621,9 +640,10 @@ export function MatchdayPage() {
       const result = await request();
       setSelected(result.turn);
       setActionMessage(result.message);
+      closeProgressToast();
       toast?.push({
         title: result.message,
-        variant: result.homologated || result.resultFinal ? "success" : result.recalculated ? "info" : "warning",
+        variant: exclusionResultTone(result),
       });
       // Solo l'elenco (conteggi e stati): loadTurns() riselezionerebbe il turno di default,
       // facendo saltare l'admin via dal turno su cui sta lavorando.
@@ -634,6 +654,7 @@ export function MatchdayPage() {
     } catch (error) {
       const message = getApiErrorMessage(error, "Esclusione non consentita.");
       setActionError(message);
+      closeProgressToast();
       toast?.push({ title: message, variant: "danger" });
     } finally {
       setExclusionProgress(null);
@@ -681,7 +702,7 @@ export function MatchdayPage() {
         });
       },
       "Partita rimessa nel turno (demo). Il ricalcolo parte solo su una lega reale.",
-      "Reinclusione in corso. Poi ricalcolo la giornata.",
+      "reinclude",
     );
   }
 
@@ -763,6 +784,7 @@ export function MatchdayPage() {
         });
       },
       "Partite non disputate e rinviate escluse (demo). Il ricalcolo parte solo su una lega reale.",
+      "exclude_unplayed",
     );
   }
 
@@ -891,6 +913,7 @@ export function MatchdayPage() {
                       <LockCountdown
                         state={countdown.state}
                         nextLockAt={countdown.nextLockAt}
+                        roundStatus={countdown.roundStatus}
                         onExpire={refetchCountdown}
                       />
                     ) : null}

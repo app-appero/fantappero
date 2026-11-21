@@ -16,6 +16,7 @@ import {
   rejectTradeProposalAsAdmin,
 } from "../api/market";
 import { getApiErrorMessage } from "../session/DemoSessionContext";
+import { submitTrade } from "./tradeSubmit";
 
 export interface UseTradeFlowOptions {
   leagueId: string | null;
@@ -90,22 +91,27 @@ export function useTradeFlow({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [active, leagueId, accessToken]);
 
+  /** `true` se la proposta è stata inviata: solo allora il form si chiude e si svuota. */
   const createProposal = useCallback(
-    async (body: CreateTradeProposalRequest) => {
+    async (body: CreateTradeProposalRequest): Promise<boolean> => {
       if (!leagueId) {
-        return;
+        return false;
       }
       if (!accessToken) {
         setCreateError("Sessione non disponibile. Accedi di nuovo.");
-        return;
+        return false;
       }
       setCreating(true);
       setCreateError(null);
       try {
-        await createTradeProposal(accessToken, leagueId, body);
-        await loadProposals();
-      } catch (error) {
-        setCreateError(getApiErrorMessage(error, "Impossibile inviare la proposta."));
+        const sent = await submitTrade(
+          () => createTradeProposal(accessToken, leagueId, body),
+          (error) => setCreateError(getApiErrorMessage(error, "Impossibile inviare la proposta.")),
+        );
+        if (sent) {
+          await loadProposals();
+        }
+        return sent;
       } finally {
         setCreating(false);
       }

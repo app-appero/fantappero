@@ -124,6 +124,6 @@ docker compose --env-file infra/local/.env.example run --rm web \
 | --- | --- |
 | `skipped_unmapped` > 0 | Verificare `provider_position_raw`; aggiornare mapping versionato o correggere roster |
 | `athlete_not_on_listone` | Eseguire generazione listone dopo sync roster |
-| Override non applicato in lega attiva | Controllare `effectiveFromRound` vs `currentRound` (decorre dal turno successivo) |
+| Override non applicato in lega attiva | Controllare `effectiveFromRound`: decorre dal turno dopo il più alto già aperto, bloccato o in corso (lo calcola il server, `currentRound` conta solo se più avanti) |
 
 Roster: [`sports_roster_sync.md`](./sports_roster_sync.md) · Catalogo: [`sports_catalog_sync.md`](./sports_catalog_sync.md).

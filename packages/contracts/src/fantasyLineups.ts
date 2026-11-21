@@ -226,6 +226,29 @@ export interface LineupLockCountdown {
   serverNow: string;
 }
 
+/** Testo del conto alla rovescia quando non c'è nessun blocco da contare. */
+export const LOCK_COUNTDOWN_IDLE_LABEL: Record<LineupLockCountdownState, string> = {
+  no_active_turn: "Nessun turno attivo",
+  turn_not_open: "Turno non ancora aperto",
+  no_roster: "Rosa non ancora assegnata",
+  no_pending_lock: "Formazione confermata",
+  counting_down: "",
+};
+
+/**
+ * Come `LOCK_COUNTDOWN_IDLE_LABEL`, ma un turno di riferimento saltato (sotto la soglia di
+ * copertura) si legge «Turno saltato», non «Turno non ancora aperto» (Rosario, 21/11).
+ */
+export function lockCountdownIdleLabel(
+  state: LineupLockCountdownState,
+  roundStatus?: string | null,
+): string {
+  if (state === "turn_not_open" && roundStatus === "skipped") {
+    return "Turno saltato";
+  }
+  return LOCK_COUNTDOWN_IDLE_LABEL[state] ?? "";
+}
+
 export const APPROVED_MODULES: readonly FantasyModule[] = [
   "3-4-3",
   "3-5-2",

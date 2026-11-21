@@ -160,17 +160,23 @@ function RosterRoleTable({
                       ) : slot.role ? (
                         <RoleBadge className="fa-auction-player__role" code={slot.role} />
                       ) : null}
-                      <AthleteName className="fa-auction-player__name" athleteId={slot.athleteId}>
-                        {slot.athleteName ?? "Calciatore"}
-                      </AthleteName>
-                      {slot.exceedsRoleQuota ? (
-                        <Badge
-                          variant="warning"
-                          title="Scambio accettato con la rosa già al completo (per ruolo o nel totale): svincola qualcuno per schierarlo."
-                        >
-                          In attesa
-                        </Badge>
-                      ) : null}
+                      {/* Nome e badge in un blocco che va a capo: in colonna stretta il badge
+                          scende sotto il nome invece di schiacciarlo a 0 px (QA 20-21/11). */}
+                      <span className="fa-auction-player__text">
+                        <AthleteName className="fa-auction-player__name" athleteId={slot.athleteId}>
+                          {slot.athleteName ?? "Calciatore"}
+                        </AthleteName>
+                        {slot.exceedsRoleQuota ? (
+                          <Badge
+                            variant="warning"
+                            className="fa-auction-player__badge"
+                            data-testid={`roster-pending-badge-${slot.athleteId ?? slot.slotIndex}`}
+                            title="Scambio accettato con la rosa già al completo (per ruolo o nel totale): svincola qualcuno per schierarlo."
+                          >
+                            In attesa
+                          </Badge>
+                        ) : null}
+                      </span>
                     </span>
                   </TableCell>
                   <TableCell className="fa-roster-col fa-roster-col--club">{slot.clubName ?? "—"}</TableCell>

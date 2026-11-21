@@ -558,7 +558,11 @@ def set_league_role_override(
     league_access: LeagueAccess = Depends(require_league_permissions(Permission.LEAGUE_ADMIN)),
     service: LeagueListoneService = Depends(get_league_listone_service),
 ) -> LeagueListoneEntryResponse | JSONResponse:
-    """Imposta override ruolo pre-asta (immediato) o post-avvio (turno successivo)."""
+    """Imposta override ruolo pre-asta (immediato) o post-avvio (turno successivo).
+
+    A lega avviata vale dal turno dopo il più alto già aperto, bloccato o in corso, calcolato
+    dal server: ``currentRound`` è facoltativo e conta solo se è più avanti.
+    """
     try:
         return service.set_override(
             league_access,

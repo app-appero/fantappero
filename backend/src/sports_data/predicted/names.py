@@ -12,7 +12,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from uuid import UUID
 
-from app.text_folding import strip_accents
+from app.text_folding import repair_mojibake, strip_accents
 
 _NOISE = re.compile(
     r"\b(fc|cf|afc|sc|ssc|ac|us|as|calcio|club|de|the|04|1899|1846)\b",
@@ -50,7 +50,8 @@ def normalize_person(value: str | None) -> str:
         return ""
     # Stesso confronto senza accenti dell'import rose: anche la ı turca senza punto
     # ("Bayındır" = "Bayindir"), che prima diventava uno spazio (QA 19-20/11).
-    text = strip_accents(value)
+    # Anche i nomi con la codifica rovinata del listone ("JovanoviÄ\x87", QA 20-21/11).
+    text = strip_accents(repair_mojibake(value))
     text = text.lower().replace("'", "").replace("`", "")
     text = re.sub(r"[^a-z0-9 ]+", " ", text)
     return re.sub(r"\s+", " ", text).strip()

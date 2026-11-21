@@ -1,7 +1,7 @@
 import type { RootStackParamList } from "../navigation/types";
 import { lazyStyles } from "../theme/lazyStyles";
 import {
-  avatarInitial,
+  avatarInitials,
   DELETE_ACCOUNT_CONFIRMATION_PHRASE,
   PROFILE_LANGUAGE_OPTIONS,
   PROFILE_TIMEZONE_OPTIONS,
@@ -12,8 +12,9 @@ import * as ImagePicker from "expo-image-picker";
 import { useCallback, useMemo, useState } from "react";
 import { useNavigation } from "@react-navigation/core";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { Image, Pressable, StyleSheet, Switch, Text, View } from "react-native";
+import { Pressable, StyleSheet, Switch, Text, View } from "react-native";
 import { AppTextInput as TextInput } from "../components/AppTextInput";
+import { AvatarWithFallback } from "../components/AvatarWithFallback";
 import { deleteAccount } from "../api/privacy";
 import {
   AVATAR_MAX_BYTES,
@@ -411,24 +412,22 @@ export function ProfileScreen() {
         <>
       <View style={styles.section} testID="profile-avatar-section">
         <Text style={styles.sectionTitle}>Avatar</Text>
-        {resolveAvatarUrl(profile.avatarUrl) ? (
-          <Image
-            key={profile.avatarUrl}
-            source={{
-              uri: resolveAvatarUrl(profile.avatarUrl) ?? undefined,
-              cache: "reload",
-            }}
-            style={styles.avatarImage}
-            testID="profile-avatar-image"
-            accessibilityLabel="Avatar profilo"
-          />
-        ) : (
-          <View style={styles.avatarPlaceholder} testID="profile-avatar-placeholder">
-            <Text style={styles.avatarPlaceholderLabel}>
-              {avatarInitial(profile.displayName)}
-            </Text>
-          </View>
-        )}
+        {/* Se la foto non si carica (es. 404) restano le iniziali, non un cerchio vuoto. */}
+        <AvatarWithFallback
+          key={profile.avatarUrl}
+          src={resolveAvatarUrl(profile.avatarUrl)}
+          cache="reload"
+          style={styles.avatarImage}
+          testID="profile-avatar-image"
+          accessibilityLabel="Avatar profilo"
+          fallback={
+            <View style={styles.avatarPlaceholder} testID="profile-avatar-placeholder">
+              <Text style={styles.avatarPlaceholderLabel}>
+                {avatarInitials(profile.displayName)}
+              </Text>
+            </View>
+          }
+        />
         <Text style={styles.hint}>JPEG, PNG o WebP — massimo 5 MB.</Text>
         <Pressable
           accessibilityRole="button"

@@ -45,7 +45,7 @@ In Docker Compose è montato il volume `fantappero_avatar_data` sul servizio `ap
 | --- | --- | --- |
 | `AVATAR_STORAGE_PATH` | `/data/avatars` | Directory locale avatar |
 | `AVATAR_MAX_BYTES` | `5242880` | Dimensione massima upload |
-| `PROFILE_POLICY_VERSION` | `2026-01` | Versione policy corrente |
+| `PROFILE_POLICY_VERSION` | `2026-11c` | Versione policy corrente |
 
 ## Metriche
 

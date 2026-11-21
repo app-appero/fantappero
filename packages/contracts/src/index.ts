@@ -187,6 +187,10 @@ export {
   reconcileFixtureKickoffLock,
   resolveDefaultEuropeanTurn,
   resolveTurnDisplayStates,
+  exclusionProgressMessage,
+  exclusionResultTone,
+  isSkippedTurn,
+  turnHasStarted,
 } from "./fantasyTurns.js";
 export type {
   EnsureFantasyTurnsResponse,
@@ -217,6 +221,8 @@ export type {
   KickoffLockState,
   RoundCalculationResult,
   TurnDisplayState,
+  TurnDisplayInput,
+  FantasyTurnExclusionKind,
 } from "./fantasyTurns.js";
 
 export type {
@@ -253,6 +259,8 @@ export type {
 } from "./fantasyLineups.js";
 export {
   APPROVED_MODULES,
+  LOCK_COUNTDOWN_IDLE_LABEL,
+  lockCountdownIdleLabel,
   BENCH_ACTIVE_ROLE_QUOTA,
   BENCH_ACTIVE_SIZE,
   LINEUP_ATHLETE_LEFT_ROSTER_CODE,
@@ -370,8 +378,15 @@ export {
   marketNotFullNotice,
   marketSwitchLocked,
   pendingInvitesLabel,
+  MARKET_ROUND_IN_PROGRESS_LABEL,
+  MARKET_ROUND_IN_PROGRESS_NOTICE,
+  MARKET_STATUS_BADGE_LABEL,
+  marketBlockedNotice,
+  marketClosedTitle,
+  marketRoundInProgress,
+  marketStatusBadge,
 } from "./marketGate.js";
-export type { MarketGateState } from "./marketGate.js";
+export type { MarketGateState, MarketStatusBadge } from "./marketGate.js";
 
 export {
   LIVE_SEAT_CALL_COLOR,

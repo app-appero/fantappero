@@ -675,7 +675,8 @@ const styles = lazyStyles(() =>
     close: { color: colors.foregroundMuted, fontSize: 20 },
     roleDot: { width: 34, height: 34, borderRadius: 17, alignItems: "center", justifyContent: "center" },
     roleDotSm: { width: 34, height: 34, borderRadius: 17, alignItems: "center", justifyContent: "center" },
-    roleDotText: { color: "#11162B", fontWeight: "800", fontStyle: "italic" },
+    // Come RoleBadge: lettera scura nel tema scuro, bianca nel chiaro sui fondi del ruolo.
+    roleDotText: { color: colors.accentContrast, fontWeight: "800", fontStyle: "italic" },
     search: {
       minHeight: 44,
       borderWidth: 1,

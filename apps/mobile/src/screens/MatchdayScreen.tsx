@@ -2,12 +2,14 @@ import { lazyStyles } from "../theme/lazyStyles";
 import { HScroll } from "../components/HScroll";
 import type {
   FantasyTurnDetail,
+  FantasyTurnExclusionKind,
   FantasyTurnSummary,
   H2HCalendar,
   PendingFixtureSummary,
 } from "@fantappero/contracts";
 import {
   TURN_DISPLAY_LABEL,
+  exclusionProgressMessage,
   isUnplayedFixtureStatus,
   mapFixtureMatchStatus,
   resolveDefaultEuropeanTurn,
@@ -116,8 +118,14 @@ export function MatchdayScreen() {
   const [selected, setSelected] = useState<FantasyTurnDetail | null>(null);
 
   // Stato mostrato all'utente: posizione del turno rispetto ad adesso, non
-  // stato interno del ciclo di vita formazioni.
-  const turnDisplayStates = useMemo(() => resolveTurnDisplayStates(turns), [turns]);
+  // stato interno del ciclo di vita formazioni. L'orologio va avanti da solo: al
+  // primo blocco il turno passa da «Prossimo» a «In corso» (QA 20-21/11).
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const timer = setInterval(() => setNow(new Date()), 30_000);
+    return () => clearInterval(timer);
+  }, []);
+  const turnDisplayStates = useMemo(() => resolveTurnDisplayStates(turns, now), [turns, now]);
   const selectedDisplayState = useMemo(() => {
     const index = turns.findIndex((turn) => turn.id === selected?.id);
     return index >= 0 ? (turnDisplayStates[index] ?? "upcoming") : "upcoming";
@@ -221,13 +229,16 @@ export function MatchdayScreen() {
 
   async function excludeAndRecalculate(
     request: () => ReturnType<typeof excludeFantasyTurnFixture>,
+    kind: FantasyTurnExclusionKind = "exclude",
   ) {
     if (!accessToken || !activeLeagueId || !selected) {
       return;
     }
     setExcluding(true);
     setActionError(null);
-    setActionMessage("Esclusione in corso. Poi ricalcolo la giornata.");
+    // Senza calendario H2H non c'è nessuna giornata da ricalcolare: non la si annuncia.
+    // L'esito del server sostituisce poi questo testo.
+    setActionMessage(exclusionProgressMessage(kind, h2h !== null));
     try {
       const result = await request();
       setSelected(result.turn);
@@ -378,6 +389,7 @@ export function MatchdayScreen() {
               <LockCountdown
                 state={countdown.state}
                 nextLockAt={countdown.nextLockAt}
+                roundStatus={countdown.roundStatus}
                 onExpire={refetchCountdown}
               />
             ) : null}
@@ -419,14 +431,20 @@ export function MatchdayScreen() {
                   selected.fixtures.every((fixture) => !isUnplayedFixtureStatus(fixture.statusShort))
                 }
                 onPress={() =>
-                  void excludeAndRecalculate(() =>
-                    excludeUnplayedFantasyTurnFixtures(accessToken as string, activeLeagueId as string, selected.id),
+                  void excludeAndRecalculate(
+                    () =>
+                      excludeUnplayedFantasyTurnFixtures(accessToken as string, activeLeagueId as string, selected.id),
+                    "exclude_unplayed",
                   )
                 }
                 testID="matchday-exclude-unplayed"
               >
                 <Text style={styles.buttonLabel}>
-                  {excluding ? "Esclusione e ricalcolo in corso…" : "Escludi non disputate e rinviate"}
+                  {excluding
+                    ? h2h !== null
+                      ? "Esclusione e ricalcolo in corso…"
+                      : "Esclusione in corso…"
+                    : "Escludi non disputate e rinviate"}
                 </Text>
               </Pressable>
             ) : null}
@@ -542,10 +560,12 @@ export function MatchdayScreen() {
                         style={styles.ghostButton}
                         disabled={busy || excluding}
                         onPress={() =>
-                          void excludeAndRecalculate(() =>
-                            reincludeFantasyTurnFixture(accessToken as string, activeLeagueId as string, selected.id, {
-                              fixtureId: fixture.fixtureId,
-                            }),
+                          void excludeAndRecalculate(
+                            () =>
+                              reincludeFantasyTurnFixture(accessToken as string, activeLeagueId as string, selected.id, {
+                                fixtureId: fixture.fixtureId,
+                              }),
+                            "reinclude",
                           )
                         }
                         testID={`matchday-reinclude-${fixture.fixtureId}`}

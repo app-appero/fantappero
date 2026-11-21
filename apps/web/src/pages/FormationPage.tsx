@@ -2071,6 +2071,7 @@ export function FormationPage() {
                 <LockCountdown
                   state={countdown.state}
                   nextLockAt={countdown.nextLockAt}
+                  roundStatus={countdown.roundStatus}
                   onExpire={refetchCountdown}
                 />
               ) : (
@@ -2141,6 +2142,7 @@ export function FormationPage() {
                 <LockCountdown
                   state={countdown.state}
                   nextLockAt={countdown.nextLockAt}
+                  roundStatus={countdown.roundStatus}
                   onExpire={refetchCountdown}
                   data-testid="formation-lock-countdown"
                 />
@@ -2509,7 +2511,7 @@ export function FormationPage() {
           </div>
           </div>
 
-          <div data-testid="formation-bench-order" className="fa-ds-showcase__stack">
+          <div data-testid="formation-bench-order" className="fa-ds-showcase__stack fa-formation-layout__bench">
             <p data-testid="formation-sub-hint">
               La panchina ha {benchActive} posti: 1 portiere, 3 difensori, 3 centrocampisti e 3
               attaccanti. Entrano al massimo {maxSubs} panchinari, nell&apos;ordine sotto e solo a

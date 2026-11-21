@@ -1018,6 +1018,28 @@ a.fa-member-list__identity:focus-visible {
   min-width: 0;
 }
 
+/* Nome e badge «In attesa» della Rosa: affiancati se c'è posto, altrimenti il badge va sotto
+   il nome. Prima erano affiancati e basta: in colonna stretta il nome scendeva a 0 px e il
+   badge restava tagliato («IN ATTES» a 390 px, QA 20-21/11). */
+.fa-auction-player__text {
+  display: flex;
+  flex: 1 1 auto;
+  flex-wrap: wrap;
+  align-items: center;
+  column-gap: 0.35rem;
+  row-gap: 0.15rem;
+  min-width: 0;
+}
+
+.fa-auction-player__text .fa-auction-player__name {
+  max-width: 100%;
+}
+
+.fa-auction-player__badge {
+  flex-shrink: 0;
+  max-width: 100%;
+}
+
 .fa-roster-action__icon {
   display: none;
 }
@@ -1254,6 +1276,173 @@ a.fa-member-list__identity:focus-visible {
   [data-color-scheme="light"] .fa-roster-action--assign,
   [data-color-scheme="light"] .fa-roster-action--release {
     color: #ffffff;
+  }
+}
+
+/* Rosa: le tabelle stanno in colonne strette anche su desktop (a 1280 px la colonna dei ruoli
+   è larga circa 370 px). Le regole compatte del telefono qui sopra guardano lo schermo, non la
+   colonna, e su desktop bisognava scorrere in orizzontale per vedere «Slot» e «Rimuovi»
+   (QA 20-21/11). Qui le stesse regole valgono quando è stretta la tabella, a ogni larghezza
+   dello schermo. Soglia 38rem: la tabella di un ruolo, completa, è larga circa 32rem e a
+   1920 px (colonna da 620 px) resta com'è; a 1280 e 1440 px diventa compatta. */
+.fa-roster-columns .fa-table-wrap:has(> .fa-roster-table) {
+  container: fa-roster-table / inline-size;
+}
+
+@container fa-roster-table (max-width: 38rem) {
+  .fa-roster-table {
+    table-layout: fixed;
+    font-size: 0.75rem;
+  }
+
+  .fa-roster-table th,
+  .fa-roster-table td {
+    padding: 0.2rem 0.2rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    vertical-align: middle;
+    letter-spacing: 0;
+  }
+
+  .fa-roster-table th {
+    text-transform: none;
+    font-size: 0.68rem;
+  }
+
+  .fa-roster-table .fa-athlete-name,
+  .fa-roster-table .fa-auction-player__name {
+    display: block;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    text-align: left;
+  }
+
+  .fa-roster-col--name {
+    width: auto;
+  }
+
+  /* Più spazio al nome che al club nella Rosa. */
+  .fa-roster-table--rosa .fa-roster-col--club {
+    width: 28%;
+  }
+
+  .fa-roster-col--role {
+    width: 1.7rem;
+  }
+
+  .fa-roster-col--credits,
+  .fa-roster-col--price {
+    width: 2.7rem;
+  }
+
+  .fa-roster-col--slot {
+    width: 1.5rem;
+    text-align: center;
+  }
+
+  .fa-roster-col--action {
+    width: 1.9rem;
+    overflow: visible;
+    text-align: center;
+  }
+
+  .fa-roster-col--status .fa-badge,
+  .fa-roster-table .fa-auction-player__badge {
+    display: inline-block;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    vertical-align: middle;
+    padding-inline: 0.3rem;
+  }
+
+  /* «In attesa» intero anche sotto un nome in colonna stretta. */
+  .fa-roster-table .fa-auction-player__badge {
+    font-size: 0.6rem;
+    letter-spacing: 0.02em;
+  }
+
+  .fa-roster-col--role .fa-badge {
+    padding: 0 0.15rem;
+    min-width: 1.15rem;
+    justify-content: center;
+  }
+
+  .fa-roster-col-label--full,
+  .fa-roster-role-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  .fa-roster-col-label--short {
+    display: inline;
+  }
+
+  .fa-roster-action {
+    width: 1.7rem;
+    height: 1.7rem;
+    min-height: 1.7rem;
+    padding: 0;
+    border-radius: 999px;
+    gap: 0;
+  }
+
+  .fa-roster-action__label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  .fa-roster-action__icon {
+    display: inline-flex;
+  }
+
+  .fa-roster-action--assign {
+    background-color: var(--fa-color-accent);
+    border-color: transparent;
+    color: var(--fa-color-accent-contrast);
+  }
+
+  .fa-roster-action--release {
+    background-color: var(--fa-color-danger);
+    border-color: transparent;
+    color: var(--fa-ivory-50);
+  }
+
+  [data-color-scheme="light"] .fa-roster-action--assign,
+  [data-color-scheme="light"] .fa-roster-action--release {
+    color: #ffffff;
+  }
+
+  .fa-roster-table .fa-roster-price-edit .fa-input,
+  .fa-roster-table .fa-roster-price-input {
+    width: 100%;
+    min-width: 0;
+    min-height: 1.65rem;
+    padding: 0 0.1rem;
+    text-align: center;
+    font-size: 0.75rem;
+  }
+
+  .fa-roster-price-edit .fa-btn {
+    min-height: 1.65rem;
+    padding: 0 0.3rem;
+    font-size: 0.68rem;
   }
 }
 
@@ -1532,8 +1721,15 @@ a.fa-member-list__identity:focus-visible {
   border-bottom: 1px solid var(--fa-color-border);
 }
 
-.fa-bench-order__row--overflow {
-  opacity: 0.65;
+/* Tribuna (dall'11° posto): niente più opacità, che portava numero, ruolo e freccia sotto
+   4,5:1 in entrambi i temi (QA 20-21/11). La si distingue dalla panchina con il numero in
+   grigio e il bordo tratteggiato, colori pieni e leggibili. */
+.fa-bench-order__row--overflow .fa-bench-order__number {
+  color: var(--fa-color-foreground-muted);
+}
+
+.fa-bench-order__row--overflow .fa-starter-row {
+  border-style: dashed;
 }
 
 .fa-bench-order__row--probable {
@@ -5809,6 +6005,238 @@ button.fa-starter-row:disabled {
   display: inline-flex;
   gap: var(--fa-space-xs);
   margin-left: auto;
+}
+
+/* ══ Formazione su telefono: rifinitura grafica (proposte di design del 21/11) ══════
+   Solo misure, spazi, allineamenti, livelli e colori del testo: nessun cambio di
+   comportamento. Ogni blocco porta il numero della proposta (proposals.json), così si
+   può tenere o togliere da solo. Sta prima delle regole iPhone in fondo al file, che
+   restano l'ultima parola su env(safe-area-inset-*) e campi da 16px. */
+
+/* [Proposta 1] Barra azioni su telefono: griglia a due colonne, «Salva formazione» a
+   tutta riga, bottoni da 44px (erano 36px) e testo da 14px (era 12.8px). La barra si
+   abbassa (3 righe invece di 4-5) e i bottoni hanno larghezze uguali. */
+@media (max-width: 56rem) {
+  .fa-formation-layout__sidebar > .fa-formation-layout__actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--fa-space-sm);
+  }
+
+  .fa-formation-layout__sidebar > .fa-formation-layout__actions > .fa-btn {
+    min-height: 2.75rem;
+    padding: 0.25rem var(--fa-space-sm);
+    font-size: var(--fa-text-sm);
+    line-height: 1.15;
+    white-space: normal;
+    text-wrap: balance;
+  }
+
+  .fa-formation-layout__sidebar > .fa-formation-layout__actions [data-testid="formation-save"] {
+    grid-column: 1 / -1;
+  }
+
+  /* Bottoni secondari in numero dispari: l'ultimo prende tutta la riga, niente buchi. */
+  .fa-formation-layout__sidebar
+    > .fa-formation-layout__actions
+    > .fa-btn:nth-last-child(2 of .fa-btn):nth-child(odd of .fa-btn) {
+    grid-column: 1 / -1;
+  }
+
+  /* I bottoni «ghost» (Annulla modifiche, Ripristina) con un bordo leggero: celle uguali. */
+  .fa-formation-layout__sidebar > .fa-formation-layout__actions > .fa-btn--ghost {
+    border-color: var(--fa-color-border);
+  }
+}
+
+/* [Proposta 2] Le finestre (Applica la formazione migliore, Svuota formazione) nascono
+   dentro la barra azioni (z-index 20) e dentro il corpo della pagina (z-index 1, sotto
+   l'header a 200): header e «Prossimo blocco» restavano accesi sopra il velo scuro.
+   Con una finestra aperta barra e corpo salgono al livello delle finestre. */
+.fa-formation-layout__sidebar > .fa-formation-layout__actions:has(> .fa-modal) {
+  z-index: var(--fa-z-modal);
+}
+
+.fa-app-shell__body:has(.fa-formation-page .fa-modal) {
+  z-index: var(--fa-z-modal);
+}
+
+/* [Proposta 3] Legenda: su telefono va a capo invece di scorrere tagliata («Espuls…»);
+   bordo col colore dei bordi del tema (in chiaro quello bianco non si vedeva). */
+.fa-formation-legend {
+  border-color: var(--fa-color-border);
+}
+
+@media (max-width: 56rem) {
+  .fa-formation-legend {
+    flex-wrap: wrap;
+    overflow-x: visible;
+    white-space: normal;
+    gap: 6px 14px;
+  }
+}
+
+/* [Proposta 4] Ritmo verticale: su telefono 16px tra i blocchi (erano 24, 32 o 40px)
+   e i due testi della panchina staccati dalle card (prima la card era incollata). */
+@media (max-width: 56rem) {
+  .fa-formation-layout,
+  .fa-formation-layout__main,
+  .fa-formation-layout__pitch-row,
+  .fa-formation-layout__benches {
+    gap: var(--fa-space-md);
+  }
+
+  .fa-formation-legend {
+    margin: 0;
+  }
+}
+
+.fa-formation-layout__bench {
+  display: grid;
+  gap: var(--fa-space-sm);
+}
+
+.fa-formation-layout__bench > p {
+  margin: 0;
+}
+
+.fa-formation-layout__bench > .fa-formation-layout__benches {
+  margin-top: var(--fa-space-sm);
+}
+
+/* [Proposta 5] Card Titolari, Panchina e Tribuna su telefono: margine interno 16px
+   (erano 24px, le righe guadagnano 16px) e titoli da 18px (erano 22px), con a capo
+   bilanciato: «Panchina — 10 posti · massimo 5 subentri» non lascia una parola sola. */
+.fa-formation-layout__section-title {
+  text-wrap: balance;
+}
+
+@media (max-width: 34rem) {
+  .fa-formation-layout__editor,
+  .fa-formation-layout__benches > div {
+    padding: var(--fa-space-md);
+  }
+
+  .fa-formation-layout__section-title {
+    font-size: 1.15rem;
+  }
+}
+
+/* [Proposta 6] «Da correggere prima di salvare» e avvisi di rosa: riquadro colorato e
+   compatto, elenco rientrato di 20px invece di 40px; «Sistema la panchina» da 44px. */
+.fa-formation-layout__issues,
+.fa-formation-layout__notice {
+  padding: var(--fa-space-sm) var(--fa-space-md);
+  border: 1px solid color-mix(in srgb, var(--fa-color-danger) 40%, transparent);
+  border-left-width: 4px;
+  border-left-color: var(--fa-color-danger);
+  border-radius: var(--fa-radius-md);
+  background: color-mix(in srgb, var(--fa-color-danger) 7%, var(--fa-color-background-elevated));
+}
+
+.fa-formation-layout__notice {
+  border-color: color-mix(in srgb, var(--fa-color-warning) 40%, transparent);
+  border-left-color: var(--fa-color-warning);
+  background: color-mix(in srgb, var(--fa-color-warning) 8%, var(--fa-color-background-elevated));
+}
+
+.fa-formation-layout__issues ul,
+.fa-formation-layout__notice ul {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding-left: 1.25rem;
+  font-size: 0.9375rem;
+}
+
+.fa-formation-layout__issues .fa-btn {
+  margin-top: var(--fa-space-sm);
+}
+
+@media (max-width: 56rem) {
+  .fa-formation-layout__issues .fa-btn {
+    min-height: 2.75rem;
+    padding-inline: var(--fa-space-md);
+    font-size: var(--fa-text-sm);
+  }
+}
+
+/* [Proposta 7] Finestre e campo: le due scelte della formazione migliore una sotto
+   l'altra (in due colonne «4-3-3» andava a capo a metà, anche su desktop); «×» delle
+   finestre e portiere in campo con area di tocco da 44px (erano 23×32 e 93×40). */
+.fa-formation-page .fa-nop-radio {
+  flex-basis: 100%;
+}
+
+.fa-formation-page .fa-modal__close {
+  min-width: 2.75rem;
+  min-height: 2.75rem;
+  margin: -6px -8px -6px 0;
+  padding: 0;
+  font-size: 1.375rem;
+  line-height: 1;
+}
+
+.fa-formation-page .fa-pitch-player--gk {
+  min-height: 2.75rem;
+  justify-content: center;
+}
+
+/* Anche «Leghe» nel percorso in alto (era 32×18): area di tocco 44×44, impaginazione uguale. */
+.fa-formation-page .fa-breadcrumb__link {
+  display: inline-block;
+  padding: 13px 6px;
+  margin: -13px -6px;
+}
+
+/* [Proposta 8] Countdown nelle righe: stessa misura per titolari (erano 16px) e
+   panchina (erano 12px), 13px; il nome torna l'elemento principale della riga. */
+.fa-formation-page .fa-starter-row__count {
+  font-size: 0.8125rem;
+}
+
+/* Sempre proposta 8: in panchina e tribuna il numero d'ordine al centro della riga
+   (stava 3px più in alto). Altezza fissa, così con la tendina aperta non si sposta. */
+.fa-bench-order__number {
+  display: flex;
+  align-items: center;
+  min-height: 2.875rem;
+  padding-top: 0;
+  line-height: 1;
+}
+
+/* [Proposta 9] I due testi d'aiuto sopra Panchina e Tribuna con la stessa misura e lo
+   stesso grigio: il primo era da 16px pieno (5 righe a 360) e pesava più delle card. */
+.fa-formation-layout__bench > p {
+  font-size: var(--fa-text-sm);
+  line-height: 1.45;
+  color: var(--fa-color-foreground-muted);
+}
+
+/* [Proposta 10] Contrasto: il rosso di «Svuota formazione» era 3.8:1 nel tema scuro e
+   4.5:1 appena sotto soglia nel chiaro; in tribuna (righe al 65% di opacità) le lettere
+   di ruolo scendevano a 2.8-4.1:1 e i numeri a 2.9:1 nel chiaro. Rosso più chiaro nello
+   scuro, più scuro nel chiaro; la tribuna resta riconoscibile col bordo tratteggiato
+   invece che sbiadita, così testi e ruoli tornano pieni. */
+.fa-btn.fa-formation-clear {
+  color: var(--fa-danger-400);
+}
+
+[data-color-scheme="light"] .fa-btn.fa-formation-clear {
+  color: var(--fa-danger-600);
+}
+
+.fa-bench-order__row--overflow {
+  opacity: 1;
+}
+
+.fa-bench-order__row--overflow .fa-starter-row {
+  border-style: dashed;
+}
+
+.fa-bench-order__row--overflow
+  .fa-starter-row:not(.fa-starter-row--starter, .fa-starter-row--bench, .fa-starter-row--expelled) {
+  border-color: var(--fa-color-border-strong);
 }
 
 /* Distintivi dei campionati (SVG generati, non loghi ufficiali). */

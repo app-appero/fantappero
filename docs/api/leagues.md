@@ -589,7 +589,7 @@ UI: schermata **Asta** (`/asta`) — tabella con tab Tutti/P/D/C/A (sola lettura
 | Stato lega | Effetto |
 | --- | --- |
 | `draft` / `configuring` / `auction` | Override immediato (`effectiveFromRound: null`) |
-| `active` | Decorre dal turno `currentRound + 1` |
+| `active` | Decorre dal turno dopo il più alto già aperto, bloccato o in corso, calcolato dal server (con 12 e 13 aperti insieme: dal 14). `currentRound` è facoltativo e conta solo se è più avanti (QA 20-21/11) |
 | `concluded` / `archived` | Rifiutato (`league_role_override_locked`) |
 
 `DELETE /leagues/{league_id}/amministrazione/listone/{athlete_id}/ruolo` — ripristina il ruolo ufficiale (supersede override attivo).

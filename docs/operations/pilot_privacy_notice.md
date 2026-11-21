@@ -1,7 +1,10 @@
 # Informativa privacy — pilota FantApperò
 
-**Stato: v. 2026-11b APPROVATA dal privacy contact (Rosario Trotta) il 09/11/2026.** Contatto
-per le richieste: info@fantappero.it. La versione precedente (2026-11, approvata il 04/11/2026)
+**Stato: v. 2026-11c APPROVATA dal privacy contact (Rosario Trotta) il 21/11/2026.** Contatto
+per le richieste: info@fantappero.it. La 2026-11c aggiunge l'accesso con email e password (password
+salvata solo in forma cifrata) e la richiesta di accesso al pilota (nome, cognome, email, telefono per il
+gruppo WhatsApp dei tester e motivo facoltativo). La 2026-11b (approvata il 09/11/2026) parlava solo dell'accesso con
+Google. La 2026-11 (approvata il 04/11/2026)
 indicava info@globetrotta.it come contatto, sostituito da info@fantappero.it dopo l'attivazione
 del dominio proprio. La versione prima ancora (2026-01, approvata il 28/09/2026) parlava di
 email e password e non copriva accesso con Google, segnalazioni con allegati e notifiche.
@@ -24,9 +27,15 @@ Il testo qui sotto è la fonte unica: è mostrato in app e sul web alla pagina `
 > (info@fantappero.it), che è anche il tuo contatto per qualsiasi richiesta.
 >
 > **Cosa raccogliamo**
-> - *Account*: l'indirizzo email e il nome del tuo account Google (accedi con Google; non
->   riceviamo né salviamo la tua password Google). Il nome o soprannome che scegli di mostrare
->   agli altri partecipanti e l'eventuale foto profilo che carichi.
+> - *Account*: l'indirizzo email e il nome. Se accedi con Google li riceviamo dal tuo account
+>   Google, ma non riceviamo né salviamo la tua password Google. Se accedi con email e password,
+>   la password la salviamo solo in forma cifrata: non è leggibile, nemmeno da noi. In più il
+>   nome o soprannome che scegli di mostrare agli altri partecipanti e l'eventuale foto profilo
+>   che carichi.
+> - *Richiesta di accesso al pilota*: nome, cognome, l'email con cui hai fatto l'accesso e, se
+>   li indichi, il numero di telefono e un motivo. Il telefono serve solo per aggiungerti al
+>   gruppo WhatsApp dei tester, dove gli altri partecipanti del gruppo vedono il tuo numero.
+>   Puoi chiedere di cancellarlo quando vuoi.
 > - *Dati di gioco*: leghe a cui partecipi, rosa, formazioni, risultati, scambi di mercato.
 > - *Segnalazioni*: se usi «Segnala un problema», il testo che scrivi, le immagini o i video
 >   che alleghi, la schermata da cui scrivi e informazioni tecniche (tipo di dispositivo,
@@ -61,5 +70,5 @@ Il testo qui sotto è la fonte unica: è mostrato in app e sul web alla pagina `
 - **Minorenni**: esclusi dal pilota; nessuna verifica automatica dell'età, regola di
   ammissione manuale applicata in fase di selezione dei partecipanti.
 - **Archivio richieste/ticket**: la casella `info@fantappero.it` funge anche da archivio.
-- **Consenso**: l'accesso con Google vale come accettazione (frase con link sotto il tasto); il server salva versione e data al login e il profilo le mostra con il link all'informativa. A ogni nuova versione (`PROFILE_POLICY_VERSION`) l'accettazione si registra al prossimo accesso.
+- **Consenso**: l'accesso (con Google o con email e password) vale come accettazione (frase con link sotto il tasto e nel pannello email); il server salva versione e data al login e il profilo le mostra con il link all'informativa. A ogni nuova versione (`PROFILE_POLICY_VERSION`) l'accettazione si registra al prossimo accesso.
 - Coerente con `pilot_support_process.md` (stesso canale, divieto di inviare password/token).

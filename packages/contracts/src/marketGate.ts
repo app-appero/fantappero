@@ -14,13 +14,64 @@ import type { MarketGate } from "./market.js";
  * Gli inviti nominativi in attesa (`pendingInviteCount`) tengono un posto ma non rendono la
  * lega al completo: si mostrano accanto al conto, «3/4 · 1 invito in attesa» (Rosario, 20/11).
  *
+ * A turno in corso (dal primo blocco all'omologazione) rosa, aste e scambi sono fermi per
+ * tutti, amministratore compreso: le pagine dicono «Mercato fermo: turno in corso» invece di
+ * «Mercato aperto» (decisione di Rosario del 21/11). Il motivo arriva dal server
+ * (`marketBlockedReason: "round_in_progress"`).
+ *
  * Sull'app mobile la stessa logica è copiata in `apps/mobile/src/market/marketGateNotice.ts`
  * (i test `node:test` non importano il bundle di `@fantappero/contracts`).
  */
 export type MarketGateState = Pick<MarketGate, "marketOpen"> &
   Partial<
-    Pick<MarketGate, "memberCount" | "participantCount" | "leagueFull" | "pendingInviteCount">
+    Pick<
+      MarketGate,
+      | "memberCount"
+      | "participantCount"
+      | "leagueFull"
+      | "pendingInviteCount"
+      | "marketBlockedReason"
+    >
   >;
+
+/** Stato del mercato a turno in corso (decisione di Rosario del 21/11). */
+export const MARKET_ROUND_IN_PROGRESS_LABEL = "Mercato fermo: turno in corso";
+
+/** Perché è fermo: vale anche per l'amministratore e anche a interruttore spento. */
+export const MARKET_ROUND_IN_PROGRESS_NOTICE =
+  "Rosa, aste e scambi sono fermi finché il turno non è calcolato.";
+
+/** Turno in corso: rosa, aste e scambi fermi per tutti. */
+export function marketRoundInProgress(gate: MarketGateState | null | undefined): boolean {
+  return gate?.marketBlockedReason === "round_in_progress";
+}
+
+/** Stato mostrato nel riquadro «Mercato …». */
+export type MarketStatusBadge = "open" | "closed" | "round_in_progress";
+
+/** Parola accanto a «Mercato»: «Mercato aperto», «Mercato chiuso», «Mercato fermo: turno in corso». */
+export const MARKET_STATUS_BADGE_LABEL: Record<MarketStatusBadge, string> = {
+  open: "aperto",
+  closed: "chiuso",
+  round_in_progress: "fermo: turno in corso",
+};
+
+export function marketStatusBadge(gate: MarketGateState): MarketStatusBadge {
+  if (gate.leagueFull === false) {
+    return "closed";
+  }
+  if (marketRoundInProgress(gate)) {
+    return "round_in_progress";
+  }
+  return gate.marketOpen ? "open" : "closed";
+}
+
+/** Titolo degli avvisi «mercato fermo» (asta, scambi): il turno in corso ha il suo. */
+export function marketClosedTitle(gate: MarketGateState | null | undefined): string {
+  return gate && gate.leagueFull !== false && marketRoundInProgress(gate)
+    ? MARKET_ROUND_IN_PROGRESS_LABEL
+    : "Mercato chiuso";
+}
 
 /** «1 invito in attesa», «2 inviti in attesa». */
 export function pendingInvitesLabel(count: number): string {
@@ -63,7 +114,22 @@ export function marketSwitchLocked(gate: MarketGateState): boolean {
   return gate.leagueFull === false && !gate.marketOpen;
 }
 
-/** Rosa, aste e scambi del partecipante: interruttore acceso e lega al completo. */
+/**
+ * Motivo del mercato fermo da mostrare sempre (non solo nell'info): lega non al completo o
+ * turno in corso; `null` altrimenti (interruttore spento: lo spiega il suggerimento).
+ */
+export function marketBlockedNotice(gate: MarketGateState | null | undefined): string | null {
+  const notFull = marketNotFullNotice(gate);
+  if (notFull) {
+    return notFull;
+  }
+  return marketRoundInProgress(gate) ? MARKET_ROUND_IN_PROGRESS_NOTICE : null;
+}
+
+/**
+ * Rosa, aste e scambi del partecipante: interruttore acceso, lega al completo e nessun turno
+ * in corso.
+ */
 export function isMarketActive(gate: MarketGateState): boolean {
-  return gate.marketOpen && gate.leagueFull !== false;
+  return gate.marketOpen && gate.leagueFull !== false && !marketRoundInProgress(gate);
 }

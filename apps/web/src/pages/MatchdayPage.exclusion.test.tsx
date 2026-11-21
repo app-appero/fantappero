@@ -3,6 +3,7 @@ import type {
   FantasyTurnExclusionResult,
   FantasyTurnFixture,
   FantasyTurnSummary,
+  H2HCalendar,
   SessionUser,
 } from "@fantappero/contracts";
 import { ToastProvider } from "@fantappero/ui";
@@ -14,6 +15,7 @@ const fetchFantasyTurnsMock = vi.fn();
 const fetchFantasyTurnMock = vi.fn();
 const excludeFantasyTurnFixtureMock = vi.fn();
 const reincludeFantasyTurnFixtureMock = vi.fn();
+const fetchH2HCalendarMock = vi.fn();
 
 vi.mock("../api/leagues", () => ({
   fetchFantasyTurns: (...args: unknown[]) => fetchFantasyTurnsMock(...args),
@@ -21,7 +23,7 @@ vi.mock("../api/leagues", () => ({
   excludeFantasyTurnFixture: (...args: unknown[]) => excludeFantasyTurnFixtureMock(...args),
   reincludeFantasyTurnFixture: (...args: unknown[]) => reincludeFantasyTurnFixtureMock(...args),
   excludeUnplayedFantasyTurnFixtures: vi.fn(),
-  fetchH2HCalendar: vi.fn().mockResolvedValue(null),
+  fetchH2HCalendar: (...args: unknown[]) => fetchH2HCalendarMock(...args),
   fetchPendingFixtures: vi.fn().mockResolvedValue([]),
   fetchLineupLockCountdown: vi.fn().mockResolvedValue(null),
 }));
@@ -98,6 +100,23 @@ function detail(base: FantasyTurnSummary, fixtures: FantasyTurnFixture[], exclud
 const TURN_1 = summary("turn-1", 1);
 const TURN_2 = summary("turn-2", 2);
 
+const H2H_CALENDAR: H2HCalendar = {
+  id: "calendar-1",
+  leagueId: "league-1",
+  status: "confirmed",
+  format: "single_round_robin",
+  algorithmVersion: "v1",
+  participantCount: 4,
+  roundCount: 3,
+  matchupCount: 6,
+  byeCount: 0,
+  generatedAt: "2026-11-01T10:00:00.000Z",
+  confirmedAt: "2026-11-01T12:00:00.000Z",
+  live: false,
+  rounds: [],
+  summary: { message: "Calendario confermato." },
+};
+
 describe("MatchdayPage — esclusione e reinclusione di una partita", () => {
   let container: HTMLDivElement;
   let root: Root;
@@ -147,6 +166,9 @@ describe("MatchdayPage — esclusione e reinclusione di una partita", () => {
     fetchFantasyTurnMock.mockReset();
     excludeFantasyTurnFixtureMock.mockReset();
     reincludeFantasyTurnFixtureMock.mockReset();
+    // Di base la lega ha il calendario H2H: dopo l'esclusione la giornata si ricalcola.
+    fetchH2HCalendarMock.mockReset();
+    fetchH2HCalendarMock.mockResolvedValue(H2H_CALENDAR);
   });
 
   afterEach(() => {
@@ -167,7 +189,11 @@ describe("MatchdayPage — esclusione e reinclusione di una partita", () => {
     expect(excludeFantasyTurnFixtureMock).toHaveBeenCalledWith("access-token", "league-1", "turn-2", {
       fixtureId: "fx-20",
     });
-    expect(container.textContent).toContain("Esclusione in corso. Poi ricalcolo la giornata.");
+    // L'esito sostituisce l'avviso «in corso» (QA 20-21/11).
+    expect(container.textContent).not.toContain("Esclusione in corso. Poi ricalcolo la giornata.");
+    expect(container.querySelector(".fa-toast--info")?.textContent).toContain(
+      "Partita esclusa. Giornata ricalcolata.",
+    );
     expect(q<HTMLSelectElement>("matchday-turn-select")?.value).toBe("turn-2");
     expect(q("matchday-turn-detail")?.querySelector("h2")?.textContent).toBe("Turno 2");
     expect(q("matchday-reinclude-fx-20")).not.toBeNull();
@@ -193,6 +219,9 @@ describe("MatchdayPage — esclusione e reinclusione di una partita", () => {
     });
     // Mentre il server lavora: avviso e nota nella pagina parlano di reinclusione.
     expect(q("matchday-exclude-progress")?.textContent).toBe("Reinclusione in corso. Poi ricalcolo la giornata.");
+    expect(container.querySelector(".fa-toast")?.textContent).toContain(
+      "Reinclusione in corso. Poi ricalcolo la giornata.",
+    );
     await act(async () => {
       resolveReinclude(
         exclusionResult(detail(TURN_2, [fixture("fx-20")]), "Partita rimessa nel turno. Giornata ricalcolata."),
@@ -200,10 +229,82 @@ describe("MatchdayPage — esclusione e reinclusione di una partita", () => {
     });
 
     expect(q("matchday-exclude-progress")).toBeNull();
-    expect(container.textContent).toContain("Reinclusione in corso. Poi ricalcolo la giornata.");
+    // Arrivato l'esito, l'avviso «in corso» si chiude e resta solo quello con l'esito.
+    expect(container.textContent).not.toContain("Reinclusione in corso");
+    expect(container.querySelectorAll(".fa-toast")).toHaveLength(1);
+    expect(container.textContent).toContain("Partita rimessa nel turno. Giornata ricalcolata.");
     expect(container.textContent).not.toContain("Esclusione in corso");
     expect(q<HTMLSelectElement>("matchday-turn-select")?.value).toBe("turn-2");
     expect(q("matchday-exclude-fx-20")).not.toBeNull();
     expect(q("matchday-excluded-fixtures")).toBeNull();
+  });
+
+  it("un turno aperto col primo blocco passato è «In corso» e uno saltato «Turno saltato»", async () => {
+    const started: FantasyTurnSummary = {
+      ...TURN_1,
+      status: "open",
+      effectiveStatus: "open",
+      modificationAllowed: false,
+      // Primo blocco un'ora fa, primo calcio d'inizio fra 15 minuti: nessuna partita è live.
+      firstLockAt: new Date(Date.now() - 60 * 60_000).toISOString(),
+      cutoffAt: new Date(Date.now() + 15 * 60_000).toISOString(),
+    };
+    const skipped: FantasyTurnSummary = { ...TURN_2, status: "skipped", effectiveStatus: "skipped" };
+    const next = summary("turn-3", 3);
+    fetchFantasyTurnsMock.mockResolvedValue([started, skipped, next]);
+    fetchFantasyTurnMock.mockResolvedValue(detail(started, [fixture("fx-10")]));
+    await act(async () => {
+      root.render(
+        createElement(MemoryRouter, {
+          initialEntries: ["/turni?tab=europei"],
+          children: createElement(ToastProvider, { children: createElement(MatchdayPage) }),
+        }),
+      );
+    });
+
+    const options = Array.from(
+      q<HTMLSelectElement>("matchday-turn-select")?.querySelectorAll("option") ?? [],
+    ).map((option) => option.textContent);
+    // Il turno in corso occupa il posto del prossimo: il successivo è «Da disputare».
+    expect(options).toEqual([
+      "Turno 1 — In corso",
+      "Turno 2 — Turno saltato",
+      "Turno 3 — Da disputare",
+    ]);
+    expect(q("matchday-turn-detail")?.textContent).toContain("Stato: In corso");
+  });
+
+  it("senza calendario non annuncia né segnala un ricalcolo (QA 20-21/11)", async () => {
+    fetchH2HCalendarMock.mockResolvedValue(null);
+    await renderAndOpenTurn2(detail(TURN_2, [fixture("fx-20")]));
+    let resolveExclude: (result: FantasyTurnExclusionResult) => void = () => undefined;
+    excludeFantasyTurnFixtureMock.mockReturnValue(
+      new Promise<FantasyTurnExclusionResult>((resolve) => {
+        resolveExclude = resolve;
+      }),
+    );
+
+    await click("matchday-exclude-fx-20");
+
+    expect(q("matchday-exclude-progress")?.textContent).toBe("Esclusione in corso.");
+    expect(container.textContent).not.toContain("ricalcolo");
+    await act(async () => {
+      resolveExclude({
+        turn: detail(TURN_2, [], [fixture("fx-20")]),
+        excludedCount: 1,
+        recalculated: false,
+        resultFinal: false,
+        homologated: false,
+        recalculationSkipped: true,
+        message: "Partita esclusa.",
+      });
+    });
+
+    expect(container.textContent).not.toContain("Il ricalcolo non è riuscito");
+    expect(container.textContent).not.toContain("Esclusione in corso");
+    expect(container.querySelectorAll(".fa-toast")).toHaveLength(1);
+    expect(container.querySelector(".fa-toast--success")?.textContent).toContain("Partita esclusa.");
+    expect(container.querySelector(".fa-toast--warning")).toBeNull();
+    expect(q("matchday-success")?.textContent).toBe("Partita esclusa.");
   });
 });

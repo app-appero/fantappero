@@ -21,7 +21,11 @@ from sqlalchemy.orm import Session
 
 from fantasy_turns.models import FantasyRound
 from fantasy_turns.rules import ensure_utc
-from leagues.models.league_calendar import LeagueCalendar, LeagueCalendarRoundWindow
+from leagues.models.league_calendar import (
+    LeagueCalendar,
+    LeagueCalendarRoundWindow,
+    LeagueCalendarSlot,
+)
 
 
 def _window_key(start_at: datetime, end_at: datetime) -> tuple[datetime, datetime]:
@@ -89,3 +93,42 @@ def h2h_round_numbers_for_round(
         for mapping in mappings
         if _window_key(mapping.window_start_at, mapping.window_end_at) == target
     )
+
+
+def resting_membership_ids(
+    session: Session,
+    *,
+    league_id: UUID,
+    fantasy_round: FantasyRound,
+) -> set[UUID]:
+    """Partecipanti che riposano nel turno: hanno il riposo (bye) del calendario H2H nella
+    giornata ospitata dal turno e nessuno scontro.
+
+    Stesso calendario e stesso abbinamento giornata ↔ turno del calcolo dei risultati
+    (``leagues.scoring_service``): chi riposa non ha uno scontro da giocare. Senza calendario,
+    o con un turno che non ospita nessuna giornata, non riposa nessuno.
+    """
+    calendar = session.scalar(select(LeagueCalendar).where(LeagueCalendar.league_id == league_id))
+    if calendar is None:
+        return set()
+    round_numbers = h2h_round_numbers_for_round(
+        session, calendar=calendar, fantasy_round=fantasy_round
+    )
+    if not round_numbers:
+        return set()
+    slots = session.scalars(
+        select(LeagueCalendarSlot).where(
+            LeagueCalendarSlot.calendar_id == calendar.id,
+            LeagueCalendarSlot.round_number.in_(round_numbers),
+        )
+    ).all()
+    playing: set[UUID] = set()
+    resting: set[UUID] = set()
+    for slot in slots:
+        if slot.is_bye:
+            resting.add(slot.home_membership_id)
+            continue
+        playing.add(slot.home_membership_id)
+        if slot.away_membership_id is not None:
+            playing.add(slot.away_membership_id)
+    return resting - playing

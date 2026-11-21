@@ -52,7 +52,10 @@ export function MarketScreen() {
   const canManageMarket = can(["market:manage"]);
   // Decisione del 20/11: a lega non al completo gli scambi sono fermi (proporre, accettare,
   // approvare); il banner dice perché invece di lasciar fallire le azioni.
-  const { leagueFull, notFullNotice } = useMarketGate();
+  // Decisione del 21/11: a turno in corso gli scambi sono fermi per tutti («Mercato fermo:
+  // turno in corso»).
+  const { leagueFull, roundInProgress, blockedNotice, closedTitle } = useMarketGate();
+  const tradesLocked = !leagueFull || roundInProgress;
   // Apertura da una notifica di scambio (vedi notificationDestination.ts).
   const highlightedProposalId = route.params?.scambio ?? null;
 
@@ -337,9 +340,13 @@ export function MarketScreen() {
         requestedCredits: creditsDirection === "request" ? credits : 0,
         expiresAt: expiresIso,
       })
-      .then(() => {
-        resetTradeForm();
-        setShowForm(false);
+      .then((sent) => {
+        // Con un errore del server (es. turno in corso) il form resta aperto, con quanto
+        // compilato e il messaggio sopra «Invia proposta», come sul web (QA 20-21/11).
+        if (sent) {
+          resetTradeForm();
+          setShowForm(false);
+        }
       });
   }
 
@@ -360,12 +367,12 @@ export function MarketScreen() {
         onSelect={(id) => navigation.navigate(id as keyof AppTabParamList)}
         testID="market-hub-tabs"
       />
-      {notFullNotice ? (
+      {blockedNotice ? (
         <UiStatePanel
           state="empty"
-          title="Mercato chiuso"
-          message={notFullNotice}
-          testID="market-not-full"
+          title={closedTitle}
+          message={blockedNotice}
+          testID={roundInProgress ? "market-round-in-progress" : "market-not-full"}
         />
       ) : null}
       {loading ? (
@@ -463,8 +470,8 @@ export function MarketScreen() {
             </View>
           </View>
           <Pressable
-            style={[styles.bigButton, !leagueFull && styles.disabled]}
-            disabled={!leagueFull}
+            style={[styles.bigButton, tradesLocked && styles.disabled]}
+            disabled={tradesLocked}
             onPress={() => setShowForm((value) => !value)}
             testID="market-trade-new-toggle"
           >
@@ -473,7 +480,7 @@ export function MarketScreen() {
         </View>
       ) : null}
 
-      {!loading && !loadError && activeLeagueId && showForm && leagueFull ? (
+      {!loading && !loadError && activeLeagueId && showForm && !tradesLocked ? (
         <MarketTradeCreateForm
           recipientOptions={recipientOptions}
           recipientTeamId={recipientTeamId}
@@ -511,7 +518,7 @@ export function MarketScreen() {
           ownedSlots={ownedSlots}
           canManageMarket={canManageMarket}
           athleteMeta={athleteMeta}
-          locked={!leagueFull}
+          locked={tradesLocked}
         />
       ) : null}
 

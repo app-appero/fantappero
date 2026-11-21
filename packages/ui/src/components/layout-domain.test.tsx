@@ -193,6 +193,17 @@ describe("EPUI-03 layout components", () => {
     }
   });
 
+  it("labels a skipped reference turn as «Turno saltato» (Rosario, 21/11)", () => {
+    const skipped = renderToStaticMarkup(
+      createElement(LockCountdown, { state: "turn_not_open", nextLockAt: null, roundStatus: "skipped" }),
+    );
+    expect(skipped).toContain("Turno saltato");
+    const notOpen = renderToStaticMarkup(
+      createElement(LockCountdown, { state: "turn_not_open", nextLockAt: null, roundStatus: "scheduled" }),
+    );
+    expect(notOpen).toContain("Turno non ancora aperto");
+  });
+
   it("ticks down toward the next lock using an injectable clock", () => {
     const html = renderToStaticMarkup(
       createElement(LockCountdown, {

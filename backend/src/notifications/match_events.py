@@ -167,6 +167,17 @@ def notify_match_event(session: Session, *, event: object, fixture_status: str |
                 "player_out": getattr(leaving, "canonical_name", None),
                 "player_in": getattr(entering, "canonical_name", None),
             }
+            # Chiave stabile per la sostituzione, non per la riga dell'evento (QA 20-21/11):
+            # il provider non ha un id dell'evento e la chiave della riga cambia quando
+            # corregge minuto o dettaglio («Substitution 2» → «Substitution 3»), creando una
+            # riga nuova e un secondo avviso. Un calciatore esce una volta sola per partita,
+            # quindi partita + chi esce identificano la sostituzione. La stessa chiave vale
+            # per chi esce e per chi entra: chi li ha entrambi in rosa riceve un solo avviso.
+            dedup_prefix = (
+                f"match_event_subst:{fixture_id}:{athlete_id}"
+                if fixture_id is not None
+                else f"match_event_subst:{event_id}"
+            )
             for owned_id in (athlete_id, related_id):
                 if owned_id is None:
                     continue
@@ -176,7 +187,7 @@ def notify_match_event(session: Session, *, event: object, fixture_status: str |
                     template_key="risultati.sostituzione",
                     template_version=1,
                     params=params,
-                    dedup_prefix=f"match_event_subst:{event_id}:{owned_id}",
+                    dedup_prefix=dedup_prefix,
                     fixture_id=fixture_id,
                 )
         return sent

@@ -33,6 +33,7 @@ export function LockCountdownBar() {
             <LockCountdown
               state={countdown.state}
               nextLockAt={countdown.nextLockAt}
+              roundStatus={countdown.roundStatus}
               onExpire={refetch}
               testID="header-lock-countdown"
             />
@@ -61,6 +62,7 @@ export function LockCountdownBar() {
         <LockCountdown
           state={countdown.state}
           nextLockAt={countdown.nextLockAt}
+          roundStatus={countdown.roundStatus}
           onExpire={refetch}
           testID="header-lock-countdown"
         />

@@ -11,7 +11,8 @@ export interface EntitlementStatus {
 export interface AuditLogEntry {
   id: string;
   occurredAt: string;
-  actorId: string;
+  /** `null` per gli eventi automatici (job, sistema): nessun utente li ha fatti. */
+  actorId: string | null;
   actorDisplayName: string | null;
   action: string;
   details: Record<string, unknown> | null;

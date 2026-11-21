@@ -168,6 +168,30 @@ describe("EP05-01/02/03 roster, credits and manual assignment", () => {
     expect(html).toContain("Gli scambi restano sempre disponibili.");
   });
 
+  it("a turno in corso dice «Mercato fermo: turno in corso», non «Mercato aperto» (21/11)", () => {
+    for (const path of [
+      "/rosa?persona=member&stato=success&mercato=turno",
+      "/mercato?persona=admin&mercato=turno",
+      "/asta?persona=member&mercato=turno",
+    ]) {
+      const html = renderRoute(path);
+      const status = html.match(/data-testid="market-gate-status"[^>]*>(.*?)<\/p>/s)?.[1] ?? "";
+      expect(status.replace(/<[^>]+>/g, "")).toContain("Mercato fermo: turno in corso");
+      expect(status).not.toContain(">aperto<");
+      expect(html).toContain('data-testid="market-gate-round"');
+      expect(html).toContain("Rosa, aste e scambi sono fermi finché il turno non è calcolato.");
+      expect(html).not.toContain("Gli scambi restano sempre disponibili.");
+    }
+  });
+
+  it("a turno in corso rosa e scambi sono fermi anche per l'amministratore (21/11)", () => {
+    const roster = renderRoute("/rosa?persona=admin&stato=success&mercato=turno");
+    expect(roster).toMatch(/<button[^>]*disabled=""[^>]*data-testid="roster-admin-assign-a3"/);
+    const open = renderRoute("/rosa?persona=admin&stato=success");
+    expect(open).toContain('data-testid="roster-admin-assign-a3"');
+    expect(open).not.toMatch(/<button[^>]*disabled=""[^>]*data-testid="roster-admin-assign-a3"/);
+  });
+
   it("renders roster history success in demo mode", () => {
     const html = renderRoute("/rosa?persona=member&stato=success&sezione=storico");
     expect(html).toContain('data-testid="roster-section-tabs"');

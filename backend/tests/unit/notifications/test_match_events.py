@@ -101,6 +101,57 @@ def test_substitution_notifies_owners_of_both_players() -> None:
     assert {call["template_key"] for call in _FakeService.calls} == {"risultati.sostituzione"}
 
 
+class _DedupService(_FakeService):
+    """Come il servizio vero: una seconda notifica con la stessa chiave non viene creata."""
+
+    def create_notification(self, **kwargs: object) -> tuple[None, bool]:
+        key = (kwargs["user_id"], kwargs["dedup_key"])
+        if any((call["user_id"], call["dedup_key"]) == key for call in _FakeService.calls):
+            return None, False
+        _FakeService.calls.append(kwargs)
+        return None, True
+
+
+def test_substitution_is_notified_once_with_a_stable_key(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """QA 20-21/11: la stessa sostituzione arrivava due volte. Chi ha in rosa sia chi esce sia
+    chi entra riceveva due avvisi (una chiave per giocatore), e il provider che corregge minuto
+    o dettaglio crea una nuova riga evento (un nuovo id): la chiave ora è partita + chi esce."""
+    owner = uuid4()
+    team = uuid4()
+    monkeypatch.setattr(match_events, "NotificationService", _DedupService)
+    monkeypatch.setattr(match_events, "user_ids_for_teams", lambda s, ids: {team: owner})
+    fixture_id = uuid4()
+    leaving = uuid4()
+    entering = uuid4()
+
+    first = _event(
+        event_type="subst",
+        event_detail="Substitution 2",
+        athlete_id=leaving,
+        related_athlete_id=entering,
+        fixture_id=fixture_id,
+    )
+    # Stessa squadra proprietaria di entrambi: un solo avviso.
+    assert match_events.notify_match_event(_session(), event=first, fixture_status="2H") == 1
+
+    # Il provider rinumera la sostituzione e corregge il minuto: nuova riga, stesso cambio.
+    corrected = _event(
+        event_type="subst",
+        event_detail="Substitution 3",
+        minute_elapsed=64,
+        athlete_id=leaving,
+        related_athlete_id=entering,
+        fixture_id=fixture_id,
+    )
+    assert match_events.notify_match_event(_session(), event=corrected, fixture_status="2H") == 0
+    assert len(_FakeService.calls) == 1
+    assert _FakeService.calls[0]["dedup_key"] == (
+        f"match_event_subst:{fixture_id}:{leaving}:{owner}:{team}"
+    )
+
+
 def test_finished_match_does_not_notify_backfill() -> None:
     event = _event(scoring_kind="goal")
     assert match_events.notify_match_event(_session(), event=event, fixture_status="FT") == 0

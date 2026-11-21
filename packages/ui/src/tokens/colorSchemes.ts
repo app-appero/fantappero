@@ -86,7 +86,8 @@ export const lightColors: AppColors = {
   borderStrong: "#a9b8c4",
   success: palette.success600,
   successMuted: palette.success500,
-  warning: palette.warning600,
+  /** Come testo #b8860b arrivava a 3:1 sul fondo: ambra scuro, almeno 4,5:1 sugli sfondi chiari. */
+  warning: palette.warning700,
   warningMuted: palette.warning500,
   danger: palette.danger600,
   dangerMuted: palette.danger500,

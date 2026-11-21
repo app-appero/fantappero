@@ -3,6 +3,7 @@ import { describe, it } from "node:test";
 import type { LineupRole, LineupRosterPlayer } from "./fantasyLineups.ts";
 import {
   APPROVED_MODULES,
+  lockCountdownIdleLabel,
   copyPreviousLineup,
   blockingLineupSaveIssue,
   evaluateBenchOrderLock,
@@ -1046,5 +1047,15 @@ describe("panchina con un portiere al posto di un attaccante (Rosario, 20/11)", 
       formationLineupBench({ orderedBench: ["A5", ...saved], savedBench: saved, placedBench: saved, isBlocked }),
       [...saved, "A5"],
     );
+  });
+});
+
+describe("conto alla rovescia senza blocchi da contare", () => {
+  it("un turno di riferimento saltato si legge «Turno saltato» (Rosario, 21/11)", () => {
+    assert.equal(lockCountdownIdleLabel("turn_not_open", "skipped"), "Turno saltato");
+    assert.equal(lockCountdownIdleLabel("turn_not_open", "scheduled"), "Turno non ancora aperto");
+    assert.equal(lockCountdownIdleLabel("turn_not_open"), "Turno non ancora aperto");
+    assert.equal(lockCountdownIdleLabel("no_active_turn", "skipped"), "Nessun turno attivo");
+    assert.equal(lockCountdownIdleLabel("counting_down"), "");
   });
 });

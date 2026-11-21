@@ -1,12 +1,13 @@
 import { NotificationEventSettings } from "../notifications/NotificationEventSettings";
 import {
-  avatarInitial,
+  avatarInitials,
   DELETE_ACCOUNT_CONFIRMATION_PHRASE,
   PROFILE_LANGUAGE_OPTIONS,
   PROFILE_TIMEZONE_OPTIONS,
   type UserProfile,
 } from "@fantappero/contracts";
 import {
+  AvatarWithFallback,
   Breadcrumb,
   Button,
   Card,
@@ -442,19 +443,18 @@ export function ProfilePage() {
           <CardHeader title="Identità" />
           <CardBody>
             <div className="fa-profile-avatar">
-              {avatarSrc ? (
-                <img
-                  key={avatarSrc}
-                  src={avatarSrc}
-                  alt=""
-                  className="fa-profile-avatar__image"
-                  data-testid="profile-avatar-image"
-                />
-              ) : (
-                <div className="fa-profile-avatar__placeholder" data-testid="profile-avatar-placeholder">
-                  {avatarInitial(profile.displayName)}
-                </div>
-              )}
+              {/* Se la foto non si carica (es. 404) restano le iniziali, non un'immagine rotta;
+                  un avatar nuovo ha un indirizzo nuovo (`?v=`) e viene riprovato. */}
+              <AvatarWithFallback
+                src={avatarSrc}
+                className="fa-profile-avatar__image"
+                testId="profile-avatar-image"
+                fallback={
+                  <div className="fa-profile-avatar__placeholder" data-testid="profile-avatar-placeholder">
+                    {avatarInitials(profile.displayName)}
+                  </div>
+                }
+              />
               <div className="fa-profile-avatar__actions">
                 <label className="fa-button fa-button--secondary fa-button--sm">
                   {avatarUploading ? "Caricamento…" : "Carica avatar"}

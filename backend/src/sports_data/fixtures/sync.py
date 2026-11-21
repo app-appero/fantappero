@@ -12,6 +12,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 import database.models  # noqa: F401 — register ORM mappers
+from app.text_folding import repair_mojibake
 from leagues.models.competition import Competition
 from observability.logging import get_logger
 from observability.metrics import Timer, get_metrics
@@ -184,7 +185,8 @@ def _ensure_athlete(
     if row is not None:
         return row
     name = (canonical_name or f"athlete:{provider_id}").strip() or f"athlete:{provider_id}"
-    row = Athlete(provider_id=provider_id, canonical_name=name[:160])
+    # Stessa riparazione dei nomi della sincronizzazione delle rose (QA 20-21/11).
+    row = Athlete(provider_id=provider_id, canonical_name=repair_mojibake(name)[:160])
     session.add(row)
     session.flush()
     counters.incr_entity("athletes", "created")

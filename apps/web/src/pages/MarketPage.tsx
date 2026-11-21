@@ -184,9 +184,11 @@ export function MarketPage() {
   const canManageMarket = can(["market:manage"]);
   // Decisione del 20/11: scambi (proposta, accettazione, approvazione) e svincoli del
   // partecipante solo a lega al completo. Il banner con il motivo è nella barra del mercato.
-  const { leagueFull, marketActive } = useMarketGate();
-  const tradesLocked = !leagueFull;
-  const releaseLocked = !canManageMarket && !marketActive;
+  // Decisione del 21/11: a turno in corso gli scambi sono fermi per tutti («Mercato fermo:
+  // turno in corso» nella barra del mercato).
+  const { leagueFull, marketActive, roundInProgress } = useMarketGate();
+  const tradesLocked = !leagueFull || roundInProgress;
+  const releaseLocked = roundInProgress || (!canManageMarket && !marketActive);
   const { search } = useLocation();
   const demoState = isDemoMode ? parseWireframeStateFromSearch(search) : null;
   // Notifica di scambio (?scambio=<id>): apre direttamente la proposta giusta

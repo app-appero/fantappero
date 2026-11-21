@@ -115,7 +115,10 @@ Ambiguità → status `ambiguous` + candidati con `role` (ruolo nella lega), `cl
 `competitionName`, risolvibili in conferma via `resolutions: [{rowNumber, athleteId}]`.
 Una riga ambigua è un avviso, non un errore: non entra in `errorCount` ma in `ambiguousCount`;
 `canConfirm` resta `false` finché ce n'è una, e la conferma senza scelta risponde
-`import_has_ambiguities`.
+`import_has_ambiguities`. Una conferma rifiutata (`import_has_ambiguities`, `import_has_errors`)
+non salva niente, nemmeno le scelte inviate: l'anteprima resta quella del file e la conferma dopo
+usa le sue scelte (QA 20-21/11). I nomi con la codifica rovinata (`JovanoviÄ\x87`) si confrontano
+già riparati.
 
 Vincoli server (stessi dell’inserimento manuale): esclusività lega, crediti ≥ 0, saldo non negativo,
 slot liberi, tetti ruolo P–D–C–A. Diversità campionati e completezza valgono all’avvio stagione.

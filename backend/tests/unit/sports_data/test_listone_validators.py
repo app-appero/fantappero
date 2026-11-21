@@ -42,6 +42,45 @@ def test_active_override_defaults_current_round_zero() -> None:
     )
 
 
+@pytest.mark.parametrize("client_round", [None, 0, 5, 11])
+def test_active_override_never_starts_before_the_turn_after_the_latest_started(
+    client_round: int | None,
+) -> None:
+    """QA 20-21/11 (D1): senza `currentRound`, o con un valore indietro, l'override valeva
+    dal turno 1, anche nei turni già aperti o bloccati. Il turno lo decide il server."""
+    assert (
+        compute_override_effective_from_round(
+            league_state=LeagueState.ACTIVE,
+            current_round=client_round,
+            latest_started_round=12,
+        )
+        == 13
+    )
+
+
+def test_active_override_accepts_a_client_round_further_ahead() -> None:
+    # Più avanti del server si può: rimanda l'override, non tocca turni già partiti.
+    assert (
+        compute_override_effective_from_round(
+            league_state=LeagueState.ACTIVE,
+            current_round=15,
+            latest_started_round=12,
+        )
+        == 16
+    )
+
+
+def test_pre_auction_override_ignores_the_latest_started_round() -> None:
+    assert (
+        compute_override_effective_from_round(
+            league_state=LeagueState.AUCTION,
+            current_round=None,
+            latest_started_round=3,
+        )
+        is None
+    )
+
+
 @pytest.mark.parametrize("state", [LeagueState.CONCLUDED, LeagueState.ARCHIVED])
 def test_locked_states_reject_override(state: LeagueState) -> None:
     with pytest.raises(ListoneValidationError) as exc:

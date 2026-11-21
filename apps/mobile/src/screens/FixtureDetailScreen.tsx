@@ -13,7 +13,7 @@ import { layoutFromGrid, layoutFromRoles, mapFixtureMatchStatus, pitchRoleCodeFr
   playerAvatarUrl,
   clubCrestUrl,
 } from "@fantappero/contracts";
-import { theme } from "@fantappero/ui/theme";
+import { darkColors, theme } from "@fantappero/ui/theme";
 import { liveStringMap } from "../theme/liveColors";
 import { useRoute, type RouteProp } from "@react-navigation/core";
 import { useCallback, useState, type ReactNode } from "react";
@@ -434,7 +434,8 @@ function eventVisual(event: FixtureTimelineEvent): { icon: ReactNode; headline: 
   if (type === "card") {
     const isRed = detailText.includes("red");
     return {
-      icon: <MaterialCommunityIcons name="card" size={16} color={isRed ? colors.danger : colors.warning} />,
+      // Il cartellino giallo resta giallo anche nel tema chiaro, come `YellowCardIcon` sul web.
+      icon: <MaterialCommunityIcons name="card" size={16} color={isRed ? colors.danger : darkColors.warning} />,
       headline: (
         <AthleteName athleteId={event.athleteId} style={styles.eventName}>
           {event.athleteName ?? "?"}

@@ -91,5 +91,6 @@ docker compose --env-file infra/local/.env.example --profile test run --rm api \
 | `memberships_skipped_missing_season` | Sincronizzare stagioni per la competizione |
 | Trasferimento Loan in coda admin | Atteso: `requires_admin_review=true`; risolvere manualmente (FR-MKT-02) |
 | UUID atleta cambiato | Verificare unique su `athletes.provider_id` |
+| Nome con la codifica rovinata (`JovanoviÄ\x87`, `DembÃ©lÃ©`), la ricerca senza accenti non lo trova | Le sincronizzazioni salvano i nomi già riparati e alla prossima riparano anche quelli salvati. Per ripararli subito: `python scripts/repair_athlete_names.py --dry-run` (elenco), poi senza `--dry-run`. Idempotente: tocca solo i nomi UTF-8 letti come Latin-1/Windows-1252 che tornano puliti (QA 20-21/11) |
 
 Catalogo club: [`sports_catalog_sync.md`](./sports_catalog_sync.md) · Adapter HTTP: [`api_football_adapter.md`](./api_football_adapter.md).

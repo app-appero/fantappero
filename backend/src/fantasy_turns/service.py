@@ -25,6 +25,7 @@ from database.enums import (
     LeagueState,
 )
 from fantasy_lineups.models import EffectiveLineup, LineupSubmission
+from fantasy_lineups.rules import DEFAULT_LINEUP_LOCK_MARGIN_MINUTES
 from fantasy_turns.coverage import (
     RosteredPlayer,
     clubs_playing_between,
@@ -208,6 +209,8 @@ class FantasyTurnService:
         # Rose per lega: il backfill stagionale valuta molte finestre di
         # seguito e la rosa non cambia durante quel ciclo.
         self._rosters_cache: dict[UUID, dict[UUID, list[RosteredPlayer]]] = {}
+        # Margine di blocco per lega, per il primo blocco reale dei turni (`firstLockAt`).
+        self._lock_margins: dict[UUID, int] = {}
 
     def list_turns(self, league_access: LeagueAccess) -> list[FantasyTurnSummaryResponse]:
         now = datetime.now(UTC)
@@ -1186,24 +1189,36 @@ class FantasyTurnService:
         single: bool,
         subject: str | None = None,
     ) -> FantasyTurnExclusionResponse:
-        """Persiste l'esclusione, poi ricalcola. Un ricalcolo fallito non la annulla."""
+        """Persiste l'esclusione, poi ricalcola. Un ricalcolo fallito non la annulla.
+
+        Senza calendario H2H non c'è nessuna giornata da ricalcolare: il ricalcolo non si tenta
+        e l'esito non ne parla (prima diceva «Il ricalcolo non è riuscito: Calendario di lega
+        non trovato.», QA 20-21/11).
+        """
         self._session.commit()
         recalculated = False
         result_final = False
         homologated = False
         error: str | None = None
-        try:
-            result = calculate_league_round(
-                self._session,
-                round_id=round_id,
-                league_id=league_access.league.id,
-                actor_id=league_access.user.id,
-                automatic=False,
+        has_calendar = (
+            self._session.scalar(
+                select(LeagueCalendar.id).where(LeagueCalendar.league_id == league_access.league.id)
             )
-            self._session.commit()
-            recalculated = True
-            result_final = result.result_final
-            homologated = result.homologated
+            is not None
+        )
+        try:
+            if has_calendar:
+                result = calculate_league_round(
+                    self._session,
+                    round_id=round_id,
+                    league_id=league_access.league.id,
+                    actor_id=league_access.user.id,
+                    automatic=False,
+                )
+                self._session.commit()
+                recalculated = True
+                result_final = result.result_final
+                homologated = result.homologated
         except ValidationAuthError as exc:
             self._session.rollback()
             error = exc.message
@@ -1224,6 +1239,7 @@ class FantasyTurnService:
             recalculated=recalculated,
             resultFinal=result_final,
             homologated=homologated,
+            recalculationSkipped=not has_calendar,
             message=_exclusion_message(
                 excluded_count=excluded_count,
                 single=single,
@@ -2404,6 +2420,18 @@ class FantasyTurnService:
             select(LeagueRules).where(LeagueRules.league_id == league_id)
         ).first()
 
+    def _lock_margin_minutes(self, league_id: UUID) -> int:
+        """Margine di blocco della lega (letto una volta per lega: l'elenco ha molti turni)."""
+        cached = self._lock_margins.get(league_id)
+        if cached is not None:
+            return cached
+        margin = self._session.scalar(
+            select(LeagueRules.lineup_lock_margin_minutes).where(LeagueRules.league_id == league_id)
+        )
+        value = margin if margin is not None else DEFAULT_LINEUP_LOCK_MARGIN_MINUTES
+        self._lock_margins[league_id] = value
+        return value
+
     def _load_round(
         self,
         league_id: UUID,
@@ -2522,6 +2550,12 @@ class FantasyTurnService:
             opensAt=fantasy_round.opens_at,
             closesAt=fantasy_round.closes_at,
             cutoffAt=fantasy_round.cutoff_at,
+            firstLockAt=(
+                fantasy_round.cutoff_at
+                - timedelta(minutes=self._lock_margin_minutes(fantasy_round.league_id))
+                if fantasy_round.cutoff_at is not None
+                else None
+            ),
             status=fantasy_round.status.value,
             effectiveStatus=effective.value,
             skipReason=fantasy_round.skip_reason,
@@ -2554,6 +2588,7 @@ class FantasyTurnService:
             opensAt=summary.opens_at,
             closesAt=summary.closes_at,
             cutoffAt=summary.cutoff_at,
+            firstLockAt=summary.first_lock_at,
             status=summary.status,
             effectiveStatus=summary.effective_status,
             skipReason=summary.skip_reason,

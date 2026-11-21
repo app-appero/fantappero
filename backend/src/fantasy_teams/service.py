@@ -1551,16 +1551,12 @@ class FantasyTeamService:
         self._flag_role_quota_overflow(league, rows)
         rows = recompute_slot_assignments(self._session, league_id=league.id, rows=rows)
         error_count, warning_count = count_preview_issues(rows)
-        session.preview_payload = {
-            "rows": [preview_row_to_dict(row) for row in rows],
-            "skippedSheets": skipped_sheets,
-        }
-        session.error_count = error_count
-        session.warning_count = warning_count
-        session.row_count = len(rows)
 
+        # Una conferma rifiutata non salva niente, nemmeno le scelte dei nomi ambigui:
+        # l'anteprima resta quella del file e la conferma dopo applica le sue scelte. Prima le
+        # righe scelte restavano salvate come risolte e una scelta diversa veniva ignorata
+        # (QA 20-21/11). Annulla tutto `rollback_on_error`, all'uscita con l'errore.
         if error_count > 0:
-            self._session.commit()
             get_metrics().incr(
                 "fantasy_roster_csv_confirm_total",
                 labels={"result": "blocked"},
@@ -1572,7 +1568,6 @@ class FantasyTeamService:
         # I nomi ambigui non sono errori (QA 19-20/11), ma senza una scelta la riga
         # resterebbe fuori in silenzio: la conferma aspetta il calciatore giusto.
         if has_unresolved_ambiguities(rows):
-            self._session.commit()
             get_metrics().incr(
                 "fantasy_roster_csv_confirm_total",
                 labels={"result": "blocked"},
@@ -1581,6 +1576,9 @@ class FantasyTeamService:
                 "Scegli il calciatore giusto per ogni nome ambiguo prima di confermare.",
                 code="import_has_ambiguities",
             )
+        session.error_count = error_count
+        session.warning_count = warning_count
+        session.row_count = len(rows)
 
         ok_rows = [row for row in rows if row.status == "ok"]
         if not ok_rows:

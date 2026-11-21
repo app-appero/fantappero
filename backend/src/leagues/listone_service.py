@@ -6,14 +6,15 @@ from collections.abc import Callable
 from datetime import UTC, datetime
 from uuid import UUID
 
-from sqlalchemy import func, select
+from sqlalchemy import and_, func, or_, select
 from sqlalchemy.orm import Session
 
 from auth.exceptions import ValidationAuthError
 from authorization.context import LeagueAccess
 from config.settings.loader import get_api_settings
-from database.enums import FantasyRole, LeagueAuditAction
+from database.enums import FantasyRole, FantasyTurnStatus, LeagueAuditAction
 from fantasy_teams.composition_service import resync_team_compositions
+from fantasy_turns.models import FantasyRound
 from leagues.listone_refresh_progress import (
     ListoneRefreshProgress,
     load_progress,
@@ -49,6 +50,7 @@ from sports_data.listone.overrides import (
     override_is_pending,
 )
 from sports_data.listone.validators import (
+    POST_START_STATES,
     ListoneValidationError,
     compute_override_effective_from_round,
     validate_fantasy_role,
@@ -362,11 +364,18 @@ class LeagueListoneService:
         reason: str | None = None,
     ) -> LeagueListoneEntryResponse:
         league = league_access.league
+        # Il turno corrente lo calcola il server: il `currentRound` del client conta solo se è
+        # più avanti. Senza, l'override valeva dal turno 1 anche nei turni già bloccati
+        # (QA 20-21/11).
+        latest_started = (
+            self._latest_started_round_number(league.id) if league.state in POST_START_STATES else 0
+        )
         try:
             fantasy_role = validate_fantasy_role(role)
             effective_from = compute_override_effective_from_round(
                 league_state=league.state,
                 current_round=current_round,
+                latest_started_round=latest_started,
             )
         except ListoneValidationError as exc:
             raise ValidationAuthError(exc.message, code=exc.code) from exc
@@ -431,7 +440,7 @@ class LeagueListoneService:
             },
         )
 
-        round_for_view = 0 if current_round is None else current_round
+        round_for_view = max(current_round or 0, latest_started)
         effective = effective_role_for_athlete(
             official_role=assignment.role,
             override=row,
@@ -562,6 +571,30 @@ class LeagueListoneService:
             effective_role=effective,
             current_round=current_round,
         )
+
+    def _latest_started_round_number(self, league_id: UUID) -> int:
+        """Il turno più alto già aperto, bloccato o in corso (0 se nessuno).
+
+        Con più turni aperti insieme conta il più alto: in tutti si può già schierare la
+        formazione, e l'override non deve cambiare i ruoli sotto una formazione schierabile.
+        Un turno ancora programmato conta se il suo primo calcio d'inizio è già passato
+        (apertura automatica in ritardo); un turno saltato non conta.
+        """
+        now = datetime.now(UTC)
+        latest = self._session.scalar(
+            select(func.max(FantasyRound.number)).where(
+                FantasyRound.league_id == league_id,
+                or_(
+                    FantasyRound.status.in_((FantasyTurnStatus.OPEN, FantasyTurnStatus.LOCKED)),
+                    and_(
+                        FantasyRound.status == FantasyTurnStatus.SCHEDULED,
+                        FantasyRound.cutoff_at.is_not(None),
+                        FantasyRound.cutoff_at <= now,
+                    ),
+                ),
+            )
+        )
+        return int(latest or 0)
 
     def _count_clubs_for_season(self, season_year: int) -> int:
         return int(

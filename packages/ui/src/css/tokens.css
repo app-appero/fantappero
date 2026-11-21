@@ -44,6 +44,7 @@
   --fa-success-500: #3ddc97;
   --fa-success-400: #7be8b8;
 
+  --fa-warning-700: #8a5a00;
   --fa-warning-600: #b8860b;
   --fa-warning-500: #e6a700;
   --fa-warning-400: #f0c040;
@@ -192,6 +193,9 @@
   --fa-color-border-strong: #a9b8c4;
   /* Il menta del tema scuro su fondo chiaro si leggeva a 1,6:1: verde scuro, almeno 4,5:1. */
   --fa-color-success: #08765a;
+  /* Anche l'ambra del tema scuro (#e6a700) come testo si leggeva a 1,9-2,1:1: ambra scuro,
+     almeno 4,5:1 su fondo, fondo tenue e superficie rialzata (e testo chiaro sopra quando fa da fondo). */
+  --fa-color-warning: var(--fa-warning-700);
   --fa-color-input-bg: #ffffff;
   --fa-color-input-placeholder: #4f5c78;
   --fa-color-disabled-bg: #dce5eb;

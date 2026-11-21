@@ -155,6 +155,54 @@ def _render_formazione_blocco_imminente(params: NotificationParams) -> Notificat
     )
 
 
+@register_template("formazione.scadenza_turno", 2)
+def _render_formazione_scadenza_turno_v2(params: NotificationParams) -> NotificationContent:
+    """Promemoria del turno con l'orario del primo blocco reale (QA 20-21/11).
+
+    ``lock_local`` è il primo calcio d'inizio del turno meno il margine di blocco della lega
+    (decisione del 16/11): la v1 diceva l'orario del calcio d'inizio, un quarto d'ora dopo
+    il blocco vero.
+    """
+    round_number = params.get("round_number")
+    lock_local = params.get("lock_local")
+    return NotificationContent(
+        title="Scadenza formazione in arrivo",
+        body=_league_body(
+            f"Turno {round_number}: la formazione si blocca alle {lock_local}. "
+            "Salvala prima del blocco.",
+            params,
+        ),
+        deep_link=_league_link("/formazione", params),
+    )
+
+
+@register_template("formazione.blocco_imminente", 2)
+def _render_formazione_blocco_imminente_v2(params: NotificationParams) -> NotificationContent:
+    """Prossimo blocco progressivo, con l'orario del blocco vero (QA 20-21/11).
+
+    Il conteggio è sui calciatori della rosa, non della formazione: il blocco vale per ogni
+    calciatore della rosa (chi è bloccato non si schiera più né si sposta), e l'avviso serve
+    anche a chi non l'ha ancora schierato. ``lock_local`` è il calcio d'inizio meno il margine
+    di lega, ``kickoff_time`` l'ora della partita.
+    """
+    lock_local = params.get("lock_local")
+    kickoff_time = params.get("kickoff_time")
+    player_count = int(params.get("player_count") or 1)
+    single = player_count == 1
+    subject = "1 calciatore" if single else f"{player_count} calciatori"
+    verb = "si blocca" if single else "si bloccano"
+    owner = "sua" if single else "loro"
+    if not kickoff_time or str(lock_local).endswith(f" {kickoff_time}"):
+        detail = f", al calcio d'inizio della {owner} partita."
+    else:
+        detail = f": la {owner} partita inizia alle {kickoff_time}."
+    return NotificationContent(
+        title="Blocco formazione in arrivo",
+        body=_league_body(f"{subject} della tua rosa {verb} alle {lock_local}{detail}", params),
+        deep_link=_league_link("/formazione", params),
+    )
+
+
 # Percorsi web delle due sotto-schede di Asta: «/mercato» apre invece la scheda Scambi.
 _AUCTION_PATH = "/asta"
 _LIVE_AUCTION_PATH = "/asta-live"

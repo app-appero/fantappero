@@ -5,7 +5,11 @@ import {
   applyCutoffRecalculation,
   computeCutoff,
   deriveEffectiveStatus,
+  exclusionProgressMessage,
+  exclusionResultTone,
   isModificationAllowed,
+  TURN_DISPLAY_LABEL,
+  turnHasStarted,
   isUnplayedFixtureStatus,
   kickoffCountsForCutoff,
   labelFantasyTurnStatus,
@@ -41,7 +45,8 @@ describe("fantasyTurns rules", () => {
     assert.equal(labelFantasyTurnStatus("scheduled"), "Programmato");
     assert.equal(labelFantasyTurnStatus("open"), "Aperto");
     assert.equal(labelFantasyTurnStatus("locked"), "Chiuso");
-    assert.equal(labelFantasyTurnStatus("skipped"), "Non disputato");
+    // Decisione di Rosario del 21/11.
+    assert.equal(labelFantasyTurnStatus("skipped"), "Turno saltato");
     assert.equal(labelFantasyTurnStatus(null), "");
     assert.equal(labelFantasyTurnStatus("other"), "other");
   });
@@ -222,5 +227,87 @@ describe("fantasyTurns rules", () => {
   it("resolveTurnDisplayStates: stagione finita, nessun prossimo", () => {
     const turns = [{ matchStatus: "completed" as const }, { matchStatus: "completed" as const }];
     assert.deepEqual(resolveTurnDisplayStates(turns), ["completed", "completed"]);
+  });
+
+  // QA 20-21/11 (7.6): turno 11 aperto, primo calcio d'inizio 21:00, margine 15 minuti.
+  const kickoff = "2026-11-20T20:00:00.000Z"; // 21:00 a Roma
+  const firstLock = "2026-11-20T19:45:00.000Z"; // 20:45 a Roma
+
+  it("resolveTurnDisplayStates: turno aperto col primo blocco passato è «In corso», non «Prossimo»", () => {
+    const turns = [
+      { matchStatus: "completed" as const, effectiveStatus: "locked" as const },
+      {
+        matchStatus: "scheduled" as const,
+        effectiveStatus: "open" as const,
+        cutoffAt: kickoff,
+        firstLockAt: firstLock,
+      },
+      { matchStatus: "scheduled" as const, effectiveStatus: "scheduled" as const },
+    ];
+    const beforeLock = new Date("2026-11-20T19:44:00.000Z");
+    const afterLock = new Date("2026-11-20T19:50:00.000Z");
+    assert.deepEqual(resolveTurnDisplayStates(turns, beforeLock), [
+      "completed",
+      "next",
+      "upcoming",
+    ]);
+    assert.deepEqual(resolveTurnDisplayStates(turns, afterLock), [
+      "completed",
+      "live",
+      "upcoming",
+    ]);
+    assert.equal(TURN_DISPLAY_LABEL.live, "In corso");
+  });
+
+  it("resolveTurnDisplayStates: turno chiuso con partite ancora da giocare resta «In corso»", () => {
+    // Martedì finite, mercoledì ancora da giocare: l'aggregato è «scheduled» ma il turno è iniziato.
+    const turns = [
+      { matchStatus: "scheduled" as const, effectiveStatus: "locked" as const },
+      { matchStatus: "scheduled" as const, effectiveStatus: "scheduled" as const },
+    ];
+    assert.deepEqual(resolveTurnDisplayStates(turns), ["live", "upcoming"]);
+  });
+
+  it("turnHasStarted: senza firstLockAt (backend più vecchio) vale il calcio d'inizio", () => {
+    const turn = { matchStatus: "scheduled" as const, effectiveStatus: "open" as const, cutoffAt: kickoff };
+    assert.equal(turnHasStarted(turn, new Date("2026-11-20T19:50:00.000Z")), false);
+    assert.equal(turnHasStarted(turn, new Date("2026-11-20T20:00:00.000Z")), true);
+    assert.equal(
+      turnHasStarted({ matchStatus: "scheduled", effectiveStatus: "scheduled", cutoffAt: kickoff }),
+      false,
+    );
+  });
+
+  it("resolveTurnDisplayStates: un turno saltato è «Turno saltato» e non prende il posto del prossimo", () => {
+    const turns = [
+      { matchStatus: "completed" as const, effectiveStatus: "locked" as const },
+      { matchStatus: "scheduled" as const, status: "skipped" as const, effectiveStatus: "skipped" as const },
+      { matchStatus: "scheduled" as const, effectiveStatus: "scheduled" as const },
+      { matchStatus: "completed" as const, effectiveStatus: "skipped" as const },
+    ];
+    assert.deepEqual(resolveTurnDisplayStates(turns), ["completed", "skipped", "next", "skipped"]);
+    assert.equal(TURN_DISPLAY_LABEL.skipped, "Turno saltato");
+  });
+
+  it("esclusione: il ricalcolo si annuncia solo con un calendario", () => {
+    assert.equal(
+      exclusionProgressMessage("exclude", true),
+      "Esclusione in corso. Poi ricalcolo la giornata.",
+    );
+    assert.equal(exclusionProgressMessage("exclude", false), "Esclusione in corso.");
+    assert.equal(exclusionProgressMessage("exclude_unplayed", false), "Esclusione in corso.");
+    assert.equal(
+      exclusionProgressMessage("reinclude", true),
+      "Reinclusione in corso. Poi ricalcolo la giornata.",
+    );
+    assert.equal(exclusionProgressMessage("reinclude", false), "Reinclusione in corso.");
+  });
+
+  it("esclusione: senza calendario l'esito non è un avviso di errore", () => {
+    const base = { recalculated: false, resultFinal: false, homologated: false };
+    assert.equal(exclusionResultTone({ ...base, recalculationSkipped: true }), "success");
+    assert.equal(exclusionResultTone(base), "warning");
+    assert.equal(exclusionResultTone({ ...base, recalculated: true }), "info");
+    assert.equal(exclusionResultTone({ ...base, recalculated: true, homologated: true }), "success");
   });
 });

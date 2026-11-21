@@ -355,6 +355,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
               <LockCountdown
                 state={countdown.state}
                 nextLockAt={countdown.nextLockAt}
+                roundStatus={countdown.roundStatus}
                 onExpire={refetchCountdown}
               />
             </div>
@@ -486,6 +487,7 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
             <LockCountdown
               state={countdown.state}
               nextLockAt={countdown.nextLockAt}
+              roundStatus={countdown.roundStatus}
               onExpire={refetchCountdown}
             />
           </div>
