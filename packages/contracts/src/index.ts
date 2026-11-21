@@ -422,6 +422,14 @@ export {
 export type { MarketGateState, MarketStatusBadge } from "./marketGate.js";
 
 export {
+  appUpdateBannerText,
+  displayAppVersionName,
+  isHttpsDownloadUrl,
+  isNewerAppVersion,
+} from "./appVersion.js";
+export type { AndroidAppVersion, AndroidAppVersionUpdate, AppVersionInfo } from "./appVersion.js";
+
+export {
   LIVE_SEAT_CALL_COLOR,
   LIVE_SEAT_LEAD_COLOR,
   LIVE_SEAT_LEGEND,

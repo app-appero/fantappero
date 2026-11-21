@@ -7859,3 +7859,35 @@ button.fa-starter-row:disabled {
     font-size: 16px;
   }
 }
+
+/* Versione app — pannello operatore: «Versione dell'app Android» (pilota-1.2). I campi restano
+   da 16px su telefono per la regola «campi da 16px» qui sopra. */
+.fa-admin-appversion {
+  display: grid;
+  gap: var(--fa-space-md);
+  margin-top: var(--fa-space-lg);
+  padding: var(--fa-space-lg);
+  border: 1px solid var(--fa-color-border);
+  border-radius: var(--fa-radius-lg);
+  background: var(--fa-color-background-elevated);
+}
+
+.fa-admin-appversion h2,
+.fa-admin-appversion p {
+  margin: 0;
+}
+
+.fa-admin-appversion__hint {
+  color: var(--fa-color-foreground-muted);
+}
+
+.fa-admin-appversion__form {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr));
+  gap: var(--fa-space-md);
+  align-items: start;
+}
+
+.fa-admin-appversion__actions {
+  grid-column: 1 / -1;
+}

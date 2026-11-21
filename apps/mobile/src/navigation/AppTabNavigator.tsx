@@ -7,6 +7,8 @@ import { StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { theme } from "@fantappero/ui/theme";
 import { AppDrawer } from "../components/AppDrawer";
+import { AppUpdateBanner } from "../components/AppUpdateBanner";
+import { useAppUpdateBanner } from "../appVersion/useAppUpdateBanner";
 import { ImpersonationBanner } from "../components/ImpersonationBanner";
 import { openAdminScreen } from "./adminEntry";
 import { fetchPendingInviteCount } from "../api/managerInvites";
@@ -128,6 +130,8 @@ function AppTabShell({
     useUnreadNotifications(accessToken);
   // Registra il token push e naviga alla destinazione giusta al tap (EP09-05).
   usePushNotifications(accessToken);
+  // Avviso «È disponibile la versione X dell'app» (solo APK Android, pilota-1.2).
+  const appUpdate = useAppUpdateBanner(accessToken, user?.id);
   // Tornando da una schermata (es. dopo aver letto le notifiche) il badge si riallinea.
   useEffect(() => {
     return navigation.addListener("state", refreshUnreadNotifications);
@@ -255,6 +259,9 @@ function AppTabShell({
         onBrandPress={() => navigation.navigate("LeagueHome")}
       />
       <LockCountdownBar />
+      {appUpdate.version ? (
+        <AppUpdateBanner version={appUpdate.version} onDismiss={appUpdate.dismiss} />
+      ) : null}
       <AppDrawer
         visible={drawerOpen}
         items={drawerItems}

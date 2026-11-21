@@ -6,6 +6,7 @@ import { ApiError } from "../api/client";
 import { getApiErrorMessage } from "../auth/AuthContext";
 import { loadStoredSession } from "../auth/sessionStorage";
 import { Link } from "../router/simpleRouter";
+import { AdminAppVersionPanel } from "./AdminAppVersionPanel";
 
 export function AdminDashboardPage() {
   const [overview, setOverview] = useState<AdminOverview | null>(null);
@@ -125,6 +126,7 @@ export function AdminDashboardPage() {
               <span>Avvisi, novità e prove agli utenti</span>
             </Link>
           </nav>
+          <AdminAppVersionPanel />
         </div>
       ) : null}
       {!loading && !error && !overview ? (
