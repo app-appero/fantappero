@@ -91,6 +91,10 @@ function roundStatusHint(round: H2HCalendarRound): string {
   if (hasResult) {
     return "Risultati provvisori / in attesa";
   }
+  if (round.europeanTurnStatus === "skipped") {
+    // Decisione di Rosario del 21/11: non «Da disputare» né «Turno europeo: …».
+    return labelFantasyTurnStatus("skipped");
+  }
   if (round.europeanTurnStatus) {
     return `Turno europeo: ${labelFantasyTurnStatus(round.europeanTurnStatus)}`;
   }

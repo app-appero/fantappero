@@ -74,6 +74,41 @@ def test_league_admin_sees_own_league_audit_events(
     assert body["items"][0]["actorId"] == str(owner_id)
 
 
+def test_automatic_audit_event_has_no_actor_id(
+    client: TestClient, db_session: Session, competition_ids: list[str]
+) -> None:
+    """QA 20-21/11: un evento automatico (job, sistema) aveva ``actorId: "None"``."""
+    from database.enums import LeagueAuditAction
+    from leagues.models.league_audit_event import LeagueAuditEvent
+
+    token, _ = _register_and_login(client, "audit-automatic@example.com")
+    league_id = _create_league(client, token, competition_ids, "Lega Audit Automatica")
+    event = LeagueAuditEvent(
+        league_id=UUID(league_id),
+        actor_id=None,
+        action=LeagueAuditAction.FANTASY_TURN_FIXTURE_EXCLUDED,
+        details={"source": "job"},
+    )
+    db_session.add(event)
+    db_session.commit()
+    try:
+        response = client.get(
+            f"/leagues/{league_id}/audit", headers={"Authorization": f"Bearer {token}"}
+        )
+        assert response.status_code == 200
+        automatic = [
+            item for item in response.json()["items"] if item["details"] == {"source": "job"}
+        ]
+        assert len(automatic) == 1
+        assert automatic[0]["actorId"] is None
+        assert automatic[0]["actorDisplayName"] is None
+    finally:
+        # Una migrazione vecchia, all'indietro, rimette actor_id NOT NULL: la riga senza
+        # autore bloccherebbe il ripristino del database a fine modulo.
+        db_session.delete(event)
+        db_session.commit()
+
+
 def test_audit_log_denied_for_non_member(client: TestClient, competition_ids: list[str]) -> None:
     token, _ = _register_and_login(client, "audit-owner@example.com")
     league_id = _create_league(client, token, competition_ids, "Lega Audit Privata")

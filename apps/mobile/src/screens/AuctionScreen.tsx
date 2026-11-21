@@ -32,7 +32,7 @@ export function AuctionScreen() {
   const { can, accessToken, activeLeagueId, activeLeague } = useAuthSession();
   const canManageSession = can(["market:manage"]);
   // Aste solo a mercato attivo: interruttore acceso e lega al completo (decisione del 20/11).
-  const { marketActive: marketOpen, notFullNotice } = useMarketGate();
+  const { marketActive: marketOpen, blockedNotice, closedTitle } = useMarketGate();
 
   const [entries, setEntries] = useState<LeagueListoneEntry[]>([]);
   const [tab, setTab] = useState<RoleTab>("all");
@@ -170,7 +170,8 @@ export function AuctionScreen() {
         athleteNameById={athleteNameById}
         testIdPrefix="auction"
         marketOpen={marketOpen}
-        closedMessage={notFullNotice}
+        closedMessage={blockedNotice}
+        closedTitle={closedTitle}
       />
 
       {/* Il listone si vede solo quando l'asta a buste chiuse è stata aperta dall'operatore. */}

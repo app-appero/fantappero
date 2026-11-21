@@ -150,6 +150,9 @@ class FantasyTurnSummaryResponse(ApiModel):
     opens_at: datetime | None = Field(default=None, alias="opensAt")
     closes_at: datetime | None = Field(default=None, alias="closesAt")
     cutoff_at: datetime | None = Field(default=None, alias="cutoffAt")
+    # Primo blocco reale: primo calcio d'inizio meno il margine di blocco della lega (16/11).
+    # Le app lo usano per dire «In corso» a turno aperto e iniziato (QA 20-21/11).
+    first_lock_at: datetime | None = Field(default=None, alias="firstLockAt")
     status: str
     effective_status: str = Field(alias="effectiveStatus")
     skip_reason: str | None = Field(default=None, alias="skipReason")
@@ -270,6 +273,8 @@ class FantasyTurnExclusionResponse(ApiModel):
     recalculated: bool
     result_final: bool = Field(alias="resultFinal")
     homologated: bool
+    # Nessuna giornata da ricalcolare: la lega non ha ancora un calendario H2H (QA 20-21/11).
+    recalculation_skipped: bool = Field(default=False, alias="recalculationSkipped")
     message: str
 
 

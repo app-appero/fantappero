@@ -4,7 +4,11 @@ import { fetchMarketGate, setMarketGate } from "../api/market";
 import { getApiErrorMessage, useAuthSession } from "../session/DemoSessionContext";
 import {
   isMarketActive,
+  marketBlockedNotice,
+  marketClosedTitle,
   marketNotFullNotice,
+  marketRoundInProgress,
+  marketStatusBadge,
   marketSwitchLocked,
 } from "./marketGateNotice";
 
@@ -84,6 +88,17 @@ export function useMarketGate({ reloadToken = 0 }: { reloadToken?: number } = {}
     notFullNotice: marketNotFullNotice(gate),
     /** Inviti nominativi in attesa: tengono un posto, ma la lega è al completo solo con gli iscritti. */
     pendingInviteCount: gate.pendingInviteCount ?? 0,
+    /**
+     * Turno in corso (dal primo blocco all'omologazione): rosa, aste e scambi fermi per tutti,
+     * amministratore compreso (decisione di Rosario del 21/11).
+     */
+    roundInProgress: marketRoundInProgress(gate),
+    /** Stato del riquadro: «Mercato aperto», «Mercato chiuso», «Mercato fermo: turno in corso». */
+    statusBadge: marketStatusBadge(gate),
+    /** Motivo sempre visibile del mercato fermo (lega incompleta o turno in corso), altrimenti `null`. */
+    blockedNotice: marketBlockedNotice(gate),
+    /** Titolo degli avvisi di mercato fermo: «Mercato chiuso» o «Mercato fermo: turno in corso». */
+    closedTitle: marketClosedTitle(gate),
     /** A lega incompleta l'interruttore spento non si accende (spegnerlo resta possibile). */
     switchLocked: marketSwitchLocked(gate),
     canManage,

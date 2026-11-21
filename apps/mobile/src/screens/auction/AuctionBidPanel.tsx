@@ -34,6 +34,7 @@ export function AuctionBidPanel({
   extraField,
   marketOpen = true,
   closedMessage = null,
+  closedTitle = "Mercato chiuso",
 }: {
   flow: MarketSessionFlow;
   balance: number | null;
@@ -54,6 +55,8 @@ export function AuctionBidPanel({
   marketOpen?: boolean;
   /** Motivo del mercato fermo, se diverso dall'interruttore (es. lega non al completo, 20/11). */
   closedMessage?: string | null;
+  /** Titolo del mercato fermo: «Mercato fermo: turno in corso» a turno in corso (21/11). */
+  closedTitle?: string;
 }) {
   const sessionOpen = marketOpen && flow.currentSession?.status === "open";
 
@@ -64,7 +67,7 @@ export function AuctionBidPanel({
       {!sessionOpen ? (
         <UiStatePanel
           state="empty"
-          title={!marketOpen ? "Mercato chiuso" : "Asta non aperta"}
+          title={!marketOpen ? closedTitle : "Asta non aperta"}
           message={
             !marketOpen
               ? (closedMessage ??

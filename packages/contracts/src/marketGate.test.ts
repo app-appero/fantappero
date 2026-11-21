@@ -4,10 +4,55 @@ import {
   isMarketActive,
   leagueNotFullMessage,
   leagueOccupancyLabel,
+  MARKET_STATUS_BADGE_LABEL,
+  marketBlockedNotice,
+  marketClosedTitle,
   marketNotFullNotice,
+  marketRoundInProgress,
+  marketStatusBadge,
   marketSwitchLocked,
   pendingInvitesLabel,
 } from "./marketGate.ts";
+
+describe("mercato a turno in corso (decisione di Rosario del 21/11)", () => {
+  const roundGate = {
+    marketOpen: true,
+    leagueFull: true,
+    marketBlockedReason: "round_in_progress" as const,
+  };
+
+  it("non si legge più «Mercato aperto»: «Mercato fermo: turno in corso»", () => {
+    assert.equal(marketStatusBadge(roundGate), "round_in_progress");
+    assert.equal(
+      `Mercato ${MARKET_STATUS_BADGE_LABEL[marketStatusBadge(roundGate)]}`,
+      "Mercato fermo: turno in corso",
+    );
+    // Anche a interruttore spento il turno in corso blocca gli scambi.
+    assert.equal(marketStatusBadge({ ...roundGate, marketOpen: false }), "round_in_progress");
+    assert.equal(marketStatusBadge({ marketOpen: true, leagueFull: true }), "open");
+    assert.equal(marketStatusBadge({ marketOpen: false, leagueFull: true }), "closed");
+    assert.equal(
+      marketStatusBadge({ marketOpen: true, leagueFull: false, marketBlockedReason: "league_not_full" }),
+      "closed",
+    );
+  });
+
+  it("il mercato del partecipante si ferma e il motivo resta visibile", () => {
+    assert.equal(marketRoundInProgress(roundGate), true);
+    assert.equal(isMarketActive(roundGate), false);
+    assert.equal(
+      marketBlockedNotice(roundGate),
+      "Rosa, aste e scambi sono fermi finché il turno non è calcolato.",
+    );
+    assert.equal(marketClosedTitle(roundGate), "Mercato fermo: turno in corso");
+    assert.equal(marketClosedTitle({ marketOpen: false, leagueFull: true }), "Mercato chiuso");
+    assert.equal(marketBlockedNotice({ marketOpen: true, leagueFull: true }), null);
+    assert.equal(
+      marketBlockedNotice({ marketOpen: false, leagueFull: false, memberCount: 3, participantCount: 4 }),
+      "Il mercato si apre quando la lega è al completo (3/4).",
+    );
+  });
+});
 
 describe("mercato e lega al completo (decisione del 20/11)", () => {
   it("il testo riporta iscritti e partecipanti previsti", () => {

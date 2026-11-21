@@ -10,7 +10,8 @@ from auth.schemas import ApiModel
 class AuditLogEntryResponse(ApiModel):
     id: str
     occurred_at: str = Field(alias="occurredAt")
-    actor_id: str = Field(alias="actorId")
+    # ``None`` per gli eventi automatici (job, sistema): nessun utente li ha fatti.
+    actor_id: str | None = Field(default=None, alias="actorId")
     actor_display_name: str | None = Field(default=None, alias="actorDisplayName")
     action: str
     details: dict[str, object] | None = None

@@ -105,7 +105,8 @@ class AuditLogService:
             AuditLogEntryResponse(
                 id=str(row.id),
                 occurredAt=row.created_at.isoformat(),
-                actorId=str(row.actor_id),
+                # Evento automatico: nessun autore, non la stringa «None».
+                actorId=str(row.actor_id) if row.actor_id is not None else None,
                 actorDisplayName=(
                     actors[row.actor_id].display_name if row.actor_id in actors else None
                 ),

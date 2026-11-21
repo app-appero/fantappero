@@ -2,6 +2,7 @@ import Feather from "@expo/vector-icons/Feather";
 import { theme } from "@fantappero/ui/theme";
 import { useState } from "react";
 import { Pressable, Switch, Text, View } from "react-native";
+import { MARKET_STATUS_BADGE_LABEL } from "./marketGateNotice";
 import { marketUiStyles as styles } from "./marketUiStyles";
 import { type MarketGateHandle, useMarketGate } from "./useMarketGate";
 
@@ -15,11 +16,13 @@ export function MarketGateBar({ reloadToken = 0 }: { reloadToken?: number } = {}
  * degli iscritti, inviti in attesa compresi (Rosario, 20/11).
  */
 export function MarketGateBarView({ gate }: { gate: MarketGateHandle }) {
-  const { marketOpen, canManage, toggling, error, setOpen, notFullNotice, switchLocked } = gate;
+  const { marketOpen, canManage, toggling, error, setOpen, blockedNotice, statusBadge, switchLocked } =
+    gate;
   const [infoOpen, setInfoOpen] = useState(false);
-  const running = marketOpen && !notFullNotice;
+  const running = statusBadge === "open";
+  // Lega non al completo (20/11) o turno in corso (21/11): il motivo resta sempre visibile.
   const hint =
-    notFullNotice ??
+    blockedNotice ??
     (marketOpen
       ? "Rosa e asta sono attive. Gli scambi restano sempre disponibili."
       : "Rosa e asta sono bloccate. Gli scambi restano disponibili.");
@@ -30,8 +33,12 @@ export function MarketGateBarView({ gate }: { gate: MarketGateHandle }) {
         <Text style={styles.gateTitle} numberOfLines={1}>
           Mercato
         </Text>
-        <View style={[styles.gateStatus, running ? styles.gateStatusOpen : styles.gateStatusClosed]}>
-          <Text style={styles.gateStatusLabel}>{running ? "aperto" : "chiuso"}</Text>
+        <View
+          style={[styles.gateStatus, running ? styles.gateStatusOpen : styles.gateStatusClosed]}
+          testID="market-gate-status"
+          accessibilityLabel={`Mercato ${MARKET_STATUS_BADGE_LABEL[statusBadge]}`}
+        >
+          <Text style={styles.gateStatusLabel}>{MARKET_STATUS_BADGE_LABEL[statusBadge]}</Text>
         </View>
         <Pressable
           style={styles.gateInfo}
@@ -54,10 +61,14 @@ export function MarketGateBarView({ gate }: { gate: MarketGateHandle }) {
           />
         ) : null}
       </View>
-      {/* Lega non al completo (20/11): il motivo resta sempre visibile, non solo nell'info. */}
-      {notFullNotice ? (
-        <Text style={styles.gateNotice} testID="market-gate-not-full" accessibilityRole="alert">
-          {notFullNotice}
+      {/* Lega non al completo (20/11) o turno in corso (21/11): il motivo resta sempre visibile. */}
+      {blockedNotice ? (
+        <Text
+          style={styles.gateNotice}
+          testID={statusBadge === "round_in_progress" ? "market-gate-round" : "market-gate-not-full"}
+          accessibilityRole="alert"
+        >
+          {blockedNotice}
         </Text>
       ) : infoOpen ? (
         <Text style={styles.gateHint} testID="market-gate-hint">

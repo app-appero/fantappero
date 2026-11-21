@@ -1,7 +1,7 @@
 """Avvisi per ogni prossimo istante di blocco formazione (EP-turni-automazione).
 
 Diverso da ``LineupReminderService`` (un unico avviso per turno: "salva
-prima che il turno chiuda", legato a ``round.cutoff_at``). Qui si avvisa
+prima che la formazione si blocchi", legato al primo blocco del turno). Qui si avvisa
 per **ogni** prossimo istante in cui scatta il lock progressivo
 per-calciatore — lo stesso calcolo del countdown "Prossimo blocco" mostrato
 in UI (``FantasyLineupService.get_lock_countdown`` /
@@ -13,6 +13,14 @@ preciso kickoff, o in kickoff simultanei).
 Deduplicato per ``(round, team, istante di blocco)``: lo stesso istante non
 genera mai un secondo avviso; un istante successivo (prossimo blocco del
 turno) ne genera uno nuovo quando entra nella finestra di preavviso.
+
+Il conteggio è sui calciatori della rosa (non solo su quelli schierati): il blocco vale per
+ogni calciatore della rosa, che da quel momento non si schiera più né si sposta, e l'avviso
+serve anche a chi non l'ha ancora messo in formazione. Il testo lo dice («… della tua rosa»).
+
+Non ricevono l'avviso (decisione di Rosario del 21/11): le squadre che riposano nel turno
+(riposo del calendario H2H, nessuno scontro da giocare) e quelle senza nessun calciatore
+nella partita che si blocca.
 """
 
 from __future__ import annotations
@@ -29,11 +37,12 @@ from fantasy_lineups.kickoffs import athlete_kickoffs
 from fantasy_lineups.rules import DEFAULT_LINEUP_LOCK_MARGIN_MINUTES, next_unlocked_kickoff
 from fantasy_teams.models import FantasyRosterSlot, FantasyTeam
 from fantasy_turns.models import FantasyRound
+from leagues.calendar_round_mapping import resting_membership_ids
 from leagues.models.league import League
 from leagues.models.league_membership import LeagueMembership
 from leagues.models.league_rules import LeagueRules
 from notifications.league_context import league_params
-from notifications.reminder_service import _format_local
+from notifications.reminder_service import _format_local, _format_local_time
 from notifications.service import NotificationService
 
 
@@ -63,13 +72,24 @@ class LineupLockReminderService:
                 continue
             margin = self._lock_margin(round_.league_id)
             teams = self._session.execute(
-                select(FantasyTeam.id, LeagueMembership.user_id, UserProfile.timezone)
+                select(
+                    FantasyTeam.id,
+                    FantasyTeam.membership_id,
+                    LeagueMembership.user_id,
+                    UserProfile.timezone,
+                )
                 .join(LeagueMembership, FantasyTeam.membership_id == LeagueMembership.id)
                 .outerjoin(UserProfile, UserProfile.user_id == LeagueMembership.user_id)
                 .where(FantasyTeam.league_id == round_.league_id)
             ).all()
+            # Chi riposa nel turno non ha uno scontro da giocare: niente avviso di blocco.
+            resting = resting_membership_ids(
+                self._session, league_id=round_.league_id, fantasy_round=round_
+            )
 
-            for team_id, user_id, tz_name in teams:
+            for team_id, membership_id, user_id, tz_name in teams:
+                if membership_id in resting:
+                    continue
                 roster_ids = list(
                     self._session.scalars(
                         select(FantasyRosterSlot.athlete_id).where(
@@ -108,6 +128,8 @@ class LineupLockReminderService:
                 if lock_instant > now + timedelta(minutes=window_minutes):
                     continue
 
+                # Calciatori della rosa che giocano la partita che si blocca: senza nessuno, la
+                # squadra non riceve l'avviso.
                 player_count = sum(1 for ref in kickoffs.values() if ref.kickoff_at == next_lock)
                 if player_count == 0:
                     continue
@@ -116,10 +138,11 @@ class LineupLockReminderService:
                     user_id=user_id,
                     category=NotificationCategory.FORMAZIONE,
                     template_key="formazione.blocco_imminente",
-                    template_version=1,
+                    template_version=2,
                     params={
                         "round_number": round_.number,
-                        "kickoff_local": _format_local(next_lock, tz_name),
+                        "lock_local": _format_local(lock_instant, tz_name),
+                        "kickoff_time": _format_local_time(next_lock, tz_name),
                         "player_count": player_count,
                         **league_params(self._session, round_.league_id),
                     },

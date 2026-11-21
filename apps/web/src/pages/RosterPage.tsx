@@ -93,11 +93,11 @@ export function RosterPage() {
   const isAdmin = can(["league:admin"]);
   const canView = can(["roster:view"]);
   const canEdit = can(["roster:edit"]);
-  const { marketActive } = useMarketGate();
+  const { marketActive, roundInProgress } = useMarketGate();
   // Decisione del 20/11: il partecipante si inserisce calciatori solo a lega al completo e a
   // interruttore acceso; l'amministratore prepara le rose in anticipo (assegna, rettifica,
-  // svincola, importa) e si ferma solo a turno in corso, che decide il server.
-  const rosterLocked = !isAdmin && !marketActive;
+  // svincola, importa) e si ferma solo a turno in corso (21/11: «Mercato fermo: turno in corso»).
+  const rosterLocked = roundInProgress || (!isAdmin && !marketActive);
 
   const [team, setTeam] = useState<FantasyTeam | null>(() =>
     initialDemoTeam(isDemoMode, demoState),

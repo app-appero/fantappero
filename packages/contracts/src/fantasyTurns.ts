@@ -7,7 +7,8 @@ export const FANTASY_TURN_STATUS_LABEL: Record<FantasyTurnStatus, string> = {
   scheduled: "Programmato",
   open: "Aperto",
   locked: "Chiuso",
-  skipped: "Non disputato",
+  // Decisione di Rosario del 21/11: un turno sotto la soglia di copertura si legge «Turno saltato».
+  skipped: "Turno saltato",
 };
 
 export function labelFantasyTurnStatus(status: string | null | undefined): string {
@@ -170,6 +171,11 @@ export interface FantasyTurnSummary {
   opensAt: string | null;
   closesAt: string | null;
   cutoffAt: string | null;
+  /**
+   * Primo blocco reale del turno: primo calcio d'inizio (`cutoffAt`) meno il margine di blocco
+   * della lega (decisione del 16/11). Assente nelle risposte dei backend più vecchi.
+   */
+  firstLockAt?: string | null;
   status: FantasyTurnStatus;
   effectiveStatus: FantasyTurnStatus;
   skipReason: string | null;
@@ -280,7 +286,44 @@ export interface FantasyTurnExclusionResult {
   recalculated: boolean;
   resultFinal: boolean;
   homologated: boolean;
+  /**
+   * `true` quando non c'era niente da ricalcolare: la lega non ha ancora un calendario H2H.
+   * Assente nelle risposte dei backend più vecchi.
+   */
+  recalculationSkipped?: boolean;
   message: string;
+}
+
+/** Azioni dell'admin sulle partite di un turno (Escludi, Rimetti nel turno, Escludi non disputate). */
+export type FantasyTurnExclusionKind = "exclude" | "reinclude" | "exclude_unplayed";
+
+/**
+ * Testo mostrato mentre l'esclusione (o la reinclusione) è in corso. Il ricalcolo della
+ * giornata si annuncia solo se la lega ha un calendario H2H: senza calendario non c'è niente
+ * da ricalcolare (QA 20-21/11).
+ */
+export function exclusionProgressMessage(
+  kind: FantasyTurnExclusionKind,
+  hasCalendar: boolean,
+): string {
+  const action = kind === "reinclude" ? "Reinclusione in corso" : "Esclusione in corso";
+  return hasCalendar ? `${action}. Poi ricalcolo la giornata.` : `${action}.`;
+}
+
+/**
+ * Colore dell'avviso con l'esito: «attenzione» solo se il ricalcolo è stato tentato e non è
+ * riuscito, non quando non c'era niente da ricalcolare.
+ */
+export function exclusionResultTone(
+  result: Pick<
+    FantasyTurnExclusionResult,
+    "recalculated" | "resultFinal" | "homologated" | "recalculationSkipped"
+  >,
+): "success" | "info" | "warning" {
+  if (result.homologated || result.resultFinal || result.recalculationSkipped) {
+    return "success";
+  }
+  return result.recalculated ? "info" : "warning";
 }
 
 export type FantasyFixtureMatchStatus =
@@ -511,25 +554,74 @@ export function aggregateTurnStatus(
  * futuri identici fra loro apparivano "Programmato" o "Aperto" a seconda del
  * momento in cui erano stati generati.
  */
-export type TurnDisplayState = "completed" | "live" | "next" | "upcoming";
+export type TurnDisplayState = "completed" | "live" | "next" | "upcoming" | "skipped";
 
 export const TURN_DISPLAY_LABEL: Record<TurnDisplayState, string> = {
   completed: "Completato",
   live: "In corso",
   next: "Prossimo",
   upcoming: "Da disputare",
+  // Decisione di Rosario del 21/11: non «Da disputare» per un turno sotto la soglia.
+  skipped: "Turno saltato",
 };
+
+/** Ciò che serve per collocare un turno rispetto ad adesso (i campi di stato sono facoltativi). */
+export type TurnDisplayInput = {
+  matchStatus: FantasyTurnAggregateStatus;
+  status?: FantasyTurnStatus;
+  effectiveStatus?: FantasyTurnStatus;
+  cutoffAt?: string | null;
+  firstLockAt?: string | null;
+};
+
+function turnLifecycleStatus(turn: TurnDisplayInput): FantasyTurnStatus | undefined {
+  return turn.effectiveStatus ?? turn.status;
+}
+
+/** Turno sotto la soglia di copertura (`skipped`): non si gioca. */
+export function isSkippedTurn(turn: TurnDisplayInput): boolean {
+  return turnLifecycleStatus(turn) === "skipped";
+}
+
+/**
+ * Il turno è già iniziato: è chiuso (`locked`), oppure è aperto e il primo blocco reale
+ * (primo calcio d'inizio meno il margine di lega, `firstLockAt`) è passato. Senza
+ * `firstLockAt` (backend più vecchio) vale il primo calcio d'inizio.
+ */
+export function turnHasStarted(turn: TurnDisplayInput, now: Date = new Date()): boolean {
+  const status = turnLifecycleStatus(turn);
+  if (status === "locked") {
+    return true;
+  }
+  if (status !== "open") {
+    return false;
+  }
+  const lockAt = turn.firstLockAt ?? turn.cutoffAt ?? null;
+  if (!lockAt) {
+    return false;
+  }
+  const lockMs = Date.parse(lockAt);
+  return Number.isFinite(lockMs) && now.getTime() >= lockMs;
+}
 
 /**
  * Colloca ogni turno rispetto ad *adesso*, non rispetto al suo stato interno:
- * concluso, in corso, il primo ancora da giocare, tutti gli altri. `turns`
- * deve essere ordinato per numero crescente.
+ * saltato, concluso, in corso, il primo ancora da giocare, tutti gli altri.
+ * `turns` deve essere ordinato per numero crescente.
+ *
+ * «In corso» non è solo una partita live: anche un turno aperto il cui primo blocco è
+ * passato (le formazioni sono già bloccate) è in corso, non «Prossimo» (QA 20-21/11).
+ * Un turno saltato non prende il posto del prossimo.
  */
-export function resolveTurnDisplayStates<
-  T extends { matchStatus: FantasyTurnAggregateStatus },
->(turns: readonly T[]): TurnDisplayState[] {
+export function resolveTurnDisplayStates<T extends TurnDisplayInput>(
+  turns: readonly T[],
+  now: Date = new Date(),
+): TurnDisplayState[] {
   let nextAssigned = false;
   return turns.map((turn) => {
+    if (isSkippedTurn(turn)) {
+      return "skipped";
+    }
     if (turn.matchStatus === "live") {
       // Un turno in corso è già "adesso": non c'è un prossimo prima di lui.
       nextAssigned = true;
@@ -537,6 +629,11 @@ export function resolveTurnDisplayStates<
     }
     if (turn.matchStatus === "completed") {
       return "completed";
+    }
+    if (turnHasStarted(turn, now)) {
+      // Primo blocco passato: le formazioni sono bloccate anche se nessuna partita è live.
+      nextAssigned = true;
+      return "live";
     }
     if (!nextAssigned) {
       nextAssigned = true;

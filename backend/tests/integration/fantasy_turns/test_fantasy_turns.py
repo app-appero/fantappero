@@ -407,7 +407,11 @@ def test_exclude_before_open_and_reject_after_open(
     excluded_body = excluded.json()
     assert excluded_body["excludedCount"] == 1
     assert excluded_body["turn"]["fixtureCount"] == created.json()["fixtureCount"] - 1
-    assert "ricalcol" in excluded_body["message"].lower()
+    # La lega non ha calendario: nessun ricalcolo tentato né segnalato come fallito (QA 20-21/11;
+    # prima: «Partita esclusa. Il ricalcolo non è riuscito: Calendario di lega non trovato.»).
+    assert excluded_body["message"] == "Partita esclusa."
+    assert excluded_body["recalculated"] is False
+    assert excluded_body["recalculationSkipped"] is True
 
     def exclude(fid: str):
         return client.post(
@@ -430,7 +434,8 @@ def test_exclude_before_open_and_reject_after_open(
     )
     assert reincluded.status_code == 200, reincluded.text
     assert reincluded.json()["turn"]["fixtureCount"] == created.json()["fixtureCount"] - 1
-    assert reincluded.json()["message"].startswith("Partita rimessa nel turno")
+    assert reincluded.json()["message"] == "Partita rimessa nel turno."
+    assert reincluded.json()["recalculationSkipped"] is True
 
     _promote_to_operator(db_session, user_id)
     opened = client.post(
@@ -1140,3 +1145,46 @@ def test_prune_invalid_rounds_removes_phantom_turns_and_renumbers(
     assert [row.number for row in remaining] == [1, 2]
     assert db_session.get(FantasyRound, phantom_1.id) is None
     assert db_session.get(FantasyRound, phantom_2.id) is None
+
+
+def test_turn_list_exposes_the_first_lock_before_kickoff(
+    client: TestClient,
+    db_session: Session,
+    competition_ids: list[str],
+) -> None:
+    """`firstLockAt` = primo calcio d'inizio meno il margine di lega (decisione del 16/11): le app
+    lo usano per dire «In corso» a turno aperto e già bloccato, non «Prossimo» (QA 20-21/11)."""
+    token, _ = _register_and_login(client, "turn.first.lock@example.com")
+    league_id = _create_league(client, token, competition_ids, "Lega Primo Blocco")
+    _set_min_fixtures(db_session, league_id, 10)
+    rules = db_session.scalars(
+        select(LeagueRules).where(LeagueRules.league_id == UUID(league_id))
+    ).one()
+    rules.lineup_lock_margin_minutes = 20
+    db_session.commit()
+    saturday = _future_saturday()
+    _seed_weekend_fixtures(
+        db_session,
+        competition_ids,
+        count=12,
+        kickoff=saturday,
+        id_offset=989_000,
+        league_id=league_id,
+    )
+    created = client.post(
+        f"/leagues/{league_id}/turni",
+        headers={"Authorization": f"Bearer {token}"},
+        json={"kind": "weekend", "anchorDate": saturday.date().isoformat()},
+    )
+    assert created.status_code == 201, created.text
+
+    listed = client.get(f"/leagues/{league_id}/turni", headers={"Authorization": f"Bearer {token}"})
+    assert listed.status_code == 200
+    turn = next(item for item in listed.json() if item["id"] == created.json()["id"])
+    cutoff = datetime.fromisoformat(turn["cutoffAt"])
+    assert datetime.fromisoformat(turn["firstLockAt"]) == cutoff - timedelta(minutes=20)
+    detail = client.get(
+        f"/leagues/{league_id}/turni/{turn['id']}", headers={"Authorization": f"Bearer {token}"}
+    )
+    assert detail.status_code == 200
+    assert detail.json()["firstLockAt"] == turn["firstLockAt"]

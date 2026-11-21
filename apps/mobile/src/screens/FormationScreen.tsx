@@ -1433,6 +1433,7 @@ export function FormationScreen() {
           <LockCountdown
             state={countdown.state}
             nextLockAt={countdown.nextLockAt}
+            roundStatus={countdown.roundStatus}
             onExpire={refetchCountdown}
             testID="formation-lock-countdown"
           />

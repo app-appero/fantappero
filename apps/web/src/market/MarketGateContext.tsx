@@ -1,9 +1,14 @@
 import {
   isMarketActive,
   isMarketOpen,
+  marketBlockedNotice,
+  marketClosedTitle,
   marketNotFullNotice,
+  marketRoundInProgress,
+  marketStatusBadge,
   marketSwitchLocked,
   type MarketGate,
+  type MarketStatusBadge,
 } from "@fantappero/contracts";
 import {
   createContext,
@@ -38,6 +43,17 @@ export type MarketGateContextValue = {
   notFullNotice: string | null;
   /** Inviti nominativi in attesa: tengono un posto, ma la lega è al completo solo con gli iscritti. */
   pendingInviteCount: number;
+  /**
+   * Turno in corso (dal primo blocco all'omologazione): rosa, aste e scambi fermi per tutti,
+   * amministratore compreso (decisione di Rosario del 21/11).
+   */
+  roundInProgress: boolean;
+  /** Stato del riquadro: «Mercato aperto», «Mercato chiuso», «Mercato fermo: turno in corso». */
+  statusBadge: MarketStatusBadge;
+  /** Motivo sempre visibile del mercato fermo (lega incompleta o turno in corso), altrimenti `null`. */
+  blockedNotice: string | null;
+  /** Titolo degli avvisi di mercato fermo: «Mercato chiuso» o «Mercato fermo: turno in corso». */
+  closedTitle: string;
   /** A lega incompleta l'interruttore spento non si accende (spegnerlo resta possibile). */
   switchLocked: boolean;
   canManage: boolean;
@@ -64,8 +80,21 @@ const DEMO_NOT_FULL_GATE: MarketGate = {
   marketBlockedReason: "league_not_full",
 };
 
+/** Stato demo «turno in corso» (`?mercato=turno`): lega al completo, interruttore acceso. */
+const DEMO_ROUND_GATE: MarketGate = {
+  marketOpen: true,
+  memberCount: 8,
+  participantCount: 8,
+  leagueFull: true,
+  marketBlockedReason: "round_in_progress",
+};
+
 function demoGateFromSearch(search: string): MarketGate | null {
-  return new URLSearchParams(search).get("mercato") === "incompleto" ? DEMO_NOT_FULL_GATE : null;
+  const value = new URLSearchParams(search).get("mercato");
+  if (value === "incompleto") {
+    return DEMO_NOT_FULL_GATE;
+  }
+  return value === "turno" ? DEMO_ROUND_GATE : null;
 }
 
 export function MarketGateProvider({
@@ -162,6 +191,10 @@ export function MarketGateProvider({
       leagueFull: gate.leagueFull !== false,
       notFullNotice: marketNotFullNotice(gate),
       pendingInviteCount: gate.pendingInviteCount ?? 0,
+      roundInProgress: marketRoundInProgress(gate),
+      statusBadge: marketStatusBadge(gate),
+      blockedNotice: marketBlockedNotice(gate),
+      closedTitle: marketClosedTitle(gate),
       switchLocked: marketSwitchLocked(gate),
       canManage,
       toggling,
@@ -183,6 +216,10 @@ export function useMarketGate(): MarketGateContextValue {
       leagueFull: true,
       notFullNotice: null,
       pendingInviteCount: 0,
+      roundInProgress: false,
+      statusBadge: "open",
+      blockedNotice: null,
+      closedTitle: "Mercato chiuso",
       switchLocked: false,
       canManage: false,
       toggling: false,

@@ -152,3 +152,79 @@ def test_reminder_ignores_rounds_outside_window_or_past_cutoff(
         now=datetime.now(UTC), window_hours=24
     )
     assert result["reminders_sent"] == 0
+
+
+def _set_lock_margin(db_session: Session, league_id: str, minutes: int) -> None:
+    from leagues.models.league_rules import LeagueRules
+
+    rules = db_session.scalars(
+        select(LeagueRules).where(LeagueRules.league_id == UUID(league_id))
+    ).one()
+    rules.lineup_lock_margin_minutes = minutes
+    db_session.commit()
+
+
+def _reminder_for(db_session: Session, user_id: UUID) -> Notification | None:
+    return db_session.scalar(
+        select(Notification).where(
+            Notification.user_id == user_id,
+            Notification.template_key == "formazione.scadenza_turno",
+        )
+    )
+
+
+def test_reminder_text_says_the_real_lock_time_not_the_kickoff(
+    client: TestClient, db_session: Session, competition_ids: list[str]
+) -> None:
+    """QA 20-21/11: «Il turno 11 chiude alle 20/11/2026 21:00» con il blocco vero alle 20:45."""
+    from notifications.reminder_service import _format_local
+
+    token, user_id = _register_and_login(client, "reminder-lock-time@example.com")
+    league_id = _create_league(client, token, competition_ids, "Lega Reminder Blocco")
+    _set_lock_margin(db_session, league_id, 15)
+    cutoff = (datetime.now(UTC) + timedelta(hours=3)).replace(second=0, microsecond=0)
+    _create_round(db_session, league_id, cutoff=cutoff, number=11)
+
+    LineupReminderService(db_session).send_due_reminders(now=datetime.now(UTC), window_hours=24)
+    db_session.commit()
+
+    notification = _reminder_for(db_session, user_id)
+    assert notification is not None
+    lock_local = _format_local(cutoff - timedelta(minutes=15), "Europe/Rome")
+    kickoff_local = _format_local(cutoff, "Europe/Rome")
+    assert notification.title == "Scadenza formazione in arrivo"
+    assert notification.body.endswith(
+        f"Turno 11: la formazione si blocca alle {lock_local}. Salvala prima del blocco."
+    )
+    assert kickoff_local not in notification.body
+    assert notification.template_version == 2
+
+
+def test_no_reminder_between_the_lock_and_the_kickoff(
+    client: TestClient, db_session: Session, competition_ids: list[str]
+) -> None:
+    """Calcio d'inizio fra 5 minuti, margine 15: la formazione è già bloccata."""
+    token, user_id = _register_and_login(client, "reminder-locked@example.com")
+    league_id = _create_league(client, token, competition_ids, "Lega Reminder Bloccata")
+    _set_lock_margin(db_session, league_id, 15)
+    _create_round(db_session, league_id, cutoff=datetime.now(UTC) + timedelta(minutes=5))
+
+    LineupReminderService(db_session).send_due_reminders(now=datetime.now(UTC), window_hours=24)
+    db_session.commit()
+
+    assert _reminder_for(db_session, user_id) is None
+
+
+def test_reminder_window_is_measured_on_the_lock(
+    client: TestClient, db_session: Session, competition_ids: list[str]
+) -> None:
+    """Finestra di un'ora: il calcio d'inizio è fra 70 minuti, ma il blocco fra 55 è dentro."""
+    token, user_id = _register_and_login(client, "reminder-window-lock@example.com")
+    league_id = _create_league(client, token, competition_ids, "Lega Reminder Finestra")
+    _set_lock_margin(db_session, league_id, 15)
+    _create_round(db_session, league_id, cutoff=datetime.now(UTC) + timedelta(minutes=70))
+
+    LineupReminderService(db_session).send_due_reminders(now=datetime.now(UTC), window_hours=1)
+    db_session.commit()
+
+    assert _reminder_for(db_session, user_id) is not None

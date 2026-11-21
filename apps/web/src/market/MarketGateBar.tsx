@@ -1,22 +1,32 @@
+import { MARKET_STATUS_BADGE_LABEL } from "@fantappero/contracts";
 import { Badge, Switch } from "@fantappero/ui";
 import { useState } from "react";
 import { marketGateHint, useMarketGate } from "./MarketGateContext";
 
 /** Admin switch (and member status) for the league transfer window. */
 export function MarketGateBar() {
-  const { marketOpen, canManage, toggling, error, setOpen, notFullNotice, switchLocked } =
-    useMarketGate();
+  const {
+    marketOpen,
+    canManage,
+    toggling,
+    error,
+    setOpen,
+    blockedNotice,
+    statusBadge,
+    switchLocked,
+  } = useMarketGate();
   const [infoOpen, setInfoOpen] = useState(false);
-  // A lega incompleta il testo spiega perché il mercato è fermo (decisione del 20/11).
-  const hint = notFullNotice ?? marketGateHint(marketOpen);
+  // A lega incompleta (decisione del 20/11) o a turno in corso (decisione del 21/11) il testo
+  // spiega perché il mercato è fermo, e resta sempre visibile.
+  const hint = blockedNotice ?? marketGateHint(marketOpen);
 
   return (
     <div className="fa-market-gate" data-testid="market-gate-bar">
       <div className="fa-market-gate__main">
-        <p className="fa-market-gate__title">
+        <p className="fa-market-gate__title" data-testid="market-gate-status">
           Mercato{" "}
-          <Badge variant={marketOpen && !notFullNotice ? "success" : "warning"}>
-            {marketOpen && !notFullNotice ? "aperto" : "chiuso"}
+          <Badge variant={statusBadge === "open" ? "success" : "warning"}>
+            {MARKET_STATUS_BADGE_LABEL[statusBadge]}
           </Badge>
           <span className="fa-market-gate__info">
             <button
@@ -36,13 +46,13 @@ export function MarketGateBar() {
             ) : null}
           </span>
         </p>
-        {notFullNotice ? (
+        {blockedNotice ? (
           <p
             className="fa-market-gate__notice"
             role="status"
-            data-testid="market-gate-not-full"
+            data-testid={statusBadge === "round_in_progress" ? "market-gate-round" : "market-gate-not-full"}
           >
-            {notFullNotice}
+            {blockedNotice}
           </p>
         ) : (
           <p className="fa-market-gate__hint">{hint}</p>

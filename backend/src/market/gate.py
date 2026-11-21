@@ -114,12 +114,15 @@ def market_status(session: Session, league_id: UUID) -> MarketStatus:
     occupancy = league_occupancy(session, league_id)
     market_open = read_market_open(session, league_id)
     reason: MarketBlockedReason | None
+    # A turno in corso le app dicono «Mercato fermo: turno in corso» (decisione di Rosario del
+    # 21/11). Il turno conta prima dell'interruttore: blocca anche gli scambi, che
+    # l'interruttore lascia passare, quindi «mercato chiuso, restano gli scambi» sarebbe falso.
     if not occupancy.is_full:
         reason = "league_not_full"
-    elif not market_open:
-        reason = "market_closed"
     elif league_round_in_progress(session, league_id) is not None:
         reason = "round_in_progress"
+    elif not market_open:
+        reason = "market_closed"
     else:
         reason = None
     return MarketStatus(

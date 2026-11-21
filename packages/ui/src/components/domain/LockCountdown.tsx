@@ -2,21 +2,16 @@ import { useEffect, useRef, useState, type HTMLAttributes } from "react";
 import {
   computeCountdown,
   formatCountdown,
+  lockCountdownIdleLabel,
   type LineupLockCountdownState,
 } from "@fantappero/contracts";
 import { classNames } from "../../utils/classNames.js";
 
-const STATE_LABEL: Record<LineupLockCountdownState, string> = {
-  no_active_turn: "Nessun turno attivo",
-  turn_not_open: "Turno non ancora aperto",
-  no_roster: "Rosa non ancora assegnata",
-  no_pending_lock: "Formazione confermata",
-  counting_down: "",
-};
-
 export type LockCountdownProps = Omit<HTMLAttributes<HTMLDivElement>, "children"> & {
   state: LineupLockCountdownState;
   nextLockAt: string | null;
+  /** Stato del turno di riferimento (`roundStatus` della risposta): un turno saltato ha il suo testo. */
+  roundStatus?: string | null;
   /** Injectable clock, for tests; defaults to the real clock, ticking every second. */
   now?: () => Date;
   /** Called once when the ticking countdown reaches zero, to trigger a data refetch. */
@@ -31,6 +26,7 @@ function defaultClock(): Date {
 export function LockCountdown({
   state,
   nextLockAt,
+  roundStatus,
   now,
   onExpire,
   className,
@@ -68,7 +64,7 @@ export function LockCountdown({
         data-state={state}
         {...rest}
       >
-        <span className="fa-lock-countdown__label">{STATE_LABEL[state]}</span>
+        <span className="fa-lock-countdown__label">{lockCountdownIdleLabel(state, roundStatus)}</span>
       </div>
     );
   }

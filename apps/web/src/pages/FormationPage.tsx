@@ -2071,6 +2071,7 @@ export function FormationPage() {
                 <LockCountdown
                   state={countdown.state}
                   nextLockAt={countdown.nextLockAt}
+                  roundStatus={countdown.roundStatus}
                   onExpire={refetchCountdown}
                 />
               ) : (
@@ -2141,6 +2142,7 @@ export function FormationPage() {
                 <LockCountdown
                   state={countdown.state}
                   nextLockAt={countdown.nextLockAt}
+                  roundStatus={countdown.roundStatus}
                   onExpire={refetchCountdown}
                   data-testid="formation-lock-countdown"
                 />

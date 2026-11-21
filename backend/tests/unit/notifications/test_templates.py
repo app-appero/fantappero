@@ -351,6 +351,60 @@ def test_render_formazione_blocco_imminente_plural() -> None:
     assert "il loro turno" in content.body
 
 
+def test_render_formazione_scadenza_turno_v2_says_the_lock_time() -> None:
+    """QA 20-21/11: il promemoria dice quando si blocca la formazione, non il calcio d'inizio."""
+    content = render_notification(
+        "formazione.scadenza_turno",
+        2,
+        {"round_number": 11, "lock_local": "20/11/2026 20:45", "league_name": "Lega Demo"},
+    )
+    assert content.title == "Scadenza formazione in arrivo"
+    assert content.body == (
+        "«Lega Demo» · Turno 11: la formazione si blocca alle 20/11/2026 20:45. "
+        "Salvala prima del blocco."
+    )
+    assert "chiude" not in content.body
+    assert "fischio d'inizio" not in content.body
+
+
+def test_render_formazione_blocco_imminente_v2_counts_roster_players() -> None:
+    plural = render_notification(
+        "formazione.blocco_imminente",
+        2,
+        {
+            "round_number": 11,
+            "lock_local": "20/11/2026 20:45",
+            "kickoff_time": "21:00",
+            "player_count": 3,
+        },
+    )
+    assert plural.title == "Blocco formazione in arrivo"
+    assert plural.body == (
+        "3 calciatori della tua rosa si bloccano alle 20/11/2026 20:45: "
+        "la loro partita inizia alle 21:00."
+    )
+    single = render_notification(
+        "formazione.blocco_imminente",
+        2,
+        {"lock_local": "20/11/2026 20:45", "kickoff_time": "21:00", "player_count": 1},
+    )
+    assert single.body == (
+        "1 calciatore della tua rosa si blocca alle 20/11/2026 20:45: "
+        "la sua partita inizia alle 21:00."
+    )
+    # Margine di lega 0: blocco e calcio d'inizio coincidono.
+    same_time = render_notification(
+        "formazione.blocco_imminente",
+        2,
+        {"lock_local": "20/11/2026 21:00", "kickoff_time": "21:00", "player_count": 2},
+    )
+    assert same_time.body == (
+        "2 calciatori della tua rosa si bloccano alle 20/11/2026 21:00, "
+        "al calcio d'inizio della loro partita."
+    )
+    assert single.deep_link == "/formazione"
+
+
 def test_every_test_sample_renders() -> None:
     from notifications.samples import SAMPLES
 

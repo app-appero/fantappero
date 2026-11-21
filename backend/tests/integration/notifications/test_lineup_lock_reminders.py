@@ -360,3 +360,183 @@ def test_lock_reminder_also_covers_rounds_already_locked_by_the_first_kickoff(
     )
     assert notification is not None
     assert "2 calciatori" in notification.body
+
+
+def _lock_notification(db_session: Session, user_id: UUID) -> Notification | None:
+    return db_session.scalar(
+        select(Notification).where(
+            Notification.user_id == user_id,
+            Notification.template_key == "formazione.blocco_imminente",
+        )
+    )
+
+
+def _seed_team_with_late_players(
+    client: TestClient,
+    db_session: Session,
+    competition_ids: list[str],
+    *,
+    email: str,
+    league_name: str,
+    id_offset: int,
+    late_count: int,
+    late_kickoff: datetime | None = None,
+) -> tuple[UUID, str, FantasyRound, datetime]:
+    token, user_id = _register_and_login(client, email)
+    league_id = _create_league(client, token, competition_ids, league_name)
+    kickoff = late_kickoff or (datetime.now(UTC) + timedelta(hours=1)).replace(microsecond=0)
+    fantasy_round, early_club_id, late_club_id = _create_round_with_two_fixtures(
+        db_session,
+        league_id,
+        id_offset=id_offset,
+        competition_ids=competition_ids,
+        late_kickoff=kickoff,
+    )
+    athletes = _seed_roster(
+        db_session,
+        id_offset=id_offset + 100,
+        early_club_id=early_club_id,
+        late_club_id=late_club_id,
+        late_count=late_count,
+    )
+    _assign_roster(db_session, league_id, athletes)
+    return user_id, league_id, fantasy_round, kickoff
+
+
+def _add_calendar_with_bye(db_session: Session, league_id: str, *, bye_round_number: int) -> None:
+    """Calendario H2H in cui la squadra della lega riposa nella giornata ``bye_round_number``."""
+    from leagues.models.league_calendar import LeagueCalendar, LeagueCalendarSlot
+
+    team = db_session.scalars(
+        select(FantasyTeam).where(FantasyTeam.league_id == UUID(league_id))
+    ).one()
+    calendar = LeagueCalendar(
+        league_id=UUID(league_id),
+        algorithm_version="test",
+        participant_fingerprint="test",
+        participant_count=4,
+        round_count=3,
+        matchup_count=0,
+        bye_count=1,
+        generated_at=datetime.now(UTC),
+    )
+    db_session.add(calendar)
+    db_session.flush()
+    db_session.add(
+        LeagueCalendarSlot(
+            calendar_id=calendar.id,
+            round_number=bye_round_number,
+            slot_index=0,
+            is_bye=True,
+            home_membership_id=team.membership_id,
+        )
+    )
+    db_session.commit()
+
+
+def test_lock_reminder_says_roster_players_and_the_real_lock_time(
+    client: TestClient, db_session: Session, competition_ids: list[str]
+) -> None:
+    """Il conteggio è sui calciatori della rosa e l'orario è quello del blocco (calcio d'inizio
+    meno il margine di lega), con l'ora della partita accanto (QA 20-21/11)."""
+    from leagues.models.league_rules import LeagueRules
+    from notifications.reminder_service import _format_local, _format_local_time
+
+    user_id, league_id, _round, kickoff = _seed_team_with_late_players(
+        client,
+        db_session,
+        competition_ids,
+        email="lock-reminder-text@example.com",
+        league_name="Lega Blocco Testo",
+        id_offset=9_600_000,
+        late_count=2,
+    )
+    rules = db_session.scalars(
+        select(LeagueRules).where(LeagueRules.league_id == UUID(league_id))
+    ).one()
+    rules.lineup_lock_margin_minutes = 15
+    db_session.commit()
+
+    LineupLockReminderService(db_session).send_due_reminders(
+        now=datetime.now(UTC), window_minutes=180
+    )
+    db_session.commit()
+
+    notification = _lock_notification(db_session, user_id)
+    assert notification is not None
+    lock_local = _format_local(kickoff - timedelta(minutes=15), "Europe/Rome")
+    kickoff_time = _format_local_time(kickoff, "Europe/Rome")
+    assert notification.body.endswith(
+        f"2 calciatori della tua rosa si bloccano alle {lock_local}: "
+        f"la loro partita inizia alle {kickoff_time}."
+    )
+    assert "della tua formazione" not in notification.body
+
+
+def test_lock_reminder_skips_a_team_resting_in_the_turn(
+    client: TestClient, db_session: Session, competition_ids: list[str]
+) -> None:
+    """Decisione di Rosario del 21/11: chi riposa (riposo del calendario H2H) non riceve
+    «Blocco formazione in arrivo»."""
+    user_id, league_id, fantasy_round, _kickoff = _seed_team_with_late_players(
+        client,
+        db_session,
+        competition_ids,
+        email="lock-reminder-bye@example.com",
+        league_name="Lega Blocco Riposo",
+        id_offset=9_700_000,
+        late_count=2,
+    )
+    _add_calendar_with_bye(db_session, league_id, bye_round_number=fantasy_round.number)
+
+    LineupLockReminderService(db_session).send_due_reminders(
+        now=datetime.now(UTC), window_minutes=180
+    )
+    db_session.commit()
+
+    assert _lock_notification(db_session, user_id) is None
+
+
+def test_lock_reminder_still_reaches_a_team_resting_in_another_turn(
+    client: TestClient, db_session: Session, competition_ids: list[str]
+) -> None:
+    user_id, league_id, fantasy_round, _kickoff = _seed_team_with_late_players(
+        client,
+        db_session,
+        competition_ids,
+        email="lock-reminder-bye-later@example.com",
+        league_name="Lega Blocco Riposo Dopo",
+        id_offset=9_750_000,
+        late_count=2,
+    )
+    _add_calendar_with_bye(db_session, league_id, bye_round_number=fantasy_round.number + 1)
+
+    LineupLockReminderService(db_session).send_due_reminders(
+        now=datetime.now(UTC), window_minutes=180
+    )
+    db_session.commit()
+
+    assert _lock_notification(db_session, user_id) is not None
+
+
+def test_lock_reminder_skips_a_team_without_players_in_the_locking_match(
+    client: TestClient, db_session: Session, competition_ids: list[str]
+) -> None:
+    """Già corretto nella corsa live del 20/11: nessun calciatore della rosa nella partita che
+    si blocca, nessun avviso (la rosa ha solo il portiere della partita già iniziata)."""
+    user_id, _league_id, _round, _kickoff = _seed_team_with_late_players(
+        client,
+        db_session,
+        competition_ids,
+        email="lock-reminder-no-player@example.com",
+        league_name="Lega Blocco Senza Giocatori",
+        id_offset=9_800_000,
+        late_count=0,
+    )
+
+    LineupLockReminderService(db_session).send_due_reminders(
+        now=datetime.now(UTC), window_minutes=180
+    )
+    db_session.commit()
+
+    assert _lock_notification(db_session, user_id) is None
