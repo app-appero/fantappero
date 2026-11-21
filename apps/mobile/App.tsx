@@ -11,7 +11,9 @@ import { View } from "react-native";
 import { GlobalListoneRefreshBar, ListoneRefreshProvider } from "./src/admin/ListoneRefreshContext";
 import { AthleteCardProvider } from "./src/athletes/AthleteCard";
 import { AppErrorBoundary } from "./src/errors/AppErrorBoundary";
+import { rememberLastScreen } from "./src/feedback/lastScreen";
 import { AppLinkHandler } from "./src/navigation/AppLinkHandler";
+import { focusedRouteName } from "./src/navigation/focusedRoute";
 import { RootNavigator } from "./src/navigation/RootNavigator";
 import type { RootStackParamList } from "./src/navigation/types";
 import { DemoSessionProvider } from "./src/session/DemoSessionContext";
@@ -54,8 +56,16 @@ function ThemedShell() {
             ref={navigationRef}
             theme={buildNavigationTheme()}
             initialState={navigationState.current}
+            // «Segnala un problema» porta con sé la schermata a fuoco nell'intero albero
+            // (tab, schermate dello stack come Home lega, pannello admin), qualunque sia la
+            // strada per arrivarci. `onReady` copre la prima schermata, che non passa da
+            // `onStateChange`; `getRootState` legge anche lo stato dei navigator annidati.
+            onReady={() => {
+              rememberLastScreen(focusedRouteName(navigationRef.getRootState()));
+            }}
             onStateChange={(state) => {
               navigationState.current = state;
+              rememberLastScreen(focusedRouteName(state));
             }}
           >
             <AppErrorBoundary>

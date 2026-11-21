@@ -32,7 +32,6 @@ import {
   MOBILE_NAV_GROUPS,
   type ResolvedMobileNavItem,
 } from "./navConfig";
-import { rememberLastScreen } from "../feedback/lastScreen";
 import type { AppTabParamList, RootStackParamList } from "./types";
 import { buildSceneBackgroundStyle } from "../theme/navigationTheme";
 
@@ -177,13 +176,11 @@ function AppTabShell({
     if (nested && typeof nested.index === "number") {
       return nested.routes[nested.index]?.name;
     }
-    // Stato annidato non ancora idratato: la tab iniziale è "Matchday".
+    // Stato annidato non ancora idratato: la tab iniziale è "Matchday". Serve solo a
+    // evidenziare la voce del menu: la pagina di «Segnala un problema» si legge in App.tsx
+    // dall'intero albero di navigazione, senza valori di ripiego.
     return "Matchday";
   });
-  // «Segnala un problema» porta con sé l'ultima schermata vista prima di aprirla.
-  useEffect(() => {
-    rememberLastScreen(activeRouteName);
-  }, [activeRouteName]);
   const activeItemId = activeRouteName ? (NAV_ID_BY_ROUTE[activeRouteName] ?? null) : null;
 
   const expandedGroupIds = MOBILE_NAV_GROUPS.filter(

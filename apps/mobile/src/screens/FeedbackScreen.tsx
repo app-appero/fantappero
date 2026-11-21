@@ -17,6 +17,7 @@ import * as ImagePicker from "expo-image-picker";
 import { useCallback, useState } from "react";
 import { Image, Pressable, StyleSheet, Text, View } from "react-native";
 import { fetchMyFeedback, sendFeedback } from "../api/feedback";
+import { installedAppVersionLabel } from "../appVersion/installedVersion";
 import { AppTextInput as TextInput } from "../components/AppTextInput";
 import { UiStatePanel } from "../components/UiStatePanel";
 import { readLastScreen } from "../feedback/lastScreen";
@@ -135,6 +136,7 @@ export function FeedbackScreen() {
         message,
         category,
         pageContext: readLastScreen(),
+        appVersion: installedAppVersionLabel(),
         files: picked.map((item) => ({ uri: item.uri, name: item.name, type: item.mimeType ?? undefined })),
       });
       setPicked([]);
