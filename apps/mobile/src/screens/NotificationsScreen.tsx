@@ -21,7 +21,7 @@ import { UiStatePanel } from "../components/UiStatePanel";
 import { useScreenData } from "../hooks/useScreenData";
 import { PageContainer } from "../layout/PageContainer";
 import { openAdminScreen } from "../navigation/adminEntry";
-import { resolveNotificationRoute } from "../navigation/notificationDestination";
+import { planNotificationOpen } from "../navigation/notificationDestination";
 import {
   NOTIFICATION_GROUP_COLOR,
   NOTIFICATION_GROUP_LABEL,
@@ -64,7 +64,7 @@ function formatDateTime(value: string): string {
 /** Centro notifiche mobile — parità con la campanella web (EP13-P07). */
 export function NotificationsScreen() {
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
-  const { accessToken, can } = useAuthSession();
+  const { accessToken, can, activeLeagueId, leagues, setActiveLeagueId } = useAuthSession();
 
   const [items, setItems] = useState<NotificationItem[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -137,14 +137,22 @@ export function NotificationsScreen() {
         setActionError(getApiErrorMessage(error, "Impossibile segnare come letta."));
       }
     }
-    const route = resolveNotificationRoute(item);
-    if (route?.kind === "matchup") {
+    const plan = planNotificationOpen(item, { activeLeagueId, leagues });
+    if (!plan) {
+      return;
+    }
+    // Prima la lega della notifica (se è un'altra e se ne fa ancora parte), poi la schermata.
+    if (plan.switchToLeagueId) {
+      setActiveLeagueId(plan.switchToLeagueId);
+    }
+    const { route } = plan;
+    if (route.kind === "matchup") {
       navigation.navigate("MatchupDetail", { slotId: route.slotId });
-    } else if (route?.kind === "stack") {
+    } else if (route.kind === "stack") {
       (navigation as unknown as { navigate: (name: string, params?: object) => void }).navigate(route.name, route.params);
-    } else if (route?.kind === "tab") {
+    } else if (route.kind === "tab") {
       navigation.navigate("MainTabs", { screen: route.screen, params: route.params });
-    } else if (route?.kind === "admin") {
+    } else if (route.kind === "admin") {
       openAdminScreen(route.screen);
       navigation.navigate("AdminPanel");
     }

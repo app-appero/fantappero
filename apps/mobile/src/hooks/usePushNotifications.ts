@@ -3,12 +3,13 @@ import { useNavigation, type NavigationProp } from "@react-navigation/core";
 import Constants, { ExecutionEnvironment } from "expo-constants";
 import * as Device from "expo-device";
 import type * as NotificationsModule from "expo-notifications";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { Platform } from "react-native";
 import { registerPushDevice } from "../api/notifications";
 import { openAdminScreen } from "../navigation/adminEntry";
-import { resolveNotificationRoute } from "../navigation/notificationDestination";
+import { planNotificationOpen } from "../navigation/notificationDestination";
 import type { RootStackParamList } from "../navigation/types";
+import { useAuthSession } from "../session/DemoSessionContext";
 import { pushNotificationsAvailable } from "./pushSupport";
 
 type Notifications = typeof NotificationsModule;
@@ -77,6 +78,11 @@ function platformName(): PushDevicePlatform | null {
  */
 export function usePushNotifications(accessToken: string | null | undefined): void {
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
+  // Lega attiva e leghe di adesso, lette al tocco: l'ascoltatore resta registrato una volta
+  // sola (dipende solo dalla navigazione) e non va rifatto a ogni cambio di lega.
+  const { activeLeagueId, leagues, setActiveLeagueId } = useAuthSession();
+  const leagueSessionRef = useRef({ activeLeagueId, leagues, setActiveLeagueId });
+  leagueSessionRef.current = { activeLeagueId, leagues, setActiveLeagueId };
 
   useEffect(() => {
     const Notifications = loadNotifications();
@@ -132,14 +138,24 @@ export function usePushNotifications(accessToken: string | null | undefined): vo
       lastHandledResponseId = id;
       const content = response.notification.request.content;
       const deepLink = (content.data?.deepLink as string | null | undefined) ?? null;
-      const route = resolveNotificationRoute({ title: content.title ?? "", deepLink });
-      if (route?.kind === "matchup") {
+      const session = leagueSessionRef.current;
+      const plan = planNotificationOpen({ title: content.title ?? "", deepLink }, session);
+      if (!plan) {
+        return;
+      }
+      // Il deep link della push porta `?lega=`: prima quella lega (se ne fa parte), poi la
+      // schermata. Anche ad app riaperta da ferma: questa shell si monta a leghe già caricate.
+      if (plan.switchToLeagueId) {
+        session.setActiveLeagueId(plan.switchToLeagueId);
+      }
+      const { route } = plan;
+      if (route.kind === "matchup") {
         (navigation as unknown as { navigate: (name: string, params: object) => void }).navigate("MatchupDetail", { slotId: route.slotId });
-      } else if (route?.kind === "stack") {
+      } else if (route.kind === "stack") {
         (navigation as unknown as { navigate: (name: string, params?: object) => void }).navigate(route.name, route.params);
-      } else if (route?.kind === "tab") {
+      } else if (route.kind === "tab") {
         navigation.navigate("MainTabs", { screen: route.screen, params: route.params });
-      } else if (route?.kind === "admin") {
+      } else if (route.kind === "admin") {
         openAdminScreen(route.screen);
         navigation.navigate("AdminPanel");
       }

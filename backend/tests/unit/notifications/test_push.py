@@ -7,6 +7,8 @@ altre suite di questo repo (es. ``test_predicted_lineups_oracle.py``).
 
 from __future__ import annotations
 
+from collections.abc import Iterator
+from contextlib import contextmanager
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 from uuid import uuid4
@@ -239,6 +241,64 @@ def test_dispatch_push_enqueues_task_in_test_env(monkeypatch: pytest.MonkeyPatch
     assert sent[0]["user_id"] == str(user.id)
     assert sent[0]["notification_id"] == str(notification.id)
     assert sent[0]["category"] == "mercato"
+
+
+def test_push_data_carries_the_league_deep_link(monkeypatch: pytest.MonkeyPatch) -> None:
+    """L'app legge la lega della push dal ``?lega=`` di ``data.deepLink`` (Rosario 21/11):
+    il deep link della notifica arriva al task e nei dati del messaggio senza modifiche."""
+    import notifications.tasks as tasks
+
+    monkeypatch.setenv("FANTAPPERO_ENV", "test")
+    deep_link = "/mercato?scambio=p-1&lega=lega-x"
+    enqueued: list[dict[str, object]] = []
+
+    class _FakeTask:
+        def apply(self, kwargs: dict[str, object]) -> None:
+            enqueued.append(kwargs)
+
+    real_task = tasks.send_push_task
+    monkeypatch.setattr(tasks, "send_push_task", _FakeTask())
+    dispatch_notification_push(
+        notification=_notification(deep_link=deep_link),
+        user=SimpleNamespace(id=uuid4()),
+        profile=_profile(),
+    )
+    assert enqueued[0]["deep_link"] == deep_link
+
+    sent_data: list[dict[str, object]] = []
+
+    def _fake_send(
+        _session: object,
+        _client: object,
+        devices: list[object],
+        *,
+        title: str,
+        body: str,
+        data: dict[str, object],
+    ) -> dict[str, int]:
+        sent_data.append(data)
+        return {"sent": len(devices), "revoked": 0}
+
+    @contextmanager
+    def _fake_scope(_factory: object) -> Iterator[MagicMock]:
+        session = MagicMock()
+        session.scalars.return_value.all.return_value = [_device()]
+        yield session
+
+    monkeypatch.setattr(tasks, "create_engine_from_url", lambda _url: MagicMock())
+    monkeypatch.setattr(tasks, "create_session_factory", lambda _engine: MagicMock())
+    monkeypatch.setattr(tasks, "session_scope", _fake_scope)
+    monkeypatch.setattr(tasks, "send_to_devices", _fake_send)
+
+    real_task(**enqueued[0])
+
+    assert sent_data == [
+        {
+            "notificationId": enqueued[0]["notification_id"],
+            "deepLink": deep_link,
+            "category": "mercato",
+        }
+    ]
 
 
 def test_dispatch_push_respects_quiet_hours(monkeypatch: pytest.MonkeyPatch) -> None:

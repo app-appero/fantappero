@@ -627,4 +627,9 @@ export function useAuth(): AuthContextValue {
   return context;
 }
 
+/** Come `useAuth`, ma `null` fuori da AuthProvider (es. test di un componente isolato). */
+export function useOptionalAuth(): AuthContextValue | null {
+  return useContext(AuthContext);
+}
+
 export { getApiErrorMessage } from "../api/client";

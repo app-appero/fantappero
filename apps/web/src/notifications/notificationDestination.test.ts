@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { resolveNotificationDestination } from "./notificationDestination";
+import { notificationLeagueToActivate, resolveNotificationDestination } from "./notificationDestination";
 
 describe("resolveNotificationDestination", () => {
   it("manda l'invito di lega agli inviti ricevuti", () => {
@@ -44,5 +44,22 @@ describe("resolveNotificationDestination", () => {
         deepLink: "https://example.com/inviti",
       }),
     ).toBeNull();
+  });
+});
+
+describe("notificationLeagueToActivate (Rosario 21/11)", () => {
+  const session = { activeLeagueId: "lega-b", leagues: [{ id: "lega-a" }, { id: "lega-b" }] };
+
+  it("la lega di ?lega= quando è un'altra lega dell'utente", () => {
+    expect(notificationLeagueToActivate("/mercato?scambio=p-1&lega=lega-a", session)).toBe("lega-a");
+    expect(notificationLeagueToActivate("/turni/scontro/slot-1?lega=lega-a", session)).toBe("lega-a");
+    expect(notificationLeagueToActivate("/?lega=lega-a#home", session)).toBe("lega-a");
+  });
+
+  it("nessun cambio con la lega già attiva, senza ?lega= o con una lega non dell'utente", () => {
+    expect(notificationLeagueToActivate("/formazione?lega=lega-b", session)).toBeNull();
+    expect(notificationLeagueToActivate("/inviti", session)).toBeNull();
+    expect(notificationLeagueToActivate("/classifica?lega=lega-lasciata", session)).toBeNull();
+    expect(notificationLeagueToActivate("https://example.com/?lega=lega-a", session)).toBeNull();
   });
 });
