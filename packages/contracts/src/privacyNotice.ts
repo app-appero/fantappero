@@ -33,7 +33,7 @@ export const PRIVACY_NOTICE_SECTIONS: readonly PrivacyNoticeSection[] = [
     title: "Cosa raccogliamo",
     bullets: [
       "Account: l'indirizzo email e il nome. Se accedi con Google li riceviamo dal tuo account Google, ma non riceviamo né salviamo la tua password Google. Se accedi con email e password, la password la salviamo solo in forma cifrata: non è leggibile, nemmeno da noi. In più il nome o soprannome che scegli di mostrare agli altri partecipanti e l'eventuale foto profilo che carichi.",
-      "Richiesta di accesso al pilota: nome, cognome e, se lo indichi, il numero di telefono. Il telefono serve solo per aggiungerti al gruppo WhatsApp dei tester, dove gli altri partecipanti del gruppo vedono il tuo numero. Puoi chiedere di cancellarlo quando vuoi.",
+      "Richiesta di accesso al pilota: nome, cognome, l'email con cui hai fatto l'accesso e, se li indichi, il numero di telefono e un motivo. Il telefono serve solo per aggiungerti al gruppo WhatsApp dei tester, dove gli altri partecipanti del gruppo vedono il tuo numero. Puoi chiedere di cancellarlo quando vuoi.",
       "Dati di gioco: leghe a cui partecipi, rosa, formazioni, risultati, scambi di mercato.",
       "Segnalazioni: se usi «Segnala un problema», il testo che scrivi, le immagini o i video che alleghi, la schermata da cui scrivi e informazioni tecniche (tipo di dispositivo, sistema, versione dell'app). Gli allegati sono visibili solo a chi gestisce il progetto.",
       "Notifiche: se le attivi nell'app Android, un identificativo del dispositivo per inviarti le notifiche e le tue preferenze di notifica.",

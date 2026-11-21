@@ -20,7 +20,7 @@ test("l'informativa copre l'accesso con Google e con email e password", () => {
 test("l'informativa copre la richiesta di accesso al pilota e il telefono per WhatsApp", () => {
   const request = bullets("dati").find((text) => text.startsWith("Richiesta di accesso al pilota:"));
   assert.ok(request, "manca la voce Richiesta di accesso al pilota");
-  assert.match(request, /nome, cognome e, se lo indichi, il numero di telefono/);
+  assert.match(request, /nome, cognome, l'email con cui hai fatto l'accesso e, se li indichi, il numero di telefono e un motivo/);
   assert.match(request, /gruppo WhatsApp dei tester/);
   assert.match(request, /Puoi chiedere di cancellarlo quando vuoi/);
 });

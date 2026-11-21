@@ -2,8 +2,8 @@
 
 **Stato: v. 2026-11c APPROVATA dal privacy contact (Rosario Trotta) il 21/11/2026.** Contatto
 per le richieste: info@fantappero.it. La 2026-11c aggiunge l'accesso con email e password (password
-salvata solo in forma cifrata) e la richiesta di accesso al pilota (nome, cognome, telefono per il
-gruppo WhatsApp dei tester). La 2026-11b (approvata il 09/11/2026) parlava solo dell'accesso con
+salvata solo in forma cifrata) e la richiesta di accesso al pilota (nome, cognome, email, telefono per il
+gruppo WhatsApp dei tester e motivo facoltativo). La 2026-11b (approvata il 09/11/2026) parlava solo dell'accesso con
 Google. La 2026-11 (approvata il 04/11/2026)
 indicava info@globetrotta.it come contatto, sostituito da info@fantappero.it dopo l'attivazione
 del dominio proprio. La versione prima ancora (2026-01, approvata il 28/09/2026) parlava di
@@ -32,9 +32,10 @@ Il testo qui sotto è la fonte unica: è mostrato in app e sul web alla pagina `
 >   la password la salviamo solo in forma cifrata: non è leggibile, nemmeno da noi. In più il
 >   nome o soprannome che scegli di mostrare agli altri partecipanti e l'eventuale foto profilo
 >   che carichi.
-> - *Richiesta di accesso al pilota*: nome, cognome e, se lo indichi, il numero di telefono. Il
->   telefono serve solo per aggiungerti al gruppo WhatsApp dei tester, dove gli altri
->   partecipanti del gruppo vedono il tuo numero. Puoi chiedere di cancellarlo quando vuoi.
+> - *Richiesta di accesso al pilota*: nome, cognome, l'email con cui hai fatto l'accesso e, se
+>   li indichi, il numero di telefono e un motivo. Il telefono serve solo per aggiungerti al
+>   gruppo WhatsApp dei tester, dove gli altri partecipanti del gruppo vedono il tuo numero.
+>   Puoi chiedere di cancellarlo quando vuoi.
 > - *Dati di gioco*: leghe a cui partecipi, rosa, formazioni, risultati, scambi di mercato.
 > - *Segnalazioni*: se usi «Segnala un problema», il testo che scrivi, le immagini o i video
 >   che alleghi, la schermata da cui scrivi e informazioni tecniche (tipo di dispositivo,
