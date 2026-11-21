@@ -1,12 +1,13 @@
 import { lazyStyles } from "../theme/lazyStyles";
 import type { FantasyCoachDirectoryItem } from "@fantappero/contracts";
-import { avatarInitial } from "@fantappero/contracts";
+import { avatarInitials } from "@fantappero/contracts";
 import { theme } from "@fantappero/ui/theme";
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useCallback, useEffect, useState } from "react";
-import { Alert, Image, Pressable, StyleSheet, Text, View } from "react-native";
+import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
 import { AppTextInput as TextInput } from "./AppTextInput";
+import { AvatarWithFallback } from "./AvatarWithFallback";
 import { ApiError } from "../api/client";
 import {
   createNamedLeagueInvite,
@@ -29,14 +30,17 @@ import { UiStatePanel } from "./UiStatePanel";
 const { colors, spacing, typography, radius } = theme;
 
 function CoachAvatar({ name, avatarUrl }: { name: string; avatarUrl: string | null }) {
-  const src = resolveAvatarUrl(avatarUrl);
-  if (src) {
-    return <Image source={{ uri: src }} style={styles.avatarImage} />;
-  }
+  // Se la foto non si carica (es. 404) restano le iniziali, non un cerchio vuoto.
   return (
-    <View style={styles.avatarPlaceholder}>
-      <Text style={styles.avatarInitial}>{avatarInitial(name)}</Text>
-    </View>
+    <AvatarWithFallback
+      src={resolveAvatarUrl(avatarUrl)}
+      style={styles.avatarImage}
+      fallback={
+        <View style={styles.avatarPlaceholder}>
+          <Text style={styles.avatarInitial}>{avatarInitials(name)}</Text>
+        </View>
+      }
+    />
   );
 }
 

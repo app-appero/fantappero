@@ -3,7 +3,12 @@ import type { NotificationItem } from "@fantappero/contracts";
 import { theme } from "@fantappero/ui/theme";
 import { useNavigation, type NavigationProp } from "@react-navigation/core";
 import { useCallback, useMemo, useState } from "react";
-import { appendNotificationPage, NOTIFICATIONS_PAGE_SIZE } from "../navigation/notificationPages";
+import {
+  allNotificationPagesLoaded,
+  appendNotificationPage,
+  notificationFilterCountLabel,
+  NOTIFICATIONS_PAGE_SIZE,
+} from "../navigation/notificationPages";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import {
   fetchNotifications,
@@ -71,6 +76,8 @@ export function NotificationsScreen() {
   // raggiungevano più (QA emulatore 18/11). "Carica altre" aggiunge la pagina dopo.
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  // Totale dell'API (tutte le notifiche, non solo quelle caricate): il numero di «Tutte».
+  const [total, setTotal] = useState(0);
   const [loadingMore, setLoadingMore] = useState(false);
 
   const load = useCallback(async () => {
@@ -88,6 +95,7 @@ export function NotificationsScreen() {
       setUnreadCount(result.unreadCount);
       setPage(1);
       setTotalPages(result.totalPages);
+      setTotal(result.total);
     } catch (error) {
       setItems([]);
       setLoadError(getApiErrorMessage(error, "Impossibile caricare le notifiche."));
@@ -155,6 +163,7 @@ export function NotificationsScreen() {
       setUnreadCount(result.unreadCount);
       setPage(next);
       setTotalPages(result.totalPages);
+      setTotal(result.total);
     } catch (error) {
       setActionError(getApiErrorMessage(error, "Impossibile caricare altre notifiche."));
     } finally {
@@ -260,6 +269,12 @@ export function NotificationsScreen() {
               if (value !== "tutte" && count === 0 && filter !== value) {
                 return null;
               }
+              // «Tutte» con il totale dell'API; i gruppi, finché non è caricato tutto, «12+».
+              const countLabel = notificationFilterCountLabel({
+                loaded: count,
+                total: value === "tutte" ? total : null,
+                allLoaded: allNotificationPagesLoaded(page, totalPages),
+              });
               const active = filter === value;
               return (
                 <Pressable
@@ -270,7 +285,7 @@ export function NotificationsScreen() {
                   testID={`notifications-filter-${value}`}
                 >
                   <Text style={[styles.filterLabel, active && styles.filterLabelActive]}>
-                    {`${value === "tutte" ? "Tutte" : NOTIFICATION_GROUP_LABEL[value]}${count > 0 ? ` ${count}` : ""}`}
+                    {`${value === "tutte" ? "Tutte" : NOTIFICATION_GROUP_LABEL[value]}${countLabel ? ` ${countLabel}` : ""}`}
                   </Text>
                 </Pressable>
               );

@@ -1,7 +1,7 @@
-import { Badge, Button, Input, Modal, Select, UiStatePanel } from "@fantappero/ui";
+import { AvatarWithFallback, Badge, Button, Input, Modal, Select, UiStatePanel } from "@fantappero/ui";
 import { useCallback, useEffect, useState } from "react";
 import type { CoachPlacement, FantasyCoachProfile } from "@fantappero/contracts";
-import { avatarInitial, formatFantasyPoints } from "@fantappero/contracts";
+import { avatarInitials, formatFantasyPoints } from "@fantappero/contracts";
 import {
   createNamedLeagueInvite,
   fetchManagerDirectory,
@@ -190,14 +190,17 @@ function CoachAvatar({
   avatarUrl: string | null;
   className: string;
 }) {
-  const src = resolveAvatarUrl(avatarUrl);
-  if (src) {
-    return <img src={src} alt="" className={className} />;
-  }
+  // Se la foto non si carica (es. 404) restano le iniziali, non un'immagine rotta.
   return (
-    <span className={className} aria-hidden>
-      {avatarInitial(name)}
-    </span>
+    <AvatarWithFallback
+      src={resolveAvatarUrl(avatarUrl)}
+      className={className}
+      fallback={
+        <span className={className} aria-hidden>
+          {avatarInitials(name)}
+        </span>
+      }
+    />
   );
 }
 

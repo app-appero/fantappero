@@ -9,20 +9,27 @@ import { registerPushDevice } from "../api/notifications";
 import { openAdminScreen } from "../navigation/adminEntry";
 import { resolveNotificationRoute } from "../navigation/notificationDestination";
 import type { RootStackParamList } from "../navigation/types";
+import { pushNotificationsAvailable } from "./pushSupport";
 
 type Notifications = typeof NotificationsModule;
 
 /**
  * `expo-notifications` richiede un modulo nativo che Expo Go non ha: importarlo
  * a livello di file manderebbe in crash tutta l'app. Lo carichiamo solo in una
- * build vera (APK/dev client); in Expo Go le push restano semplicemente spente.
+ * build vera (APK/dev client); in Expo Go e nel browser le push restano
+ * semplicemente spente (vedi `pushNotificationsAvailable`).
  */
 let cached: Notifications | null | undefined;
 function loadNotifications(): Notifications | null {
   if (cached !== undefined) {
     return cached;
   }
-  if (Constants.executionEnvironment === ExecutionEnvironment.StoreClient) {
+  if (
+    !pushNotificationsAvailable(
+      Platform.OS,
+      Constants.executionEnvironment === ExecutionEnvironment.StoreClient,
+    )
+  ) {
     cached = null;
     return cached;
   }

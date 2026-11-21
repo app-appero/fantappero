@@ -1,6 +1,6 @@
 import type { FantasyCoachDirectoryItem, LeagueMember } from "@fantappero/contracts";
-import { avatarInitial, pendingInvitesLabel } from "@fantappero/contracts";
-import { Button, Input, Modal, Select, UiStatePanel } from "@fantappero/ui";
+import { avatarInitials, pendingInvitesLabel } from "@fantappero/contracts";
+import { AvatarWithFallback, Button, Input, Modal, Select, UiStatePanel } from "@fantappero/ui";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   assignRandomAiRoster,
@@ -463,11 +463,8 @@ export function LeagueMembersPanel({
             const identity = (
               <>
                 <span className="fa-member-list__avatar" aria-hidden="true">
-                  {avatarSrc ? (
-                    <img src={avatarSrc} alt="" />
-                  ) : (
-                    avatarInitial(member.displayName)
-                  )}
+                  {/* Se la foto non si carica (es. 404) restano le iniziali, non un'immagine rotta. */}
+                  <AvatarWithFallback src={avatarSrc} fallback={avatarInitials(member.displayName)} />
                 </span>
                 <span className="fa-member-list__text">
                   <strong>{member.displayName}</strong>

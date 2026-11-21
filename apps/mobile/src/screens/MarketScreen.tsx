@@ -337,9 +337,13 @@ export function MarketScreen() {
         requestedCredits: creditsDirection === "request" ? credits : 0,
         expiresAt: expiresIso,
       })
-      .then(() => {
-        resetTradeForm();
-        setShowForm(false);
+      .then((sent) => {
+        // Con un errore del server (es. turno in corso) il form resta aperto, con quanto
+        // compilato e il messaggio sopra «Invia proposta», come sul web (QA 20-21/11).
+        if (sent) {
+          resetTradeForm();
+          setShowForm(false);
+        }
       });
   }
 

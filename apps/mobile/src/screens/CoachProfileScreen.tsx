@@ -1,12 +1,13 @@
 import { lazyStyles } from "../theme/lazyStyles";
-import { avatarInitial, formatFantasyPoints } from "@fantappero/contracts";
+import { avatarInitials, formatFantasyPoints } from "@fantappero/contracts";
 import type { FantasyCoachProfile } from "@fantappero/contracts";
 import { theme } from "@fantappero/ui/theme";
 import { useNavigation, useRoute, type RouteProp } from "@react-navigation/core";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useCallback, useState } from "react";
-import { Image, Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 import { fetchCoachProfile } from "../api/managerInvites";
+import { AvatarWithFallback } from "../components/AvatarWithFallback";
 import { UiStatePanel } from "../components/UiStatePanel";
 import { useScreenData } from "../hooks/useScreenData";
 import { PageContainer } from "../layout/PageContainer";
@@ -86,13 +87,16 @@ export function CoachProfileScreen() {
       {!loading && !loadError && profile ? (
         <View style={styles.card} testID="coach-profile">
           <View style={styles.header}>
-            {avatarSrc ? (
-              <Image source={{ uri: avatarSrc }} style={styles.avatarImage} />
-            ) : (
-              <View style={styles.avatarPlaceholder}>
-                <Text style={styles.avatarInitial}>{avatarInitial(profile.displayName)}</Text>
-              </View>
-            )}
+            {/* Se la foto non si carica (es. 404) restano le iniziali, non un cerchio vuoto. */}
+            <AvatarWithFallback
+              src={avatarSrc}
+              style={styles.avatarImage}
+              fallback={
+                <View style={styles.avatarPlaceholder}>
+                  <Text style={styles.avatarInitial}>{avatarInitials(profile.displayName)}</Text>
+                </View>
+              }
+            />
             <View style={styles.headerText}>
               <Text style={styles.name}>{profile.nickname?.trim() || profile.displayName}</Text>
               {profile.nickname?.trim() ? (

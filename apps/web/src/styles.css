@@ -1532,8 +1532,15 @@ a.fa-member-list__identity:focus-visible {
   border-bottom: 1px solid var(--fa-color-border);
 }
 
-.fa-bench-order__row--overflow {
-  opacity: 0.65;
+/* Tribuna (dall'11° posto): niente più opacità, che portava numero, ruolo e freccia sotto
+   4,5:1 in entrambi i temi (QA 20-21/11). La si distingue dalla panchina con il numero in
+   grigio e il bordo tratteggiato, colori pieni e leggibili. */
+.fa-bench-order__row--overflow .fa-bench-order__number {
+  color: var(--fa-color-foreground-muted);
+}
+
+.fa-bench-order__row--overflow .fa-starter-row {
+  border-style: dashed;
 }
 
 .fa-bench-order__row--probable {
