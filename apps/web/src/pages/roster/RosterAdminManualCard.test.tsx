@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import type { LeagueListoneEntry } from "@fantappero/contracts";
 import { DEMO_TEAM, DEMO_TEAMS } from "./rosterDemoData";
 import { RosterAdminManualCard } from "./RosterAdminManualCard";
-import type { AthleteOwnership } from "./rosterHelpers";
+import type { AthleteOwnership, RoleTab } from "./rosterHelpers";
 
 const entries: LeagueListoneEntry[] = Array.from({ length: 25 }, (_, index) => ({
   athleteId: `athlete-${index}`,
@@ -218,7 +218,10 @@ describe("filtri Campionato e Squadra nella ricerca del listone (Rosario, 21/11)
     container = null;
   });
 
-  function render(listone: LeagueListoneEntry[]): HTMLDivElement {
+  function render(
+    listone: LeagueListoneEntry[],
+    roleProps: { roleTab?: RoleTab; onRoleTabChange?: (value: RoleTab) => void } = {},
+  ): HTMLDivElement {
     container = document.createElement("div");
     document.body.appendChild(container);
     root = createRoot(container);
@@ -235,8 +238,8 @@ describe("filtri Campionato e Squadra nella ricerca del listone (Rosario, 21/11)
           listone,
           listoneQuery: "",
           onListoneQueryChange: () => undefined,
-          roleTab: "all",
-          onRoleTabChange: () => undefined,
+          roleTab: roleProps.roleTab ?? "all",
+          onRoleTabChange: roleProps.onRoleTabChange ?? (() => undefined),
           ownership: new Map(),
           canReleaseAthlete: () => true,
           adminBusy: false,
@@ -344,6 +347,18 @@ describe("filtri Campionato e Squadra nella ricerca del listone (Rosario, 21/11)
     expect(select(view, "roster-listone-club")?.value).toBe("");
     expect(view.querySelector('[data-testid="roster-listone-chip-competition"]')).toBeNull();
     expect(count(view)).toBe("28 calciatori");
+  });
+
+  it("«Azzera filtri» riporta anche il ruolo su «Tutti» (Rosario, 21/11)", () => {
+    const roleChanges: RoleTab[] = [];
+    const view = render(multiListone, {
+      roleTab: "P",
+      onRoleTabChange: (value) => roleChanges.push(value),
+    });
+    choose(view, "roster-listone-competition", "c-ita");
+    click(view, "roster-listone-reset-filters");
+    expect(select(view, "roster-listone-competition")?.value).toBe("");
+    expect(roleChanges).toEqual(["all"]);
   });
 
   it("cambiando un filtro la lista torna a pagina 1", () => {

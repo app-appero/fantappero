@@ -333,7 +333,12 @@ export function RosterAdminManualCard({
                 autoCorrect={false}
                 testID="roster-admin-listone-search"
               />
-              <ListoneFilterBar listone={listone} place={place} onChange={setChosenPlace} />
+              <ListoneFilterBar
+                listone={listone}
+                place={place}
+                onChange={setChosenPlace}
+                onResetAll={() => setRoleTab("all")}
+              />
               <Pressable
                 style={styles.freeToggle}
                 onPress={() => setOnlyFree((current) => !current)}
