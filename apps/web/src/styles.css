@@ -6007,6 +6007,238 @@ button.fa-starter-row:disabled {
   margin-left: auto;
 }
 
+/* ══ Formazione su telefono: rifinitura grafica (proposte di design del 21/11) ══════
+   Solo misure, spazi, allineamenti, livelli e colori del testo: nessun cambio di
+   comportamento. Ogni blocco porta il numero della proposta (proposals.json), così si
+   può tenere o togliere da solo. Sta prima delle regole iPhone in fondo al file, che
+   restano l'ultima parola su env(safe-area-inset-*) e campi da 16px. */
+
+/* [Proposta 1] Barra azioni su telefono: griglia a due colonne, «Salva formazione» a
+   tutta riga, bottoni da 44px (erano 36px) e testo da 14px (era 12.8px). La barra si
+   abbassa (3 righe invece di 4-5) e i bottoni hanno larghezze uguali. */
+@media (max-width: 56rem) {
+  .fa-formation-layout__sidebar > .fa-formation-layout__actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--fa-space-sm);
+  }
+
+  .fa-formation-layout__sidebar > .fa-formation-layout__actions > .fa-btn {
+    min-height: 2.75rem;
+    padding: 0.25rem var(--fa-space-sm);
+    font-size: var(--fa-text-sm);
+    line-height: 1.15;
+    white-space: normal;
+    text-wrap: balance;
+  }
+
+  .fa-formation-layout__sidebar > .fa-formation-layout__actions [data-testid="formation-save"] {
+    grid-column: 1 / -1;
+  }
+
+  /* Bottoni secondari in numero dispari: l'ultimo prende tutta la riga, niente buchi. */
+  .fa-formation-layout__sidebar
+    > .fa-formation-layout__actions
+    > .fa-btn:nth-last-child(2 of .fa-btn):nth-child(odd of .fa-btn) {
+    grid-column: 1 / -1;
+  }
+
+  /* I bottoni «ghost» (Annulla modifiche, Ripristina) con un bordo leggero: celle uguali. */
+  .fa-formation-layout__sidebar > .fa-formation-layout__actions > .fa-btn--ghost {
+    border-color: var(--fa-color-border);
+  }
+}
+
+/* [Proposta 2] Le finestre (Applica la formazione migliore, Svuota formazione) nascono
+   dentro la barra azioni (z-index 20) e dentro il corpo della pagina (z-index 1, sotto
+   l'header a 200): header e «Prossimo blocco» restavano accesi sopra il velo scuro.
+   Con una finestra aperta barra e corpo salgono al livello delle finestre. */
+.fa-formation-layout__sidebar > .fa-formation-layout__actions:has(> .fa-modal) {
+  z-index: var(--fa-z-modal);
+}
+
+.fa-app-shell__body:has(.fa-formation-page .fa-modal) {
+  z-index: var(--fa-z-modal);
+}
+
+/* [Proposta 3] Legenda: su telefono va a capo invece di scorrere tagliata («Espuls…»);
+   bordo col colore dei bordi del tema (in chiaro quello bianco non si vedeva). */
+.fa-formation-legend {
+  border-color: var(--fa-color-border);
+}
+
+@media (max-width: 56rem) {
+  .fa-formation-legend {
+    flex-wrap: wrap;
+    overflow-x: visible;
+    white-space: normal;
+    gap: 6px 14px;
+  }
+}
+
+/* [Proposta 4] Ritmo verticale: su telefono 16px tra i blocchi (erano 24, 32 o 40px)
+   e i due testi della panchina staccati dalle card (prima la card era incollata). */
+@media (max-width: 56rem) {
+  .fa-formation-layout,
+  .fa-formation-layout__main,
+  .fa-formation-layout__pitch-row,
+  .fa-formation-layout__benches {
+    gap: var(--fa-space-md);
+  }
+
+  .fa-formation-legend {
+    margin: 0;
+  }
+}
+
+.fa-formation-layout__bench {
+  display: grid;
+  gap: var(--fa-space-sm);
+}
+
+.fa-formation-layout__bench > p {
+  margin: 0;
+}
+
+.fa-formation-layout__bench > .fa-formation-layout__benches {
+  margin-top: var(--fa-space-sm);
+}
+
+/* [Proposta 5] Card Titolari, Panchina e Tribuna su telefono: margine interno 16px
+   (erano 24px, le righe guadagnano 16px) e titoli da 18px (erano 22px), con a capo
+   bilanciato: «Panchina — 10 posti · massimo 5 subentri» non lascia una parola sola. */
+.fa-formation-layout__section-title {
+  text-wrap: balance;
+}
+
+@media (max-width: 34rem) {
+  .fa-formation-layout__editor,
+  .fa-formation-layout__benches > div {
+    padding: var(--fa-space-md);
+  }
+
+  .fa-formation-layout__section-title {
+    font-size: 1.15rem;
+  }
+}
+
+/* [Proposta 6] «Da correggere prima di salvare» e avvisi di rosa: riquadro colorato e
+   compatto, elenco rientrato di 20px invece di 40px; «Sistema la panchina» da 44px. */
+.fa-formation-layout__issues,
+.fa-formation-layout__notice {
+  padding: var(--fa-space-sm) var(--fa-space-md);
+  border: 1px solid color-mix(in srgb, var(--fa-color-danger) 40%, transparent);
+  border-left-width: 4px;
+  border-left-color: var(--fa-color-danger);
+  border-radius: var(--fa-radius-md);
+  background: color-mix(in srgb, var(--fa-color-danger) 7%, var(--fa-color-background-elevated));
+}
+
+.fa-formation-layout__notice {
+  border-color: color-mix(in srgb, var(--fa-color-warning) 40%, transparent);
+  border-left-color: var(--fa-color-warning);
+  background: color-mix(in srgb, var(--fa-color-warning) 8%, var(--fa-color-background-elevated));
+}
+
+.fa-formation-layout__issues ul,
+.fa-formation-layout__notice ul {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding-left: 1.25rem;
+  font-size: 0.9375rem;
+}
+
+.fa-formation-layout__issues .fa-btn {
+  margin-top: var(--fa-space-sm);
+}
+
+@media (max-width: 56rem) {
+  .fa-formation-layout__issues .fa-btn {
+    min-height: 2.75rem;
+    padding-inline: var(--fa-space-md);
+    font-size: var(--fa-text-sm);
+  }
+}
+
+/* [Proposta 7] Finestre e campo: le due scelte della formazione migliore una sotto
+   l'altra (in due colonne «4-3-3» andava a capo a metà, anche su desktop); «×» delle
+   finestre e portiere in campo con area di tocco da 44px (erano 23×32 e 93×40). */
+.fa-formation-page .fa-nop-radio {
+  flex-basis: 100%;
+}
+
+.fa-formation-page .fa-modal__close {
+  min-width: 2.75rem;
+  min-height: 2.75rem;
+  margin: -6px -8px -6px 0;
+  padding: 0;
+  font-size: 1.375rem;
+  line-height: 1;
+}
+
+.fa-formation-page .fa-pitch-player--gk {
+  min-height: 2.75rem;
+  justify-content: center;
+}
+
+/* Anche «Leghe» nel percorso in alto (era 32×18): area di tocco 44×44, impaginazione uguale. */
+.fa-formation-page .fa-breadcrumb__link {
+  display: inline-block;
+  padding: 13px 6px;
+  margin: -13px -6px;
+}
+
+/* [Proposta 8] Countdown nelle righe: stessa misura per titolari (erano 16px) e
+   panchina (erano 12px), 13px; il nome torna l'elemento principale della riga. */
+.fa-formation-page .fa-starter-row__count {
+  font-size: 0.8125rem;
+}
+
+/* Sempre proposta 8: in panchina e tribuna il numero d'ordine al centro della riga
+   (stava 3px più in alto). Altezza fissa, così con la tendina aperta non si sposta. */
+.fa-bench-order__number {
+  display: flex;
+  align-items: center;
+  min-height: 2.875rem;
+  padding-top: 0;
+  line-height: 1;
+}
+
+/* [Proposta 9] I due testi d'aiuto sopra Panchina e Tribuna con la stessa misura e lo
+   stesso grigio: il primo era da 16px pieno (5 righe a 360) e pesava più delle card. */
+.fa-formation-layout__bench > p {
+  font-size: var(--fa-text-sm);
+  line-height: 1.45;
+  color: var(--fa-color-foreground-muted);
+}
+
+/* [Proposta 10] Contrasto: il rosso di «Svuota formazione» era 3.8:1 nel tema scuro e
+   4.5:1 appena sotto soglia nel chiaro; in tribuna (righe al 65% di opacità) le lettere
+   di ruolo scendevano a 2.8-4.1:1 e i numeri a 2.9:1 nel chiaro. Rosso più chiaro nello
+   scuro, più scuro nel chiaro; la tribuna resta riconoscibile col bordo tratteggiato
+   invece che sbiadita, così testi e ruoli tornano pieni. */
+.fa-btn.fa-formation-clear {
+  color: var(--fa-danger-400);
+}
+
+[data-color-scheme="light"] .fa-btn.fa-formation-clear {
+  color: var(--fa-danger-600);
+}
+
+.fa-bench-order__row--overflow {
+  opacity: 1;
+}
+
+.fa-bench-order__row--overflow .fa-starter-row {
+  border-style: dashed;
+}
+
+.fa-bench-order__row--overflow
+  .fa-starter-row:not(.fa-starter-row--starter, .fa-starter-row--bench, .fa-starter-row--expelled) {
+  border-color: var(--fa-color-border-strong);
+}
+
 /* Distintivi dei campionati (SVG generati, non loghi ufficiali). */
 .fa-league-badge {
   width: 1.25rem;
