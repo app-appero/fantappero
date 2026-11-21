@@ -4,8 +4,9 @@ from __future__ import annotations
 
 from datetime import datetime
 from typing import Literal
+from urllib.parse import urlsplit
 
-from pydantic import Field
+from pydantic import Field, field_validator
 
 from app.text_validation import AthleteNameStr, NoNulStr
 from auth.schemas import ApiModel, SessionUserResponse
@@ -397,3 +398,55 @@ class AdminTesterRequestBulkRequest(ApiModel):
     ids: list[str] = Field(min_length=1, max_length=200)
     action: str = Field(pattern="^(approve|reject)$")
     note: str | None = Field(default=None, max_length=500)
+
+
+# --- versione dell'app Android (avviso «nuova versione disponibile») ---------------------------
+#: Il versionCode più alto accettato da Android.
+ANDROID_MAX_VERSION_CODE = 2_100_000_000
+
+
+class AndroidAppVersionResponse(ApiModel):
+    latest_version_name: str = Field(alias="latestVersionName")
+    latest_version_code: int = Field(alias="latestVersionCode")
+    download_url: str = Field(alias="downloadUrl")
+    message: str | None = None
+
+
+class AppVersionResponse(ApiModel):
+    #: Ultima versione pubblicata dell'app Android; None se l'operatore non l'ha impostata.
+    android: AndroidAppVersionResponse | None = None
+
+
+class AdminAndroidAppVersionUpdateRequest(ApiModel):
+    latest_version_name: NoNulStr = Field(
+        alias="latestVersionName",
+        min_length=1,
+        max_length=32,
+        pattern=r"^\s*[0-9]+(\.[0-9]+){0,3}\s*$",
+    )
+    latest_version_code: int = Field(
+        alias="latestVersionCode", ge=1, le=ANDROID_MAX_VERSION_CODE, strict=True
+    )
+    download_url: NoNulStr = Field(alias="downloadUrl", min_length=9, max_length=500)
+    message: NoNulStr | None = Field(default=None, max_length=200)
+
+    @field_validator("latest_version_name")
+    @classmethod
+    def _strip_name(cls, value: str) -> str:
+        return value.strip()
+
+    @field_validator("download_url")
+    @classmethod
+    def _https_only(cls, value: str) -> str:
+        url = value.strip()
+        parts = urlsplit(url)
+        if parts.scheme != "https" or not parts.hostname or any(ch.isspace() for ch in url):
+            raise ValueError("Il link deve essere un indirizzo https://")
+        return url
+
+    @field_validator("message")
+    @classmethod
+    def _blank_message(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        return value.strip() or None

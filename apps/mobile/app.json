@@ -3,7 +3,7 @@
     "name": "FantApperò",
     "slug": "fantappero",
     "scheme": "fantappero",
-    "version": "0.0.0",
+    "version": "1.2.0",
     "orientation": "portrait",
     "userInterfaceStyle": "dark",
     "ios": {
@@ -15,6 +15,7 @@
     },
     "android": {
       "package": "com.fantappero.mobile",
+      "versionCode": 3,
       "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",

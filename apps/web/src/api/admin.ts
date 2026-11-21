@@ -31,6 +31,7 @@ import type {
   PaginatedAdminLeagues,
   PaginatedAdminUsers,
 } from "@fantappero/contracts";
+import type { AndroidAppVersionUpdate, AppVersionInfo } from "@fantappero/contracts";
 import { apiRequest } from "./client";
 
 export function fetchSystemJobs(accessToken: string): Promise<SystemJob[]> {
@@ -383,6 +384,18 @@ export async function repairHistoricalRounds(
       window.setTimeout(resolve, pollIntervalMs);
     });
   }
+}
+
+/** Versione dell'app Android annunciata nell'app (avviso «nuova versione disponibile»). */
+export function fetchAppVersionConfig(accessToken: string): Promise<AppVersionInfo> {
+  return apiRequest<AppVersionInfo>("/admin/app-version", { accessToken });
+}
+
+export function saveAppVersionConfig(
+  accessToken: string,
+  body: AndroidAppVersionUpdate,
+): Promise<AppVersionInfo> {
+  return apiRequest<AppVersionInfo>("/admin/app-version", { accessToken, method: "PUT", body });
 }
 
 export function fetchTestMode(accessToken: string): Promise<AdminTestMode> {

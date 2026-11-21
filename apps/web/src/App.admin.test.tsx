@@ -53,6 +53,8 @@ vi.mock("./api/admin", () => ({
   addBlocked: vi.fn(),
   removeBlocked: vi.fn(),
   deleteUser: vi.fn(),
+  fetchAppVersionConfig: vi.fn().mockResolvedValue({ android: null }),
+  saveAppVersionConfig: vi.fn(),
 }));
 
 import { ToastProvider } from "@fantappero/ui";

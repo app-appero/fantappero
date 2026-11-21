@@ -29,6 +29,18 @@ un'etichetta fissa su un commit: non si sposta e non cambia anche se `main` va a
 
 Il tag si crea **dopo** aver verificato il rilascio, non prima.
 
+### Versione dell'app Android (da pilota-1.2)
+
+- A **ogni** nuovo APK si alzano in `apps/mobile/app.json` sia `expo.version` (nome, es. `1.3.0`)
+  sia `expo.android.versionCode` (intero, sempre più alto del precedente). È l'unica fonte: il
+  prebuild di `build:android:pilota` li scrive nell'APK e l'app li legge da lì. Con lo stesso
+  versionCode Android non installa l'APK come aggiornamento e l'avviso non funziona.
+- Usati finora: versionCode `1` per pilota-1 e pilota-1.1 (versione `0.0.0`), `3` per pilota-1.2
+  (versione `1.2.0`). Il prossimo APK parte da `4`.
+- Pubblicato l'APK (Drive, gruppo WhatsApp), l'operatore apre il pannello operatore sul sito,
+  sezione «Versione dell'app Android», e scrive versione, versionCode e link: chi ha un'app più
+  vecchia vede l'avviso «È disponibile la versione … dell'app.» con «Scarica» e «Più tardi».
+
 ## Tornare indietro
 
 Se un rilascio rompe qualcosa, si rifà il deploy del commit del **tag precedente** (es. da

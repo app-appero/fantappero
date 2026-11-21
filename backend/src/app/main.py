@@ -14,6 +14,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, PlainTextResponse
 from starlette.types import ASGIApp, Receive, Scope, Send
 
+from admin.app_version import admin_router as admin_app_version_router
+from admin.app_version import router as app_version_router
 from admin.jobs_router import router as admin_jobs_router
 from admin.router import router as admin_router
 from admin.turni_router import router as admin_turni_router
@@ -109,6 +111,8 @@ app.include_router(profile_router)
 app.include_router(admin_router)
 app.include_router(admin_turni_router)
 app.include_router(admin_jobs_router)
+app.include_router(admin_app_version_router)
+app.include_router(app_version_router)
 app.include_router(leagues_router)
 app.include_router(scoring_router)
 app.include_router(fantasy_teams_router)
