@@ -380,7 +380,12 @@ export function RosterAdminManualCard({
                     onChange={(event) => onListoneQueryChange(event.target.value)}
                     data-testid="roster-admin-listone-search"
                   />
-                  <ListoneFilterControls listone={listone} place={place} onChange={setChosenPlace} />
+                  <ListoneFilterControls
+                    listone={listone}
+                    place={place}
+                    onChange={setChosenPlace}
+                    onResetAll={() => onRoleTabChange("all")}
+                  />
                   <div className="fa-listone-filters__free-row">
                     <label className="fa-roster-listone__free">
                       <input

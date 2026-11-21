@@ -26,10 +26,13 @@ export function ListoneFilterControls({
   listone,
   place,
   onChange,
+  onResetAll,
 }: {
   listone: readonly LeagueListoneEntry[];
   place: ListonePlaceFilters;
   onChange: (place: ListonePlaceFilters) => void;
+  /** «Azzera filtri» riporta anche il ruolo su «Tutti» (Rosario, 21/11). */
+  onResetAll?: () => void;
 }) {
   const visibility = useMemo(() => listoneFilterVisibility(listone), [listone]);
   const competitionOptions = useMemo(() => listoneCompetitionOptions(listone), [listone]);
@@ -101,7 +104,10 @@ export function ListoneFilterControls({
           <button
             type="button"
             className="fa-listone-filters__reset"
-            onClick={() => onChange(NO_LISTONE_PLACE_FILTERS)}
+            onClick={() => {
+              onChange(NO_LISTONE_PLACE_FILTERS);
+              onResetAll?.();
+            }}
             data-testid="roster-listone-reset-filters"
           >
             {LISTONE_RESET_FILTERS_LABEL}
