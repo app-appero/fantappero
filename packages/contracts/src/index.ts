@@ -680,3 +680,20 @@ export {
 
 export { avatarInitial, avatarInitials, avatarLetters, firstGrapheme, leadingGraphemes } from "./initials.js";
 export type { AvatarInitialsOptions } from "./initials.js";
+
+export {
+  ROLE_QUOTA_EXCEEDED_CODE,
+  ROLE_QUOTA_PLURAL,
+  ROSTER_QUOTA_ROLES,
+  fullRoleQuotas,
+  fullRolesSummary,
+  isRoleQuotaFull,
+  listoneQuotaNotice,
+  roleQuotaBlockReason,
+  roleQuotaBlockedLabel,
+  roleQuotaCountLabel,
+  roleQuotaErrorMessage,
+  roleQuotaFullMessage,
+  rosterRoleQuota,
+} from "./rosterQuota.js";
+export type { ListoneQuotaContext, RoleQuotaMessageOptions, RoleQuotaStat, RoleQuotaTeam, RosterRoleQuota } from "./rosterQuota.js";

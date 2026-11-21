@@ -11,6 +11,7 @@ import type {
   RosterTurnSnapshotDetail,
   RosterTurnSnapshotSummary,
 } from "@fantappero/contracts";
+import { roleQuotaErrorMessage, rosterRoleQuota } from "@fantappero/contracts";
 import { useNavigation, type NavigationProp } from "@react-navigation/core";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Pressable, Text, View } from "react-native";
@@ -703,26 +704,27 @@ export function RosterScreen() {
     })();
   };
 
-  const onAssignAthlete = async (athleteId: string, creditsInput: number) => {
+  /** Assegna dal listone; in caso di rifiuto restituisce il motivo, che la riga mostra sotto di sé. */
+  const onAssignAthlete = async (athleteId: string, creditsInput: number): Promise<string | null> => {
     setAdminMessage(null);
     setAdminError(null);
+    const refuse = (message: string) => {
+      setAdminError(message);
+      return message;
+    };
     if (!activeLeagueId || !accessToken || !targetTeamId || !targetTeam) {
-      setAdminError("Sessione o squadra non disponibile.");
-      return;
+      return refuse("Sessione o squadra non disponibile.");
     }
     const emptySlot = emptySlots[0];
     if (!emptySlot) {
-      setAdminError("Nessuno slot libero sulla squadra selezionata.");
-      return;
+      return refuse("Nessuno slot libero sulla squadra selezionata.");
     }
     if (ownership.has(athleteId)) {
-      setAdminError("Il calciatore appartiene già a una squadra di questa lega.");
-      return;
+      return refuse("Il calciatore appartiene già a una squadra di questa lega.");
     }
     const credits = creditsInput;
     if (!Number.isFinite(credits) || credits < 1) {
-      setAdminError("Inserisci crediti acquisto validi (minimo 1).");
-      return;
+      return refuse("Inserisci crediti acquisto validi (minimo 1).");
     }
     const athlete = listone.find((entry) => entry.athleteId === athleteId);
     const previousTeam = targetTeam;
@@ -741,10 +743,16 @@ export function RosterScreen() {
       applyTeamUpdate(updated);
       await refreshViewedCredits();
       setAdminMessage(`Assegnato a slot ${emptySlot.slotIndex + 1}.`);
+      return null;
     } catch (error) {
       applyTeamUpdate(previousTeam);
-      setAdminError(getApiErrorMessage(error, "Impossibile assegnare il calciatore."));
       void loadRoster({ silent: true });
+      // Quota del ruolo superata: stesso testo dell'avviso del listone (contracts).
+      const teamName = isAdmin && previousTeam.id !== team?.id ? previousTeam.name : null;
+      return refuse(
+        roleQuotaErrorMessage(error, athlete?.effectiveRole, rosterRoleQuota(previousTeam), { teamName }) ??
+          getApiErrorMessage(error, "Impossibile assegnare il calciatore."),
+      );
     } finally {
       setAdminBusy(false);
     }
@@ -1060,6 +1068,7 @@ export function RosterScreen() {
           isAdmin={isAdmin}
           leagueTeams={leagueTeams}
           targetTeam={targetTeam}
+          ownTeamId={team?.id ?? null}
           emptySlotsCount={emptySlots.length}
           listone={listone}
           listoneQuery={listoneQuery}

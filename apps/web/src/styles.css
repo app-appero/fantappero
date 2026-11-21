@@ -7413,6 +7413,30 @@ button.fa-starter-row:disabled {
   }
 }
 
+/* Quota ruolo */
+/* Ruolo al completo nel listone «Inserimento manuale» (tester, Rosario 21/11): avviso in cima
+   alla lista e conto sulle schede dei ruoli. Testo nel colore principale, contrasto pieno in
+   entrambi i temi; l'ambra solo su bordo e fondo tenue. Le schede scorrono già (nowrap). */
+.fa-roster-quota-notice {
+  margin: 0 0 var(--fa-space-sm);
+  padding: var(--fa-space-sm) var(--fa-space-md);
+  border-left: 3px solid var(--fa-color-warning);
+  border-radius: var(--fa-radius-md);
+  background: color-mix(in srgb, var(--fa-color-warning) 12%, transparent);
+  color: var(--fa-color-foreground);
+  font-size: var(--fa-text-sm);
+  font-weight: 600;
+  line-height: var(--fa-leading-snug);
+}
+
+.fa-roster-quota-tab__count {
+  font-variant-numeric: tabular-nums;
+}
+
+.fa-roster-quota-tab__count--full {
+  font-weight: 700;
+}
+
 /* ══ Parti comuni su telefono: rifinitura grafica (proposte di design del 21/11) ══════
    Header, «Prossimo blocco», titoli delle pagine, finestre, avvisi, banda d'assistenza,
    schede e bottoni piccoli: solo misure, spazi, livelli e posizioni, nessun cambio di

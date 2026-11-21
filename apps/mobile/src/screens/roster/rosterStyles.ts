@@ -469,6 +469,30 @@ export const rosterStyles = lazyStyles(() => StyleSheet.create({
     color: colors.danger,
     marginTop: spacing.sm,
   },
+  // Quota ruolo: avviso in cima al listone e motivo sotto la riga. Testo nel colore principale
+  // (contrasto pieno in entrambi i temi), l'ambra solo sul bordo.
+  quotaNotice: {
+    marginBottom: spacing.sm,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    borderLeftWidth: 3,
+    borderLeftColor: colors.warning,
+    borderRadius: radius.md,
+    // Ambra al 12% sul fondo: il testo principale resta oltre 4,5:1.
+    backgroundColor: `${colors.warning}1F`,
+  },
+  quotaNoticeText: {
+    fontSize: typography.fontSize.sm,
+    color: colors.foreground,
+    fontWeight: typography.fontWeight.semibold,
+  },
+  quotaRowNotice: {
+    marginTop: -2,
+    marginBottom: spacing.xs,
+    paddingHorizontal: spacing.md,
+    fontSize: typography.fontSize.sm,
+    color: colors.foreground,
+  },
   heroCard: {
     gap: spacing.sm,
     padding: spacing.md,

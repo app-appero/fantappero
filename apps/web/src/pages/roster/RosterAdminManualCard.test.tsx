@@ -2,7 +2,7 @@ import { createElement, useState } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { act } from "react";
 import { afterEach, describe, expect, it } from "vitest";
-import type { LeagueListoneEntry } from "@fantappero/contracts";
+import type { FantasyRosterSlot, FantasyTeam, LeagueListoneEntry } from "@fantappero/contracts";
 import { DEMO_TEAM, DEMO_TEAMS } from "./rosterDemoData";
 import { RosterAdminManualCard } from "./RosterAdminManualCard";
 import type { AthleteOwnership, RoleTab } from "./rosterHelpers";
@@ -392,5 +392,119 @@ describe("filtri Campionato e Squadra nella ricerca del listone (Rosario, 21/11)
     const view = render(old);
     expect(select(view, "roster-listone-competition")).toBeNull();
     expect(optionLabels(select(view, "roster-listone-club"))).toHaveLength(5);
+  });
+});
+
+describe("quota per ruolo nel listone (tester, Rosario 21/11)", () => {
+  let root: Root | null = null;
+  let container: HTMLDivElement | null = null;
+
+  afterEach(() => {
+    act(() => {
+      root?.unmount();
+    });
+    container?.remove();
+    root = null;
+    container = null;
+  });
+
+  function slot(index: number, athleteId: string | null, role: string | null): FantasyRosterSlot {
+    return {
+      id: `slot-${index}`,
+      slotIndex: index,
+      athleteId,
+      athleteName: athleteId,
+      photoUrl: null,
+      clubName: "Club",
+      role,
+      purchaseCredits: athleteId ? 1 : null,
+      exceedsRoleQuota: false,
+    };
+  }
+
+  // Dieci attaccanti su dieci e un difensore: gli attaccanti sono al completo, i difensori no.
+  const fullForwards: FantasyTeam = {
+    ...DEMO_TEAM,
+    slots: [
+      ...Array.from({ length: 10 }, (_, index) => slot(index, `owned-a-${index}`, "A")),
+      slot(10, "owned-d-0", "D"),
+      ...Array.from({ length: 5 }, (_, index) => slot(11 + index, null, null)),
+    ],
+  };
+  const quotaListone: LeagueListoneEntry[] = [
+    { ...entries[0]!, athleteId: "free-a", canonicalName: "Punta libera", officialRole: "A", effectiveRole: "A" },
+    { ...entries[0]!, athleteId: "free-d", canonicalName: "Difensore libero", officialRole: "D", effectiveRole: "D" },
+  ];
+
+  function renderCard(roleTab: RoleTab, ownTeamId: string | null, emptySlotsCount = 5) {
+    const host = document.createElement("div");
+    container = host;
+    document.body.appendChild(host);
+    root = createRoot(host);
+    act(() => {
+      root?.render(
+        createElement(RosterAdminManualCard, {
+          isAdmin: true,
+          adminLoadError: null,
+          leagueTeams: DEMO_TEAMS,
+          targetTeam: fullForwards,
+          ownTeamId,
+          emptySlotsCount,
+          adminMessage: null,
+          adminError: null,
+          listone: quotaListone,
+          listoneQuery: "",
+          onListoneQueryChange: () => undefined,
+          roleTab,
+          onRoleTabChange: () => undefined,
+          ownership: new Map(),
+          canReleaseAthlete: () => true,
+          adminBusy: false,
+          onReleaseAthlete: () => undefined,
+          onAssignAthlete: () => undefined,
+        }),
+      );
+    });
+    return host;
+  }
+
+  const assignButton = (host: HTMLElement, athleteId: string) =>
+    host.querySelector(`[data-testid="roster-admin-assign-${athleteId}"]`) as HTMLButtonElement | null;
+  const notice = (host: HTMLElement, tab: string) =>
+    host.querySelector(`[data-testid="roster-admin-quota-notice-${tab}"]`);
+
+  it("scheda Attaccanti: avviso in cima e «+» spento con il motivo", () => {
+    const host = renderCard("A", DEMO_TEAM.id);
+    expect(notice(host, "A")?.textContent).toBe(
+      "Attaccanti al completo: 10 su 10. Per prenderne un altro prima svincolane uno.",
+    );
+    const button = assignButton(host, "free-a");
+    expect(button?.disabled).toBe(true);
+    expect(button?.getAttribute("aria-label")).toBe(
+      "Non puoi assegnare Punta libera. Attaccanti al completo: 10 su 10. Per prenderne un altro prima svincolane uno.",
+    );
+    expect(button?.getAttribute("title")).toContain("Attaccanti al completo");
+    expect(host.querySelector('[data-testid="roster-admin-quota-count-A"]')?.textContent?.trim()).toBe("10/10");
+  });
+
+  it("scheda Tutti: riga dei ruoli al completo, gli altri ruoli restano assegnabili", () => {
+    const host = renderCard("all", DEMO_TEAM.id);
+    expect(notice(host, "all")?.textContent).toBe("Al completo: Attaccanti (10/10)");
+    expect(assignButton(host, "free-a")?.disabled).toBe(true);
+    const defender = assignButton(host, "free-d");
+    expect(defender?.disabled).toBe(false);
+    expect(defender?.getAttribute("aria-label")).toBe("Assegna Difensore libero");
+  });
+
+  it("admin che assegna a un'altra squadra: il messaggio la nomina", () => {
+    const host = renderCard("A", "another-team");
+    expect(notice(host, "A")?.textContent).toBe(`${DEMO_TEAM.name} ha già 10 attaccanti su 10.`);
+  });
+
+  it("rosa piena: nessun avviso di ruolo, assegnazione spenta come prima", () => {
+    const host = renderCard("all", DEMO_TEAM.id, 0);
+    expect(notice(host, "all")).toBeNull();
+    expect(assignButton(host, "free-d")?.disabled).toBe(true);
+    expect(assignButton(host, "free-d")?.getAttribute("aria-label")).toBe("Assegna Difensore libero");
   });
 });
