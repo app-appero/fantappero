@@ -7413,6 +7413,281 @@ button.fa-starter-row:disabled {
   }
 }
 
+/* ══ Parti comuni su telefono: rifinitura grafica (proposte di design del 21/11) ══════
+   Header, «Prossimo blocco», titoli delle pagine, finestre, avvisi, banda d'assistenza,
+   schede e bottoni piccoli: solo misure, spazi, livelli e posizioni, nessun cambio di
+   comportamento. Ogni blocco porta il numero della proposta (design_comune/proposals.json),
+   così si può tenere o togliere da solo. Sta prima delle regole iPhone in fondo al file,
+   che restano l'ultima parola su env(safe-area-inset-*) e campi da 16px. */
+
+/* [Comune 1] Header su una riga sola anche a 360px: il selettore della lega si stringe
+   (il nome finisce con «…») invece di spingere il «+» sotto, sulla seconda riga. Un
+   eventuale errore di caricamento delle leghe va ancora a capo da solo. */
+@media (max-width: 767px) {
+  .fa-app-header .fa-league-selector {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+}
+
+/* [Comune 2] Header: menu, logo, «+», campanella ed «Esci» con un'area di tocco da 44px
+   (erano 32, 28×17, 32, 26 e 30×24); il selettore della lega e le voci del menu «+»
+   (Crea lega, Unisciti con codice) alti 44px (erano 32). Spazi
+   tra le icone ridotti, così la riga resta una sola anche a 360px. Il numero delle
+   notifiche non copre più la campanella. */
+@media (max-width: 767px) {
+  .fa-app-header {
+    column-gap: 0.125rem;
+  }
+
+  .fa-app-header__menu-button,
+  .fa-app-header__add-league {
+    width: 2.75rem;
+    height: 2.75rem;
+  }
+
+  .fa-app-header__menu-button {
+    margin-left: -0.375rem;
+  }
+
+  .fa-app-header__brand a {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 2.75rem;
+    min-height: 2.75rem;
+  }
+
+  .fa-app-header .fa-select {
+    min-height: 2.75rem;
+  }
+
+  .fa-app-header__league-menu .fa-app-header__league-action {
+    display: flex;
+    align-items: center;
+    min-height: 2.75rem;
+  }
+
+  .fa-app-header__actions {
+    gap: 0;
+  }
+
+  .fa-app-header__actions .fa-notification-center__trigger {
+    min-width: 2.75rem;
+    min-height: 2.75rem;
+  }
+
+  .fa-app-header__actions .fa-notification-center__badge {
+    top: 0.125rem;
+    right: 0.125rem;
+  }
+
+  .fa-app-header__actions .fa-logout-button {
+    min-width: 2.75rem;
+    min-height: 2.75rem;
+    margin-right: -0.375rem;
+    padding: 0 0.25rem;
+    font-size: var(--fa-text-sm);
+  }
+}
+
+/* [Comune 3] «Prossimo blocco» su telefono: la pillola sta dentro l'header, in una
+   striscia sotto la riga delle icone, invece di galleggiare sopra la pagina (scorrendo
+   copriva bottoni e testi). Quando nella Formazione si aggancia la barra delle mosse, la
+   striscia resta al suo posto (vuota), così la pagina non salta. */
+@media (max-width: 767px) {
+  .fa-app-chrome,
+  .fa-surface-pitch > .fa-app-chrome {
+    margin-bottom: var(--fa-space-sm);
+  }
+
+  .fa-app-chrome:has(> .fa-lock-countdown-bar) {
+    border-bottom: 1px solid var(--fa-color-border);
+    background-color: color-mix(in srgb, var(--fa-color-background) 78%, transparent);
+    -webkit-backdrop-filter: blur(16px);
+    backdrop-filter: blur(16px);
+  }
+
+  .fa-app-chrome > .fa-app-header {
+    padding-bottom: 0.2rem;
+  }
+
+  .fa-app-chrome:has(> .fa-lock-countdown-bar) > .fa-app-header {
+    border-bottom-color: transparent;
+    background-color: transparent;
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+
+  .fa-app-chrome > .fa-lock-countdown-bar {
+    position: relative;
+    left: auto;
+    bottom: auto;
+    margin: 0 auto;
+    z-index: 0;
+    padding: 0 0 0.375rem;
+    transform: none;
+  }
+
+  .fa-app-chrome > .fa-lock-countdown-bar > * {
+    box-shadow: none;
+  }
+
+  .fa-app-chrome > .fa-lock-countdown-bar:has(> .fa-lock-countdown--idle) {
+    display: none;
+  }
+
+  .fa-moves-docked .fa-app-chrome > .fa-lock-countdown-bar {
+    display: flex;
+    visibility: hidden;
+  }
+}
+
+/* [Comune 4] Titoli delle pagine (ROSA, SCAMBI, TURNI, …) su telefono da 32px (erano
+   16px, più piccoli dei titoli delle sezioni sotto, come «Stato stagione» da 28px): si
+   capisce subito dove si è. Su desktop restano da 40px. */
+@media (max-width: 767px) {
+  .fa-page-container__title {
+    font-size: 2rem;
+    line-height: 1.1;
+  }
+}
+
+/* [Comune 5] Finestre (Modal) in tutte le pagine: il velo scuro copre anche header,
+   selettore della lega, «Prossimo blocco» e banda d'assistenza, che prima restavano
+   accesi e cliccabili sopra il velo (il corpo della pagina ha z-index 1, l'header 200).
+   La «×» di chiusura ha un'area di tocco da 44px (era 23×32). Le regole locali di
+   Formazione ([Proposta 2]) e Mercato ([Rosa/Mercato 5]) restano: fanno la stessa cosa
+   per le loro pagine e la barra azioni della Formazione. */
+.fa-app-shell__body:has(.fa-modal) {
+  z-index: var(--fa-z-modal);
+}
+
+:root:has(.fa-app-shell .fa-modal) .fa-impersonation-banner {
+  z-index: 0;
+}
+
+.fa-modal__header .fa-modal__close {
+  min-width: 2.75rem;
+  min-height: 2.75rem;
+  margin: -6px -8px -6px 0;
+  padding: 0;
+  font-size: 1.375rem;
+  line-height: 1;
+}
+
+/* [Comune 6] Avvisi (toast) su telefono in alto, sotto la barra di stato, a tutta
+   larghezza: in basso coprivano la barra azioni della Formazione («Salva formazione») e
+   le altre barre fisse in fondo. La «×» ha un'area di tocco da 44px. Selettore più
+   forte delle regole iPhone in fondo (che lo mettono in basso a destra), con gli stessi
+   margini env(safe-area-inset-*). */
+@media (max-width: 767px) {
+  :root .fa-toast-region {
+    top: calc(var(--fa-space-sm) + env(safe-area-inset-top, 0px));
+    right: calc(var(--fa-space-sm) + env(safe-area-inset-right, 0px));
+    bottom: auto;
+    left: calc(var(--fa-space-sm) + env(safe-area-inset-left, 0px));
+    max-width: none;
+  }
+}
+
+.fa-toast .fa-toast__dismiss {
+  min-width: 2.75rem;
+  min-height: 2.75rem;
+  margin: -0.625rem -0.625rem -0.625rem 0;
+  padding: 0;
+  font-size: 1.25rem;
+  line-height: 1;
+}
+
+/* [Comune 7] Pannello Notifiche su telefono: largo quanto lo schermo (meno 8px per
+   lato) invece di 320px spostato a sinistra; «Segna tutte come lette» su una riga, col
+   carattere normale dei bottoni (prendeva il corsivo grande del titolo) e alto 44px. */
+@media (max-width: 767px) {
+  /* Con left e width fissati il «right» calcolato accanto alla campanella non conta. */
+  .fa-notification-center__panel {
+    left: calc(var(--fa-space-sm) + env(safe-area-inset-left, 0px));
+    width: calc(
+      100% - 2 * var(--fa-space-sm) - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px)
+    );
+  }
+}
+
+.fa-notification-center__header {
+  padding-inline: var(--fa-space-md) var(--fa-space-sm);
+}
+
+.fa-notification-center__header button {
+  min-height: 2.75rem;
+  font-family: var(--fa-font-sans);
+  font-size: var(--fa-text-sm);
+  font-style: normal;
+  font-weight: 600;
+  text-transform: none;
+  white-space: nowrap;
+}
+
+/* [Comune 8] Banda «Stai impersonando…» su telefono: testo e bottone sulla stessa riga
+   (alta 64px, era 85px) e «Torna al tuo account» da 44px. Scorrendo l'header si ferma
+   sotto la banda invece di finirle dietro (prima menu, lega e campanella sparivano).
+   Il bottone ha un fondo pieno: il testo era a 3.0:1 nel tema chiaro e 2.0:1 nello scuro. */
+.fa-impersonation-banner .fa-btn {
+  border-color: transparent;
+  background-color: var(--fa-color-background-elevated);
+  color: var(--fa-color-foreground);
+}
+
+@media (max-width: 767px) {
+  .fa-impersonation-banner {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: var(--fa-space-sm);
+    box-sizing: content-box;
+    height: 3rem;
+    margin-top: 0;
+    padding-bottom: var(--fa-space-sm);
+    font-size: 0.8125rem;
+    line-height: 1.2;
+    text-align: left;
+  }
+
+  .fa-impersonation-banner > span {
+    display: -webkit-box;
+    overflow: hidden;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 3;
+  }
+
+  .fa-impersonation-banner .fa-btn {
+    min-height: 2.75rem;
+  }
+
+  :root:has(.fa-impersonation-banner) .fa-app-chrome {
+    top: calc(4rem + env(safe-area-inset-top, 0px));
+  }
+}
+
+/* [Comune 9] Schede (Profilo: Utente · Notifiche, Turni, Amministrazione: Configurazione ·
+   Invitati, …) su telefono alte 44px con testo da 14px (erano 40px e 12px). */
+@media (max-width: 767px) {
+  .fa-tab {
+    min-height: 2.75rem;
+    font-size: var(--fa-text-sm);
+  }
+}
+
+/* [Comune 10] Bottoni piccoli (Amministratori, Sostituisci fantallenatore, Invita, Sei
+   tu, …) su telefono alti 44px con testo da 14px (erano 32px e 12px). Dove una pagina ha
+   già misure sue più specifiche (tabelle della Rosa, Formazione) restano quelle. */
+@media (max-width: 767px) {
+  .fa-btn--sm {
+    min-height: 2.75rem;
+    padding-inline: var(--fa-space-md);
+    font-size: var(--fa-text-sm);
+  }
+}
+
 /* ══ iPhone: sito aggiunto alla schermata Home (si apre come un'app) ═══════════
    Con viewport-fit=cover la pagina arriva sotto notch, angoli arrotondati e
    indicatore Home: env(safe-area-inset-*) dice quanto spazio lasciare libero.
