@@ -6707,6 +6707,599 @@ button.fa-starter-row:disabled {
   text-decoration: underline;
 }
 
+/* ══ Rosa e Mercato su telefono: rifinitura grafica (proposte di design del 21/11) ═══
+   Solo misure, spazi, allineamenti, livelli e colori di sfondo: nessun cambio di
+   comportamento né di testi. Ogni blocco porta il numero della proposta (proposals.json),
+   così si può tenere o togliere da solo. Il perimetro è la pagina del mercato: la barra
+   del mercato e, subito dopo, le schede Rosa · Asta · Scambi («.fa-market-gate ~ .fa-tabs»).
+   Sta prima delle regole iPhone in fondo al file, che restano l'ultima parola su
+   env(safe-area-inset-*) e campi da 16px. */
+
+/* [Rosa/Mercato 1] Nomi interi nelle tabelle della Rosa: vanno a capo invece dei puntini
+   («Gianluca Bell…» a 390 px, «Gianluca …» a 360 px, «Alessandro Bian…» nel listone a 1280 px).
+   Di solito due righe, tre solo per un cognome lunghissimo a 360 px, sempre dentro l'altezza
+   della riga; su telefono a 13px (erano 12px). Anche il club va a capo invece di tagliarsi
+   («Aquile Bergam…»), in una colonna del 25% (era 28%). Card dei ruoli su telefono con margine
+   interno di 12px (erano 24px): la tabella guadagna 24px. */
+@container fa-roster-table (max-width: 38rem) {
+  .fa-roster-table td.fa-roster-col--name,
+  .fa-roster-table--rosa td.fa-roster-col--club {
+    white-space: normal;
+  }
+
+  .fa-roster-table--rosa .fa-roster-col--club {
+    width: 25%;
+  }
+
+  .fa-roster-table--rosa td.fa-roster-col--club {
+    overflow-wrap: break-word;
+    line-height: 1.25;
+  }
+
+  .fa-roster-table .fa-roster-col--name .fa-auction-player__name {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 3;
+    max-height: 3.75em;
+    overflow: hidden;
+    white-space: normal;
+    overflow-wrap: break-word;
+    hyphens: auto;
+    line-height: 1.25;
+  }
+}
+
+@media (max-width: 767px) {
+  @container fa-roster-table (max-width: 38rem) {
+    .fa-roster-table .fa-roster-col--name .fa-auction-player__name {
+      font-size: 0.8125rem;
+    }
+  }
+}
+
+@media (max-width: 34rem) {
+  .fa-roster-role-tables > * {
+    padding: 0.75rem;
+  }
+}
+
+/* [Rosa/Mercato 2] Tabelle di Rosa e listone: ✕ (rimuovi), + (assegna) e prezzo con area di
+   tocco da 44px (erano 27×27 e 37×26). Il cerchio colorato resta piccolo (32px, era 27px)
+   dentro un pulsante trasparente da 44×44; il prezzo ha angoli da 12px, non a pillola. Nel
+   tema scuro il «+» diventa scuro sul cerchio azzurro (era bianco, 2.5:1). Vale su telefono e
+   sugli schermi touch: col mouse, su desktop, le righe restano come prima. */
+@media (max-width: 767px), (pointer: coarse) {
+  @container fa-roster-table (max-width: 38rem) {
+    .fa-roster-table .fa-roster-col--action {
+      width: 2.75rem;
+      padding-inline: 0;
+    }
+
+    .fa-roster-table .fa-roster-col--credits,
+    .fa-roster-table .fa-roster-col--price {
+      width: 3rem;
+      padding-inline: 0.125rem;
+    }
+
+    .fa-roster-table .fa-roster-action,
+    .fa-roster-table .fa-roster-action:hover:not(:disabled) {
+      width: 2.75rem;
+      height: 2.75rem;
+      min-height: 2.75rem;
+      border-color: transparent;
+      background: transparent;
+      box-shadow: none;
+    }
+
+    .fa-roster-table .fa-roster-action__icon {
+      width: 2rem;
+      height: 2rem;
+      align-items: center;
+      justify-content: center;
+      border-radius: 999px;
+    }
+
+    .fa-roster-table .fa-roster-action--release .fa-roster-action__icon {
+      background-color: var(--fa-color-danger);
+    }
+
+    .fa-roster-table .fa-roster-action--assign .fa-roster-action__icon {
+      background-color: var(--fa-color-accent);
+      color: var(--fa-color-accent-contrast);
+    }
+
+    .fa-roster-table .fa-roster-price-edit .fa-input,
+    .fa-roster-table .fa-roster-price-input {
+      min-height: 2.75rem;
+      border-radius: var(--fa-radius-md);
+    }
+  }
+}
+
+/* [Rosa/Mercato 3] Schede e percorso: Rosa · Asta · Scambi e Buste chiuse · Live da 44px
+   (erano 40px) e, su telefono, a tutta larghezza con voci uguali (prima una pillola a
+   sinistra e il resto vuoto). «Leghe» nel percorso con area di tocco 44×44 (era 32×18). */
+.fa-market-gate ~ .fa-tabs .fa-tab {
+  min-height: 2.75rem;
+}
+
+@media (max-width: 34rem) {
+  .fa-market-gate ~ .fa-tabs > .fa-tablist,
+  .fa-market-gate ~ .fa-tabs .fa-page-container__body > .fa-tabs > .fa-tablist {
+    display: flex;
+    width: 100%;
+  }
+
+  .fa-market-gate ~ .fa-tabs > .fa-tablist > .fa-tab,
+  .fa-market-gate ~ .fa-tabs .fa-page-container__body > .fa-tabs > .fa-tablist > .fa-tab {
+    flex: 1 1 0;
+    padding-inline: var(--fa-space-sm);
+    font-size: var(--fa-text-sm);
+  }
+}
+
+.fa-market-gate ~ .fa-tabs .fa-breadcrumb__link {
+  display: inline-block;
+  padding: 13px 6px;
+  margin: -13px -6px;
+}
+
+/* [Rosa/Mercato 4] Barra del mercato: quando è fermo (turno in corso, lega non al completo)
+   diventa un riquadro giallo tenue con la riga gialla a sinistra, come gli avvisi della
+   Formazione; il motivo passa dal giallo scuro in grassetto al colore del testo.
+   «i» e interruttore con area di tocco 44×44 (erano 20×20 e 44×24), stesso disegno. */
+.fa-market-gate:has(.fa-market-gate__notice) {
+  border-color: color-mix(in srgb, var(--fa-color-warning) 45%, var(--fa-color-border));
+  border-left: 4px solid var(--fa-color-warning);
+  background-color: color-mix(in srgb, var(--fa-color-warning) 9%, var(--fa-color-background-elevated));
+}
+
+.fa-market-gate__notice {
+  color: var(--fa-color-foreground);
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+.fa-market-gate .fa-info-badge {
+  position: relative;
+  width: 1.5rem;
+  height: 1.5rem;
+  font-size: 0.8125rem;
+}
+
+.fa-market-gate .fa-info-badge::after,
+.fa-market-gate .fa-switch__control::after {
+  content: "";
+  position: absolute;
+  inset: -11px;
+}
+
+.fa-market-gate .fa-switch__control::after {
+  inset: -11px -1px;
+}
+
+@media (max-width: 767px) {
+  .fa-market-gate {
+    padding: 0.5rem 0.75rem;
+  }
+}
+
+/* [Rosa/Mercato 5] Proposta di scambio: Accetta, Rifiuta, Controproponi e Annulla da 44px
+   (erano 32px) e testo da 14px (era 12px). Su telefono «Accetta» a tutta riga e gli altri
+   due affiancati, a larghezza uguale; card con margine interno di 16px (erano 24px).
+   Finestra «Accettare lo scambio?»: il velo copre anche header e «Prossimo blocco» e la
+   «×» ha un'area di tocco da 44px (era 23×32). */
+.fa-trade-card .fa-btn {
+  min-height: 2.75rem;
+  padding-inline: var(--fa-space-md);
+  font-size: var(--fa-text-sm);
+}
+
+@media (max-width: 34rem) {
+  .fa-trade-card {
+    padding: var(--fa-space-md);
+  }
+
+  .fa-trade-card .fa-ds-showcase__row {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .fa-trade-card .fa-ds-showcase__row > .fa-btn--primary {
+    grid-column: 1 / -1;
+  }
+}
+
+.fa-app-shell__body:has(.fa-market-page .fa-modal) {
+  z-index: var(--fa-z-modal);
+}
+
+.fa-market-page .fa-modal__close {
+  min-width: 2.75rem;
+  min-height: 2.75rem;
+  margin: -6px -8px -6px 0;
+  padding: 0;
+  font-size: 1.375rem;
+  line-height: 1;
+}
+
+/* [Rosa/Mercato 6] Modulo «Nuova proposta di scambio»: niente più riquadri grigi del browser
+   attorno a «Giocatori offerti», «Giocatori richiesti» e «Crediti»; i titoli diventano
+   etichette come «Squadra destinataria» e i blocchi stanno a 16px l'uno dall'altro. Righe
+   dei calciatori, Offri/Chiedi e «Imposta una scadenza» alte 44px (erano 40, 24 e 19px),
+   con caselle da 20px (erano 13-16px). */
+[data-testid="market-trade-create-form"] {
+  display: grid;
+  gap: var(--fa-space-md);
+}
+
+[data-testid="market-trade-create-form"] > .fa-trade-columns {
+  margin-bottom: 0;
+}
+
+[data-testid="market-trade-create-form"] > p,
+[data-testid="market-trade-requested-athletes"] > p {
+  margin: 0;
+  color: var(--fa-color-foreground-muted);
+  font-size: var(--fa-text-sm);
+}
+
+[data-testid="market-trade-create-form"] > .fa-btn {
+  justify-self: start;
+}
+
+[data-testid="market-trade-create-form"] fieldset {
+  display: grid;
+  gap: var(--fa-space-sm);
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+[data-testid="market-trade-create-form"] legend {
+  float: left;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  font-size: var(--fa-text-sm);
+  font-weight: 600;
+  color: var(--fa-color-foreground);
+}
+
+[data-testid="market-trade-create-form"] [role="radiogroup"] > label,
+[data-testid="market-trade-create-form"] > label {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--fa-space-sm);
+  min-height: 2.75rem;
+  padding-right: var(--fa-space-sm);
+  cursor: pointer;
+}
+
+[data-testid="market-trade-create-form"] > label {
+  justify-self: start;
+}
+
+[data-testid="market-trade-create-form"] input[type="radio"],
+[data-testid="market-trade-create-form"] input[type="checkbox"] {
+  flex-shrink: 0;
+  width: 1.25rem;
+  height: 1.25rem;
+  margin: 0;
+  accent-color: var(--fa-color-accent);
+}
+
+[data-testid="market-trade-create-form"] .fa-trade-athlete-list label {
+  min-height: 2.75rem;
+  padding-block: var(--fa-space-xs);
+  cursor: pointer;
+}
+
+/* [Rosa/Mercato 7] Scambi: i quattro numeri in alto più compatti su telefono (card da 68px,
+   erano 88px; numeri da 24px, erano 32px) e staccati di 16px dal modulo (prima attaccati). Filtri
+   Ricevute · Inviate · In corso · Tutte su una riga, a larghezza uguale e da 44px: prima
+   «Tutte» andava a capo da solo. */
+.fa-trade-stats {
+  margin-bottom: var(--fa-space-md);
+}
+
+.fa-trade-tabs {
+  margin-bottom: 0;
+}
+
+@media (max-width: 34rem) {
+  .fa-trade-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--fa-space-sm);
+  }
+
+  .fa-trade-stat {
+    padding: 0.625rem 0.875rem;
+    border-radius: var(--fa-radius-lg);
+  }
+
+  .fa-trade-stat strong {
+    font-size: 1.5rem;
+  }
+
+  .fa-trade-stats > .fa-trade-stat:last-child:nth-child(odd) {
+    grid-column: 1 / -1;
+  }
+
+  .fa-trade-tabs {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .fa-trade-tabs__tab {
+    min-height: 2.75rem;
+    padding: 0 var(--fa-space-xs);
+    font-size: var(--fa-text-sm);
+    white-space: nowrap;
+  }
+}
+
+/* [Rosa/Mercato 8] Rosa su telefono: crediti residui in una striscia a tutta larghezza
+   (etichetta a sinistra, numero a destra) invece di una card alta 105px accanto al titolo;
+   riepilogo «28/35 giocatori» a tutta larghezza. Spazi uniformi da 16px: tra le card dei
+   ruoli erano 8px, sopra «Rosa vuota», «Svincolati non aperti» e «Nessuna asta a rilanci»
+   erano 40-64px. */
+@media (max-width: 34rem) {
+  .fa-roster-page > .fa-page-container__header {
+    gap: var(--fa-space-sm);
+  }
+
+  .fa-roster-page > .fa-page-container__header > .fa-page-container__actions,
+  .fa-roster-credits-bar,
+  .fa-roster-credits-bar .fa-field {
+    flex: 1 1 100%;
+    max-width: none;
+  }
+
+  .fa-roster-credits-bar__balance,
+  [data-testid="roster-summary"] {
+    display: flex;
+    flex: 1 1 100%;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    min-width: 0;
+    margin: 0;
+    padding: 0.625rem var(--fa-space-md);
+  }
+
+  .fa-roster-credits-bar__balance strong {
+    font-size: 1.625rem;
+  }
+
+  [data-testid="roster-summary"] {
+    margin-bottom: var(--fa-space-md);
+  }
+
+  .fa-roster-role-tables {
+    gap: var(--fa-space-md);
+    margin-top: var(--fa-space-md);
+  }
+
+  .fa-market-gate ~ .fa-tabs .fa-state-panel {
+    margin-top: 0;
+  }
+}
+
+/* [Rosa/Mercato 9] Asta e Svincolati: nel pannello dell'offerta 16px tra i campi («Offerta
+   (crediti)» era attaccata alla paginazione dei calciatori, i campi degli svincolati a 8px);
+   filtri per ruolo e pagine da 44px (erano 42px). Tabelle delle offerte con margine a
+   sinistra («Nome» toccava il bordo arrotondato) e «Ritira» da 44px (era 39×26); su
+   telefono la tabella degli svincolati sta tutta nello schermo (prima «Ritira» restava
+   fuori, a destra). */
+.fa-auction-page .fa-card__body {
+  display: grid;
+  gap: var(--fa-space-md);
+}
+
+.fa-auction-page .fa-card__body > * {
+  margin-block: 0;
+}
+
+.fa-auction-page .fa-athlete-chooser__pill,
+.fa-auction-page .fa-athlete-chooser__pager button {
+  min-height: 2.75rem;
+}
+
+.fa-auction-page .fa-table th:first-child,
+.fa-auction-page .fa-table td:first-child {
+  padding-left: var(--fa-space-md);
+}
+
+.fa-auction-page .fa-table .fa-btn {
+  min-height: 2.75rem;
+  padding-inline: var(--fa-space-md);
+  font-size: var(--fa-text-sm);
+}
+
+@media (max-width: 767px) {
+  .fa-auction-bids-table .fa-roster-col--action {
+    width: 5rem;
+  }
+
+  .fa-auction-bids-table td.fa-roster-col--name,
+  .fa-auction-bids-table .fa-athlete-name {
+    white-space: normal;
+  }
+
+  .fa-auction-page .fa-table .fa-btn {
+    padding-inline: 0.75rem;
+    font-size: 0.8125rem;
+  }
+
+  [data-testid="waiver-my-bids-table"] {
+    font-size: 0.8125rem;
+  }
+
+  [data-testid="waiver-my-bids-table"] th,
+  [data-testid="waiver-my-bids-table"] td {
+    padding: var(--fa-space-sm) 0.2rem;
+  }
+
+  [data-testid="waiver-my-bids-table"] th {
+    letter-spacing: 0.04em;
+  }
+
+  [data-testid="waiver-my-bids-table"] th:first-child,
+  [data-testid="waiver-my-bids-table"] td:first-child {
+    padding-left: 0.625rem;
+  }
+
+  [data-testid="waiver-my-bids-table"] th:last-child,
+  [data-testid="waiver-my-bids-table"] td:last-child {
+    padding-right: var(--fa-space-sm);
+  }
+
+  [data-testid="waiver-my-bids-table"] .fa-btn {
+    padding-inline: 0.5rem;
+  }
+
+  [data-testid="waiver-my-bids-table"] .fa-badge {
+    padding-inline: 0.35rem;
+    letter-spacing: 0.02em;
+  }
+}
+
+/* [Rosa/Mercato 10] Listone su telefono: ogni calciatore su due righe. Sopra foto, nome
+   intero, prezzo e +/✕; sotto club e stato. Prima sei colonne in 356px: il nome restava
+   «Ales…» a 390 px e «A…» a 360 px, lo stato «BRUNO R…». Il ruolo resta nel bollino della
+   foto; l'intestazione della tabella resta per lo screen reader. «Solo disponibili» alta
+   44px (era 22px) e ruoli Tutti · Portieri · … in una riga sola, anche a 1280 px dove
+   «Attaccanti» andava a capo da solo. */
+@container fa-roster-table (max-width: 30rem) {
+  .fa-roster-table--listone,
+  .fa-roster-table--listone > tbody {
+    display: block;
+    width: 100%;
+  }
+
+  .fa-roster-table--listone > thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  .fa-roster-table--listone > tbody > tr {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto 3rem 2.75rem;
+    grid-template-rows: minmax(1.25rem, auto) auto;
+    align-items: center;
+    column-gap: var(--fa-space-xs);
+    padding: 0.375rem var(--fa-space-xs) 0.375rem var(--fa-space-sm);
+    border-bottom: 1px solid var(--fa-color-border);
+  }
+
+  .fa-roster-table--listone > tbody > tr:last-child {
+    border-bottom: 0;
+  }
+
+  .fa-roster-table--listone > tbody > tr > td {
+    display: block;
+    width: auto;
+    min-width: 0;
+    padding: 0;
+    border-bottom: 0;
+  }
+
+  /* Foto e nome in alto a sinistra, sulle due righe; club e stato nella seconda riga. */
+  .fa-roster-table--listone td.fa-roster-col--name {
+    grid-column: 1 / 3;
+    grid-row: 1 / 3;
+    align-self: stretch;
+    overflow: visible;
+  }
+
+  .fa-roster-table--listone td.fa-roster-col--name .fa-auction-player {
+    align-items: flex-start;
+  }
+
+  .fa-roster-table--listone .fa-roster-col--name .fa-auction-player__name {
+    -webkit-line-clamp: 1;
+    max-height: 1.25em;
+    margin: 1px 0 0 0.25rem;
+  }
+
+  .fa-roster-table--listone td.fa-roster-col--role {
+    display: none;
+  }
+
+  .fa-roster-table--listone td.fa-roster-col--club {
+    grid-column: 1;
+    grid-row: 2;
+    align-self: end;
+    padding-left: 2.85rem;
+    color: var(--fa-color-foreground-muted);
+  }
+
+  .fa-roster-table--listone td.fa-roster-col--status {
+    grid-column: 2;
+    grid-row: 2;
+    align-self: end;
+  }
+
+  .fa-roster-table--listone td.fa-roster-col--price {
+    grid-column: 3;
+    grid-row: 1 / 3;
+    text-align: center;
+  }
+
+  .fa-roster-table--listone td.fa-roster-col--action {
+    grid-column: 4;
+    grid-row: 1 / 3;
+  }
+
+  .fa-roster-table--listone .fa-pitch-player__card {
+    width: 2.25rem;
+    height: 2.25rem;
+  }
+
+  .fa-roster-table--listone .fa-roster-col--status .fa-badge {
+    font-size: 0.6875rem;
+  }
+}
+
+.fa-roster-listone__free {
+  min-height: 2.75rem;
+  margin-top: 0;
+  cursor: pointer;
+}
+
+.fa-roster-listone__free input {
+  width: 1.25rem;
+  height: 1.25rem;
+}
+
+[data-testid="roster-admin-manual"] .fa-tablist {
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+[data-testid="roster-admin-manual"] .fa-tab {
+  flex: 0 0 auto;
+  min-width: 2.75rem;
+  padding-inline: var(--fa-space-md);
+  white-space: nowrap;
+}
+
+@media (max-width: 34rem) {
+  [data-testid="roster-admin-manual"] .fa-tab {
+    padding-inline: 0.375rem;
+  }
+}
+
 /* ══ iPhone: sito aggiunto alla schermata Home (si apre come un'app) ═══════════
    Con viewport-fit=cover la pagina arriva sotto notch, angoli arrotondati e
    indicatore Home: env(safe-area-inset-*) dice quanto spazio lasciare libero.
