@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from datetime import date
 from pathlib import Path
 
 import pytest
@@ -92,6 +93,20 @@ def _fixture_roster_batches() -> tuple[list[SquadBatch], list[PlayersBatch], lis
     return squad_batches, players_batches, [transfers]
 
 
+def _transfers_during_season() -> ProviderEnvelope:
+    """``transfers_sample`` con la cessione Wolves → Chelsea a stagione 2026/27 iniziata.
+
+    Nel campione è del 10/01/2026, prima dell'inizio della Premier 2026 (21/08/2026):
+    un'uscita prima della stagione non chiude la membership di una rosa che lo
+    elenca ancora (es. rientro non tracciato), quindi qui va spostata dopo l'inizio.
+    """
+    payload = _load("reference/transfers_sample.json")
+    for entry in payload["response"][0]["transfers"]:
+        if entry["date"] == "2026-01-10":
+            entry["date"] = "2026-09-01"
+    return parse_envelope(payload, endpoint="/transfers", http_status=200)
+
+
 def test_roster_sync_idempotent_stable_uuids(session: Session) -> None:
     reset_metrics()
     _seed_catalog(session)
@@ -169,13 +184,13 @@ def test_team_change_preserves_historical_membership(session: Session) -> None:
         session,
         squad_batches=squad_batches,
         players_batches=[],
-        transfers_envelopes=transfers,
+        transfers_envelopes=[_transfers_during_season()],
     )
     session.commit()
 
     session.refresh(wolves_membership)
     assert wolves_membership.is_active is False
-    assert wolves_membership.ended_at is not None
+    assert wolves_membership.ended_at == date(2026, 9, 1)
 
     chelsea = session.execute(select(Club).where(Club.provider_id == 49)).scalar_one()
     chelsea_membership = session.execute(

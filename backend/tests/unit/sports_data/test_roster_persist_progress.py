@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
+from datetime import date
 from types import SimpleNamespace
 from uuid import uuid4
 
 from sports_data.roster.sync import (
     RosterSyncCounters,
-    _athlete_has_transfer_out,
+    _latest_transfer_dates,
     _roster_cache,
     _RosterLookupCache,
     sync_roster,
@@ -81,28 +82,23 @@ def test_cached_transfer_key_skips_the_database() -> None:
     assert counters.transfers_unchanged == 1
 
 
-def test_transfer_out_cache_answers_without_a_query() -> None:
+def test_transfer_dates_cache_answers_without_a_query() -> None:
     athlete_id = uuid4()
     club_id = uuid4()
     cache = _RosterLookupCache()
-    cache.transfer_outs.add((athlete_id, club_id))
+    cache.transfer_outs[(athlete_id, club_id)] = date(2025, 9, 1)
+    cache.transfer_ins[(athlete_id, club_id)] = date(2026, 7, 1)
     token = _roster_cache.set(cache)
     try:
-        assert (
-            _athlete_has_transfer_out(
-                _QueryBoom(),  # type: ignore[arg-type]
-                athlete_id=athlete_id,
-                club_id=club_id,
-            )
-            is True
-        )
-        assert (
-            _athlete_has_transfer_out(
-                _QueryBoom(),  # type: ignore[arg-type]
-                athlete_id=uuid4(),
-                club_id=club_id,
-            )
-            is False
-        )
+        assert _latest_transfer_dates(
+            _QueryBoom(),  # type: ignore[arg-type]
+            athlete_id=athlete_id,
+            club_id=club_id,
+        ) == (date(2025, 9, 1), date(2026, 7, 1))
+        assert _latest_transfer_dates(
+            _QueryBoom(),  # type: ignore[arg-type]
+            athlete_id=uuid4(),
+            club_id=club_id,
+        ) == (None, None)
     finally:
         _roster_cache.reset(token)

@@ -9,7 +9,7 @@ from datetime import UTC, date, datetime
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 import database.models  # noqa: F401 — register ORM mappers
@@ -101,9 +101,10 @@ class PlayersBatch:
 class _RosterLookupCache:
     """Request-scoped indexes so roster persist does not re-query every row.
 
-    Clubs are few and stay as ORM instances. Transfer keys and transfer-out
-    pairs are scalars: loading every Transfer row into the identity map would
-    make each later flush walk tens of thousands of objects.
+    Clubs are few and stay as ORM instances. Transfer keys and the latest
+    transfer dates per (athlete, club) are scalars: loading every Transfer row
+    into the identity map would make each later flush walk tens of thousands
+    of objects.
     """
 
     clubs: dict[int, Club | None] = field(default_factory=dict)
@@ -111,7 +112,34 @@ class _RosterLookupCache:
     competitions: dict[int, Competition | None] = field(default_factory=dict)
     seasons: dict[tuple[int, int], SportSeason | None] = field(default_factory=dict)
     transfer_keys: set[str] = field(default_factory=set)
-    transfer_outs: set[tuple[UUID, UUID]] = field(default_factory=set)
+    #: Data dell'ultima uscita da / dell'ultimo arrivo a un club, per (atleta, club).
+    transfer_outs: dict[tuple[UUID, UUID], date] = field(default_factory=dict)
+    transfer_ins: dict[tuple[UUID, UUID], date] = field(default_factory=dict)
+
+    def remember_transfer(self, transfer: Transfer) -> None:
+        self.transfer_keys.add(transfer.provider_key)
+        if transfer.from_club_id is not None:
+            _keep_latest(
+                self.transfer_outs,
+                (transfer.athlete_id, transfer.from_club_id),
+                transfer.transfer_date,
+            )
+        if transfer.to_club_id is not None:
+            _keep_latest(
+                self.transfer_ins,
+                (transfer.athlete_id, transfer.to_club_id),
+                transfer.transfer_date,
+            )
+
+
+def _keep_latest(
+    index: dict[tuple[UUID, UUID], date],
+    key: tuple[UUID, UUID],
+    value: date,
+) -> None:
+    current = index.get(key)
+    if current is None or value > current:
+        index[key] = value
 
 
 _roster_cache: ContextVar[_RosterLookupCache | None] = ContextVar(
@@ -130,12 +158,16 @@ def _load_roster_lookup_cache(session: Session) -> _RosterLookupCache:
     for club in session.scalars(select(Club)).all():
         cache.clubs[club.provider_id] = club
     cache.transfer_keys.update(session.scalars(select(Transfer.provider_key)).all())
-    for athlete_id, from_club_id in session.execute(
-        select(Transfer.athlete_id, Transfer.from_club_id).where(
-            Transfer.from_club_id.is_not(None),
-        ),
+    for club_column, index in (
+        (Transfer.from_club_id, cache.transfer_outs),
+        (Transfer.to_club_id, cache.transfer_ins),
     ):
-        cache.transfer_outs.add((athlete_id, from_club_id))
+        for athlete_id, club_id, last_date in session.execute(
+            select(Transfer.athlete_id, club_column, func.max(Transfer.transfer_date))
+            .where(club_column.is_not(None))
+            .group_by(Transfer.athlete_id, club_column),
+        ):
+            index[(athlete_id, club_id)] = last_date
     return cache
 
 
@@ -275,24 +307,71 @@ def upsert_athlete_from_membership(
     )
 
 
-def _athlete_has_transfer_out(
+def _latest_transfer_dates(
     session: Session,
     *,
     athlete_id: UUID,
     club_id: UUID,
-) -> bool:
+) -> tuple[date | None, date | None]:
+    """Date dell'ultima uscita dal club e dell'ultimo arrivo al club."""
     cache = _roster_cache.get()
     if cache is not None:
-        return (athlete_id, club_id) in cache.transfer_outs
-    return (
-        session.execute(
-            select(Transfer.id).where(
-                Transfer.athlete_id == athlete_id,
-                Transfer.from_club_id == club_id,
-            ),
-        ).first()
-        is not None
+        key = (athlete_id, club_id)
+        return cache.transfer_outs.get(key), cache.transfer_ins.get(key)
+    last_out = session.execute(
+        select(func.max(Transfer.transfer_date)).where(
+            Transfer.athlete_id == athlete_id,
+            Transfer.from_club_id == club_id,
+        ),
+    ).scalar_one_or_none()
+    last_in = session.execute(
+        select(func.max(Transfer.transfer_date)).where(
+            Transfer.athlete_id == athlete_id,
+            Transfer.to_club_id == club_id,
+        ),
+    ).scalar_one_or_none()
+    return last_out, last_in
+
+
+def _season_start(sport_season: SportSeason) -> date:
+    """Inizio della stagione; senza data dal provider, il 1° luglio dell'anno.
+
+    Per API-Football ``season=2026`` è la 2026/27: il 1° luglio è l'apertura
+    del mercato estivo europeo, prima della prima giornata di ogni campionato MVP.
+    """
+    if sport_season.start_date is not None:
+        return sport_season.start_date
+    return date(sport_season.year, 7, 1)
+
+
+def _membership_end_from_transfers(
+    session: Session,
+    *,
+    athlete_id: UUID,
+    club_id: UUID,
+    sport_season: SportSeason,
+) -> date | None:
+    """Data di uscita se la membership del club per la stagione va chiusa, se no ``None``.
+
+    Decide la sequenza dei trasferimenti, non la sola esistenza di un'uscita:
+    un calciatore andato in prestito e poi rientrato («Back from Loan») resta
+    nel club. La membership è chiusa solo se l'ultimo trasferimento che tocca il
+    club è un'uscita, ed è successiva all'ultimo arrivo nel club oppure, se un
+    arrivo non c'è, è avvenuta da inizio stagione in poi. Un'uscita e un arrivo
+    nello stesso giorno contano come uscita (il calciatore è passato ed è
+    ripartito). Un'unica uscita prima della stagione non chiude la membership:
+    il provider lo rimette in rosa per la stagione in corso.
+    """
+    last_out, last_in = _latest_transfer_dates(
+        session,
+        athlete_id=athlete_id,
+        club_id=club_id,
     )
+    if last_out is None:
+        return None
+    if last_in is not None:
+        return None if last_in > last_out else last_out
+    return last_out if last_out >= _season_start(sport_season) else None
 
 
 def upsert_squad_membership(
@@ -348,11 +427,13 @@ def upsert_squad_membership(
         return None
 
     athlete = upsert_athlete_from_membership(session, mapped, counters)
-    should_be_active = not _athlete_has_transfer_out(
+    transfer_end = _membership_end_from_transfers(
         session,
         athlete_id=athlete.id,
         club_id=club.id,
+        sport_season=sport_season,
     )
+    should_be_active = transfer_end is None
     row = session.execute(
         select(SquadMembership).where(
             SquadMembership.athlete_id == athlete.id,
@@ -365,7 +446,7 @@ def upsert_squad_membership(
         "shirt_number": mapped.shirt_number,
         "provider_position_raw": mapped.provider_position_raw,
         "is_active": should_be_active,
-        "ended_at": None if should_be_active else row.ended_at if row else None,
+        "ended_at": transfer_end,
         "source": mapped.source,
     }
     if row is None:
@@ -458,9 +539,7 @@ def upsert_transfer(
     ).scalar_one_or_none()
     if existing is not None:
         if cache is not None:
-            cache.transfer_keys.add(mapped.provider_key)
-            if existing.from_club_id is not None:
-                cache.transfer_outs.add((existing.athlete_id, existing.from_club_id))
+            cache.remember_transfer(existing)
         counters.incr_entity("transfers", "unchanged")
         return existing
 
@@ -525,9 +604,7 @@ def upsert_transfer(
     session.add(row)
     session.flush()
     if cache is not None:
-        cache.transfer_keys.add(mapped.provider_key)
-        if row.from_club_id is not None:
-            cache.transfer_outs.add((row.athlete_id, row.from_club_id))
+        cache.remember_transfer(row)
     counters.incr_entity("transfers", "created")
 
     _apply_transfer_membership_effects(
@@ -550,16 +627,34 @@ def _apply_transfer_membership_effects(
     to_club_id: UUID | None,
     counters: RosterSyncCounters,
 ) -> None:
-    """Close origin membership and open destination without deleting history."""
+    """Close origin membership and open destination without deleting history.
+
+    The origin membership is closed only when the transfer timeline says so
+    (see ``_membership_end_from_transfers``): a loan of September 2025 does not
+    close the 2026/27 membership of a player who came back, nor one the
+    provider lists in the squad of a season that started after the exit.
+    """
     if from_club_id is not None:
-        active_from = session.scalars(
-            select(SquadMembership).where(
+        active_from = session.execute(
+            select(SquadMembership, SportSeason)
+            .join(SportSeason, SquadMembership.sport_season_id == SportSeason.id)
+            .where(
                 SquadMembership.athlete_id == athlete_id,
                 SquadMembership.club_id == from_club_id,
                 SquadMembership.is_active.is_(True),
             ),
         ).all()
-        for membership in active_from:
+        for membership, sport_season in active_from:
+            if (
+                _membership_end_from_transfers(
+                    session,
+                    athlete_id=athlete_id,
+                    club_id=from_club_id,
+                    sport_season=sport_season,
+                )
+                is None
+            ):
+                continue
             _deactivate_membership(
                 membership,
                 ended_at=mapped.transfer_date,
@@ -755,9 +850,10 @@ def sync_roster(
 ) -> RosterSyncResult:
     """Atomic roster unit of work: players, then transfers, then squads.
 
-    Transfers are stored before squads because squad membership uses transfer-out
-    history to decide ``is_active``. ``on_progress`` reports each persisted batch
-    so a refresh does not sit on the last fetched club while this write runs.
+    Transfers are stored before squads because squad membership uses the transfer
+    timeline (latest exit vs latest arrival) to decide ``is_active``.
+    ``on_progress`` reports each persisted batch so a refresh does not sit on the
+    last fetched club while this write runs.
     """
     metrics = get_metrics()
     metric_labels = {"provider": PROVIDER_NAME}
