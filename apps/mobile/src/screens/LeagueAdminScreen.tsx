@@ -1270,7 +1270,7 @@ export function LeagueAdminScreen() {
           <AppTextInput
             value={replaceQuery}
             onChangeText={setReplaceQuery}
-            placeholder="Cerca per nome o email"
+            placeholder="Cerca per nome o nickname"
             autoCapitalize="none"
             autoCorrect={false}
             testID="league-members-replace-query"

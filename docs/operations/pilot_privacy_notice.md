@@ -70,5 +70,5 @@ Il testo qui sotto è la fonte unica: è mostrato in app e sul web alla pagina `
 - **Minorenni**: esclusi dal pilota; nessuna verifica automatica dell'età, regola di
   ammissione manuale applicata in fase di selezione dei partecipanti.
 - **Archivio richieste/ticket**: la casella `info@fantappero.it` funge anche da archivio.
-- **Consenso**: l'accesso (con Google o con email e password) vale come accettazione (frase con link sotto il tasto e nel pannello email); il server salva versione e data al login e il profilo le mostra con il link all'informativa. A ogni nuova versione (`PROFILE_POLICY_VERSION`) l'accettazione si registra al prossimo accesso.
+- **Consenso**: l'accesso (con Google o con email e password) vale come accettazione (frase con link sotto il tasto e nel pannello email); il server salva versione e data al login (con email e password anche alla registrazione) e il profilo le mostra con il link all'informativa. A ogni nuova versione (`PROFILE_POLICY_VERSION`) l'accettazione si registra al prossimo accesso.
 - Coerente con `pilot_support_process.md` (stesso canale, divieto di inviare password/token).

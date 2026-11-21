@@ -659,7 +659,7 @@ export function LeagueMembersPanel({
           />
           <h3>2. Chi vuoi mettere</h3>
           <Input
-            label="Cerca per nome o email"
+            label="Cerca per nome o nickname"
             name="replace-coach-query"
             value={replaceQuery}
             onChange={(event) => setReplaceQuery(event.target.value)}

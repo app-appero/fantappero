@@ -12,7 +12,9 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useLayoutEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -166,16 +168,38 @@ export function AuthProvider({ children }: AuthProviderProps) {
   }, [isDemoMode, leaguesState, user]);
 
   // Un link di notifica con "?lega=<id>" apre la lega giusta, se l'utente ne fa parte.
+  // Si applica una volta sola per valore (di nuovo solo dopo che il parametro è sparito):
+  // altrimenti ogni nuovo elenco di leghe (ricaricato a ogni navigazione) rimetteva la lega del
+  // link sopra quella scelta dopo, per esempio da RequirePermissions quando nella lega del link
+  // l'utente non ha i permessi della pagina (QA 21/11: «Selezione lega» infinita).
+  // È un layout effect perché giri prima degli effetti dei figli: RequirePermissions sceglie la
+  // lega di ripiego nel suo useEffect, che altrimenti verrebbe sovrascritto da questo.
   const requestedLeagueId = searchParams.get("lega");
-  useEffect(() => {
-    if (isDemoMode || !requestedLeagueId) {
+  const appliedRequestedLeagueIdRef = useRef<string | null>(null);
+  useLayoutEffect(() => {
+    if (!requestedLeagueId) {
+      appliedRequestedLeagueIdRef.current = null;
+      return;
+    }
+    if (isDemoMode || appliedRequestedLeagueIdRef.current === requestedLeagueId) {
       return;
     }
     if (leaguesState.some((league) => league.id === requestedLeagueId)) {
+      appliedRequestedLeagueIdRef.current = requestedLeagueId;
       saveStoredActiveLeagueId(requestedLeagueId);
       setActiveLeagueIdState(requestedLeagueId);
     }
   }, [isDemoMode, leaguesState, requestedLeagueId]);
+
+  // La lega attiva salvata segue quella mostrata. `applyMemberships` la salva dentro
+  // l'updater di setState, che React può rieseguire dopo un aggiornamento successivo (per
+  // esempio la lega di ripiego di RequirePermissions): senza questo restava salvata la lega
+  // precedente e al ricaricamento si ripartiva da quella.
+  useEffect(() => {
+    if (!isDemoMode && activeLeagueId) {
+      saveStoredActiveLeagueId(activeLeagueId);
+    }
+  }, [activeLeagueId, isDemoMode]);
 
   useEffect(() => {
     if (isDemoMode) {
