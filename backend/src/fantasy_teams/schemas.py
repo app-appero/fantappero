@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pydantic import Field
 
-from app.text_validation import NoNulStr, NoSurrogateStr
+from app.text_validation import AthleteNameStr, NoNulStr, NoSurrogateStr
 from auth.schemas import ApiModel
 
 
@@ -12,7 +12,7 @@ class FantasyRosterSlotResponse(ApiModel):
     id: str
     slot_index: int = Field(alias="slotIndex")
     athlete_id: str | None = Field(default=None, alias="athleteId")
-    athlete_name: str | None = Field(default=None, alias="athleteName")
+    athlete_name: AthleteNameStr | None = Field(default=None, alias="athleteName")
     photo_url: str | None = Field(default=None, alias="photoUrl")
     club_name: str | None = Field(default=None, alias="clubName")
     role: str | None = None
@@ -92,7 +92,7 @@ class RosterOccupancyEntryResponse(ApiModel):
     athlete_id: str = Field(alias="athleteId")
     fantasy_team_id: str = Field(alias="fantasyTeamId")
     team_name: str = Field(alias="teamName")
-    athlete_name: str | None = Field(default=None, alias="athleteName")
+    athlete_name: AthleteNameStr | None = Field(default=None, alias="athleteName")
     slot_index: int = Field(alias="slotIndex")
     purchase_credits: int | None = Field(default=None, alias="purchaseCredits")
 
@@ -101,7 +101,7 @@ class TeamRosterPlayerResponse(ApiModel):
     """Giocatore in rosa di una squadra, per UI scambi (EP08-05)."""
 
     athlete_id: str = Field(alias="athleteId")
-    athlete_name: str = Field(alias="athleteName")
+    athlete_name: AthleteNameStr = Field(alias="athleteName")
     slot_index: int = Field(alias="slotIndex")
     purchase_credits: int | None = Field(default=None, alias="purchaseCredits")
     exceeds_role_quota: bool = Field(default=False, alias="exceedsRoleQuota")
@@ -148,7 +148,7 @@ class RosterImportIssueResponse(ApiModel):
 class RosterImportAthleteCandidateResponse(ApiModel):
     athlete_id: str = Field(alias="athleteId")
     provider_id: int = Field(alias="providerId")
-    canonical_name: str = Field(alias="canonicalName")
+    canonical_name: AthleteNameStr = Field(alias="canonicalName")
     # Per scegliere fra omonimi: ruolo nella lega (P/D/C/A), squadra e campionato.
     role: str | None = None
     club_name: str | None = Field(default=None, alias="clubName")
@@ -165,7 +165,7 @@ class RosterImportRowResponse(ApiModel):
     fantasy_team_id: str | None = Field(default=None, alias="fantasyTeamId")
     fantasy_team_name: str | None = Field(default=None, alias="fantasyTeamName")
     athlete_id: str | None = Field(default=None, alias="athleteId")
-    athlete_name: str | None = Field(default=None, alias="athleteName")
+    athlete_name: AthleteNameStr | None = Field(default=None, alias="athleteName")
     slot_index: int | None = Field(default=None, alias="slotIndex")
     issues: list[RosterImportIssueResponse] = Field(default_factory=list)
     candidates: list[RosterImportAthleteCandidateResponse] = Field(default_factory=list)
@@ -219,7 +219,7 @@ class RosterOwnershipIntervalResponse(ApiModel):
     id: str
     fantasy_team_id: str = Field(alias="fantasyTeamId")
     athlete_id: str = Field(alias="athleteId")
-    athlete_name: str | None = Field(default=None, alias="athleteName")
+    athlete_name: AthleteNameStr | None = Field(default=None, alias="athleteName")
     slot_index: int = Field(alias="slotIndex")
     purchase_credits: int = Field(alias="purchaseCredits")
     acquired_at: str = Field(alias="acquiredAt")
@@ -236,7 +236,7 @@ class RosterOwnershipHistoryResponse(ApiModel):
 class RosterAsOfSlotResponse(ApiModel):
     slot_index: int = Field(alias="slotIndex")
     athlete_id: str = Field(alias="athleteId")
-    athlete_name: str | None = Field(default=None, alias="athleteName")
+    athlete_name: AthleteNameStr | None = Field(default=None, alias="athleteName")
     purchase_credits: int = Field(alias="purchaseCredits")
     acquired_at: str = Field(alias="acquiredAt")
     role: str | None = None
@@ -267,7 +267,7 @@ class RosterTurnSnapshotEntryResponse(ApiModel):
     team_name: str = Field(alias="teamName")
     slot_index: int = Field(alias="slotIndex")
     athlete_id: str = Field(alias="athleteId")
-    athlete_name: str | None = Field(default=None, alias="athleteName")
+    athlete_name: AthleteNameStr | None = Field(default=None, alias="athleteName")
     purchase_credits: int = Field(alias="purchaseCredits")
     role: str | None = None
     #: Collocazione nella formazione di quel turno: "starter" | "bench" | "tribuna";
@@ -330,9 +330,9 @@ class AthleteCardResponse(ApiModel):
 
     athlete_id: str = Field(alias="athleteId")
     provider_id: int = Field(alias="providerId")
-    canonical_name: str = Field(alias="canonicalName")
-    first_name: str | None = Field(default=None, alias="firstName")
-    last_name: str | None = Field(default=None, alias="lastName")
+    canonical_name: AthleteNameStr = Field(alias="canonicalName")
+    first_name: AthleteNameStr | None = Field(default=None, alias="firstName")
+    last_name: AthleteNameStr | None = Field(default=None, alias="lastName")
     nationality: str | None = None
     birth_date: str | None = Field(default=None, alias="birthDate")
     age: int | None = None

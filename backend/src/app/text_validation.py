@@ -1,10 +1,12 @@
-"""Validazioni di testo comuni agli schemi di input."""
+"""Validazioni di testo comuni agli schemi di input e di risposta."""
 
 from __future__ import annotations
 
 from typing import Annotated
 
 from pydantic import AfterValidator
+
+from app.text_folding import repair_provider_text
 
 _INVALID_TEXT = "Il testo contiene caratteri non validi."
 
@@ -34,3 +36,10 @@ def reject_nul(value: str) -> str:
 NoNulStr = Annotated[str, AfterValidator(reject_nul)]
 # Per i campi in cui il NUL è già gestito più avanti (es. le righe del CSV).
 NoSurrogateStr = Annotated[str, AfterValidator(reject_surrogates)]
+
+# Nome di un calciatore (o di un club) come lo manda il fornitore, riparato quando esce
+# dall'API: codifica rovinata ("L. JovanoviÄ\x87"), riferimenti dell'HTML ("D. O&apos;Shea")
+# e controlli C1 rimasti da soli (QA 20-21/11 e 21/11). Così listone, rosa, formazione e le
+# altre risposte mostrano il nome giusto anche se la riga salvata è ancora rovinata, senza
+# aspettare la sincronizzazione o la riparazione dei nomi salvati. Un nome già giusto non cambia.
+AthleteNameStr = Annotated[str, AfterValidator(repair_provider_text)]

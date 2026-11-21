@@ -13,6 +13,7 @@ from observability.metrics import get_metrics, reset_metrics
 from sports_data.catalog.models import Club, CompetitionSeasonClub, SportSeason
 from sports_data.catalog.sync import (
     CATALOG_SYNC_ENTITIES_TOTAL,
+    CatalogSyncResult,
     TeamsBatch,
     sync_catalog,
 )
@@ -208,3 +209,82 @@ def test_catalog_sync_removes_clubs_no_longer_listed_for_the_season(session: Ses
     )
     session.commit()
     assert season_members() == before - 2  # una risposta vuota non cancella nulla
+
+
+def test_catalog_sync_repairs_names_with_html_character_references(session: Session) -> None:
+    """QA 21/11: il fornitore manda a volte i nomi con i riferimenti dell'HTML ("&amp;",
+    "&apos;"). Club e competizioni si salvano riparati, e la sincronizzazione dopo ripara
+    anche quelli già salvati; una "&" vera resta com'è."""
+    raw_leagues = _load("reference/leagues.json")
+    sync_catalog(
+        session,
+        leagues_envelope=parse_envelope(raw_leagues, endpoint="/leagues", http_status=200),
+        teams_batches=[],
+    )
+    session.commit()
+
+    # Salvati prima della correzione, così come li mandava il fornitore.
+    ligue_1 = session.execute(select(Competition).where(Competition.provider_id == 61)).scalar_one()
+    ligue_1.name = "Ligue 1 McDonald&#039;s"
+    session.add(Club(provider_id=990_201, name="Brighton &amp; Hove Albion"))
+    session.commit()
+
+    escaped_leagues = json.loads(json.dumps(raw_leagues))
+    for row in escaped_leagues["response"]:
+        if row["league"]["id"] == 61:
+            row["league"]["name"] = "Ligue 1 McDonald&#039;s"
+    teams_payload = {
+        "get": "teams",
+        "parameters": {"league": "61", "season": "2026"},
+        "errors": [],
+        "results": 3,
+        "paging": {"current": 1, "total": 1},
+        "response": [
+            {"team": {"id": 990_201, "name": "Brighton &amp; Hove Albion", "national": False}},
+            {"team": {"id": 990_202, "name": "Borussia M&amp;apos;gladbach", "national": False}},
+            {"team": {"id": 990_203, "name": "Atlético & Deportivo", "national": False}},
+        ],
+    }
+
+    def sync() -> CatalogSyncResult:
+        result = sync_catalog(
+            session,
+            leagues_envelope=parse_envelope(escaped_leagues, endpoint="/leagues", http_status=200),
+            teams_batches=[
+                TeamsBatch(
+                    envelope=parse_envelope(teams_payload, endpoint="/teams", http_status=200),
+                    competition_provider_id=61,
+                    season_year=2026,
+                )
+            ],
+        )
+        session.commit()
+        session.expire_all()
+        return result
+
+    def names() -> tuple[str, dict[int, str]]:
+        competition = session.execute(
+            select(Competition).where(Competition.provider_id == 61)
+        ).scalar_one()
+        clubs = session.scalars(select(Club).where(Club.provider_id >= 990_201)).all()
+        return competition.name, {club.provider_id: club.name for club in clubs}
+
+    first = sync()
+    assert names() == (
+        "Ligue 1 McDonald's",
+        {
+            990_201: "Brighton & Hove Albion",
+            990_202: "Borussia M'gladbach",
+            990_203: "Atlético & Deportivo",
+        },
+    )
+    assert first.counters.competitions_updated == 1
+    assert first.counters.clubs_updated == 1
+    assert first.counters.clubs_created == 2
+
+    # Il fornitore manda ancora i riferimenti: niente cambia.
+    second = sync()
+    assert names()[1][990_201] == "Brighton & Hove Albion"
+    assert second.counters.competitions_updated == 0
+    assert second.counters.clubs_updated == 0
+    assert second.counters.clubs_unchanged == 3

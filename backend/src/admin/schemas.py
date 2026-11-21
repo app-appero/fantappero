@@ -7,7 +7,7 @@ from typing import Literal
 
 from pydantic import Field
 
-from app.text_validation import NoNulStr
+from app.text_validation import AthleteNameStr, NoNulStr
 from auth.schemas import ApiModel, SessionUserResponse
 from database.enums import LeagueState, PlatformRole
 
@@ -252,7 +252,7 @@ class AdminHistoricalRepairProgressResponse(ApiModel):
 
 class AdminListoneEntryResponse(ApiModel):
     athlete_id: str = Field(alias="athleteId")
-    canonical_name: str = Field(alias="canonicalName")
+    canonical_name: AthleteNameStr = Field(alias="canonicalName")
     season_year: int = Field(alias="seasonYear")
     official_role: Literal["P", "D", "C", "A"] = Field(alias="officialRole")
     provider_position_raw: str | None = Field(default=None, alias="providerPositionRaw")
@@ -303,7 +303,7 @@ class AdminPendingTransferResponse(ApiModel):
 
     id: str
     athlete_id: str = Field(alias="athleteId")
-    athlete_name: str = Field(alias="athleteName")
+    athlete_name: AthleteNameStr = Field(alias="athleteName")
     transfer_date: str = Field(alias="transferDate")
     from_club_name: str | None = Field(default=None, alias="fromClubName")
     to_club_name: str | None = Field(default=None, alias="toClubName")
@@ -329,7 +329,7 @@ class AdminPredictedHintDiagnosisResponse(ApiModel):
     """Perché un atleta ha (o non ha) un indizio di formazione probabile."""
 
     athlete_id: str = Field(alias="athleteId")
-    athlete_name: str = Field(alias="athleteName")
+    athlete_name: AthleteNameStr = Field(alias="athleteName")
     club_name: str | None = Field(default=None, alias="clubName")
     fixture_id: str | None = Field(default=None, alias="fixtureId")
     hint: Literal["starter", "bench", "unavailable"] | None = None

@@ -244,3 +244,32 @@ def test_stats_hash_change_counts_as_correction(session: Session) -> None:
         select(PlayerMatchStat).where(PlayerMatchStat.athlete_provider_id == 253),
     ).scalar_one()
     assert areola.minutes == 89
+
+
+def test_fixture_sync_saves_new_athletes_without_html_character_references(
+    session: Session,
+) -> None:
+    """QA 21/11: un calciatore che compare prima nelle partite che nelle rose si salva con il
+    nome riparato, come nella sincronizzazione delle rose."""
+    _seed_catalog(session)
+    session.commit()
+
+    payload = copy.deepcopy(_load("matches/39/1035055/fixtures_players.json"))
+    payload["response"][0]["players"][0]["player"]["name"] = "A. O&amp;apos;Reola"
+    fixtures_envs, _ = _match_batches()
+    sync_fixtures(
+        session,
+        fixtures_envelopes=fixtures_envs,
+        detail_batches=[
+            FixtureDetailBatch(
+                fixture_provider_id=1035055,
+                players_envelope=parse_envelope(
+                    payload, endpoint="/fixtures/players", http_status=200
+                ),
+            ),
+        ],
+    )
+    session.commit()
+
+    athlete = session.execute(select(Athlete).where(Athlete.provider_id == 253)).scalar_one()
+    assert athlete.canonical_name == "A. O'Reola"

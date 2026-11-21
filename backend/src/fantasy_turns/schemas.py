@@ -8,7 +8,7 @@ from uuid import UUID
 
 from pydantic import Field
 
-from app.text_validation import NoNulStr
+from app.text_validation import AthleteNameStr, NoNulStr
 from auth.schemas import ApiModel
 
 
@@ -50,15 +50,15 @@ class FixtureTimelineEventResponse(ApiModel):
     club_id: str | None = Field(default=None, alias="clubId")
     club_name: str | None = Field(default=None, alias="clubName")
     athlete_id: str | None = Field(default=None, alias="athleteId")
-    athlete_name: str | None = Field(default=None, alias="athleteName")
+    athlete_name: AthleteNameStr | None = Field(default=None, alias="athleteName")
     related_athlete_id: str | None = Field(default=None, alias="relatedAthleteId")
-    related_athlete_name: str | None = Field(default=None, alias="relatedAthleteName")
+    related_athlete_name: AthleteNameStr | None = Field(default=None, alias="relatedAthleteName")
     comments: str | None = None
 
 
 class FixtureLineupPlayerResponse(ApiModel):
     athlete_id: str | None = Field(default=None, alias="athleteId")
-    name: str
+    name: AthleteNameStr
     shirt_number: int | None = Field(default=None, alias="shirtNumber")
     position: str | None = None
     grid: str | None = None
@@ -86,7 +86,7 @@ class FixtureLineupResponse(ApiModel):
 
 class FixtureUnavailablePlayerResponse(ApiModel):
     athlete_id: str | None = Field(default=None, alias="athleteId")
-    name: str
+    name: AthleteNameStr
     club_name: str | None = Field(default=None, alias="clubName")
     side: str
     kind: str | None = None

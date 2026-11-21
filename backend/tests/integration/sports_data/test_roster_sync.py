@@ -13,9 +13,9 @@ from observability.metrics import get_metrics, reset_metrics
 from sports_data.catalog.models import Club
 from sports_data.catalog.sync import TeamsBatch, sync_catalog
 from sports_data.provider.envelope import parse_envelope
-from sports_data.provider.types import MappedAthlete
+from sports_data.provider.types import MappedAthlete, ProviderEnvelope
 from sports_data.roster.models import Athlete, SquadMembership, Transfer
-from sports_data.roster.name_repair import repair_athlete_names
+from sports_data.roster.name_repair import repair_athlete_names, repair_club_names
 from sports_data.roster.sync import (
     ROSTER_SYNC_ENTITIES_TOTAL,
     PlayersBatch,
@@ -335,3 +335,246 @@ def test_repair_athlete_names_fixes_only_broken_names_and_is_idempotent(
     assert repair_athlete_names(session) == []
     session.commit()
     assert names() == after
+
+
+# --- Nomi con i riferimenti dell'HTML (QA 21/11) ------------------------------------------------
+
+#: Come arrivati dal fornitore (riferimenti dell'HTML, anche escapati due volte) e come devono
+#: essere.
+ESCAPED_NAMES = {
+    880_301: ("D. O&apos;Shea", "D. O'Shea"),
+    880_302: ("J. O&amp;#039;Brien", "J. O'Brien"),
+    880_303: ("N. Kant&eacute;", "N. Kanté"),
+}
+
+
+def _players_envelope(players: list[dict]) -> ProviderEnvelope:
+    """Una risposta ``/players`` di Wolves (club 39) per la Premier League 2026."""
+    payload = {
+        "errors": [],
+        "get": "players",
+        "parameters": {"team": "39", "season": "2026"},
+        "paging": {"current": 1, "total": 1},
+        "results": len(players),
+        "response": [
+            {
+                "player": player,
+                "statistics": [
+                    {
+                        "team": {"id": 39, "name": "Wolves"},
+                        "league": {"id": 39, "name": "Premier League", "season": 2026},
+                        "games": {"position": "Defender"},
+                    }
+                ],
+            }
+            for player in players
+        ],
+    }
+    return parse_envelope(payload, endpoint="/players", http_status=200)
+
+
+def test_roster_sync_repairs_stored_names_with_html_character_references(
+    session: Session,
+) -> None:
+    _seed_catalog(session)
+    # Salvato prima della correzione, così come lo mandava il fornitore.
+    stored = Athlete(provider_id=880_301, canonical_name="D. O&apos;Shea")
+    session.add(stored)
+    session.commit()
+    stored_id = stored.id
+
+    batches = [
+        PlayersBatch(
+            envelope=_players_envelope(
+                [
+                    {"id": provider_id, "name": escaped}
+                    for provider_id, (escaped, _) in ESCAPED_NAMES.items()
+                ]
+            ),
+            club_provider_id=39,
+            season_year=2026,
+        )
+    ]
+    first = sync_roster(session, players_batches=batches)
+    session.commit()
+
+    def names() -> dict[int, str]:
+        session.expire_all()
+        return {
+            row.provider_id: row.canonical_name
+            for row in session.scalars(
+                select(Athlete).where(Athlete.provider_id.in_(ESCAPED_NAMES))
+            ).all()
+        }
+
+    expected = {provider_id: fixed for provider_id, (_, fixed) in ESCAPED_NAMES.items()}
+    assert names() == expected
+    # La riga già salvata è la stessa, riparata.
+    repaired = session.get(Athlete, stored_id)
+    assert repaired is not None
+    assert repaired.canonical_name == "D. O'Shea"
+    assert first.counters.athletes_created == 2
+
+    # Alla sincronizzazione dopo il fornitore manda ancora i riferimenti: niente cambia.
+    second = sync_roster(session, players_batches=batches)
+    session.commit()
+    assert names() == expected
+    assert second.counters.athletes_created == 0
+    assert second.counters.athletes_updated == 0
+
+
+def test_upsert_athlete_repairs_first_and_last_names_with_html_character_references(
+    session: Session,
+) -> None:
+    session.add(
+        Athlete(
+            provider_id=880_301,
+            canonical_name="D. O&apos;Shea",
+            first_name="Dara",
+            last_name="O&apos;Shea",
+        )
+    )
+    session.commit()
+
+    counters = RosterSyncCounters()
+    upsert_athlete(
+        session,
+        MappedAthlete(
+            provider_id=880_301,
+            canonical_name="D. O&apos;Shea",
+            first_name="Dara",
+            last_name="O&#039;Shea",
+        ),
+        counters,
+    )
+    upsert_athlete(
+        session,
+        MappedAthlete(
+            provider_id=880_304,
+            canonical_name="Brighton & Hove",
+            first_name="R&amp;B",
+            last_name="AT&T",
+        ),
+        counters,
+    )
+    session.commit()
+
+    rows = {
+        row.provider_id: (row.canonical_name, row.first_name, row.last_name)
+        for row in session.scalars(select(Athlete)).all()
+    }
+    assert rows[880_301] == ("D. O'Shea", "Dara", "O'Shea")
+    # Una "&" vera resta com'è.
+    assert rows[880_304] == ("Brighton & Hove", "R&B", "AT&T")
+    assert counters.athletes_updated == 1
+    assert counters.athletes_created == 1
+
+
+def test_repair_names_fixes_html_character_references_in_athletes_and_clubs(
+    session: Session,
+) -> None:
+    _seed_catalog(session)
+    session.commit()
+    for provider_id, (escaped, _) in ESCAPED_NAMES.items():
+        session.add(
+            Athlete(
+                provider_id=provider_id,
+                canonical_name=escaped,
+                last_name=escaped.split(" ", 1)[1],
+            )
+        )
+    # Un nome rovinato in due modi insieme, e un nome giusto con un apostrofo e una "&" vera.
+    session.add(Athlete(provider_id=880_305, canonical_name="L. JovanoviÄ‡ O&apos;Neill"))
+    session.add(Athlete(provider_id=880_306, canonical_name="D. O'Shea", first_name="R&B"))
+    escaped_clubs = {
+        990_101: ("Brighton &amp; Hove Albion", "Brighton & Hove Albion"),
+        990_102: ("Borussia M&apos;gladbach", "Borussia M'gladbach"),
+    }
+    for provider_id, (escaped, _) in escaped_clubs.items():
+        session.add(Club(provider_id=provider_id, name=escaped))
+    session.add(Club(provider_id=990_103, name="Atlético & Deportivo"))
+    session.commit()
+
+    def athletes() -> dict[int, tuple[str, str | None, str | None]]:
+        session.expire_all()
+        return {
+            row.provider_id: (row.canonical_name, row.first_name, row.last_name)
+            for row in session.scalars(select(Athlete)).all()
+        }
+
+    def clubs() -> dict[int, str]:
+        session.expire_all()
+        return {row.provider_id: row.name for row in session.scalars(select(Club)).all()}
+
+    athletes_before, clubs_before = athletes(), clubs()
+    planned_athletes = repair_athlete_names(session, dry_run=True)
+    planned_clubs = repair_club_names(session, dry_run=True)
+    session.commit()
+    # In prova: solo l'elenco «prima -> dopo», nessuna modifica.
+    assert athletes() == athletes_before
+    assert clubs() == clubs_before
+    assert [
+        (item.provider_id, item.field, item.before, item.after) for item in planned_athletes
+    ] == [
+        (880_301, "canonical_name", "D. O&apos;Shea", "D. O'Shea"),
+        (880_301, "last_name", "O&apos;Shea", "O'Shea"),
+        (880_302, "canonical_name", "J. O&amp;#039;Brien", "J. O'Brien"),
+        (880_302, "last_name", "O&amp;#039;Brien", "O'Brien"),
+        (880_303, "canonical_name", "N. Kant&eacute;", "N. Kanté"),
+        (880_303, "last_name", "Kant&eacute;", "Kanté"),
+        (880_305, "canonical_name", "L. JovanoviÄ‡ O&apos;Neill", "L. Jovanović O'Neill"),
+    ]
+    assert [(item.provider_id, item.before, item.after) for item in planned_clubs] == [
+        (provider_id, escaped, fixed) for provider_id, (escaped, fixed) in escaped_clubs.items()
+    ]
+
+    assert len(repair_athlete_names(session)) == 7
+    assert len(repair_club_names(session)) == 2
+    session.commit()
+    athletes_after, clubs_after = athletes(), clubs()
+    for provider_id, (_, fixed) in ESCAPED_NAMES.items():
+        assert athletes_after[provider_id] == (fixed, None, fixed.split(" ", 1)[1])
+    assert athletes_after[880_305] == ("L. Jovanović O'Neill", None, None)
+    assert athletes_after[880_306] == ("D. O'Shea", "R&B", None)
+    for provider_id, (_, fixed) in escaped_clubs.items():
+        assert clubs_after[provider_id] == fixed
+    assert clubs_after[990_103] == "Atlético & Deportivo"
+    # I club del catalogo, già giusti, non cambiano.
+    catalog_before = {key: name for key, name in clubs_before.items() if key < 990_000}
+    assert {key: name for key, name in clubs_after.items() if key < 990_000} == catalog_before
+
+    # Seconda volta: niente da riparare, niente cambia.
+    assert repair_athlete_names(session) == []
+    assert repair_club_names(session) == []
+    session.commit()
+    assert athletes() == athletes_after
+    assert clubs() == clubs_after
+
+    session.execute(delete(Club).where(Club.provider_id >= 990_000))
+    session.commit()
+
+
+def test_repair_athlete_names_finds_and_strips_stray_c1_controls(session: Session) -> None:
+    """QA 21/11 su dev: «D. Pejičić\\x87» e «N. Kovač \\x8d» hanno la lettera già giusta e un
+    controllo C1 rimasto. Il filtro in SQL non li trovava (nessun carattere tra "Â" e "ô")."""
+    stray = {
+        880_501: ("D. Pejičić\x87", "D. Pejičić"),
+        880_502: ("N. Kovač \x8d", "N. Kovač"),
+    }
+    for provider_id, (broken, _) in stray.items():
+        session.add(Athlete(provider_id=provider_id, canonical_name=broken))
+    session.add(Athlete(provider_id=880_503, canonical_name="L. Modrić"))
+    session.commit()
+
+    planned = repair_athlete_names(session, dry_run=True)
+    session.commit()
+    assert [(item.provider_id, item.before, item.after) for item in planned] == [
+        (provider_id, broken, fixed) for provider_id, (broken, fixed) in stray.items()
+    ]
+
+    assert len(repair_athlete_names(session)) == 2
+    session.commit()
+    session.expire_all()
+    names = {row.provider_id: row.canonical_name for row in session.scalars(select(Athlete))}
+    assert names == {880_501: "D. Pejičić", 880_502: "N. Kovač", 880_503: "L. Modrić"}
+    assert repair_athlete_names(session) == []

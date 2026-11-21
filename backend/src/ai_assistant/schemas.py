@@ -4,14 +4,15 @@ from __future__ import annotations
 
 from pydantic import Field
 
+from app.text_validation import AthleteNameStr
 from auth.schemas import ApiModel
 
 
 class LineupSuggestionResponse(ApiModel):
     starter_athlete_id: str = Field(alias="starterAthleteId")
-    starter_name: str = Field(alias="starterName")
+    starter_name: AthleteNameStr = Field(alias="starterName")
     bench_athlete_id: str = Field(alias="benchAthleteId")
-    bench_name: str = Field(alias="benchName")
+    bench_name: AthleteNameStr = Field(alias="benchName")
     reason: str
 
 
@@ -24,7 +25,7 @@ class ViceallenatoreAdviceResponse(ApiModel):
 
 class AthleteComparisonRowResponse(ApiModel):
     athlete_id: str = Field(alias="athleteId")
-    name: str
+    name: AthleteNameStr
     role: str | None = None
     avg_rating: float | None = Field(default=None, alias="avgRating")
     recent_minutes_avg: float | None = Field(default=None, alias="recentMinutesAvg")
@@ -44,7 +45,7 @@ class CompareAthletesRequest(ApiModel):
 
 class AnalistaExplanationResponse(ApiModel):
     athlete_id: str = Field(alias="athleteId")
-    athlete_name: str = Field(alias="athleteName")
+    athlete_name: AthleteNameStr = Field(alias="athleteName")
     as_of: str = Field(alias="asOf")
     explanation: str
     limits: str

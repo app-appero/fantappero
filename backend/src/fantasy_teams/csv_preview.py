@@ -8,6 +8,7 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
+from app.text_folding import repair_provider_text
 from fantasy_teams.composition_service import resolve_effective_athlete_roles
 from fantasy_teams.csv_import import (
     AthleteCandidate,
@@ -167,7 +168,9 @@ def build_preview_rows(
 
         if athlete is not None:
             row.athlete_id = str(athlete.id)
-            row.athlete_name = athlete.canonical_name
+            # Il nome salvato può essere ancora rovinato ("D. O&apos;Shea", QA 21/11): l'anteprima
+            # lo mostra riparato.
+            row.athlete_name = repair_provider_text(athlete.canonical_name)
             if athlete.id in seen_athletes:
                 row.issues.append(
                     PreviewRowIssue(
@@ -416,7 +419,7 @@ def _resolve_athlete(
                     code="name_mismatch",
                     message=(
                         f"Il nome «{row.nome}» non coincide con "
-                        f"«{athlete.canonical_name}» (usato provider_id)."
+                        f"«{repair_provider_text(athlete.canonical_name)}» (usato provider_id)."
                     ),
                     severity="warning",
                 )
@@ -453,7 +456,7 @@ def _resolve_athlete(
             AthleteCandidate(
                 athlete_id=str(athlete.id),
                 provider_id=athlete.provider_id,
-                canonical_name=athlete.canonical_name,
+                canonical_name=repair_provider_text(athlete.canonical_name),
             )
             for athlete in matches[:20]
         ]
@@ -473,7 +476,10 @@ def _resolve_athlete(
         row.issues.append(
             PreviewRowIssue(
                 code="matched_by_surname",
-                message=f"Riconosciuto come «{athlete.canonical_name}» dal cognome.",
+                message=(
+                    f"Riconosciuto come «{repair_provider_text(athlete.canonical_name)}» "
+                    "dal cognome."
+                ),
                 severity="warning",
             )
         )

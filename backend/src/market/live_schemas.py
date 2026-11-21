@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from pydantic import Field
 
+from app.text_validation import AthleteNameStr
 from auth.schemas import ApiModel
 
 # Le colonne dei crediti sono interi a 32 bit: oltre questo valore la richiesta è respinta (422).
@@ -82,7 +83,7 @@ class LiveLotResponse(ApiModel):
     id: str
     session_id: str = Field(alias="sessionId")
     athlete_id: str = Field(alias="athleteId")
-    athlete_name: str = Field(alias="athleteName")
+    athlete_name: AthleteNameStr = Field(alias="athleteName")
     photo_url: str | None = Field(default=None, alias="photoUrl")
     sequence_number: int = Field(alias="sequenceNumber")
     status: str
@@ -108,7 +109,7 @@ class LiveRaiseResponse(ApiModel):
 class LiveSwapCandidateResponse(ApiModel):
     slot_index: int = Field(alias="slotIndex")
     athlete_id: str = Field(alias="athleteId")
-    athlete_name: str = Field(alias="athleteName")
+    athlete_name: AthleteNameStr = Field(alias="athleteName")
     photo_url: str | None = Field(default=None, alias="photoUrl")
     purchase_credits: int = Field(alias="purchaseCredits")
 
@@ -116,7 +117,7 @@ class LiveSwapCandidateResponse(ApiModel):
 class PendingSwapResponse(ApiModel):
     lot_id: str = Field(alias="lotId")
     athlete_id: str = Field(alias="athleteId")
-    athlete_name: str = Field(alias="athleteName")
+    athlete_name: AthleteNameStr = Field(alias="athleteName")
     photo_url: str | None = Field(default=None, alias="photoUrl")
     amount_credits: int = Field(alias="amountCredits")
     role: str

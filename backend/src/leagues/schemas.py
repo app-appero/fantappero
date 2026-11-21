@@ -8,7 +8,7 @@ from uuid import UUID
 
 from pydantic import Field
 
-from app.text_validation import NoNulStr
+from app.text_validation import AthleteNameStr, NoNulStr
 from auth.schemas import ApiModel
 from database.enums import LeagueState
 from market.gate import MarketBlockedReason
@@ -428,7 +428,7 @@ class H2HCalendarResponse(ApiModel):
 
 class H2HPlayerScoreResponse(ApiModel):
     athlete_id: str = Field(alias="athleteId")
-    name: str
+    name: AthleteNameStr
     photo_url: str | None = Field(default=None, alias="photoUrl")
     role: Literal["P", "D", "C", "A"]
     fantasy_score: float | None = Field(default=None, alias="fantasyScore")
@@ -604,7 +604,7 @@ class LeagueListoneOverrideResponse(ApiModel):
 
 class LeagueListoneEntryResponse(ApiModel):
     athlete_id: str = Field(alias="athleteId")
-    canonical_name: str = Field(alias="canonicalName")
+    canonical_name: AthleteNameStr = Field(alias="canonicalName")
     photo_url: str | None = Field(default=None, alias="photoUrl")
     season_year: int = Field(alias="seasonYear")
     official_role: Literal["P", "D", "C", "A"] = Field(alias="officialRole")

@@ -93,5 +93,6 @@ docker compose --env-file infra/local/.env.example --profile test run --rm api \
 | `ValueError` stagione assente | Eseguire prima sync competizioni/stagioni (`/leagues`) |
 | `ProviderConfigError` | Impostare `API_FOOTBALL_KEY` solo per `--from-provider` |
 | UUID competizione cambiato | Non dovrebbe accadere: verificare unique su `provider_id` e assenza di delete/recreate |
+| Nome di club o competizione con i riferimenti dell'HTML (`Brighton &amp; Hove Albion`) | La sincronizzazione salva i nomi riparati (`repair_provider_text`) e alla prossima ripara quelli salvati; per i club subito: `python scripts/repair_athlete_names.py --dry-run`, poi senza `--dry-run` (QA 21/11) |
 
 Adapter HTTP: [`api_football_adapter.md`](./api_football_adapter.md).
