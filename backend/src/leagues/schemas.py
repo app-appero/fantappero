@@ -613,6 +613,11 @@ class LeagueListoneEntryResponse(ApiModel):
     mapping_version: str = Field(alias="mappingVersion")
     club_id: str | None = Field(default=None, alias="clubId")
     club_name: str | None = Field(default=None, alias="clubName")
+    # Campionato del club nella stagione della lega, fra quelli scelti dalla lega: serve ai
+    # filtri «Campionato» e «Squadra» della ricerca in Rosa (Rosario, 21/11). `None` se il
+    # calciatore non ha club o il club non è in un campionato della lega in quella stagione.
+    competition_id: str | None = Field(default=None, alias="competitionId")
+    competition_name: str | None = Field(default=None, alias="competitionName")
     override: LeagueListoneOverrideResponse | None = None
 
 

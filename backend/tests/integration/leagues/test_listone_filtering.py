@@ -7,10 +7,11 @@ from uuid import UUID
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import select
+from sqlalchemy import event, select
 from sqlalchemy.orm import Session
 from tests.integration.database.helpers import create_engine_for_url
 
+import auth.dependencies as auth_dependencies
 from database.enums import FantasyRole
 from database.session import create_session_factory
 from leagues.models.competition import Competition
@@ -211,3 +212,240 @@ def test_new_assignment_rejects_athlete_outside_competitions(
     )
     assert response.status_code == 400
     assert response.json()["code"] == "role_unresolved"
+
+
+# ── Campionato di ogni voce del listone (filtri «Campionato» e «Squadra», Rosario 21/11) ──
+
+
+@pytest.fixture
+def mvp_competitions(db_session: Session) -> list[Competition]:
+    """I cinque campionati del catalogo MVP, in ordine di nome (una lega ne sceglie almeno 3)."""
+    rows = db_session.scalars(
+        select(Competition)
+        .where(Competition.provider_id.in_((39, 140, 135, 78, 61)))
+        .order_by(Competition.name.asc())
+    ).all()
+    assert len(rows) == 5
+    return list(rows)
+
+
+def _sport_season(db_session: Session, *, competition_id: UUID, year: int) -> SportSeason:
+    season = db_session.scalars(
+        select(SportSeason).where(
+            SportSeason.competition_id == competition_id, SportSeason.year == year
+        )
+    ).first()
+    if season is None:
+        season = SportSeason(competition_id=competition_id, year=year)
+        db_session.add(season)
+        db_session.flush()
+    return season
+
+
+def _seed_club(
+    db_session: Session,
+    *,
+    provider_id: int,
+    name: str,
+    memberships: list[tuple[UUID, int]],
+) -> Club:
+    """Club con le sue partecipazioni (campionato, anno): una per ogni stagione indicata."""
+    club = Club(provider_id=provider_id, name=name)
+    db_session.add(club)
+    db_session.flush()
+    for competition_id, year in memberships:
+        season = _sport_season(db_session, competition_id=competition_id, year=year)
+        db_session.add(CompetitionSeasonClub(sport_season_id=season.id, club_id=club.id))
+    db_session.commit()
+    db_session.refresh(club)
+    return club
+
+
+def _listone_by_athlete(client: TestClient, token: str, league_id: str) -> dict[str, dict]:
+    response = client.get(
+        f"/leagues/{league_id}/listone",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert response.status_code == 200
+    return {row["athleteId"]: row for row in response.json()}
+
+
+def _count_request_queries(call) -> tuple[object, int]:
+    engine = auth_dependencies._engine
+    assert engine is not None
+    count = 0
+
+    def _before_cursor_execute(*_args: object) -> None:
+        nonlocal count
+        count += 1
+
+    event.listen(engine, "before_cursor_execute", _before_cursor_execute)
+    try:
+        response = call()
+    finally:
+        event.remove(engine, "before_cursor_execute", _before_cursor_execute)
+    return response, count
+
+
+def test_listone_entries_carry_the_club_competition(
+    client: TestClient, db_session: Session, mvp_competitions: list[Competition]
+) -> None:
+    token, _ = _register_and_login(client, "listone.competition.a@example.com")
+    first, second = mvp_competitions[:2]
+    league_id = _create_league(client, token, [str(row.id) for row in mvp_competitions[:3]])
+
+    club_first = _seed_club(
+        db_session,
+        provider_id=990101,
+        name="Club Primo Campionato",
+        memberships=[(first.id, SEASON_YEAR)],
+    )
+    club_second = _seed_club(
+        db_session,
+        provider_id=990102,
+        name="Club Secondo Campionato",
+        memberships=[(second.id, SEASON_YEAR)],
+    )
+    in_first = _seed_athlete(
+        db_session, provider_id=880101, name="Giocatore Primo", club_id=club_first.id
+    )
+    in_second = _seed_athlete(
+        db_session, provider_id=880102, name="Giocatore Secondo", club_id=club_second.id
+    )
+    without_club = _seed_athlete(
+        db_session, provider_id=880103, name="Giocatore Senza Club Campionato", club_id=None
+    )
+
+    rows = _listone_by_athlete(client, token, league_id)
+
+    assert rows[str(in_first.id)]["clubName"] == "Club Primo Campionato"
+    assert rows[str(in_first.id)]["competitionId"] == str(first.id)
+    assert rows[str(in_first.id)]["competitionName"] == first.name
+    assert rows[str(in_second.id)]["competitionId"] == str(second.id)
+    assert rows[str(in_second.id)]["competitionName"] == second.name
+    # Senza club non c'è campionato: la voce resta nel listone, con i campi nulli.
+    assert rows[str(without_club.id)]["competitionId"] is None
+    assert rows[str(without_club.id)]["competitionName"] is None
+
+
+def test_listone_competition_is_the_one_of_the_league_season(
+    client: TestClient, db_session: Session, mvp_competitions: list[Competition]
+) -> None:
+    """Conta la stagione della lega, e solo fra i campionati scelti dalla lega."""
+    token, _ = _register_and_login(client, "listone.competition.b@example.com")
+    first, second = mvp_competitions[:2]
+    not_chosen = mvp_competitions[4]
+    league_id = _create_league(client, token, [str(row.id) for row in mvp_competitions[:3]])
+
+    # Promosso: l'anno prima era in un campionato non scelto, quest'anno è nel secondo.
+    promoted = _seed_club(
+        db_session,
+        provider_id=990111,
+        name="Club Promosso",
+        memberships=[(not_chosen.id, SEASON_YEAR - 1), (second.id, SEASON_YEAR)],
+    )
+    # Anche in una coppa non scelta dalla lega (prima per nome): conta solo il campionato.
+    cup = Competition(provider_id=990199, name="AAA Coppa Non Scelta", country="ZZ")
+    db_session.add(cup)
+    db_session.commit()
+    db_session.refresh(cup)
+    with_cup = _seed_club(
+        db_session,
+        provider_id=990112,
+        name="Club Con Coppa",
+        memberships=[(cup.id, SEASON_YEAR), (first.id, SEASON_YEAR)],
+    )
+    promoted_athlete = _seed_athlete(
+        db_session, provider_id=880111, name="Giocatore Promosso", club_id=promoted.id
+    )
+    cup_athlete = _seed_athlete(
+        db_session, provider_id=880112, name="Giocatore Con Coppa", club_id=with_cup.id
+    )
+
+    rows = _listone_by_athlete(client, token, league_id)
+
+    assert rows[str(promoted_athlete.id)]["competitionId"] == str(second.id)
+    assert rows[str(promoted_athlete.id)]["competitionName"] == second.name
+    assert rows[str(cup_athlete.id)]["competitionId"] == str(first.id)
+    assert rows[str(cup_athlete.id)]["competitionName"] == first.name
+
+
+def test_listone_competition_lookup_does_not_grow_with_clubs(
+    client: TestClient, db_session: Session, mvp_competitions: list[Competition]
+) -> None:
+    """Il campionato si legge con una query sola per tutto il listone (niente N+1)."""
+    token, _ = _register_and_login(client, "listone.competition.c@example.com")
+    league_competitions = mvp_competitions[:3]
+    league_id = _create_league(client, token, [str(row.id) for row in league_competitions])
+
+    def seed_clubs(offset: int, count: int) -> None:
+        for index in range(count):
+            competition = league_competitions[index % len(league_competitions)]
+            club = _seed_club(
+                db_session,
+                provider_id=990200 + offset + index,
+                name=f"Club Budget {offset + index}",
+                memberships=[(competition.id, SEASON_YEAR)],
+            )
+            _seed_athlete(
+                db_session,
+                provider_id=880200 + offset + index,
+                name=f"Giocatore Budget {offset + index}",
+                club_id=club.id,
+            )
+
+    def get_listone():
+        return client.get(
+            f"/leagues/{league_id}/listone",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+
+    seed_clubs(0, 2)
+    get_listone()  # riscaldamento: cache di autenticazione e impostazioni
+    first_response, before = _count_request_queries(get_listone)
+    seed_clubs(10, 6)
+    second_response, after = _count_request_queries(get_listone)
+
+    assert first_response.status_code == 200
+    assert second_response.status_code == 200
+    budget_rows = [
+        row for row in second_response.json() if row["canonicalName"].startswith("Giocatore Budget")
+    ]
+    assert len(budget_rows) == 8
+    assert all(row["competitionId"] for row in budget_rows)
+    assert after == before
+
+
+def test_role_override_responses_keep_the_competition(
+    client: TestClient, db_session: Session, mvp_competitions: list[Competition]
+) -> None:
+    """La voce restituita dall'override sostituisce quella del listone: deve avere il campionato."""
+    token, _ = _register_and_login(client, "listone.competition.d@example.com")
+    first = mvp_competitions[0]
+    league_id = _create_league(client, token, [str(row.id) for row in mvp_competitions[:3]])
+    club = _seed_club(
+        db_session,
+        provider_id=990301,
+        name="Club Override Campionato",
+        memberships=[(first.id, SEASON_YEAR)],
+    )
+    athlete = _seed_athlete(
+        db_session, provider_id=880301, name="Giocatore Override Campionato", club_id=club.id
+    )
+
+    set_response = client.put(
+        f"/leagues/{league_id}/amministrazione/listone/{athlete.id}/ruolo",
+        headers={"Authorization": f"Bearer {token}"},
+        json={"role": "C"},
+    )
+    assert set_response.status_code == 200
+    assert set_response.json()["competitionId"] == str(first.id)
+    assert set_response.json()["competitionName"] == first.name
+
+    clear_response = client.delete(
+        f"/leagues/{league_id}/amministrazione/listone/{athlete.id}/ruolo",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert clear_response.status_code == 200
+    assert clear_response.json()["competitionId"] == str(first.id)
+    assert clear_response.json()["competitionName"] == first.name

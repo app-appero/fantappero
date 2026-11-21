@@ -801,6 +801,119 @@ a.fa-member-list__identity:focus-visible {
   accent-color: var(--fa-color-accent);
 }
 
+/* Filtri listone ── «Campionato» e «Squadra» nella ricerca della Rosa (Rosario, 21/11).
+   Due menu nativi affiancati sotto la ricerca, i filtri attivi come piccole etichette da
+   togliere una per una e «Azzera filtri». Bersagli da 44px; su telefono il testo dei
+   menu è da 16px (niente zoom al tocco su iPhone). */
+.fa-listone-filters {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fa-space-xs);
+  max-width: 44rem;
+  margin-top: var(--fa-space-sm);
+}
+
+.fa-listone-filters__selects {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--fa-space-sm);
+}
+
+.fa-listone-filters__selects--single {
+  grid-template-columns: minmax(0, 24rem);
+}
+
+.fa-listone-filters__selects .fa-field {
+  min-width: 0;
+}
+
+.fa-listone-filters .fa-select {
+  min-height: 2.75rem;
+}
+
+.fa-listone-filters__active {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  column-gap: var(--fa-space-xs);
+}
+
+.fa-listone-filters__chip,
+.fa-listone-filters__reset {
+  display: inline-flex;
+  align-items: center;
+  min-height: 2.75rem;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.fa-listone-filters__chip-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  padding: 0.2rem 0.65rem;
+  border: 1px solid var(--fa-color-border-strong);
+  border-radius: var(--fa-radius-pill);
+  background: var(--fa-color-background-elevated);
+  color: var(--fa-color-foreground);
+  font-size: var(--fa-text-xs);
+  font-weight: 600;
+  line-height: var(--fa-leading-snug);
+}
+
+.fa-listone-filters__chip:hover .fa-listone-filters__chip-pill {
+  border-color: var(--fa-color-accent);
+}
+
+.fa-listone-filters__chip:focus-visible,
+.fa-listone-filters__reset:focus-visible {
+  outline: 2px solid var(--fa-color-focus-ring);
+  outline-offset: 2px;
+  border-radius: var(--fa-radius-pill);
+}
+
+.fa-listone-filters__reset {
+  margin-left: auto;
+  padding: 0 var(--fa-space-xs);
+  color: var(--fa-color-accent);
+  font-size: var(--fa-text-sm);
+  font-weight: 600;
+}
+
+.fa-listone-filters__free-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--fa-space-sm);
+  margin-top: 0.35rem;
+}
+
+.fa-listone-filters__count {
+  color: var(--fa-color-foreground-muted);
+  font-size: var(--fa-text-sm);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* Su telefono i due menu stanno in mezza riga: margini interni e freccia più stretti, così
+   «Tutti i campionati» e «Tutte le squadre» si leggono interi a 390 px (a 360 px il primo
+   perde le ultime lettere; sopra resta l'etichetta «Campionato»). Su iPhone anche in
+   orizzontale vale la regola «campi da 16px» in fondo al file: qui nulla la rimpicciolisce. */
+@media (max-width: 767px) {
+  .fa-listone-filters .fa-select {
+    padding-left: 0.625rem;
+    padding-right: 1.75rem;
+    background-position: right 0.5rem center;
+    background-size: 1rem;
+    font-size: 16px;
+  }
+}
+/* Fine filtri listone */
+
 .fa-roster-excel .fa-card__body {
   padding: var(--fa-space-sm) var(--fa-space-md);
 }

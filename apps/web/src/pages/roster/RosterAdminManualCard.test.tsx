@@ -174,3 +174,208 @@ describe("listone pagination stays on the clicked page", () => {
     expect(container.textContent).not.toContain("Calciatore 1");
   });
 });
+
+describe("filtri Campionato e Squadra nella ricerca del listone (Rosario, 21/11)", () => {
+  const SERIE_A = { competitionId: "c-ita", competitionName: "Serie A" };
+  const PREMIER = { competitionId: "c-eng", competitionName: "Premier League" };
+  const LALIGA = { competitionId: "c-esp", competitionName: "La Liga" };
+
+  function player(
+    id: string,
+    clubId: string,
+    clubName: string,
+    competition: { competitionId: string; competitionName: string } | null,
+  ): LeagueListoneEntry {
+    return {
+      ...entries[0]!,
+      athleteId: id,
+      canonicalName: `Giocatore ${id}`,
+      clubId,
+      clubName,
+      ...(competition ?? {}),
+    };
+  }
+
+  const multiListone: LeagueListoneEntry[] = [
+    ...Array.from({ length: 22 }, (_, index) => player(`fio-${index}`, "fio", "Fiorentina", SERIE_A)),
+    player("ata-0", "ata", "Atalanta", SERIE_A),
+    player("ata-1", "ata", "Atalanta", SERIE_A),
+    player("ars-0", "ars", "Arsenal", PREMIER),
+    player("ars-1", "ars", "Arsenal", PREMIER),
+    player("ars-2", "ars", "Arsenal", PREMIER),
+    player("atm-0", "atm", "Atlético Madrid", LALIGA),
+  ];
+
+  let root: Root | null = null;
+  let container: HTMLDivElement | null = null;
+
+  afterEach(() => {
+    act(() => {
+      root?.unmount();
+    });
+    container?.remove();
+    root = null;
+    container = null;
+  });
+
+  function render(listone: LeagueListoneEntry[]): HTMLDivElement {
+    container = document.createElement("div");
+    document.body.appendChild(container);
+    root = createRoot(container);
+    act(() => {
+      root?.render(
+        createElement(RosterAdminManualCard, {
+          isAdmin: true,
+          adminLoadError: null,
+          leagueTeams: DEMO_TEAMS,
+          targetTeam: DEMO_TEAM,
+          emptySlotsCount: 10,
+          adminMessage: null,
+          adminError: null,
+          listone,
+          listoneQuery: "",
+          onListoneQueryChange: () => undefined,
+          roleTab: "all",
+          onRoleTabChange: () => undefined,
+          ownership: new Map(),
+          canReleaseAthlete: () => true,
+          adminBusy: false,
+          onReleaseAthlete: () => undefined,
+          onAssignAthlete: () => undefined,
+        }),
+      );
+    });
+    return container;
+  }
+
+  function select(root: HTMLElement, testId: string): HTMLSelectElement | null {
+    return root.querySelector(`[data-testid="${testId}"]`);
+  }
+
+  function optionLabels(element: HTMLSelectElement | null): string[] {
+    return Array.from(element?.options ?? []).map((option) => option.textContent ?? "");
+  }
+
+  function choose(root: HTMLElement, testId: string, value: string) {
+    const element = select(root, testId);
+    expect(element).not.toBeNull();
+    act(() => {
+      element!.value = value;
+      element!.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+  }
+
+  function click(root: HTMLElement, testId: string) {
+    const button = root.querySelector(`[data-testid="${testId}"]`) as HTMLButtonElement | null;
+    expect(button).not.toBeNull();
+    act(() => {
+      button!.click();
+    });
+  }
+
+  function count(root: HTMLElement): string | null | undefined {
+    return root.querySelector('[data-testid="roster-listone-count"]')?.textContent;
+  }
+
+  it("mostra Campionato e Squadra sotto la ricerca, con le squadre in ordine e i calciatori", () => {
+    const view = render(multiListone);
+    const search = view.querySelector('[data-testid="roster-admin-listone-search"]');
+    const filters = view.querySelector('[data-testid="roster-listone-filters"]');
+    expect(search && filters && search.compareDocumentPosition(filters) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(optionLabels(select(view, "roster-listone-competition"))).toEqual([
+      "Tutti i campionati",
+      "La Liga",
+      "Premier League",
+      "Serie A",
+    ]);
+    expect(optionLabels(select(view, "roster-listone-club"))).toEqual([
+      "Tutte le squadre",
+      "Arsenal (3)",
+      "Atalanta (2)",
+      "Atlético Madrid (1)",
+      "Fiorentina (22)",
+    ]);
+    expect(count(view)).toBe("28 calciatori");
+    expect(view.querySelector('[data-testid="roster-listone-reset-filters"]')).toBeNull();
+  });
+
+  it("scegliendo il campionato la Squadra elenca solo i suoi club e il conto segue i filtri", () => {
+    const view = render(multiListone);
+    choose(view, "roster-listone-competition", "c-ita");
+    expect(optionLabels(select(view, "roster-listone-club"))).toEqual([
+      "Tutte le squadre",
+      "Atalanta (2)",
+      "Fiorentina (22)",
+    ]);
+    expect(count(view)).toBe("24 calciatori");
+    expect(view.querySelector('[data-testid="roster-listone-chip-competition"]')?.textContent).toContain("Serie A");
+    expect(view.textContent).toContain("Azzera filtri");
+
+    choose(view, "roster-listone-club", "ata");
+    expect(count(view)).toBe("2 calciatori");
+    expect(view.textContent).toContain("Giocatore ata-0");
+    expect(view.textContent).not.toContain("Giocatore fio-0");
+  });
+
+  it("scegliere un campionato azzera una squadra che non ci gioca", () => {
+    const view = render(multiListone);
+    choose(view, "roster-listone-club", "ars");
+    expect(count(view)).toBe("3 calciatori");
+    choose(view, "roster-listone-competition", "c-ita");
+    expect(select(view, "roster-listone-club")?.value).toBe("");
+    expect(view.querySelector('[data-testid="roster-listone-chip-club"]')).toBeNull();
+    expect(count(view)).toBe("24 calciatori");
+  });
+
+  it("ogni filtro attivo si toglie da solo, «Azzera filtri» li toglie tutti", () => {
+    const view = render(multiListone);
+    choose(view, "roster-listone-competition", "c-ita");
+    choose(view, "roster-listone-club", "fio");
+    const clubChip = view.querySelector('[data-testid="roster-listone-chip-club"]');
+    expect(clubChip?.getAttribute("aria-label")).toBe("Togli il filtro Squadra: Fiorentina");
+
+    click(view, "roster-listone-chip-club");
+    expect(select(view, "roster-listone-club")?.value).toBe("");
+    expect(select(view, "roster-listone-competition")?.value).toBe("c-ita");
+
+    choose(view, "roster-listone-club", "fio");
+    click(view, "roster-listone-reset-filters");
+    expect(select(view, "roster-listone-competition")?.value).toBe("");
+    expect(select(view, "roster-listone-club")?.value).toBe("");
+    expect(view.querySelector('[data-testid="roster-listone-chip-competition"]')).toBeNull();
+    expect(count(view)).toBe("28 calciatori");
+  });
+
+  it("cambiando un filtro la lista torna a pagina 1", () => {
+    const view = render(multiListone);
+    const pagination = () => view.querySelector('[data-testid="roster-admin-listone-pagination-all"]');
+    const next = Array.from(pagination()?.querySelectorAll("button") ?? []).find((button) =>
+      button.textContent?.includes("Successiva"),
+    );
+    act(() => {
+      next?.click();
+    });
+    expect(pagination()?.textContent).toContain("Pagina 2 di 2");
+
+    choose(view, "roster-listone-club", "fio");
+    expect(pagination()?.textContent).toContain("Pagina 1 di 2");
+    expect(pagination()?.textContent).toContain("22 calciatori");
+  });
+
+  it("con un campionato solo resta solo Squadra", () => {
+    const view = render(multiListone.filter((row) => row.competitionId === "c-ita"));
+    expect(select(view, "roster-listone-competition")).toBeNull();
+    expect(optionLabels(select(view, "roster-listone-club"))).toEqual([
+      "Tutte le squadre",
+      "Atalanta (2)",
+      "Fiorentina (22)",
+    ]);
+  });
+
+  it("con un backend che non manda il campionato resta solo Squadra, con tutti i club", () => {
+    const old = multiListone.map(({ competitionId: _id, competitionName: _name, ...rest }) => rest);
+    const view = render(old);
+    expect(select(view, "roster-listone-competition")).toBeNull();
+    expect(optionLabels(select(view, "roster-listone-club"))).toHaveLength(5);
+  });
+});

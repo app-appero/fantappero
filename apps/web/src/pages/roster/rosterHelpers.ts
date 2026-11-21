@@ -1,4 +1,5 @@
 import { foldSearchText } from "../../utils/searchText";
+import { filterListoneEntries, NO_LISTONE_PLACE_FILTERS } from "@fantappero/contracts";
 import type {
   CreditAccount,
   CreditLedgerList,
@@ -6,6 +7,7 @@ import type {
   FantasyTeam,
   FantasyTeamSummary,
   LeagueListoneEntry,
+  ListonePlaceFilters,
   RosterOccupancyEntry,
   RosterOwnershipSource,
 } from "@fantappero/contracts";
@@ -135,32 +137,24 @@ export function formatLedgerEntry(entry: CreditLedgerList["entries"][number]): s
   return `${formatLedgerDate(entry.createdAt)} · ${reasonLabel(entry.reason)}${detail}: ${sign}${entry.amount} → saldo ${entry.balanceAfter}`;
 }
 
-export function filterByTab(entries: LeagueListoneEntry[], tab: RoleTab): LeagueListoneEntry[] {
-  if (tab === "all") {
-    return entries;
-  }
-  return entries.filter((entry) => entry.effectiveRole === tab);
-}
-
+/**
+ * Listone filtrato per ruolo, testo, «Solo disponibili», campionato e squadra. La logica è
+ * quella condivisa con l'app (`filterListoneEntries` in `@fantappero/contracts`), con la
+ * ricerca senza accenti e con la codifica riparata del sito (`utils/searchText.ts`).
+ */
 export function filterListone(
   entries: LeagueListoneEntry[],
   tab: RoleTab,
   query: string,
   onlyFree = false,
   ownedAthleteIds?: ReadonlySet<string>,
+  place: ListonePlaceFilters = NO_LISTONE_PLACE_FILTERS,
 ): LeagueListoneEntry[] {
-  const normalized = foldSearchText(query);
-  const hideOwned = onlyFree && normalized.length === 0;
-  return filterByTab(entries, tab).filter((entry) => {
-    if (hideOwned && ownedAthleteIds?.has(entry.athleteId)) {
-      return false;
-    }
-    if (!normalized) {
-      return true;
-    }
-    const haystack = foldSearchText(`${entry.canonicalName} ${entry.clubName ?? ""}`);
-    return haystack.includes(normalized);
-  });
+  return filterListoneEntries(
+    entries,
+    { role: tab, query, onlyFree, competitionId: place.competitionId, clubId: place.clubId },
+    { fold: foldSearchText, ownedAthleteIds },
+  );
 }
 
 export function buildOwnership(entries: RosterOccupancyEntry[]): Map<string, AthleteOwnership> {

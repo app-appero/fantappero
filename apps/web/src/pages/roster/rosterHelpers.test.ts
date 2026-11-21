@@ -56,6 +56,58 @@ describe("filterListone (ricerca senza accenti, QA 18/11)", () => {
   });
 });
 
+describe("filterListone con campionato e squadra (Rosario, 21/11)", () => {
+  const entries = [
+    {
+      athleteId: "1",
+      canonicalName: "Dodô",
+      effectiveRole: "D",
+      clubId: "fio",
+      clubName: "Fiorentina",
+      competitionId: "ita",
+      competitionName: "Serie A",
+    },
+    {
+      athleteId: "2",
+      canonicalName: "L. JovanoviÄ\u0087",
+      effectiveRole: "D",
+      clubId: "fio",
+      clubName: "Fiorentina",
+      competitionId: "ita",
+      competitionName: "Serie A",
+    },
+    {
+      athleteId: "3",
+      canonicalName: "M. Ødegaard",
+      effectiveRole: "C",
+      clubId: "ars",
+      clubName: "Arsenal",
+      competitionId: "eng",
+      competitionName: "Premier League",
+    },
+  ] as unknown as LeagueListoneEntry[];
+
+  it("combina campionato e squadra con ruolo, ricerca e «Solo disponibili»", () => {
+    const ids = (rows: LeagueListoneEntry[]) => rows.map((row) => row.athleteId);
+    const owned = new Set(["1"]);
+    const serieA = { competitionId: "ita", clubId: null };
+    expect(ids(filterListone(entries, "all", "", false, undefined, serieA))).toEqual(["1", "2"]);
+    expect(ids(filterListone(entries, "D", "", true, owned, serieA))).toEqual(["2"]);
+    expect(ids(filterListone(entries, "all", "dodo", true, owned, serieA))).toEqual(["1"]);
+    expect(ids(filterListone(entries, "all", "odegaard", false, undefined, serieA))).toEqual([]);
+    expect(
+      ids(filterListone(entries, "all", "", false, undefined, { competitionId: null, clubId: "ars" })),
+    ).toEqual(["3"]);
+  });
+
+  it("usa la ricerca del sito, che ripara anche la codifica rovinata", () => {
+    const fiorentina = { competitionId: "ita", clubId: "fio" };
+    expect(filterListone(entries, "all", "jovanovic", false, undefined, fiorentina).map((row) => row.athleteId)).toEqual([
+      "2",
+    ]);
+  });
+});
+
 describe("sortLedgerNewestFirst", () => {
   function entry(id: string, createdAt: string, balanceAfter: number): CreditLedgerEntry {
     return {

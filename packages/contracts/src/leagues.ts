@@ -733,6 +733,13 @@ export interface LeagueListoneEntry {
   mappingVersion: string;
   clubId: string | null;
   clubName: string | null;
+  /**
+   * Campionato del club nella stagione della lega, fra quelli scelti dalla lega (filtri
+   * «Campionato» e «Squadra» della ricerca in Rosa, 21/11). `null` senza club o fuori dai
+   * campionati della lega; assente da un backend più vecchio.
+   */
+  competitionId?: string | null;
+  competitionName?: string | null;
   override: LeagueListoneOverride | null;
 }
 
