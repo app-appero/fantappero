@@ -12,6 +12,7 @@ from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 import database.models  # noqa: F401 — register ORM mappers
+from app.text_folding import repair_provider_text
 from leagues.models.competition import Competition
 from observability.logging import get_logger
 from observability.metrics import Timer, get_metrics
@@ -93,10 +94,14 @@ def upsert_competition(
     row = session.execute(
         select(Competition).where(Competition.provider_id == mapped.provider_id),
     ).scalar_one_or_none()
+    # Come i nomi dei calciatori: il fornitore li manda a volte con la codifica rovinata o con
+    # i riferimenti dell'HTML ("&amp;", "&apos;", QA 21/11). Si salvano riparati, e la
+    # prossima sincronizzazione ripara anche quelli già salvati.
+    name = repair_provider_text(mapped.name)
     if row is None:
         row = Competition(
             provider_id=mapped.provider_id,
-            name=mapped.name,
+            name=name,
             country=mapped.country,
         )
         session.add(row)
@@ -105,8 +110,8 @@ def upsert_competition(
         return row
 
     changed = False
-    if row.name != mapped.name:
-        row.name = mapped.name
+    if row.name != name:
+        row.name = name
         changed = True
     if row.country != mapped.country:
         row.country = mapped.country
@@ -178,10 +183,13 @@ def upsert_club(
     row = session.execute(
         select(Club).where(Club.provider_id == mapped.provider_id),
     ).scalar_one_or_none()
+    # Stessa riparazione dei nomi delle competizioni: "Brighton &amp; Hove Albion" si salva
+    # "Brighton & Hove Albion", una "&" vera resta com'è (QA 21/11).
+    name = repair_provider_text(mapped.name)
     if row is None:
         row = Club(
             provider_id=mapped.provider_id,
-            name=mapped.name,
+            name=name,
             code=mapped.code,
             country=mapped.country,
             logo_url=mapped.logo_url,
@@ -193,8 +201,8 @@ def upsert_club(
         return row
 
     changed = False
-    if row.name != mapped.name:
-        row.name = mapped.name
+    if row.name != name:
+        row.name = name
         changed = True
     if row.code != mapped.code:
         row.code = mapped.code

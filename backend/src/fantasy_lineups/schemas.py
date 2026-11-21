@@ -8,6 +8,7 @@ from uuid import UUID
 
 from pydantic import Field
 
+from app.text_validation import AthleteNameStr
 from auth.schemas import ApiModel
 
 FantasyModuleLiteral = Literal[
@@ -36,7 +37,7 @@ class ModuleCountsResponse(ApiModel):
 
 class LineupRosterPlayerResponse(ApiModel):
     athlete_id: str = Field(alias="athleteId")
-    athlete_name: str = Field(alias="athleteName")
+    athlete_name: AthleteNameStr = Field(alias="athleteName")
     role: str | None = None
     slot_index: int = Field(alias="slotIndex")
     locked: bool = False
@@ -74,7 +75,7 @@ class LineupRosterPlayerResponse(ApiModel):
 
 class LineupPlayerResponse(ApiModel):
     athlete_id: str = Field(alias="athleteId")
-    athlete_name: str = Field(alias="athleteName")
+    athlete_name: AthleteNameStr = Field(alias="athleteName")
     role: str
     slot_kind: str = Field(alias="slotKind")
     sort_order: int = Field(alias="sortOrder")

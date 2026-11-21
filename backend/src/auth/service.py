@@ -116,7 +116,11 @@ class AuthService:
         )
         self._session.add(user)
         self._session.flush()
-        self._session.add(UserProfile(user_id=user.id, display_name=validated_name))
+        user.profile = UserProfile(user_id=user.id, display_name=validated_name)
+        # Il modulo di registrazione dice «Registrandoti accetti l'informativa privacy»: come
+        # per Google, si salvano subito versione e data. Solo per l'account appena creato:
+        # su un indirizzo già registrato chi compila il modulo potrebbe non esserne il titolare.
+        self._record_policy_acceptance(user)
         if self._settings.auth_email_verification_required:
             self._issue_email_verification(user)
         else:
@@ -176,6 +180,9 @@ class AuthService:
             user.profile.display_name if user.profile is not None else None,
             user.platform_role,
         )
+        # «Accedendo accetti l'informativa privacy» vale anche per email e password, come per
+        # Google: stesso punto, dopo il controllo tester e prima di aprire la sessione.
+        self._record_policy_acceptance(user)
         tokens = self._create_session(user)
         self._session.commit()
         if self._rate_limiter is not None:
@@ -385,9 +392,12 @@ class AuthService:
             raise
 
     def _record_policy_acceptance(self, user: User) -> None:
-        """L'accesso con Google vale come accettazione dell'informativa mostrata sotto il tasto.
+        """L'accesso vale come accettazione dell'informativa mostrata sotto il tasto.
 
-        Salva versione e data se l'utente non ha già accettato la versione corrente.
+        Vale per Google, per email e password e per la registrazione con email (le schermate
+        di accesso lo dicono per tutti). Salva versione e data se l'utente non ha già accettato
+        la versione corrente. Il rinnovo della sessione non la registra (né per Google né per
+        l'email): serve un nuovo accesso.
         """
         current = self._settings.profile_policy_version
         profile = user.profile

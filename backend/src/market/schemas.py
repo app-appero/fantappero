@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pydantic import Field, StrictInt
 
-from app.text_validation import NoNulStr
+from app.text_validation import AthleteNameStr, NoNulStr
 from auth.schemas import ApiModel
 from market.gate import MarketBlockedReason
 
@@ -55,13 +55,13 @@ class MarketBidResponse(ApiModel):
     session_id: str = Field(alias="sessionId")
     fantasy_team_id: str = Field(alias="fantasyTeamId")
     athlete_id: str = Field(alias="athleteId")
-    athlete_name: str = Field(alias="athleteName")
+    athlete_name: AthleteNameStr = Field(alias="athleteName")
     photo_url: str | None = Field(default=None, alias="photoUrl")
     amount_credits: int = Field(alias="amountCredits")
     status: str
     submitted_at: str = Field(alias="submittedAt")
     release_athlete_id: NoNulStr | None = Field(default=None, alias="releaseAthleteId")
-    release_athlete_name: str | None = Field(default=None, alias="releaseAthleteName")
+    release_athlete_name: AthleteNameStr | None = Field(default=None, alias="releaseAthleteName")
 
 
 class MarketBidListResponse(ApiModel):
@@ -72,7 +72,7 @@ class MarketBidListResponse(ApiModel):
 
 class MarketResolutionOutcomeResponse(ApiModel):
     athlete_id: str = Field(alias="athleteId")
-    athlete_name: str = Field(alias="athleteName")
+    athlete_name: AthleteNameStr = Field(alias="athleteName")
     outcome: str  # "assigned" | "tiebreak" | "unassigned"
     winning_team_id: str | None = Field(default=None, alias="winningTeamId")
     amount_credits: int | None = Field(default=None, alias="amountCredits")
@@ -96,7 +96,7 @@ class MarketReleasePreviewResponse(ApiModel):
     fantasy_team_id: str = Field(alias="fantasyTeamId")
     slot_index: int = Field(alias="slotIndex")
     athlete_id: str = Field(alias="athleteId")
-    athlete_name: str = Field(alias="athleteName")
+    athlete_name: AthleteNameStr = Field(alias="athleteName")
     purchase_credits: int = Field(alias="purchaseCredits")
     reason: str
     refund_percent: int = Field(alias="refundPercent")

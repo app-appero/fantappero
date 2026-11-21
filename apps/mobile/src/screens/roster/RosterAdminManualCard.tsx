@@ -1,19 +1,28 @@
-import { playerAvatarUrl } from "@fantappero/contracts";
+import {
+  NO_LISTONE_PLACE_FILTERS,
+  filterListoneEntries,
+  hasListonePlaceFilters,
+  listonePlayerCountLabel,
+  normalizeListonePlaceFilters,
+  playerAvatarUrl,
+} from "@fantappero/contracts";
 import type {
   FantasyRole,
   FantasyTeam,
   FantasyTeamSummary,
   LeagueListoneEntry,
+  ListonePlaceFilters,
 } from "@fantappero/contracts";
 import { HScroll } from "../../components/HScroll";
 import { PlayerPhotoRing } from "../../components/PlayerPhotoRing";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Pressable, ScrollView, Text, View } from "react-native";
 import { AppTextInput as TextInput } from "../../components/AppTextInput";
 import { AthleteName } from "../../athletes/AthleteCard";
 import { UiStatePanel } from "../../components/UiStatePanel";
+import { ListoneFilterBar } from "./ListoneFilterBar";
+import { foldSearchText } from "./listoneFilter";
 import {
-  filterListone,
   LISTONE_PAGE_SIZE,
   ROLE_LABEL,
   ROLE_TABS,
@@ -113,6 +122,7 @@ function ListoneTable({
   adminBusy,
   listoneQuery,
   onlyFree,
+  placeKey,
   onReleaseAthlete,
   onAssignAthlete,
 }: {
@@ -124,6 +134,8 @@ function ListoneTable({
   adminBusy: boolean;
   listoneQuery: string;
   onlyFree: boolean;
+  /** Campionato e squadra scelti: cambiandoli si torna a pagina 1, come con testo e ruolo. */
+  placeKey: string;
   onReleaseAthlete: (athleteId: string) => void | Promise<void>;
   onAssignAthlete: (athleteId: string, purchaseCredits: number) => void | Promise<void>;
 }) {
@@ -131,7 +143,7 @@ function ListoneTable({
   const availabilityKey = listoneQuery.trim() ? "search" : onlyFree ? "free" : "all";
   useEffect(() => {
     setPage(0);
-  }, [listoneQuery, tabValue, availabilityKey]);
+  }, [listoneQuery, tabValue, availabilityKey, placeKey]);
   const pageCount = Math.max(1, Math.ceil(rows.length / LISTONE_PAGE_SIZE));
   const safePage = Math.min(page, pageCount - 1);
   const pagedRows = rows.slice(
@@ -222,7 +234,24 @@ export function RosterAdminManualCard({
 }) {
   const [roleTab, setRoleTab] = useState<RoleTab>("all");
   const [onlyFree, setOnlyFree] = useState(false);
+  const [chosenPlace, setChosenPlace] = useState<ListonePlaceFilters>(NO_LISTONE_PLACE_FILTERS);
+  // Un listone ricaricato può non avere più il campionato o la squadra scelti: si torna a «tutti».
+  const place = useMemo(() => normalizeListonePlaceFilters(listone, chosenPlace), [listone, chosenPlace]);
+  const placeKey = `${place.competitionId ?? ""}|${place.clubId ?? ""}`;
+  const placeActive = hasListonePlaceFilters(place);
   const ownedAthleteIds = new Set(ownership.keys());
+  // Stessa logica del sito (`@fantappero/contracts`), con la ricerca senza accenti dell'app.
+  const rows = filterListoneEntries(
+    listone,
+    {
+      role: roleTab,
+      query: listoneQuery,
+      onlyFree,
+      competitionId: place.competitionId,
+      clubId: place.clubId,
+    },
+    { fold: foldSearchText, ownedAthleteIds },
+  );
 
   return (
     <View style={{ gap: 12 }} testID="roster-admin-manual">
@@ -304,6 +333,7 @@ export function RosterAdminManualCard({
                 autoCorrect={false}
                 testID="roster-admin-listone-search"
               />
+              <ListoneFilterBar listone={listone} place={place} onChange={setChosenPlace} />
               <Pressable
                 style={styles.freeToggle}
                 onPress={() => setOnlyFree((current) => !current)}
@@ -315,7 +345,9 @@ export function RosterAdminManualCard({
                   {onlyFree ? <Text style={styles.freeMark}>✓</Text> : null}
                 </View>
                 <Text style={styles.freeLabel}>Solo disponibili</Text>
-                <Text style={[styles.meta, { marginLeft: "auto" }]}>{listone.length} calciatori</Text>
+                <Text style={[styles.meta, { marginLeft: "auto" }]} testID="roster-listone-count">
+                  {listonePlayerCountLabel(rows.length)}
+                </Text>
               </Pressable>
               <HScroll accessibilityRole="tablist">
                 {ROLE_TABS.map((tab) => {
@@ -340,13 +372,6 @@ export function RosterAdminManualCard({
                 if (tab.value !== roleTab) {
                   return null;
                 }
-                const rows = filterListone(
-                  listone,
-                  tab.value,
-                  listoneQuery,
-                  onlyFree,
-                  ownedAthleteIds,
-                );
                 if (rows.length === 0) {
                   return (
                     <UiStatePanel
@@ -356,11 +381,13 @@ export function RosterAdminManualCard({
                       message={
                         listoneQuery.trim()
                           ? "Nessun risultato per la ricerca corrente."
-                          : onlyFree
-                            ? "Nessun calciatore libero."
-                            : tab.value === "all"
-                              ? "Il listone è vuoto."
-                              : `Nessun ${ROLE_LABEL[tab.value as FantasyRole].toLowerCase()} nel listone.`
+                          : placeActive
+                            ? "Nessun calciatore con i filtri scelti."
+                            : onlyFree
+                              ? "Nessun calciatore libero."
+                              : tab.value === "all"
+                                ? "Il listone è vuoto."
+                                : `Nessun ${ROLE_LABEL[tab.value as FantasyRole].toLowerCase()} nel listone.`
                       }
                       testID={`roster-admin-listone-empty-${tab.value}`}
                     />
@@ -377,6 +404,7 @@ export function RosterAdminManualCard({
                     adminBusy={adminBusy}
                     listoneQuery={listoneQuery}
                     onlyFree={onlyFree}
+                    placeKey={placeKey}
                     onReleaseAthlete={onReleaseAthlete}
                     onAssignAthlete={onAssignAthlete}
                   />

@@ -1,8 +1,27 @@
-import { createElement } from "react";
+import type { LeagueMember } from "@fantappero/contracts";
+import { act, createElement } from "react";
+import { createRoot, type Root } from "react-dom/client";
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter } from "../router/simpleRouter";
 import { LeagueMembersPanel } from "./LeagueMembersPanel";
+
+const fetchLeagueMembersMock = vi.fn();
+const fetchManagerDirectoryMock = vi.fn();
+
+// Solo per la finestra «Sostituisci» (fuori demo): i test in demo non chiamano l'API.
+vi.mock("../api/leagues", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../api/leagues")>()),
+  fetchLeagueMembers: (...args: unknown[]) => fetchLeagueMembersMock(...args),
+}));
+vi.mock("../api/managerInvites", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../api/managerInvites")>()),
+  fetchManagerDirectory: (...args: unknown[]) => fetchManagerDirectoryMock(...args),
+}));
+vi.mock("../auth/sessionStorage", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../auth/sessionStorage")>()),
+  loadStoredSession: () => ({ accessToken: "token-admin", refreshToken: "refresh-admin" }),
+}));
 
 // Il pannello legge solo l'utente corrente: niente AuthProvider completo.
 vi.mock("../auth/AuthContext", async (importOriginal) => {
@@ -97,6 +116,89 @@ describe("LeagueMembersPanel — inviti nominativi in attesa (Rosario, 20/11)", 
     expect(capacityText(renderPanel({ participantCount: 4 }))).toBe("Iscritti: 3 / Previsti: 4");
     expect(capacityText(renderPanel({ participantCount: 4, pendingInviteCount: 0 }))).toBe(
       "Iscritti: 3 / Previsti: 4",
+    );
+  });
+});
+
+describe("LeagueMembersPanel — Sostituisci, «2. Chi vuoi mettere» (QA 21/11)", () => {
+  const MEMBERS: LeagueMember[] = [
+    {
+      userId: "admin-1",
+      displayName: "Marco",
+      email: "marco@example.com",
+      userType: "human",
+      role: "league_admin",
+      joinedAt: "2026-08-01T10:00:00Z",
+    },
+    {
+      userId: "member-1",
+      displayName: "Giulia",
+      email: "giulia@example.com",
+      userType: "human",
+      role: "member",
+      joinedAt: "2026-08-02T10:00:00Z",
+    },
+  ];
+  let container: HTMLDivElement;
+  let root: Root;
+
+  beforeEach(() => {
+    fetchLeagueMembersMock.mockReset().mockResolvedValue(MEMBERS);
+    fetchManagerDirectoryMock
+      .mockReset()
+      .mockResolvedValue({ items: [], total: 0, page: 1, pageSize: 8 });
+    container = document.createElement("div");
+    document.body.appendChild(container);
+    root = createRoot(container);
+  });
+
+  afterEach(() => {
+    act(() => root.unmount());
+    container.remove();
+  });
+
+  it("la ricerca dice «Cerca per nome o nickname», come la directory: l'email non si cerca più", async () => {
+    await act(async () => {
+      root.render(
+        createElement(MemoryRouter, {
+          initialEntries: ["/lega/amministrazione"],
+          children: createElement(LeagueMembersPanel, {
+            leagueId: "league-1",
+            isDemoMode: false,
+            search: "",
+          }),
+        }),
+      );
+    });
+    const open = container.querySelector<HTMLButtonElement>(
+      '[data-testid="league-members-replace-open"]',
+    );
+    expect(open?.disabled).toBe(false);
+    await act(async () => {
+      open?.click();
+    });
+
+    const panel = container.querySelector('[data-testid="league-members-replace-panel"]');
+    expect(panel).not.toBeNull();
+    const input = panel?.querySelector<HTMLInputElement>('input[name="replace-coach-query"]');
+    expect(input).not.toBeNull();
+    const label = panel?.querySelector(`label[for="${input?.id}"]`);
+    expect(label?.textContent).toBe("Cerca per nome o nickname");
+    expect(panel?.textContent).not.toMatch(/email/i);
+
+    // Il campo cerca nella directory dei fantallenatori (nome e nickname), come la pagina.
+    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
+    await act(async () => {
+      setter?.call(input, "giul");
+      input?.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 300));
+    });
+    expect(fetchManagerDirectoryMock).toHaveBeenLastCalledWith(
+      "token-admin",
+      "league-1",
+      expect.objectContaining({ query: "giul", available: true }),
     );
   });
 });

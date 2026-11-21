@@ -409,6 +409,73 @@ def test_roster_exposes_athlete_photo_url_when_available(
     )
 
 
+def test_broken_stored_names_come_back_repaired_from_listone_rosa_and_lineup(
+    client: TestClient,
+    db_session: Session,
+    competition_ids: list[str],
+) -> None:
+    """QA 21/11: i nomi salvati come li manda il fornitore («D. O&apos;Shea», codifica rovinata,
+    controllo C1 rimasto) escono riparati da listone, rosa e formazione, anche se la riga nel
+    database non è ancora stata riparata."""
+    token, _ = _register_and_login(client, "lineup.names.repaired@example.com")
+    league_id = _create_league(client, token, competition_ids, "Lega Nomi Riparati")
+    grouped = _seed_roster_athletes(db_session, id_offset=2_440_000)
+    # La prima lettera resta quella del ruolo: `_lineup_payload` la usa per schierarli.
+    broken = {
+        grouped["D"][0].id: ("D. O&apos;Shea", "D. O'Shea"),
+        grouped["C"][0].id: ("C. JovanoviÄ\x87", "C. Jovanović"),
+        grouped["A"][0].id: ("A. Pejičić\x87", "A. Pejičić"),
+    }
+    for athlete in (grouped["D"][0], grouped["C"][0], grouped["A"][0]):
+        athlete.canonical_name = broken[athlete.id][0]
+    db_session.commit()
+    athletes = _fill_validated_roster(db_session, league_id, grouped)
+    expected = {str(athlete_id): fixed for athlete_id, (_, fixed) in broken.items()}
+
+    fantasy_round, clubs = _create_open_round(
+        db_session,
+        league_id,
+        cutoff=datetime.now(UTC) + timedelta(hours=4),
+        id_offset=2_445_000,
+        competition_ids=competition_ids,
+    )
+    # Il club dei calciatori gioca nei campionati della lega: così sono nel suo listone.
+    _register_club_in_competitions(db_session, clubs[-1], competition_ids)
+    headers = {"Authorization": f"Bearer {token}"}
+    saved = client.put(
+        f"/leagues/{league_id}/turni/{fantasy_round.id}/formazione",
+        headers=headers,
+        json=_lineup_payload(athletes),
+    )
+    assert saved.status_code == 200, saved.text
+
+    listone = client.get(f"/leagues/{league_id}/listone", headers=headers)
+    assert listone.status_code == 200, listone.text
+    listone_names = {row["athleteId"]: row["canonicalName"] for row in listone.json()}
+    assert {key: listone_names[key] for key in expected} == expected
+
+    rosa = client.get(f"/leagues/{league_id}/rosa", headers=headers)
+    assert rosa.status_code == 200, rosa.text
+    rosa_names = {slot["athleteId"]: slot["athleteName"] for slot in rosa.json()["slots"]}
+    assert {key: rosa_names[key] for key in expected} == expected
+
+    context = client.get(
+        f"/leagues/{league_id}/turni/{fantasy_round.id}/formazione", headers=headers
+    )
+    assert context.status_code == 200, context.text
+    body = context.json()
+    roster_names = {row["athleteId"]: row["athleteName"] for row in body["roster"]}
+    assert {key: roster_names[key] for key in expected} == expected
+    starter_names = {row["athleteId"]: row["athleteName"] for row in body["lineup"]["starters"]}
+    assert {key: starter_names[key] for key in expected} == expected
+
+    # Riparati solo in uscita: la riga salvata resta com'era.
+    db_session.expire_all()
+    stored = db_session.get(Athlete, grouped["D"][0].id)
+    assert stored is not None
+    assert stored.canonical_name == "D. O&apos;Shea"
+
+
 def test_roster_exposes_fantasy_score_for_a_concluded_fixture(
     client: TestClient,
     db_session: Session,
@@ -1584,6 +1651,11 @@ def test_concurrent_identical_lineup_saves_produce_single_revision(
     client.get(f"/leagues/{league_id}/rosa", headers={"Authorization": f"Bearer {token}"})
     grouped = _seed_roster_athletes(db_session, id_offset=2_950_000)
     athletes = _fill_validated_roster(db_session, league_id, grouped)
+    # Le partite lasciate dai test precedenti nei campionati della lega possono far generare
+    # da sola, alla creazione, un turno 1: il turno del test prende il numero successivo.
+    last_number = db_session.scalar(
+        select(func.max(FantasyRound.number)).where(FantasyRound.league_id == UUID(league_id))
+    )
     cutoff = datetime.now(UTC) + timedelta(hours=4)
     fantasy_round, _clubs = _create_open_round(
         db_session,
@@ -1591,6 +1663,7 @@ def test_concurrent_identical_lineup_saves_produce_single_revision(
         cutoff=cutoff,
         id_offset=2_960_000,
         competition_ids=competition_ids,
+        number=(last_number or 0) + 1,
     )
     payload = _lineup_payload(athletes, "4-3-3")
 

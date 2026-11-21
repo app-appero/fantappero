@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 from datetime import UTC, datetime
+from typing import TYPE_CHECKING
 from uuid import UUID
 
 from sqlalchemy import and_, func, or_, select
@@ -21,6 +22,7 @@ from leagues.listone_refresh_progress import (
     new_job_id,
     save_progress,
 )
+from leagues.models.competition import Competition
 from leagues.models.league_audit_event import LeagueAuditEvent
 from leagues.schemas import (
     LeagueListoneEntryResponse,
@@ -69,6 +71,9 @@ from sports_data.provider.errors import (
 from sports_data.roster.models import Athlete
 from sports_data.roster.sync import sync_mvp_roster_with_client
 
+if TYPE_CHECKING:
+    from leagues.models.league import League
+
 logger = get_logger(__name__)
 
 LISTONE_OVERRIDE_WRITES_TOTAL = "listone_override_writes_total"
@@ -89,10 +94,11 @@ class LeagueListoneService:
         current_round: int = 0,
     ) -> list[LeagueListoneEntryResponse]:
         league = league_access.league
+        competition_ids = {competition.id for competition in league.competitions}
         assignments = list_role_assignments(
             self._session,
             season_year=league.season_year,
-            competition_ids={competition.id for competition in league.competitions},
+            competition_ids=competition_ids,
         )
         overrides = {
             row.athlete_id: row for row in list_active_overrides(self._session, league_id=league.id)
@@ -115,6 +121,11 @@ class LeagueListoneService:
                 .scalars()
                 .all()
             }
+        club_competitions = self._club_competitions(
+            club_ids,
+            season_year=league.season_year,
+            competition_ids=competition_ids,
+        )
 
         entries: list[LeagueListoneEntryResponse] = []
         for assignment in assignments:
@@ -131,6 +142,9 @@ class LeagueListoneService:
                     assignment=assignment,
                     athlete=athlete,
                     club=club,
+                    competition=(
+                        club_competitions.get(assignment.club_id) if assignment.club_id else None
+                    ),
                     override=override,
                     effective_role=effective,
                     current_round=current_round,
@@ -450,6 +464,7 @@ class LeagueListoneService:
             assignment=assignment,
             athlete=athlete,
             club=club,
+            competition=self._club_competition(assignment, league=league),
             override=row,
             effective_role=effective,
             current_round=round_for_view,
@@ -527,6 +542,7 @@ class LeagueListoneService:
             assignment=assignment,
             athlete=athlete,
             club=club,
+            competition=self._club_competition(assignment, league=league),
             override=None,
             effective_role=assignment.role,
             current_round=current_round,
@@ -567,10 +583,55 @@ class LeagueListoneService:
             assignment=assignment,
             athlete=athlete,
             club=club,
+            competition=self._club_competition(assignment, league=league),
             override=override,
             effective_role=effective,
             current_round=current_round,
         )
+
+    def _club_competitions(
+        self,
+        club_ids: Iterable[UUID],
+        *,
+        season_year: int,
+        competition_ids: set[UUID],
+    ) -> dict[UUID, Competition]:
+        """Campionato di ogni club nella stagione della lega, fra quelli scelti dalla lega.
+
+        Una sola query per tutto il listone, qualunque sia il numero di club (niente N+1).
+        Un club in più campionati della lega nella stessa stagione (con i campionati
+        nazionali non succede) prende il primo per nome, sempre lo stesso.
+        """
+        distinct_club_ids = set(club_ids)
+        if not distinct_club_ids or not competition_ids:
+            return {}
+        rows = self._session.execute(
+            select(CompetitionSeasonClub.club_id, Competition)
+            .join(SportSeason, SportSeason.id == CompetitionSeasonClub.sport_season_id)
+            .join(Competition, Competition.id == SportSeason.competition_id)
+            .where(
+                CompetitionSeasonClub.club_id.in_(distinct_club_ids),
+                SportSeason.year == season_year,
+                SportSeason.competition_id.in_(competition_ids),
+            )
+            .order_by(Competition.name.asc(), Competition.id.asc())
+        ).all()
+        competitions: dict[UUID, Competition] = {}
+        for club_id, competition in rows:
+            competitions.setdefault(club_id, competition)
+        return competitions
+
+    def _club_competition(
+        self, assignment: RoleAssignment, *, league: League
+    ) -> Competition | None:
+        """Campionato del club di una sola voce (override e dettaglio), come nel listone."""
+        if assignment.club_id is None:
+            return None
+        return self._club_competitions(
+            [assignment.club_id],
+            season_year=league.season_year,
+            competition_ids={competition.id for competition in league.competitions},
+        ).get(assignment.club_id)
 
     def _latest_started_round_number(self, league_id: UUID) -> int:
         """Il turno più alto già aperto, bloccato o in corso (0 se nessuno).
@@ -612,6 +673,7 @@ class LeagueListoneService:
         assignment: RoleAssignment,
         athlete: Athlete | None,
         club: Club | None,
+        competition: Competition | None,
         override: LeagueRoleOverride | None,
         effective_role: FantasyRole,
         current_round: int,
@@ -636,5 +698,7 @@ class LeagueListoneService:
             mappingVersion=assignment.mapping_version,
             clubId=str(assignment.club_id) if assignment.club_id else None,
             clubName=club.name if club else None,
+            competitionId=str(competition.id) if competition else None,
+            competitionName=competition.name if competition else None,
             override=override_payload,
         )

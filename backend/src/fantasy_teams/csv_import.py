@@ -9,7 +9,7 @@ import re
 from dataclasses import dataclass, field
 from uuid import UUID
 
-from app.text_folding import repair_mojibake, strip_accents
+from app.text_folding import repair_provider_text, strip_accents
 from auth.exceptions import ValidationAuthError
 
 CSV_TEMPLATE_HEADERS = ("squadra", "provider_id", "nome", "crediti")
@@ -234,9 +234,10 @@ def normalize_athlete_name(name: str) -> str:
     come "Dembélé" e "Dembele" (QA 18/11). Anche le lettere che non si
     scompongono, come la ı turca senza punto: "A. Bayindir" trova "A. Bayındır"
     (QA 19-20/11). Prima di tutto si ripara la codifica rovinata ("JovanoviÄ\\x87" è
-    "Jovanović", QA 20-21/11), che dopo `casefold` non si riconosce più.
+    "Jovanović", QA 20-21/11), che dopo `casefold` non si riconosce più, e si decodificano i
+    riferimenti dell'HTML: "D. O&apos;Shea" salvato così trova "D. O'Shea" (QA 21/11).
     """
-    return re.sub(r"\s+", " ", strip_accents(repair_mojibake(name).casefold())).strip()
+    return re.sub(r"\s+", " ", strip_accents(repair_provider_text(name).casefold())).strip()
 
 
 _INITIAL_CANONICAL = re.compile(r"^[^\W\d_]\.\s+(.+)$", re.UNICODE)

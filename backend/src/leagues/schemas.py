@@ -8,7 +8,7 @@ from uuid import UUID
 
 from pydantic import Field
 
-from app.text_validation import NoNulStr
+from app.text_validation import AthleteNameStr, NoNulStr
 from auth.schemas import ApiModel
 from database.enums import LeagueState
 from market.gate import MarketBlockedReason
@@ -428,7 +428,7 @@ class H2HCalendarResponse(ApiModel):
 
 class H2HPlayerScoreResponse(ApiModel):
     athlete_id: str = Field(alias="athleteId")
-    name: str
+    name: AthleteNameStr
     photo_url: str | None = Field(default=None, alias="photoUrl")
     role: Literal["P", "D", "C", "A"]
     fantasy_score: float | None = Field(default=None, alias="fantasyScore")
@@ -604,7 +604,7 @@ class LeagueListoneOverrideResponse(ApiModel):
 
 class LeagueListoneEntryResponse(ApiModel):
     athlete_id: str = Field(alias="athleteId")
-    canonical_name: str = Field(alias="canonicalName")
+    canonical_name: AthleteNameStr = Field(alias="canonicalName")
     photo_url: str | None = Field(default=None, alias="photoUrl")
     season_year: int = Field(alias="seasonYear")
     official_role: Literal["P", "D", "C", "A"] = Field(alias="officialRole")
@@ -613,6 +613,11 @@ class LeagueListoneEntryResponse(ApiModel):
     mapping_version: str = Field(alias="mappingVersion")
     club_id: str | None = Field(default=None, alias="clubId")
     club_name: str | None = Field(default=None, alias="clubName")
+    # Campionato del club nella stagione della lega, fra quelli scelti dalla lega: serve ai
+    # filtri «Campionato» e «Squadra» della ricerca in Rosa (Rosario, 21/11). `None` se il
+    # calciatore non ha club o il club non è in un campionato della lega in quella stagione.
+    competition_id: str | None = Field(default=None, alias="competitionId")
+    competition_name: str | None = Field(default=None, alias="competitionName")
     override: LeagueListoneOverrideResponse | None = None
 
 

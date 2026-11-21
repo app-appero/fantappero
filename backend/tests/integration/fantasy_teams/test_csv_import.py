@@ -974,6 +974,39 @@ def test_csv_matches_dotless_turkish_i(
     assert row["athleteId"] == str(keeper.id)
 
 
+def test_csv_matches_stored_names_with_html_character_references(
+    client: TestClient,
+    db_session: Session,
+    competition_ids: list[str],
+) -> None:
+    """QA 21/11: un nome salvato come lo manda il fornitore, "D. O&apos;Shea", combacia con
+    "D. O'Shea" scritto nel file, anche solo per cognome."""
+    token, _ = _register_and_login(client, "csv.names.entities@example.com")
+    league_id = _create_league(client, token, competition_ids, "Lega CSV O'Shea")
+    headers = {"Authorization": f"Bearer {token}"}
+    team_name = client.get(f"/leagues/{league_id}/rosa", headers=headers).json()["name"]
+    tag = random.randint(100_000, 999_999)
+    defender = _seed_athlete(db_session, _random_provider_id(), f"D. O&apos;Shea{tag}")
+    forward = _seed_athlete(db_session, _random_provider_id(), f"J. O&amp;#039;Brien{tag}")
+    preview = client.post(
+        f"/leagues/{league_id}/amministrazione/import-csv/anteprima-testo",
+        headers=headers,
+        json={
+            "csvText": (
+                "squadra,provider_id,nome,crediti\n"
+                f"{team_name},,D. O'Shea{tag},1\n"
+                f"{team_name},,O'Brien{tag},1\n"
+            )
+        },
+    )
+    assert preview.status_code == 200, preview.text
+    by_exact, by_surname = preview.json()["rows"]
+    assert by_exact["status"] == "ok", by_exact["issues"]
+    assert by_exact["athleteId"] == str(defender.id)
+    assert by_surname["status"] == "ok", by_surname["issues"]
+    assert by_surname["athleteId"] == str(forward.id)
+
+
 def test_excel_ambiguous_name_is_kept_to_choose_instead_of_ignored(
     client: TestClient,
     db_session: Session,

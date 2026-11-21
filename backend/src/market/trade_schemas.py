@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from pydantic import Field
 
+from app.text_validation import AthleteNameStr
 from auth.schemas import ApiModel
 
 # Tetto tecnico (colonne a 32 bit): oltre, la richiesta è respinta con 422.
@@ -32,7 +33,7 @@ class CounterTradeProposalRequest(ApiModel):
 
 class TradeAthleteResponse(ApiModel):
     id: str
-    name: str
+    name: AthleteNameStr
 
 
 class TradeProposalResponse(ApiModel):
