@@ -1,4 +1,10 @@
-import { isMarketOpen } from "@fantappero/contracts";
+import {
+  isMarketActive,
+  isMarketOpen,
+  marketNotFullNotice,
+  marketSwitchLocked,
+  type MarketGate,
+} from "@fantappero/contracts";
 import {
   createContext,
   useCallback,
@@ -12,9 +18,28 @@ import {
 import { fetchMarketGate, setMarketGate } from "../api/market";
 import { getApiErrorMessage, useAuth } from "../auth/AuthContext";
 import { loadStoredSession } from "../auth/sessionStorage";
+import { useLocation } from "../router/simpleRouter";
 
 export type MarketGateContextValue = {
+  /** Interruttore dell'amministratore. */
   marketOpen: boolean;
+  /**
+   * Interruttore acceso e lega al completo (decisione del 20/11): rosa, aste e scambi del
+   * partecipante. Le operazioni dell'amministratore sulle rose non dipendono né da questo
+   * né dall'interruttore: si fermano solo a turno in corso.
+   */
+  marketActive: boolean;
+  /** `false` finché non sono occupati tutti i posti della lega. */
+  leagueFull: boolean;
+  /**
+   * «Il mercato si apre quando la lega è al completo (5/8).», con «· 1 invito in attesa» se ci
+   * sono inviti nominativi in attesa; `null` a lega al completo.
+   */
+  notFullNotice: string | null;
+  /** Inviti nominativi in attesa: tengono un posto, ma la lega è al completo solo con gli iscritti. */
+  pendingInviteCount: number;
+  /** A lega incompleta l'interruttore spento non si accende (spegnerlo resta possibile). */
+  switchLocked: boolean;
   canManage: boolean;
   toggling: boolean;
   error: string | null;
@@ -30,10 +55,34 @@ export function marketGateHint(marketOpen: boolean): string {
   return marketOpen ? OPEN_HINT : CLOSED_HINT;
 }
 
-export function MarketGateProvider({ children }: { children: ReactNode }) {
+/** Stato demo «lega non al completo» (`?mercato=incompleto`): 5 iscritti su 8. */
+const DEMO_NOT_FULL_GATE: MarketGate = {
+  marketOpen: false,
+  memberCount: 5,
+  participantCount: 8,
+  leagueFull: false,
+  marketBlockedReason: "league_not_full",
+};
+
+function demoGateFromSearch(search: string): MarketGate | null {
+  return new URLSearchParams(search).get("mercato") === "incompleto" ? DEMO_NOT_FULL_GATE : null;
+}
+
+export function MarketGateProvider({
+  children,
+  reloadToken = 0,
+}: {
+  children: ReactNode;
+  /** Cambia quando gli iscritti cambiano (es. Amministrazione lega): rilegge lo stato. */
+  reloadToken?: number;
+}) {
   const { isDemoMode, activeLeagueId, activeLeague, can, patchLeague } = useAuth();
+  const { search } = useLocation();
   const canManage = can(["market:manage"]);
-  const [marketOpen, setMarketOpen] = useState(() => isMarketOpen(activeLeague));
+  const demoGate = isDemoMode ? demoGateFromSearch(search) : null;
+  const [gate, setGate] = useState<MarketGate>(
+    () => demoGate ?? { marketOpen: isMarketOpen(activeLeague) },
+  );
   const [toggling, setToggling] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -43,7 +92,7 @@ export function MarketGateProvider({ children }: { children: ReactNode }) {
       return;
     }
     lastLeagueIdRef.current = activeLeagueId;
-    setMarketOpen(isMarketOpen(activeLeague));
+    setGate({ marketOpen: isMarketOpen(activeLeague) });
   }, [activeLeague, activeLeagueId]);
 
   useEffect(() => {
@@ -56,12 +105,12 @@ export function MarketGateProvider({ children }: { children: ReactNode }) {
     }
     let cancelled = false;
     void fetchMarketGate(stored.accessToken, activeLeagueId)
-      .then((gate) => {
+      .then((next) => {
         if (cancelled) {
           return;
         }
-        setMarketOpen(gate.marketOpen);
-        patchLeague(activeLeagueId, { marketOpen: gate.marketOpen });
+        setGate(next);
+        patchLeague(activeLeagueId, { marketOpen: next.marketOpen });
       })
       .catch(() => {
         // Keep the last known value from the league summary.
@@ -69,7 +118,7 @@ export function MarketGateProvider({ children }: { children: ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, [activeLeagueId, isDemoMode, patchLeague]);
+  }, [activeLeagueId, isDemoMode, patchLeague, reloadToken]);
 
   const setOpen = useCallback(
     async (open: boolean) => {
@@ -77,7 +126,7 @@ export function MarketGateProvider({ children }: { children: ReactNode }) {
         return;
       }
       if (isDemoMode) {
-        setMarketOpen(open);
+        setGate((current) => ({ ...current, marketOpen: open }));
         if (activeLeagueId) {
           patchLeague(activeLeagueId, { marketOpen: open });
         }
@@ -94,9 +143,9 @@ export function MarketGateProvider({ children }: { children: ReactNode }) {
       setToggling(true);
       setError(null);
       try {
-        const gate = await setMarketGate(stored.accessToken, activeLeagueId, { open });
-        setMarketOpen(gate.marketOpen);
-        patchLeague(activeLeagueId, { marketOpen: gate.marketOpen });
+        const next = await setMarketGate(stored.accessToken, activeLeagueId, { open });
+        setGate(next);
+        patchLeague(activeLeagueId, { marketOpen: next.marketOpen });
       } catch (cause) {
         setError(getApiErrorMessage(cause, "Impossibile aggiornare lo stato del mercato."));
       } finally {
@@ -107,8 +156,19 @@ export function MarketGateProvider({ children }: { children: ReactNode }) {
   );
 
   const value = useMemo<MarketGateContextValue>(
-    () => ({ marketOpen, canManage, toggling, error, setOpen }),
-    [canManage, error, marketOpen, setOpen, toggling],
+    () => ({
+      marketOpen: gate.marketOpen,
+      marketActive: isMarketActive(gate),
+      leagueFull: gate.leagueFull !== false,
+      notFullNotice: marketNotFullNotice(gate),
+      pendingInviteCount: gate.pendingInviteCount ?? 0,
+      switchLocked: marketSwitchLocked(gate),
+      canManage,
+      toggling,
+      error,
+      setOpen,
+    }),
+    [canManage, error, gate, setOpen, toggling],
   );
 
   return <MarketGateContext.Provider value={value}>{children}</MarketGateContext.Provider>;
@@ -119,6 +179,11 @@ export function useMarketGate(): MarketGateContextValue {
   if (!context) {
     return {
       marketOpen: true,
+      marketActive: true,
+      leagueFull: true,
+      notFullNotice: null,
+      pendingInviteCount: 0,
+      switchLocked: false,
       canManage: false,
       toggling: false,
       error: null,

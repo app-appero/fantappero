@@ -45,6 +45,7 @@ from fantasy_lineups.rules import (
     LINEUP_ATHLETE_LEFT_ROSTER_CODE,
     MAX_AUTOMATIC_SUBSTITUTIONS,
     MAX_TACTICAL_MOVES,
+    LeftRosterRemoval,
     LineupPlayerRef,
     approved_module_catalog,
     assert_bench_order_lock,
@@ -59,7 +60,7 @@ from fantasy_lineups.rules import (
     fill_starter_holes,
     is_athlete_kickoff_locked,
     is_lineup_modification_allowed,
-    lineup_athlete_left_roster_message,
+    lineup_athlete_left_roster_messages,
     lineup_signature,
     next_unlocked_kickoff,
     parse_module,
@@ -1471,7 +1472,10 @@ class FantasyLineupService:
             if departed_cleanup
             else set()
         )
-        removed_names: list[str] = []
+        # Chi non è più in rosa ed è uscito dalla formazione: l'avviso dice chi, e se il suo posto
+        # è già coperto (fantasy_lineups.departures) o resta da coprire. Quelli tolti qui, in
+        # lettura, hanno sempre un posto da coprire: la loro uscita non è passata dalla pulizia.
+        left_roster: list[LeftRosterRemoval] = []
         if submission is not None:
             saved = self._to_saved(submission)
             names_by_id = {
@@ -1488,7 +1492,10 @@ class FantasyLineupService:
                     locked_athlete_ids=locked_departed,
                 )
                 removed = set(cleanup.removed_ids)
-                removed_names.extend(names_by_id.get(str(item), "") for item in cleanup.removed_ids)
+                left_roster.extend(
+                    LeftRosterRemoval(name=names_by_id.get(str(item), ""))
+                    for item in cleanup.removed_ids
+                )
             # Posto vuoto ma con il ruolo di chi c'era: la validazione segnala lo slot da
             # riempire (`missing_athlete`), non un modulo sbagliato. Lo stesso per il posto
             # lasciato nel DB da chi è uscito dalla rosa (fantasy_lineups.departures): lì il
@@ -1580,8 +1587,9 @@ class FantasyLineupService:
                 )
                 if any(draft_response.starter_athlete_ids):
                     draft_names = self._athlete_names([str(item) for item in cleanup.removed_ids])
-                    removed_names.extend(
-                        draft_names.get(str(item), "") for item in cleanup.removed_ids
+                    left_roster.extend(
+                        LeftRosterRemoval(name=draft_names.get(str(item), ""))
+                        for item in cleanup.removed_ids
                     )
         if draft_response is not None and unresolved:
             # Come per la formazione salvata: chi non ha un ruolo in tribuna non si restituisce.
@@ -1622,6 +1630,8 @@ class FantasyLineupService:
             # Chi è uscito dalla rosa è già stato tolto dal DB al momento dell'uscita
             # (fantasy_lineups.departures): l'avviso col nome resta finché il fantallenatore non
             # salva di nuovo formazione o bozza, e sparisce se nel frattempo è tornato in rosa.
+            # Se in panchina al suo posto è già salito qualcuno l'avviso lo nomina, invece di
+            # chiedere chi mettere al suo posto (Rosario, 20/11).
             last_saved = max(
                 moment
                 for moment in (
@@ -1630,8 +1640,8 @@ class FantasyLineupService:
                 )
                 if moment is not None
             )
-            removed_names[:0] = [
-                notice.athlete_name
+            left_roster[:0] = [
+                notice.removal()
                 for notice in departure_notices(
                     self._session,
                     league_id=league_id,
@@ -1642,14 +1652,11 @@ class FantasyLineupService:
                 and notice.athlete_id not in owned_ids
                 and notice.athlete_id not in settled_ids
             ]
-        if removed_names:
-            issues.insert(
-                0,
-                LineupIssueResponse(
-                    code=LINEUP_ATHLETE_LEFT_ROSTER_CODE,
-                    message=lineup_athlete_left_roster_message(removed_names),
-                ),
-            )
+        if left_roster:
+            issues[:0] = [
+                LineupIssueResponse(code=LINEUP_ATHLETE_LEFT_ROSTER_CODE, message=message)
+                for message in lineup_athlete_left_roster_messages(left_roster)
+            ]
         # Stesso codice dell'avviso «non è più nella tua rosa»: web e app lo mostrano già nello
         # stesso riquadro, in testa.
         issues[:0] = [

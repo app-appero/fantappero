@@ -112,6 +112,20 @@ test("esito invito e nuovo partecipante aprono la directory fantallenatori", () 
   });
 });
 
+test("«La lega è al completo» apre l'amministrazione della lega (20/11)", () => {
+  assert.deepEqual(
+    resolveNotificationRoute({
+      title: "La lega è al completo: puoi aprire il mercato",
+      deepLink: "/lega/amministrazione?lega=league-1",
+    }),
+    { kind: "stack", name: "LeagueAdmin", params: { leagueId: "league-1" } },
+  );
+  assert.deepEqual(resolveNotificationRoute({ title: "x", deepLink: "/lega/amministrazione" }), {
+    kind: "stack",
+    name: "LeagueAdmin",
+  });
+});
+
 test("senza meta noto non naviga", () => {
   assert.equal(resolveNotificationRoute({ title: "x", deepLink: null }), null);
   assert.equal(resolveNotificationRoute({ title: "x", deepLink: "https://evil.example" }), null);

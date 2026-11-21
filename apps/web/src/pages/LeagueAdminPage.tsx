@@ -16,12 +16,22 @@ import {
   Tabs,
   UiStatePanel,
 } from "@fantappero/ui";
-import { type FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  type ComponentProps,
+  type FormEvent,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { fetchLeagueAdminPanel, updateLeagueRules } from "../api/leagues";
 import { getApiErrorMessage, useAuth } from "../auth/AuthContext";
 import { ManagerDirectory } from "../components/ManagerDirectory";
 import { loadStoredSession } from "../auth/sessionStorage";
 import { NoLeagueSelectedPanel } from "../components/NoLeagueSelectedPanel";
+import { MarketGateBar } from "../market/MarketGateBar";
+import { MarketGateProvider, useMarketGate } from "../market/MarketGateContext";
 import { useLocation } from "../router/simpleRouter";
 import { parseWireframeStateFromSearch } from "../wireframes/useWireframeState";
 import { LeagueDeletePanel } from "./LeagueDeletePanel";
@@ -148,6 +158,14 @@ function buildPayloadFromRules(rules: LeagueRules): UpdateLeagueRulesRequest {
   };
 }
 
+/** Il conto degli iscritti con gli inviti nominativi in attesa dello stato del mercato (20/11). */
+function LeagueMembersPanelWithPendingInvites(
+  props: Omit<ComponentProps<typeof LeagueMembersPanel>, "pendingInviteCount">,
+) {
+  const { pendingInviteCount } = useMarketGate();
+  return <LeagueMembersPanel {...props} pendingInviteCount={pendingInviteCount} />;
+}
+
 /** Configurazione regolamento lega prima dell'avvio stagione (EP03-02). */
 export function LeagueAdminPage() {
   const { isDemoMode, activeLeagueId, activeLeague } = useAuth();
@@ -177,6 +195,11 @@ export function LeagueAdminPage() {
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [saving, setSaving] = useState(false);
   const [membersReloadToken, setMembersReloadToken] = useState(0);
+  // Un invito nominativo inviato o annullato cambia gli inviti in attesa accanto al conto.
+  const [invitesReloadToken, setInvitesReloadToken] = useState(0);
+  const refreshAfterInvitesChange = useCallback(() => {
+    setInvitesReloadToken((current) => current + 1);
+  }, []);
   const [memberCount, setMemberCount] = useState<number | null>(null);
   const configurationSavedRef = useRef(configurationSaved);
   configurationSavedRef.current = configurationSaved;
@@ -421,7 +444,9 @@ export function LeagueAdminPage() {
       ) : null}
 
       {!loading && !loadError && rules ? (
-        <>
+        // Lo stato del mercato serve all'interruttore e al conto degli iscritti (inviti in attesa
+        // compresi, Rosario 20/11): si rilegge quando cambiano iscritti o inviti nominativi.
+        <MarketGateProvider reloadToken={membersReloadToken + invitesReloadToken}>
           {lifecycle ? (
             <LeagueSeasonPanel
               leagueId={activeLeagueId}
@@ -431,6 +456,15 @@ export function LeagueAdminPage() {
               onOpenSetupHint={openSetupHint}
             />
           ) : null}
+
+          {/* Interruttore «Mercato aperto»: a lega incompleta non si accende (decisione del 20/11). */}
+          <section
+            aria-label="Mercato"
+            style={{ marginTop: "1.5rem" }}
+            data-testid="league-admin-market"
+          >
+            <MarketGateBar />
+          </section>
 
           <section
             aria-labelledby="league-admin-next-title"
@@ -703,7 +737,7 @@ export function LeagueAdminPage() {
                   />
                 ) : (
                   <>
-                    <LeagueMembersPanel
+                    <LeagueMembersPanelWithPendingInvites
                       leagueId={activeLeagueId}
                       isDemoMode={isDemoMode}
                       search={search}
@@ -729,6 +763,7 @@ export function LeagueAdminPage() {
                       participantCount={rules.participantCount}
                       reloadToken={membersReloadToken}
                       onMembershipChanged={refreshAfterMembershipChange}
+                      onInvitesChanged={refreshAfterInvitesChange}
                     />
                   </>
                 )}
@@ -744,7 +779,7 @@ export function LeagueAdminPage() {
               isDemoMode={isDemoMode}
             />
           ) : null}
-        </>
+        </MarketGateProvider>
       ) : null}
     </PageContainer>
   );

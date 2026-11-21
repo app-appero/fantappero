@@ -34,6 +34,7 @@ import { AthleteName } from "../athletes/AthleteCard";
 import { RoleGroupedAthletes } from "./RoleGroupedAthletes";
 import { getApiErrorMessage, useAuth } from "../auth/AuthContext";
 import { loadStoredSession } from "../auth/sessionStorage";
+import { useMarketGate } from "../market/MarketGateContext";
 import { useMarketHistory } from "../market/useMarketHistory";
 import {
   TRADE_ACCEPT_CANCEL_LABEL,
@@ -181,6 +182,11 @@ function CreditsDirectionField({
 export function MarketPage() {
   const { isDemoMode, activeLeagueId, can } = useAuth();
   const canManageMarket = can(["market:manage"]);
+  // Decisione del 20/11: scambi (proposta, accettazione, approvazione) e svincoli del
+  // partecipante solo a lega al completo. Il banner con il motivo è nella barra del mercato.
+  const { leagueFull, marketActive } = useMarketGate();
+  const tradesLocked = !leagueFull;
+  const releaseLocked = !canManageMarket && !marketActive;
   const { search } = useLocation();
   const demoState = isDemoMode ? parseWireframeStateFromSearch(search) : null;
   // Notifica di scambio (?scambio=<id>): apre direttamente la proposta giusta
@@ -685,7 +691,7 @@ export function MarketPage() {
                   </Button>
                   <Button
                     variant="primary"
-                    disabled={isDemoMode || !preview || applying}
+                    disabled={isDemoMode || !preview || applying || releaseLocked}
                     onClick={() => void handleApply()}
                   >
                     {applying ? "Conferma…" : "Conferma svincolo"}
@@ -906,7 +912,11 @@ export function MarketPage() {
                 />
               ) : null}
 
-              <Button type="submit" variant="primary" disabled={trade.creating || ownedSlots.length === 0}>
+              <Button
+                type="submit"
+                variant="primary"
+                disabled={trade.creating || ownedSlots.length === 0 || tradesLocked}
+              >
                 {trade.creating ? "Invio…" : "Proponi scambio"}
               </Button>
             </form>
@@ -1048,7 +1058,7 @@ export function MarketPage() {
                           <Button
                             variant="primary"
                             size="sm"
-                            disabled={pending || proposal.awaitingCredits === true}
+                            disabled={pending || proposal.awaitingCredits === true || tradesLocked}
                             onClick={() => setAcceptTarget(proposal)}
                             data-testid={`market-trade-accept-${proposal.id}`}
                           >
@@ -1073,7 +1083,7 @@ export function MarketPage() {
                           <Button
                             variant="secondary"
                             size="sm"
-                            disabled={pending || ownedSlots.length === 0}
+                            disabled={pending || ownedSlots.length === 0 || tradesLocked}
                             onClick={() => startCounter(proposal.id)}
                           >
                             Controproponi
@@ -1086,7 +1096,7 @@ export function MarketPage() {
                           <Button
                             variant="primary"
                             size="sm"
-                            disabled={pending}
+                            disabled={pending || tradesLocked}
                             onClick={() => void trade.approveProposal(proposal.id)}
                           >
                             Approva
@@ -1165,7 +1175,7 @@ export function MarketPage() {
                             <p>Nessuna scadenza: la controproposta resta valida finché non viene decisa o annullata.</p>
                           )}
                           <div className="fa-ds-showcase__row">
-                            <Button type="submit" variant="primary" disabled={pending}>
+                            <Button type="submit" variant="primary" disabled={pending || tradesLocked}>
                               Invia controproposta
                             </Button>
                             <Button

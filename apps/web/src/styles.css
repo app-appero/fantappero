@@ -1791,6 +1791,26 @@ a.fa-member-list__identity:focus-visible {
   gap: var(--fa-space-sm);
 }
 
+/* «Svuota formazione» (Rosario, 20/11): contorno e testo rossi, come un'azione che toglie. */
+.fa-btn.fa-formation-clear {
+  border-color: color-mix(in srgb, var(--fa-color-danger) 60%, transparent);
+  color: var(--fa-color-danger);
+}
+
+.fa-btn.fa-formation-clear:hover:not(:disabled):not([aria-disabled="true"]) {
+  border-color: var(--fa-color-danger);
+  background-color: color-mix(in srgb, var(--fa-color-danger) 10%, transparent);
+}
+
+.fa-formation-clear__points {
+  margin: var(--fa-space-sm) 0 0;
+  padding-left: 1.25rem;
+  display: grid;
+  gap: var(--fa-space-xs);
+  color: var(--fa-color-foreground-muted);
+  font-size: var(--fa-text-sm);
+}
+
 .fa-formation-layout__pitch-row {
   display: flex;
   flex-wrap: wrap;
@@ -6257,4 +6277,176 @@ button.fa-starter-row:disabled {
   color: inherit;
   font-weight: 700;
   text-decoration: underline;
+}
+
+/* ══ iPhone: sito aggiunto alla schermata Home (si apre come un'app) ═══════════
+   Con viewport-fit=cover la pagina arriva sotto notch, angoli arrotondati e
+   indicatore Home: env(safe-area-inset-*) dice quanto spazio lasciare libero.
+   Vale 0 su desktop, su Android e in Safari con le barre, quindi lì non cambia
+   nulla. Con la barra di stato «default» in verticale il margine in alto è 0;
+   contano il fondo (indicatore Home) e, in orizzontale, i lati (notch).
+   Qui solo aggiunte ai margini esistenti: stessi valori di partenza di
+   @fantappero/ui (layout.css, components.css) e delle regole sopra. */
+
+/* Header: lontano da barra di stato e notch. */
+@media (min-width: 768px) {
+  .fa-app-header {
+    padding-top: calc(var(--fa-space-sm) + env(safe-area-inset-top, 0px));
+    padding-right: calc(var(--fa-space-md) + env(safe-area-inset-right, 0px));
+    padding-left: calc(var(--fa-space-md) + env(safe-area-inset-left, 0px));
+  }
+
+  /* Menu laterale a sinistra (notch in orizzontale), contenuto a destra e in fondo. */
+  .fa-app-shell__sidebar {
+    padding-left: calc(var(--fa-space-md) + env(safe-area-inset-left, 0px));
+  }
+
+  .fa-app-shell__main {
+    padding-right: calc(var(--fa-space-md) + env(safe-area-inset-right, 0px));
+    padding-bottom: calc(var(--fa-space-md) + env(safe-area-inset-bottom, 0px));
+  }
+}
+
+/* Su schermo stretto il margine in alto dell'header e quello in fondo al contenuto
+   ci sono già (layout.css): qui solo i lati. */
+@media (max-width: 767px) {
+  .fa-app-header {
+    padding-right: calc(var(--fa-space-sm) + env(safe-area-inset-right, 0px));
+    padding-left: calc(var(--fa-space-sm) + env(safe-area-inset-left, 0px));
+  }
+
+  .fa-app-shell__main {
+    padding-right: calc(var(--fa-space-sm) + env(safe-area-inset-right, 0px));
+    padding-left: calc(var(--fa-space-sm) + env(safe-area-inset-left, 0px));
+  }
+}
+
+/* Banner dell'operatore che impersona: sta sopra l'header, quindi in cima allo schermo. */
+.fa-impersonation-banner {
+  padding-top: calc(var(--fa-space-sm) + env(safe-area-inset-top, 0px));
+  padding-right: calc(var(--fa-space-md) + env(safe-area-inset-right, 0px));
+  padding-left: calc(var(--fa-space-md) + env(safe-area-inset-left, 0px));
+}
+
+/* Menu a scomparsa (si apre da sinistra): alto e basso li gestisce già layout.css. */
+.fa-nav-drawer__panel {
+  padding-left: calc(var(--fa-space-md) + env(safe-area-inset-left, 0px));
+}
+
+/* Finestre (Modal): mai sotto notch o indicatore Home. */
+.fa-modal {
+  padding:
+    calc(var(--fa-space-md) + env(safe-area-inset-top, 0px))
+    calc(var(--fa-space-md) + env(safe-area-inset-right, 0px))
+    calc(var(--fa-space-md) + env(safe-area-inset-bottom, 0px))
+    calc(var(--fa-space-md) + env(safe-area-inset-left, 0px));
+}
+
+.fa-modal__dialog {
+  max-height: calc(
+    100vh - var(--fa-space-xl) - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)
+  );
+}
+
+/* Avvisi in basso a destra. */
+.fa-toast-region {
+  right: calc(var(--fa-space-md) + env(safe-area-inset-right, 0px));
+  bottom: calc(var(--fa-space-md) + env(safe-area-inset-bottom, 0px));
+}
+
+/* Barra «Aggiorna» del listone (pannello operatore), fissa in fondo. */
+.fa-listone-refresh-bar {
+  padding-right: calc(var(--fa-space-xs) + env(safe-area-inset-right, 0px));
+  padding-bottom: calc(var(--fa-space-xs) + env(safe-area-inset-bottom, 0px));
+  padding-left: calc(var(--fa-space-xs) + env(safe-area-inset-left, 0px));
+}
+
+/* Barra delle azioni della formazione (Salva, Annulla, ...): sopra l'indicatore Home. */
+.fa-formation-layout__sidebar > .fa-formation-layout__actions {
+  bottom: calc(var(--fa-space-sm) + env(safe-area-inset-bottom, 0px));
+}
+
+@media (max-width: 56rem) {
+  /* Qui la barra è attaccata al fondo dello schermo: il suo sfondo copre anche la zona
+     dell'indicatore Home, i bottoni restano sopra. */
+  .fa-formation-layout__sidebar > .fa-formation-layout__actions {
+    bottom: 0;
+    padding-bottom: calc(var(--fa-space-sm) + env(safe-area-inset-bottom, 0px));
+  }
+}
+
+/* Link «Salta al contenuto» quando prende il focus. */
+.fa-skip-link:focus {
+  top: calc(var(--fa-space-sm) + env(safe-area-inset-top, 0px));
+  left: calc(var(--fa-space-sm) + env(safe-area-inset-left, 0px));
+}
+
+/* Pagine di accesso (/accedi e sottopagine): fuori dalla shell, a tutto schermo. */
+.fa-login:not(.fa-login-cards) {
+  padding:
+    env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px)
+    env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px);
+}
+
+.fa-login-cards {
+  padding:
+    calc(var(--fa-space-xl) + env(safe-area-inset-top, 0px))
+    calc(clamp(1.5rem, 5vw, 5rem) + env(safe-area-inset-right, 0px))
+    calc(var(--fa-space-xl) + env(safe-area-inset-bottom, 0px))
+    calc(clamp(1.5rem, 5vw, 5rem) + env(safe-area-inset-left, 0px));
+}
+
+@media (max-width: 899px) {
+  .fa-login-cards {
+    padding:
+      calc(1.75rem + env(safe-area-inset-top, 0px))
+      calc(1.75rem + env(safe-area-inset-right, 0px))
+      calc(1.75rem + env(safe-area-inset-bottom, 0px))
+      calc(1.75rem + env(safe-area-inset-left, 0px));
+  }
+}
+
+/* Informativa privacy (/privacy), anche lei fuori dalla shell. */
+.fa-privacy {
+  padding-top: calc(var(--fa-space-lg) + env(safe-area-inset-top, 0px));
+  padding-right: calc(var(--fa-space-md) + env(safe-area-inset-right, 0px));
+  padding-bottom: calc(var(--fa-space-xl) + env(safe-area-inset-bottom, 0px));
+  padding-left: calc(var(--fa-space-md) + env(safe-area-inset-left, 0px));
+}
+
+/* ══ iPhone: niente zoom quando si tocca un campo ════════════════════════════
+   Safari su iPhone ingrandisce la pagina se il testo del campo è sotto i 16px
+   (qui di base 14px, 12px nell'header). Da 16px in su non zooma; lo zoom con
+   due dita resta libero (nessun maximum-scale nel viewport). Su schermo stretto
+   per tutti, e su iPhone/iPad anche in orizzontale (@supports vale solo su iOS).
+   I campi già più grandi (es. il codice d'invito) restano come sono: i selettori
+   per tag hanno la specificità più bassa. */
+@media (max-width: 767px) {
+  input:where(:not([type="checkbox"], [type="radio"], [type="range"], [type="file"], [type="color"], [type="button"], [type="submit"], [type="reset"], [type="image"])),
+  select,
+  textarea,
+  .fa-input,
+  .fa-select,
+  .fa-app-header .fa-select,
+  .fa-roster-table .fa-roster-price-edit .fa-input,
+  .fa-roster-table .fa-roster-price-input,
+  .fa-athlete-chooser__search,
+  .fa-nop-textarea {
+    font-size: 16px;
+  }
+}
+
+@supports (-webkit-touch-callout: none) {
+  input:where(:not([type="checkbox"], [type="radio"], [type="range"], [type="file"], [type="color"], [type="button"], [type="submit"], [type="reset"], [type="image"])),
+  select,
+  textarea,
+  .fa-input,
+  .fa-select,
+  .fa-app-header .fa-select,
+  .fa-roster-table .fa-roster-price-edit .fa-input,
+  .fa-roster-table .fa-roster-price-input,
+  .fa-athlete-chooser__search,
+  .fa-nop-textarea {
+    font-size: 16px;
+  }
 }

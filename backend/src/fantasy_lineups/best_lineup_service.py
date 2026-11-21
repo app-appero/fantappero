@@ -45,7 +45,13 @@ from fantasy_lineups.ai_selection import (
     score_candidate,
 )
 from fantasy_lineups.ai_service import collect_candidates_for_team
-from fantasy_lineups.rules import BENCH_ACTIVE_ROLE_QUOTA, BENCH_ACTIVE_SIZE, module_counts
+from fantasy_lineups.rules import (
+    BENCH_ACTIVE_ROLE_QUOTA,
+    BENCH_ACTIVE_SIZE,
+    LineupPlayerRef,
+    module_counts,
+    restore_bench_active_roles,
+)
 
 __all__ = [
     "compute_best_lineup_for_team",
@@ -121,11 +127,34 @@ def compute_best_lineup_respecting_locks(
         season_year=season_year,
         decided_at=decided_at,
     )
+    # Davanti a un bloccato in panchina (o in tribuna) non si entra e non si esce
+    # (`assert_bench_order_lock`): chi è in panchina fino all'ultimo bloccato resta al suo
+    # posto, anche se non ha ancora giocato. Prima un panchinaro davanti a un bloccato poteva
+    # salire titolare: la panchina scalava di un posto (bloccati compresi) e al 10° posto
+    # saliva il primo della tribuna, spesso un portiere (bozza non salvabile, e2e 20/11).
+    last_locked = max(
+        (
+            index
+            for index, athlete_id in enumerate(confirmed_bench_order)
+            if athlete_id in locked_athlete_ids
+        ),
+        default=-1,
+    )
+    held_bench_ids = set(confirmed_bench_order[: last_locked + 1])
     locked = [c for c in candidates if c.athlete_id in locked_athlete_ids]
-    free = [c for c in candidates if c.athlete_id not in locked_athlete_ids]
+    held = [
+        c
+        for c in candidates
+        if c.athlete_id in held_bench_ids and c.athlete_id not in locked_athlete_ids
+    ]
+    free = [
+        c
+        for c in candidates
+        if c.athlete_id not in locked_athlete_ids and c.athlete_id not in held_bench_ids
+    ]
 
     pinned_starters = [c for c in locked if c.athlete_id in confirmed_starter_ids]
-    pinned_bench = [c for c in locked if c.athlete_id not in confirmed_starter_ids]
+    pinned_bench = [c for c in locked if c.athlete_id not in confirmed_starter_ids] + held
 
     targets = dict(_role_targets(module))
     for candidate in pinned_starters:
@@ -169,12 +198,24 @@ def compute_best_lineup_respecting_locks(
         carried_bench=carried_bench,
         new_arrival_ids=new_arrivals,
     )
+    # Un panchinaro dei primi 10 salito titolare (dopo l'ultimo bloccato) lascia un posto: chi
+    # segue scala e al 10° posto sale il primo della tribuna, qualunque ruolo abbia. Stessa
+    # riparazione della pulizia all'uscita e della regola di inizio turno (20/11): sale il
+    # primo della tribuna con il ruolo che manca, senza spostare né scavalcare chi è fermo.
+    role_by_id = {c.athlete_id: c.role for c in candidates}
+    repaired = restore_bench_active_roles(
+        [
+            LineupPlayerRef(athlete_id=athlete_id, role=role_by_id.get(athlete_id))
+            for athlete_id in (*carried_bench, *new_arrivals)
+        ],
+        locked_athlete_ids=set(locked_athlete_ids) | held_bench_ids,
+    )
 
     return LineupPlan(
         algorithm_version=free_plan.algorithm_version,
         decided_at=decided_at,
         starters=starters,
-        bench=tuple(carried_bench) + tuple(new_arrivals),
+        bench=tuple(ref.athlete_id for ref in repaired.bench),
         candidates=free_plan.candidates,
         used_fallback=free_plan.used_fallback,
         unfilled_roles=free_plan.unfilled_roles,

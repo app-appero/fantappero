@@ -5,7 +5,7 @@ import {
   type LeagueMember,
   type LeagueNextStepTarget,
 } from "@fantappero/contracts";
-import { avatarInitials } from "@fantappero/contracts";
+import { avatarInitials, pendingInvitesLabel } from "@fantappero/contracts";
 import {
   Breadcrumb,
   Button,
@@ -304,6 +304,12 @@ export function LeagueHomePage() {
                 <strong>
                   {members.length}/{league.rules.participantCount}
                 </strong>
+                {/* Inviti nominativi in attesa: tengono un posto (Rosario, 20/11). */}
+                {(league.pendingInviteCount ?? 0) > 0 ? (
+                  <small data-testid="league-home-pending-invites">
+                    {pendingInvitesLabel(league.pendingInviteCount ?? 0)}
+                  </small>
+                ) : null}
                 <small>
                   {league.rules.participantMin}–{league.rules.participantMax} consentiti
                 </small>

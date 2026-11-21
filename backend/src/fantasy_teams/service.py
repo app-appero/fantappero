@@ -379,7 +379,9 @@ class FantasyTeamService:
             )
 
         league = self._lock_league(league_access.league.id)
-        assert_market_open(league)
+        # Operazione dell'amministratore: vale a lega incompleta e a interruttore spento,
+        # ferma solo a turno in corso (20/11).
+        assert_market_open(league, actor_is_admin=True)
         team = self._get_team_for_update(league.id, team_id)
         membership = self._session.scalar(
             select(LeagueMembership)
@@ -762,7 +764,10 @@ class FantasyTeamService:
         payload: AssignRosterSlotRequest,
     ) -> FantasyTeamResponse:
         league = self._lock_league(league_access.league.id)
-        assert_market_open(league)
+        # Il partecipante si inserisce calciatori in rosa solo a lega al completo e a
+        # interruttore acceso (20/11); l'amministratore prepara le rose in anticipo:
+        # assegna, sostituisce e rettifica i prezzi fermandosi solo a turno in corso.
+        assert_market_open(league, actor_is_admin=self._is_league_admin(league_access))
         team = self._get_team_for_update(league.id, team_id)
         self._assert_can_edit_team(league_access, team)
         roster_size = resolve_roster_size(self._session, league.id)
@@ -969,7 +974,8 @@ class FantasyTeamService:
         slot_index: int,
     ) -> FantasyTeamResponse:
         league = self._lock_league(league_access.league.id)
-        assert_market_open(league)
+        # Come l'assegnazione: lo svincolo dell'amministratore si ferma solo a turno in corso.
+        assert_market_open(league, actor_is_admin=self._is_league_admin(league_access))
         team = self._get_team_for_update(league.id, team_id)
         self._assert_can_edit_team(league_access, team)
         if not 0 <= slot_index <= 1_000:
@@ -1492,7 +1498,9 @@ class FantasyTeamService:
         payload: RosterImportConfirmRequest,
     ) -> RosterImportConfirmResponse:
         league = self._lock_league(league_access.league.id)
-        assert_market_open(league)
+        # Import delle rose (CSV/Excel): l'amministratore lo fa anche a lega incompleta e a
+        # interruttore spento; si ferma solo a turno in corso (20/11).
+        assert_market_open(league, actor_is_admin=self._is_league_admin(league_access))
         session = self._session.scalars(
             select(RosterImportSession)
             .where(

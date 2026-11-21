@@ -608,6 +608,18 @@ def _render_lega_nuovo_membro(params: NotificationParams) -> NotificationContent
     )
 
 
+@register_template("lega.al_completo", 1)
+def _render_lega_al_completo(params: NotificationParams) -> NotificationContent:
+    """Tutti i posti sono occupati: arriva agli amministratori, che aprono il mercato (20/11)."""
+    return NotificationContent(
+        title="La lega è al completo: puoi aprire il mercato",
+        body=_league_body(
+            "Tutti i posti sono occupati. Apri il mercato da Amministrazione lega.", params
+        ),
+        deep_link=_league_link("/lega/amministrazione", params),
+    )
+
+
 @register_template("lega.attivata", 1)
 def _render_lega_attivata(params: NotificationParams) -> NotificationContent:
     """La lega è partita: arriva a tutti i partecipanti."""

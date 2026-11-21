@@ -4,17 +4,19 @@ import { marketGateHint, useMarketGate } from "./MarketGateContext";
 
 /** Admin switch (and member status) for the league transfer window. */
 export function MarketGateBar() {
-  const { marketOpen, canManage, toggling, error, setOpen } = useMarketGate();
+  const { marketOpen, canManage, toggling, error, setOpen, notFullNotice, switchLocked } =
+    useMarketGate();
   const [infoOpen, setInfoOpen] = useState(false);
-  const hint = marketGateHint(marketOpen);
+  // A lega incompleta il testo spiega perché il mercato è fermo (decisione del 20/11).
+  const hint = notFullNotice ?? marketGateHint(marketOpen);
 
   return (
     <div className="fa-market-gate" data-testid="market-gate-bar">
       <div className="fa-market-gate__main">
         <p className="fa-market-gate__title">
           Mercato{" "}
-          <Badge variant={marketOpen ? "success" : "warning"}>
-            {marketOpen ? "aperto" : "chiuso"}
+          <Badge variant={marketOpen && !notFullNotice ? "success" : "warning"}>
+            {marketOpen && !notFullNotice ? "aperto" : "chiuso"}
           </Badge>
           <span className="fa-market-gate__info">
             <button
@@ -34,14 +36,24 @@ export function MarketGateBar() {
             ) : null}
           </span>
         </p>
-        <p className="fa-market-gate__hint">{hint}</p>
+        {notFullNotice ? (
+          <p
+            className="fa-market-gate__notice"
+            role="status"
+            data-testid="market-gate-not-full"
+          >
+            {notFullNotice}
+          </p>
+        ) : (
+          <p className="fa-market-gate__hint">{hint}</p>
+        )}
       </div>
       {canManage ? (
         <Switch
           checked={marketOpen}
           onCheckedChange={(checked) => void setOpen(checked)}
-          disabled={toggling}
-          ariaLabel="Apri o chiudi il mercato"
+          disabled={toggling || switchLocked}
+          ariaLabel="Mercato aperto"
           statusLabel={marketOpen ? "Aperto" : "Chiuso"}
           testId="market-gate-switch"
         />

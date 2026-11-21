@@ -3,14 +3,26 @@ import { theme } from "@fantappero/ui/theme";
 import { useState } from "react";
 import { Pressable, Switch, Text, View } from "react-native";
 import { marketUiStyles as styles } from "./marketUiStyles";
-import { useMarketGate } from "./useMarketGate";
+import { type MarketGateHandle, useMarketGate } from "./useMarketGate";
 
-export function MarketGateBar() {
-  const { marketOpen, canManage, toggling, error, setOpen } = useMarketGate();
+export function MarketGateBar({ reloadToken = 0 }: { reloadToken?: number } = {}) {
+  const gate = useMarketGate({ reloadToken });
+  return <MarketGateBarView gate={gate} />;
+}
+
+/**
+ * La barra con uno stato del mercato già letto: Amministrazione lega lo condivide con il conto
+ * degli iscritti, inviti in attesa compresi (Rosario, 20/11).
+ */
+export function MarketGateBarView({ gate }: { gate: MarketGateHandle }) {
+  const { marketOpen, canManage, toggling, error, setOpen, notFullNotice, switchLocked } = gate;
   const [infoOpen, setInfoOpen] = useState(false);
-  const hint = marketOpen
-    ? "Rosa e asta sono attive. Gli scambi restano sempre disponibili."
-    : "Rosa e asta sono bloccate. Gli scambi restano disponibili.";
+  const running = marketOpen && !notFullNotice;
+  const hint =
+    notFullNotice ??
+    (marketOpen
+      ? "Rosa e asta sono attive. Gli scambi restano sempre disponibili."
+      : "Rosa e asta sono bloccate. Gli scambi restano disponibili.");
 
   return (
     <View style={styles.gateBar} testID="market-gate-bar">
@@ -18,8 +30,8 @@ export function MarketGateBar() {
         <Text style={styles.gateTitle} numberOfLines={1}>
           Mercato
         </Text>
-        <View style={[styles.gateStatus, marketOpen ? styles.gateStatusOpen : styles.gateStatusClosed]}>
-          <Text style={styles.gateStatusLabel}>{marketOpen ? "aperto" : "chiuso"}</Text>
+        <View style={[styles.gateStatus, running ? styles.gateStatusOpen : styles.gateStatusClosed]}>
+          <Text style={styles.gateStatusLabel}>{running ? "aperto" : "chiuso"}</Text>
         </View>
         <Pressable
           style={styles.gateInfo}
@@ -35,14 +47,19 @@ export function MarketGateBar() {
         {canManage ? (
           <Switch
             value={marketOpen}
-            disabled={toggling}
+            disabled={toggling || switchLocked}
             onValueChange={(value) => void setOpen(value)}
-            accessibilityLabel="Apri o chiudi il mercato"
+            accessibilityLabel="Mercato aperto"
             testID="market-gate-switch"
           />
         ) : null}
       </View>
-      {infoOpen ? (
+      {/* Lega non al completo (20/11): il motivo resta sempre visibile, non solo nell'info. */}
+      {notFullNotice ? (
+        <Text style={styles.gateNotice} testID="market-gate-not-full" accessibilityRole="alert">
+          {notFullNotice}
+        </Text>
+      ) : infoOpen ? (
         <Text style={styles.gateHint} testID="market-gate-hint">
           {hint}
         </Text>

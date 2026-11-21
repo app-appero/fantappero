@@ -36,6 +36,7 @@ from leagues.validators import (
     validate_configurable_league_state,
     validate_member_removal,
 )
+from notifications.league_events import notify_league_full_if_needed
 from notifications.service import NotificationService
 from observability.context import get_correlation_id
 from observability.logging import get_logger
@@ -198,6 +199,8 @@ class LeagueMembershipService:
             team.name = new_user.display_name
         self._release_accepted_named_invites(league.id, target_user_id)
         self._accept_pending_named_invites(league.id, new_user.id, actor_id=league_access.user.id)
+        # Come ogni ingresso: a lega al completo e mercato chiuso l'admin riceve l'avviso (20/11).
+        notify_league_full_if_needed(self._session, league=league)
         self._session.add(
             LeagueAuditEvent(
                 league_id=league.id,

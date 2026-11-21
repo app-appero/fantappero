@@ -23,6 +23,7 @@ from database.enums import (
     NamedInviteStatus,
 )
 from fantasy_teams.factory import ensure_team_for_membership
+from leagues.capacity import pending_named_invite_count
 from leagues.models.league import League
 from leagues.models.league_audit_event import LeagueAuditEvent
 from leagues.models.league_invite import LeagueInvite
@@ -42,6 +43,12 @@ from leagues.validators import (
 )
 from observability.context import get_correlation_id
 from observability.metrics import get_metrics
+
+LEAGUE_FULL_MESSAGE = "La lega ha raggiunto il numero massimo di partecipanti."
+#: Ingresso con link o codice rifiutato solo perché i posti liberi sono di inviti in attesa.
+LEAGUE_SEATS_RESERVED_MESSAGE = (
+    "La lega è al completo: i posti rimasti sono riservati a inviti in attesa."
+)
 
 _INVITE_CODE_ALPHABET = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ"
 _INVITE_CODE_LENGTH = 10
@@ -209,19 +216,15 @@ class LeagueInviteService:
                 code="league_rules_not_found",
                 result="rules_missing",
             )
-        member_count = self._session.scalar(
-            select(func.count(LeagueMembership.id)).where(LeagueMembership.league_id == league.id)
-        )
-        pending_named_count = (
+        member_count = (
             self._session.scalar(
-                select(func.count(NamedLeagueInvite.id)).where(
-                    NamedLeagueInvite.league_id == league.id,
-                    NamedLeagueInvite.status == NamedInviteStatus.PENDING,
-                    NamedLeagueInvite.expires_at > now,
+                select(func.count(LeagueMembership.id)).where(
+                    LeagueMembership.league_id == league.id
                 )
             )
             or 0
         )
+        pending_named_count = pending_named_invite_count(self._session, league.id, now=now)
         own_named_invite = self._session.scalar(
             select(NamedLeagueInvite)
             .where(
@@ -232,12 +235,15 @@ class LeagueInviteService:
             )
             .with_for_update()
         )
-        projected_occupancy = (
-            (member_count or 0) + pending_named_count + (0 if own_named_invite is not None else 1)
-        )
-        if projected_occupancy > rules.participant_count:
+        # Gli inviti nominativi in attesa tengono il posto (il proprio no: è quello che si usa).
+        reserved_seats = pending_named_count - (1 if own_named_invite is not None else 0)
+        if member_count + 1 + reserved_seats > rules.participant_count:
+            # Rosario, 20/11: se un posto per gli iscritti ci sarebbe, a fermare l'ingresso sono
+            # gli inviti in attesa, e il messaggio lo dice. Il codice resta ``league_full``.
             self._fail_accept(
-                "La lega ha raggiunto il numero massimo di partecipanti.",
+                LEAGUE_SEATS_RESERVED_MESSAGE
+                if member_count + 1 <= rules.participant_count
+                else LEAGUE_FULL_MESSAGE,
                 code="league_full",
                 result="full",
             )
@@ -271,7 +277,7 @@ class LeagueInviteService:
                 LeagueAuditAction.NAMED_INVITE_ACCEPTED,
             )
         self._add_audit(league.id, user.id, LeagueAuditAction.LEAGUE_MEMBER_JOINED)
-        from notifications.league_events import notify_member_joined
+        from notifications.league_events import notify_league_full_if_needed, notify_member_joined
 
         notify_member_joined(
             self._session,
@@ -280,6 +286,8 @@ class LeagueInviteService:
             member_name=user.display_name,
             member_user_id=user.id,
         )
+        # Ultimo posto occupato: l'amministratore può aprire il mercato (20/11).
+        notify_league_full_if_needed(self._session, league=league)
         from leagues.season_activate import try_advance_league_lifecycle
 
         try_advance_league_lifecycle(self._session, league.id, actor_id=user.id)

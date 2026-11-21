@@ -93,7 +93,11 @@ export function RosterPage() {
   const isAdmin = can(["league:admin"]);
   const canView = can(["roster:view"]);
   const canEdit = can(["roster:edit"]);
-  const { marketOpen } = useMarketGate();
+  const { marketActive } = useMarketGate();
+  // Decisione del 20/11: il partecipante si inserisce calciatori solo a lega al completo e a
+  // interruttore acceso; l'amministratore prepara le rose in anticipo (assegna, rettifica,
+  // svincola, importa) e si ferma solo a turno in corso, che decide il server.
+  const rosterLocked = !isAdmin && !marketActive;
 
   const [team, setTeam] = useState<FantasyTeam | null>(() =>
     initialDemoTeam(isDemoMode, demoState),
@@ -1619,7 +1623,6 @@ export function RosterPage() {
           <RosterAdminToolsPanel
             ensuring={ensuring}
             randomAiBusy={randomAiBusy}
-            marketOpen={marketOpen}
             onEnsureTeams={onEnsureTeams}
             leagueTeams={leagueTeams}
             adminOrViewedTeam={adminTeam ?? viewedTeam}
@@ -1642,7 +1645,7 @@ export function RosterPage() {
                 viewedTeam={viewedTeam}
                 filledByRole={filledByRole}
                 canEdit={canEdit}
-                adminBusy={adminBusy || !marketOpen}
+                adminBusy={adminBusy || rosterLocked}
                 onReleaseAthlete={onReleaseAthlete}
                 onUpdatePurchaseCredits={onUpdatePurchaseCredits}
               />
@@ -1665,7 +1668,7 @@ export function RosterPage() {
                 onRoleTabChange={setRoleTab}
                 ownership={ownership}
                 canReleaseAthlete={canReleaseAthlete}
-                adminBusy={adminBusy || !marketOpen}
+                adminBusy={adminBusy || rosterLocked}
                 onReleaseAthlete={onReleaseAthlete}
                 onAssignAthlete={onAssignAthlete}
               />

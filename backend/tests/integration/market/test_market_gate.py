@@ -199,20 +199,34 @@ def test_closed_market_blocks_roster_and_auction_but_allows_trades(
     )
     assert closed.status_code == 200
 
+    # A mercato chiuso il partecipante non tocca la rosa...
     blocked_assign = client.put(
-        f"/leagues/{league_id}/amministrazione/squadre/{admin_team_id}/slot/1",
-        headers={"Authorization": f"Bearer {admin_token}"},
+        f"/leagues/{league_id}/amministrazione/squadre/{member_team_id}/slot/1",
+        headers={"Authorization": f"Bearer {member_token}"},
         json={"athleteId": str(extra_athlete.id), "purchaseCredits": 1},
     )
     assert blocked_assign.status_code == 400
     assert blocked_assign.json()["code"] == "market_closed"
 
     blocked_release = client.delete(
-        f"/leagues/{league_id}/amministrazione/squadre/{admin_team_id}/slot/0",
-        headers={"Authorization": f"Bearer {admin_token}"},
+        f"/leagues/{league_id}/amministrazione/squadre/{member_team_id}/slot/0",
+        headers={"Authorization": f"Bearer {member_token}"},
     )
     assert blocked_release.status_code == 400
     assert blocked_release.json()["code"] == "market_closed"
+
+    # ...l'amministratore sì: prepara le rose anche a interruttore spento (decisione del 20/11).
+    admin_assign = client.put(
+        f"/leagues/{league_id}/amministrazione/squadre/{admin_team_id}/slot/1",
+        headers={"Authorization": f"Bearer {admin_token}"},
+        json={"athleteId": str(extra_athlete.id), "purchaseCredits": 1},
+    )
+    assert admin_assign.status_code == 200, admin_assign.text
+    admin_release = client.delete(
+        f"/leagues/{league_id}/amministrazione/squadre/{admin_team_id}/slot/1",
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+    assert admin_release.status_code == 200, admin_release.text
 
     opens_at = datetime.now(UTC).isoformat()
     closes_at = (datetime.now(UTC) + timedelta(hours=24)).isoformat()

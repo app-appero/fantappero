@@ -1,5 +1,5 @@
 import type { FantasyCoachDirectoryItem, LeagueMember } from "@fantappero/contracts";
-import { avatarInitial } from "@fantappero/contracts";
+import { avatarInitial, pendingInvitesLabel } from "@fantappero/contracts";
 import { Button, Input, Modal, Select, UiStatePanel } from "@fantappero/ui";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
@@ -56,6 +56,11 @@ type LeagueMembersPanelProps = {
    * `null` = nessun limite noto, come prima.
    */
   participantMin?: number | null;
+  /**
+   * Inviti nominativi in attesa (`pendingInviteCount` del server): tengono un posto, si
+   * mostrano accanto agli iscritti (Rosario, 20/11). Non contano come iscritti.
+   */
+  pendingInviteCount?: number;
   /** Incrementato dal parent per ricaricare gli iscritti dopo un invito. */
   reloadToken?: number;
   /** Conteggio iscritti dopo ogni load, per la directory. */
@@ -72,6 +77,7 @@ export function LeagueMembersPanel({
   search,
   participantCount = null,
   participantMin = null,
+  pendingInviteCount = 0,
   reloadToken = 0,
   onMembersLoaded,
   onMembersChanged,
@@ -388,6 +394,11 @@ export function LeagueMembersPanel({
           Iscritti: <strong>{members.length}</strong>
           {" / "}
           Previsti: <strong>{participantCount}</strong>
+          {pendingInviteCount > 0 ? (
+            <span data-testid="league-members-pending-invites">
+              {` · ${pendingInvitesLabel(pendingInviteCount)}`}
+            </span>
+          ) : null}
         </p>
       ) : null}
       {!loading &&

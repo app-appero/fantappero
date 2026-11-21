@@ -222,6 +222,7 @@ export type {
 export type {
   BenchActiveRoleRepair,
   BenchRepairBlock,
+  ClearedLineup,
   CopyLineupResult,
   FantasyModule,
   AiLineupRun,
@@ -256,8 +257,18 @@ export {
   BENCH_ACTIVE_SIZE,
   LINEUP_ATHLETE_LEFT_ROSTER_CODE,
   MAX_AUTOMATIC_SUBSTITUTIONS,
+  CLEAR_LINEUP_CANCEL_LABEL,
+  CLEAR_LINEUP_CONFIRM_BODY,
+  CLEAR_LINEUP_CONFIRM_LABEL,
+  CLEAR_LINEUP_CONFIRM_POINTS,
+  CLEAR_LINEUP_CONFIRM_TITLE,
+  CLEAR_LINEUP_DESCRIPTION,
+  CLEAR_LINEUP_TITLE,
   benchActiveShortfall,
+  benchAfterStarterPick,
   benchQuotaSwapIds,
+  clearLineupKeepingLocked,
+  clearLineupSuccessMessage,
   formationLineupBench,
   orderBenchForActiveRoles,
   restoreBenchActiveRoles,
@@ -323,6 +334,7 @@ export type {
   MarketBid,
   MarketBidList,
   MarketBidStatus,
+  MarketBlockedReason,
   MarketGate,
   MarketHistoryCategory,
   MarketHistoryEntry,
@@ -351,6 +363,15 @@ export type {
   TradeProposalList,
   TradeStatus,
 } from "./market.js";
+export {
+  isMarketActive,
+  leagueNotFullMessage,
+  leagueOccupancyLabel,
+  marketNotFullNotice,
+  marketSwitchLocked,
+  pendingInvitesLabel,
+} from "./marketGate.js";
+export type { MarketGateState } from "./marketGate.js";
 
 export {
   LIVE_SEAT_CALL_COLOR,

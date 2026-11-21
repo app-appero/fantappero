@@ -167,8 +167,26 @@ export interface MarketHistoryList {
   totalPages: number;
 }
 
+/**
+ * Perché il mercato è fermo (decisione del 20/11): lega non al completo, interruttore
+ * dell'amministratore spento o turno in corso. `null` quando il mercato è attivo.
+ */
+export type MarketBlockedReason = "league_not_full" | "market_closed" | "round_in_progress";
+
 export interface MarketGate {
   marketOpen: boolean;
+  /** Iscritti alla lega. Il mercato si apre solo quando sono quanti i partecipanti previsti. */
+  memberCount?: number;
+  /** Partecipanti previsti dal regolamento (`null` senza regolamento). */
+  participantCount?: number | null;
+  /** `false` finché non sono occupati tutti i posti; assente da risposte più vecchie. */
+  leagueFull?: boolean;
+  marketBlockedReason?: MarketBlockedReason | null;
+  /**
+   * Inviti nominativi in attesa e non scaduti: tengono un posto (chi entra col codice non lo
+   * prende) ma non rendono la lega al completo. Si mostrano accanto al conto (Rosario, 20/11).
+   */
+  pendingInviteCount?: number;
 }
 
 export interface SetMarketGateRequest {

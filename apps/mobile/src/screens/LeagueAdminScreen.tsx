@@ -44,6 +44,9 @@ import { useScreenData } from "../hooks/useScreenData";
 import { PageContainer } from "../layout/PageContainer";
 import { isLeagueDeletable } from "../leagues/leagueDeleteHelpers";
 import { leagueStateLabel } from "../leagues/leagueLabels";
+import { MarketGateBarView } from "../market/MarketGateBar";
+import { pendingInvitesLabel } from "../market/marketGateNotice";
+import { useMarketGate } from "../market/useMarketGate";
 import type { RootStackParamList } from "../navigation/types";
 import { getApiErrorMessage, useAuthSession } from "../session/DemoSessionContext";
 import { copyToClipboard } from "../utils/clipboard";
@@ -189,6 +192,11 @@ export function LeagueAdminScreen() {
   );
 
   const { refreshing, onRefresh } = useScreenData(loadAll);
+  // Lo stato del mercato serve all'interruttore e al conto degli iscritti, inviti nominativi in
+  // attesa compresi (Rosario, 20/11): si rilegge quando cambiano iscritti o inviti.
+  const [invitesReload, setInvitesReload] = useState(0);
+  const marketGate = useMarketGate({ reloadToken: members.length + invitesReload });
+  const pendingInviteCount = marketGate.pendingInviteCount;
 
   if (!can(["league:admin"])) {
     return (
@@ -617,6 +625,11 @@ export function LeagueAdminScreen() {
             ) : null}
           </View>
 
+          {/* Interruttore «Mercato aperto»: a lega incompleta non si accende (decisione del 20/11). */}
+          <View testID="league-admin-market">
+            <MarketGateBarView gate={marketGate} />
+          </View>
+
           <Text style={styles.heading}>Prossime fasi</Text>
           <Text style={styles.body}>
             Prima salva la configurazione della lega, poi invita i fantallenatori.
@@ -823,6 +836,7 @@ export function LeagueAdminScreen() {
           ) : null}
           <Text style={styles.body} testID="league-members-capacity">
             Iscritti: {members.length} / Previsti: {rules.participantCount}
+            {pendingInviteCount > 0 ? ` · ${pendingInvitesLabel(pendingInviteCount)}` : ""}
           </Text>
           {members.length !== rules.participantCount ? (
             <UiStatePanel
@@ -871,8 +885,10 @@ export function LeagueAdminScreen() {
               leagueId={leagueId}
               capacity={rules.participantCount}
               memberCount={members.length}
+              pendingInviteCount={pendingInviteCount}
               testIDPrefix="league-admin-directory"
               onMembershipChanged={() => void loadAll({ silent: true })}
+              onInvitesChanged={() => setInvitesReload((current) => current + 1)}
             />
           ) : null}
 

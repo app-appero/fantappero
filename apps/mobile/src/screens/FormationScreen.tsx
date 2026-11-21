@@ -39,7 +39,7 @@ import {
 import { theme } from "@fantappero/ui/theme";
 import { useIsFocused } from "@react-navigation/core";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Alert, Image, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { AthleteName } from "../athletes/AthleteCard";
 import {
   fetchFantasyTeams,
@@ -56,7 +56,22 @@ import { BottomSheet, FormationLegend, FormationPitch, PlayerPickerSheet, TONE_C
 import { moduleChangeFallbackNotice, moduleChangeRoute } from "./formation/moduleChange";
 import { rosterDepartureNotices, savedStarterSlotIds } from "./formation/savedLineup";
 import { withoutRoleQuotaExcess } from "./formation/roleQuotaExcess";
-import { benchQuotaSwapIds, formationLineupBench, restoreBenchActiveRoles } from "./formation/benchQuota";
+import {
+  benchAfterStarterPick,
+  benchQuotaSwapIds,
+  clearLineupKeepingLocked,
+  formationLineupBench,
+  restoreBenchActiveRoles,
+} from "./formation/benchQuota";
+import {
+  CLEAR_LINEUP_CANCEL_LABEL,
+  CLEAR_LINEUP_CONFIRM_LABEL,
+  CLEAR_LINEUP_CONFIRM_TITLE,
+  CLEAR_LINEUP_DESCRIPTION,
+  CLEAR_LINEUP_TITLE,
+  clearLineupConfirmMessage,
+  clearLineupSuccessMessage,
+} from "./formation/clearLineup";
 import { LockCountdown } from "../components/LockCountdown";
 import { EventBadges } from "../components/match/EventBadges";
 import { setMovesDock } from "../layout/movesDock";
@@ -601,6 +616,47 @@ export function FormationScreen() {
     setActionMessage(
       `Panchina sistemata: 1 portiere, 3 difensori, 3 centrocampisti, 3 attaccanti${moved ? ` (in panchina ${moved})` : ""}.`,
     );
+  }
+  // «Svuota formazione»: che cosa resterebbe (i bloccati) e la panchina nell'ordine della rosa.
+  // Se è uguale a quella mostrata non c'è niente da svuotare e la voce è spenta.
+  const clearedLineup = clearLineupKeepingLocked({
+    starterIds: displayStarters,
+    benchIds: lineupBench,
+    rosterAthleteIds: withoutRoleQuotaExcess(roster.map((row) => row.athleteId), roster),
+    lockedAthleteIds,
+    roleByAthleteId,
+    unavailableAthleteIds: roster.filter((row) => playerBlocked(row.athleteId)).map((row) => row.athleteId),
+    unfieldableAthleteIds: unfieldableIds,
+  });
+  const nothingToClear =
+    lineupSignature({ module: moduleCode, starterIds: clearedLineup.starterIds, benchIds: clearedLineup.benchIds }) ===
+    lineupSignature({ module: moduleCode, starterIds: displayStarters, benchIds: lineupBench });
+  /**
+   * «Svuota formazione» (Rosario, 20/11): toglie i titolari tranne i bloccati e rimette la panchina
+   * nell'ordine della rosa. Solo l'editor, come le altre modifiche: niente chiamate al server,
+   * nessuna mossa; «Annulla modifiche» rimette lo stato del server.
+   */
+  function clearLineup() {
+    setStarterIds(clearedLineup.starterIds);
+    setBenchIds(clearedLineup.benchIds);
+    setBenchPickerIndex(null);
+    setPickerIndex(null);
+    setActionError(null);
+    setActionMessage(clearLineupSuccessMessage(clearedLineup.heldBenchIds.length));
+  }
+  /** Conferma sopra la scheda «•••»: «Indietro» torna alla scheda, «Svuota» la chiude e svuota. */
+  function confirmClearLineup() {
+    Alert.alert(CLEAR_LINEUP_CONFIRM_TITLE, clearLineupConfirmMessage(), [
+      { text: CLEAR_LINEUP_CANCEL_LABEL, style: "cancel" },
+      {
+        text: CLEAR_LINEUP_CONFIRM_LABEL,
+        style: "destructive",
+        onPress: () => {
+          setToolsOpen(false);
+          clearLineup();
+        },
+      },
+    ]);
   }
   // Chi non è più in rosa è stato tolto dalla formazione dal server: si dice chi (QA 19/11).
   const rosterNotices = rosterDepartureNotices(context?.issues);
@@ -1179,12 +1235,19 @@ export function FormationScreen() {
       swappedBench[incomingBenchPos] = currentId;
       setBenchIds(swappedBench);
     } else {
+      // Slot vuoto (es. dopo «Svuota formazione»): se dopo chi sale c'è un bloccato, il suo posto in
+      // panchina lo prende un pari ruolo tolto dai titolari, così il bloccato non scorre.
+      const filledBench =
+        !currentId && incomingBenchPos >= 0
+          ? benchAfterStarterPick({ bench: lineupBench, athleteId, savedBench, lockedAthleteIds, roleByAthleteId })
+          : null;
       setBenchIds(
-        orderedBenchFromRoster(
-          withoutRoleQuotaExcess(roster.map((row) => row.athleteId), roster),
-          nextStarters,
-          benchIds,
-        ),
+        filledBench ??
+          orderedBenchFromRoster(
+            withoutRoleQuotaExcess(roster.map((row) => row.athleteId), roster),
+            nextStarters,
+            benchIds,
+          ),
       );
     }
     setActionError(null);
@@ -1994,6 +2057,17 @@ export function FormationScreen() {
               </View>
             </View>
           ) : null}
+          <Pressable
+            accessibilityRole="button"
+            accessibilityHint={CLEAR_LINEUP_DESCRIPTION}
+            disabled={toolDisabled || nothingToClear}
+            onPress={confirmClearLineup}
+            style={[styles.tool, styles.toolDanger, toolDisabled || nothingToClear ? styles.disabled : null]}
+            testID="formation-clear-tool"
+          >
+            <Text style={[styles.toolTitle, styles.toolTitleDanger]}>{CLEAR_LINEUP_TITLE}</Text>
+            <Text style={styles.meta}>{CLEAR_LINEUP_DESCRIPTION}</Text>
+          </Pressable>
           {isAdmin && context.leagueHasAiManager ? (
             <View style={styles.tool} testID="formation-ai-admin">
               <Text style={styles.toolTitle}>Formazioni IA</Text>
@@ -2411,4 +2485,7 @@ const styles = lazyStyles(() => StyleSheet.create({
     padding: spacing.md,
   },
   toolTitle: { color: colors.foreground, fontWeight: "700", fontSize: typography.fontSize.md },
+  // «Svuota formazione»: testo rosso su scheda rosso scuro (Rosario, 20/11).
+  toolDanger: { borderColor: "rgba(224, 49, 49, 0.55)", backgroundColor: "rgba(224, 49, 49, 0.12)" },
+  toolTitleDanger: { color: colors.danger },
 }));

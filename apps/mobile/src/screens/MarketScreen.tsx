@@ -24,6 +24,7 @@ import { UiStatePanel } from "../components/UiStatePanel";
 import { useScreenData } from "../hooks/useScreenData";
 import { PageContainer } from "../layout/PageContainer";
 import { marketUiStyles as styles } from "../market/marketUiStyles";
+import { useMarketGate } from "../market/useMarketGate";
 import { useMarketHistory } from "../market/useMarketHistory";
 import { useTradeFlow } from "../market/useTradeFlow";
 import { MARKET_HUB_TABS } from "../navigation/marketHubTabs";
@@ -49,6 +50,9 @@ export function MarketScreen() {
   const route = useRoute<RouteProp<AppTabParamList, "Market">>();
   const { can, accessToken, activeLeagueId } = useAuthSession();
   const canManageMarket = can(["market:manage"]);
+  // Decisione del 20/11: a lega non al completo gli scambi sono fermi (proporre, accettare,
+  // approvare); il banner dice perché invece di lasciar fallire le azioni.
+  const { leagueFull, notFullNotice } = useMarketGate();
   // Apertura da una notifica di scambio (vedi notificationDestination.ts).
   const highlightedProposalId = route.params?.scambio ?? null;
 
@@ -356,6 +360,14 @@ export function MarketScreen() {
         onSelect={(id) => navigation.navigate(id as keyof AppTabParamList)}
         testID="market-hub-tabs"
       />
+      {notFullNotice ? (
+        <UiStatePanel
+          state="empty"
+          title="Mercato chiuso"
+          message={notFullNotice}
+          testID="market-not-full"
+        />
+      ) : null}
       {loading ? (
         <UiStatePanel
           state="loading"
@@ -451,7 +463,8 @@ export function MarketScreen() {
             </View>
           </View>
           <Pressable
-            style={styles.bigButton}
+            style={[styles.bigButton, !leagueFull && styles.disabled]}
+            disabled={!leagueFull}
             onPress={() => setShowForm((value) => !value)}
             testID="market-trade-new-toggle"
           >
@@ -460,7 +473,7 @@ export function MarketScreen() {
         </View>
       ) : null}
 
-      {!loading && !loadError && activeLeagueId && showForm ? (
+      {!loading && !loadError && activeLeagueId && showForm && leagueFull ? (
         <MarketTradeCreateForm
           recipientOptions={recipientOptions}
           recipientTeamId={recipientTeamId}
@@ -498,6 +511,7 @@ export function MarketScreen() {
           ownedSlots={ownedSlots}
           canManageMarket={canManageMarket}
           athleteMeta={athleteMeta}
+          locked={!leagueFull}
         />
       ) : null}
 

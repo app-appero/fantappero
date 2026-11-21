@@ -195,6 +195,22 @@ describe("EP03-02 league admin page", () => {
     expect(html).toContain("Prima salva la configurazione della lega");
     expect(html).not.toContain('data-testid="league-home-roster-link"');
   });
+
+  it("a lega non al completo l'interruttore «Mercato aperto» è disattivato e spiega perché (20/11)", () => {
+    const html = renderRoute("/lega/amministrazione?persona=admin&mercato=incompleto");
+    expect(html).toContain('data-testid="league-admin-market"');
+    expect(html).toContain('data-testid="market-gate-not-full"');
+    expect(html).toContain("Il mercato si apre quando la lega è al completo (5/8).");
+    expect(html).toMatch(/<button[^>]*aria-label="Mercato aperto"[^>]*disabled=""[^>]*data-testid="market-gate-switch"/);
+  });
+
+  it("a lega al completo l'interruttore «Mercato aperto» si può usare", () => {
+    const html = renderRoute("/lega/amministrazione?persona=admin");
+    expect(html).toContain('data-testid="league-admin-market"');
+    expect(html).toContain('data-testid="market-gate-switch"');
+    expect(html).not.toContain('data-testid="market-gate-not-full"');
+    expect(html).not.toMatch(/<button[^>]*disabled=""[^>]*data-testid="market-gate-switch"/);
+  });
 });
 
 

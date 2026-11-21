@@ -215,6 +215,8 @@ type ManagerDirectoryProps = {
   reloadToken?: number;
   /** Ricarica iscritti e prerequisiti dopo un ingresso in lega o a capienza piena. */
   onMembershipChanged?: () => void;
+  /** Invito nominativo inviato o annullato: cambiano gli inviti in attesa accanto al conto. */
+  onInvitesChanged?: () => void;
 };
 
 function inviteErrorMessage(error: unknown): string {
@@ -383,6 +385,7 @@ export function ManagerDirectory({
   participantCount = null,
   reloadToken = 0,
   onMembershipChanged,
+  onInvitesChanged,
 }: ManagerDirectoryProps) {
   const demoState = new URLSearchParams(search).get("directory");
   const [query, setQuery] = useState("");
@@ -579,6 +582,8 @@ export function ManagerDirectory({
       );
       if (created.autoAccepted) {
         onMembershipChanged?.();
+      } else {
+        onInvitesChanged?.();
       }
     } catch (error) {
       if (error instanceof ApiError && error.code === "league_full") {
@@ -640,6 +645,7 @@ export function ManagerDirectory({
       setRevokeTarget(null);
       // Ricarica dal server: la riga torna su «Invita» e il posto prenotato si libera.
       await load();
+      onInvitesChanged?.();
       setSuccess({ title: "Invito annullato", message: revokedMessage });
     } catch (error) {
       setRevokeTarget(null);

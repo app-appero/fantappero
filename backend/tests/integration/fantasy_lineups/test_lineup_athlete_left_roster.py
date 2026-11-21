@@ -52,6 +52,10 @@ def _left_roster_notice(name: str) -> str:
     )
 
 
+def _bench_filled_notice(name: str, replacement: str) -> str:
+    return f"{name} non è più nella tua rosa: al suo posto in panchina è salito {replacement}."
+
+
 def _name(db_session: Session, athlete_id: UUID) -> str:
     athlete = db_session.get(Athlete, athlete_id)
     assert athlete is not None
@@ -167,8 +171,15 @@ def test_bench_player_traded_away_leaves_the_open_turn_lineup(
     roster_ids = {row["athleteId"] for row in body["roster"]}
     assert str(departed) not in roster_ids
     assert str(incoming) in roster_ids
+    # Il posto in panchina l'ha già coperto il sistema: l'avviso dice chi è salito, non chiede
+    # più chi mettere al suo posto (Rosario, 20/11).
     notices = [issue for issue in body["issues"] if issue["code"] == LEFT_ROSTER_CODE]
-    assert notices == [{"code": LEFT_ROSTER_CODE, "message": _left_roster_notice(name)}]
+    assert notices == [
+        {
+            "code": LEFT_ROSTER_CODE,
+            "message": _bench_filled_notice(name, _name(db_session, first_tribuna_defender)),
+        }
+    ]
     assert body["issues"][0]["code"] == LEFT_ROSTER_CODE
     codes = {issue["code"] for issue in body["issues"]}
     assert "athlete_not_in_roster" not in codes
@@ -197,6 +208,135 @@ def test_bench_player_traded_away_leaves_the_open_turn_lineup(
     again = client.get(_lineup_url(setup), headers=_headers(token)).json()
     assert again["issues"] == []
     assert [player["athleteId"] for player in again["lineup"]["bench"]] == corrected_bench
+
+
+def _left_roster_messages(body: dict) -> list[str]:
+    return [issue["message"] for issue in body["issues"] if issue["code"] == LEFT_ROSTER_CODE]
+
+
+def test_starter_and_bench_player_traded_together_get_one_notice_each(
+    client: TestClient,
+    db_session: Session,
+    competition_ids: list[str],
+) -> None:
+    """Rosario, 20/11: un titolare e un panchinaro ceduti con lo stesso scambio.
+
+    Il posto del titolare resta vuoto e l'avviso chiede ancora chi metterci; quello in panchina
+    l'ha già coperto il sistema (sale il primo difensore della tribuna) e l'avviso dice chi è
+    salito. All'inizio del turno il posto del titolare lo copre la regola di sistema: al posto
+    del «scegli» c'è il suo avviso («All'inizio del turno … è entrato …»), quello della panchina
+    resta com'era.
+    """
+    setup = _trade_league(
+        client,
+        db_session,
+        competition_ids,
+        prefix="lar.misto",
+        id_offset=9_830_000,
+        record_ownership=True,
+    )
+    token = setup["token_a"]
+    payload = _save_lineup(client, db_session, setup)
+    role_of = setup["role_of"]
+    starter = UUID(payload["starterAthleteIds"][2])
+    bench_player = UUID(payload["benchAthleteIds"][3])
+    assert role_of[starter] == role_of[bench_player] == FantasyRole.D
+    replacement = next(
+        UUID(item)
+        for item in payload["benchAthleteIds"][10:]
+        if role_of[UUID(item)] == FantasyRole.D
+    )
+    _trade(
+        client,
+        setup,
+        offered=[starter, bench_player],
+        requested=setup["roles_b"][FantasyRole.D][-2:],
+    )
+
+    body = client.get(_lineup_url(setup), headers=_headers(token)).json()
+    assert _left_roster_messages(body) == [
+        _left_roster_notice(_name(db_session, starter)),
+        _bench_filled_notice(_name(db_session, bench_player), _name(db_session, replacement)),
+    ]
+    assert [UUID(player["athleteId"]) for player in body["lineup"]["bench"]][9] == replacement
+    assert "missing_athlete" in {issue["code"] for issue in body["issues"]}
+    assert "bench_roles_invalid" not in {issue["code"] for issue in body["issues"]}
+
+    # Primo blocco del turno: tutte le partite tra 5 minuti, dentro il margine di 15.
+    kickoff = datetime.now(UTC) + timedelta(minutes=5)
+    fantasy_round = db_session.get(FantasyRound, UUID(setup["round_id"]))
+    assert fantasy_round is not None
+    fantasy_round.cutoff_at = kickoff
+    for fixture in db_session.scalars(
+        select(Fixture)
+        .join(FantasyRoundFixture, FantasyRoundFixture.fixture_id == Fixture.id)
+        .where(FantasyRoundFixture.round_id == UUID(setup["round_id"]))
+    ).all():
+        fixture.kickoff_at = kickoff
+    db_session.commit()
+
+    started = client.get(_lineup_url(setup), headers=_headers(token)).json()
+    assert started["effectiveStatus"] == "open"
+    starters = {
+        player["sortOrder"]: player["athleteId"] for player in started["lineup"]["starters"]
+    }
+    entered = UUID(starters[2])
+    assert entered == UUID(payload["benchAthleteIds"][1])  # il primo difensore della panchina
+    messages = _left_roster_messages(started)
+    assert len(messages) == 2
+    assert messages[0].startswith(
+        f"All'inizio del turno 1 {_name(db_session, entered)} è entrato al posto di "
+        f"{_name(db_session, starter)} (non più in rosa)"
+    )
+    assert messages[1] == _bench_filled_notice(
+        _name(db_session, bench_player), _name(db_session, replacement)
+    )
+    assert not any("scegli chi mettere" in message for message in messages)
+
+
+def test_bench_goalkeeper_and_tribuna_player_traded_away(
+    client: TestClient,
+    db_session: Session,
+    competition_ids: list[str],
+) -> None:
+    """Uscito il portiere della panchina gli altri scalano e il primo della tribuna, il secondo
+    portiere, entra nei primi 10 senza bisogno di correggere la quota: l'avviso nomina lui. Chi
+    era in tribuna non lascia un posto da coprire (Rosario, 20/11)."""
+    setup = _trade_league(
+        client,
+        db_session,
+        competition_ids,
+        prefix="lar.portiere",
+        id_offset=9_840_000,
+        record_ownership=True,
+    )
+    token = setup["token_a"]
+    payload = _save_lineup(client, db_session, setup)
+    role_of = setup["role_of"]
+    goalkeeper = UUID(payload["benchAthleteIds"][0])
+    first_tribuna = UUID(payload["benchAthleteIds"][10])
+    tribuna_player = UUID(payload["benchAthleteIds"][11])
+    assert role_of[goalkeeper] == role_of[first_tribuna] == FantasyRole.P
+    assert role_of[tribuna_player] == FantasyRole.D
+    _trade(
+        client,
+        setup,
+        offered=[goalkeeper, tribuna_player],
+        requested=[setup["roles_b"][FantasyRole.P][-1], setup["roles_b"][FantasyRole.D][-1]],
+    )
+
+    body = client.get(_lineup_url(setup), headers=_headers(token)).json()
+    bench = [UUID(player["athleteId"]) for player in body["lineup"]["bench"]]
+    assert bench[:10] == [
+        *(UUID(item) for item in payload["benchAthleteIds"][1:10]),
+        first_tribuna,
+    ]
+    assert _left_roster_messages(body) == [
+        _bench_filled_notice(_name(db_session, goalkeeper), _name(db_session, first_tribuna)),
+        f"{_name(db_session, tribuna_player)} non è più nella tua rosa: è stato tolto dalla "
+        "tribuna.",
+    ]
+    assert "bench_roles_invalid" not in {issue["code"] for issue in body["issues"]}
 
 
 def test_player_of_another_team_is_refused_with_the_neutral_message(

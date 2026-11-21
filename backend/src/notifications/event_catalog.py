@@ -87,6 +87,7 @@ EVENT_KEY_BY_TEMPLATE_KEY: dict[str, str] = {
     "mercato.asta_live_scambio_richiesto": "sistema.asta",
     "mercato.asta_live_perso": "sistema.asta",
     "lega.nuovo_membro": "sistema.lega",
+    "lega.al_completo": "sistema.lega",
     "lega.attivata": "sistema.lega",
     "lega.eliminata": "sistema.lega",
     "turni.aperto": "sistema.turno_aperto",

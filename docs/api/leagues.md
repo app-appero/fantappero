@@ -182,6 +182,13 @@ vincolo univoco `(league_id, user_id)` rimane la garanzia DB contro i duplicati.
 Errori di dominio: `invalid_invite`, `invite_expired`, `invite_revoked`, `league_full`,
 `league_not_draft`, `manual_invites_disabled`, `invite_not_found`.
 
+Gli inviti nominativi in attesa (non scaduti e senza risposta) tengono un posto: chi entra con
+link o codice non lo prende, chi ha l'invito sì. Il conto è `pending_named_invite_count` in
+`leagues/capacity.py`, lo stesso dei nuovi inviti nominativi. `league_full` ha due messaggi
+(Rosario, 20/11): «La lega ha raggiunto il numero massimo di partecipanti.» quando i posti sono
+tutti degli iscritti, «La lega è al completo: i posti rimasti sono riservati a inviti in
+attesa.» quando un posto per gli iscritti ci sarebbe ma è di un invito in attesa.
+
 Interfacce:
 
 - web admin: `/lega/amministrazione`;
@@ -216,6 +223,46 @@ Metriche:
 
 - `league_member_removed_total{result=success|not_found|cannot_remove_admin|league_not_draft}`
 - `league_admin_transferred_total{result=success|noop|not_found|invalid_target|admin_missing|league_not_draft}`
+
+## Mercato e lega al completo (decisione del 20/11/2026)
+
+Il mercato si apre solo quando la lega è **al completo**: iscritti = `rules.participantCount`
+(gli inviti in attesa non contano). L'attività di mercato richiede tre condizioni insieme:
+lega al completo, interruttore `market_open` acceso e nessun turno in corso
+(`market_round_in_progress`). Il conto è in `leagues/capacity.py`, il controllo in
+`market/gate.py`.
+
+- Una lega nuova nasce con `market_open = false`; le leghe esistenti tengono il valore salvato,
+  ma la regola «al completo» vale anche per loro.
+- `POST /leagues/{league_id}/mercato/stato` con `{"open": true}` a lega incompleta risponde
+  `400 league_not_full`; `{"open": false}` è sempre consentito.
+- `GET /mercato/stato`, la risposta di `POST /mercato/stato` e `LeagueDetail` riportano
+  `memberCount`, `participantCount`, `leagueFull`, `marketBlockedReason`
+  (`null` | `league_not_full` | `market_closed` | `round_in_progress`) e `pendingInviteCount`
+  (inviti nominativi in attesa e non scaduti, la stessa regola che riserva i posti
+  all'ingresso). Web e app mostrano «Il mercato si apre quando la lega è al completo (3/4 · 1
+  invito in attesa).» (plurale «2 inviti in attesa»; senza inviti solo «(3/4)»), anche nel
+  conto dei partecipanti di home lega e Amministrazione lega. Gli inviti non rendono la lega
+  al completo.
+- A lega incompleta rispondono `400 league_not_full` («Il mercato si apre quando la lega è al
+  completo (X/Y partecipanti).», con «· N inviti in attesa» se ce ne sono): inserimento e svincolo in rosa fatti dal partecipante,
+  svincolo volontario del partecipante, asta a buste chiuse e svincolati (creazione e
+  risoluzione delle sessioni, offerte e ritiro), asta a rilanci (creazione, avvio, chiamata,
+  rilanci, aggiudica, salta, annulla, scambio del lotto) e scambi (proposta, controproposta,
+  accettazione, approvazione dell'amministratore). Rifiutare o annullare uno scambio resta
+  possibile.
+- Restano consentite le operazioni dell'amministratore sulle rose (assegnazione e sostituzione
+  su ogni squadra, rettifica del prezzo, svincolo, import CSV/Excel, rosa random IA). Per lui
+  conta solo il turno in corso, così prepara le rose in anticipo anche a lega incompleta e a
+  interruttore spento, già in una lega appena creata. Aste, svincolati e scambi restano fermi
+  anche per l'amministratore.
+- Quando un ingresso (invito con link o codice, invito nominativo, fantallenatore IA,
+  sostituzione) porta la lega al completo con l'interruttore spento, ogni amministratore riceve
+  una sola volta (`dedup_key = league_full:{league_id}:{admin_id}`) la notifica
+  `lega.al_completo` «La lega è al completo: puoi aprire il mercato», con link
+  `/lega/amministrazione?lega={league_id}`. Il mercato non si apre da solo.
+- Se un'uscita lascia la lega incompleta (con meno di 4 iscritti il regolamento non si
+  abbassa, vedi sopra) il mercato torna fermo; l'interruttore salvato non cambia.
 
 ## Stati e avvio stagione
 

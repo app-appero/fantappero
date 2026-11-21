@@ -747,6 +747,12 @@ export function NotFoundPage() {
         message="La pagina richiesta non esiste o è stata spostata."
         testId="not-found"
       />
+      {/* Fuori dalla shell non c'è il menu: dall'app sulla schermata Home (senza il tasto Indietro di Safari) è l'unica via d'uscita. */}
+      <p>
+        <Link to="/leghe" data-testid="not-found-home">
+          Torna alle tue leghe
+        </Link>
+      </p>
     </PageContainer>
   );
 }

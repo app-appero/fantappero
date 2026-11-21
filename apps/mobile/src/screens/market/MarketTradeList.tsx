@@ -77,6 +77,7 @@ export function MarketTradeList({
   canManageMarket,
   athleteMeta,
   highlightedProposalId,
+  locked = false,
 }: {
   trade: ReturnType<typeof useTradeFlow>;
   selfTeamId: string | undefined;
@@ -89,6 +90,11 @@ export function MarketTradeList({
   athleteMeta: Map<string, TradeAthleteMeta>;
   /** Proposta aperta da una notifica: evidenziata invece di lasciarla cercare a mano. */
   highlightedProposalId?: string | null;
+  /**
+   * Lega non al completo (decisione del 20/11): accettare, controproporre e approvare sono
+   * fermi. Rifiutare e annullare restano possibili.
+   */
+  locked?: boolean;
 }) {
   const [tab, setTab] = useState<TradeTab>("open");
   const [counteringProposalId, setCounteringProposalId] = useState<string | null>(null);
@@ -314,9 +320,9 @@ export function MarketTradeList({
                       style={[
                         styles.button,
                         styles.tradeAction,
-                        (pending || proposal.awaitingCredits) && styles.disabled,
+                        (pending || proposal.awaitingCredits || locked) && styles.disabled,
                       ]}
-                      disabled={pending || proposal.awaitingCredits === true}
+                      disabled={pending || proposal.awaitingCredits === true || locked}
                       onPress={() => confirmAccept(proposal)}
                       testID={`market-trade-accept-${proposal.id}`}
                     >
@@ -341,9 +347,9 @@ export function MarketTradeList({
                       style={[
                         styles.secondaryButton,
                         styles.tradeAction,
-                        (pending || ownedSlots.length === 0) && styles.disabled,
+                        (pending || ownedSlots.length === 0 || locked) && styles.disabled,
                       ]}
-                      disabled={pending || ownedSlots.length === 0}
+                      disabled={pending || ownedSlots.length === 0 || locked}
                       onPress={() => startCounter(proposal.id)}
                       testID={`market-trade-counter-start-${proposal.id}`}
                     >
@@ -355,8 +361,8 @@ export function MarketTradeList({
                 {proposal.status === "pending_approval" && canManageMarket ? (
                   <View style={styles.rowActions} testID={`market-trade-admin-actions-${proposal.id}`}>
                     <Pressable
-                      style={[styles.button, pending && styles.disabled]}
-                      disabled={pending}
+                      style={[styles.button, (pending || locked) && styles.disabled]}
+                      disabled={pending || locked}
                       onPress={() => void trade.approveProposal(proposal.id)}
                       testID={`market-trade-approve-${proposal.id}`}
                     >
@@ -424,8 +430,8 @@ export function MarketTradeList({
                     />
                     <View style={styles.rowActions}>
                       <Pressable
-                        style={[styles.button, pending && styles.disabled]}
-                        disabled={pending}
+                        style={[styles.button, (pending || locked) && styles.disabled]}
+                        disabled={pending || locked}
                         onPress={() => handleCounterSubmit(proposal.id)}
                         testID={`market-trade-counter-submit-${proposal.id}`}
                       >

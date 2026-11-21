@@ -1,4 +1,4 @@
-"""Notifiche di lega e di turno: nuovo membro, lega attivata, turno aperto."""
+"""Notifiche di lega e di turno: nuovo membro, lega al completo, lega attivata, turno aperto."""
 
 from __future__ import annotations
 
@@ -53,6 +53,41 @@ def notify_member_joined(
                 "league_id": str(league.id),
             },
             dedup_key=f"league_joined:{membership_id}:{owner_id}",
+        )
+
+
+def league_full_dedup_key(league_id: UUID, owner_id: UUID) -> str:
+    return f"league_full:{league_id}:{owner_id}"
+
+
+def notify_league_full_if_needed(session: Session, *, league: League) -> None:
+    """La lega è appena diventata al completo: gli amministratori possono aprire il mercato.
+
+    Decisione del 20/11: il mercato non si apre da solo. Si chiama dopo ogni ingresso (invito,
+    invito nominativo, codice, sostituzione); l'avviso parte solo se la lega è al completo e
+    l'interruttore è spento, e una sola volta per amministratore (``dedup_key``).
+    """
+    from leagues.capacity import league_is_full
+    from leagues.market_open import read_market_open
+
+    session.flush()
+    if not league_is_full(session, league.id) or read_market_open(session, league.id):
+        return
+    owner_ids = session.scalars(
+        select(LeagueMembership.user_id).where(
+            LeagueMembership.league_id == league.id,
+            LeagueMembership.role == LeagueMemberRole.OWNER,
+        )
+    ).all()
+    service = NotificationService(session)
+    for owner_id in owner_ids:
+        service.create_notification(
+            user_id=owner_id,
+            category=NotificationCategory.SISTEMA,
+            template_key="lega.al_completo",
+            template_version=1,
+            params={"league_name": league.name, "league_id": str(league.id)},
+            dedup_key=league_full_dedup_key(league.id, owner_id),
         )
 
 

@@ -141,7 +141,8 @@ const DEMO_TABLE_LOT: LiveLot = {
 export function AuctionLivePage() {
   const { isDemoMode, activeLeagueId, can, user } = useAuth();
   const canManageSession = can(["market:manage"]);
-  const { marketOpen } = useMarketGate();
+  // Asta a rilanci solo a mercato attivo: interruttore acceso e lega al completo (20/11).
+  const { marketActive: marketOpen } = useMarketGate();
 
   const [entries, setEntries] = useState<LeagueListoneEntry[]>([]);
   const [members, setMembers] = useState<Array<{ userId: string; displayName: string }>>([]);

@@ -420,12 +420,27 @@ def test_trade_removes_departed_players_from_future_lineup_draft_and_scoring(
     assert all(item["roundId"] == round_id for item in departures)
     assert all(item["tacticalMoveConsumed"] is False for item in departures)
 
-    # GET formazione: avviso con i due nomi, posto vuoto tra i titolari, slot da riempire.
+    # GET formazione: un avviso per il titolare (posto vuoto, slot da riempire) e uno per il
+    # panchinaro, il cui posto è già coperto da chi è salito dalla tribuna (Rosario, 20/11).
     body = client.get(_url(setup), headers=_headers(setup["token_a"])).json()
-    assert body["issues"][0] == {
-        "code": LEFT_ROSTER_CODE,
-        "message": lineup_athlete_left_roster_message(names),
-    }
+    replacement = _expected_bench(
+        payload_a["benchAthleteIds"], bench_player, role_of=setup["role_of"]
+    )[9][1]
+    assert body["issues"][:2] == [
+        {"code": LEFT_ROSTER_CODE, "message": lineup_athlete_left_roster_message(names[:1])},
+        {
+            "code": LEFT_ROSTER_CODE,
+            "message": (
+                f"{names[1]} non è più nella tua rosa: al suo posto in panchina è salito "
+                f"{_name(db_session, replacement)}."
+            ),
+        },
+    ]
+    departure_by_name = {item["athleteName"]: item for item in departures}
+    assert departure_by_name[names[0]]["benchEntered"] == []
+    assert departure_by_name[names[1]]["benchEntered"] == [
+        {"athleteId": str(replacement), "athleteName": _name(db_session, replacement)}
+    ]
     codes = {issue["code"] for issue in body["issues"]}
     assert "missing_athlete" in codes
     assert not codes & {"starter_count_invalid", "module_role_mismatch", "athlete_not_in_roster"}
@@ -533,9 +548,18 @@ def test_release_removes_the_player_from_the_future_lineup(
 
     body = client.get(_url(setup), headers=_headers(token)).json()
     notices = [issue for issue in body["issues"] if issue["code"] == LEFT_ROSTER_CODE]
-    assert notices == [
-        {"code": LEFT_ROSTER_CODE, "message": lineup_athlete_left_roster_message([name])}
-    ]
+    if exit_path == "rimozione_admin":
+        # In panchina il posto è già coperto: l'avviso dice chi è salito (Rosario, 20/11).
+        replacement = _expected_bench(
+            payload["benchAthleteIds"], departed, role_of=setup["role_of"]
+        )[9][1]
+        message = (
+            f"{name} non è più nella tua rosa: al suo posto in panchina è salito "
+            f"{_name(db_session, replacement)}."
+        )
+    else:
+        message = lineup_athlete_left_roster_message([name])
+    assert notices == [{"code": LEFT_ROSTER_CODE, "message": message}]
 
 
 # -- turni bloccati o conclusi: la storia non cambia --------------------------------------
