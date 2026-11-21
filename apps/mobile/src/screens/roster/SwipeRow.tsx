@@ -5,12 +5,16 @@ import { lazyStyles } from "../../theme/lazyStyles";
 
 const THRESHOLD = 96;
 const MAX_PULL = 150;
+/** Scorrimento bloccato: la riga si sposta poco, quanto basta per dire che il gesto è arrivato. */
+const BLOCKED_PULL = 64;
 
 /**
  * Riga con gesti orizzontali: da destra verso sinistra esegue `onSwipeLeft` (es. rimuovi),
  * da sinistra verso destra esegue `onSwipeRight` (es. assegna). Sotto la riga compare lo sfondo
  * colorato con l'etichetta, così il gesto si capisce mentre lo si fa. `nudge` fa «respirare»
- * la riga una volta all'apertura per far capire che si può scorrere.
+ * la riga una volta all'apertura per far capire che si può scorrere. `onBlockedSwipeRight`: lo
+ * scorrimento a destra non è permesso (es. ruolo al completo), la riga si sposta appena e chiama
+ * la funzione, così chi scorre vede il motivo invece di un gesto che non fa nulla.
  */
 export function SwipeRow({
   children,
@@ -19,6 +23,8 @@ export function SwipeRow({
   leftLabel = "Rimuovi",
   rightLabel = "Assegna",
   nudge,
+  onBlockedSwipeRight,
+  blockedRightLabel = "Pieno",
   testID,
 }: {
   children: ReactNode;
@@ -27,15 +33,20 @@ export function SwipeRow({
   leftLabel?: string;
   rightLabel?: string;
   nudge?: "left" | "right";
+  onBlockedSwipeRight?: () => void;
+  blockedRightLabel?: string;
   testID?: string;
 }) {
   const x = useRef(new Animated.Value(0)).current;
   const leftRef = useRef(onSwipeLeft);
   const rightRef = useRef(onSwipeRight);
+  const blockedRightRef = useRef(onBlockedSwipeRight);
   leftRef.current = onSwipeLeft;
   rightRef.current = onSwipeRight;
+  blockedRightRef.current = onBlockedSwipeRight;
   const canLeft = !!onSwipeLeft;
   const canRight = !!onSwipeRight;
+  const blockedRight = !canRight && !!onBlockedSwipeRight;
 
   useEffect(() => {
     if (!nudge) {
@@ -63,15 +74,21 @@ export function SwipeRow({
         onMoveShouldSetPanResponder: (_event, gesture) =>
           Math.abs(gesture.dx) > 10 &&
           Math.abs(gesture.dx) > Math.abs(gesture.dy) * 2 &&
-          ((gesture.dx < 0 && canLeft) || (gesture.dx > 0 && canRight)),
+          ((gesture.dx < 0 && canLeft) || (gesture.dx > 0 && (canRight || blockedRight))),
         onPanResponderMove: (_event, gesture) => {
           const min = canLeft ? -MAX_PULL : 0;
-          const max = canRight ? MAX_PULL : 0;
+          const max = canRight ? MAX_PULL : blockedRight ? BLOCKED_PULL : 0;
           x.setValue(Math.max(min, Math.min(max, gesture.dx)));
         },
         onPanResponderRelease: (_event, gesture) => {
           const action =
-            gesture.dx <= -THRESHOLD ? leftRef.current : gesture.dx >= THRESHOLD ? rightRef.current : undefined;
+            gesture.dx <= -THRESHOLD
+              ? leftRef.current
+              : gesture.dx >= THRESHOLD
+                ? rightRef.current ?? blockedRightRef.current
+                : gesture.dx >= BLOCKED_PULL && !rightRef.current
+                  ? blockedRightRef.current
+                  : undefined;
           // La riga torna al suo posto prima di eseguire l'azione, così non resta mai spostata.
           Animated.timing(x, { toValue: 0, duration: 140, useNativeDriver: false }).start(() => {
             x.setValue(0);
@@ -82,10 +99,10 @@ export function SwipeRow({
           Animated.timing(x, { toValue: 0, duration: 140, useNativeDriver: false }).start(() => x.setValue(0));
         },
       }),
-    [canLeft, canRight, x],
+    [blockedRight, canLeft, canRight, x],
   );
 
-  if (!canLeft && !canRight) {
+  if (!canLeft && !canRight && !blockedRight) {
     return <View style={styles.wrap}>{children}</View>;
   }
   const leftOpacity = x.interpolate({ inputRange: [-THRESHOLD, -12, 0], outputRange: [1, 0.6, 0], extrapolate: "clamp" });
@@ -100,6 +117,10 @@ export function SwipeRow({
       {canRight ? (
         <Animated.View style={[styles.reveal, styles.revealRight, { opacity: rightOpacity }]} pointerEvents="none">
           <Text style={styles.revealLabel}>{rightLabel}</Text>
+        </Animated.View>
+      ) : blockedRight ? (
+        <Animated.View style={[styles.reveal, styles.revealBlocked, { opacity: rightOpacity }]} pointerEvents="none">
+          <Text style={styles.revealLabel} numberOfLines={1}>{blockedRightLabel}</Text>
         </Animated.View>
       ) : null}
       <Animated.View style={{ transform: [{ translateX: x }] }} {...responder.panHandlers}>
@@ -129,6 +150,8 @@ const styles = lazyStyles(() => StyleSheet.create({
   },
   revealLeft: { alignItems: "flex-end", backgroundColor: "#E5484D" },
   revealRight: { alignItems: "flex-start", backgroundColor: "#22A06B" },
+  // Grigio ardesia: testo bianco a 6:1, in entrambi i temi.
+  revealBlocked: { alignItems: "flex-start", backgroundColor: "#5B6478", paddingHorizontal: theme.spacing.sm },
   revealLabel: { color: "#fff", fontWeight: "700" },
   hint: { flexDirection: "row", justifyContent: "space-between", gap: theme.spacing.sm, marginBottom: 6 },
   hintText: { color: theme.colors.foregroundMuted, fontSize: 12 },

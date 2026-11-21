@@ -3,8 +3,11 @@ import {
   filterListoneEntries,
   hasListonePlaceFilters,
   listonePlayerCountLabel,
+  listoneQuotaNotice,
   normalizeListonePlaceFilters,
   playerAvatarUrl,
+  roleQuotaBlockReason,
+  rosterRoleQuota,
 } from "@fantappero/contracts";
 import type {
   FantasyRole,
@@ -16,7 +19,7 @@ import type {
 import { HScroll } from "../../components/HScroll";
 import { PlayerPhotoRing } from "../../components/PlayerPhotoRing";
 import { useEffect, useMemo, useState } from "react";
-import { Pressable, ScrollView, Text, View } from "react-native";
+import { AccessibilityInfo, Pressable, ScrollView, Text, View } from "react-native";
 import { AppTextInput as TextInput } from "../../components/AppTextInput";
 import { AthleteName } from "../../athletes/AthleteCard";
 import { UiStatePanel } from "../../components/UiStatePanel";
@@ -31,12 +34,19 @@ import {
   type RoleTab,
 } from "./rosterHelpers";
 import { SwipeHint, SwipeRow } from "./SwipeRow";
+import { listoneSwipeDecision, roleTabLabel } from "./listoneSwipe";
 import { rosterStyles as styles } from "./rosterStyles";
+
+type AssignAthleteHandler = (
+  athleteId: string,
+  purchaseCredits: number,
+) => void | string | null | Promise<void | string | null>;
 
 function ListoneAssignRow({
   entry,
   owner,
-  canAssign,
+  emptySlotsCount,
+  quotaReason,
   canRelease,
   adminBusy,
   onReleaseAthlete,
@@ -45,26 +55,59 @@ function ListoneAssignRow({
 }: {
   entry: LeagueListoneEntry;
   owner: AthleteOwnership | undefined;
-  canAssign: boolean;
+  emptySlotsCount: number;
+  /** Ruolo al completo: il motivo (stesso testo del sito), `null` se il ruolo ha posto. */
+  quotaReason: string | null;
   canRelease: boolean;
   adminBusy: boolean;
   nudge?: boolean;
   onReleaseAthlete: (athleteId: string) => void | Promise<void>;
-  onAssignAthlete: (athleteId: string, purchaseCredits: number) => void | Promise<void>;
+  /** Se restituisce un testo (assegnazione rifiutata), la riga lo mostra sotto di sé. */
+  onAssignAthlete: AssignAthleteHandler;
 }) {
   const [draft, setDraft] = useState("1");
   const parsed = Number.parseInt(draft, 10);
   const isValid = Number.isFinite(parsed) && parsed >= 1;
   const roleColors = roleBadgeColors(entry.effectiveRole);
+  // Motivo di un'assegnazione bloccata o rifiutata, mostrato qui sotto e non solo in cima alla scheda.
+  const [rowNotice, setRowNotice] = useState<string | null>(null);
+  useEffect(() => {
+    if (!quotaReason) {
+      setRowNotice(null);
+    }
+  }, [quotaReason]);
+  const showRowNotice = (message: string) => {
+    setRowNotice(message);
+    AccessibilityInfo.announceForAccessibility(message);
+  };
 
-  const assignDisabled = adminBusy || !canAssign || !isValid;
+  const decision = listoneSwipeDecision({
+    owned: Boolean(owner),
+    canRelease,
+    busy: adminBusy,
+    emptySlotsCount,
+    priceValid: isValid,
+    quotaReason,
+  });
+  const canAssign = !owner && emptySlotsCount > 0 && !quotaReason;
+  const assign = async () => {
+    setRowNotice(null);
+    const refusal = await onAssignAthlete(entry.athleteId, parsed);
+    if (typeof refusal === "string" && refusal) {
+      showRowNotice(refusal);
+    }
+  };
+  const blockedReason = decision.blockedReason;
   return (
+    <View>
     <SwipeRow
-      onSwipeRight={!owner && !assignDisabled ? () => void onAssignAthlete(entry.athleteId, parsed) : undefined}
-      onSwipeLeft={owner && canRelease && !adminBusy ? () => void onReleaseAthlete(entry.athleteId) : undefined}
+      onSwipeRight={decision.assign ? () => void assign() : undefined}
+      onSwipeLeft={decision.release ? () => void onReleaseAthlete(entry.athleteId) : undefined}
+      onBlockedSwipeRight={blockedReason ? () => showRowNotice(blockedReason) : undefined}
       rightLabel="Assegna"
       leftLabel="Rimuovi"
-      nudge={nudge ? (owner ? "left" : "right") : undefined}
+      blockedRightLabel="Pieno"
+      nudge={nudge && (owner || decision.assign) ? (owner ? "left" : "right") : undefined}
       testID={owner ? `roster-admin-release-${entry.athleteId}` : `roster-admin-assign-${entry.athleteId}`}
     >
       <View style={[styles.playerCard, { marginBottom: 0 }, owner ? { opacity: 0.7 } : null]}>
@@ -110,6 +153,17 @@ function ListoneAssignRow({
         ) : null}
       </View>
     </SwipeRow>
+    {rowNotice ? (
+      <Text
+        style={styles.quotaRowNotice}
+        accessibilityLiveRegion="polite"
+        accessibilityRole="alert"
+        testID={`roster-admin-assign-notice-${entry.athleteId}`}
+      >
+        {rowNotice}
+      </Text>
+    ) : null}
+    </View>
   );
 }
 
@@ -119,6 +173,7 @@ function ListoneTable({
   ownership,
   canReleaseAthlete,
   emptySlotsCount,
+  quotaReasonByRole,
   adminBusy,
   listoneQuery,
   onlyFree,
@@ -131,13 +186,15 @@ function ListoneTable({
   ownership: Map<string, AthleteOwnership>;
   canReleaseAthlete: (ownerTeamId: string) => boolean;
   emptySlotsCount: number;
+  quotaReasonByRole: Record<FantasyRole, string | null>;
   adminBusy: boolean;
   listoneQuery: string;
   onlyFree: boolean;
   /** Campionato e squadra scelti: cambiandoli si torna a pagina 1, come con testo e ruolo. */
   placeKey: string;
   onReleaseAthlete: (athleteId: string) => void | Promise<void>;
-  onAssignAthlete: (athleteId: string, purchaseCredits: number) => void | Promise<void>;
+  /** Se restituisce un testo (assegnazione rifiutata), la riga lo mostra sotto di sé. */
+  onAssignAthlete: AssignAthleteHandler;
 }) {
   const [page, setPage] = useState(0);
   const availabilityKey = listoneQuery.trim() ? "search" : onlyFree ? "free" : "all";
@@ -157,14 +214,14 @@ function ListoneTable({
       <View style={styles.playerTable}>
       {pagedRows.map((entry, index) => {
         const owner = ownership.get(entry.athleteId);
-        const canAssign = !owner && emptySlotsCount > 0;
         const canRelease = owner ? canReleaseAthlete(owner.teamId) : false;
         return (
           <ListoneAssignRow
             key={entry.athleteId}
             entry={entry}
             owner={owner}
-            canAssign={canAssign}
+            emptySlotsCount={emptySlotsCount}
+            quotaReason={quotaReasonByRole[entry.effectiveRole] ?? null}
             canRelease={canRelease}
             adminBusy={adminBusy}
             nudge={index === 0 && safePage === 0}
@@ -203,6 +260,7 @@ export function RosterAdminManualCard({
   isAdmin,
   leagueTeams,
   targetTeam,
+  ownTeamId = null,
   emptySlotsCount,
   listone,
   listoneQuery,
@@ -219,6 +277,8 @@ export function RosterAdminManualCard({
   isAdmin: boolean;
   leagueTeams: FantasyTeamSummary[];
   targetTeam: FantasyTeam | null;
+  /** Squadra di chi guarda: se l'admin assegna a un'altra, gli avvisi di quota la nominano. */
+  ownTeamId?: string | null;
   emptySlotsCount: number;
   listone: LeagueListoneEntry[];
   listoneQuery: string;
@@ -227,7 +287,8 @@ export function RosterAdminManualCard({
   canReleaseAthlete: (ownerTeamId: string) => boolean;
   adminBusy: boolean;
   onReleaseAthlete: (athleteId: string) => void | Promise<void>;
-  onAssignAthlete: (athleteId: string, purchaseCredits: number) => void | Promise<void>;
+  /** Se restituisce un testo (assegnazione rifiutata), la riga lo mostra sotto di sé. */
+  onAssignAthlete: AssignAthleteHandler;
   onSelectTargetTeam?: (teamId: string) => void;
   adminMessage: string | null;
   adminError: string | null;
@@ -252,6 +313,19 @@ export function RosterAdminManualCard({
     },
     { fold: foldSearchText, ownedAthleteIds },
   );
+  // Quota per ruolo della squadra a cui si assegna: stessa regola del server (contracts).
+  const quota = useMemo(() => rosterRoleQuota(targetTeam), [targetTeam]);
+  const quotaContext = {
+    emptySlotsCount,
+    teamName: isAdmin && targetTeam && targetTeam.id !== ownTeamId ? targetTeam.name : null,
+  };
+  const quotaReasonByRole: Record<FantasyRole, string | null> = {
+    P: roleQuotaBlockReason(quota, "P", quotaContext),
+    D: roleQuotaBlockReason(quota, "D", quotaContext),
+    C: roleQuotaBlockReason(quota, "C", quotaContext),
+    A: roleQuotaBlockReason(quota, "A", quotaContext),
+  };
+  const quotaNotice = listoneQuotaNotice(quota, roleTab, quotaContext);
 
   return (
     <View style={{ gap: 12 }} testID="roster-admin-manual">
@@ -367,12 +441,19 @@ export function RosterAdminManualCard({
                       onPress={() => setRoleTab(tab.value)}
                     >
                       <Text style={[styles.pillLabel, selected && styles.pillLabelActive]}>
-                        {tab.label}
+                        {tab.value === "all" ? tab.label : roleTabLabel(tab.label, quota?.roles[tab.value])}
                       </Text>
                     </Pressable>
                   );
                 })}
               </HScroll>
+              {quotaNotice ? (
+                <View style={[styles.quotaNotice, { marginTop: 8 }]} testID="roster-admin-quota-notice">
+                  <Text style={styles.quotaNoticeText} accessibilityLiveRegion="polite">
+                    {quotaNotice}
+                  </Text>
+                </View>
+              ) : null}
               {ROLE_TABS.map((tab) => {
                 if (tab.value !== roleTab) {
                   return null;
@@ -406,6 +487,7 @@ export function RosterAdminManualCard({
                     ownership={ownership}
                     canReleaseAthlete={canReleaseAthlete}
                     emptySlotsCount={emptySlotsCount}
+                    quotaReasonByRole={quotaReasonByRole}
                     adminBusy={adminBusy}
                     listoneQuery={listoneQuery}
                     onlyFree={onlyFree}

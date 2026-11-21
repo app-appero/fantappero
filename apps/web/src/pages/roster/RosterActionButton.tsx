@@ -16,12 +16,15 @@ export function RosterActionButton({
   disabled,
   testId,
   label,
+  title,
   onClick,
 }: {
   action: "assign" | "release";
   disabled?: boolean;
   testId: string;
   label: string;
+  /** Suggerimento al passaggio del mouse, es. perché il pulsante è spento. */
+  title?: string;
   onClick: () => void;
 }) {
   const release = action === "release";
@@ -33,6 +36,7 @@ export function RosterActionButton({
       disabled={disabled}
       data-testid={testId}
       aria-label={label}
+      title={title}
       onClick={onClick}
     >
       <span className="fa-roster-action__label">{release ? "Rimuovi" : "Assegna"}</span>

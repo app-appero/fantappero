@@ -11,7 +11,7 @@ import type {
   RosterTurnSnapshotDetail,
   RosterTurnSnapshotSummary,
 } from "@fantappero/contracts";
-import { canConfirmRosterImport } from "@fantappero/contracts";
+import { canConfirmRosterImport, roleQuotaErrorMessage, rosterRoleQuota } from "@fantappero/contracts";
 import { Breadcrumb, Button, PageContainer, UiStatePanel } from "@fantappero/ui";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -1252,7 +1252,13 @@ export function RosterPage() {
       );
     } catch (error) {
       applyTeamUpdate(previousTeam);
-      setAdminError(getApiErrorMessage(error, "Impossibile assegnare il calciatore."));
+      // Quota del ruolo superata: stesso testo dell'avviso del listone (contracts).
+      const teamName = isAdmin && previousTeam.id !== team?.id ? previousTeam.name : null;
+      setAdminError(
+        roleQuotaErrorMessage(error, athlete?.effectiveRole, rosterRoleQuota(previousTeam), {
+          teamName,
+        }) ?? getApiErrorMessage(error, "Impossibile assegnare il calciatore."),
+      );
     } finally {
       setAdminBusy(false);
     }
@@ -1658,6 +1664,7 @@ export function RosterPage() {
                 adminLoadError={adminLoadError}
                 leagueTeams={leagueTeams}
                 targetTeam={targetTeam}
+                ownTeamId={team?.id ?? null}
                 emptySlotsCount={emptySlots.length}
                 adminMessage={adminMessage}
                 adminError={adminError}

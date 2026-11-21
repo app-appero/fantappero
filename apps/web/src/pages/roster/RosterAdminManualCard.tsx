@@ -2,8 +2,13 @@ import {
   NO_LISTONE_PLACE_FILTERS,
   hasListonePlaceFilters,
   listonePlayerCountLabel,
+  listoneQuotaNotice,
   normalizeListonePlaceFilters,
   playerAvatarUrl,
+  roleQuotaBlockReason,
+  roleQuotaBlockedLabel,
+  roleQuotaCountLabel,
+  rosterRoleQuota,
 } from "@fantappero/contracts";
 import type {
   FantasyRole,
@@ -50,6 +55,7 @@ function ListoneAssignRow({
   entry,
   owner,
   canAssign,
+  quotaReason,
   canRelease,
   adminBusy,
   onReleaseAthlete,
@@ -58,6 +64,8 @@ function ListoneAssignRow({
   entry: LeagueListoneEntry;
   owner: AthleteOwnership | undefined;
   canAssign: boolean;
+  /** Ruolo al completo: il motivo (stesso testo dell'app), `null` se il ruolo ha posto. */
+  quotaReason: string | null;
   canRelease: boolean;
   adminBusy: boolean;
   onReleaseAthlete: (athleteId: string) => void | Promise<void>;
@@ -127,7 +135,12 @@ function ListoneAssignRow({
             action="assign"
             disabled={adminBusy || !canAssign || !isValid}
             testId={`roster-admin-assign-${entry.athleteId}`}
-            label={`Assegna ${entry.canonicalName}`}
+            label={
+              quotaReason
+                ? roleQuotaBlockedLabel(entry.canonicalName, quotaReason)
+                : `Assegna ${entry.canonicalName}`
+            }
+            title={quotaReason ?? undefined}
             onClick={() => void onAssignAthlete(entry.athleteId, parsed)}
           />
         ) : null}
@@ -142,6 +155,7 @@ function ListoneTable({
   ownership,
   canReleaseAthlete,
   emptySlotsCount,
+  quotaReasonByRole,
   adminBusy,
   listoneQuery,
   onlyFree,
@@ -154,6 +168,7 @@ function ListoneTable({
   ownership: Map<string, AthleteOwnership>;
   canReleaseAthlete: (ownerTeamId: string) => boolean;
   emptySlotsCount: number;
+  quotaReasonByRole: Record<FantasyRole, string | null>;
   adminBusy: boolean;
   listoneQuery: string;
   onlyFree: boolean;
@@ -198,7 +213,8 @@ function ListoneTable({
         <TableBody>
           {pagedRows.map((entry) => {
             const owner = ownership.get(entry.athleteId);
-            const canAssign = !owner && emptySlotsCount > 0;
+            const quotaReason = owner ? null : (quotaReasonByRole[entry.effectiveRole] ?? null);
+            const canAssign = !owner && emptySlotsCount > 0 && !quotaReason;
             const canRelease = owner ? canReleaseAthlete(owner.teamId) : false;
             return (
               <ListoneAssignRow
@@ -206,6 +222,7 @@ function ListoneTable({
                 entry={entry}
                 owner={owner}
                 canAssign={canAssign}
+                quotaReason={quotaReason}
                 canRelease={canRelease}
                 adminBusy={adminBusy}
                 onReleaseAthlete={onReleaseAthlete}
@@ -250,6 +267,7 @@ export function RosterAdminManualCard({
   adminLoadError,
   leagueTeams,
   targetTeam,
+  ownTeamId = null,
   emptySlotsCount,
   adminMessage,
   adminError,
@@ -268,6 +286,8 @@ export function RosterAdminManualCard({
   adminLoadError: string | null;
   leagueTeams: FantasyTeamSummary[];
   targetTeam: FantasyTeam | null;
+  /** Squadra di chi guarda: se l'admin assegna a un'altra, gli avvisi di quota la nominano. */
+  ownTeamId?: string | null;
   emptySlotsCount: number;
   adminMessage: string | null;
   adminError: string | null;
@@ -298,6 +318,18 @@ export function RosterAdminManualCard({
       filterListone(listone, tab.value, listoneQuery, onlyFree, ownedAthleteIds, place),
     ]),
   );
+  // Quota per ruolo della squadra a cui si assegna: stessa regola del server (contracts).
+  const quota = useMemo(() => rosterRoleQuota(targetTeam), [targetTeam]);
+  const quotaContext = {
+    emptySlotsCount,
+    teamName: isAdmin && targetTeam && targetTeam.id !== ownTeamId ? targetTeam.name : null,
+  };
+  const quotaReasonByRole: Record<FantasyRole, string | null> = {
+    P: roleQuotaBlockReason(quota, "P", quotaContext),
+    D: roleQuotaBlockReason(quota, "D", quotaContext),
+    C: roleQuotaBlockReason(quota, "C", quotaContext),
+    A: roleQuotaBlockReason(quota, "A", quotaContext),
+  };
   return (
     <Card data-testid="roster-admin-manual">
       <CardHeader>
@@ -407,16 +439,38 @@ export function RosterAdminManualCard({
                   aria-label="Filtra listone per ruolo"
                 >
                   <TabList>
-                    {ROLE_TABS.map((tab) => (
-                      <Tab key={tab.value} value={tab.value}>
-                        {tab.label}
-                      </Tab>
-                    ))}
+                    {ROLE_TABS.map((tab) => {
+                      const stat = tab.value === "all" ? null : quota?.roles[tab.value];
+                      return (
+                        <Tab key={tab.value} value={tab.value}>
+                          {tab.label}
+                          {stat ? (
+                            <span
+                              className={`fa-roster-quota-tab__count${stat.full ? " fa-roster-quota-tab__count--full" : ""}`}
+                              data-testid={`roster-admin-quota-count-${tab.value}`}
+                            >
+                              {" "}
+                              {roleQuotaCountLabel(stat)}
+                            </span>
+                          ) : null}
+                        </Tab>
+                      );
+                    })}
                   </TabList>
                   {ROLE_TABS.map((tab) => {
                     const rows = rowsByTab.get(tab.value) ?? [];
+                    const quotaNotice = listoneQuotaNotice(quota, tab.value, quotaContext);
                     return (
                       <TabPanel key={tab.value} value={tab.value}>
+                        {quotaNotice ? (
+                          <p
+                            className="fa-roster-quota-notice"
+                            role="status"
+                            data-testid={`roster-admin-quota-notice-${tab.value}`}
+                          >
+                            {quotaNotice}
+                          </p>
+                        ) : null}
                         {rows.length === 0 ? (
                           <UiStatePanel
                             state="empty"
@@ -441,6 +495,7 @@ export function RosterAdminManualCard({
                             ownership={ownership}
                             canReleaseAthlete={canReleaseAthlete}
                             emptySlotsCount={emptySlotsCount}
+                            quotaReasonByRole={quotaReasonByRole}
                             adminBusy={adminBusy}
                             listoneQuery={listoneQuery}
                             onlyFree={onlyFree}
