@@ -1,4 +1,4 @@
-import type { NotificationItem } from "@fantappero/contracts";
+import type { LeagueSummary, NotificationItem } from "@fantappero/contracts";
 import type { AdminStackParamList, AppTabParamList, RootStackParamList } from "./types";
 
 export type NotificationRoute =
@@ -128,6 +128,43 @@ export function resolveNotificationRoute(
     return { kind: "tab", screen: "Standings" };
   }
   return null;
+}
+
+/** Cosa fare al tocco su una notifica: prima, se serve, cambiare lega; poi aprire `route`. */
+export type NotificationOpenPlan = {
+  route: NotificationRoute;
+  /** Lega da rendere attiva prima di navigare, `null` se resta quella attiva. */
+  switchToLeagueId: string | null;
+};
+
+/**
+ * Tocco su una notifica (elenco in app o push): chi è in più leghe deve finire nella lega
+ * dell'evento, non in quella attiva (Rosario 21/11). Le schede lavorano sulla lega attiva,
+ * quindi prima si rende attiva la lega della notifica, come fa il web con `?lega=`.
+ *
+ * La lega è il parametro `lega` del deep link: il backend lo aggiunge a ogni notifica di lega,
+ * e lo stesso deep link arriva nei dati della push (`data.deepLink`). Senza lega, con la lega
+ * già attiva o con una lega di cui l'utente non fa più parte (lasciata, eliminata) non cambia
+ * nulla: la notifica si apre nella lega attiva, come prima. `null` = nessuna meta.
+ */
+export function planNotificationOpen(
+  item: Pick<NotificationItem, "deepLink" | "title">,
+  session: { activeLeagueId: string | null; leagues: readonly Pick<LeagueSummary, "id">[] },
+): NotificationOpenPlan | null {
+  const route = resolveNotificationRoute(item);
+  if (!route) {
+    return null;
+  }
+  const link = (item.deepLink ?? "").trim();
+  const isInternalLink = link.startsWith("/") && !link.startsWith("//") && !link.includes("://");
+  const leagueId = isInternalLink ? extractQueryParam(link, "lega") : null;
+  const switchToLeagueId =
+    leagueId &&
+    leagueId !== session.activeLeagueId &&
+    session.leagues.some((league) => league.id === leagueId)
+      ? leagueId
+      : null;
+  return { route, switchToLeagueId };
 }
 
 const TAB_NAMES: readonly (keyof AppTabParamList)[] = [

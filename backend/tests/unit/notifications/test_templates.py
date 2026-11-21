@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+from urllib.parse import parse_qs, urlsplit
+
 import pytest
 
-from notifications.templates import render_notification
+from notifications.templates import _TEMPLATES, render_notification
 
 
 def test_render_sistema_generico_v1_uses_params() -> None:
@@ -403,6 +405,50 @@ def test_render_formazione_blocco_imminente_v2_counts_roster_players() -> None:
         "al calcio d'inizio della loro partita."
     )
     assert single.deep_link == "/formazione"
+
+
+# Notifiche che non riguardano una lega dell'utente: avvisi generici e degli operatori,
+# segnalazioni, invito non ancora accettato (il destinatario non è nella lega) e lega eliminata.
+_NOT_LEAGUE_SCOPED = {
+    "sistema.generico",
+    "sistema.invito_lega",
+    "sistema.richiesta_tester",
+    "sistema.feedback_utente",
+    "sistema.feedback_stato",
+    "lega.eliminata",
+}
+
+
+def test_every_league_notification_links_its_league() -> None:
+    """Chi è in più leghe apre la notifica nella lega dell'evento (Rosario 21/11).
+
+    Il sito e l'app leggono la lega dal ``?lega=`` del deep link, che è anche il ``deepLink``
+    dei dati della push: ogni template di lega, in ogni sua variante, deve metterlo.
+    """
+    base: dict[str, object] = {
+        "league_id": "lega-x",
+        "league_name": "Lega X",
+        "proposal_id": "p-1",
+        "deep_link": "/turni/scontro/slot-1",
+    }
+    variants: list[dict[str, object]] = [
+        {},
+        {"outcome": "accepted"},
+        {"outcome": "assigned"},
+        {"outcome": "tiebreak"},
+        {"tiebreak_cancelled": True},
+        {"session_kind": "waiver"},
+        {"session_kind": "waiver", "outcome": "assigned"},
+        {"status": "proposed"},
+    ]
+    league_scoped = sorted(key for key in _TEMPLATES if key[0] not in _NOT_LEAGUE_SCOPED)
+    assert len(league_scoped) > 20
+    for template_key, version in league_scoped:
+        for variant in variants:
+            content = render_notification(template_key, version, {**base, **variant})
+            assert content.deep_link is not None, (template_key, version, variant)
+            query = parse_qs(urlsplit(content.deep_link).query)
+            assert query.get("lega") == ["lega-x"], (template_key, version, content.deep_link)
 
 
 def test_every_test_sample_renders() -> None:

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { impersonationTab, resolveNotificationRoute } from "./notificationDestination.ts";
+import { impersonationTab, planNotificationOpen, resolveNotificationRoute } from "./notificationDestination.ts";
 
 test("le notifiche di scambio aprono Scambi", () => {
   assert.deepEqual(resolveNotificationRoute({ title: "Nuova proposta di scambio", deepLink: "/mercato" }), { kind: "tab", screen: "Market" });
@@ -171,4 +171,97 @@ test("l'avviso di stato di una propria segnalazione apre «Segnala un problema»
     resolveNotificationRoute({ title: "La tua segnalazione è stata risolta", deepLink: "/feedback" }),
     { kind: "stack", name: "Feedback" },
   );
+});
+
+// -- Lega della notifica (Rosario 21/11): prima si rende attiva, poi si naviga. ----------------
+
+const IN_A_AND_B = {
+  activeLeagueId: "league-b",
+  leagues: [{ id: "league-a" }, { id: "league-b" }],
+};
+
+test("tocco su una notifica della lega A con attiva la B: prima la lega A, poi la schermata", () => {
+  assert.deepEqual(
+    planNotificationOpen(
+      { title: "Squadra X ti propone uno scambio", deepLink: "/mercato?scambio=p-1&lega=league-a" },
+      IN_A_AND_B,
+    ),
+    {
+      route: { kind: "tab", screen: "Market", params: { scambio: "p-1" } },
+      switchToLeagueId: "league-a",
+    },
+  );
+});
+
+test("ogni deep link di lega del backend cambia la lega attiva prima di aprire la schermata", () => {
+  // Percorsi di notifications/templates.py con `_league_link`: in app e nei dati della push.
+  const cases: Array<[string, string]> = [
+    ["Blocco formazione in arrivo", "/formazione?lega=league-a"],
+    ["Scadenza formazione in arrivo", "/formazione?lega=league-a"],
+    ["Turno 8 aperto", "/formazione?lega=league-a"],
+    ["Busta aggiudicata", "/asta?lega=league-a"],
+    ["Sei stato sorpassato", "/asta-live?lega=league-a"],
+    ["Svincolato aggiudicato", "/svincolati?lega=league-a"],
+    ["Scambio con Squadra X approvato", "/mercato?scambio=p-1&lega=league-a"],
+    ["Turno omologato", "/classifica?lega=league-a"],
+    ["Gol di Lautaro", "/turni?lega=league-a"],
+    ["Gol di Lautaro", "/turni/scontro/slot-1?lega=league-a"],
+    ["Invito accettato", "/fantallenatori?lega=league-a"],
+    ["Nuovo partecipante in lega", "/fantallenatori?lega=league-a"],
+    ["La lega è al completo: puoi aprire il mercato", "/lega/amministrazione?lega=league-a"],
+    ["La lega è partita", "/?lega=league-a"],
+  ];
+  for (const [title, deepLink] of cases) {
+    const plan = planNotificationOpen({ title, deepLink }, IN_A_AND_B);
+    assert.ok(plan, deepLink);
+    assert.deepEqual(plan.route, resolveNotificationRoute({ title, deepLink }), deepLink);
+    assert.equal(plan.switchToLeagueId, "league-a", deepLink);
+  }
+  // Lo scontro e l'amministrazione restano quelli della notifica.
+  assert.deepEqual(
+    planNotificationOpen({ title: "Gol", deepLink: "/turni/scontro/slot-1?lega=league-a" }, IN_A_AND_B)?.route,
+    { kind: "matchup", slotId: "slot-1" },
+  );
+  assert.deepEqual(
+    planNotificationOpen({ title: "x", deepLink: "/lega/amministrazione?lega=league-a" }, IN_A_AND_B)?.route,
+    { kind: "stack", name: "LeagueAdmin", params: { leagueId: "league-a" } },
+  );
+});
+
+test("notifica della lega già attiva: nessun cambio di lega", () => {
+  assert.deepEqual(planNotificationOpen({ title: "x", deepLink: "/formazione?lega=league-b" }, IN_A_AND_B), {
+    route: { kind: "tab", screen: "Formation" },
+    switchToLeagueId: null,
+  });
+});
+
+test("lega di cui non si fa più parte: si apre come prima, nella lega attiva", () => {
+  assert.deepEqual(planNotificationOpen({ title: "x", deepLink: "/classifica?lega=league-lasciata" }, IN_A_AND_B), {
+    route: { kind: "tab", screen: "Standings" },
+    switchToLeagueId: null,
+  });
+  // Nessuna lega caricata (es. elenco non disponibile): nessun cambio, nessun errore.
+  assert.deepEqual(
+    planNotificationOpen({ title: "x", deepLink: "/classifica?lega=league-a" }, { activeLeagueId: null, leagues: [] }),
+    { route: { kind: "tab", screen: "Standings" }, switchToLeagueId: null },
+  );
+});
+
+test("notifiche senza lega (inviti, lega eliminata, operatori): solo la navigazione", () => {
+  for (const deepLink of ["/inviti", "/", "/admin/feedback", "/feedback"]) {
+    const plan = planNotificationOpen({ title: "x", deepLink }, IN_A_AND_B);
+    assert.ok(plan, deepLink);
+    assert.equal(plan.switchToLeagueId, null, deepLink);
+  }
+  // Notifica vecchia senza deep link: meta dal titolo, lega attiva invariata.
+  assert.deepEqual(planNotificationOpen({ title: "Turno omologato", deepLink: null }, IN_A_AND_B), {
+    route: { kind: "tab", screen: "Standings" },
+    switchToLeagueId: null,
+  });
+});
+
+test("senza meta o con un link esterno non cambia nulla, nemmeno la lega", () => {
+  assert.equal(planNotificationOpen({ title: "x", deepLink: "/pagina-sconosciuta?lega=league-a" }, IN_A_AND_B), null);
+  assert.equal(planNotificationOpen({ title: "x", deepLink: "https://evil.example/?lega=league-a" }, IN_A_AND_B), null);
+  assert.equal(planNotificationOpen({ title: "x", deepLink: null }, IN_A_AND_B), null);
 });

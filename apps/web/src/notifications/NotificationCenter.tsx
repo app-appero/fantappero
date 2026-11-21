@@ -2,10 +2,11 @@ import type { NotificationItem } from "@fantappero/contracts";
 import { useOptionalToast } from "@fantappero/ui";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type MouseEvent as ReactMouseEvent } from "react";
 import { createPortal } from "react-dom";
+import { useOptionalAuth } from "../auth/AuthContext";
 import { notifyReceivedInvitesChanged } from "../layout/receivedInviteEvents";
 import { useNavigate } from "../router/simpleRouter";
 import { IconBell } from "../navigation/NavIcons";
-import { resolveNotificationDestination } from "./notificationDestination";
+import { notificationLeagueToActivate, resolveNotificationDestination } from "./notificationDestination";
 import { useNotificationCenter } from "./useNotificationCenter";
 
 const CATEGORY_LABELS: Record<NotificationItem["category"], string> = {
@@ -33,6 +34,8 @@ export function NotificationCenter() {
   const containerRef = useRef<HTMLDivElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
+  // `null` fuori da AuthProvider (test della sola campanella): si naviga e basta.
+  const auth = useOptionalAuth();
   // `null` fuori da un ToastProvider (es. test di pagine isolate): il popup
   // in basso a destra resta solo un'aggiunta facoltativa alla campanella.
   const toast = useOptionalToast();
@@ -112,6 +115,19 @@ export function NotificationCenter() {
     if (destination) {
       if (destination === "/inviti" || destination.startsWith("/inviti?")) {
         notifyReceivedInvitesChanged();
+      }
+      // La notifica apre la sua lega anche quando l'indirizzo ha già lo stesso `?lega=`, che
+      // AuthProvider non riapplica (es. dopo un cambio lega dal selettore). Come per `?lega=`,
+      // non nella modalità demo.
+      const leagueId =
+        auth && !auth.isDemoMode
+          ? notificationLeagueToActivate(destination, {
+              activeLeagueId: auth.activeLeagueId,
+              leagues: auth.leagues,
+            })
+          : null;
+      if (leagueId) {
+        auth?.setActiveLeagueId(leagueId);
       }
       navigate(destination);
     }
