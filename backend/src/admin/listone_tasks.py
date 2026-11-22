@@ -12,8 +12,18 @@ from leagues.listone_refresh_progress import ListoneRefreshProgress, save_progre
 
 
 @celery_app.task(name="admin.refresh_platform_listone_from_provider")
-def refresh_platform_listone_task(*, job_id: str, season_year: int, actor_id: str) -> dict:
-    """Run full catalog+roster+listone refresh for the platform and publish progress."""
+def refresh_platform_listone_task(
+    *,
+    job_id: str,
+    season_year: int,
+    actor_id: str,
+    update_roles: bool = False,
+) -> dict:
+    """Run full catalog+roster+listone refresh for the platform and publish progress.
+
+    ``update_roles``: the result also carries the preview of the roles the provider would
+    change (applied only after the operator confirms).
+    """
     settings = get_api_settings()
     engine = create_engine_from_url(settings.database_url)
     factory = create_session_factory(engine)
@@ -37,6 +47,7 @@ def refresh_platform_listone_task(*, job_id: str, season_year: int, actor_id: st
                 session,
                 season_year=season_year,
                 on_progress=lambda percent, stage, message: publish(percent, stage, message),
+                update_roles=update_roles,
             )
             save_progress(
                 ListoneRefreshProgress(

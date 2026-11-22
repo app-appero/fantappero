@@ -82,8 +82,15 @@ def refresh_platform_listone(
     season_year: int,
     client: ApiFootballClient | None = None,
     on_progress: Callable[[int, str, str], None] | None = None,
+    update_roles: bool = False,
 ) -> AdminListoneRefreshResultResponse:
-    """Sync full MVP catalog + rosters from API-Football, then regenerate the listone."""
+    """Sync full MVP catalog + rosters from API-Football, then regenerate the listone.
+
+    Official roles of athletes already in the listone stay frozen. With ``update_roles``
+    («Aggiorna anche i ruoli dal fornitore») the result also carries the preview of the
+    roles the provider would change; they are applied only after the operator confirms
+    (``POST /admin/listone/ruoli-dal-fornitore``).
+    """
     metrics = get_metrics()
     status = "ok"
     owns_client = client is None
@@ -162,9 +169,26 @@ def refresh_platform_listone(
                 listoneUpdated=listone_result.counters.updated,
                 listoneUnchanged=listone_result.counters.unchanged,
                 listoneSkippedUnmapped=listone_result.counters.skipped_unmapped,
+                roleChangesSkipped=listone_result.counters.role_changes_skipped,
                 catalogSynced=True,
             )
             session.flush()
+            role_changes = None
+            message = "Listone aggiornato dal provider sportivo."
+            if update_roles:
+                # Import locale: il servizio dei ruoli usa PLATFORM_JOB_SCOPE di questo modulo.
+                from admin.listone_roles_service import AdminListoneRolesService
+
+                role_changes = AdminListoneRolesService(session).provider_roles(
+                    actor=None,
+                    season_year=season_year,
+                    dry_run=True,
+                )
+                message = (
+                    "Listone aggiornato. Nessun ruolo da cambiare."
+                    if role_changes.counts.changes == 0
+                    else "Listone aggiornato. Controlla i ruoli che cambierebbero e conferma."
+                )
             _logger.info(
                 "listone_platform_refresh_ok",
                 extra={
@@ -172,15 +196,18 @@ def refresh_platform_listone(
                     "season_year": season_year,
                     "listone_created": counters.listone_created,
                     "listone_updated": counters.listone_updated,
+                    "role_changes_skipped": counters.role_changes_skipped,
+                    "update_roles": update_roles,
                 },
             )
-            report(100, "completed", "Listone aggiornato dal provider sportivo.")
+            report(100, "completed", message)
             return AdminListoneRefreshResultResponse(
                 seasonYear=season_year,
                 mappingVersion=MAPPING_VERSION,
                 refreshedAt=refreshed_at,
-                message="Listone aggiornato dal provider sportivo.",
+                message=message,
                 counters=counters,
+                roleChanges=role_changes,
             )
         except ValidationAuthError:
             status = "error"
@@ -279,7 +306,13 @@ class AdminListoneService:
             for assignment in assignments
         ]
 
-    def start_refresh_job(self, *, season_year: int, actor: User) -> AdminListoneRefreshJobResponse:
+    def start_refresh_job(
+        self,
+        *,
+        season_year: int,
+        actor: User,
+        update_roles: bool = False,
+    ) -> AdminListoneRefreshJobResponse:
         from admin.listone_tasks import refresh_platform_listone_task
 
         job_id = new_job_id()
@@ -297,6 +330,7 @@ class AdminListoneService:
             job_id=job_id,
             season_year=season_year,
             actor_id=str(actor.id),
+            update_roles=update_roles,
         )
         return AdminListoneRefreshJobResponse(
             jobId=job_id,

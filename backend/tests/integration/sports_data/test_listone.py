@@ -149,8 +149,10 @@ def test_listone_generate_reports_the_athletes_whose_assignment_changed(
 
     changed = generate_official_listone(session, season_year=2026)
     session.commit()
-    assert changed.affected_athlete_ids == {jimenez.id, left.id}
-    assert changed.counters.updated == 1
+    # Il ruolo è congelato (22/11): la nuova posizione non cambia nulla, si conta soltanto.
+    assert changed.affected_athlete_ids == {left.id}
+    assert changed.counters.updated == 0
+    assert changed.counters.role_changes_skipped == 1
     assert changed.counters.deactivated == 1
 
 

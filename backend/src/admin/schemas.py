@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Literal
 from urllib.parse import urlsplit
 
@@ -272,7 +272,94 @@ class AdminListoneRefreshCounters(ApiModel):
     listone_updated: int = Field(alias="listoneUpdated")
     listone_unchanged: int = Field(alias="listoneUnchanged")
     listone_skipped_unmapped: int = Field(alias="listoneSkippedUnmapped")
+    #: Ruoli che il fornitore cambierebbe ma che restano quelli del listone (congelati).
+    role_changes_skipped: int = Field(default=0, alias="roleChangesSkipped")
     catalog_synced: bool = Field(alias="catalogSynced")
+
+
+# --- ruoli del listone: ripristino e ruoli dal fornitore (22/11) -----------------------------
+
+ListoneRoleCode = Literal["P", "D", "C", "A"]
+
+
+class AdminListoneRoleRestoreRequest(ApiModel):
+    season_year: int = Field(alias="seasonYear", ge=2000, le=2100)
+    #: Momento prima dell'aggiornamento da annullare. Senza fuso orario vale come UTC.
+    before: datetime
+    dry_run: bool = Field(default=True, alias="dryRun")
+    #: Solo questi calciatori (quelli dell'anteprima confermata); senza, tutti i candidati.
+    athlete_ids: list[str] | None = Field(default=None, alias="athleteIds", max_length=10_000)
+
+    @field_validator("before")
+    @classmethod
+    def _aware(cls, value: datetime) -> datetime:
+        if value.tzinfo is None:
+            return value.replace(tzinfo=UTC)
+        return value
+
+
+class AdminListoneRoleRestoreEntry(ApiModel):
+    athlete_id: str = Field(alias="athleteId")
+    name: AthleteNameStr
+    club: str | None = None
+    current_role: ListoneRoleCode = Field(alias="currentRole")
+    #: ``None`` se le risposte salvate prima di ``before`` non permettono di ricostruirlo.
+    restored_role: ListoneRoleCode | None = Field(default=None, alias="restoredRole")
+    reconstructible: bool
+    restored_position: str | None = Field(default=None, alias="restoredPosition")
+    restored_club: str | None = Field(default=None, alias="restoredClub")
+    #: ``squads`` (rosa del club) o ``players`` (statistiche).
+    restored_source: str | None = Field(default=None, alias="restoredSource")
+    in_rosters: list[str] = Field(default_factory=list, alias="inRosters")
+
+
+class AdminListoneRoleRestoreCounts(ApiModel):
+    to_restore: int = Field(alias="toRestore")
+    not_reconstructible: int = Field(alias="notReconstructible")
+    restored: int
+    rosters_over_quota_now: int = Field(alias="rostersOverQuotaNow")
+    rosters_over_quota_after: int = Field(alias="rostersOverQuotaAfter")
+    rosters_resynced: int = Field(alias="rostersResynced")
+
+
+class AdminListoneRoleRestoreResponse(ApiModel):
+    season_year: int = Field(alias="seasonYear")
+    before: datetime
+    dry_run: bool = Field(alias="dryRun")
+    entries: list[AdminListoneRoleRestoreEntry]
+    counts: AdminListoneRoleRestoreCounts
+
+
+class AdminListoneProviderRolesRequest(ApiModel):
+    season_year: int = Field(alias="seasonYear", ge=2000, le=2100)
+    dry_run: bool = Field(default=True, alias="dryRun")
+    #: Solo questi calciatori (quelli dell'anteprima confermata); senza, tutti.
+    athlete_ids: list[str] | None = Field(default=None, alias="athleteIds", max_length=10_000)
+
+
+class AdminListoneProviderRoleEntry(ApiModel):
+    athlete_id: str = Field(alias="athleteId")
+    name: AthleteNameStr
+    club: str | None = None
+    current_role: ListoneRoleCode = Field(alias="currentRole")
+    new_role: ListoneRoleCode = Field(alias="newRole")
+    provider_position_raw: str | None = Field(default=None, alias="providerPositionRaw")
+    in_rosters: list[str] = Field(default_factory=list, alias="inRosters")
+
+
+class AdminListoneProviderRolesCounts(ApiModel):
+    changes: int
+    applied: int
+    rosters_over_quota_now: int = Field(alias="rostersOverQuotaNow")
+    rosters_over_quota_after: int = Field(alias="rostersOverQuotaAfter")
+    rosters_resynced: int = Field(alias="rostersResynced")
+
+
+class AdminListoneProviderRolesResponse(ApiModel):
+    season_year: int = Field(alias="seasonYear")
+    dry_run: bool = Field(alias="dryRun")
+    entries: list[AdminListoneProviderRoleEntry]
+    counts: AdminListoneProviderRolesCounts
 
 
 class AdminListoneRefreshResultResponse(ApiModel):
@@ -281,6 +368,11 @@ class AdminListoneRefreshResultResponse(ApiModel):
     refreshed_at: datetime = Field(alias="refreshedAt")
     message: str
     counters: AdminListoneRefreshCounters
+    #: Con «Aggiorna anche i ruoli dal fornitore» (``updateRoles``): l'anteprima dei ruoli che
+    #: cambierebbero, da confermare con ``POST /admin/listone/ruoli-dal-fornitore``.
+    role_changes: AdminListoneProviderRolesResponse | None = Field(
+        default=None, alias="roleChanges"
+    )
 
 
 class AdminListoneRefreshJobResponse(ApiModel):

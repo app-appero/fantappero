@@ -41,6 +41,7 @@ vi.mock("./api/admin", () => ({
     fetchAdminListoneRefreshProgressMock(...args),
   fetchActiveAdminListoneRefresh: (...args: unknown[]) =>
     fetchActiveAdminListoneRefreshMock(...args),
+  restoreAdminListoneRoles: vi.fn(),
   promoteOperator: vi.fn(),
   revokeOperator: vi.fn(),
   impersonateUser: vi.fn(),

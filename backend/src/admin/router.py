@@ -9,6 +9,7 @@ from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
 from admin.exceptions import AdminError
+from admin.listone_roles_service import AdminListoneRolesService
 from admin.listone_service import AdminListoneService
 from admin.schemas import (
     AdminAddBlockedRequest,
@@ -19,8 +20,12 @@ from admin.schemas import (
     AdminImpersonateResponse,
     AdminImpersonationRevokeResponse,
     AdminListoneEntryResponse,
+    AdminListoneProviderRolesRequest,
+    AdminListoneProviderRolesResponse,
     AdminListoneRefreshJobResponse,
     AdminListoneRefreshProgressResponse,
+    AdminListoneRoleRestoreRequest,
+    AdminListoneRoleRestoreResponse,
     AdminOverviewResponse,
     AdminTesterRequestBulkRequest,
     AdminTesterRequestListResponse,
@@ -59,6 +64,12 @@ def get_admin_listone_service(
     settings: ApiSettings = Depends(get_api_settings),
 ) -> AdminListoneService:
     return AdminListoneService(session, settings)
+
+
+def get_admin_listone_roles_service(
+    session: Session = Depends(get_db_session),
+) -> AdminListoneRolesService:
+    return AdminListoneRolesService(session)
 
 
 def get_admin_transfers_service(
@@ -333,10 +344,16 @@ def list_listone(
 @router.post("/listone/aggiorna", response_model=AdminListoneRefreshJobResponse)
 def start_listone_refresh(
     season_year: int = Query(alias="seasonYear", ge=2000, le=2100),
+    update_roles: bool = Query(default=False, alias="updateRoles"),
     operator: User = Depends(require_permissions(Permission.GLOBAL_OPERATE)),
     service: AdminListoneService = Depends(get_admin_listone_service),
 ) -> AdminListoneRefreshJobResponse:
-    return service.start_refresh_job(season_year=season_year, actor=operator)
+    """Aggiorna il listone dal fornitore. I ruoli di chi c'è già restano (congelati);
+    con ``updateRoles`` il risultato porta l'anteprima dei ruoli che cambierebbero,
+    da confermare con ``POST /admin/listone/ruoli-dal-fornitore``."""
+    return service.start_refresh_job(
+        season_year=season_year, actor=operator, update_roles=update_roles
+    )
 
 
 @router.get("/listone/aggiorna", response_model=AdminListoneRefreshProgressResponse | None)
@@ -357,5 +374,46 @@ def get_listone_refresh_progress(
 ) -> AdminListoneRefreshProgressResponse | JSONResponse:
     try:
         return service.get_refresh_progress(job_id=job_id)
+    except ValidationAuthError as exc:
+        return _listone_error_response(exc)
+
+
+@router.post("/listone/ripristina-ruoli", response_model=AdminListoneRoleRestoreResponse)
+def restore_listone_roles(
+    body: AdminListoneRoleRestoreRequest,
+    operator: User = Depends(require_permissions(Permission.GLOBAL_OPERATE)),
+    service: AdminListoneRolesService = Depends(get_admin_listone_roles_service),
+) -> AdminListoneRoleRestoreResponse | JSONResponse:
+    """Ripristina i ruoli ufficiali cambiati dopo ``before`` (aggiornamento del 21/11).
+
+    ``dryRun`` (default) elenca soltanto; con ``dryRun: false`` applica e ricalcola le rose.
+    """
+    try:
+        return service.restore_roles(
+            actor=operator,
+            season_year=body.season_year,
+            before=body.before,
+            dry_run=body.dry_run,
+            athlete_ids=body.athlete_ids,
+        )
+    except ValidationAuthError as exc:
+        return _listone_error_response(exc)
+
+
+@router.post("/listone/ruoli-dal-fornitore", response_model=AdminListoneProviderRolesResponse)
+def update_listone_roles_from_provider(
+    body: AdminListoneProviderRolesRequest,
+    operator: User = Depends(require_permissions(Permission.GLOBAL_OPERATE)),
+    service: AdminListoneRolesService = Depends(get_admin_listone_roles_service),
+) -> AdminListoneProviderRolesResponse | JSONResponse:
+    """«Aggiorna anche i ruoli dal fornitore»: ``dryRun`` (default) è l'anteprima; con
+    ``dryRun: false`` e gli ``athleteIds`` dell'anteprima applica i ruoli e ricalcola le rose."""
+    try:
+        return service.provider_roles(
+            actor=operator,
+            season_year=body.season_year,
+            dry_run=body.dry_run,
+            athlete_ids=body.athlete_ids,
+        )
     except ValidationAuthError as exc:
         return _listone_error_response(exc)

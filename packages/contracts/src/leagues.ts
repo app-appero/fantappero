@@ -819,6 +819,8 @@ export interface LeagueListoneRefreshCounters {
   listoneUpdated: number;
   listoneUnchanged: number;
   listoneSkippedUnmapped: number;
+  /** Ruoli che il fornitore cambierebbe ma che restano quelli del listone (congelati). */
+  roleChangesSkipped: number;
   catalogSynced: boolean;
 }
 

@@ -11,6 +11,15 @@
 
 Genera il **listone ufficiale** della piattaforma: ogni calciatore con membership attiva riceve un ruolo FantApperò valido **P / D / C / A**. Le leghe possono applicare **override pre-asta** (effetto immediato); dopo l’avvio stagione le modifiche decorrono dal **turno successivo**.
 
+**Ruoli congelati per la stagione (22/11):** il ruolo si assegna quando il calciatore entra nel
+listone della stagione e un aggiornamento o una rigenerazione non lo cambia più, anche se la
+posizione del fornitore cambia (club, membership e metadati sì). La differenza si conta in
+`roleChangesSkipped` e nel log `listone_role_change_skipped`. Il ruolo cambia solo con un'azione
+esplicita: override di lega, «Aggiorna anche i ruoli dal fornitore» (anteprima e conferma) o
+«Ripristina i ruoli» dal pannello operatore. Con più membership attive vale quella del club
+attuale: arrivo dell'ultimo trasferimento, poi la rosa attuale del fornitore (`/players/squads`),
+poi la più recente.
+
 Fuori scope: persistenza fixture/eventi (EP04-05 — [`sports_fixtures_sync.md`](./sports_fixtures_sync.md)), scheduler polling (EP04-06), asta/rose fantasy complete.
 
 ## Mapping posizione → ruolo (OQ-01)
@@ -62,6 +71,29 @@ backend equivalenti: `GET /admin/listone?seasonYear=`, `POST /admin/listone/aggi
 `GET /admin/listone/aggiorna/{jobId}` — orchestrazione indipendente da
 `LeagueListoneService.refresh_from_provider` (stesse funzioni di sync/generate, nessun audit
 per-lega: log strutturato `listone_platform_refresh_ok`/`_failed`).
+
+**Scelta in «Aggiorna listone» (22/11):** il pulsante apre una finestra con due opzioni.
+«Aggiungi i nuovi calciatori e aggiorna le squadre» (default, `POST /admin/listone/aggiorna?seasonYear=`)
+lascia i ruoli congelati. «Aggiorna anche i ruoli dal fornitore» (`…&updateRoles=true`, con
+l'avviso che le rose possono andare fuori quota) fa lo stesso aggiornamento e mette nel
+risultato del job `roleChanges`: l'anteprima di chi cambierebbe ruolo (nome, club, ruolo ora →
+nuovo, leghe in cui è in rosa, rose fuori quota ora e dopo). I ruoli cambiano solo con la
+conferma: `POST /admin/listone/ruoli-dal-fornitore` `{ seasonYear, dryRun: false, athleteIds }`
+(con `dryRun: true` ricalcola l'anteprima), poi `resync_team_compositions` e audit
+(`details.operation = listone_roles_from_provider`). L'aggiornamento dalla lega e l'app usano
+il default (ruoli congelati).
+
+**Ripristina i ruoli (22/11):** `POST /admin/listone/ripristina-ruoli` (`global:operate`) con
+`{ "seasonYear": 2026, "before": "<ISO>", "dryRun": true }`. Candidati: le assegnazioni della
+stagione aggiornate dopo `before` il cui ruolo ricostruito è diverso. Il ruolo di prima si
+ricostruisce dalle risposte salvate in `provider_snapshots` prima di `before` (`/players/squads`
+del club, se no `/players`; stesso mapping e stessa scelta del club del listone,
+`sports_data/listone/reconstruct.py`). Chi aveva già l'assegnazione ma non è ricostruibile è
+elencato «non ricostruibile» e non si tocca. Con `dryRun: false` (e `athleteIds` dell'anteprima)
+applica, ricalcola le rose (`resync_team_compositions`) e scrive l'audit di piattaforma
+(`league_listone_refreshed`, `details.operation = listone_roles_restored`, log
+`admin_listone_roles_restored`). Idempotente. Dal web: sezione «Ripristina i ruoli cambiati da
+un aggiornamento» in `/admin/listone`.
 
 **Filtro per campionato lega**: la vista listone di ciascuna lega (`GET /leagues/{id}/listone`,
 consumata da Rosa/Asta/CSV import) è filtrata sui soli campionati scelti in creazione lega
