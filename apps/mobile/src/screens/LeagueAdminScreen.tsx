@@ -631,9 +631,13 @@ export function LeagueAdminScreen() {
           </View>
 
           <Text style={styles.heading}>Prossime fasi</Text>
-          <Text style={styles.body}>
-            Prima salva la configurazione della lega, poi invita i fantallenatori.
-          </Text>
+          {/* Solo finché la configurazione non è salvata: una lega avviata conta come
+              configurata anche senza un salvataggio del regolamento (Rosario 22/11). */}
+          {!configurationSaved ? (
+            <Text style={styles.body} testID="league-admin-save-first">
+              Prima salva la configurazione della lega, poi invita i fantallenatori.
+            </Text>
+          ) : null}
           <ScreenTabs
             items={[
               { id: "configurazione", label: "Configurazione" },

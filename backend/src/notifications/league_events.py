@@ -8,10 +8,11 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from database.enums import LeagueMemberRole, NotificationCategory
+from database.enums import LeagueMemberRole, NamedInviteStatus, NotificationCategory
 from leagues.models.league import League
 from leagues.models.league_membership import LeagueMembership
 from leagues.models.league_rules import LeagueRules
+from leagues.models.named_league_invite import NamedLeagueInvite
 from notifications.service import NotificationService
 
 # Un turno si notifica solo se il blocco è vicino: la sincronizzazione può aprire mesi di turni
@@ -113,22 +114,75 @@ def notify_league_deleted(
     Senza ``deleted_by_user_id`` l'ha eliminata un operatore e l'avviso va a tutti.
     Con ``deleted_by_user_id`` l'ha eliminata l'amministratore della lega: lui non
     riceve l'avviso della propria azione e il testo dice chi l'ha eliminata (QA 19/11).
+    Vale per entrambe le eliminazioni anche la chiusura degli inviti nominativi in
+    attesa (QA 21→22/11, vedi ``_close_pending_named_invites``).
     """
     params: dict[str, object] = {"league_name": league.name}
     if deleted_by_user_id is not None:
         params["by_league_admin"] = True
     service = NotificationService(session)
+    already_told: set[UUID] = set()
+    if deleted_by_user_id is not None:
+        already_told.add(deleted_by_user_id)
     for user_id in _member_user_ids(session, league.id):
-        if user_id == deleted_by_user_id:
+        if user_id in already_told:
             continue
-        service.create_notification(
-            user_id=user_id,
-            category=NotificationCategory.SISTEMA,
-            template_key="lega.eliminata",
-            template_version=1,
-            params=params,
-            dedup_key=f"league_deleted:{league.id}:{user_id}",
+        _notify_deleted(service, league=league, user_id=user_id, params=params)
+        already_told.add(user_id)
+    _close_pending_named_invites(
+        session, service, league=league, params=params, skip_user_ids=already_told
+    )
+
+
+def _notify_deleted(
+    service: NotificationService, *, league: League, user_id: UUID, params: dict[str, object]
+) -> None:
+    service.create_notification(
+        user_id=user_id,
+        category=NotificationCategory.SISTEMA,
+        template_key="lega.eliminata",
+        template_version=1,
+        params=params,
+        dedup_key=f"league_deleted:{league.id}:{user_id}",
+    )
+
+
+def _close_pending_named_invites(
+    session: Session,
+    service: NotificationService,
+    *,
+    league: League,
+    params: dict[str, object],
+    skip_user_ids: set[UUID],
+) -> None:
+    """Inviti nominativi in attesa di una lega che sta per essere eliminata (QA 21→22/11).
+
+    La notifica «Nuovo invito» restava in campanella e portava a «Inviti ricevuti» vuoti,
+    e l'invitato non sapeva che la lega non c'era più. Come per «Annulla invito» la
+    notifica si toglie; chi aveva un invito ancora valido riceve «Lega eliminata», lo
+    stesso avviso dei partecipanti. Va fatto prima di eliminare la lega: gli inviti
+    spariscono con lei (ON DELETE CASCADE).
+    """
+    # Import qui: named_invite_service importa già questo modulo.
+    from leagues.named_invite_service import invite_notification_dedup_key
+
+    now = datetime.now(UTC)
+    pending = session.execute(
+        select(
+            NamedLeagueInvite.id, NamedLeagueInvite.recipient_id, NamedLeagueInvite.expires_at
+        ).where(
+            NamedLeagueInvite.league_id == league.id,
+            NamedLeagueInvite.status == NamedInviteStatus.PENDING,
         )
+    ).all()
+    for invite_id, recipient_id, expires_at in pending:
+        service.delete_notification_by_dedup_key(
+            user_id=recipient_id, dedup_key=invite_notification_dedup_key(invite_id)
+        )
+        if expires_at <= now or recipient_id in skip_user_ids:
+            continue
+        _notify_deleted(service, league=league, user_id=recipient_id, params=params)
+        skip_user_ids.add(recipient_id)
 
 
 def notify_turn_opened(

@@ -271,6 +271,59 @@ def test_admin_can_delete_active_league_and_members_are_notified(
     assert again.status_code == 404
 
 
+def test_admin_delete_league_withdraws_pending_named_invites(
+    client: TestClient, db_session: Session
+) -> None:
+    """QA 21→22/11: anche con l'eliminazione da operatore la notifica «Nuovo invito»
+    restava all'invitato, senza nessun «Lega eliminata»."""
+    from auth.models.user_profile import UserProfile
+    from notifications.models import Notification
+
+    token, op_id = _register_and_login(client, "admin.operator.del.invite@example.com")
+    _promote(db_session, op_id)
+    owner_token, owner_id = _register_and_login(client, "admin.owner.del.invite@example.com")
+    _, guest_id = _register_and_login(client, "admin.guest.del.invite@example.com")
+    profile = db_session.scalars(select(UserProfile).where(UserProfile.user_id == guest_id)).one()
+    profile.available_for_invites = True
+    db_session.commit()
+    league_id = _seed_league(db_session, name="Lega Inviti Operatore", owner_id=owner_id)
+    invited = client.post(
+        f"/leagues/{league_id}/amministrazione/inviti-nominativi",
+        headers={"Authorization": f"Bearer {owner_token}"},
+        json={"recipientUserId": str(guest_id)},
+    )
+    assert invited.status_code in (200, 201), invited.text
+
+    def guest_notes(template_key: str) -> list[Notification]:
+        return list(
+            db_session.scalars(
+                select(Notification).where(
+                    Notification.user_id == guest_id, Notification.template_key == template_key
+                )
+            ).all()
+        )
+
+    assert len(guest_notes("sistema.invito_lega")) == 1
+
+    response = client.delete(
+        f"/admin/leagues/{league_id}", headers={"Authorization": f"Bearer {token}"}
+    )
+    assert response.status_code == 204
+    db_session.expire_all()
+    assert guest_notes("sistema.invito_lega") == []
+    deleted = guest_notes("lega.eliminata")
+    assert [note.body for note in deleted] == [
+        "La lega Lega Inviti Operatore è stata eliminata dall'amministrazione."
+    ]
+    # Il proprietario resta avvisato una volta sola, come prima.
+    owner_notes = db_session.scalars(
+        select(Notification).where(
+            Notification.user_id == owner_id, Notification.template_key == "lega.eliminata"
+        )
+    ).all()
+    assert len(owner_notes) == 1
+
+
 def test_admin_delete_league_denied_for_member(client: TestClient, db_session: Session) -> None:
     token, _ = _register_and_login(client, "admin.member.del@example.com")
     response = client.delete(
@@ -314,6 +367,47 @@ def test_admin_listone_refresh_job_lifecycle_for_operator(
     body = progress.json()
     assert body["status"] == "failed"
     assert body["errorCode"] == "provider_key_missing"
+
+
+def test_league_listone_refresh_is_operator_only(client: TestClient, db_session: Session) -> None:
+    """Rosario 22/11: il listone vale per tutte le leghe della stagione, quindi
+    «Aggiorna listone» dalla lega lo può lanciare solo l'operatore, non l'amministratore."""
+    owner_token, owner_id = _register_and_login(client, "listone.league.owner@example.com")
+    member_token, member_id = _register_and_login(client, "listone.league.member@example.com")
+    operator_token, operator_id = _register_and_login(client, "listone.league.operator@example.com")
+    _promote(db_session, operator_id)
+    league_id = _seed_league(db_session, name="Lega Listone Operatore", owner_id=owner_id)
+    db_session.add(
+        LeagueMembership(league_id=league_id, user_id=member_id, role=LeagueMemberRole.MEMBER)
+    )
+    db_session.commit()
+    start_path = f"/leagues/{league_id}/amministrazione/listone/aggiorna"
+    progress_path = f"{start_path}/00000000-0000-4000-8000-000000000123"
+
+    for path, method in ((start_path, "POST"), (progress_path, "GET")):
+        denied = client.request(method, path, headers={"Authorization": f"Bearer {owner_token}"})
+        assert denied.status_code == 403, (path, denied.text)
+        assert denied.json() == {
+            "message": "Solo l'operatore può aggiornare il listone.",
+            "code": "listone_refresh_operator_only",
+        }
+    # Il partecipante semplice resta fuori come prima.
+    member = client.post(start_path, headers={"Authorization": f"Bearer {member_token}"})
+    assert member.status_code == 403
+    assert member.json()["code"] == "forbidden"
+
+    # L'operatore, anche senza essere iscritto alla lega, avvia e segue il job.
+    # Senza API_FOOTBALL_KEY nell'ambiente di test il job eager fallisce subito.
+    started = client.post(start_path, headers={"Authorization": f"Bearer {operator_token}"})
+    assert started.status_code == 200, started.text
+    assert started.json()["status"] == "queued"
+    progress = client.get(
+        f"{start_path}/{started.json()['jobId']}",
+        headers={"Authorization": f"Bearer {operator_token}"},
+    )
+    assert progress.status_code == 200, progress.text
+    assert progress.json()["status"] == "failed"
+    assert progress.json()["errorCode"] == "provider_key_missing"
 
 
 def test_admin_listone_refresh_progress_unknown_job_not_found(

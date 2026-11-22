@@ -1,4 +1,4 @@
-import type { SessionUser } from "@fantappero/contracts";
+import type { LeagueSummary, SessionUser } from "@fantappero/contracts";
 import { act, createElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -88,9 +88,10 @@ async function flushAsync(rounds = 6): Promise<void> {
 async function renderAppAt(
   path: string,
   user: SessionUser,
+  leagues: LeagueSummary[] = [],
 ): Promise<{ html: string; unmount: () => void }> {
   fetchMeMock.mockResolvedValue(user);
-  fetchMyLeaguesMock.mockResolvedValue([]);
+  fetchMyLeaguesMock.mockResolvedValue(leagues);
   saveStoredSession({ accessToken: "access-token", refreshToken: "refresh-token", user });
 
   const container = document.createElement("div");
@@ -172,6 +173,25 @@ describe("Admin panel identity gate (EP11-04a)", () => {
     const listoneResult = await renderAppAt("/admin/listone", MEMBER);
     expect(listoneResult.html).toContain('data-testid="route-forbidden"');
     listoneResult.unmount();
+  });
+
+  it("«Aggiorna listone» solo per l'operatore: l'amministratore di lega non lo vede (Rosario 22/11)", async () => {
+    // Il listone vale per tutte le leghe della stagione: amministrare una lega non basta.
+    const leagueAdmin = await renderAppAt("/admin/listone", MEMBER, [
+      { id: "league-1", name: "Lega Test", role: "league_admin", state: "active", marketOpen: true },
+    ]);
+    expect(fetchMyLeaguesMock).toHaveBeenCalled();
+    expect(leagueAdmin.html).toContain('data-testid="route-forbidden"');
+    expect(leagueAdmin.html).not.toContain('data-testid="admin-listone-refresh"');
+    expect(leagueAdmin.html).not.toContain("Aggiorna listone");
+    expect(startAdminListoneRefreshMock).not.toHaveBeenCalled();
+    leagueAdmin.unmount();
+
+    fetchAdminListoneMock.mockResolvedValue([]);
+    const operator = await renderAppAt("/admin/listone", OPERATOR);
+    expect(operator.html).toContain('data-testid="admin-listone-refresh"');
+    expect(operator.html).toContain("Aggiorna listone dal provider");
+    operator.unmount();
   });
 
   it("allows an operator session into /admin with real overview data", async () => {

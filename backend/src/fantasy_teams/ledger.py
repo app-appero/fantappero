@@ -8,6 +8,7 @@ from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app.text_folding import repair_provider_text
 from auth.exceptions import ValidationAuthError
 from database.enums import CreditLedgerReason
 from fantasy_teams.models import CreditAccount, CreditLedgerEntry, FantasyTeam
@@ -82,14 +83,22 @@ _LIVE_WIN_TRANSACTION_PREFIX = "market-live:"
 
 
 def ledger_note_for_display(entry: CreditLedgerEntry) -> str | None:
-    """Nota del movimento da mostrare a web e app."""
+    """Nota del movimento da mostrare a web e app.
+
+    Le note scritte dal sistema contengono il nome del calciatore com'era salvato: fino al
+    22/11 a volte con la codifica rovinata dal fornitore («Assegnazione L. JovanoviÄ\\x87»,
+    «D. O&apos;Shea», «N. Kovač \\x8d»). Il registro non si riscrive: si ripara qui, alla
+    lettura. La nota libera dell'amministratore (rettifica manuale) resta com'è scritta.
+    """
     if (
         entry.reason == CreditLedgerReason.MARKET_AUCTION_WIN
         and entry.note == _LEGACY_LIVE_WIN_NOTE
         and entry.transaction_id.startswith(_LIVE_WIN_TRANSACTION_PREFIX)
     ):
         return _LIVE_WIN_NOTE
-    return entry.note
+    if entry.note is None or entry.reason == CreditLedgerReason.ADMIN_ADJUSTMENT:
+        return entry.note
+    return repair_provider_text(entry.note)
 
 
 def reconstruct_balance(session: Session, account_id: UUID) -> int:

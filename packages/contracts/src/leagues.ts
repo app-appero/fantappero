@@ -333,7 +333,7 @@ export interface LeagueAdminPanel {
   message: string;
   rules: LeagueRules;
   lifecycle: LeagueLifecycle;
-  /** True dopo almeno un salvataggio esplicito del regolamento. */
+  /** True dopo almeno un salvataggio esplicito del regolamento, o a lega avviata (attiva o oltre). */
   configurationSaved: boolean;
 }
 

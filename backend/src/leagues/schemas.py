@@ -157,8 +157,9 @@ class LeagueAdminPanelResponse(ApiModel):
     message: str
     rules: LeagueRulesResponse
     lifecycle: LeagueLifecycleResponse
-    # True dopo almeno un salvataggio esplicito del regolamento: sblocca
-    # la tab Inviti in Amministrazione (EP13 setup a tappe).
+    # True dopo almeno un salvataggio esplicito del regolamento, o a lega
+    # avviata (attiva, conclusa, archiviata; Rosario 22/11): sblocca la tab
+    # Inviti in Amministrazione (EP13 setup a tappe).
     configuration_saved: bool = Field(alias="configurationSaved")
 
 

@@ -232,6 +232,49 @@ def test_active_state_hides_manual_conclude(
     assert manual.json()["code"] == "league_transition_blocked"
 
 
+def test_started_league_counts_as_configured_without_a_rules_save(
+    client: TestClient,
+    db_session: Session,
+    competition_ids: list[str],
+) -> None:
+    """Rosario 22/11: una lega attivata con le regole predefinite (o da altri percorsi)
+    restava «Prima salva la configurazione…» con la tab Invitati bloccata, perché
+    configurationSaved guardava solo il salvataggio del regolamento."""
+    owner_token, _ = _register_and_login(client, "lifecycle.configured@example.com")
+    league_id = _create_league(client, owner_token, competition_ids, "Lega Avviata")
+
+    def configuration_saved() -> bool:
+        panel = client.get(
+            f"/leagues/{league_id}/amministrazione",
+            headers={"Authorization": f"Bearer {owner_token}"},
+        )
+        assert panel.status_code == 200
+        return panel.json()["configurationSaved"]
+
+    def set_state(state: LeagueState) -> None:
+        league = db_session.get(League, UUID(league_id))
+        assert league is not None
+        league.state = state
+        db_session.commit()
+
+    rules_saved = db_session.scalar(
+        select(func.count(LeagueAuditEvent.id)).where(
+            LeagueAuditEvent.league_id == UUID(league_id),
+            LeagueAuditEvent.action == LeagueAuditAction.LEAGUE_RULES_UPDATED,
+        )
+    )
+    assert rules_saved == 0
+
+    # Bozza o configurazione senza regolamento salvato: ancora da configurare.
+    for state in (LeagueState.DRAFT, LeagueState.CONFIGURING, LeagueState.AUCTION):
+        set_state(state)
+        assert configuration_saved() is False, state
+    # Da lega avviata in poi conta come configurata.
+    for state in (LeagueState.ACTIVE, LeagueState.CONCLUDED, LeagueState.ARCHIVED):
+        set_state(state)
+        assert configuration_saved() is True, state
+
+
 def test_invalid_transition_is_rejected(
     client: TestClient,
     competition_ids: list[str],

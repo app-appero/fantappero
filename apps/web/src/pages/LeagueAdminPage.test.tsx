@@ -196,6 +196,17 @@ describe("EP03-02 league admin page", () => {
     expect(html).not.toContain('data-testid="league-home-roster-link"');
   });
 
+  it("a configurazione salvata (o lega avviata) niente «Prima salva…» e la tab Invitati è attiva (22/11)", () => {
+    // Il server dà configurationSaved anche a una lega attiva senza regolamento salvato.
+    const html = renderRoute("/lega/amministrazione?persona=admin&partecipanti");
+    expect(html).toContain("Prossime fasi");
+    expect(html).not.toContain('data-testid="league-admin-save-first"');
+    expect(html).not.toContain("Prima salva la configurazione della lega");
+    expect(html).toContain('id="tab-invitati"');
+    expect(html).not.toMatch(/id="tab-invitati"[^>]*disabled/);
+    expect(html).not.toContain('data-testid="league-admin-invites-locked"');
+  });
+
   it("a lega non al completo l'interruttore «Mercato aperto» è disattivato e spiega perché (20/11)", () => {
     const html = renderRoute("/lega/amministrazione?persona=admin&mercato=incompleto");
     expect(html).toContain('data-testid="league-admin-market"');

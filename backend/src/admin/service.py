@@ -561,6 +561,8 @@ class AdminService:
             "seasonYear": league.season_year,
             "deletedByOperator": True,
         }
+        # Prima del DELETE: partecipanti e invitati in attesa (la loro notifica «Nuovo
+        # invito» si toglie, QA 22/11) si leggono finché la lega c'è.
         notify_league_deleted(self._session, league=league)
         self._session.add(
             LeagueAuditEvent(

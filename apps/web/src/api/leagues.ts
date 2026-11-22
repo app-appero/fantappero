@@ -315,6 +315,11 @@ export function fetchLeagueListone(
   });
 }
 
+/**
+ * Solo per l'operatore (Rosario 22/11): il listone vale per tutte le leghe della stagione e
+ * all'amministratore di lega il server risponde 403 «Solo l'operatore può aggiornare il
+ * listone.». Nessuna pagina di lega lo usa: l'operatore aggiorna da /admin/listone.
+ */
 export function startLeagueListoneRefresh(
   accessToken: string,
   leagueId: string,
