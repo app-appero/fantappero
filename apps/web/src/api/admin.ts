@@ -17,7 +17,12 @@ import type {
   AdminListoneRefreshProgress,
   AdminListoneRoleRestoreRequest,
   AdminListoneRoleRestoreResult,
+  AdminMarketValuesRefreshRequest,
+  AdminMarketValuesRefreshResult,
   AdminOverview,
+  AdminSeasonHistoryImportRequest,
+  AdminSeasonHistoryImportResponse,
+  AdminSeasonHistoryProgress,
   AdminResultRecoveryJob,
   AdminResultRecoveryProgress,
   AdminResultRecoveryResult,
@@ -179,6 +184,52 @@ export function fetchActiveAdminListoneRefresh(
 ): Promise<AdminListoneRefreshProgress | null> {
   return apiRequest<AdminListoneRefreshProgress | null>(`/admin/listone/aggiorna`, {
     accessToken,
+  });
+}
+
+// --- Storico stagioni dal fornitore, media stagionale e Valore (1.3) ---
+
+/**
+ * «Storico stagioni»: con `dryRun` (default) solo il conto delle chiamate, senza chiamare il
+ * fornitore; con `dryRun: false` avvia il job (o restituisce quello già in corso).
+ */
+export function importAdminSeasonHistory(
+  accessToken: string,
+  body: AdminSeasonHistoryImportRequest,
+): Promise<AdminSeasonHistoryImportResponse> {
+  return apiRequest<AdminSeasonHistoryImportResponse>("/admin/listone/storico", {
+    accessToken,
+    method: "POST",
+    body,
+  });
+}
+
+/** L'import dello storico in corso, per ogni operatore (non solo chi l'ha avviato); `null` se nessuno. */
+export function fetchActiveAdminSeasonHistory(
+  accessToken: string,
+): Promise<AdminSeasonHistoryProgress | null> {
+  return apiRequest<AdminSeasonHistoryProgress | null>("/admin/listone/storico", { accessToken });
+}
+
+export function fetchAdminSeasonHistoryProgress(
+  accessToken: string,
+  jobId: string,
+): Promise<AdminSeasonHistoryProgress> {
+  return apiRequest<AdminSeasonHistoryProgress>(
+    `/admin/listone/storico/${encodeURIComponent(jobId)}`,
+    { accessToken },
+  );
+}
+
+/** «Ricalcola valori»: medie stagionali e Valore del listone, subito (senza chiamare il fornitore). */
+export function refreshAdminMarketValues(
+  accessToken: string,
+  body: AdminMarketValuesRefreshRequest,
+): Promise<AdminMarketValuesRefreshResult> {
+  return apiRequest<AdminMarketValuesRefreshResult>("/admin/listone/valori/ricalcola", {
+    accessToken,
+    method: "POST",
+    body,
   });
 }
 

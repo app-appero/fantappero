@@ -9709,6 +9709,408 @@ body:has(.fa-listone-refresh-bar) .fa-page-container {
   }
 }
 
+/* Valore e media 1.3 */
+/* ══ Valore di mercato, media stagionale e carriera (release 1.3, canvas «Proposte 1.3»,
+   Rosario 21–22/11) ══════════════════════════════════════════════════════════════════
+   In ogni riga del mercato «Valore N» in ambra e la media voto: verde se è della stagione in
+   corso, rossa con la stagione («6,12 · 25/26») se è quella della stagione scorsa. Testo nel
+   colore pieno su un fondo tenue dello stesso colore: almeno 4,5:1 in tutti e due i temi.
+   Sotto il prezzo la riga «Valore N: hai solo X crediti». Poi la carriera della scheda
+   calciatore e «Storico stagioni» del pannello operatore. Tutto regge a 390px. */
+:root {
+  --fa-market-value-color: #ffd166;
+  --fa-market-current-color: var(--fa-success-500);
+  --fa-market-previous-color: #ff9a9a;
+}
+
+[data-color-scheme="light"] {
+  --fa-market-value-color: var(--fa-warning-700);
+  --fa-market-current-color: #08765a;
+  --fa-market-previous-color: var(--fa-danger-600);
+}
+
+.fa-market-tags {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem 0.375rem;
+  margin-top: 0.2rem;
+  white-space: normal;
+}
+
+.fa-market-tags--inline {
+  display: inline-flex;
+  margin: 0 0 0 0.375rem;
+  vertical-align: middle;
+}
+
+.fa-market-value,
+.fa-season-avg {
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
+  padding: 0.0625rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  line-height: 1.35;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.fa-market-value {
+  color: var(--fa-market-value-color);
+  background: color-mix(in srgb, var(--fa-market-value-color) 14%, transparent);
+}
+
+.fa-season-avg--current {
+  color: var(--fa-market-current-color);
+  background: color-mix(in srgb, var(--fa-market-current-color) 14%, transparent);
+}
+
+.fa-season-avg--previous {
+  color: var(--fa-market-previous-color);
+  background: color-mix(in srgb, var(--fa-market-previous-color) 14%, transparent);
+}
+
+.fa-season-avg--none {
+  padding-inline: 0;
+  color: var(--fa-color-foreground-muted);
+  font-weight: 400;
+}
+
+.fa-season-avg__label {
+  font-weight: 600;
+  white-space: pre;
+}
+
+.fa-market-hint {
+  margin: 0.25rem 0 0;
+  color: var(--fa-market-value-color);
+  font-size: var(--fa-text-xs);
+  line-height: 1.4;
+}
+
+.fa-market-hint--row {
+  display: block;
+  margin-top: 0.2rem;
+  font-size: 0.6875rem;
+  line-height: 1.3;
+  white-space: normal;
+}
+
+/* Prezzo ancora quello proposto dal Valore (non toccato): bordo ambra come nel canvas. */
+.fa-roster-price-input--suggested {
+  border-color: var(--fa-market-value-color);
+  color: var(--fa-market-value-color);
+  font-weight: 700;
+}
+
+/* «Solo disponibili» e «Ordina per media» affiancati; il conto va a capo a destra se serve. */
+.fa-listone-filters__free-row {
+  flex-wrap: wrap;
+}
+
+.fa-listone-filters__checks {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  column-gap: var(--fa-space-md);
+  min-width: 0;
+}
+
+.fa-listone-filters__checks .fa-roster-listone__free {
+  margin-top: 0;
+}
+
+.fa-listone-filters__free-row .fa-listone-filters__count {
+  margin-left: auto;
+}
+
+/* Colonna «Valore e media» del listone (tabella). */
+.fa-roster-table--listone .fa-roster-col--value {
+  white-space: normal;
+}
+
+.fa-roster-table--listone td.fa-roster-col--value .fa-market-tags {
+  margin-top: 0;
+}
+
+@container fa-roster-table (max-width: 38rem) {
+  .fa-roster-table--listone .fa-roster-col--value {
+    width: 6.25rem;
+    overflow: visible;
+    white-space: normal;
+  }
+
+  /* Con la colonna in più il nome resta il più largo: club e stato si stringono. */
+  .fa-roster-table--with-value .fa-roster-col--club {
+    width: 20%;
+  }
+
+  .fa-roster-table--with-value .fa-roster-col--status {
+    width: 4.5rem;
+  }
+
+  /* In colonna stretta l'intestazione dice già «Valore»: si legge solo il numero della media. */
+  .fa-roster-table--listone .fa-roster-col--value .fa-season-avg__label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    border: 0;
+  }
+}
+
+/* Telefono (righe su più righe, vedi [Rosa/Mercato 10]): Valore e media in una terza riga
+   sotto club e stato, allineati al nome; la riga «hai solo X crediti» a tutta larghezza. */
+@container fa-roster-table (max-width: 30rem) {
+  .fa-roster-table--listone > tbody > tr {
+    grid-template-rows: minmax(1.25rem, auto) auto auto;
+  }
+
+  .fa-roster-table--listone td.fa-roster-col--value {
+    grid-column: 1 / -1;
+    grid-row: 3;
+    width: auto;
+    padding: 0.25rem 0 0 2.85rem;
+    overflow: visible;
+  }
+
+  .fa-roster-table--with-value td.fa-roster-col--club,
+  .fa-roster-table--with-value td.fa-roster-col--status {
+    width: auto;
+  }
+
+  .fa-roster-table--listone .fa-roster-col--value .fa-season-avg__label {
+    position: static;
+    width: auto;
+    height: auto;
+    margin: 0;
+    overflow: visible;
+    clip: auto;
+  }
+}
+
+/* Offerte (buste e svincolati): nome nelle tabelle delle offerte con Valore e media sotto. */
+.fa-roster-table .fa-roster-col--name .fa-market-tags {
+  white-space: normal;
+}
+
+/* Modulo d'offerta: il calciatore scelto, Valore e media, e la riga sul prezzo proposto. */
+.fa-market-offer {
+  display: grid;
+  gap: 0.25rem;
+  min-width: 0;
+  padding: var(--fa-space-sm) var(--fa-space-md);
+  border: 1px solid var(--fa-color-border);
+  border-radius: var(--fa-radius-md);
+  background: color-mix(in srgb, var(--fa-color-foreground) 4%, transparent);
+}
+
+.fa-market-offer__selected {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.fa-market-offer__club {
+  color: var(--fa-color-foreground-muted);
+}
+
+.fa-market-offer .fa-market-tags,
+.fa-market-offer .fa-market-hint {
+  margin: 0;
+}
+
+/* Asta live: Valore e media sotto il nome al centro del tavolo e in cima al lotto. */
+.fa-live-auction-table__value {
+  justify-content: center;
+  margin-top: 0.25rem;
+}
+
+.fa-auction-live-lot__value {
+  margin: 0 0 var(--fa-space-sm);
+}
+
+.fa-auction-live-history .fa-market-tags {
+  margin-top: 0.125rem;
+}
+
+/* Scambi: nome e, sotto, Valore e media; il prezzo d'acquisto resta a destra. */
+.fa-trade-athlete-list__who {
+  display: grid;
+  justify-items: start;
+  min-width: 0;
+}
+
+/* Scheda calciatore: «Valore N» sotto il club e la carriera. */
+.fa-athlete-card__hero .fa-market-value {
+  margin-top: 0.3rem;
+}
+
+.fa-athlete-career__table-wrap {
+  overflow-x: auto;
+}
+
+.fa-athlete-career__table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8125rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.fa-athlete-career__table th,
+.fa-athlete-career__table td {
+  padding: 0.375rem 0.25rem;
+  border-bottom: 1px solid var(--fa-color-border);
+  color: var(--fa-color-foreground-muted);
+  text-align: left;
+  vertical-align: bottom;
+  white-space: nowrap;
+}
+
+/* Le nove colonne del portiere stanno nella scheda (36rem): intestazioni, squadra e
+   campionato vanno a capo invece di far scorrere la tabella. */
+.fa-athlete-career__table th,
+.fa-athlete-career__table td:nth-child(2),
+.fa-athlete-career__table td:nth-child(3) {
+  white-space: normal;
+}
+
+.fa-athlete-career__table th {
+  font-size: 0.625rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  line-height: 1.25;
+  text-transform: uppercase;
+}
+
+.fa-athlete-career__table abbr {
+  text-decoration: none;
+  cursor: help;
+}
+
+.fa-athlete-career__table .fa-athlete-career__num {
+  text-align: right;
+}
+
+.fa-athlete-career__table .fa-athlete-career__row--current td {
+  color: var(--fa-color-foreground);
+  font-weight: 700;
+}
+
+.fa-athlete-career__cards {
+  display: none;
+  gap: var(--fa-space-sm);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.fa-athlete-career__card {
+  display: grid;
+  gap: 0.25rem;
+  padding: 0.5rem 0.625rem;
+  border: 1px solid var(--fa-color-border);
+  border-radius: var(--fa-radius-md);
+  background: var(--fa-color-background-elevated);
+}
+
+.fa-athlete-career__card--current {
+  border-color: var(--fa-color-accent);
+}
+
+.fa-athlete-career__card-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: var(--fa-space-sm);
+  margin: 0;
+  font-size: var(--fa-text-sm);
+}
+
+.fa-athlete-career__card-head span {
+  color: var(--fa-color-foreground-muted);
+  font-size: var(--fa-text-xs);
+  text-align: right;
+}
+
+.fa-athlete-career__card-line {
+  margin: 0;
+  color: var(--fa-color-foreground-muted);
+  font-size: 0.8125rem;
+  line-height: 1.45;
+  font-variant-numeric: tabular-nums;
+}
+
+.fa-athlete-career__card-line b {
+  color: var(--fa-color-foreground);
+}
+
+@media (max-width: 600px) {
+  .fa-athlete-career__table-wrap {
+    display: none;
+  }
+
+  .fa-athlete-career__cards {
+    display: grid;
+  }
+}
+
+/* Pannello operatore, Listone: «Storico stagioni» (stessa struttura di «Ripristina i ruoli»). */
+.fa-season-history__summary {
+  margin: 0;
+  padding: var(--fa-space-sm) var(--fa-space-md);
+  border-radius: var(--fa-radius-md);
+  background: color-mix(in srgb, var(--fa-color-foreground) 5%, transparent);
+  line-height: 1.5;
+}
+
+.fa-season-history__seasons {
+  display: grid;
+  gap: 0.25rem;
+  margin: 0;
+  padding-left: 1.1rem;
+  color: var(--fa-color-foreground-muted);
+  font-size: var(--fa-text-sm);
+  line-height: 1.45;
+}
+
+.fa-season-history__seasons strong {
+  color: var(--fa-color-foreground);
+}
+
+.fa-season-history__progress {
+  display: grid;
+  gap: var(--fa-space-xs);
+  margin-bottom: var(--fa-space-md);
+}
+
+.fa-season-history__progress .fa-progress-bar {
+  height: 0.5rem;
+}
+
+/* La percentuale si legge nella riga sotto, non sopra il riempimento (contrasto). */
+.fa-season-history__progress .fa-progress-bar__label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  border: 0;
+}
+
+.fa-season-history__progress p {
+  margin: 0;
+  color: var(--fa-color-foreground-muted);
+  font-size: var(--fa-text-sm);
+}
+
 /* ══ iPhone: sito aggiunto alla schermata Home (si apre come un'app) ═══════════
    Con viewport-fit=cover la pagina arriva sotto notch, angoli arrotondati e
    indicatore Home: env(safe-area-inset-*) dice quanto spazio lasciare libero.

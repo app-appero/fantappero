@@ -22,6 +22,10 @@ vi.mock("../api/admin", () => ({
   fetchAdminListone: (...args: unknown[]) => fetchAdminListoneMock(...args),
   updateAdminListoneRolesFromProvider: (...args: unknown[]) => updateRolesMock(...args),
   restoreAdminListoneRoles: vi.fn(),
+  fetchActiveAdminSeasonHistory: vi.fn().mockResolvedValue(null),
+  fetchAdminSeasonHistoryProgress: vi.fn(),
+  importAdminSeasonHistory: vi.fn(),
+  refreshAdminMarketValues: vi.fn(),
 }));
 vi.mock("../auth/sessionStorage", () => ({
   loadStoredSession: () => ({ accessToken: "token-op" }),

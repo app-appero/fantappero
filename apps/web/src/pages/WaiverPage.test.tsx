@@ -25,6 +25,7 @@ vi.mock("../api/leagues", () => ({
   refreshLeagueListone: vi.fn(),
   fetchMyCredits: vi.fn(),
   fetchMyFantasyTeam: vi.fn(),
+  fetchRosterOccupancy: vi.fn().mockResolvedValue([]),
 }));
 
 vi.mock("../api/market", () => ({

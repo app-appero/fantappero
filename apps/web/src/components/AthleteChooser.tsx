@@ -3,6 +3,7 @@ import { foldSearchText } from "../utils/searchText";
 import type { FantasyRole, LeagueListoneEntry } from "@fantappero/contracts";
 import { PlayerPhotoBadge } from "@fantappero/ui";
 import { useEffect, useMemo, useState } from "react";
+import { AthleteMarketTags } from "../market/AthleteValueTags";
 
 const PAGE_SIZE = 10;
 const ROLE_PILLS: Array<{ value: "all" | FantasyRole; label: string }> = [
@@ -120,6 +121,8 @@ export function AthleteChooser({
                       riga e, toccato, aprirebbe la scheda invece di scegliere il calciatore. */}
                   <span>{entry.canonicalName}</span>
                   {entry.clubName ? <small>{entry.clubName}</small> : null}
+                  {/* Valore e media stagionale (1.3): solo mostrati, la scelta resta il tocco. */}
+                  <AthleteMarketTags marketValue={entry.marketValue} seasonAverage={entry.seasonAverage} />
                 </span>
               </button>
             </li>

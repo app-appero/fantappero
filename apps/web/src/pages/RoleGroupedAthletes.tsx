@@ -1,4 +1,6 @@
+import type { AthleteSeasonAverage } from "@fantappero/contracts";
 import { AthleteName } from "../athletes/AthleteCard";
+import { AthleteMarketTags } from "../market/AthleteValueTags";
 
 const ROLES: Array<{ role: string; title: string }> = [
   { role: "P", title: "Portieri" },
@@ -12,6 +14,9 @@ export type RoleGroupedRow = {
   name: string;
   role: string | null;
   price: number | null;
+  /** Valore di mercato e media stagionale (1.3), dal listone della lega. */
+  marketValue?: number | null;
+  seasonAverage?: AthleteSeasonAverage | null;
 };
 
 /** Elenco selezionabile di calciatori diviso per ruolo (Portieri → Attaccanti), come nell'app. */
@@ -52,7 +57,10 @@ export function RoleGroupedAthletes({
                   disabled={disabled}
                   onChange={() => onToggle(row.athleteId)}
                 />
-                <AthleteName athleteId={row.athleteId}>{row.name}</AthleteName>
+                <span className="fa-trade-athlete-list__who">
+                  <AthleteName athleteId={row.athleteId}>{row.name}</AthleteName>
+                  <AthleteMarketTags marketValue={row.marketValue} seasonAverage={row.seasonAverage} />
+                </span>
                 {row.price != null ? <span className="fa-trade-role__price">{row.price}</span> : null}
               </label>
             ))}

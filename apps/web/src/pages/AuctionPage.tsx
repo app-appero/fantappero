@@ -36,6 +36,8 @@ import { getApiErrorMessage, useAuth } from "../auth/AuthContext";
 import { loadStoredSession } from "../auth/sessionStorage";
 import { useMarketGate } from "../market/MarketGateContext";
 import { useMarketSessionFlow } from "../market/useMarketSessionFlow";
+import { AthleteMarketTags } from "../market/AthleteValueTags";
+import { OfferValueSummary, useValuePrefilledBid } from "../market/useValuePrefilledBid";
 import { useLocation } from "../router/simpleRouter";
 import { parseWireframeStateFromSearch } from "../wireframes/useWireframeState";
 
@@ -264,8 +266,10 @@ export function AuctionPage() {
     });
   }
 
-  const [bidAthleteId, setBidAthleteId] = useState("");
-  const [bidAmount, setBidAmount] = useState("");
+  // L'offerta parte dal Valore del calciatore scelto, o dai crediti rimasti se sono meno (1.3).
+  const bidForm = useValuePrefilledBid(entries, balance);
+  const bidAthleteId = bidForm.athleteId;
+  const bidAmount = bidForm.amount;
 
   function handleSubmitBid(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -274,10 +278,17 @@ export function AuctionPage() {
       return;
     }
     void flow.submitBid(bidAthleteId, { amountCredits: amount }).then(() => {
-      setBidAthleteId("");
-      setBidAmount("");
+      bidForm.reset();
     });
   }
+
+  const bidMarketByAthleteId = useMemo(() => {
+    const map = new Map<string, LeagueListoneEntry>();
+    for (const entry of entries) {
+      map.set(entry.athleteId, entry);
+    }
+    return map;
+  }, [entries]);
 
   const athleteNameById = useMemo(() => {
     const map = new Map<string, string>();
@@ -478,7 +489,7 @@ export function AuctionPage() {
                         entries={entries}
                         ownedAthleteIds={ownedAthleteIds}
                         selected={bidAthleteId ? [bidAthleteId] : []}
-                        onToggle={(id) => setBidAthleteId(id === bidAthleteId ? "" : id)}
+                        onToggle={(id) => bidForm.selectAthlete(id === bidAthleteId ? "" : id)}
                         single
                       />
                     )}
@@ -488,7 +499,16 @@ export function AuctionPage() {
               bidLabel="Offerta (crediti)"
               bidPlaceholder="Es. 45"
               bidValue={isDemoMode ? undefined : bidAmount}
-              onBidChange={isDemoMode ? undefined : (event) => setBidAmount(event.target.value)}
+              onBidChange={isDemoMode ? undefined : (event) => bidForm.changeAmount(event.target.value)}
+              extraField={
+                isDemoMode ? undefined : (
+                  <OfferValueSummary
+                    selected={bidForm.selected}
+                    prefill={bidForm.prefill}
+                    testId="auction-bid-value"
+                  />
+                )
+              }
               onSubmit={isDemoMode ? undefined : handleSubmitBid}
               submitting={flow.bidSubmitting}
               disabled={isDemoMode || !flow.currentSession}
@@ -531,6 +551,12 @@ export function AuctionPage() {
                       <AthleteName athleteId={bid.athleteId}>
                         {athleteNameById.get(bid.athleteId) ?? bid.athleteName}
                       </AthleteName>
+                      <AthleteMarketTags
+                        marketValue={bid.marketValue ?? bidMarketByAthleteId.get(bid.athleteId)?.marketValue}
+                        seasonAverage={
+                          bid.seasonAverage ?? bidMarketByAthleteId.get(bid.athleteId)?.seasonAverage
+                        }
+                      />
                     </TableCell>
                     <TableCell className="fa-roster-col fa-roster-col--credits">
                       <RosterColLabel full={`${bid.amountCredits} crediti`} short={String(bid.amountCredits)} />

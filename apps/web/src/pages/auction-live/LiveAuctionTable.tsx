@@ -9,6 +9,7 @@ import {
   resolveLiveSeatCue,
 } from "@fantappero/contracts";
 import { AthleteName } from "../../athletes/AthleteCard";
+import { AthleteMarketTags } from "../../market/AthleteValueTags";
 
 function seatPosition(index: number, total: number): { left: string; top: string } {
   const angle = (index / total) * 2 * Math.PI - Math.PI / 2;
@@ -60,6 +61,13 @@ export function LiveAuctionTable({
               <p className="fa-live-auction-table__athlete">
                 <AthleteName athleteId={currentLot.athleteId}>{currentLot.athleteName}</AthleteName>
               </p>
+              {/* Valore solo mostrato (1.3): i rilanci restano liberi. */}
+              <AthleteMarketTags
+                className="fa-live-auction-table__value"
+                marketValue={currentLot.marketValue}
+                seasonAverage={currentLot.seasonAverage}
+                testId="auction-live-table-value"
+              />
               <p className="fa-live-auction-table__amount">{currentLot.currentAmountCredits} crediti</p>
               {secondsRemaining !== null ? (
                 <p className="fa-live-auction-table__countdown">{secondsRemaining}s</p>

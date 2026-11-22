@@ -1,4 +1,5 @@
 import type {
+  AthleteMarketFields,
   FantasyTeam,
   FantasyTeamSummary,
   LeagueListoneEntry,
@@ -35,6 +36,7 @@ import { RoleGroupedAthletes } from "./RoleGroupedAthletes";
 import { getApiErrorMessage, useAuth } from "../auth/AuthContext";
 import { loadStoredSession } from "../auth/sessionStorage";
 import { useMarketGate } from "../market/MarketGateContext";
+import { AthleteMarketTags } from "../market/AthleteValueTags";
 import { useMarketHistory } from "../market/useMarketHistory";
 import {
   TRADE_ACCEPT_CANCEL_LABEL,
@@ -273,6 +275,15 @@ export function MarketPage() {
     const map = new Map<string, string>();
     for (const entry of listoneEntries) {
       map.set(entry.athleteId, entry.canonicalName);
+    }
+    return map;
+  }, [listoneEntries]);
+
+  // Valore e media stagionale (1.3) dal listone, per le righe della proposta di scambio.
+  const marketFieldsById = useMemo(() => {
+    const map = new Map<string, AthleteMarketFields>();
+    for (const entry of listoneEntries) {
+      map.set(entry.athleteId, { marketValue: entry.marketValue, seasonAverage: entry.seasonAverage });
     }
     return map;
   }, [listoneEntries]);
@@ -790,7 +801,7 @@ export function MarketPage() {
                       <p>Nessun giocatore in rosa da offrire.</p>
                     ) : (
                       <RoleGroupedAthletes
-                        rows={ownedSlots.map((slot) => ({ athleteId: slot.athleteId as string, name: slot.athleteName ?? "Giocatore", role: slot.role ?? roleByAthleteId.get(slot.athleteId as string) ?? null, price: slot.purchaseCredits ?? null }))}
+                        rows={ownedSlots.map((slot) => ({ athleteId: slot.athleteId as string, name: slot.athleteName ?? "Giocatore", role: slot.role ?? roleByAthleteId.get(slot.athleteId as string) ?? null, price: slot.purchaseCredits ?? null, ...marketFieldsById.get(slot.athleteId as string) }))}
                         checked={offeredAthleteIds}
                         onToggle={(id) => setOfferedAthleteIds((prev) => toggleAthleteId(prev, id))}
                       />
@@ -858,7 +869,7 @@ export function MarketPage() {
                     !recipientRosterError &&
                     recipientPlayers.length > 0 ? (
                       <RoleGroupedAthletes
-                        rows={recipientPlayers.map((athlete) => ({ athleteId: athlete.athleteId, name: athlete.athleteName, role: roleByAthleteId.get(athlete.athleteId) ?? null, price: athlete.purchaseCredits ?? null }))}
+                        rows={recipientPlayers.map((athlete) => ({ athleteId: athlete.athleteId, name: athlete.athleteName, role: roleByAthleteId.get(athlete.athleteId) ?? null, price: athlete.purchaseCredits ?? null, ...marketFieldsById.get(athlete.athleteId) }))}
                         checked={requestedAthleteIds}
                         disabled={ownedSlots.length === 0}
                         onToggle={(id) => setRequestedAthleteIds((prev) => toggleAthleteId(prev, id))}
@@ -1022,6 +1033,11 @@ export function MarketPage() {
                               <span key={athlete.id}>
                                 {index > 0 ? ", " : null}
                                 <AthleteName athleteId={athlete.id}>{athlete.name}</AthleteName>
+                                <AthleteMarketTags
+                                  className="fa-market-tags--inline"
+                                  marketValue={athlete.marketValue ?? marketFieldsById.get(athlete.id)?.marketValue}
+                                  seasonAverage={athlete.seasonAverage ?? marketFieldsById.get(athlete.id)?.seasonAverage}
+                                />
                               </span>
                             ))}
                         {proposal.offeredCredits > 0 ? ` + ${proposal.offeredCredits} crediti` : ""}
@@ -1034,6 +1050,11 @@ export function MarketPage() {
                               <span key={athlete.id}>
                                 {index > 0 ? ", " : null}
                                 <AthleteName athleteId={athlete.id}>{athlete.name}</AthleteName>
+                                <AthleteMarketTags
+                                  className="fa-market-tags--inline"
+                                  marketValue={athlete.marketValue ?? marketFieldsById.get(athlete.id)?.marketValue}
+                                  seasonAverage={athlete.seasonAverage ?? marketFieldsById.get(athlete.id)?.seasonAverage}
+                                />
                               </span>
                             ))}
                         {proposal.requestedCredits > 0 ? ` + ${proposal.requestedCredits} crediti` : ""}
@@ -1124,7 +1145,7 @@ export function MarketPage() {
                               <fieldset>
                                 <legend>Giocatori offerti nella controproposta</legend>
                                 <RoleGroupedAthletes
-                                  rows={ownedSlots.map((slot) => ({ athleteId: slot.athleteId as string, name: slot.athleteName ?? "Giocatore", role: slot.role ?? roleByAthleteId.get(slot.athleteId as string) ?? null, price: slot.purchaseCredits ?? null }))}
+                                  rows={ownedSlots.map((slot) => ({ athleteId: slot.athleteId as string, name: slot.athleteName ?? "Giocatore", role: slot.role ?? roleByAthleteId.get(slot.athleteId as string) ?? null, price: slot.purchaseCredits ?? null, ...marketFieldsById.get(slot.athleteId as string) }))}
                                   checked={counterOfferedAthleteIds}
                                   onToggle={(id) => setCounterOfferedAthleteIds((prev) => toggleAthleteId(prev, id))}
                                 />
@@ -1136,7 +1157,7 @@ export function MarketPage() {
                                 <RoleGroupedAthletes
                                   rows={occupancy
                                     .filter((entry) => entry.fantasyTeamId === proposal.proposerTeamId)
-                                    .map((entry) => ({ athleteId: entry.athleteId, name: entry.athleteName ?? athleteNameById.get(entry.athleteId) ?? "Giocatore", role: roleByAthleteId.get(entry.athleteId) ?? null, price: entry.purchaseCredits ?? null }))}
+                                    .map((entry) => ({ athleteId: entry.athleteId, name: entry.athleteName ?? athleteNameById.get(entry.athleteId) ?? "Giocatore", role: roleByAthleteId.get(entry.athleteId) ?? null, price: entry.purchaseCredits ?? null, ...marketFieldsById.get(entry.athleteId) }))}
                                   checked={counterRequestedAthleteIds}
                                   onToggle={(id) => setCounterRequestedAthleteIds((prev) => toggleAthleteId(prev, id))}
                                 />
