@@ -13,6 +13,8 @@ import type {
   AdminListoneEntry,
   AdminListoneRefreshJob,
   AdminListoneRefreshProgress,
+  AdminListoneRoleRestoreRequest,
+  AdminListoneRoleRestoreResult,
   AdminOverview,
   AdminResultRecoveryJob,
   AdminResultRecoveryProgress,
@@ -137,6 +139,18 @@ export function fetchAdminListoneRefreshProgress(
 ): Promise<AdminListoneRefreshProgress> {
   return apiRequest<AdminListoneRefreshProgress>(`/admin/listone/aggiorna/${jobId}`, {
     accessToken,
+  });
+}
+
+/** «Ripristina i ruoli cambiati da un aggiornamento»: anteprima (`dryRun`) o ripristino. */
+export function restoreAdminListoneRoles(
+  accessToken: string,
+  body: AdminListoneRoleRestoreRequest,
+): Promise<AdminListoneRoleRestoreResult> {
+  return apiRequest<AdminListoneRoleRestoreResult>("/admin/listone/ripristina-ruoli", {
+    accessToken,
+    method: "POST",
+    body,
   });
 }
 

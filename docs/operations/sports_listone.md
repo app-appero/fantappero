@@ -72,6 +72,18 @@ backend equivalenti: `GET /admin/listone?seasonYear=`, `POST /admin/listone/aggi
 `LeagueListoneService.refresh_from_provider` (stesse funzioni di sync/generate, nessun audit
 per-lega: log strutturato `listone_platform_refresh_ok`/`_failed`).
 
+**Ripristina i ruoli (22/11):** `POST /admin/listone/ripristina-ruoli` (`global:operate`) con
+`{ "seasonYear": 2026, "before": "<ISO>", "dryRun": true }`. Candidati: le assegnazioni della
+stagione aggiornate dopo `before` il cui ruolo ricostruito è diverso. Il ruolo di prima si
+ricostruisce dalle risposte salvate in `provider_snapshots` prima di `before` (`/players/squads`
+del club, se no `/players`; stesso mapping e stessa scelta del club del listone,
+`sports_data/listone/reconstruct.py`). Chi aveva già l'assegnazione ma non è ricostruibile è
+elencato «non ricostruibile» e non si tocca. Con `dryRun: false` (e `athleteIds` dell'anteprima)
+applica, ricalcola le rose (`resync_team_compositions`) e scrive l'audit di piattaforma
+(`league_listone_refreshed`, `details.operation = listone_roles_restored`, log
+`admin_listone_roles_restored`). Idempotente. Dal web: sezione «Ripristina i ruoli cambiati da
+un aggiornamento» in `/admin/listone`.
+
 **Filtro per campionato lega**: la vista listone di ciascuna lega (`GET /leagues/{id}/listone`,
 consumata da Rosa/Asta/CSV import) è filtrata sui soli campionati scelti in creazione lega
 (`league.competitions`). Un atleta il cui `RoleAssignment.club_id` è noto e non milita in

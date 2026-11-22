@@ -123,6 +123,48 @@ export interface AdminListoneRefreshResult {
   counters: AdminListoneRefreshCounters;
 }
 
+/** «Ripristina i ruoli cambiati da un aggiornamento» (POST /admin/listone/ripristina-ruoli). */
+export interface AdminListoneRoleRestoreRequest {
+  seasonYear: number;
+  /** ISO 8601 con fuso orario: ruoli com'erano prima di questo momento. */
+  before: string;
+  dryRun: boolean;
+  /** Solo questi calciatori (quelli dell'anteprima confermata). */
+  athleteIds?: string[];
+}
+
+export interface AdminListoneRoleRestoreEntry {
+  athleteId: string;
+  name: string;
+  club: string | null;
+  currentRole: FantasyRole;
+  /** `null` = non ricostruibile dalle risposte salvate del fornitore. */
+  restoredRole: FantasyRole | null;
+  reconstructible: boolean;
+  restoredPosition: string | null;
+  restoredClub: string | null;
+  restoredSource: string | null;
+  /** Leghe (non concluse) in cui il calciatore è in rosa. */
+  inRosters: string[];
+}
+
+export interface AdminListoneRoleRestoreCounts {
+  toRestore: number;
+  notReconstructible: number;
+  restored: number;
+  rostersOverQuotaNow: number;
+  rostersOverQuotaAfter: number;
+  rostersResynced: number;
+}
+
+export interface AdminListoneRoleRestoreResult {
+  seasonYear: number;
+  before: string;
+  dryRun: boolean;
+  entries: AdminListoneRoleRestoreEntry[];
+  counts: AdminListoneRoleRestoreCounts;
+}
+
 export interface AdminListoneRefreshJob {
   jobId: string;
   status: string;

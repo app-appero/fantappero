@@ -1083,6 +1083,66 @@ a.fa-member-list__identity:focus-visible {
   color: var(--fa-color-foreground-muted);
 }
 
+/* «Ripristina i ruoli cambiati da un aggiornamento» (pannello operatore, 22/11). I campi sono
+   da 16px su telefono per la regola «campi da 16px» in fondo al file. */
+.fa-admin-listone-restore {
+  margin-top: var(--fa-space-lg);
+}
+
+.fa-admin-listone-restore__title {
+  margin: 0;
+  font-size: 1.1rem;
+}
+
+.fa-admin-listone-restore__intro {
+  margin: 0 0 var(--fa-space-md);
+  color: var(--fa-color-foreground-muted);
+}
+
+.fa-admin-listone-restore__form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--fa-space-sm);
+  margin-bottom: var(--fa-space-md);
+}
+
+.fa-admin-listone-restore__form .fa-field {
+  flex: 0 1 18rem;
+  min-width: 0;
+  margin: 0;
+}
+
+.fa-admin-listone-restore__preview {
+  display: grid;
+  gap: var(--fa-space-md);
+  min-width: 0;
+  overflow-x: auto;
+}
+
+.fa-admin-listone-restore__preview > .fa-btn {
+  justify-self: start;
+}
+
+.fa-admin-listone-restore__confirm {
+  display: grid;
+  gap: var(--fa-space-sm);
+  padding: var(--fa-space-md);
+  border: 1px solid var(--fa-color-border);
+  border-radius: var(--fa-radius-lg);
+  background: var(--fa-color-background-elevated);
+}
+
+.fa-admin-listone-restore__confirm p {
+  margin: 0;
+}
+
+.fa-admin-listone-restore__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--fa-space-sm);
+}
+
 .fa-listone-refresh-bar {
   position: fixed;
   bottom: 0;

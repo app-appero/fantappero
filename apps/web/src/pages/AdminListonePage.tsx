@@ -23,6 +23,7 @@ import {
 import { AthleteName } from "../athletes/AthleteCard";
 import { useCallback, useEffect, useState } from "react";
 import { useListoneRefresh } from "../admin/ListoneRefreshContext";
+import { ListoneRoleRestoreSection } from "../admin/ListoneRoleRestoreSection";
 import { fetchAdminListone } from "../api/admin";
 import { ApiError } from "../api/client";
 import { getApiErrorMessage } from "../auth/AuthContext";
@@ -352,6 +353,10 @@ export function AdminListonePage() {
           ) : null}
         </CardBody>
       </Card>
+      <ListoneRoleRestoreSection
+        seasonYear={Number.isInteger(Number(seasonYear)) ? Number(seasonYear) : null}
+        onRestored={() => void load()}
+      />
     </PageContainer>
   );
 }
