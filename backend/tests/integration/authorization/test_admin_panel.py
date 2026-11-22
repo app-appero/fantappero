@@ -369,6 +369,47 @@ def test_admin_listone_refresh_job_lifecycle_for_operator(
     assert body["errorCode"] == "provider_key_missing"
 
 
+def test_league_listone_refresh_is_operator_only(client: TestClient, db_session: Session) -> None:
+    """Rosario 22/11: il listone vale per tutte le leghe della stagione, quindi
+    «Aggiorna listone» dalla lega lo può lanciare solo l'operatore, non l'amministratore."""
+    owner_token, owner_id = _register_and_login(client, "listone.league.owner@example.com")
+    member_token, member_id = _register_and_login(client, "listone.league.member@example.com")
+    operator_token, operator_id = _register_and_login(client, "listone.league.operator@example.com")
+    _promote(db_session, operator_id)
+    league_id = _seed_league(db_session, name="Lega Listone Operatore", owner_id=owner_id)
+    db_session.add(
+        LeagueMembership(league_id=league_id, user_id=member_id, role=LeagueMemberRole.MEMBER)
+    )
+    db_session.commit()
+    start_path = f"/leagues/{league_id}/amministrazione/listone/aggiorna"
+    progress_path = f"{start_path}/00000000-0000-4000-8000-000000000123"
+
+    for path, method in ((start_path, "POST"), (progress_path, "GET")):
+        denied = client.request(method, path, headers={"Authorization": f"Bearer {owner_token}"})
+        assert denied.status_code == 403, (path, denied.text)
+        assert denied.json() == {
+            "message": "Solo l'operatore può aggiornare il listone.",
+            "code": "listone_refresh_operator_only",
+        }
+    # Il partecipante semplice resta fuori come prima.
+    member = client.post(start_path, headers={"Authorization": f"Bearer {member_token}"})
+    assert member.status_code == 403
+    assert member.json()["code"] == "forbidden"
+
+    # L'operatore, anche senza essere iscritto alla lega, avvia e segue il job.
+    # Senza API_FOOTBALL_KEY nell'ambiente di test il job eager fallisce subito.
+    started = client.post(start_path, headers={"Authorization": f"Bearer {operator_token}"})
+    assert started.status_code == 200, started.text
+    assert started.json()["status"] == "queued"
+    progress = client.get(
+        f"{start_path}/{started.json()['jobId']}",
+        headers={"Authorization": f"Bearer {operator_token}"},
+    )
+    assert progress.status_code == 200, progress.text
+    assert progress.json()["status"] == "failed"
+    assert progress.json()["errorCode"] == "provider_key_missing"
+
+
 def test_admin_listone_refresh_progress_unknown_job_not_found(
     client: TestClient, db_session: Session
 ) -> None:

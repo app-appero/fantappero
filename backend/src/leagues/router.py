@@ -14,12 +14,14 @@ from auth.dependencies import get_db_session, get_rate_limiter
 from auth.exceptions import AuthError
 from auth.models.user import User
 from auth.rate_limit import AuthRateLimiter
-from authorization.context import LeagueAccess
+from authorization.context import LeagueAccess, PermissionContext
 from authorization.dependencies import (
     get_authorization_service,
     require_league_permissions,
     require_permissions,
 )
+from authorization.exceptions import AuthorizationError
+from authorization.permissions import has_permissions
 from authorization.service import AuthorizationService
 from billing.entitlement_service import EntitlementService
 from config.settings.api import ApiSettings
@@ -74,6 +76,7 @@ from leagues.schemas import (
 )
 from leagues.service import LeagueService
 from leagues.standings_service import compute_league_standings, list_league_standings
+from observability.metrics import get_metrics
 
 router = APIRouter(prefix="/leagues", tags=["leagues"])
 
@@ -517,12 +520,36 @@ def list_league_listone(
     return service.list_entries(league_access, current_round=current_round)
 
 
+LISTONE_REFRESH_OPERATOR_ONLY_MESSAGE = "Solo l'operatore può aggiornare il listone."
+
+
+def require_listone_refresh_operator(
+    league_access: LeagueAccess = Depends(require_league_permissions(Permission.LEAGUE_ADMIN)),
+) -> LeagueAccess:
+    """Aggiornamento del listone dal fornitore: solo operatore (decisione di Rosario, 22/11).
+
+    Il listone è uno solo per tutte le leghe della stagione: amministrare una lega non basta
+    per riscriverlo. All'amministratore di lega un 403 con il motivo; l'operatore passa,
+    anche se non è iscritto alla lega. Stesso permesso di ``POST /admin/listone/aggiorna``.
+    """
+    context = PermissionContext.for_user(league_access.user, league_access=league_access)
+    if not has_permissions(context, (Permission.GLOBAL_OPERATE,)):
+        get_metrics().incr(
+            "authorization_denied_total",
+            labels={"reason": "forbidden", "permission": Permission.GLOBAL_OPERATE.value},
+        )
+        raise AuthorizationError(
+            LISTONE_REFRESH_OPERATOR_ONLY_MESSAGE, code="listone_refresh_operator_only"
+        )
+    return league_access
+
+
 @router.post(
     "/{league_id}/amministrazione/listone/aggiorna",
     response_model=LeagueListoneRefreshJobResponse,
 )
 def refresh_league_listone(
-    league_access: LeagueAccess = Depends(require_league_permissions(Permission.LEAGUE_ADMIN)),
+    league_access: LeagueAccess = Depends(require_listone_refresh_operator),
     service: LeagueListoneService = Depends(get_league_listone_service),
 ) -> LeagueListoneRefreshJobResponse | JSONResponse:
     """Avvia sync async catalogo+rose MVP e generazione listone (poll progresso)."""
@@ -538,7 +565,7 @@ def refresh_league_listone(
 )
 def get_league_listone_refresh_progress(
     job_id: UUID,
-    league_access: LeagueAccess = Depends(require_league_permissions(Permission.LEAGUE_ADMIN)),
+    league_access: LeagueAccess = Depends(require_listone_refresh_operator),
     service: LeagueListoneService = Depends(get_league_listone_service),
 ) -> LeagueListoneRefreshProgressResponse | JSONResponse:
     """Stato percentuale di un job di aggiornamento listone."""
