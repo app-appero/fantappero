@@ -20,6 +20,8 @@ from admin.schemas import (
     AdminImpersonateResponse,
     AdminImpersonationRevokeResponse,
     AdminListoneEntryResponse,
+    AdminListoneProviderRolesRequest,
+    AdminListoneProviderRolesResponse,
     AdminListoneRefreshJobResponse,
     AdminListoneRefreshProgressResponse,
     AdminListoneRoleRestoreRequest,
@@ -342,10 +344,16 @@ def list_listone(
 @router.post("/listone/aggiorna", response_model=AdminListoneRefreshJobResponse)
 def start_listone_refresh(
     season_year: int = Query(alias="seasonYear", ge=2000, le=2100),
+    update_roles: bool = Query(default=False, alias="updateRoles"),
     operator: User = Depends(require_permissions(Permission.GLOBAL_OPERATE)),
     service: AdminListoneService = Depends(get_admin_listone_service),
 ) -> AdminListoneRefreshJobResponse:
-    return service.start_refresh_job(season_year=season_year, actor=operator)
+    """Aggiorna il listone dal fornitore. I ruoli di chi c'è già restano (congelati);
+    con ``updateRoles`` il risultato porta l'anteprima dei ruoli che cambierebbero,
+    da confermare con ``POST /admin/listone/ruoli-dal-fornitore``."""
+    return service.start_refresh_job(
+        season_year=season_year, actor=operator, update_roles=update_roles
+    )
 
 
 @router.get("/listone/aggiorna", response_model=AdminListoneRefreshProgressResponse | None)
@@ -385,6 +393,25 @@ def restore_listone_roles(
             actor=operator,
             season_year=body.season_year,
             before=body.before,
+            dry_run=body.dry_run,
+            athlete_ids=body.athlete_ids,
+        )
+    except ValidationAuthError as exc:
+        return _listone_error_response(exc)
+
+
+@router.post("/listone/ruoli-dal-fornitore", response_model=AdminListoneProviderRolesResponse)
+def update_listone_roles_from_provider(
+    body: AdminListoneProviderRolesRequest,
+    operator: User = Depends(require_permissions(Permission.GLOBAL_OPERATE)),
+    service: AdminListoneRolesService = Depends(get_admin_listone_roles_service),
+) -> AdminListoneProviderRolesResponse | JSONResponse:
+    """«Aggiorna anche i ruoli dal fornitore»: ``dryRun`` (default) è l'anteprima; con
+    ``dryRun: false`` e gli ``athleteIds`` dell'anteprima applica i ruoli e ricalcola le rose."""
+    try:
+        return service.provider_roles(
+            actor=operator,
+            season_year=body.season_year,
             dry_run=body.dry_run,
             athlete_ids=body.athlete_ids,
         )

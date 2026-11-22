@@ -1143,6 +1143,54 @@ a.fa-member-list__identity:focus-visible {
   gap: var(--fa-space-sm);
 }
 
+/* «Aggiorna listone»: scelta fra ruoli congelati (default) e ruoli dal fornitore (22/11). */
+.fa-admin-listone-refresh-choice {
+  display: grid;
+  gap: var(--fa-space-sm);
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.fa-admin-listone-refresh-choice legend {
+  margin-bottom: var(--fa-space-xs);
+  font-weight: 600;
+}
+
+.fa-admin-listone-refresh-choice__option {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--fa-space-sm);
+  min-height: 44px;
+  padding: var(--fa-space-sm);
+  border: 1px solid var(--fa-color-border);
+  border-radius: var(--fa-radius-md);
+  cursor: pointer;
+}
+
+.fa-admin-listone-refresh-choice__option input {
+  flex: 0 0 auto;
+  width: 20px;
+  height: 20px;
+  margin-top: 2px;
+}
+
+.fa-admin-listone-refresh-choice__option span {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.fa-admin-listone-refresh-choice__option small {
+  color: var(--fa-color-foreground-muted);
+}
+
+.fa-admin-listone-refresh-choice__warning {
+  margin: var(--fa-space-sm) 0 0;
+  color: var(--fa-color-warning);
+  font-weight: 600;
+}
+
 .fa-listone-refresh-bar {
   position: fixed;
   bottom: 0;

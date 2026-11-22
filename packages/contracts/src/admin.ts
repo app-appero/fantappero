@@ -115,12 +115,48 @@ export interface AdminListoneRefreshCounters {
   catalogSynced: boolean;
 }
 
+/** «Aggiorna anche i ruoli dal fornitore» (POST /admin/listone/ruoli-dal-fornitore). */
+export interface AdminListoneProviderRolesRequest {
+  seasonYear: number;
+  dryRun: boolean;
+  /** Solo questi calciatori (quelli dell'anteprima confermata). */
+  athleteIds?: string[];
+}
+
+export interface AdminListoneProviderRoleEntry {
+  athleteId: string;
+  name: string;
+  club: string | null;
+  currentRole: FantasyRole;
+  newRole: FantasyRole;
+  providerPositionRaw: string | null;
+  /** Leghe (non concluse) in cui il calciatore è in rosa. */
+  inRosters: string[];
+}
+
+export interface AdminListoneProviderRolesCounts {
+  changes: number;
+  applied: number;
+  rostersOverQuotaNow: number;
+  rostersOverQuotaAfter: number;
+  rostersResynced: number;
+}
+
+export interface AdminListoneProviderRolesResult {
+  seasonYear: number;
+  dryRun: boolean;
+  entries: AdminListoneProviderRoleEntry[];
+  counts: AdminListoneProviderRolesCounts;
+}
+
 export interface AdminListoneRefreshResult {
   seasonYear: number;
   mappingVersion: string;
   refreshedAt: string;
   message: string;
   counters: AdminListoneRefreshCounters;
+  /** Con `updateRoles`: anteprima dei ruoli che cambierebbero, da confermare. */
+  roleChanges?: AdminListoneProviderRolesResult | null;
 }
 
 /** «Ripristina i ruoli cambiati da un aggiornamento» (POST /admin/listone/ripristina-ruoli). */

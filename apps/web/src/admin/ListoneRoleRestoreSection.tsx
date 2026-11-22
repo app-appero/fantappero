@@ -239,6 +239,12 @@ export function ListoneRoleRestoreSection({ seasonYear, onRestored }: Props) {
                       </TableCell>
                       <TableCell>
                         <RoleBadge role={entry.restoredRole} />
+                        {entry.restoredClub && entry.restoredClub !== entry.club ? (
+                          <small className="fa-admin-listone-restore__from">
+                            {" "}
+                            (rosa {entry.restoredClub})
+                          </small>
+                        ) : null}
                       </TableCell>
                       <TableCell>
                         {entry.inRosters.length > 0 ? entry.inRosters.join(", ") : "—"}

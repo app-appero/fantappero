@@ -12,6 +12,7 @@ from sqlalchemy import or_, select
 from sqlalchemy.orm import Session, selectinload
 
 import database.models  # noqa: F401 — register ORM mappers
+from database.enums import FantasyRole
 from observability.logging import get_logger
 from observability.metrics import Timer, get_metrics
 from sports_data.catalog.models import CompetitionSeasonClub, SportSeason
@@ -348,6 +349,46 @@ def generate_official_listone(
         counters=counters,
         affected_athlete_ids=affected,
     )
+
+
+@dataclass(frozen=True)
+class ProviderRoleChange:
+    """Ruolo ufficiale che il fornitore cambierebbe (ruoli congelati: non applicato)."""
+
+    assignment: RoleAssignment
+    membership: SquadMembership
+    new_role: FantasyRole
+
+
+def compute_provider_role_changes(
+    session: Session,
+    *,
+    season_year: int,
+) -> list[ProviderRoleChange]:
+    """Calciatori del listone il cui ruolo ufficiale differisce da quello del fornitore oggi.
+
+    Stessa membership e stesso mapping della generazione del listone: sono le differenze
+    che un aggiornamento conta in ``role_changes_skipped`` senza applicarle. Nessuna scrittura.
+    """
+    by_athlete = pick_active_memberships(session, season_year)
+    if not by_athlete:
+        return []
+    changes: list[ProviderRoleChange] = []
+    assignments = session.execute(
+        select(RoleAssignment)
+        .where(RoleAssignment.season_year == season_year)
+        .order_by(RoleAssignment.athlete_id)
+    ).scalars()
+    for assignment in assignments:
+        membership = by_athlete.get(assignment.athlete_id)
+        if membership is None:
+            continue
+        role = map_provider_position_to_role(membership.provider_position_raw)
+        if role is not None and role != assignment.role:
+            changes.append(
+                ProviderRoleChange(assignment=assignment, membership=membership, new_role=role)
+            )
+    return changes
 
 
 def _competition_filter_clause(*, season_year: int, competition_ids: set[UUID]):

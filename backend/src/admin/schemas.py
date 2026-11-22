@@ -330,12 +330,49 @@ class AdminListoneRoleRestoreResponse(ApiModel):
     counts: AdminListoneRoleRestoreCounts
 
 
+class AdminListoneProviderRolesRequest(ApiModel):
+    season_year: int = Field(alias="seasonYear", ge=2000, le=2100)
+    dry_run: bool = Field(default=True, alias="dryRun")
+    #: Solo questi calciatori (quelli dell'anteprima confermata); senza, tutti.
+    athlete_ids: list[str] | None = Field(default=None, alias="athleteIds", max_length=10_000)
+
+
+class AdminListoneProviderRoleEntry(ApiModel):
+    athlete_id: str = Field(alias="athleteId")
+    name: AthleteNameStr
+    club: str | None = None
+    current_role: ListoneRoleCode = Field(alias="currentRole")
+    new_role: ListoneRoleCode = Field(alias="newRole")
+    provider_position_raw: str | None = Field(default=None, alias="providerPositionRaw")
+    in_rosters: list[str] = Field(default_factory=list, alias="inRosters")
+
+
+class AdminListoneProviderRolesCounts(ApiModel):
+    changes: int
+    applied: int
+    rosters_over_quota_now: int = Field(alias="rostersOverQuotaNow")
+    rosters_over_quota_after: int = Field(alias="rostersOverQuotaAfter")
+    rosters_resynced: int = Field(alias="rostersResynced")
+
+
+class AdminListoneProviderRolesResponse(ApiModel):
+    season_year: int = Field(alias="seasonYear")
+    dry_run: bool = Field(alias="dryRun")
+    entries: list[AdminListoneProviderRoleEntry]
+    counts: AdminListoneProviderRolesCounts
+
+
 class AdminListoneRefreshResultResponse(ApiModel):
     season_year: int = Field(alias="seasonYear")
     mapping_version: str = Field(alias="mappingVersion")
     refreshed_at: datetime = Field(alias="refreshedAt")
     message: str
     counters: AdminListoneRefreshCounters
+    #: Con «Aggiorna anche i ruoli dal fornitore» (``updateRoles``): l'anteprima dei ruoli che
+    #: cambierebbero, da confermare con ``POST /admin/listone/ruoli-dal-fornitore``.
+    role_changes: AdminListoneProviderRolesResponse | None = Field(
+        default=None, alias="roleChanges"
+    )
 
 
 class AdminListoneRefreshJobResponse(ApiModel):

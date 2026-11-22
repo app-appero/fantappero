@@ -34,7 +34,7 @@ const PREVIEW: AdminListoneRoleRestoreResult = {
       restoredRole: "C",
       reconstructible: true,
       restoredPosition: "Midfielder",
-      restoredClub: "Napoli",
+      restoredClub: "Lazio",
       restoredSource: "squads",
       inRosters: ["Lega Pilota"],
     },
@@ -128,6 +128,8 @@ describe("Ripristina i ruoli cambiati da un aggiornamento (pannello operatore)",
     expect(row?.textContent).toContain("A");
     expect(row?.textContent).toContain("C");
     expect(row?.textContent).toContain("Lega Pilota");
+    // Ruolo di prima preso dalla rosa di un altro club (membership cambiata il 21/11).
+    expect(row?.textContent).toContain("(rosa Lazio)");
     expect(byTestId("admin-listone-restore-row-ath-2")?.textContent).toContain(
       "non ricostruibile",
     );

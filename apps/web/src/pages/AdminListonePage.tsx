@@ -1,4 +1,8 @@
-import type { AdminListoneEntry, FantasyRole } from "@fantappero/contracts";
+import type {
+  AdminListoneEntry,
+  AdminListoneProviderRolesResult,
+  FantasyRole,
+} from "@fantappero/contracts";
 import {
   Badge,
   Breadcrumb,
@@ -7,6 +11,7 @@ import {
   CardBody,
   CardHeader,
   Input,
+  Modal,
   PageContainer,
   Tab,
   Table,
@@ -22,6 +27,7 @@ import {
 } from "@fantappero/ui";
 import { AthleteName } from "../athletes/AthleteCard";
 import { useCallback, useEffect, useState } from "react";
+import { ListoneProviderRolesPreview } from "../admin/ListoneProviderRolesPreview";
 import { useListoneRefresh } from "../admin/ListoneRefreshContext";
 import { ListoneRoleRestoreSection } from "../admin/ListoneRoleRestoreSection";
 import { fetchAdminListone } from "../api/admin";
@@ -153,6 +159,17 @@ function AdminListoneTable({ tabValue, rows }: { tabValue: RoleTab; rows: AdminL
 
 const CURRENT_YEAR = new Date().getFullYear();
 
+/** «Aggiorna listone»: solo nuovi calciatori e squadre (default) o anche i ruoli. */
+type RefreshMode = "keep_roles" | "update_roles";
+
+function refreshSummary(message: string, created: number, updated: number, skipped: number) {
+  const base = `${message} Creati: ${created}, aggiornati: ${updated}.`;
+  if (skipped === 0) {
+    return base;
+  }
+  return `${base} Ruoli lasciati com'erano (il fornitore ne indica un altro): ${skipped}.`;
+}
+
 export function AdminListonePage() {
   const [seasonYear, setSeasonYear] = useState(String(CURRENT_YEAR));
   const [entries, setEntries] = useState<AdminListoneEntry[]>([]);
@@ -163,6 +180,9 @@ export function AdminListonePage() {
   const { refreshing, progress: refreshProgress, startRefresh } = useListoneRefresh();
   const [refreshError, setRefreshError] = useState<string | null>(null);
   const [refreshSuccess, setRefreshSuccess] = useState<string | null>(null);
+  const [refreshModalOpen, setRefreshModalOpen] = useState(false);
+  const [refreshMode, setRefreshMode] = useState<RefreshMode>("keep_roles");
+  const [rolePreview, setRolePreview] = useState<AdminListoneProviderRolesResult | null>(null);
 
   const load = useCallback(async () => {
     const year = Number(seasonYear);
@@ -197,7 +217,13 @@ export function AdminListonePage() {
     void load();
   }, [load]);
 
-  async function onRefresh() {
+  function openRefreshModal() {
+    setRefreshMode("keep_roles");
+    setRefreshModalOpen(true);
+  }
+
+  async function onRefresh(mode: RefreshMode) {
+    setRefreshModalOpen(false);
     const year = Number(seasonYear);
     if (!Number.isInteger(year) || year < 2000) {
       setRefreshError("Inserisci un anno stagione valido.");
@@ -208,17 +234,40 @@ export function AdminListonePage() {
       setRefreshError("Sessione non disponibile. Accedi di nuovo.");
       return;
     }
+    const updateRoles = mode === "update_roles";
     setRefreshError(null);
     setRefreshSuccess(null);
+    setRolePreview(null);
     try {
-      const result = await startRefresh(session.accessToken, year);
+      const result = await startRefresh(session.accessToken, year, { updateRoles });
+      const { counters } = result;
       setRefreshSuccess(
-        `${result.message} Creati: ${result.counters.listoneCreated}, aggiornati: ${result.counters.listoneUpdated}.`,
+        refreshSummary(
+          result.message,
+          counters.listoneCreated,
+          counters.listoneUpdated,
+          updateRoles ? 0 : (counters.roleChangesSkipped ?? 0),
+        ),
       );
+      if (updateRoles && result.roleChanges && result.roleChanges.counts.changes > 0) {
+        setRolePreview(result.roleChanges);
+      }
       await load();
     } catch (refreshErr) {
       setRefreshError(getApiErrorMessage(refreshErr, "Aggiornamento listone non riuscito."));
     }
+  }
+
+  function onRolePreviewDone(applied: AdminListoneProviderRolesResult | null) {
+    setRolePreview(null);
+    if (applied === null) {
+      setRefreshSuccess("Ruoli lasciati come sono: nessun ruolo è cambiato.");
+      return;
+    }
+    setRefreshSuccess(
+      `Ruoli aggiornati dal fornitore: ${applied.counts.applied}. Rose ricalcolate: ${applied.counts.rostersResynced}.`,
+    );
+    void load();
   }
 
   return (
@@ -242,7 +291,7 @@ export function AdminListonePage() {
               type="button"
               variant="primary"
               loading={refreshing}
-              onClick={() => void onRefresh()}
+              onClick={openRefreshModal}
               data-testid="admin-listone-refresh"
             >
               Aggiorna listone dal provider
@@ -353,6 +402,78 @@ export function AdminListonePage() {
           ) : null}
         </CardBody>
       </Card>
+      {rolePreview ? (
+        <ListoneProviderRolesPreview preview={rolePreview} onDone={onRolePreviewDone} />
+      ) : null}
+      <Modal
+        open={refreshModalOpen}
+        onClose={() => setRefreshModalOpen(false)}
+        title="Aggiorna listone dal provider"
+        footer={
+          <>
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => setRefreshModalOpen(false)}
+              data-testid="admin-listone-refresh-cancel"
+            >
+              Annulla
+            </Button>
+            <Button
+              type="button"
+              variant="primary"
+              onClick={() => void onRefresh(refreshMode)}
+              data-testid="admin-listone-refresh-start"
+            >
+              {refreshMode === "update_roles" ? "Aggiorna e mostra i ruoli" : "Aggiorna listone"}
+            </Button>
+          </>
+        }
+      >
+        <fieldset className="fa-admin-listone-refresh-choice" data-testid="admin-listone-refresh-choice">
+          <legend>Cosa vuoi aggiornare?</legend>
+          <label className="fa-admin-listone-refresh-choice__option">
+            <input
+              type="radio"
+              name="admin-listone-refresh-mode"
+              value="keep_roles"
+              checked={refreshMode === "keep_roles"}
+              onChange={() => setRefreshMode("keep_roles")}
+              data-testid="admin-listone-refresh-mode-keep"
+            />
+            <span>
+              <strong>Aggiungi i nuovi calciatori e aggiorna le squadre</strong>
+              <small>I ruoli dei calciatori già nel listone restano come sono.</small>
+            </span>
+          </label>
+          <label className="fa-admin-listone-refresh-choice__option">
+            <input
+              type="radio"
+              name="admin-listone-refresh-mode"
+              value="update_roles"
+              checked={refreshMode === "update_roles"}
+              onChange={() => setRefreshMode("update_roles")}
+              data-testid="admin-listone-refresh-mode-roles"
+            />
+            <span>
+              <strong>Aggiorna anche i ruoli dal fornitore</strong>
+              <small>
+                Prima vedi chi cambierebbe ruolo e in quali rose, poi confermi o annulli.
+              </small>
+            </span>
+          </label>
+        </fieldset>
+        {refreshMode === "update_roles" ? (
+          <p
+            className="fa-admin-listone-refresh-choice__warning"
+            role="alert"
+            data-testid="admin-listone-refresh-roles-warning"
+          >
+            Alcuni calciatori possono cambiare ruolo e le rose che li hanno possono andare fuori
+            quota.
+          </p>
+        ) : null}
+      </Modal>
       <ListoneRoleRestoreSection
         seasonYear={Number.isInteger(Number(seasonYear)) ? Number(seasonYear) : null}
         onRestored={() => void load()}

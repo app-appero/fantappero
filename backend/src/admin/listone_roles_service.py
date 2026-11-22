@@ -6,6 +6,9 @@ solo con un'azione esplicita dell'operatore, da qui.
 - «Ripristina i ruoli cambiati da un aggiornamento» (`restore_roles`): dopo l'aggiornamento
   del 21/11 su pilota, che ha cambiato ruoli già nelle rose, ricostruisce il ruolo di prima
   dalle risposte del fornitore salvate (`reconstruct_roles_before`) e lo riapplica.
+- «Aggiorna anche i ruoli dal fornitore» (`provider_roles`): anteprima dei ruoli che il
+  fornitore cambierebbe oggi (`compute_provider_role_changes`, le stesse differenze che
+  l'aggiornamento conta in ``roleChangesSkipped``) e, dopo la conferma, la loro applicazione.
 
 Ogni modifica ricalcola le rose che contengono i calciatori toccati
 (`resync_team_compositions`) e lascia una riga di audit di piattaforma.
@@ -23,6 +26,9 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from admin.schemas import (
+    AdminListoneProviderRoleEntry,
+    AdminListoneProviderRolesCounts,
+    AdminListoneProviderRolesResponse,
     AdminListoneRoleRestoreCounts,
     AdminListoneRoleRestoreEntry,
     AdminListoneRoleRestoreResponse,
@@ -41,6 +47,7 @@ from leagues.models.league import League
 from leagues.models.league_audit_event import LeagueAuditEvent
 from observability.logging import get_logger
 from sports_data.catalog.models import Club
+from sports_data.listone.generate import compute_provider_role_changes
 from sports_data.listone.models import LeagueRoleOverride, RoleAssignment
 from sports_data.listone.overrides import effective_role_for_athlete
 from sports_data.listone.reconstruct import reconstruct_roles_before
@@ -346,6 +353,108 @@ class AdminListoneRolesService:
                 toRestore=len(to_restore),
                 notReconstructible=len(not_reconstructible),
                 restored=restored,
+                rostersOverQuotaNow=impact.rosters_over_quota_now,
+                rostersOverQuotaAfter=impact.rosters_over_quota_after,
+                rostersResynced=resynced,
+            ),
+        )
+
+    def provider_roles(
+        self,
+        *,
+        actor: User | None,
+        season_year: int,
+        dry_run: bool,
+        athlete_ids: Collection[str] | None = None,
+    ) -> AdminListoneProviderRolesResponse:
+        """Ruoli ufficiali da allineare alla posizione del fornitore di oggi.
+
+        Con ``dry_run`` (anteprima, anche nel risultato di «Aggiorna listone» con
+        ``updateRoles``) elenca chi cambierebbe ruolo, dove è in rosa e quante rose
+        andrebbero fuori quota. Con la conferma applica i ruoli (solo ``athlete_ids`` se
+        indicati: quelli dell'anteprima), ricalcola le rose e scrive l'audit. Idempotente.
+        """
+        if not dry_run:
+            _ensure_no_refresh_running()
+        changes = compute_provider_role_changes(self._session, season_year=season_year)
+        names = self._names([change.assignment.athlete_id for change in changes])
+        clubs = self._club_names([change.membership.club_id for change in changes])
+        impact = roster_impact(
+            self._session,
+            season_year=season_year,
+            new_roles={change.assignment.athlete_id: change.new_role for change in changes},
+        )
+        entries = sorted(
+            (
+                AdminListoneProviderRoleEntry(
+                    athleteId=str(change.assignment.athlete_id),
+                    name=names.get(change.assignment.athlete_id, ""),
+                    club=clubs.get(change.membership.club_id),
+                    currentRole=change.assignment.role.value,  # type: ignore[arg-type]
+                    newRole=change.new_role.value,  # type: ignore[arg-type]
+                    providerPositionRaw=change.membership.provider_position_raw,
+                    inRosters=impact.in_rosters.get(change.assignment.athlete_id, []),
+                )
+                for change in changes
+            ),
+            key=lambda entry: entry.name.casefold(),
+        )
+        selected = set(athlete_ids) if athlete_ids is not None else None
+        applied = [
+            change
+            for change in changes
+            if selected is None or str(change.assignment.athlete_id) in selected
+        ]
+        resynced = 0
+        if not dry_run and applied:
+            audit_changes = [
+                {
+                    "athleteId": str(change.assignment.athlete_id),
+                    "from": change.assignment.role.value,
+                    "to": change.new_role.value,
+                }
+                for change in applied
+            ]
+            for change in applied:
+                change.assignment.role = change.new_role
+                change.assignment.provider_position_raw = change.membership.provider_position_raw
+                change.assignment.squad_membership_id = change.membership.id
+                change.assignment.club_id = change.membership.club_id
+            self._session.flush()
+            resynced = resync_team_compositions(
+                self._session,
+                athlete_ids=[change.assignment.athlete_id for change in applied],
+                season_year=season_year,
+            )
+            if actor is not None:
+                self._audit(
+                    actor=actor,
+                    operation="listone_roles_from_provider",
+                    details={
+                        "seasonYear": season_year,
+                        "applied": len(applied),
+                        "rostersResynced": resynced,
+                        "changes": audit_changes,
+                    },
+                )
+            _logger.info(
+                "admin_listone_roles_from_provider",
+                extra={
+                    "event": "admin_listone_roles_from_provider",
+                    "actor_id": str(actor.id) if actor is not None else None,
+                    "season_year": season_year,
+                    "applied": len(applied),
+                    "rosters_resynced": resynced,
+                    "athlete_ids": [str(change.assignment.athlete_id) for change in applied],
+                },
+            )
+        return AdminListoneProviderRolesResponse(
+            seasonYear=season_year,
+            dryRun=dry_run,
+            entries=entries,
+            counts=AdminListoneProviderRolesCounts(
+                changes=len(changes),
+                applied=0 if dry_run else len(applied),
                 rostersOverQuotaNow=impact.rosters_over_quota_now,
                 rostersOverQuotaAfter=impact.rosters_over_quota_after,
                 rostersResynced=resynced,

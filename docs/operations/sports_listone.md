@@ -72,6 +72,17 @@ backend equivalenti: `GET /admin/listone?seasonYear=`, `POST /admin/listone/aggi
 `LeagueListoneService.refresh_from_provider` (stesse funzioni di sync/generate, nessun audit
 per-lega: log strutturato `listone_platform_refresh_ok`/`_failed`).
 
+**Scelta in «Aggiorna listone» (22/11):** il pulsante apre una finestra con due opzioni.
+«Aggiungi i nuovi calciatori e aggiorna le squadre» (default, `POST /admin/listone/aggiorna?seasonYear=`)
+lascia i ruoli congelati. «Aggiorna anche i ruoli dal fornitore» (`…&updateRoles=true`, con
+l'avviso che le rose possono andare fuori quota) fa lo stesso aggiornamento e mette nel
+risultato del job `roleChanges`: l'anteprima di chi cambierebbe ruolo (nome, club, ruolo ora →
+nuovo, leghe in cui è in rosa, rose fuori quota ora e dopo). I ruoli cambiano solo con la
+conferma: `POST /admin/listone/ruoli-dal-fornitore` `{ seasonYear, dryRun: false, athleteIds }`
+(con `dryRun: true` ricalcola l'anteprima), poi `resync_team_compositions` e audit
+(`details.operation = listone_roles_from_provider`). L'aggiornamento dalla lega e l'app usano
+il default (ruoli congelati).
+
 **Ripristina i ruoli (22/11):** `POST /admin/listone/ripristina-ruoli` (`global:operate`) con
 `{ "seasonYear": 2026, "before": "<ISO>", "dryRun": true }`. Candidati: le assegnazioni della
 stagione aggiornate dopo `before` il cui ruolo ricostruito è diverso. Il ruolo di prima si

@@ -11,6 +11,8 @@ import type {
   AdminImpersonateResult,
   AdminLeagueTurnStatus,
   AdminListoneEntry,
+  AdminListoneProviderRolesRequest,
+  AdminListoneProviderRolesResult,
   AdminListoneRefreshJob,
   AdminListoneRefreshProgress,
   AdminListoneRoleRestoreRequest,
@@ -125,8 +127,13 @@ export function fetchAdminListone(
 export function startAdminListoneRefresh(
   accessToken: string,
   seasonYear: number,
+  options: { updateRoles?: boolean } = {},
 ): Promise<AdminListoneRefreshJob> {
   const params = new URLSearchParams({ seasonYear: String(seasonYear) });
+  if (options.updateRoles) {
+    // Anche l'anteprima dei ruoli che cambierebbero; si applicano solo dopo la conferma.
+    params.set("updateRoles", "true");
+  }
   return apiRequest<AdminListoneRefreshJob>(`/admin/listone/aggiorna?${params}`, {
     accessToken,
     method: "POST",
@@ -139,6 +146,18 @@ export function fetchAdminListoneRefreshProgress(
 ): Promise<AdminListoneRefreshProgress> {
   return apiRequest<AdminListoneRefreshProgress>(`/admin/listone/aggiorna/${jobId}`, {
     accessToken,
+  });
+}
+
+/** «Aggiorna anche i ruoli dal fornitore»: anteprima (`dryRun`) o conferma dei nuovi ruoli. */
+export function updateAdminListoneRolesFromProvider(
+  accessToken: string,
+  body: AdminListoneProviderRolesRequest,
+): Promise<AdminListoneProviderRolesResult> {
+  return apiRequest<AdminListoneProviderRolesResult>("/admin/listone/ruoli-dal-fornitore", {
+    accessToken,
+    method: "POST",
+    body,
   });
 }
 
