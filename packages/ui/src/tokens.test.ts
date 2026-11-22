@@ -147,6 +147,33 @@ describe("tema scuro (CSS)", () => {
   });
 });
 
+describe("campo della Formazione: «senza voto»", () => {
+  /** Colori del gradiente di una regola di layout.css, nell'ordine. */
+  function gradientStops(selector: RegExp): string[] {
+    const rule = new RegExp(`${selector.source}\\s*\\{([^}]*)\\}`).exec(readCss("layout.css"))?.[1] ?? "";
+    expect(rule, `regola ${selector.source}`).toContain("color: #fff;");
+    const gradient = /linear-gradient\(([^)]*)\)/.exec(rule)?.[1] ?? "";
+    return [...gradient.matchAll(/#[0-9a-fA-F]{6}/g)].map((match) => match[0]);
+  }
+
+  // Colori fissi, non token: sono gli stessi nel tema chiaro e in quello scuro.
+  it("il nome bianco del titolare senza voto si legge su tutto il gradiente (almeno 4,5:1)", () => {
+    const stops = gradientStops(/\.fa-pitch-player--sv \.fa-pitch-player__name/);
+    expect(stops).toEqual(["#7c3aed", "#9333ea"]);
+    for (const stop of stops) {
+      expect(contrastRatio("#ffffff", stop), `#ffffff su ${stop}`).toBeGreaterThanOrEqual(4.5);
+    }
+  });
+
+  it("anche il voto «s.v.» bianco sullo stesso viola si legge (almeno 4,5:1)", () => {
+    const stops = gradientStops(/\.fa-pitch-player__score--sv/);
+    expect(stops).toEqual(["#6d28d9", "#9333ea"]);
+    for (const stop of stops) {
+      expect(contrastRatio("#ffffff", stop), `#ffffff su ${stop}`).toBeGreaterThanOrEqual(4.5);
+    }
+  });
+});
+
 describe("ambra «attenzione» nell'app", () => {
   it("nel tema chiaro si legge come testo sugli sfondi (almeno 4,5:1)", () => {
     for (const background of APP_BACKGROUNDS) {

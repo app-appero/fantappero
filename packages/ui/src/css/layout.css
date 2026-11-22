@@ -1257,13 +1257,15 @@ button.fa-app-header__league-action {
     0 0 14px 4px rgba(168, 85, 247, 0.8);
 }
 
+/* Testo bianco su viola: il gradiente finisce su #9333ea (5,4:1). Con #a855f7 si arrivava
+   solo a 3,96:1 (QA 21-22/11). Colori fissi, uguali nei due temi. */
 .fa-pitch-player--sv .fa-pitch-player__name {
-  background: linear-gradient(135deg, #7c3aed, #a855f7);
+  background: linear-gradient(135deg, #7c3aed, #9333ea);
   color: #fff;
 }
 
 .fa-pitch-player__score--sv {
-  background: linear-gradient(135deg, #6d28d9, #a855f7);
+  background: linear-gradient(135deg, #6d28d9, #9333ea);
   color: #fff;
   box-shadow: 0 0 12px rgba(168, 85, 247, 0.8);
 }
