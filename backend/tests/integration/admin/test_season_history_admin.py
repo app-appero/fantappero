@@ -28,7 +28,11 @@ from sports_data.listone.models import RoleAssignment
 from sports_data.provider.client import ApiFootballClient
 from sports_data.provider.throttle import MinuteRateLimiter
 from sports_data.roster.models import Athlete
-from sports_data.season_stats.models import AthleteSeasonImportFetch, AthleteSeasonStat
+from sports_data.season_stats.models import (
+    AthleteSeasonImportFetch,
+    AthleteSeasonStat,
+    ProviderCompetitionType,
+)
 
 IMPORT_URL = "/admin/listone/storico"
 REFRESH_URL = "/admin/listone/valori/ricalcola"
@@ -52,13 +56,39 @@ def _player(provider_id: int, season: int, league: int, rating: str | None) -> d
     }
 
 
+#: Risposta di ``/leagues``: campionati e coppe (Primeira Liga 94 è un campionato).
+_LEAGUES = (
+    (135, "Serie A", "League"),
+    (94, "Primeira Liga", "League"),
+    (2, "UEFA Champions League", "Cup"),
+)
+
+
 class _Provider:
     def __init__(self) -> None:
         self.calls: list[dict[str, str]] = []
+        self.paths: list[str] = []
 
     def handler(self, request: httpx.Request) -> httpx.Response:
         params = dict(request.url.params)
         self.calls.append(params)
+        self.paths.append(request.url.path)
+        if request.url.path == "/leagues":
+            leagues = [
+                {"league": {"id": league_id, "name": name, "type": kind}, "seasons": []}
+                for league_id, name, kind in _LEAGUES
+            ]
+            return httpx.Response(
+                200,
+                json={
+                    "get": "leagues",
+                    "parameters": [],
+                    "errors": [],
+                    "results": len(leagues),
+                    "paging": {"current": 1, "total": 1},
+                    "response": leagues,
+                },
+            )
         season = int(params["season"])
         response: list[Any] = []
         if params.get("league") == "135":
@@ -90,6 +120,7 @@ def listone(db_session: Session) -> None:
     resta fra un test e l'altro: si riparte da zero)."""
     db_session.execute(delete(AthleteSeasonImportFetch))
     db_session.execute(delete(AthleteSeasonStat))
+    db_session.execute(delete(ProviderCompetitionType))
     for provider_id, role in ((IN_PAGES, FantasyRole.A), (FILLED, FantasyRole.D)):
         athlete = db_session.scalar(select(Athlete).where(Athlete.provider_id == provider_id))
         if athlete is not None:
@@ -151,6 +182,10 @@ def test_dry_run_counts_calls_without_calling_the_provider(
     assert estimate["seasons"][0]["leaguePagesRemaining"] == 200
     assert estimate["seasons"][0]["leaguePagesExact"] is False
     assert estimate["estimatedCalls"] >= 400
+    # Più una chiamata, una volta sola: i tipi di competizione (campionato o coppa).
+    assert estimate["estimatedCalls"] == 1 + sum(
+        season["estimatedCalls"] for season in estimate["seasons"]
+    )
     assert estimate["requestsPerMinute"] >= 1
     assert estimate["estimatedMinutes"] >= 1
 
@@ -180,11 +215,13 @@ def test_import_job_runs_with_progress_then_rerun_is_free(
     body = progress.json()
     assert body["status"] == "completed", body
     result = body["result"]
-    # 5 campionati × 2 stagioni (una pagina ciascuno) + il calciatore mancante × 2 stagioni.
+    # Tipi di competizione (1) + 5 campionati × 2 stagioni (una pagina ciascuno) + il
+    # calciatore mancante × 2 stagioni.
+    assert provider.paths[0] == "/leagues"
     assert result["leaguePages"] == 10
     assert result["athletesChecked"] == 2
     assert result["athletesFound"] == 1
-    assert result["calls"] == 12
+    assert result["calls"] == 13
     assert result["stoppedReason"] is None
     assert result["remaining"]["estimatedCalls"] == 0
     assert result["marketValues"]["athletesValued"] >= 2
@@ -211,7 +248,8 @@ def test_import_job_runs_with_progress_then_rerun_is_free(
     second = client.get(f"{IMPORT_URL}/{again.json()['job']['jobId']}", headers=_headers(token))
     assert second.json()["status"] == "completed"
     assert second.json()["result"]["calls"] == 0
-    assert len(provider.calls) == 12
+    assert len(provider.calls) == 13
+    assert provider.paths.count("/leagues") == 1
     db_session.expire_all()
     assert db_session.scalar(select(func.count()).select_from(AthleteSeasonImportFetch)) == fetches
 

@@ -2,6 +2,9 @@
 
 - ``refresh_market_values``: materializza lo storico della stagione in corso dai nostri dati,
   poi calcola media stagionale e Valore di tutto il listone e riscrive ``athlete_market_values``.
+  Delle stagioni passate dal fornitore contano **solo le righe di campionato**: le coppe
+  restano nella carriera (``build_career``) ma non nella media né nel Valore (decisione di
+  Rosario, 22/11; regola in ``sports_data.season_stats.competition_types``).
   Salta il lavoro se nulla è cambiato dall'ultima volta (impronta in ``system_flags``).
   Gira dal job periodico «Medie e Valore di mercato», a fine import dello storico e a richiesta
   dell'operatore.
@@ -47,8 +50,14 @@ from sports_data.catalog.models import SportSeason
 from sports_data.fixtures.models import Fixture, PlayerMatchStat
 from sports_data.listone.models import RoleAssignment
 from sports_data.roster.models import Athlete
+from sports_data.season_stats.competition_types import (
+    COMPETITION_TYPE_CUP,
+    competition_kind,
+    is_championship,
+    load_competition_types,
+)
 from sports_data.season_stats.current_season import materialize_current_season
-from sports_data.season_stats.models import AthleteSeasonStat
+from sports_data.season_stats.models import AthleteSeasonStat, ProviderCompetitionType
 from sports_data.season_stats.seasons import (
     SOURCE_FANTAPPERO,
     SOURCE_PROVIDER,
@@ -59,7 +68,8 @@ from sports_data.season_stats.seasons import (
 logger = get_logger(__name__)
 
 #: Cambia quando cambia la formula: forza il ricalcolo anche a dati fermi.
-VALUATION_VERSION = "1.3.0"
+#: 1.3.1: solo le righe di campionato delle stagioni passate (coppe escluse, 22/11).
+VALUATION_VERSION = "1.3.1"
 FINGERPRINT_FLAG_PREFIX = "market_values:"
 #: Oltre questo numero di calciatori si legge la stagione intera (listone) invece di un IN.
 _BULK_READ_THRESHOLD = 400
@@ -102,7 +112,8 @@ def _count_max(session: Session, stmt: Any) -> list[str]:
 
 
 def data_fingerprint(session: Session, *, season_year: int) -> str:
-    """Impronta dei dati che entrano nel calcolo: voti, statistiche, storico, listone."""
+    """Impronta dei dati che entrano nel calcolo: voti, statistiche, storico, tipi di
+    competizione (campionato o coppa), listone."""
     parts: list[str] = [VALUATION_VERSION, str(season_year)]
     parts += _count_max(session, select(func.count(), func.max(PlayerMatchRating.updated_at)))
     parts += _count_max(session, select(func.count(), func.max(PlayerMatchStat.updated_at)))
@@ -120,6 +131,10 @@ def data_fingerprint(session: Session, *, season_year: int) -> str:
         select(func.count(), func.max(AthleteSeasonStat.updated_at)).where(
             AthleteSeasonStat.source == SOURCE_PROVIDER
         ),
+    )
+    parts += _count_max(
+        session,
+        select(func.count(), func.max(ProviderCompetitionType.updated_at)),
     )
     parts += _count_max(
         session,
@@ -175,12 +190,19 @@ def season_samples(
 
     Stagione in corso: solo i nostri voti (peso = partite con voto). Stagioni passate: i nostri
     dati se c'erano (stagioni vissute in FantApperò), altrimenti il fornitore (peso = presenze).
+
+    Solo campionati: delle righe del fornitore contano quelle di un campionato
+    (``competition_types.is_championship``: i 5 di ``MVP_LEAGUE_IDS`` o tipo ``league``); le
+    coppe e le competizioni di tipo sconosciuto sono escluse. Una stagione con sole coppe è
+    una stagione senza dati. Le righe nostre vengono dalle partite del catalogo, che ha solo i
+    5 campionati: si prendono tutte.
     """
     seasons = career_seasons(current_season_year)
     stmt = select(
         AthleteSeasonStat.athlete_provider_id,
         AthleteSeasonStat.season_year,
         AthleteSeasonStat.source,
+        AthleteSeasonStat.competition_provider_id,
         AthleteSeasonStat.rating,
         AthleteSeasonStat.appearances,
         AthleteSeasonStat.votes,
@@ -190,12 +212,37 @@ def season_samples(
         if not ids:
             return {}
         stmt = stmt.where(AthleteSeasonStat.athlete_provider_id.in_(ids))
+    types = load_competition_types(session)
+    excluded_cups = 0
+    excluded_unknown: dict[int, int] = defaultdict(int)
     by_key: dict[tuple[int, int], dict[str, list[tuple[float | None, int | None]]]] = defaultdict(
         lambda: defaultdict(list)
     )
-    for pid, year, source, rating, appearances, votes in session.execute(stmt).tuples():
+    for pid, year, source, competition, rating, appearances, votes in session.execute(
+        stmt
+    ).tuples():
+        if source == SOURCE_PROVIDER and not is_championship(int(competition), types):
+            if competition_kind(int(competition), types) == COMPETITION_TYPE_CUP:
+                excluded_cups += 1
+            else:
+                excluded_unknown[int(competition)] += 1
+            continue
         weight = votes if source == SOURCE_FANTAPPERO else appearances
         by_key[(int(pid), int(year))][source].append((rating, weight))
+    if excluded_cups or excluded_unknown:
+        logger.info(
+            "season_samples_rows_excluded",
+            extra={
+                "current_season_year": current_season_year,
+                "cup_rows": excluded_cups,
+                "unknown_type_rows": sum(excluded_unknown.values()),
+                # Le competizioni di tipo sconosciuto più frequenti (id del fornitore).
+                "unknown_competitions": sorted(
+                    excluded_unknown, key=lambda cid: (-excluded_unknown[cid], cid)
+                )[:20],
+                "competition_types_known": len(types),
+            },
+        )
     result: dict[tuple[int, int], SeasonSample] = {}
     for (pid, year), sources in by_key.items():
         if year == current_season_year:

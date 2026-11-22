@@ -1,6 +1,10 @@
 """Import una tantum delle statistiche di stagione dal fornitore (API-Football ``/players``).
 
-Stagioni concluse (con la 2026/27 in corso: ``season=2025`` e ``season=2024``), dalla più
+Primo passo, una chiamata sola: **tipi di competizione** ``/leagues`` (tutte le competizioni del
+fornitore, campionato o coppa), salvati in ``provider_competition_types``: la media stagionale e
+il Valore contano solo i campionati (``competition_types``). Una volta per stagione in corso.
+
+Poi le stagioni concluse (con la 2026/27 in corso: ``season=2025`` e ``season=2024``), dalla più
 recente:
 
 1. **pagine di campionato** ``/players?league=<id>&season=<anno>&page=<n>`` per i campionati
@@ -49,6 +53,11 @@ from sports_data.provider.snapshots import store_provider_snapshot
 from sports_data.provider.types import ProviderEnvelope
 from sports_data.roster.models import Athlete
 from sports_data.scheduler.quota import DEGRADE_REMAINING_FRACTION
+from sports_data.season_stats.competition_types import (
+    LEAGUES_ENDPOINT,
+    parse_competition_types,
+    upsert_competition_types,
+)
 from sports_data.season_stats.models import AthleteSeasonImportFetch, AthleteSeasonStat
 from sports_data.season_stats.seasons import (
     SOURCE_PROVIDER,
@@ -63,6 +72,9 @@ PLAYERS_ENDPOINT = "/players"
 PLAYERS_PER_PAGE = 20
 KIND_LEAGUE_PAGE = "league_page"
 KIND_ATHLETE = "athlete"
+#: Elenco dei tipi di competizione (``/leagues``): una riga per stagione in corso
+#: (``season_year`` = stagione in corso dell'import, non una stagione passata).
+KIND_COMPETITION_TYPES = "leagues"
 
 #: Pagine stimate per campionato-stagione finché la prima non dice ``paging.total``
 #: (~800 calciatori a rosa nella stagione, giovani compresi, a 20 per pagina).
@@ -90,6 +102,10 @@ def league_page_key(competition_provider_id: int, season_year: int, page: int) -
 
 def athlete_key(athlete_provider_id: int, season_year: int) -> str:
     return f"players:id={athlete_provider_id}:season={season_year}"
+
+
+def competition_types_key(current_season_year: int) -> str:
+    return f"leagues:types:current_season={current_season_year}"
 
 
 # -- parsing ------------------------------------------------------------------
@@ -371,10 +387,15 @@ class SeasonImportEstimate:
 class ImportEstimate:
     current_season_year: int
     seasons: list[SeasonImportEstimate] = field(default_factory=list)
+    #: ``1`` finché l'elenco dei tipi di competizione (``/leagues``) non è scaricato per la
+    #: stagione in corso, poi ``0``. Non è di una stagione: conta solo nel totale.
+    competition_types_remaining: int = 0
 
     @property
     def estimated_calls(self) -> int:
-        return sum(season.estimated_calls for season in self.seasons)
+        return self.competition_types_remaining + sum(
+            season.estimated_calls for season in self.seasons
+        )
 
 
 def _fetches(session: Session, *, season_year: int, kind: str) -> list[AthleteSeasonImportFetch]:
@@ -385,6 +406,18 @@ def _fetches(session: Session, *, season_year: int, kind: str) -> list[AthleteSe
                 AthleteSeasonImportFetch.kind == kind,
             )
         ).all()
+    )
+
+
+def competition_types_fetched(session: Session, *, current_season_year: int) -> bool:
+    """L'elenco dei tipi di competizione è già stato scaricato per questa stagione in corso."""
+    return (
+        session.scalar(
+            select(AthleteSeasonImportFetch.id).where(
+                AthleteSeasonImportFetch.request_key == competition_types_key(current_season_year)
+            )
+        )
+        is not None
     )
 
 
@@ -437,7 +470,12 @@ def estimate_import(
 ) -> ImportEstimate:
     """Quante chiamate mancano, senza chiamare il fornitore (modalità «conta»)."""
     listone = _listone_provider_ids(session, current_season_year=current_season_year)
-    result = ImportEstimate(current_season_year=current_season_year)
+    result = ImportEstimate(
+        current_season_year=current_season_year,
+        competition_types_remaining=(
+            0 if competition_types_fetched(session, current_season_year=current_season_year) else 1
+        ),
+    )
     for season_year in past_seasons(current_season_year):
         item = SeasonImportEstimate(season_year=season_year, listone_athletes=len(listone))
         pages = _fetches(session, season_year=season_year, kind=KIND_LEAGUE_PAGE)
@@ -488,6 +526,8 @@ def estimate_import(
 @dataclass
 class ImportCounters:
     calls: int = 0
+    #: Competizioni salvate dall'elenco dei tipi (``/leagues``), 0 se già scaricato.
+    competition_types: int = 0
     league_pages: int = 0
     athletes_checked: int = 0
     athletes_found: int = 0
@@ -542,12 +582,14 @@ class _Runner:
         if self.on_progress is not None:
             self.on_progress(self.counters.calls, self.planned_calls, label)
 
-    def call(self, params: dict[str, Any]) -> ProviderEnvelope | None:
+    def call(
+        self, params: dict[str, Any], *, endpoint: str = PLAYERS_ENDPOINT
+    ) -> ProviderEnvelope | None:
         if self.counters.calls >= self.max_calls:
             raise _Stop(STOP_MAX_CALLS)
         self.counters.calls += 1
         try:
-            envelope = self.client.get(PLAYERS_ENDPOINT, params, fetch_all_pages=False)
+            envelope = self.client.get(endpoint, params, fetch_all_pages=False)
         except (ProviderRateLimitError, ProviderAuthError, ProviderConfigError):
             raise
         except ProviderError:
@@ -556,7 +598,10 @@ class _Runner:
             get_metrics().incr(SEASON_IMPORT_CALLS_TOTAL, labels={"result": "error"})
             logger.warning(
                 "season_history_import_call_failed",
-                extra={"params": {key: str(value) for key, value in params.items()}},
+                extra={
+                    "endpoint": endpoint,
+                    "params": {key: str(value) for key, value in params.items()},
+                },
             )
             if self._consecutive_errors >= MAX_CONSECUTIVE_ERRORS:
                 raise _Stop(STOP_TOO_MANY_ERRORS) from None
@@ -585,6 +630,32 @@ class _Runner:
         )
         self.counters.rows_created += rows_created
         self.counters.rows_updated += rows_updated
+        self.record_fetch(
+            envelope,
+            snapshot_id=snapshot.id,
+            season_year=season_year,
+            request_key=request_key,
+            kind=kind,
+            competition_provider_id=competition_provider_id,
+            page=page,
+            athlete_provider_id=athlete_provider_id,
+        )
+        self.finish(envelope)
+        return len(rows)
+
+    def record_fetch(
+        self,
+        envelope: ProviderEnvelope,
+        *,
+        snapshot_id: UUID,
+        season_year: int,
+        request_key: str,
+        kind: str,
+        competition_provider_id: int | None = None,
+        page: int | None = None,
+        athlete_provider_id: int | None = None,
+    ) -> None:
+        """Riga del registro: rilanciando, questa chiamata non si ripete."""
         stmt = insert(AthleteSeasonImportFetch).values(
             request_key=request_key,
             kind=kind,
@@ -594,17 +665,19 @@ class _Runner:
             athlete_provider_id=athlete_provider_id,
             results_count=envelope.results,
             page_total=envelope.paging.total if kind == KIND_LEAGUE_PAGE else None,
-            snapshot_id=snapshot.id,
+            snapshot_id=snapshot_id,
             fetched_at=datetime.now(UTC),
         )
         self.session.execute(
             stmt.on_conflict_do_nothing(constraint="uq_athlete_season_import_fetches_request_key")
         )
+
+    def finish(self, envelope: ProviderEnvelope) -> None:
+        """Dopo ogni chiamata salvata: flush, checkpoint e controllo della quota."""
         self.session.flush()
         if self.checkpoint is not None:
             self.checkpoint()
         self._check_quota(envelope)
-        return len(rows)
 
     def _check_quota(self, envelope: ProviderEnvelope) -> None:
         rate = envelope.rate_limit
@@ -612,6 +685,42 @@ class _Runner:
             return
         if rate.remaining <= rate.limit * QUOTA_RESERVE_FRACTION:
             raise _Stop(STOP_QUOTA_RESERVE)
+
+
+def _competition_types(runner: _Runner, *, current_season_year: int) -> None:
+    """Primo passo: tipi di tutte le competizioni del fornitore, una chiamata ``/leagues``.
+
+    Una volta per stagione in corso (registro dell'import): rilanciando non si ripete. Se il
+    fornitore non restituisce nessun tipo la chiamata non si registra e il prossimo import la
+    rifà; intanto contano solo i 5 campionati (``competition_types.is_championship``).
+    """
+    if competition_types_fetched(runner.session, current_season_year=current_season_year):
+        return
+    envelope = runner.call({}, endpoint=LEAGUES_ENDPOINT)
+    if envelope is None:
+        return
+    snapshot, created = store_provider_snapshot(runner.session, envelope)
+    if created:
+        runner.counters.snapshots_created += 1
+    items = parse_competition_types(envelope)
+    runner.counters.competition_types += upsert_competition_types(
+        runner.session, items, fetched_at=datetime.now(UTC), snapshot_id=snapshot.id
+    )
+    if items:
+        runner.record_fetch(
+            envelope,
+            snapshot_id=snapshot.id,
+            season_year=current_season_year,
+            request_key=competition_types_key(current_season_year),
+            kind=KIND_COMPETITION_TYPES,
+        )
+    else:
+        logger.warning(
+            "season_history_competition_types_empty",
+            extra={"current_season_year": current_season_year, "results": envelope.results},
+        )
+    runner.progress(f"Tipi di competizione: {len(items)} fra campionati e coppe")
+    runner.finish(envelope)
 
 
 def _league_pages(
@@ -690,7 +799,8 @@ def run_provider_import(
     checkpoint: Callable[[], None] | None = None,
     competitions: tuple[int, ...] = MVP_LEAGUE_IDS,
 ) -> ImportRunResult:
-    """Scarica le stagioni passate mancanti. Rieseguibile: salta le chiamate già registrate.
+    """Tipi di competizione, poi le stagioni passate mancanti. Rieseguibile: salta le chiamate
+    già registrate.
 
     ``checkpoint`` (es. ``session.commit``) gira dopo ogni chiamata salvata: un'interruzione
     non perde il lavoro fatto. Errori di quota/autenticazione del fornitore risalgono.
@@ -709,6 +819,7 @@ def run_provider_import(
     )
     stopped: str | None = None
     try:
+        _competition_types(runner, current_season_year=current_season_year)
         for season_year in seasons:
             for competition in competitions:
                 _league_pages(runner, season_year=season_year, competition_provider_id=competition)
@@ -723,6 +834,7 @@ def run_provider_import(
         extra={
             "current_season_year": current_season_year,
             "calls": runner.counters.calls,
+            "competition_types": runner.counters.competition_types,
             "league_pages": runner.counters.league_pages,
             "athletes_checked": runner.counters.athletes_checked,
             "rows_created": runner.counters.rows_created,

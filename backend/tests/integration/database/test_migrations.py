@@ -38,6 +38,7 @@ def test_upgrade_from_empty_database(clean_db: str) -> None:
         assert table_exists(engine, "league_calendars")
         assert table_exists(engine, "league_calendar_slots")
         assert table_exists(engine, "provider_snapshots")
+        assert table_exists(engine, "provider_competition_types")
         assert table_exists(engine, "clubs")
         assert table_exists(engine, "sport_seasons")
         assert table_exists(engine, "competition_season_clubs")
@@ -108,10 +109,10 @@ def test_upgrade_from_empty_database(clean_db: str) -> None:
                 .scalars()
                 .all()
             )
-            # Head aggiornata a f3a5c7e9b1d4 (storico stagionale dei calciatori e Valore di
-            # mercato, 1.3); prima e9b1d3f5a672 (mercato chiuso di default per le leghe nuove).
-            # Aggiornare questa costante ad ogni nuova migrazione in coda.
-            assert version == "f3a5c7e9b1d4"
+            # Head aggiornata a 70b4367fdb66 (tipi delle competizioni del fornitore, campionato
+            # o coppa, 1.3); prima f3a5c7e9b1d4 (storico stagionale dei calciatori e Valore di
+            # mercato, 1.3). Aggiornare questa costante ad ogni nuova migrazione in coda.
+            assert version == "70b4367fdb66"
         assert named_statuses == ["pending", "accepted", "declined", "revoked", "expired"]
         assert calendar_statuses == ["draft", "confirmed"]
         assert fantasy_roles == ["P", "D", "C", "A"]

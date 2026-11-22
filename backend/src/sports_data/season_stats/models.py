@@ -95,8 +95,9 @@ class AthleteSeasonStat(Base, UUIDPrimaryKeyMixin, TimestampMixin):
 class AthleteSeasonImportFetch(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     """Registro delle chiamate già fatte dall'import dello storico (riprendibile).
 
-    Una riga per pagina di campionato (``/players?league&season&page``) o per calciatore cercato
-    uno per uno (``/players?id&season``), anche quando il fornitore non ha restituito nulla: una
+    Una riga per pagina di campionato (``/players?league&season&page``), per calciatore cercato
+    uno per uno (``/players?id&season``), anche quando il fornitore non ha restituito nulla, e
+    per l'elenco dei tipi di competizione (``/leagues``, una volta per stagione in corso): una
     seconda esecuzione salta quello che c'è già e non spende quota.
     """
 
@@ -114,6 +115,29 @@ class AthleteSeasonImportFetch(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     athlete_provider_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     results_count: Mapped[int] = mapped_column(Integer, nullable=False)
     page_total: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    snapshot_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("provider_snapshots.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    fetched_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False)
+
+
+class ProviderCompetitionType(Base, TimestampMixin):
+    """Tipo di ogni competizione del fornitore: campionato (``league``) o coppa (``cup``).
+
+    Viene da una sola chiamata ``/leagues`` (tutte le competizioni del fornitore, ognuna con
+    ``league.type``), fatta come primo passo dell'import dello storico. Serve a contare solo i
+    campionati nella media stagionale e nel Valore (decisione di Rosario, 22/11): le righe di
+    coppa dello storico restano nella carriera del calciatore. Vedi
+    ``sports_data.season_stats.competition_types``.
+    """
+
+    __tablename__ = "provider_competition_types"
+    __table_args__ = (CheckConstraint("type IN ('league', 'cup')", name="type"),)
+
+    provider_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=False)
+    type: Mapped[str] = mapped_column(String(16), nullable=False)
+    name: Mapped[str | None] = mapped_column(String(120), nullable=True)
     snapshot_id: Mapped[UUID | None] = mapped_column(
         ForeignKey("provider_snapshots.id", ondelete="SET NULL"),
         nullable=True,

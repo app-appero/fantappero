@@ -72,7 +72,11 @@ from sports_data.provider.models import ProviderSnapshot
 from sports_data.quality.models import SportsDataQualityIssue, SportsDataSyncRetry
 from sports_data.roster.models import Athlete, SquadMembership, Transfer
 from sports_data.scheduler.models import SportsPollRun
-from sports_data.season_stats.models import AthleteSeasonImportFetch, AthleteSeasonStat
+from sports_data.season_stats.models import (
+    AthleteSeasonImportFetch,
+    AthleteSeasonStat,
+    ProviderCompetitionType,
+)
 from system_jobs.models import SystemJob
 
 __all__ = [
@@ -131,6 +135,7 @@ __all__ = [
     "PlayerMatchRating",
     "PlayerMatchStat",
     "PrivacyAuditEvent",
+    "ProviderCompetitionType",
     "ProviderSnapshot",
     "PushDevice",
     "RoleAssignment",
