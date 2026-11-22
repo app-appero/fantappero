@@ -941,7 +941,10 @@ export function MatchdayPage() {
                     già trascorso. Le mosse tattiche già usate restano consumate.
                   </p>
                 ) : null}
-                {selected.skipReason ? <p>{selected.skipReason}</p> : null}
+                {/* [Home/Turni 9] Classe solo grafica: il motivo del turno saltato in un riquadro. */}
+                {selected.skipReason ? (
+                  <p className="fa-matchday-skip-reason">{selected.skipReason}</p>
+                ) : null}
 
                 <div className="fa-matchday-fixture-tools" data-testid="matchday-fixture-filters">
                   <Button
