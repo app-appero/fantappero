@@ -12,6 +12,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
 
+from app.text_folding import repair_provider_text
 from auth.exceptions import ValidationAuthError
 from auth.models.user import User
 from authorization.context import LeagueAccess
@@ -882,7 +883,7 @@ class FantasyTeamService:
                 reason=CreditLedgerReason.ROSTER_PURCHASE,
                 transaction_id=(f"purchase:{team.id}:{slot_index}:{athlete_id}:{account.version}"),
                 actor_id=league_access.user.id,
-                note=f"Acquisto {athlete.canonical_name}",
+                note=f"Acquisto {repair_provider_text(athlete.canonical_name)}",
             )
         elif previous_athlete_id == athlete_id and (previous_purchase or 0) != purchase_credits:
             # Rettifica del prezzo dello stesso calciatore, anche verso 0: la
@@ -900,7 +901,7 @@ class FantasyTeamService:
                         f"{purchase_credits}:{account.version}"
                     ),
                     actor_id=league_access.user.id,
-                    note=f"Rettifica prezzo {athlete.canonical_name}",
+                    note=f"Rettifica prezzo {repair_provider_text(athlete.canonical_name)}",
                 )
 
         ownership = sync_ownership_on_assign(
@@ -1744,7 +1745,7 @@ class FantasyTeamService:
                     f"{ledger_tx_prefix}:{team.id}:{slot_index}:{athlete_id}:{account.version}"
                 ),
                 actor_id=league_access.user.id,
-                note=f"Assegnazione {athlete.canonical_name}",
+                note=f"Assegnazione {repair_provider_text(athlete.canonical_name)}",
             )
 
         sync_ownership_on_assign(
@@ -1886,7 +1887,7 @@ class FantasyTeamService:
             reason=CreditLedgerReason.ROSTER_RELEASE_REFUND,
             transaction_id=f"refund:{team_id}:{slot_index}:{athlete_id}:{account.version}",
             actor_id=actor_id,
-            note=f"Rimborso {athlete_name}",
+            note=f"Rimborso {repair_provider_text(athlete_name)}",
         )
 
     def _is_league_admin(self, league_access: LeagueAccess) -> bool:

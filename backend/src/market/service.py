@@ -9,6 +9,7 @@ from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session, selectinload
 
+from app.text_folding import repair_provider_text
 from auth.exceptions import ValidationAuthError
 from authorization.context import LeagueAccess
 from database.enums import (
@@ -1072,6 +1073,8 @@ class MarketService:
             actor_id=league_access.user.id,
         )
         if refund > 0:
+            # Il nome come arriva dal fornitore può avere la codifica rovinata (QA 21-22/11).
+            athlete_name = repair_provider_text(athlete.canonical_name)
             apply_ledger_movement(
                 self._session,
                 account,
@@ -1079,7 +1082,7 @@ class MarketService:
                 reason=CreditLedgerReason.MARKET_RELEASE_REFUND,
                 transaction_id=f"release:{team.id}:{slot_index}:{athlete_id}:v{account.version}",
                 actor_id=league_access.user.id,
-                note=f"Svincolo {athlete.canonical_name} ({reason.value}, {percent}%)",
+                note=f"Svincolo {athlete_name} ({reason.value}, {percent}%)",
             )
         # Chi era in esubero (di ruolo o di rosa) può rientrare: ripulisce i flag e gli slot extra.
         reconcile_roster_overflow(self._session, league=league, team=team)
