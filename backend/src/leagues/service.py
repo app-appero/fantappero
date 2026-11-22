@@ -100,6 +100,10 @@ _ADMIN_PANEL_MESSAGES: dict[LeagueState, str] = {
     LeagueState.CONCLUDED: "La stagione è conclusa.",
     LeagueState.ARCHIVED: "La lega è archiviata.",
 }
+# Stati da lega avviata in poi: la configurazione conta come salvata (Rosario 22/11).
+_CONFIGURED_BY_ACTIVATION_STATES = frozenset(
+    (LeagueState.ACTIVE, LeagueState.CONCLUDED, LeagueState.ARCHIVED)
+)
 
 
 def admin_panel_message(state: LeagueState) -> str:
@@ -316,7 +320,7 @@ class LeagueService:
             message=admin_panel_message(league.state),
             rules=self._to_rules_response(rules),
             lifecycle=self._to_lifecycle_response(league),
-            configuration_saved=self._configuration_saved(league.id),
+            configuration_saved=self._configuration_saved(league),
         )
 
     def transition_state(
@@ -707,11 +711,19 @@ class LeagueService:
             ],
         )
 
-    def _configuration_saved(self, league_id: UUID) -> bool:
-        """True se l'admin ha salvato almeno una volta il regolamento."""
+    def _configuration_saved(self, league: League) -> bool:
+        """True se l'admin ha salvato almeno una volta il regolamento, o se la lega è avviata.
+
+        Una lega attivata (o conclusa, o archiviata) conta come configurata anche senza
+        un salvataggio esplicito del regolamento: avviata con le regole predefinite o da
+        altri percorsi, restava «Prima salva la configurazione…» con la tab Invitati
+        bloccata (Rosario 22/11).
+        """
+        if league.state in _CONFIGURED_BY_ACTIVATION_STATES:
+            return True
         count = self._session.scalar(
             select(func.count(LeagueAuditEvent.id)).where(
-                LeagueAuditEvent.league_id == league_id,
+                LeagueAuditEvent.league_id == league.id,
                 LeagueAuditEvent.action == LeagueAuditAction.LEAGUE_RULES_UPDATED,
             )
         )

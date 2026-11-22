@@ -472,9 +472,13 @@ export function LeagueAdminPage() {
             data-testid="league-admin-setup"
           >
             <h2 id="league-admin-next-title">Prossime fasi</h2>
-            <p>
-              Prima salva la configurazione della lega, poi invita i fantallenatori.
-            </p>
+            {/* Solo finché la configurazione non è salvata: una lega avviata conta come
+                configurata anche senza un salvataggio del regolamento (Rosario 22/11). */}
+            {!configurationSaved ? (
+              <p data-testid="league-admin-save-first">
+                Prima salva la configurazione della lega, poi invita i fantallenatori.
+              </p>
+            ) : null}
 
             <Tabs
               value={setupTab}
