@@ -53,8 +53,10 @@ from leagues.schemas import (
     H2HCalendarResponse,
     H2HMatchupDetailResponse,
     LeagueAdminPanelResponse,
+    LeagueCalendarActionRequest,
     LeagueCalendarPlanResponse,
     LeagueCalendarResponse,
+    LeagueCalendarRosterCheckResponse,
     LeagueDetailResponse,
     LeagueInviteResponse,
     LeagueLifecycleResponse,
@@ -87,9 +89,11 @@ def _error_response(exc: AuthError) -> JSONResponse:
         if exc.code == "rate_limit_exceeded"
         else status.HTTP_400_BAD_REQUEST
     )
+    # I campi in più dell'errore (es. ``teams`` delle rose non in regola per il calendario)
+    # arrivano al client accanto a ``message`` e ``code``, che restano quelli dell'errore.
     return JSONResponse(
         status_code=status_code,
-        content={"message": exc.message, "code": exc.code},
+        content={**exc.extra, "message": exc.message, "code": exc.code},
     )
 
 
@@ -424,17 +428,34 @@ def get_league_calendar_plan(
     return service.plan_preview_response(league_access)
 
 
+@router.get(
+    "/{league_id}/amministrazione/calendario/rose",
+    response_model=LeagueCalendarRosterCheckResponse,
+)
+def get_league_calendar_roster_check(
+    league_access: LeagueAccess = Depends(require_league_permissions(Permission.LEAGUE_ADMIN)),
+    service: LeagueCalendarService = Depends(get_league_calendar_service),
+) -> LeagueCalendarRosterCheckResponse:
+    """Rose non in regola per il calendario, per l'avviso prima di generarlo (solo lettura)."""
+    return service.roster_check(league_access)
+
+
 @router.post(
     "/{league_id}/amministrazione/calendario/genera",
     response_model=LeagueCalendarResponse,
 )
 def generate_league_calendar(
+    body: LeagueCalendarActionRequest | None = None,
     league_access: LeagueAccess = Depends(require_league_permissions(Permission.LEAGUE_ADMIN)),
     service: LeagueCalendarService = Depends(get_league_calendar_service),
 ) -> LeagueCalendarResponse | JSONResponse:
-    """Generate a balanced single round-robin preview (FR-LEG-04)."""
+    """Generate a balanced single round-robin preview (FR-LEG-04).
+
+    Rose non in regola: ``league_rosters_invalid`` con ``teams`` (squadra e problemi); con
+    ``{"force": true}`` si genera comunque (vedi `LeagueCalendarService.generate`).
+    """
     try:
-        return service.generate(league_access)
+        return service.generate(league_access, force=body is not None and body.force)
     except AuthError as exc:
         return _error_response(exc)
 
@@ -444,12 +465,16 @@ def generate_league_calendar(
     response_model=LeagueCalendarResponse,
 )
 def confirm_league_calendar(
+    body: LeagueCalendarActionRequest | None = None,
     league_access: LeagueAccess = Depends(require_league_permissions(Permission.LEAGUE_ADMIN)),
     service: LeagueCalendarService = Depends(get_league_calendar_service),
 ) -> LeagueCalendarResponse | JSONResponse:
-    """Confirm the generated calendar; idempotent when already confirmed."""
+    """Confirm the generated calendar; idempotent when already confirmed.
+
+    Stesso prerequisito sulle rose di «Genera», saltabile con ``{"force": true}``.
+    """
     try:
-        return service.confirm(league_access)
+        return service.confirm(league_access, force=body is not None and body.force)
     except AuthError as exc:
         return _error_response(exc)
 

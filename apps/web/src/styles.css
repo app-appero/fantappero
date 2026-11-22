@@ -137,6 +137,23 @@ button.fa-link-muted,
   border-top: 1px solid var(--fa-color-border);
 }
 
+/* Modale «Genera/Conferma calendario»: tutti i bottoni, la × compresa, almeno 44px. */
+.fa-calendar-action-modal .fa-modal__close {
+  min-width: 2.75rem;
+  min-height: 2.75rem;
+}
+
+.fa-calendar-action-modal .fa-modal__footer .fa-btn {
+  min-height: 2.75rem;
+}
+
+.fa-calendar-action-modal__issues {
+  margin: var(--fa-space-sm) 0 var(--fa-space-md);
+  padding-left: var(--fa-space-lg);
+  display: grid;
+  gap: var(--fa-space-xs);
+}
+
 .fa-member-list {
   list-style: none;
   margin: var(--fa-space-md) 0 0;

@@ -948,7 +948,13 @@ def test_calendar_generation_requires_complete_rosters_even_in_active(
         headers={"Authorization": f"Bearer {owner_token}"},
     )
     assert locked.status_code == 400
-    assert locked.json()["code"] == "league_calendar_locked"
+    assert locked.json()["code"] == "league_rosters_invalid"
+    assert len(locked.json()["teams"]) == 4
+    assert all(
+        any(issue.startswith("Rosa incompleta") for issue in team["issues"])
+        and team["lineupBlocked"] is True
+        for team in locked.json()["teams"]
+    )
 
     _complete_league_rosters(
         client,
@@ -1141,3 +1147,259 @@ def test_rules_total_credits_above_int32_is_rejected_not_500(
     assert too_big.json()["code"] == "invalid_total_credits"
     ok = client.put(url, headers=headers, json={**payload, "totalCredits": 2**31 - 1})
     assert ok.status_code == 200
+
+
+def _push_team_over_forward_quota(db_session: Session, *, league_id: str) -> str:
+    """Un difensore della prima squadra diventa attaccante nel listone (pilota 21/11).
+
+    La rosa resta a 35 ma va a 10 difensori su 11 e 11 attaccanti su 10, come dopo
+    l'«Aggiorna listone» che ha cambiato i ruoli. Ritorna il nome della squadra.
+    """
+    from database.enums import FantasyRole
+    from fantasy_teams.models import FantasyRosterSlot, FantasyTeam
+    from sports_data.listone.models import RoleAssignment
+
+    team = db_session.scalars(
+        select(FantasyTeam)
+        .where(FantasyTeam.league_id == UUID(league_id))
+        .order_by(FantasyTeam.id.asc())
+    ).first()
+    assert team is not None
+    athlete_ids = [
+        slot.athlete_id
+        for slot in db_session.scalars(
+            select(FantasyRosterSlot).where(FantasyRosterSlot.fantasy_team_id == team.id)
+        ).all()
+        if slot.athlete_id is not None
+    ]
+    assignment = db_session.scalars(
+        select(RoleAssignment).where(
+            RoleAssignment.athlete_id.in_(athlete_ids),
+            RoleAssignment.season_year == 2026,
+            RoleAssignment.role == FantasyRole.D,
+        )
+    ).first()
+    assert assignment is not None
+    assignment.role = FantasyRole.A
+    db_session.commit()
+    return team.name
+
+
+def _league_with_over_quota_roster(
+    client: TestClient,
+    db_session: Session,
+    competition_ids: list[str],
+    *,
+    prefix: str,
+    anchors: list[date],
+    turns_offset: int,
+    rosters_offset: int,
+) -> tuple[str, str, list[str], str]:
+    league_id, owner_token, member_tokens = _create_league_with_members(
+        client,
+        competition_ids,
+        size=4,
+        prefix=prefix,
+    )
+    _set_min_fixtures(db_session, league_id, 10)
+    _seed_turns(
+        client,
+        db_session,
+        competition_ids,
+        league_id=league_id,
+        token=owner_token,
+        anchors=anchors,
+        id_offset=turns_offset,
+    )
+    _complete_league_rosters(
+        client,
+        db_session,
+        competition_ids,
+        league_id=league_id,
+        owner_token=owner_token,
+        id_offset=rosters_offset,
+    )
+    team_name = _push_team_over_forward_quota(db_session, league_id=league_id)
+    return league_id, owner_token, member_tokens, team_name
+
+
+def test_calendar_blocked_without_force_lists_roster_issues(
+    client: TestClient,
+    db_session: Session,
+    competition_ids: list[str],
+) -> None:
+    """Rose oltre quota: senza force la generazione si ferma e dice quali squadre e cosa."""
+    league_id, owner_token, member_tokens, team_name = _league_with_over_quota_roster(
+        client,
+        db_session,
+        competition_ids,
+        prefix="cal.quota.block",
+        anchors=[date(2027, 3, 6), date(2027, 3, 13), date(2027, 3, 20)],
+        turns_offset=780_000,
+        rosters_offset=785_000,
+    )
+    headers = {"Authorization": f"Bearer {owner_token}"}
+
+    check = client.get(f"/leagues/{league_id}/amministrazione/calendario/rose", headers=headers)
+    assert check.status_code == 200, check.text
+    teams = check.json()["teams"]
+    assert check.json()["valid"] is False
+    assert teams == [
+        {
+            "teamId": teams[0]["teamId"],
+            "teamName": team_name,
+            "issues": ["Difensori 10 su 11", "Attaccanti 11 su 10"],
+            "lineupBlocked": False,
+        }
+    ]
+    member_check = client.get(
+        f"/leagues/{league_id}/amministrazione/calendario/rose",
+        headers={"Authorization": f"Bearer {member_tokens[0]}"},
+    )
+    assert member_check.status_code == 403
+
+    for body in (None, {"force": False}):
+        blocked = client.post(
+            f"/leagues/{league_id}/amministrazione/calendario/genera",
+            headers=headers,
+            json=body,
+        )
+        assert blocked.status_code == 400
+        payload = blocked.json()
+        assert payload["code"] == "league_rosters_invalid"
+        assert f"{team_name}: Difensori 10 su 11, Attaccanti 11 su 10" in payload["message"]
+        assert payload["teams"] == teams
+
+    assert (
+        db_session.scalars(
+            select(LeagueCalendar).where(LeagueCalendar.league_id == UUID(league_id))
+        ).first()
+        is None
+    )
+
+
+def test_calendar_generated_and_confirmed_with_force_is_audited(
+    client: TestClient,
+    db_session: Session,
+    competition_ids: list[str],
+) -> None:
+    """Con force l'amministratore genera e conferma comunque; l'audit tiene i problemi."""
+    league_id, owner_token, _, team_name = _league_with_over_quota_roster(
+        client,
+        db_session,
+        competition_ids,
+        prefix="cal.quota.force",
+        anchors=[date(2027, 4, 3), date(2027, 4, 10), date(2027, 4, 17)],
+        turns_offset=800_000,
+        rosters_offset=805_000,
+    )
+    headers = {"Authorization": f"Bearer {owner_token}"}
+
+    generated = client.post(
+        f"/leagues/{league_id}/amministrazione/calendario/genera",
+        headers=headers,
+        json={"force": True},
+    )
+    assert generated.status_code == 200, generated.text
+    assert generated.json()["status"] == "draft"
+    assert generated.json()["roundCount"] == 3
+
+    # La conferma ha lo stesso prerequisito: senza force si ferma, con force passa.
+    not_confirmed = client.post(
+        f"/leagues/{league_id}/amministrazione/calendario/conferma",
+        headers=headers,
+    )
+    assert not_confirmed.status_code == 400
+    assert not_confirmed.json()["code"] == "league_rosters_invalid"
+    confirmed = client.post(
+        f"/leagues/{league_id}/amministrazione/calendario/conferma",
+        headers=headers,
+        json={"force": True},
+    )
+    assert confirmed.status_code == 200, confirmed.text
+    assert confirmed.json()["status"] == "confirmed"
+
+    db_session.expire_all()
+    audits = {
+        audit.action: audit.details
+        for audit in db_session.scalars(
+            select(LeagueAuditEvent).where(LeagueAuditEvent.league_id == UUID(league_id))
+        ).all()
+    }
+    generated_audit = audits[LeagueAuditAction.LEAGUE_CALENDAR_GENERATED]
+    expected_issues = [
+        {
+            "teamId": generated_audit["rosterIssues"][0]["teamId"],
+            "teamName": team_name,
+            "issues": ["Difensori 10 su 11", "Attaccanti 11 su 10"],
+            "lineupBlocked": False,
+        }
+    ]
+    for action in (
+        LeagueAuditAction.LEAGUE_CALENDAR_GENERATED,
+        LeagueAuditAction.LEAGUE_CALENDAR_CONFIRMED,
+    ):
+        assert audits[action]["forced"] is True
+        assert audits[action]["forcedByOperator"] is False
+        assert audits[action]["rosterIssues"] == expected_issues
+
+
+def test_calendar_force_does_not_bypass_participant_count(
+    client: TestClient,
+    db_session: Session,
+    competition_ids: list[str],
+) -> None:
+    """Force salta solo le rose: una lega non al completo resta bloccata."""
+    from leagues.models.league_rules import LeagueRules
+
+    league_id, owner_token, _ = _create_league_with_members(
+        client,
+        competition_ids,
+        size=4,
+        prefix="cal.quota.notfull",
+    )
+    rules = db_session.scalars(
+        select(LeagueRules).where(LeagueRules.league_id == UUID(league_id))
+    ).one()
+    rules.participant_count = 5
+    db_session.commit()
+
+    response = client.post(
+        f"/leagues/{league_id}/amministrazione/calendario/genera",
+        headers={"Authorization": f"Bearer {owner_token}"},
+        json={"force": True},
+    )
+    assert response.status_code == 400
+    assert response.json()["code"] == "participant_count_mismatch"
+    assert (
+        db_session.scalars(
+            select(LeagueCalendar).where(LeagueCalendar.league_id == UUID(league_id))
+        ).first()
+        is None
+    )
+
+
+def test_calendar_force_forbidden_for_league_member(
+    client: TestClient,
+    db_session: Session,
+    competition_ids: list[str],
+) -> None:
+    league_id, _owner_token, member_tokens = _create_league_with_members(
+        client,
+        competition_ids,
+        size=4,
+        prefix="cal.quota.member",
+    )
+    for path in ("genera", "conferma"):
+        response = client.post(
+            f"/leagues/{league_id}/amministrazione/calendario/{path}",
+            headers={"Authorization": f"Bearer {member_tokens[0]}"},
+            json={"force": True},
+        )
+        assert response.status_code == 403
+    assert (
+        db_session.scalars(
+            select(LeagueCalendar).where(LeagueCalendar.league_id == UUID(league_id))
+        ).first()
+        is None
+    )

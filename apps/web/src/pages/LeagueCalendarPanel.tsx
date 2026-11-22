@@ -1,11 +1,18 @@
-import type { CalendarWindow, LeagueCalendar, LeagueCalendarPlan } from "@fantappero/contracts";
-import { Badge, Button, UiStatePanel } from "@fantappero/ui";
+import type {
+  CalendarRosterTeamIssues,
+  CalendarWindow,
+  LeagueCalendar,
+  LeagueCalendarPlan,
+} from "@fantappero/contracts";
+import { Badge, Button, Modal, UiStatePanel } from "@fantappero/ui";
 import { useCallback, useEffect, useState } from "react";
 import { ApiError } from "../api/client";
 import {
+  calendarRosterIssuesFromError,
   confirmLeagueCalendar,
   ensureFantasyTurns,
   fetchLeagueCalendarAdmin,
+  fetchLeagueCalendarRosterCheck,
   generateLeagueCalendar,
 } from "../api/leagues";
 import { getApiErrorMessage } from "../auth/AuthContext";
@@ -114,6 +121,134 @@ export function CalendarWindowsPanel({ plan }: { plan: LeagueCalendarPlan }) {
   );
 }
 
+export type CalendarAction = "generate" | "confirm";
+
+/** Stato del modale di «Genera/Conferma calendario»: verifica rose, poi conferma o avviso. */
+export type CalendarActionModalState = {
+  action: CalendarAction;
+  phase: "checking" | "ready";
+  teams: CalendarRosterTeamIssues[];
+};
+
+const ACTION_COPY: Record<
+  CalendarAction,
+  { title: string; verb: string; button: string; forceButton: string; working: string; prompt: string }
+> = {
+  generate: {
+    title: "Genera calendario",
+    verb: "generare",
+    button: "Genera calendario",
+    forceButton: "Genera comunque",
+    working: "Generazione…",
+    prompt:
+      "Vuoi generare il calendario? Le giornate seguono i Turni Europei della lega: dopo controlli l'anteprima e la confermi.",
+  },
+  confirm: {
+    title: "Conferma calendario",
+    verb: "confermare",
+    button: "Conferma calendario",
+    forceButton: "Conferma comunque",
+    working: "Conferma…",
+    prompt: "Vuoi confermare il calendario? Gli scontri diventano visibili a tutti i partecipanti.",
+  },
+};
+
+function joinTeamNames(names: string[]): string {
+  if (names.length <= 1) {
+    return names[0] ?? "";
+  }
+  return `${names.slice(0, -1).join(", ")} e ${names[names.length - 1]}`;
+}
+
+/**
+ * Modale di «Genera/Conferma calendario» (Rosario 22/11): conferma normale con le rose in
+ * regola, altrimenti l'avviso con squadre e problemi e «Genera comunque» / «Conferma comunque».
+ *
+ * Il testo segue il comportamento reale della formazione (`roster_allows_lineup`,
+ * `drop_role_quota_excess_from_tribuna`): chi è in esubero di ruolo resta in rosa ma non si
+ * schiera (né titolare né nei primi 10 della panchina), gli altri sì. Una rosa con slot vuoti
+ * o meno di 3 campionati (`lineupBlocked`) invece non schiera proprio.
+ */
+export function CalendarActionModal({
+  state,
+  working,
+  onCancel,
+  onProceed,
+}: {
+  state: CalendarActionModalState | null;
+  working: boolean;
+  onCancel: () => void;
+  onProceed: (force: boolean) => void;
+}) {
+  const copy = ACTION_COPY[state?.action ?? "generate"];
+  const teams = state?.teams ?? [];
+  const checking = state?.phase === "checking";
+  const hasIssues = !checking && teams.length > 0;
+  const blocked = teams.filter((team) => team.lineupBlocked).map((team) => team.teamName);
+  return (
+    <Modal
+      open={state !== null}
+      onClose={onCancel}
+      title={copy.title}
+      className="fa-calendar-action-modal"
+      footer={
+        <>
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={onCancel}
+            disabled={working}
+            data-testid="league-calendar-modal-cancel"
+          >
+            Annulla
+          </Button>
+          <Button
+            type="button"
+            variant="primary"
+            onClick={() => onProceed(hasIssues)}
+            disabled={working || checking}
+            data-testid="league-calendar-modal-proceed"
+          >
+            {working ? copy.working : hasIssues ? copy.forceButton : copy.button}
+          </Button>
+        </>
+      }
+    >
+      {checking ? (
+        <p data-testid="league-calendar-modal-checking">Verifica delle rose in corso…</p>
+      ) : hasIssues ? (
+        <div data-testid="league-calendar-modal-warning">
+          <p>
+            <strong>Alcune rose non sono in regola:</strong>
+          </p>
+          <ul className="fa-calendar-action-modal__issues" data-testid="league-calendar-modal-issues">
+            {teams.map((team) => (
+              <li key={team.teamId ?? team.teamName}>
+                <strong>{team.teamName}</strong>: {team.issues.join(", ")}
+              </li>
+            ))}
+          </ul>
+          <p>
+            Puoi {copy.verb} comunque il calendario: le rose andranno sistemate, meglio prima del
+            primo turno. Finché una rosa non torna in regola, i calciatori in esubero restano in
+            rosa ma non potranno essere schierati, né titolari né tra i primi 10 della panchina; il
+            resto della squadra può schierare la formazione senza di loro.
+          </p>
+          {blocked.length > 0 ? (
+            <p data-testid="league-calendar-modal-blocked">
+              {joinTeamNames(blocked)} invece non{" "}
+              {blocked.length === 1 ? "potrà" : "potranno"} schierare la formazione finché la rosa
+              non sarà completa e con almeno 3 campionati.
+            </p>
+          ) : null}
+        </div>
+      ) : (
+        <p data-testid="league-calendar-modal-confirm">{copy.prompt}</p>
+      )}
+    </Modal>
+  );
+}
+
 function calendarStatusLabel(calendar: LeagueCalendar | null): string {
   if (!calendar) {
     return "Non generato";
@@ -154,7 +289,8 @@ export function LeagueCalendarPanel({
     }
     return true;
   });
-  const [working, setWorking] = useState<"generate" | "confirm" | null>(null);
+  const [working, setWorking] = useState<CalendarAction | null>(null);
+  const [modal, setModal] = useState<CalendarActionModalState | null>(null);
   const [loadError, setLoadError] = useState<string | null>(() =>
     isDemoMode && demoState === "error" ? "Impossibile caricare il calendario (demo)." : null,
   );
@@ -227,21 +363,74 @@ export function LeagueCalendarPanel({
     void loadCalendar();
   }, [loadCalendar]);
 
-  async function onGenerate() {
+  /**
+   * «Genera/Conferma calendario» apre il modale: prima si verificano le rose, poi si mostra la
+   * conferma normale o l'avviso con «Genera comunque» / «Conferma comunque».
+   */
+  async function openActionModal(action: CalendarAction) {
+    setActionError(null);
+    setSuccess(null);
+    setModal({ action, phase: "checking", teams: [] });
+    const stored = loadStoredSession();
+    if (isDemoMode || !leagueId || !stored?.accessToken) {
+      setModal({ action, phase: "ready", teams: [] });
+      return;
+    }
+    let teams: CalendarRosterTeamIssues[] = [];
+    try {
+      teams = (await fetchLeagueCalendarRosterCheck(stored.accessToken, leagueId)).teams;
+    } catch {
+      // Verifica non riuscita: conferma normale; se le rose non sono in regola lo dice
+      // l'azione stessa (`league_rosters_invalid`) e il modale passa all'avviso.
+    }
+    setModal((current) =>
+      current && current.action === action ? { action, phase: "ready", teams } : current,
+    );
+  }
+
+  function closeActionModal() {
+    if (working === null) {
+      setModal(null);
+    }
+  }
+
+  async function runAction(action: CalendarAction, force: boolean) {
+    if (action === "generate") {
+      await onGenerate(force);
+    } else {
+      await onConfirm(force);
+    }
+  }
+
+  /** Errore dell'azione: avviso sulle rose nel modale se è quello, altrimenti nel pannello. */
+  function onActionError(action: CalendarAction, error: unknown, fallback: string) {
+    const teams = calendarRosterIssuesFromError(error);
+    if (teams !== null && teams.length > 0) {
+      setModal({ action, phase: "ready", teams });
+      return;
+    }
+    setModal(null);
+    setActionError(getApiErrorMessage(error, fallback));
+  }
+
+  async function onGenerate(force: boolean) {
     setActionError(null);
     setSuccess(null);
     if (isDemoMode) {
+      setModal(null);
       setCalendar(DEMO_CALENDAR);
       setSuccess("Calendario generato.");
       onCalendarChanged?.();
       return;
     }
     if (!leagueId) {
+      setModal(null);
       setActionError("Seleziona una lega prima di generare il calendario.");
       return;
     }
     const stored = loadStoredSession();
     if (!stored?.accessToken) {
+      setModal(null);
       setActionError("Sessione non disponibile. Accedi di nuovo.");
       return;
     }
@@ -249,7 +438,7 @@ export function LeagueCalendarPanel({
     try {
       let next;
       try {
-        next = await generateLeagueCalendar(stored.accessToken, leagueId);
+        next = await generateLeagueCalendar(stored.accessToken, leagueId, { force });
       } catch (error) {
         // I Turni Europei di questa lega non esistono ancora (lega nuova, mai
         // entrata nella finestra del cron automatico che copre solo le leghe
@@ -259,32 +448,26 @@ export function LeagueCalendarPanel({
           throw error;
         }
         await ensureFantasyTurns(stored.accessToken, leagueId);
-        next = await generateLeagueCalendar(stored.accessToken, leagueId);
+        next = await generateLeagueCalendar(stored.accessToken, leagueId, { force });
       }
+      setModal(null);
       setCalendar(next);
       setSuccess(
         `Calendario generato: ${next.matchupCount} incontri su ${next.roundCount} giornate.`,
       );
       onCalendarChanged?.();
     } catch (error) {
-      const message = getApiErrorMessage(error, "Impossibile generare il calendario.");
-      setActionError(message);
-      if (
-        error instanceof ApiError &&
-        error.code === "league_calendar_locked" &&
-        /rose|Partecipanti/i.test(message)
-      ) {
-        // Messaggio già allineato al backend: il link Partecipanti è sotto.
-      }
+      onActionError("generate", error, "Impossibile generare il calendario.");
     } finally {
       setWorking(null);
     }
   }
 
-  async function onConfirm() {
+  async function onConfirm(force: boolean) {
     setActionError(null);
     setSuccess(null);
     if (isDemoMode) {
+      setModal(null);
       setCalendar({
         ...DEMO_CALENDAR,
         status: "confirmed",
@@ -296,22 +479,25 @@ export function LeagueCalendarPanel({
       return;
     }
     if (!leagueId) {
+      setModal(null);
       setActionError("Seleziona una lega prima di confermare il calendario.");
       return;
     }
     const stored = loadStoredSession();
     if (!stored?.accessToken) {
+      setModal(null);
       setActionError("Sessione non disponibile. Accedi di nuovo.");
       return;
     }
     setWorking("confirm");
     try {
-      const next = await confirmLeagueCalendar(stored.accessToken, leagueId);
+      const next = await confirmLeagueCalendar(stored.accessToken, leagueId, { force });
+      setModal(null);
       setCalendar(next);
       setSuccess("Calendario confermato.");
       onCalendarChanged?.();
     } catch (error) {
-      setActionError(getApiErrorMessage(error, "Impossibile confermare il calendario."));
+      onActionError("confirm", error, "Impossibile confermare il calendario.");
     } finally {
       setWorking(null);
     }
@@ -377,8 +563,9 @@ export function LeagueCalendarPanel({
           : null}
       </p>
       <p>
-        Genera e conferma il calendario quando tutte le rose in Partecipanti sono complete. Gli
-        scontri compaiono sotto, giornata per giornata.
+        Genera e conferma il calendario quando tutte le rose in Partecipanti sono in regola: se
+        qualcuna non lo è, prima di procedere ti diciamo quale e cosa manca. Gli scontri
+        compaiono sotto, giornata per giornata.
       </p>
 
       {!calendar ? (
@@ -421,8 +608,8 @@ export function LeagueCalendarPanel({
         <Button
           type="button"
           variant="primary"
-          disabled={working !== null}
-          onClick={() => void onGenerate()}
+          disabled={working !== null || modal !== null}
+          onClick={() => void openActionModal("generate")}
           data-testid="league-calendar-generate"
         >
           {working === "generate" ? "Generazione…" : "Genera calendario"}
@@ -430,13 +617,23 @@ export function LeagueCalendarPanel({
         <Button
           type="button"
           variant="secondary"
-          disabled={working !== null || !calendar}
-          onClick={() => void onConfirm()}
+          disabled={working !== null || modal !== null || !calendar}
+          onClick={() => void openActionModal("confirm")}
           data-testid="league-calendar-confirm"
         >
           {working === "confirm" ? "Conferma…" : "Conferma calendario"}
         </Button>
       </div>
+      <CalendarActionModal
+        state={modal}
+        working={working !== null}
+        onCancel={closeActionModal}
+        onProceed={(force) => {
+          if (modal) {
+            void runAction(modal.action, force);
+          }
+        }}
+      />
     </section>
   );
 }

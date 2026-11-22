@@ -593,6 +593,31 @@ export interface LeagueCalendar {
   summary: { message: string };
 }
 
+/** Una squadra con la rosa non in regola per il calendario H2H (es. «Attaccanti 11 su 10»). */
+export interface CalendarRosterTeamIssues {
+  teamId: string | null;
+  teamName: string;
+  issues: string[];
+  /**
+   * La squadra non può schierare la formazione finché la rosa non è sistemata (slot vuoti,
+   * meno di 3 campionati, squadra mancante). Con i soli esuberi di ruolo è `false`: si
+   * schiera senza di loro.
+   */
+  lineupBlocked: boolean;
+}
+
+/** `GET /leagues/{id}/amministrazione/calendario/rose`: rose da sistemare prima del calendario. */
+export interface LeagueCalendarRosterCheck {
+  valid: boolean;
+  teams: CalendarRosterTeamIssues[];
+}
+
+/**
+ * Codice d'errore di «Genera/Conferma calendario» con rose non in regola. Il corpo dell'errore
+ * ha anche `teams: CalendarRosterTeamIssues[]`; si può ripetere con `{ force: true }`.
+ */
+export const CALENDAR_ROSTERS_INVALID_CODE = "league_rosters_invalid";
+
 export type FantasyRole = "P" | "D" | "C" | "A";
 
 /** Risultato H2H persistito sullo slot (EP07-05), lettura matchday. */
