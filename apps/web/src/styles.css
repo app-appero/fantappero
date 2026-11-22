@@ -9223,6 +9223,492 @@ body:has(.fa-listone-refresh-bar) .fa-page-container {
   }
 }
 
+/* ══ Pannello operatore, Job, Notifiche, Email e Segnalazioni: rifinitura grafica (proposte di design del 22/11) ══
+   /admin/job, /admin/notifiche (Nuova, Scegli utenti, Test, Storico), /admin/email (Nuova, Storico)
+   e /admin/feedback (schede e finestre), più due ritocchi validi in tutto il pannello (percorso
+   in alto e margine laterale su telefono): solo misure, spazi, allineamenti e colori, nessun
+   cambio di testi o di comportamento. Ogni blocco porta il numero della proposta
+   (design_oper3/proposals.json), così si può tenere o togliere da solo. Sta prima delle regole
+   iPhone in fondo al file, che restano l'ultima parola su env(safe-area-inset-*) e campi da 16px. */
+
+/* [Operatore Job/Notifiche/Email/Segnalazioni 1] Bollini e scritte leggibili nei due temi.
+   «Ricevuta» delle segnalazioni era testo scuro su blu scuro (2,3:1 nel tema chiaro, 1,4:1 nello
+   scuro); «Push attivo», «Inviato», «Programmato» e «Inviata a 1 utenti» erano verde e giallo
+   chiarissimi su fondo chiaro (1,3:1); «Attivo» dei job verde su verde (3,1:1); le iniziali
+   degli utenti e «Selezionati» poco sotto la soglia. Ora ogni stato ha il suo colore, sempre
+   almeno 4,5:1: Ricevuta azzurra, In lavorazione ambra, Risolta verde, Chiusa grigia, come gli
+   stati delle leghe. I job spenti non sono più trasparenti (le scritte grigie scendevano a
+   3,9:1): fondo grigio tenue e bordo tratteggiato. Nell'anteprima email la riga in fondo passa
+   da 3,0 a 5,2:1. */
+.fa-feedback-admin__head > .fa-feedback__status--new {
+  background: color-mix(in srgb, var(--fa-color-accent) 14%, transparent);
+  color: var(--fa-color-accent-muted);
+}
+
+.fa-feedback-admin__head > .fa-feedback__status--in_review {
+  background: color-mix(in srgb, var(--fa-color-warning) 18%, transparent);
+  color: var(--fa-color-warning);
+}
+
+.fa-feedback-admin__head > .fa-feedback__status--resolved {
+  background: color-mix(in srgb, var(--fa-color-success) 11%, transparent);
+  color: var(--fa-color-success);
+}
+
+.fa-feedback-admin__head > .fa-feedback__status--dismissed {
+  background: color-mix(in srgb, var(--fa-color-foreground) 8%, transparent);
+  color: var(--fa-color-foreground-muted);
+}
+
+.fa-job__chip--on,
+.fa-nop .fa-nop-chip--ok,
+.fa-nop .fa-nop-chip--sent {
+  background: color-mix(in srgb, var(--fa-color-success) 11%, var(--fa-color-background-elevated));
+  color: var(--fa-color-success);
+}
+
+.fa-nop .fa-nop-chip--scheduled {
+  background: color-mix(in srgb, var(--fa-color-warning) 18%, var(--fa-color-background-elevated));
+  color: var(--fa-color-warning);
+}
+
+.fa-nop .fa-nop-done {
+  color: var(--fa-color-success);
+}
+
+.fa-nop .fa-nop-pill--sel {
+  background: color-mix(in srgb, var(--fa-color-accent) 14%, transparent);
+  color: var(--fa-color-accent-muted);
+}
+
+.fa-nop .fa-nop-user__avatar {
+  color: #ffffff;
+}
+
+.fa-nop .fa-nop-mail small {
+  color: #646d8a;
+}
+
+.fa-job--off {
+  opacity: 1;
+  border-style: dashed;
+  background: var(--fa-color-background-subtle);
+}
+
+/* [Operatore Job/Notifiche/Email/Segnalazioni 2] Segnalazioni: barra in alto e intestazione di
+   ogni scheda in ordine. Su telefono «Aggiorna» finiva da solo sulla riga sotto; ora sta accanto
+   a «Stato» e «7 da leggere» va sotto, a tutta larghezza; su computer «7 da leggere» è centrato
+   sull'altezza dei comandi. Nell'intestazione stato, categoria e autore si spezzavano in punti
+   diversi da scheda a scheda, «Impersona» galleggiava (74×32px, testo da 12px) e la data finiva
+   sola a destra su una riga vuota. Ora: sopra stato e categoria (su computer con la data a
+   destra), sotto autore ed email in 14px, «Impersona» a destra con il bordo e alto 44px; su
+   telefono data e «Impersona» in fondo, sulla stessa riga. */
+.fa-feedback-admin__count {
+  display: flex;
+  align-items: center;
+  min-height: 2.75rem;
+}
+
+.fa-feedback-admin__head {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-areas:
+    "status category time"
+    "who who action";
+  align-items: center;
+  gap: var(--fa-space-xs) var(--fa-space-sm);
+}
+
+.fa-feedback-admin__head > .fa-feedback__status {
+  grid-area: status;
+  justify-self: start;
+}
+
+.fa-feedback-admin__head > strong {
+  grid-area: category;
+  min-width: 0;
+}
+
+.fa-feedback-admin__head > .fa-feedback-admin__who {
+  grid-area: who;
+  min-width: 0;
+  font-size: var(--fa-text-sm);
+}
+
+.fa-feedback-admin__head > .fa-btn {
+  grid-area: action;
+  justify-self: end;
+  min-height: 2.75rem;
+  padding-inline: var(--fa-space-md);
+  border-color: var(--fa-color-border);
+  font-size: var(--fa-text-sm);
+}
+
+.fa-feedback-admin__head > time {
+  grid-area: time;
+  justify-self: end;
+  margin-left: 0;
+  white-space: nowrap;
+}
+
+@media (max-width: 640px) {
+  .fa-feedback-admin__toolbar {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: end;
+    gap: var(--fa-space-xs) var(--fa-space-sm);
+  }
+
+  .fa-feedback-admin__toolbar > .fa-feedback-admin__count {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    min-height: 0;
+  }
+
+  .fa-feedback-admin__head {
+    grid-template-areas:
+      "status category category"
+      "who who who"
+      "time time action";
+  }
+
+  .fa-feedback-admin__head > time {
+    justify-self: start;
+    width: auto;
+  }
+}
+
+/* [Operatore Job/Notifiche/Email/Segnalazioni 3] Segnalazioni su telefono: dettagli in colonna e
+   allegati affiancati. «Pagina», «Piattaforma», «Versione» e «Dispositivo» andavano a capo in
+   punti diversi, con i valori ora a destra ora sotto; ora sono una tabellina a due colonne, nomi
+   a sinistra e valori allineati. Le schermate allegate erano una sotto l'altra, alte 320px
+   ciascuna (più di una schermata e mezza di scorrimento per due immagini): ora sono miniature
+   alte 200px, una accanto all'altra; toccandole si aprono intere come prima. Margine interno
+   della scheda da 24 a 16px, come le schede di Job e Notifiche. */
+@media (max-width: 640px) {
+  .fa-feedback-admin__card {
+    padding: var(--fa-space-md);
+  }
+
+  .fa-feedback-admin__meta {
+    display: grid;
+    grid-template-columns: max-content minmax(0, 1fr);
+    gap: var(--fa-space-xs) var(--fa-space-md);
+  }
+
+  .fa-feedback-admin__meta > div {
+    display: contents;
+  }
+
+  .fa-feedback-admin__attachments {
+    gap: var(--fa-space-sm);
+  }
+
+  .fa-feedback-admin__attachments > a {
+    max-width: 100%;
+  }
+
+  .fa-feedback-admin__attachments .fa-feedback-admin__media {
+    max-width: 100%;
+    max-height: 200px;
+  }
+}
+
+/* [Operatore Job/Notifiche/Email/Segnalazioni 4] Segnalazioni: bottoni ripetuti più calmi e in
+   ordine. Ogni scheda aveva «Segna come risolta» pieno con il gradiente ed «Elimina» rosso pieno
+   con l'alone: sedici schede, trentadue bottoni principali. Ora sono colorati ma tenui, come
+   «Abilita tester» ed «Elimina» delle leghe (pieni al passaggio del mouse). Su telefono i quattro
+   bottoni sono due colonne uguali (prima tre righe sfalsate, «Elimina» da solo); nelle finestre
+   «Elimina segnalazione» e «Impersona utente» i bottoni sono uno sotto l'altro a tutta
+   larghezza, la conferma sopra; «Precedente · Pagina 1 di 2 · Successiva» come nelle altre
+   pagine del pannello (a 360px «Pagina 1 di 2» andava a capo). */
+.fa-feedback-admin__actions > .fa-btn--primary {
+  border-color: color-mix(in srgb, var(--fa-color-accent) 45%, transparent);
+  background-color: color-mix(in srgb, var(--fa-color-accent) 14%, var(--fa-color-background-elevated));
+  background-image: none;
+  color: var(--fa-color-accent-muted);
+  box-shadow: none;
+}
+
+.fa-feedback-admin__actions > .fa-btn--primary:hover:not(:disabled) {
+  background-color: color-mix(in srgb, var(--fa-color-accent) 24%, var(--fa-color-background-elevated));
+  filter: none;
+}
+
+.fa-feedback-admin__actions > .fa-btn--danger {
+  border-color: color-mix(in srgb, var(--fa-danger-500) 60%, transparent);
+  background-color: transparent;
+  color: var(--fa-danger-400);
+  box-shadow: none;
+}
+
+[data-color-scheme="light"] .fa-feedback-admin__actions > .fa-btn--danger {
+  color: var(--fa-danger-600);
+}
+
+.fa-feedback-admin__actions > .fa-btn--danger:hover:not(:disabled) {
+  border-color: transparent;
+  background-color: var(--fa-danger-600);
+  color: #ffffff;
+}
+
+@media (max-width: 640px) {
+  .fa-feedback-admin__actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .fa-feedback-admin__actions > .fa-btn {
+    padding-inline: var(--fa-space-sm);
+  }
+
+  .fa-feedback-admin__pager {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    gap: var(--fa-space-xs);
+    font-size: var(--fa-text-sm);
+    line-height: 1.35;
+    text-align: center;
+  }
+
+  .fa-feedback-admin__pager > .fa-btn {
+    padding-inline: var(--fa-space-md);
+  }
+}
+
+@media (max-width: 480px) {
+  .fa-modal__dialog:has([data-testid="feedback-admin-delete-confirm"]) .fa-modal__footer,
+  .fa-modal__dialog:has([data-testid="feedback-admin-impersonate-confirm"]) .fa-modal__footer {
+    display: flex;
+    flex-direction: column-reverse;
+    align-items: stretch;
+    gap: var(--fa-space-xs);
+  }
+
+  .fa-modal__dialog:has([data-testid="feedback-admin-delete-confirm"]) .fa-modal__footer > .fa-btn,
+  .fa-modal__dialog:has([data-testid="feedback-admin-impersonate-confirm"]) .fa-modal__footer > .fa-btn {
+    width: 100%;
+  }
+}
+
+/* [Operatore Job/Notifiche/Email/Segnalazioni 5] Schede dei job più ordinate. Su telefono la
+   descrizione stava in una colonna stretta accanto all'interruttore (210px su 326) e andava a
+   capo su quattro o cinque righe; «Prossima partenza» e la data si spezzavano su due righe; il
+   bottone «Salva frequenza» finiva da solo a destra sotto i campi. Ora l'interruttore sta
+   accanto al titolo e la descrizione usa tutta la larghezza; ogni data è una riga sola, nome a
+   sinistra e data a destra (anche a 360px);
+   «Ogni» e «Unità» riempiono la riga e «Salva frequenza» è largo quanto la scheda; margine
+   interno 16px invece di 24. Su computer le due schede affiancate hanno la stessa altezza e i
+   campi della frequenza sono allineati in fondo (prima la scheda più corta finiva prima e i
+   campi delle due colonne erano sfalsati). */
+.fa-jobs__grid {
+  align-items: stretch;
+}
+
+.fa-job {
+  display: flex;
+  flex-direction: column;
+}
+
+.fa-job__form {
+  margin-top: auto;
+}
+
+@media (max-width: 640px) {
+  .fa-job {
+    padding: var(--fa-space-md);
+  }
+
+  .fa-job__head {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      "title switch"
+      "desc desc";
+    align-items: start;
+    gap: var(--fa-space-xs) var(--fa-space-sm);
+  }
+
+  .fa-job__head > div:not(.fa-switch) {
+    display: contents;
+  }
+
+  .fa-job__head .fa-job__title {
+    grid-area: title;
+    align-self: center;
+  }
+
+  .fa-job__head .fa-job__desc {
+    grid-area: desc;
+    margin: 0;
+  }
+
+  .fa-job__head > .fa-switch {
+    grid-area: switch;
+    min-height: 2.75rem;
+  }
+
+  .fa-job__times {
+    flex-direction: column;
+    gap: var(--fa-space-xs);
+  }
+
+  .fa-job__times > div {
+    flex: 0 0 auto;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0 var(--fa-space-sm);
+    padding: var(--fa-space-sm) var(--fa-space-md);
+  }
+
+  .fa-job__times span {
+    letter-spacing: 0.08em;
+  }
+
+  .fa-job__form {
+    display: grid;
+    grid-template-columns: minmax(0, 2fr) minmax(0, 3fr);
+  }
+
+  .fa-job__form .fa-field:first-child,
+  .fa-job__form .fa-field:nth-child(2) {
+    width: auto;
+    min-width: 0;
+  }
+
+  .fa-job__form .fa-btn {
+    grid-column: 1 / -1;
+    margin-left: 0;
+  }
+}
+
+/* [Operatore Job/Notifiche/Email/Segnalazioni 6] Riepiloghi e storico più compatti su telefono.
+   I riquadri «Attivi · Prossimo giro» (Job) e «Inviate · Lette» (Storico notifiche) occupavano
+   una riga intera ciascuno, 130px l'uno per un numero: ora stanno affiancati, e la prima scheda
+   si vede subito. Nello storico delle notifiche la seconda riga («Consegnate · Lette» e lo stato)
+   ripartiva dal bordo, sotto l'icona: ora è allineata al titolo, con lo stato in fondo a destra. */
+@media (max-width: 640px) {
+  .fa-jobs__tiles {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--fa-space-sm);
+  }
+
+  .fa-jobs__tiles li {
+    min-width: 0;
+    padding: var(--fa-space-sm) var(--fa-space-md);
+  }
+
+  .fa-jobs__tiles strong {
+    font-size: 1.75rem;
+  }
+
+  .fa-jobs__tiles small {
+    font-size: var(--fa-text-sm);
+    overflow-wrap: anywhere;
+  }
+
+  .fa-nop-hist:has(> .fa-nop-glyph) > .fa-nop-hist__nums {
+    margin-left: 52px;
+  }
+
+  .fa-nop-hist > .fa-nop-chip {
+    margin-left: auto;
+  }
+}
+
+/* [Operatore Job/Notifiche/Email/Segnalazioni 7] Notifiche ed Email su telefono: le scelte
+   («Tipo», «Destinatari», «Invio», «A me · A utenti scelti») sono una per riga, a tutta
+   larghezza, come le scelte della formazione migliore. Prima a 390px stavano due per riga ma
+   larghe secondo il testo: «Novità» e «Manutenzione» non erano in colonna con «Test» e «Avviso»,
+   «Tutti gli utenti» e «Selezione manuale» andavano a capo e i suggerimenti si spezzavano dopo
+   una o due parole (a 360px invece erano già una per riga: ora è uguale su ogni telefono).
+   Pallino e testo più vicini; margine interno delle schede da 24 a 16px, come le schede dei job. Nel «Riepilogo» le righe
+   divisorie erano bianche, invisibili nel tema chiaro: ora usano il colore dei bordi. */
+.fa-nop .fa-nop-sum div {
+  border-top-color: var(--fa-color-border);
+}
+
+@media (max-width: 640px) {
+  .fa-nop .fa-nop-card {
+    padding: var(--fa-space-md);
+  }
+
+  .fa-nop .fa-nop-radios {
+    gap: var(--fa-space-sm);
+  }
+
+  .fa-nop .fa-nop-radio {
+    flex-basis: 100%;
+    gap: 10px;
+    padding: 12px 14px;
+  }
+}
+
+/* [Operatore Job/Notifiche/Email/Segnalazioni 8] Aree di tocco da 44px in Job e Notifiche.
+   Gli interruttori (accensione dei job, «Push sul telefono», «Email») erano 44×24px: ora l'area
+   che risponde al tocco è 44×44, senza cambiare il disegno; fra un interruttore e quello sotto
+   20px invece di 12, così le due aree non si sovrappongono. In «Scegli utenti» i filtri (36px)
+   uscivano dalla riga e «Operatori» e «Selezionati» restavano nascosti a destra, anche su
+   computer: ora vanno a capo e su telefono sono alti 44px; «Seleziona questa pagina» (24px) e
+   «Seleziona tutti i 18» (20px) sono alti 44px; «Svuota» e «Conferma» sono due bottoni uguali
+   a tutta larghezza. */
+.fa-app-shell[data-surface="admin"] .fa-switch__control::after {
+  content: "";
+  position: absolute;
+  inset: -11px -1px;
+}
+
+.fa-nop .fa-nop-row--switches {
+  row-gap: 20px;
+}
+
+[data-testid="admin-notifications-picker"] .fa-nop-filters {
+  flex-wrap: wrap;
+  overflow: visible;
+}
+
+[data-testid="admin-notifications-picker"] .fa-nop-pickhead > button {
+  min-height: 2.75rem;
+}
+
+@media (max-width: 640px) {
+  [data-testid="admin-notifications-picker"] .fa-nop-pill {
+    display: inline-flex;
+    align-items: center;
+    min-height: 2.75rem;
+    padding-inline: 12px;
+  }
+
+  [data-testid="admin-notifications-picker"] .fa-nop-pickfoot > span {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--fa-space-sm);
+    width: 100%;
+  }
+}
+
+/* [Operatore Job/Notifiche/Email/Segnalazioni 9] Percorso in alto («Operazioni / …»,
+   «Pannello / Segnalazioni») in tutte le pagine del pannello: il link era un'area di 55×18px su
+   telefono (65×21 su computer). Ora risponde al tocco su 44px di altezza, senza spostare nulla. */
+.fa-app-shell[data-surface="admin"] .fa-breadcrumb__link {
+  display: inline-block;
+  padding: 13px 6px;
+  margin: -13px -6px;
+}
+
+/* [Operatore Job/Notifiche/Email/Segnalazioni 10] Margine laterale del pannello su telefono:
+   16px invece di 8px, in tutte le pagine operatore. Titoli, percorso in alto e testi
+   introduttivi stavano a 8px dal bordo dello schermo, più vicini al bordo che al contenuto
+   delle schede. Si aggiunge, come prima, il margine dell'area sicura dell'iPhone. */
+@media (max-width: 767px) {
+  .fa-app-shell[data-surface="admin"] .fa-app-shell__main {
+    padding-right: calc(var(--fa-space-md) + env(safe-area-inset-right, 0px));
+    padding-left: calc(var(--fa-space-md) + env(safe-area-inset-left, 0px));
+  }
+}
+
 /* ══ iPhone: sito aggiunto alla schermata Home (si apre come un'app) ═══════════
    Con viewport-fit=cover la pagina arriva sotto notch, angoli arrotondati e
    indicatore Home: env(safe-area-inset-*) dice quanto spazio lasciare libero.
