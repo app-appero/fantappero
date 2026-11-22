@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from typing import Literal
+from typing import Any, Literal
 from uuid import UUID
 
 from auth.exceptions import ValidationAuthError
@@ -378,28 +378,58 @@ def auction_activation_blockers(
     return blockers
 
 
-def validate_calendar_generation_state(state: LeagueState, *, rosters_complete: bool) -> None:
-    """Prerequisito reale per generare/confermare il calendario H2H (EP13-P04).
+def validate_calendar_generation_state(state: LeagueState) -> None:
+    """Stato della lega in cui il calendario H2H non si genera né si conferma più.
 
     Prima il blocco era legato allo stato macro della lega (configuring o
     auction): concettualmente sbagliato, perché una lega può popolare le
     rose anche senza passare per l'asta (assegnazione manuale/random IA in
-    Amministrazione lega). Il vero prerequisito sono le rose complete di
-    tutti i partecipanti — riusa lo stesso controllo dei blocker di
-    attivazione stagione (`league_rosters_complete`). Restano bloccati solo
-    gli stati terminali, dove la stagione è comunque conclusa.
+    Amministrazione lega). Restano bloccati solo gli stati terminali, dove la
+    stagione è comunque conclusa. Il prerequisito sulle rose (EP13-P04) è a
+    parte (`calendar_rosters_invalid_error`): è l'unico che l'amministratore
+    può saltare con ``force``.
     """
     if state in CALENDAR_LOCKED_LEAGUE_STATES:
         raise ValidationAuthError(
             "La stagione è conclusa: il calendario non può più essere generato.",
             code="league_calendar_locked",
         )
-    if not rosters_complete:
-        raise ValidationAuthError(
-            "Completa le rose di tutti i partecipanti nella sezione Partecipanti "
-            "prima di generare il calendario.",
-            code="league_calendar_locked",
-        )
+
+
+#: Rose non pronte per il calendario H2H: l'unico prerequisito che ``force`` può saltare.
+CALENDAR_ROSTERS_INVALID_CODE = "league_rosters_invalid"
+
+#: Quante squadre nominare nel messaggio d'errore (l'elenco completo è in ``teams``).
+_CALENDAR_ROSTERS_MESSAGE_TEAMS = 3
+
+
+def calendar_rosters_invalid_error(
+    teams: Sequence[Mapping[str, Any]],
+    *,
+    action: str = "genera",
+) -> ValidationAuthError:
+    """Errore del prerequisito sulle rose, con l'elenco strutturato dei problemi.
+
+    ``teams`` è ``[{teamId, teamName, issues: [...]}, ...]`` e arriva al client nel corpo
+    dell'errore insieme a ``code`` e ``message``. Il messaggio nomina le prime squadre, per
+    i client che mostrano solo quello (l'app già installata). ``action`` è il verbo del
+    messaggio («genera» o «conferma»).
+    """
+    parts = [
+        f"{team['teamName']}: {', '.join(str(item) for item in team['issues'])}"
+        for team in teams[:_CALENDAR_ROSTERS_MESSAGE_TEAMS]
+    ]
+    others = len(teams) - len(parts)
+    if others == 1:
+        parts.append("e un'altra squadra")
+    elif others > 1:
+        parts.append(f"e altre {others} squadre")
+    return ValidationAuthError(
+        f"Alcune rose non sono in regola ({'; '.join(parts)}). Sistemale nella sezione "
+        f"Partecipanti oppure, dal sito, {action} comunque il calendario.",
+        code=CALENDAR_ROSTERS_INVALID_CODE,
+        extra={"teams": [dict(team) for team in teams]},
+    )
 
 
 def validate_calendar_participant_alignment(

@@ -103,6 +103,8 @@ export type {
   CalendarWindow,
   LeagueCalendarMatchup,
   LeagueCalendarPlan,
+  LeagueCalendarRosterCheck,
+  CalendarRosterTeamIssues,
   LeagueCalendarRound,
   LeagueCalendarStatus,
   H2HCalendar,
@@ -155,6 +157,7 @@ export type {
 } from "./leagues.js";
 
 export {
+  CALENDAR_ROSTERS_INVALID_CODE,
   LEAGUE_LIFECYCLE_ACTION_HINT_LABEL,
   LEAGUE_LIFECYCLE_PHASES,
   LEAGUE_SETUP_BLOCKER_ORDER,

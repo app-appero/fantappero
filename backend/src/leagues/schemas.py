@@ -360,6 +360,36 @@ class LeagueCalendarResponse(ApiModel):
     summary: LeagueCalendarSummaryResponse
 
 
+class LeagueCalendarActionRequest(ApiModel):
+    """Corpo facoltativo di «Genera» e «Conferma» calendario.
+
+    ``force`` salta solo il prerequisito sulle rose (rose non in regola, per esempio oltre
+    quota dopo un cambio di ruolo nel listone); gli altri restano bloccanti. Stessi permessi
+    dell'azione: amministratore di lega o operatore.
+    """
+
+    force: bool = False
+
+
+class CalendarRosterTeamIssuesResponse(ApiModel):
+    """Una squadra con la rosa non pronta per il calendario e i problemi in breve."""
+
+    team_id: str | None = Field(default=None, alias="teamId")
+    team_name: str = Field(alias="teamName")
+    issues: list[str]
+    #: True se la squadra non può schierare la formazione finché la rosa non è sistemata
+    #: (slot vuoti, meno di 3 campionati, squadra mancante). Con i soli esuberi di ruolo è
+    #: False: si schiera senza di loro.
+    lineup_blocked: bool = Field(default=False, alias="lineupBlocked")
+
+
+class LeagueCalendarRosterCheckResponse(ApiModel):
+    """Verifica delle rose prima di generare o confermare il calendario."""
+
+    valid: bool
+    teams: list[CalendarRosterTeamIssuesResponse]
+
+
 class H2HMatchupScoreResponse(ApiModel):
     """Risultato H2H persistito sullo slot (EP07-05), esposto in lettura matchday."""
 

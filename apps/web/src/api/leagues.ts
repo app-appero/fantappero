@@ -43,6 +43,8 @@ import type {
   LeagueAdminPanel,
   LeagueCalendar,
   LeagueCalendarPlan,
+  LeagueCalendarRosterCheck,
+  CalendarRosterTeamIssues,
   H2HCalendar,
   H2HMatchupDetail,
   LeagueDetail,
@@ -60,6 +62,7 @@ import type {
   TransitionLeagueStateRequest,
   UpdateLeagueRulesRequest,
 } from "@fantappero/contracts";
+import { CALENDAR_ROSTERS_INVALID_CODE } from "@fantappero/contracts";
 import { apiRequest, apiUpload, ApiError } from "./client";
 import { getWebEnv, resolveApiBaseUrl } from "../config/env";
 
@@ -284,23 +287,79 @@ export function fetchLeagueCalendarPlan(
   );
 }
 
+/** Rose da sistemare prima di generare o confermare il calendario (solo lettura). */
+export function fetchLeagueCalendarRosterCheck(
+  accessToken: string,
+  leagueId: string,
+): Promise<LeagueCalendarRosterCheck> {
+  return apiRequest<LeagueCalendarRosterCheck>(
+    `/leagues/${leagueId}/amministrazione/calendario/rose`,
+    { accessToken },
+  );
+}
+
+export type LeagueCalendarActionOptions = {
+  /**
+   * Salta solo il prerequisito sulle rose (`league_rosters_invalid`): l'amministratore ha visto
+   * l'avviso e ha scelto «Genera comunque» / «Conferma comunque».
+   */
+  force?: boolean;
+};
+
 export function generateLeagueCalendar(
   accessToken: string,
   leagueId: string,
+  options: LeagueCalendarActionOptions = {},
 ): Promise<LeagueCalendar> {
   return apiRequest<LeagueCalendar>(`/leagues/${leagueId}/amministrazione/calendario/genera`, {
     method: "POST",
     accessToken,
+    ...(options.force ? { body: { force: true } } : {}),
   });
 }
 
 export function confirmLeagueCalendar(
   accessToken: string,
   leagueId: string,
+  options: LeagueCalendarActionOptions = {},
 ): Promise<LeagueCalendar> {
   return apiRequest<LeagueCalendar>(`/leagues/${leagueId}/amministrazione/calendario/conferma`, {
     method: "POST",
     accessToken,
+    ...(options.force ? { body: { force: true } } : {}),
+  });
+}
+
+/**
+ * Le squadre con la rosa non in regola dal corpo di un errore `league_rosters_invalid` di
+ * «Genera/Conferma calendario»; `null` per ogni altro errore.
+ */
+export function calendarRosterIssuesFromError(error: unknown): CalendarRosterTeamIssues[] | null {
+  if (!(error instanceof ApiError) || error.code !== CALENDAR_ROSTERS_INVALID_CODE) {
+    return null;
+  }
+  const raw = error.payload.teams;
+  if (!Array.isArray(raw)) {
+    return [];
+  }
+  return raw.flatMap((item): CalendarRosterTeamIssues[] => {
+    if (!item || typeof item !== "object") {
+      return [];
+    }
+    const team = item as Record<string, unknown>;
+    if (typeof team.teamName !== "string") {
+      return [];
+    }
+    return [
+      {
+        teamId: typeof team.teamId === "string" ? team.teamId : null,
+        teamName: team.teamName,
+        issues: Array.isArray(team.issues)
+          ? team.issues.filter((issue): issue is string => typeof issue === "string")
+          : [],
+        lineupBlocked: team.lineupBlocked === true,
+      },
+    ];
   });
 }
 

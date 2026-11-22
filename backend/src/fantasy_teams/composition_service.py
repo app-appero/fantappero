@@ -9,11 +9,12 @@ from datetime import UTC, datetime
 from uuid import UUID
 
 from sqlalchemy import select, update
-from sqlalchemy.orm import Session, undefer
+from sqlalchemy.orm import Session, selectinload, undefer
 
 from database.enums import FantasyRole, LeagueState, RosterCompositionStatus
 from fantasy_teams.composition import (
     MIN_ROSTER_COMPETITIONS,
+    ROLE_LABEL_IT,
     RosterCompositionLimits,
     RosterCompositionReport,
     evaluate_roster_composition,
@@ -1129,35 +1130,133 @@ def activation_roster_and_credit_blockers(
     return blockers
 
 
-def league_rosters_complete(session: Session, league: League) -> bool:
-    """True se ogni membership ha una squadra con rosa completa e valida.
+@dataclass(frozen=True)
+class TeamRosterProblems:
+    """Una squadra la cui rosa non è pronta per il calendario H2H, con i problemi in breve."""
+
+    team_id: UUID | None
+    team_name: str
+    issues: tuple[str, ...]
+    #: La squadra non può schierare la formazione finché la rosa non è sistemata: rosa con
+    #: slot vuoti, meno di 3 campionati o squadra mancante (vedi `roster_allows_lineup`).
+    #: Con i soli esuberi di ruolo o calciatori senza ruolo resta False: si schiera senza loro.
+    lineup_blocked: bool = False
+
+    def as_payload(self) -> dict[str, object]:
+        """Forma JSON dell'avviso (risposta d'errore, verifica rose, audit)."""
+        return {
+            "teamId": str(self.team_id) if self.team_id is not None else None,
+            "teamName": self.team_name,
+            "issues": list(self.issues),
+            "lineupBlocked": self.lineup_blocked,
+        }
+
+
+def roster_problem_labels(report: RosterCompositionReport) -> list[str]:
+    """I problemi della rosa in forma breve, per l'avviso del calendario («Attaccanti 11 su 10»).
+
+    Stessi controlli della convalida per l'avvio stagione (``require_complete=True``): misura
+    della rosa, quota esatta per ruolo, calciatori senza ruolo, almeno 3 campionati. Un ruolo
+    oltre quota e uno sotto quota (un D diventato A) compaiono entrambi.
+    """
+    codes = {issue.code for issue in report.issues}
+    labels: list[str] = []
+    if "roster_incomplete" in codes:
+        size = report.limits.roster_size
+        if report.filled_slots < size:
+            labels.append(f"Rosa incompleta: {report.filled_slots} su {size}")
+        else:
+            labels.append(f"Calciatori in rosa: {report.filled_slots} su {size}")
+    for role in FantasyRole:
+        current = report.counts.get(role.value, 0)
+        limit = report.limits.for_role(role)
+        if current > limit or (current < limit and "role_quota_underfilled" in codes):
+            labels.append(f"{ROLE_LABEL_IT[role].capitalize()} {current} su {limit}")
+    if "role_unresolved" in codes:
+        unresolved = report.filled_slots - sum(report.counts.values())
+        noun = "calciatore" if unresolved == 1 else "calciatori"
+        labels.append(f"{unresolved} {noun} senza ruolo nel listone")
+    if "insufficient_roster_competitions" in codes:
+        labels.append(
+            f"Campionati rappresentati: {report.competition_count} su almeno "
+            f"{MIN_ROSTER_COMPETITIONS}"
+        )
+    known = {
+        "roster_incomplete",
+        "role_quota_exceeded",
+        "role_quota_underfilled",
+        "role_unresolved",
+        "insufficient_roster_competitions",
+    }
+    labels.extend(issue.message for issue in report.issues if issue.code not in known)
+    if not labels and not report.is_valid_for_season_start:
+        labels.append("Rosa non convalidata")
+    return labels
+
+
+def league_roster_problems(session: Session, league: League) -> list[TeamRosterProblems]:
+    """Le squadre della lega con la rosa non pronta per il calendario H2H (EP13-P04).
 
     Stesso controllo di composizione usato per sbloccare l'avvio stagione
-    (`activation_roster_and_credit_blockers`), ma senza il vincolo sui
-    crediti: qui serve solo sapere se le rose sono pronte per generare il
-    calendario H2H (EP13-P04) — le rose si possono completare anche senza
-    passare per lo stato "asta" (es. assegnazione manuale/random IA in
-    Amministrazione lega), quindi il prerequisito è sulle rose stesse, non
-    sullo stato macro della lega.
+    (`activation_roster_and_credit_blockers`), ma senza il vincolo sui crediti: le rose si
+    possono completare anche senza passare per lo stato "asta" (es. assegnazione
+    manuale/random IA in Amministrazione lega), quindi il prerequisito è sulle rose stesse,
+    non sullo stato macro della lega. Una membership senza squadra conta come problema.
+    Solo lettura: non segna esuberi né riscrive lo stato salvato. Lista vuota = rose pronte.
     """
     memberships = list(
         session.scalars(
-            select(LeagueMembership).where(LeagueMembership.league_id == league.id)
+            select(LeagueMembership)
+            .where(LeagueMembership.league_id == league.id)
+            .options(selectinload(LeagueMembership.user))
+            .order_by(LeagueMembership.created_at.asc(), LeagueMembership.id.asc())
         ).all()
     )
-    if not memberships:
-        return False
     teams = {
         team.membership_id: team
         for team in session.scalars(
             select(FantasyTeam).where(FantasyTeam.league_id == league.id)
         ).all()
     }
+    problems: list[TeamRosterProblems] = []
     for membership in memberships:
         team = teams.get(membership.id)
         if team is None:
-            return False
+            problems.append(
+                TeamRosterProblems(
+                    team_id=None,
+                    team_name=membership.user.display_name or "Squadra senza nome",
+                    issues=("Squadra non ancora creata",),
+                    lineup_blocked=True,
+                )
+            )
+            continue
         report = evaluate_team_composition(session, team, league=league, require_complete=True)
-        if not report.is_valid_for_season_start:
-            return False
-    return True
+        if report.is_valid_for_season_start:
+            continue
+        problems.append(
+            TeamRosterProblems(
+                team_id=team.id,
+                team_name=team.name,
+                issues=tuple(roster_problem_labels(report)),
+                lineup_blocked=(
+                    report.filled_slots < report.limits.roster_size
+                    or report.competition_count < MIN_ROSTER_COMPETITIONS
+                ),
+            )
+        )
+    return problems
+
+
+def league_rosters_complete(session: Session, league: League) -> bool:
+    """True se ogni membership ha una squadra con rosa completa e valida.
+
+    Vedi `league_roster_problems`, di cui è la forma sì/no (una lega senza iscritti non ha
+    rose pronte).
+    """
+    has_members = session.scalar(
+        select(LeagueMembership.id).where(LeagueMembership.league_id == league.id).limit(1)
+    )
+    if has_members is None:
+        return False
+    return not league_roster_problems(session, league)

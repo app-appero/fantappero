@@ -19,7 +19,7 @@ from database.enums import (
     LeagueCalendarStatus,
     LeagueState,
 )
-from fantasy_teams.composition_service import league_rosters_complete
+from fantasy_teams.composition_service import TeamRosterProblems, league_roster_problems
 from fantasy_turns.models import FantasyRound
 from fantasy_turns.rules import DEFAULT_LEAGUE_TZ
 from leagues.calendar_planning import (
@@ -41,14 +41,17 @@ from leagues.models.league_rules import LeagueRules
 from leagues.schedule import participant_fingerprint
 from leagues.schemas import (
     CalendarPlannedRoundResponse,
+    CalendarRosterTeamIssuesResponse,
     CalendarWindowResponse,
     LeagueCalendarMatchupResponse,
     LeagueCalendarPlanResponse,
     LeagueCalendarResponse,
+    LeagueCalendarRosterCheckResponse,
     LeagueCalendarRoundResponse,
     LeagueCalendarSummaryResponse,
 )
 from leagues.validators import (
+    calendar_rosters_invalid_error,
     validate_calendar_generation_state,
     validate_calendar_participant_alignment,
 )
@@ -92,7 +95,89 @@ class LeagueCalendarService:
             return None
         return self._to_response(calendar)
 
-    def generate(self, league_access: LeagueAccess) -> LeagueCalendarResponse:
+    def roster_check(self, league_access: LeagueAccess) -> LeagueCalendarRosterCheckResponse:
+        """Le rose non pronte per il calendario, per l'avviso prima di «Genera calendario»."""
+        problems = league_roster_problems(self._session, league_access.league)
+        return LeagueCalendarRosterCheckResponse(
+            valid=not problems,
+            teams=[
+                CalendarRosterTeamIssuesResponse(
+                    teamId=None if item.team_id is None else str(item.team_id),
+                    teamName=item.team_name,
+                    issues=list(item.issues),
+                    lineupBlocked=item.lineup_blocked,
+                )
+                for item in problems
+            ],
+        )
+
+    def _roster_gate(
+        self,
+        league: League,
+        *,
+        force: bool,
+        metric: str,
+        action: str,
+    ) -> list[TeamRosterProblems]:
+        """Prerequisito sulle rose (EP13-P04): l'unico che ``force`` può saltare.
+
+        Senza ``force`` rose non pronte bloccano con ``league_rosters_invalid`` e l'elenco dei
+        problemi per squadra. Con ``force`` (stessi permessi della generazione: amministratore
+        di lega o operatore) si prosegue e si ritornano i problemi, per l'audit.
+        """
+        problems = league_roster_problems(self._session, league)
+        if problems and not force:
+            get_metrics().incr(metric, labels={"result": "rosters_invalid"})
+            raise calendar_rosters_invalid_error(
+                [item.as_payload() for item in problems],
+                action=action,
+            )
+        return problems
+
+    @staticmethod
+    def _forced_details(
+        league_access: LeagueAccess,
+        *,
+        force: bool,
+        problems: list[TeamRosterProblems],
+    ) -> dict[str, object]:
+        """Campi di audit di un'operazione forzata: chi, con che ruolo e i problemi di allora.
+
+        Vuoto se non si è forzato davvero (``force`` senza problemi nelle rose è
+        un'operazione normale).
+        """
+        if not force or not problems:
+            return {}
+        issues = [item.as_payload() for item in problems]
+        logger.warning(
+            "league_calendar_roster_gate_forced",
+            extra={
+                "league_id": str(league_access.league.id),
+                "actor_id": str(league_access.user.id),
+                "operator_bypass": league_access.operator_bypass,
+                "teams_with_issues": len(issues),
+            },
+        )
+        return {
+            "forced": True,
+            "forcedByOperator": league_access.operator_bypass,
+            "rosterIssues": issues,
+        }
+
+    def generate(
+        self,
+        league_access: LeagueAccess,
+        *,
+        force: bool = False,
+    ) -> LeagueCalendarResponse:
+        """Genera l'anteprima del calendario H2H.
+
+        ``force`` salta **solo** il prerequisito sulle rose (`_roster_gate`, per esempio rose
+        oltre quota dopo un cambio di ruolo nel listone): partecipanti allineati al
+        regolamento, stagione non conclusa, risultati già calcolati, calendario già confermato
+        in una lega attiva e Turni Europei restano bloccanti. La generazione forzata finisce
+        nell'audit con i problemi delle rose di quel momento.
+        """
         league = self._lock_league(league_access.league.id)
         memberships = self._load_memberships(league.id, for_update=True)
         rules = self._load_rules(league.id)
@@ -108,9 +193,8 @@ class LeagueCalendarService:
             )
             raise
 
-        rosters_complete = league_rosters_complete(self._session, league)
         try:
-            validate_calendar_generation_state(league.state, rosters_complete=rosters_complete)
+            validate_calendar_generation_state(league.state)
         except ValidationAuthError:
             get_metrics().incr("league_calendar_generated_total", labels={"result": "locked"})
             raise
@@ -187,6 +271,14 @@ class LeagueCalendarService:
                 code="european_turns_before_creation",
             )
         assert_plan_invariants(plan, membership_ids)
+        # Le rose per ultime: dopo i prerequisiti che rendono il calendario impossibile, così
+        # l'avviso sulle rose (e ``force``) arriva solo quando la generazione può riuscire.
+        roster_problems = self._roster_gate(
+            league,
+            force=force,
+            metric="league_calendar_generated_total",
+            action="genera",
+        )
         slots = plan.slots
         round_count = plan.round_count
         matchup_count = plan.matchup_count
@@ -260,30 +352,33 @@ class LeagueCalendarService:
                 )
             )
 
+        details: dict[str, object] = {
+            "algorithmVersion": algorithm_version,
+            "format": LeagueCalendarFormat.SINGLE_ROUND_ROBIN.value,
+            "participantCount": len(membership_ids),
+            "roundCount": round_count,
+            "matchupCount": matchup_count,
+            "byeCount": bye_count,
+            "cycleCount": plan.cycle_count,
+            "cycleLength": plan.cycle_length,
+            "eligibleWindows": plan.eligible_window_count,
+            "discardedWindows": len(plan.windows_discarded),
+        }
+        forced = self._forced_details(league_access, force=force, problems=roster_problems)
+        details.update(forced)
         self._session.add(
             LeagueAuditEvent(
                 league_id=league.id,
                 actor_id=league_access.user.id,
                 action=LeagueAuditAction.LEAGUE_CALENDAR_GENERATED,
                 correlation_id=get_correlation_id(),
-                details={
-                    "algorithmVersion": algorithm_version,
-                    "format": LeagueCalendarFormat.SINGLE_ROUND_ROBIN.value,
-                    "participantCount": len(membership_ids),
-                    "roundCount": round_count,
-                    "matchupCount": matchup_count,
-                    "byeCount": bye_count,
-                    "cycleCount": plan.cycle_count,
-                    "cycleLength": plan.cycle_length,
-                    "eligibleWindows": plan.eligible_window_count,
-                    "discardedWindows": len(plan.windows_discarded),
-                },
+                details=details,
             )
         )
         self._session.commit()
         get_metrics().incr(
             "league_calendar_generated_total",
-            labels={"result": "success"},
+            labels={"result": "forced" if forced.get("forced") else "success"},
         )
         logger.info(
             "league_calendar_generated",
@@ -470,6 +565,8 @@ class LeagueCalendarService:
             membership_role=None,
             operator_bypass=True,
         )
+        # Il percorso automatico non forza mai: con rose non in regola resta "non generato" e
+        # il calendario esistente non si tocca. Forzare è una scelta dell'amministratore.
         try:
             self.generate(access)
         except ValidationAuthError as exc:
@@ -619,11 +716,17 @@ class LeagueCalendarService:
             return False
         return calendar.windows_fingerprint != windows_fingerprint(self.build_windows(league))
 
-    def confirm(self, league_access: LeagueAccess) -> LeagueCalendarResponse:
+    def confirm(
+        self,
+        league_access: LeagueAccess,
+        *,
+        force: bool = False,
+    ) -> LeagueCalendarResponse:
+        """Conferma l'anteprima. ``force`` salta solo il prerequisito sulle rose, come in
+        `generate`: serve a confermare un'anteprima generata forzando."""
         league = self._lock_league(league_access.league.id)
-        rosters_complete = league_rosters_complete(self._session, league)
         try:
-            validate_calendar_generation_state(league.state, rosters_complete=rosters_complete)
+            validate_calendar_generation_state(league.state)
         except ValidationAuthError:
             get_metrics().incr("league_calendar_confirmed_total", labels={"result": "locked"})
             raise
@@ -658,6 +761,13 @@ class LeagueCalendarService:
                 code="calendar_stale",
             )
 
+        roster_problems = self._roster_gate(
+            league,
+            force=force,
+            metric="league_calendar_confirmed_total",
+            action="conferma",
+        )
+
         if calendar.status == LeagueCalendarStatus.CONFIRMED:
             from leagues.season_activate import try_advance_league_lifecycle
 
@@ -672,6 +782,7 @@ class LeagueCalendarService:
 
         calendar.status = LeagueCalendarStatus.CONFIRMED
         calendar.confirmed_at = datetime.now(UTC)
+        forced = self._forced_details(league_access, force=force, problems=roster_problems)
         self._session.add(
             LeagueAuditEvent(
                 league_id=league.id,
@@ -682,6 +793,7 @@ class LeagueCalendarService:
                     "roundCount": calendar.round_count,
                     "matchupCount": calendar.matchup_count,
                     "byeCount": calendar.bye_count,
+                    **forced,
                 },
             )
         )
@@ -693,7 +805,10 @@ class LeagueCalendarService:
             actor_id=league_access.user.id,
         )
         self._session.commit()
-        get_metrics().incr("league_calendar_confirmed_total", labels={"result": "success"})
+        get_metrics().incr(
+            "league_calendar_confirmed_total",
+            labels={"result": "forced" if forced else "success"},
+        )
         logger.info(
             "league_calendar_confirmed",
             extra={
