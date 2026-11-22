@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Collection, Mapping
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any
@@ -18,7 +18,7 @@ from sports_data.catalog.models import CompetitionSeasonClub, SportSeason
 from sports_data.listone.mapping import MAPPING_VERSION, map_provider_position_to_role
 from sports_data.listone.models import RoleAssignment
 from sports_data.provider.constants import PROVIDER_NAME
-from sports_data.roster.models import Athlete, SquadMembership
+from sports_data.roster.models import Athlete, SquadMembership, Transfer
 
 logger = get_logger(__name__)
 
@@ -26,6 +26,7 @@ LISTONE_GENERATE_RUNS_TOTAL = "listone_generate_runs_total"
 LISTONE_GENERATE_ENTITIES_TOTAL = "listone_generate_entities_total"
 LISTONE_GENERATE_DURATION_SECONDS = "listone_generate_duration_seconds"
 LISTONE_UNMAPPED_POSITIONS_TOTAL = "listone_unmapped_positions_total"
+LISTONE_ROLE_CHANGES_SKIPPED_TOTAL = "listone_role_changes_skipped_total"
 
 UpsertResult = str  # created | updated | unchanged | skipped_unmapped | deactivated
 
@@ -37,6 +38,9 @@ class ListoneGenerateCounters:
     unchanged: int = 0
     skipped_unmapped: int = 0
     deactivated: int = 0
+    #: Calciatori già nel listone per cui il fornitore indica oggi un altro ruolo: il ruolo
+    #: ufficiale resta quello (congelato per la stagione), la differenza si conta qui.
+    role_changes_skipped: int = 0
 
     def incr(self, result: UpsertResult) -> None:
         if hasattr(self, result):
@@ -77,15 +81,98 @@ def _active_memberships_for_season(session: Session, season_year: int) -> list[S
     return list(session.execute(stmt).scalars().all())
 
 
+def latest_transfer_destinations(
+    session: Session,
+    athlete_ids: Collection[UUID],
+) -> dict[UUID, UUID]:
+    """Club di arrivo dell'ultimo trasferimento di ogni calciatore (se il club è censito).
+
+    È il club attuale secondo la storia dei trasferimenti: chi è rientrato dal prestito
+    («Back from Loan») è tornato al club che l'aveva prestato, chi è stato ceduto è al club
+    che l'ha comprato. Un ultimo trasferimento verso un club non censito non dà preferenze.
+    """
+    ids = list(dict.fromkeys(athlete_ids))
+    if not ids:
+        return {}
+    destinations: dict[UUID, UUID] = {}
+    for start in range(0, len(ids), 1000):
+        chunk = ids[start : start + 1000]
+        rows = session.execute(
+            select(Transfer.athlete_id, Transfer.to_club_id)
+            .where(Transfer.athlete_id.in_(chunk))
+            .distinct(Transfer.athlete_id)
+            .order_by(
+                Transfer.athlete_id,
+                Transfer.transfer_date.desc(),
+                Transfer.created_at.desc(),
+            )
+        ).all()
+        for athlete_id, to_club_id in rows:
+            if to_club_id is not None:
+                destinations[athlete_id] = to_club_id
+    return destinations
+
+
+def membership_preference(
+    *,
+    club_id: UUID,
+    source: str | None,
+    provider_position_raw: str | None,
+    current_club_id: UUID | None,
+) -> tuple[bool, bool, bool]:
+    """Ordine di preferenza fra più membership attive dello stesso calciatore (più alto vince).
+
+    Prima il club attuale (arrivo dell'ultimo trasferimento), poi la rosa attuale del
+    fornitore (``/players/squads``, la fonte scritta per ultima nella sync), poi una
+    posizione che dà un ruolo. Una membership riattivata o appena toccata da una sync non
+    vince più solo perché è la più recente: con la correzione dei prestiti del 21/11 un
+    calciatore può avere attiva anche quella del club che ha lasciato, che il fornitore
+    elenca ancora, con un'altra posizione.
+    """
+    return (
+        current_club_id is not None and club_id == current_club_id,
+        source == "squads",
+        map_provider_position_to_role(provider_position_raw) is not None,
+    )
+
+
 def _pick_membership_per_athlete(
     memberships: list[SquadMembership],
+    current_clubs: Mapping[UUID, UUID] | None = None,
 ) -> dict[UUID, SquadMembership]:
-    """One active membership per athlete (most recently updated wins)."""
+    """Una membership attiva per calciatore.
+
+    Con più membership attive vince quella del club attuale (`membership_preference`); a
+    parità la più recente (``memberships`` arriva in ordine di ``updated_at`` decrescente).
+    """
+    clubs = current_clubs or {}
     chosen: dict[UUID, SquadMembership] = {}
+    chosen_rank: dict[UUID, tuple[bool, bool, bool]] = {}
     for membership in memberships:
-        if membership.athlete_id not in chosen:
+        rank = membership_preference(
+            club_id=membership.club_id,
+            source=membership.source,
+            provider_position_raw=membership.provider_position_raw,
+            current_club_id=clubs.get(membership.athlete_id),
+        )
+        best = chosen_rank.get(membership.athlete_id)
+        if best is None or rank > best:
             chosen[membership.athlete_id] = membership
+            chosen_rank[membership.athlete_id] = rank
     return chosen
+
+
+def pick_active_memberships(session: Session, season_year: int) -> dict[UUID, SquadMembership]:
+    """La membership che vale per il listone, per ogni calciatore con membership attiva."""
+    memberships = _active_memberships_for_season(session, season_year)
+    counts: dict[UUID, int] = {}
+    for membership in memberships:
+        counts[membership.athlete_id] = counts.get(membership.athlete_id, 0) + 1
+    multi = [athlete_id for athlete_id, count in counts.items() if count > 1]
+    return _pick_membership_per_athlete(
+        memberships,
+        latest_transfer_destinations(session, multi),
+    )
 
 
 def _upsert_assignment(
@@ -134,9 +221,33 @@ def _upsert_assignment(
         counters.incr("created")
         return row
 
+    # Ruoli congelati per la stagione (Rosario 22/11): un calciatore già nel listone tiene il
+    # suo ruolo ufficiale anche se il fornitore oggi indica un'altra posizione, perché un
+    # cambio silenzioso manda fuori quota rose già valide. Club e membership si aggiornano.
+    # Il ruolo cambia solo con un'azione esplicita: override di lega, «Aggiorna anche i
+    # ruoli dal fornitore» o «Ripristina i ruoli» dal pannello operatore.
+    position_raw = membership.provider_position_raw
+    if row.role != role:
+        counters.role_changes_skipped += 1
+        get_metrics().incr(
+            LISTONE_ROLE_CHANGES_SKIPPED_TOTAL,
+            labels={"provider": PROVIDER_NAME},
+        )
+        logger.info(
+            "listone_role_change_skipped",
+            extra={
+                "athlete_id": str(athlete_id),
+                "season_year": season_year,
+                "role": row.role.value,
+                "provider_role": role.value,
+                "provider_position_raw": membership.provider_position_raw,
+            },
+        )
+        # La posizione salvata resta quella da cui viene il ruolo ufficiale.
+        position_raw = row.provider_position_raw
+
     changed = (
-        row.role != role
-        or row.provider_position_raw != membership.provider_position_raw
+        row.provider_position_raw != position_raw
         or row.mapping_version != MAPPING_VERSION
         or row.squad_membership_id != membership.id
         or row.club_id != membership.club_id
@@ -145,8 +256,7 @@ def _upsert_assignment(
         counters.incr("unchanged")
         return row
 
-    row.role = role
-    row.provider_position_raw = membership.provider_position_raw
+    row.provider_position_raw = position_raw
     row.mapping_version = MAPPING_VERSION
     row.squad_membership_id = membership.id
     row.club_id = membership.club_id
@@ -161,7 +271,12 @@ def generate_official_listone(
     season_year: int,
     on_progress: Callable[[int, int], None] | None = None,
 ) -> ListoneGenerateResult:
-    """Build/refresh official role assignments from active squad memberships."""
+    """Build/refresh official role assignments from active squad memberships.
+
+    New athletes get the role mapped from their provider position; athletes already in the
+    season listone keep their role (frozen, see ``_upsert_assignment``), while club,
+    membership and position metadata follow the provider.
+    """
     counters = ListoneGenerateCounters()
     affected: set[UUID] = set()
     metrics = get_metrics()
@@ -172,8 +287,7 @@ def generate_official_listone(
         labels={"provider": PROVIDER_NAME},
     ):
         try:
-            memberships = _active_memberships_for_season(session, season_year)
-            by_athlete = _pick_membership_per_athlete(memberships)
+            by_athlete = pick_active_memberships(session, season_year)
             kept_athlete_ids = set(by_athlete.keys())
             assignments = list(by_athlete.items())
             assignment_total = len(assignments)
@@ -212,6 +326,7 @@ def generate_official_listone(
                     "unchanged": counters.unchanged,
                     "skipped_unmapped": counters.skipped_unmapped,
                     "deactivated": counters.deactivated,
+                    "role_changes_skipped": counters.role_changes_skipped,
                 },
             )
         except Exception:

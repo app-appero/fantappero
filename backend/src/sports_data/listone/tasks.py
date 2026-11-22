@@ -42,4 +42,5 @@ def generate_official_listone_task(season_year: int) -> dict[str, int | str]:
         "unchanged": c.unchanged,
         "skipped_unmapped": c.skipped_unmapped,
         "deactivated": c.deactivated,
+        "role_changes_skipped": c.role_changes_skipped,
     }

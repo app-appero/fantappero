@@ -162,6 +162,7 @@ def refresh_platform_listone(
                 listoneUpdated=listone_result.counters.updated,
                 listoneUnchanged=listone_result.counters.unchanged,
                 listoneSkippedUnmapped=listone_result.counters.skipped_unmapped,
+                roleChangesSkipped=listone_result.counters.role_changes_skipped,
                 catalogSynced=True,
             )
             session.flush()

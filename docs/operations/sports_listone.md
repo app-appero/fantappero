@@ -11,6 +11,15 @@
 
 Genera il **listone ufficiale** della piattaforma: ogni calciatore con membership attiva riceve un ruolo FantApperò valido **P / D / C / A**. Le leghe possono applicare **override pre-asta** (effetto immediato); dopo l’avvio stagione le modifiche decorrono dal **turno successivo**.
 
+**Ruoli congelati per la stagione (22/11):** il ruolo si assegna quando il calciatore entra nel
+listone della stagione e un aggiornamento o una rigenerazione non lo cambia più, anche se la
+posizione del fornitore cambia (club, membership e metadati sì). La differenza si conta in
+`roleChangesSkipped` e nel log `listone_role_change_skipped`. Il ruolo cambia solo con un'azione
+esplicita: override di lega, «Aggiorna anche i ruoli dal fornitore» (anteprima e conferma) o
+«Ripristina i ruoli» dal pannello operatore. Con più membership attive vale quella del club
+attuale: arrivo dell'ultimo trasferimento, poi la rosa attuale del fornitore (`/players/squads`),
+poi la più recente.
+
 Fuori scope: persistenza fixture/eventi (EP04-05 — [`sports_fixtures_sync.md`](./sports_fixtures_sync.md)), scheduler polling (EP04-06), asta/rose fantasy complete.
 
 ## Mapping posizione → ruolo (OQ-01)
