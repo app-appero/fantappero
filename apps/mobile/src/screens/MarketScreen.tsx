@@ -32,7 +32,7 @@ import type { AppTabParamList } from "../navigation/types";
 import { getApiErrorMessage, useAuthSession } from "../session/DemoSessionContext";
 import { MarketHistorySection } from "./market/MarketHistorySection";
 import { MarketReleaseSection } from "./market/MarketReleaseSection";
-import { MarketTradeCreateForm } from "./market/MarketTradeCreateForm";
+import { MarketTradeCreateForm, type TradeAthleteMeta } from "./market/MarketTradeCreateForm";
 import { MarketTradeList } from "./market/MarketTradeList";
 
 const SHOW_VOLUNTARY_RELEASE = false;
@@ -120,9 +120,15 @@ export function MarketScreen() {
   }, [listoneEntries]);
 
   const athleteMeta = useMemo(() => {
-    const map = new Map<string, { role: string | null; club: string | null }>();
+    const map = new Map<string, TradeAthleteMeta>();
     for (const entry of listoneEntries) {
-      map.set(entry.athleteId, { role: entry.effectiveRole ?? null, club: entry.clubName ?? null });
+      // Valore e media stagionale dal listone (1.3), accanto a ogni giocatore della proposta.
+      map.set(entry.athleteId, {
+        role: entry.effectiveRole ?? null,
+        club: entry.clubName ?? null,
+        marketValue: entry.marketValue,
+        seasonAverage: entry.seasonAverage,
+      });
     }
     for (const slot of team?.slots ?? []) {
       if (slot.athleteId && !map.has(slot.athleteId)) {

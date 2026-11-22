@@ -15,6 +15,7 @@ import { AthleteName } from "../../athletes/AthleteCard";
 import { PageContainer } from "../../layout/PageContainer";
 import { foldSearchText } from "../roster/listoneFilter";
 import { getApiErrorMessage, useAuthSession } from "../../session/DemoSessionContext";
+import { AdminSeasonHistoryCard } from "./AdminSeasonHistoryCard";
 
 const { colors } = theme;
 
@@ -184,6 +185,7 @@ export function AdminListoneScreen() {
       refreshing={refreshing}
       onRefresh={onRefresh}
     >
+      <AdminSeasonHistoryCard />
       <View style={styles.section} testID="admin-listone-card">
         <View style={seasonStyles.row}>
           <View style={seasonStyles.field}>

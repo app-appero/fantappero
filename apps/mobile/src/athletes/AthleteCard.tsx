@@ -25,6 +25,8 @@ import {
 } from "react-native";
 import { fetchAthleteCard } from "../api/leagues";
 import { UiStatePanel } from "../components/UiStatePanel";
+import { AthleteMarketTags } from "../market/AthleteMarketTags";
+import { careerRowModels, currentSeasonSummary, isGoalkeeperRole } from "./athleteCareer";
 import { getApiErrorMessage, useAuthSession } from "../session/DemoSessionContext";
 import { lazyStyles } from "../theme/lazyStyles";
 import { AvatarImage } from "../components/AvatarImage";
@@ -157,7 +159,12 @@ function AthleteCardView({ card }: { card: AthleteCard }) {
       value: card.live.score != null ? `${formatFantasyPoints(card.live.score)}${card.live.isFantasy ? "" : " (voto provider)"}` : "In corso",
     });
   }
-  if (card.seasonStats) {
+  // Carriera (1.3): con la stagione in corso nello storico, le sue caselle prendono il posto
+  // delle statistiche del campionato; senza (backend più vecchio) resta tutto come prima.
+  const goalkeeper = isGoalkeeperRole(card.effectiveRole ?? card.role);
+  const careerRows = careerRowModels(card.career, { goalkeeper });
+  const currentSeason = currentSeasonSummary(card.career, { goalkeeper });
+  if (card.seasonStats && !currentSeason) {
     const st = card.seasonStats;
     facts.push(
       { label: "Media voto", value: st.averageRating != null ? formatFantasyPoints(st.averageRating) : "—" },
@@ -185,6 +192,8 @@ function AthleteCardView({ card }: { card: AthleteCard }) {
             {[card.firstName, card.lastName].filter(Boolean).join(" ") || card.canonicalName}
           </Text>
           <Text style={styles.sub}>{card.clubName ?? "Club non disponibile"}</Text>
+          {/* Come nel canvas: in alto solo il Valore; le medie sono nella stagione e nella carriera. */}
+          <AthleteMarketTags fields={{ marketValue: card.marketValue }} testID="athlete-card-market-tags" />
         </View>
       </View>
       <View style={styles.facts}>
@@ -195,8 +204,57 @@ function AthleteCardView({ card }: { card: AthleteCard }) {
           </View>
         ))}
       </View>
-      <Text style={styles.sectionTitle}>Stagioni</Text>
-      {card.seasons.length === 0 ? (
+      {currentSeason ? (
+        <View testID="athlete-card-current-season">
+          <Text style={styles.sectionTitle}>{currentSeason.title}</Text>
+          <View style={styles.tiles}>
+            {currentSeason.tiles.map((tile) => (
+              <View
+                key={tile.key}
+                style={styles.tile}
+                accessible
+                accessibilityLabel={`${tile.label}: ${tile.value}`}
+              >
+                <Text style={styles.tileValue}>{tile.value}</Text>
+                <Text style={styles.tileLabel} numberOfLines={2}>
+                  {tile.label}
+                </Text>
+              </View>
+            ))}
+          </View>
+        </View>
+      ) : null}
+      {careerRows.length > 0 ? (
+        <View testID="athlete-card-career">
+          <Text style={styles.sectionTitle}>Carriera</Text>
+          {careerRows.map((row) => (
+            <View
+              key={row.key}
+              style={[styles.season, row.isCurrent ? styles.seasonCurrent : null]}
+              accessible
+              accessibilityLabel={row.accessibilityLabel}
+              testID={row.isCurrent ? "athlete-card-career-current" : undefined}
+            >
+              <View style={styles.seasonHead}>
+                <Text style={styles.seasonTitle}>
+                  {row.title}
+                  {row.isCurrent ? " ●" : ""}
+                </Text>
+                {row.competition ? <Text style={styles.seasonCompetition}>{row.competition}</Text> : null}
+              </View>
+              <View style={styles.seasonStats}>
+                {row.stats.map((stat) => (
+                  <Text key={stat.key} style={styles.seasonStat}>
+                    <Text style={styles.seasonStatValue}>{stat.value}</Text> {stat.short}
+                  </Text>
+                ))}
+              </View>
+            </View>
+          ))}
+        </View>
+      ) : null}
+      {careerRows.length > 0 ? null : <Text style={styles.sectionTitle}>Stagioni</Text>}
+      {careerRows.length > 0 ? null : card.seasons.length === 0 ? (
         <Text style={styles.sub}>Nessuna stagione salvata dal provider.</Text>
       ) : (
         card.seasons.map((season) => (
@@ -408,6 +466,79 @@ const styles = lazyStyles(() =>
       color: colors.foreground,
       fontSize: typography.fontSize.sm,
       marginBottom: 2,
+    },
+    // Stagione in corso e carriera (1.3, canvas «Scheda calciatore»): caselle a 3 per riga e
+    // una scheda per stagione che va a capo, niente scorrimento orizzontale sul telefono.
+    tiles: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      gap: spacing.xs,
+      marginBottom: spacing.xs,
+    },
+    tile: {
+      width: "31.5%",
+      alignItems: "center",
+      gap: 2,
+      paddingVertical: spacing.xs,
+      paddingHorizontal: 4,
+      borderRadius: radius.md,
+      borderWidth: 1,
+      borderColor: colors.border,
+      backgroundColor: colors.backgroundSubtle,
+    },
+    tileValue: {
+      color: colors.foreground,
+      fontSize: typography.fontSize.md,
+      fontWeight: "700",
+      fontVariant: ["tabular-nums"],
+    },
+    tileLabel: {
+      color: colors.foregroundMuted,
+      fontSize: 11,
+      textAlign: "center",
+    },
+    season: {
+      gap: 4,
+      padding: spacing.sm,
+      marginBottom: spacing.xs,
+      borderRadius: radius.md,
+      borderWidth: 1,
+      borderColor: colors.border,
+      backgroundColor: colors.backgroundSubtle,
+    },
+    seasonCurrent: {
+      borderColor: colors.success,
+    },
+    seasonHead: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      justifyContent: "space-between",
+      columnGap: spacing.sm,
+    },
+    seasonTitle: {
+      flexShrink: 1,
+      color: colors.foreground,
+      fontSize: typography.fontSize.sm,
+      fontWeight: "700",
+    },
+    seasonCompetition: {
+      color: colors.foregroundMuted,
+      fontSize: typography.fontSize.xs,
+    },
+    seasonStats: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      columnGap: spacing.sm,
+      rowGap: 2,
+    },
+    seasonStat: {
+      color: colors.foregroundMuted,
+      fontSize: typography.fontSize.xs,
+    },
+    seasonStatValue: {
+      color: colors.foreground,
+      fontWeight: "700",
+      fontVariant: ["tabular-nums"],
     },
   }),
 );

@@ -4,6 +4,7 @@ import type { FantasyRole, LeagueListoneEntry } from "@fantappero/contracts";
 import { useEffect, useMemo, useState } from "react";
 import { Pressable, Text, View } from "react-native";
 import { AthleteName } from "../athletes/AthleteCard";
+import { AthleteMarketTags } from "../market/AthleteMarketTags";
 import { marketUiStyles as styles } from "../market/marketUiStyles";
 import { roleBadgeColors } from "../screens/roster/rosterHelpers";
 import { AppTextInput as TextInput } from "./AppTextInput";
@@ -131,6 +132,7 @@ export function AthleteChooser({
                   {entry.canonicalName}
                 </AthleteName>
                 {entry.clubName ? <Text style={styles.meta}>{entry.clubName}</Text> : null}
+                <AthleteMarketTags fields={entry} testID={testID ? `${testID}-${entry.athleteId}-tags` : undefined} />
               </View>
             </Pressable>
           );

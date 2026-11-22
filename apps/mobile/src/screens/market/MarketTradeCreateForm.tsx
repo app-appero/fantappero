@@ -1,5 +1,6 @@
-import type { FantasyRosterSlot, TeamRosterPlayer } from "@fantappero/contracts";
+import type { AthleteMarketFields, FantasyRosterSlot, TeamRosterPlayer } from "@fantappero/contracts";
 import { DateTimeField, formatDateTimeValue } from "../../components/DateTimeField";
+import { AthleteMarketTags } from "../../market/AthleteMarketTags";
 import { Pressable, Text, View } from "react-native";
 import { AthleteName } from "../../athletes/AthleteCard";
 import { AppTextInput as TextInput } from "../../components/AppTextInput";
@@ -10,7 +11,8 @@ import { marketUiStyles as styles } from "../../market/marketUiStyles";
 import { roleBadgeColors } from "../roster/rosterHelpers";
 import { useState } from "react";
 
-export type TradeAthleteMeta = { role: string | null; club: string | null };
+/** Ruolo, squadra e (1.3) Valore e media stagionale dal listone della lega. */
+export type TradeAthleteMeta = { role: string | null; club: string | null } & AthleteMarketFields;
 
 /** Riga selezionabile con pallino del ruolo, squadra e prezzo di acquisto. */
 function AthleteCheckRow({
@@ -53,6 +55,7 @@ function AthleteCheckRow({
           {label}
         </AthleteName>
         {meta?.club ? <Text style={styles.meta}>{meta.club}</Text> : null}
+        <AthleteMarketTags fields={meta} testID={testID ? `${testID}-tags` : undefined} />
       </View>
       {price != null ? <Text style={styles.heroValue}>{price}</Text> : null}
     </Pressable>

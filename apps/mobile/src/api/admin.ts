@@ -15,6 +15,7 @@ import type {
   AdminListoneEntry,
   AdminListoneRefreshJob,
   AdminListoneRefreshProgress,
+  AdminMarketValuesRefreshResult,
   AdminOverview,
   AdminResultRecoveryJob,
   AdminResultRecoveryProgress,
@@ -23,6 +24,8 @@ import type {
   AdminSeasonImportJob,
   AdminSeasonImportProgress,
   AdminSeasonImportResult,
+  AdminSeasonHistoryImportResponse,
+  AdminSeasonHistoryProgress,
   AdminTurniSyncResult,
   PredictedLineupSyncResult,
   SystemJob,
@@ -148,6 +151,58 @@ export function fetchActiveAdminListoneRefresh(
 ): Promise<AdminListoneRefreshProgress | null> {
   return apiRequest<AdminListoneRefreshProgress | null>(`/admin/listone/aggiorna`, {
     accessToken,
+  });
+}
+
+// --- Storico stagioni dal fornitore, medie e Valore (1.3) -------------------------------------
+
+/** «Calcola chiamate»: conto delle chiamate, nessuna chiamata al fornitore (`dryRun`). */
+export function estimateSeasonHistoryImport(
+  accessToken: string,
+  seasonYear: number,
+): Promise<AdminSeasonHistoryImportResponse> {
+  return apiRequest<AdminSeasonHistoryImportResponse>("/admin/listone/storico", {
+    accessToken,
+    method: "POST",
+    body: { seasonYear, dryRun: true },
+  });
+}
+
+/** «Avvia import»: parte il job (o torna quello già in corso). */
+export function startSeasonHistoryImport(
+  accessToken: string,
+  seasonYear: number,
+): Promise<AdminSeasonHistoryImportResponse> {
+  return apiRequest<AdminSeasonHistoryImportResponse>("/admin/listone/storico", {
+    accessToken,
+    method: "POST",
+    body: { seasonYear, dryRun: false },
+  });
+}
+
+/** L'import in corso, anche se l'ha avviato un altro operatore; `null` se non ce n'è. */
+export function fetchActiveSeasonHistoryImport(
+  accessToken: string,
+): Promise<AdminSeasonHistoryProgress | null> {
+  return apiRequest<AdminSeasonHistoryProgress | null>("/admin/listone/storico", { accessToken });
+}
+
+export function fetchSeasonHistoryImportProgress(
+  accessToken: string,
+  jobId: string,
+): Promise<AdminSeasonHistoryProgress> {
+  return apiRequest<AdminSeasonHistoryProgress>(`/admin/listone/storico/${jobId}`, { accessToken });
+}
+
+/** «Ricalcola valori»: storico della stagione in corso, medie e Valore del listone. */
+export function refreshMarketValues(
+  accessToken: string,
+  seasonYear: number,
+): Promise<AdminMarketValuesRefreshResult> {
+  return apiRequest<AdminMarketValuesRefreshResult>("/admin/listone/valori/ricalcola", {
+    accessToken,
+    method: "POST",
+    body: { seasonYear },
   });
 }
 

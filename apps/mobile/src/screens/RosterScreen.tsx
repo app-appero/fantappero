@@ -48,6 +48,7 @@ import { PageContainer } from "../layout/PageContainer";
 import { MARKET_HUB_TABS } from "../navigation/marketHubTabs";
 import type { AppTabParamList } from "../navigation/types";
 import { MarketGateBar } from "../market/MarketGateBar";
+import { manualAddMinimum } from "../market/pricePrefill";
 import { useMarketGate } from "../market/useMarketGate";
 import { getApiErrorMessage, useAuthSession } from "../session/DemoSessionContext";
 import { RosterAdminManualCard } from "./roster/RosterAdminManualCard";
@@ -723,8 +724,10 @@ export function RosterScreen() {
       return refuse("Il calciatore appartiene già a una squadra di questa lega.");
     }
     const credits = creditsInput;
-    if (!Number.isFinite(credits) || credits < 1) {
-      return refuse("Inserisci crediti acquisto validi (minimo 1).");
+    // Partecipante almeno 1 credito, amministratore anche 0 (come il backend).
+    const minimum = manualAddMinimum(isAdmin);
+    if (!Number.isFinite(credits) || credits < minimum) {
+      return refuse(`Inserisci crediti acquisto validi (minimo ${minimum}).`);
     }
     const athlete = listone.find((entry) => entry.athleteId === athleteId);
     const previousTeam = targetTeam;
@@ -1081,6 +1084,7 @@ export function RosterScreen() {
           onSelectTargetTeam={onSelectAdminTeam}
           adminMessage={adminMessage}
           adminError={adminError}
+          remainingCredits={credits && targetTeam && credits.fantasyTeamId === targetTeam.id ? credits.balance : null}
         />
       ) : null}
     </PageContainer>
