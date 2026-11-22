@@ -36,4 +36,5 @@ Quando un punto viene effettivamente superato, va marcato `SUPERSEDED` nel regis
 ## Documenti collegati
 
 - Registro dei requisiti (Blocco A1): [`docs/operations/registro_requisiti_fase1.md`](operations/registro_requisiti_fase1.md)
+- Regolamento di turni, copertura del 75%, calendario e ruoli del listone, con le domande frequenti per i fantallenatori: [`docs/operations/regolamento_turni_calendario.md`](operations/regolamento_turni_calendario.md)
 - Piano di chiusura Fase 1: [`FantAppero_Piano_Chiusura_Fase_1.md`](FantAppero_Piano_Chiusura_Fase_1.md)
