@@ -86,6 +86,7 @@ from market.validators import (
     validate_athlete_is_free_agent,
     validate_session_window,
 )
+from market.valuation_service import LeagueMarketInfoCache
 from market.windows import effective_status
 from notifications.league_context import league_params
 from notifications.recipients import user_ids_for_league, user_ids_for_teams
@@ -132,6 +133,8 @@ MAX_NOMINATION_QUEUE = 10_000
 class LiveMarketService:
     def __init__(self, session: Session) -> None:
         self._session = session
+        # Valore e media stagionale del calciatore del lotto (1.3), letti una volta per richiesta.
+        self._market_info = LeagueMarketInfoCache(session)
 
     # -- session lifecycle --------------------------------------------------
 
@@ -1014,6 +1017,8 @@ class LiveMarketService:
             .where(MarketLiveLot.session_id == market_session.id)
             .order_by(MarketLiveLot.sequence_number.asc())
         ).all()
+        # Una sola lettura del Valore per tutti i lotti della sessione.
+        self._market_info.get(market_session.league_id, [row.athlete_id for row in rows])
         return LiveLotListResponse(
             sessionId=str(market_session.id),
             lots=[self._to_lot_response(row, athlete=row.athlete) for row in rows],
@@ -1867,7 +1872,13 @@ class LiveMarketService:
             or 0
         )
 
+    def _lot_league_id(self, lot: MarketLiveLot) -> UUID | None:
+        market_session = self._session.get(MarketSession, lot.session_id)
+        return market_session.league_id if market_session is not None else None
+
     def _to_lot_response(self, lot: MarketLiveLot, *, athlete: Athlete) -> LiveLotResponse:
+        league_id = self._lot_league_id(lot)
+        market = self._market_info.one(league_id, lot.athlete_id) if league_id is not None else None
         minimum_next = compute_minimum_next_amount(
             current_amount_credits=lot.current_amount_credits,
             has_leader=lot.current_leader_team_id is not None,
@@ -1896,6 +1907,8 @@ class LiveMarketService:
             currentAmountCredits=lot.current_amount_credits,
             minimumNextAmountCredits=minimum_next,
             closedAt=lot.closed_at.isoformat() if lot.closed_at else None,
+            marketValue=market.market_value if market is not None else None,
+            seasonAverage=market.season_average if market is not None else None,
         )
 
     def _to_raise_response(self, row: MarketLiveRaise) -> LiveRaiseResponse:

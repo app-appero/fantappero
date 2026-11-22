@@ -32,6 +32,7 @@ from leagues.schemas import (
     LeagueListoneRefreshProgressResponse,
     LeagueListoneRefreshResponse,
 )
+from market.valuation_service import AthleteMarketInfo, load_market_info
 from observability.logging import get_logger
 from observability.metrics import Timer, get_metrics
 from sports_data.catalog.models import Club, CompetitionSeasonClub, SportSeason
@@ -126,6 +127,10 @@ class LeagueListoneService:
             season_year=league.season_year,
             competition_ids=competition_ids,
         )
+        # Valore (crediti di questa lega) e media stagionale: una lettura per tutto il listone.
+        market = load_market_info(
+            self._session, league_id=league.id, athlete_ids=athlete_ids, league=league
+        )
 
         entries: list[LeagueListoneEntryResponse] = []
         for assignment in assignments:
@@ -148,6 +153,7 @@ class LeagueListoneService:
                     override=override,
                     effective_role=effective,
                     current_round=current_round,
+                    market=market.get(assignment.athlete_id),
                 )
             )
         return entries
@@ -678,6 +684,7 @@ class LeagueListoneService:
         override: LeagueRoleOverride | None,
         effective_role: FantasyRole,
         current_round: int,
+        market: AthleteMarketInfo | None = None,
     ) -> LeagueListoneEntryResponse:
         pending = override_is_pending(override=override, current_round=current_round)
         override_payload = None
@@ -702,4 +709,6 @@ class LeagueListoneService:
             competitionId=str(competition.id) if competition else None,
             competitionName=competition.name if competition else None,
             override=override_payload,
+            marketValue=market.market_value if market is not None else None,
+            seasonAverage=market.season_average if market is not None else None,
         )

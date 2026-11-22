@@ -59,6 +59,16 @@ class BonusMalusResult:
         return [item.as_dict() for item in self.components]
 
 
+def is_goalkeeper_clean_sheet(role: RoleCode | str | None, team_goals_conceded: int | None) -> bool:
+    """Porta inviolata: portiere (ruolo P) e squadra a zero gol subiti, risultato noto.
+
+    Vale solo per un calciatore con voto (come il bonus: ``compute_bonus_malus`` la applica
+    solo se eleggibile). La usa anche lo storico della stagione in corso
+    (``sports_data.season_stats.current_season``) per contare le porte inviolate.
+    """
+    return role == "P" and team_goals_conceded is not None and team_goals_conceded == 0
+
+
 def reconstruct_total_from_stored(components: list[dict[str, Any]]) -> float:
     """Ricostruisce il totale bonus/malus dai componenti JSON persistiti."""
     return round(sum(float(item["contribution"]) for item in components), 10)
@@ -115,7 +125,7 @@ def compute_bonus_malus(
                 data.team_goals_conceded,
                 config.goalkeeper_goal_conceded,
             )
-            if data.team_goals_conceded == 0:
+            if is_goalkeeper_clean_sheet(data.role, data.team_goals_conceded):
                 add("goalkeeper_clean_sheet", 1, config.goalkeeper_clean_sheet)
 
     return BonusMalusResult(

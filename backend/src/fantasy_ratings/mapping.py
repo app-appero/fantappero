@@ -226,12 +226,30 @@ def as_uuid(value: UUID | str) -> UUID:
 
 def team_goals_conceded(fixture: Fixture, club_id: UUID | None) -> int | None:
     """Gol subiti dalla squadra di ``club_id`` nella partita, se il risultato e' noto."""
+    return goals_conceded_by_club(
+        club_id=club_id,
+        home_club_id=fixture.home_club_id,
+        away_club_id=fixture.away_club_id,
+        home_goals=fixture.home_goals,
+        away_goals=fixture.away_goals,
+    )
+
+
+def goals_conceded_by_club(
+    *,
+    club_id: UUID | None,
+    home_club_id: UUID,
+    away_club_id: UUID,
+    home_goals: int | None,
+    away_goals: int | None,
+) -> int | None:
+    """Come ``team_goals_conceded`` ma dalle sole colonne della partita (letture in blocco)."""
     if club_id is None:
         return None
-    if club_id == fixture.home_club_id:
-        return fixture.away_goals
-    if club_id == fixture.away_club_id:
-        return fixture.home_goals
+    if club_id == home_club_id:
+        return away_goals
+    if club_id == away_club_id:
+        return home_goals
     return None
 
 

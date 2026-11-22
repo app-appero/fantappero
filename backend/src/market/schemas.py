@@ -7,6 +7,7 @@ from pydantic import Field, StrictInt
 from app.text_validation import AthleteNameStr, NoNulStr
 from auth.schemas import ApiModel
 from market.gate import MarketBlockedReason
+from market.valuation_schemas import AthleteSeasonAverageResponse
 
 
 class MarketGateResponse(ApiModel):
@@ -62,6 +63,11 @@ class MarketBidResponse(ApiModel):
     submitted_at: str = Field(alias="submittedAt")
     release_athlete_id: NoNulStr | None = Field(default=None, alias="releaseAthleteId")
     release_athlete_name: AthleteNameStr | None = Field(default=None, alias="releaseAthleteName")
+    #: Valore di mercato in crediti di questa lega (budget della lega, almeno 1); ``None`` se il
+    #: calciatore non è nel listone della stagione. Prezzo consigliato, non un minimo (1.3).
+    market_value: int | None = Field(default=None, alias="marketValue")
+    #: Media stagionale (in corso se ha almeno un voto, altrimenti la scorsa, es. «25/26»).
+    season_average: AthleteSeasonAverageResponse | None = Field(default=None, alias="seasonAverage")
 
 
 class MarketBidListResponse(ApiModel):

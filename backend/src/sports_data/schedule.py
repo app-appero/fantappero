@@ -16,6 +16,8 @@ def sports_data_beat_schedule(
     fixtures_interval_seconds: int = 259_200,
     predicted_lineups_enabled: bool = True,
     predicted_lineups_interval_seconds: int = 86_400,
+    market_values_enabled: bool = False,
+    market_values_interval_seconds: int = 3600,
 ) -> dict[str, dict]:
     schedule: dict[str, dict] = {}
     if catalog_enabled:
@@ -40,5 +42,12 @@ def sports_data_beat_schedule(
             "task": "sports_data.sync_predicted_lineups",
             "schedule": float(predicted_lineups_interval_seconds),
             "options": {"expires": float(predicted_lineups_interval_seconds)},
+        }
+    if market_values_enabled:
+        # Medie stagionali e Valore (1.3): nessuna chiamata al fornitore, salta se nulla cambia.
+        schedule["market-values-refresh"] = {
+            "task": "market.refresh_market_values",
+            "schedule": float(market_values_interval_seconds),
+            "options": {"expires": float(market_values_interval_seconds)},
         }
     return schedule

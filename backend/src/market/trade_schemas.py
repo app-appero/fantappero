@@ -6,6 +6,7 @@ from pydantic import Field
 
 from app.text_validation import AthleteNameStr
 from auth.schemas import ApiModel
+from market.valuation_schemas import AthleteSeasonAverageResponse
 
 # Tetto tecnico (colonne a 32 bit): oltre, la richiesta è respinta con 422.
 MAX_TRADE_CREDITS = 1_000_000
@@ -34,6 +35,11 @@ class CounterTradeProposalRequest(ApiModel):
 class TradeAthleteResponse(ApiModel):
     id: str
     name: AthleteNameStr
+    #: Valore di mercato in crediti di questa lega (budget della lega, almeno 1); ``None`` se il
+    #: calciatore non è nel listone della stagione. Prezzo consigliato, non un minimo (1.3).
+    market_value: int | None = Field(default=None, alias="marketValue")
+    #: Media stagionale (in corso se ha almeno un voto, altrimenti la scorsa, es. «25/26»).
+    season_average: AthleteSeasonAverageResponse | None = Field(default=None, alias="seasonAverage")
 
 
 class TradeProposalResponse(ApiModel):

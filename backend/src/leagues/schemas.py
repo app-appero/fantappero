@@ -12,6 +12,7 @@ from app.text_validation import AthleteNameStr, NoNulStr
 from auth.schemas import ApiModel
 from database.enums import LeagueState
 from market.gate import MarketBlockedReason
+from market.valuation_schemas import AthleteSeasonAverageResponse
 
 
 class LeagueSummaryResponse(ApiModel):
@@ -650,6 +651,11 @@ class LeagueListoneEntryResponse(ApiModel):
     competition_id: str | None = Field(default=None, alias="competitionId")
     competition_name: str | None = Field(default=None, alias="competitionName")
     override: LeagueListoneOverrideResponse | None = None
+    #: Valore di mercato in crediti di questa lega (budget della lega, almeno 1); ``None`` se il
+    #: calciatore non è nel listone della stagione. Prezzo consigliato, non un minimo (1.3).
+    market_value: int | None = Field(default=None, alias="marketValue")
+    #: Media stagionale (in corso se ha almeno un voto, altrimenti la scorsa, es. «25/26»).
+    season_average: AthleteSeasonAverageResponse | None = Field(default=None, alias="seasonAverage")
 
 
 class SetLeagueRoleOverrideRequest(ApiModel):

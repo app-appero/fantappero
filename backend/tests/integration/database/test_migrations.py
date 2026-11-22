@@ -108,10 +108,10 @@ def test_upgrade_from_empty_database(clean_db: str) -> None:
                 .scalars()
                 .all()
             )
-            # Head aggiornata a e9b1d3f5a672 (mercato chiuso di default per le leghe nuove);
-            # prima e8a0c2d4f569 (pausa del lotto live a mercato chiuso).
+            # Head aggiornata a f3a5c7e9b1d4 (storico stagionale dei calciatori e Valore di
+            # mercato, 1.3); prima e9b1d3f5a672 (mercato chiuso di default per le leghe nuove).
             # Aggiornare questa costante ad ogni nuova migrazione in coda.
-            assert version == "e9b1d3f5a672"
+            assert version == "f3a5c7e9b1d4"
         assert named_statuses == ["pending", "accepted", "declined", "revoked", "expired"]
         assert calendar_statuses == ["draft", "confirmed"]
         assert fantasy_roles == ["P", "D", "C", "A"]
