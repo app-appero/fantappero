@@ -619,7 +619,8 @@ class LeagueService:
         )
         # Avviso «Lega eliminata» agli altri partecipanti, come per l'eliminazione da
         # operatore (QA 19/11): va scritto prima di eliminare la lega, finché le iscrizioni
-        # si possono ancora leggere, e nella stessa transazione dell'eliminazione.
+        # si possono ancora leggere, e nella stessa transazione dell'eliminazione. Anche
+        # gli invitati in attesa lo ricevono e perdono la notifica «Nuovo invito» (QA 22/11).
         notify_league_deleted(
             self._session, league=league, deleted_by_user_id=league_access.user.id
         )

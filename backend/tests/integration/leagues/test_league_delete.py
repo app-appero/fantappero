@@ -158,6 +158,91 @@ def test_admin_delete_notifies_other_participants(
     assert owner_notes == []
 
 
+def _make_available(db_session: Session, user_id: UUID) -> None:
+    from auth.models.user_profile import UserProfile
+
+    profile = db_session.scalars(select(UserProfile).where(UserProfile.user_id == user_id)).one()
+    profile.available_for_invites = True
+    db_session.commit()
+
+
+def _named_invite(client: TestClient, token: str, league_id: str, recipient_id: UUID) -> None:
+    response = client.post(
+        f"/leagues/{league_id}/amministrazione/inviti-nominativi",
+        headers={"Authorization": f"Bearer {token}"},
+        json={"recipientUserId": str(recipient_id)},
+    )
+    assert response.status_code in (200, 201), response.text
+
+
+def test_admin_delete_withdraws_pending_named_invites_and_tells_the_invitees(
+    client: TestClient,
+    db_session: Session,
+    competition_ids: list[str],
+) -> None:
+    """QA 21→22/11: la notifica «Nuovo invito» restava dopo l'eliminazione della lega e
+    portava a «Inviti ricevuti» vuoti; l'invitato non riceveva «Lega eliminata»."""
+    from datetime import UTC, datetime, timedelta
+
+    from leagues.models.named_league_invite import NamedLeagueInvite
+    from notifications.models import Notification
+
+    owner_token, owner_id = _register_and_login(client, "delete.invite.owner@example.com")
+    _, guest_id = _register_and_login(client, "delete.invite.guest@example.com")
+    _, late_id = _register_and_login(client, "delete.invite.late@example.com")
+    league_id = _create_league(client, owner_token, competition_ids, "Lega Con Inviti")
+    other_league_id = _create_league(client, owner_token, competition_ids, "Lega Che Resta")
+    for user_id in (guest_id, late_id):
+        _make_available(db_session, user_id)
+    _named_invite(client, owner_token, league_id, guest_id)
+    _named_invite(client, owner_token, league_id, late_id)
+    _named_invite(client, owner_token, other_league_id, guest_id)
+    # L'invito a «late» è scaduto ma non ancora segnato come tale.
+    late_invite = db_session.scalars(
+        select(NamedLeagueInvite).where(
+            NamedLeagueInvite.league_id == UUID(league_id),
+            NamedLeagueInvite.recipient_id == late_id,
+        )
+    ).one()
+    late_invite.created_at = datetime.now(UTC) - timedelta(days=10)
+    late_invite.expires_at = datetime.now(UTC) - timedelta(days=1)
+    db_session.commit()
+
+    def notes(user_id: UUID, template_key: str) -> list[Notification]:
+        return list(
+            db_session.scalars(
+                select(Notification).where(
+                    Notification.user_id == user_id,
+                    Notification.template_key == template_key,
+                )
+            ).all()
+        )
+
+    assert len(notes(guest_id, "sistema.invito_lega")) == 2
+    assert len(notes(late_id, "sistema.invito_lega")) == 1
+
+    response = client.delete(
+        f"/leagues/{league_id}",
+        headers={"Authorization": f"Bearer {owner_token}"},
+    )
+    assert response.status_code == 204
+
+    db_session.expire_all()
+    # Resta solo l'invito dell'altra lega, che c'è ancora.
+    guest_invites = notes(guest_id, "sistema.invito_lega")
+    assert len(guest_invites) == 1
+    assert "«Lega Che Resta»" in guest_invites[0].body
+    deleted = notes(guest_id, "lega.eliminata")
+    assert [note.body for note in deleted] == [
+        "La lega Lega Con Inviti è stata eliminata dall'amministratore della lega."
+    ]
+    assert deleted[0].deep_link == "/"
+    # Invito scaduto: la notifica si toglie, ma niente avviso per una lega che non lo riguarda più.
+    assert notes(late_id, "sistema.invito_lega") == []
+    assert notes(late_id, "lega.eliminata") == []
+    assert notes(owner_id, "lega.eliminata") == []
+
+
 def test_member_cannot_delete_league(
     client: TestClient,
     competition_ids: list[str],
